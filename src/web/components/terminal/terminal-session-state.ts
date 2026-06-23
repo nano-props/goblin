@@ -1,11 +1,11 @@
 import type { TerminalOutputEvent } from '#/shared/terminal-types.ts'
-import { createTerminalAttachmentSnapshot } from '#/web/components/terminal/types.ts'
+import { createTerminalClientSnapshot } from '#/web/components/terminal/types.ts'
 import type {
   TerminalPhase,
   TerminalProgressState,
   TerminalSearchResult,
   TerminalSnapshot,
-  TerminalAttachmentOwnershipViewModel,
+  TerminalClientOwnershipViewModel,
   TerminalOwnershipViewModel,
 } from '#/web/components/terminal/types.ts'
 export class TerminalSlotState {
@@ -17,7 +17,7 @@ export class TerminalSlotState {
     message: string | null
     processName: string
     canonicalTitle: string | null
-    attachmentOwnership: TerminalAttachmentOwnershipViewModel
+    clientOwnership: TerminalClientOwnershipViewModel
     canonicalSize: { cols: number; rows: number }
     takeoverPending: boolean
   } = {
@@ -25,7 +25,7 @@ export class TerminalSlotState {
     message: null,
     processName: 'terminal',
     canonicalTitle: null,
-    attachmentOwnership: {
+    clientOwnership: {
       role: 'controller',
       controllerStatus: 'connected',
     },
@@ -71,11 +71,11 @@ export class TerminalSlotState {
   }
 
   getCanResize(): boolean {
-    return this.runtimeState.phase === 'open' && this.runtimeState.attachmentOwnership.role === 'controller'
+    return this.runtimeState.phase === 'open' && this.runtimeState.clientOwnership.role === 'controller'
   }
 
-  getAttachmentOwnership(): TerminalAttachmentOwnershipViewModel {
-    return this.runtimeState.attachmentOwnership
+  getClientOwnership(): TerminalClientOwnershipViewModel {
+    return this.runtimeState.clientOwnership
   }
 
   getCanonicalSize(): { cols: number; rows: number } {
@@ -90,8 +90,8 @@ export class TerminalSlotState {
       canonicalTitle: this.runtimeState.canonicalTitle,
     }
     if (this.runtimeState.phase === 'open' && ptySessionId) {
-      snapshot.attachment = createTerminalAttachmentSnapshot({
-        ...this.runtimeState.attachmentOwnership,
+      snapshot.attachment = createTerminalClientSnapshot({
+        ...this.runtimeState.clientOwnership,
         canonicalCols: this.runtimeState.canonicalSize.cols,
         canonicalRows: this.runtimeState.canonicalSize.rows,
         phase: this.runtimeState.phase,
@@ -138,8 +138,8 @@ export class TerminalSlotState {
     message?: string | null
     processName: string
     canonicalTitle?: string | null
-    role: TerminalAttachmentOwnershipViewModel['role']
-    controllerStatus: TerminalAttachmentOwnershipViewModel['controllerStatus']
+    role: TerminalClientOwnershipViewModel['role']
+    controllerStatus: TerminalClientOwnershipViewModel['controllerStatus']
     canonicalCols: number
     canonicalRows: number
   }): boolean {
@@ -148,10 +148,10 @@ export class TerminalSlotState {
     changed = this.setProcessName(input.processName) || changed
     changed = this.setCanonicalTitle(input.canonicalTitle ?? null) || changed
     if (
-      this.runtimeState.attachmentOwnership.role !== input.role ||
-      this.runtimeState.attachmentOwnership.controllerStatus !== input.controllerStatus
+      this.runtimeState.clientOwnership.role !== input.role ||
+      this.runtimeState.clientOwnership.controllerStatus !== input.controllerStatus
     ) {
-      this.runtimeState.attachmentOwnership = { role: input.role, controllerStatus: input.controllerStatus }
+      this.runtimeState.clientOwnership = { role: input.role, controllerStatus: input.controllerStatus }
       changed = true
     }
     changed = this.setCanonicalSize(input.canonicalCols, input.canonicalRows) || changed
@@ -161,10 +161,10 @@ export class TerminalSlotState {
   applyOwnership(event: TerminalOwnershipViewModel): boolean {
     let changed = false
     if (
-      this.runtimeState.attachmentOwnership.role !== event.role ||
-      this.runtimeState.attachmentOwnership.controllerStatus !== event.controllerStatus
+      this.runtimeState.clientOwnership.role !== event.role ||
+      this.runtimeState.clientOwnership.controllerStatus !== event.controllerStatus
     ) {
-      this.runtimeState.attachmentOwnership = { role: event.role, controllerStatus: event.controllerStatus }
+      this.runtimeState.clientOwnership = { role: event.role, controllerStatus: event.controllerStatus }
       changed = true
     }
     changed = this.setCanonicalSize(event.canonicalCols, event.canonicalRows) || changed

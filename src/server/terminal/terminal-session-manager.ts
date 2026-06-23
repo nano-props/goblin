@@ -38,11 +38,11 @@ import {
   type TerminalRenderState,
 } from '#/server/terminal/terminal-render-state.ts'
 import {
-  markTerminalSessionClosed,
-  markTerminalSessionError,
-  markTerminalSessionOpen,
-  markTerminalSessionOpening,
-  markTerminalSessionRestarting,
+  markTerminalSlotClosed,
+  markTerminalSlotError,
+  markTerminalSlotOpen,
+  markTerminalSlotOpening,
+  markTerminalSlotRestarting,
 } from '#/server/terminal/terminal-session-lifecycle.ts'
 import type { PtyHandle, PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 
@@ -216,7 +216,7 @@ export class TerminalSlotManager<TUser extends string | number> {
     return true
   }
 
-  async attachSession(
+  async attachSlot(
     userId: TUser,
     ptySessionId: string,
     cols: number,
@@ -290,7 +290,7 @@ export class TerminalSlotManager<TUser extends string | number> {
     return this.takeoverResult(session)
   }
 
-  async restartSession(
+  async restartSlot(
     userId: TUser,
     ptySessionId: string,
     cols: number,
@@ -312,7 +312,7 @@ export class TerminalSlotManager<TUser extends string | number> {
     this.resetSessionState(session, size.cols, size.rows, 'restarting')
     const result = await this.spawnSessionPty(session)
     if (!result.ok) {
-      markTerminalSessionError(session, result.message)
+      markTerminalSlotError(session, result.message)
     }
     return result
   }
@@ -326,7 +326,7 @@ export class TerminalSlotManager<TUser extends string | number> {
   closeSlot(ptySessionId: string): void {
     const session = this.slotsByPtySessionId.get(ptySessionId)
     if (!session) return
-    markTerminalSessionClosed(session)
+    markTerminalSlotClosed(session)
     this.slotsByPtySessionId.delete(ptySessionId)
     const ownerKey = this.userSlotKey(session.userId, session.key)
     if (this.ptySessionIdByUserSlotKey.get(ownerKey) === ptySessionId) this.ptySessionIdByUserSlotKey.delete(ownerKey)
@@ -345,7 +345,7 @@ export class TerminalSlotManager<TUser extends string | number> {
     }
   }
 
-  setAttachmentConnected(userId: TUser, clientId: string, connected: boolean): void {
+  setClientConnected(userId: TUser, clientId: string, connected: boolean): void {
     for (const session of Array.from(this.slotsByPtySessionId.values())) {
       if (session.userId !== userId) continue
       this.applyOwnershipEffect(session, updateTerminalClientConnection(session, clientId, connected))
@@ -525,8 +525,8 @@ export class TerminalSlotManager<TUser extends string | number> {
     this.disposeSessionResources(session)
     session.cols = cols
     session.rows = rows
-    if (phase === 'restarting') markTerminalSessionRestarting(session)
-    else markTerminalSessionOpening(session)
+    if (phase === 'restarting') markTerminalSlotRestarting(session)
+    else markTerminalSlotOpening(session)
     resetRender(session.render, cols, rows)
     session.inputQueue = []
     session.inputFlushScheduled = false
@@ -537,7 +537,7 @@ export class TerminalSlotManager<TUser extends string | number> {
     // here. The caller decides what to do with a failed spawn:
     //   - `ensureSlot` removes the just-created session from the
     //     maps so the catalog doesn't surface a zombie on retry.
-    //   - `restartSession` keeps the session in the maps (the new
+    //   - `restartSlot` keeps the session in the maps (the new
     //     pty simply wasn't created) so a later retry can succeed.
     // In both cases the failed spawn itself does not need any
     // listener/pty cleanup — the spawn attempt never wired them.
@@ -558,7 +558,7 @@ export class TerminalSlotManager<TUser extends string | number> {
       return resolved
     }
     session.pty = resolved.handle
-    markTerminalSessionOpen(session)
+    markTerminalSlotOpen(session)
     const handle = resolved.handle
     const supervisor = this.ptySupervisor
     let lastBroadcastTitle: string | null = session.render.title
@@ -669,17 +669,17 @@ export function isValidTerminalWriteData(value: unknown): value is string {
 // keys. Lives next to the manager because the keys are the wire
 // protocol's; the decision function itself stays string-free so it
 // can be reused for non-IPC paths (e.g. internal supervisor logic).
-function authorityReasonToMessage(reason: 'not-controller' | 'session-unowned' | 'unknown-attachment'): string {
+function authorityReasonToMessage(reason: 'not-controller' | 'slot-unowned' | 'unknown-client'): string {
   switch (reason) {
     case 'not-controller':
       return 'error.not-controller'
-    case 'session-unowned':
+    case 'slot-unowned':
       // Unowned sessions must be explicitly taken over before they
       // can be restarted. The same error key is appropriate: a
       // different session already "owns" the recovery, even if the
       // controller slot is currently empty.
       return 'error.not-controller'
-    case 'unknown-attachment':
+    case 'unknown-client':
       return 'error.invalid-arguments'
   }
 }
@@ -695,7 +695,7 @@ function disposeSessionListeners<TUser extends string | number>(session: Termina
 }
 
 function createPtySessionId(): string {
-  return `term_${crypto.randomUUID()}`
+  return `pty_${crypto.randomUUID()}`
 }
 
 function parseWorktreePathFromKey(key: string): string | null {

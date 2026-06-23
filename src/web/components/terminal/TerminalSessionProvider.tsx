@@ -204,8 +204,8 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     // window) doesn't reattach to the orphan. The originating window
     // already disposed the local entry, so the handler is a no-op
     // there — the broadcast is multi-window safe by construction.
-    const offSessionClosed = terminalBridge.onSessionClosed((event) => {
-      registry.handleSessionClosed(event.ptySessionId)
+    const offSlotClosed = terminalBridge.onSlotClosed((event) => {
+      registry.handleSlotClosed(event.ptySessionId)
     })
 
     setTerminalSessionCommandBridge({
@@ -220,7 +220,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       offTitle()
       offExit()
       offOwnership()
-      offSessionClosed()
+      offSlotClosed()
     }
   }, [registry])
 

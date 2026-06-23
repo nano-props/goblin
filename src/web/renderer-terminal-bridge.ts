@@ -40,12 +40,12 @@ export interface RendererServerTerminalConfig {
   clientId: string
 }
 
-const WEB_TERMINAL_CLIENT_ID_STORAGE_KEY = 'goblin:web-terminal-attachment-id'
+const WEB_TERMINAL_CLIENT_ID_STORAGE_KEY = 'goblin:web-terminal-client-id'
 const TERMINAL_REQUEST_TIMEOUT_MS = 30_000
 
 export function createServerTerminalBridge(options: {
   getServerConfig: () => RendererServerTerminalConfig
-  getAttachmentId: () => string
+  getClientId: () => string
   // `notifyBell` returning `undefined` (rather than a `Promise<false>`)
   // is the *deliberate* signal to fall through to the bridge's
   // built-in browser-notification path. The renderer-bridge wrapper
@@ -68,8 +68,8 @@ export function createServerTerminalBridge(options: {
   const exitSubscribers = new Set<(event: TerminalExitEvent) => void>()
   const ownershipSubscribers = new Set<(event: TerminalOwnershipViewModel) => void>()
   const sessionsChangedSubscribers = new Set<(repoRoot: string) => void>()
-  const sessionClosedSubscribers = new Set<(event: { ptySessionId: string; repoRoot: string }) => void>()
-  const clientId = options.getAttachmentId()
+  const slotClosedSubscribers = new Set<(event: { ptySessionId: string; repoRoot: string }) => void>()
+  const clientId = options.getClientId()
   let socket: WebSocket | null = null
   let reconnectTimer: number | null = null
   let manualSocketClose = false
@@ -84,7 +84,7 @@ export function createServerTerminalBridge(options: {
       exitSubscribers.size > 0 ||
       ownershipSubscribers.size > 0 ||
       sessionsChangedSubscribers.size > 0 ||
-      sessionClosedSubscribers.size > 0
+      slotClosedSubscribers.size > 0
     )
   }
 
@@ -183,7 +183,7 @@ export function createServerTerminalBridge(options: {
       } else if (message.type === 'sessions-changed') {
         for (const subscriber of sessionsChangedSubscribers) subscriber(message.repoRoot)
       } else if (message.type === 'slot-closed') {
-        for (const subscriber of sessionClosedSubscribers)
+        for (const subscriber of slotClosedSubscribers)
           subscriber({ ptySessionId: message.ptySessionId, repoRoot: message.repoRoot })
       } else {
         const ownershipEvent = {
@@ -293,7 +293,7 @@ export function createServerTerminalBridge(options: {
         .catch(() => {})
     },
     getSlotSnapshot(input) {
-      return requestOverSocket('session-snapshot', input satisfies TerminalSlotSnapshotInput).then((value) => {
+      return requestOverSocket('slot-snapshot', input satisfies TerminalSlotSnapshotInput).then((value) => {
         if (value === null) return null
         const snapshot = normalizeTerminalSlotSnapshot(value)
         if (!snapshot) throw new Error('Terminal socket response failed: invalid terminal session snapshot response')
@@ -367,12 +367,12 @@ export function createServerTerminalBridge(options: {
         closeSocketIfIdle()
       }
     },
-    onSessionClosed(cb) {
-      sessionClosedSubscribers.add(cb)
+    onSlotClosed(cb) {
+      slotClosedSubscribers.add(cb)
       manualSocketClose = false
       ensureSocket()
       return () => {
-        sessionClosedSubscribers.delete(cb)
+        slotClosedSubscribers.delete(cb)
         closeSocketIfIdle()
       }
     },
@@ -403,7 +403,7 @@ export function createServerTerminalBridge(options: {
     input: { repoRoot: string },
   ): Promise<TerminalSlotSummary[]>
   async function requestOverSocket(
-    action: 'session-snapshot',
+    action: 'slot-snapshot',
     input: TerminalSlotSnapshotInput,
   ): Promise<TerminalSlotSnapshot | null>
   async function requestOverSocket(

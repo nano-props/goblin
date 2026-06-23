@@ -145,8 +145,8 @@ function makeCreateResult(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     ok: true as const,
     action: 'created' as const,
-    key: `${REPO_ROOT}\0${WORKTREE_PATH}\0terminal-1`,
-    ptySessionId: 'session-1',
+    key: `${REPO_ROOT}\0${WORKTREE_PATH}\0slot-1`,
+    ptySessionId: 'pty_session_1_aaaaaaaaa',
     processName: 'zsh',
     canonicalTitle: null,
     phase: 'open' as const,
@@ -158,8 +158,8 @@ function makeCreateResult(overrides: Partial<Record<string, unknown>> = {}) {
     canonicalRows: 31,
     sessions: [
       {
-        ptySessionId: 'session-1',
-        key: `${REPO_ROOT}\0${WORKTREE_PATH}\0terminal-1`,
+        ptySessionId: 'pty_session_1_aaaaaaaaa',
+        key: `${REPO_ROOT}\0${WORKTREE_PATH}\0slot-1`,
         cwd: WORKTREE_PATH,
         controller: { clientId: 'client_local', status: 'connected' as const },
         processName: 'zsh',
@@ -246,7 +246,7 @@ describe('TerminalSessionRegistry create flow', () => {
     expect(registry.worktreeSnapshot(WORKTREE_KEY).count).toBe(0)
 
     resolve(makeCreateResult())
-    await expect(pending).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0terminal-1`)
+    await expect(pending).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0slot-1`)
     expect(registry.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
     expect(registry.worktreeSnapshot(WORKTREE_KEY).count).toBe(1)
   })
@@ -274,7 +274,7 @@ describe('TerminalSessionRegistry create flow', () => {
     document.body.appendChild(host)
     registry.registerHost(WORKTREE_KEY, host)
 
-    await expect(pending).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0terminal-1`)
+    await expect(pending).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0slot-1`)
     expect(mocks.createMock).toHaveBeenCalledTimes(1)
     expect(mocks.createMock).toHaveBeenCalledWith({
       repoRoot: REPO_ROOT,
@@ -385,7 +385,7 @@ describe('TerminalSessionRegistry create flow', () => {
 
     // Both promises settle eventually.
     await expect(closePromise).resolves.toBeUndefined()
-    await expect(createPromise).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0terminal-1`)
+    await expect(createPromise).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0slot-1`)
 
     // Close is awaited before create. Without the durable-close
     // guard, create would resolve first because the close promise
@@ -417,7 +417,7 @@ describe('TerminalSessionRegistry create flow', () => {
     // The next create proceeds normally.
     await expect(
       registry.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH }),
-    ).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0terminal-1`)
+    ).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0slot-1`)
     expect(mocks.createMock).toHaveBeenCalledTimes(1)
   })
 
@@ -468,10 +468,10 @@ describe('TerminalSessionRegistry create flow', () => {
     expect((registry as any).pendingCloseBySessionId.size).toBe(0)
   })
 
-  test('durable close: handleSessionClosed drops the matching local session', async () => {
+  test('durable close: handleSlotClosed drops the matching local session', async () => {
     // The server emits a session-closed broadcast when window A
     // closes a session. Sibling windows route the event into
-    // handleSessionClosed to drop the local entry without a
+    // handleSlotClosed to drop the local entry without a
     // full reconcile.
     const host = document.createElement('div')
     document.body.appendChild(host)
@@ -480,7 +480,7 @@ describe('TerminalSessionRegistry create flow', () => {
 
     expect(registry.worktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
 
-    registry.handleSessionClosed('session-1')
+    registry.handleSlotClosed('pty_session_1_aaaaaaaaa')
 
     // The local session is gone; the worktree snapshot is empty.
     expect(registry.worktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(0)

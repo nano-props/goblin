@@ -370,12 +370,12 @@ describe('explainAuthority', () => {
     const unownedState = createState({
       attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]),
     })
-    expect(explainAuthority(unownedState, 'a1', 'write')).toBe('session-unowned')
+    expect(explainAuthority(unownedState, 'a1', 'write')).toBe('slot-unowned')
 
     const unknownState = createState({
       attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]),
       controller: { clientId: 'a1', status: 'connected' },
     })
-    expect(explainAuthority(unknownState, 'a-unknown', 'write')).toBe('unknown-attachment')
+    expect(explainAuthority(unknownState, 'a-unknown', 'write')).toBe('unknown-client')
   })
 })

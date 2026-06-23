@@ -1,8 +1,8 @@
 import { describe, expect, test, vi } from 'vitest'
 import { TerminalRealtimeBroker } from '#/server/terminal/terminal-realtime-broker.ts'
 
-const OWNER_A = 'owner_a'
-const OWNER_B = 'owner_b'
+const USER_A = 'user_a'
+const USER_B = 'user_b'
 
 describe('terminal realtime broker', () => {
   test('disconnectAll closes registered sockets and clears connection state', () => {
@@ -14,15 +14,15 @@ describe('terminal realtime broker', () => {
     const first = { send: vi.fn(), close: vi.fn() }
     const second = { send: vi.fn(), close: vi.fn() }
 
-    broker.registerSocket('client_1_a', OWNER_A, first)
-    broker.registerSocket('client_1_b', OWNER_A, second)
+    broker.registerSocket('client_1_a', USER_A, first)
+    broker.registerSocket('client_1_b', USER_A, second)
     broker.disconnectAll()
 
     expect(first.close).toHaveBeenCalledWith(1001, 'server shutting down')
     expect(second.close).toHaveBeenCalledWith(1001, 'server shutting down')
-    expect(broker.hasOwnerSockets(OWNER_A)).toBe(false)
-    expect(broker.isClientConnected(OWNER_A, 'client_a')).toBe(false)
-    expect(broker.isClientConnected(OWNER_A, 'client_b')).toBe(false)
+    expect(broker.hasOwnerSockets(USER_A)).toBe(false)
+    expect(broker.isClientConnected(USER_A, 'client_a')).toBe(false)
+    expect(broker.isClientConnected(USER_A, 'client_b')).toBe(false)
   })
 
   test('broadcastToOwner fans out to every clientId sharing the same userId', () => {
@@ -36,10 +36,10 @@ describe('terminal realtime broker', () => {
     // Two clientIds (Electron and Chrome on the same host share the
     // same access token → same userId) registered as separate WS
     // sockets.
-    broker.registerSocket('client_electron_a', OWNER_A, electronSocket)
-    broker.registerSocket('client_chrome_b', OWNER_A, chromeSocket)
+    broker.registerSocket('client_electron_a', USER_A, electronSocket)
+    broker.registerSocket('client_chrome_b', USER_A, chromeSocket)
 
-    broker.broadcastToOwner(OWNER_A, {
+    broker.broadcastToOwner(USER_A, {
       type: 'output',
       event: { ptySessionId: 's_1', data: 'hi', seq: 1, processName: 'zsh' },
     })
@@ -70,10 +70,10 @@ describe('terminal realtime broker', () => {
     })
     const ownerASocket = { send: vi.fn(), close: vi.fn() }
     const ownerBSocket = { send: vi.fn(), close: vi.fn() }
-    broker.registerSocket('client_a_a', OWNER_A, ownerASocket)
-    broker.registerSocket('client_b_a', OWNER_B, ownerBSocket)
+    broker.registerSocket('client_a_a', USER_A, ownerASocket)
+    broker.registerSocket('client_b_a', USER_B, ownerBSocket)
 
-    broker.broadcastToOwner(OWNER_A, {
+    broker.broadcastToOwner(USER_A, {
       type: 'output',
       event: { ptySessionId: 's_1', data: 'a', seq: 1, processName: 'zsh' },
     })
@@ -90,19 +90,19 @@ describe('terminal realtime broker', () => {
     })
     const ownerASocket = { send: vi.fn(), close: vi.fn() }
     const ownerBSocket = { send: vi.fn(), close: vi.fn() }
-    broker.registerSocket('client_shared_a', OWNER_A, ownerASocket)
-    broker.registerSocket('client_shared_b', OWNER_B, ownerBSocket)
+    broker.registerSocket('client_shared_a', USER_A, ownerASocket)
+    broker.registerSocket('client_shared_b', USER_B, ownerBSocket)
 
-    broker.broadcastToOwner(OWNER_A, {
+    broker.broadcastToOwner(USER_A, {
       type: 'output',
       event: { ptySessionId: 's_1', data: 'a', seq: 1, processName: 'zsh' },
     })
 
     expect(ownerASocket.send).toHaveBeenCalledTimes(1)
     expect(ownerBSocket.send).not.toHaveBeenCalled()
-    expect(broker.isClientConnected(OWNER_A, 'client_shared_a')).toBe(true)
-    expect(broker.isClientConnected(OWNER_B, 'client_shared_b')).toBe(true)
-    expect(broker.isClientConnected(OWNER_A, 'client_shared_b')).toBe(false)
+    expect(broker.isClientConnected(USER_A, 'client_shared_a')).toBe(true)
+    expect(broker.isClientConnected(USER_B, 'client_shared_b')).toBe(true)
+    expect(broker.isClientConnected(USER_A, 'client_shared_b')).toBe(false)
   })
 
   test('unregisterSocket removes the socket from owner fanout', () => {
@@ -112,15 +112,15 @@ describe('terminal realtime broker', () => {
       onOwnerDisconnected: vi.fn(),
     })
     const socket = { send: vi.fn(), close: vi.fn() }
-    broker.registerSocket('client_1_a', OWNER_A, socket)
+    broker.registerSocket('client_1_a', USER_A, socket)
     broker.unregisterSocket(socket)
 
     // After the last socket for `client_1` is gone, a
-    // `broadcastToOwner` for OWNER_A must not attempt to send to
+    // `broadcastToOwner` for USER_A must not attempt to send to
     // the now-empty owner set. We assert the side effect by
     // checking the WS was not closed and the broadcast is a no-op.
     expect(socket.close).not.toHaveBeenCalled()
-    broker.broadcastToOwner(OWNER_A, {
+    broker.broadcastToOwner(USER_A, {
       type: 'output',
       event: { ptySessionId: 's_1', data: 'a', seq: 1, processName: 'zsh' },
     })
@@ -134,17 +134,17 @@ describe('terminal realtime broker', () => {
       onOwnerDisconnected: vi.fn(),
     })
     const socket = { send: vi.fn(), close: vi.fn() }
-    broker.registerSocket('client_a_a', OWNER_A, socket)
-    broker.registerSocket('client_b_b', OWNER_B, socket)
+    broker.registerSocket('client_a_a', USER_A, socket)
+    broker.registerSocket('client_b_b', USER_B, socket)
 
-    expect(broker.isClientConnected(OWNER_A, 'client_a_a')).toBe(false)
-    expect(broker.isClientConnected(OWNER_B, 'client_b_b')).toBe(true)
+    expect(broker.isClientConnected(USER_A, 'client_a_a')).toBe(false)
+    expect(broker.isClientConnected(USER_B, 'client_b_b')).toBe(true)
 
-    broker.broadcastToOwner(OWNER_A, {
+    broker.broadcastToOwner(USER_A, {
       type: 'output',
       event: { ptySessionId: 's_1', data: 'a', seq: 1, processName: 'zsh' },
     })
-    broker.broadcastToOwner(OWNER_B, {
+    broker.broadcastToOwner(USER_B, {
       type: 'output',
       event: { ptySessionId: 's_1', data: 'b', seq: 2, processName: 'zsh' },
     })
@@ -163,8 +163,8 @@ describe('terminal realtime broker', () => {
       onOwnerDisconnected: vi.fn(),
     })
     const socket = { send: vi.fn(), close: vi.fn() }
-    broker.registerSocket('client_1_a', OWNER_A, socket)
-    expect(onClientConnected).toHaveBeenCalledWith('client_1_a', OWNER_A)
+    broker.registerSocket('client_1_a', USER_A, socket)
+    expect(onClientConnected).toHaveBeenCalledWith('client_1_a', USER_A)
   })
 
   test('onOwnerDisconnected waits for the last socket under that owner', () => {
@@ -176,13 +176,13 @@ describe('terminal realtime broker', () => {
     })
     const first = { send: vi.fn(), close: vi.fn() }
     const second = { send: vi.fn(), close: vi.fn() }
-    broker.registerSocket('client_1_a', OWNER_A, first)
-    broker.registerSocket('client_2_b', OWNER_A, second)
+    broker.registerSocket('client_1_a', USER_A, first)
+    broker.registerSocket('client_2_b', USER_A, second)
 
     broker.unregisterSocket(first)
     expect(onOwnerDisconnected).not.toHaveBeenCalled()
 
     broker.unregisterSocket(second)
-    expect(onOwnerDisconnected).toHaveBeenCalledWith(OWNER_A)
+    expect(onOwnerDisconnected).toHaveBeenCalledWith(USER_A)
   })
 })

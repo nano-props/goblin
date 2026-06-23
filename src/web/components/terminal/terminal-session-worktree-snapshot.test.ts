@@ -50,7 +50,7 @@ function makeSession(
 
 describe('terminal session worktree snapshot helper', () => {
   test('builds summaries and populates snapshot cache lazily', () => {
-    const descriptor = makeDescriptor('terminal-1', 1)
+    const descriptor = makeDescriptor('slot-1', 1)
     const session = makeSession(descriptor, {
       phase: 'open',
       message: null,
@@ -79,7 +79,7 @@ describe('terminal session worktree snapshot helper', () => {
           type: 'terminal',
           id: descriptor.key,
           key: descriptor.key,
-          slotId: 'terminal-1',
+          slotId: 'slot-1',
           selected: true,
           hasBell: true,
           phase: 'open',

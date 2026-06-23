@@ -33,7 +33,7 @@ export function createTerminalRuntimeCoordinator(
   const broker = new TerminalRealtimeBroker({
     onClientConnected(clientId, userId) {
       connectionState.clearOwnerDisconnect(userId)
-      manager.setAttachmentConnected(userId, clientId, true)
+      manager.setClientConnected(userId, clientId, true)
     },
     onClientDisconnected(clientId, userId) {
       // Disconnect is immediate: the controller slot clears on
@@ -41,7 +41,7 @@ export function createTerminalRuntimeCoordinator(
       // auto-claims (see `terminal-ownership.ts`). The detached TTL
       // is the only timer we still schedule on disconnect — it
       // covers the "all sockets gone, drop the catalog" path.
-      manager.setAttachmentConnected(userId, clientId, false)
+      manager.setClientConnected(userId, clientId, false)
       connectionState.scheduleOwnerDisconnect(userId, () => broker.hasOwnerSockets(userId))
     },
     onOwnerDisconnected(userId) {

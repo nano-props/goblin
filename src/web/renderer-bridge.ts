@@ -5,7 +5,7 @@ import type { RendererShellBridge, RendererBridge, RendererTerminalBridge } from
 import { readNativeBridge } from '#/web/native-bridge.ts'
 import { createHttpClipboardBackend } from '#/web/clipboard/http-backend.ts'
 import {
-  emptyRendererBridgeBootstrap as emptyBootstrapSnapshot,
+  emptyBootstrapSnapshot,
   normalizeRendererServerClientId,
   readWebBootstrap,
 } from '#/web/renderer-bootstrap-bridge.ts'
@@ -14,8 +14,6 @@ import {
   readOrCreateWebTerminalClientId,
   type RendererServerTerminalConfig,
 } from '#/web/renderer-terminal-bridge.ts'
-
-// const _WEB_TERMINAL_CLIENT_ID_STORAGE_KEY = 'goblin:web-terminal-client-id' // deprecated: identity moved to sessionStorage
 
 /**
  * Compute the renderer's capability set from the live `goblinNative`
@@ -98,7 +96,7 @@ let memoizedTerminalBridge: RendererTerminalBridge | null = null
 function getOrCreateTerminalBridge(): RendererTerminalBridge {
   if (memoizedTerminalBridge) return memoizedTerminalBridge
   memoizedTerminalBridge = createServerTerminalBridge({
-    getAttachmentId: readOrCreateWebTerminalClientId,
+    getClientId: readOrCreateWebTerminalClientId,
     getServerConfig() {
       const server = readServerTerminalConfig()
       if (!server) throw new Error('Renderer terminal bridge is unavailable')
@@ -257,16 +255,4 @@ export function getRendererBridge(): RendererBridge {
 let testOverride: RendererBridge | null = null
 export function setRendererBridgeForTests(bridge: RendererBridge | null): void {
   testOverride = bridge
-}
-
-function readOrCreateWebTerminalClientId_REMOVED(): string {
-  // DEPRECATED — identity persistence moved to sessionStorage; this
-  // localStorage-backed variant exists only for backward-compat reads.
-  // New writes go through `readOrCreateWebTerminalClientId` imported
-  // from `renderer-terminal-bridge.ts`.
-  return ''
-}
-
-export function emptyRendererBridgeBootstrap(): RendererBootstrapSnapshot {
-  return emptyBootstrapSnapshot()
 }

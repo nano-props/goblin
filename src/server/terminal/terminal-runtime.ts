@@ -107,14 +107,14 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     catalog,
     isValidTerminalClientId,
     // The previous stub returned `true` whenever an clientId
-    // was present (see `resolveAttachmentConnected` before this
+    // was present (see `resolveClientConnected` before this
     // plan), which made the takeover path "work" for the first
     // browser tab but masked the fact that we never asked the
     // broker. Replacing with the broker check ensures a takeover
     // request from a brand-new tab (the cross-browser scenario)
     // only counts the attachment as connected if the WS is
     // actually alive for the (userId, clientId) pair.
-    resolveAttachmentConnected(userId, clientId) {
+    resolveClientConnected(userId, clientId) {
       return broker.isClientConnected(userId, clientId) ?? false
     },
   })

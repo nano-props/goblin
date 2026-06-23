@@ -58,7 +58,7 @@ function terminalHandlerNameForSocketAction(action: string): keyof TerminalBridg
       return 'terminal.prune'
     case 'list-sessions':
       return 'terminal.listSessions'
-    case 'session-snapshot':
+    case 'slot-snapshot':
       return 'terminal.getSlotSnapshot'
     default:
       return null
@@ -390,7 +390,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       onExit: () => () => {},
       onOwnership: () => () => {},
       onSessionsChanged: () => () => {},
-      onSessionClosed: () => () => {},
+      onSlotClosed: () => () => {},
     }),
   })
   vi.stubGlobal(

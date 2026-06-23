@@ -31,7 +31,7 @@ import type { TerminalTakeoverResult } from '#/shared/terminal-types.ts'
  * right toast can be shown (and to logs so the failure mode is
  * diagnosable from production).
  *
- * - `session-closed` — gate-internal: the runtime no longer has a
+ * - `slot-closed` — gate-internal: the runtime no longer has a
  *   ptySessionId, or the session was disposed mid-call. The takeover
  *   round-trip never started.
  * - `no-bridge` — gate-internal: the renderer bridge is unavailable
@@ -51,7 +51,7 @@ export type AuthorizationDenialReason =
   | 'slot-closed'
   | 'no-bridge'
   | 'session-unknown'
-  | 'attachment-offline'
+  | 'client-offline'
   | 'takeover-rejected'
 
 export type AuthorizationResult =
@@ -130,7 +130,7 @@ interface XtermAuthorityGateOptions {
 export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): TerminalAuthorityGate {
   let role: 'controller' | 'viewer' | 'unowned' = 'unowned'
 
-  function readAttachmentId(): string {
+  function readClientId(): string {
     return readOrCreateWebTerminalClientId()
   }
 
@@ -199,7 +199,7 @@ export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): Termi
         ptySessionId,
         cols: size.cols,
         rows: size.rows,
-        clientId: readAttachmentId(),
+        clientId: readClientId(),
       })
     } catch (err) {
       return deny('no-bridge', 'bridge', { ptySessionId, err })
@@ -237,7 +237,7 @@ export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): Termi
  * message key can land without a renderer change.
  */
 function classifyTakeoverRejection(message: string): AuthorizationDenialReason {
-  if (message === 'error.unavailable') return 'attachment-offline'
+  if (message === 'error.unavailable') return 'client-offline'
   if (message === 'error.invalid-arguments') return 'session-unknown'
   return 'takeover-rejected'
 }

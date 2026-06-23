@@ -23,7 +23,7 @@ describe('shared terminal validators', () => {
   })
 
   test('validates attachment ids and bell payloads', () => {
-    expect(isValidTerminalPtySessionId('term_1234567890abcdef')).toBe(true)
+    expect(isValidTerminalPtySessionId('pty_1234567890abcdef')).toBe(true)
     expect(isValidTerminalPtySessionId('short')).toBe(false)
     expect(isValidTerminalPtySessionId('bad id')).toBe(false)
 
@@ -62,13 +62,13 @@ describe('shared terminal validators', () => {
         type: 'request',
         requestId: 'req_1',
         action: 'attach',
-        input: { ptySessionId: 'term_1234567890abcdef', cols: 80, rows: 24, clientId: 'client_a' },
+        input: { ptySessionId: 'pty_1234567890abcdef', cols: 80, rows: 24, clientId: 'client_a' },
       }),
     ).toEqual({
       type: 'request',
       requestId: 'req_1',
       action: 'attach',
-      input: { ptySessionId: 'term_1234567890abcdef', cols: 80, rows: 24, clientId: 'client_a' },
+      input: { ptySessionId: 'pty_1234567890abcdef', cols: 80, rows: 24, clientId: 'client_a' },
     })
 
     expect(
@@ -76,7 +76,7 @@ describe('shared terminal validators', () => {
         type: 'request',
         requestId: 'bad id',
         action: 'attach',
-        input: { ptySessionId: 'term_1234567890abcdef', cols: 80, rows: 24 },
+        input: { ptySessionId: 'pty_1234567890abcdef', cols: 80, rows: 24 },
       }),
     ).toBeNull()
   })
@@ -85,11 +85,11 @@ describe('shared terminal validators', () => {
     expect(
       normalizeTerminalSocketServerMessage({
         type: 'output',
-        event: { ptySessionId: 'term_1234567890abcdef', data: 'hi', seq: 1, processName: 'zsh' },
+        event: { ptySessionId: 'pty_1234567890abcdef', data: 'hi', seq: 1, processName: 'zsh' },
       }),
     ).toEqual({
       type: 'output',
-      event: { ptySessionId: 'term_1234567890abcdef', data: 'hi', seq: 1, processName: 'zsh' },
+      event: { ptySessionId: 'pty_1234567890abcdef', data: 'hi', seq: 1, processName: 'zsh' },
     })
 
     expect(
@@ -106,12 +106,12 @@ describe('shared terminal validators', () => {
     expect(
       normalizeTerminalSocketServerMessage({
         type: 'slot-closed',
-        ptySessionId: 'session-1',
+        ptySessionId: 'pty_session_1_aaaaaaaaa',
         repoRoot: '/repo',
       }),
     ).toEqual({
       type: 'slot-closed',
-      ptySessionId: 'session-1',
+      ptySessionId: 'pty_session_1_aaaaaaaaa',
       repoRoot: '/repo',
     })
   })

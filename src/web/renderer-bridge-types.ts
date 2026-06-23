@@ -71,7 +71,7 @@ export interface RendererTerminalBridge {
    * see the previous shell's `Restored session: …` line print twice"
    * bug, where a lost close request left the server PTY alive.
    */
-  onSessionClosed: (cb: (event: { ptySessionId: string; repoRoot: string }) => void) => () => void
+  onSlotClosed: (cb: (event: { ptySessionId: string; repoRoot: string }) => void) => () => void
 }
 
 export interface RendererShellBridge {

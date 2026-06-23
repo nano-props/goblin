@@ -13,7 +13,7 @@ interface TerminalBrokerOptions {
 
 export class TerminalRealtimeBroker {
   private readonly options: TerminalBrokerOptions
-  private readonly socketsByOwnerId = new Map<string, Set<TerminalRealtimeSocket>>()
+  private readonly socketsByUserId = new Map<string, Set<TerminalRealtimeSocket>>()
   private readonly socketMetaBySocket = new Map<
     TerminalRealtimeSocket,
     { clientId: string; userId: string }
@@ -26,10 +26,10 @@ export class TerminalRealtimeBroker {
 
   registerSocket(clientId: string, userId: string, socket: TerminalRealtimeSocket): void {
     if (this.socketMetaBySocket.has(socket)) this.unregisterSocket(socket)
-    let sockets = this.socketsByOwnerId.get(userId)
+    let sockets = this.socketsByUserId.get(userId)
     if (!sockets) {
       sockets = new Set()
-      this.socketsByOwnerId.set(userId, sockets)
+      this.socketsByUserId.set(userId, sockets)
     }
     sockets.add(socket)
     this.socketMetaBySocket.set(socket, { clientId, userId })
@@ -43,7 +43,7 @@ export class TerminalRealtimeBroker {
     const meta = this.socketMetaBySocket.get(socket)
     if (!meta) return
     const { clientId, userId } = meta
-    const sockets = this.socketsByOwnerId.get(userId)
+    const sockets = this.socketsByUserId.get(userId)
     if (!sockets?.has(socket)) return
     sockets.delete(socket)
     this.socketMetaBySocket.delete(socket)
@@ -54,19 +54,19 @@ export class TerminalRealtimeBroker {
       this.options.onClientDisconnected(clientId, userId)
     } else this.socketCountByUserClientKey.set(attachmentKey, nextCount)
     if (sockets.size > 0) return
-    this.socketsByOwnerId.delete(userId)
+    this.socketsByUserId.delete(userId)
     this.options.onOwnerDisconnected(userId)
   }
 
   // Fan out to every clientId that authenticates with the same
   // `userId`. This is the cross-tab path: when the live PTY
   // produces an output event under one clientId, a sibling tab
-  // (same access token, different `clientId` from localStorage)
+  // (same access token, different `clientId` from sessionStorage)
   // receives the same event without needing a new attach roundtrip.
   // The terminal sink callback decides which event type triggers
   // this fanout (output, title, exit, ownership).
   broadcastToOwner(userId: string, message: TerminalRealtimeMessage): void {
-    const sockets = this.socketsByOwnerId.get(userId)
+    const sockets = this.socketsByUserId.get(userId)
     if (!sockets || sockets.size === 0) return
     const payload = JSON.stringify(message)
     for (const socket of Array.from(sockets)) this.sendOrUnregister(socket, payload)
@@ -78,24 +78,24 @@ export class TerminalRealtimeBroker {
   }
 
   hasOwnerSockets(userId: string): boolean {
-    return (this.socketsByOwnerId.get(userId)?.size ?? 0) > 0
+    return (this.socketsByUserId.get(userId)?.size ?? 0) > 0
   }
 
   socketCount(): number {
     let total = 0
-    for (const sockets of this.socketsByOwnerId.values()) total += sockets.size
+    for (const sockets of this.socketsByUserId.values()) total += sockets.size
     return total
   }
 
   disconnectAll(): void {
-    for (const sockets of this.socketsByOwnerId.values()) {
+    for (const sockets of this.socketsByUserId.values()) {
       for (const socket of Array.from(sockets)) {
         try {
           socket.close(1001, 'server shutting down')
         } catch {}
       }
     }
-    this.socketsByOwnerId.clear()
+    this.socketsByUserId.clear()
     this.socketMetaBySocket.clear()
     this.socketCountByUserClientKey.clear()
   }

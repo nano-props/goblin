@@ -10,10 +10,10 @@ import type { WorkspacePaneViewSummary } from '#/web/components/terminal/types.t
 
 const terminalView: WorkspacePaneViewSummary = {
   type: 'terminal',
-  id: 'terminal-1',
-  key: 'terminal-1',
+  id: 'slot-1',
+  key: 'slot-1',
   worktreeTerminalKey: 'repo\0worktree',
-  slotId: 'terminal-1',
+  slotId: 'slot-1',
   index: 1,
   displayOrder: 1,
   title: 'terminal 1',
@@ -24,8 +24,8 @@ const terminalView: WorkspacePaneViewSummary = {
 
 describe('workspace pane view model', () => {
   test('builds stable identities for runtime and static workspace pane views', () => {
-    expect(workspacePaneViewIdentity(terminalView)).toBe('terminal:terminal-1')
-    expect(terminalWorkspacePaneViewIdentity('terminal-1')).toBe('terminal:terminal-1')
+    expect(workspacePaneViewIdentity(terminalView)).toBe('terminal:slot-1')
+    expect(terminalWorkspacePaneViewIdentity('slot-1')).toBe('terminal:slot-1')
     expect(staticWorkspacePaneViewIdentity('status')).toBe('status:status')
     expect(staticWorkspacePaneViewIdentity('changes')).toBe('changes:changes')
   })

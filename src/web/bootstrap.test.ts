@@ -173,7 +173,7 @@ describe('renderer bootstrap', () => {
                 ok: true as const,
                 action: 'reused' as const,
                 key: 'repo\0worktree\0slot-1',
-                ptySessionId: 'session-1',
+                ptySessionId: 'pty_session_1_aaaaaaaaa',
                 processName: 'zsh',
                 canonicalTitle: null,
                 phase: 'open' as const,
@@ -189,7 +189,7 @@ describe('renderer bootstrap', () => {
                 ok: true as const,
                 action: 'created' as const,
                 key: 'repo\0worktree\0slot-2',
-                ptySessionId: 'session-2',
+                ptySessionId: 'pty_session_2_aaaaaaaaa',
                 processName: 'zsh',
                 canonicalTitle: null,
                 phase: 'open' as const,
@@ -214,7 +214,7 @@ describe('renderer bootstrap', () => {
         onExit: () => () => {},
         onOwnership: () => () => {},
         onSessionsChanged: () => () => {},
-        onSessionClosed: () => () => {},
+        onSlotClosed: () => () => {},
       }),
     })
 

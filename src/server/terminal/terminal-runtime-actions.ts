@@ -34,7 +34,7 @@ interface TerminalRuntimeActionDependencies {
   broker: Pick<TerminalRealtimeBroker, 'broadcastToOwner'>
   catalog: TerminalCatalogLike
   isValidTerminalClientId(value: unknown): value is string
-  resolveAttachmentConnected(userId: string, clientId?: string): boolean | undefined
+  resolveClientConnected(userId: string, clientId?: string): boolean | undefined
 }
 
 // Manager, broker, and catalog all use `userId` as the terminal
@@ -42,7 +42,7 @@ interface TerminalRuntimeActionDependencies {
 // identifier, but it must not decide session visibility or lifecycle
 // fanout.
 export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependencies) {
-  const { manager, broker, catalog, isValidTerminalClientId, resolveAttachmentConnected } = deps
+  const { manager, broker, catalog, isValidTerminalClientId, resolveClientConnected } = deps
 
   return {
     async attach(clientId: string, userId: string, input: TerminalAttachInput): Promise<TerminalAttachResult> {
@@ -54,13 +54,13 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         return { ok: false, message: 'error.invalid-arguments' }
       }
       const slotClientId = input.clientId ?? clientId
-      const result = await manager.attachSession(
+      const result = await manager.attachSlot(
         userId,
         input.ptySessionId,
         input.cols,
         input.rows,
         slotClientId,
-        resolveAttachmentConnected(userId, slotClientId),
+        resolveClientConnected(userId, slotClientId),
       )
       return result
     },
@@ -75,13 +75,13 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         return { ok: false, message: 'error.invalid-arguments' }
       }
       const slotClientId = input.clientId ?? clientId
-      const result = await manager.restartSession(
+      const result = await manager.restartSlot(
         userId,
         input.ptySessionId,
         input.cols,
         input.rows,
         slotClientId,
-        resolveAttachmentConnected(userId, slotClientId),
+        resolveClientConnected(userId, slotClientId),
       )
       if (repoRoot) broadcastRepoSessionsChanged(userId, repoRoot)
       return result
@@ -126,7 +126,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         input.cols,
         input.rows,
         slotClientId,
-        resolveAttachmentConnected(userId, slotClientId),
+        resolveClientConnected(userId, slotClientId),
       )
     },
 
@@ -145,7 +145,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         : false
       if (closed && repoRoot) {
         // `sessions-changed` keeps the full repo list in sync for
-        // observers that only watch that primitive. `session-closed`
+        // observers that only watch that primitive. `slot-closed`
         // is the immediate invalidation for any sibling window under
         // the same owner. Other owners must not hear about this
         // session id.
@@ -174,7 +174,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         input.cols,
         input.rows,
         slotClientId,
-        resolveAttachmentConnected(userId, slotClientId),
+        resolveClientConnected(userId, slotClientId),
       )
     },
 

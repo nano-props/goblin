@@ -8,7 +8,7 @@ describe('TerminalSessionRuntime', () => {
     runtime.applyAttachResult(
       {
         ok: true,
-        ptySessionId: 'session-1',
+        ptySessionId: 'pty_session_1_aaaaaaaaa',
         snapshot: '',
         snapshotSeq: 0,
         processName: 'zsh',
@@ -25,7 +25,7 @@ describe('TerminalSessionRuntime', () => {
     )
     runtime.markAttached()
 
-    expect(runtime.currentSessionId()).toBe('session-1')
+    expect(runtime.currentSessionId()).toBe('pty_session_1_aaaaaaaaa')
     expect(runtime.snapshot().attachment).toMatchObject({ active: true, canTakeover: false })
 
     runtime.prepareRestart()
@@ -34,7 +34,7 @@ describe('TerminalSessionRuntime', () => {
     expect(runtime.phase()).toBe('restarting')
     expect(runtime.snapshot().attachment).toBeUndefined()
     expect(runtime.consumeRestartFlag()).toBe(true)
-    expect(runtime.closeReplacingSessionId()).toBe('session-1')
+    expect(runtime.closeReplacingSessionId()).toBe('pty_session_1_aaaaaaaaa')
   })
 
   test('routes output, ownership, replay, and takeover through runtime state', () => {
@@ -42,7 +42,7 @@ describe('TerminalSessionRuntime', () => {
     runtime.applyAttachResult(
       {
         ok: true,
-        ptySessionId: 'session-1',
+        ptySessionId: 'pty_session_1_aaaaaaaaa',
         snapshot: '',
         snapshotSeq: 0,
         processName: 'zsh',
@@ -62,16 +62,16 @@ describe('TerminalSessionRuntime', () => {
     expect(runtime.snapshot().attachment).toMatchObject({ active: false, canTakeover: true })
 
     runtime.beginReplay(2)
-    expect(runtime.handleOutput({ ptySessionId: 'session-1', data: 'old', seq: 1, processName: 'zsh' })).toEqual({
+    expect(runtime.handleOutput({ ptySessionId: 'pty_session_1_aaaaaaaaa', data: 'old', seq: 1, processName: 'zsh' })).toEqual({
       changed: false,
       output: null,
     })
-    expect(runtime.handleOutput({ ptySessionId: 'session-1', data: 'new', seq: 3, processName: 'bash' })).toEqual({
+    expect(runtime.handleOutput({ ptySessionId: 'pty_session_1_aaaaaaaaa', data: 'new', seq: 3, processName: 'bash' })).toEqual({
       changed: true,
       output: null,
     })
     expect(runtime.processName()).toBe('bash')
-    expect(runtime.finishReplay()).toEqual([{ ptySessionId: 'session-1', data: 'new', seq: 3, processName: 'bash' }])
+    expect(runtime.finishReplay()).toEqual([{ ptySessionId: 'pty_session_1_aaaaaaaaa', data: 'new', seq: 3, processName: 'bash' }])
   })
 
   test('drainReplay discards the replay buffer without surfacing captured events', () => {
@@ -83,7 +83,7 @@ describe('TerminalSessionRuntime', () => {
     runtime.applyAttachResult(
       {
         ok: true,
-        ptySessionId: 'session-1',
+        ptySessionId: 'pty_session_1_aaaaaaaaa',
         snapshot: '',
         snapshotSeq: 0,
         processName: 'zsh',
@@ -101,7 +101,7 @@ describe('TerminalSessionRuntime', () => {
     runtime.markAttached()
 
     runtime.beginReplay(2)
-    runtime.handleOutput({ ptySessionId: 'session-1', data: 'new', seq: 3, processName: 'bash' })
+    runtime.handleOutput({ ptySessionId: 'pty_session_1_aaaaaaaaa', data: 'new', seq: 3, processName: 'bash' })
     runtime.drainReplay()
     // Subsequent finishReplay returns nothing — the buffer was cleared.
     expect(runtime.finishReplay()).toEqual([])
@@ -120,7 +120,7 @@ describe('TerminalSessionRuntime', () => {
     runtime.applyAttachResult(
       {
         ok: true,
-        ptySessionId: 'session-1',
+        ptySessionId: 'pty_session_1_aaaaaaaaa',
         snapshot: '',
         snapshotSeq: 0,
         processName: 'zsh',
@@ -140,13 +140,13 @@ describe('TerminalSessionRuntime', () => {
     // Preload window: events arrive during the cached-snapshot write.
     // The boundary is the cached snapshot's seq.
     runtime.beginReplay(2)
-    runtime.handleOutput({ ptySessionId: 'session-1', data: 'preload-old', seq: 3, processName: 'bash' })
-    runtime.handleOutput({ ptySessionId: 'session-1', data: 'preload-new', seq: 6, processName: 'bash' })
+    runtime.handleOutput({ ptySessionId: 'pty_session_1_aaaaaaaaa', data: 'preload-old', seq: 3, processName: 'bash' })
+    runtime.handleOutput({ ptySessionId: 'pty_session_1_aaaaaaaaa', data: 'preload-new', seq: 6, processName: 'bash' })
 
     // Post-attach window: the new snapshot is at seq=5. Update the
     // boundary; the buffer is preserved across the call.
     runtime.beginReplay(5)
-    runtime.handleOutput({ ptySessionId: 'session-1', data: 'post-attach', seq: 7, processName: 'bash' })
+    runtime.handleOutput({ ptySessionId: 'pty_session_1_aaaaaaaaa', data: 'post-attach', seq: 7, processName: 'bash' })
 
     const events = runtime.finishReplay()
     // preload-old (seq 3) is older than the new snapshot (seq=5) → dropped
@@ -161,7 +161,7 @@ describe('TerminalSessionRuntime', () => {
     runtime.applyAttachResult(
       {
         ok: true,
-        ptySessionId: 'session-1',
+        ptySessionId: 'pty_session_1_aaaaaaaaa',
         snapshot: '',
         snapshotSeq: 0,
         processName: 'zsh',
@@ -220,7 +220,7 @@ describe('TerminalSessionRuntime', () => {
   test('resetTransientState clears transient terminal state without dropping runtime metadata', () => {
     const runtime = new TerminalSessionRuntime()
     runtime.hydrateSession({
-      ptySessionId: 'session-1',
+      ptySessionId: 'pty_session_1_aaaaaaaaa',
       phase: 'open',
       message: null,
       processName: 'zsh',

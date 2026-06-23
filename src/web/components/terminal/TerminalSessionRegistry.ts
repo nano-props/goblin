@@ -24,7 +24,7 @@ import {
   waitForMeasurableHost,
 } from '#/web/components/terminal/terminal-session-geometry.ts'
 import {
-  countOrphanedTerminalSessionKeys,
+  countOrphanedTerminalSlotKeys,
   resolveAdjacentTerminalSelectionAfterRemoval,
 } from '#/web/components/terminal/terminal-session-eviction.ts'
 import { syncTerminalSessionIdIndex } from '#/web/components/terminal/terminal-session-index.ts'
@@ -45,10 +45,6 @@ const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = {
   processName: 'terminal',
   canonicalTitle: null,
 }
-// Re-exported for any callers that still want the parser under its
-// renderer-side name.
-export const parseServerSessionKey = parseTerminalSlotKey
-
 /**
  * Renderer-level authority for terminal session state.
  *
@@ -259,7 +255,7 @@ export class TerminalSessionRegistry {
     }
   }
 
-  // Targeted drop on a server-side `session-closed` broadcast. Mirrors
+  // Targeted drop on a server-side `slot-closed` broadcast. Mirrors
   // `handleExit` but for the close path: the originating window has
   // already disposed the local entry, so the no-op case is the
   // common one. Sibling windows with a stale local entry get
@@ -269,7 +265,7 @@ export class TerminalSessionRegistry {
   // `closeTerminal`) because the server has already killed the PTY
   // — calling `close` again would no-op the `closeSlotForUser` check
   // on the server and add a useless WS roundtrip.
-  handleSessionClosed(ptySessionId: string): void {
+  handleSlotClosed(ptySessionId: string): void {
     const directKey = this.slotKeyByPtySessionId.get(ptySessionId)
     if (!directKey) return
     const session = this.sessions.get(directKey)
@@ -347,7 +343,7 @@ export class TerminalSessionRegistry {
       }
       this.sessions.get(descriptor.key)?.hydrate(projected.hydrateInput)
       this.syncSessionIdIndex(descriptor.key, projected.hydrateInput.ptySessionId)
-      if (projected.controlsAttachment) controllerKeyByWorktree.set(projected.worktreeTerminalKey, descriptor.key)
+      if (projected.controlsTerminal) controllerKeyByWorktree.set(projected.worktreeTerminalKey, descriptor.key)
       const previousDisplayOrder = this.displayOrderByKey.get(descriptor.key)
       this.displayOrderByKey.set(descriptor.key, projected.displayOrder)
       if (previousDisplayOrder !== undefined && previousDisplayOrder !== projected.displayOrder) {
@@ -364,9 +360,9 @@ export class TerminalSessionRegistry {
   // never-attached local shells (purely UI placeholders) are left
   // alone. Returns the count for the debug log.
   private evictOrphanedLocalSessions(repoRoot: string, serverKeys: Set<string>): number {
-    const orphanedKeys = countOrphanedTerminalSessionKeys({
+    const orphanedKeys = countOrphanedTerminalSlotKeys({
       repoRoot,
-      localSessionKeys: Array.from(this.sessions.keys()),
+      localSlotKeys: Array.from(this.sessions.keys()),
       getRepoRootForKey: (key) => this.sessions.get(key)?.descriptor.repoRoot ?? null,
       hasServerSessionId: (key) => this.sessionIdByKey.has(key),
       serverKeys,

@@ -487,7 +487,7 @@ describe('BranchWorkspaceContent', () => {
       workspacePaneTabOrderByBranch: { 'feature/terminal-loading': [staticEntry('status')] },
     })
     const detail = getSelectedBranchWorkspacePresentation(repo)
-    const createTerminal = vi.fn(async () => 'terminal-1')
+    const createTerminal = vi.fn(async () => 'slot-1')
     const registerHost = vi.fn()
     const worktreeSnapshot: WorktreeTerminalSnapshot = {
       ...emptyWorktreeSnapshot,
@@ -728,7 +728,7 @@ const emptyTerminalReadContext: TerminalSessionReadContextValue = {
 
 function terminalCommandContextWith(overrides: Partial<TerminalSessionContextValue> = {}): TerminalSessionContextValue {
   return {
-    createTerminal: vi.fn(async () => 'terminal-1'),
+    createTerminal: vi.fn(async () => 'slot-1'),
     registerHost: vi.fn(),
     unregisterHost: vi.fn(),
     selectTerminal: vi.fn(),

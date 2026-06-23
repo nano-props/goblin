@@ -10,7 +10,7 @@ Use these docs for app-level product and architecture decisions:
 - `realtime.md`: realtime rules
 - `g-command.md`: `g` shell command architecture (registry, control vs. data plane, error envelope)
 - `terminal.md`: terminal system design
-- `terminal-session-lifecycle.md`: terminal session lifecycle correctness (first-frame protocol, durable close, `session-closed` broadcast, empty-state CTA)
+- `terminal-session-lifecycle.md`: terminal session lifecycle correctness (first-frame protocol, durable close, `slot-closed` broadcast, empty-state CTA)
 - `terminal-roadmap.md`: terminal refactor roadmap
 - `terminal-target-model.md`: terminal target lifecycle and ownership model
 - `terminal-takeover.md`: terminal takeover — who controls the cursor (single-user, multi-device, intent-recent, owner-scoped)

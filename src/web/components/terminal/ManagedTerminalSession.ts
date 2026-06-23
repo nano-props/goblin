@@ -17,7 +17,7 @@ import {
   waitForMeasurableHost,
 } from '#/web/components/terminal/terminal-session-geometry.ts'
 import {
-  projectTerminalAttachResultForAttachment,
+  projectTerminalAttachResultForClient,
   type TerminalAttachResultWithOwnership,
 } from '#/web/components/terminal/terminal-session-projection.ts'
 import { TerminalSessionRuntime } from '#/web/components/terminal/terminal-session-runtime.ts'
@@ -111,7 +111,7 @@ export class ManagedTerminalSession {
 
   private shouldStartAttachedSession(): boolean {
     if (this.runtime.canResize()) return true
-    return this.runtime.phase() === 'open' && this.runtime.attachmentRole() === 'unowned'
+    return this.runtime.phase() === 'open' && this.runtime.clientRole() === 'unowned'
   }
 
   detach(host: HTMLElement, parkingRoot: HTMLElement): void {
@@ -320,7 +320,7 @@ export class ManagedTerminalSession {
     const pendingCleared = applies ? this.runtime.clearTakeoverPending() : false
     if (changed) {
       const isController = this.runtime.canResize()
-      const isUnowned = this.runtime.phase() === 'open' && this.runtime.attachmentRole() === 'unowned'
+      const isUnowned = this.runtime.phase() === 'open' && this.runtime.clientRole() === 'unowned'
       // The gate only distinguishes pass-through vs takeover.
       this.authority().setRole(isController ? 'controller' : 'viewer')
       if (!isController) {
@@ -586,7 +586,7 @@ export class ManagedTerminalSession {
 
   private withLocalOwnership(result: Extract<TerminalAttachResult, { ok: true }>): TerminalAttachResultWithOwnership {
     const clientId = readOrCreateWebTerminalClientId()
-    return projectTerminalAttachResultForAttachment(result, clientId)
+    return projectTerminalAttachResultForClient(result, clientId)
   }
 
   private async replayActiveView(token: number, term: XTermTerminal, replay: string, replaySeq: number): Promise<void> {

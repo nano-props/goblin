@@ -5,7 +5,7 @@ import type { Context } from 'hono'
  * Identity model
  * --------------
  * `clientId` is a per-tab routing identifier minted by the renderer
- * (localStorage / Electron IPC). It keys the realtime broker and the
+ * (sessionStorage / Electron IPC). It keys the realtime broker and the
  * WebSocket query param. It is NOT a stable identity — two browsers
  * on the same machine get two different `clientId`s.
  *
@@ -33,7 +33,7 @@ const CACHE_CAP = 1024
  * Derive a stable `userId` from an access token. Two clients with
  * the same token always see the same `userId`. The `owner_` prefix
  * keeps log lines and Map keys unambiguous against the `term_…`,
- * `attachment_…`, and `web_…` namespaces used elsewhere in the
+ * `client_…`, and `web_…` namespaces used elsewhere in the
  * terminal code.
  *
  * 128 bits of entropy is collision-safe across realistic installs
@@ -47,7 +47,7 @@ export function deriveUserId(token: string): string {
   if (cached) return cached
   if (cache.size >= CACHE_CAP) cache.clear()
   const hex = crypto.createHash('sha256').update(token).digest('hex').slice(0, 32)
-  const id = `owner_${hex}`
+  const id = `user_${hex}`
   cache.set(token, id)
   return id
 }

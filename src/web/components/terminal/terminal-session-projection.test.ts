@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import {
   projectServerTerminalSession,
-  projectTerminalAttachResultForAttachment,
+  projectTerminalAttachResultForClient,
 } from '#/web/components/terminal/terminal-session-projection.ts'
 import type { TerminalRepoIndex } from '#/web/components/terminal/types.ts'
 
@@ -24,7 +24,7 @@ describe('terminal session projection helpers', () => {
       repoRoot: REPO_ROOT,
       clientId: 'client_a',
       serverSession: {
-        ptySessionId: 'session_123',
+        ptySessionId: 'pty_session_123_aaaaaaaaa',
         key: `${REPO_ROOT}\0${WORKTREE_PATH}\0slot-2`,
         viewType: 'terminal',
         viewId: `${REPO_ROOT}\0${WORKTREE_PATH}\0slot-2`,
@@ -38,7 +38,7 @@ describe('terminal session projection helpers', () => {
         rows: 40,
         displayOrder: 2,
       },
-      serverSnapshot: { ptySessionId: 'session_123', snapshot: 'server-snap', snapshotSeq: 9 },
+      serverSnapshot: { ptySessionId: 'pty_session_123_aaaaaaaaa', snapshot: 'server-snap', snapshotSeq: 9 },
     })
 
     expect(projected).toEqual({
@@ -53,7 +53,7 @@ describe('terminal session projection helpers', () => {
       },
       worktreeTerminalKey: `${REPO_ROOT}\0${WORKTREE_PATH}`,
       hydrateInput: {
-        ptySessionId: 'session_123',
+        ptySessionId: 'pty_session_123_aaaaaaaaa',
         processName: 'zsh',
         canonicalTitle: 'shell',
         phase: 'open',
@@ -65,7 +65,7 @@ describe('terminal session projection helpers', () => {
         snapshot: 'server-snap',
         snapshotSeq: 9,
       },
-      controlsAttachment: true,
+      controlsTerminal: true,
       displayOrder: 2,
     })
   })
@@ -76,7 +76,7 @@ describe('terminal session projection helpers', () => {
       repoRoot: REPO_ROOT,
       clientId: 'client_b',
       serverSession: {
-        ptySessionId: 'session_123',
+        ptySessionId: 'pty_session_123_aaaaaaaaa',
         key: `${REPO_ROOT}\0${WORKTREE_PATH}\0slot-1`,
         viewType: 'terminal',
         viewId: `${REPO_ROOT}\0${WORKTREE_PATH}\0slot-1`,
@@ -90,21 +90,21 @@ describe('terminal session projection helpers', () => {
         rows: 24,
         displayOrder: 1,
       },
-      reattachSnapshot: { ptySessionId: 'session_123', snapshot: 'cached-snap', snapshotSeq: 3 },
+      reattachSnapshot: { ptySessionId: 'pty_session_123_aaaaaaaaa', snapshot: 'cached-snap', snapshotSeq: 3 },
     })
 
     expect(projected?.hydrateInput.snapshot).toBe('cached-snap')
     expect(projected?.hydrateInput.snapshotSeq).toBe(3)
     expect(projected?.hydrateInput.role).toBe('viewer')
     expect(projected?.hydrateInput.controllerStatus).toBe('connected')
-    expect(projected?.controlsAttachment).toBe(false)
+    expect(projected?.controlsTerminal).toBe(false)
   })
 
   test('projects attach results into local ownership for the active attachment', () => {
-    const projected = projectTerminalAttachResultForAttachment(
+    const projected = projectTerminalAttachResultForClient(
       {
         ok: true,
-        ptySessionId: 'session_123',
+        ptySessionId: 'pty_session_123_aaaaaaaaa',
         snapshot: '',
         snapshotSeq: 0,
         processName: 'zsh',

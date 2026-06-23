@@ -10,7 +10,7 @@
 >
 > - R0 first-frame atomicity — `d020cd5`, type-level tightening
 >   in §Type-level atomicity.
-> - R1 durable close, R2 `session-closed` broadcast, R3 empty-state
+> - R1 durable close, R2 `slot-closed` broadcast, R3 empty-state
 >   CTA — landed together in `fa67adb` (the "wip: snapshot
 >   uncommitted tree" baseline; the commit name is from the
 >   code-review prep step, the code itself is the stable fix set
@@ -57,7 +57,7 @@ In scope:
   for completeness and to anchor the design rules).
 - Durable close on the client — every close must be tracked to server
   ack before a subsequent create in the same repo is allowed to race.
-- `session-closed` per-session broadcast — multi-window consistency
+- `slot-closed` per-session broadcast — multi-window consistency
   without a full repo list rescan.
 - Empty-state CTA on the terminal slot.
 
@@ -124,7 +124,7 @@ is intentionally retained in summary form.
    data directly. The success payload carries the same class of
    information the renderer already relied on for `attach` /
    `restart`:
-   - `sessionId`
+   - `ptySessionId`
    - `processName`
    - `canonicalTitle`
    - `phase`
@@ -149,7 +149,7 @@ is intentionally retained in summary form.
 
 ### `create.sessions` is projection data, not the success oracle
 
-- `create.sessionId` + `snapshot` + `snapshotSeq` are the
+- `create.ptySessionId` + `snapshot` + `snapshotSeq` are the
   **authoritative first-frame handshake**.
 - `create.sessions` is **projection / directory data**.
 
@@ -168,7 +168,7 @@ toast.
 
 The renderer was doing an overly strict validation step:
 
-- required `sessionId`, `snapshot`, `snapshotSeq` from `create`, **and**
+- required `ptySessionId`, `snapshot`, `snapshotSeq` from `create`, **and**
 - required the returned `sessions` list to already include the
   created session.
 
@@ -189,7 +189,7 @@ crash. Two changes:
 1. A new `TerminalFirstFrame` interface
    (`src/shared/terminal-types.ts`) is the single source of truth for
    the first-frame handshake. It lifts every field that R0 made
-   required (`sessionId`, `processName`, `canonicalTitle`, `phase`,
+   required (`ptySessionId`, `processName`, `canonicalTitle`, `phase`,
    `message`, `snapshot`, `snapshotSeq`, `controller`, `canonicalCols`,
    `canonicalRows`).
 2. `TerminalAttachResult` no longer accepts `canonicalCols?` /
@@ -198,7 +198,7 @@ crash. Two changes:
 3. `TerminalCatalogMutationResult` intersects with `TerminalFirstFrame`
    instead of `Partial<Extract<TerminalAttachResult, { ok: true }>>`,
    so every `create` success carries the full first-frame payload at
-   the type level. The renderer's runtime "missing sessionId" check
+   the type level. The renderer's runtime "missing ptySessionId" check
    is now redundant for the type-checked paths (and stays as a
    belt-and-suspenders guard against `unknown`/JSON-blob shapes
    arriving from the bridge layer).
@@ -231,8 +231,8 @@ block, lines 215 onward).
 `ManagedTerminalSession.dispose()` today:
 
 ```ts
-for (const sessionId of sessionIds) {
-  void terminalBridge.close({ sessionId }).catch(() => {})
+for (const ptySessionId of sessionIds) {
+  void terminalBridge.close({ ptySessionId }).catch(() => {})
 }
 ```
 
@@ -268,7 +268,7 @@ private readonly pendingCloseBySessionId = new Map<
 
 **New registry methods**:
 
-- `enqueueDurableClose({ sessionId, worktreeTerminalKey })` —
+- `enqueueDurableClose({ ptySessionId, worktreeTerminalKey })` —
   called from `ManagedTerminalSession.dispose()`. Records a pending
   entry, kicks off `terminalBridge.close` in the background, resolves
   on server ack, rejects on socket error. The entry is removed from
@@ -289,7 +289,7 @@ private readonly pendingCloseBySessionId = new Map<
 **Caller change** (`ManagedTerminalSession.ts`):
 
 - Replace the fire-and-forget loop with
-  `registry.enqueueDurableClose({ sessionId, worktreeTerminalKey: this.descriptor.worktreeTerminalKey })`.
+  `registry.enqueueDurableClose({ ptySessionId, worktreeTerminalKey: this.descriptor.worktreeTerminalKey })`.
 - Local view teardown stays synchronous — the next create rebuilds
   from a fresh server-side session.
 - Registry is injected via the constructor alongside `notify` and
@@ -303,8 +303,8 @@ private readonly pendingCloseBySessionId = new Map<
   future regression must be visible in logs.
 
 ```ts
-registry.enqueueDurableClose({ sessionId, worktreeTerminalKey }).catch((err) => {
-  terminalLog.warn('durable close failed', { sessionId, err })
+registry.enqueueDurableClose({ ptySessionId, worktreeTerminalKey }).catch((err) => {
+  terminalLog.warn('durable close failed', { ptySessionId, err })
 })
 ```
 
@@ -320,7 +320,7 @@ registry.enqueueDurableClose({ sessionId, worktreeTerminalKey }).catch((err) => 
 
 ---
 
-## R2: `session-closed` broadcast
+## R2: `slot-closed` broadcast
 
 ### Status
 
@@ -349,7 +349,7 @@ A per-session broadcast is the targeted counterpart.
 Add to `TerminalRealtimeMessage` in `src/shared/terminal-socket.ts`:
 
 ```ts
-| { type: 'session-closed'; sessionId: string; repoRoot: string }
+| { type: 'slot-closed'; ptySessionId: string; repoRoot: string }
 ```
 
 ### Server emit
@@ -359,8 +359,8 @@ returns `true`:
 
 ```ts
 broker.broadcastToOwner(userId, {
-  type: 'session-closed',
-  sessionId: input.sessionId,
+  type: 'slot-closed',
+  ptySessionId: input.ptySessionId,
   repoRoot,
 })
 ```
@@ -369,7 +369,7 @@ The `repoRoot` is derived from the session's scope. The message is
 sent only to sockets for the same `userId`; other owners never see
 the closed session id. The manager
 returns it on the close result, or we look it up via
-`manager.findSessionById(sessionId)` before closing.
+`manager.findSessionById(ptySessionId)` before closing.
 
 ### Renderer dispatcher
 
@@ -377,7 +377,7 @@ returns it on the close result, or we look it up via
 
 - Add `sessionClosedSubscribers: Set<(event) => void>` and include
   it in `hasRealtimeSubscribers()`.
-- Add a dispatcher branch for `message.type === 'session-closed'`
+- Add a dispatcher branch for `message.type === 'slot-closed'`
   in the same switch that handles `output` / `title` / `exit` /
   `ownership` / `sessions-changed`.
 - Expose `onSessionClosed(cb)` on the returned bridge and add a
@@ -387,10 +387,10 @@ returns it on the close result, or we look it up via
 ### Registry subscribes
 
 `TerminalSessionProvider.tsx`: mirror the `onExit` pattern. On
-`session-closed`:
+`slot-closed`:
 
 ```ts
-const key = sessionKeyBySessionId.get(event.sessionId)
+const key = sessionKeyBySessionId.get(event.ptySessionId)
 if (key) registry.discardLocalSessionAndDismissDetailIfLast(key, descriptor)
 ```
 
@@ -476,7 +476,7 @@ attach). The renderer no longer waits for a follow-up
 ### The two-step handshake that was
 
 Before this change, `terminal.takeover` returned only
-`{ ok, sessionId, controller }`. The renderer treated the
+`{ ok, ptySessionId, controller }`. The renderer treated the
 realtime `ownership` event as the authority and used the bridge
 response only to "trigger the server-side handoff". The
 comment in `ManagedTerminalSession.takeover()` was explicit:
@@ -541,7 +541,7 @@ The realtime `ownership` event keeps its authority role on the
 non-takeover paths (controller crash, controller reconnect,
 sibling auto-claim). For those, ownership-event-as-authority
 is the only choice — there is no response to be authoritative.
-A subsequent realtime event for the _same_ sessionId after a
+A subsequent realtime event for the _same_ ptySessionId after a
 successful takeover is treated as a benign re-apply with
 identical values (no-op).
 
@@ -624,7 +624,7 @@ R3: empty-state CTA.
 
 ### P2 — Protocol addition
 
-R2: `session-closed` broadcast.
+R2: `slot-closed` broadcast.
 
 - Adds a new `TerminalRealtimeMessage` variant. Additive — old
   subscribers ignore the new variant.
@@ -658,7 +658,7 @@ R1: durable close.
   first-frame hydration fields on both `created` and `reused`
   paths. Registry-side validation in
   `TerminalSessionRegistry.create.test.ts` covers the
-  `create.sessionId` + `snapshot` + `snapshotSeq` rule.
+  `create.ptySessionId` + `snapshot` + `snapshotSeq` rule.
 
 **R1** — `TerminalSessionRegistry.create.test.ts`
 (`describe('durable close')`):
@@ -675,11 +675,11 @@ R1: durable close.
 - `terminal-runtime-actions.test.ts`:
   - `emits BOTH sessions-changed and session-closed on a successful
 close` (56).
-  - A non-owner close does not leak a phantom `session-closed`
+  - A non-owner close does not leak a phantom `slot-closed`
     event (84).
-  - A failed close path does not synthesize a `session-closed`
+  - A failed close path does not synthesize a `slot-closed`
     with a fake repoRoot (100, 129).
-- `TerminalSessionProvider.test.tsx`: `session-closed` mocks feed
+- `TerminalSessionProvider.test.tsx`: `slot-closed` mocks feed
   the registry's `handleSessionClosed` path (already exercised by
   the R1 durable-close test above).
 
@@ -721,7 +721,7 @@ These rules are derived from the symptom family and should outlive
 any individual implementation:
 
 1. **Do not use `create.sessions` as the success criterion for first
-   paint.** `create.sessionId` + `snapshot` + `snapshotSeq` are the
+   paint.** `create.ptySessionId` + `snapshot` + `snapshotSeq` are the
    authoritative created-session handshake. `create.sessions` is
    projection data.
 2. **Keep `create`, `attach`, and `restart` aligned in first-frame
@@ -730,7 +730,7 @@ any individual implementation:
 3. **Close is durable.** `dispose()` must not be fire-and-forget on
    the server side. The registry owns pending close state.
 4. **Close is a broadcast event.** When the server confirms a close,
-   other windows learn about it through `session-closed`, not
+   other windows learn about it through `slot-closed`, not
    through a full reconcile.
 5. **A subsequent create in the same worktree must await in-flight
    closes in that worktree.** The catalog must never hand back an
@@ -785,4 +785,4 @@ any individual implementation:
 - `docs/terminal-target-model.md` — terminal target lifecycle and
   ownership model
 - `docs/realtime.md` — realtime channel discipline that R2's
-  `session-closed` broadcast inherits from
+  `slot-closed` broadcast inherits from

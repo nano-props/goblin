@@ -6,7 +6,7 @@ export function isValidTerminalId(value: unknown): value is string {
   return typeof value === 'string' && TERMINAL_ID_RE.test(value)
 }
 
-// `resolveAttachmentConnected` previously lived here as a stub
+// `resolveClientConnected` previously lived here as a stub
 // that returned `true` whenever an clientId was present. The
 // runtime now wires a real broker-backed check via dependency
 // injection into `createTerminalRuntimeActions` — see

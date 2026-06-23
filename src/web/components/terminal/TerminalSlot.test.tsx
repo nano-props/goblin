@@ -68,9 +68,9 @@ async function renderControllerSlot() {
   const root: Root = createRoot(container)
   const writeInput = vi.fn()
   const descriptor = {
-    key: 'terminal-1',
+    key: 'slot-1',
     worktreeTerminalKey: '/repo\0/worktree',
-    slotId: 'terminal-1',
+    slotId: 'slot-1',
     index: 1,
     repoRoot: '/repo',
     branch: 'feature',
@@ -81,9 +81,9 @@ async function renderControllerSlot() {
     selectedDescriptor: descriptor,
     sessions: [
       {
-        key: 'terminal-1',
+        key: 'slot-1',
         worktreeTerminalKey: '/repo\0/worktree',
-        slotId: 'terminal-1',
+        slotId: 'slot-1',
         index: 1,
         title: 'zsh',
         phase: 'open' as const,
@@ -109,7 +109,7 @@ async function renderControllerSlot() {
     },
   }
   const context: TerminalSessionContextValue = {
-    createTerminal: async () => 'terminal-1',
+    createTerminal: async () => 'slot-1',
     registerHost: vi.fn(),
     unregisterHost: vi.fn(),
     selectTerminal: vi.fn(),
@@ -183,9 +183,9 @@ describe('TerminalSlot', () => {
     const takeover = vi.fn().mockResolvedValue(true)
     const summaries = [
       {
-        key: 'terminal-1',
+        key: 'slot-1',
         worktreeTerminalKey: '/repo\0/worktree',
-        slotId: 'terminal-1',
+        slotId: 'slot-1',
         index: 1,
         title: 'zsh',
         phase: 'open' as const,
@@ -194,9 +194,9 @@ describe('TerminalSlot', () => {
       },
     ]
     const descriptor = {
-      key: 'terminal-1',
+      key: 'slot-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      slotId: 'terminal-1',
+      slotId: 'slot-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -224,7 +224,7 @@ describe('TerminalSlot', () => {
       },
     }
     const context: TerminalSessionContextValue = {
-      createTerminal: async () => 'terminal-1',
+      createTerminal: async () => 'slot-1',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -274,7 +274,7 @@ describe('TerminalSlot', () => {
         button?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       })
 
-      expect(takeover).toHaveBeenCalledWith('terminal-1')
+      expect(takeover).toHaveBeenCalledWith('slot-1')
     } finally {
       await act(async () => root.unmount())
       container.remove()
@@ -295,7 +295,7 @@ describe('TerminalSlot', () => {
     }
     const emptySnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
     const context: TerminalSessionContextValue = {
-      createTerminal: vi.fn(async () => 'terminal-2'),
+      createTerminal: vi.fn(async () => 'slot-2'),
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -360,9 +360,9 @@ describe('TerminalSlot', () => {
     const takeover = vi.fn().mockResolvedValue(true)
     const restart = vi.fn()
     const descriptor = {
-      key: 'terminal-1',
+      key: 'slot-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      slotId: 'terminal-1',
+      slotId: 'slot-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -373,9 +373,9 @@ describe('TerminalSlot', () => {
       selectedDescriptor: descriptor,
       sessions: [
         {
-          key: 'terminal-1',
+          key: 'slot-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          slotId: 'terminal-1',
+          slotId: 'slot-1',
           index: 1,
           title: 'zsh',
           phase: 'error' as const,
@@ -401,7 +401,7 @@ describe('TerminalSlot', () => {
       },
     }
     const context: TerminalSessionContextValue = {
-      createTerminal: async () => 'terminal-1',
+      createTerminal: async () => 'slot-1',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -476,9 +476,9 @@ describe('TerminalSlot', () => {
     const root: Root = createRoot(container)
     const writeInput = vi.fn()
     const descriptor = {
-      key: 'terminal-1',
+      key: 'slot-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      slotId: 'terminal-1',
+      slotId: 'slot-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -489,9 +489,9 @@ describe('TerminalSlot', () => {
       selectedDescriptor: descriptor,
       sessions: [
         {
-          key: 'terminal-1',
+          key: 'slot-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          slotId: 'terminal-1',
+          slotId: 'slot-1',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -519,7 +519,7 @@ describe('TerminalSlot', () => {
       },
     }
     const context: TerminalSessionContextValue = {
-      createTerminal: async () => 'terminal-1',
+      createTerminal: async () => 'slot-1',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -597,9 +597,9 @@ describe('TerminalSlot', () => {
     const root: Root = createRoot(container)
     const writeInput = vi.fn()
     const descriptor = {
-      key: 'terminal-1',
+      key: 'slot-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      slotId: 'terminal-1',
+      slotId: 'slot-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -610,9 +610,9 @@ describe('TerminalSlot', () => {
       selectedDescriptor: descriptor,
       sessions: [
         {
-          key: 'terminal-1',
+          key: 'slot-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          slotId: 'terminal-1',
+          slotId: 'slot-1',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -640,7 +640,7 @@ describe('TerminalSlot', () => {
       },
     }
     const context: TerminalSessionContextValue = {
-      createTerminal: async () => 'terminal-1',
+      createTerminal: async () => 'slot-1',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -709,7 +709,7 @@ describe('TerminalSlot', () => {
       // quotes — if the escape regresses to plain concat this
       // assertion catches it.
       expect(writeInput).toHaveBeenCalledTimes(1)
-      expect(writeInput).toHaveBeenCalledWith('terminal-1', "'/resolved/shot with space.png'", 'drop')
+      expect(writeInput).toHaveBeenCalledWith('slot-1', "'/resolved/shot with space.png'", 'drop')
       // The path-attempt tier succeeded, so the blob-save backend
       // was never consulted.
       expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
@@ -737,9 +737,9 @@ describe('TerminalSlot', () => {
     const root: Root = createRoot(container)
     const writeInput = vi.fn()
     const descriptor = {
-      key: 'terminal-1',
+      key: 'slot-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      slotId: 'terminal-1',
+      slotId: 'slot-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -750,9 +750,9 @@ describe('TerminalSlot', () => {
       selectedDescriptor: descriptor,
       sessions: [
         {
-          key: 'terminal-1',
+          key: 'slot-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          slotId: 'terminal-1',
+          slotId: 'slot-1',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -778,7 +778,7 @@ describe('TerminalSlot', () => {
       },
     }
     const context: TerminalSessionContextValue = {
-      createTerminal: async () => 'terminal-1',
+      createTerminal: async () => 'slot-1',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -847,9 +847,9 @@ describe('TerminalSlot', () => {
     const root: Root = createRoot(container)
     const writeInput = vi.fn()
     const descriptor = {
-      key: 'terminal-1',
+      key: 'slot-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      slotId: 'terminal-1',
+      slotId: 'slot-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -860,9 +860,9 @@ describe('TerminalSlot', () => {
       selectedDescriptor: descriptor,
       sessions: [
         {
-          key: 'terminal-1',
+          key: 'slot-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          slotId: 'terminal-1',
+          slotId: 'slot-1',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -888,7 +888,7 @@ describe('TerminalSlot', () => {
       },
     }
     const context: TerminalSessionContextValue = {
-      createTerminal: async () => 'terminal-1',
+      createTerminal: async () => 'slot-1',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -950,7 +950,7 @@ describe('TerminalSlot', () => {
       // both of which `shellEscapePath` wraps in single quotes — if
       // the escape regresses to plain concat this catches it.
       expect(writeInput).toHaveBeenCalledTimes(1)
-      expect(writeInput).toHaveBeenCalledWith('terminal-1', "'/resolved/weird name & space.png'", 'paste')
+      expect(writeInput).toHaveBeenCalledWith('slot-1', "'/resolved/weird name & space.png'", 'paste')
       expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
     } finally {
       await act(async () => root.unmount())
@@ -970,9 +970,9 @@ describe('TerminalSlot', () => {
     const root: Root = createRoot(container)
     const writeInput = vi.fn()
     const descriptor = {
-      key: 'terminal-1',
+      key: 'slot-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      slotId: 'terminal-1',
+      slotId: 'slot-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -983,9 +983,9 @@ describe('TerminalSlot', () => {
       selectedDescriptor: descriptor,
       sessions: [
         {
-          key: 'terminal-1',
+          key: 'slot-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          slotId: 'terminal-1',
+          slotId: 'slot-1',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -1011,7 +1011,7 @@ describe('TerminalSlot', () => {
       },
     }
     const context: TerminalSessionContextValue = {
-      createTerminal: async () => 'terminal-1',
+      createTerminal: async () => 'slot-1',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -1154,7 +1154,7 @@ describe('TerminalSlot', () => {
         new File([new Uint8Array([1])], 'c.png'),
       ])
 
-      expect(rendered.writeInput).toHaveBeenCalledWith('terminal-1', "'/abs/a.png' '/tmp/b.png'", 'paste')
+      expect(rendered.writeInput).toHaveBeenCalledWith('slot-1', "'/abs/a.png' '/tmp/b.png'", 'paste')
       expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-partial')
       expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('terminal.paste-file-failed')
     } finally {
@@ -1177,9 +1177,9 @@ describe('TerminalSlot', () => {
     const root: Root = createRoot(container)
     const writeInput = vi.fn()
     const descriptor = {
-      key: 'terminal-1',
+      key: 'slot-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      slotId: 'terminal-1',
+      slotId: 'slot-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -1190,9 +1190,9 @@ describe('TerminalSlot', () => {
       selectedDescriptor: descriptor,
       sessions: [
         {
-          key: 'terminal-1',
+          key: 'slot-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          slotId: 'terminal-1',
+          slotId: 'slot-1',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -1218,7 +1218,7 @@ describe('TerminalSlot', () => {
       },
     }
     const context: TerminalSessionContextValue = {
-      createTerminal: async () => 'terminal-1',
+      createTerminal: async () => 'slot-1',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -1288,7 +1288,7 @@ describe('TerminalSlot', () => {
       // the order the resolver returns them (path-attempt tier first,
       // then blob-save). paste-file-partial toasts once.
       expect(writeInput).toHaveBeenCalledTimes(1)
-      expect(writeInput).toHaveBeenCalledWith('terminal-1', "'/abs/a.png' '/tmp/b.png'", 'drop')
+      expect(writeInput).toHaveBeenCalledWith('slot-1', "'/abs/a.png' '/tmp/b.png'", 'drop')
       expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-partial')
       expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('terminal.paste-file-failed')
     } finally {
@@ -1314,18 +1314,18 @@ describe('TerminalSlot', () => {
     const root: Root = createRoot(container)
     const writeInput = vi.fn()
     const descriptorA = {
-      key: 'terminal-1',
+      key: 'slot-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      slotId: 'terminal-1',
+      slotId: 'slot-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
       worktreePath: '/worktree',
     }
     const descriptorB = {
-      key: 'terminal-2',
+      key: 'slot-2',
       worktreeTerminalKey: '/repo\0/worktree-other',
-      slotId: 'terminal-2',
+      slotId: 'slot-2',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -1336,9 +1336,9 @@ describe('TerminalSlot', () => {
       selectedDescriptor: descriptorA,
       sessions: [
         {
-          key: 'terminal-1',
+          key: 'slot-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          slotId: 'terminal-1',
+          slotId: 'slot-1',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -1354,9 +1354,9 @@ describe('TerminalSlot', () => {
       selectedDescriptor: descriptorB,
       sessions: [
         {
-          key: 'terminal-2',
+          key: 'slot-2',
           worktreeTerminalKey: '/repo\0/worktree-other',
-          slotId: 'terminal-2',
+          slotId: 'slot-2',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -1382,7 +1382,7 @@ describe('TerminalSlot', () => {
       },
     }
     const context: TerminalSessionContextValue = {
-      createTerminal: async () => 'terminal-1',
+      createTerminal: async () => 'slot-1',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -1493,7 +1493,7 @@ describe('TerminalSlot', () => {
     const container = document.createElement('div')
     document.body.appendChild(container)
     const root: Root = createRoot(container)
-    const createTerminal = vi.fn(async () => 'terminal-1')
+    const createTerminal = vi.fn(async () => 'slot-1')
     const emptyWorktreeSnapshot = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: null,

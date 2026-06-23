@@ -52,7 +52,7 @@ export function createTerminalRealtimeHandlers(host: ServerTerminalHost): {
     prune(clientId, userId, input) {
       return host.prune(clientId, userId, input.repoRoot)
     },
-    'session-snapshot'(clientId, userId, input) {
+    'slot-snapshot'(clientId, userId, input) {
       return host.getSlotSnapshot(clientId, userId, input)
     },
   }
@@ -118,7 +118,7 @@ function sendRealtimeResponse(socket: TerminalRealtimeSocket, message: TerminalS
 // split the renderer's transition across two sources.
 //
 // `attach`, `restart`, and now `create` all return snapshot hydration
-// data that the renderer applies as one boundary. `session-snapshot`
+// data that the renderer applies as one boundary. `slot-snapshot`
 // still remains excluded because that payload is consumed as a later
 // reconciliation path rather than the primary first-frame handshake.
 // `takeover` does not return a fresh snapshot, but its response is still

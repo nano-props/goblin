@@ -32,7 +32,7 @@ const TERMINAL_SOCKET_ACTIONS = [
   'list-sessions',
   'create',
   'prune',
-  'session-snapshot',
+  'slot-snapshot',
 ] as const satisfies TerminalSocketRequestAction[]
 const TERMINAL_CONNECTED_CONTROLLER_STATUS_VALUES = ['connected'] satisfies Exclude<
   TerminalControllerStatus,
@@ -222,7 +222,7 @@ const TerminalClientMessageSchema = v.variant('type', [
   v.object({
     type: v.literal('request'),
     requestId: TerminalRequestIdSchema,
-    action: v.literal('session-snapshot'),
+    action: v.literal('slot-snapshot'),
     input: TerminalSlotSnapshotInputSchema,
   }),
 ])

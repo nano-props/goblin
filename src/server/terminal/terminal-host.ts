@@ -78,7 +78,7 @@ export interface ServerTerminalHost {
   isValidClientId(value: unknown): value is string
   getDiagnostics(): ServerTerminalHostDiagnostics
   // `clientId` is a per-tab routing identifier (broker key, WS
-  // query param, localStorage value). `userId` is a per-token
+  // query param, sessionStorage value). `userId` is a per-token
   // identity derived from the access token; it partitions the
   // in-memory session store so the same token shared across
   // browsers sees the same terminals. See `identity.ts` for the

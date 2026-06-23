@@ -1,5 +1,5 @@
 import { preloadTerminalFont, proposeTerminalGeometry } from '#/web/components/terminal/terminal-geometry.ts'
-import type { TerminalAttachmentSnapshot, TerminalDescriptor } from '#/web/components/terminal/types.ts'
+import type { TerminalClientSnapshot, TerminalDescriptor } from '#/web/components/terminal/types.ts'
 
 export async function captureTerminalHostGeometry(input: {
   worktreeTerminalKey: string
@@ -20,7 +20,7 @@ export async function resolveTerminalCreateGeometry(input: {
   hostByWorktree: ReadonlyMap<string, HTMLElement>
   geometryByWorktree: Map<string, { cols: number; rows: number }>
   selectedDescriptor: TerminalDescriptor | null
-  getAttachmentSnapshot: (key: string) => TerminalAttachmentSnapshot | null | undefined
+  getAttachmentSnapshot: (key: string) => TerminalClientSnapshot | null | undefined
 }): Promise<{ cols: number; rows: number } | null> {
   const measured = await captureTerminalHostGeometry(input)
   if (measured) return measured

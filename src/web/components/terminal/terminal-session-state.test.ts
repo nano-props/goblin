@@ -22,7 +22,7 @@ describe('TerminalSlotState', () => {
       }),
     ).toBe(true)
     expect(state.setOpen()).toBe(false)
-    expect(state.snapshot('session-1')).toEqual({
+    expect(state.snapshot('pty_session_1_aaaaaaaaa')).toEqual({
       phase: 'open',
       message: null,
       processName: 'zsh',
@@ -49,9 +49,9 @@ describe('TerminalSlotState', () => {
       canonicalCols: 120,
       canonicalRows: 40,
     })
-    expect(state.snapshot('session-1').attachment?.active).toBe(true)
+    expect(state.snapshot('pty_session_1_aaaaaaaaa').attachment?.active).toBe(true)
     expect(state.setRestarting()).toBe(true)
-    expect(state.snapshot('session-1')).toEqual({
+    expect(state.snapshot('pty_session_1_aaaaaaaaa')).toEqual({
       phase: 'restarting',
       message: null,
       processName: 'zsh',
@@ -63,18 +63,18 @@ describe('TerminalSlotState', () => {
     const state = new TerminalSlotState()
 
     state.beginReplay(3)
-    expect(state.captureReplayOutput({ ptySessionId: 'session-1', data: 'old', seq: 2, processName: 'zsh' })).toBe(true)
-    expect(state.captureReplayOutput({ ptySessionId: 'session-1', data: 'new', seq: 4, processName: 'zsh' })).toBe(true)
+    expect(state.captureReplayOutput({ ptySessionId: 'pty_session_1_aaaaaaaaa', data: 'old', seq: 2, processName: 'zsh' })).toBe(true)
+    expect(state.captureReplayOutput({ ptySessionId: 'pty_session_1_aaaaaaaaa', data: 'new', seq: 4, processName: 'zsh' })).toBe(true)
 
-    expect(state.finishReplay()).toEqual([{ ptySessionId: 'session-1', data: 'new', seq: 4, processName: 'zsh' }])
-    expect(state.captureReplayOutput({ ptySessionId: 'session-1', data: 'live', seq: 5, processName: 'zsh' })).toBe(false)
+    expect(state.finishReplay()).toEqual([{ ptySessionId: 'pty_session_1_aaaaaaaaa', data: 'new', seq: 4, processName: 'zsh' }])
+    expect(state.captureReplayOutput({ ptySessionId: 'pty_session_1_aaaaaaaaa', data: 'live', seq: 5, processName: 'zsh' })).toBe(false)
   })
 
   test('ignores stale replay generation cleanup', () => {
     const state = new TerminalSlotState()
 
     const staleGeneration = state.beginReplay(1)
-    expect(state.captureReplayOutput({ ptySessionId: 'session-1', data: 'old-window', seq: 2, processName: 'zsh' })).toBe(
+    expect(state.captureReplayOutput({ ptySessionId: 'pty_session_1_aaaaaaaaa', data: 'old-window', seq: 2, processName: 'zsh' })).toBe(
       true,
     )
     const currentGeneration = state.beginReplay(2)
@@ -82,7 +82,7 @@ describe('TerminalSlotState', () => {
     state.discardReplay(staleGeneration)
     expect(state.isReplaying()).toBe(true)
     expect(
-      state.captureReplayOutput({ ptySessionId: 'session-1', data: 'current-window', seq: 3, processName: 'zsh' }),
+      state.captureReplayOutput({ ptySessionId: 'pty_session_1_aaaaaaaaa', data: 'current-window', seq: 3, processName: 'zsh' }),
     ).toBe(true)
 
     expect(state.finishReplay(staleGeneration)).toEqual([])
@@ -103,12 +103,12 @@ describe('TerminalSlotState', () => {
     })
     state.setOpen()
     state.beginReplay(1)
-    state.captureReplayOutput({ ptySessionId: 'session-1', data: 'live', seq: 2, processName: 'zsh' })
+    state.captureReplayOutput({ ptySessionId: 'pty_session_1_aaaaaaaaa', data: 'live', seq: 2, processName: 'zsh' })
     state.setSearchResult({ resultIndex: 0, resultCount: 1, found: true })
     state.setProgress(1, 10)
 
     expect(state.resetTransientState()).toBe(true)
-    expect(state.snapshot('session-1')).toEqual({
+    expect(state.snapshot('pty_session_1_aaaaaaaaa')).toEqual({
       phase: 'open',
       message: null,
       processName: 'zsh',

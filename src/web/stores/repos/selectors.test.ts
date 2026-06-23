@@ -62,7 +62,7 @@ describe('repo selectors', () => {
         workspaceFocused: false,
         workspacePaneSize: 50,
         selectedTerminalByWorktree: {
-          '/tmp/repo\0/tmp/repo': 'terminal-1',
+          '/tmp/repo\0/tmp/repo': 'slot-1',
         },
       }),
     ).toEqual({
@@ -71,7 +71,7 @@ describe('repo selectors', () => {
       workspaceFocused: false,
       workspacePaneSize: 50,
       selectedTerminalByWorktree: {
-        '/tmp/repo\0/tmp/repo': 'terminal-1',
+        '/tmp/repo\0/tmp/repo': 'slot-1',
       },
     })
   })

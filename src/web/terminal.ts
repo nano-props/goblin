@@ -35,5 +35,5 @@ export const terminalBridge: RendererTerminalBridge = {
   onExit: bindTerminalMethod('onExit'),
   onOwnership: bindTerminalMethod('onOwnership'),
   onSessionsChanged: bindTerminalMethod('onSessionsChanged'),
-  onSessionClosed: bindTerminalMethod('onSessionClosed'),
+  onSlotClosed: bindTerminalMethod('onSlotClosed'),
 }

@@ -27,17 +27,17 @@ interface OwnerTimerEntry {
  */
 export class TerminalConnectionState {
   private readonly options: TerminalConnectionStateOptions
-  private readonly disconnectTimerByOwnerId = new Map<string, OwnerTimerEntry>()
+  private readonly disconnectTimerByUserId = new Map<string, OwnerTimerEntry>()
 
   constructor(options: TerminalConnectionStateOptions) {
     this.options = options
   }
 
   clearOwnerDisconnect(userId: string): void {
-    const entry = this.disconnectTimerByOwnerId.get(userId)
+    const entry = this.disconnectTimerByUserId.get(userId)
     if (!entry) return
     clearTimeout(entry.timer)
-    this.disconnectTimerByOwnerId.delete(userId)
+    this.disconnectTimerByUserId.delete(userId)
   }
 
   scheduleOwnerDisconnect(userId: string, hasSockets: () => boolean): void {
@@ -45,16 +45,16 @@ export class TerminalConnectionState {
     const entry: OwnerTimerEntry = {
       userId,
       timer: setTimeout(() => {
-        this.disconnectTimerByOwnerId.delete(userId)
+        this.disconnectTimerByUserId.delete(userId)
         if (hasSockets()) return
         this.options.onOwnerExpired(userId)
       }, this.options.detachedTtlMs),
     }
-    this.disconnectTimerByOwnerId.set(userId, entry)
+    this.disconnectTimerByUserId.set(userId, entry)
   }
 
   shutdown(): void {
-    for (const entry of this.disconnectTimerByOwnerId.values()) clearTimeout(entry.timer)
-    this.disconnectTimerByOwnerId.clear()
+    for (const entry of this.disconnectTimerByUserId.values()) clearTimeout(entry.timer)
+    this.disconnectTimerByUserId.clear()
   }
 }

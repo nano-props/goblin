@@ -8,7 +8,7 @@ const CLIENT_ID = 'client_terminal_actions'
 // userId from the access token and threads it through to the
 // manager. The test stub uses a fixed value so the assertions
 // don't have to mock the derivation helper.
-const OWNER_ID = 'owner_terminal_actions'
+const USER_ID = 'user_terminal_actions'
 // 16+ alphanumerics, matches TERMINAL_PTY_SESSION_ID_RE in
 // shared/terminal-validators.ts.
 const SESSION_ID = 'session_aaaaaaaaaaaaaa'
@@ -31,8 +31,8 @@ function makeActions(
     // The other manager methods are unused by `close`, but the
     // `TerminalSlotManager` type is required by the deps
     // interface. Stub them with `vi.fn()` so TypeScript stays happy.
-    attachSession: vi.fn(),
-    restartSession: vi.fn(),
+    attachSlot: vi.fn(),
+    restartSlot: vi.fn(),
     writeSlot: vi.fn(() => false),
     resizeSlot: vi.fn(() => false),
     takeoverSlot: vi.fn(),
@@ -52,7 +52,7 @@ function makeActions(
       broker,
       catalog,
       isValidTerminalClientId,
-      resolveAttachmentConnected: () => undefined,
+      resolveClientConnected: () => undefined,
     }),
     broadcasts,
     manager,
@@ -71,16 +71,16 @@ describe('terminal-runtime-actions close broadcast', () => {
       getSessionScope: () => '/repo',
     })
 
-    const closed = actions.close(CLIENT_ID, OWNER_ID, { ptySessionId: SESSION_ID })
+    const closed = actions.close(CLIENT_ID, USER_ID, { ptySessionId: SESSION_ID })
 
     expect(closed).toBe(true)
-    expect(close).toHaveBeenCalledWith(OWNER_ID, SESSION_ID)
+    expect(close).toHaveBeenCalledWith(USER_ID, SESSION_ID)
     expect(broadcasts).toHaveBeenCalledTimes(2)
-    expect(broadcasts).toHaveBeenNthCalledWith(1, OWNER_ID, {
+    expect(broadcasts).toHaveBeenNthCalledWith(1, USER_ID, {
       type: 'sessions-changed',
       repoRoot: '/repo',
     })
-    expect(broadcasts).toHaveBeenNthCalledWith(2, OWNER_ID, {
+    expect(broadcasts).toHaveBeenNthCalledWith(2, USER_ID, {
       type: 'slot-closed',
       ptySessionId: SESSION_ID,
       repoRoot: '/repo',
@@ -95,7 +95,7 @@ describe('terminal-runtime-actions close broadcast', () => {
       getSessionScope: () => '/repo',
     })
 
-    const closed = actions.close(CLIENT_ID, OWNER_ID, { ptySessionId: SESSION_ID })
+    const closed = actions.close(CLIENT_ID, USER_ID, { ptySessionId: SESSION_ID })
 
     expect(closed).toBe(false)
     expect(broadcasts).not.toHaveBeenCalled()
@@ -110,7 +110,7 @@ describe('terminal-runtime-actions close broadcast', () => {
       getSessionScope: () => undefined,
     })
 
-    const closed = actions.close(CLIENT_ID, OWNER_ID, { ptySessionId: SESSION_ID })
+    const closed = actions.close(CLIENT_ID, USER_ID, { ptySessionId: SESSION_ID })
 
     expect(closed).toBe(true)
     expect(broadcasts).not.toHaveBeenCalled()
@@ -124,7 +124,7 @@ describe('terminal-runtime-actions close broadcast', () => {
       closeSlotForUser: () => true,
     })
 
-    const closed = actions.close(CLIENT_ID, OWNER_ID, { ptySessionId: '' })
+    const closed = actions.close(CLIENT_ID, USER_ID, { ptySessionId: '' })
 
     expect(closed).toBe(false)
     expect(broadcasts).not.toHaveBeenCalled()
@@ -141,7 +141,7 @@ describe('terminal-runtime-actions close broadcast', () => {
       getSessionScope: () => '/repo',
     })
 
-    const closed = actions.close('not_a_client', OWNER_ID, { ptySessionId: SESSION_ID })
+    const closed = actions.close('not_a_client', USER_ID, { ptySessionId: SESSION_ID })
 
     expect(closed).toBe(false)
     expect(close).not.toHaveBeenCalled()
@@ -161,19 +161,19 @@ describe('terminal-runtime-actions clientId gate', () => {
   test('write / resize / takeover / restart / attach all fall back to outer clientId when input omits it', async () => {
     const { actions, manager } = makeActions({ closeSlotForUser: () => false })
 
-    actions.write(CLIENT_ID, OWNER_ID, { ptySessionId: SESSION_ID, data: 'x' } as never)
-    actions.resize(CLIENT_ID, OWNER_ID, { ptySessionId: SESSION_ID, cols: 80, rows: 24 } as never)
-    actions.takeover(CLIENT_ID, OWNER_ID, {
+    actions.write(CLIENT_ID, USER_ID, { ptySessionId: SESSION_ID, data: 'x' } as never)
+    actions.resize(CLIENT_ID, USER_ID, { ptySessionId: SESSION_ID, cols: 80, rows: 24 } as never)
+    actions.takeover(CLIENT_ID, USER_ID, {
       ptySessionId: SESSION_ID,
       cols: 80,
       rows: 24,
     } as never)
-    await actions.restart(CLIENT_ID, OWNER_ID, {
+    await actions.restart(CLIENT_ID, USER_ID, {
       ptySessionId: SESSION_ID,
       cols: 80,
       rows: 24,
     } as never)
-    await actions.attach(CLIENT_ID, OWNER_ID, {
+    await actions.attach(CLIENT_ID, USER_ID, {
       ptySessionId: SESSION_ID,
       cols: 80,
       rows: 24,
@@ -181,10 +181,10 @@ describe('terminal-runtime-actions clientId gate', () => {
 
     // Each call crossed the gate and reached the manager, passing
     // the outer CLIENT_ID as the slot-level clientId.
-    expect(manager.writeSlot).toHaveBeenCalledWith(OWNER_ID, SESSION_ID, 'x', CLIENT_ID)
-    expect(manager.resizeSlot).toHaveBeenCalledWith(OWNER_ID, SESSION_ID, 80, 24, CLIENT_ID, undefined)
-    expect(manager.takeoverSlot).toHaveBeenCalledWith(OWNER_ID, SESSION_ID, 80, 24, CLIENT_ID, undefined)
-    expect(manager.restartSession).toHaveBeenCalledWith(OWNER_ID, SESSION_ID, 80, 24, CLIENT_ID, undefined)
-    expect(manager.attachSession).toHaveBeenCalledWith(OWNER_ID, SESSION_ID, 80, 24, CLIENT_ID, undefined)
+    expect(manager.writeSlot).toHaveBeenCalledWith(USER_ID, SESSION_ID, 'x', CLIENT_ID)
+    expect(manager.resizeSlot).toHaveBeenCalledWith(USER_ID, SESSION_ID, 80, 24, CLIENT_ID, undefined)
+    expect(manager.takeoverSlot).toHaveBeenCalledWith(USER_ID, SESSION_ID, 80, 24, CLIENT_ID, undefined)
+    expect(manager.restartSlot).toHaveBeenCalledWith(USER_ID, SESSION_ID, 80, 24, CLIENT_ID, undefined)
+    expect(manager.attachSlot).toHaveBeenCalledWith(USER_ID, SESSION_ID, 80, 24, CLIENT_ID, undefined)
   })
 })

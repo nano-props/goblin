@@ -15,7 +15,7 @@ import type { TerminalController } from '#/shared/terminal-types.ts'
  */
 export type TerminalAuthorityAction = 'write' | 'resize' | 'restart' | 'takeover'
 
-export type TerminalAuthorityReason = 'not-controller' | 'session-unowned' | 'unknown-attachment'
+export type TerminalAuthorityReason = 'not-controller' | 'slot-unowned' | 'unknown-client'
 
 type TerminalAuthorityDecision = { kind: 'allow' } | { kind: 'deny'; reason: TerminalAuthorityReason }
 
@@ -42,11 +42,11 @@ function decideTerminalActionAuthority(
   action: TerminalAuthorityAction,
 ): TerminalAuthorityDecision {
   const attachment = state.attachments.get(clientId)
-  if (!attachment) return { kind: 'deny', reason: 'unknown-attachment' }
+  if (!attachment) return { kind: 'deny', reason: 'unknown-client' }
   if (action === 'takeover') return { kind: 'allow' }
   // write / resize / restart require the caller to currently hold
   // the controller slot.
-  if (state.controller === null) return { kind: 'deny', reason: 'session-unowned' }
+  if (state.controller === null) return { kind: 'deny', reason: 'slot-unowned' }
   if (state.controller.clientId !== clientId) return { kind: 'deny', reason: 'not-controller' }
   return { kind: 'allow' }
 }

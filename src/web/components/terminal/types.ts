@@ -31,12 +31,12 @@ export interface TerminalBellEvent {
   visible: boolean
 }
 
-export interface TerminalAttachmentOwnershipViewModel {
+export interface TerminalClientOwnershipViewModel {
   role: TerminalClientRole
   controllerStatus: TerminalControllerStatus
 }
 
-export interface TerminalAttachmentSnapshot extends TerminalAttachmentOwnershipViewModel {
+export interface TerminalClientSnapshot extends TerminalClientOwnershipViewModel {
   active: boolean
   canTakeover: boolean
   canonicalCols: number | null
@@ -52,7 +52,7 @@ export interface TerminalAttachmentSnapshot extends TerminalAttachmentOwnershipV
  * surfaces carry the same fields so the renderer can apply either
  * without re-checking the shape.
  */
-export interface TerminalOwnershipViewModel extends TerminalAttachmentOwnershipViewModel {
+export interface TerminalOwnershipViewModel extends TerminalClientOwnershipViewModel {
   ptySessionId: string
   canonicalCols: number
   canonicalRows: number
@@ -74,7 +74,7 @@ export interface TerminalSnapshot {
   processName: string
   /** Server-canonical terminal title from attach hydration or realtime title events. */
   canonicalTitle?: string | null
-  attachment?: TerminalAttachmentSnapshot | null
+  attachment?: TerminalClientSnapshot | null
   search?: TerminalSearchResult | null
   progress?: TerminalProgressState | null
   /** True while a takeover request has been sent but ownership has not yet been confirmed. */
@@ -180,13 +180,13 @@ export interface ManagedTerminalSessionLike {
   handleExit: (event: TerminalExitEvent) => boolean
 }
 
-export function createTerminalAttachmentSnapshot(input: {
+export function createTerminalClientSnapshot(input: {
   role: TerminalClientRole
   controllerStatus: TerminalControllerStatus
   canonicalCols: number
   canonicalRows: number
   phase: TerminalPhase
-}): TerminalAttachmentSnapshot {
+}): TerminalClientSnapshot {
   const active = input.role === 'controller'
   return {
     role: input.role,

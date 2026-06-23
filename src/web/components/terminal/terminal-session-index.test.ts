@@ -7,29 +7,29 @@ describe('terminal session index helper', () => {
     const slotKeyByPtySessionId = new Map<string, string>()
 
     syncTerminalSessionIdIndex({
-      key: 'terminal-1',
-      ptySessionId: 'session-a',
+      key: 'slot-1',
+      ptySessionId: 'pty_session_a_aaaaaaaaa',
       sessionIdByKey,
       slotKeyByPtySessionId,
     })
-    expect(sessionIdByKey.get('terminal-1')).toBe('session-a')
-    expect(slotKeyByPtySessionId.get('session-a')).toBe('terminal-1')
+    expect(sessionIdByKey.get('slot-1')).toBe('pty_session_a_aaaaaaaaa')
+    expect(slotKeyByPtySessionId.get('pty_session_a_aaaaaaaaa')).toBe('slot-1')
 
     syncTerminalSessionIdIndex({
-      key: 'terminal-1',
-      ptySessionId: 'session-b',
+      key: 'slot-1',
+      ptySessionId: 'pty_session_b_aaaaaaaaa',
       sessionIdByKey,
       slotKeyByPtySessionId,
     })
-    expect(slotKeyByPtySessionId.has('session-a')).toBe(false)
-    expect(slotKeyByPtySessionId.get('session-b')).toBe('terminal-1')
+    expect(slotKeyByPtySessionId.has('pty_session_a_aaaaaaaaa')).toBe(false)
+    expect(slotKeyByPtySessionId.get('pty_session_b_aaaaaaaaa')).toBe('slot-1')
 
     syncTerminalSessionIdIndex({
-      key: 'terminal-1',
+      key: 'slot-1',
       ptySessionId: null,
       sessionIdByKey,
       slotKeyByPtySessionId,
     })
-    expect(sessionIdByKey.has('terminal-1')).toBe(false)
+    expect(sessionIdByKey.has('slot-1')).toBe(false)
   })
 })

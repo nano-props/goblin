@@ -45,7 +45,7 @@ export interface TerminalSocketRequestInputs {
   'list-sessions': TerminalListSessionsInput
   create: TerminalCreateInput
   prune: { repoRoot: string }
-  'session-snapshot': TerminalSlotSnapshotInput
+  'slot-snapshot': TerminalSlotSnapshotInput
 }
 
 export interface TerminalSocketResponseOutputs {
@@ -58,7 +58,7 @@ export interface TerminalSocketResponseOutputs {
   'list-sessions': TerminalSlotSummary[]
   create: TerminalCatalogMutationResult
   prune: { pruned: number; remaining: number }
-  'session-snapshot': TerminalSlotSnapshot | null
+  'slot-snapshot': TerminalSlotSnapshot | null
 }
 
 export type TerminalSocketRequestAction = keyof TerminalSocketRequestInputs

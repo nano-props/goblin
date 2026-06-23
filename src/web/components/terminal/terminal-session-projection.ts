@@ -31,11 +31,11 @@ export interface ProjectedServerTerminalSession {
   descriptor: TerminalDescriptor
   worktreeTerminalKey: string
   hydrateInput: TerminalSessionHydrationInput
-  controlsAttachment: boolean
+  controlsTerminal: boolean
   displayOrder: number
 }
 
-export function projectTerminalAttachResultForAttachment(
+export function projectTerminalAttachResultForClient(
   result: Extract<TerminalAttachResult, { ok: true }>,
   clientId: string,
 ): TerminalAttachResultWithOwnership {
@@ -82,7 +82,7 @@ export function projectServerTerminalSession(input: {
       snapshotSeq:
         input.serverSnapshot?.snapshotSeq ?? (isReattachMatch ? (input.reattachSnapshot?.snapshotSeq ?? 0) : 0),
     },
-    controlsAttachment: input.serverSession.controller?.clientId === input.clientId,
+    controlsTerminal: input.serverSession.controller?.clientId === input.clientId,
     displayOrder: input.serverSession.displayOrder,
   }
 }

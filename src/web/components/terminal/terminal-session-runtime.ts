@@ -45,8 +45,8 @@ export class TerminalSessionRuntime {
     return this.state.getCanResize()
   }
 
-  attachmentRole(): TerminalClientRole {
-    return this.state.getAttachmentOwnership().role
+  clientRole(): TerminalClientRole {
+    return this.state.getClientOwnership().role
   }
 
   startAttaching(): boolean {

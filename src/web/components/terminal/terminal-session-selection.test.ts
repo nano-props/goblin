@@ -16,41 +16,41 @@ function descriptor(key: string): TerminalDescriptor {
 
 describe('terminal session selection helper', () => {
   test('prefers preferred selection, then current, then controller, then first terminal', () => {
-    const isValid = (_worktreeKey: string, key: string) => ['terminal-1', 'terminal-2', 'terminal-3'].includes(key)
-    const sortedDescriptors = [descriptor('terminal-1'), descriptor('terminal-2'), descriptor('terminal-3')]
+    const isValid = (_worktreeKey: string, key: string) => ['slot-1', 'slot-2', 'slot-3'].includes(key)
+    const sortedDescriptors = [descriptor('slot-1'), descriptor('slot-2'), descriptor('slot-3')]
 
     expect(
       resolveSelectedTerminalKey({
         worktreeTerminalKey: 'repo\0wt',
-        preferredKey: 'terminal-3',
-        currentKey: 'terminal-2',
-        controllerKey: 'terminal-1',
+        preferredKey: 'slot-3',
+        currentKey: 'slot-2',
+        controllerKey: 'slot-1',
         sortedDescriptors,
         isSelectedKeyValid: isValid,
       }),
-    ).toBe('terminal-3')
+    ).toBe('slot-3')
 
     expect(
       resolveSelectedTerminalKey({
         worktreeTerminalKey: 'repo\0wt',
         preferredKey: 'missing',
-        currentKey: 'terminal-2',
-        controllerKey: 'terminal-1',
+        currentKey: 'slot-2',
+        controllerKey: 'slot-1',
         sortedDescriptors,
         isSelectedKeyValid: isValid,
       }),
-    ).toBe('terminal-2')
+    ).toBe('slot-2')
 
     expect(
       resolveSelectedTerminalKey({
         worktreeTerminalKey: 'repo\0wt',
         preferredKey: null,
         currentKey: null,
-        controllerKey: 'terminal-1',
+        controllerKey: 'slot-1',
         sortedDescriptors,
         isSelectedKeyValid: isValid,
       }),
-    ).toBe('terminal-1')
+    ).toBe('slot-1')
 
     expect(
       resolveSelectedTerminalKey({
@@ -61,6 +61,6 @@ describe('terminal session selection helper', () => {
         sortedDescriptors,
         isSelectedKeyValid: isValid,
       }),
-    ).toBe('terminal-1')
+    ).toBe('slot-1')
   })
 })

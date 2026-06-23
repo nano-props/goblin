@@ -100,7 +100,7 @@ function seedElectronBootstrap() {
         action: 'created' as const,
         key: 'k',
         sessions: [],
-        ptySessionId: 'session-1',
+        ptySessionId: 'pty_session_1_aaaaaaaaa',
         snapshot: '',
         snapshotSeq: 0,
         processName: 'zsh',
@@ -124,7 +124,7 @@ function seedElectronBootstrap() {
       onExit: () => () => {},
       onOwnership: () => () => {},
       onSessionsChanged: () => () => {},
-      onSessionClosed: () => () => {},
+      onSlotClosed: () => () => {},
     }),
     rotateAccessToken: vi.fn(async () => ({ accessToken: 'rotated-secret' })),
   })
@@ -168,7 +168,7 @@ function seedWebBootstrap() {
         action: 'created' as const,
         key: 'k',
         sessions: [],
-        ptySessionId: 'session-1',
+        ptySessionId: 'pty_session_1_aaaaaaaaa',
         snapshot: '',
         snapshotSeq: 0,
         processName: 'zsh',
@@ -192,7 +192,7 @@ function seedWebBootstrap() {
       onExit: () => () => {},
       onOwnership: () => () => {},
       onSessionsChanged: () => () => {},
-      onSessionClosed: () => () => {},
+      onSlotClosed: () => () => {},
     }),
   })
 }
