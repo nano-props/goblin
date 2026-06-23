@@ -9,7 +9,10 @@ export interface BranchWorkspaceRepo extends BranchActionRepo {
   data: BranchActionRepo['data'] & Pick<RepoState['data'], 'branches' | 'statusLoaded'>
   ui: Pick<
     RepoState['ui'],
-    'selectedBranch' | 'preferredWorkspacePaneViewByBranch' | 'workspacePaneTabOrderByBranch'
+    | 'selectedBranch'
+    | 'preferredWorkspacePaneViewByBranch'
+    | 'workspacePaneTabOrderByBranch'
+    | 'lastClosedTabContextByBranch'
   >
   resources: Pick<RepoState['resources'], 'status' | 'pullRequests'>
   remote: BranchActionRepo['remote'] & Pick<RepoState['remote'], 'lifecycle'>

@@ -12,7 +12,6 @@ import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import {
   adjacentBranchWorkspacePaneTab,
   createBranchWorkspacePaneTabModel,
-  nextBranchWorkspacePaneTabAfterClose,
   type BranchWorkspacePaneTab,
   type BranchWorkspacePaneTabModel,
 } from '#/web/components/branch-workspace/workspace-pane-tab-model.ts'
@@ -43,13 +42,6 @@ interface CloseWorkspacePaneTabCommandOptions {
 interface CloseWorkspacePaneTabOrWindowCommandOptions extends CloseWorkspacePaneTabCommandOptions {
   closeWindow?: () => void
 }
-
-type CloseWorkspacePaneCommandTabResult =
-  | { handled: false }
-  | {
-      handled: true
-      committed: Promise<boolean>
-    }
 
 interface SelectWorkspacePaneTabByIndexCommandOptions {
   repoId: string | null
@@ -122,7 +114,7 @@ export async function runNewTerminalTabCommand({ repoId, navigation }: NewTermin
 
 export async function runCloseWorkspacePaneTabCommand({
   repoId,
-  navigation,
+  navigation: _navigation,
   targetIdentity,
 }: CloseWorkspacePaneTabCommandOptions): Promise<boolean> {
   const target = repoId ? workspacePaneCommandTarget(repoId) : null
@@ -133,20 +125,22 @@ export async function runCloseWorkspacePaneTabCommand({
     : (target?.activeTab ?? null)
   if (!tab) return false
 
-  const isActive = target.activeTab?.identity === tab.identity
-  const nextTab = isActive ? nextBranchWorkspacePaneTabAfterClose(target.tabs, tab.identity) : null
-  const closeResult = closeWorkspacePaneCommandTab(target, tab)
-  if (!closeResult.handled) return false
+  // Capture pre-close state for the workspace pane tab model. The model uses
+  // `lastClosedTabContext` to prefer the spatial neighbor of the closed tab
+  // over its generic tabs[0] fallback when the preferred view becomes
+  // unrenderable — preserving spatial locality without this command
+  // imperatively re-selecting anything.
+  const previousTabIdentities = target.tabs.map((t) => t.identity)
+  const closingIdentity = tab.identity
 
-  if (isActive && nextTab) showWorkspacePaneCommandTab(target, nextTab, navigation)
-  const committed = await closeResult.committed
-  if (
-    !committed &&
-    isActive &&
-    nextTab &&
-    isSelectedWorkspacePaneCommandTab(target.repoId, target.branchName, nextTab)
-  ) {
-    showWorkspacePaneCommandTab(target, tab, navigation)
+  const handled = await closeWorkspacePaneCommandTab(target, tab)
+  if (!handled) return false
+
+  if (target.branchName) {
+    useReposStore.getState().setLastClosedTabContext(target.repoId, target.branchName, {
+      closingIdentity,
+      previousTabIdentities,
+    })
   }
   return true
 }
@@ -208,31 +202,26 @@ function selectedBranchWorkspaceTarget(repoId: string): { branchName: string; wo
 function closeWorkspacePaneCommandTab(
   target: BranchWorkspacePaneTabModel,
   tab: BranchWorkspacePaneTab,
-): CloseWorkspacePaneCommandTabResult {
-  if (tab.kind === 'pending') return { handled: false }
+): Promise<boolean> {
+  if (tab.kind === 'pending') return Promise.resolve(false)
   if (tab.kind === 'terminal') return closeTerminalWorkspacePaneCommandTab(target, tab)
   const branchName = target.branchName
-  if (!branchName) return { handled: false }
+  if (!branchName) return Promise.resolve(false)
   if (isWorkspacePaneStaticViewType(tab.type)) {
     useReposStore.getState().closeWorkspacePaneStaticView(target.repoId, tab.type, branchName)
-    return committedCloseResult(true)
   }
-  return committedCloseResult(true)
+  return Promise.resolve(true)
 }
 
 function closeTerminalWorkspacePaneCommandTab(
   target: BranchWorkspacePaneTabModel,
   tab: Extract<BranchWorkspacePaneTab, { kind: 'terminal' }>,
-): CloseWorkspacePaneCommandTabResult {
-  if (!target.terminalBase) return { handled: false }
+): Promise<boolean> {
+  if (!target.terminalBase) return Promise.resolve(false)
   const bridge = readTerminalSessionCommandBridge()
-  if (!bridge?.closeTerminalByDescriptor) return { handled: false }
+  if (!bridge?.closeTerminalByDescriptor) return Promise.resolve(false)
   bridge.closeTerminalByDescriptor(tab.key, target.terminalBase)
-  return committedCloseResult(true)
-}
-
-function committedCloseResult(committed: boolean): CloseWorkspacePaneCommandTabResult {
-  return { handled: true, committed: Promise.resolve(committed) }
+  return Promise.resolve(true)
 }
 
 function showWorkspacePaneCommandTab(
@@ -244,16 +233,6 @@ function showWorkspacePaneCommandTab(
   if (tab.kind === 'terminal' && target.worktreeTerminalKey) {
     readTerminalSessionCommandBridge()?.selectTerminal(target.worktreeTerminalKey, tab.key)
   }
-}
-
-function isSelectedWorkspacePaneCommandTab(
-  repoId: string,
-  branchName: string | null,
-  tab: BranchWorkspacePaneTab,
-): boolean {
-  const repo = useReposStore.getState().repos[repoId]
-  if (!repo || repo.ui.selectedBranch !== branchName) return false
-  return preferredWorkspacePaneViewForBranch(repo.ui, branchName) === tab.type
 }
 
 function workspacePaneCommandTarget(repoId: string): BranchWorkspacePaneTabModel | null {
@@ -277,5 +256,6 @@ function workspacePaneCommandTarget(repoId: string): BranchWorkspacePaneTabModel
     terminalSessionCount: snapshot?.count ?? 0,
     terminalCreatePending: snapshot?.pendingCreate ?? false,
     terminalSyncReady,
+    lastClosedTabContext: repo.ui.lastClosedTabContextByBranch[branchName] ?? null,
   })
 }

@@ -75,6 +75,31 @@ export interface RepoUiState {
   /** Branch-scoped selected workspace pane view. Branch switches read this
    *  first so selecting a tab on one branch does not select it on another. */
   preferredWorkspacePaneViewByBranch: Record<string, WorkspacePaneView>
+  /**
+   * Per-branch hint about the most recent user-initiated workspace pane tab
+   * close. Set by `setLastClosedTabContext` after `runCloseWorkspacePaneTabCommand`
+   * commits. Read by `createBranchWorkspacePaneTabModel` to prefer the spatial
+   * neighbor of the closed tab over the generic tabs[0] fallback when the
+   * preferred view becomes unrenderable. Overwritten by the next close on the
+   * same branch; never cleared explicitly because the model only consults it
+   * when the preferred view is unrenderable (the typical case is the user
+   * closed their preferred view or the last backing tab).
+   *
+   * Runtime-coherent only: not persisted to SessionState and not restored on
+   * relaunch. A fresh session starts with an empty record; the first user
+   * close populates it for that branch. If a future change starts persisting
+   * this field, gate it behind the same conditions that gate the rest of
+   * `RepoUiState` and clear stale contexts on branch-switch restore.
+   */
+  lastClosedTabContextByBranch: Record<
+    string,
+    {
+      closingIdentity: string
+      /** Pre-close tab identities in tab order. Sufficient for the model
+       *  to compute adjacency without storing the full tab model. */
+      previousTabIdentities: readonly string[]
+    } | null
+  >
 }
 
 export interface RepoProjectionMeta {
@@ -219,6 +244,16 @@ export interface RuntimeCoherentRepoProjectionActions {
     id: string,
     orderedTabs: WorkspacePaneTabOrderEntry[],
     branchName?: string,
+  ) => void
+  /** Records the most recent user-initiated close on a branch so the
+   *  workspace pane tab model can prefer the spatial neighbor of the
+   *  closed tab when the preferred view becomes unrenderable. The pre-close
+   *  tab identities carry enough information for the model to compute the
+   *  neighbor without the command imperatively re-selecting anything. */
+  setLastClosedTabContext: (
+    id: string,
+    branchName: string,
+    context: { closingIdentity: string; previousTabIdentities: readonly string[] },
   ) => void
   setBranchViewMode: (id: string, viewMode: BranchViewMode) => void
   selectBranch: (id: string, branch: string) => void

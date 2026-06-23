@@ -207,9 +207,9 @@ describe('BranchWorkspaceToolbar', () => {
     expect(openViewsFor('feature/worktree')).toEqual([])
   })
 
-  test('selects the adjacent terminal tab after closing the active status tab', async () => {
+  test('records the closing context for spatial adjacency after closing the active status tab', async () => {
     const showRepoWorkspacePaneView = vi.fn()
-    const { container: c, mocks } = renderToolbar({
+    const { container: c } = renderToolbar({
       terminalCount: 1,
       navigation: navigationWith({ showRepoWorkspacePaneView }),
     })
@@ -223,8 +223,15 @@ describe('BranchWorkspaceToolbar', () => {
     await flush()
 
     expect(openViewsFor('feature/worktree')).toEqual([])
-    expect(showRepoWorkspacePaneView).toHaveBeenCalledWith(REPO_ID, 'terminal')
-    expect(mocks.selectTerminal).toHaveBeenCalledWith(`${REPO_ID}\0${WORKTREE_PATH}`, 't1')
+    // The X-click records the closing context for the workspace pane tab
+    // model. The model itself decides where to land — the close command does
+    // not imperatively navigate, so navigation is untouched here.
+    expect(showRepoWorkspacePaneView).not.toHaveBeenCalled()
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.lastClosedTabContextByBranch['feature/worktree'])
+      .toEqual({
+        closingIdentity: 'status:status',
+        previousTabIdentities: ['status:status', 'terminal:t1'],
+      })
   })
 
   test('closes a static tab without routing through runtime close', async () => {
@@ -563,7 +570,7 @@ describe('BranchWorkspaceToolbar', () => {
     expect(document.activeElement).toBe(statusTab)
   })
 
-  test('selects the adjacent static workspace pane view after closing the active terminal view', async () => {
+  test('records the closing context for spatial adjacency after closing the active terminal view', async () => {
     const showRepoWorkspacePaneView = vi.fn()
     const { container: c, mocks } = renderToolbar({
       terminalCount: 1,
@@ -585,7 +592,15 @@ describe('BranchWorkspaceToolbar', () => {
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     })
-    expect(showRepoWorkspacePaneView).toHaveBeenCalledWith(REPO_ID, 'changes')
+    // The X-click records the closing context so the workspace pane tab model
+    // can land on changes (the spatial neighbor) at read time. Navigation is
+    // untouched here — the model is the single source of truth.
+    expect(showRepoWorkspacePaneView).not.toHaveBeenCalled()
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.lastClosedTabContextByBranch['feature/worktree'])
+      .toEqual({
+        closingIdentity: 'terminal:t1',
+        previousTabIdentities: ['status:status', 'terminal:t1', 'changes:changes'],
+      })
   })
 
   test('T6.1: renders a busy new-terminal button while the initial session sync is in flight', async () => {

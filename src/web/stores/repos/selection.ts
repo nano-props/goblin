@@ -46,6 +46,7 @@ type RuntimeCoherentSelectionActions = Pick<
   | 'addWorkspacePaneTerminalTab'
   | 'removeWorkspacePaneTerminalTab'
   | 'reorderWorkspacePaneTabs'
+  | 'setLastClosedTabContext'
   | 'selectBranch'
   | 'clearSelectedBranch'
 >
@@ -232,6 +233,32 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
         if (workspacePaneTabOrdersEqual(current, nextOrder)) return s
         return replaceRepoState(s, repo, (r) => {
           r.ui.workspacePaneTabOrderByBranch = workspacePaneTabOrderRecordWith(r.ui, branch, nextOrder)
+        })
+      })
+    },
+
+    setLastClosedTabContext(
+      id: string,
+      branchName: string,
+      context: { closingIdentity: string; previousTabIdentities: readonly string[] },
+    ) {
+      set((s) => {
+        const repo = s.repos[id]
+        if (!repo) return s
+        const current = repo.ui.lastClosedTabContextByBranch[branchName]
+        if (
+          current &&
+          current.closingIdentity === context.closingIdentity &&
+          current.previousTabIdentities.length === context.previousTabIdentities.length &&
+          current.previousTabIdentities.every((id, i) => id === context.previousTabIdentities[i])
+        ) {
+          return s
+        }
+        return replaceRepoState(s, repo, (r) => {
+          r.ui.lastClosedTabContextByBranch[branchName] = {
+            closingIdentity: context.closingIdentity,
+            previousTabIdentities: context.previousTabIdentities as string[],
+          }
         })
       })
     },
