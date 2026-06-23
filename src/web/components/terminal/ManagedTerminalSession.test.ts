@@ -398,7 +398,8 @@ const geometryMocks = vi.hoisted(() => ({
 vi.mock('#/web/components/terminal/terminal-geometry.ts', () => ({
   preloadTerminalFont: geometryMocks.preloadTerminalFont,
   proposeTerminalGeometry: geometryMocks.proposeTerminalGeometry,
-  TERMINAL_FONT_FAMILY: "'Goblin Mono', monospace",
+  TERMINAL_FONT_FAMILY:
+    "'Goblin Mono', 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', 'Twemoji Mozilla', monospace",
   TERMINAL_FONT_SIZE: 14,
   TERMINAL_LINE_HEIGHT: 1,
   DEFAULT_TERMINAL_COLS: 80,

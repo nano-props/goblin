@@ -11,7 +11,9 @@ import {
 describe('terminal-geometry', () => {
   test('exports the page-lifetime font constants', () => {
     expect(TERMINAL_FONT_SIZE).toBe(14)
-    expect(TERMINAL_FONT_FAMILY).toBe("'Goblin Mono', monospace")
+    expect(TERMINAL_FONT_FAMILY).toBe(
+      "'Goblin Mono', 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', 'Twemoji Mozilla', monospace",
+    )
     expect(TERMINAL_LINE_HEIGHT).toBe(1)
   })
 
