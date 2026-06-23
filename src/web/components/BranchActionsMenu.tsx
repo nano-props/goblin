@@ -75,7 +75,6 @@ export function BranchActionsPopover({
           title={t('action.menu')}
           aria-label={t('action.menu')}
           aria-busy={busyAction ? true : undefined}
-          className="data-[state=open]:bg-accent data-[state=open]:text-accent-foreground"
           onClick={(e) => e.stopPropagation()}
           onDoubleClick={(e) => e.stopPropagation()}
         >

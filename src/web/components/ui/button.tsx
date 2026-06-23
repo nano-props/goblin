@@ -2,7 +2,7 @@ import * as React from 'react'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { Slot } from 'radix-ui'
 import { cn } from '#/web/lib/cn.ts'
-import { dataActiveRing, focusRing, openRing } from '#/web/components/ui/focus.ts'
+import { dataActiveRing, focusRing } from '#/web/components/ui/focus.ts'
 const buttonVariants = cva(
   // Base text size collapsed to text-xs to match the desktop tool's
   // density (upstream shadcn defaults to text-sm = 14px). lg bumps
@@ -15,7 +15,6 @@ const buttonVariants = cva(
   cn(
     "inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-xs font-medium whitespace-nowrap transition-colors duration-100 cursor-pointer outline-none disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-danger-border aria-invalid:ring-danger/20 dark:aria-invalid:ring-danger/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
     focusRing,
-    openRing,
     dataActiveRing,
   ),
   {
