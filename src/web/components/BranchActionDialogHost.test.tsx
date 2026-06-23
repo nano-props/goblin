@@ -276,9 +276,10 @@ describe('BranchActionDialogHost', () => {
   })
 
   // NOTE: Regression coverage for the "dialog content stays rendered
-  // during the close animation" fix lives in `useLastNonNull.test.tsx`
-  // (the display retention hook). A Radix-portal-driven DOM check is
-  // not feasible in jsdom — Radix's `Presence` checks `getComputedStyle`
-  // for an active animation and sends `UNMOUNT` immediately when none
-  // is found, so the dialog unmounts before we can inspect content.
+  // during the close animation" fix lives in `useDialogDisplay.test.tsx`
+  // (the display retention hook that the host calls). A
+  // Radix-portal-driven DOM check is not feasible in jsdom — Radix's
+  // `Presence` checks `getComputedStyle` for an active animation and
+  // sends `UNMOUNT` immediately when none is found, so the dialog
+  // unmounts before we can inspect content.
 })
