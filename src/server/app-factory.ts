@@ -16,6 +16,7 @@ import { createHostRoutes } from '#/server/routes/host.ts'
 import { createRemoteRoutes } from '#/server/routes/remote.ts'
 import { createRealtimeRoutes } from '#/server/routes/realtime.ts'
 import { createRepoRoutes } from '#/server/routes/repo.ts'
+import { createRepoViewRoutes } from '#/server/routes/repo-view.ts'
 import { createSettingsRoutes } from '#/server/routes/settings.ts'
 import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 import { createServerSettingsState } from '#/server/modules/settings-state.ts'
@@ -215,6 +216,7 @@ export function createApp(options: ServerAppOptions): Hono {
   app.route('/api/host', createHostRoutes())
   app.route('/api/remote', createRemoteRoutes())
   app.route('/api/repo', createRepoRoutes())
+  app.route('/api/repo', createRepoViewRoutes())
   app.route('/api/clipboard', createClipboardRoutes())
   app.route('/ws', createRealtimeRoutes({ accessToken: options.accessToken, terminalHost: options.terminalHost }))
 

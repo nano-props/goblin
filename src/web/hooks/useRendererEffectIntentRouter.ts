@@ -3,6 +3,7 @@ import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { onRendererLocalEventType } from '#/web/local-events.ts'
 import { subscribeRendererEffectIntent } from '#/web/renderer-ingress.ts'
+import { subscribeServerRendererIntentIngress } from '#/web/server-renderer-intent-ingress.ts'
 import { intentLog } from '#/web/logger.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import {
@@ -13,6 +14,7 @@ import {
 } from '#/web/hooks/renderer-effect-intent-handlers.ts'
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
+import type { RendererEffectIntent } from '#/shared/renderer-effect-intents.ts'
 import {
   rendererEffectIntentStoreActionsEqual,
   rendererEffectIntentStoreActionsFromStore,
@@ -84,24 +86,31 @@ export function useRendererEffectIntentRouter({
       t: (key: string) => tRef.current(key),
     })
 
-    const offIntent = subscribeRendererEffectIntent((event) => {
+    // One dispatch closure fed by both ingresses. Adding a new
+    // producer (Electron IPC, server WS, future transports) is a
+    // one-line `subscribe*(dispatch)` below — no copy of the
+    // switch / handler chain.
+    const dispatch = (intent: RendererEffectIntent) => {
       void (async () => {
         try {
-          switch (event.type) {
+          switch (intent.type) {
             case 'terminal-bell-click':
-              handleTerminalBellClickIntent(event, sharedDeps())
+              handleTerminalBellClickIntent(intent, sharedDeps())
               return
             case 'external-open-enqueued':
               externalOpenDrainer.drain()
               return
           }
-          if (await handleAppLevelRendererIntent(event, sharedDeps())) return
-          if (await handleWorkspaceRendererIntent(event, sharedDeps())) return
+          if (await handleAppLevelRendererIntent(intent, sharedDeps())) return
+          if (await handleWorkspaceRendererIntent(intent, sharedDeps())) return
         } catch (err) {
-          intentLog.warn(`${event.type} failed`, { err })
+          intentLog.warn(`${intent.type} failed`, { err })
         }
       })()
-    })
+    }
+
+    const offIntent = subscribeRendererEffectIntent(dispatch)
+    const offServerIntent = subscribeServerRendererIntentIngress(dispatch)
     const offLocalBellClick = onRendererLocalEventType('terminal-bell-click', (event) => {
       handleTerminalBellClickIntent(event, sharedDeps())
     })
@@ -111,6 +120,7 @@ export function useRendererEffectIntentRouter({
     return () => {
       externalOpenDrainer.dispose()
       offIntent()
+      offServerIntent()
       offLocalBellClick()
     }
   }, [

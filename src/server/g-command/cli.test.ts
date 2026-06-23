@@ -1,75 +1,135 @@
 import { describe, expect, test, vi } from 'vitest'
-import { runGoblinCommand, summarizeStatus } from '#/server/g-command/cli.ts'
+import { runGoblinCommand } from '#/server/g-command/cli.ts'
+import type { GoblinCommandIo, GoblinCommandTransport } from '#/server/g-command/context.ts'
 
-function makeIo() {
-  const fetchMock = vi.fn()
+type PostJsonFn = (pathname: string, body: unknown) => Promise<unknown>
+type GetJsonFn = (pathname: string, query?: Record<string, string>) => Promise<unknown>
+type StdoutFn = (message: string) => void
+type StderrFn = (message: string) => void
+
+function makeIo(): { io: GoblinCommandIo; stdout: ReturnType<typeof vi.fn<StdoutFn>>; stderr: ReturnType<typeof vi.fn<StderrFn>> } {
+  const stdout = vi.fn<StdoutFn>()
+  const stderr = vi.fn<StderrFn>()
   return {
-    io: {
-      stdout: vi.fn(),
-      stderr: vi.fn(),
-      fetch: fetchMock as unknown as typeof fetch,
-    },
-    fetchMock,
+    io: { stdout, stderr },
+    stdout,
+    stderr,
   }
 }
 
+function makeTransport(): {
+  transport: GoblinCommandTransport
+  postJson: ReturnType<typeof vi.fn<PostJsonFn>>
+  get: ReturnType<typeof vi.fn<GetJsonFn>>
+} {
+  const postJson = vi.fn<PostJsonFn>()
+  const get = vi.fn<GetJsonFn>()
+  const transport: GoblinCommandTransport = {
+    postJson: postJson as GoblinCommandTransport['postJson'],
+    get: get as GoblinCommandTransport['get'],
+  }
+  return { transport, postJson, get }
+}
+
 describe('g command cli', () => {
-  test('prints help', async () => {
-    const { io, fetchMock } = makeIo()
+  test('prints help for the help command', async () => {
+    const { io } = makeIo()
+    const { transport, postJson } = makeTransport()
 
-    const code = await runGoblinCommand(['help'], {}, io)
-
-    expect(code).toBe(0)
-    expect(io.stdout).toHaveBeenCalledWith(expect.stringContaining('g status [cwd]'))
-    expect(fetchMock).not.toHaveBeenCalled()
-  })
-
-  test('prints current worktree status through the Goblin API', async () => {
-    const { io, fetchMock } = makeIo()
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: vi.fn(async () => [
-        {
-          path: '/repo/worktree',
-          branch: 'feature',
-          entries: [{ x: 'M', y: ' ', path: 'src/app.ts' }],
-        },
-      ]),
-    })
-
-    const code = await runGoblinCommand(
-      ['status'],
-      {
-        GOBLIN_SERVER_URL: 'http://127.0.0.1:32100',
-        GOBLIN_SERVER_ACCESS_TOKEN: 'secret',
-        GOBLIN_WORKTREE_PATH: '/repo/worktree',
-      },
-      io,
-    )
+    const code = await runGoblinCommand(['help'], {}, io, transport)
 
     expect(code).toBe(0)
-    expect(fetchMock).toHaveBeenCalledWith(
-      new URL('http://127.0.0.1:32100/api/repo/status?cwd=%2Frepo%2Fworktree'),
-      {
-        headers: {
-          'x-goblin-access-token': 'secret',
-        },
-      },
-    )
-    expect(io.stdout).toHaveBeenCalledWith('1 change\nfeature:\n  M  src/app.ts')
+    expect(io.stdout).toHaveBeenCalledWith(expect.stringContaining('g help'))
+    expect(io.stdout).toHaveBeenCalledWith(expect.stringContaining('Open the changes tab'))
+    expect(io.stdout).toHaveBeenCalledWith(expect.stringContaining('g i'))
+    expect(io.stdout).toHaveBeenCalledWith(expect.stringContaining('g log'))
+    expect(postJson).not.toHaveBeenCalled()
   })
 
-  test('requires the inherited Goblin access token for API commands', async () => {
-    const { io, fetchMock } = makeIo()
+  test('prints help and falls back to it when no command is given', async () => {
+    const { io } = makeIo()
+    const { transport } = makeTransport()
 
-    const code = await runGoblinCommand(['status'], { GOBLIN_WORKTREE_PATH: '/repo' }, io)
+    const code = await runGoblinCommand([], {}, io, transport)
+
+    expect(code).toBe(0)
+    expect(io.stdout).toHaveBeenCalledWith(expect.stringContaining('g help'))
+  })
+
+  test('rejects unknown commands and prints usage', async () => {
+    const { io } = makeIo()
+    const { transport } = makeTransport()
+
+    const code = await runGoblinCommand(['frobnicate'], {}, io, transport)
+
+    expect(code).toBe(2)
+    expect(io.stderr).toHaveBeenCalledWith(expect.stringContaining('g: unknown command: frobnicate'))
+    expect(io.stderr).toHaveBeenCalledWith(expect.stringContaining('g help'))
+  })
+
+  test('g ss posts a view intent for the changes tab', async () => {
+    const { io } = makeIo()
+    const { transport, postJson } = makeTransport()
+    postJson.mockResolvedValue({ ok: true })
+
+    const code = await runGoblinCommand(['ss'], {}, io, transport)
+
+    expect(code).toBe(0)
+    expect(postJson).toHaveBeenCalledWith('/api/repo/view', { tab: 'changes' })
+  })
+
+  test('g i posts a view intent for the status tab', async () => {
+    const { io } = makeIo()
+    const { transport, postJson } = makeTransport()
+    postJson.mockResolvedValue({ ok: true })
+
+    const code = await runGoblinCommand(['i'], {}, io, transport)
+
+    expect(code).toBe(0)
+    expect(postJson).toHaveBeenCalledWith('/api/repo/view', { tab: 'status' })
+  })
+
+  test('g log posts a view intent for the history tab', async () => {
+    const { io } = makeIo()
+    const { transport, postJson } = makeTransport()
+    postJson.mockResolvedValue({ ok: true })
+
+    const code = await runGoblinCommand(['log'], {}, io, transport)
+
+    expect(code).toBe(0)
+    expect(postJson).toHaveBeenCalledWith('/api/repo/view', { tab: 'history' })
+  })
+
+  test('rejects extra positional arguments for view commands', async () => {
+    const { io } = makeIo()
+    const { transport, postJson } = makeTransport()
+
+    const code = await runGoblinCommand(['ss', 'extra'], {}, io, transport)
+
+    expect(code).toBe(2)
+    expect(io.stderr).toHaveBeenCalledWith(expect.stringContaining('does not take arguments'))
+    expect(postJson).not.toHaveBeenCalled()
+  })
+
+  test('surfaces server-side errors with non-zero exit code', async () => {
+    const { io } = makeIo()
+    const { transport, postJson } = makeTransport()
+    postJson.mockResolvedValue({ ok: false, message: 'no Goblin window is currently listening' })
+
+    const code = await runGoblinCommand(['ss'], {}, io, transport)
 
     expect(code).toBe(1)
-    expect(io.stderr).toHaveBeenCalledWith('g: GOBLIN_SERVER_ACCESS_TOKEN is not set')
-    expect(fetchMock).not.toHaveBeenCalled()
+    expect(io.stderr).toHaveBeenCalledWith(expect.stringContaining('no Goblin window'))
   })
 
-  test('summarizes clean status', () => {
-    expect(summarizeStatus([{ path: '/repo', entries: [] }])).toBe('clean')
+  test('surfaces transport-level errors with non-zero exit code', async () => {
+    const { io } = makeIo()
+    const { transport, postJson } = makeTransport()
+    postJson.mockRejectedValue(new Error('connection refused'))
+
+    const code = await runGoblinCommand(['ss'], {}, io, transport)
+
+    expect(code).toBe(1)
+    expect(io.stderr).toHaveBeenCalledWith(expect.stringContaining('connection refused'))
   })
 })
