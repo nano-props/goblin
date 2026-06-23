@@ -1,79 +1,159 @@
-// Workspace-level host for the five branch action confirmation
-// dialogs (push / delete branch / force-delete / remove worktree /
-// force-remove worktree). State lives in `useBranchActionDialogsStore`,
-// not in component local state, so a confirmation requested from a
-// temporary surface (e.g. the focus-mode HoverCard popover) survives
-// the surface unmounting.
+// Layout-level host for the five branch action confirmation dialogs
+// (push / delete branch / force-delete / remove worktree / force-
+// remove worktree).
 //
-// Mount once per visible BranchWorkspace. Multiple mounts are safe:
-// the store keeps a single open-dialog slot, so only one dialog is
-// rendered at a time across the entire app regardless of how many
-// hosts are alive.
+// Mounted once in `Layout.MainWindowOverlays`, outside `<Outlet />`, so
+// it survives settings ⇄ workspace navigation. State lives in
+// `useBranchActionDialogsStore`, not in any React component local
+// state, so a confirmation requested from a temporary surface (e.g.
+// the focus-mode HoverCard popover) survives the surface unmounting.
+//
+// Unlike the previous workspace-mounted iteration, this host does NOT
+// close over a `(repo, branch)` for dispatch. Every confirmation is
+// resolved against the **dialog payload's** `(repoId, branchName)`,
+// looked up in `useReposStore`. This means:
+//   * The user can open a confirmation for a non-selected branch
+//     row (e.g. a row in the focus-mode HoverCard popover) and
+//     confirm against the right branch data, not the workspace's
+//     selected branch.
+//   * When the user switches active repo or selected branch, the
+//     `closeStaleDialogs` effect below closes any open dialog
+//     whose `(repoId, branchName)` no longer matches — no stale
+//     "Delete worktree for branch X" dialog can be confirmed
+//     against repo B's cwd.
 
 import { Trans } from 'react-i18next'
 import { type ReactNode } from 'react'
+import { useEffect } from 'react'
 import { ConfirmCheckbox } from '#/web/components/ConfirmCheckbox.tsx'
 import { ConfirmDialog } from '#/web/components/ConfirmDialog.tsx'
 import { formatWorktreePath } from '#/web/lib/paths.ts'
 import { remoteRepoTarget } from '#/web/stores/repos/helpers.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import type { RepoBranchState } from '#/web/stores/repos/types.ts'
 import { PROTECTED_BRANCHES } from '#/shared/git-types.ts'
-import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
-import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
-import { useBranchActions } from '#/web/hooks/useBranchActions.tsx'
 import {
   branchCheckboxesFor,
   useBranchActionDialogsStore,
   type RemoveWorktreeDialogPayload,
 } from '#/web/stores/repos/branch-action-dialogs.ts'
+import { useReposStore } from '#/web/stores/repos/store.ts'
+import {
+  dispatchConfirmPush,
+  dispatchDeleteBranch,
+  dispatchRemoveWorktree,
+} from '#/web/hooks/branchActionDispatch.ts'
+import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
+import type { RepoBranchState } from '#/web/stores/repos/types.ts'
 
 interface Props {
-  repo: BranchActionRepo
-  branch: RepoBranchState
+  /**
+   * The currently active `(repoId, branchName)`. Used as the key
+   * for `closeStaleDialogs` and as a fallback when a dialog slot
+   * is open but its payload's branch is missing from the repo
+   * (e.g. the branch was deleted upstream). Pass `null` when no
+   * repo is active — the host renders nothing.
+   */
+  activeRepoId: string | null
+  activeBranchName: string | null
 }
 
-export function BranchActionDialogHost({ repo, branch }: Props): ReactNode {
+export function BranchActionDialogHost({ activeRepoId, activeBranchName }: Props): ReactNode {
   const t = useT()
 
   // One subscription per slot — re-renders are scoped to the dialog
-  // that actually changed, not the whole host.
+  // that actually changed, not the whole host. The host still
+  // re-renders as a whole when any slot changes (no React.memo on
+  // the children), so all five `<ConfirmDialog>` instances below are
+  // re-evaluated; Radix renders nothing visible for `open={false}`
+  // dialogs, so the per-dialog cost is small.
   const pushConfirm = useBranchActionDialogsStore((s) => s.pushConfirm)
   const deleteConfirm = useBranchActionDialogsStore((s) => s.deleteConfirm)
   const forceDeleteConfirm = useBranchActionDialogsStore((s) => s.forceDeleteConfirm)
   const removeConfirm = useBranchActionDialogsStore((s) => s.removeConfirm)
   const forceRemoveConfirm = useBranchActionDialogsStore((s) => s.forceRemoveConfirm)
-  const checkboxState = useBranchActionDialogsStore((s) =>
-    branchCheckboxesFor(s, repo.id, branch.name),
-  )
 
-  // Dispatch callbacks. The duplicate `useBranchActions` call is
-  // intentional: the previous design stuffed dialog state inside the
-  // hook instance, which forced every caller to share one instance and
-  // made the dialog state hostage to whichever surface owned the row.
-  // With state moved to the store, each caller can grab its own
-  // dispatch methods independently — the only thing they share is the
-  // store, which is the point.
-  const { deleteBranch, removeWorktree, confirmPush } = useBranchActions(repo, branch)
-
+  // Store actions. Functions are stable references defined once at
+  // store creation, so subscribing to them is a no-op for re-render
+  // purposes but keeps the access pattern consistent.
   const closeDialog = useBranchActionDialogsStore((s) => s.closeDialog)
+  const closeStaleDialogs = useBranchActionDialogsStore((s) => s.closeStaleDialogs)
   const setRemoveAlsoDeletes = useBranchActionDialogsStore((s) => s.setRemoveAlsoDeletes)
   const setRemoveAlsoUpstream = useBranchActionDialogsStore((s) => s.setRemoveAlsoUpstream)
   const setDeleteAlsoUpstream = useBranchActionDialogsStore((s) => s.setDeleteAlsoUpstream)
 
-  const remoteTarget: RemoteRepoTarget | null | undefined = remoteRepoTarget(repo.id, repo.remote.lifecycle)
-  const hasUpstream = !!branch.tracking && !branch.trackingGone
+  // Auto-close any dialog whose (repoId, branchName) no longer
+  // matches the active workspace. Runs on active-repo / active-branch
+  // change. Setting the dep array to `[activeRepoId, activeBranchName]`
+  // (not including `closeStaleDialogs` since the action function is
+  // a stable reference) means the effect fires exactly when the
+  // active workspace changes — not when the user opens or closes a
+  // dialog.
+  useEffect(() => {
+    if (activeRepoId === null || activeBranchName === null) {
+      // No active workspace — close any open dialog to avoid
+      // leaving the user with a dialog whose dispatch would target
+      // a stale repo.
+      useBranchActionDialogsStore.getState().closeStaleDialogs('', '')
+      return
+    }
+    closeStaleDialogs(activeRepoId, activeBranchName)
+  }, [activeRepoId, activeBranchName, closeStaleDialogs])
+
+  // Resolve the (repo, branch) for each open slot from the store
+  // payload. The host never uses its own (activeRepo, activeBranch)
+  // for rendering context — every slot is rendered with its own
+  // payload's branch, so the user can confirm against the right
+  // branch data even if the dialog was opened for a non-selected
+  // row.
+  const repos = useReposStore((s) => s.repos)
+  const resolveContext = (repoId: string, branchName: string) => {
+    const repo = repos[repoId]
+    if (!repo) return null
+    const branch = repo.data.branches.find((b) => b.name === branchName)
+    if (!branch) return null
+    return { repo, branch }
+  }
+
+  const pushConfirmCtx = pushConfirm ? resolveContext(pushConfirm.repoId, pushConfirm.branchName) : null
+  const deleteConfirmCtx = deleteConfirm ? resolveContext(deleteConfirm.repoId, deleteConfirm.branchName) : null
+  const forceDeleteConfirmCtx = forceDeleteConfirm
+    ? resolveContext(forceDeleteConfirm.repoId, forceDeleteConfirm.branchName)
+    : null
+  const removeConfirmCtx = removeConfirm ? resolveContext(removeConfirm.repoId, removeConfirm.branchName) : null
+  const forceRemoveConfirmCtx = forceRemoveConfirm
+    ? resolveContext(forceRemoveConfirm.repoId, forceRemoveConfirm.branchName)
+    : null
+
+  // Pre-compute per-slot display data. Each slot's checkbox state and
+  // `hasUpstream` / `tracking` are read from the slot's payload's
+  // `(repoId, branchName)`, not the host's active workspace. This is
+  // the key fix for the cross-branch bug: opening a dialog for branch
+  // Y while the workspace is on X shows Y's tracking data and writes
+  // Y's checkbox preferences, not X's.
+  const pushConfirmCheckbox = useBranchActionDialogsStore((s) =>
+    pushConfirm ? branchCheckboxesFor(s, pushConfirm.repoId, pushConfirm.branchName) : null,
+  )
+  const deleteConfirmCheckbox = useBranchActionDialogsStore((s) =>
+    deleteConfirm ? branchCheckboxesFor(s, deleteConfirm.repoId, deleteConfirm.branchName) : null,
+  )
+  const forceDeleteConfirmCheckbox = useBranchActionDialogsStore((s) =>
+    forceDeleteConfirm ? branchCheckboxesFor(s, forceDeleteConfirm.repoId, forceDeleteConfirm.branchName) : null,
+  )
+  const removeConfirmCheckbox = useBranchActionDialogsStore((s) =>
+    removeConfirm ? branchCheckboxesFor(s, removeConfirm.repoId, removeConfirm.branchName) : null,
+  )
+  const forceRemoveConfirmCheckbox = useBranchActionDialogsStore((s) =>
+    forceRemoveConfirm ? branchCheckboxesFor(s, forceRemoveConfirm.repoId, forceRemoveConfirm.branchName) : null,
+  )
+
   const removeConfirmProtected = removeConfirm
     ? PROTECTED_BRANCHES.has(removeConfirm.payload.branch)
-    : false
-  const forceRemoveConfirmProtected = forceRemoveConfirm
-    ? PROTECTED_BRANCHES.has(forceRemoveConfirm.payload.branch)
     : false
 
   return (
     <>
       <ConfirmDialog
-        open={pushConfirm !== null}
+        open={pushConfirm !== null && pushConfirmCtx !== null}
         title={pushConfirm ? t('action.confirm-push-protected-title', { branch: pushConfirm.payload }) : ''}
         message={
           pushConfirm ? (
@@ -90,25 +170,29 @@ export function BranchActionDialogHost({ repo, branch }: Props): ReactNode {
         destructive
         onCancel={() => closeDialog('pushConfirm')}
         onConfirm={() => {
-          const target = pushConfirm?.payload ?? null
+          const entry = pushConfirm
           closeDialog('pushConfirm')
-          if (target) confirmPush(target)
+          if (entry && pushConfirmCtx) {
+            dispatchConfirmPush({ repo: pushConfirmCtx.repo, branchName: entry.payload })
+          }
         }}
       />
 
       <ConfirmDialog
-        open={deleteConfirm !== null}
+        open={deleteConfirm !== null && deleteConfirmCtx !== null}
         title={deleteConfirm ? t('action.confirm-delete-branch-title') : ''}
         message={
-          deleteConfirm ? (
+          deleteConfirm && deleteConfirmCtx ? (
             <DeleteBranchConfirmBody
               body={t('action.confirm-delete-branch-body')}
               branchName={deleteConfirm.payload}
               note={t('action.confirm-delete-branch-note')}
-              hasUpstream={hasUpstream}
-              deleteAlsoUpstream={checkboxState.deleteAlsoUpstream}
-              tracking={branch.tracking}
-              onDeleteAlsoUpstreamChange={(value) => setDeleteAlsoUpstream(repo.id, branch.name, value)}
+              hasUpstream={hasUpstream(deleteConfirmCtx.branch)}
+              deleteAlsoUpstream={deleteConfirmCheckbox?.deleteAlsoUpstream ?? false}
+              tracking={deleteConfirmCtx.branch.tracking}
+              onDeleteAlsoUpstreamChange={(value) =>
+                setDeleteAlsoUpstream(deleteConfirm.repoId, deleteConfirm.branchName, value)
+              }
               upstreamLabel={t('action.confirm-delete-branch-also-delete-upstream')}
             />
           ) : (
@@ -119,26 +203,36 @@ export function BranchActionDialogHost({ repo, branch }: Props): ReactNode {
         destructive
         onCancel={() => closeDialog('deleteConfirm')}
         onConfirm={() => {
-          const target = deleteConfirm?.payload ?? null
-          const upstream = checkboxState.deleteAlsoUpstream
+          const entry = deleteConfirm
+          const ctx = deleteConfirmCtx
+          const upstream = deleteConfirmCheckbox?.deleteAlsoUpstream ?? false
           closeDialog('deleteConfirm')
-          if (target) deleteBranch(target, false, upstream)
+          if (entry && ctx) {
+            dispatchDeleteBranch({
+              repo: ctx.repo,
+              branchName: entry.payload,
+              force: false,
+              alsoDeleteUpstream: upstream,
+            })
+          }
         }}
       />
 
       <ConfirmDialog
-        open={forceDeleteConfirm !== null}
+        open={forceDeleteConfirm !== null && forceDeleteConfirmCtx !== null}
         title={forceDeleteConfirm ? t('action.confirm-force-delete-unmerged-title') : ''}
         message={
-          forceDeleteConfirm ? (
+          forceDeleteConfirm && forceDeleteConfirmCtx ? (
             <DeleteBranchConfirmBody
               body={t('action.confirm-force-delete-unmerged-body')}
               branchName={forceDeleteConfirm.payload}
               note={t('action.confirm-force-delete-unmerged-note')}
-              hasUpstream={hasUpstream}
-              deleteAlsoUpstream={checkboxState.deleteAlsoUpstream}
-              tracking={branch.tracking}
-              onDeleteAlsoUpstreamChange={(value) => setDeleteAlsoUpstream(repo.id, branch.name, value)}
+              hasUpstream={hasUpstream(forceDeleteConfirmCtx.branch)}
+              deleteAlsoUpstream={forceDeleteConfirmCheckbox?.deleteAlsoUpstream ?? false}
+              tracking={forceDeleteConfirmCtx.branch.tracking}
+              onDeleteAlsoUpstreamChange={(value) =>
+                setDeleteAlsoUpstream(forceDeleteConfirm.repoId, forceDeleteConfirm.branchName, value)
+              }
               upstreamLabel={t('action.confirm-delete-branch-also-delete-upstream')}
             />
           ) : (
@@ -149,30 +243,45 @@ export function BranchActionDialogHost({ repo, branch }: Props): ReactNode {
         destructive
         onCancel={() => closeDialog('forceDeleteConfirm')}
         onConfirm={() => {
-          const target = forceDeleteConfirm?.payload ?? null
-          const upstream = checkboxState.deleteAlsoUpstream
+          const entry = forceDeleteConfirm
+          const ctx = forceDeleteConfirmCtx
+          const upstream = forceDeleteConfirmCheckbox?.deleteAlsoUpstream ?? false
           closeDialog('forceDeleteConfirm')
-          if (target) deleteBranch(target, true, upstream)
+          if (entry && ctx) {
+            dispatchDeleteBranch({
+              repo: ctx.repo,
+              branchName: entry.payload,
+              force: true,
+              alsoDeleteUpstream: upstream,
+            })
+          }
         }}
       />
 
       <ConfirmDialog
-        open={removeConfirm !== null}
+        open={removeConfirm !== null && removeConfirmCtx !== null}
         title={removeConfirm ? t('action.confirm-remove-worktree-title') : ''}
         message={
-          removeConfirm ? (
+          removeConfirm && removeConfirmCtx ? (
             <RemoveWorktreeConfirmBody
               body={t('action.confirm-remove-worktree-body')}
-              path={formatWorktreePath(removeConfirm.payload.path, remoteTarget)}
+              path={formatWorktreePath(
+                removeConfirm.payload.path,
+                remoteRepoTarget(removeConfirmCtx.repo.id, removeConfirmCtx.repo.remote.lifecycle),
+              )}
               branch={removeConfirm.payload.branch}
               protectedHint={t('action.confirm-remove-worktree-protected-hint')}
-              removeAlsoDeletes={checkboxState.removeAlsoDeletes}
+              removeAlsoDeletes={removeConfirmCheckbox?.removeAlsoDeletes ?? false}
               removeConfirmProtected={removeConfirmProtected}
-              hasUpstream={hasUpstream}
-              tracking={branch.tracking}
-              removeAlsoUpstream={checkboxState.removeAlsoUpstream}
-              onRemoveAlsoDeletesChange={(value) => setRemoveAlsoDeletes(repo.id, branch.name, value)}
-              onRemoveAlsoUpstreamChange={(value) => setRemoveAlsoUpstream(repo.id, branch.name, value)}
+              hasUpstream={hasUpstream(removeConfirmCtx.branch)}
+              tracking={removeConfirmCtx.branch.tracking}
+              removeAlsoUpstream={removeConfirmCheckbox?.removeAlsoUpstream ?? false}
+              onRemoveAlsoDeletesChange={(value) =>
+                setRemoveAlsoDeletes(removeConfirm.repoId, removeConfirm.branchName, value)
+              }
+              onRemoveAlsoUpstreamChange={(value) =>
+                setRemoveAlsoUpstream(removeConfirm.repoId, removeConfirm.branchName, value)
+              }
               alsoDeleteBranchLabel={t('action.confirm-remove-worktree-also-delete-branch')}
               alsoDeleteUpstreamLabel={t('action.confirm-delete-branch-also-delete-upstream')}
             />
@@ -184,33 +293,45 @@ export function BranchActionDialogHost({ repo, branch }: Props): ReactNode {
         destructive
         onCancel={() => closeDialog('removeConfirm')}
         onConfirm={() => {
-          const target = removeConfirm?.payload ?? null
-          if (!target) {
+          const entry = removeConfirm
+          const ctx = removeConfirmCtx
+          if (!entry || !ctx) {
             closeDialog('removeConfirm')
             return
           }
-          const alsoDelete = checkboxState.removeAlsoDeletes
-          const upstream = checkboxState.removeAlsoUpstream
+          const alsoDelete = removeConfirmCheckbox?.removeAlsoDeletes ?? false
+          const upstream = removeConfirmCheckbox?.removeAlsoUpstream ?? false
           closeDialog('removeConfirm')
-          removeWorktree(target, alsoDelete, false, upstream)
+          dispatchRemoveWorktree({
+            repo: ctx.repo,
+            target: entry.payload,
+            alsoDeleteBranch: alsoDelete,
+            forceDeleteBranch: false,
+            alsoDeleteUpstream: upstream,
+          })
         }}
       />
 
       <ConfirmDialog
-        open={forceRemoveConfirm !== null}
+        open={forceRemoveConfirm !== null && forceRemoveConfirmCtx !== null}
         title={forceRemoveConfirm ? t('action.confirm-force-delete-branch-title') : ''}
         message={
-          forceRemoveConfirm ? (
+          forceRemoveConfirm && forceRemoveConfirmCtx ? (
             <ForceRemoveWorktreeConfirmBody
               removeBody={t('action.confirm-remove-worktree-body')}
-              path={formatWorktreePath(forceRemoveConfirm.payload.path, remoteTarget)}
+              path={formatWorktreePath(
+                forceRemoveConfirm.payload.path,
+                remoteRepoTarget(forceRemoveConfirmCtx.repo.id, forceRemoveConfirmCtx.repo.remote.lifecycle),
+              )}
               forceDeleteBody={t('action.confirm-force-delete-branch-body')}
               branch={forceRemoveConfirm.payload.branch}
               note={t('action.confirm-force-delete-branch-note')}
-              hasUpstream={hasUpstream}
-              tracking={branch.tracking}
-              removeAlsoUpstream={checkboxState.removeAlsoUpstream}
-              onRemoveAlsoUpstreamChange={(value) => setRemoveAlsoUpstream(repo.id, branch.name, value)}
+              hasUpstream={hasUpstream(forceRemoveConfirmCtx.branch)}
+              tracking={forceRemoveConfirmCtx.branch.tracking}
+              removeAlsoUpstream={forceRemoveConfirmCheckbox?.removeAlsoUpstream ?? false}
+              onRemoveAlsoUpstreamChange={(value) =>
+                setRemoveAlsoUpstream(forceRemoveConfirm.repoId, forceRemoveConfirm.branchName, value)
+              }
               alsoDeleteUpstreamLabel={t('action.confirm-delete-branch-also-delete-upstream')}
             />
           ) : (
@@ -221,18 +342,29 @@ export function BranchActionDialogHost({ repo, branch }: Props): ReactNode {
         destructive
         onCancel={() => closeDialog('forceRemoveConfirm')}
         onConfirm={() => {
-          const target = forceRemoveConfirm?.payload ?? null
-          if (!target) {
+          const entry = forceRemoveConfirm
+          const ctx = forceRemoveConfirmCtx
+          if (!entry || !ctx) {
             closeDialog('forceRemoveConfirm')
             return
           }
-          const upstream = checkboxState.removeAlsoUpstream
+          const upstream = forceRemoveConfirmCheckbox?.removeAlsoUpstream ?? false
           closeDialog('forceRemoveConfirm')
-          removeWorktree(target, true, true, upstream)
+          dispatchRemoveWorktree({
+            repo: ctx.repo,
+            target: entry.payload,
+            alsoDeleteBranch: true,
+            forceDeleteBranch: true,
+            alsoDeleteUpstream: upstream,
+          })
         }}
       />
     </>
   )
+}
+
+function hasUpstream(branch: RepoBranchState): boolean {
+  return !!branch.tracking && !branch.trackingGone
 }
 
 function ConfirmValue({ value }: { value: string }) {
@@ -413,7 +545,3 @@ function ForceRemoveWorktreeConfirmBody({
     </ConfirmStack>
   )
 }
-
-// Re-export the payload shape so external callers (e.g. tests) can
-// import the canonical name without reaching into the store file.
-export type { RemoveWorktreeDialogPayload }

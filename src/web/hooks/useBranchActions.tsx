@@ -13,17 +13,8 @@ import { openRemoteRepositoryEditor, openRemoteRepositoryTerminal } from '#/web/
 import { openBranchExternalTarget } from '#/web/hooks/openBranchExternalTarget.ts'
 import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
 import { getBranchWorktreeState } from '#/web/stores/repos/worktree-state.ts'
-import {
-  deleteBranchNeedsForceConfirm,
-  dispatchRepoBranchAction,
-  dispatchRepoUiAction,
-  isPushProtected,
-  removeWorktreeNeedsForceConfirm,
-} from '#/web/stores/repos/branch-action-write-paths.ts'
-import {
-  useBranchActionDialogsStore,
-  type RemoveWorktreeDialogPayload,
-} from '#/web/stores/repos/branch-action-dialogs.ts'
+import { dispatchRepoBranchAction, dispatchRepoUiAction, isPushProtected } from '#/web/stores/repos/branch-action-write-paths.ts'
+import { useBranchActionDialogsStore } from '#/web/stores/repos/branch-action-dialogs.ts'
 import {
   branchActionBusyItemId,
   type BranchActionRepo,
@@ -67,17 +58,12 @@ export function getBranchActionCapabilities(repo: BranchActionRepo, branch: Repo
 }
 
 /**
- * Per-(repoId, branchName) action surface — capabilities, the public
- * "request" actions (most of which open a confirm dialog), and the
- * dispatch-only paths the dialog uses to commit a confirmed action.
- *
- * Dialog state (open/close + payload + checkbox state) lives in
- * `useBranchActionDialogsStore` so it survives the surface that
- * requested it — see `BranchActionDialogHost` for the workspace-level
- * mount. This hook therefore has no `dialogs` return value and no
- * `useRetainedDialogState` calls; the previous design coupled those
- * to whichever React subtree happened to render the row's menu,
- * which is exactly how the focus-mode popover leaked dialog state.
+ * Per-(repoId, branchName) request surface — capabilities and the
+ * "request" actions that open a confirm dialog. Dialog state itself
+ * lives in `useBranchActionDialogsStore` so it survives the surface
+ * that requested it; see `BranchActionDialogHost` for the
+ * workspace-level render point and `branchActionDispatch` for the
+ * dispatch functions the dialog uses to commit a confirmed action.
  */
 export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState) {
   const setLastResult = useReposStore((s) => s.setLastResult)
@@ -94,6 +80,17 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
     return branchActionBusy || hasPendingLocalAction()
   }
 
+  function runRepoAction(
+    action: Parameters<typeof runBranchAction>[1],
+    options?: { deferResultMessages?: string[]; handleResult?: (result: ExecResult) => boolean },
+  ): void {
+    if (guardBusy()) return
+    void dispatchRepoBranchAction(repo.id, repo.instanceToken, action, runBranchAction, {
+      deferResultMessages: options?.deferResultMessages,
+      handleResult: options?.handleResult,
+    })
+  }
+
   function runUiAction(
     op: LocalBranchActionItemId,
     fn: () => Promise<ExecResult>,
@@ -107,20 +104,10 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
       })
       return result
     })
-    // useAsyncPending.run returns Promise<unknown>; the inner async fn above
-    // is statically known to resolve to ExecResult | null, so narrow once.
+    // useAsyncPending.run returns Promise<unknown>; the inner async fn
+    // above is statically known to resolve to ExecResult | null, so
+    // narrow once.
     return (pending ?? Promise.resolve(null)) as Promise<ExecResult | null>
-  }
-
-  async function runRepoAction(
-    action: Parameters<typeof runBranchAction>[1],
-    options?: { deferResultMessages?: string[]; handleResult?: (result: ExecResult) => boolean },
-  ) {
-    if (guardBusy()) return
-    await dispatchRepoBranchAction(repo.id, repo.instanceToken, action, runBranchAction, {
-      deferResultMessages: options?.deferResultMessages,
-      handleResult: options?.handleResult,
-    })
   }
 
   function copyPatch(): Promise<boolean> {
@@ -140,7 +127,7 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
   }
 
   function pull() {
-    void runRepoAction({ kind: 'pull', branch: branch.name, worktreePath: branch.worktree?.path })
+    runRepoAction({ kind: 'pull', branch: branch.name, worktreePath: branch.worktree?.path })
   }
 
   function push() {
@@ -149,7 +136,8 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
       // Open the protected-branch confirm dialog through the central
       // store. State outlives any temporary surface (e.g. focus-mode
       // HoverCard popover), so the dialog stays open even after the
-      // trigger surface unmounts.
+      // trigger surface unmounts. The dialog's Confirm button calls
+      // `dispatchConfirmPush` from `branchActionDispatch` to commit.
       useBranchActionDialogsStore.getState().openPushConfirm({
         repoId: repo.id,
         branchName: branch.name,
@@ -157,17 +145,7 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
       })
       return
     }
-    void runRepoAction({ kind: 'push', branch: branch.name })
-  }
-
-  /**
-   * Dispatch push directly without re-evaluating the protected-branch
-   * gate. Called from the protected-branch confirm dialog onConfirm —
-   * the user has already cleared the gate by confirming.
-   */
-  function confirmPush(target: string) {
-    if (guardBusy()) return
-    void runRepoAction({ kind: 'push', branch: target })
+    runRepoAction({ kind: 'push', branch: branch.name })
   }
 
   function openTerminal() {
@@ -213,58 +191,6 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
     )
   }
 
-  function deleteBranch(target: string, force = false, alsoDeleteUpstream = false) {
-    void runRepoAction(
-      { kind: 'deleteBranch', branch: target, force, alsoDeleteUpstream },
-      {
-        deferResultMessages: force ? [] : ['error.branch-not-fully-merged'],
-        handleResult: (result) => {
-          if (deleteBranchNeedsForceConfirm(result, force)) {
-            useBranchActionDialogsStore.getState().openForceDeleteConfirm({
-              repoId: repo.id,
-              branchName: target,
-              payload: target,
-            })
-            return true
-          }
-          return false
-        },
-      },
-    )
-  }
-
-  function removeWorktree(
-    target: RemoveWorktreeDialogPayload,
-    alsoDeleteBranch: boolean,
-    forceDeleteBranch: boolean,
-    alsoDeleteUpstream = false,
-  ) {
-    void runRepoAction(
-      {
-        kind: 'removeWorktree',
-        branch: target.branch,
-        worktreePath: target.path,
-        alsoDeleteBranch,
-        forceDeleteBranch,
-        alsoDeleteUpstream,
-      },
-      {
-        deferResultMessages: alsoDeleteBranch && !forceDeleteBranch ? ['error.cannot-remove-unpushed-worktree'] : [],
-        handleResult: (result) => {
-          if (removeWorktreeNeedsForceConfirm(result, alsoDeleteBranch, forceDeleteBranch)) {
-            useBranchActionDialogsStore.getState().openForceRemoveWorktreeConfirm({
-              repoId: repo.id,
-              branchName: target.branch,
-              payload: target,
-            })
-            return true
-          }
-          return false
-        },
-      },
-    )
-  }
-
   const capabilities = getBranchActionCapabilities(repo, branch)
 
   return {
@@ -281,12 +207,5 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
       requestDeleteBranch,
       requestRemoveWorktree,
     },
-    // Dispatch-only handles the dialog host wires into Confirm onClick.
-    // They bypass the request layer (which would re-open the same
-    // dialog) and go straight through the IPC write layer. The dialog
-    // reads checkbox state from the store and passes it in.
-    deleteBranch,
-    removeWorktree,
-    confirmPush,
   }
 }

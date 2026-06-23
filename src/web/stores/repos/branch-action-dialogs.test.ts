@@ -129,6 +129,72 @@ describe('useBranchActionDialogsStore', () => {
     expect(useBranchActionDialogsStore.getState().pushConfirm).toBeNull()
   })
 
+  test('closeStaleDialogs only closes dialogs whose (repoId, branchName) does not match', () => {
+    // Seed three slots directly via setState to bypass the
+    // one-dialog-at-a-time invariant of `openXxx` (which is tested
+    // elsewhere). The bug being covered is in the close path, not
+    // the open path.
+    useBranchActionDialogsStore.setState({
+      pushConfirm: { repoId: 'repo-a', branchName: 'main', payload: 'main' },
+      deleteConfirm: { repoId: 'repo-a', branchName: 'feature/x', payload: 'feature/x' },
+      removeConfirm: {
+        repoId: 'repo-b',
+        branchName: 'main',
+        payload: { branch: 'main', path: '/b/main' },
+      },
+    })
+
+    // Active workspace is (repo-a, main). Only the matching
+    // pushConfirm should survive; the other two close.
+    useBranchActionDialogsStore.getState().closeStaleDialogs('repo-a', 'main')
+    const state = useBranchActionDialogsStore.getState()
+    expect(state.pushConfirm).not.toBeNull()
+    expect(state.deleteConfirm).toBeNull()
+    expect(state.removeConfirm).toBeNull()
+  })
+
+  test('resetBranchActionDialogsStore actually clears slot state (regression: spread-order bug)', () => {
+    // Pre-fix implementation used `{ ...INITIAL_STATE, ...current }`,
+    // which let `current` override every key in `INITIAL_STATE` and
+    // was a no-op. The fix uses `{ ...INITIAL_STATE }` so the reset
+    // actually reaches the slot fields.
+    //
+    // We seed the slots directly via `setState` to bypass the
+    // one-dialog-at-a-time invariant of `openXxx` (which is tested
+    // separately); the bug is in the reset path, not the open path.
+    useBranchActionDialogsStore.setState({
+      pushConfirm: { repoId: 'repo-1', branchName: 'main', payload: 'main' },
+      deleteConfirm: { repoId: 'repo-1', branchName: 'main', payload: 'main' },
+      forceDeleteConfirm: { repoId: 'repo-1', branchName: 'main', payload: 'main' },
+      removeConfirm: {
+        repoId: 'repo-1',
+        branchName: 'main',
+        payload: { branch: 'main', path: '/p' },
+      },
+      forceRemoveConfirm: {
+        repoId: 'repo-1',
+        branchName: 'main',
+        payload: { branch: 'main', path: '/p' },
+      },
+      checkboxStateByBranch: {
+        'repo-1\0main': {
+          removeAlsoDeletes: true,
+          removeAlsoUpstream: false,
+          deleteAlsoUpstream: true,
+        },
+      },
+    })
+
+    resetBranchActionDialogsStore()
+    const state = useBranchActionDialogsStore.getState()
+    expect(state.pushConfirm).toBeNull()
+    expect(state.deleteConfirm).toBeNull()
+    expect(state.forceDeleteConfirm).toBeNull()
+    expect(state.removeConfirm).toBeNull()
+    expect(state.forceRemoveConfirm).toBeNull()
+    expect(state.checkboxStateByBranch).toEqual({})
+  })
+
   test('checkbox state survives across dialog close/reopen of the same branch', () => {
     useBranchActionDialogsStore.getState().openRemoveWorktreeConfirm(
       {
