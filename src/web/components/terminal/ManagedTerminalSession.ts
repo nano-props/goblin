@@ -99,7 +99,7 @@ export class ManagedTerminalSession {
   attach(host: HTMLElement): void {
     if (this.disposed) return
     this.view.attach(host)
-    if (this.runtime.canResize()) {
+    if (this.shouldStartAttachedSession()) {
       if (this.view.currentTerminal()) {
         this.view.fitSoon()
       } else {
@@ -107,6 +107,11 @@ export class ManagedTerminalSession {
       }
     }
     if (this.runtime.phase() === 'open' && this.runtime.canResize() && this.view.isVisible()) this.view.focus()
+  }
+
+  private shouldStartAttachedSession(): boolean {
+    if (this.runtime.canResize()) return true
+    return this.runtime.phase() === 'open' && this.runtime.attachmentRole() === 'unowned'
   }
 
   detach(host: HTMLElement, parkingRoot: HTMLElement): void {
@@ -293,11 +298,11 @@ export class ManagedTerminalSession {
       canonicalCols: input.canonicalCols,
       canonicalRows: input.canonicalRows,
     })
-    // Sync the gate's cached role from the hydration input so the
-    // first write after attach doesn't have to wait for a realtime
-    // ownership event to know whether a takeover round-trip is
-    // needed.
+    // Keep the write-side authority cache aligned with hydration.
     if (changed) this.authority().setRole(input.role)
+    if (changed && input.phase === 'open' && input.role === 'unowned' && this.view.isConnected()) {
+      this.start()
+    }
     if (previousSessionId && previousSessionId !== input.sessionId) this.applyHydratedSnapshotToActiveView()
     if (changed) this.notify('metadata')
   }
@@ -309,42 +314,21 @@ export class ManagedTerminalSession {
   }
 
   handleOwnership(event: TerminalOwnershipViewModel): void {
-    // The realtime broker routes ownership events by sessionId, so we
-    // normally only see events for this session. The sessionId can
-    // change (e.g. during a re-hydrate) and a stale event for the old
-    // sessionId may still reach us, in which case `runtime.handleOwnership`
-    // no-ops. Guard the takeover-pending clear so it only follows an
-    // event that actually applies to this session.
     const applies = this.runtime.currentSessionId() === event.sessionId
     const wasController = this.runtime.canResize()
     const changed = this.runtime.handleOwnership(event)
     const pendingCleared = applies ? this.runtime.clearTakeoverPending() : false
     if (changed) {
       const isController = this.runtime.canResize()
-      // Sync the gate's cached role with the runtime's view of the
-      // world. The gate uses this cache to decide whether a write
-      // needs a takeover round-trip or can pass through.
-      //
-      // We deliberately collapse the runtime's three-state role
-      // (`controller | viewer | unowned`) to the gate's two-state
-      // cache (`controller | viewer`) here:
-      //   - `unowned` in the gate is reserved for "session vanished"
-      //     (hydrate before any controller existed, or post-exit).
-      //   - A server event that flips the controller to `null` while
-      //     we are still attached is the "slot is empty, you can
-      //     claim" case — the user-typing-into-it path should
-      //     auto-promote, not drop the keystroke as session-closed.
-      // Collapsing to `viewer` here is what makes the "viewer
-      // types → auto-promote → take control" round-trip work
-      // uniformly for "another tab has it" and "nobody has it
-      // yet". The runtime retains the full three-state view for
-      // UI consumers; the gate is a write-path cache and only
-      // needs to know "can I pass through or do I need a
-      // takeover".
+      const isUnowned = this.runtime.phase() === 'open' && this.runtime.attachmentRole() === 'unowned'
+      // The gate only distinguishes pass-through vs takeover.
       this.authority().setRole(isController ? 'controller' : 'viewer')
       if (!isController) {
         if (this.view.currentTerminal()) {
           this.destroyActiveView({ preserveTransientState: true })
+        }
+        if (isUnowned && this.view.isConnected()) {
+          this.start()
         }
       } else if (!wasController && isController) {
         // Bug E: a viewer → controller transition must always
@@ -446,8 +430,8 @@ export class ManagedTerminalSession {
         if (changed) this.notify('metadata')
         return
       }
-      await this.replayPhase(token, term, result)
-      this.finalizePhase(token, term)
+      const metadataChanged = await this.replayPhase(token, term, result)
+      this.finalizePhase(token, term, metadataChanged)
     } catch (err) {
       if (err instanceof StartCancelledError) {
         // A newer start has superseded this one. Drop the replay
@@ -556,8 +540,8 @@ export class ManagedTerminalSession {
     token: number,
     term: XTermTerminal,
     result: TerminalAttachResultWithOwnership,
-  ): Promise<void> {
-    let changed = this.runtime.applyAttachResult(result, { cols: term.cols, rows: term.rows })
+  ): Promise<boolean> {
+    const changed = this.runtime.applyAttachResult(result, { cols: term.cols, rows: term.rows })
     if (!this.runtime.canResize()) {
       this.applyCanonicalSizeToView()
     } else {
@@ -568,11 +552,12 @@ export class ManagedTerminalSession {
     }
     await this.replayActiveView(token, term, result.snapshot, result.snapshotSeq)
     this.guardStart(token, term)
+    return changed
   }
 
-  private finalizePhase(token: number, term: XTermTerminal): void {
+  private finalizePhase(token: number, term: XTermTerminal, metadataChanged: boolean): void {
     this.guardStart(token, term)
-    const changed = this.runtime.markAttached()
+    const changed = this.runtime.markAttached() || metadataChanged
     if (changed) this.notify('metadata')
     if (this.view.isVisible()) term.focus()
   }

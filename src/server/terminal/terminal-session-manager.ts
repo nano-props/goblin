@@ -146,6 +146,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
       })
       if (input.attachmentId) {
         registerTerminalAttachment(existing, input.attachmentId, size.cols, size.rows, input.attachmentConnected)
+        this.applyOwnershipEffect(existing, attachTerminalAttachment(existing, input.attachmentId))
       }
       return await this.attachResult(existing)
     }
@@ -185,9 +186,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
     })
     if (input.attachmentId) {
       registerTerminalAttachment(session, input.attachmentId, size.cols, size.rows, input.attachmentConnected ?? true)
-      session.controller = session.attachments.get(input.attachmentId)?.connected
-        ? { attachmentId: input.attachmentId, status: 'connected' }
-        : null
+      attachTerminalAttachment(session, input.attachmentId)
     }
     const result = await this.spawnSessionPty(session)
     if (!result.ok) {

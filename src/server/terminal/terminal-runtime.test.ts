@@ -433,6 +433,61 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
+  test('reopening an existing terminal from a new attachment auto-reclaims owner-sticky control', async () => {
+    const { host, shutdown } = buildRuntime()
+    const browserSocket = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_browser', 'attachment_browser', OWNER_1, browserSocket)
+
+    const first = await host.create('client_browser', OWNER_1, {
+      repoRoot: '/repo',
+      branch: 'feature',
+      worktreePath: '/repo-linked',
+      kind: 'primary',
+      cols: 80,
+      rows: 24,
+      attachmentId: 'attachment_browser',
+    })
+    expect(first.ok).toBe(true)
+    if (!first.ok) return
+    expect(first.controller).toEqual({ attachmentId: 'attachment_browser', status: 'connected' })
+
+    host.unregisterSocket('client_browser', 'attachment_browser', OWNER_1, browserSocket)
+
+    const electronSocket = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_electron', 'attachment_electron', OWNER_1, electronSocket)
+
+    const reopened = await host.create('client_electron', OWNER_1, {
+      repoRoot: '/repo',
+      branch: 'feature',
+      worktreePath: '/repo-linked',
+      kind: 'primary',
+      cols: 102,
+      rows: 33,
+      attachmentId: 'attachment_electron',
+    })
+    expect(reopened.ok).toBe(true)
+    if (!reopened.ok) return
+    expect(reopened.action).toBe('reused')
+    expect(reopened.key).toBe(first.key)
+    expect(reopened.controller).toEqual({ attachmentId: 'attachment_electron', status: 'connected' })
+    expect(reopened.canonicalCols).toBe(102)
+    expect(reopened.canonicalRows).toBe(33)
+    expect(mockPtys[0]?.resize).toHaveBeenLastCalledWith(102, 33)
+
+    const sessions = await host.listSessions('client_electron', OWNER_1, '/repo')
+    expect(sessions).toEqual([
+      expect.objectContaining({
+        key: first.key,
+        controller: { attachmentId: 'attachment_electron', status: 'connected' },
+        cols: 102,
+        rows: 33,
+      }),
+    ])
+
+    host.unregisterSocket('client_electron', 'attachment_electron', OWNER_1, electronSocket)
+    shutdown()
+  })
+
   test('a failed spawn removes the zombie session so the next create retries cleanly', async () => {
     const { spawn } = await import('node-pty')
     vi.mocked(spawn).mockImplementationOnce(() => {

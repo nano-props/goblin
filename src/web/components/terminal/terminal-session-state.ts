@@ -74,6 +74,10 @@ export class TerminalSessionState {
     return this.runtimeState.phase === 'open' && this.runtimeState.attachmentOwnership.role === 'controller'
   }
 
+  getAttachmentOwnership(): TerminalAttachmentOwnershipViewModel {
+    return this.runtimeState.attachmentOwnership
+  }
+
   getCanonicalSize(): { cols: number; rows: number } {
     return this.runtimeState.canonicalSize
   }

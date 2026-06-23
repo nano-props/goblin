@@ -1,5 +1,6 @@
 import type {
   TerminalAttachResult,
+  TerminalAttachmentRole,
   TerminalOutputEvent,
   TerminalSessionPhase,
   TerminalTakeoverResult,
@@ -42,6 +43,10 @@ export class TerminalSessionRuntime {
 
   canResize(): boolean {
     return this.state.getCanResize()
+  }
+
+  attachmentRole(): TerminalAttachmentRole {
+    return this.state.getAttachmentOwnership().role
   }
 
   startAttaching(): boolean {

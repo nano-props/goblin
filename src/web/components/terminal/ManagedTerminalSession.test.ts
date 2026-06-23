@@ -1565,6 +1565,92 @@ describe('ManagedTerminalSession', () => {
     })
   })
 
+  test('mounting a hydrated unowned session attaches and auto-claims without manual takeover', async () => {
+    terminalCalls.attach.mockResolvedValueOnce(
+      attachResult('session-1', {
+        controller: { attachmentId: 'attachment_local', status: 'connected' },
+        canonicalCols: 100,
+        canonicalRows: 30,
+      }),
+    )
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session, {
+      role: 'unowned',
+      controllerStatus: 'none',
+      canonicalCols: 120,
+      canonicalRows: 40,
+    })
+
+    session.attach(host)
+    await flushTerminalStart()
+
+    expect(terminalCalls.attach).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      cols: 100,
+      rows: 30,
+    })
+    expect(xtermMocks.terminals).toHaveLength(1)
+    expect(session.snapshot().attachment).toMatchObject({
+      role: 'controller',
+      controllerStatus: 'connected',
+      canTakeover: false,
+    })
+  })
+
+  test('mounted viewer hydrate to unowned auto-attaches without manual takeover', async () => {
+    terminalCalls.attach.mockResolvedValueOnce(
+      attachResult('session-1', {
+        controller: { attachmentId: 'attachment_local', status: 'connected' },
+        canonicalCols: 100,
+        canonicalRows: 30,
+        snapshot: 'reclaimed-after-hydrate',
+        snapshotSeq: 10,
+      }),
+    )
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session, {
+      role: 'viewer',
+      controllerStatus: 'connected',
+      canonicalCols: 120,
+      canonicalRows: 40,
+    })
+
+    session.attach(host)
+    await flushTerminalStart()
+    await flushUntil(() => session.snapshot().phase === 'open')
+
+    session.hydrate({
+      sessionId: 'session-1',
+      phase: 'open',
+      message: null,
+      processName: 'zsh',
+      canonicalTitle: null,
+      role: 'unowned',
+      controllerStatus: 'none',
+      canonicalCols: 120,
+      canonicalRows: 40,
+      snapshot: '',
+      snapshotSeq: 0,
+    })
+    await flushTerminalStart()
+
+    expect(terminalCalls.attach).toHaveBeenNthCalledWith(1, {
+      sessionId: 'session-1',
+      cols: 100,
+      rows: 30,
+    })
+    expect(session.snapshot().attachment).toMatchObject({
+      role: 'controller',
+      controllerStatus: 'connected',
+      canTakeover: false,
+    })
+    expect(xtermMocks.terminals[0]!.write).toHaveBeenCalledWith('reclaimed-after-hydrate', expect.any(Function))
+  })
+
   test('takeover falls back to canonical size when the host is not immediately measurable', async () => {
     terminalCalls.takeover.mockResolvedValueOnce(
       takeoverResult('session-1', {
@@ -1626,8 +1712,6 @@ describe('ManagedTerminalSession', () => {
     session.takeover()
     await flushUntil(() => terminalCalls.takeover.mock.calls.length > 0)
 
-    // No handleOwnership call — yet the runtime already reflects the
-    // takeover response's geometry.
     expect(session.snapshot().attachment).toMatchObject({
       canonicalCols: 132,
       canonicalRows: 43,
@@ -1636,12 +1720,6 @@ describe('ManagedTerminalSession', () => {
   })
 
   test('takeover response propagates phase into the runtime view', async () => {
-    // Companion to the geometry test above. When the server's
-    // takeover response says phase='restarting', the runtime picks
-    // it up synchronously — without waiting for a follow-up realtime
-    // ownership event. Pinning this here so the phase propagation
-    // path through applyTakeover → applyOwnership → setPhaseAndMessage
-    // stays covered.
     terminalCalls.attach.mockResolvedValueOnce(
       attachResult('session-1', {
         controller: { attachmentId: 'attachment_remote', status: 'connected' },
@@ -1670,12 +1748,6 @@ describe('ManagedTerminalSession', () => {
   })
 
   test('realtime ownership event is the authority for non-takeover paths', async () => {
-    // The realtime `ownership` event still has a job on the
-    // non-takeover paths: another window crashing, grace expiry,
-    // controller reconnect. For those there is no response to be
-    // authoritative; the event is the truth. This test pins that
-    // contract — the renderer still applies `handleOwnership`
-    // updates without any takeover response on the wire.
     terminalCalls.attach.mockResolvedValueOnce(
       attachResult('session-1', {
         controller: { attachmentId: 'attachment_remote', status: 'connected' },
@@ -1699,9 +1771,6 @@ describe('ManagedTerminalSession', () => {
     session.takeover()
     await flushUntil(() => terminalCalls.takeover.mock.calls.length > 0)
 
-    // The takeover response went through; but a subsequent realtime
-    // ownership event with a different role/state still applies and
-    // is the authority for the non-takeover paths.
     session.handleOwnership({
       sessionId: 'session-1',
       role: 'unowned',
@@ -1718,6 +1787,61 @@ describe('ManagedTerminalSession', () => {
       canonicalCols: 120,
       canonicalRows: 40,
     })
+  })
+
+  test('mounted viewer auto-attaches when realtime ownership flips to unowned', async () => {
+    terminalCalls.attach
+      .mockResolvedValueOnce(
+        attachResult('session-1', {
+          controller: { attachmentId: 'attachment_remote', status: 'connected' },
+          canonicalCols: 120,
+          canonicalRows: 40,
+        }),
+      )
+      .mockResolvedValueOnce(
+        attachResult('session-1', {
+          controller: { attachmentId: 'attachment_local', status: 'connected' },
+          canonicalCols: 100,
+          canonicalRows: 30,
+          snapshot: 'reclaimed-screen',
+          snapshotSeq: 9,
+        }),
+      )
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session)
+    session.attach(host)
+    await flushTerminalStart()
+    await flushUntil(() => session.snapshot().phase === 'open')
+
+    expect(session.snapshot().attachment).toMatchObject({
+      role: 'viewer',
+      controllerStatus: 'connected',
+      canTakeover: true,
+    })
+
+    session.handleOwnership({
+      sessionId: 'session-1',
+      role: 'unowned',
+      controllerStatus: 'none',
+      canonicalCols: 120,
+      canonicalRows: 40,
+      phase: 'open',
+    })
+    await flushTerminalStart()
+
+    expect(terminalCalls.attach).toHaveBeenNthCalledWith(2, {
+      sessionId: 'session-1',
+      cols: 100,
+      rows: 30,
+    })
+    expect(session.snapshot().attachment).toMatchObject({
+      role: 'controller',
+      controllerStatus: 'connected',
+      canTakeover: false,
+    })
+    expect(xtermMocks.terminals.at(-1)!.write).toHaveBeenCalledWith('reclaimed-screen', expect.any(Function))
   })
 
   test('applies ownership updates from realtime messages', async () => {
