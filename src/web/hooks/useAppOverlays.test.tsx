@@ -21,18 +21,22 @@ function Harness() {
       <button id="open-repo" type="button" onClick={overlays.openRepoPathDialog}>
         open repo
       </button>
+      <button id="open-create-worktree" type="button" onClick={overlays.openCreateWorktree}>
+        open create worktree
+      </button>
       <button id="close-all" type="button" onClick={overlays.closeAllOverlays}>
         close all
       </button>
       <output id="clone-open">{overlays.state.clone.open ? 'open' : 'closed'}</output>
       <output id="open-repo-open">{overlays.state.openRepo.open ? 'open' : 'closed'}</output>
+      <output id="create-worktree-open">{overlays.state.createWorktree.open ? 'open' : 'closed'}</output>
       <output id="any-open">{overlays.anyOpen ? 'open' : 'closed'}</output>
     </>
   )
 }
 
 function RoutedHarness() {
-  const [overlay, setOverlay] = useState<'clone' | 'openRepo' | 'openRemoteRepo' | null>(null)
+  const [overlay, setOverlay] = useState<'clone' | 'openRepo' | 'openRemoteRepo' | 'createWorktree' | null>(null)
   const overlays = useAppOverlays({
     routeOverlay: overlay,
     onRouteOverlayChange: setOverlay,
@@ -82,13 +86,16 @@ describe('useAppOverlays', () => {
 
     click('#open-clone')
     click('#open-repo')
+    click('#open-create-worktree')
     expect(text('#clone-open')).toBe('open')
     expect(text('#open-repo-open')).toBe('open')
+    expect(text('#create-worktree-open')).toBe('open')
     expect(text('#any-open')).toBe('open')
 
     click('#close-all')
     expect(text('#clone-open')).toBe('closed')
     expect(text('#open-repo-open')).toBe('closed')
+    expect(text('#create-worktree-open')).toBe('closed')
     expect(text('#any-open')).toBe('closed')
   })
 

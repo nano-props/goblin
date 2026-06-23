@@ -20,19 +20,21 @@ interface Props {
 }
 
 export function BranchActionsMenu({ repo, branch, open, onOpenChange }: Props) {
-  const { mainItems, destructiveItems, dialogs } = useBranchActionItems(repo, branch)
+  const { mainItems, destructiveItems } = useBranchActionItems(repo, branch)
 
+  // Dialogs are no longer rendered here. The shared
+  // `BranchActionDialogHost` is mounted once at the workspace level
+  // (`BranchWorkspace`), and its open/close state is held by
+  // `useBranchActionDialogsStore` so that triggering a confirm from a
+  // temporary surface (e.g. the focus-mode HoverCard popover) does
+  // not get its dialog torn down when the surface unmounts.
   return (
-    <>
-      <BranchActionsPopover
-        mainItems={mainItems}
-        destructiveItems={destructiveItems}
-        open={open}
-        onOpenChange={onOpenChange}
-      />
-
-      {dialogs}
-    </>
+    <BranchActionsPopover
+      mainItems={mainItems}
+      destructiveItems={destructiveItems}
+      open={open}
+      onOpenChange={onOpenChange}
+    />
   )
 }
 

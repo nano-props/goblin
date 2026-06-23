@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
@@ -8,6 +8,7 @@ import { TokenGate } from '#/web/components/TokenGate.tsx'
 import { RepoCloneDialog } from '#/web/components/RepoCloneDialog.tsx'
 import { RepoOpenDialog } from '#/web/components/RepoOpenDialog.tsx'
 import { OpenRemoteRepositoryDialog } from '#/web/components/OpenRemoteRepositoryDialog.tsx'
+import { CreateWorktreeDialog, type CreateWorktreeRequest } from '#/web/components/CreateWorktreeDialog.tsx'
 import { RepoDropOverlay } from '#/web/components/RepoDropOverlay.tsx'
 import { Toaster } from '#/web/components/ui/sonner.tsx'
 import { useAuthenticatedAppBootstrap } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
@@ -62,7 +63,7 @@ export function Layout() {
         setWorkspacePaneView,
         onOpenSettings: (page) => void navigate({ to: `/settings/${page}` }),
       }),
-    [activeId, closeRepo, cycleActive, navigate, order, selectBranch, setActive, setWorkspacePaneView],
+    [activeId, closeRepo, cycleActive, navigate, order, selectBranch, setWorkspacePaneView],
   )
 
   const workspaceShortcutsSuppressed = modalOpen || isSettingsOpen
@@ -99,6 +100,7 @@ export function Layout() {
               openRepoPathDialog: overlays.openRepoPathDialog,
               openCloneRepo: overlays.openCloneRepo,
               openRemoteRepo: overlays.openRemoteRepo,
+              openCreateWorktree: overlays.openCreateWorktree,
             }}
           >
             <TerminalSessionProvider>
@@ -110,7 +112,11 @@ export function Layout() {
                 onDrop={repoDrop.onDrop}
               >
                 <Outlet />
-                <MainWindowOverlays overlays={overlays} repoDrop={repoDrop} />
+                <MainWindowOverlays
+                  overlays={overlays}
+                  repoDrop={repoDrop}
+                  activeId={activeId}
+                />
               </div>
             </TerminalSessionProvider>
           </LayoutOverlayActions.Provider>
@@ -124,9 +130,10 @@ export function Layout() {
 interface MainWindowOverlaysProps {
   overlays: ReturnType<typeof useAppOverlays>
   repoDrop: ReturnType<typeof useRepoDrop>
+  activeId: string | null
 }
 
-function MainWindowOverlays({ overlays, repoDrop }: MainWindowOverlaysProps) {
+function MainWindowOverlays({ overlays, repoDrop, activeId }: MainWindowOverlaysProps) {
   return (
     <>
       <RepoOpenDialog open={overlays.state.openRepo.open} onOpenChange={overlays.setOpenRepoOpen} />
@@ -135,10 +142,62 @@ function MainWindowOverlays({ overlays, repoDrop }: MainWindowOverlaysProps) {
         open={overlays.state.openRemoteRepo.open}
         onOpenChange={overlays.setOpenRemoteRepoOpen}
       />
+      <CreateWorktreeDialogConnected
+        open={overlays.state.createWorktree.open}
+        onOpenChange={overlays.setCreateWorktreeOpen}
+        activeId={activeId}
+      />
       <RepoDropOverlay active={repoDrop.active} />
       <Toaster position="bottom-right" closeButton />
     </>
   )
+}
+
+/**
+ * Hosts the create-worktree dialog at the layout level so it survives
+ * settings ⇄ workspace navigation. Source of truth for the dialog is
+ * `useAppOverlays.createWorktree` (see `LayoutOverlayActions`).
+ *
+ * Form state lives inside `CreateWorktreeDialog` and is therefore
+ * preserved across settings navigation — the user can type a branch
+ * name, click "Settings", read a config, come back, and the typed
+ * name is still there. Active repo switches still close the dialog to
+ * match the previous behaviour (`useEffect([activeId])` below).
+ */
+function CreateWorktreeDialogConnected({
+  open,
+  onOpenChange,
+  activeId,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  activeId: string | null
+}) {
+  const repo = useReposStore((s) => (activeId ? s.repos[activeId] : undefined))
+  const submitBranchAction = useReposStore((s) => s.submitBranchAction)
+
+  // Force-close when the active repo changes. Without this a
+  // half-typed branch name from repo A could leak into a submission
+  // against repo B. Same contract as the previous Topbar-mounted
+  // implementation (`useEffect([repoId])` in
+  // `CreateWorktreeAction`).
+  useEffect(() => {
+    if (open) onOpenChange(false)
+  }, [activeId, onOpenChange, open])
+
+  if (!repo) return null
+
+  function handleCreateWorktree(request: CreateWorktreeRequest): void {
+    if (!repo) return
+    if (repo.operations.branchAction.phase !== 'idle') return
+    submitBranchAction(
+      repo.id,
+      { kind: 'createWorktree', input: request.input },
+      { token: repo.instanceToken, refreshOnError: false },
+    )
+  }
+
+  return <CreateWorktreeDialog open={open} repo={repo} onClose={() => onOpenChange(false)} onCreate={handleCreateWorktree} />
 }
 
 /**

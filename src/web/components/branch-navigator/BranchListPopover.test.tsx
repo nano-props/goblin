@@ -6,7 +6,9 @@
 // CAN assert in jsdom is that the trigger slot is rendered for both
 // a known and an unknown repo. The popover doesn't subscribe to the
 // store, so a workspaceFocused flip is no longer its concern (the
-// parent unmounts it).
+// parent unmounts it). Branch action dialogs are no longer mounted
+// inside the popover — see BranchActionDialogHost — so we don't need
+// to stub BranchActionsMenu anymore.
 //
 // BranchList's own behaviour is covered in BranchList.test.tsx.
 
@@ -34,10 +36,6 @@ vi.mock('#/web/main-window-navigation.tsx', () => ({
 
 vi.mock('#/web/components/branch-workspace/open-workspace-pane-view.ts', () => ({
   openWorkspacePaneView: vi.fn(),
-}))
-
-vi.mock('#/web/components/BranchActionsMenu.tsx', () => ({
-  BranchActionsMenu: () => null,
 }))
 
 vi.mock('#/web/components/terminal/terminal-session-store.ts', () => ({

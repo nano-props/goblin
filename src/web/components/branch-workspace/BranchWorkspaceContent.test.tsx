@@ -73,7 +73,6 @@ describe('BranchWorkspaceContent', () => {
       mainItems: [],
       destructiveItems: [],
       copyPatchAction,
-      dialogs: null,
     }
   }
 
