@@ -14,15 +14,7 @@ export const DEFAULT_TERMINAL_ROWS = 24
  * change.
  */
 export const TERMINAL_FONT_SIZE = 14
-// Font fallback chain: 'Goblin Mono' (Maple Mono NF CN) handles ASCII / CJK /
-// Nerd Font glyphs, then platform color-emoji fonts cover U+1F000+ codepoints
-// that Maple Mono does not carry. Without the emoji fallback, Linux and
-// Windows users see tofu boxes for 🚀, 👨‍👩‍👧 etc. because `monospace` alone
-// resolves to a font with no color emoji on most distros.
-// Order matters: platform-native emoji fonts first so the OS can supply
-// flag / skin-tone / ZWJ sequences with its own substitution tables.
-export const TERMINAL_FONT_FAMILY =
-  "'Goblin Mono', 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', 'Twemoji Mozilla', monospace"
+export const TERMINAL_FONT_FAMILY = "'Goblin Mono', monospace"
 export const TERMINAL_LINE_HEIGHT = 1
 
 const MIN_INITIAL_TERMINAL_COLS = 2
