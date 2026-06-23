@@ -376,14 +376,11 @@ describe('workspace commands', () => {
       preferredWorkspacePaneView: 'status',
     })
     const closeWindow = vi.fn()
-    const selectTerminal = vi.fn()
-    const showRepoWorkspacePaneView = vi.fn((repoId, tab) => {
-      useReposStore.getState().setWorkspacePaneView(repoId, tab)
-    })
+    const showRepoWorkspacePaneView = vi.fn()
     setTerminalSessionCommandBridge({
       worktreeSnapshot: () => worktreeSnapshotWithTerminal(),
       createTerminal: vi.fn(async () => 'terminal-2'),
-      selectTerminal,
+      selectTerminal: vi.fn(),
       closeTerminalByDescriptor: vi.fn(),
     })
 
@@ -395,12 +392,20 @@ describe('workspace commands', () => {
       }),
     ).toBe(true)
     expect(openViewsFor('feature/worktree')).toEqual([])
-    expect(showRepoWorkspacePaneView).toHaveBeenCalledWith(REPO_ID, 'terminal')
-    expect(selectTerminal).toHaveBeenCalledWith(WORKTREE_KEY, 'terminal-1')
+    // The close command no longer imperatively re-selects the adjacent tab;
+    // it records the closing context in the store so the workspace pane tab
+    // model can derive the spatial neighbor at read time. Navigation is
+    // untouched here.
+    expect(showRepoWorkspacePaneView).not.toHaveBeenCalled()
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.lastClosedTabContextByBranch['feature/worktree'])
+      .toEqual({
+        closingIdentity: 'status:status',
+        previousTabIdentities: ['status:status', 'terminal:terminal-1'],
+      })
     expect(closeWindow).not.toHaveBeenCalled()
   })
 
-  test('close workspace tab command closes changes as a static tab and activates the adjacent terminal', async () => {
+  test('close workspace tab command closes changes as a static tab and signals the closing context to the model', async () => {
     seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -411,9 +416,7 @@ describe('workspace commands', () => {
       },
     })
     const closeWindow = vi.fn()
-    const showRepoWorkspacePaneView = vi.fn((repoId, tab) => {
-      useReposStore.getState().setWorkspacePaneView(repoId, tab)
-    })
+    const showRepoWorkspacePaneView = vi.fn()
     setTerminalSessionCommandBridge({
       worktreeSnapshot: () => worktreeSnapshotWithTerminal(),
       createTerminal: vi.fn(async () => 'terminal-2'),
@@ -429,8 +432,61 @@ describe('workspace commands', () => {
       }),
     ).toBe(true)
     expect(openViewsFor('feature/worktree')).toEqual(['status'])
-    expect(showRepoWorkspacePaneView).toHaveBeenCalledWith(REPO_ID, 'terminal')
-    expect(preferredWorkspacePaneView()).toBe('terminal')
+    // The close command records what was closed (and the pre-close tab order)
+    // so the model can derive the spatial neighbor at read time. Preferred
+    // view is unchanged — the model flips it to the neighbor via the same
+    // derivation.
+    expect(showRepoWorkspacePaneView).not.toHaveBeenCalled()
+    expect(preferredWorkspacePaneView()).toBe('changes')
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.lastClosedTabContextByBranch['feature/worktree'])
+      .toEqual({
+        closingIdentity: 'changes:changes',
+        previousTabIdentities: ['status:status', 'terminal:terminal-1', 'changes:changes'],
+      })
+    expect(closeWindow).not.toHaveBeenCalled()
+  })
+
+  test('close workspace tab command on the only terminal in a mixed strip records the context for spatial adjacency', async () => {
+    // Regression: with preferred=terminal and tabOrder=[status, terminal-1, changes],
+    // closing terminal-1 must let the model surface changes (the spatial neighbor),
+    // not status (materializedTabs[0]). The fix routes adjacency through
+    // `lastClosedTabContextByBranch` so the model — not the close command —
+    // decides where the user lands. The next model computation reads the
+    // recorded context and prefers the neighbor; navigation is untouched.
+    seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      selectedBranch: 'feature/worktree',
+      preferredWorkspacePaneView: 'terminal',
+      workspacePaneTabOrderByBranch: {
+        'feature/worktree': [staticEntry('status'), terminalEntry('terminal-1'), staticEntry('changes')],
+      },
+    })
+    const closeWindow = vi.fn()
+    const showRepoWorkspacePaneView = vi.fn()
+    setTerminalSessionCommandBridge({
+      worktreeSnapshot: () => worktreeSnapshotWithTerminal(),
+      createTerminal: vi.fn(async () => 'terminal-2'),
+      selectTerminal: vi.fn(),
+      closeTerminalByDescriptor: vi.fn(),
+    })
+
+    expect(
+      await runCloseWorkspacePaneTabOrWindowCommand({
+        repoId: REPO_ID,
+        navigation: navigationWith({ showRepoWorkspacePaneView }),
+        closeWindow,
+        targetIdentity: 'terminal:terminal-1',
+      }),
+    ).toBe(true)
+    // The close command does not imperatively navigate. It only records the
+    // closing context so the model can derive the spatial neighbor at read time.
+    expect(showRepoWorkspacePaneView).not.toHaveBeenCalled()
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.lastClosedTabContextByBranch['feature/worktree'])
+      .toEqual({
+        closingIdentity: 'terminal:terminal-1',
+        previousTabIdentities: ['status:status', 'terminal:terminal-1', 'changes:changes'],
+      })
     expect(closeWindow).not.toHaveBeenCalled()
   })
 

@@ -76,6 +76,7 @@ export function BranchWorkspaceContent({ repo, detail, workspacePaneId }: Props)
     terminalSessionCount: worktreeSnapshot.count,
     terminalCreatePending: worktreeSnapshot.pendingCreate,
     terminalSyncReady,
+    lastClosedTabContext: branch ? (repo.ui.lastClosedTabContextByBranch[branch.name] ?? null) : null,
   })
   const selection = workspacePaneTabModel.selection
   const renderedView = selection?.view ?? null

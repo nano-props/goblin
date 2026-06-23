@@ -74,9 +74,13 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     registryRef.current = getTerminalSessionRegistry({
       getCurrentRepoId: () => currentRepoIdRef.current,
       onSelectedWorktreeChange: setSelectedTerminal,
+      // Terminal-session lifetime owns terminal tab lifetime. User closes,
+      // server exits, and reconcile removals all converge through this hook.
+      // The workspace pane tab model falls back to the first materialized tab
+      // at read time when the active tab disappears, so this callback only
+      // needs to drop the tab from the branch-scoped tab order — no
+      // navigation or view-switch call required.
       onTerminalSessionRemoved: (key, base) => {
-        // Terminal-session lifetime owns terminal tab lifetime. User closes,
-        // server exits, and reconcile removals all converge through this hook.
         useReposStore.getState().removeWorkspacePaneTerminalTab(base.repoRoot, key, base.branch)
       },
     })

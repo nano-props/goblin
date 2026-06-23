@@ -129,6 +129,7 @@ function createRepo(input: {
       branchViewMode: 'all',
       workspacePaneTabOrderByBranch: {},
       preferredWorkspacePaneViewByBranch: {},
+      lastClosedTabContextByBranch: {},
     },
     projection: { source: 'fresh', savedAt: null },
     remote: {

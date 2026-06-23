@@ -90,6 +90,20 @@ export interface BranchWorkspacePaneTabModelInput {
   terminalSessionCount: number
   terminalCreatePending?: boolean
   terminalSyncReady: boolean
+  /**
+   * Set by `runCloseWorkspacePaneTabCommand` after a successful user-initiated
+   * close. The model uses `closingIdentity` to compute the spatial neighbor
+   * from `previousTabIdentities` (pre-close tab order), then looks the
+   * neighbor up in the current materialized tabs. Falls back to the generic
+   * tabs[0] fallback if no neighbor exists or the neighbor is no longer in
+   * the strip. Server-side terminal exits leave this null and use the
+   * generic fallback. Callers must pass `null` explicitly when they have no
+   * context to signal (e.g., the model is recomputed outside a close path).
+   */
+  lastClosedTabContext: {
+    closingIdentity: string
+    previousTabIdentities: readonly string[]
+  } | null
 }
 
 export function createBranchWorkspacePaneTabModel(
@@ -110,7 +124,12 @@ export function createBranchWorkspacePaneTabModel(
     terminalSyncReady: input.terminalSyncReady,
   })
   const materializedActiveTab = candidateView ? activeBranchWorkspacePaneTab(materializedTabs, candidateView) : null
-  const selection = workspacePaneSelection(candidateView, materializedActiveTab)
+  const selection = workspacePaneSelection(
+    candidateView,
+    materializedActiveTab,
+    materializedTabs,
+    input.lastClosedTabContext,
+  )
   const pendingTab =
     selection?.kind === 'terminal-host' && input.terminalCreatePending ? pendingTerminalWorkspacePaneTab() : null
   const tabs = pendingTab ? [...materializedTabs, pendingTab] : materializedTabs
@@ -128,7 +147,7 @@ export function createBranchWorkspacePaneTabModel(
     tabs,
     selection,
     renderedView: selection?.view ?? null,
-    activeTab: materializedActiveTab,
+    activeTab: selection?.kind === 'materialized-tab' ? selection.tab : null,
   }
 }
 
@@ -238,10 +257,53 @@ function materializedWorkspacePaneTabs(input: {
 function workspacePaneSelection(
   renderableView: WorkspacePaneView | null,
   activeTab: BranchWorkspacePaneMaterializedTab | null,
+  materializedTabs: readonly BranchWorkspacePaneMaterializedTab[],
+  lastClosedTabContext: { closingIdentity: string; previousTabIdentities: readonly string[] } | null,
 ): BranchWorkspacePaneSelection | null {
-  if (!renderableView) return null
   if (activeTab) return { kind: 'materialized-tab', view: activeTab.type, tab: activeTab }
-  if (renderableView === 'terminal') return { kind: 'terminal-host', view: 'terminal', tab: null }
+  // Terminal-host is reserved for the "actively waiting" states — the user
+  // wants the terminal view but no terminal session exists yet, so we keep
+  // the new-terminal affordance reachable. Skip when a user-initiated close
+  // just happened: the adjacency fallback below will land them on the
+  // spatial neighbor instead.
+  if (renderableView === 'terminal' && !lastClosedTabContext) {
+    return { kind: 'terminal-host', view: 'terminal', tab: null }
+  }
+  // User-initiated close: when the user just closed a tab AND the preferred
+  // view became unrenderable as a result, prefer the spatial neighbor from
+  // the pre-close tab order. Falls back to the generic tabs[0] lookup below
+  // if no neighbor exists or the neighbor was removed by a subsequent action.
+  if (lastClosedTabContext) {
+    const neighborIdentity = adjacentIdentityAfterClose(
+      lastClosedTabContext.previousTabIdentities,
+      lastClosedTabContext.closingIdentity,
+    )
+    if (neighborIdentity) {
+      const neighbor = materializedTabs.find((tab) => tab.identity === neighborIdentity)
+      if (neighbor) return { kind: 'materialized-tab', view: neighbor.type, tab: neighbor }
+    }
+  }
+  // Generic fallback: the preferred view is unrenderable (no backing tab)
+  // and either no user-initiated close was recorded, or the neighbor lookup
+  // failed. Surface the first materialized tab so the user does not land on
+  // the empty pane.
+  const firstTab = materializedTabs[0]
+  if (firstTab) return { kind: 'materialized-tab', view: firstTab.type, tab: firstTab }
+  return null
+}
+
+function adjacentIdentityAfterClose(
+  identities: readonly string[],
+  closingIdentity: string,
+): string | null {
+  const closingIndex = identities.indexOf(closingIdentity)
+  if (closingIndex === -1) return null
+  for (let offset = 1; offset < identities.length; offset += 1) {
+    const forward = identities[closingIndex + offset]
+    if (forward !== undefined && forward !== closingIdentity) return forward
+    const backward = identities[closingIndex - offset]
+    if (backward !== undefined && backward !== closingIdentity) return backward
+  }
   return null
 }
 

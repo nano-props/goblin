@@ -92,6 +92,7 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
         terminalSessionCount: worktreeSnapshot.count,
         terminalCreatePending: worktreeSnapshot.pendingCreate,
         terminalSyncReady,
+        lastClosedTabContext: branchName ? (repo.ui.lastClosedTabContextByBranch[branchName] ?? null) : null,
       }),
     [
       branchName,
@@ -103,6 +104,7 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
       worktreeSnapshot.count,
       worktreeSnapshot.pendingCreate,
       worktreeSnapshot.sessions,
+      repo.ui.lastClosedTabContextByBranch,
     ],
   )
   const workspacePaneTabFocusRegistry = useFocusRegistry<string, HTMLButtonElement>()

@@ -375,7 +375,7 @@ describe('BranchWorkspaceContent', () => {
     expect(container?.textContent).toContain('workspace-pane-views.empty')
   })
 
-  test('does not render status for a worktree-scoped preference on a branch without a worktree', () => {
+  test('falls back to status when a worktree-scoped preference is unrenderable on a branch without a worktree', () => {
     const repo = seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/no-worktree')],
@@ -388,17 +388,22 @@ describe('BranchWorkspaceContent', () => {
     act(() => {
       root!.render(
         <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
-          <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
+          <BranchActionSurfaceContext.Provider value={defaultBranchActionSurface()}>
+            <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
+          </BranchActionSurfaceContext.Provider>
         </TerminalSessionReadContext.Provider>,
       )
     })
 
-    expect(container?.querySelector('#workspace-status-panel')).toBeNull()
+    // The user's preferred view (terminal) is unrenderable without a
+    // worktree. The model falls back to the first materialized tab (status)
+    // so the user lands on a real view instead of the empty pane.
+    expect(container?.querySelector('#workspace-status-panel')).not.toBeNull()
     expect(container?.querySelector('#workspace-terminal-panel')).toBeNull()
-    expect(container?.textContent).toContain('workspace-pane-views.empty')
+    expect(container?.textContent).not.toContain('workspace-pane-views.empty')
   })
 
-  test('does not render status when terminal is preferred but sync confirms no terminal tabs', () => {
+  test('falls back to status when terminal is preferred but sync confirms no terminal tabs', () => {
     const worktreePath = '/tmp/terminal-empty-worktree'
     const repo = seedRepoState({
       id: REPO_ID,
@@ -413,14 +418,20 @@ describe('BranchWorkspaceContent', () => {
     act(() => {
       root!.render(
         <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
-          <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
+          <BranchActionSurfaceContext.Provider value={defaultBranchActionSurface()}>
+            <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
+          </BranchActionSurfaceContext.Provider>
         </TerminalSessionReadContext.Provider>,
       )
     })
 
-    expect(container?.querySelector('#workspace-status-panel')).toBeNull()
+    // Sync is ready, the worktree has no terminal sessions, and the user
+    // preferred terminal — the preferred view is unrenderable. The model
+    // falls back to the first materialized tab (status) at read time so
+    // the user does not land on the empty pane.
+    expect(container?.querySelector('#workspace-status-panel')).not.toBeNull()
     expect(container?.querySelector('#workspace-terminal-panel')).toBeNull()
-    expect(container?.textContent).toContain('workspace-pane-views.empty')
+    expect(container?.textContent).not.toContain('workspace-pane-views.empty')
   })
 
   test('mounts the terminal slot while terminal creation is pending with no sessions', () => {
@@ -552,7 +563,7 @@ describe('BranchWorkspaceContent', () => {
     expect(registerHost).toHaveBeenCalledWith(worktreeKey, expect.any(HTMLDivElement))
   })
 
-  test('does not select another tab when the preferred branch tab is closed', async () => {
+  test('falls back to status when a branch preference names a closed tab', async () => {
     const repo = seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/a'), createRepoBranch('feature/b')],
@@ -567,15 +578,23 @@ describe('BranchWorkspaceContent', () => {
     act(() => {
       root!.render(
         <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
-          <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
+          <BranchActionSurfaceContext.Provider value={defaultBranchActionSurface()}>
+            <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
+          </BranchActionSurfaceContext.Provider>
         </TerminalSessionReadContext.Provider>,
       )
     })
     await flushAsyncWork()
 
-    expect(container?.querySelector('#workspace-status-panel')).toBeNull()
+    // The selected branch (feature/b) has no explicit tab order, so it
+    // falls back to the default [status]. The user's preferred view
+    // (history) is not in the materialized tab list. The model falls
+    // back to the first materialized tab (status) so the user does not
+    // land on the empty pane. The store keeps the original preferred
+    // view (history) so opening history later returns to it.
+    expect(container?.querySelector('#workspace-status-panel')).not.toBeNull()
     expect(container?.querySelector('#workspace-history-panel')).toBeNull()
-    expect(container?.textContent).toContain('workspace-pane-views.empty')
+    expect(container?.textContent).not.toContain('workspace-pane-views.empty')
     expect(repoClientMocks.getRepositoryLog).not.toHaveBeenCalled()
   })
 
