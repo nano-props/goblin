@@ -100,7 +100,7 @@ describe('session restore store', () => {
       openRepos: [],
       activeRepo: null,
       workspaceFocused: false,
-      workspacePaneSize: 61.8,
+      workspacePaneSize: 70,
     })
   })
 })

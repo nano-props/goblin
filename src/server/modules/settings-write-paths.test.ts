@@ -173,12 +173,12 @@ describe('settings write paths', () => {
         openRepos: [],
         activeRepo: null,
         workspaceFocused: true,
-        workspacePaneSize: 61.8,
+        workspacePaneSize: 42.5,
         workspacePaneTabOrderByBranchByRepo: {},
       },
     })
     expect(parsed.session.workspaceFocused).toBe(true)
-    expect(parsed.session.workspacePaneSize).toBe(61.8)
+    expect(parsed.session.workspacePaneSize).toBe(42.5)
   })
 
   test('schema accepts changes as a session-restorable preferred view', async () => {
@@ -191,7 +191,7 @@ describe('settings write paths', () => {
           openRepos: [{ kind: 'local', id: '/tmp/repo' }],
           activeRepo: '/tmp/repo',
           workspaceFocused: true,
-          workspacePaneSize: 61.8,
+          workspacePaneSize: 42.5,
           preferredWorkspacePaneViewByBranchByRepo: {
             '/tmp/repo': {
               main: 'changes',
@@ -215,7 +215,7 @@ describe('settings write paths', () => {
       openRepos: [{ kind: 'local', id: '/tmp/repo' }],
       activeRepo: '/tmp/repo',
       workspaceFocused: true,
-      workspacePaneSize: 61.8,
+      workspacePaneSize: 42.5,
       workspacePaneTabOrderByBranchByRepo: {
         '/tmp/repo': {
           main: [],
