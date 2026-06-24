@@ -2,7 +2,7 @@
 // left pane (BranchNavigator) and the focus-mode hover card
 // (BranchListPopover) render this same view; the difference between
 // the two surfaces is captured entirely by:
-//   • the outer container (pane = ScrollArea, popover = overflow div)
+//   • the outer container (pane = flex ScrollArea, popover = max-h ScrollArea in compact mode)
 //   • whether clicking a row closes the surface afterwards
 // The list, store subscription, action-menu wiring, and empty state
 // live in one place, so the two surfaces can't drift.

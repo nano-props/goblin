@@ -7,7 +7,7 @@
 //
 // Notes on the abstraction boundary:
 //   • does NOT read the store; receives `repo` and `branches` from the parent
-//   • does NOT wrap in ScrollArea (pane uses ScrollArea, popover uses overflow on its content)
+//   • does NOT wrap in ScrollArea (pane and popover both own their own ScrollArea)
 //   • owns the per-list `actionMenuOpen` so the "row is no longer rendered
 //     ⇒ close the menu" invariant lives next to the rows that draw it
 //   • uses useLayoutEffect to scroll the highlighted row into view
