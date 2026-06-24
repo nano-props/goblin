@@ -52,7 +52,9 @@ export function BranchRow({
         <div
           className={cn(
             'pointer-events-none relative z-20 flex shrink-0 items-center py-1.5 pr-4',
-            !compact && 'opacity-0 transition-opacity duration-100 group-hover:opacity-100 focus-visible:opacity-100',
+            !compact &&
+              !actionMenuOpen &&
+              'opacity-0 transition-opacity duration-100 group-hover:opacity-100 focus-visible:opacity-100',
           )}
         >
           <div className="pointer-events-auto">

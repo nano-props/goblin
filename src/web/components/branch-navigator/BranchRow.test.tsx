@@ -209,6 +209,13 @@ describe('BranchRow', () => {
     expect(className).toContain('transition-opacity')
   })
 
+  test('keeps the actions wrapper visible while the action popover is open in non-compact mode', () => {
+    const className = renderRow(false, { actionMenuOpen: true })?.className ?? ''
+    expect(className).not.toContain('opacity-0')
+    expect(className).not.toContain('group-hover:opacity-100')
+    expect(className).not.toContain('focus-visible:opacity-100')
+  })
+
   test('keeps the actions wrapper fully visible in compact mode', () => {
     const className = renderRow(true)?.className ?? ''
     expect(className).not.toContain('opacity-0')
@@ -223,7 +230,7 @@ function render(element: React.ReactNode) {
   })
 }
 
-function renderRow(compact: boolean): HTMLDivElement | undefined {
+function renderRow(compact: boolean, options: { actionMenuOpen?: boolean } = {}): HTMLDivElement | undefined {
   responsiveMocks.compact = compact
   const repo = emptyRepo('/tmp/repo', 'repo')
   const branch = createRepoBranch('feature/a')
@@ -237,6 +244,8 @@ function renderRow(compact: boolean): HTMLDivElement | undefined {
         onOpenBranchStatus={vi.fn()}
         selectedRef={createRef<HTMLLIElement>()}
         showActions
+        actionMenuOpen={options.actionMenuOpen}
+        onActionMenuOpenChange={vi.fn()}
       />
     </ul>,
   )
