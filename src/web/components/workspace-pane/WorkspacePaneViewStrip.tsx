@@ -351,7 +351,11 @@ export function WorkspacePaneViewStrip({
   const activeItem = activeTabIdentity ? (items.find((item) => item.identity === activeTabIdentity) ?? null) : null
   const compactPendingItem = showCollapsedTabs ? (items.find(isPendingWorkspacePaneTabItem) ?? null) : null
   const selectedItem = activeItem ?? compactPendingItem
-  const collapseToSelectedTab = showCollapsedTabs && selectedItem !== null
+  // Compact mode is a structural choice — driven by screen size, not data.
+  // Decoupling it from `selectedItem` means the strip never falls through to
+  // the scrollable layout when there is no active tab; the compact body
+  // handles that case itself (empty tab area + popover switcher).
+  const collapseToSelectedTab = showCollapsedTabs
   const focusableTabIdentity = selectedItem?.identity ?? items[0]?.identity ?? null
   const internalFocusRegistry = useFocusRegistry<string, HTMLButtonElement>()
   const focusRegistry = externalFocusRegistry ?? internalFocusRegistry
@@ -554,7 +558,6 @@ export function WorkspacePaneViewStrip({
 
   function renderCompactTabsBody() {
     const compactItem = selectedItem
-    if (!compactItem) return null
     const newTerminalLabelKey = newTerminalBusy ? 'terminal.loading' : 'terminal.new'
     // Compact tabs intentionally use muted chrome even when selected, so
     // selection should not suppress separators; hover still does.
@@ -568,30 +571,32 @@ export function WorkspacePaneViewStrip({
           aria-label={t('workspace-pane-views.tabs')}
           className="flex-1"
         >
-          <WorkspacePaneView
-            item={compactItem}
-            isActive={!!panelActive && compactItem.identity === activeTabIdentity}
-            isSelected={compactItem.identity === activeTabIdentity}
-            isFocusable={compactItem.identity === focusableTabIdentity}
-            tabId={
-              isStaticWorkspacePaneTabItem(compactItem) || isPendingWorkspacePaneTabItem(compactItem)
-                ? tabIdForItem(compactItem)
-                : workspacePaneViewButtonId(workspacePaneId, 0)
-            }
-            focusRegistry={focusRegistry}
-            onSelect={handleSelect}
-            onClose={handleClose}
-            onKeyDown={handleTabKeyDown}
-            t={t}
-            compact={collapseToSelectedTab}
-            showSeparator={shouldShowWorkspacePaneViewSeparator({
-              leftId: compactItem.identity,
-              rightId: WORKSPACE_PANE_COMPACT_TRAILING_ACTION_ID,
-              activeId: compactActiveVisualIdentity,
-              hoveredId: hoveredTabIdentity,
-            })}
-            onHoverChange={setHoveredTabIdentity}
-          />
+          {compactItem ? (
+            <WorkspacePaneView
+              item={compactItem}
+              isActive={!!panelActive && compactItem.identity === activeTabIdentity}
+              isSelected={compactItem.identity === activeTabIdentity}
+              isFocusable={compactItem.identity === focusableTabIdentity}
+              tabId={
+                isStaticWorkspacePaneTabItem(compactItem) || isPendingWorkspacePaneTabItem(compactItem)
+                  ? tabIdForItem(compactItem)
+                  : workspacePaneViewButtonId(workspacePaneId, 0)
+              }
+              focusRegistry={focusRegistry}
+              onSelect={handleSelect}
+              onClose={handleClose}
+              onKeyDown={handleTabKeyDown}
+              t={t}
+              compact={collapseToSelectedTab}
+              showSeparator={shouldShowWorkspacePaneViewSeparator({
+                leftId: compactItem.identity,
+                rightId: WORKSPACE_PANE_COMPACT_TRAILING_ACTION_ID,
+                activeId: compactActiveVisualIdentity,
+                hoveredId: hoveredTabIdentity,
+              })}
+              onHoverChange={setHoveredTabIdentity}
+            />
+          ) : null}
         </WorkspacePaneViewTooltipLayer>
         <WorkspacePaneViewSwitcherPopover
           items={items}

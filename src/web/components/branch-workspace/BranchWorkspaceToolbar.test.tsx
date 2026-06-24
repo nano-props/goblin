@@ -358,6 +358,41 @@ describe('BranchWorkspaceToolbar', () => {
     expect(c.querySelector('button[aria-label="workspace-pane-views.tabs"]')).not.toBeNull()
   })
 
+  test('compact workspace view keeps the popover switcher reachable while the terminal view is loading', () => {
+    // Regression: when the user is viewing the terminal panel while the
+    // terminal registry is still hydrating (`preferredWorkspacePaneView =
+    // 'terminal'`, no materialized terminal tabs), the toolbar's
+    // `activeTabIdentity` is null because the tab-model's selection is
+    // `terminal-host` with `tab: null`. The compact layout must still be
+    // used (a structural choice driven by screen size) — otherwise the
+    // strip falls through to the scrollable layout, which renders fixed
+    // `w-36` tabs and the busy `+ New` button. The compact body shows an
+    // empty tab area in this state and keeps the popover switcher
+    // reachable so the user can navigate to an existing tab.
+    compactUi = true
+    const { container: c } = renderToolbar({
+      terminalCount: 0,
+      preferredWorkspacePaneView: 'terminal',
+      navigation: navigationWith({}),
+      loading: true,
+    })
+
+    const tablist = c.querySelector('[role="tablist"][aria-label="workspace-pane-views.tabs"]')
+    const tabs = Array.from(c.querySelectorAll('[role="tab"]'))
+
+    expect(tablist).not.toBeNull()
+    expect(tablist?.className).toContain('flex-1')
+    // No tab is rendered because no tab is active and no terminal is
+    // materialized. The compact body renders an empty tab area + chevron.
+    expect(tabs).toHaveLength(0)
+    // The scrollable-layout affordances (the busy `+ New` button) must
+    // stay out of the compact strip — the chevron-driven tab switcher is
+    // the only way to reach the workspace pane views in compact mode.
+    expect(c.querySelector('button[aria-label="terminal.new"]')).toBeNull()
+    expect(c.querySelector('button[aria-label="terminal.loading"]')).toBeNull()
+    expect(c.querySelector('button[aria-label="workspace-pane-views.tabs"]')).not.toBeNull()
+  })
+
   test('compact workspace view shows terminal creation as a full-width pending tab', () => {
     compactUi = true
     const { container: c } = renderToolbar({
