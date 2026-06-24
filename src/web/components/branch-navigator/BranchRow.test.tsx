@@ -37,6 +37,14 @@ vi.mock('#/web/components/BranchActionsMenu.tsx', () => ({
   BranchActionsMenu: () => null,
 }))
 
+const responsiveMocks = vi.hoisted(() => ({
+  compact: false,
+}))
+
+vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
+  useIsCompactUi: () => responsiveMocks.compact,
+}))
+
 let container: HTMLDivElement | null = null
 let root: Root | null = null
 
@@ -58,6 +66,7 @@ afterEach(() => {
   container = null
   document.body.innerHTML = ''
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
+  responsiveMocks.compact = false
 })
 
 describe('BranchRow', () => {
@@ -190,10 +199,46 @@ describe('BranchRow', () => {
     expect(branchLabel).not.toBeUndefined()
     expect(badge!.compareDocumentPosition(branchLabel!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
+
+  test('hides the actions wrapper by default and reveals it on row hover in non-compact mode', () => {
+    const className = renderRow(false)?.className ?? ''
+    expect(document.querySelector('li')?.className).toContain('group')
+    expect(className).toContain('opacity-0')
+    expect(className).toContain('group-hover:opacity-100')
+    expect(className).toContain('focus-visible:opacity-100')
+    expect(className).toContain('transition-opacity')
+  })
+
+  test('keeps the actions wrapper fully visible in compact mode', () => {
+    const className = renderRow(true)?.className ?? ''
+    expect(className).not.toContain('opacity-0')
+    expect(className).not.toContain('group-hover:opacity-100')
+    expect(className).not.toContain('focus-visible:opacity-100')
+  })
 })
 
 function render(element: React.ReactNode) {
   act(() => {
     root!.render(element)
   })
+}
+
+function renderRow(compact: boolean): HTMLDivElement | undefined {
+  responsiveMocks.compact = compact
+  const repo = emptyRepo('/tmp/repo', 'repo')
+  const branch = createRepoBranch('feature/a')
+  render(
+    <ul>
+      <BranchRow
+        repo={repo}
+        branch={branch}
+        selected={null}
+        onSelectBranch={vi.fn()}
+        onOpenBranchStatus={vi.fn()}
+        selectedRef={createRef<HTMLLIElement>()}
+        showActions
+      />
+    </ul>,
+  )
+  return document.querySelector('li')?.children[1] as HTMLDivElement | undefined
 }

@@ -4,6 +4,7 @@ import { BranchActionsMenu } from '#/web/components/BranchActionsMenu.tsx'
 import { BranchSummaryInline } from '#/web/components/repo-workspace/BranchSummaryInline.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
+import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 export interface BranchRowProps {
   repo: BranchActionRepo
   branch: RepoBranchState
@@ -30,6 +31,7 @@ export function BranchRow({
   terminalBellCount = 0,
 }: BranchRowProps) {
   const isSelected = branch.name === selected
+  const compact = useIsCompactUi()
 
   return (
     <li
@@ -37,7 +39,7 @@ export function BranchRow({
       onClick={() => onSelectBranch(branch.name)}
       onDoubleClick={() => onOpenBranchStatus(branch.name)}
       className={cn(
-        'relative grid min-h-9 items-stretch cursor-pointer rounded-md',
+        'group relative grid min-h-9 items-stretch cursor-pointer rounded-md',
         showActions ? 'grid-cols-[minmax(0,1fr)_auto]' : 'grid-cols-1',
         'transition-colors duration-100',
         isSelected ? 'bg-selected text-selected-foreground hover:bg-selected' : 'hover:bg-muted',
@@ -47,7 +49,12 @@ export function BranchRow({
         <BranchSummaryInline repo={repo} branch={branch} selected={isSelected} terminalBellCount={terminalBellCount} />
       </div>
       {showActions && (
-        <div className="pointer-events-none relative z-20 flex shrink-0 items-center py-1.5 pr-4">
+        <div
+          className={cn(
+            'pointer-events-none relative z-20 flex shrink-0 items-center py-1.5 pr-4',
+            !compact && 'opacity-0 transition-opacity duration-100 group-hover:opacity-100 focus-visible:opacity-100',
+          )}
+        >
           <div className="pointer-events-auto">
             <BranchActionsMenu
               repo={repo}
