@@ -14,6 +14,7 @@ import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 function makeTerminalHost(): ServerTerminalHost {
   return {
     isValidClientId: ((value: unknown): value is string => typeof value === 'string') as never,
+    isClientConnected: ((_userId: string, _clientId: string): boolean => true) as never,
     getDiagnostics: vi.fn(() => ({}) as never),
     registerSocket: vi.fn(),
     unregisterSocket: vi.fn(),

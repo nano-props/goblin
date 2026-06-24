@@ -123,6 +123,9 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     isValidClientId(value) {
       return isValidTerminalClientId(value)
     },
+    isClientConnected(userId, clientId) {
+      return broker.isClientConnected(userId, clientId) ?? false
+    },
     getDiagnostics() {
       const bufferStats = manager.getSessionBufferStats()
       return {
@@ -215,7 +218,12 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
         // liveness signal that feeds the broker's deadline scan.
         // Resolving here means the rest of the realtime pipeline
         // (buffered socket, handler table) stays untouched.
-        broker.recordHeartbeat(clientId, userId, message.at)
+        // `recordHeartbeat`'s signature is `(userId, clientId, at)` —
+        // reverse the order and the broker's `userClientKey` lookup
+        // misses on every live heartbeat, the deadline scan
+        // prematurely fires, and the entire feature silently does
+        // nothing.
+        broker.recordHeartbeat(userId, clientId, message.at)
         return
       }
       const bufferedSocket = bufferedSocketByRawSocket.get(socket as TerminalRealtimeSocket)

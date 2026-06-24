@@ -84,6 +84,11 @@ export class TerminalRealtimeBroker {
    * implicitly: a fresh `registerSocket` resets the timestamp to
    * "now" and `recordHeartbeat` keeps it fresh, so the deadline
    * only fires for truly silent clients.
+   *
+   * Each fired disconnect is one-shot: the heartbeat entry is
+   * dropped so the next scan doesn't fire it again. A later
+   * `registerSocket` re-seeds the clock to "now", so a
+   * reconnecting client gets a fresh deadline window.
    */
   private scanHeartbeats(): void {
     const now = Date.now()
@@ -96,6 +101,7 @@ export class TerminalRealtimeBroker {
         continue
       }
       const { userId, clientId } = splitUserClientKey(clientKey)
+      this.lastHeartbeatAtByClientKey.delete(clientKey)
       this.options.onClientDisconnected(clientId, userId)
     }
   }

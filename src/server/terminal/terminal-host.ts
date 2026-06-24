@@ -77,6 +77,14 @@ export interface ServerTerminalHostDiagnostics {
 export interface ServerTerminalHost {
   isValidClientId(value: unknown): value is string
   getDiagnostics(): ServerTerminalHostDiagnostics
+  /**
+   * `true` when the realtime broker has at least one live socket
+   * for the given `(userId, clientId)`. Returns `false` for either
+   * a never-registered pair or a pair whose only socket is in
+   * `CLOSING`. Tests use this to assert the heartbeat path keeps
+   * a registered controller "connected" past its raw deadline.
+   */
+  isClientConnected(userId: string, clientId: string): boolean
   // `clientId` is a per-tab routing identifier (broker key, WS
   // query param, sessionStorage value). `userId` is a per-token
   // identity derived from the access token; it partitions the

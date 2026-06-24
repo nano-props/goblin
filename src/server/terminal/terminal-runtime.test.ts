@@ -12,6 +12,10 @@ import { getWorktrees } from '#/system/git/worktrees.ts'
 import { resolveRemoteTarget } from '#/system/ssh/config.ts'
 import { createInProcessPtySupervisor } from '#/server/terminal/pty-supervisor-inprocess.ts'
 import { createServerTerminalRuntime } from '#/server/terminal/terminal-runtime.ts'
+import {
+  HEARTBEAT_DEADLINE_MS,
+  HEARTBEAT_INTERVAL_MS,
+} from '#/server/terminal/terminal-realtime-broker.ts'
 import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 
 // Under method 2 the host threads `userId` (derived from the
@@ -87,11 +91,16 @@ vi.mock('node-pty', () => ({
 interface RuntimeHandle {
   host: ServerTerminalHost
   shutdown: () => void
+  isClientConnected: (clientId: string) => boolean
 }
 
 function buildRuntime(): RuntimeHandle {
   const runtime = createServerTerminalRuntime({ ptySupervisor: createInProcessPtySupervisor() })
-  return { host: runtime.host, shutdown: () => runtime.shutdown() }
+  return {
+    host: runtime.host,
+    shutdown: () => runtime.shutdown(),
+    isClientConnected: (clientId: string) => runtime.host.isClientConnected(USER_1, clientId),
+  }
 }
 
 beforeEach(() => {
@@ -1250,6 +1259,60 @@ describe('server terminal runtime', () => {
       // about unused locals.
       expect([sessionA, sessionB]).toHaveLength(2)
     } finally {
+      shutdown()
+    }
+  })
+
+  test('runtime routes a heartbeat envelope to the broker with the right (userId, clientId, at) triple', async () => {
+    // Regression guard for the
+    // `broker.recordHeartbeat(clientId, userId, at)` arg-order bug
+    // that the original implementation shipped. The broker keys
+    // on `userClientKey(userId, clientId)`, so a swapped call
+    // silently misses every live heartbeat — the deadline scan
+    // then prematurely fires `onClientDisconnected` for healthy
+    // controllers. The broker unit tests passed because they
+    // call the broker directly with the right order; this test
+    // covers the wiring through the runtime's `handleRealtimeMessage`.
+    //
+    // The assertion is end-to-end: after a real heartbeat has been
+    // routed through the runtime, advancing the fake clock past
+    // the original deadline must NOT clear the registered socket
+    // — only a heartbeat routed with the correct (userId, clientId)
+    // order resets the broker's deadline clock.
+    const { host, shutdown, isClientConnected } = buildRuntime()
+    const socket = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_a', USER_1, socket)
+
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(new Date('2026-06-24T00:00:00Z'))
+
+      // First heartbeat at t=0.
+      host.handleRealtimeMessage(
+        'client_a',
+        USER_1,
+        socket,
+        JSON.stringify({ type: 'heartbeat', at: Date.now() }),
+      )
+      // Advance just shy of the original deadline.
+      vi.advanceTimersByTime(HEARTBEAT_DEADLINE_MS - 1_000)
+      // Heartbeat again — this MUST use the right (userId, clientId, at)
+      // order, otherwise the broker's clock never updates and the
+      // very next scan would synthesize a disconnect.
+      host.handleRealtimeMessage(
+        'client_a',
+        USER_1,
+        socket,
+        JSON.stringify({ type: 'heartbeat', at: Date.now() }),
+      )
+      // Advance past the original 90 s deadline. A correctly routed
+      // heartbeat (a real renderer sending every 30 s) means the
+      // broker clock is fresh, so the synthetic disconnect must NOT
+      // fire and the registered socket must still be connected.
+      vi.advanceTimersByTime(HEARTBEAT_INTERVAL_MS)
+      expect(isClientConnected('client_a')).toBe(true)
+    } finally {
+      vi.useRealTimers()
       shutdown()
     }
   })

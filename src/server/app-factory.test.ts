@@ -32,6 +32,7 @@ const mocks = vi.hoisted(() => ({
 
 const terminalHostStub = {
   isValidClientId: (_value: unknown): _value is string => true,
+  isClientConnected: (_userId: string, _clientId: string): boolean => true,
   getDiagnostics: vi.fn(() => ({
     mode: 'in-process' as const,
     state: 'running' as const,
