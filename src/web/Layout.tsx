@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
@@ -8,6 +8,8 @@ import { TokenGate } from '#/web/components/TokenGate.tsx'
 import { RepoCloneDialog } from '#/web/components/RepoCloneDialog.tsx'
 import { RepoOpenDialog } from '#/web/components/RepoOpenDialog.tsx'
 import { OpenRemoteRepositoryDialog } from '#/web/components/OpenRemoteRepositoryDialog.tsx'
+import { CreateWorktreeDialogHost } from '#/web/components/CreateWorktreeDialogHost.tsx'
+import { BranchActionDialogHost } from '#/web/components/BranchActionDialogHost.tsx'
 import { RepoDropOverlay } from '#/web/components/RepoDropOverlay.tsx'
 import { Toaster } from '#/web/components/ui/sonner.tsx'
 import { useAuthenticatedAppBootstrap } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
@@ -44,6 +46,7 @@ export function Layout() {
   const modalOpen = overlays.anyOpen
 
   const activeId = useReposStore((s) => s.activeId)
+  const activeBranchName = useReposStore((s) => (s.activeId ? s.repos[s.activeId]?.ui.selectedBranch ?? null : null))
   const order = useReposStore((s) => s.order)
   const { setActive, closeRepo, cycleActive, selectBranch, setWorkspacePaneView } = useStoreWithEqualityFn(
     useReposStore,
@@ -62,7 +65,7 @@ export function Layout() {
         setWorkspacePaneView,
         onOpenSettings: (page) => void navigate({ to: `/settings/${page}` }),
       }),
-    [activeId, closeRepo, cycleActive, navigate, order, selectBranch, setActive, setWorkspacePaneView],
+    [activeId, closeRepo, cycleActive, navigate, order, selectBranch, setWorkspacePaneView],
   )
 
   const workspaceShortcutsSuppressed = modalOpen || isSettingsOpen
@@ -99,6 +102,7 @@ export function Layout() {
               openRepoPathDialog: overlays.openRepoPathDialog,
               openCloneRepo: overlays.openCloneRepo,
               openRemoteRepo: overlays.openRemoteRepo,
+              openCreateWorktree: overlays.openCreateWorktree,
             }}
           >
             <TerminalSessionProvider>
@@ -110,7 +114,12 @@ export function Layout() {
                 onDrop={repoDrop.onDrop}
               >
                 <Outlet />
-                <MainWindowOverlays overlays={overlays} repoDrop={repoDrop} />
+                <MainWindowOverlays
+                  overlays={overlays}
+                  repoDrop={repoDrop}
+                  activeId={activeId}
+                  activeBranchName={activeBranchName}
+                />
               </div>
             </TerminalSessionProvider>
           </LayoutOverlayActions.Provider>
@@ -124,9 +133,11 @@ export function Layout() {
 interface MainWindowOverlaysProps {
   overlays: ReturnType<typeof useAppOverlays>
   repoDrop: ReturnType<typeof useRepoDrop>
+  activeId: string | null
+  activeBranchName: string | null
 }
 
-function MainWindowOverlays({ overlays, repoDrop }: MainWindowOverlaysProps) {
+function MainWindowOverlays({ overlays, repoDrop, activeId, activeBranchName }: MainWindowOverlaysProps) {
   return (
     <>
       <RepoOpenDialog open={overlays.state.openRepo.open} onOpenChange={overlays.setOpenRepoOpen} />
@@ -135,12 +146,23 @@ function MainWindowOverlays({ overlays, repoDrop }: MainWindowOverlaysProps) {
         open={overlays.state.openRemoteRepo.open}
         onOpenChange={overlays.setOpenRemoteRepoOpen}
       />
+      <CreateWorktreeDialogHost
+        open={overlays.state.createWorktree.open}
+        onOpenChange={overlays.setCreateWorktreeOpen}
+        activeId={activeId}
+      />
+      <BranchActionDialogHost activeRepoId={activeId} activeBranchName={activeBranchName} />
       <RepoDropOverlay active={repoDrop.active} />
       <Toaster position="bottom-right" closeButton />
     </>
   )
 }
 
+/**
+ * Hosts the create-worktree dialog at the layout level. The host
+ * itself lives in `CreateWorktreeDialogHost`; this file only wires
+ * the layout-level state into it.
+ */
 /**
  * Auth-gated side effects. Mounts only when `<TokenGate>` lets
  * its children through (i.e. the user is authenticated), so the

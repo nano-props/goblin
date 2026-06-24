@@ -62,7 +62,6 @@ describe('useBranchActionItems', () => {
         requestDeleteBranch: vi.fn(),
         requestRemoveWorktree: vi.fn(),
       },
-      dialogs: null,
     })
   })
 

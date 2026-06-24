@@ -29,7 +29,12 @@ interface Props {
   /** Renders the confirm button red. Use for genuinely irreversible ops. */
   destructive?: boolean
   onCancel: () => void
-  onConfirm: () => void | Promise<void>
+  /**
+   * Returning a Promise (of any type) tells `useAsyncPending.run`
+   * to mark the Confirm button `aria-busy` and reject duplicate
+   * clicks for the duration of the IPC round-trip.
+   */
+  onConfirm: () => void | Promise<unknown>
 }
 
 export function ConfirmDialog({ open, title, message, confirmLabel, destructive, onCancel, onConfirm }: Props) {
@@ -63,7 +68,7 @@ export function ConfirmDialog({ open, title, message, confirmLabel, destructive,
             aria-busy={isPending ? true : undefined}
             onClick={handleConfirm}
           >
-            {isPending && <Loader2 className="animate-spin" />}
+            {isPending && <Loader2 aria-hidden="true" className="animate-spin" />}
             {confirmLabel}
           </Button>
         </AlertDialogFooter>

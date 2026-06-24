@@ -88,6 +88,7 @@ function render(element: React.ReactNode) {
           openRepoPathDialog: vi.fn(),
           openRemoteRepo: vi.fn(),
           openCloneRepo: vi.fn(),
+          openCreateWorktree: vi.fn(),
         }}
       >
         {element}

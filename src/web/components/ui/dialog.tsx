@@ -5,6 +5,7 @@ import { cn } from '#/web/lib/cn.ts'
 import { focusRingInset } from '#/web/components/ui/focus.ts'
 import { Button } from '#/web/components/ui/button.tsx'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
+import { useT } from '#/web/stores/i18n.ts'
 function Dialog({ ...props }: React.ComponentProps<typeof DialogPrimitive.Root>) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />
 }
@@ -89,6 +90,7 @@ function DialogFooter({
   showCloseButton?: boolean
 }) {
   const compact = useIsCompactUi()
+  const t = useT()
   return (
     <div
       data-slot="dialog-footer"
@@ -98,7 +100,7 @@ function DialogFooter({
       {children}
       {showCloseButton && (
         <DialogPrimitive.Close asChild>
-          <Button variant="outline">Close</Button>
+          <Button variant="outline">{t('dialog.close')}</Button>
         </DialogPrimitive.Close>
       )}
     </div>

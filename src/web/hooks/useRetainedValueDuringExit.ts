@@ -1,5 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
+// Timer-based variant of `useLastNonNull`: retains `value` for
+// `retainMs` after `active` flips to false, then drops it. Used by
+// the compact-workspace pane transition which has a fixed exit
+// duration. For the timer-free "retain forever while null" variant,
+// see `useLastNonNull` (used by the branch-action dialog close
+// animation, where Radix AlertDialog drives the unmount itself).
+
 interface UseRetainedValueDuringExitOptions<T> {
   value: T | null
   active: boolean

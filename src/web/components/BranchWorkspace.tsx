@@ -140,7 +140,6 @@ function BranchShortcutHandler({
   return (
     <BranchActionSurfaceContext.Provider value={actions}>
       <BranchWorkspaceToolbar repo={repo} detail={detail} workspacePaneId={workspacePaneId} />
-      {actions.dialogs}
       <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId={workspacePaneId} />
     </BranchActionSurfaceContext.Provider>
   )

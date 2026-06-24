@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { useAppOverlays } from '#/web/hooks/useAppOverlays.ts'
+import { resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 
 let container: HTMLDivElement | null = null
 let root: Root | null = null
@@ -21,18 +22,22 @@ function Harness() {
       <button id="open-repo" type="button" onClick={overlays.openRepoPathDialog}>
         open repo
       </button>
+      <button id="open-create-worktree" type="button" onClick={overlays.openCreateWorktree}>
+        open create worktree
+      </button>
       <button id="close-all" type="button" onClick={overlays.closeAllOverlays}>
         close all
       </button>
       <output id="clone-open">{overlays.state.clone.open ? 'open' : 'closed'}</output>
       <output id="open-repo-open">{overlays.state.openRepo.open ? 'open' : 'closed'}</output>
+      <output id="create-worktree-open">{overlays.state.createWorktree.open ? 'open' : 'closed'}</output>
       <output id="any-open">{overlays.anyOpen ? 'open' : 'closed'}</output>
     </>
   )
 }
 
 function RoutedHarness() {
-  const [overlay, setOverlay] = useState<'clone' | 'openRepo' | 'openRemoteRepo' | null>(null)
+  const [overlay, setOverlay] = useState<'clone' | 'openRepo' | 'openRemoteRepo' | 'createWorktree' | null>(null)
   const overlays = useAppOverlays({
     routeOverlay: overlay,
     onRouteOverlayChange: setOverlay,
@@ -58,6 +63,7 @@ function RoutedHarness() {
 
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
+  resetReposStore()
 })
 
 afterEach(() => {
@@ -76,19 +82,28 @@ describe('useAppOverlays', () => {
     document.body.append(container)
     root = createRoot(container)
 
+    // Seed an active repo so the openCreateWorktree defensive
+    // guard (in production) does not short-circuit the test.
+    act(() => {
+      seedRepoState({ id: '/tmp/gbl-overlay-test', branches: [] })
+    })
+
     act(() => {
       root!.render(<Harness />)
     })
 
     click('#open-clone')
     click('#open-repo')
+    click('#open-create-worktree')
     expect(text('#clone-open')).toBe('open')
     expect(text('#open-repo-open')).toBe('open')
+    expect(text('#create-worktree-open')).toBe('open')
     expect(text('#any-open')).toBe('open')
 
     click('#close-all')
     expect(text('#clone-open')).toBe('closed')
     expect(text('#open-repo-open')).toBe('closed')
+    expect(text('#create-worktree-open')).toBe('closed')
     expect(text('#any-open')).toBe('closed')
   })
 
@@ -114,6 +129,35 @@ describe('useAppOverlays', () => {
     expect(text('#clone-open')).toBe('closed')
     expect(text('#open-repo-open')).toBe('closed')
     expect(text('#any-open')).toBe('closed')
+  })
+
+  test('openCreateWorktree no-ops when no active repo (defensive guard)', () => {
+    // The create-worktree dialog is repo-scoped — it renders nothing
+    // when no active repo. If a future surface (e.g. command-palette
+    // entry) calls openCreateWorktree with no active repo, the
+    // naive behaviour is `state.createWorktree.open = true` with no
+    // dialog visible, and a later `useEffect([activeId])` clears it
+    // when a repo is finally activated. The guard short-circuits at
+    // the action so the intent is never silently lost.
+    container = document.createElement('div')
+    document.body.append(container)
+    root = createRoot(container)
+
+    // Active repo is null (resetReposStore in beforeEach).
+    act(() => {
+      root!.render(<Harness />)
+    })
+
+    click('#open-create-worktree')
+    expect(text('#create-worktree-open')).toBe('closed')
+    expect(text('#any-open')).toBe('closed')
+
+    // Now seed an active repo; opening should now work.
+    act(() => {
+      seedRepoState({ id: '/tmp/gbl-overlay-test', branches: [] })
+    })
+    click('#open-create-worktree')
+    expect(text('#create-worktree-open')).toBe('open')
   })
 })
 

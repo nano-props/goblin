@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react'
 import { useOverlayRegistry } from '#/web/hooks/useOverlayRegistry.ts'
-export const APP_OVERLAY_KEYS = ['clone', 'openRepo', 'openRemoteRepo'] as const
+import { useReposStore } from '#/web/stores/repos/store.ts'
+export const APP_OVERLAY_KEYS = ['clone', 'openRepo', 'openRemoteRepo', 'createWorktree'] as const
 export type AppOverlayKey = (typeof APP_OVERLAY_KEYS)[number]
 
 interface AppOverlayRouteOptions {
@@ -76,6 +77,36 @@ export function useAppOverlays(options: AppOverlayRouteOptions = {}) {
     [options, routeDriven, routeOverlay, setOpen],
   )
 
+  const openCreateWorktree = useCallback(() => {
+    // The create-worktree dialog is repo-scoped — it has nothing to
+    // render without an active repo. Guard against a future caller
+    // (e.g. a command-palette entry) that invokes this without
+    // `activeId` set, so we don't leave `state.createWorktree.open`
+    // stuck `true` until a later `useEffect([activeId])` clears it.
+    // Currently only the Topbar button calls this, and the Topbar
+    // button is itself hidden when no repo is active — this is a
+    // defensive guard for future surface expansion.
+    if (!useReposStore.getState().activeId) return
+    if (routeDriven) {
+      options.onRouteOverlayChange?.('createWorktree')
+      return
+    }
+    open('createWorktree')
+  }, [open, options, routeDriven])
+
+  const setCreateWorktreeOpen = useCallback(
+    (open: boolean) => {
+      if (routeDriven) {
+        options.onRouteOverlayChange?.(
+          open ? 'createWorktree' : routeOverlay === 'createWorktree' ? null : routeOverlay,
+        )
+        return
+      }
+      setOpen('createWorktree', open)
+    },
+    [options, routeDriven, routeOverlay, setOpen],
+  )
+
   const closeAllOverlays = useCallback(() => {
     if (routeDriven) {
       options.onRouteOverlayChange?.(null)
@@ -88,9 +119,19 @@ export function useAppOverlays(options: AppOverlayRouteOptions = {}) {
     () => ({
       clone: { open: routeDriven ? routeOverlay === 'clone' : openByKey.clone },
       openRepo: { open: routeDriven ? routeOverlay === 'openRepo' : openByKey.openRepo },
-      openRemoteRepo: { open: routeDriven ? routeOverlay === 'openRemoteRepo' : openByKey.openRemoteRepo },
+      openRemoteRepo: {
+        open: routeDriven ? routeOverlay === 'openRemoteRepo' : openByKey.openRemoteRepo,
+      },
+      createWorktree: { open: routeDriven ? routeOverlay === 'createWorktree' : openByKey.createWorktree },
     }),
-    [openByKey.clone, openByKey.openRepo, openByKey.openRemoteRepo, routeDriven, routeOverlay],
+    [
+      openByKey.clone,
+      openByKey.openRepo,
+      openByKey.openRemoteRepo,
+      openByKey.createWorktree,
+      routeDriven,
+      routeOverlay,
+    ],
   )
 
   return {
@@ -102,6 +143,8 @@ export function useAppOverlays(options: AppOverlayRouteOptions = {}) {
     setOpenRepoOpen,
     openRemoteRepo,
     setOpenRemoteRepoOpen,
+    openCreateWorktree,
+    setCreateWorktreeOpen,
     closeAllOverlays,
   }
 }

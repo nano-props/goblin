@@ -1,8 +1,6 @@
-import { useState } from 'react'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { remoteRepoTarget } from '#/web/stores/repos/helpers.ts'
 import type { RepoBranchState } from '#/web/stores/repos/types.ts'
-import { BranchActionDialogs, type RemoveConfirm } from '#/web/components/BranchActionDialogs.tsx'
 import type { ExecResult } from '#/web/types.ts'
 import { PROTECTED_BRANCHES } from '#/shared/git-types.ts'
 import {
@@ -12,23 +10,17 @@ import {
   openRepositoryTerminal,
 } from '#/web/repo-client.ts'
 import { openRemoteRepositoryEditor, openRemoteRepositoryTerminal } from '#/web/remote-client.ts'
+import { openBranchExternalTarget } from '#/web/hooks/openBranchExternalTarget.ts'
+import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
+import { getBranchWorktreeState } from '#/web/stores/repos/worktree-state.ts'
+import { dispatchRepoBranchAction, dispatchRepoUiAction, isPushProtected } from '#/web/stores/repos/branch-action-write-paths.ts'
+import { useBranchActionDialogsStore } from '#/web/stores/repos/branch-action-dialogs.ts'
 import {
   branchActionBusyItemId,
   type BranchActionRepo,
   isBranchActionBlocked,
   type BranchActionItemId,
 } from '#/web/hooks/branch-action-state.ts'
-import { openBranchExternalTarget } from '#/web/hooks/openBranchExternalTarget.ts'
-import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
-import { useRetainedDialogState } from '#/web/hooks/useRetainedDialogState.ts'
-import { getBranchWorktreeState } from '#/web/stores/repos/worktree-state.ts'
-import {
-  deleteBranchNeedsForceConfirm,
-  dispatchRepoBranchAction,
-  dispatchRepoUiAction,
-  isPushProtected,
-  removeWorktreeNeedsForceConfirm,
-} from '#/web/stores/repos/branch-action-write-paths.ts'
 
 export type { BranchActionItemId } from '#/web/hooks/branch-action-state.ts'
 
@@ -65,6 +57,14 @@ export function getBranchActionCapabilities(repo: BranchActionRepo, branch: Repo
   }
 }
 
+/**
+ * Per-(repoId, branchName) request surface — capabilities and the
+ * "request" actions that open a confirm dialog. Dialog state itself
+ * lives in `useBranchActionDialogsStore` so it survives the surface
+ * that requested it; see `BranchActionDialogHost` for the
+ * workspace-level render point and `branchActionDispatch` for the
+ * dispatch functions the dialog uses to commit a confirmed action.
+ */
 export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState) {
   const setLastResult = useReposStore((s) => s.setLastResult)
   const runBranchAction = useReposStore((s) => s.runBranchAction)
@@ -75,18 +75,20 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
     hasPending: hasPendingLocalAction,
     run: runPendingLocalAction,
   } = useAsyncPending<LocalBranchActionItemId>()
-  const pushConfirm = useRetainedDialogState<string>()
-  const deleteConfirm = useRetainedDialogState<string>()
-  const forceDeleteConfirm = useRetainedDialogState<string>()
-  const removeConfirm = useRetainedDialogState<RemoveConfirm>()
-  const forceRemoveConfirm = useRetainedDialogState<RemoveConfirm>()
-  const [removeAlsoDeletes, setRemoveAlsoDeletes] = useState(true)
-  const [deleteAlsoUpstream, setDeleteAlsoUpstream] = useState(false)
-  const [removeAlsoUpstream, setRemoveAlsoUpstream] = useState(false)
-  const hasUpstream = !!branch.tracking && !branch.trackingGone
 
   function guardBusy(): boolean {
     return branchActionBusy || hasPendingLocalAction()
+  }
+
+  function runRepoAction(
+    action: Parameters<typeof runBranchAction>[1],
+    options?: { deferResultMessages?: string[]; handleResult?: (result: ExecResult) => boolean },
+  ): void {
+    if (guardBusy()) return
+    void dispatchRepoBranchAction(repo.id, repo.instanceToken, action, runBranchAction, {
+      deferResultMessages: options?.deferResultMessages,
+      handleResult: options?.handleResult,
+    })
   }
 
   function runUiAction(
@@ -102,20 +104,10 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
       })
       return result
     })
-    // useAsyncPending.run returns Promise<unknown>; the inner async fn above
-    // is statically known to resolve to ExecResult | null, so narrow once.
+    // useAsyncPending.run returns Promise<unknown>; the inner async fn
+    // above is statically known to resolve to ExecResult | null, so
+    // narrow once.
     return (pending ?? Promise.resolve(null)) as Promise<ExecResult | null>
-  }
-
-  async function runRepoAction(
-    action: Parameters<typeof runBranchAction>[1],
-    options?: { deferResultMessages?: string[]; handleResult?: (result: ExecResult) => boolean },
-  ) {
-    if (guardBusy()) return
-    await dispatchRepoBranchAction(repo.id, repo.instanceToken, action, runBranchAction, {
-      deferResultMessages: options?.deferResultMessages,
-      handleResult: options?.handleResult,
-    })
   }
 
   function copyPatch(): Promise<boolean> {
@@ -135,16 +127,25 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
   }
 
   function pull() {
-    void runRepoAction({ kind: 'pull', branch: branch.name, worktreePath: branch.worktree?.path })
+    runRepoAction({ kind: 'pull', branch: branch.name, worktreePath: branch.worktree?.path })
   }
 
   function push() {
     if (guardBusy()) return
     if (isPushProtected(branch.name)) {
-      pushConfirm.openWith(branch.name)
+      // Open the protected-branch confirm dialog through the central
+      // store. State outlives any temporary surface (e.g. focus-mode
+      // HoverCard popover), so the dialog stays open even after the
+      // trigger surface unmounts. The dialog's Confirm button calls
+      // `dispatchPush` from `branchActionDispatch` to commit.
+      useBranchActionDialogsStore.getState().openPushConfirm({
+        repoId: repo.id,
+        branchName: branch.name,
+        payload: branch.name,
+      })
       return
     }
-    void runRepoAction({ kind: 'push', branch: branch.name })
+    runRepoAction({ kind: 'push', branch: branch.name })
   }
 
   function openTerminal() {
@@ -171,90 +172,26 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
 
   function requestDeleteBranch() {
     if (guardBusy()) return
-    setDeleteAlsoUpstream(false)
-    deleteConfirm.openWith(branch.name)
+    useBranchActionDialogsStore.getState().openDeleteConfirm({
+      repoId: repo.id,
+      branchName: branch.name,
+      payload: branch.name,
+    })
   }
 
   function requestRemoveWorktree() {
     if (guardBusy() || !branch.worktree?.path) return
-    setRemoveAlsoDeletes(!PROTECTED_BRANCHES.has(branch.name))
-    setRemoveAlsoUpstream(false)
-    removeConfirm.openWith({ branch: branch.name, path: branch.worktree.path })
-  }
-
-  function deleteBranch(target: string, force = false, alsoDeleteUpstream = false) {
-    void runRepoAction(
-      { kind: 'deleteBranch', branch: target, force, alsoDeleteUpstream },
+    useBranchActionDialogsStore.getState().openRemoveWorktreeConfirm(
       {
-        deferResultMessages: force ? [] : ['error.branch-not-fully-merged'],
-        handleResult: (result) => {
-          if (deleteBranchNeedsForceConfirm(result, force)) {
-            forceDeleteConfirm.openWith(target)
-            return true
-          }
-          return false
-        },
+        repoId: repo.id,
+        branchName: branch.name,
+        payload: { branch: branch.name, path: branch.worktree.path },
       },
-    )
-  }
-
-  function removeWorktree(
-    target: RemoveConfirm,
-    alsoDeleteBranch: boolean,
-    forceDeleteBranch: boolean,
-    alsoDeleteUpstream = false,
-  ) {
-    void runRepoAction(
-      {
-        kind: 'removeWorktree',
-        branch: target.branch,
-        worktreePath: target.path,
-        alsoDeleteBranch,
-        forceDeleteBranch,
-        alsoDeleteUpstream,
-      },
-      {
-        deferResultMessages: alsoDeleteBranch && !forceDeleteBranch ? ['error.cannot-remove-unpushed-worktree'] : [],
-        handleResult: (result) => {
-          if (removeWorktreeNeedsForceConfirm(result, alsoDeleteBranch, forceDeleteBranch)) {
-            forceRemoveConfirm.openWith(target)
-            return true
-          }
-          return false
-        },
-      },
+      { isProtectedBranch: PROTECTED_BRANCHES.has(branch.name) },
     )
   }
 
   const capabilities = getBranchActionCapabilities(repo, branch)
-
-  const dialogs = (
-    <BranchActionDialogs
-      branch={branch}
-      remoteTarget={remoteRepoTarget(repo.id, repo.remote.lifecycle)}
-      hasUpstream={hasUpstream}
-      pushConfirm={pushConfirm}
-      deleteConfirm={deleteConfirm}
-      forceDeleteConfirm={forceDeleteConfirm}
-      removeConfirm={removeConfirm}
-      forceRemoveConfirm={forceRemoveConfirm}
-      deleteAlsoUpstream={deleteAlsoUpstream}
-      removeAlsoDeletes={removeAlsoDeletes}
-      removeAlsoUpstream={removeAlsoUpstream}
-      setDeleteAlsoUpstream={setDeleteAlsoUpstream}
-      setRemoveAlsoDeletes={setRemoveAlsoDeletes}
-      setRemoveAlsoUpstream={setRemoveAlsoUpstream}
-      onPushConfirm={(target) => {
-        void runRepoAction({ kind: 'push', branch: target })
-      }}
-      onDeleteBranch={(target, force, alsoDeleteUpstream) => {
-        void deleteBranch(target, force, alsoDeleteUpstream)
-      }}
-      onRemoveWorktree={(target, alsoDeleteBranch, forceDeleteBranch, alsoDeleteUpstream) => {
-        void removeWorktree(target, alsoDeleteBranch, forceDeleteBranch, alsoDeleteUpstream)
-      }}
-    />
-  )
 
   return {
     blocked: branchActionBusy || pendingLocalAction !== null,
@@ -270,6 +207,5 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
       requestDeleteBranch,
       requestRemoveWorktree,
     },
-    dialogs,
   }
 }

@@ -39,7 +39,6 @@ export interface BranchActionSurface {
   mainItems: BranchActionItem[]
   destructiveItems: BranchActionItem[]
   copyPatchAction: BranchCopyPatchAction
-  dialogs: ReactNode
 }
 
 export function visibleBranchActionItems({
@@ -74,7 +73,7 @@ export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchS
   const navigation = useMainWindowNavigation()
   const { terminalApp, resolvedTerminalApp, terminalAvailable, editorApp, resolvedEditorApp, editorAvailable } =
     useRuntimeExternalAppSettings()
-  const { blocked, busyAction, capabilities, actions, dialogs } = useBranchActions(repo, branch)
+  const { blocked, busyAction, capabilities, actions } = useBranchActions(repo, branch)
   const disabled = blocked
   const busy = (id: BranchActionItemId) => busyAction === id
   const phase = branchActionDisplayPhase(repo, branch.name)
@@ -263,5 +262,5 @@ export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchS
       : []),
   ]
 
-  return { mainItems, destructiveItems, copyPatchAction, dialogs }
+  return { mainItems, destructiveItems, copyPatchAction }
 }
