@@ -152,11 +152,10 @@ describe('terminal-runtime-actions close broadcast', () => {
 describe('terminal-runtime-actions clientId gate', () => {
   // The action layer is the single point that validates caller
   // identity before reaching the manager. Every authority-gated
-  // After the `attachmentId` + `clientId` -> `clientId` merge, every
-  // authority-gated action (write / resize / takeover / restart /
-  // attach) accepts a missing `input.clientId` and falls back to
-  // the outer (request-level) `clientId`. The manager sees a single
-  // string, never undefined, and the manager's tightened
+  // action (write / resize / takeover / restart / attach) accepts a
+  // missing `input.clientId` and falls back to the outer
+  // (request-level) `clientId`. The manager sees a single string,
+  // never undefined, and the manager's tightened
   // `clientId: string` (no longer optional) contract holds.
   test('write / resize / takeover / restart / attach all fall back to outer clientId when input omits it', async () => {
     const { actions, manager } = makeActions({ closeSlotForUser: () => false })

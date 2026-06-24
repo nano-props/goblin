@@ -357,7 +357,7 @@ export class ManagedTerminalSlot {
   }
 
   hydrate(input: TerminalSlotHydrationInput): void {
-    const previousSessionId = this.runtime.currentPtySessionId()
+    const previousPtySessionId = this.runtime.currentPtySessionId()
     this.hydratedSnapshot = { snapshot: input.snapshot, snapshotSeq: input.snapshotSeq }
     const changed = this.runtime.hydrateSession({
       ptySessionId: input.ptySessionId,
@@ -375,7 +375,7 @@ export class ManagedTerminalSlot {
     if (changed && input.phase === 'open' && input.role === 'unowned' && this.view.isConnected()) {
       this.start()
     }
-    if (previousSessionId && previousSessionId !== input.ptySessionId) this.applyHydratedSnapshotToActiveView()
+    if (previousPtySessionId && previousPtySessionId !== input.ptySessionId) this.applyHydratedSnapshotToActiveView()
     if (changed) this.notify('metadata')
   }
 
@@ -387,22 +387,40 @@ export class ManagedTerminalSlot {
 
   handleOwnership(event: TerminalOwnershipViewModel): void {
     const applies = this.runtime.currentPtySessionId() === event.ptySessionId
-    const wasController = this.runtime.canResize()
+    // Check the role *before* applying the event so the controller→viewer
+    // transition is detected even when the event also moves the phase to
+    // a transitional value like `'opening'`. `canResize()` would be false
+    // in that case (it requires `phase === 'open'`) and the transition
+    // would silently re-mount the xterm into a parked host, leaving the
+    // tab blank. `wasRole` is the role-based signal we actually want: it
+    // answers "did the user *lose* control" rather than "is the PTY fully
+    // open right now".
+    const wasRole = this.runtime.clientRole()
     const changed = this.runtime.handleOwnership(event)
     const pendingCleared = applies ? this.runtime.clearTakeoverPending() : false
     if (changed) {
+      const newRole = this.runtime.clientRole()
       const isController = this.runtime.canResize()
-      const isUnowned = this.runtime.phase() === 'open' && this.runtime.clientRole() === 'unowned'
+      const isUnowned = this.runtime.phase() === 'open' && newRole === 'unowned'
       // The gate only distinguishes pass-through vs takeover.
       this.authority().setRole(isController ? 'controller' : 'viewer')
-      if (!isController) {
+      // Use the role (not `canResize()`) to detect the controller→viewer
+      // transition. The realtime event can carry a transitional phase
+      // (`opening`, `restarting`) that races with our local `start()` call
+      // and makes `canResize()` flap between true and false across events
+      // for the same user. The role is the authoritative signal of who
+      // owns the PTY; the phase just reflects whether the PTY is fully
+      // started. The pre-event `wasRole` is what avoids a controller
+      // holding a slot for themselves being re-mounted just because the
+      // server pushed a phase='opening' tick.
+      if (wasRole === 'controller' && newRole !== 'controller') {
         if (this.view.currentTerminal()) {
           this.destroyActiveView({ preserveTransientState: true })
         }
         if (isUnowned && this.view.isConnected()) {
           this.start()
         }
-      } else if (!wasController && isController) {
+      } else if (wasRole !== 'controller' && isController) {
         // Bug E: a viewer → controller transition must always
         // notify, even when the xterm view is already mounted.
         // The previous gate (`!this.view.currentTerminal()`) only
@@ -414,6 +432,18 @@ export class ManagedTerminalSlot {
         // paint via the metadata notify below.
         if (this.view.isConnected()) this.start()
         if (this.view.isVisible()) this.view.focus()
+      } else if (wasRole === 'viewer' && newRole === 'unowned' && this.view.isConnected()) {
+        // A mounted viewer slot became unowned: the previous PTY
+        // owner released the slot. Auto-attach as the new owner so
+        // the user does not have to click into the tab. This branch
+        // is independent of the controller→viewer transition above
+        // because the xterm is still alive in viewer mode. Tear
+        // it down first so the new start() can re-open xterm with
+        // the new controller's size.
+        if (this.view.currentTerminal()) {
+          this.destroyActiveView({ preserveTransientState: true })
+        }
+        this.start()
       }
     }
     if (changed || pendingCleared) {

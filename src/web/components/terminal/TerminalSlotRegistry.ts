@@ -17,7 +17,7 @@ import {
   type ReattachSnapshotCacheEntry,
 } from '#/web/components/terminal/terminal-slot-projection.ts'
 import { userTerminalInput, type TerminalUserInputSource } from '#/web/components/terminal/terminal-input.ts'
-import { terminalSessionDisplayOrder } from '#/web/components/terminal/terminal-slot-display-order.ts'
+import { terminalSlotDisplayOrder } from '#/web/components/terminal/terminal-slot-display-order.ts'
 import {
   captureTerminalHostGeometry,
   resolveTerminalCreateGeometry,
@@ -436,8 +436,8 @@ export class TerminalSlotRegistry {
     if (!result.ok) {
       throw new Error(result.message)
     }
-    const snapshotSessionId = result.ptySessionId
-    if (!snapshotSessionId || typeof result.snapshot !== 'string' || typeof result.snapshotSeq !== 'number') {
+    const snapshotPtySessionId = result.ptySessionId
+    if (!snapshotPtySessionId || typeof result.snapshot !== 'string' || typeof result.snapshotSeq !== 'number') {
       throw new Error('error.terminal-create-failed')
     }
     // First-frame contract: when the server reports `action: 'created'`,
@@ -447,7 +447,7 @@ export class TerminalSlotRegistry {
     // committed the slot row but skipped the catalog append). Reject
     // and let the operator restart the create.
     const createdSlot = result.sessions.find(
-      (slot) => slot.key === result.key && slot.ptySessionId === snapshotSessionId,
+      (slot) => slot.key === result.key && slot.ptySessionId === snapshotPtySessionId,
     )
     if (!createdSlot) {
       throw new Error('error.terminal-create-failed')
@@ -458,7 +458,7 @@ export class TerminalSlotRegistry {
       base.repoRoot,
       serverSlots,
       clientId,
-      new Map<string, TerminalSlotSnapshot>([[snapshotSessionId, result as TerminalSlotSnapshot]]),
+      new Map<string, TerminalSlotSnapshot>([[snapshotPtySessionId, result as TerminalSlotSnapshot]]),
     )
     return result.key
   }
@@ -696,7 +696,7 @@ export class TerminalSlotRegistry {
       getCachedSnapshot: (key) => this.snapshotCache.get(key) ?? null,
       cacheSnapshot: (key, nextSnapshot) => this.snapshotCache.set(key, nextSnapshot),
       hasBell: (key) => this.bellController.hasBell(key),
-      getDisplayOrder: (session) => terminalSessionDisplayOrder(session.descriptor, this.displayOrderByKey),
+      getDisplayOrder: (session) => terminalSlotDisplayOrder(session.descriptor, this.displayOrderByKey),
     })
     this.worktreeSnapshotCache.set(worktreeTerminalKey, snapshot)
     return snapshot
@@ -1010,8 +1010,8 @@ export class TerminalSlotRegistry {
     return Array.from(this.sessions.values())
       .filter((session) => session.descriptor.worktreeTerminalKey === worktreeTerminalKey)
       .sort((a, b) => {
-        const orderA = terminalSessionDisplayOrder(a.descriptor, this.displayOrderByKey)
-        const orderB = terminalSessionDisplayOrder(b.descriptor, this.displayOrderByKey)
+        const orderA = terminalSlotDisplayOrder(a.descriptor, this.displayOrderByKey)
+        const orderB = terminalSlotDisplayOrder(b.descriptor, this.displayOrderByKey)
         return orderA - orderB || a.descriptor.index - b.descriptor.index
       })
   }

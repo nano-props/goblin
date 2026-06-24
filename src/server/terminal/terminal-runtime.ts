@@ -25,7 +25,7 @@ import {
 } from '#/server/terminal/terminal-runtime-realtime.ts'
 import {
   isValidTerminalClientId,
-  isValidTerminalId,
+  isValidSlotId,
 } from '#/server/terminal/terminal-runtime-support.ts'
 import { TerminalSlotManager } from '#/server/terminal/terminal-slot-manager.ts'
 import { type PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
@@ -88,7 +88,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   })
   const catalog = createTerminalCatalog({
     isValidClientId: isValidTerminalClientId,
-    isValidTerminalId,
+    isValidSlotId,
     manager,
     isClientConnected(userId, clientId) {
       return broker.isClientConnected(userId, clientId)

@@ -1,13 +1,13 @@
 import type { TerminalDescriptor } from '#/web/components/terminal/types.ts'
 
-export function terminalSessionDisplayOrder(
+export function terminalSlotDisplayOrder(
   descriptor: TerminalDescriptor,
   displayOrderByKey: ReadonlyMap<string, number>,
 ): number {
   return displayOrderByKey.get(descriptor.key) ?? descriptor.index - 1
 }
 
-export function snapshotDisplayOrder(
+export function slotSnapshotDisplayOrder(
   orderedKeys: string[],
   displayOrderByKey: ReadonlyMap<string, number>,
 ): Map<string, number | undefined> {
@@ -16,7 +16,7 @@ export function snapshotDisplayOrder(
   return previousOrder
 }
 
-export function restoreDisplayOrder(
+export function restoreSlotDisplayOrder(
   displayOrderByKey: Map<string, number>,
   previousOrder: ReadonlyMap<string, number | undefined>,
 ): void {

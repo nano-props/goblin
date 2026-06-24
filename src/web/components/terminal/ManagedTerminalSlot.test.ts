@@ -2329,6 +2329,92 @@ describe('ManagedTerminalSlot', () => {
       })
       expect(session.snapshot().phase).toBe('restarting')
     })
+
+    test('realtime ownership event with a transitional phase does not destroy the controller xterm', async () => {
+      // Reproduces the blank-on-create race: the user creates a slot,
+      // the slot hydrates with role=controller and phase=open, and
+      // then the server's realtime ownership event arrives carrying
+      // a transitional phase (opening) — even though the user is
+      // still the controller by role. The previous `!canResize()`
+      // gate misread the transitional phase as a controller→viewer
+      // transition and tore down the freshly-opened xterm, leaving
+      // the tab blank until refresh.
+      const host = document.createElement('div')
+      document.body.appendChild(host)
+      const session = new ManagedTerminalSlot(descriptor, vi.fn())
+      hydrateManagedSession(session)
+      session.attach(host)
+      await flushTerminalStart()
+      await flushUntil(() => session.snapshot().phase === 'open')
+
+      // Sanity: xterm is mounted under the active host, and the
+      // user is the controller.
+      expect(host.querySelector('.goblin-managed-terminal-host .xterm')).not.toBeNull()
+      const xtermBefore = host.querySelector('.goblin-managed-terminal-host .xterm')
+      expect(session.snapshot().attachment).toMatchObject({ role: 'controller' })
+
+      // The server's realtime ownership event arrives with role still
+      // 'controller' but with a transitional phase ('opening'). The
+      // role is the authoritative signal for who owns the PTY — the
+      // phase just reflects whether the PTY is fully started. The
+      // previous `!canResize()` gate misread this as a downgrade
+      // because canResize() requires `phase === 'open'`.
+      session.handleOwnership({
+        ptySessionId: 'pty_session_1_aaaaaaaaa',
+        role: 'controller',
+        controllerStatus: 'connected',
+        canonicalCols: 100,
+        canonicalRows: 30,
+        phase: 'opening',
+      })
+
+      // The role did not change, so the controller xterm must still
+      // be mounted and attached. The old behavior destroyed it here
+      // because canResize() flipped to false (phase was 'opening'),
+      // and the user saw a blank tab until refresh.
+      const xtermAfter = host.querySelector('.goblin-managed-terminal-host .xterm')
+      expect(xtermAfter).not.toBeNull()
+      expect(xtermAfter).toBe(xtermBefore)
+      // The role is still 'controller' — only the phase moved to
+      // 'opening'. Once the orchestrator's start() completes its
+      // final phase transition, the role-gated gate stays closed
+      // (no destroyActiveView), the xterm is preserved, and the
+      // tab is not blank.
+      expect(session.snapshot().phase).toBe('opening')
+    })
+
+    test('realtime ownership event with role=viewer still tears down the controller xterm', async () => {
+      // Companion to the previous test: the role-based gate must
+      // still tear down the xterm when the user actually loses
+      // control. The previous fix could not regress this path; this
+      // test pins it down.
+      const host = document.createElement('div')
+      document.body.appendChild(host)
+      const session = new ManagedTerminalSlot(descriptor, vi.fn())
+      hydrateManagedSession(session)
+      session.attach(host)
+      await flushTerminalStart()
+      await flushUntil(() => session.snapshot().phase === 'open')
+
+      expect(host.querySelector('.goblin-managed-terminal-host .xterm')).not.toBeNull()
+
+      // Another client (or a viewer-mode switch) takes over: the
+      // realtime event flips the role to 'viewer'. The phase is
+      // 'open' here (not the transitional case), so canResize()
+      // would also have flipped — the test exercises the role
+      // signal independently of phase.
+      session.handleOwnership({
+        ptySessionId: 'pty_session_1_aaaaaaaaa',
+        role: 'viewer',
+        controllerStatus: 'connected',
+        canonicalCols: 100,
+        canonicalRows: 30,
+        phase: 'open',
+      })
+
+      expect(session.snapshot().attachment).toMatchObject({ role: 'viewer' })
+      expect(host.querySelector('.goblin-managed-terminal-host .xterm')).toBeNull()
+    })
   })
 })
 

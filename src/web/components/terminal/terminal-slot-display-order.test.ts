@@ -1,15 +1,15 @@
 import { describe, expect, test } from 'vitest'
 import {
-  restoreDisplayOrder,
-  snapshotDisplayOrder,
-  terminalSessionDisplayOrder,
+  restoreSlotDisplayOrder,
+  slotSnapshotDisplayOrder,
+  terminalSlotDisplayOrder,
 } from '#/web/components/terminal/terminal-slot-display-order.ts'
 
-describe('terminal session display order helpers', () => {
+describe('terminal slot display order helpers', () => {
   test('derives display rank from persisted order or descriptor index fallback', () => {
     const orders = new Map([['slot-2', 0]])
     expect(
-      terminalSessionDisplayOrder(
+      terminalSlotDisplayOrder(
         {
           key: 'slot-2',
           worktreeTerminalKey: 'repo\0wt',
@@ -23,7 +23,7 @@ describe('terminal session display order helpers', () => {
       ),
     ).toBe(0)
     expect(
-      terminalSessionDisplayOrder(
+      terminalSlotDisplayOrder(
         {
           key: 'slot-3',
           worktreeTerminalKey: 'repo\0wt',
@@ -43,7 +43,7 @@ describe('terminal session display order helpers', () => {
       ['slot-1', 1],
       ['slot-2', 0],
     ])
-    const previous = snapshotDisplayOrder(['slot-1', 'slot-2', 'slot-3'], orders)
+    const previous = slotSnapshotDisplayOrder(['slot-1', 'slot-2', 'slot-3'], orders)
     orders.set('slot-3', 0)
     orders.set('slot-1', 1)
     orders.set('slot-2', 2)
@@ -52,7 +52,7 @@ describe('terminal session display order helpers', () => {
       ['slot-2', 2],
       ['slot-3', 0],
     ])
-    restoreDisplayOrder(orders, previous)
+    restoreSlotDisplayOrder(orders, previous)
     expect(Array.from(orders.entries())).toEqual([
       ['slot-1', 1],
       ['slot-2', 0],

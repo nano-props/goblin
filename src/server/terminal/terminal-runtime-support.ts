@@ -1,9 +1,9 @@
 import { isValidTerminalClientId } from '#/shared/terminal-validators.ts'
 
-const TERMINAL_ID_RE = /^[A-Za-z0-9_-]{1,64}$/
+const SLOT_ID_RE = /^[A-Za-z0-9_-]{1,64}$/
 
-export function isValidTerminalId(value: unknown): value is string {
-  return typeof value === 'string' && TERMINAL_ID_RE.test(value)
+export function isValidSlotId(value: unknown): value is string {
+  return typeof value === 'string' && SLOT_ID_RE.test(value)
 }
 
 // `resolveClientConnected` previously lived here as a stub

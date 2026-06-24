@@ -74,7 +74,7 @@ export class PtyWorkerRuntime {
       this.options.emit({ type: 'pty-spawn-result', requestId, ok: false, error: result.message })
       return
     }
-    const ptySessionId = createSessionId()
+    const ptySessionId = createPtySessionId()
     // Defer the initial sample to the first onData chunk: node-pty's
     // macOS spawn-helper briefly holds the PTY before exec'ing the
     // shell, so term.process read in the same tick as pty.spawn returns
@@ -121,7 +121,7 @@ export class PtyWorkerRuntime {
   }
 }
 
-function createSessionId(): string {
+function createPtySessionId(): string {
   return `pty_${crypto.randomUUID()}`
 }
 

@@ -78,7 +78,7 @@ interface TerminalCatalogManager {
 
 interface TerminalCatalogOptions {
   isValidClientId(value: unknown): value is string
-  isValidTerminalId(value: unknown): value is string
+  isValidSlotId(value: unknown): value is string
   manager: TerminalCatalogManager
   isClientConnected(userId: string, clientId?: string): boolean | undefined
   broadcastSessionsChanged(userId: string, repoRoot: string): void
@@ -105,7 +105,7 @@ class TerminalCatalog {
     const slotId = input.slotId ?? formatSlotId(1)
     const cols = input.cols ?? 80
     const rows = input.rows ?? 24
-    if (!this.options.isValidTerminalId(slotId)) return { ok: false, message: 'error.invalid-arguments' }
+    if (!this.options.isValidSlotId(slotId)) return { ok: false, message: 'error.invalid-arguments' }
     if (!isValidTerminalSize(cols, rows)) return { ok: false, message: 'error.invalid-arguments' }
 
     const slotScope = terminalSlotScope(input.repoRoot)
@@ -114,22 +114,22 @@ class TerminalCatalog {
     // to scope owner-scoped session lists — see the comment on
     // `terminalSlotScope` in server/terminal/terminal-slot-scope.ts
     // for the normalization rationale.
-    const targetSessionKey = formatTerminalSlotKey(
+    const targetSlotKey = formatTerminalSlotKey(
       slotScope,
       isRemoteRepoId(input.repoRoot) ? input.worktreePath : path.resolve(input.worktreePath),
       slotId,
     )
-    const existingSession = existingSessions.find((session) => session.key === targetSessionKey)
-    const action: TerminalCatalogAction = existingSession
-      ? existingSession.controller
+    const existingSlot = existingSessions.find((session) => session.key === targetSlotKey)
+    const action: TerminalCatalogAction = existingSlot
+      ? existingSlot.controller
         ? 'restored'
         : 'reused'
       : 'created'
 
     if (isRemoteRepoId(input.repoRoot)) {
-      return await this.ensureRemote(userId, input, { slotId, cols, rows, targetSessionKey, action })
+      return await this.ensureRemote(userId, input, { slotId, cols, rows, targetSlotKey, action })
     }
-    return await this.ensureLocal(userId, input, { cols, rows, targetSessionKey, action })
+    return await this.ensureLocal(userId, input, { cols, rows, targetSlotKey, action })
   }
 
   async create(clientId: string, userId: string, input: TerminalCreateInput): Promise<TerminalCatalogMutationResult> {
@@ -220,7 +220,7 @@ class TerminalCatalog {
       slotId: string
       cols: number
       rows: number
-      targetSessionKey: string
+      targetSlotKey: string
       action: TerminalCatalogAction
     },
   ): Promise<EnsureTerminalCatalogResult> {
@@ -239,7 +239,7 @@ class TerminalCatalog {
     const result = await this.options.manager.ensureSlot({
       userId,
       scope: input.repoRoot,
-      key: context.targetSessionKey,
+      key: context.targetSlotKey,
       cwd: process.cwd(),
       cols: context.cols,
       rows: context.rows,
@@ -251,7 +251,7 @@ class TerminalCatalog {
     })
     if (!result.ok) return { ok: false, message: result.message }
     this.options.broadcastSessionsChanged(userId, input.repoRoot)
-    return toEnsureResult(context.targetSessionKey, context.action, result)
+    return toEnsureResult(context.targetSlotKey, context.action, result)
   }
 
   private async ensureLocal(
@@ -260,7 +260,7 @@ class TerminalCatalog {
     context: {
       cols: number
       rows: number
-      targetSessionKey: string
+      targetSlotKey: string
       action: TerminalCatalogAction
     },
   ): Promise<EnsureTerminalCatalogResult> {
@@ -280,7 +280,7 @@ class TerminalCatalog {
     const result = await this.options.manager.ensureSlot({
       userId,
       scope: repoRoot,
-      key: context.targetSessionKey,
+      key: context.targetSlotKey,
       cwd: worktreePath,
       cols: context.cols,
       rows: context.rows,
@@ -291,7 +291,7 @@ class TerminalCatalog {
     })
     if (!result.ok) return { ok: false, message: result.message }
     this.options.broadcastSessionsChanged(userId, input.repoRoot)
-    return toEnsureResult(context.targetSessionKey, context.action, result)
+    return toEnsureResult(context.targetSlotKey, context.action, result)
   }
 }
 
