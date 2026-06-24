@@ -5,7 +5,7 @@
 //   options, trusted entry URL normalization, navigation blocking, and
 //   external link handling.
 // - It does NOT own surface identity/capabilities; that lives in
-//   window-registry.ts / renderer-surface.ts.
+//   window-registry.ts / client-surface.ts.
 
 import { app, type BrowserWindow, type BrowserWindowConstructorOptions } from 'electron'
 import { createHash } from 'node:crypto'
@@ -104,7 +104,7 @@ export function createRendererEntryUrl({ entryHtml = 'index.html', routePath = '
   return { url }
 }
 
-export function configureTrustedRendererWindow(win: BrowserWindow, logLabel: string): void {
+export function configureTrustedClientWindow(win: BrowserWindow, logLabel: string): void {
   win.webContents.on('will-navigate', (event, nextUrl) => {
     // Renderer windows are expected to stay on their bootstrap entry and
     // route internally via app state / browser-history updates, not

@@ -33,7 +33,7 @@ describe('window registry', () => {
     const registry = await import('#/main/window-registry.ts')
     const main = makeWindow()
 
-    registry.registerRendererWindowSurface(main, { windowKey: 'main' })
+    registry.registerClientWindowSurface(main, { windowKey: 'main' })
 
     expect(registry.getMainWindow()).toBe(main)
     expect(registry.isRegisteredRendererSurfaceId(main.webContents.id)).toBe(true)
@@ -62,7 +62,7 @@ describe('window registry', () => {
     const registry = await import('#/main/window-registry.ts')
     const main = makeWindow()
 
-    registry.registerRendererWindowSurface(main, { windowKey: 'main', capabilities: { ipcBroadcast: true } })
+    registry.registerClientWindowSurface(main, { windowKey: 'main', capabilities: { ipcBroadcast: true } })
     registry.broadcastToSurfaceCapability('ipcBroadcast', IPC_EVENT_CHANNEL, [{ type: 'settings-write-error' }])
 
     expect(main.webContents.send).toHaveBeenCalledWith(IPC_EVENT_CHANNEL, { type: 'settings-write-error' })
@@ -72,7 +72,7 @@ describe('window registry', () => {
     const registry = await import('#/main/window-registry.ts')
     const main = makeWindow()
 
-    registry.registerRendererWindowSurface(main, { windowKey: 'main', capabilities: { themeSync: true } })
+    registry.registerClientWindowSurface(main, { windowKey: 'main', capabilities: { themeSync: true } })
 
     expect(registry.allRegisteredSurfacesWithCapability('themeSync')).toEqual([
       {

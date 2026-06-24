@@ -1,4 +1,4 @@
-import { broadcastClientEffectIntent } from '#/main/renderer-surface-events.ts'
+import { broadcastClientEffectIntent } from '#/main/client-surface-events.ts'
 import { toSafeSessionPath } from '#/shared/input-validation.ts'
 
 const queuedPaths = new Set<string>()

@@ -9,7 +9,7 @@
 
 import { BrowserWindow, app, screen } from 'electron'
 import { loadWindowState, setWindowBounds, type WindowBounds } from '#/main/window-state.ts'
-import { attachRendererSurfaceWindow, detachRendererSurfaceWindow } from '#/main/renderer-surface.ts'
+import { attachClientSurfaceWindow, detachClientSurfaceWindow } from '#/main/client-surface.ts'
 import { plantEmbedAuthCookie } from '#/main/cookie-bootstrap.ts'
 import { getEmbeddedServerRuntime } from '#/main/server-manager.ts'
 import {
@@ -120,7 +120,7 @@ async function createMainWindow(): Promise<BrowserWindow> {
   win.webContents.on('render-process-gone', (_event, details) => {
     rendererNodeLog.error({ details }, 'process gone')
   })
-  attachRendererSurfaceWindow(win, { logLabel: 'window', surface: MAIN_WINDOW_SURFACE })
+  attachClientSurfaceWindow(win, { logLabel: 'window', surface: MAIN_WINDOW_SURFACE })
   const { url } = createRendererEntryUrl({ routePath: '/' })
   allowRendererWindowEntryUrl(win, url.toString())
   // Plant the auth cookie on the renderer's session BEFORE
@@ -159,7 +159,7 @@ async function createMainWindow(): Promise<BrowserWindow> {
   win.on('move', persistBounds)
 
   win.on('closed', () => {
-    detachRendererSurfaceWindow(win, MAIN_WINDOW_SURFACE)
+    detachClientSurfaceWindow(win, MAIN_WINDOW_SURFACE)
   })
 
   try {

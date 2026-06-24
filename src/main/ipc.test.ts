@@ -185,7 +185,7 @@ vi.mock('#/system/editors.ts', () => ({
   ),
 }))
 
-vi.mock('#/main/renderer-surface-events.ts', () => ({
+vi.mock('#/main/client-surface-events.ts', () => ({
   broadcastIpcEvent: vi.fn(),
   sendIpcEvent: vi.fn(),
 }))

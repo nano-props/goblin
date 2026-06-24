@@ -1,7 +1,7 @@
 // Registry of trusted renderer BrowserWindows and their capabilities.
 //
 // Boundary:
-// - This module owns renderer-surface identity and capability lookup.
+// - This module owns client-surface identity and capability lookup.
 // - It does NOT own window shell policy (navigation/open-handler), which
 //   lives in window-shell.ts.
 
@@ -15,7 +15,7 @@ export interface RegisteredRendererSurfaceCapabilities {
 
 export type RegisteredRendererSurfaceCapability = keyof RegisteredRendererSurfaceCapabilities
 
-export interface RendererSurfaceSpec {
+export interface ClientSurfaceSpec {
   windowKey: string
   capabilities?: Partial<RegisteredRendererSurfaceCapabilities>
 }
@@ -190,7 +190,7 @@ export function broadcastToSurfaceCapability(
   })
 }
 
-export function registerRendererWindowSurface(win: BrowserWindowType, surface: RendererSurfaceSpec): void {
+export function registerClientWindowSurface(win: BrowserWindowType, surface: ClientSurfaceSpec): void {
   mainWindow = win
   registerSurface(win, {
     windowKey: surface.windowKey,
@@ -198,6 +198,6 @@ export function registerRendererWindowSurface(win: BrowserWindowType, surface: R
   })
 }
 
-export function unregisterRendererWindowSurface(_surface: RendererSurfaceSpec, win?: BrowserWindowType): void {
+export function unregisterClientWindowSurface(_surface: ClientSurfaceSpec, win?: BrowserWindowType): void {
   unregisterMainWindow(win)
 }
