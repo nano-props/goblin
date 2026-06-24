@@ -1,6 +1,6 @@
 import type { SettingsPage } from '#/shared/api-types.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
-import { getRendererBridge } from '#/web/renderer-bridge.ts'
+import { getRendererBridge } from '#/web/client-bridge.ts'
 import { homeDirectory as hostInfoHomeDirectory } from '#/web/stores/host-info.ts'
 const PROJECT_GITHUB_URL = 'https://github.com/nano-props/goblin'
 

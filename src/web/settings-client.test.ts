@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
-import type { RendererBridge } from '#/web/renderer-bridge-types.ts'
-import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
+import type { RendererBridge } from '#/web/client-bridge-types.ts'
+import { setRendererBridgeForTests } from '#/web/client-bridge.ts'
 
 function webBootstrap(overrides: Partial<ClientBootstrapSnapshot> = {}): ClientBootstrapSnapshot {
   return {

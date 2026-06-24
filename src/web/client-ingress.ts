@@ -1,7 +1,7 @@
 import type { IpcEvent } from '#/shared/api-types.ts'
 import { isClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { ClientEffectIntent, ClientEffectIntentType } from '#/shared/client-effect-intents.ts'
-import { getRendererBridge } from '#/web/renderer-bridge.ts'
+import { getRendererBridge } from '#/web/client-bridge.ts'
 
 // Native-host ingress for Electron renderers. Keep this separate from server
 // ingress modules so browser- and Electron-owned downlinks stay explicit.

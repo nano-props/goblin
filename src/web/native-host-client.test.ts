@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
-import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
+import { setRendererBridgeForTests } from '#/web/client-bridge.ts'
 
 function installBridge(calls: Array<{ path: string; input?: unknown }>, result = new Promise(() => {})): void {
   Object.defineProperty(globalThis, 'window', {

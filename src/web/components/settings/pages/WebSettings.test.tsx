@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { WebSettings } from '#/web/components/settings/pages/WebSettings.tsx'
-import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
+import { setRendererBridgeForTests } from '#/web/client-bridge.ts'
 
 const toastMocks = vi.hoisted(() => ({
   success: vi.fn(),
@@ -142,7 +142,7 @@ function seedWebBootstrap() {
   }
   // Web runtime: no `goblinNative` preload surface, no rotate
   // capability. The renderer falls through to the safe defaults
-  // in `renderer-bridge.ts`.
+  // in `client-bridge.ts`.
   delete testWindow.goblinNative
   setRendererBridgeForTests({
     kind: () => 'web',

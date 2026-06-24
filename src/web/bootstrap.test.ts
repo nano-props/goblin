@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
+import { setRendererBridgeForTests } from '#/web/client-bridge.ts'
 import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 
@@ -148,7 +148,7 @@ describe('renderer bootstrap', () => {
     const bootstrap: ClientBootstrapSnapshot = webBootstrap({
       initialServer: { url: 'http://127.0.0.1:32100', accessToken: 'secret', clientId: 'client_sharedterminal' },
     })
-    const bridgeModule = await import('#/web/renderer-bridge.ts')
+    const bridgeModule = await import('#/web/client-bridge.ts')
     bridgeModule.setRendererBridgeForTests({
       kind: () => 'web',
       hasCapability: () => false,

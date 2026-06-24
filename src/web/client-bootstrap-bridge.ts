@@ -34,7 +34,7 @@ function isClientBootstrapSnapshot(value: unknown): value is ClientBootstrapSnap
   // not by `bootstrap.runtime.kind`. Tests that previously had the
   // runtime carried via the preload (and never in the bootstrap)
   // keep working without having to fill in both surfaces. The
-  // `getBootstrap()` reader in `renderer-bridge.ts` substitutes a
+  // `getBootstrap()` reader in `client-bridge.ts` substitutes a
   // sensible default when the field is missing.
   return (
     (candidate.runtime === undefined || isClientRuntimeSnapshot(candidate.runtime)) &&
@@ -61,7 +61,7 @@ function fillRuntimeDefaults(snapshot: ClientBootstrapSnapshot): ClientBootstrap
   // The `runtime` field is now optional in the input; substitute a
   // web default when the source omitted it. The bridge layer's
   // Electron detection does not depend on this field — see
-  // `getRendererBridge` in `#/web/renderer-bridge.ts`.
+  // `getRendererBridge` in `#/web/client-bridge.ts`.
   return { ...snapshot, runtime: { ...EMPTY_BOOTSTRAP.runtime } }
 }
 

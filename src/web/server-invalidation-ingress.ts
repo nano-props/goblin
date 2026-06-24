@@ -2,7 +2,7 @@ import { isServerInvalidationEvent, type ServerInvalidationEvent } from '#/share
 import { createServerWebSocketIngress } from '#/web/lib/server-ws-ingress.ts'
 
 // Shared server-owned invalidation ingress for browser and Electron
-// renderers. Distinct from native-host ingress (`renderer-ingress.ts`),
+// renderers. Distinct from native-host ingress (`client-ingress.ts`),
 // which is for Electron IPC-driven events/intents only.
 
 function parseInvalidationMessage(data: unknown): ServerInvalidationEvent | null {

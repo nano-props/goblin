@@ -1,5 +1,5 @@
-import { getRendererBridge } from '#/web/renderer-bridge.ts'
-import type { RendererTerminalBridge } from '#/web/renderer-bridge-types.ts'
+import { getRendererBridge } from '#/web/client-bridge.ts'
+import type { RendererTerminalBridge } from '#/web/client-bridge-types.ts'
 
 function getTerminalBridge(): RendererTerminalBridge {
   return getRendererBridge().terminal()

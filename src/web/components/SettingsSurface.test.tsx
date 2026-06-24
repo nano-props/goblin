@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { SettingsSurface } from '#/web/components/SettingsSurface.tsx'
-import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
+import { setRendererBridgeForTests } from '#/web/client-bridge.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import { resetReposStore } from '#/web/stores/repos/test-utils.ts'
 

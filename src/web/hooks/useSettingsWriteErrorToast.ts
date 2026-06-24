@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import { useT } from '#/web/stores/i18n.ts'
-import { subscribeNativeHostEventType } from '#/web/renderer-ingress.ts'
+import { subscribeNativeHostEventType } from '#/web/client-ingress.ts'
 export function useSettingsWriteErrorToast() {
   const t = useT()
   // `t` is read through a ref so a language switch doesn't tear down /

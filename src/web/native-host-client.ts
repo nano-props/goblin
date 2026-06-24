@@ -1,5 +1,5 @@
 import type { NativeIpcPath, IpcRequest } from '#/shared/api-types.ts'
-import { getRendererBridge } from '#/web/renderer-bridge.ts'
+import { getRendererBridge } from '#/web/client-bridge.ts'
 
 let nextNativeRequestId = 1
 

@@ -5,7 +5,7 @@ import { SettingsGroup, SettingsList, SettingsRow } from '#/web/components/setti
 import { Switch } from '#/web/components/ui/switch.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
 import { getInitialBootstrap } from '#/web/bootstrap.ts'
-import { getRendererBridge } from '#/web/renderer-bridge.ts'
+import { getRendererBridge } from '#/web/client-bridge.ts'
 import { useLanInfoQuery } from '#/web/settings-queries.ts'
 import { useLanSettingsController, useRuntimeLanSettings } from '#/web/runtime-settings-lan.ts'
 import { useT } from '#/web/stores/i18n.ts'

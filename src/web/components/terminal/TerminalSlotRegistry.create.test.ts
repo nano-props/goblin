@@ -21,7 +21,7 @@ vi.mock('#/web/terminal.ts', () => ({
   },
 }))
 
-vi.mock('#/web/renderer-terminal-bridge.ts', () => ({
+vi.mock('#/web/client-terminal-bridge.ts', () => ({
   readOrCreateWebTerminalClientId: mocks.attachmentIdMock,
 }))
 

@@ -13,7 +13,7 @@ import {
   useTerminalSlotSummaries,
 } from '#/web/components/terminal/terminal-slot-store.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
-import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
+import { setRendererBridgeForTests } from '#/web/client-bridge.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-queries.ts'

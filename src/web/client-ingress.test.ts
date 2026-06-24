@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { IpcEvent } from '#/shared/api-types.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
-import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
+import { setRendererBridgeForTests } from '#/web/client-bridge.ts'
 
 describe('renderer ingress', () => {
   beforeEach(() => {
@@ -39,7 +39,7 @@ describe('renderer ingress', () => {
       },
     })
 
-    const { subscribeNativeHostEventType } = await import('#/web/renderer-ingress.ts')
+    const { subscribeNativeHostEventType } = await import('#/web/client-ingress.ts')
     const cb = vi.fn()
     const unsubscribe = subscribeNativeHostEventType('settings-write-error', cb)
 
@@ -79,7 +79,7 @@ describe('renderer ingress', () => {
       },
     })
 
-    const { subscribeClientEffectIntentType } = await import('#/web/renderer-ingress.ts')
+    const { subscribeClientEffectIntentType } = await import('#/web/client-ingress.ts')
     const cb = vi.fn()
     const unsubscribe = subscribeClientEffectIntentType('external-open-enqueued', cb)
 

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
-import type { RendererBridge } from '#/web/renderer-bridge-types.ts'
+import type { RendererBridge } from '#/web/client-bridge-types.ts'
 
 function installWindow(openReturn: unknown = {}) {
   Object.defineProperty(globalThis, 'window', {
@@ -55,7 +55,7 @@ describe('app shell client', () => {
   })
 
   test('opens app settings through the renderer bridge shell', async () => {
-    const bridgeModule = await import('#/web/renderer-bridge.ts')
+    const bridgeModule = await import('#/web/client-bridge.ts')
     const openSettingsWindow = vi.fn(async () => true)
     bridgeModule.setRendererBridgeForTests(
       testBridge({
@@ -92,7 +92,7 @@ describe('app shell client', () => {
   })
 
   test('opens the project GitHub URL through the native shell with https-only policy', async () => {
-    const bridgeModule = await import('#/web/renderer-bridge.ts')
+    const bridgeModule = await import('#/web/client-bridge.ts')
     const shellOpenExternalUrl = vi.fn(async () => ({ ok: true, message: 'https://github.com/nano-props/goblin' }))
     bridgeModule.setRendererBridgeForTests(
       testBridge({
@@ -116,7 +116,7 @@ describe('app shell client', () => {
   })
 
   test('chooses repository paths through the renderer bridge shell', async () => {
-    const bridgeModule = await import('#/web/renderer-bridge.ts')
+    const bridgeModule = await import('#/web/client-bridge.ts')
     const openDirectoryDialog = vi.fn(async (input?: { title?: string }) =>
       input?.title === 'Open Git Repository' ? '/tmp/repo' : '/tmp',
     )
@@ -145,7 +145,7 @@ describe('app shell client', () => {
     // hit the paste-file-partial branch when only some files made
     // it across. Without this test, that contract relied on
     // coincidence.
-    const bridgeModule = await import('#/web/renderer-bridge.ts')
+    const bridgeModule = await import('#/web/client-bridge.ts')
     bridgeModule.setRendererBridgeForTests(testBridge({ saveClipboardFiles: vi.fn(async () => ['/tmp/a', '/tmp/b']) }))
     const { saveClipboardFiles } = await import('#/web/app-shell-client.ts')
     await expect(saveClipboardFiles([new File([new Uint8Array([1])], 'a')])).resolves.toEqual(['/tmp/a', '/tmp/b'])
@@ -156,7 +156,7 @@ describe('app shell client', () => {
     // throws (uninitialised, IPC channel down, etc.) must not bubble
     // the error out of app-shell-client — the resolver reads `[]`
     // and surfaces a single toast instead.
-    const bridgeModule = await import('#/web/renderer-bridge.ts')
+    const bridgeModule = await import('#/web/client-bridge.ts')
     bridgeModule.setRendererBridgeForTests(
       testBridge({
         saveClipboardFiles: vi.fn(() => {
@@ -169,7 +169,7 @@ describe('app shell client', () => {
   })
 
   test('saveClipboardFiles collapses bridge rejection to []', async () => {
-    const bridgeModule = await import('#/web/renderer-bridge.ts')
+    const bridgeModule = await import('#/web/client-bridge.ts')
     bridgeModule.setRendererBridgeForTests(
       testBridge({
         saveClipboardFiles: vi.fn(async () => {

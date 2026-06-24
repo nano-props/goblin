@@ -12,7 +12,7 @@
 //
 // The two consumers today are
 //   `#/web/server-invalidation-ingress.ts` and
-//   `#/web/server-renderer-intent-ingress.ts`; both reduce to
+//   `#/web/server-client-intent-ingress.ts`; both reduce to
 //   ~25 lines once they pick the path + parser and forward to this
 // factory.
 

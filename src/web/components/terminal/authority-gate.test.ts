@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { TerminalTakeoverInput, TerminalTakeoverResult } from '#/shared/terminal-types.ts'
 import { createXtermAuthorityGate } from '#/web/components/terminal/authority-gate.ts'
 import { terminalLog } from '#/web/logger.ts'
-import type { RendererTerminalBridge } from '#/web/renderer-bridge-types.ts'
+import type { RendererTerminalBridge } from '#/web/client-bridge-types.ts'
 
 // Focused unit tests for the AuthorityGate. The gate is the single
 // source of truth for write-side authorization, so its decision

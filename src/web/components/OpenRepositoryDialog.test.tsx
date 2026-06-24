@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { OpenRepositoryDialog } from '#/web/components/OpenRepositoryDialog.tsx'
-import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
+import { setRendererBridgeForTests } from '#/web/client-bridge.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import type { OpenRepoResult } from '#/web/stores/repos/types.ts'
 

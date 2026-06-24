@@ -30,7 +30,7 @@ import type {
   TerminalTitleEvent,
   TerminalRestartInput,
 } from '#/shared/terminal-types.ts'
-import type { RendererTerminalBridge } from '#/web/renderer-bridge-types.ts'
+import type { RendererTerminalBridge } from '#/web/client-bridge-types.ts'
 import type { TerminalIdentityViewModel, TerminalLifecycleViewModel } from '#/web/components/terminal/types.ts'
 import { isAppQuitting, subscribeAppQuitting } from '#/web/app-lifecycle.ts'
 
@@ -53,7 +53,7 @@ export function createServerTerminalBridge(options: {
   getClientId: () => string
   // `notifyBell` returning `undefined` (rather than a `Promise<false>`)
   // is the *deliberate* signal to fall through to the bridge's
-  // built-in browser-notification path. The renderer-bridge wrapper
+  // built-in browser-notification path. The client-bridge wrapper
   // uses that distinction so the web-runtime bell events get the
   // full Notification API + click handler — collapsing both paths
   // to `Promise.resolve(false)` would make the bell click test
@@ -362,7 +362,7 @@ export function createServerTerminalBridge(options: {
     },
     notifyBell(input) {
       // First check whether the wrapper has a native handler at all
-      // (the renderer-bridge wrapper is always present, so this is
+      // (the client-bridge wrapper is always present, so this is
       // the "Electron preload registered" case). Then call it and
       // inspect the *result*: `undefined` means "no native bridge
       // right now, fall through to the browser notification path".

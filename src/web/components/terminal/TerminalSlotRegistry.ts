@@ -5,7 +5,7 @@ import { createTerminalBellController } from '#/web/components/terminal/terminal
 import { terminalDescriptor } from '#/web/components/terminal/terminal-descriptor.ts'
 import { parseWorktreeKey, worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
 import { terminalBridge } from '#/web/terminal.ts'
-import { readOrCreateWebTerminalClientId } from '#/web/renderer-terminal-bridge.ts'
+import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-bridge.ts'
 import { parseTerminalSlotKey } from '#/shared/terminal-slot-key.ts'
 import type {
   TerminalSlotSnapshot,
@@ -1044,7 +1044,7 @@ let registryInstance: TerminalSlotRegistry | null = null
  * caller; tests inject via `setTerminalSlotRegistryForTests`.
  *
  * Mirrors the `getRendererBridge()` shape at
- * `src/web/renderer-bridge.ts`.
+ * `src/web/client-bridge.ts`.
  */
 export function getTerminalSlotRegistry(deps: TerminalSlotRegistryDeps): TerminalSlotRegistry {
   if (!registryInstance) {
@@ -1068,7 +1068,7 @@ export function getTerminalSlotRegistry(deps: TerminalSlotRegistryDeps): Termina
  *    reference before clearing the slot.
  *
  * Production code never calls this. Mirrors
- * `setRendererBridgeForTests()` at `src/web/renderer-bridge.ts`.
+ * `setRendererBridgeForTests()` at `src/web/client-bridge.ts`.
  */
 export function setTerminalSlotRegistryForTests(instance: TerminalSlotRegistry | null): void {
   registryInstance = instance

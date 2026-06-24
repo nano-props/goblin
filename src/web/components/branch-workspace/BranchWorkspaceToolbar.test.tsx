@@ -24,12 +24,12 @@ import type {
   WorktreeTerminalSnapshot,
 } from '#/web/components/terminal/types.ts'
 import { MainWindowNavigationProvider, type MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
-import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
-import { emptyBootstrapSnapshot } from '#/web/renderer-bootstrap-bridge.ts'
+import { setRendererBridgeForTests } from '#/web/client-bridge.ts'
+import { emptyBootstrapSnapshot } from '#/web/client-bootstrap-bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
-import type { RendererBridge } from '#/web/renderer-bridge-types.ts'
+import type { RendererBridge } from '#/web/client-bridge-types.ts'
 import {
   workspacePaneStaticViewsForBranch,
   workspacePaneTabOrderForBranch,

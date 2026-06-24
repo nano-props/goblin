@@ -11,7 +11,7 @@ import {
   TerminalSlotContext,
   TerminalSlotReadContext,
 } from '#/web/components/terminal/terminal-slot-context.ts'
-import { readOrCreateWebTerminalClientId } from '#/web/renderer-terminal-bridge.ts'
+import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-bridge.ts'
 import { preloadTerminalFont } from '#/web/components/terminal/terminal-geometry.ts'
 import { loadTerminalSlots } from '#/web/terminal-slot-queries.ts'
 import {

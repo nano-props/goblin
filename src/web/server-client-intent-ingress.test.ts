@@ -66,7 +66,7 @@ describe('server renderer intent source', () => {
   test('connects to /ws/client-intent on the resolved server URL', async () => {
     installBootstrap('http://127.0.0.1:32100/', 'tok')
     const { resetServerRendererIntentIngressForTests, subscribeServerRendererIntentIngress } =
-      await import('#/web/server-renderer-intent-ingress.ts')
+      await import('#/web/server-client-intent-ingress.ts')
 
     const dispose = subscribeServerRendererIntentIngress(() => {})
     const expected = new URL('/ws/client-intent', 'http://127.0.0.1:32100/')
@@ -81,7 +81,7 @@ describe('server renderer intent source', () => {
   test('dispatches a valid renderer-effect-intent envelope to the listener', async () => {
     installBootstrap('http://127.0.0.1:32100/', 'tok')
     const { resetServerRendererIntentIngressForTests, subscribeServerRendererIntentIngress } =
-      await import('#/web/server-renderer-intent-ingress.ts')
+      await import('#/web/server-client-intent-ingress.ts')
 
     const listener = vi.fn()
     const dispose = subscribeServerRendererIntentIngress(listener)
@@ -106,7 +106,7 @@ describe('server renderer intent source', () => {
   test('silently drops malformed envelopes', async () => {
     installBootstrap('http://127.0.0.1:32100/', 'tok')
     const { resetServerRendererIntentIngressForTests, subscribeServerRendererIntentIngress } =
-      await import('#/web/server-renderer-intent-ingress.ts')
+      await import('#/web/server-client-intent-ingress.ts')
 
     const listener = vi.fn()
     const dispose = subscribeServerRendererIntentIngress(listener)
@@ -129,7 +129,7 @@ describe('server renderer intent source', () => {
     vi.useFakeTimers()
     installBootstrap('http://127.0.0.1:32100/', 'tok')
     const { resetServerRendererIntentIngressForTests, subscribeServerRendererIntentIngress } =
-      await import('#/web/server-renderer-intent-ingress.ts')
+      await import('#/web/server-client-intent-ingress.ts')
 
     const listener = vi.fn()
     const dispose = subscribeServerRendererIntentIngress(listener)
@@ -164,7 +164,7 @@ describe('server renderer intent source', () => {
     installBootstrap('http://127.0.0.1:32100/', 'tok')
     const { markAppQuitting } = await import('#/web/app-lifecycle.ts')
     const { resetServerRendererIntentIngressForTests, subscribeServerRendererIntentIngress } =
-      await import('#/web/server-renderer-intent-ingress.ts')
+      await import('#/web/server-client-intent-ingress.ts')
 
     const dispose = subscribeServerRendererIntentIngress(() => {})
     const socket = MockWebSocket.instances[0]

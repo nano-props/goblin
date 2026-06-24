@@ -1,19 +1,19 @@
 import type { ClientBootstrapSnapshot, ClientNativeCapability } from '#/shared/bootstrap.ts'
 import type { IpcEvent, IpcRequest } from '#/shared/api-types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
-import type { RendererShellBridge, RendererBridge, RendererTerminalBridge } from '#/web/renderer-bridge-types.ts'
+import type { RendererShellBridge, RendererBridge, RendererTerminalBridge } from '#/web/client-bridge-types.ts'
 import { readNativeBridge } from '#/web/native-bridge.ts'
 import { createHttpClipboardBackend } from '#/web/clipboard/http-backend.ts'
 import {
   emptyBootstrapSnapshot,
   normalizeRendererServerClientId,
   readWebBootstrap,
-} from '#/web/renderer-bootstrap-bridge.ts'
+} from '#/web/client-bootstrap-bridge.ts'
 import {
   createServerTerminalBridge,
   readOrCreateWebTerminalClientId,
   type RendererServerTerminalConfig,
-} from '#/web/renderer-terminal-bridge.ts'
+} from '#/web/client-terminal-bridge.ts'
 
 /**
  * Compute the renderer's capability set from the live `goblinNative`
