@@ -146,7 +146,7 @@ Ownership is a business concept, not just a transport detail.
 
 - Only the controller may drive PTY writes and PTY resize.
 - Attach may result in controller, viewer, or unowned state.
-- On disconnect, the controller slot clears immediately; the per-session `ownerSticky` flag stays set so a subsequent attach from any of the owner's attachments auto-claims when no controller is present.
+- On disconnect, the controller slot clears immediately; the per-session `userSticky` flag stays set so a subsequent attach from any of the owner's attachments auto-claims when no controller is present.
 - Takeover should be explicit and confirmed by server-owned ownership state. See `terminal-takeover.md` for the model.
 
 ### Why this matters

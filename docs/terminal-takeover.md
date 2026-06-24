@@ -12,7 +12,7 @@ The answer to that question is what this document is about.
 This is a principles-level document. It does not describe fields,
 methods, timers, or flags. It describes the *shape* of the answer
 and the *constraints* the answer has to respect. Implementation
-lives in `src/server/terminal/terminal-ownership.ts`,
+lives in `src/server/terminal/terminal-controller.ts`,
 `src/web/components/terminal/authority-gate.ts`, and the
 `ManagedTerminalSlot` glue.
 

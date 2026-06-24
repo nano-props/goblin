@@ -127,7 +127,7 @@ This allows the server to reason about:
 - viewer attachments
 - reconnect of the same attachment
 - takeover by a different attachment
-- release on disconnect (the controller slot clears immediately; ownership survives via the per-session `ownerSticky` flag, not via a per-attachment grace timer)
+- release on disconnect (the controller slot clears immediately; ownership survives via the per-session `userSticky` flag, not via a per-attachment grace timer)
 
 ## Ownership roles as renderer projection
 
@@ -159,7 +159,7 @@ That keeps the UI simple while keeping the business model accurate.
 ### Disconnect behavior
 
 - disconnect should clear the controller slot immediately, not preserve it
-- a subsequent attach from the same owner (any attachment) auto-claims when no controller is present, because `ownerSticky` is sticky per session
+- a subsequent attach from the same owner (any attachment) auto-claims when no controller is present, because `userSticky` is sticky per session
 - releasing control should not require the renderer to guess what happened
 
 ### Takeover behavior
