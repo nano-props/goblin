@@ -38,7 +38,7 @@ interface RealtimeRouteOptions {
 // receives a `ClientEffectIntent` over HTTP (e.g. from `g delta`), wraps it
 // in a JSON envelope, and fans it out to subscribed renderers. The server
 // does not interpret intent semantics — it just forwards. Interpretation
-// happens in the renderer's existing `useRendererEffectIntentRouter`,
+// happens in the renderer's existing `useClientEffectIntentRouter`,
 // which already handles the same intents coming from Electron IPC.
 export function createRealtimeRoutes({ accessToken, terminalHost }: RealtimeRouteOptions) {
   // The shared middleware accepts cookie, header, or `?t=` query, so

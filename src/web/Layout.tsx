@@ -19,7 +19,7 @@ import { useBackgroundFetch } from '#/web/hooks/useBackgroundFetch.ts'
 import { useNetworkReconnect } from '#/web/hooks/useNetworkReconnect.ts'
 import { useRepoStatusRefresh } from '#/web/hooks/useRepoStatusRefresh.ts'
 import { useKeyboard } from '#/web/hooks/useKeyboard.ts'
-import { useRendererEffectIntentRouter } from '#/web/hooks/useRendererEffectIntentRouter.ts'
+import { useClientEffectIntentRouter } from '#/web/hooks/useClientEffectIntentRouter.ts'
 import { useRepoDrop } from '#/web/hooks/useRepoDrop.ts'
 import { useRepoStoreInvalidationRefresh } from '#/web/hooks/useRepoStoreInvalidationRefresh.ts'
 import { useSessionPersistence } from '#/web/hooks/useSessionPersistence.ts'
@@ -70,7 +70,7 @@ export function Layout() {
 
   const workspaceShortcutsSuppressed = modalOpen || isSettingsOpen
 
-  useRendererEffectIntentRouter({
+  useClientEffectIntentRouter({
     navigation,
     currentRepoId: activeId,
     closeAllOverlays: overlays.closeAllOverlays,

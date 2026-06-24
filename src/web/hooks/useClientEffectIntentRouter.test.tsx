@@ -3,7 +3,7 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { useRendererEffectIntentRouter } from '#/web/hooks/useRendererEffectIntentRouter.ts'
+import { useClientEffectIntentRouter } from '#/web/hooks/useClientEffectIntentRouter.ts'
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
@@ -137,7 +137,7 @@ afterEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
-describe('useRendererEffectIntentRouter', () => {
+describe('useClientEffectIntentRouter', () => {
   test('terminal bell clicks close all overlays and focus the repo terminal view', async () => {
     const repo = seedRepoState({
       id: '/tmp/repo',
@@ -435,7 +435,7 @@ async function renderHookHost() {
 }
 
 function HookHost() {
-  useRendererEffectIntentRouter({
+  useClientEffectIntentRouter({
     navigation,
     currentRepoId,
     closeAllOverlays,

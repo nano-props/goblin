@@ -11,7 +11,7 @@ import {
   handleAppLevelRendererIntent,
   handleTerminalBellClickIntent,
   handleWorkspaceRendererIntent,
-} from '#/web/hooks/renderer-effect-intent-handlers.ts'
+} from '#/web/hooks/client-effect-intent-handlers.ts'
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
@@ -31,7 +31,7 @@ interface ClientEffectIntentRouterOptions {
   isWorkspaceShortcutSuppressed: () => boolean
 }
 
-export function useRendererEffectIntentRouter({
+export function useClientEffectIntentRouter({
   navigation,
   currentRepoId,
   closeAllOverlays,

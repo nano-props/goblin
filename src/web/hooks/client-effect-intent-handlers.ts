@@ -21,7 +21,7 @@ import {
   createExternalOpenDrainKickPlan,
   createTerminalBellIntentPlan,
   createWorkspaceIntentPlan,
-} from '#/web/hooks/renderer-effect-intent-plans.ts'
+} from '#/web/hooks/client-effect-intent-plans.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import type { OpenRepoResult } from '#/web/stores/repos/types.ts'
