@@ -144,7 +144,7 @@ export interface RepositoryComposite {
 }
 
 /**
- * Fetch several repo read results in one round trip. The renderer's
+ * Fetch several repo read results in one round trip. The client's
  * refresh flow collapses the three calls (snapshot + status + PRs)
  * into a single network request.
  */

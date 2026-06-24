@@ -62,7 +62,7 @@ function loadPreload(
     sendSync: vi.fn((channel: string, ...args: unknown[]) => {
       invocations.push({ channel, args })
       // The preload used to call `sendSync` to seed the bootstrap
-      // before the renderer's modules started (access token,
+      // before the client's modules started (access token,
       // server URL, home dir, platform). Those channels are gone:
       // auth is via the http-only cookie planted by main, server
       // URL is `window.location.origin`, and host info lives on
@@ -275,7 +275,7 @@ describe('preload goblinNative bridge', () => {
     // These are the last two standalone channels on the preload
     // surface. They round out the "browser-missing only" invariant:
     // every `safeInvoke` / `ipcRenderer.send` call below is a
-    // capability that the browser can't provide. The renderer
+    // capability that the browser can't provide. The client
     // either falls through to its HTTP backend (clipboard) or
     // gets a typed "unavailable in this runtime" rejection
     // (rotateAccessToken — only the embedded Electron build can
@@ -301,7 +301,7 @@ describe('preload goblinNative bridge', () => {
   })
 
   test('locks the goblinNative IPC surface to browser-missing capabilities', () => {
-    // The renderer's "Server First" architecture means the server
+    // The client's "Server First" architecture means the server
     // is the single source of truth: any IPC channel that the
     // server *could* expose over `/api/*` belongs on the HTTP
     // surface, not here. The remaining IPC channels must each be a
@@ -316,8 +316,8 @@ describe('preload goblinNative bridge', () => {
       [IPC_CHANNEL]:
         'native-only RPC dispatch — currently used for global-shortcut registration, native menu rebuilds, and workspace-layout menu gating',
       [IPC_ABORT_CHANNEL]: 'paired with IPC_CHANNEL for cancellation',
-      [IPC_EVENT_CHANNEL]: 'main → renderer event broadcast (Electron-only transport)',
-      [CLIENT_EFFECT_INTENT_CHANNEL]: 'renderer effect intent dispatch (paired with the IPC dispatch channel)',
+      [IPC_EVENT_CHANNEL]: 'main → client event broadcast (Electron-only transport)',
+      [CLIENT_EFFECT_INTENT_CHANNEL]: 'client effect intent dispatch (paired with the IPC dispatch channel)',
       [SHELL_OPEN_SETTINGS_WINDOW_CHANNEL]: 'BrowserWindow management — open the settings window as its own OS window',
       [SHELL_OPEN_EXTERNAL_URL_CHANNEL]:
         'Electron shell.openExternal — protocol-handler restrictions the browser API cannot enforce',

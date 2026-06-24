@@ -116,7 +116,7 @@ beforeEach(() => {
   fetchMock.mockClear()
   vi.stubGlobal('fetch', fetchMock)
   // Host info used to live in the bootstrap payload; it now lives
-  // on the public `/api/host` endpoint and the renderer-side
+  // on the public `/api/host` endpoint and the client-side
   // `useHostInfoStore`. Seed the store directly so tests don't
   // have to mock `fetch('/api/host')` for every scenario.
   useHostInfoStore.setState({

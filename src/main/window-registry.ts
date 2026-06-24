@@ -1,4 +1,4 @@
-// Registry of trusted renderer BrowserWindows and their capabilities.
+// Registry of trusted client BrowserWindows and their capabilities.
 //
 // Boundary:
 // - This module owns client-surface identity and capability lookup.

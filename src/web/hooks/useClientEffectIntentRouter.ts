@@ -41,7 +41,7 @@ export function useClientEffectIntentRouter({
   isOverlayOpen,
   isWorkspaceShortcutSuppressed,
 }: ClientEffectIntentRouterOptions) {
-  // This hook is the single renderer-side subscription point for native effect
+  // This hook is the single client-side subscription point for native effect
   // intents. Routing stays centralized here; intent-specific behavior lives in
   // the handler/plan helpers so components do not subscribe independently.
   const { ensureWorkspaceOpen, setSelectedTerminal, resetLayout, toggleWorkspaceFocused } = useStoreWithEqualityFn(

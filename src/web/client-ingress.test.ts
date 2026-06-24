@@ -3,14 +3,14 @@ import type { IpcEvent } from '#/shared/api-types.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 
-describe('renderer ingress', () => {
+describe('client ingress', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.restoreAllMocks()
     setClientBridgeForTests(null)
   })
 
-  test('subscribes to typed native host events through the renderer bridge', async () => {
+  test('subscribes to typed native host events through the client bridge', async () => {
     const off = vi.fn()
     const onEvent = vi.fn((cb: (event: IpcEvent) => void) => {
       cb({ type: 'settings-write-error', message: 'failed' })
@@ -49,7 +49,7 @@ describe('renderer ingress', () => {
     expect(off).toHaveBeenCalled()
   })
 
-  test('subscribes to renderer effect intents without forwarding non-intent payloads', async () => {
+  test('subscribes to client effect intents without forwarding non-intent payloads', async () => {
     const off = vi.fn()
     const onIntent = vi.fn((cb: (event: unknown) => void) => {
       cb({ type: 'external-open-enqueued' })

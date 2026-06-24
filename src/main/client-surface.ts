@@ -1,6 +1,6 @@
 // Bridge between the window shell and the surface registry.
 //
-// This module is intentionally tiny: attaching a renderer surface means
+// This module is intentionally tiny: attaching a client surface means
 // "apply trusted shell policy" + "register the surface identity/capabilities".
 
 import type { BrowserWindow } from 'electron'

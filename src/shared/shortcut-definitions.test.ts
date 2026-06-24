@@ -16,7 +16,7 @@ describe('shortcut definitions', () => {
     expect(matchBranchActionShortcut({ code: 'KeyV', shiftKey: true })).toBeNull()
   })
 
-  test('matches renderer navigation and app shortcuts from keyboard input', () => {
+  test('matches client navigation and app shortcuts from keyboard input', () => {
     expect(matchRendererKeyboardShortcut({ key: 'j', code: 'KeyJ', shiftKey: false })).toBe('next-branch')
     expect(matchRendererKeyboardShortcut({ key: 'ArrowLeft', code: 'ArrowLeft', shiftKey: false })).toBe(
       'prev-workspace-pane-view',

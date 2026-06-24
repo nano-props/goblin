@@ -23,7 +23,7 @@ function electronBootstrap(overrides: Partial<ClientBootstrapSnapshot> = {}): Cl
   }
 }
 
-describe('renderer bootstrap', () => {
+describe('client bootstrap', () => {
   beforeEach(() => {
     Reflect.deleteProperty(globalThis, 'window')
     Reflect.deleteProperty(globalThis, 'document')
@@ -39,10 +39,10 @@ describe('renderer bootstrap', () => {
       configurable: true,
       value: {
         // The bootstrap is now the single source of truth for the
-        // tiny renderer-state payload (runtime kind, initial server
+        // tiny client-state payload (runtime kind, initial server
         // handoff). Host info (homeDir, platform) and i18n live
         // on dedicated `/api/*` endpoints fetched by
-        // the renderer bootstrap hooks, not in the bootstrap.
+        // the client bootstrap hooks, not in the bootstrap.
         __GOBLIN_BOOTSTRAP__: bootstrap,
       },
     })
@@ -144,7 +144,7 @@ describe('renderer bootstrap', () => {
     })
   })
 
-  test('prefers the configured renderer bridge over directly reading window.goblinNative', async () => {
+  test('prefers the configured client bridge over directly reading window.goblinNative', async () => {
     const bootstrap: ClientBootstrapSnapshot = webBootstrap({
       initialServer: { url: 'http://127.0.0.1:32100', accessToken: 'secret', clientId: 'client_sharedterminal' },
     })

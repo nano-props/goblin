@@ -4,7 +4,7 @@ import type { Context } from 'hono'
 /**
  * Identity model
  * --------------
- * `clientId` is a per-tab routing identifier minted by the renderer
+ * `clientId` is a per-tab routing identifier minted by the client
  * (sessionStorage / Electron IPC). It keys the realtime broker and the
  * WebSocket query param. It is NOT a stable identity — two browsers
  * on the same machine get two different `clientId`s.

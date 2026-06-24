@@ -38,7 +38,7 @@ describe('POST /api/repo/view', () => {
     disconnectAllRendererIntentSockets()
   })
 
-  test('returns 200 and fans out an intent when a renderer is subscribed', async () => {
+  test('returns 200 and fans out an intent when a client is subscribed', async () => {
     const subscriber = { send: vi.fn(), close: vi.fn() }
     registerRendererIntentSocket(subscriber)
 
@@ -54,13 +54,13 @@ describe('POST /api/repo/view', () => {
     expect(json).toEqual({ ok: true })
     expect(subscriber.send).toHaveBeenCalledWith(
       JSON.stringify({
-        type: 'renderer-effect-intent',
+        type: 'client-effect-intent',
         intent: { type: 'show-workspace-pane-view-requested', tab: 'changes' },
       }),
     )
   })
 
-  test('returns 503 with a clear code when no renderer is subscribed', async () => {
+  test('returns 503 with a clear code when no client is subscribed', async () => {
     const app = createRepoViewRoutes()
     const res = await app.request('http://localhost/view', {
       method: 'POST',
@@ -174,7 +174,7 @@ describe('POST /api/repo/view — auth integration via createApp()', () => {
     expect(res.status).toBe(200)
     expect(subscriber.send).toHaveBeenCalledWith(
       JSON.stringify({
-        type: 'renderer-effect-intent',
+        type: 'client-effect-intent',
         intent: { type: 'show-workspace-pane-view-requested', tab: 'changes' },
       }),
     )

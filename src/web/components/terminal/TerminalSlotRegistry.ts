@@ -47,9 +47,9 @@ const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = {
   canonicalTitle: null,
 }
 /**
- * Renderer-level authority for terminal session state.
+ * Client-level authority for terminal session state.
  *
- * **Lifetime**: renderer-level singleton — one instance per renderer
+ * **Lifetime**: client-level singleton — one instance per client
  * process, created on first access via `getTerminalSlotRegistry(...)`,
  * lives until the process tears down. The class is intentionally
  * Provider-independent: `TerminalSlotProvider` is just a wiring
@@ -171,8 +171,8 @@ export class TerminalSlotRegistry {
   /**
    * Test-only / explicit-teardown path.
    *
-   * Production code does NOT call this. The registry is a renderer-
-   * level singleton and is meant to live for the renderer's entire
+   * Production code does NOT call this. The registry is a client-
+   * level singleton and is meant to live for the client's entire
    * lifetime. The Provider never invokes `destroy()` on unmount; the
    * `pendingRegistryDestroyRef + setTimeout` debounce that used to
    * gate a Provider-unmount destroy has been removed.
@@ -1035,7 +1035,7 @@ export interface TerminalSlotRegistryDeps {
 let registryInstance: TerminalSlotRegistry | null = null
 
 /**
- * Lazy getter for the renderer-level terminal session registry.
+ * Lazy getter for the client-level terminal session registry.
  *
  * First call constructs the singleton with `deps` (only the first
  * call's deps are honored — subsequent calls return the existing

@@ -54,7 +54,7 @@ describe('app shell client', () => {
     installWindow()
   })
 
-  test('opens app settings through the renderer bridge shell', async () => {
+  test('opens app settings through the client bridge shell', async () => {
     const bridgeModule = await import('#/web/client-bridge.ts')
     const openSettingsWindow = vi.fn(async () => true)
     bridgeModule.setClientBridgeForTests(
@@ -83,7 +83,7 @@ describe('app shell client', () => {
   test('still reports success when window.open returns null under noopener', async () => {
     // window.open() with `noopener` returns null by spec even when the new
     // tab opens — that is the entire point of noopener (reverse-tabnabbing
-    // protection). The renderer cannot observe the outcome, so the URL
+    // protection). The client cannot observe the outcome, so the URL
     // handoff is treated as best-effort success.
     installWindow(null)
     const { openExternalUrl } = await import('#/web/app-shell-client.ts')
@@ -115,7 +115,7 @@ describe('app shell client', () => {
     expect(window.open).not.toHaveBeenCalled()
   })
 
-  test('chooses repository paths through the renderer bridge shell', async () => {
+  test('chooses repository paths through the client bridge shell', async () => {
     const bridgeModule = await import('#/web/client-bridge.ts')
     const openDirectoryDialog = vi.fn(async (input?: { title?: string }) =>
       input?.title === 'Open Git Repository' ? '/tmp/repo' : '/tmp',

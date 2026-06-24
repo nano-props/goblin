@@ -58,7 +58,7 @@ export function pathForDroppedFile(file: File): string {
 }
 
 /**
- * Persist clipboard / drop blobs via the active renderer bridge.
+ * Persist clipboard / drop blobs via the active client bridge.
  *
  * Returns absolute paths the PTY can read. On any failure (bridge
  * unavailable, IPC error, HTTP transport problem, server 4xx/5xx),

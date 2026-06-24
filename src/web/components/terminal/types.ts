@@ -45,10 +45,10 @@ export interface TerminalClientSnapshot extends TerminalControllerViewModel {
 
 /**
  * Identity view-model: the stable controller + geometry fields the
- * renderer needs to decide who controls the PTY and at what size.
+ * client needs to decide who controls the PTY and at what size.
  * No `phase` — phase lives on the lifecycle channel so a transitional
  * phase update can never be confused with a role change at the
- * renderer's `applyIdentity` boundary.
+ * client's `applyIdentity` boundary.
  */
 export interface TerminalIdentityViewModel extends TerminalControllerViewModel {
   ptySessionId: string

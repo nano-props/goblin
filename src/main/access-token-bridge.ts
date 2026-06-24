@@ -12,7 +12,7 @@ import { accessTokenNodeLog } from '#/node/logger.ts'
 /**
  * Wire the access-token rotation IPC.
  *
- * The renderer calls `goblin:rotateAccessToken` to invalidate the
+ * The client calls `goblin:rotateAccessToken` to invalidate the
  * current token. The flow:
  *
  *  1. Delete the on-disk token file so the next read produces a
@@ -21,20 +21,20 @@ import { accessTokenNodeLog } from '#/node/logger.ts'
  *     the old token.
  *  3. Restart the embedded server — it reads (or generates) the
  *     new token, and the embedded main replants the new cookie on
- *     the renderer's `webContents.session` (see
+ *     the client's `webContents.session` (see
  *     `#/main/cookie-bootstrap.ts`).
  *
  * Concurrency: a module-level Promise chain serializes concurrent
- * rotation calls. Without this, two rapid clicks (or two renderers
+ * rotation calls. Without this, two rapid clicks (or two clients
  * firing the IPC) race on `unlink` + `stop` + `start` + `read`:
  * the second `unlink` may delete the freshly written token, the
  * second `stop` may issue SIGKILL against the first start's proc,
  * and the second `read` may return a token that no longer matches
  * the server's in-memory state. The mutex is the cheapest way to
- * keep the four steps atomic from the renderer's perspective.
+ * keep the four steps atomic from the client's perspective.
  *
  * Note: the `get-access-token` and `get-embedded-server-url` IPC
- * channels that used to live here are gone. The renderer no longer
+ * channels that used to live here are gone. The client no longer
  * needs the access token in the bootstrap (auth is now via a
  * session cookie planted by `plantEmbedAuthCookie` before
  * `loadURL`), and the server URL is just `window.location.origin`
@@ -69,13 +69,13 @@ async function doRotate(): Promise<{ accessToken: string }> {
   // they are today because `startEmbeddedServer` always sets them
   // from the same `readOrCreateAccessToken` call.)
   const accessToken = await readOrCreateAccessToken(dataDir)
-  // The embedded renderer authenticates against the server with an
+  // The embedded client authenticates against the server with an
   // http-only cookie on its `webContents.session`. Without this
   // replant, the cookie still holds the OLD token after the server
   // restart and the next authenticated request fires with a stale
   // credential — the user sees the token gate re-appear even
   // though the rotation IPC returned the new token successfully.
-  // Errors are non-fatal: the renderer's `useAccessTokenStatus`
+  // Errors are non-fatal: the client's `useAccessTokenStatus`
   // hook falls back to the URL-token path (`?accessToken=…` →
   // POST /api/login → Set-Cookie), so a transient cookie-replant
   // failure (e.g. window destroyed mid-rotation) self-heals on
@@ -102,7 +102,7 @@ async function tryReplantEmbedAuthCookie(accessToken: string): Promise<void> {
       webContents: main.webContents,
     })
   } catch (err) {
-    accessTokenNodeLog.warn({ err }, 'failed to replant embed auth cookie after rotation; renderer will fall back to URL-token path')
+    accessTokenNodeLog.warn({ err }, 'failed to replant embed auth cookie after rotation; client will fall back to URL-token path')
   }
 }
 
@@ -118,7 +118,7 @@ export function wireAccessTokenBridgeIpc(): void {
   // `goblin:get-home-dir` / `goblin:get-platform`. They were
   // removed when host info moved to the public `/api/host`
   // endpoint (see `#/server/modules/host-info.ts` and
-  // `#/web/stores/host-info.ts`); the embedded renderer now
+  // `#/web/stores/host-info.ts`); the embedded client now
   // fetches it the same way the standalone web path does.
   ipcMain.handle(ROTATE_ACCESS_TOKEN_CHANNEL, async (event): Promise<{ accessToken: string }> => {
     if (!isTrustedIpcEvent(event)) {

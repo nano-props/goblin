@@ -35,7 +35,7 @@ import type { TerminalIdentityViewModel, TerminalLifecycleViewModel } from '#/we
 import { isAppQuitting, subscribeAppQuitting } from '#/web/app-lifecycle.ts'
 
 // Matches the server-side `HEARTBEAT_INTERVAL_MS`. Kept as a
-// renderer-local constant so the renderer doesn't need to import a
+// client-local constant so the client doesn't need to import a
 // server module to know its own beat cadence.
 const TERMINAL_RENDERER_HEARTBEAT_INTERVAL_MS = 30_000
 
@@ -78,7 +78,7 @@ export function createServerTerminalBridge(options: {
   const clientId = options.getClientId()
   let socket: WebSocket | null = null
   let reconnectTimer: number | null = null
-  // Renderer→server liveness heartbeat. Sent while the socket is
+  // Client→server liveness heartbeat. Sent while the socket is
   // OPEN; the server's broker uses receipts to drive its per-`clientId`
   // deadline scan. Tied to the socket lifetime so it cannot outlive
   // the connection it's measuring.

@@ -455,7 +455,7 @@ describe('main repo ipc cancellation', () => {
     expect(app.addRecentDocument).toHaveBeenCalledWith('/repo')
   })
 
-  test('projects server-owned prefs into native shell state when the renderer updates them', async () => {
+  test('projects server-owned prefs into native shell state when the client updates them', async () => {
     const result = await invokeIpc('settings.applyShellProjection', {
       prefs: {
         patch: {

@@ -18,7 +18,7 @@ function makeRepoIndex(): TerminalRepoIndex {
 }
 
 describe('terminal slot projection helpers', () => {
-  test('projects server slot summaries into renderer hydration input', () => {
+  test('projects server slot summaries into client hydration input', () => {
     const projected = projectServerTerminalSlot({
       repoIndex: makeRepoIndex(),
       repoRoot: REPO_ROOT,

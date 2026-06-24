@@ -8,7 +8,7 @@
 //
 // Scope normalization (`terminalSlotScope`) lives in
 // `server/terminal/terminal-slot-scope.ts` because it depends on
-// `node:path`. This file stays pure so the renderer can import the
+// `node:path`. This file stays pure so the client can import the
 // format/parse helpers via `web/components/terminal/terminal-slot-keys.ts`
 // without dragging Node built-ins into the bundle.
 

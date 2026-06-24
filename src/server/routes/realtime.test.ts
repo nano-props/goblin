@@ -86,17 +86,17 @@ describe('createRealtimeRoutes — auth middleware', () => {
     expect(json.message).toBe('Missing client id')
   })
 
-  test('rejects /renderer-intent without a token', async () => {
+  test('rejects /client-intent without a token', async () => {
     const host = makeTerminalHost()
     const app = createRealtimeRoutes({ accessToken: 'secret', terminalHost: host })
-    const res = await app.request('http://localhost/renderer-intent')
+    const res = await app.request('http://localhost/client-intent')
     expect(res.status).toBe(401)
   })
 
-  test('rejects /renderer-intent with a wrong token', async () => {
+  test('rejects /client-intent with a wrong token', async () => {
     const host = makeTerminalHost()
     const app = createRealtimeRoutes({ accessToken: 'secret', terminalHost: host })
-    const res = await app.request('http://localhost/renderer-intent?t=wrong')
+    const res = await app.request('http://localhost/client-intent?t=wrong')
     expect(res.status).toBe(401)
   })
 })

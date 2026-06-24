@@ -1,4 +1,4 @@
-// Generic renderer-side WebSocket subscription for the server's
+// Generic client-side WebSocket subscription for the server's
 // per-purpose `/ws/*` channels (`/ws/invalidation`,
 // `/ws/client-intent`, future ones).
 //

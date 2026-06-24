@@ -56,7 +56,7 @@ function installBootstrap(url: string | null, accessToken: string | null) {
   })
 }
 
-describe('server renderer intent source', () => {
+describe('server client intent source', () => {
   beforeEach(() => {
     vi.resetModules()
     MockWebSocket.instances.length = 0
@@ -78,7 +78,7 @@ describe('server renderer intent source', () => {
     resetServerRendererIntentIngressForTests()
   })
 
-  test('dispatches a valid renderer-effect-intent envelope to the listener', async () => {
+  test('dispatches a valid client-effect-intent envelope to the listener', async () => {
     installBootstrap('http://127.0.0.1:32100/', 'tok')
     const { resetServerRendererIntentIngressForTests, subscribeServerRendererIntentIngress } =
       await import('#/web/server-client-intent-ingress.ts')
@@ -90,7 +90,7 @@ describe('server renderer intent source', () => {
 
     socket.emitMessage(
       JSON.stringify({
-        type: 'renderer-effect-intent',
+        type: 'client-effect-intent',
         intent: { type: 'show-workspace-pane-view-requested', tab: 'changes' },
       }),
     )
@@ -116,7 +116,7 @@ describe('server renderer intent source', () => {
     // Wrong envelope discriminator.
     socket.emitMessage(JSON.stringify({ type: 'something-else', intent: {} }))
     // Right discriminator but invalid intent shape.
-    socket.emitMessage(JSON.stringify({ type: 'renderer-effect-intent', intent: { type: 'banana' } }))
+    socket.emitMessage(JSON.stringify({ type: 'client-effect-intent', intent: { type: 'banana' } }))
     // Garbage payload.
     socket.emitMessage('not json')
 
@@ -143,7 +143,7 @@ describe('server renderer intent source', () => {
     if (!secondSocket) throw new Error('missing reconnected socket')
 
     const payload = JSON.stringify({
-      type: 'renderer-effect-intent',
+      type: 'client-effect-intent',
       intent: { type: 'show-workspace-pane-view-requested', tab: 'changes' },
     })
     firstSocket.emitMessage(payload) // stale; should be ignored

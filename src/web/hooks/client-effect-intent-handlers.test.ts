@@ -7,7 +7,7 @@ import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspac
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 
-const REPO_ID = '/tmp/gbl-renderer-intent-handlers-repo'
+const REPO_ID = '/tmp/gbl-client-intent-handlers-repo'
 
 beforeEach(() => {
   resetReposStore()
@@ -17,7 +17,7 @@ afterEach(() => {
   resetReposStore()
 })
 
-describe('renderer effect intent handlers', () => {
+describe('client effect intent handlers', () => {
   test('returns false when changes cannot be shown for a branch without a worktree', async () => {
     seedRepoState({
       id: REPO_ID,

@@ -392,7 +392,7 @@ beforeEach(() => {
     ]
     // New first-frame hydration contract: `create` returns
     // `ptySessionId` + `snapshot` + `snapshotSeq` directly so the
-    // renderer can paint without a follow-up snapshot fetch.
+    // client can paint without a follow-up snapshot fetch.
     // The fields are still optional on the shared type (transitional
     // shape — see docs/terminal-first-frame-fix.md) but the
     // registry validates them at runtime, so the test mock has to
@@ -621,7 +621,7 @@ beforeEach(() => {
 })
 
 describe('TerminalSlotProvider', () => {
-  // The Provider reaches the registry via the renderer-level singleton.
+  // The Provider reaches the registry via the client-level singleton.
   // Each test must clear the slot so a previous test's bridge wiring
   // doesn't leak into the next one. Mirrors
   // `setTerminalSlotRegistryForTests(null)` in the registry tests.
@@ -1983,7 +1983,7 @@ describe('TerminalSlotProvider', () => {
 
   test('P1.7: registry state survives a Provider unmount + remount via the singleton', async () => {
     // Before P1.7, the Provider owned its registry and destroyed it
-    // on unmount. After P1.7, the registry is a renderer-level
+    // on unmount. After P1.7, the registry is a client-level
     // singleton — a remount must reuse the same instance with its
     // session list intact. This test mounts, creates a terminal,
     // unmounts, remounts, and confirms the prior session is still

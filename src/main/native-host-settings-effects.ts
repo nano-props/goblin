@@ -14,7 +14,7 @@ import type {
 // Native-host application of server-owned settings changes.
 //
 // Naming rule:
-// - `broadcast*` = publish renderer-visible state that main has already resolved
+// - `broadcast*` = publish client-visible state that main has already resolved
 //   or validated.
 // - `apply*` = mutate native host chrome / menu / OS integration state.
 //

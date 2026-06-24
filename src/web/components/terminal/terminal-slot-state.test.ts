@@ -203,7 +203,7 @@ describe('TerminalSlotState', () => {
     expect(state.setRestarting()).toBe(true)
     // When the phase leaves 'open', the attachment is removed from
     // the snapshot — even though the role is still 'controller'.
-    // The renderer reads the role from the (no longer published)
+    // The client reads the role from the (no longer published)
     // attachment only when phase is 'open'.
     expect(state.snapshot('pty_session_1_aaaaaaaaa')).toEqual({
       phase: 'restarting',

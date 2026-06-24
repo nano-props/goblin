@@ -35,7 +35,7 @@ beforeEach(() => {
     initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
   }
   // Host info used to live in the bootstrap payload; it now
-  // lives on the public `/api/host` endpoint and the renderer-side
+  // lives on the public `/api/host` endpoint and the client-side
   // `useHostInfoStore`. Seed the store directly so the dialog's
   // default parent dir (`~/Developer`) resolves correctly without
   // mocking `fetch('/api/host')`.

@@ -3,9 +3,9 @@
 //   2) Wire global keyboard shortcuts that should work regardless of
 //      which element has focus — e.g. ⌘O always opens a repo.
 //
-// Renderer-driven actions (Open / Close Tab / Switch Tab / Refresh /
+// Client-driven actions (Open / Close Tab / Switch Tab / Refresh /
 // Toggle View) are dispatched as typed IPC events so the
-// renderer can run them in its existing store/state, instead of
+// client can run them in its existing store/state, instead of
 // duplicating that logic in main.
 // A small number of truly native menu actions (for example open data
 // folder, open in browser, and native-only projections) still run in
@@ -73,7 +73,7 @@ async function sendRendererIntent(intent: ClientEffectIntent): Promise<void> {
     const win = getMainWindow() ?? focusedRegisteredSurface()?.window ?? (await activateMainWindow())
     sendClientEffectIntent(win, intent)
   } catch (err) {
-    menuNodeLog.warn({ err }, 'failed to send renderer intent')
+    menuNodeLog.warn({ err }, 'failed to send client intent')
   }
 }
 
@@ -301,9 +301,9 @@ function accelerator(state: AppMenuState, value: string): string | undefined {
 function createRendererCommandMenuItem(
   state: AppMenuState,
   id: Parameters<typeof rendererMenuCommandById>[0],
-  // `beforeIntent` runs a main-side side effect before the renderer
+  // `beforeIntent` runs a main-side side effect before the client
   // intent is dispatched — for actions like Reset Window that need to
-  // touch the Electron window itself, not just the renderer state.
+  // touch the Electron window itself, not just the client state.
   options?: { beforeIntent?: () => void },
 ): MenuItemConstructorOptions {
   const command = rendererMenuCommandById(id)

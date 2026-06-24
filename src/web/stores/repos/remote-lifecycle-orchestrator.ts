@@ -6,7 +6,7 @@
  * through this function. The previous design had three independent
  * entry points (hydrateSession, ensureWorkspaceOpen, ad-hoc retry)
  * that each composed resolveTarget + probe + classification
- * themselves; the renderer ended up owning the entire lifecycle
+ * themselves; the client ended up owning the entire lifecycle
  * state machine. Phase 3 lifts the resolveTarget + probe +
  * classification work to the server boundary, leaving the
  * orchestrator with a single server call to make and a single

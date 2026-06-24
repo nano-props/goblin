@@ -198,7 +198,7 @@ describe('app menu actions', () => {
     })
   })
 
-  test('routes appearance changes through renderer intent instead of mutating settings in main', async () => {
+  test('routes appearance changes through client intent instead of mutating settings in main', async () => {
     const { buildAppMenu } = await import('#/main/menu.ts')
 
     buildAppMenu()
@@ -211,7 +211,7 @@ describe('app menu actions', () => {
     })
   })
 
-  test('routes language changes through renderer intent instead of mutating settings in main', async () => {
+  test('routes language changes through client intent instead of mutating settings in main', async () => {
     const { buildAppMenu } = await import('#/main/menu.ts')
 
     buildAppMenu()
@@ -376,7 +376,7 @@ describe('app menu actions', () => {
     })
   })
 
-  test('routes clear recent through renderer intent', async () => {
+  test('routes clear recent through client intent', async () => {
     mocks.readMenuRuntimeState.mockReturnValue({
       ...defaultMenuRuntimeState(),
       recentRepos: [{ kind: 'local', id: '/tmp/repo' }],

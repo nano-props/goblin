@@ -1,20 +1,20 @@
 import { isClientEffectIntent, type ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import { createServerWebSocketIngress } from '#/web/lib/server-ws-ingress.ts'
 
-// Server-controlled ingress for renderer effect intents (e.g. those
-// dispatched by `g delta` from a Goblin PTY). Renderer-side counterpart
+// Server-controlled ingress for client effect intents (e.g. those
+// dispatched by `g delta` from a Goblin PTY). Client-side counterpart
 // to `#/server/modules/client-intent-broker.ts` and
 // `#/server/routes/realtime.ts` (`/ws/client-intent`). The server
 // fans intents out as envelopes of the form
 //
-//   { type: 'renderer-effect-intent', intent: ClientEffectIntent }
+//   { type: 'client-effect-intent', intent: ClientEffectIntent }
 //
 // The envelope wraps `ClientEffectIntent` so the same wire format
 // can later carry additional control messages without collision with
 // data-plane invalidations on `/ws/invalidation`.
 
 interface RendererIntentEnvelope {
-  type: 'renderer-effect-intent'
+  type: 'client-effect-intent'
   intent: unknown
 }
 
@@ -28,7 +28,7 @@ function parseRendererIntentMessage(data: unknown): ClientEffectIntent | null {
   }
   if (!parsed || typeof parsed !== 'object') return null
   const envelope = parsed as Partial<RendererIntentEnvelope>
-  if (envelope.type !== 'renderer-effect-intent') return null
+  if (envelope.type !== 'client-effect-intent') return null
   if (!isClientEffectIntent(envelope.intent)) return null
   return envelope.intent
 }

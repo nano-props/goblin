@@ -199,7 +199,7 @@ A per-`clientId` heartbeat closes this gap:
 The `HEARTBEAT_INTERVAL_MS` / `HEARTBEAT_DEADLINE_MS` constants
 are exported from
 `src/server/terminal/terminal-realtime-broker.ts` so the
-client (in `src/web/renderer-terminal-bridge.ts`) and the
+client (in `src/web/client-terminal-bridge.ts`) and the
 broker cannot drift out of sync.
 
 ## Known behavior: self-reconnect mid-flight

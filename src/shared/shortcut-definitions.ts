@@ -289,7 +289,7 @@ export function matchRendererKeyboardShortcut(input: {
 
 export function rendererMenuCommandById(id: RendererMenuCommandId): RendererMenuCommandDefinition {
   const command = RENDERER_MENU_COMMANDS.find((candidate) => candidate.id === id)
-  if (!command) throw new Error(`Unknown renderer menu command: ${id}`)
+  if (!command) throw new Error(`Unknown client menu command: ${id}`)
   return command
 }
 
@@ -366,7 +366,7 @@ function rendererMenuAcceleratorShortcuts(ids: RendererMenuCommandId[]): Acceler
     const command = rendererMenuCommandById(id)
     const accelerator = resolveRendererMenuCommandAccelerator(command, {})
     if (!accelerator || !command.helpLabelKey)
-      throw new Error(`Renderer menu command ${id} is missing help shortcut metadata`)
+      throw new Error(`Client menu command ${id} is missing help shortcut metadata`)
     return { accelerator, labelKey: command.helpLabelKey }
   })
 }

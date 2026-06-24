@@ -3,7 +3,7 @@ import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { ACCESS_TOKEN_URL_PARAM } from '#/shared/access-token.ts'
 
 /**
- * Bootstrap for a web-hosted renderer with no host OS. The bootstrap
+ * Bootstrap for a web-hosted client with no host OS. The bootstrap
  * is now a tiny 3-field payload: `runtime` (kind, bridge version,
  * capabilities), `initialServer` (only populated for QR-code
  * logins), and nothing else. Host info (homeDir / platform) moved

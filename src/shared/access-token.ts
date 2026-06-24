@@ -1,7 +1,7 @@
 /**
  * Shared constants for the access-token auth surface.
  *
- * The server (`src/server/common/auth.ts`) and the renderer
+ * The server (`src/server/common/auth.ts`) and the client
  * (`src/web/lib/server-fetch.ts`, `src/web/clipboard/http-backend.ts`,
  * `src/shared/embedded-server-client.ts`, `src/main/preload.cjs`)
  * all need to agree on the cookie / header / WS-query / URL-param
@@ -19,7 +19,7 @@
 export const ACCESS_TOKEN_COOKIE = 'goblin_access_token'
 
 /** HTTP header set on every authenticated request from the embedded
- *  renderer (and from the Electron main's IPC client when calling
+ *  client (and from the Electron main's IPC client when calling
  *  the server's HTTP API). */
 export const ACCESS_TOKEN_HEADER = 'x-goblin-access-token'
 

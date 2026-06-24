@@ -1,4 +1,4 @@
-// Renderer-side host info. Hydrated at boot from the public
+// Client-side host info. Hydrated at boot from the public
 // `/api/host` endpoint (see `#/server/routes/host.ts` and
 // `#/server/modules/host-info.ts`). The server already knows its
 // own `process.platform` and `os.homedir()` — the Electron preload
@@ -11,7 +11,7 @@
 //     embedded and standalone web paths now share the same fetch,
 //     the same module, and the same code path
 //   - lets the Vite-served dev path exercise the exact same wire
-//     format the production renderer does
+//     format the production client does
 //
 // `homeDirectory()` and `getPlatform()` are kept synchronous so the
 // existing call sites (`paths.ts`, `CloneRepositoryDialog`,
@@ -29,9 +29,9 @@ import { create } from 'zustand'
 import { fetchServerJson } from '#/web/lib/server-fetch.ts'
 
 /**
- * Platform identifier the renderer can branch on. The server
+ * Platform identifier the client can branch on. The server
  * returns `process.platform` directly; `'web'` is the fallback the
- * renderer uses when the hydrate hasn't completed (or the host
+ * client uses when the hydrate hasn't completed (or the host
  * somehow doesn't expose `process.platform`).
  */
 export type RendererPlatform = NodeJS.Platform | 'web'
@@ -61,7 +61,7 @@ export const useHostInfoStore = create<HostInfoState>((set) => ({
 
   async hydrate() {
     // Bump the version so a fast second call (StrictMode dev
-    // double-invoke, the user reloading the renderer with a stale
+    // double-invoke, the user reloading the client with a stale
     // `hydrate()` still in flight) cannot overwrite a fresher
     // snapshot. Same pattern as `#/web/stores/i18n.ts`.
     const version = ++hydrateVersion
@@ -74,7 +74,7 @@ export const useHostInfoStore = create<HostInfoState>((set) => ({
       // they returned before hydration existed; the settings
       // page can still render, it just hides OS-specific
       // options. We do not throw — a host-info outage must not
-      // block the renderer from booting.
+      // block the client from booting.
       if (version === hydrateVersion) set({ hydrated: true })
       return
     }
@@ -103,7 +103,7 @@ export function homeDirectory(): string {
 }
 
 /**
- * Platform identifier the renderer should branch on for
+ * Platform identifier the client should branch on for
  * OS-specific UI. Falls back to `'web'` (the same sentinel the
  * old bootstrap used) when the hydrate hasn't completed.
  */

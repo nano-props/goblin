@@ -10,7 +10,7 @@ function readInitialBootstrap(): ClientBootstrapSnapshot {
   }
 }
 
-// The renderer bridge populates asynchronously: the Electron preload
+// The client bridge populates asynchronously: the Electron preload
 // may register `window.goblinNative` after this module is first
 // imported, and the server-rendered `<script id="goblin-bootstrap">`
 // may not have run yet. The first read at module-load time can
@@ -22,7 +22,7 @@ function readInitialBootstrap(): ClientBootstrapSnapshot {
 // state, so one re-read is enough to detect "the bootstrap just
 // populated" without going through the sameSnapshot dance.
 //
-// A bare cache (no re-read at all) would lock the renderer into
+// A bare cache (no re-read at all) would lock the client into
 // the first read forever, which is the bug this function exists
 // to prevent.
 //

@@ -6,7 +6,7 @@ import type { TerminalTakeoverResult } from '#/shared/terminal-types.ts'
 /**
  * `AuthorityGate` is the single source of truth for "can I write to
  * the terminal right now?" It is shared by every write path the
- * renderer exposes — xterm onData, paste, file drop, the manual
+ * client exposes — xterm onData, paste, file drop, the manual
  * "接管" button — so the auto-promote behavior lives in one place
  * instead of being duplicated across call sites.
  *
@@ -34,14 +34,14 @@ import type { TerminalTakeoverResult } from '#/shared/terminal-types.ts'
  * - `slot-closed` — gate-internal: the runtime no longer has a
  *   ptySessionId, or the session was disposed mid-call. The takeover
  *   round-trip never started.
- * - `no-bridge` — gate-internal: the renderer bridge is unavailable
+ * - `no-bridge` — gate-internal: the client bridge is unavailable
  *   (typically only in tests / startup). The takeover round-trip
  *   never started.
  * - `session-unknown` — the server reported the ptySessionId is not
- *   known to this user. The renderer's catalog is stale; the user
+ *   known to this user. The client's catalog is stale; the user
  *   needs to re-list before retrying.
  * - `client-offline` — the server's broker has no live socket
- *   for `(userId, clientId)`. The renderer is reconnecting.
+ *   for `(userId, clientId)`. The client is reconnecting.
  *   Retrying after a moment usually works.
  * - `takeover-rejected` — catch-all for any other server-side
  *   refusal (size out of range, validator rejection, etc.). The
@@ -246,7 +246,7 @@ export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): Termi
  * "attachment not connected" path, and `error.invalid-arguments`
  * for everything else, including unknown session/attachment). The
  * catch-all `takeover-rejected` is preserved so a future server
- * message key can land without a renderer change.
+ * message key can land without a client change.
  */
 function classifyTakeoverRejection(message: string): AuthorizationDenialReason {
   if (message === 'error.unavailable') return 'client-offline'

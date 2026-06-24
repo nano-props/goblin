@@ -15,7 +15,7 @@ export function NotificationSettings() {
   const [testingTerminalNotification, setTestingTerminalNotification] = useState(false)
   // Pick the OS-specific hint at render time so the settings UI doesn't
   // hand a Windows user a macOS-flavored "System Settings → Notifications"
-  // path. The renderer doesn't have `process.platform`; the host-info
+  // path. The client doesn't have `process.platform`; the host-info
   // store carries the value the server returns from `/api/host`.
   const hintKey = notificationsHintKey()
 

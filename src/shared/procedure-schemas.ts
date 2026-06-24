@@ -122,7 +122,7 @@ export const REMOTE_PROCEDURE_SCHEMAS = {
   // repo id. The server parses the id, resolves the SSH target,
   // probes the remote repo, classifies the failure, and returns
   // a converged `RemoteRepoLifecycleResult`. NEVER returns
-  // 'connecting' — that's a renderer projection.
+  // 'connecting' — that's a client projection.
   remoteLifecycle: v.object({ repoId: v.string() }),
   pathSuggestions: RemotePathSuggestionsInputSchema,
   testRepository: v.object({ target: RemoteTargetSchema }),
@@ -166,7 +166,7 @@ const SessionStateSchema = v.object({
 
 // Shared shape for the GitHub CLI state endpoints (`/api/settings/github-cli`
 // and `/api/settings/github-cli/refresh`): both accept an optional `hosts`
-// filter so the renderer can scope detection to specific hostnames.
+// filter so the client can scope detection to specific hostnames.
 export const GITHUB_CLI_REFRESH_SCHEMA = v.object({
   hosts: v.optional(StringArray),
 })

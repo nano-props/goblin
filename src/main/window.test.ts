@@ -154,7 +154,7 @@ describe('main window navigation boundaries', () => {
     mocks.cookieSetMock.mockResolvedValue(undefined)
   })
 
-  test('prevents renderer navigation away from the packaged app page', async () => {
+  test('prevents client navigation away from the packaged app page', async () => {
     const { getOrCreateMainWindow } = await import('#/main/window.ts')
     await getOrCreateMainWindow()
 
@@ -219,7 +219,7 @@ describe('main window navigation boundaries', () => {
     expect(mocks.BrowserWindow).toHaveBeenCalledTimes(1)
   })
 
-  test('loads the configured renderer dev server URL in development', async () => {
+  test('loads the configured client dev server URL in development', async () => {
     process.env.GOBLIN_WEB_DEV_URL = 'http://127.0.0.1:5173/'
     const { getOrCreateMainWindow } = await import('#/main/window.ts')
 
@@ -228,7 +228,7 @@ describe('main window navigation boundaries', () => {
     expect(mocks.loadURL).toHaveBeenCalledWith('http://127.0.0.1:5173/?theme=light&colorTheme=macos')
   })
 
-  test('adds a renderer build cache key to the embedded server URL', async () => {
+  test('adds a client build cache key to the embedded server URL', async () => {
     mocks.isPackaged = true
     const { getOrCreateMainWindow } = await import('#/main/window.ts')
 
@@ -246,7 +246,7 @@ describe('main window navigation boundaries', () => {
   test('plants the auth cookie scoped to the Vite dev origin (port 5173)', async () => {
     // Regression: the cookie bootstrap used to strip the port
     // when computing the cookie URL, which silently defaulted
-    // the cookie to port 80. In dev the renderer loads from Vite
+    // the cookie to port 80. In dev the client loads from Vite
     // (5173), so the cookie must be scoped to that origin —
     // otherwise the very first whoami probe fails and the token
     // gate reappears on every fresh dev run.
@@ -304,10 +304,10 @@ describe('main window navigation boundaries', () => {
     expect(mocks.windowOptions[0]?.webPreferences?.preload).toBe('/app/dist/preload/preload-0.1.0-testhash.cjs')
   })
 
-  test('uses the renderer dev server origin in window URL during development', async () => {
+  test('uses the client dev server origin in window URL during development', async () => {
     // The bootstrap (access token, server URL, home dir, platform)
     // is ferried from the main process to the preload via IPC; the
-    // `webDevUrl` env override just changes which URL the renderer
+    // `webDevUrl` env override just changes which URL the client
     // window is pointed at (Vite vs the embedded server's static
     // file route). The dev-URL override flows through
     // `createRendererEntryUrl`; the bootstrap-IPC behavior is
@@ -320,11 +320,11 @@ describe('main window navigation boundaries', () => {
     expect(mocks.windowOptions[0]?.webPreferences?.preload).toBeTruthy()
   })
 
-  test('fails window creation when no renderer base URL is available', async () => {
+  test('fails window creation when no client base URL is available', async () => {
     mocks.getEmbeddedServerRuntime.mockReturnValue(null)
     const { getOrCreateMainWindow } = await import('#/main/window.ts')
 
-    await expect(getOrCreateMainWindow()).rejects.toThrow('Renderer base URL is unavailable')
+    await expect(getOrCreateMainWindow()).rejects.toThrow('Client base URL is unavailable')
   })
 
   test('configures chrome to match the current platform', async () => {

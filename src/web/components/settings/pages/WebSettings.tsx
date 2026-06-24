@@ -13,7 +13,7 @@ import { fetchServerJson } from '#/web/lib/server-fetch.ts'
 
 /**
  * Settings page for everything related to the embedded / standalone
- * server that the renderer talks to. Visible in both runtimes:
+ * server that the client talks to. Visible in both runtimes:
  *
  * - Both: the server URL, the access token (with copy + auto-rotate
  *   QR), and any LAN URLs the server is currently bound to.
@@ -86,11 +86,11 @@ export function WebSettings() {
     try {
       const { accessToken: next } = await bridge.rotateAccessToken()
       setFetchedToken(next)
-      // The main process replants the embedded renderer's auth
+      // The main process replants the embedded client's auth
       // cookie with the new token before this IPC returns, so the
       // cookie path is now self-consistent. A full reload is still
       // required because the preload's `__GOBLIN_BOOTSTRAP__` was
-      // captured once with the OLD token; the renderer's HTTP
+      // captured once with the OLD token; the client's HTTP
       // client (`server-fetch`) prefers the bootstrap header when
       // present. After the reload the preload runs again, captures
       // the new token via IPC, and the gate stays clear.

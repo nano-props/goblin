@@ -8,7 +8,7 @@ import {
   unregisterRendererIntentSocket,
 } from '#/server/modules/client-intent-broker.ts'
 
-describe('renderer intent broker', () => {
+describe('client intent broker', () => {
   beforeEach(() => {
     disconnectAllRendererIntentSockets()
   })
@@ -29,7 +29,7 @@ describe('renderer intent broker', () => {
     expect(ok).toBe(true)
 
     const expected = JSON.stringify({
-      type: 'renderer-effect-intent',
+      type: 'client-effect-intent',
       intent: { type: 'show-workspace-pane-view-requested', tab: 'changes' },
     })
     expect(first.send).toHaveBeenCalledWith(expected)

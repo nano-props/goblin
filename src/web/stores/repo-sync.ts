@@ -5,7 +5,7 @@
 // focus thrash from spamming the server. Consumers read whether a given repo
 // is currently marked ready for the live instanceToken.
 //
-// This is runtime-coherent UI state (renderer-local projection of sync
+// This is runtime-coherent UI state (client-local projection of sync
 // progress), so it lives alongside the other runtime-coherent stores
 // (theme, i18n, repos, session-restore) under src/web/stores/.
 

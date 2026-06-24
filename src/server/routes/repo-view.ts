@@ -18,7 +18,7 @@ export function createRepoViewRoutes() {
 
   app.post('/view', async (c): Promise<Response> => {
     const { tab } = await parseHttpBody(RepoViewBodySchema, c)
-    // No renderer subscribed → 503 with a clear message. We don't
+    // No client subscribed → 503 with a clear message. We don't
     // queue: a queued intent that lands in a stale UI state is
     // worse than no-op, and `g` is human-triggered so the user can
     // simply rerun it.

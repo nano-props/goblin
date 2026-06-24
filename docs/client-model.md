@@ -2,7 +2,7 @@
 
 Use this doc for the server-first client model.
 
-> *We use "client" to mean a browser-side UI host — this includes both Electron renderer processes and plain web browser tabs. The legacy term "renderer" is retained in the code directory `src/web/` and in a few historical type names for compatibility.*
+> *We use "client" to mean a browser-side UI host — this includes both Electron client processes and plain web browser tabs. The legacy term "client" is retained in the code directory `src/web/` and in a few historical type names for compatibility.*
 
 - Treat the backend as the primary runtime.
 - Design client behavior around the server contract first.

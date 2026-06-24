@@ -7,7 +7,7 @@ import type { WorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
 // `{ tab }` to the server, map the response to a process exit code.
 //
 // Idempotency ("open or switch") is delegated to the server's
-// `show-workspace-pane-view-requested` intent — the renderer's plan
+// `show-workspace-pane-view-requested` intent — the client's plan
 // (`#/web/hooks/client-effect-intent-plans.ts`) treats this as a
 // pure active-tab assignment, so calling it twice with the same
 // `tab` is a no-op the second time.

@@ -68,7 +68,7 @@ export async function gitResultWithOptions(
     return { ok: true, message: output }
   } catch (err: unknown) {
     // Distinguish three "we ended the process" reasons. The user-visible
-    // copy is short on purpose — the renderer surfaces these via toast
+    // copy is short on purpose — the client surfaces these via toast
     // and the kbps user is rarely interested in the underlying signal.
     if (err instanceof ExecaError) {
       if (opts?.signal?.aborted || err.isCanceled) return { ok: false, message: 'cancelled' }

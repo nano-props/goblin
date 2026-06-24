@@ -1,4 +1,4 @@
-// Tests for the renderer-side theme store. Specifically covers the
+// Tests for the client-side theme store. Specifically covers the
 // `installMediaQueryListener` path that keeps the resolved theme in sync
 // when the OS appearance flips while the user's pref is 'auto'. The
 // store's invalidation-driven refresh path is covered by
@@ -296,7 +296,7 @@ describe('theme store OS-appearance sync', () => {
   })
 
   test('hydrate applies the server snapshot verbatim on first paint', async () => {
-    // Server stores `theme` + `colorTheme`; the renderer derives
+    // Server stores `theme` + `colorTheme`; the client derives
     // `resolved` from `theme` + matchMedia. The pref survives a
     // round-trip, even when the pref is explicit.
     const mql = createMediaQuery(true) // OS is dark

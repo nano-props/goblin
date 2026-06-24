@@ -81,7 +81,7 @@ async function runOptionalBootstrapTask(label: string, task: () => Promise<void>
  * `/api/settings` + `/api/settings/external-apps` endpoints so the
  * settings pages render with their persisted values on first paint
  * instead of flashing the defaults. Each call sites its own error
- * log on failure - the renderer's boot must not be blocked by a
+ * log on failure - the client's boot must not be blocked by a
  * settings fetch outage.
  */
 async function primeSettingsQueryCache(settingsSnapshot: Promise<SettingsSnapshot>): Promise<void> {
@@ -97,7 +97,7 @@ async function primeSettingsQueryCache(settingsSnapshot: Promise<SettingsSnapsho
     } catch {
       // Settings fetch failure must not block boot - the page will
       // retry the auto-fetch on first use. The empty cache is the
-      // same state the renderer had before this priming pass.
+      // same state the client had before this priming pass.
     }
   }
   await Promise.all([

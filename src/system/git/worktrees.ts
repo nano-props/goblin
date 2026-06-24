@@ -76,7 +76,7 @@ export async function removeWorktree(cwd: string, worktreePath: string, signal?:
  *  Git refuses on path-already-exists, branch-already-exists,
  *  parent-dir-missing, etc.; we surface those errors directly rather than
  *  pre-checking. Validation lives in `normalizeCreateWorktreeInput` so the
- *  same shape flows through the renderer and the IPC bridge. */
+ *  same shape flows through the client and the IPC bridge. */
 export async function createWorktree(
   cwd: string,
   input: CreateWorktreeInput,

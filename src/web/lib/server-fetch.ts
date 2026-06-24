@@ -8,7 +8,7 @@ export async function fetchServerJson<T>(path: string | URL, init?: RequestInit)
   const { headers: extraHeaders, ...rest } = init ?? {}
   const headers: Record<string, string> = {}
   if (server.accessToken) {
-    // Embedded renderer or dev mode: send the token as a header.
+    // Embedded client or dev mode: send the token as a header.
     // Standalone browser mode: leave the header off entirely; the
     // cookie is the only auth channel and the browser attaches it
     // automatically on same-origin requests.

@@ -1,7 +1,7 @@
-// Renderer-side view of server-backed theme settings. Hydrate reads
+// Client-side view of server-backed theme settings. Hydrate reads
 // `{pref, colorTheme}` from the embedded server snapshot and derives
 // the resolved browser theme locally. When `pref === 'auto'`, the
-// renderer also listens for `(prefers-color-scheme: dark)` changes so
+// client also listens for `(prefers-color-scheme: dark)` changes so
 // OS appearance flips propagate without a server round-trip —
 // Chromium's matchMedia tracks `nativeTheme` in Electron, so this
 // covers both the desktop and plain-browser runtimes. Electron main
@@ -62,9 +62,9 @@ function colorThemeFromHtmlAttr(): ColorTheme {
 }
 
 function resolveOsTheme(): ResolvedTheme | null {
-  // matchMedia is the only signal the renderer has for the OS
+  // matchMedia is the only signal the client has for the OS
   // appearance — in Electron it tracks `nativeTheme` because the
-  // renderer shares Chromium's media-query implementation with the
+  // client shares Chromium's media-query implementation with the
   // host process; in a plain browser it tracks the OS via the
   // browser's own plumbing. Either way the listener below covers
   // both runtimes.

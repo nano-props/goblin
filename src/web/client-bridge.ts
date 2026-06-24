@@ -16,12 +16,12 @@ import {
 } from '#/web/client-terminal-bridge.ts'
 
 /**
- * Compute the renderer's capability set from the live `goblinNative`
+ * Compute the client's capability set from the live `goblinNative`
  * bridge. The capability list is intentionally a *projection* of the
  * preload's exposed methods, not a hard-coded constant — a partial
  * preload (e.g. an older Electron build that hasn't added
  * `openDirectoryDialog` yet) will simply not advertise the missing
- * capabilities, and the renderer's UI gates (`canOpenAppSettings`,
+ * capabilities, and the client's UI gates (`canOpenAppSettings`,
  * `hasNativeDirectoryPicker`, …) will quietly hide themselves.
  *
  * This collapses the previous "static Electron capability list + a
@@ -85,7 +85,7 @@ function readServerTerminalConfig(): RendererServerTerminalConfig | null {
 }
 
 // The terminal bridge is *expensive*: it opens a WebSocket, holds
-// subscriber sets, and shares state across the whole renderer.
+// subscriber sets, and shares state across the whole client.
 // `terminalBridge` from `#/web/terminal.ts` re-reads `getClientBridge()`
 // on every method call, so we must keep a stable singleton here.
 // The bridge's `notifyBell` / `sendTestNotification` / `setBadge`
@@ -99,7 +99,7 @@ function getOrCreateTerminalBridge(): ClientTerminalBridge {
     getClientId: readOrCreateWebTerminalClientId,
     getServerConfig() {
       const server = readServerTerminalConfig()
-      if (!server) throw new Error('Renderer terminal bridge is unavailable')
+      if (!server) throw new Error('Client terminal bridge is unavailable')
       return server
     },
     // These callbacks re-read `goblinNative` on every invocation
@@ -125,7 +125,7 @@ function getOrCreateTerminalBridge(): ClientTerminalBridge {
 }
 
 /**
- * The single renderer bridge. Replaces the previous
+ * The single client bridge. Replaces the previous
  * `electronBridge()` / `webBridge()` pair: there is no longer a
  * runtime-specific factory, just one bridge whose every method
  * reads `window.goblinNative` lazily and falls through to a safe

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 
-describe('renderer server config', () => {
+describe('client server config', () => {
   beforeEach(() => {
     vi.resetModules()
     Reflect.deleteProperty(globalThis, 'window')

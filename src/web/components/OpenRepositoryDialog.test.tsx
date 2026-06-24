@@ -27,7 +27,7 @@ beforeEach(() => {
     initialServer: null,
   }
   // Host info used to live in the bootstrap payload; it now lives
-  // on the public `/api/host` endpoint and the renderer-side
+  // on the public `/api/host` endpoint and the client-side
   // `useHostInfoStore`. Seed the store directly so the dialog's
   // tilde resolution and platform branching work without
   // mocking `fetch`.

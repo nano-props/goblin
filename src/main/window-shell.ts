@@ -1,4 +1,4 @@
-// Shared shell policy for trusted renderer windows.
+// Shared shell policy for trusted client windows.
 //
 // Boundary:
 // - This module owns BrowserWindow shell concerns: preload, security
@@ -87,8 +87,8 @@ export function createRendererEntryUrl({ entryHtml = 'index.html', routePath = '
   if (!baseUrl) {
     throw new Error(
       app.isPackaged
-        ? 'Embedded renderer server is unavailable in packaged app mode'
-        : `Renderer base URL is unavailable for ${path.join(WEB_DIST_DIR, entryHtml)}`,
+        ? 'Embedded client server is unavailable in packaged app mode'
+        : `Client base URL is unavailable for ${path.join(WEB_DIST_DIR, entryHtml)}`,
     )
   }
   const url = new URL(
@@ -106,7 +106,7 @@ export function createRendererEntryUrl({ entryHtml = 'index.html', routePath = '
 
 export function configureTrustedClientWindow(win: BrowserWindow, logLabel: string): void {
   win.webContents.on('will-navigate', (event, nextUrl) => {
-    // Renderer windows are expected to stay on their bootstrap entry and
+    // Client windows are expected to stay on their bootstrap entry and
     // route internally via app state / browser-history updates, not
     // arbitrary full-frame navigations. We still allow the exact entry URL
     // that main explicitly bound to this webContents so dev/prod reloads and
@@ -129,6 +129,6 @@ export function configureTrustedClientWindow(win: BrowserWindow, logLabel: strin
 
 export function allowRendererWindowEntryUrl(win: BrowserWindow, value: string): void {
   // Scope trust per BrowserWindow, not just per app origin. Once Goblin has
-  // multiple renderer surfaces, a globally-trusted URL set is too broad.
+  // multiple client surfaces, a globally-trusted URL set is too broad.
   allowTrustedAppUrlForWebContents(win.webContents, value)
 }

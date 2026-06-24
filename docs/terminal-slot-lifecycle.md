@@ -239,7 +239,7 @@ for (const ptySessionId of sessionIds) {
 Two problems:
 
 - `.catch(() => {})` swallows rejections. A WebSocket mid-request
-  teardown (`renderer-terminal-bridge.ts:104
+  teardown (`client-terminal-bridge.ts:104
 rejectPendingSocketRequests`, called from `handleSocketDisconnection`)
   or a race with `closeSocketIfIdle` can drop the close before the
   server sees it.
@@ -326,8 +326,8 @@ registry.enqueueDurableClose({ ptySessionId, worktreeTerminalKey }).catch((err) 
 
 Implemented on `main` (landed via `fa67adb`). Protocol variant in
 `src/shared/terminal-socket.ts:30-37`. Server emit in
-`terminal-runtime-actions.ts:144-156`. Renderer dispatcher branch
-in `renderer-terminal-bridge.ts:186`. Registry handler
+`terminal-runtime-actions.ts:144-156`. Client dispatcher branch
+in `client-terminal-bridge.ts:186`. Registry handler
 `handleSessionClosed` in
 `TerminalSlotRegistry.ts:210`. Coverage in
 `terminal-runtime-actions.test.ts` (emits both broadcasts on
@@ -371,9 +371,9 @@ the closed session id. The manager
 returns it on the close result, or we look it up via
 `manager.findSessionById(ptySessionId)` before closing.
 
-### Renderer dispatcher
+### Client dispatcher
 
-`src/web/renderer-terminal-bridge.ts`:
+`src/web/client-terminal-bridge.ts`:
 
 - Add `sessionClosedSubscribers: Set<(event) => void>` and include
   it in `hasRealtimeSubscribers()`.
@@ -382,7 +382,7 @@ returns it on the close result, or we look it up via
   `identity` / `lifecycle` / `sessions-changed`.
 - Expose `onSessionClosed(cb)` on the returned bridge and add a
   matching method to `RendererTerminalBridge` in
-  `src/web/renderer-bridge-types.ts`.
+  `src/web/client-bridge-types.ts`.
 
 ### Registry subscribes
 
@@ -535,7 +535,7 @@ response.
    `terminalLog.warn('takeover failed ...')` to mirror the
    `terminal.ts:resize` rejection pattern.
 6. `ManagedTerminalSlot.handleIdentity` and the bridge
-   conversion in `renderer-terminal-bridge.ts` were aligned to
+   conversion in `client-terminal-bridge.ts` were aligned to
    route the role / status / canonical-size fields through the
    new identity channel, with `handleLifecycle` carrying phase
    and message on a separate channel.
@@ -619,11 +619,11 @@ For reference, the notional landing order _had_ this fix set been
 split into separate commits (it was not, due to the wip-snapshot
 baseline):
 
-### P1 — Renderer-only, lowest risk
+### P1 — Client-only, lowest risk
 
 R3: empty-state CTA.
 
-- Renderer-only. No protocol change, no registry change.
+- Client-only. No protocol change, no registry change.
 - i18n key already defined in all four locales.
 - No risk of regressing existing terminal flows.
 - Visible UX win on its own.

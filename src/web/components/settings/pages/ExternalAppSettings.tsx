@@ -94,7 +94,7 @@ const PLATFORM_TERMINAL_IDS: Record<BootstrapPlatform, ReadonlySet<string>> = {
   netbsd: new Set(['ghostty']),
   openbsd: new Set(['ghostty']),
   sunos: new Set(['ghostty']),
-  // Web-hosted renderers (the dev preview) have no real terminal; hide
+  // Web-hosted clients (the dev preview) have no real terminal; hide
   // every OS-specific entry.
   web: new Set<string>(),
 }
@@ -169,7 +169,7 @@ export function ExternalAppSettings() {
   const editorAppAvailability = data.editor.appAvailability
   const { refreshExternalApps, refreshing, setTerminalApp, setEditorApp } = useExternalAppSettingsController()
   // Read the platform from the host-info store, not `process.platform`:
-  // the renderer is sandboxed and does not have `process` at runtime, so
+  // the client is sandboxed and does not have `process` at runtime, so
   // the only reliable source is the public `/api/host` endpoint fetched
   // during public bootstrap. The store falls back to `'web'`
   // (which hides every OS-specific terminal entry) until the hydrate

@@ -30,15 +30,15 @@ interface RealtimeRouteOptions {
 // reasoning.
 
 // Server-authoritative realtime for data, plus a dedicated envelope-forwarding
-// channel for renderer effect intents sourced from `g`-style CLI clients.
+// channel for client effect intents sourced from `g`-style CLI clients.
 //
 // `/ws/invalidation` and `/ws/terminal` remain data-plane — they push server-
 // owned state changes (repo invalidations, terminal stream events) to
 // subscribers. `/ws/client-intent` is a control-plane relay: the server
 // receives a `ClientEffectIntent` over HTTP (e.g. from `g delta`), wraps it
-// in a JSON envelope, and fans it out to subscribed renderers. The server
+// in a JSON envelope, and fans it out to subscribed clients. The server
 // does not interpret intent semantics — it just forwards. Interpretation
-// happens in the renderer's existing `useClientEffectIntentRouter`,
+// happens in the client's existing `useClientEffectIntentRouter`,
 // which already handles the same intents coming from Electron IPC.
 export function createRealtimeRoutes({ accessToken, terminalHost }: RealtimeRouteOptions) {
   // The shared middleware accepts cookie, header, or `?t=` query, so
@@ -94,14 +94,14 @@ export function createRealtimeRoutes({ accessToken, terminalHost }: RealtimeRout
       }
     }),
   )
-  // Renderer-side subscribers opt in to receive renderer effect intents
-  // forwarded by the server. The renderer opens this socket once at boot
+  // Client-side subscribers opt in to receive client effect intents
+  // forwarded by the server. The client opens this socket once at boot
   // and feeds incoming payloads into its existing intent router — the
   // same path Electron IPC intents travel through. No server-side
   // message handling beyond register/unregister; the server never
   // receives anything from this socket beyond the upgrade.
   app.get(
-    '/renderer-intent',
+    '/client-intent',
     auth,
     upgradeWebSocket(() => {
       return {

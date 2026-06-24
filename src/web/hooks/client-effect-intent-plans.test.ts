@@ -7,7 +7,7 @@ import {
   createWorkspaceIntentPlan,
 } from '#/web/hooks/client-effect-intent-plans.ts'
 
-describe('renderer effect intent plans', () => {
+describe('client effect intent plans', () => {
   test('creates a worktree terminal bell plan when the bell key matches a known worktree', () => {
     resetReposStore()
     const repo = seedRepoState({

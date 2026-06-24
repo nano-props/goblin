@@ -1477,7 +1477,7 @@ describe('ManagedTerminalSlot', () => {
   test('takeover response is the authoritative handshake (no realtime event required)', async () => {
     // After the takeover atomicity follow-up, the `terminal.takeover`
     // response carries role/controllerStatus/canonicalCols/Rows/phase
-    // and is applied synchronously. The renderer does NOT have to
+    // and is applied synchronously. The client does NOT have to
     // wait for a realtime `identity` event before painting the
     // post-takeover frame. A subsequent realtime event for the same
     // session is idempotent.
@@ -2331,7 +2331,7 @@ describe('ManagedTerminalSlot', () => {
       // PTY crashes mid-takeover — server pushes a realtime lifecycle
       // event with phase=restarting. After the identity/lifecycle
       // split, phase is on its own channel; the identity event no
-      // longer carries phase at all. The renderer applies the
+      // longer carries phase at all. The client applies the
       // lifecycle event through `handleLifecycle` and the new
       // phase replaces the takeover response's phase.
       session.handleLifecycle({

@@ -111,7 +111,7 @@ function showNotificationWithResult(
     notif.once('show', () => settle(true))
     notif.once('failed', () => settle(false))
     notif.once('click', () => {
-      // Bring the window to the foreground, then tell the renderer to switch
+      // Bring the window to the foreground, then tell the client to switch
       // to the repo and open the terminal view (only when repoRoot is known).
       void activateMainWindow().catch(() => {})
       if (repoRoot) broadcastClientEffectIntent({ type: 'terminal-bell-click', repoRoot, key })

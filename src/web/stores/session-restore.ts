@@ -1,4 +1,4 @@
-// Renderer-side restorable-state bridge for boot-only session restore.
+// Client-side restorable-state bridge for boot-only session restore.
 // Persisted settings and external-app detection now flow through
 // TanStack Query; this store exists only so bootstrap can consume the
 // one-shot saved session snapshot.
@@ -30,7 +30,7 @@ interface SessionRestoreStore {
   /** Applies an already-fetched settings snapshot to avoid duplicate boot fetches. */
   hydrateFromSettingsSnapshot: (snapshot: Pick<SettingsSnapshot, 'session'>) => SessionState
   /** Returns the boot session snapshot once, then clears it so all later
-   *  session writes remain renderer -> persistence only. */
+   *  session writes remain client -> persistence only. */
   consumeBootSessionSnapshot: () => SessionState
 }
 

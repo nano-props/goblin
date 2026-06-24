@@ -379,7 +379,7 @@ describe('useClientEffectIntentRouter', () => {
     expect(activateRepoSpy).toHaveBeenCalledWith('/tmp/repo-a')
   })
 
-  test('theme menu intents update theme through the renderer store', async () => {
+  test('theme menu intents update theme through the client store', async () => {
     const setPref = vi.fn(async () => {})
     useThemeStore.setState((state) => ({ ...state, setPref }))
 
@@ -393,7 +393,7 @@ describe('useClientEffectIntentRouter', () => {
     expect(setPref).toHaveBeenCalledWith('dark')
   })
 
-  test('language menu intents update i18n through the renderer store', async () => {
+  test('language menu intents update i18n through the client store', async () => {
     const setPref = vi.fn(async () => {})
     useI18nStore.setState((state) => ({ ...state, setPref }))
 
@@ -407,7 +407,7 @@ describe('useClientEffectIntentRouter', () => {
     expect(setPref).toHaveBeenCalledWith('ko')
   })
 
-  test('clear recent intent clears server-backed recents through the renderer client', async () => {
+  test('clear recent intent clears server-backed recents through the client client', async () => {
     await renderHookHost()
 
     await act(async () => {

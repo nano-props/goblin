@@ -141,7 +141,7 @@ function seedWebBootstrap() {
     initialServer: null,
   }
   // Web runtime: no `goblinNative` preload surface, no rotate
-  // capability. The renderer falls through to the safe defaults
+  // capability. The client falls through to the safe defaults
   // in `client-bridge.ts`.
   delete testWindow.goblinNative
   setClientBridgeForTests({
@@ -251,7 +251,7 @@ describe('WebSettings runtime parity', () => {
     const webHtml = container!.innerHTML
     expect(webHtml).toContain('settings.web.url')
     expect(webHtml).toContain('settings.web.token-copy')
-    // No toasts fired — both renderers stay quiet when the page
+    // No toasts fired — both clients stay quiet when the page
     // mounts. (The toast mock would catch any accidental error
     // reporting from a missing bridge call.)
     expect(toastMocks.error).not.toHaveBeenCalled()
