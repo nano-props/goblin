@@ -31,7 +31,7 @@ const CACHE_CAP = 1024
 
 /**
  * Derive a stable `userId` from an access token. Two clients with
- * the same token always see the same `userId`. The `owner_` prefix
+ * the same token always see the same `userId`. The `user_` prefix
  * keeps log lines and Map keys unambiguous against the `term_…`,
  * `client_…`, and `web_…` namespaces used elsewhere in the
  * terminal code.
