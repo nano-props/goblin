@@ -187,6 +187,51 @@ describe('RepoPicker', () => {
     expect(locator).not.toBeNull()
     expect(locator?.textContent?.trim()).toBe('/tmp/repo-a')
   })
+
+  test('shows a + button that opens the action popover when no repo is open', async () => {
+    const onOpenLocal = vi.fn()
+    const onOpenRemote = vi.fn()
+    const onClone = vi.fn()
+
+    render(
+      <RepoPicker
+        repos={[]}
+        activeId={null}
+        labels={labels}
+        onActivate={() => {}}
+        onClose={() => {}}
+        onOpenLocal={onOpenLocal}
+        onOpenRemote={onOpenRemote}
+        onClone={onClone}
+      />,
+    )
+
+    const plus = document.body.querySelector('button[aria-label="Open"]')
+    expect(plus).not.toBeNull()
+
+    await act(async () => {
+      plus!.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+      plus!.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
+      await Promise.resolve()
+    })
+
+    // Popover shows the three actions and no repo rows.
+    expect(document.body.textContent).toContain('Open local repository…')
+    expect(document.body.textContent).toContain('Open remote repository…')
+    expect(document.body.textContent).toContain('Clone repository…')
+    expect(document.body.querySelector('button[aria-current]')).toBeNull()
+
+    // Clicking an action invokes the matching callback and closes
+    // the popover (which the parent would do via onSelectAction).
+    const cloneButton = [...document.body.querySelectorAll('button')].find((b) =>
+      b.textContent?.includes('Clone repository…'),
+    )
+    expect(cloneButton).not.toBeNull()
+    await act(async () => {
+      cloneButton!.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
+    })
+    expect(onClone).toHaveBeenCalled()
+  })
 })
 
 function render(element: React.ReactNode) {

@@ -71,67 +71,6 @@ function RepoSwitcherAction({
   )
 }
 
-function OpenRepoPopover({
-  labels,
-  onOpenLocal,
-  onOpenRemote,
-  onClone,
-}: Pick<RepoPickerProps, 'labels' | 'onOpenLocal' | 'onOpenRemote' | 'onClone'>) {
-  const [open, setOpen] = useState(false)
-  const contentRef = useRef<HTMLDivElement>(null)
-  const selectAction = (action: () => void) => {
-    setOpen(false)
-    action()
-  }
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <Tip label={labels.open}>
-        <PopoverTrigger asChild>
-          <Button variant="ghost" size="icon" className="size-8 shrink-0" aria-label={labels.open}>
-            <Plus />
-          </Button>
-        </PopoverTrigger>
-      </Tip>
-      <PopoverContent
-        side="bottom"
-        align="start"
-        className="flex w-max min-w-48 max-w-72 flex-col overflow-hidden p-0"
-        ref={contentRef}
-        tabIndex={-1}
-        onOpenAutoFocus={(event) => {
-          event.preventDefault()
-          contentRef.current?.focus({ preventScroll: true })
-        }}
-      >
-        <div className="flex h-8 items-center border-b border-separator px-2.5">
-          <span className="min-w-0 truncate text-xs font-medium text-popover-foreground">{labels.open}</span>
-        </div>
-        <div className="p-1">
-          <RepoSwitcherAction
-            icon={<FolderOpen size={14} />}
-            label={labels.openLocal}
-            shortcut={labels.openLocalShortcut}
-            onSelect={() => selectAction(onOpenLocal)}
-          />
-          <RepoSwitcherAction
-            icon={<Server size={14} />}
-            label={labels.openRemote}
-            shortcut={labels.openRemoteShortcut}
-            onSelect={() => selectAction(onOpenRemote)}
-          />
-          <RepoSwitcherAction
-            icon={<Download size={14} />}
-            label={labels.clone}
-            shortcut={labels.cloneShortcut}
-            onSelect={() => selectAction(onClone)}
-          />
-        </div>
-      </PopoverContent>
-    </Popover>
-  )
-}
-
 // Popover content for the repo menu. The Popover itself is owned by
 // `RepoPicker` so the tab strip can be the trigger and the popover
 // state can be reset on selection.
@@ -163,11 +102,12 @@ function RepoMenuContent({
   onSelectAction: (action: () => void) => void
 }) {
   const contentRef = useRef<HTMLDivElement>(null)
+  const showRepoList = repos.length > 0
   return (
     <PopoverContent
       side="bottom"
       align="start"
-      className="flex w-max min-w-64 max-w-[min(28rem,calc(100vw-2rem))] flex-col overflow-hidden p-0"
+      className="flex w-max min-w-64 max-w-[calc(100vw-2rem)] flex-col overflow-hidden p-0"
       aria-label={labels.repositories}
       ref={contentRef}
       tabIndex={-1}
@@ -176,78 +116,103 @@ function RepoMenuContent({
         contentRef.current?.focus({ preventScroll: true })
       }}
     >
-      <ScrollArea className="max-h-80" scrollbarMode="compact">
-        <div className="space-y-0.5 p-1" role="list">
-          {repos.map((repo) => {
-            const selected = repo.id === activeId
-            const RepoIcon = isRemoteRepoId(repo.id) ? Server : FolderGit2
-            const remoteTarget = remoteRepoLifecycleTarget(repo.lifecycle)
-            return (
-              <div key={repo.id} className="group relative flex items-center" role="listitem">
-                <button
-                  type="button"
-                  className={cn(
-                    'flex w-full min-h-11 cursor-pointer items-center gap-2.5 rounded-sm py-1.5 pl-2 pr-8 text-left text-sm outline-none transition-colors duration-100 hover:bg-accent hover:text-accent-foreground',
-                    selected &&
-                      'bg-selected text-selected-foreground hover:bg-selected hover:text-selected-foreground',
-                  )}
-                  onClick={() => onSelectRepo(repo.id)}
-                  aria-current={selected ? 'true' : undefined}
-                >
-                  <span className="flex size-3.5 shrink-0 items-center justify-center">
-                    {selected ? (
-                      <Check size={13} aria-hidden />
-                    ) : (
-                      <RepoIcon size={13} className="text-muted-foreground" aria-hidden />
-                    )}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <div className="truncate font-medium leading-5">{repo.name}</div>
-                    <div className="truncate font-mono text-xs leading-4 text-muted-foreground">
-                      {formatRepoLocator(repo.id, remoteTarget)}
-                    </div>
-                  </span>
-                </button>
-                <Button
-                  type="button"
-                  size="icon-sm"
-                  variant="ghost"
-                  className="absolute right-1 top-1/2 size-6 -translate-y-1/2 text-muted-foreground"
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onClose(repo.id)
-                  }}
-                  title={labels.closeWithName(repo.name)}
-                  aria-label={labels.closeWithName(repo.name)}
-                >
-                  <X size={13} />
-                </Button>
-              </div>
-            )
-          })}
+      {showRepoList ? (
+        <>
+          <ScrollArea className="max-h-80" scrollbarMode="compact">
+            <div className="space-y-0.5 p-1" role="list">
+              {repos.map((repo) => {
+                const selected = repo.id === activeId
+                const RepoIcon = isRemoteRepoId(repo.id) ? Server : FolderGit2
+                const remoteTarget = remoteRepoLifecycleTarget(repo.lifecycle)
+                return (
+                  <div key={repo.id} className="group relative flex items-center" role="listitem">
+                    <button
+                      type="button"
+                      className={cn(
+                        'flex w-full min-h-11 cursor-pointer items-center gap-2.5 rounded-sm py-1.5 pl-2 pr-8 text-left text-sm outline-none transition-colors duration-100 hover:bg-accent hover:text-accent-foreground',
+                        selected &&
+                          'bg-selected text-selected-foreground hover:bg-selected hover:text-selected-foreground',
+                      )}
+                      onClick={() => onSelectRepo(repo.id)}
+                      aria-current={selected ? 'true' : undefined}
+                    >
+                      <span className="flex size-3.5 shrink-0 items-center justify-center">
+                        {selected ? (
+                          <Check size={13} aria-hidden />
+                        ) : (
+                          <RepoIcon size={13} className="text-muted-foreground" aria-hidden />
+                        )}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <div className="truncate font-medium leading-5">{repo.name}</div>
+                        <div className="truncate font-mono text-xs leading-4 text-muted-foreground">
+                          {formatRepoLocator(repo.id, remoteTarget)}
+                        </div>
+                      </span>
+                    </button>
+                    <Button
+                      type="button"
+                      size="icon-sm"
+                      variant="ghost"
+                      className="absolute right-1 top-1/2 size-6 -translate-y-1/2 text-muted-foreground"
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onClose(repo.id)
+                      }}
+                      title={labels.closeWithName(repo.name)}
+                      aria-label={labels.closeWithName(repo.name)}
+                    >
+                      <X size={13} />
+                    </Button>
+                  </div>
+                )
+              })}
+            </div>
+          </ScrollArea>
+          <div className="border-t border-separator p-1">
+            <RepoSwitcherAction
+              icon={<FolderOpen size={14} />}
+              label={labels.openLocal}
+              shortcut={labels.openLocalShortcut}
+              onSelect={() => onSelectAction(onOpenLocal)}
+            />
+            <RepoSwitcherAction
+              icon={<Server size={14} />}
+              label={labels.openRemote}
+              shortcut={labels.openRemoteShortcut}
+              onSelect={() => onSelectAction(onOpenRemote)}
+            />
+            <RepoSwitcherAction
+              icon={<Download size={14} />}
+              label={labels.clone}
+              shortcut={labels.cloneShortcut}
+              onSelect={() => onSelectAction(onClone)}
+            />
+          </div>
+        </>
+      ) : (
+        <div className="p-1">
+          <RepoSwitcherAction
+            icon={<FolderOpen size={14} />}
+            label={labels.openLocal}
+            shortcut={labels.openLocalShortcut}
+            onSelect={() => onSelectAction(onOpenLocal)}
+          />
+          <RepoSwitcherAction
+            icon={<Server size={14} />}
+            label={labels.openRemote}
+            shortcut={labels.openRemoteShortcut}
+            onSelect={() => onSelectAction(onOpenRemote)}
+          />
+          <RepoSwitcherAction
+            icon={<Download size={14} />}
+            label={labels.clone}
+            shortcut={labels.cloneShortcut}
+            onSelect={() => onSelectAction(onClone)}
+          />
         </div>
-      </ScrollArea>
-      <div className="border-t border-separator p-1">
-        <RepoSwitcherAction
-          icon={<FolderOpen size={14} />}
-          label={labels.openLocal}
-          shortcut={labels.openLocalShortcut}
-          onSelect={() => onSelectAction(onOpenLocal)}
-        />
-        <RepoSwitcherAction
-          icon={<Server size={14} />}
-          label={labels.openRemote}
-          shortcut={labels.openRemoteShortcut}
-          onSelect={() => onSelectAction(onOpenRemote)}
-        />
-        <RepoSwitcherAction
-          icon={<Download size={14} />}
-          label={labels.clone}
-          shortcut={labels.cloneShortcut}
-          onSelect={() => onSelectAction(onClone)}
-        />
-      </div>
+      )}
     </PopoverContent>
   )
 }
@@ -287,18 +252,12 @@ export function RepoPicker({
 
   const currentRepo = repos.find((r) => r.id === activeId) ?? repos[0] ?? null
 
-  const openMenu = (
-    <OpenRepoPopover labels={labels} onOpenLocal={onOpenLocal} onOpenRemote={onOpenRemote} onClone={onClone} />
-  )
-
   return (
     <nav className="flex h-full min-w-0 items-center" aria-label={labels.repositories}>
-      {!currentRepo ? (
-        openMenu
-      ) : (
-        <ToolbarTabStripBody>
-          <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-            <PopoverTrigger asChild>
+      <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+        {currentRepo ? (
+          <PopoverTrigger asChild>
+            <ToolbarTabStripBody>
               {/* The tablist absorbs PopoverTrigger's onClick + data
                * attributes; clicks anywhere in the tab area open the
                * popover. The inner CurrentRepoButton keeps its focus
@@ -314,30 +273,38 @@ export function RepoPicker({
                   unavailableLabel={labels.unavailable}
                 />
               </ToolbarTabList>
+            </ToolbarTabStripBody>
+          </PopoverTrigger>
+        ) : (
+          <Tip label={labels.open}>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="icon" className="size-8 shrink-0" aria-label={labels.open}>
+                <Plus />
+              </Button>
             </PopoverTrigger>
-            <RepoMenuContent
-              repos={repos}
-              activeId={activeId}
-              labels={labels}
-              onSelectRepo={(id) => {
-                setMenuOpen(false)
-                onActivate(id)
-              }}
-              onClose={(id) => {
-                setMenuOpen(false)
-                handleClose(id)
-              }}
-              onOpenLocal={onOpenLocal}
-              onOpenRemote={onOpenRemote}
-              onClone={onClone}
-              onSelectAction={(action) => {
-                setMenuOpen(false)
-                action()
-              }}
-            />
-          </Popover>
-        </ToolbarTabStripBody>
-      )}
+          </Tip>
+        )}
+        <RepoMenuContent
+          repos={repos}
+          activeId={activeId}
+          labels={labels}
+          onSelectRepo={(id) => {
+            setMenuOpen(false)
+            onActivate(id)
+          }}
+          onClose={(id) => {
+            setMenuOpen(false)
+            handleClose(id)
+          }}
+          onOpenLocal={onOpenLocal}
+          onOpenRemote={onOpenRemote}
+          onClone={onClone}
+          onSelectAction={(action) => {
+            setMenuOpen(false)
+            action()
+          }}
+        />
+      </Popover>
     </nav>
   )
 }

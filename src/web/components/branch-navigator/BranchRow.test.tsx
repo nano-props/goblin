@@ -222,6 +222,13 @@ describe('BranchRow', () => {
     expect(className).not.toContain('group-hover:opacity-100')
     expect(className).not.toContain('focus-visible:opacity-100')
   })
+
+  test('keeps the actions wrapper visible while the row reports a busy branch action', () => {
+    const className = renderRow(false, { branchActionBusy: true })?.className ?? ''
+    expect(className).not.toContain('opacity-0')
+    expect(className).not.toContain('group-hover:opacity-100')
+    expect(className).not.toContain('focus-visible:opacity-100')
+  })
 })
 
 function render(element: React.ReactNode) {
@@ -230,7 +237,10 @@ function render(element: React.ReactNode) {
   })
 }
 
-function renderRow(compact: boolean, options: { actionMenuOpen?: boolean } = {}): HTMLDivElement | undefined {
+function renderRow(
+  compact: boolean,
+  options: { actionMenuOpen?: boolean; branchActionBusy?: boolean } = {},
+): HTMLDivElement | undefined {
   responsiveMocks.compact = compact
   const repo = emptyRepo('/tmp/repo', 'repo')
   const branch = createRepoBranch('feature/a')
@@ -246,6 +256,7 @@ function renderRow(compact: boolean, options: { actionMenuOpen?: boolean } = {})
         showActions
         actionMenuOpen={options.actionMenuOpen}
         onActionMenuOpenChange={vi.fn()}
+        branchActionBusy={options.branchActionBusy}
       />
     </ul>,
   )

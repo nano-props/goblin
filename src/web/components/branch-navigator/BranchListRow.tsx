@@ -1,16 +1,26 @@
-// Branch list row wrapper. Resolves `terminalBellCount` from the
-// terminal-session store and delegates rendering to BranchRow. Shared
-// between the persistent BranchNavigator pane and the focus-mode
-// BranchListPopover so the row behavior stays in lockstep.
+// Branch list row wrapper. Resolves per-row derived state from each
+// feature's respective store — `terminalBellCount` from the terminal-
+// session store, `branchActionBusy` from the repo's operations state
+// — and delegates rendering to BranchRow. Shared between the persistent
+// BranchNavigator pane and the focus-mode BranchListPopover so the row
+// behavior stays in lockstep.
 
 import { BranchRow, type BranchRowProps } from '#/web/components/branch-navigator/BranchRow.tsx'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
 import { useWorktreeTerminalBellCount } from '#/web/components/terminal/terminal-session-store.ts'
+import { branchActionDisplayPhase } from '#/web/hooks/branch-action-state.ts'
 
 export function BranchListRow(props: BranchRowProps) {
   const terminalKey = props.branch.worktree?.path
     ? worktreeTerminalKey(props.repo.id, props.branch.worktree.path)
     : null
   const terminalBellCount = useWorktreeTerminalBellCount(terminalKey)
-  return <BranchRow {...props} terminalBellCount={terminalBellCount} />
+  const branchActionBusy = branchActionDisplayPhase(props.repo, props.branch.name) !== null
+  return (
+    <BranchRow
+      {...props}
+      terminalBellCount={terminalBellCount}
+      branchActionBusy={branchActionBusy}
+    />
+  )
 }

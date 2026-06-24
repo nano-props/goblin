@@ -16,6 +16,14 @@ export interface BranchRowProps {
   actionMenuOpen?: boolean
   onActionMenuOpenChange?: (open: boolean) => void
   terminalBellCount?: number
+  /**
+   * Whether a branch action (queued or running) currently targets this
+   * row. Resolved by the data-binding wrapper (`BranchListRow`) from
+   * `branchActionDisplayPhase` so the row stays purely presentational
+   * and can be reused in contexts that don't carry a live operations
+   * state. Defaults to `false` when the wrapper doesn't compute it.
+   */
+  branchActionBusy?: boolean
 }
 
 export function BranchRow({
@@ -29,9 +37,15 @@ export function BranchRow({
   actionMenuOpen,
   onActionMenuOpenChange,
   terminalBellCount = 0,
+  branchActionBusy = false,
 }: BranchRowProps) {
   const isSelected = branch.name === selected
   const compact = useIsCompactUi()
+  // The action affordance only appears on hover/focus in non-compact
+  // mode. Keep it visible while the row's own branch action is busy so
+  // the spinner stays anchored to the menu button the user just
+  // clicked, instead of fading out from under the in-flight action.
+  const isActionsHidden = !compact && !actionMenuOpen && !branchActionBusy
 
   return (
     <li
@@ -52,8 +66,7 @@ export function BranchRow({
         <div
           className={cn(
             'pointer-events-none relative z-20 flex shrink-0 items-center py-1.5 pr-4',
-            !compact &&
-              !actionMenuOpen &&
+            isActionsHidden &&
               'opacity-0 transition-opacity duration-100 group-hover:opacity-100 focus-visible:opacity-100',
           )}
         >
