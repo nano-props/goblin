@@ -49,7 +49,7 @@ export async function postServerJson<TInput extends object, TOutput>(
   })
 }
 
-type QueryParamValue = string | number | boolean | undefined | null | Array<string | number>
+type QueryParamValue = string | number | boolean | undefined | null
 
 function appendQueryParam(url: URL, key: string, value: string | number | boolean): void {
   url.searchParams.append(key, String(value))
@@ -63,11 +63,7 @@ export async function getServerJson<TParams extends Record<string, QueryParamVal
   const url = new URL(path, resolveApiBaseUrl(requireRendererServerConfig().url))
   for (const [key, value] of Object.entries(params)) {
     if (value === undefined || value === null) continue
-    if (Array.isArray(value)) {
-      for (const item of value) appendQueryParam(url, key, item)
-    } else {
-      appendQueryParam(url, key, value)
-    }
+    appendQueryParam(url, key, value)
   }
   return await fetchServerJson<TOutput>(url, {
     method: 'GET',

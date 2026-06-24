@@ -52,11 +52,7 @@ Rules:
 - **Never put arrays, unbounded long strings (> ~200 B), or `JSON.stringify`'d objects in the URL.** Bodies are bounded by `API_BODY_LIMIT_BYTES` (1 MiB) and the clipboard cap (12 MiB).
 - **New endpoints follow the existing POST shape:** `postServerJson` client-side, `*_PROCEDURE_SCHEMAS` in `src/shared/procedure-schemas.ts`, `parseHttpBody` server-side, plus a row in `src/shared/embedded-server-ipc-routes.ts` if it needs an IPC entry.
 
-Known GET endpoints that must migrate to POST:
-
-- `GET /api/repo/pull-requests` — `branches: string[]` in query (the 431 trigger).
-- `GET /api/repo/composite` — `include: string[]` + `branches: string[]` in query.
-- `GET /api/settings/github-cli` — `host: string[]` in query.
+Known GET endpoints that must migrate to POST: _none — `GET /api/repo/pull-requests`, `GET /api/repo/composite`, and `GET /api/settings/github-cli` were the array-bearing offenders and all moved to POST bodies in this branch._
 
 **Any PR that changes a GET's payload must migrate it to POST in the same PR.** Internal-only refactors (logic, comments) don't trigger migration. Other tolerated GETs (e.g. the `cwd`-bearing `/api/repo/{probe,snapshot,status,log,patch}`) may be migrated opportunistically, folded into a PR that already touches them.
 

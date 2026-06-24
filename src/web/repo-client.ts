@@ -56,7 +56,11 @@ export async function getRepositoryPullRequests(
   options?: { mode?: PullRequestFetchMode },
   signal?: AbortSignal,
 ): Promise<PullRequestEntry[] | null> {
-  return await getServerJson('/api/repo/pull-requests', { cwd, branches, mode: options?.mode }, { signal })
+  return await postServerJson(
+    '/api/repo/pull-requests',
+    { cwd, branches, mode: options?.mode },
+    { signal },
+  )
 }
 
 export async function abortRepositoryOperation(cwd: string): Promise<boolean> {
@@ -155,11 +159,11 @@ export async function getRepositoryComposite(
     timeoutMs?: number
   } = {},
 ): Promise<RepositoryComposite> {
-  return await getServerJson(
+  return await postServerJson(
     '/api/repo/composite',
     {
       cwd,
-      include: [...(options.include ?? ['snapshot', 'status', 'pullRequests'])],
+      include: options.include ? [...options.include] : undefined,
       branches: options.branches,
       mode: options.mode,
       timeoutMs: options.timeoutMs,

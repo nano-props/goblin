@@ -164,4 +164,31 @@ describe('settings routes', () => {
     expect(response.status).toBe(400)
     expect(mocks.applyServerGlobalShortcutRegistrationWrite).not.toHaveBeenCalled()
   })
+
+  test('delegates github-cli detection to the server module, scoping by hosts when provided', async () => {
+    const state = { available: true, version: '2.93.0', detectedAt: 1, hosts: { 'github.example.com': { authed: true } } }
+    mocks.getServerGitHubCliState.mockResolvedValue(state)
+    const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
+    const app = createSettingsRoutes(createServerSettingsState())
+
+    const hostsResponse = await app.request(
+      new Request('http://127.0.0.1:32100/github-cli', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ hosts: ['github.example.com'] }),
+      }),
+    )
+    await expect(hostsResponse.json()).resolves.toEqual(state)
+    expect(mocks.getServerGitHubCliState).toHaveBeenLastCalledWith(expect.any(AbortSignal), ['github.example.com'])
+
+    const emptyResponse = await app.request(
+      new Request('http://127.0.0.1:32100/github-cli', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      }),
+    )
+    await expect(emptyResponse.json()).resolves.toEqual(state)
+    expect(mocks.getServerGitHubCliState).toHaveBeenLastCalledWith(expect.any(AbortSignal), undefined)
+  })
 })

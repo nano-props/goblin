@@ -410,10 +410,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       const result = (() => {
         if (url.pathname === '/api/settings') return call('settings.get', undefined)
         if (url.pathname === '/api/i18n') return call('i18n.get', undefined)
-        if (url.pathname === '/api/settings/github-cli') {
-          const hosts = url.searchParams.getAll('host')
-          return call('githubCli.get', hosts.length > 0 ? { hosts } : undefined)
-        }
+        if (url.pathname === '/api/settings/github-cli') return call('githubCli.get', body)
         if (url.pathname === '/api/settings/github-cli/refresh') return call('githubCli.refresh', body)
         if (url.pathname === '/api/settings/external-apps') {
           return init?.method === 'POST' ? call('externalApps.refresh', body) : call('externalApps.get', undefined)
@@ -448,26 +445,13 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           return call('repo.log', payload)
         }
         if (url.pathname === '/api/repo/remote-branches') return call('repo.remoteBranches', body)
-        if (url.pathname === '/api/repo/pull-requests') {
-          const payload: Record<string, unknown> = { branches: url.searchParams.getAll('branches') }
-          for (const [k, v] of url.searchParams.entries()) {
-            if (k !== 'branches') payload[k] = v
-          }
-          return call('repo.pullRequests', payload)
-        }
+        if (url.pathname === '/api/repo/pull-requests') return call('repo.pullRequests', body)
         if (url.pathname === '/api/repo/patch') {
           const payload: Record<string, unknown> = {}
           for (const [k, v] of url.searchParams.entries()) payload[k] = v
           return call('repo.patch', payload)
         }
-        if (url.pathname === '/api/repo/composite') {
-          const payload: Record<string, unknown> = { include: url.searchParams.getAll('include') }
-          for (const [k, v] of url.searchParams.entries()) {
-            if (k !== 'include') payload[k] = v
-          }
-          if (url.searchParams.has('branches')) payload.branches = url.searchParams.getAll('branches')
-          return call('repo.composite', payload)
-        }
+        if (url.pathname === '/api/repo/composite') return call('repo.composite', body)
         if (url.pathname === '/api/repo/fetch') return call('repo.fetch', body)
         if (url.pathname === '/api/repo/clone') return call('repo.clone', body)
         if (url.pathname === '/api/repo/abort-clone') return call('repo.abortClone', body)

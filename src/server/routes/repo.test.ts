@@ -69,9 +69,15 @@ describe('repo routes — GET query validation', () => {
     expect(mocks.probeRepository).not.toHaveBeenCalled()
   })
 
-  test('returns 400 for invalid picklist values in the query (e.g. pull-requests mode)', async () => {
+  test('returns 400 for invalid picklist values in the body (e.g. pull-requests mode)', async () => {
     const app = createRepoRoutes()
-    const response = await app.request(new Request('http://localhost/pull-requests?cwd=/tmp/repo&mode=not-a-mode'))
+    const response = await app.request(
+      new Request('http://localhost/pull-requests', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: '/tmp/repo', mode: 'not-a-mode' }),
+      }),
+    )
     expect(response.status).toBe(400)
     const json = (await response.json()) as { ok: boolean; code: string }
     expect(json.code).toBe('BAD_REQUEST')
@@ -87,11 +93,15 @@ describe('repo routes — GET query validation', () => {
     expect(mocks.probeRepository).toHaveBeenCalledWith('/tmp/repo')
   })
 
-  test('passes repeated query keys as arrays (e.g. branches)', async () => {
+  test('passes an array of branches through the body to the module layer', async () => {
     mocks.getRepositoryPullRequests.mockResolvedValue([])
     const app = createRepoRoutes()
     const response = await app.request(
-      new Request('http://localhost/pull-requests?cwd=/tmp/repo&branches=main&branches=feature'),
+      new Request('http://localhost/pull-requests', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: '/tmp/repo', branches: ['main', 'feature'] }),
+      }),
     )
     expect(response.status).toBe(200)
     expect(mocks.getRepositoryPullRequests).toHaveBeenCalledWith('/tmp/repo', ['main', 'feature'], {
@@ -137,7 +147,13 @@ describe('repo routes — composite read', () => {
       pullRequests: [],
     })
     const app = createRepoRoutes()
-    const response = await app.request(new Request('http://localhost/composite?cwd=/tmp/repo'))
+    const response = await app.request(
+      new Request('http://localhost/composite', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: '/tmp/repo' }),
+      }),
+    )
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({
       snapshot: { branches: [], current: 'main' },
@@ -150,9 +166,16 @@ describe('repo routes — composite read', () => {
     mocks.getRepositoryComposite.mockResolvedValue({ snapshot: null, status: [], pullRequests: null })
     const app = createRepoRoutes()
     await app.request(
-      new Request(
-        'http://localhost/composite?cwd=/tmp/repo&include=snapshot&include=status&branches=main&branches=feature&mode=summary',
-      ),
+      new Request('http://localhost/composite', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          cwd: '/tmp/repo',
+          include: ['snapshot', 'status'],
+          branches: ['main', 'feature'],
+          mode: 'summary',
+        }),
+      }),
     )
     expect(mocks.getRepositoryComposite).toHaveBeenCalledWith('/tmp/repo', ['snapshot', 'status'], {
       branches: ['main', 'feature'],
@@ -166,7 +189,11 @@ describe('repo routes — composite read', () => {
     mocks.getRepositoryComposite.mockResolvedValue({ snapshot: null, status: [], pullRequests: null })
     const app = createRepoRoutes()
     await app.request(
-      new Request('http://localhost/composite?cwd=/tmp/repo&include=snapshot&include=status&timeoutMs=2500'),
+      new Request('http://localhost/composite', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: '/tmp/repo', include: ['snapshot', 'status'], timeoutMs: 2500 }),
+      }),
     )
     expect(mocks.getRepositoryComposite).toHaveBeenCalledWith(
       '/tmp/repo',
@@ -175,10 +202,14 @@ describe('repo routes — composite read', () => {
     )
   })
 
-  test('returns 400 when timeoutMs is non-numeric', async () => {
+  test('returns 400 when timeoutMs is not a number', async () => {
     const app = createRepoRoutes()
     const response = await app.request(
-      new Request('http://localhost/composite?cwd=/tmp/repo&include=snapshot&include=status&timeoutMs=soon'),
+      new Request('http://localhost/composite', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: '/tmp/repo', include: ['snapshot', 'status'], timeoutMs: 'soon' }),
+      }),
     )
     expect(response.status).toBe(400)
     const json = (await response.json()) as { code: string }
@@ -188,14 +219,24 @@ describe('repo routes — composite read', () => {
   test('returns 400 when timeoutMs is negative', async () => {
     const app = createRepoRoutes()
     const response = await app.request(
-      new Request('http://localhost/composite?cwd=/tmp/repo&include=snapshot&include=status&timeoutMs=-1'),
+      new Request('http://localhost/composite', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: '/tmp/repo', include: ['snapshot', 'status'], timeoutMs: -1 }),
+      }),
     )
     expect(response.status).toBe(400)
   })
 
   test('returns 400 when include has an unknown value', async () => {
     const app = createRepoRoutes()
-    const response = await app.request(new Request('http://localhost/composite?cwd=/tmp/repo&include=not-a-section'))
+    const response = await app.request(
+      new Request('http://localhost/composite', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: '/tmp/repo', include: ['not-a-section'] }),
+      }),
+    )
     expect(response.status).toBe(400)
     const json = (await response.json()) as { code: string }
     expect(json.code).toBe('BAD_REQUEST')
@@ -208,7 +249,13 @@ describe('repo routes — composite read', () => {
     // the renderer can keep rendering whatever it already has.
     mocks.getRepositoryComposite.mockRejectedValue(new Error('backend exploded'))
     const app = createRepoRoutes()
-    const response = await app.request(new Request('http://localhost/composite?cwd=/tmp/repo'))
+    const response = await app.request(
+      new Request('http://localhost/composite', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: '/tmp/repo' }),
+      }),
+    )
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ snapshot: null, status: [], pullRequests: null })
   })

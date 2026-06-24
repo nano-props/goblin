@@ -82,8 +82,8 @@ export function createRepoRoutes() {
     const { cwd, worktreePath } = parseHttpQuery(REPO_QUERY_SCHEMAS.patch, c)
     return c.json(await jsonOr(() => getRepositoryPatch(cwd, worktreePath, c.req.raw.signal), READ_REPO_ERROR, 'patch'))
   })
-  app.get('/pull-requests', async (c) => {
-    const { cwd, branches, mode } = parseHttpQuery(REPO_QUERY_SCHEMAS.pullRequests, c)
+  app.post('/pull-requests', async (c) => {
+    const { cwd, branches, mode } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.pullRequests, c)
     return c.json(
       await jsonOr(
         () => getRepositoryPullRequests(cwd, branches, { mode: mode ?? 'full', signal: c.req.raw.signal }),
@@ -92,14 +92,8 @@ export function createRepoRoutes() {
       ),
     )
   })
-  app.get('/composite', async (c) => {
-    const { cwd, include, branches, mode, timeoutMs } = parseHttpQuery(REPO_QUERY_SCHEMAS.composite, c)
-    // `include` is a `string[]` per the schema; `parseHttpQuery`
-    // materialises it from `searchParams.getAll('include')`, so the
-    // wire format is repeated keys:
-    //   `?include=snapshot&include=status`
-    // Comma-separated values (`?include=snapshot,status`) are not
-    // supported — the renderer always sends repeated keys.
+  app.post('/composite', async (c) => {
+    const { cwd, include, branches, mode, timeoutMs } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.composite, c)
     const wants = (include ?? ['snapshot', 'status', 'pullRequests']) as ReadonlyArray<
       'snapshot' | 'status' | 'pullRequests'
     >
