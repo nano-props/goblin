@@ -31,12 +31,12 @@ export interface TerminalBellEvent {
   visible: boolean
 }
 
-export interface TerminalClientOwnershipViewModel {
+export interface TerminalControllerViewModel {
   role: TerminalClientRole
   controllerStatus: TerminalControllerStatus
 }
 
-export interface TerminalClientSnapshot extends TerminalClientOwnershipViewModel {
+export interface TerminalClientSnapshot extends TerminalControllerViewModel {
   active: boolean
   canTakeover: boolean
   canonicalCols: number | null
@@ -44,13 +44,13 @@ export interface TerminalClientSnapshot extends TerminalClientOwnershipViewModel
 }
 
 /**
- * Identity view-model: the stable ownership + geometry fields the
+ * Identity view-model: the stable controller + geometry fields the
  * renderer needs to decide who controls the PTY and at what size.
  * No `phase` — phase lives on the lifecycle channel so a transitional
  * phase update can never be confused with a role change at the
  * renderer's `applyIdentity` boundary.
  */
-export interface TerminalIdentityViewModel extends TerminalClientOwnershipViewModel {
+export interface TerminalIdentityViewModel extends TerminalControllerViewModel {
   ptySessionId: string
   canonicalCols: number
   canonicalRows: number
@@ -87,7 +87,7 @@ export interface TerminalSnapshot {
   attachment?: TerminalClientSnapshot | null
   search?: TerminalSearchResult | null
   progress?: TerminalProgressState | null
-  /** True while a takeover request has been sent but ownership has not yet been confirmed. */
+  /** True while a takeover request has been sent but control has not yet been confirmed. */
   takeoverPending?: boolean
 }
 

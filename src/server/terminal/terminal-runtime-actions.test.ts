@@ -38,7 +38,7 @@ function makeActions(
     takeoverSlot: vi.fn(),
     getSlotSnapshot: vi.fn(() => null),
   } as any
-  const broker = { broadcastToOwner: broadcasts as unknown as (userId: string, message: unknown) => void }
+  const broker = { broadcastToUser: broadcasts as unknown as (userId: string, message: unknown) => void }
   const catalog = {
     create: vi.fn(),
     prune: vi.fn(),
@@ -88,7 +88,7 @@ describe('terminal-runtime-actions close broadcast', () => {
   })
 
   test('emits NEITHER broadcast when the close returns false (session not owned)', async () => {
-    // A non-owner close must not leak a phantom slot-closed to
+    // A non-user close must not leak a phantom slot-closed to
     // sibling windows. The guard is `if (closed && repoRoot)`.
     const { actions, broadcasts } = makeActions({
       closeSlotForUser: () => false,

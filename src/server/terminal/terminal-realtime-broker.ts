@@ -8,7 +8,7 @@ export interface TerminalRealtimeSocket {
 interface TerminalBrokerOptions {
   onClientConnected(clientId: string, userId: string): void
   onClientDisconnected(clientId: string, userId: string): void
-  onOwnerDisconnected(userId: string): void
+  onUserDisconnected(userId: string): void
 }
 
 /**
@@ -160,7 +160,7 @@ export class TerminalRealtimeBroker {
     } else this.socketCountByUserClientKey.set(clientKey, nextCount)
     if (sockets.size > 0) return
     this.socketsByUserId.delete(userId)
-    this.options.onOwnerDisconnected(userId)
+    this.options.onUserDisconnected(userId)
   }
 
   // Fan out to every clientId that authenticates with the same
@@ -169,8 +169,8 @@ export class TerminalRealtimeBroker {
   // (same access token, different `clientId` from sessionStorage)
   // receives the same event without needing a new attach roundtrip.
   // The terminal sink callback decides which event type triggers
-  // this fanout (output, title, exit, ownership).
-  broadcastToOwner(userId: string, message: TerminalRealtimeMessage): void {
+  // this fanout (output, title, exit, identity).
+  broadcastToUser(userId: string, message: TerminalRealtimeMessage): void {
     const sockets = this.socketsByUserId.get(userId)
     if (!sockets || sockets.size === 0) return
     const payload = JSON.stringify(message)

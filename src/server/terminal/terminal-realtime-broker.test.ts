@@ -13,7 +13,7 @@ describe('terminal realtime broker', () => {
     const broker = new TerminalRealtimeBroker({
       onClientConnected: vi.fn(),
       onClientDisconnected: vi.fn(),
-      onOwnerDisconnected: vi.fn(),
+      onUserDisconnected: vi.fn(),
     })
     const first = { send: vi.fn(), close: vi.fn() }
     const second = { send: vi.fn(), close: vi.fn() }
@@ -29,11 +29,11 @@ describe('terminal realtime broker', () => {
     expect(broker.isClientConnected(USER_A, 'client_b')).toBe(false)
   })
 
-  test('broadcastToOwner fans out to every clientId sharing the same userId', () => {
+  test('broadcastToUser fans out to every clientId sharing the same userId', () => {
     const broker = new TerminalRealtimeBroker({
       onClientConnected: vi.fn(),
       onClientDisconnected: vi.fn(),
-      onOwnerDisconnected: vi.fn(),
+      onUserDisconnected: vi.fn(),
     })
     const electronSocket = { send: vi.fn(), close: vi.fn() }
     const chromeSocket = { send: vi.fn(), close: vi.fn() }
@@ -43,7 +43,7 @@ describe('terminal realtime broker', () => {
     broker.registerSocket('client_electron_a', USER_A, electronSocket)
     broker.registerSocket('client_chrome_b', USER_A, chromeSocket)
 
-    broker.broadcastToOwner(USER_A, {
+    broker.broadcastToUser(USER_A, {
       type: 'output',
       event: { ptySessionId: 's_1', data: 'hi', seq: 1, processName: 'zsh' },
     })
@@ -63,68 +63,68 @@ describe('terminal realtime broker', () => {
     })
   })
 
-  test('broadcastToOwner does not leak across ownerIds', () => {
+  test('broadcastToUser does not leak across userIds', () => {
     // Two different access tokens must never see each other's
-    // fanout. Socket storage is owner-keyed; cross-owner messages
+    // fanout. Socket storage is user-keyed; cross-user messages
     // stay isolated.
     const broker = new TerminalRealtimeBroker({
       onClientConnected: vi.fn(),
       onClientDisconnected: vi.fn(),
-      onOwnerDisconnected: vi.fn(),
+      onUserDisconnected: vi.fn(),
     })
-    const ownerASocket = { send: vi.fn(), close: vi.fn() }
-    const ownerBSocket = { send: vi.fn(), close: vi.fn() }
-    broker.registerSocket('client_a_a', USER_A, ownerASocket)
-    broker.registerSocket('client_b_a', USER_B, ownerBSocket)
+    const userASocket = { send: vi.fn(), close: vi.fn() }
+    const userBSocket = { send: vi.fn(), close: vi.fn() }
+    broker.registerSocket('client_a_a', USER_A, userASocket)
+    broker.registerSocket('client_b_a', USER_B, userBSocket)
 
-    broker.broadcastToOwner(USER_A, {
+    broker.broadcastToUser(USER_A, {
       type: 'output',
       event: { ptySessionId: 's_1', data: 'a', seq: 1, processName: 'zsh' },
     })
 
-    expect(ownerASocket.send).toHaveBeenCalledTimes(1)
-    expect(ownerBSocket.send).not.toHaveBeenCalled()
+    expect(userASocket.send).toHaveBeenCalledTimes(1)
+    expect(userBSocket.send).not.toHaveBeenCalled()
   })
 
-  test('broadcastToOwner isolates owners even when clientId is reused', () => {
+  test('broadcastToUser isolates users even when clientId is reused', () => {
     const broker = new TerminalRealtimeBroker({
       onClientConnected: vi.fn(),
       onClientDisconnected: vi.fn(),
-      onOwnerDisconnected: vi.fn(),
+      onUserDisconnected: vi.fn(),
     })
-    const ownerASocket = { send: vi.fn(), close: vi.fn() }
-    const ownerBSocket = { send: vi.fn(), close: vi.fn() }
-    broker.registerSocket('client_shared_a', USER_A, ownerASocket)
-    broker.registerSocket('client_shared_b', USER_B, ownerBSocket)
+    const userASocket = { send: vi.fn(), close: vi.fn() }
+    const userBSocket = { send: vi.fn(), close: vi.fn() }
+    broker.registerSocket('client_shared_a', USER_A, userASocket)
+    broker.registerSocket('client_shared_b', USER_B, userBSocket)
 
-    broker.broadcastToOwner(USER_A, {
+    broker.broadcastToUser(USER_A, {
       type: 'output',
       event: { ptySessionId: 's_1', data: 'a', seq: 1, processName: 'zsh' },
     })
 
-    expect(ownerASocket.send).toHaveBeenCalledTimes(1)
-    expect(ownerBSocket.send).not.toHaveBeenCalled()
+    expect(userASocket.send).toHaveBeenCalledTimes(1)
+    expect(userBSocket.send).not.toHaveBeenCalled()
     expect(broker.isClientConnected(USER_A, 'client_shared_a')).toBe(true)
     expect(broker.isClientConnected(USER_B, 'client_shared_b')).toBe(true)
     expect(broker.isClientConnected(USER_A, 'client_shared_b')).toBe(false)
   })
 
-  test('unregisterSocket removes the socket from owner fanout', () => {
+  test('unregisterSocket removes the socket from user fanout', () => {
     const broker = new TerminalRealtimeBroker({
       onClientConnected: vi.fn(),
       onClientDisconnected: vi.fn(),
-      onOwnerDisconnected: vi.fn(),
+      onUserDisconnected: vi.fn(),
     })
     const socket = { send: vi.fn(), close: vi.fn() }
     broker.registerSocket('client_1_a', USER_A, socket)
     broker.unregisterSocket(socket)
 
     // After the last socket for `client_1` is gone, a
-    // `broadcastToOwner` for USER_A must not attempt to send to
-    // the now-empty owner set. We assert the side effect by
+    // `broadcastToUser` for USER_A must not attempt to send to
+    // the now-empty user set. We assert the side effect by
     // checking the WS was not closed and the broadcast is a no-op.
     expect(socket.close).not.toHaveBeenCalled()
-    broker.broadcastToOwner(USER_A, {
+    broker.broadcastToUser(USER_A, {
       type: 'output',
       event: { ptySessionId: 's_1', data: 'a', seq: 1, processName: 'zsh' },
     })
@@ -135,7 +135,7 @@ describe('terminal realtime broker', () => {
     const broker = new TerminalRealtimeBroker({
       onClientConnected: vi.fn(),
       onClientDisconnected: vi.fn(),
-      onOwnerDisconnected: vi.fn(),
+      onUserDisconnected: vi.fn(),
     })
     const socket = { send: vi.fn(), close: vi.fn() }
     broker.registerSocket('client_a_a', USER_A, socket)
@@ -144,11 +144,11 @@ describe('terminal realtime broker', () => {
     expect(broker.isClientConnected(USER_A, 'client_a_a')).toBe(false)
     expect(broker.isClientConnected(USER_B, 'client_b_b')).toBe(true)
 
-    broker.broadcastToOwner(USER_A, {
+    broker.broadcastToUser(USER_A, {
       type: 'output',
       event: { ptySessionId: 's_1', data: 'a', seq: 1, processName: 'zsh' },
     })
-    broker.broadcastToOwner(USER_B, {
+    broker.broadcastToUser(USER_B, {
       type: 'output',
       event: { ptySessionId: 's_1', data: 'b', seq: 2, processName: 'zsh' },
     })
@@ -164,19 +164,19 @@ describe('terminal realtime broker', () => {
     const broker = new TerminalRealtimeBroker({
       onClientConnected,
       onClientDisconnected: vi.fn(),
-      onOwnerDisconnected: vi.fn(),
+      onUserDisconnected: vi.fn(),
     })
     const socket = { send: vi.fn(), close: vi.fn() }
     broker.registerSocket('client_1_a', USER_A, socket)
     expect(onClientConnected).toHaveBeenCalledWith('client_1_a', USER_A)
   })
 
-  test('onOwnerDisconnected waits for the last socket under that owner', () => {
-    const onOwnerDisconnected = vi.fn()
+  test('onUserDisconnected waits for the last socket under that user', () => {
+    const onUserDisconnected = vi.fn()
     const broker = new TerminalRealtimeBroker({
       onClientConnected: vi.fn(),
       onClientDisconnected: vi.fn(),
-      onOwnerDisconnected,
+      onUserDisconnected,
     })
     const first = { send: vi.fn(), close: vi.fn() }
     const second = { send: vi.fn(), close: vi.fn() }
@@ -184,10 +184,10 @@ describe('terminal realtime broker', () => {
     broker.registerSocket('client_2_b', USER_A, second)
 
     broker.unregisterSocket(first)
-    expect(onOwnerDisconnected).not.toHaveBeenCalled()
+    expect(onUserDisconnected).not.toHaveBeenCalled()
 
     broker.unregisterSocket(second)
-    expect(onOwnerDisconnected).toHaveBeenCalledWith(USER_A)
+    expect(onUserDisconnected).toHaveBeenCalledWith(USER_A)
   })
 })
 
@@ -209,7 +209,7 @@ describe('terminal realtime broker heartbeat', () => {
     const broker = new TerminalRealtimeBroker({
       onClientConnected: vi.fn(),
       onClientDisconnected,
-      onOwnerDisconnected: vi.fn(),
+      onUserDisconnected: vi.fn(),
     })
     const socket = { send: vi.fn(), close: vi.fn() }
     broker.registerSocket('client_a_1', USER_A, socket)
@@ -226,7 +226,7 @@ describe('terminal realtime broker heartbeat', () => {
     const broker = new TerminalRealtimeBroker({
       onClientConnected: vi.fn(),
       onClientDisconnected,
-      onOwnerDisconnected: vi.fn(),
+      onUserDisconnected: vi.fn(),
     })
     const socket = { send: vi.fn(), close: vi.fn() }
     broker.registerSocket('client_a_1', USER_A, socket)
@@ -248,7 +248,7 @@ describe('terminal realtime broker heartbeat', () => {
     const broker = new TerminalRealtimeBroker({
       onClientConnected: vi.fn(),
       onClientDisconnected,
-      onOwnerDisconnected: vi.fn(),
+      onUserDisconnected: vi.fn(),
     })
     // No registerSocket — the (userId, clientId) is unknown.
     broker.recordHeartbeat(USER_A, 'never_connected', Date.now())
@@ -264,7 +264,7 @@ describe('terminal realtime broker heartbeat', () => {
     const broker = new TerminalRealtimeBroker({
       onClientConnected: vi.fn(),
       onClientDisconnected,
-      onOwnerDisconnected: vi.fn(),
+      onUserDisconnected: vi.fn(),
     })
     const socket = { send: vi.fn(), close: vi.fn() }
     broker.registerSocket('client_a_1', USER_A, socket)

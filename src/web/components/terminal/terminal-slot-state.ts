@@ -5,12 +5,12 @@ import type {
   TerminalProgressState,
   TerminalSearchResult,
   TerminalSnapshot,
-  TerminalClientOwnershipViewModel,
+  TerminalControllerViewModel,
   TerminalIdentityViewModel,
   TerminalLifecycleViewModel,
 } from '#/web/components/terminal/types.ts'
 export class TerminalSlotState {
-  /** Terminal runtime metadata mirrored from attach/session/ownership events.
+  /** Terminal runtime metadata mirrored from attach/session/identity events.
    *  This is authoritative runtime shape for the renderer, but it is not
    *  the same thing as workspace/session persistence. */
   private runtimeState: {
@@ -18,7 +18,7 @@ export class TerminalSlotState {
     message: string | null
     processName: string
     canonicalTitle: string | null
-    clientOwnership: TerminalClientOwnershipViewModel
+    clientController: TerminalControllerViewModel
     canonicalSize: { cols: number; rows: number }
     takeoverPending: boolean
   } = {
@@ -26,7 +26,7 @@ export class TerminalSlotState {
     message: null,
     processName: 'terminal',
     canonicalTitle: null,
-    clientOwnership: {
+    clientController: {
       role: 'controller',
       controllerStatus: 'connected',
     },
@@ -77,11 +77,11 @@ export class TerminalSlotState {
   // role banner, focus, etc. A transitional phase update must
   // never make this return false for a slot whose role is still
   // `'controller'`. Named after the role enum value (not the
-  // older "owner" terminology) to match the userId/clientId/
+  // older "user" terminology) to match the userId/clientId/
   // ptySessionId identity split: the role is `controller`, not
-  // `owner`.
+  // `user`.
   isController(): boolean {
-    return this.runtimeState.clientOwnership.role === 'controller'
+    return this.runtimeState.clientController.role === 'controller'
   }
 
   // Write-path predicate. Use this only at the actual input gate
@@ -91,11 +91,11 @@ export class TerminalSlotState {
   // the teardown decision uses `isController()` and the write
   // decision uses this method. The two are intentionally separate.
   canSendInput(): boolean {
-    return this.runtimeState.clientOwnership.role === 'controller' && this.runtimeState.phase === 'open'
+    return this.runtimeState.clientController.role === 'controller' && this.runtimeState.phase === 'open'
   }
 
-  getClientOwnership(): TerminalClientOwnershipViewModel {
-    return this.runtimeState.clientOwnership
+  getClientOwnership(): TerminalControllerViewModel {
+    return this.runtimeState.clientController
   }
 
   getCanonicalSize(): { cols: number; rows: number } {
@@ -115,7 +115,7 @@ export class TerminalSlotState {
     // top level of the snapshot already.
     if (this.runtimeState.phase === 'open' && ptySessionId) {
       snapshot.attachment = createTerminalClientSnapshot({
-        ...this.runtimeState.clientOwnership,
+        ...this.runtimeState.clientController,
         canonicalCols: this.runtimeState.canonicalSize.cols,
         canonicalRows: this.runtimeState.canonicalSize.rows,
       })
@@ -161,8 +161,8 @@ export class TerminalSlotState {
     message?: string | null
     processName: string
     canonicalTitle?: string | null
-    role: TerminalClientOwnershipViewModel['role']
-    controllerStatus: TerminalClientOwnershipViewModel['controllerStatus']
+    role: TerminalControllerViewModel['role']
+    controllerStatus: TerminalControllerViewModel['controllerStatus']
     canonicalCols: number
     canonicalRows: number
   }): boolean {
@@ -196,10 +196,10 @@ export class TerminalSlotState {
   applyIdentity(event: TerminalIdentityViewModel): boolean {
     let changed = false
     if (
-      this.runtimeState.clientOwnership.role !== event.role ||
-      this.runtimeState.clientOwnership.controllerStatus !== event.controllerStatus
+      this.runtimeState.clientController.role !== event.role ||
+      this.runtimeState.clientController.controllerStatus !== event.controllerStatus
     ) {
-      this.runtimeState.clientOwnership = { role: event.role, controllerStatus: event.controllerStatus }
+      this.runtimeState.clientController = { role: event.role, controllerStatus: event.controllerStatus }
       changed = true
     }
     changed = this.setCanonicalSize(event.canonicalCols, event.canonicalRows) || changed

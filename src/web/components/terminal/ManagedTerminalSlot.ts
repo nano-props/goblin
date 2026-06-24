@@ -212,8 +212,8 @@ export class ManagedTerminalSlot {
         // Post-dispose guard: the gate's takeover round-trip can
         // resolve after `dispose()` ran, in which case the slot no
         // longer owns this ptySessionId. Drop the write — the
-        // registry's durable-close queue has already taken ownership
-        // of the actual close.
+        // registry's durable-close queue has already taken
+        // responsibility for the actual close.
         if (this.disposed || this.runtime.currentPtySessionId() !== ptySessionId) return
         if (result.kind === 'denied') {
           this.reportGateDenial('write', result.reason, ptySessionId)
@@ -348,7 +348,7 @@ export class ManagedTerminalSlot {
         onPromoted: (result) => {
           // Mirror the runtime's `applyTakeover` so the new
           // controller's view (cols/rows/phase) is applied
-          // synchronously. The realtime ownership event that
+          // synchronously. The realtime identity event that
           // follows is idempotent.
           if (result.ok) this.runtime.applyTakeover(result)
         },
@@ -425,8 +425,9 @@ export class ManagedTerminalSlot {
         if (this.view.isVisible()) this.view.focus()
       } else if (wasRole === 'viewer' && newRole === 'unowned' && this.view.isConnected()) {
         // A mounted viewer slot became unowned: the previous PTY
-        // owner released the slot. Auto-attach as the new owner so
-        // the user does not have to click into the tab. This branch
+        // controller released the slot. Auto-attach as the new
+        // controller so the user does not have to click into the
+        // tab. This branch
         // is independent of the controller→viewer transition above
         // because the xterm is still alive in viewer mode. Tear
         // it down first so the new start() can re-open xterm with
@@ -728,7 +729,7 @@ export class ManagedTerminalSlot {
       if (hydratedSnapshot.snapshot) await termWrite(term, hydratedSnapshot.snapshot)
       // Post-await dispose guard: `termWrite` may have resolved
       // after `dispose()` ran (the slot is no longer the current
-      // owner of this ptySessionId, the term is destroyed, and any
+      // controller of this ptySessionId, the term is destroyed, and any
       // `term.write` callback would land on a freed term and throw
       // an unhandled-rejection). Drop the replay window before
       // letting the callback path touch anything.

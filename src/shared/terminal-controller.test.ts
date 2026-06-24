@@ -2,10 +2,10 @@ import { describe, expect, test } from 'vitest'
 import {
   cloneTerminalController,
   resolveTerminalClientRole,
-  resolveTerminalOwnership,
-} from '#/shared/terminal-ownership.ts'
+  resolveTerminalController,
+} from '#/shared/terminal-controller.ts'
 
-describe('shared terminal ownership helpers', () => {
+describe('shared terminal controller helpers', () => {
   test('resolves controller, viewer, and unowned attachment roles', () => {
     expect(resolveTerminalClientRole(null, 'client_a')).toBe('unowned')
     expect(resolveTerminalClientRole({ clientId: 'client_a', status: 'connected' }, 'client_a')).toBe(
@@ -16,12 +16,12 @@ describe('shared terminal ownership helpers', () => {
     )
   })
 
-  test('resolves ownership view model with controller status fallback', () => {
-    expect(resolveTerminalOwnership(null, 'client_a')).toEqual({
+  test('resolves controller view model with controller status fallback', () => {
+    expect(resolveTerminalController(null, 'client_a')).toEqual({
       role: 'unowned',
       controllerStatus: 'none',
     })
-    expect(resolveTerminalOwnership({ clientId: 'client_a', status: 'connected' }, 'client_b')).toEqual({
+    expect(resolveTerminalController({ clientId: 'client_a', status: 'connected' }, 'client_b')).toEqual({
       role: 'viewer',
       controllerStatus: 'connected',
     })

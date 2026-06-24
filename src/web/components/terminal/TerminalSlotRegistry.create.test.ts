@@ -75,7 +75,7 @@ vi.mock('#/web/components/terminal/ManagedTerminalSlot.ts', () => {
     handleExit(): boolean {
       return false
     }
-    handleOwnership(): void {}
+    handleIdentity(): void {}
     currentPtySessionId(): string | null {
       return this.ptySessionId
     }

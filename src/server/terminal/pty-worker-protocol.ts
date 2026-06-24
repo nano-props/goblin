@@ -5,7 +5,7 @@
 // main process owns the business runtime and talks to the worker over
 // IPC for the few low-level operations that have to live close to the
 // OS process boundary (spawn / write / resize / kill). Every other
-// concern (slot lifecycle, ownership, sockets, catalog) is handled
+// concern (slot lifecycle, controllers, sockets, catalog) is handled
 // in-process by the main runtime.
 //
 // Protocol surface (8 message types total):

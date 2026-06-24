@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import type { TerminalOwnershipState } from '#/server/terminal/terminal-ownership.ts'
+import type { TerminalControllerState } from '#/server/terminal/terminal-controller.ts'
 import {
   registerTerminalClient,
   attachTerminalClient,
@@ -8,13 +8,13 @@ import {
   updateTerminalClientConnection,
   isAuthoritative,
   explainAuthority,
-} from '#/server/terminal/terminal-ownership.ts'
+} from '#/server/terminal/terminal-controller.ts'
 
-function createState(overrides?: Partial<TerminalOwnershipState>): TerminalOwnershipState {
+function createState(overrides?: Partial<TerminalControllerState>): TerminalControllerState {
   return {
     attachments: new Map(),
     controller: null,
-    ownerSticky: false,
+    userSticky: false,
     cols: 80,
     rows: 24,
     ...overrides,
@@ -50,12 +50,12 @@ describe('registerTerminalClient', () => {
 })
 
 describe('attachTerminalClient (single-owner model)', () => {
-  test('first attach auto-claims and sets ownerSticky', () => {
+  test('first attach auto-claims and sets userSticky', () => {
     const state = createState({ attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]) })
     const effect = attachTerminalClient(state, 'a1')
     expect(effect.emitIdentity).toBe(true)
     expect(state.controller).toEqual({ clientId: 'a1', status: 'connected' })
-    expect(state.ownerSticky).toBe(true)
+    expect(state.userSticky).toBe(true)
   })
 
   test('rejects when controller already exists on a different attachment', () => {
@@ -65,7 +65,7 @@ describe('attachTerminalClient (single-owner model)', () => {
         ['a2', { cols: 100, rows: 30, connected: true }],
       ]),
       controller: { clientId: 'a1', status: 'connected' },
-      ownerSticky: true,
+      userSticky: true,
     })
     const effect = attachTerminalClient(state, 'a2')
     expect(effect.emitIdentity).toBe(false)
@@ -79,11 +79,11 @@ describe('attachTerminalClient (single-owner model)', () => {
         ['a2', { cols: 100, rows: 30, connected: true }],
       ]),
       controller: null,
-      ownerSticky: true,
+      userSticky: true,
     })
     const effect = attachTerminalClient(state, 'a2')
     // The new attachment reports a different geometry, so the
-    // claim goes out as a resize instead of a plain ownership emit.
+    // claim goes out as a resize instead of a plain identity emit.
     expect(effect.emitIdentity).toBe(false)
     expect(effect.resizeTo).toEqual({ cols: 100, rows: 30 })
     expect(state.controller).toEqual({ clientId: 'a2', status: 'connected' })
@@ -105,7 +105,7 @@ describe('attachTerminalClient (single-owner model)', () => {
     const state = createState({
       attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]),
       controller: null,
-      ownerSticky: true,
+      userSticky: true,
     })
     const effect = attachTerminalClient(state, 'a1')
     expect(effect.emitIdentity).toBe(true)
@@ -116,7 +116,7 @@ describe('attachTerminalClient (single-owner model)', () => {
     const state = createState({
       attachments: new Map([['a1', { cols: 100, rows: 30, connected: true }]]),
       controller: null,
-      ownerSticky: true,
+      userSticky: true,
       cols: 80,
       rows: 24,
     })
@@ -127,12 +127,12 @@ describe('attachTerminalClient (single-owner model)', () => {
 })
 
 describe('claimTerminalClientControl', () => {
-  test('claims control and emits ownership when size matches', () => {
+  test('claims control and emits identity when size matches', () => {
     const state = createState({ attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]) })
     const effect = claimTerminalClientControl(state, 'a1')
     expect(effect.emitIdentity).toBe(true)
     expect(state.controller).toEqual({ clientId: 'a1', status: 'connected' })
-    expect(state.ownerSticky).toBe(true)
+    expect(state.userSticky).toBe(true)
   })
 
   test('claims control and requests resize when size differs', () => {
@@ -162,7 +162,7 @@ describe('restartTerminalClientControl', () => {
     const state = createState({ attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]) })
     restartTerminalClientControl(state, 'a1')
     expect(state.controller).toEqual({ clientId: 'a1', status: 'connected' })
-    expect(state.ownerSticky).toBe(true)
+    expect(state.userSticky).toBe(true)
   })
 
   test('clears controller when clientId does not match', () => {
@@ -209,7 +209,7 @@ describe('updateTerminalClientConnection', () => {
     const state = createState({
       attachments: new Map([['a1', { cols: 80, rows: 24, connected: false }]]),
       controller: null,
-      ownerSticky: true,
+      userSticky: true,
     })
     const effect = updateTerminalClientConnection(state, 'a1', true)
     expect(effect.emitIdentity).toBe(true)
@@ -220,7 +220,7 @@ describe('updateTerminalClientConnection', () => {
     const state = createState({
       attachments: new Map([['a1', { cols: 80, rows: 24, connected: false }]]),
       controller: null,
-      ownerSticky: true,
+      userSticky: true,
     })
     const effect = updateTerminalClientConnection(state, 'a1', true)
     expect(effect.emitIdentity).toBe(true)
@@ -231,7 +231,7 @@ describe('updateTerminalClientConnection', () => {
     const state = createState({
       attachments: new Map([['a1', { cols: 80, rows: 24, connected: false }]]),
       controller: null,
-      ownerSticky: false,
+      userSticky: false,
     })
     const effect = updateTerminalClientConnection(state, 'a1', true)
     expect(effect.emitIdentity).toBe(false)
@@ -242,7 +242,7 @@ describe('updateTerminalClientConnection', () => {
     const state = createState({
       attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]),
       controller: null,
-      ownerSticky: false,
+      userSticky: false,
     })
     const effect = updateTerminalClientConnection(state, 'a1', false)
     expect(effect.emitIdentity).toBe(false)
@@ -279,13 +279,13 @@ describe('updateTerminalClientConnection', () => {
         ['a2', { cols: 100, rows: 30, connected: false }],
       ]),
       controller: { clientId: 'a1', status: 'connected' },
-      ownerSticky: true,
+      userSticky: true,
     })
     updateTerminalClientConnection(state, 'a1', false)
     expect(state.controller).toBeNull()
     const effect = updateTerminalClientConnection(state, 'a2', true)
     // B reports a different geometry, so the claim goes out as a
-    // resize instead of a plain ownership emit.
+    // resize instead of a plain identity emit.
     expect(effect.emitIdentity).toBe(false)
     expect(effect.resizeTo).toEqual({ cols: 100, rows: 30 })
     expect(state.controller).toEqual({ clientId: 'a2', status: 'connected' })

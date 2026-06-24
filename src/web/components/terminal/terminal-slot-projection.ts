@@ -1,4 +1,4 @@
-import { resolveTerminalOwnership } from '#/shared/terminal-ownership.ts'
+import { resolveTerminalController } from '#/shared/terminal-controller.ts'
 import { parseSlotIdIndex } from '#/shared/slot-ids.ts'
 import { parseTerminalSlotKey } from '#/shared/terminal-slot-key.ts'
 import type {
@@ -41,7 +41,7 @@ export function projectTerminalAttachResultForClient(
 ): TerminalAttachResultWithOwnership {
   return {
     ...result,
-    ...resolveTerminalOwnership(result.controller, clientId),
+    ...resolveTerminalController(result.controller, clientId),
   }
 }
 
@@ -63,7 +63,7 @@ export function projectServerTerminalSlot(input: {
     parseSlotIdIndex(parsed.slotId) ?? 1,
   )
   const terminalWorktree = worktreeTerminalKey(parsed.repoRoot, parsed.worktreePath)
-  const ownership = resolveTerminalOwnership(input.serverSlot.controller, input.clientId)
+  const controller = resolveTerminalController(input.serverSlot.controller, input.clientId)
   const isReattachMatch = input.reattachSnapshot?.ptySessionId === input.serverSlot.ptySessionId
   return {
     descriptor,
@@ -74,8 +74,8 @@ export function projectServerTerminalSlot(input: {
       canonicalTitle: input.serverSlot.canonicalTitle,
       phase: input.serverSlot.phase,
       message: input.serverSlot.message,
-      role: ownership.role,
-      controllerStatus: ownership.controllerStatus,
+      role: controller.role,
+      controllerStatus: controller.controllerStatus,
       canonicalCols: input.serverSlot.cols,
       canonicalRows: input.serverSlot.rows,
       snapshot: input.serverSnapshot?.snapshot ?? (isReattachMatch ? (input.reattachSnapshot?.snapshot ?? '') : ''),

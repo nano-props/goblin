@@ -1,6 +1,6 @@
 // Server-side terminal runtime integration tests.
 //
-// The lower-level modules (session-manager, ownership, render-state,
+// The lower-level modules (session-manager, controller, render-state,
 // broker, catalog) carry their own focused unit tests. This file
 // exercises `createServerTerminalRuntime` end-to-end through its
 // `ServerTerminalHost` surface so the wiring between the supervisor,
@@ -129,7 +129,7 @@ async function createTerminalSlot(
 }
 
 describe('server terminal runtime', () => {
-  test('create claims controller ownership for the provided attachment', async () => {
+  test('create claims controller control for the provided attachment', async () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
@@ -161,7 +161,7 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
-  test('a second attachment can attach as viewer without stealing controller ownership', async () => {
+  test('a second attachment can attach as viewer without stealing controller control', async () => {
     const { host, shutdown } = buildRuntime()
     const socketA = { send: vi.fn(), close: vi.fn() }
     const socketB = { send: vi.fn(), close: vi.fn() }
@@ -236,12 +236,12 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
-  test('reattaching after a disconnect auto-reclaims ownership and canonical geometry', async () => {
+  test('reattaching after a disconnect auto-reclaims control and canonical geometry', async () => {
     // The previous revision had a 30s grace sub-state that kept the
     // controller slot occupied between disconnect and reconnect. The
     // current model clears the slot on disconnect (no grace) and
     // treats a reconnect as a fresh attach — for a session that has
-    // already been claimed by the owner (ownerSticky=true), the
+    // already been claimed by the user (userSticky=true), the
     // reattach auto-claims.
     const { host, shutdown } = buildRuntime()
     const socketA = { send: vi.fn(), close: vi.fn() }
@@ -437,7 +437,7 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
-  test('reopening an existing terminal from a new attachment auto-reclaims owner-sticky control', async () => {
+  test('reopening an existing terminal from a new attachment auto-reclaims user-sticky control', async () => {
     const { host, shutdown } = buildRuntime()
     const browserSocket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_browser', USER_1, browserSocket)
@@ -728,7 +728,7 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
-  test('takeover returns authoritative ownership snapshot from the server', async () => {
+  test('takeover returns authoritative controller snapshot from the server', async () => {
     const { host, shutdown } = buildRuntime()
     const socketA = { send: vi.fn(), close: vi.fn() }
     const socketB = { send: vi.fn(), close: vi.fn() }
@@ -800,18 +800,18 @@ describe('server terminal runtime', () => {
     const responseIndex = messages.findIndex(
       (message) => message.type === 'response' && message.requestId === 'req_takeover',
     )
-    const ownershipIndex = messages.findIndex(
+    const identityIndex = messages.findIndex(
       (message) => message.type === 'identity' && message.event.ptySessionId === ptySessionId,
     )
     expect(responseIndex).toBeGreaterThanOrEqual(0)
-    expect(ownershipIndex).toBeGreaterThan(responseIndex)
+    expect(identityIndex).toBeGreaterThan(responseIndex)
 
     host.unregisterSocket('client_a', USER_1, socketA)
     host.unregisterSocket('client_b', USER_1, socketB)
     shutdown()
   })
 
-  test('lists repo sessions across clients sharing an owner and broadcasts lifecycle invalidations to that owner', async () => {
+  test('lists repo sessions across clients sharing a userId and broadcasts lifecycle invalidations to that user', async () => {
     const { host, shutdown } = buildRuntime()
     const socketA = { send: vi.fn(), close: vi.fn() }
     const socketB = { send: vi.fn(), close: vi.fn() }
@@ -845,12 +845,12 @@ describe('server terminal runtime', () => {
 
   test('isolates terminal catalog reads and lifecycle broadcasts by userId', async () => {
     const { host, shutdown } = buildRuntime()
-    const ownerASocket = { send: vi.fn(), close: vi.fn() }
-    const ownerBSocket = { send: vi.fn(), close: vi.fn() }
-    host.registerSocket('client_shared_attachment_a', USER_1, ownerASocket)
-    host.registerSocket('client_shared_attachment_b', USER_2, ownerBSocket)
+    const userASocket = { send: vi.fn(), close: vi.fn() }
+    const userBSocket = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_shared_attachment_a', USER_1, userASocket)
+    host.registerSocket('client_shared_attachment_b', USER_2, userBSocket)
 
-    const ownerACreate = await host.create('client_shared', USER_1, {
+    const userACreate = await host.create('client_shared', USER_1, {
       repoRoot: '/repo',
       branch: 'feature',
       worktreePath: '/repo-linked',
@@ -859,24 +859,24 @@ describe('server terminal runtime', () => {
       rows: 24,
       clientId: 'client_a',
     })
-    expect(ownerACreate.ok).toBe(true)
-    if (!ownerACreate.ok) return
-    const ownerASession = ownerACreate.sessions[0]
-    if (!ownerASession) throw new Error('expected owner A session')
+    expect(userACreate.ok).toBe(true)
+    if (!userACreate.ok) return
+    const userASession = userACreate.sessions[0]
+    if (!userASession) throw new Error('expected user A session')
 
     expect(await host.listSessions('client_shared', USER_2, '/repo')).toEqual([])
     await expect(
-      host.getSlotSnapshot('client_shared', USER_2, { ptySessionId: ownerASession.ptySessionId }),
+      host.getSlotSnapshot('client_shared', USER_2, { ptySessionId: userASession.ptySessionId }),
     ).resolves.toBeNull()
-    expect(host.close('client_shared', USER_2, { ptySessionId: ownerASession.ptySessionId })).toBe(false)
+    expect(host.close('client_shared', USER_2, { ptySessionId: userASession.ptySessionId })).toBe(false)
     expect(
-      ownerBSocket.send.mock.calls.some(([payload]) => {
+      userBSocket.send.mock.calls.some(([payload]) => {
         const parsed = JSON.parse(String(payload))
         return parsed.type === 'sessions-changed' && parsed.repoRoot === '/repo'
       }),
     ).toBe(false)
 
-    const ownerBCreate = await host.create('client_shared', USER_2, {
+    const userBCreate = await host.create('client_shared', USER_2, {
       repoRoot: '/repo',
       branch: 'feature',
       worktreePath: '/repo-linked',
@@ -885,22 +885,22 @@ describe('server terminal runtime', () => {
       rows: 30,
       clientId: 'client_b',
     })
-    expect(ownerBCreate.ok).toBe(true)
-    if (!ownerBCreate.ok) return
-    const ownerBSession = ownerBCreate.sessions[0]
-    if (!ownerBSession) throw new Error('expected owner B session')
+    expect(userBCreate.ok).toBe(true)
+    if (!userBCreate.ok) return
+    const userBSession = userBCreate.sessions[0]
+    if (!userBSession) throw new Error('expected user B session')
 
-    expect(ownerBSession.key).toBe(ownerASession.key)
-    expect(ownerBSession.ptySessionId).not.toBe(ownerASession.ptySessionId)
+    expect(userBSession.key).toBe(userASession.key)
+    expect(userBSession.ptySessionId).not.toBe(userASession.ptySessionId)
     expect(await host.listSessions('client_shared', USER_1, '/repo')).toEqual([
-      expect.objectContaining({ ptySessionId: ownerASession.ptySessionId, key: ownerASession.key }),
+      expect.objectContaining({ ptySessionId: userASession.ptySessionId, key: userASession.key }),
     ])
     expect(await host.listSessions('client_shared', USER_2, '/repo')).toEqual([
-      expect.objectContaining({ ptySessionId: ownerBSession.ptySessionId, key: ownerBSession.key }),
+      expect.objectContaining({ ptySessionId: userBSession.ptySessionId, key: userBSession.key }),
     ])
 
-    host.unregisterSocket('client_shared_attachment_a', USER_1, ownerASocket)
-    host.unregisterSocket('client_shared_attachment_b', USER_2, ownerBSocket)
+    host.unregisterSocket('client_shared_attachment_a', USER_1, userASocket)
+    host.unregisterSocket('client_shared_attachment_b', USER_2, userBSocket)
     shutdown()
   })
 
@@ -1185,7 +1185,7 @@ describe('server terminal runtime', () => {
     expect(host.getDiagnostics().shuttingDown).toBe(true)
   })
 
-  test('emits an ownership change when a takeover succeeds', async () => {
+  test('emits an identity change when a takeover succeeds', async () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)

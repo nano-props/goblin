@@ -10,8 +10,8 @@ import type { TerminalTakeoverResult } from '#/shared/terminal-types.ts'
  * "接管" button — so the auto-promote behavior lives in one place
  * instead of being duplicated across call sites.
  *
- * Model (matches `src/server/terminal/terminal-ownership.ts`):
- * the server is owner-scoped. Every clientId from the same
+ * Model (matches `src/server/terminal/terminal-controller.ts`):
+ * the server is user-scoped. Every clientId from the same
  * userId is the same logical user. If the server believes the
  * caller is the controller, writes pass through; if the caller is
  * a viewer (someone else — including a sibling device — is
@@ -21,7 +21,7 @@ import type { TerminalTakeoverResult } from '#/shared/terminal-types.ts'
  * UI can show a toast on the rare failure path.
  *
  * The gate is intentionally synchronous for "is controller?": the
- * realtime ownership event pushes role changes into `setRole`, and
+ * realtime identity event pushes role changes into `setRole`, and
  * read paths (`isController`, `canWrite`) just return the cached
  * value. The only async path is `authorize` / `takeover`, both of
  * which hit the bridge.
@@ -38,7 +38,7 @@ import type { TerminalTakeoverResult } from '#/shared/terminal-types.ts'
  *   (typically only in tests / startup). The takeover round-trip
  *   never started.
  * - `session-unknown` — the server reported the ptySessionId is not
- *   known to this owner. The renderer's catalog is stale; the user
+ *   known to this user. The renderer's catalog is stale; the user
  *   needs to re-list before retrying.
  * - `client-offline` — the server's broker has no live socket
  *   for `(userId, clientId)`. The renderer is reconnecting.
@@ -92,8 +92,8 @@ export interface TerminalAuthorityGate {
   takeover(): Promise<Exclude<AuthorizationResult, { kind: 'promoted' }>>
   /**
    * Push the latest role the server believes this clientId has.
-   * Called by the realtime ownership event handler in
-   * `ManagedTerminalSlot.handleOwnership`.
+   * Called by the realtime identity event handler in
+   * `ManagedTerminalSlot.handleIdentity`.
    */
   setRole(role: 'controller' | 'viewer' | 'unowned'): void
   /**
@@ -225,7 +225,7 @@ export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): Termi
     // ORDERING CONTRACT: `onPromoted` MUST run before `role` is
     // flipped to 'controller'. Callers of `takeover()` /
     // `authorize('write')` rely on the post-call `canWrite()`
-    // returning true without a separate realtime ownership event.
+    // returning true without a separate realtime identity event.
     // The runtime's `applyTakeover` (wired through `onPromoted`)
     // updates the runtime's controller cache synchronously, so by
     // the time the gate sets `role = 'controller'`, both layers

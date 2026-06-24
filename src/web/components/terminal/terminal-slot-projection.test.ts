@@ -100,7 +100,7 @@ describe('terminal slot projection helpers', () => {
     expect(projected?.controlsTerminal).toBe(false)
   })
 
-  test('projects attach results into local ownership for the active attachment', () => {
+  test('projects attach results into local controller state for the active attachment', () => {
     const projected = projectTerminalAttachResultForClient(
       {
         ok: true,

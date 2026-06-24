@@ -49,10 +49,10 @@ export class TerminalViewOrderRuntime<TUser extends string | number> {
     return this.viewsByWorktree.get(this.worktreeKey(input))?.get(input.id)?.displayOrder ?? null
   }
 
-  closeViewsForOwner(userId: TUser): void {
+  closeViewsForUser(userId: TUser): void {
     for (const [key, views] of Array.from(this.viewsByWorktree.entries())) {
-      const hasOwnerViews = Array.from(views.values()).some((view) => view.userId === userId)
-      if (hasOwnerViews) this.viewsByWorktree.delete(key)
+      const hasUserViews = Array.from(views.values()).some((view) => view.userId === userId)
+      if (hasUserViews) this.viewsByWorktree.delete(key)
     }
   }
 

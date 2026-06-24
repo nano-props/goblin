@@ -1478,7 +1478,7 @@ describe('ManagedTerminalSlot', () => {
     // After the takeover atomicity follow-up, the `terminal.takeover`
     // response carries role/controllerStatus/canonicalCols/Rows/phase
     // and is applied synchronously. The renderer does NOT have to
-    // wait for a realtime `ownership` event before painting the
+    // wait for a realtime `identity` event before painting the
     // post-takeover frame. A subsequent realtime event for the same
     // session is idempotent.
     terminalCalls.attach.mockResolvedValueOnce(
@@ -1521,7 +1521,7 @@ describe('ManagedTerminalSlot', () => {
       clientId: 'client_local',
     })
     // The takeover response itself is now the authority — without
-    // any `handleOwnership` call, role already flipped to controller
+    // any `handleIdentity` call, role already flipped to controller
     // and the canonical size tracks the request (101x31).
     expect(session.snapshot().attachment).toMatchObject({
       role: 'controller',
@@ -1531,7 +1531,7 @@ describe('ManagedTerminalSlot', () => {
       canonicalRows: 31,
     })
 
-    // A later realtime ownership event for the same session is a
+    // A later realtime identity event for the same session is a
     // benign re-apply — the runtime treats it as idempotent because
     // every field already matches.
     session.handleIdentity({
@@ -1725,7 +1725,7 @@ describe('ManagedTerminalSlot', () => {
     // runtime applies all three in one shot. This is the new atomic-
     // handshake contract: a viewer who clicks takeover sees the
     // post-takeover geometry immediately, not after a follow-up
-    // realtime ownership event.
+    // realtime identity event.
     terminalCalls.attach.mockResolvedValueOnce(
       attachResult('pty_session_1_aaaaaaaaa', {
         controller: { clientId: 'client_remote', status: 'connected' },
@@ -1786,7 +1786,7 @@ describe('ManagedTerminalSlot', () => {
     expect(session.snapshot().phase).toBe('restarting')
   })
 
-  test('realtime ownership event is the authority for non-takeover paths', async () => {
+  test('realtime identity event is the authority for non-takeover paths', async () => {
     terminalCalls.attach.mockResolvedValueOnce(
       attachResult('pty_session_1_aaaaaaaaa', {
         controller: { clientId: 'client_remote', status: 'connected' },
@@ -1828,7 +1828,7 @@ describe('ManagedTerminalSlot', () => {
     })
   })
 
-  test('mounted viewer auto-attaches when realtime ownership flips to unowned', async () => {
+  test('mounted viewer auto-attaches when realtime identity flips to unowned', async () => {
     terminalCalls.attach
       .mockResolvedValueOnce(
         attachResult('pty_session_1_aaaaaaaaa', {
@@ -1883,7 +1883,7 @@ describe('ManagedTerminalSlot', () => {
     expect(xtermMocks.terminals.at(-1)!.write).toHaveBeenCalledWith('reclaimed-screen', expect.any(Function))
   })
 
-  test('applies ownership updates from realtime messages', async () => {
+  test('applies identity updates from realtime messages', async () => {
     terminalCalls.attach.mockResolvedValueOnce(
       attachResult('pty_session_1_aaaaaaaaa', {
         controller: { clientId: 'client_remote', status: 'connected' },
@@ -2283,15 +2283,15 @@ describe('ManagedTerminalSlot', () => {
     expect(session.snapshot().progress).toEqual({ state: 1, value: 0 })
   })
 
-  // Contract: ownership (response + realtime event interleavings).
+  // Contract: identity (response + realtime event interleavings).
   // The takeover atomicity work made the response authoritative AND
   // kept the realtime event firing for other listeners. This test
   // pins the one orthogonal new invariant that the existing
   // follow-up #2 tests don't already cover: that phase is part of
   // the realtime event surface and can override the response's
   // phase after the takeover settled.
-  describe('ownership contract (response + realtime event interleavings)', () => {
-    test('realtime ownership event with phase=restarting overrides a prior takeover response phase', async () => {
+  describe('identity contract (response + realtime event interleavings)', () => {
+    test('realtime identity event with phase=restarting overrides a prior takeover response phase', async () => {
       terminalCalls.attach.mockResolvedValueOnce(
         attachResult('pty_session_1_aaaaaaaaa', {
           controller: { clientId: 'client_remote', status: 'connected' },
@@ -2332,10 +2332,10 @@ describe('ManagedTerminalSlot', () => {
       expect(session.snapshot().phase).toBe('restarting')
     })
 
-    test('realtime ownership event with a transitional phase does not destroy the controller xterm', async () => {
+    test('realtime identity event with a transitional phase does not destroy the controller xterm', async () => {
       // Reproduces the blank-on-create race: the user creates a slot,
       // the slot hydrates with role=controller and phase=open, and
-      // then the server's realtime ownership event arrives carrying
+      // then the server's realtime identity event arrives carrying
       // a transitional phase (opening) — even though the user is
       // still the controller by role. The previous `!canResize()`
       // gate misread the transitional phase as a controller→viewer
@@ -2355,7 +2355,7 @@ describe('ManagedTerminalSlot', () => {
       const xtermBefore = host.querySelector('.goblin-managed-terminal-host .xterm')
       expect(session.snapshot().attachment).toMatchObject({ role: 'controller' })
 
-      // The server's realtime ownership event arrives with role still
+      // The server's realtime identity event arrives with role still
       // 'controller' but with a transitional phase ('opening'). The
       // role is the authoritative signal for who owns the PTY — the
       // phase just reflects whether the PTY is fully started. The
@@ -2393,7 +2393,7 @@ describe('ManagedTerminalSlot', () => {
       expect(session.snapshot().phase).toBe('opening')
     })
 
-    test('realtime ownership event with role=viewer still tears down the controller xterm', async () => {
+    test('realtime identity event with role=viewer still tears down the controller xterm', async () => {
       // Companion to the previous test: the role-based gate must
       // still tear down the xterm when the user actually loses
       // control. The previous fix could not regress this path; this

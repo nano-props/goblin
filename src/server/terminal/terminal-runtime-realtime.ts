@@ -122,8 +122,8 @@ function sendRealtimeResponse(socket: TerminalRealtimeSocket, message: TerminalS
 // still remains excluded because that payload is consumed as a later
 // reconciliation path rather than the primary first-frame handshake.
 // `takeover` does not return a fresh snapshot, but its response is still
-// the authoritative ownership/geometry handshake for the new controller;
-// the same socket must not observe the ownership event before that
+// the authoritative identity/geometry handshake for the new controller;
+// the same socket must not observe the identity event before that
 // response settles.
 export function shouldPauseRealtimeRequest(action: TerminalSocketRequestAction): boolean {
   return action === 'attach' || action === 'restart' || action === 'create' || action === 'takeover'

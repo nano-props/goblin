@@ -757,7 +757,7 @@ describe('TerminalSlotProvider', () => {
     }
   })
 
-  test('routes realtime output, title, and ownership directly to the matching terminal session', async () => {
+  test('routes realtime output, title, and identity directly to the matching terminal session', async () => {
     seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -973,7 +973,7 @@ describe('TerminalSlotProvider', () => {
     }
   })
 
-  test('keeps a newly created terminal active after session sync when create transfers controller ownership', async () => {
+  test('keeps a newly created terminal active after session sync when create transfers controller control', async () => {
     seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -1025,7 +1025,7 @@ describe('TerminalSlotProvider', () => {
     }
   })
 
-  test('restores the persisted selected terminal for a worktree even when server ownership points at another session', async () => {
+  test('restores the persisted selected terminal for a worktree even when server control points at another session', async () => {
     seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],

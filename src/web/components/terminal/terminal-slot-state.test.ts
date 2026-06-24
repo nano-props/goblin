@@ -92,7 +92,7 @@ describe('TerminalSlotState', () => {
   })
 
   test('isController reflects role only — a transitional phase does not flip it', () => {
-    // The split: `isController` is the role-only ownership predicate the
+    // The split: `isController` is the role-only controller predicate the
     // teardown decision uses. A `canSendInput` (which adds the phase
     // requirement) is the write-path gate. They are intentionally
     // separate so the conflation in the pre-split `canResize()` is

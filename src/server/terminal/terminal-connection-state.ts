@@ -1,9 +1,9 @@
 interface TerminalConnectionStateOptions {
   /**
-   * Time after the owner's last socket disconnects before the
-   * server-side sessions owned by that owner are torn down entirely
+   * Time after the user's last socket disconnects before the
+   * server-side sessions owned by that user are torn down entirely
    * (PTY exit, view-order purge). This is unrelated to terminal
-   * ownership grace — by the time it fires the owner is presumed to
+   * controller grace — by the time it fires the controller is presumed to
    * have moved on. Keep it long enough that an end-of-day quit-then-
    * resume doesn't lose the session catalog.
    */
@@ -19,11 +19,11 @@ interface OwnerTimerEntry {
 }
 
 /**
- * Tracks the per-owner detached TTL. The previous revision also
- * managed a per-attachment ownership grace timer (30 s after a
+ * Tracks the per-user detached TTL. The previous revision also
+ * managed a per-attachment controller grace timer (30 s after a
  * controller's socket dropped) — that timer has been removed: the
  * server now clears the controller slot on disconnect and the next
- * attach auto-claims (see `terminal-ownership.ts`).
+ * attach auto-claims (see `terminal-controller.ts`).
  */
 export class TerminalConnectionState {
   private readonly options: TerminalConnectionStateOptions

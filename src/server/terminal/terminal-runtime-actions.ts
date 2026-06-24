@@ -31,7 +31,7 @@ interface TerminalCatalogLike {
 
 interface TerminalRuntimeActionDependencies {
   manager: TerminalSlotManager<string>
-  broker: Pick<TerminalRealtimeBroker, 'broadcastToOwner'>
+  broker: Pick<TerminalRealtimeBroker, 'broadcastToUser'>
   catalog: TerminalCatalogLike
   isValidTerminalClientId(value: unknown): value is string
   resolveClientConnected(userId: string, clientId?: string): boolean | undefined
@@ -147,10 +147,10 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         // `sessions-changed` keeps the full repo list in sync for
         // observers that only watch that primitive. `slot-closed`
         // is the immediate invalidation for any sibling window under
-        // the same owner. Other owners must not hear about this
+        // the same user. Other users must not hear about this
         // session id.
         broadcastRepoSessionsChanged(userId, repoRoot)
-        broker.broadcastToOwner(userId, {
+        broker.broadcastToUser(userId, {
           type: 'slot-closed',
           ptySessionId: input.ptySessionId,
           repoRoot,
@@ -197,6 +197,6 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
   }
 
   function broadcastRepoSessionsChanged(userId: string, repoRoot: string): void {
-    broker.broadcastToOwner(userId, { type: 'sessions-changed', repoRoot })
+    broker.broadcastToUser(userId, { type: 'sessions-changed', repoRoot })
   }
 }

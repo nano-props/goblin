@@ -1,4 +1,4 @@
-// Server-side terminal runtime. Single owner of the business state
+// Server-side terminal runtime. Single holder of the business state
 // for a Goblin server instance: the session manager, the catalog, the
 // realtime broker, the connection-state tracker, and the realtime
 // dispatch table. Exposes a `ServerTerminalHost` to the Hono realtime
@@ -35,8 +35,8 @@ import type { GoblinTerminalCommandRuntime } from '#/server/terminal/g-command.t
 // Intentionally long TTL: we want terminals to survive as long as possible in
 // the background so users can leave builds or long-running tasks unattended.
 // 24 hours gives a full day for the user to reconnect before sessions are
-// forcibly cleaned up. (The previous revision also kept a 30s ownership
-// grace timer here; it has been removed — see `terminal-ownership.ts` for
+// forcibly cleaned up. (The previous revision also kept a 30s controller grace
+// grace timer here; it has been removed — see `terminal-controller.ts` for
 // the new disconnect-clears-controller semantics.)
 const TERMINAL_DETACHED_TTL_MS = 24 * 60 * 60 * 1000
 const terminalRuntimeLogger = serverLogger.child({ module: 'terminal-runtime' })
@@ -65,21 +65,21 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     ptySupervisor,
     {
       onOutput(userId, event) {
-        broker.broadcastToOwner(userId, { type: 'output', event })
+        broker.broadcastToUser(userId, { type: 'output', event })
       },
       onTitle(userId, event) {
-        broker.broadcastToOwner(userId, { type: 'title', event })
+        broker.broadcastToUser(userId, { type: 'title', event })
       },
       onExit(userId, event) {
         const repoRoot = manager.getSlot(userId, event.ptySessionId)?.scope
-        broker.broadcastToOwner(userId, { type: 'exit', event })
+        broker.broadcastToUser(userId, { type: 'exit', event })
         if (repoRoot) broadcastRepoSessionsChanged(userId, repoRoot)
       },
       onIdentity(userId, event) {
-        broker.broadcastToOwner(userId, { type: 'identity', event })
+        broker.broadcastToUser(userId, { type: 'identity', event })
       },
       onLifecycle(userId, event) {
-        broker.broadcastToOwner(userId, { type: 'lifecycle', event })
+        broker.broadcastToUser(userId, { type: 'lifecycle', event })
       },
     },
     terminalViewOrder,
@@ -262,6 +262,6 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   }
 
   function broadcastRepoSessionsChanged(userId: string, repoRoot: string): void {
-    broker.broadcastToOwner(userId, { type: 'sessions-changed', repoRoot })
+    broker.broadcastToUser(userId, { type: 'sessions-changed', repoRoot })
   }
 }

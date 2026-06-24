@@ -3,7 +3,7 @@ import type { TerminalController } from '#/shared/terminal-types.ts'
 /**
  * Per-action authority decisions.
  *
- * The model is owner-scoped: a single userId owns each session and
+ * The model is user-scoped: a single userId owns each session and
  * every attachment from that userId is considered the same logical
  * user. `write` and `resize` are restricted to whichever attachment
  * currently holds the controller slot — every other attachment is a
@@ -20,7 +20,7 @@ export type TerminalAuthorityReason = 'not-controller' | 'slot-unowned' | 'unkno
 type TerminalAuthorityDecision = { kind: 'allow' } | { kind: 'deny'; reason: TerminalAuthorityReason }
 
 export function isAuthoritative(
-  state: TerminalOwnershipState,
+  state: TerminalControllerState,
   clientId: string,
   action: TerminalAuthorityAction,
 ): boolean {
@@ -28,7 +28,7 @@ export function isAuthoritative(
 }
 
 export function explainAuthority(
-  state: TerminalOwnershipState,
+  state: TerminalControllerState,
   clientId: string,
   action: TerminalAuthorityAction,
 ): TerminalAuthorityReason | null {
@@ -37,7 +37,7 @@ export function explainAuthority(
 }
 
 function decideTerminalActionAuthority(
-  state: TerminalOwnershipState,
+  state: TerminalControllerState,
   clientId: string,
   action: TerminalAuthorityAction,
 ): TerminalAuthorityDecision {
@@ -51,35 +51,41 @@ function decideTerminalActionAuthority(
   return { kind: 'allow' }
 }
 
-export interface TerminalClientState {
+/**
+ * Per-client attachment state: the cols/rows this clientId last
+ * reported and whether its socket is currently alive. The connection
+ * flag is what the auto-claim / takeover paths gate on — an
+ * attachment that disconnected cannot claim or hold the controller.
+ */
+export interface TerminalClientControllerState {
   cols: number
   rows: number
   connected: boolean
 }
 
-export interface TerminalOwnershipState {
-  attachments: Map<string, TerminalClientState>
+export interface TerminalControllerState {
+  attachments: Map<string, TerminalClientControllerState>
   controller: TerminalController | null
   /**
-   * Sticky owner-level claim. Set on the first successful attach or
+   * Sticky user-level claim. Set on the first successful attach or
    * explicit takeover for the session. Persists for the lifetime of
    * the session so a subsequent attach from a different clientId
-   * can still auto-claim when no controller is present (e.g. the user
-   * switched devices). The flag does NOT prevent takeover — it just
-   * records "this owner has touched this session".
+   * can still auto-claim when no controller is present (e.g. the
+   * user switched devices). The flag does NOT prevent takeover — it
+   * just records "this user has touched this session".
    */
-  ownerSticky: boolean
+  userSticky: boolean
   cols: number
   rows: number
 }
 
-export interface TerminalOwnershipEffect {
+export interface TerminalControllerEffect {
   resizeTo?: { cols: number; rows: number }
   emitIdentity: boolean
 }
 
 export function registerTerminalClient(
-  state: TerminalOwnershipState,
+  state: TerminalControllerState,
   clientId: string,
   cols: number,
   rows: number,
@@ -97,18 +103,18 @@ export function registerTerminalClient(
  * Called when an attachment issues `attach` (or `ensureSlot` /
  * `create` with an clientId).
  *
- * Semantics (single-owner model):
+ * Semantics (single-user model):
  * - The same attachment reconnecting to a session it already
  *   controlled restores its controller slot if the slot was cleared
  *   while it was disconnected. (The server also clears the slot on
  *   disconnect, so this is the post-clear restore path.)
  * - If no controller is present, the attachment auto-claims. The
- *   `ownerSticky` flag is set so a later attach from a different
+ *   `userSticky` flag is set so a later attach from a different
  *   attachment can still auto-claim when the controller is empty.
  * - If a controller is already present and it isn't this attachment,
  *   the call returns without effect — the caller stays a viewer.
  */
-export function attachTerminalClient(state: TerminalOwnershipState, clientId: string): TerminalOwnershipEffect {
+export function attachTerminalClient(state: TerminalControllerState, clientId: string): TerminalControllerEffect {
   const attachment = state.attachments.get(clientId)
   if (!attachment?.connected) return { emitIdentity: false }
 
@@ -118,7 +124,7 @@ export function attachTerminalClient(state: TerminalOwnershipState, clientId: st
     // controller and adopt the latest geometry.
     const sizeChanged = state.cols !== attachment.cols || state.rows !== attachment.rows
     state.controller = { clientId, status: 'connected' }
-    state.ownerSticky = true
+    state.userSticky = true
     return {
       resizeTo: sizeChanged ? { cols: attachment.cols, rows: attachment.rows } : undefined,
       emitIdentity: !sizeChanged,
@@ -126,9 +132,9 @@ export function attachTerminalClient(state: TerminalOwnershipState, clientId: st
   }
 
   if (state.controller === null) {
-    // No live controller: auto-claim. The owner has either touched
-    // this session before (`ownerSticky`) or is touching it for
-    // the first time — both paths produce a controller here.
+    // No live controller: auto-claim. The user has either touched
+    // this session before (`userSticky`) or is touching it for the
+    // first time — both paths produce a controller here.
     return claimTerminalClientControl(state, clientId)
   }
   return { emitIdentity: false }
@@ -139,20 +145,20 @@ export function attachTerminalClient(state: TerminalOwnershipState, clientId: st
  * existing controller. This is the only path that can preempt; it
  * is what `takeoverSlot` calls server-side, and (transitively)
  * what the renderer's AuthorityGate fires when a viewer issues a
- * write. Because the model is owner-scoped there is no cross-owner
+ * write. Because the model is user-scoped there is no cross-user
  * ambiguity — every attachment from the session's userId is the
- * same user. The `ownerSticky` flag is set on takeover so that
+ * same user. The `userSticky` flag is set on takeover so that
  * future disconnects don't strand the session.
  */
 export function claimTerminalClientControl(
-  state: TerminalOwnershipState,
+  state: TerminalControllerState,
   clientId: string,
-): TerminalOwnershipEffect {
+): TerminalControllerEffect {
   const attachment = state.attachments.get(clientId)
   if (!attachment?.connected) return { emitIdentity: false }
   const sizeChanged = state.cols !== attachment.cols || state.rows !== attachment.rows
   state.controller = { clientId, status: 'connected' }
-  state.ownerSticky = true
+  state.userSticky = true
   return {
     resizeTo: sizeChanged ? { cols: attachment.cols, rows: attachment.rows } : undefined,
     emitIdentity: !sizeChanged,
@@ -169,9 +175,9 @@ export function claimTerminalClientControl(
  * isn't connected we drop control rather than leave the session in a
  * half-claimed state.
  */
-export function restartTerminalClientControl(state: TerminalOwnershipState, clientId: string): void {
+export function restartTerminalClientControl(state: TerminalControllerState, clientId: string): void {
   state.controller = state.attachments.get(clientId)?.connected ? { clientId, status: 'connected' } : null
-  if (state.controller) state.ownerSticky = true
+  if (state.controller) state.userSticky = true
 }
 
 /**
@@ -179,8 +185,8 @@ export function restartTerminalClientControl(state: TerminalOwnershipState, clie
  *
  * Disconnect is immediate: the previous design kept the controller
  * slot in a 'grace' sub-state for 30 seconds so a transient network
- * blip wouldn't strand the controller. With owner-scoped auto-claim
- * + sticky `ownerSticky`, that protection is no longer needed —
+ * blip wouldn't strand the controller. With user-scoped auto-claim
+ * + sticky `userSticky`, that protection is no longer needed —
  * when the controller's attachment disconnects the slot clears,
  * and the next attach from any attachment auto-claims. A controller
  * that reconnects within milliseconds is still treated as the
@@ -192,10 +198,10 @@ export function restartTerminalClientControl(state: TerminalOwnershipState, clie
  * the previous design's "same clientId keeps control" invariant.
  */
 export function updateTerminalClientConnection(
-  state: TerminalOwnershipState,
+  state: TerminalControllerState,
   clientId: string,
   connected: boolean,
-): TerminalOwnershipEffect {
+): TerminalControllerEffect {
   const attachment = state.attachments.get(clientId)
   if (!attachment) return { emitIdentity: false }
 
@@ -221,12 +227,12 @@ export function updateTerminalClientConnection(
   }
 
   // Non-controller transition: only auto-claim on a fresh connect
-  // when there's no live controller and the owner has touched this
+  // when there's no live controller and the user has touched this
   // session before. The first attach uses the same path via
   // `attachTerminalClient`, so we only reach here when the
   // attachment already exists in the map (e.g. a viewer coming
   // online) — in that case there is no slot to claim.
-  if (connected && !wasConnected && state.controller === null && state.ownerSticky) {
+  if (connected && !wasConnected && state.controller === null && state.userSticky) {
     return claimTerminalClientControl(state, clientId)
   }
   return { emitIdentity: false }

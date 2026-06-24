@@ -37,7 +37,7 @@ describe('TerminalSlotRuntime', () => {
     expect(runtime.closeReplacingPtySessionId()).toBe('pty_session_1_aaaaaaaaa')
   })
 
-  test('routes output, ownership, replay, and takeover through runtime state', () => {
+  test('routes output, identity, replay, and takeover through runtime state', () => {
     const runtime = new TerminalSlotRuntime()
     runtime.applyAttachResult(
       {

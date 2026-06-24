@@ -6,7 +6,7 @@ import {
   normalizeTerminalSlotSnapshot,
   normalizeTerminalSlotSummaryList,
 } from '#/shared/terminal-validators.ts'
-import { resolveTerminalOwnership } from '#/shared/terminal-ownership.ts'
+import { resolveTerminalController } from '#/shared/terminal-controller.ts'
 import type {
   TerminalClientMessage,
   TerminalSocketRequestAction,
@@ -202,7 +202,7 @@ export function createServerTerminalBridge(options: {
       } else if (message.type === 'identity') {
         const identityEvent = {
           ptySessionId: message.event.ptySessionId,
-          ...resolveTerminalOwnership(message.event.controller, clientId),
+          ...resolveTerminalController(message.event.controller, clientId),
           canonicalCols: message.event.canonicalCols,
           canonicalRows: message.event.canonicalRows,
         }

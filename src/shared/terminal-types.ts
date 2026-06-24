@@ -10,7 +10,7 @@ export type TerminalControllerStatus = 'connected' | 'none'
 export type TerminalClientRole = 'controller' | 'viewer' | 'unowned'
 export type TerminalSlotPhase = 'opening' | 'restarting' | 'open' | 'error' | 'closed'
 
-export interface TerminalResolvedOwnership {
+export interface TerminalResolvedController {
   role: TerminalClientRole
   controllerStatus: TerminalControllerStatus
 }
@@ -50,14 +50,14 @@ export interface TerminalRestartInput {
  * First-frame contract: takeover is the authoritative handshake for
  * the new controller's view. The renderer applies the response
  * synchronously and does not need to wait for a follow-up realtime
- * `ownership` event before painting the post-takeover frame. The
+ * `identity` event before painting the post-takeover frame. The
  * fields mirror `TerminalFirstFrame` minus the snapshot fields
  * (`snapshot`, `snapshotSeq`) — takeover does not return a fresh
  * snapshot because the new controller keeps the buffer the viewer
  * was already showing (no re-fetch needed).
  *
- * The realtime `ownership` event still has a real job on the
- * non-takeover ownership-change paths (controller crash, grace
+ * The realtime `identity` event still has a real job on the
+ * non-takeover controller-change paths (controller crash, grace
  * expiry, etc.). For those paths there is no response to be
  * authoritative; the event remains the source of truth. Both
  * surfaces now carry the same fields so the renderer can apply
