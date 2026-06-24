@@ -1,7 +1,7 @@
 import type { ClientBootstrapSnapshot, ClientNativeCapability } from '#/shared/bootstrap.ts'
 import type { IpcEvent, IpcRequest } from '#/shared/api-types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
-import type { RendererShellBridge, RendererBridge, RendererTerminalBridge } from '#/web/client-bridge-types.ts'
+import type { ClientShellBridge, ClientBridge, ClientTerminalBridge } from '#/web/client-bridge-types.ts'
 import { readNativeBridge } from '#/web/native-bridge.ts'
 import { createHttpClipboardBackend } from '#/web/clipboard/http-backend.ts'
 import {
@@ -86,14 +86,14 @@ function readServerTerminalConfig(): RendererServerTerminalConfig | null {
 
 // The terminal bridge is *expensive*: it opens a WebSocket, holds
 // subscriber sets, and shares state across the whole renderer.
-// `terminalBridge` from `#/web/terminal.ts` re-reads `getRendererBridge()`
+// `terminalBridge` from `#/web/terminal.ts` re-reads `getClientBridge()`
 // on every method call, so we must keep a stable singleton here.
 // The bridge's `notifyBell` / `sendTestNotification` / `setBadge`
 // callbacks re-read `goblinNative` on each invocation — that's
 // the lazy hook that lets the bell-controller tests swap the
 // preload between cases without rebuilding the WebSocket layer.
-let memoizedTerminalBridge: RendererTerminalBridge | null = null
-function getOrCreateTerminalBridge(): RendererTerminalBridge {
+let memoizedTerminalBridge: ClientTerminalBridge | null = null
+function getOrCreateTerminalBridge(): ClientTerminalBridge {
   if (memoizedTerminalBridge) return memoizedTerminalBridge
   memoizedTerminalBridge = createServerTerminalBridge({
     getClientId: readOrCreateWebTerminalClientId,
@@ -146,7 +146,7 @@ function getOrCreateTerminalBridge(): RendererTerminalBridge {
  *    a property of the bridge's `kind()` and `hasCapability()`
  *    results, not a fork in every call site.
  */
-function createRendererBridge(): RendererBridge {
+function createClientBridge(): ClientBridge {
   const clipboardBackend = (() => {
     const server = readServerTerminalConfig()
     if (!server) return null
@@ -220,7 +220,7 @@ function createRendererBridge(): RendererBridge {
       }
       return await bridge.rotateAccessToken()
     },
-    shell(): RendererShellBridge | null {
+    shell(): ClientShellBridge | null {
       return readNativeBridge()?.shell ?? null
     },
     terminal() {
@@ -243,16 +243,16 @@ function createRendererBridge(): RendererBridge {
 // round-trip the bridge is built to support) and means tests (and
 // StrictMode double-mounts in dev) can swap the preload between
 // phases of an effect without breaking the bridge shape.
-export function getRendererBridge(): RendererBridge {
+export function getClientBridge(): ClientBridge {
   if (testOverride) return testOverride
-  return createRendererBridge()
+  return createClientBridge()
 }
 
 // Test override. When set to a non-null bridge, every
-// `getRendererBridge()` call returns that bridge verbatim. When
+// `getClientBridge()` call returns that bridge verbatim. When
 // cleared back to `null`, the next call rebuilds from the live
 // `window.goblinNative`. Production code never touches this.
-let testOverride: RendererBridge | null = null
-export function setRendererBridgeForTests(bridge: RendererBridge | null): void {
+let testOverride: ClientBridge | null = null
+export function setClientBridgeForTests(bridge: ClientBridge | null): void {
   testOverride = bridge
 }

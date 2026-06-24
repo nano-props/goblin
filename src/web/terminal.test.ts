@@ -2,7 +2,7 @@
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
-import { setRendererBridgeForTests } from '#/web/client-bridge.ts'
+import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 
 class MockWebSocket {
   static readonly CONNECTING = 0
@@ -98,7 +98,7 @@ describe('terminal web host bridge', () => {
     Object.defineProperty(window, 'sessionStorage', { value: createStorage(), configurable: true })
     vi.restoreAllMocks()
     vi.resetModules()
-    setRendererBridgeForTests(null)
+    setClientBridgeForTests(null)
     MockWebSocket.instances.length = 0
     mockNotifications.length = 0
     window.localStorage.clear()

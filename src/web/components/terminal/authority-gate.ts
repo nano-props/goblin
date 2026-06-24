@@ -1,6 +1,6 @@
 import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-bridge.ts'
 import { terminalLog } from '#/web/logger.ts'
-import type { RendererTerminalBridge } from '#/web/client-bridge-types.ts'
+import type { ClientTerminalBridge } from '#/web/client-bridge-types.ts'
 import type { TerminalTakeoverResult } from '#/shared/terminal-types.ts'
 
 /**
@@ -105,7 +105,7 @@ export interface TerminalAuthorityGate {
 }
 
 interface XtermAuthorityGateOptions {
-  bridge: RendererTerminalBridge
+  bridge: ClientTerminalBridge
   resolveSize: () => Promise<{ cols: number; rows: number }>
   /**
    * Non-throwing predicate: returns true while the session is

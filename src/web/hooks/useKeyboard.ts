@@ -28,7 +28,7 @@ import {
   runNewTerminalTabCommand,
   runSelectWorkspacePaneTabByIndexCommand,
 } from '#/web/commands/workspace-commands.ts'
-import { getRendererBridge } from '#/web/client-bridge.ts'
+import { getClientBridge } from '#/web/client-bridge.ts'
 
 type MoveDirection = 1 | -1
 const INTERACTIVE_SHORTCUT_TARGET_SELECTOR =
@@ -70,7 +70,7 @@ function digitShortcutIndex(event: KeyboardEvent): number | null {
 
 function hasNativeMenuAccelerators(): boolean {
   try {
-    return getRendererBridge().kind() === 'electron'
+    return getClientBridge().kind() === 'electron'
   } catch {
     return false
   }

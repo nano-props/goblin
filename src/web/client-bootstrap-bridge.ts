@@ -61,7 +61,7 @@ function fillRuntimeDefaults(snapshot: ClientBootstrapSnapshot): ClientBootstrap
   // The `runtime` field is now optional in the input; substitute a
   // web default when the source omitted it. The bridge layer's
   // Electron detection does not depend on this field — see
-  // `getRendererBridge` in `#/web/client-bridge.ts`.
+  // `getClientBridge` in `#/web/client-bridge.ts`.
   return { ...snapshot, runtime: { ...EMPTY_BOOTSTRAP.runtime } }
 }
 

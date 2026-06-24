@@ -24,7 +24,7 @@ import type {
 } from '#/shared/terminal-types.ts'
 import type { TerminalIdentityViewModel, TerminalLifecycleViewModel } from '#/web/components/terminal/types.ts'
 
-export interface RendererTerminalBridge {
+export interface ClientTerminalBridge {
   attach: (input: TerminalAttachInput) => Promise<TerminalAttachResult>
   restart: (input: TerminalRestartInput) => Promise<TerminalAttachResult>
   write: (input: TerminalWriteInput) => Promise<TerminalMutationResult>
@@ -75,7 +75,7 @@ export interface RendererTerminalBridge {
   onSlotClosed: (cb: (event: { ptySessionId: string; repoRoot: string }) => void) => () => void
 }
 
-export interface RendererShellBridge {
+export interface ClientShellBridge {
   openSettingsWindow: (input?: { page?: SettingsPage }) => Promise<boolean>
   openExternalUrl: (input: { url: string; allowHttp?: boolean }) => Promise<ExecResult>
   openDirectoryDialog: (input?: { title?: string }) => Promise<string | null>
@@ -83,7 +83,7 @@ export interface RendererShellBridge {
   openInFinder: (input: { path: string }) => Promise<ExecResult>
 }
 
-export interface RendererBridge {
+export interface ClientBridge {
   kind(): ClientRuntimeKind
   hasCapability(capability: ClientNativeCapability): boolean
   getBootstrap(): ClientBootstrapSnapshot
@@ -111,6 +111,6 @@ export interface RendererBridge {
    * gates the rotation button on `kind() === 'electron'`.
    */
   rotateAccessToken?(): Promise<{ accessToken: string }>
-  shell(): RendererShellBridge | null
-  terminal(): RendererTerminalBridge
+  shell(): ClientShellBridge | null
+  terminal(): ClientTerminalBridge
 }

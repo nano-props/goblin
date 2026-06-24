@@ -7,7 +7,7 @@ import { ManagedTerminalSlot } from '#/web/components/terminal/ManagedTerminalSl
 import { terminalLog } from '#/web/logger.ts'
 import { installTerminalThemeStyles } from '#/web/components/terminal/terminal-theme-test-utils.ts'
 import { isTerminalFocused } from '#/web/terminal-focus.ts'
-import { setRendererBridgeForTests } from '#/web/client-bridge.ts'
+import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import type {
   TerminalMutationResult,
   TerminalNotifyBellInput,
@@ -587,7 +587,7 @@ beforeEach(() => {
       },
     },
   })
-  setRendererBridgeForTests({
+  setClientBridgeForTests({
     kind: () => 'electron',
     hasCapability: (capability) =>
       capability === 'settings-ipc' ||

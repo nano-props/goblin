@@ -1,20 +1,20 @@
-import { getRendererBridge } from '#/web/client-bridge.ts'
-import type { RendererTerminalBridge } from '#/web/client-bridge-types.ts'
+import { getClientBridge } from '#/web/client-bridge.ts'
+import type { ClientTerminalBridge } from '#/web/client-bridge-types.ts'
 
-function getTerminalBridge(): RendererTerminalBridge {
-  return getRendererBridge().terminal()
+function getTerminalBridge(): ClientTerminalBridge {
+  return getClientBridge().terminal()
 }
 
-function bindTerminalMethod<TKey extends keyof RendererTerminalBridge>(key: TKey): RendererTerminalBridge[TKey] {
-  return ((...args: Parameters<RendererTerminalBridge[TKey]>) => {
+function bindTerminalMethod<TKey extends keyof ClientTerminalBridge>(key: TKey): ClientTerminalBridge[TKey] {
+  return ((...args: Parameters<ClientTerminalBridge[TKey]>) => {
     const method = getTerminalBridge()[key] as (
-      ...innerArgs: Parameters<RendererTerminalBridge[TKey]>
-    ) => ReturnType<RendererTerminalBridge[TKey]>
+      ...innerArgs: Parameters<ClientTerminalBridge[TKey]>
+    ) => ReturnType<ClientTerminalBridge[TKey]>
     return method(...args)
-  }) as unknown as RendererTerminalBridge[TKey]
+  }) as unknown as ClientTerminalBridge[TKey]
 }
 
-export const terminalBridge: RendererTerminalBridge = {
+export const terminalBridge: ClientTerminalBridge = {
   attach: bindTerminalMethod('attach'),
   restart: bindTerminalMethod('restart'),
   write: bindTerminalMethod('write'),

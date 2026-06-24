@@ -1,7 +1,7 @@
 import type { IpcEvent } from '#/shared/api-types.ts'
 import { isClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { ClientEffectIntent, ClientEffectIntentType } from '#/shared/client-effect-intents.ts'
-import { getRendererBridge } from '#/web/client-bridge.ts'
+import { getClientBridge } from '#/web/client-bridge.ts'
 
 // Native-host ingress for Electron renderers. Keep this separate from server
 // ingress modules so browser- and Electron-owned downlinks stay explicit.
@@ -11,13 +11,13 @@ export function subscribeNativeHostEventType<TType extends NativeHostEventType>(
   type: TType,
   cb: (event: Extract<IpcEvent, { type: TType }>) => void,
 ): () => void {
-  return getRendererBridge().onIpcEvent((event) => {
+  return getClientBridge().onIpcEvent((event) => {
     if (event.type === type) cb(event as Extract<IpcEvent, { type: TType }>)
   })
 }
 
 export function subscribeClientEffectIntent(cb: (event: ClientEffectIntent) => void): () => void {
-  return getRendererBridge().onEffectIntent(cb)
+  return getClientBridge().onEffectIntent(cb)
 }
 
 export function subscribeClientEffectIntentType<TType extends ClientEffectIntentType>(

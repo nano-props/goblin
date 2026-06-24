@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { IpcEvent } from '#/shared/api-types.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
-import { setRendererBridgeForTests } from '#/web/client-bridge.ts'
+import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 
 describe('renderer ingress', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.restoreAllMocks()
-    setRendererBridgeForTests(null)
+    setClientBridgeForTests(null)
   })
 
   test('subscribes to typed native host events through the renderer bridge', async () => {

@@ -13,7 +13,7 @@ import {
   useTerminalSlotSummaries,
 } from '#/web/components/terminal/terminal-slot-store.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
-import { setRendererBridgeForTests } from '#/web/client-bridge.ts'
+import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-queries.ts'
@@ -523,7 +523,7 @@ beforeEach(() => {
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
     },
   })
-  setRendererBridgeForTests({
+  setClientBridgeForTests({
     kind: () => 'electron',
     hasCapability: (capability) =>
       capability === 'settings-ipc' ||
@@ -1767,7 +1767,7 @@ describe('TerminalSlotProvider', () => {
 
   test('T1.2: prewarms the terminal WebSocket when the active repo is set', async () => {
     const prewarm = vi.fn(async () => {})
-    setRendererBridgeForTests({
+    setClientBridgeForTests({
       kind: () => 'electron',
       hasCapability: () => false,
       getBootstrap: () => ({
@@ -1867,7 +1867,7 @@ describe('TerminalSlotProvider', () => {
 
   test('T5.1: kicks reconnect on visibilitychange:visible and on persisted pageshow', async () => {
     const kickReconnect = vi.fn(() => {})
-    setRendererBridgeForTests({
+    setClientBridgeForTests({
       kind: () => 'electron',
       hasCapability: () => false,
       getBootstrap: () => ({

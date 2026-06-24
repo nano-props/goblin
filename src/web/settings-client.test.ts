@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
-import type { RendererBridge } from '#/web/client-bridge-types.ts'
-import { setRendererBridgeForTests } from '#/web/client-bridge.ts'
+import type { ClientBridge } from '#/web/client-bridge-types.ts'
+import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 
 function webBootstrap(overrides: Partial<ClientBootstrapSnapshot> = {}): ClientBootstrapSnapshot {
   return {
@@ -40,7 +40,7 @@ function installWebBootstrap(bootstrap: ClientBootstrapSnapshot): void {
   })
 }
 
-function testBridge(overrides: Partial<RendererBridge> = {}): RendererBridge {
+function testBridge(overrides: Partial<ClientBridge> = {}): ClientBridge {
   return {
     kind: () => 'web',
     hasCapability: () => false,
@@ -63,7 +63,7 @@ describe('settings-client', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.restoreAllMocks()
-    setRendererBridgeForTests(null)
+    setClientBridgeForTests(null)
   })
 
   test('reads theme state from embedded server settings when no Electron bridge exists', async () => {

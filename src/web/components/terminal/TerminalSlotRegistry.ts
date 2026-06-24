@@ -1043,7 +1043,7 @@ let registryInstance: TerminalSlotRegistry | null = null
  * outlive any Provider remount). The Provider is the canonical
  * caller; tests inject via `setTerminalSlotRegistryForTests`.
  *
- * Mirrors the `getRendererBridge()` shape at
+ * Mirrors the `getClientBridge()` shape at
  * `src/web/client-bridge.ts`.
  */
 export function getTerminalSlotRegistry(deps: TerminalSlotRegistryDeps): TerminalSlotRegistry {
@@ -1068,7 +1068,7 @@ export function getTerminalSlotRegistry(deps: TerminalSlotRegistryDeps): Termina
  *    reference before clearing the slot.
  *
  * Production code never calls this. Mirrors
- * `setRendererBridgeForTests()` at `src/web/client-bridge.ts`.
+ * `setClientBridgeForTests()` at `src/web/client-bridge.ts`.
  */
 export function setTerminalSlotRegistryForTests(instance: TerminalSlotRegistry | null): void {
   registryInstance = instance

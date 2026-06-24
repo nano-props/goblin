@@ -30,7 +30,7 @@ import type {
   TerminalTitleEvent,
   TerminalRestartInput,
 } from '#/shared/terminal-types.ts'
-import type { RendererTerminalBridge } from '#/web/client-bridge-types.ts'
+import type { ClientTerminalBridge } from '#/web/client-bridge-types.ts'
 import type { TerminalIdentityViewModel, TerminalLifecycleViewModel } from '#/web/components/terminal/types.ts'
 import { isAppQuitting, subscribeAppQuitting } from '#/web/app-lifecycle.ts'
 
@@ -61,7 +61,7 @@ export function createServerTerminalBridge(options: {
   notifyBell?: (input: TerminalNotifyBellInput) => Promise<TerminalMutationResult> | undefined
   sendTestNotification?: () => Promise<boolean> | undefined
   setBadge?: (count: number) => void
-}): RendererTerminalBridge {
+}): ClientTerminalBridge {
   type PendingSocketRequest = {
     action: TerminalSocketRequestAction
     resolve: (value: TerminalSocketResponseOutputs[TerminalSocketRequestAction]) => void

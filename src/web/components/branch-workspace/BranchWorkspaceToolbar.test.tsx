@@ -24,12 +24,12 @@ import type {
   WorktreeTerminalSnapshot,
 } from '#/web/components/terminal/types.ts'
 import { MainWindowNavigationProvider, type MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
-import { setRendererBridgeForTests } from '#/web/client-bridge.ts'
+import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { emptyBootstrapSnapshot } from '#/web/client-bootstrap-bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
-import type { RendererBridge } from '#/web/client-bridge-types.ts'
+import type { ClientBridge } from '#/web/client-bridge-types.ts'
 import {
   workspacePaneStaticViewsForBranch,
   workspacePaneTabOrderForBranch,
@@ -70,7 +70,7 @@ beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   compactUi = false
   resetReposStore()
-  setRendererBridgeForTests(null)
+  setClientBridgeForTests(null)
   // T6.1: the toolbar reads `isInitialSyncInFlight` from
   // useRepoSyncStore; existing tests assume the repo has been
   // synced. Mark ready by default so the "+ New" button renders; the
@@ -87,7 +87,7 @@ afterEach(() => {
   container = null
   queryClient = null
   toastMocks.error.mockClear()
-  setRendererBridgeForTests(null)
+  setClientBridgeForTests(null)
   setTerminalSlotCommandBridge(null)
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })

@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
-import { setRendererBridgeForTests } from '#/web/client-bridge.ts'
+import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 
 describe('remote client web helpers', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     vi.resetModules()
-    setRendererBridgeForTests(null)
+    setClientBridgeForTests(null)
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {

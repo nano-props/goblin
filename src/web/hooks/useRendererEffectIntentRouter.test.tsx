@@ -5,7 +5,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { useRendererEffectIntentRouter } from '#/web/hooks/useRendererEffectIntentRouter.ts'
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
-import { setRendererBridgeForTests } from '#/web/client-bridge.ts'
+import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
@@ -43,7 +43,7 @@ const consumeExternalOpenPathsSpy = vi.fn<() => Promise<string[]>>(async () => [
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   resetReposStore()
-  setRendererBridgeForTests(null)
+  setClientBridgeForTests(null)
   closeAllOverlays.mockClear()
   activateRepoSpy.mockClear()
   closeRepoSpy.mockClear()
@@ -133,7 +133,7 @@ afterEach(() => {
   container = null
   ipcEventListeners.clear()
   intentListeners.clear()
-  setRendererBridgeForTests(null)
+  setClientBridgeForTests(null)
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 

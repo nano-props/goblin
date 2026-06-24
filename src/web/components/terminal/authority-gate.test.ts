@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { TerminalTakeoverInput, TerminalTakeoverResult } from '#/shared/terminal-types.ts'
 import { createXtermAuthorityGate } from '#/web/components/terminal/authority-gate.ts'
 import { terminalLog } from '#/web/logger.ts'
-import type { RendererTerminalBridge } from '#/web/client-bridge-types.ts'
+import type { ClientTerminalBridge } from '#/web/client-bridge-types.ts'
 
 // Focused unit tests for the AuthorityGate. The gate is the single
 // source of truth for write-side authorization, so its decision
@@ -13,12 +13,12 @@ import type { RendererTerminalBridge } from '#/web/client-bridge-types.ts'
 
 function makeBridge(
   takeoverImpl?: (input: TerminalTakeoverInput) => Promise<TerminalTakeoverResult>,
-): RendererTerminalBridge {
+): ClientTerminalBridge {
   return {
     takeover: takeoverImpl
-      ? vi.fn<RendererTerminalBridge['takeover']>(takeoverImpl)
-      : vi.fn<RendererTerminalBridge['takeover']>(),
-  } as unknown as RendererTerminalBridge
+      ? vi.fn<ClientTerminalBridge['takeover']>(takeoverImpl)
+      : vi.fn<ClientTerminalBridge['takeover']>(),
+  } as unknown as ClientTerminalBridge
 }
 
 function successResult(ptySessionId: string, clientId = 'client_local'): TerminalTakeoverResult {
@@ -35,7 +35,7 @@ function successResult(ptySessionId: string, clientId = 'client_local'): Termina
 }
 
 interface GateHarness {
-  bridge: RendererTerminalBridge
+  bridge: ClientTerminalBridge
   gate: ReturnType<typeof createXtermAuthorityGate>
   promoted: ReturnType<typeof vi.fn>
   isSessionAlive: ReturnType<typeof vi.fn>

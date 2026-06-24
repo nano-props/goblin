@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { OpenRepositoryDialog } from '#/web/components/OpenRepositoryDialog.tsx'
-import { setRendererBridgeForTests } from '#/web/client-bridge.ts'
+import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import type { OpenRepoResult } from '#/web/stores/repos/types.ts'
 
@@ -21,7 +21,7 @@ const testWindow = window as unknown as {
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   ipcCalls = []
-  setRendererBridgeForTests(null)
+  setClientBridgeForTests(null)
   testWindow.__GOBLIN_BOOTSTRAP__ = {
     runtime: { kind: 'electron', bridgeVersion: 1, capabilities: [] },
     initialServer: null,
@@ -59,7 +59,7 @@ afterEach(() => {
   document.body.innerHTML = ''
   delete testWindow.goblinNative
   delete testWindow.__GOBLIN_BOOTSTRAP__
-  setRendererBridgeForTests(null)
+  setClientBridgeForTests(null)
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
@@ -218,7 +218,7 @@ describe('OpenRepositoryDialog', () => {
 
   test('hides native picker button when no Electron bridge exists', async () => {
     delete testWindow.goblinNative
-    setRendererBridgeForTests(null)
+    setClientBridgeForTests(null)
     const onClose = vi.fn()
     const onOpen = vi.fn(async (): Promise<OpenRepoResult> => ({ ok: true, id: '/Users/tester/Developer/repo' }))
 

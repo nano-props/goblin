@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { CloneRepositoryDialog } from '#/web/components/CloneRepositoryDialog.tsx'
-import { setRendererBridgeForTests } from '#/web/client-bridge.ts'
+import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import type { CloneRepoResult } from '#/shared/api-types.ts'
@@ -23,7 +23,7 @@ const fetchMock = vi.fn(async () => ({
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   ipcCalls = []
-  setRendererBridgeForTests(null)
+  setClientBridgeForTests(null)
   fetchMock.mockClear()
   vi.stubGlobal('fetch', fetchMock)
   testWindow.__GOBLIN_BOOTSTRAP__ = {
@@ -79,7 +79,7 @@ afterEach(() => {
   document.body.innerHTML = ''
   delete testWindow.goblinNative
   delete testWindow.__GOBLIN_BOOTSTRAP__
-  setRendererBridgeForTests(null)
+  setClientBridgeForTests(null)
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
@@ -179,7 +179,7 @@ describe('CloneRepositoryDialog', () => {
 
   test('hides native parent picker button when no Electron bridge exists', async () => {
     delete testWindow.goblinNative
-    setRendererBridgeForTests(null)
+    setClientBridgeForTests(null)
     const onClose = vi.fn()
     const onClone = vi.fn(async () => ({ ok: true, message: 'ok', path: '/Users/tester/Developer/repo' }))
 

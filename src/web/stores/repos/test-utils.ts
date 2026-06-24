@@ -2,7 +2,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
 import { emptyRepo } from '#/web/stores/repos/helpers.ts'
 import { disposeAllRepoRuntimes } from '#/web/stores/repos/runtime.ts'
-import { setRendererBridgeForTests } from '#/web/client-bridge.ts'
+import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { vi } from 'vitest'
 import { stripBranchWorktreeMetadata, worktreeStatesFromBranches } from '#/web/stores/repos/worktree-state.ts'
@@ -345,7 +345,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
     }
   }
   Object.defineProperty(globalThis, 'WebSocket', { configurable: true, value: MockWebSocket })
-  setRendererBridgeForTests({
+  setClientBridgeForTests({
     kind: () => 'electron',
     hasCapability: () => false,
     getBootstrap: () => ({
@@ -481,7 +481,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       }
     }),
   )
-  setRendererBridgeForTests(null)
+  setClientBridgeForTests(null)
 }
 
 export function seedRepoState(options: {

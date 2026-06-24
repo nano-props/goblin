@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { WebSettings } from '#/web/components/settings/pages/WebSettings.tsx'
-import { setRendererBridgeForTests } from '#/web/client-bridge.ts'
+import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 
 const toastMocks = vi.hoisted(() => ({
   success: vi.fn(),
@@ -23,7 +23,7 @@ let root: Root | null = null
 let queryClient: QueryClient | null = null
 
 beforeEach(() => {
-  setRendererBridgeForTests(null)
+  setClientBridgeForTests(null)
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   toastMocks.success.mockClear()
   toastMocks.error.mockClear()
@@ -77,7 +77,7 @@ function seedElectronBootstrap() {
     },
     initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
   }
-  setRendererBridgeForTests({
+  setClientBridgeForTests({
     kind: () => 'electron',
     hasCapability: () => true,
     getBootstrap: () => testWindow.__GOBLIN_BOOTSTRAP__ as never,
@@ -144,7 +144,7 @@ function seedWebBootstrap() {
   // capability. The renderer falls through to the safe defaults
   // in `client-bridge.ts`.
   delete testWindow.goblinNative
-  setRendererBridgeForTests({
+  setClientBridgeForTests({
     kind: () => 'web',
     hasCapability: () => false,
     getBootstrap: () => testWindow.__GOBLIN_BOOTSTRAP__ as never,
