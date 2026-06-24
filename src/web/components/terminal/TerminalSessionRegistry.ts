@@ -21,6 +21,7 @@ import { terminalSessionDisplayOrder } from '#/web/components/terminal/terminal-
 import {
   captureTerminalHostGeometry,
   resolveTerminalCreateGeometry,
+  waitForMeasurableHost,
 } from '#/web/components/terminal/terminal-session-geometry.ts'
 import {
   countOrphanedTerminalSessionKeys,
@@ -79,6 +80,7 @@ export class TerminalSessionRegistry {
   private readonly selectedKeyByWorktree = new Map<string, string>()
   private readonly preferredSelectedKeyByWorktree = new Map<string, string>()
   private readonly hostByWorktree = new Map<string, HTMLElement>()
+  private readonly hostWaitersByWorktree = new Map<string, () => void>()
   private readonly geometryByWorktree = new Map<string, { cols: number; rows: number }>()
   private readonly pendingCreateByWorktree = new Map<
     string,
@@ -88,6 +90,7 @@ export class TerminalSessionRegistry {
       resolve: (key: string) => void
       reject: (error: unknown) => void
       flushing: boolean
+      geometryAbortController: AbortController | null
     }
   >()
   // Durable close queue. `ManagedTerminalSession.dispose` used to fire
@@ -131,6 +134,7 @@ export class TerminalSessionRegistry {
   // the source-of-truth fallback: a user who lost the snapshot sees
   // the server's ring buffer on next attach.
   private static readonly REATTACH_SNAPSHOT_CACHE_HARD_CAP = 8
+  private static readonly CREATE_GEOMETRY_WAIT_TIMEOUT_MS = 5000
   private readonly reattachSnapshotCache = new Map<string, ReattachSnapshotCacheEntry>()
   private readonly worktreeSnapshotCache = new Map<string, WorktreeTerminalSnapshot>()
   private readonly worktreeListeners = new Map<string, Set<() => void>>()
@@ -188,8 +192,10 @@ export class TerminalSessionRegistry {
    */
   destroy(): void {
     setTerminalFocused(false)
-    for (const pending of this.pendingCreateByWorktree.values())
+    for (const pending of this.pendingCreateByWorktree.values()) {
+      pending.geometryAbortController?.abort(new Error('terminal registry destroyed'))
       pending.reject(new Error('terminal registry destroyed'))
+    }
     for (const pending of this.pendingCloseBySessionId.values())
       pending.reject(new Error('terminal registry destroyed'))
     for (const session of this.sessions.values()) session.dispose({ closeSession: false })
@@ -199,6 +205,7 @@ export class TerminalSessionRegistry {
     this.selectedKeyByWorktree.clear()
     this.preferredSelectedKeyByWorktree.clear()
     this.hostByWorktree.clear()
+    this.hostWaitersByWorktree.clear()
     this.geometryByWorktree.clear()
     this.pendingCreateByWorktree.clear()
     this.pendingCloseBySessionId.clear()
@@ -400,6 +407,8 @@ export class TerminalSessionRegistry {
 
   registerHost = (worktreeTerminalKey: string, host: HTMLElement): void => {
     this.hostByWorktree.set(worktreeTerminalKey, host)
+    const waiter = this.hostWaitersByWorktree.get(worktreeTerminalKey)
+    if (waiter) waiter()
     void captureTerminalHostGeometry({
       worktreeTerminalKey,
       hostByWorktree: this.hostByWorktree,
@@ -468,6 +477,76 @@ export class TerminalSessionRegistry {
     })
   }
 
+  private async waitForHostRegistration(
+    worktreeTerminalKey: string,
+    signal: AbortSignal,
+  ): Promise<void> {
+    if (this.hostByWorktree.get(worktreeTerminalKey)) return
+    await new Promise<void>((resolve, reject) => {
+      if (signal.aborted) {
+        reject(signal.reason ?? new Error('aborted'))
+        return
+      }
+      const cleanup = () => {
+        this.hostWaitersByWorktree.delete(worktreeTerminalKey)
+        signal.removeEventListener('abort', onAbort)
+      }
+      // `enqueuePendingCreate` dedupes per worktree, so at most one
+      // waiter is ever outstanding. The callback owns its map entry:
+      // `registerHost` reads + calls, and the same callback (via
+      // `onAbort`) cleans up on cancel. No iteration, no Set bookkeeping.
+      const waiter = () => {
+        cleanup()
+        if (signal.aborted) {
+          reject(signal.reason ?? new Error('aborted'))
+          return
+        }
+        resolve()
+      }
+      const onAbort = () => {
+        cleanup()
+        reject(signal.reason ?? new Error('aborted'))
+      }
+      this.hostWaitersByWorktree.set(worktreeTerminalKey, waiter)
+      signal.addEventListener('abort', onAbort)
+    })
+  }
+
+  private async resolveCreateGeometryForRequest(
+    worktreeTerminalKey: string,
+    pending: { geometryAbortController: AbortController | null },
+  ): Promise<{ cols: number; rows: number }> {
+    const immediate = await this.resolveCreateGeometry(worktreeTerminalKey)
+    if (immediate) return immediate
+
+    // The pending entry is the only writer of `geometryAbortController` and
+    // `flushPendingCreate` is guarded by `pending.flushing`, so a fresh
+    // controller is always created here. The reference is stored on
+    // `pending` so `destroy()` can abort the in-flight wait, and nulled in
+    // the `finally` so the post-await state matches the pre-await state.
+    const geometryAbortController = new AbortController()
+    pending.geometryAbortController = geometryAbortController
+    const timeoutMs = TerminalSessionRegistry.CREATE_GEOMETRY_WAIT_TIMEOUT_MS
+    const timeout = timeoutMs > 0 ? setTimeout(() => {
+      geometryAbortController.abort(new Error(`terminal create geometry wait timed out after ${timeoutMs}ms`))
+    }, timeoutMs) : null
+    try {
+      await this.waitForHostRegistration(worktreeTerminalKey, geometryAbortController.signal)
+      const host = this.hostByWorktree.get(worktreeTerminalKey)
+      if (!host) {
+        throw new Error('terminal create host unavailable')
+      }
+      const geometry = await waitForMeasurableHost(host, {
+        signal: geometryAbortController.signal,
+      })
+      this.geometryByWorktree.set(worktreeTerminalKey, geometry)
+      return geometry
+    } finally {
+      if (timeout) clearTimeout(timeout)
+      pending.geometryAbortController = null
+    }
+  }
+
   private enqueuePendingCreate(base: TerminalSessionBase, worktreeTerminalKey: string): Promise<string> {
     const existing = this.pendingCreateByWorktree.get(worktreeTerminalKey)
     if (existing) return existing.promise
@@ -477,7 +556,14 @@ export class TerminalSessionRegistry {
       resolve = innerResolve
       reject = innerReject
     })
-    this.pendingCreateByWorktree.set(worktreeTerminalKey, { base, promise, resolve, reject, flushing: false })
+    this.pendingCreateByWorktree.set(worktreeTerminalKey, {
+      base,
+      promise,
+      resolve,
+      reject,
+      flushing: false,
+      geometryAbortController: null,
+    })
     this.notifyWorktree(worktreeTerminalKey)
     void this.flushPendingCreate(worktreeTerminalKey)
     return promise
@@ -496,27 +582,21 @@ export class TerminalSessionRegistry {
       // `enqueuePendingCreate` puts the entry into the map first and
       // emits the synchronous `pendingCreate: true` snapshot.
       await this.flushPendingClosesForWorktree(worktreeTerminalKey)
-      if (this.pendingCreateByWorktree.get(worktreeTerminalKey) !== pending) return
-      const geometry = await this.resolveCreateGeometry(worktreeTerminalKey)
-      if (this.pendingCreateByWorktree.get(worktreeTerminalKey) !== pending) return
-      if (!geometry) {
-        // Host not mounted yet: hand the entry back. Clearing `flushing`
-        // is what keeps the cleanup below from removing it.
-        pending.flushing = false
-        this.notifyWorktree(worktreeTerminalKey)
-        return
+      if (this.pendingCreateByWorktree.get(worktreeTerminalKey) !== pending) {
+        throw new Error('terminal create request canceled')
+      }
+      const geometry = await this.resolveCreateGeometryForRequest(worktreeTerminalKey, pending)
+      if (this.pendingCreateByWorktree.get(worktreeTerminalKey) !== pending) {
+        throw new Error('terminal create request canceled')
       }
       pending.resolve(await this.performCreateTerminal(pending.base, geometry))
     } catch (error) {
       pending.reject(error)
-    }
-    // Cleanup runs iff we owned the create to completion. Geometry-missing
-    // has cleared `flushing` to keep the entry. `destroy()` is the only
-    // other writer to this map, and it rejects every entry before clearing,
-    // so the early-return identity checks above never strand a caller.
-    if (pending.flushing) {
-      this.pendingCreateByWorktree.delete(worktreeTerminalKey)
-      this.notifyWorktree(worktreeTerminalKey)
+    } finally {
+      if (this.pendingCreateByWorktree.get(worktreeTerminalKey) === pending) {
+        this.pendingCreateByWorktree.delete(worktreeTerminalKey)
+        this.notifyWorktree(worktreeTerminalKey)
+      }
     }
   }
 
