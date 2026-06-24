@@ -2,7 +2,7 @@ import { isRendererEffectIntent, type RendererEffectIntent } from '#/shared/rend
 import { createServerWebSocketIngress } from '#/web/lib/server-ws-ingress.ts'
 
 // Server-controlled ingress for renderer effect intents (e.g. those
-// dispatched by `g ss` from a Goblin PTY). Renderer-side counterpart
+// dispatched by `g delta` from a Goblin PTY). Renderer-side counterpart
 // to `#/server/modules/renderer-intent-broker.ts` and
 // `#/server/routes/realtime.ts` (`/ws/renderer-intent`). The server
 // fans intents out as envelopes of the form

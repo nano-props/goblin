@@ -37,7 +37,7 @@ describe('g command cli', () => {
     expect(code).toBe(0)
     expect(io.stdout).toHaveBeenCalledWith(expect.stringContaining('g help'))
     expect(io.stdout).toHaveBeenCalledWith(expect.stringContaining('Open the changes tab'))
-    expect(io.stdout).toHaveBeenCalledWith(expect.stringContaining('g i'))
+    expect(io.stdout).toHaveBeenCalledWith(expect.stringContaining('g st'))
     expect(io.stdout).toHaveBeenCalledWith(expect.stringContaining('g log'))
     expect(postJson).not.toHaveBeenCalled()
   })
@@ -63,23 +63,23 @@ describe('g command cli', () => {
     expect(io.stderr).toHaveBeenCalledWith(expect.stringContaining('g help'))
   })
 
-  test('g ss posts a view intent for the changes tab', async () => {
+  test('g delta posts a view intent for the changes tab', async () => {
     const { io } = makeIo()
     const { transport, postJson } = makeTransport()
     postJson.mockResolvedValue({ ok: true })
 
-    const code = await runGoblinCommand(['ss'], {}, io, transport)
+    const code = await runGoblinCommand(['delta'], {}, io, transport)
 
     expect(code).toBe(0)
     expect(postJson).toHaveBeenCalledWith('/api/repo/view', { tab: 'changes' })
   })
 
-  test('g i posts a view intent for the status tab', async () => {
+  test('g st posts a view intent for the status tab', async () => {
     const { io } = makeIo()
     const { transport, postJson } = makeTransport()
     postJson.mockResolvedValue({ ok: true })
 
-    const code = await runGoblinCommand(['i'], {}, io, transport)
+    const code = await runGoblinCommand(['st'], {}, io, transport)
 
     expect(code).toBe(0)
     expect(postJson).toHaveBeenCalledWith('/api/repo/view', { tab: 'status' })
@@ -100,7 +100,7 @@ describe('g command cli', () => {
     const { io } = makeIo()
     const { transport, postJson } = makeTransport()
 
-    const code = await runGoblinCommand(['ss', 'extra'], {}, io, transport)
+    const code = await runGoblinCommand(['delta', 'extra'], {}, io, transport)
 
     expect(code).toBe(2)
     expect(io.stderr).toHaveBeenCalledWith(expect.stringContaining('does not take arguments'))
@@ -112,7 +112,7 @@ describe('g command cli', () => {
     const { transport, postJson } = makeTransport()
     postJson.mockResolvedValue({ ok: false, message: 'no Goblin window is currently listening' })
 
-    const code = await runGoblinCommand(['ss'], {}, io, transport)
+    const code = await runGoblinCommand(['delta'], {}, io, transport)
 
     expect(code).toBe(1)
     expect(io.stderr).toHaveBeenCalledWith(expect.stringContaining('no Goblin window'))
@@ -123,7 +123,7 @@ describe('g command cli', () => {
     const { transport, postJson } = makeTransport()
     postJson.mockRejectedValue(new Error('connection refused'))
 
-    const code = await runGoblinCommand(['ss'], {}, io, transport)
+    const code = await runGoblinCommand(['delta'], {}, io, transport)
 
     expect(code).toBe(1)
     expect(io.stderr).toHaveBeenCalledWith(expect.stringContaining('connection refused'))

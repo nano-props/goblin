@@ -35,7 +35,7 @@ interface RealtimeRouteOptions {
 // `/ws/invalidation` and `/ws/terminal` remain data-plane — they push server-
 // owned state changes (repo invalidations, terminal stream events) to
 // subscribers. `/ws/renderer-intent` is a control-plane relay: the server
-// receives a `RendererEffectIntent` over HTTP (e.g. from `g ss`), wraps it
+// receives a `RendererEffectIntent` over HTTP (e.g. from `g delta`), wraps it
 // in a JSON envelope, and fans it out to subscribed renderers. The server
 // does not interpret intent semantics — it just forwards. Interpretation
 // happens in the renderer's existing `useRendererEffectIntentRouter`,

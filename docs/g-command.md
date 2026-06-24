@@ -38,7 +38,7 @@ This shape scales linearly: the first command and the tenth command cost the sam
 
 ## Idempotency by design
 
-Most `g` commands are target-state, not actions. `g ss` means "the changes tab is the active tab", not "switch to the changes tab and increment a counter". Two `g ss` calls produce the same final state as one.
+Most `g` commands are target-state, not actions. `g delta` means "the changes tab is the active tab", not "switch to the changes tab and increment a counter". Two `g delta` calls produce the same final state as one.
 
 This makes commands safe to retry, easy to test (no setup-then-act sequences), and lets the renderer treat each intent as a pure assignment rather than a stateful transition. The renderer's existing intent plan for view-switching is already a pure assignment — `g` leans on that rather than introducing a new model.
 
