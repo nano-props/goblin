@@ -31,7 +31,7 @@ The project runs in Node.js strip-only mode (no `tsc` emit). Do not use these un
   - `docs/arch.md` for architecture
   - `docs/layering.md` for feature layering rules
   - `docs/state-sync.md` for state ownership and sync guidance
-  - `docs/renderer-model.md` for renderer model guidance
+  - `docs/client-model.md` for client model guidance
   - `docs/realtime.md` for realtime guidance
   - `docs/terminal.md` for terminal system design
   - `docs/terminal-roadmap.md` for terminal refactor roadmap
