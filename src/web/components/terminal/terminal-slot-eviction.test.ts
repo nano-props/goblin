@@ -10,7 +10,7 @@ describe('terminal session eviction helpers', () => {
       repoRoot: '/repo',
       localSlotKeys: ['a', 'b', 'c'],
       getRepoRootForKey: (key) => (key === 'c' ? '/other' : '/repo'),
-      hasServerSessionId: (key) => key !== 'b',
+      hasServerPtySessionId: (key) => key !== 'b',
       serverKeys: new Set(['a']),
     })
     expect(orphaned).toEqual([])
@@ -19,7 +19,7 @@ describe('terminal session eviction helpers', () => {
       repoRoot: '/repo',
       localSlotKeys: ['a', 'b', 'c'],
       getRepoRootForKey: (key) => (key === 'c' ? '/other' : '/repo'),
-      hasServerSessionId: (key) => key === 'b',
+      hasServerPtySessionId: (key) => key === 'b',
       serverKeys: new Set(['a']),
     })
     expect(orphaned2).toEqual(['b'])

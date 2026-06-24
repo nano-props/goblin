@@ -378,7 +378,7 @@ describe('branch workspace pane tab model', () => {
   })
 
   test('falls back to tabs[0] for server-side exits with no lastClosedTabContext', () => {
-    // The last terminal exits externally (registry onTerminalSessionRemoved),
+    // The last terminal exits externally (registry onTerminalSlotRemoved),
     // no user-initiated close recorded. The model has no adjacency hint, so
     // it uses the generic tabs[0] fallback.
     const model = createBranchWorkspacePaneTabModel({

@@ -10,7 +10,7 @@ import { terminalSlotProviderLog } from '#/web/logger.ts'
 import { useTerminalSlotContext } from '#/web/components/terminal/terminal-slot-context.ts'
 import {
   useWorktreeTerminalCount,
-  useTerminalSessionSummaries,
+  useTerminalSlotSummaries,
 } from '#/web/components/terminal/terminal-slot-store.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
 import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
@@ -157,7 +157,7 @@ vi.mock('#/web/components/terminal/ManagedTerminalSlot.ts', () => {
       return this.serializeValue
     }
 
-    currentSessionId(): string | null {
+    currentPtySessionId(): string | null {
       return this.ptySessionId
     }
 
@@ -243,9 +243,9 @@ let ownershipHandler: ((event: TerminalOwnershipViewModel) => void) | null = nul
 let sessionsChangedHandler: ((repoRoot: string) => void) | null = null
 let workspacePaneChangedHandler: ((repoRoot: string) => void) | null = null
 let sessionClosedHandler: ((event: { ptySessionId: string; repoRoot: string }) => void) | null = null
-type TestTerminalSessionSummary = Omit<TerminalSlotSummary, 'viewType' | 'viewId'> &
+type TestTerminalSlotSummary = Omit<TerminalSlotSummary, 'viewType' | 'viewId'> &
   Partial<Pick<TerminalSlotSummary, 'viewType' | 'viewId'>>
-const listSessionsMock = vi.fn<(...args: Array<{ repoRoot: string }>) => Promise<TestTerminalSessionSummary[]>>(
+const listSessionsMock = vi.fn<(...args: Array<{ repoRoot: string }>) => Promise<TestTerminalSlotSummary[]>>(
   async () => [],
 )
 const getSlotSnapshotMock = vi.fn<
@@ -253,9 +253,9 @@ const getSlotSnapshotMock = vi.fn<
 >(async () => null)
 const closeMock = vi.fn(async () => true)
 const createTerminalMock = vi.fn<(input: TerminalCreateInput) => Promise<TerminalCatalogMutationResult>>()
-let managedServerSessions: TestTerminalSessionSummary[] = []
+let managedServerSessions: TestTerminalSlotSummary[] = []
 
-function completeServerSession(session: TestTerminalSessionSummary): TerminalSlotSummary {
+function completeServerSession(session: TestTerminalSlotSummary): TerminalSlotSummary {
   return {
     ...session,
     viewType: session.viewType ?? 'terminal',
@@ -263,7 +263,7 @@ function completeServerSession(session: TestTerminalSessionSummary): TerminalSlo
   }
 }
 
-function completeServerSessions(sessions: TestTerminalSessionSummary[]): TerminalSlotSummary[] {
+function completeServerSessions(sessions: TestTerminalSlotSummary[]): TerminalSlotSummary[] {
   return sessions.map(completeServerSession)
 }
 
@@ -1627,7 +1627,7 @@ describe('TerminalSlotProvider', () => {
       )
       // The failed session's rejection is logged but does not poison
       // the other session's hydrate path.
-      expect(debugSpy).toHaveBeenCalledWith('failed to load terminal session snapshot', {
+      expect(debugSpy).toHaveBeenCalledWith('failed to load terminal slot snapshot', {
         ptySessionId: 'session_fail',
         err: expect.any(Error),
       })
@@ -2020,7 +2020,7 @@ function CaptureGroupProbe({
     }>
   }) => void
 }) {
-  const summaries = useTerminalSessionSummaries(worktreeTerminalKey)
+  const summaries = useTerminalSlotSummaries(worktreeTerminalKey)
   onProbe({
     count: useWorktreeTerminalCount(worktreeTerminalKey),
     terminalIds: summaries.map((session) => session.slotId),

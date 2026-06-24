@@ -63,7 +63,7 @@ describe('terminal session worktree snapshot helper', () => {
       worktreeTerminalKey: descriptor.worktreeTerminalKey,
       selectedDescriptor: descriptor,
       pendingCreate: false,
-      sessions: [session],
+      slots: [session],
       selectedKey: descriptor.key,
       getCachedSnapshot: (key) => cache.get(key) ?? null,
       cacheSnapshot: (key, value) => cache.set(key, value),
@@ -74,7 +74,7 @@ describe('terminal session worktree snapshot helper', () => {
     expect(snapshot).toEqual({
       worktreeTerminalKey: descriptor.worktreeTerminalKey,
       selectedDescriptor: descriptor,
-      sessions: [
+      slots: [
         expect.objectContaining({
           type: 'terminal',
           id: descriptor.key,
@@ -96,7 +96,7 @@ describe('terminal session worktree snapshot helper', () => {
       worktreeTerminalKey: descriptor.worktreeTerminalKey,
       selectedDescriptor: descriptor,
       pendingCreate: false,
-      sessions: [session],
+      slots: [session],
       selectedKey: descriptor.key,
       getCachedSnapshot: (key) => cache.get(key) ?? null,
       cacheSnapshot: (key, value) => cache.set(key, value),

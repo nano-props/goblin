@@ -210,6 +210,14 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
         terminalRuntimeLogger.warn({ clientId }, 'invalid realtime message: null after normalize')
         return
       }
+      if (message.type === 'heartbeat') {
+        // Heartbeats are not request/response — they're a pure
+        // liveness signal that feeds the broker's deadline scan.
+        // Resolving here means the rest of the realtime pipeline
+        // (buffered socket, handler table) stays untouched.
+        broker.recordHeartbeat(clientId, userId, message.at)
+        return
+      }
       const bufferedSocket = bufferedSocketByRawSocket.get(socket as TerminalRealtimeSocket)
       if (shouldPauseRealtimeRequest(message.action)) bufferedSocket?.pause()
       void handleTerminalRealtimeRequestMessage(

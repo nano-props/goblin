@@ -1,35 +1,35 @@
 import { describe, expect, test } from 'vitest'
-import { syncTerminalSessionIdIndex } from '#/web/components/terminal/terminal-slot-index.ts'
+import { syncTerminalPtySessionIdIndex } from '#/web/components/terminal/terminal-slot-index.ts'
 
-describe('terminal session index helper', () => {
+describe('terminal slot index helper', () => {
   test('updates both key->session and session->key maps coherently', () => {
-    const sessionIdByKey = new Map<string, string>()
+    const ptySessionIdByKey = new Map<string, string>()
     const slotKeyByPtySessionId = new Map<string, string>()
 
-    syncTerminalSessionIdIndex({
+    syncTerminalPtySessionIdIndex({
       key: 'slot-1',
       ptySessionId: 'pty_session_a_aaaaaaaaa',
-      sessionIdByKey,
+      ptySessionIdByKey,
       slotKeyByPtySessionId,
     })
-    expect(sessionIdByKey.get('slot-1')).toBe('pty_session_a_aaaaaaaaa')
+    expect(ptySessionIdByKey.get('slot-1')).toBe('pty_session_a_aaaaaaaaa')
     expect(slotKeyByPtySessionId.get('pty_session_a_aaaaaaaaa')).toBe('slot-1')
 
-    syncTerminalSessionIdIndex({
+    syncTerminalPtySessionIdIndex({
       key: 'slot-1',
       ptySessionId: 'pty_session_b_aaaaaaaaa',
-      sessionIdByKey,
+      ptySessionIdByKey,
       slotKeyByPtySessionId,
     })
     expect(slotKeyByPtySessionId.has('pty_session_a_aaaaaaaaa')).toBe(false)
     expect(slotKeyByPtySessionId.get('pty_session_b_aaaaaaaaa')).toBe('slot-1')
 
-    syncTerminalSessionIdIndex({
+    syncTerminalPtySessionIdIndex({
       key: 'slot-1',
       ptySessionId: null,
-      sessionIdByKey,
+      ptySessionIdByKey,
       slotKeyByPtySessionId,
     })
-    expect(sessionIdByKey.has('slot-1')).toBe(false)
+    expect(ptySessionIdByKey.has('slot-1')).toBe(false)
   })
 })

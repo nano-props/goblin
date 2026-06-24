@@ -365,10 +365,10 @@ export class TerminalSlotManager<TUser extends string | number> {
   }
 
   async listSlotsForUser(userId: TUser, scope: string): Promise<TerminalSlotSummary[]> {
-    const sessions: TerminalSlotSummary[] = []
+    const slots: TerminalSlotSummary[] = []
     for (const session of Array.from(this.slotsByPtySessionId.values())) {
       if (session.userId === userId && session.scope === scope) {
-        sessions.push({
+        slots.push({
           ptySessionId: session.id,
           key: session.key,
           viewType: 'terminal',
@@ -385,8 +385,8 @@ export class TerminalSlotManager<TUser extends string | number> {
         })
       }
     }
-    sessions.sort((a, b) => a.displayOrder - b.displayOrder)
-    return sessions
+    slots.sort((a, b) => a.displayOrder - b.displayOrder)
+    return slots
   }
 
   // Look up a session by id and verify it belongs to the given

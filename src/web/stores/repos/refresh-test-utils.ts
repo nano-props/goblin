@@ -70,7 +70,7 @@ export function resetRefreshTest(): void {
     ok: true,
     action: input?.kind === 'primary' ? 'reused' : 'created',
     key: input?.kind === 'primary' ? 'repo\0worktree\0terminal-1' : 'repo\0worktree\0terminal-2',
-    sessions: [],
+    slots: [],
   })
   ipcHandlers['terminal.prune'] = async () => ({ pruned: 0, remaining: 0 })
 }

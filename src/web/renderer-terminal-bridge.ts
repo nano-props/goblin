@@ -34,6 +34,11 @@ import type { RendererTerminalBridge } from '#/web/renderer-bridge-types.ts'
 import type { TerminalOwnershipViewModel } from '#/web/components/terminal/types.ts'
 import { isAppQuitting, subscribeAppQuitting } from '#/web/app-lifecycle.ts'
 
+// Matches the server-side `HEARTBEAT_INTERVAL_MS`. Kept as a
+// renderer-local constant so the renderer doesn't need to import a
+// server module to know its own beat cadence.
+const TERMINAL_RENDERER_HEARTBEAT_INTERVAL_MS = 30_000
+
 export interface RendererServerTerminalConfig {
   url: string
   accessToken: string
@@ -72,6 +77,11 @@ export function createServerTerminalBridge(options: {
   const clientId = options.getClientId()
   let socket: WebSocket | null = null
   let reconnectTimer: number | null = null
+  // Renderer→server liveness heartbeat. Sent while the socket is
+  // OPEN; the server's broker uses receipts to drive its per-`clientId`
+  // deadline scan. Tied to the socket lifetime so it cannot outlive
+  // the connection it's measuring.
+  let heartbeatTimer: ReturnType<typeof globalThis.setInterval> | null = null
   let manualSocketClose = false
   let socketGeneration = 0
   let quitting = isAppQuitting()
@@ -164,7 +174,9 @@ export function createServerTerminalBridge(options: {
         try {
           currentSocket.close()
         } catch {}
+        return
       }
+      startHeartbeat(currentSocket, generation)
     })
     currentSocket.addEventListener('message', (event) => {
       if (!isActiveSocket(currentSocket, generation)) return
@@ -203,12 +215,52 @@ export function createServerTerminalBridge(options: {
     })
     currentSocket.addEventListener('close', () => {
       if (!isActiveSocket(currentSocket, generation)) return
+      stopHeartbeat()
       handleSocketDisconnection('Terminal socket closed')
     })
     currentSocket.addEventListener('error', () => {
       if (!isActiveSocket(currentSocket, generation)) return
+      stopHeartbeat()
       handleSocketDisconnection('Terminal socket error')
     })
+  }
+
+  function startHeartbeat(currentSocket: WebSocket, generation: number): void {
+    stopHeartbeat()
+    // The 30 s cadence matches `HEARTBEAT_INTERVAL_MS` on the server
+    // broker (`src/server/terminal/terminal-realtime-broker.ts`).
+    // The 90 s deadline (3 missed beats) is what fires a synthetic
+    // `onClientDisconnected`, which in turn lets the next `attach`
+    // auto-claim the slot under the new owner-sticky model.
+    // Use `globalThis.setInterval` (not `window.setInterval`) so the
+    // node-env test suite — which mocks `WebSocket` but does not
+    // install `window` — does not crash on this line when the
+    // mock socket fires its synthetic `open` event.
+    heartbeatTimer = globalThis.setInterval(() => {
+      if (!isActiveSocket(currentSocket, generation)) {
+        stopHeartbeat()
+        return
+      }
+      if (currentSocket.readyState !== WebSocket.OPEN) {
+        // Defensive: the close handler should have stopped us, but
+        // if a transition slipped through, don't send on a non-open
+        // socket (the browser will throw).
+        return
+      }
+      try {
+        currentSocket.send(JSON.stringify({ type: 'heartbeat', at: Date.now() }))
+      } catch {
+        // Send failure is the same signal as `error` — let the
+        // existing close path handle it.
+        stopHeartbeat()
+      }
+    }, TERMINAL_RENDERER_HEARTBEAT_INTERVAL_MS)
+  }
+
+  function stopHeartbeat(): void {
+    if (heartbeatTimer === null) return
+    globalThis.clearInterval(heartbeatTimer)
+    heartbeatTimer = null
   }
 
   function handleSocketDisconnection(reason: string) {

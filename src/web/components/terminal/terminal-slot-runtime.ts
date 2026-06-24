@@ -7,7 +7,7 @@ import type {
 } from '#/shared/terminal-types.ts'
 import { TerminalSlotState } from '#/web/components/terminal/terminal-slot-state.ts'
 import type { TerminalOwnershipViewModel, TerminalSearchResult } from '#/web/components/terminal/types.ts'
-export class TerminalSessionRuntime {
+export class TerminalSlotRuntime {
   private readonly state = new TerminalSlotState()
   private ptySessionId: string | null = null
   private replacingPtySessionId: string | null = null
@@ -29,11 +29,11 @@ export class TerminalSessionRuntime {
     return this.state.getCanonicalTitle()
   }
 
-  currentSessionId(): string | null {
+  currentPtySessionId(): string | null {
     return this.ptySessionId
   }
 
-  restartingSessionId(): string | null {
+  restartingPtySessionId(): string | null {
     return this.replacingPtySessionId ?? this.ptySessionId
   }
 
@@ -230,7 +230,7 @@ export class TerminalSessionRuntime {
     this.state.setCanonicalSize(cols, rows)
   }
 
-  disposeSessionIds(): string[] {
+  disposePtySessionIds(): string[] {
     const sessionIds = new Set([this.ptySessionId, this.replacingPtySessionId].filter((id): id is string => !!id))
     this.ptySessionId = null
     this.replacingPtySessionId = null
@@ -238,7 +238,7 @@ export class TerminalSessionRuntime {
     return Array.from(sessionIds)
   }
 
-  closeReplacingSessionId(): string | null {
+  closeReplacingPtySessionId(): string | null {
     const ptySessionId = this.replacingPtySessionId
     this.replacingPtySessionId = null
     return ptySessionId

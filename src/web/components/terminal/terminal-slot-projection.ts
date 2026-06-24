@@ -4,7 +4,7 @@ import { parseTerminalSlotKey } from '#/shared/terminal-slot-key.ts'
 import type {
   TerminalAttachResult,
   TerminalSlotSnapshot,
-  TerminalSlotSummary as ServerTerminalSessionSummary,
+  TerminalSlotSummary as ServerTerminalSlotSummary,
 } from '#/shared/terminal-types.ts'
 import { terminalDescriptor } from '#/web/components/terminal/terminal-descriptor.ts'
 import { branchForTerminalWorktree } from '#/web/components/terminal/terminal-repo-index.ts'
@@ -12,7 +12,7 @@ import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-key
 import type {
   TerminalDescriptor,
   TerminalRepoIndex,
-  TerminalSessionHydrationInput,
+  TerminalSlotHydrationInput,
   TerminalOwnershipViewModel,
 } from '#/web/components/terminal/types.ts'
 
@@ -27,10 +27,10 @@ export type TerminalAttachResultWithOwnership = Extract<TerminalAttachResult, { 
   controllerStatus: TerminalOwnershipViewModel['controllerStatus']
 }
 
-export interface ProjectedServerTerminalSession {
+export interface ProjectedServerTerminalSlot {
   descriptor: TerminalDescriptor
   worktreeTerminalKey: string
-  hydrateInput: TerminalSessionHydrationInput
+  hydrateInput: TerminalSlotHydrationInput
   controlsTerminal: boolean
   displayOrder: number
 }
@@ -45,15 +45,15 @@ export function projectTerminalAttachResultForClient(
   }
 }
 
-export function projectServerTerminalSession(input: {
+export function projectServerTerminalSlot(input: {
   repoIndex: TerminalRepoIndex
   repoRoot: string
-  serverSession: ServerTerminalSessionSummary
+  serverSlot: ServerTerminalSlotSummary
   clientId: string
   serverSnapshot?: TerminalSlotSnapshot | null
   reattachSnapshot?: ReattachSnapshotCacheEntry | null
-}): ProjectedServerTerminalSession | null {
-  const parsed = parseTerminalSlotKey(input.serverSession.key)
+}): ProjectedServerTerminalSlot | null {
+  const parsed = parseTerminalSlotKey(input.serverSlot.key)
   if (!parsed || parsed.repoRoot !== input.repoRoot) return null
   const branch = branchForTerminalWorktree(input.repoIndex, parsed.repoRoot, parsed.worktreePath)
   if (!branch) return null
@@ -63,26 +63,26 @@ export function projectServerTerminalSession(input: {
     parseSlotIdIndex(parsed.slotId) ?? 1,
   )
   const terminalWorktree = worktreeTerminalKey(parsed.repoRoot, parsed.worktreePath)
-  const ownership = resolveTerminalOwnership(input.serverSession.controller, input.clientId)
-  const isReattachMatch = input.reattachSnapshot?.ptySessionId === input.serverSession.ptySessionId
+  const ownership = resolveTerminalOwnership(input.serverSlot.controller, input.clientId)
+  const isReattachMatch = input.reattachSnapshot?.ptySessionId === input.serverSlot.ptySessionId
   return {
     descriptor,
     worktreeTerminalKey: terminalWorktree,
     hydrateInput: {
-      ptySessionId: input.serverSession.ptySessionId,
-      processName: input.serverSession.processName,
-      canonicalTitle: input.serverSession.canonicalTitle,
-      phase: input.serverSession.phase,
-      message: input.serverSession.message,
+      ptySessionId: input.serverSlot.ptySessionId,
+      processName: input.serverSlot.processName,
+      canonicalTitle: input.serverSlot.canonicalTitle,
+      phase: input.serverSlot.phase,
+      message: input.serverSlot.message,
       role: ownership.role,
       controllerStatus: ownership.controllerStatus,
-      canonicalCols: input.serverSession.cols,
-      canonicalRows: input.serverSession.rows,
+      canonicalCols: input.serverSlot.cols,
+      canonicalRows: input.serverSlot.rows,
       snapshot: input.serverSnapshot?.snapshot ?? (isReattachMatch ? (input.reattachSnapshot?.snapshot ?? '') : ''),
       snapshotSeq:
         input.serverSnapshot?.snapshotSeq ?? (isReattachMatch ? (input.reattachSnapshot?.snapshotSeq ?? 0) : 0),
     },
-    controlsTerminal: input.serverSession.controller?.clientId === input.clientId,
-    displayOrder: input.serverSession.displayOrder,
+    controlsTerminal: input.serverSlot.controller?.clientId === input.clientId,
+    displayOrder: input.serverSlot.displayOrder,
   }
 }

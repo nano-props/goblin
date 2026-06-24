@@ -59,7 +59,7 @@ export interface TerminalOwnershipViewModel extends TerminalClientOwnershipViewM
   phase: TerminalPhase
 }
 
-export interface TerminalSessionHydrationInput extends TerminalOwnershipViewModel {
+export interface TerminalSlotHydrationInput extends TerminalOwnershipViewModel {
   phase: TerminalPhase
   message: string | null
   processName: string
@@ -121,7 +121,7 @@ export type WorkspacePaneViewSummary = TerminalSlotSummary
 export interface WorktreeTerminalSnapshot {
   worktreeTerminalKey: string
   selectedDescriptor: TerminalDescriptor | null
-  sessions: TerminalSlotSummary[]
+  slots: TerminalSlotSummary[]
   count: number
   bellCount: number
   pendingCreate: boolean

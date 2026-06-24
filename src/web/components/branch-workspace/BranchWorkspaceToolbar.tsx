@@ -88,7 +88,7 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
         worktreePath,
         preferredView: preferredWorkspacePaneView,
         tabOrder: workspacePaneTabOrder,
-        runtimeTerminalViews: worktreeSnapshot.sessions,
+        runtimeTerminalViews: worktreeSnapshot.slots,
         terminalSessionCount: worktreeSnapshot.count,
         terminalCreatePending: worktreeSnapshot.pendingCreate,
         terminalSyncReady,
@@ -103,7 +103,7 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
       worktreePath,
       worktreeSnapshot.count,
       worktreeSnapshot.pendingCreate,
-      worktreeSnapshot.sessions,
+      worktreeSnapshot.slots,
       repo.ui.lastClosedTabContextByBranch,
     ],
   )

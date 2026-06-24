@@ -11,6 +11,19 @@ interface TerminalBrokerOptions {
   onOwnerDisconnected(userId: string): void
 }
 
+/**
+ * Renderer is expected to send a heartbeat every
+ * `HEARTBEAT_INTERVAL_MS` (30 s). If a `(userId, clientId)` goes
+ * silent for `HEARTBEAT_DEADLINE_MS` (90 s) the broker fires a
+ * synthetic `onClientDisconnected` so the next `attach` from a
+ * sibling can auto-claim. Without this, a controller whose process
+ * died but whose OS socket is still in `ESTABLISHED` would strand
+ * siblings in viewer mode for as long as the OS keeps the half-open
+ * socket alive (laptop sleep, OS kill, NIC never notified).
+ */
+export const HEARTBEAT_INTERVAL_MS = 30_000
+export const HEARTBEAT_DEADLINE_MS = 90_000
+
 export class TerminalRealtimeBroker {
   private readonly options: TerminalBrokerOptions
   private readonly socketsByUserId = new Map<string, Set<TerminalRealtimeSocket>>()
@@ -19,9 +32,17 @@ export class TerminalRealtimeBroker {
     { clientId: string; userId: string }
   >()
   private readonly socketCountByUserClientKey = new Map<string, number>()
+  private readonly lastHeartbeatAtByClientKey = new Map<string, number>()
+  private readonly heartbeatTimer: ReturnType<typeof setInterval>
 
   constructor(options: TerminalBrokerOptions) {
     this.options = options
+    this.heartbeatTimer = setInterval(() => this.scanHeartbeats(), HEARTBEAT_INTERVAL_MS)
+    // Unref so a running broker never holds the Node event loop open
+    // by itself. The runtime's `disconnectAll` + `shutdown` paths
+    // explicitly clear the timer, so this is only a belt-and-suspenders
+    // measure for tests that drop the broker on the floor.
+    if (typeof this.heartbeatTimer.unref === 'function') this.heartbeatTimer.unref()
   }
 
   registerSocket(clientId: string, userId: string, socket: TerminalRealtimeSocket): void {
@@ -33,10 +54,50 @@ export class TerminalRealtimeBroker {
     }
     sockets.add(socket)
     this.socketMetaBySocket.set(socket, { clientId, userId })
-    const attachmentKey = userClientKey(userId, clientId)
-    const nextCount = (this.socketCountByUserClientKey.get(attachmentKey) ?? 0) + 1
-    this.socketCountByUserClientKey.set(attachmentKey, nextCount)
+    const clientKey = userClientKey(userId, clientId)
+    const nextCount = (this.socketCountByUserClientKey.get(clientKey) ?? 0) + 1
+    this.socketCountByUserClientKey.set(clientKey, nextCount)
+    // Seed the heartbeat clock to "now" so the renderer is never
+    // racing the deadline before its first beat lands. The first
+    // real `recordHeartbeat` will overwrite this anyway.
+    this.lastHeartbeatAtByClientKey.set(clientKey, Date.now())
     if (nextCount === 1) this.options.onClientConnected(clientId, userId)
+  }
+
+  /**
+   * Update the last-heartbeat timestamp for `(userId, clientId)`.
+   * Idempotent and cheap; called by the runtime on every renderer
+   * heartbeat. The deadline check is driven by `scanHeartbeats` on
+   * the broker's own `setInterval`, not on each call.
+   */
+  recordHeartbeat(userId: string, clientId: string, at: number): void {
+    const clientKey = userClientKey(userId, clientId)
+    if (!this.socketCountByUserClientKey.has(clientKey)) return
+    this.lastHeartbeatAtByClientKey.set(clientKey, at)
+  }
+
+  /**
+   * Walk the per-client heartbeat clock and fire synthetic
+   * disconnects for any `(userId, clientId)` whose last beat is
+   * older than `HEARTBEAT_DEADLINE_MS`. The reconnection case (the
+   * socket still up, the renderer just got back) is covered
+   * implicitly: a fresh `registerSocket` resets the timestamp to
+   * "now" and `recordHeartbeat` keeps it fresh, so the deadline
+   * only fires for truly silent clients.
+   */
+  private scanHeartbeats(): void {
+    const now = Date.now()
+    for (const [clientKey, lastBeat] of this.lastHeartbeatAtByClientKey) {
+      if (now - lastBeat < HEARTBEAT_DEADLINE_MS) continue
+      if ((this.socketCountByUserClientKey.get(clientKey) ?? 0) === 0) {
+        // No live sockets left; the unregister path already fired
+        // `onClientDisconnected`. Drop the stale entry.
+        this.lastHeartbeatAtByClientKey.delete(clientKey)
+        continue
+      }
+      const { userId, clientId } = splitUserClientKey(clientKey)
+      this.options.onClientDisconnected(clientId, userId)
+    }
   }
 
   unregisterSocket(socket: TerminalRealtimeSocket): void {
@@ -47,12 +108,13 @@ export class TerminalRealtimeBroker {
     if (!sockets?.has(socket)) return
     sockets.delete(socket)
     this.socketMetaBySocket.delete(socket)
-    const attachmentKey = userClientKey(userId, clientId)
-    const nextCount = Math.max(0, (this.socketCountByUserClientKey.get(attachmentKey) ?? 0) - 1)
+    const clientKey = userClientKey(userId, clientId)
+    const nextCount = Math.max(0, (this.socketCountByUserClientKey.get(clientKey) ?? 0) - 1)
     if (nextCount === 0) {
-      this.socketCountByUserClientKey.delete(attachmentKey)
+      this.socketCountByUserClientKey.delete(clientKey)
+      this.lastHeartbeatAtByClientKey.delete(clientKey)
       this.options.onClientDisconnected(clientId, userId)
-    } else this.socketCountByUserClientKey.set(attachmentKey, nextCount)
+    } else this.socketCountByUserClientKey.set(clientKey, nextCount)
     if (sockets.size > 0) return
     this.socketsByUserId.delete(userId)
     this.options.onOwnerDisconnected(userId)
@@ -88,6 +150,7 @@ export class TerminalRealtimeBroker {
   }
 
   disconnectAll(): void {
+    clearInterval(this.heartbeatTimer)
     for (const sockets of this.socketsByUserId.values()) {
       for (const socket of Array.from(sockets)) {
         try {
@@ -98,6 +161,7 @@ export class TerminalRealtimeBroker {
     this.socketsByUserId.clear()
     this.socketMetaBySocket.clear()
     this.socketCountByUserClientKey.clear()
+    this.lastHeartbeatAtByClientKey.clear()
   }
 
   private sendOrUnregister(socket: TerminalRealtimeSocket, payload: string): void {
@@ -111,4 +175,10 @@ export class TerminalRealtimeBroker {
 
 function userClientKey(userId: string, clientId: string): string {
   return `${userId}\0${clientId}`
+}
+
+function splitUserClientKey(key: string): { userId: string; clientId: string } {
+  const idx = key.indexOf('\0')
+  if (idx < 0) return { userId: key, clientId: '' }
+  return { userId: key.slice(0, idx), clientId: key.slice(idx + 1) }
 }

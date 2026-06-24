@@ -225,6 +225,10 @@ const TerminalClientMessageSchema = v.variant('type', [
     action: v.literal('slot-snapshot'),
     input: TerminalSlotSnapshotInputSchema,
   }),
+  v.object({
+    type: v.literal('heartbeat'),
+    at: v.number(),
+  }),
 ])
 
 export function terminalUtf8ByteLength(value: string): number {

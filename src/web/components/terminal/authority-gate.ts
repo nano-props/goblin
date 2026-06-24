@@ -40,7 +40,7 @@ import type { TerminalTakeoverResult } from '#/shared/terminal-types.ts'
  * - `session-unknown` — the server reported the ptySessionId is not
  *   known to this owner. The renderer's catalog is stale; the user
  *   needs to re-list before retrying.
- * - `attachment-offline` — the server's broker has no live socket
+ * - `client-offline` — the server's broker has no live socket
  *   for `(userId, clientId)`. The renderer is reconnecting.
  *   Retrying after a moment usually works.
  * - `takeover-rejected` — catch-all for any other server-side
@@ -116,7 +116,7 @@ interface XtermAuthorityGateOptions {
    * was misleading — this never throws, it just returns false.
    */
   isSessionAlive: (ptySessionId: string) => boolean
-  getSessionId: () => string | null
+  getPtySessionId: () => string | null
   /** Called after a successful auto-promote so the caller can apply
    *  the post-takeover frame (similar to `applyTakeover` on the
    *  runtime) without coupling the gate to the runtime type. */
@@ -184,7 +184,7 @@ export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): Termi
   }
 
   async function doTakeover(): Promise<AuthorizationResult> {
-    const ptySessionId = opts.getSessionId()
+    const ptySessionId = opts.getPtySessionId()
     if (!ptySessionId) return deny('slot-closed', 'preflight')
     if (!opts.isSessionAlive(ptySessionId)) return deny('slot-closed', 'isSessionAlive', { ptySessionId })
     let size: { cols: number; rows: number }

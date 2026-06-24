@@ -13,7 +13,7 @@ import {
 } from '#/web/components/terminal/terminal-slot-context.ts'
 import { readOrCreateWebTerminalClientId } from '#/web/renderer-terminal-bridge.ts'
 import { preloadTerminalFont } from '#/web/components/terminal/terminal-geometry.ts'
-import { loadTerminalSessions } from '#/web/terminal-session-queries.ts'
+import { loadTerminalSlots } from '#/web/terminal-slot-queries.ts'
 import {
   TerminalSlotRegistry,
   getTerminalSlotRegistry,
@@ -80,7 +80,7 @@ export function TerminalSlotProvider({ children }: TerminalSlotProviderProps) {
       // at read time when the active tab disappears, so this callback only
       // needs to drop the tab from the branch-scoped tab order — no
       // navigation or view-switch call required.
-      onTerminalSessionRemoved: (key, base) => {
+      onTerminalSlotRemoved: (key, base) => {
         useReposStore.getState().removeWorkspacePaneTerminalTab(base.repoRoot, key, base.branch)
       },
     })
@@ -88,28 +88,28 @@ export function TerminalSlotProvider({ children }: TerminalSlotProviderProps) {
   const registry = registryRef.current
 
   const loadMissingSnapshots = useCallback(
-    async (serverSessions: TerminalSlotSummary[]): Promise<Map<string, TerminalSlotSnapshot>> => {
+    async (serverSlots: TerminalSlotSummary[]): Promise<Map<string, TerminalSlotSnapshot>> => {
       // allSettled (not all) so a single rejected snapshot fetch does not
       // cancel the rest of the reconciliation. Each request is bounded by
       // the bridge's per-request timeout, so the worst case here is that
-      // one slow session delays the final map by that timeout — but every
-      // other session's snapshot is delivered to the caller regardless.
+      // one slow slot delays the final map by that timeout — but every
+      // other slot's snapshot is delivered to the caller regardless.
       // Rejections are surfaced via `result.reason` so they remain visible
       // in logs without poisoning the reconciliation.
       const settled = await Promise.allSettled(
-        serverSessions.map((session) => terminalBridge.getSlotSnapshot({ ptySessionId: session.ptySessionId })),
+        serverSlots.map((slot) => terminalBridge.getSlotSnapshot({ ptySessionId: slot.ptySessionId })),
       )
       const entries: Array<readonly [string, TerminalSlotSnapshot]> = []
       settled.forEach((result, index) => {
-        const session = serverSessions[index]
-        if (!session) return
+        const slot = serverSlots[index]
+        if (!slot) return
         if (result.status === 'fulfilled') {
           const snapshot = result.value
-          if (snapshot) entries.push([session.ptySessionId, snapshot])
+          if (snapshot) entries.push([slot.ptySessionId, snapshot])
           return
         }
-        terminalSlotProviderLog.debug('failed to load terminal session snapshot', {
-          ptySessionId: session.ptySessionId,
+        terminalSlotProviderLog.debug('failed to load terminal slot snapshot', {
+          ptySessionId: slot.ptySessionId,
           err: result.reason,
         })
       })
@@ -118,15 +118,15 @@ export function TerminalSlotProvider({ children }: TerminalSlotProviderProps) {
     [registry],
   )
 
-  const syncServerSessions = useCallback(
+  const syncServerSlots = useCallback(
     async (repoRoot: string) => {
       if (!repoRoot || !repoIndexRef.current[repoRoot]) return
       try {
         const clientId = readOrCreateWebTerminalClientId()
-        const serverSessions = await loadTerminalSessions(repoRoot)
-        const snapshotsBySessionId = await loadMissingSnapshots(serverSessions)
+        const serverSlots = await loadTerminalSlots(repoRoot)
+        const snapshotsByPtySessionId = await loadMissingSnapshots(serverSlots)
         if (!repoIndexRef.current[repoRoot]) return
-        registry.reconcileServerSessions(repoRoot, serverSessions, clientId, snapshotsBySessionId)
+        registry.reconcileServerSlots(repoRoot, serverSlots, clientId, snapshotsByPtySessionId)
       } catch (err) {
         terminalSlotProviderLog.debug('failed to sync server sessions', { err })
       } finally {
@@ -227,13 +227,13 @@ export function TerminalSlotProvider({ children }: TerminalSlotProviderProps) {
   // Server sync (initial + focus + external session changes)
   useEffect(() => {
     if (!currentRepoId) return
-    void syncServerSessions(currentRepoId)
+    void syncServerSlots(currentRepoId)
 
     const handleFocus = () => {
       if (!currentRepoIdRef.current) return
       const repoRoot = currentRepoIdRef.current
       if (!useRepoSyncStore.getState().shouldSync(repoRoot)) return
-      void syncServerSessions(repoRoot)
+      void syncServerSlots(repoRoot)
     }
     window.addEventListener('focus', handleFocus)
 
@@ -248,7 +248,7 @@ export function TerminalSlotProvider({ children }: TerminalSlotProviderProps) {
         if (disposed) return
         const repoRoots = Array.from(pendingRepoRoots)
         pendingRepoRoots.clear()
-        for (const nextRepoRoot of repoRoots) void syncServerSessions(nextRepoRoot)
+        for (const nextRepoRoot of repoRoots) void syncServerSlots(nextRepoRoot)
       }, 0)
     }
     const offSessionsChanged = terminalBridge.onSessionsChanged(scheduleServerSync)
@@ -259,7 +259,7 @@ export function TerminalSlotProvider({ children }: TerminalSlotProviderProps) {
       window.removeEventListener('focus', handleFocus)
       offSessionsChanged()
     }
-  }, [currentRepoId, currentRepoInstanceToken, syncServerSessions])
+  }, [currentRepoId, currentRepoInstanceToken, syncServerSlots])
 
   const commandValue = useMemo<TerminalSlotContextValue>(
     () => ({

@@ -1,5 +1,9 @@
-import { describe, expect, test, vi } from 'vitest'
-import { TerminalRealtimeBroker } from '#/server/terminal/terminal-realtime-broker.ts'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import {
+  HEARTBEAT_DEADLINE_MS,
+  HEARTBEAT_INTERVAL_MS,
+  TerminalRealtimeBroker,
+} from '#/server/terminal/terminal-realtime-broker.ts'
 
 const USER_A = 'user_a'
 const USER_B = 'user_b'
@@ -184,5 +188,98 @@ describe('terminal realtime broker', () => {
 
     broker.unregisterSocket(second)
     expect(onOwnerDisconnected).toHaveBeenCalledWith(USER_A)
+  })
+})
+
+describe('terminal realtime broker heartbeat', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    // Pin the wall clock so `recordHeartbeat`'s `at` and the
+    // deadline scan's `Date.now()` agree. Without this, a heartbeat
+    // recorded at the boundary between two real `Date.now()` ticks
+    // could land on the wrong side of the deadline assertion.
+    vi.setSystemTime(new Date('2026-06-24T00:00:00Z'))
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  test('fired deadline fires synthetic onClientDisconnected for silent (userId, clientId)', () => {
+    const onClientDisconnected = vi.fn()
+    const broker = new TerminalRealtimeBroker({
+      onClientConnected: vi.fn(),
+      onClientDisconnected,
+      onOwnerDisconnected: vi.fn(),
+    })
+    const socket = { send: vi.fn(), close: vi.fn() }
+    broker.registerSocket('client_a_1', USER_A, socket)
+
+    // Advance past the deadline without a heartbeat in between.
+    vi.advanceTimersByTime(HEARTBEAT_DEADLINE_MS + HEARTBEAT_INTERVAL_MS)
+
+    expect(onClientDisconnected).toHaveBeenCalledWith('client_a_1', USER_A)
+    broker.disconnectAll()
+  })
+
+  test('recordHeartbeat resets the deadline so a chatty client is never disconnected', () => {
+    const onClientDisconnected = vi.fn()
+    const broker = new TerminalRealtimeBroker({
+      onClientConnected: vi.fn(),
+      onClientDisconnected,
+      onOwnerDisconnected: vi.fn(),
+    })
+    const socket = { send: vi.fn(), close: vi.fn() }
+    broker.registerSocket('client_a_1', USER_A, socket)
+
+    // 3 intervals of heartbeats keep the deadline at bay.
+    for (let i = 0; i < 3; i += 1) {
+      vi.advanceTimersByTime(HEARTBEAT_INTERVAL_MS)
+      broker.recordHeartbeat(USER_A, 'client_a_1', Date.now())
+    }
+    // Total wall clock: 90 s; without the recordHeartbeat
+    // calls that would already be past the 90 s deadline.
+    expect(onClientDisconnected).not.toHaveBeenCalled()
+
+    broker.disconnectAll()
+  })
+
+  test('recordHeartbeat for an unknown (userId, clientId) is a no-op', () => {
+    const onClientDisconnected = vi.fn()
+    const broker = new TerminalRealtimeBroker({
+      onClientConnected: vi.fn(),
+      onClientDisconnected,
+      onOwnerDisconnected: vi.fn(),
+    })
+    // No registerSocket — the (userId, clientId) is unknown.
+    broker.recordHeartbeat(USER_A, 'never_connected', Date.now())
+    // Advance past the deadline: nothing should fire because the
+    // broker never had any sockets for this pair.
+    vi.advanceTimersByTime(HEARTBEAT_DEADLINE_MS + HEARTBEAT_INTERVAL_MS)
+    expect(onClientDisconnected).not.toHaveBeenCalled()
+    broker.disconnectAll()
+  })
+
+  test('unregisterSocket clears the heartbeat clock for the closing (userId, clientId)', () => {
+    const onClientDisconnected = vi.fn()
+    const broker = new TerminalRealtimeBroker({
+      onClientConnected: vi.fn(),
+      onClientDisconnected,
+      onOwnerDisconnected: vi.fn(),
+    })
+    const socket = { send: vi.fn(), close: vi.fn() }
+    broker.registerSocket('client_a_1', USER_A, socket)
+    broker.unregisterSocket(socket)
+    // The unregister path itself fires `onClientDisconnected` exactly
+    // once. Clear the mock so the post-deadline assertion only
+    // observes the synthetic deadline-driven call (if any).
+    onClientDisconnected.mockClear()
+
+    // Past the deadline — the synthetic disconnect path should NOT
+    // fire because the (userId, clientId) was already fully
+    // unregistered (no live sockets remain).
+    vi.advanceTimersByTime(HEARTBEAT_DEADLINE_MS + HEARTBEAT_INTERVAL_MS)
+    expect(onClientDisconnected).not.toHaveBeenCalled()
+
+    broker.disconnectAll()
   })
 })

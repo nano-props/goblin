@@ -41,14 +41,14 @@ type TestTerminalSummary = Omit<TerminalSlotSummary, 'type' | 'id' | 'displayOrd
 
 type TestWorktreeSnapshot = Omit<
   WorktreeTerminalSnapshot,
-  'sessions' | 'bellCount'
+  'slots' | 'bellCount'
 > & {
-  sessions: TestTerminalSummary[]
+  slots: TestTerminalSummary[]
   bellCount?: number
 }
 
 function completeWorktreeSnapshot(snapshot: TestWorktreeSnapshot): WorktreeTerminalSnapshot {
-  const sessions = snapshot.sessions.map((session, index) => ({
+  const slots = snapshot.slots.map((session, index) => ({
     ...session,
     type: 'terminal' as const,
     id: session.id ?? session.key,
@@ -56,8 +56,8 @@ function completeWorktreeSnapshot(snapshot: TestWorktreeSnapshot): WorktreeTermi
   }))
   return {
     ...snapshot,
-    sessions,
-    bellCount: snapshot.bellCount ?? sessions.filter((session) => session.hasBell).length,
+    slots,
+    bellCount: snapshot.bellCount ?? slots.filter((session) => session.hasBell).length,
   }
 }
 
@@ -79,7 +79,7 @@ async function renderControllerSlot() {
   const worktreeSnapshot = {
     worktreeTerminalKey: '/repo\0/worktree',
     selectedDescriptor: descriptor,
-    sessions: [
+    slots: [
       {
         key: 'slot-1',
         worktreeTerminalKey: '/repo\0/worktree',
@@ -205,7 +205,7 @@ describe('TerminalSlot', () => {
     const worktreeSnapshot = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
-      sessions: summaries,
+      slots: summaries,
       count: 1,
       pendingCreate: false,
     }
@@ -289,7 +289,7 @@ describe('TerminalSlot', () => {
     const emptyWorktreeSnapshot = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: null,
-      sessions: [],
+      slots: [],
       count: 0,
       pendingCreate: false,
     }
@@ -371,7 +371,7 @@ describe('TerminalSlot', () => {
     const worktreeSnapshot = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
-      sessions: [
+      slots: [
         {
           key: 'slot-1',
           worktreeTerminalKey: '/repo\0/worktree',
@@ -487,7 +487,7 @@ describe('TerminalSlot', () => {
     const worktreeSnapshot = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
-      sessions: [
+      slots: [
         {
           key: 'slot-1',
           worktreeTerminalKey: '/repo\0/worktree',
@@ -608,7 +608,7 @@ describe('TerminalSlot', () => {
     const worktreeSnapshot = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
-      sessions: [
+      slots: [
         {
           key: 'slot-1',
           worktreeTerminalKey: '/repo\0/worktree',
@@ -748,7 +748,7 @@ describe('TerminalSlot', () => {
     const worktreeSnapshot = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
-      sessions: [
+      slots: [
         {
           key: 'slot-1',
           worktreeTerminalKey: '/repo\0/worktree',
@@ -858,7 +858,7 @@ describe('TerminalSlot', () => {
     const worktreeSnapshot = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
-      sessions: [
+      slots: [
         {
           key: 'slot-1',
           worktreeTerminalKey: '/repo\0/worktree',
@@ -981,7 +981,7 @@ describe('TerminalSlot', () => {
     const worktreeSnapshot = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
-      sessions: [
+      slots: [
         {
           key: 'slot-1',
           worktreeTerminalKey: '/repo\0/worktree',
@@ -1188,7 +1188,7 @@ describe('TerminalSlot', () => {
     const worktreeSnapshot = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
-      sessions: [
+      slots: [
         {
           key: 'slot-1',
           worktreeTerminalKey: '/repo\0/worktree',
@@ -1334,7 +1334,7 @@ describe('TerminalSlot', () => {
     const worktreeSnapshotA = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: descriptorA,
-      sessions: [
+      slots: [
         {
           key: 'slot-1',
           worktreeTerminalKey: '/repo\0/worktree',
@@ -1352,7 +1352,7 @@ describe('TerminalSlot', () => {
     const worktreeSnapshotB = {
       worktreeTerminalKey: '/repo\0/worktree-other',
       selectedDescriptor: descriptorB,
-      sessions: [
+      slots: [
         {
           key: 'slot-2',
           worktreeTerminalKey: '/repo\0/worktree-other',
@@ -1497,7 +1497,7 @@ describe('TerminalSlot', () => {
     const emptyWorktreeSnapshot = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: null,
-      sessions: [],
+      slots: [],
       count: 0,
       pendingCreate: false,
     }
@@ -1584,7 +1584,7 @@ describe('TerminalSlot', () => {
     const emptyWorktreeSnapshot = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: null,
-      sessions: [],
+      slots: [],
       count: 0,
       pendingCreate: false,
     }

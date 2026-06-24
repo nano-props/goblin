@@ -72,7 +72,7 @@ export function BranchWorkspaceContent({ repo, detail, workspacePaneId }: Props)
     worktreePath: branch?.worktree?.path ?? null,
     preferredView: preferredWorkspacePaneViewForBranch(repo.ui, branch?.name),
     tabOrder: workspacePaneTabOrder,
-    runtimeTerminalViews: worktreeSnapshot.sessions,
+    runtimeTerminalViews: worktreeSnapshot.slots,
     terminalSessionCount: worktreeSnapshot.count,
     terminalCreatePending: worktreeSnapshot.pendingCreate,
     terminalSyncReady,

@@ -1,8 +1,8 @@
 import { BufferedTerminalSocket } from '#/server/terminal/buffered-terminal-socket.ts'
 import type {
-  TerminalClientMessage,
   TerminalSocketRequestAction,
   TerminalSocketRequestInputs,
+  TerminalSocketRequestMessage,
   TerminalSocketResponseMessage,
   TerminalSocketResponseOutputs,
 } from '#/shared/terminal-socket.ts'
@@ -70,7 +70,7 @@ export async function handleTerminalRealtimeRequestMessage(
   userId: string,
   socket: TerminalRealtimeSocket,
   bufferedSocket: BufferedTerminalSocket | undefined,
-  message: TerminalClientMessage,
+  message: TerminalSocketRequestMessage,
 ): Promise<void> {
   let response: TerminalSocketResponseMessage
   try {

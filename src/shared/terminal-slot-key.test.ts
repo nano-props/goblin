@@ -7,8 +7,8 @@ import {
   terminalPruneKeyFromSlotKey,
 } from '#/shared/terminal-slot-key.ts'
 
-describe('terminal session key helpers', () => {
-  test('formats and parses terminal session keys round-trip', () => {
+describe('terminal slot key helpers', () => {
+  test('formats and parses terminal slot keys round-trip', () => {
     const key = formatTerminalSlotKey('/repo', '/repo/worktree', 'slot-2')
     expect(key).toBe('/repo\0/repo/worktree\0slot-2')
     expect(parseTerminalSlotKey(key)).toEqual({
@@ -18,7 +18,7 @@ describe('terminal session key helpers', () => {
     })
   })
 
-  test('rejects malformed terminal session keys', () => {
+  test('rejects malformed terminal slot keys', () => {
     expect(parseTerminalSlotKey('')).toBeNull()
     expect(parseTerminalSlotKey('/repo')).toBeNull()
     expect(parseTerminalSlotKey('/repo\0/worktree')).toBeNull()
@@ -43,7 +43,7 @@ describe('terminal session key helpers', () => {
     expect(parseWorktreeKey('/repo\0/worktree\0slot-1')).toBeNull()
   })
 
-  test('builds prune keys from valid session keys only', () => {
+  test('builds prune keys from valid slot keys only', () => {
     expect(terminalPruneKeyFromSlotKey('/repo\0/repo/worktree\0slot-3')).toBe('/repo\0/repo/worktree')
     expect(terminalPruneKeyFromSlotKey('invalid')).toBeNull()
   })

@@ -20,16 +20,23 @@ import {
   projectTerminalAttachResultForClient,
   type TerminalAttachResultWithOwnership,
 } from '#/web/components/terminal/terminal-slot-projection.ts'
-import { TerminalSessionRuntime } from '#/web/components/terminal/terminal-slot-runtime.ts'
+import { TerminalSlotRuntime } from '#/web/components/terminal/terminal-slot-runtime.ts'
 import { TerminalSlotView } from '#/web/components/terminal/terminal-slot-view.ts'
 import { isTerminalEmulatorInput, type TerminalInput } from '#/web/components/terminal/terminal-input.ts'
 import { readOrCreateWebTerminalClientId } from '#/web/renderer-terminal-bridge.ts'
-import { createXtermAuthorityGate, type TerminalAuthorityGate } from '#/web/components/terminal/authority-gate.ts'
+import {
+  createXtermAuthorityGate,
+  type AuthorizationDenialReason,
+  type TerminalAuthorityGate,
+} from '#/web/components/terminal/authority-gate.ts'
+import { WRITE_BLOCKED_KEY_BY_REASON } from '#/web/components/terminal/authority-denial-feedback.ts'
 import { terminalLog } from '#/web/logger.ts'
+import { t } from 'i18next'
+import { toast } from 'sonner'
 import type {
   TerminalBellEvent,
   TerminalDescriptor,
-  TerminalSessionHydrationInput,
+  TerminalSlotHydrationInput,
   TerminalOwnershipViewModel,
   TerminalSearchResult,
 } from '#/web/components/terminal/types.ts'
@@ -42,7 +49,7 @@ export class ManagedTerminalSlot {
   private readonly notify: (reason: TerminalNotifyReason) => void
   private readonly onBell: ((descriptor: TerminalDescriptor, event: TerminalBellEvent) => void) | null
   private readonly requestDurableClose: (ptySessionId: string) => Promise<void>
-  private readonly runtime = new TerminalSessionRuntime()
+  private readonly runtime = new TerminalSlotRuntime()
   private readonly view: TerminalSlotView
   // Authority gate owns the "am I the controller?" cache and the
   // auto-promote-on-write path. The gate is constructed lazily so
@@ -75,7 +82,7 @@ export class ManagedTerminalSlot {
     // fire-and-forget. The old `void … .catch(() => {})` path could
     // drop the request if the WebSocket was already closing, leaving
     // the server PTY alive and the next create reattaching to the
-    // orphan. See `TerminalSlotRegistry.pendingCloseBySessionId`.
+    // orphan. See `TerminalSlotRegistry.pendingCloseByPtySessionId`.
     requestDurableClose: (ptySessionId: string) => Promise<void> = () => Promise.resolve(),
   ) {
     this.descriptor = descriptor
@@ -134,7 +141,7 @@ export class ManagedTerminalSlot {
     this.geometryAbortController = null
     this.clearTerminalFocusIfOwned()
     this.view.blurIfFocused()
-    const sessionIds = this.runtime.disposeSessionIds()
+    const sessionIds = this.runtime.disposePtySessionIds()
     if (options.closeSlot !== false) {
       // Hand the close to the registry's durable queue instead of
       // firing `terminalBridge.close` directly. The queue fires the
@@ -166,7 +173,7 @@ export class ManagedTerminalSlot {
   }
 
   writeInput(input: TerminalInput): void {
-    const ptySessionId = this.runtime.currentSessionId()
+    const ptySessionId = this.runtime.currentPtySessionId()
     if (!ptySessionId || !this.runtime.canResize()) return
     if (this.runtime.isReplaying() && isTerminalEmulatorInput(input)) return
     this.pendingWriteBuffer += input.data
@@ -184,7 +191,7 @@ export class ManagedTerminalSlot {
 
   private flushInput(): void {
     if (this.disposed) return
-    const ptySessionId = this.runtime.currentSessionId()
+    const ptySessionId = this.runtime.currentPtySessionId()
     if (!ptySessionId || !this.runtime.canResize()) return
     const data = this.pendingWriteBuffer
     this.pendingWriteBuffer = ''
@@ -196,12 +203,13 @@ export class ManagedTerminalSlot {
     // types and the gate handles the rest. If the takeover fails
     // (session gone, server rejected), we drop the keystroke rather
     // than firing a write the server would reject with
-    // `not-controller`.
+    // `not-controller`. The user gets a toast for every non-silent
+    // denial so the keystroke disappearing is observable.
     void this.authority()
       .authorize('write')
       .then((result) => {
         if (result.kind === 'denied') {
-          terminalLog.warn('write denied by authority gate', { ptySessionId, reason: result.reason })
+          this.reportGateDenial('write', result.reason, ptySessionId)
           return
         }
         return terminalBridge.write({ ptySessionId, data })
@@ -209,6 +217,58 @@ export class ManagedTerminalSlot {
       .catch((err) => {
         terminalLog.warn('write failed for session', { ptySessionId, err })
       })
+  }
+
+  private flushResize(): void {
+    const ptySessionId = this.runtime.currentPtySessionId()
+    const resize = this.pendingResize
+    if (!ptySessionId || !resize) return
+    if (!this.runtime.canResize()) return
+    this.pendingResize = null
+    const { cols, rows } = resize
+    const canonicalSize = this.runtime.currentCanonicalSize()
+    if (canonicalSize.cols === cols && canonicalSize.rows === rows) return
+    // Mirror `flushInput`: resize is also a controller-only action,
+    // so it goes through the gate. Without this a viewer would
+    // call `terminalBridge.resize` directly, the server would reject
+    // with `not-controller`, and the user would see a stale
+    // geometry with no feedback. The gate's auto-promote path also
+    // gives the resize a chance to succeed via takeover.
+    void this.authority()
+      .authorize('resize')
+      .then((result) => {
+        if (result.kind === 'denied') {
+          this.reportGateDenial('resize', result.reason, ptySessionId)
+          return
+        }
+        return terminalBridge.resize({ ptySessionId, cols, rows }).then((ok) => {
+          if (ok && this.runtime.currentPtySessionId() === ptySessionId) this.runtime.acknowledgeResize(cols, rows)
+        })
+      })
+      .catch((err) => {
+        // Resize rejection leaves the view stuck at the old geometry —
+        // surface the failure so ops can correlate with server-side
+        // validation rejections (size out of range, lost controller, etc.).
+        terminalLog.warn('resize failed for session', { ptySessionId, cols, rows, err })
+      })
+  }
+
+  /**
+   * Map a structured gate denial to a toast. Per the AGENTS.md i18n
+   * rule, the key is read from the typed `WRITE_BLOCKED_KEY_BY_REASON`
+   * map rather than concatenated inline. `slot-closed` is intentionally
+   * silent (the session is gone, no need to nag) so the lookup is
+   * `null` in that case.
+   */
+  private reportGateDenial(
+    action: 'write' | 'resize',
+    reason: AuthorizationDenialReason,
+    ptySessionId: string,
+  ): void {
+    terminalLog.warn(`${action} denied by authority gate`, { ptySessionId, reason })
+    const key = WRITE_BLOCKED_KEY_BY_REASON[reason]
+    if (!key) return
+    toast.warning(t(key))
   }
 
   findNext(term: string, incremental = false): TerminalSearchResult {
@@ -236,8 +296,8 @@ export class ManagedTerminalSlot {
     return this.view.serialize()
   }
 
-  currentSessionId(): string | null {
-    return this.runtime.currentSessionId()
+  currentPtySessionId(): string | null {
+    return this.runtime.currentPtySessionId()
   }
 
   /**
@@ -251,7 +311,7 @@ export class ManagedTerminalSlot {
     if (!this.authorityGate) {
       this.authorityGate = createXtermAuthorityGate({
         bridge: terminalBridge,
-        getSessionId: () => this.runtime.currentSessionId(),
+        getPtySessionId: () => this.runtime.currentPtySessionId(),
         resolveSize: async () => {
           // Prefer the live xterm size — the takeover round-trip
           // resizes the PTY to match the new controller's geometry.
@@ -271,7 +331,7 @@ export class ManagedTerminalSlot {
           }
         },
         isSessionAlive: (ptySessionId) =>
-          !this.disposed && this.runtime.currentSessionId() === ptySessionId,
+          !this.disposed && this.runtime.currentPtySessionId() === ptySessionId,
         onPromoted: (result) => {
           // Mirror the runtime's `applyTakeover` so the new
           // controller's view (cols/rows/phase) is applied
@@ -284,8 +344,8 @@ export class ManagedTerminalSlot {
     return this.authorityGate
   }
 
-  hydrate(input: TerminalSessionHydrationInput): void {
-    const previousSessionId = this.runtime.currentSessionId()
+  hydrate(input: TerminalSlotHydrationInput): void {
+    const previousSessionId = this.runtime.currentPtySessionId()
     this.hydratedSnapshot = { snapshot: input.snapshot, snapshotSeq: input.snapshotSeq }
     const changed = this.runtime.hydrateSession({
       ptySessionId: input.ptySessionId,
@@ -314,7 +374,7 @@ export class ManagedTerminalSlot {
   }
 
   handleOwnership(event: TerminalOwnershipViewModel): void {
-    const applies = this.runtime.currentSessionId() === event.ptySessionId
+    const applies = this.runtime.currentPtySessionId() === event.ptySessionId
     const wasController = this.runtime.canResize()
     const changed = this.runtime.handleOwnership(event)
     const pendingCleared = applies ? this.runtime.clearTakeoverPending() : false
@@ -362,7 +422,7 @@ export class ManagedTerminalSlot {
   }
 
   async takeover(): Promise<boolean> {
-    const ptySessionId = this.runtime.currentSessionId()
+    const ptySessionId = this.runtime.currentPtySessionId()
     if (!ptySessionId) return false
     // Capture the role BEFORE the gate calls applyTakeover — the
     // post-takeover check below needs to fire `ensureControllerViewStarted`
@@ -409,7 +469,7 @@ export class ManagedTerminalSlot {
   private start(): void {
     if (this.disposed || this.view.currentTerminal() || !this.view.isConnected()) return
     const token = (this.startToken += 1)
-    if (!this.runtime.currentSessionId() && this.runtime.startAttaching()) this.notify('metadata')
+    if (!this.runtime.currentPtySessionId() && this.runtime.startAttaching()) this.notify('metadata')
     void this.startAsync(token)
   }
 
@@ -512,7 +572,7 @@ export class ManagedTerminalSlot {
 
   private async ipcPhase(token: number, term: XTermTerminal): Promise<TerminalAttachResultWithOwnership> {
     const restart = this.runtime.consumeRestartFlag()
-    const ptySessionId = restart ? this.runtime.restartingSessionId() : this.runtime.currentSessionId()
+    const ptySessionId = restart ? this.runtime.restartingPtySessionId() : this.runtime.currentPtySessionId()
     if (!ptySessionId) {
       this.destroyActiveView()
       if (this.runtime.failAttachAttempt('error.invalid-arguments')) this.notify('metadata')
@@ -676,7 +736,7 @@ export class ManagedTerminalSlot {
   }
 
   private queueResize(cols: number, rows: number): void {
-    if (!this.runtime.currentSessionId() || !this.runtime.canResize()) return
+    if (!this.runtime.currentPtySessionId() || !this.runtime.canResize()) return
     const canonicalSize = this.runtime.currentCanonicalSize()
     if (canonicalSize.cols === cols && canonicalSize.rows === rows && !this.pendingResize) return
     this.pendingResize = { cols, rows }
@@ -686,28 +746,6 @@ export class ManagedTerminalSlot {
       this.resizeFlushScheduled = false
       this.flushResize()
     })
-  }
-
-  private flushResize(): void {
-    const ptySessionId = this.runtime.currentSessionId()
-    const resize = this.pendingResize
-    if (!ptySessionId || !resize) return
-    if (!this.runtime.canResize()) return
-    this.pendingResize = null
-    const { cols, rows } = resize
-    const canonicalSize = this.runtime.currentCanonicalSize()
-    if (canonicalSize.cols === cols && canonicalSize.rows === rows) return
-    void terminalBridge
-      .resize({ ptySessionId, cols, rows })
-      .then((ok) => {
-        if (ok && this.runtime.currentSessionId() === ptySessionId) this.runtime.acknowledgeResize(cols, rows)
-      })
-      .catch((err) => {
-        // Resize rejection leaves the view stuck at the old geometry —
-        // surface the failure so ops can correlate with server-side
-        // validation rejections (size out of range, lost controller, etc.).
-        terminalLog.warn('resize failed for session', { ptySessionId, cols, rows, err })
-      })
   }
 
   private applyCanonicalSizeToView(): void {
@@ -809,7 +847,7 @@ export class ManagedTerminalSlot {
   }
 
   private closeReplacingPtySession(): void {
-    const ptySessionId = this.runtime.closeReplacingSessionId()
+    const ptySessionId = this.runtime.closeReplacingPtySessionId()
     if (ptySessionId) void terminalBridge.close({ ptySessionId }).catch(() => {})
   }
 }

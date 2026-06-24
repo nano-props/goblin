@@ -272,7 +272,7 @@ function worktreeSnapshot(): WorktreeTerminalSnapshot {
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     },
-    sessions: [
+    slots: [
       {
         type: 'terminal',
         id: 'slot-1',

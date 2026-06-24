@@ -49,7 +49,7 @@ describe('workspace commands', () => {
       worktreeSnapshot: () => ({
         worktreeTerminalKey: WORKTREE_KEY,
         selectedDescriptor: null,
-        sessions: [],
+        slots: [],
         count: 0,
         bellCount: 0,
         pendingCreate: false,
@@ -76,7 +76,7 @@ describe('workspace commands', () => {
       worktreeSnapshot: () => ({
         worktreeTerminalKey: WORKTREE_KEY,
         selectedDescriptor: null,
-        sessions: [],
+        slots: [],
         count: 0,
         bellCount: 0,
         pendingCreate: false,
@@ -103,7 +103,7 @@ describe('workspace commands', () => {
       worktreeSnapshot: () => ({
         worktreeTerminalKey: WORKTREE_KEY,
         selectedDescriptor: null,
-        sessions: [],
+        slots: [],
         count: 0,
         bellCount: 0,
         pendingCreate: false,
@@ -129,7 +129,7 @@ describe('workspace commands', () => {
       worktreeSnapshot: () => ({
         worktreeTerminalKey: WORKTREE_KEY,
         selectedDescriptor: null,
-        sessions: [],
+        slots: [],
         count: 0,
         bellCount: 0,
         pendingCreate: false,
@@ -155,7 +155,7 @@ describe('workspace commands', () => {
       worktreeSnapshot: () => ({
         worktreeTerminalKey: WORKTREE_KEY,
         selectedDescriptor: null,
-        sessions: [],
+        slots: [],
         count: 0,
         bellCount: 0,
         pendingCreate: false,
@@ -182,7 +182,7 @@ describe('workspace commands', () => {
       worktreeSnapshot: () => ({
         worktreeTerminalKey: WORKTREE_KEY,
         selectedDescriptor: null,
-        sessions: [],
+        slots: [],
         count: 0,
         bellCount: 0,
         pendingCreate: false,
@@ -216,7 +216,7 @@ describe('workspace commands', () => {
       worktreeSnapshot: () => ({
         worktreeTerminalKey: WORKTREE_KEY,
         selectedDescriptor: null,
-        sessions: [
+        slots: [
           {
             type: 'terminal',
             id: 'slot-1',
@@ -335,7 +335,7 @@ describe('workspace commands', () => {
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     })
-    // Tab removal is owned by the registry's session-removed callback, not the command.
+    // Tab removal is owned by the registry's slot-removed callback, not the command.
     expect(tabOrderFor('feature/worktree')).toEqual([staticEntry('status'), terminalEntry('slot-1')])
     expect(closeWindow).not.toHaveBeenCalled()
   })
@@ -726,7 +726,7 @@ function worktreeSnapshotWithTerminal(): WorktreeTerminalSnapshot {
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     },
-    sessions: [
+    slots: [
       {
         type: 'terminal',
         id: 'slot-1',
@@ -751,7 +751,7 @@ function emptyWorktreeSnapshot(): WorktreeTerminalSnapshot {
   return {
     worktreeTerminalKey: WORKTREE_KEY,
     selectedDescriptor: null,
-    sessions: [],
+    slots: [],
     count: 0,
     bellCount: 0,
     pendingCreate: false,
@@ -770,7 +770,7 @@ function worktreeSnapshotWithSecondTerminalSelected(): WorktreeTerminalSnapshot 
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     },
-    sessions: [
+    slots: [
       {
         type: 'terminal',
         id: 'slot-1',

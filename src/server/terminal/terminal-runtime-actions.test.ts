@@ -62,7 +62,7 @@ function makeActions(
 describe('terminal-runtime-actions close broadcast', () => {
   test('emits repo and targeted close broadcasts on a successful close', async () => {
     // The new sibling-window broadcast rides alongside the existing
-    // `sessions-changed` list-rescan. The session-closed event is the
+    // `sessions-changed` list-rescan. The slot-closed event is the
     // targeted counterpart; sibling windows drop the local entry
     // immediately instead of waiting for the next reconcile.
     const close = vi.fn(() => true)
@@ -88,7 +88,7 @@ describe('terminal-runtime-actions close broadcast', () => {
   })
 
   test('emits NEITHER broadcast when the close returns false (session not owned)', async () => {
-    // A non-owner close must not leak a phantom session-closed to
+    // A non-owner close must not leak a phantom slot-closed to
     // sibling windows. The guard is `if (closed && repoRoot)`.
     const { actions, broadcasts } = makeActions({
       closeSlotForUser: () => false,
@@ -104,7 +104,7 @@ describe('terminal-runtime-actions close broadcast', () => {
   test('emits NEITHER broadcast when the session has no scope (lookup miss)', async () => {
     // Defensive: if `getSlot` returns undefined (e.g. the session
     // was already removed server-side by a parallel path), the close
-    // path must not synthesize a session-closed with a fake repoRoot.
+    // path must not synthesize a slot-closed with a fake repoRoot.
     const { actions, broadcasts } = makeActions({
       closeSlotForUser: () => true,
       getSlotScope: () => undefined,
@@ -133,7 +133,7 @@ describe('terminal-runtime-actions close broadcast', () => {
   test('rejects an invalid clientId without emitting', async () => {
     // The `isValidTerminalClientId` guard is the first check. A bad
     // clientId must never reach `closeSlotForUser` (which would
-    // also reject it) and must not emit a session-closed with a
+    // also reject it) and must not emit a slot-closed with a
     // stale ptySessionId.
     const close = vi.fn(() => true)
     const { actions, broadcasts } = makeActions({

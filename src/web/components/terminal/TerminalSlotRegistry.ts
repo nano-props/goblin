@@ -9,11 +9,11 @@ import { readOrCreateWebTerminalClientId } from '#/web/renderer-terminal-bridge.
 import { parseTerminalSlotKey } from '#/shared/terminal-slot-key.ts'
 import type {
   TerminalSlotSnapshot,
-  TerminalSlotSummary as ServerTerminalSessionSummary,
+  TerminalSlotSummary as ServerTerminalSlotSummary,
 } from '#/shared/terminal-types.ts'
 import { branchForTerminalWorktree } from '#/web/components/terminal/terminal-repo-index.ts'
 import {
-  projectServerTerminalSession,
+  projectServerTerminalSlot,
   type ReattachSnapshotCacheEntry,
 } from '#/web/components/terminal/terminal-slot-projection.ts'
 import { userTerminalInput, type TerminalUserInputSource } from '#/web/components/terminal/terminal-input.ts'
@@ -27,7 +27,7 @@ import {
   countOrphanedTerminalSlotKeys,
   resolveAdjacentTerminalSelectionAfterRemoval,
 } from '#/web/components/terminal/terminal-slot-eviction.ts'
-import { syncTerminalSessionIdIndex } from '#/web/components/terminal/terminal-slot-index.ts'
+import { syncTerminalPtySessionIdIndex } from '#/web/components/terminal/terminal-slot-index.ts'
 import { resolveSelectedTerminalKey } from '#/web/components/terminal/terminal-slot-selection.ts'
 import { buildWorktreeTerminalSnapshot } from '#/web/components/terminal/terminal-slot-worktree-snapshot.ts'
 import type {
@@ -67,12 +67,12 @@ const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = {
 export class TerminalSlotRegistry {
   private readonly getCurrentRepoId: () => string | null
   private readonly onSelectedWorktreeChange: (worktreeTerminalKey: string, key: string | null) => void
-  private readonly onTerminalSessionRemoved: (key: string, base: TerminalSlotBase) => void
+  private readonly onTerminalSlotRemoved: (key: string, base: TerminalSlotBase) => void
   private repoIndex: TerminalRepoIndex = {}
   private parkingRoot: HTMLDivElement | null = null
   private readonly sessions = new Map<string, ManagedTerminalSlot>()
   private readonly slotKeyByPtySessionId = new Map<string, string>()
-  private readonly sessionIdByKey = new Map<string, string>()
+  private readonly ptySessionIdByKey = new Map<string, string>()
   private readonly selectedKeyByWorktree = new Map<string, string>()
   private readonly preferredSelectedKeyByWorktree = new Map<string, string>()
   private readonly hostByWorktree = new Map<string, HTMLElement>()
@@ -104,7 +104,7 @@ export class TerminalSlotRegistry {
   // Failures are logged (the old path swallowed them silently) so any
   // future regression is visible in `terminalLog` rather than invisible
   // shell ghosts in the buffer.
-  private readonly pendingCloseBySessionId = new Map<
+  private readonly pendingCloseByPtySessionId = new Map<
     string,
     {
       worktreeTerminalKey: string
@@ -151,11 +151,11 @@ export class TerminalSlotRegistry {
   constructor(
     getCurrentRepoId: () => string | null,
     onSelectedWorktreeChange: (worktreeTerminalKey: string, key: string | null) => void = () => {},
-    onTerminalSessionRemoved: (key: string, base: TerminalSlotBase) => void = () => {},
+    onTerminalSlotRemoved: (key: string, base: TerminalSlotBase) => void = () => {},
   ) {
     this.getCurrentRepoId = getCurrentRepoId
     this.onSelectedWorktreeChange = onSelectedWorktreeChange
-    this.onTerminalSessionRemoved = onTerminalSessionRemoved
+    this.onTerminalSlotRemoved = onTerminalSlotRemoved
   }
 
   setRepoIndex(repoIndex: TerminalRepoIndex): void {
@@ -192,19 +192,19 @@ export class TerminalSlotRegistry {
       pending.geometryAbortController?.abort(new Error('terminal registry destroyed'))
       pending.reject(new Error('terminal registry destroyed'))
     }
-    for (const pending of this.pendingCloseBySessionId.values())
+    for (const pending of this.pendingCloseByPtySessionId.values())
       pending.reject(new Error('terminal registry destroyed'))
     for (const session of this.sessions.values()) session.dispose({ closeSlot: false })
     this.sessions.clear()
     this.slotKeyByPtySessionId.clear()
-    this.sessionIdByKey.clear()
+    this.ptySessionIdByKey.clear()
     this.selectedKeyByWorktree.clear()
     this.preferredSelectedKeyByWorktree.clear()
     this.hostByWorktree.clear()
     this.hostWaitersByWorktree.clear()
     this.geometryByWorktree.clear()
     this.pendingCreateByWorktree.clear()
-    this.pendingCloseBySessionId.clear()
+    this.pendingCloseByPtySessionId.clear()
     this.snapshotCache.clear()
     this.reattachSnapshotCache.clear()
     this.worktreeSnapshotCache.clear()
@@ -245,7 +245,7 @@ export class TerminalSlotRegistry {
       this.discardLocalSessionAndDismissDetailIfLast(directKey, directSession.descriptor)
       return
     }
-    if (directKey && directSession && !directSession.currentSessionId()) {
+    if (directKey && directSession && !directSession.currentPtySessionId()) {
       // The runtime is empty (exit was observed earlier, or the
       // session was never attached) but the ptySessionId index still
       // points at it. The cache entry is keyed by the local key, not
@@ -281,11 +281,11 @@ export class TerminalSlotRegistry {
     }
   }
 
-  reconcileServerSessions(
+  reconcileServerSlots(
     repoRoot: string,
-    serverSessions: ServerTerminalSessionSummary[],
+    serverSlots: ServerTerminalSlotSummary[],
     clientId: string,
-    snapshotsBySessionId: ReadonlyMap<string, TerminalSlotSnapshot>,
+    snapshotsByPtySessionId: ReadonlyMap<string, TerminalSlotSnapshot>,
   ): void {
     if (!this.repoIndex[repoRoot]) return
 
@@ -294,9 +294,9 @@ export class TerminalSlotRegistry {
       .map(([key]) => key)
 
     const { controllerKeyByWorktree, touchedWorktrees, displayOrderChangedWorktrees, missingLocalCount } =
-      this.materializeServerSessions(repoRoot, serverSessions, clientId, snapshotsBySessionId)
+      this.materializeServerSlots(repoRoot, serverSlots, clientId, snapshotsByPtySessionId)
 
-    const serverKeys = new Set(serverSessions.map((s) => s.key))
+    const serverKeys = new Set(serverSlots.map((s) => s.key))
     const orphanedLocalCount = this.evictOrphanedLocalSessions(repoRoot, serverKeys)
 
     this.resolveSelectedKeysForTouchedWorktrees(touchedWorktrees, controllerKeyByWorktree)
@@ -305,15 +305,15 @@ export class TerminalSlotRegistry {
     }
   }
 
-  // Phase 1: for each server session, ensure a local ManagedTerminalSlot
+  // Phase 1: for each server slot, ensure a local ManagedTerminalSlot
   // exists, hydrate it with the latest server-side metadata, and track
   // which worktrees saw any change. Side effects: ensureSlot,
-  // session.hydrate, displayOrderByKey, syncSessionIdIndex.
-  private materializeServerSessions(
+  // session.hydrate, displayOrderByKey, syncPtySessionIdIndex.
+  private materializeServerSlots(
     repoRoot: string,
-    serverSessions: ServerTerminalSessionSummary[],
+    serverSlots: ServerTerminalSlotSummary[],
     clientId: string,
-    snapshotsBySessionId: ReadonlyMap<string, TerminalSlotSnapshot>,
+    snapshotsByPtySessionId: ReadonlyMap<string, TerminalSlotSnapshot>,
   ): {
     controllerKeyByWorktree: Map<string, string>
     touchedWorktrees: Set<string>
@@ -325,14 +325,14 @@ export class TerminalSlotRegistry {
     const displayOrderChangedWorktrees = new Set<string>()
     let missingLocalCount = 0
 
-    for (const serverSession of serverSessions) {
-      const projected = projectServerTerminalSession({
+    for (const serverSlot of serverSlots) {
+      const projected = projectServerTerminalSlot({
         repoIndex: this.repoIndex,
         repoRoot,
-        serverSession,
+        serverSlot,
         clientId,
-        serverSnapshot: snapshotsBySessionId.get(serverSession.ptySessionId) ?? null,
-        reattachSnapshot: this.reattachSnapshotCache.get(serverSession.key) ?? null,
+        serverSnapshot: snapshotsByPtySessionId.get(serverSlot.ptySessionId) ?? null,
+        reattachSnapshot: this.reattachSnapshotCache.get(serverSlot.key) ?? null,
       })
       if (!projected) continue
       touchedWorktrees.add(projected.worktreeTerminalKey)
@@ -342,7 +342,7 @@ export class TerminalSlotRegistry {
         this.ensureSlot(descriptor)
       }
       this.sessions.get(descriptor.key)?.hydrate(projected.hydrateInput)
-      this.syncSessionIdIndex(descriptor.key, projected.hydrateInput.ptySessionId)
+      this.syncPtySessionIdIndex(descriptor.key, projected.hydrateInput.ptySessionId)
       if (projected.controlsTerminal) controllerKeyByWorktree.set(projected.worktreeTerminalKey, descriptor.key)
       const previousDisplayOrder = this.displayOrderByKey.get(descriptor.key)
       this.displayOrderByKey.set(descriptor.key, projected.displayOrder)
@@ -364,7 +364,7 @@ export class TerminalSlotRegistry {
       repoRoot,
       localSlotKeys: Array.from(this.sessions.keys()),
       getRepoRootForKey: (key) => this.sessions.get(key)?.descriptor.repoRoot ?? null,
-      hasServerSessionId: (key) => this.sessionIdByKey.has(key),
+      hasServerPtySessionId: (key) => this.ptySessionIdByKey.has(key),
       serverKeys,
     })
     for (const key of orphanedKeys) {
@@ -391,7 +391,7 @@ export class TerminalSlotRegistry {
         preferredKey: preferred,
         currentKey: current,
         controllerKey: controllerKeyByWorktree.get(worktreeKey) ?? null,
-        sortedDescriptors: this.sortedSessionsForWorktree(worktreeKey).map((session) => session.descriptor),
+        sortedDescriptors: this.sortedSlotsForWorktree(worktreeKey).map((session) => session.descriptor),
         isSelectedKeyValid: (candidateWorktreeKey, key) => this.isSelectedKeyValid(candidateWorktreeKey, key),
       })
       this.selectTerminalKey(worktreeKey, next)
@@ -428,7 +428,7 @@ export class TerminalSlotRegistry {
       repoRoot: base.repoRoot,
       branch: base.branch,
       worktreePath: base.worktreePath,
-      kind: this.sortedSessionsForWorktree(terminalWorktreeKey).length === 0 ? 'primary' : 'additional',
+      kind: this.sortedSlotsForWorktree(terminalWorktreeKey).length === 0 ? 'primary' : 'additional',
       cols: geometry.cols,
       rows: geometry.rows,
       clientId,
@@ -441,22 +441,22 @@ export class TerminalSlotRegistry {
       throw new Error('error.terminal-create-failed')
     }
     // First-frame contract: when the server reports `action: 'created'`,
-    // the catalog must echo that session in `sessions[]`. The first-frame
+    // the catalog must echo that slot in `sessions[]`. The first-frame
     // payload is the source of truth — fabricates below this point would
     // hide a real protocol mismatch (e.g., a half-applied create that
-    // committed the session row but skipped the catalog append). Reject
+    // committed the slot row but skipped the catalog append). Reject
     // and let the operator restart the create.
-    const createdSession = result.sessions.find(
-      (session) => session.key === result.key && session.ptySessionId === snapshotSessionId,
+    const createdSlot = result.sessions.find(
+      (slot) => slot.key === result.key && slot.ptySessionId === snapshotSessionId,
     )
-    if (!createdSession) {
+    if (!createdSlot) {
       throw new Error('error.terminal-create-failed')
     }
-    const serverSessions = result.sessions
+    const serverSlots = result.sessions
     this.setPreferredSelectedTerminalKey(terminalWorktreeKey, result.key)
-    this.reconcileServerSessions(
+    this.reconcileServerSlots(
       base.repoRoot,
-      serverSessions,
+      serverSlots,
       clientId,
       new Map<string, TerminalSlotSnapshot>([[snapshotSessionId, result as TerminalSlotSnapshot]]),
     )
@@ -607,7 +607,7 @@ export class TerminalSlotRegistry {
   // ptySessionId in quick succession. The first call owns the request;
   // the second is a no-op and just observes the same outcome.
   enqueueDurableClose(input: { ptySessionId: string; worktreeTerminalKey: string }): Promise<void> {
-    const existing = this.pendingCloseBySessionId.get(input.ptySessionId)
+    const existing = this.pendingCloseByPtySessionId.get(input.ptySessionId)
     if (existing) return existing.promise
 
     let resolve!: () => void
@@ -616,7 +616,7 @@ export class TerminalSlotRegistry {
       resolve = innerResolve
       reject = innerReject
     })
-    this.pendingCloseBySessionId.set(input.ptySessionId, {
+    this.pendingCloseByPtySessionId.set(input.ptySessionId, {
       worktreeTerminalKey: input.worktreeTerminalKey,
       promise,
       resolve,
@@ -635,8 +635,8 @@ export class TerminalSlotRegistry {
   // `performDurableClose` and the user can `pruneTerminals` from the
   // UI to recover if the orphan ever resurfaces.
   private async flushPendingClosesForWorktree(worktreeTerminalKey: string): Promise<void> {
-    if (this.pendingCloseBySessionId.size === 0) return
-    const pendingForWorktree = Array.from(this.pendingCloseBySessionId.entries()).filter(
+    if (this.pendingCloseByPtySessionId.size === 0) return
+    const pendingForWorktree = Array.from(this.pendingCloseByPtySessionId.entries()).filter(
       ([, entry]) => entry.worktreeTerminalKey === worktreeTerminalKey,
     )
     if (pendingForWorktree.length === 0) return
@@ -646,12 +646,12 @@ export class TerminalSlotRegistry {
   private async performDurableClose(ptySessionId: string): Promise<void> {
     try {
       await terminalBridge.close({ ptySessionId })
-      const entry = this.pendingCloseBySessionId.get(ptySessionId)
-      this.pendingCloseBySessionId.delete(ptySessionId)
+      const entry = this.pendingCloseByPtySessionId.get(ptySessionId)
+      this.pendingCloseByPtySessionId.delete(ptySessionId)
       entry?.resolve()
     } catch (err) {
-      const entry = this.pendingCloseBySessionId.get(ptySessionId)
-      this.pendingCloseBySessionId.delete(ptySessionId)
+      const entry = this.pendingCloseByPtySessionId.get(ptySessionId)
+      this.pendingCloseByPtySessionId.delete(ptySessionId)
       // The old fire-and-forget path swallowed this rejection. Loud
       // logging is intentional: the failure mode (orphan PTY surviving
       // a tab close) is otherwise invisible to operators and surfaces
@@ -691,7 +691,7 @@ export class TerminalSlotRegistry {
       worktreeTerminalKey,
       selectedDescriptor: this.selectedDescriptor(worktreeTerminalKey),
       pendingCreate: this.pendingCreateByWorktree.has(worktreeTerminalKey),
-      sessions: this.sortedSessionsForWorktree(worktreeTerminalKey),
+      slots: this.sortedSlotsForWorktree(worktreeTerminalKey),
       selectedKey: this.selectedKeyByWorktree.get(worktreeTerminalKey) ?? null,
       getCachedSnapshot: (key) => this.snapshotCache.get(key) ?? null,
       cacheSnapshot: (key, nextSnapshot) => this.snapshotCache.set(key, nextSnapshot),
@@ -743,7 +743,7 @@ export class TerminalSlotRegistry {
     const session = this.sessions.get(key)
     if (session && this.parkingRoot) {
       const serialized = session.serialize()
-      const ptySessionId = session.currentSessionId()
+      const ptySessionId = session.currentPtySessionId()
       if (serialized && ptySessionId) {
         this.setReattachSnapshot(key, { ptySessionId, snapshot: serialized, snapshotSeq: 0 })
       }
@@ -852,18 +852,18 @@ export class TerminalSlotRegistry {
     }
   }
 
-  private syncSessionIdIndex(key: string, ptySessionId: string | null): void {
-    syncTerminalSessionIdIndex({
+  private syncPtySessionIdIndex(key: string, ptySessionId: string | null): void {
+    syncTerminalPtySessionIdIndex({
       key,
       ptySessionId,
-      sessionIdByKey: this.sessionIdByKey,
+      ptySessionIdByKey: this.ptySessionIdByKey,
       slotKeyByPtySessionId: this.slotKeyByPtySessionId,
     })
   }
 
   private notifySession(key: string): void {
     const session = this.sessions.get(key)
-    this.syncSessionIdIndex(key, session?.currentSessionId() ?? null)
+    this.syncPtySessionIdIndex(key, session?.currentPtySessionId() ?? null)
     if (session) {
       this.snapshotCache.set(key, session.snapshot())
     } else {
@@ -894,16 +894,16 @@ export class TerminalSlotRegistry {
     const session = this.sessions.get(key)
     if (!session) return false
     const worktreeTerminalKey = session.descriptor.worktreeTerminalKey
-    const orderedKeysBeforeRemoval = this.sortedSessionsForWorktree(worktreeTerminalKey).map(
+    const orderedKeysBeforeRemoval = this.sortedSlotsForWorktree(worktreeTerminalKey).map(
       (item) => item.descriptor.key,
     )
     const wasSelected = this.selectedKeyByWorktree.get(worktreeTerminalKey) === key
-    this.syncSessionIdIndex(key, null)
+    this.syncPtySessionIdIndex(key, null)
     this.sessions.delete(key)
     this.snapshotCache.delete(key)
     this.reattachSnapshotCache.delete(key)
     this.displayOrderByKey.delete(key)
-    this.notifyTerminalSessionRemoved(key, session.descriptor)
+    this.notifyTerminalSlotRemoved(key, session.descriptor)
     this.notifySnapshot(key)
     this.bellController.remove(key)
     if (options.dispose) session.dispose({ closeSlot: options.closeSlot !== false })
@@ -915,9 +915,9 @@ export class TerminalSlotRegistry {
     return true
   }
 
-  private notifyTerminalSessionRemoved(key: string, base: TerminalSlotBase): void {
+  private notifyTerminalSlotRemoved(key: string, base: TerminalSlotBase): void {
     try {
-      this.onTerminalSessionRemoved(key, base)
+      this.onTerminalSlotRemoved(key, base)
     } catch (err) {
       terminalSlotProviderLog.warn('terminal session removal callback failed', { key, err })
     }
@@ -953,9 +953,9 @@ export class TerminalSlotRegistry {
     const current = this.sessions.get(descriptor.key)
     if (current) {
       current.updateDescriptor(descriptor)
-      this.syncSessionIdIndex(
+      this.syncPtySessionIdIndex(
         descriptor.key,
-        current.currentSessionId() ?? this.sessionIdByKey.get(descriptor.key) ?? null,
+        current.currentPtySessionId() ?? this.ptySessionIdByKey.get(descriptor.key) ?? null,
       )
       this.notifyWorktree(descriptor.worktreeTerminalKey)
       return current
@@ -967,7 +967,7 @@ export class TerminalSlotRegistry {
       (ptySessionId) => this.enqueueDurableClose({ ptySessionId, worktreeTerminalKey: descriptor.worktreeTerminalKey }),
     )
     this.sessions.set(descriptor.key, session)
-    this.syncSessionIdIndex(descriptor.key, session.currentSessionId())
+    this.syncPtySessionIdIndex(descriptor.key, session.currentPtySessionId())
     this.snapshotCache.set(descriptor.key, session.snapshot())
     if (!this.selectedKeyByWorktree.has(descriptor.worktreeTerminalKey)) {
       const preferred = this.preferredSelectedKeyByWorktree.get(descriptor.worktreeTerminalKey)
@@ -1006,7 +1006,7 @@ export class TerminalSlotRegistry {
     return this.sessions.get(key)?.descriptor.worktreeTerminalKey === worktreeTerminalKey
   }
 
-  private sortedSessionsForWorktree(worktreeTerminalKey: string): ManagedTerminalSlot[] {
+  private sortedSlotsForWorktree(worktreeTerminalKey: string): ManagedTerminalSlot[] {
     return Array.from(this.sessions.values())
       .filter((session) => session.descriptor.worktreeTerminalKey === worktreeTerminalKey)
       .sort((a, b) => {
@@ -1020,7 +1020,7 @@ export class TerminalSlotRegistry {
 export interface TerminalSlotRegistryDeps {
   getCurrentRepoId: () => string | null
   onSelectedWorktreeChange: (worktreeTerminalKey: string, key: string | null) => void
-  onTerminalSessionRemoved?: (key: string, base: TerminalSlotBase) => void
+  onTerminalSlotRemoved?: (key: string, base: TerminalSlotBase) => void
 }
 
 let registryInstance: TerminalSlotRegistry | null = null
@@ -1042,7 +1042,7 @@ export function getTerminalSlotRegistry(deps: TerminalSlotRegistryDeps): Termina
     registryInstance = new TerminalSlotRegistry(
       deps.getCurrentRepoId,
       deps.onSelectedWorktreeChange,
-      deps.onTerminalSessionRemoved,
+      deps.onTerminalSlotRemoved,
     )
   }
   return registryInstance

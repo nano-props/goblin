@@ -93,7 +93,7 @@ export async function runTerminalPrimaryActionCommand({
     // The user expects "click the Terminal menu" to land them on a working
     // terminal session: focus the first existing session instead of leaving
     // the selection on whatever the user had open before.
-    const firstSession = worktree.sessions[0]
+    const firstSession = worktree.slots[0]
     if (firstSession) bridge.selectTerminal(worktreeKey, firstSession.key)
     return true
   }
@@ -252,7 +252,7 @@ function workspacePaneCommandTarget(repoId: string): BranchWorkspacePaneTabModel
     worktreePath: worktreePath ?? null,
     preferredView: preferredWorkspacePaneViewForBranch(repo.ui, branchName),
     tabOrder: workspacePaneTabOrderForBranch(repo.ui, branchName),
-    runtimeTerminalViews: snapshot?.sessions ?? [],
+    runtimeTerminalViews: snapshot?.slots ?? [],
     terminalSessionCount: snapshot?.count ?? 0,
     terminalCreatePending: snapshot?.pendingCreate ?? false,
     terminalSyncReady,

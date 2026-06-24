@@ -10,52 +10,52 @@ export function buildWorktreeTerminalSnapshot(input: {
   worktreeTerminalKey: string
   selectedDescriptor: WorktreeTerminalSnapshot['selectedDescriptor']
   pendingCreate: boolean
-  sessions: ManagedTerminalSlotLike[]
+  slots: ManagedTerminalSlotLike[]
   selectedKey: string | null
   getCachedSnapshot: (key: string) => TerminalSnapshot | null
   cacheSnapshot: (key: string, snapshot: TerminalSnapshot) => void
   hasBell: (key: string) => boolean
-  getDisplayOrder: (session: ManagedTerminalSlotLike) => number
+  getDisplayOrder: (slot: ManagedTerminalSlotLike) => number
 }): WorktreeTerminalSnapshot {
-  const sessions = buildTerminalSessionSummaries(input)
-  const bellCount = sessions.reduce((count, session) => count + (session.hasBell ? 1 : 0), 0)
+  const slots = buildTerminalSlotSummaries(input)
+  const bellCount = slots.reduce((count, slot) => count + (slot.hasBell ? 1 : 0), 0)
   return {
     worktreeTerminalKey: input.worktreeTerminalKey,
     selectedDescriptor: input.selectedDescriptor,
-    sessions,
-    count: sessions.length,
+    slots,
+    count: slots.length,
     bellCount,
     pendingCreate: input.pendingCreate,
   }
 }
 
-function buildTerminalSessionSummaries(input: {
+function buildTerminalSlotSummaries(input: {
   worktreeTerminalKey: string
-  sessions: ManagedTerminalSlotLike[]
+  slots: ManagedTerminalSlotLike[]
   selectedKey: string | null
   getCachedSnapshot: (key: string) => TerminalSnapshot | null
   cacheSnapshot: (key: string, snapshot: TerminalSnapshot) => void
   hasBell: (key: string) => boolean
-  getDisplayOrder: (session: ManagedTerminalSlotLike) => number
+  getDisplayOrder: (slot: ManagedTerminalSlotLike) => number
 }): TerminalSlotSummary[] {
-  return input.sessions.map((session) => {
-    const cached = input.getCachedSnapshot(session.descriptor.key)
-    const snapshot = cached ?? session.snapshot()
-    if (!cached) input.cacheSnapshot(session.descriptor.key, snapshot)
+  return input.slots.map((slot) => {
+    const cached = input.getCachedSnapshot(slot.descriptor.key)
+    const snapshot = cached ?? slot.snapshot()
+    if (!cached) input.cacheSnapshot(slot.descriptor.key, snapshot)
     return {
       type: 'terminal',
-      id: session.descriptor.key,
-      key: session.descriptor.key,
+      id: slot.descriptor.key,
+      key: slot.descriptor.key,
       worktreeTerminalKey: input.worktreeTerminalKey,
-      slotId: session.descriptor.slotId,
-      index: session.descriptor.index,
-      displayOrder: input.getDisplayOrder(session),
-      title: summarizeTerminalTitle(snapshot, session.descriptor.index),
-      fullTitle: fullTerminalTitle(snapshot, session.descriptor.index),
+      slotId: slot.descriptor.slotId,
+      index: slot.descriptor.index,
+      displayOrder: input.getDisplayOrder(slot),
+      title: summarizeTerminalTitle(snapshot, slot.descriptor.index),
+      fullTitle: fullTerminalTitle(snapshot, slot.descriptor.index),
       originalTitle: terminalOriginalTitle(snapshot),
       phase: snapshot.phase,
-      selected: session.descriptor.key === input.selectedKey,
-      hasBell: input.hasBell(session.descriptor.key),
+      selected: slot.descriptor.key === input.selectedKey,
+      hasBell: input.hasBell(slot.descriptor.key),
     }
   })
 }

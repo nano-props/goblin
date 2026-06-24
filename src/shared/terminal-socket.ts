@@ -93,4 +93,20 @@ export type TerminalSocketResponseMessage =
     }[TerminalSocketRequestAction]
 
 export type TerminalSocketServerMessage = TerminalRealtimeMessage | TerminalSocketResponseMessage
-export type TerminalClientMessage = TerminalSocketRequestMessage
+/**
+ * Heartbeat envelope. Sent renderer→server every
+ * `HEARTBEAT_INTERVAL_MS` while the realtime socket is `OPEN`. Carries
+ * no payload — the server already knows the `(clientId, userId)` from
+ * the upgrade — but a discriminating `type` keeps the union closed so
+ * the existing `normalizeTerminalClientMessage` path rejects anything
+ * malformed at the WS layer. The server uses the receipt time to drive
+ * the broker's per-`clientId` liveness timer; a missed beat
+ * (longer than `HEARTBEAT_DEADLINE_MS`) fires a synthetic
+ * `onClientDisconnected` so the next `attach` can auto-claim instead
+ * of being stranded in viewer mode.
+ */
+export interface TerminalHeartbeatMessage {
+  type: 'heartbeat'
+  at: number
+}
+export type TerminalClientMessage = TerminalSocketRequestMessage | TerminalHeartbeatMessage

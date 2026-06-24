@@ -1,9 +1,9 @@
 // Renderer-side convenience re-exports. The canonical encoding lives
-// in `src/shared/terminal-session-key.ts` so server and renderer can
+// in `src/shared/terminal-slot-key.ts` so server and renderer can
 // share the same key format.
 
 export {
-  formatTerminalSlotKey as terminalSessionKey,
+  formatTerminalSlotKey as terminalSlotKey,
   formatWorktreeKey as worktreeTerminalKey,
   parseTerminalSlotKey,
   parseWorktreeKey,

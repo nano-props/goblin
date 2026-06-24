@@ -538,7 +538,7 @@ describe('BranchWorkspaceContent', () => {
     const worktreeSnapshot: WorktreeTerminalSnapshot = {
       ...emptyWorktreeSnapshot,
       worktreeTerminalKey: worktreeKey,
-      sessions: [terminalSession('t1', 1, false, worktreeKey), terminalSession('t2', 2, true, worktreeKey)],
+      slots: [terminalSession('t1', 1, false, worktreeKey), terminalSession('t2', 2, true, worktreeKey)],
       count: 2,
     }
     const readContext: TerminalSlotReadContextValue = {
@@ -713,7 +713,7 @@ describe('BranchWorkspaceContent', () => {
 const emptyWorktreeSnapshot: WorktreeTerminalSnapshot = {
   worktreeTerminalKey: '',
   selectedDescriptor: null,
-  sessions: [],
+  slots: [],
   count: 0,
   bellCount: 0,
   pendingCreate: false,

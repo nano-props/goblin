@@ -781,7 +781,7 @@ function renderToolbar(options: {
   const worktreeSnapshot: WorktreeTerminalSnapshot = {
     worktreeTerminalKey: `${REPO_ID}\0${WORKTREE_PATH}`,
     selectedDescriptor,
-    sessions,
+    slots: sessions,
     count: options.terminalCount,
     bellCount: sessions.filter((session) => session.hasBell).length,
     pendingCreate: options.pendingCreate ?? false,

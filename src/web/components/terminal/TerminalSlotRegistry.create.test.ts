@@ -76,7 +76,7 @@ vi.mock('#/web/components/terminal/ManagedTerminalSlot.ts', () => {
       return false
     }
     handleOwnership(): void {}
-    currentSessionId(): string | null {
+    currentPtySessionId(): string | null {
       return this.ptySessionId
     }
     snapshot() {
@@ -327,7 +327,7 @@ describe('TerminalSlotRegistry create flow', () => {
 
     await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
     expect(registry.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
-    await expect(pending).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0terminal-1`)
+    await expect(pending).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0slot-1`)
   })
 
   test('fails create when terminal host is permanently unmeasurable', async () => {
@@ -393,7 +393,7 @@ describe('TerminalSlotRegistry create flow', () => {
     expect(callOrder).toEqual(['close', 'create'])
 
     // The pending entry is cleaned up after the close settles.
-    expect((registry as any).pendingCloseBySessionId.size).toBe(0)
+    expect((registry as any).pendingCloseByPtySessionId.size).toBe(0)
   })
 
   test('durable close: failures do not block the next create', async () => {
@@ -412,7 +412,7 @@ describe('TerminalSlotRegistry create flow', () => {
     })
 
     await expect(closePromise).rejects.toThrow('Terminal socket closed')
-    expect((registry as any).pendingCloseBySessionId.size).toBe(0)
+    expect((registry as any).pendingCloseByPtySessionId.size).toBe(0)
 
     // The next create proceeds normally.
     await expect(
@@ -422,7 +422,7 @@ describe('TerminalSlotRegistry create flow', () => {
   })
 
   test('durable close: deduplicates concurrent enqueues for the same session', async () => {
-    // The catalog may surface a session-closed event AND a parallel
+    // The catalog may surface a slot-closed event AND a parallel
     // dispose() call for the same ptySessionId. The first call owns the
     // request; the second observes the same outcome.
     let resolveClose!: (value: boolean) => void
@@ -462,14 +462,14 @@ describe('TerminalSlotRegistry create flow', () => {
       worktreeTerminalKey: WORKTREE_KEY,
     })
 
-    expect((registry as any).pendingCloseBySessionId.size).toBe(1)
+    expect((registry as any).pendingCloseByPtySessionId.size).toBe(1)
     registry.destroy()
     await expect(closePromise).rejects.toThrow('terminal registry destroyed')
-    expect((registry as any).pendingCloseBySessionId.size).toBe(0)
+    expect((registry as any).pendingCloseByPtySessionId.size).toBe(0)
   })
 
   test('durable close: handleSlotClosed drops the matching local session', async () => {
-    // The server emits a session-closed broadcast when window A
+    // The server emits a slot-closed broadcast when window A
     // closes a session. Sibling windows route the event into
     // handleSlotClosed to drop the local entry without a
     // full reconcile.
@@ -478,12 +478,12 @@ describe('TerminalSlotRegistry create flow', () => {
     registry.registerHost(WORKTREE_KEY, host)
     await registry.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
 
-    expect(registry.worktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
+    expect(registry.worktreeSnapshot(WORKTREE_KEY).slots.length).toBe(1)
 
     registry.handleSlotClosed('pty_session_1_aaaaaaaaa')
 
     // The local session is gone; the worktree snapshot is empty.
-    expect(registry.worktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(0)
+    expect(registry.worktreeSnapshot(WORKTREE_KEY).slots.length).toBe(0)
   })
 
 })

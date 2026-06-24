@@ -14,7 +14,7 @@ methods, timers, or flags. It describes the *shape* of the answer
 and the *constraints* the answer has to respect. Implementation
 lives in `src/server/terminal/terminal-ownership.ts`,
 `src/web/components/terminal/authority-gate.ts`, and the
-`ManagedTerminalSession` glue.
+`ManagedTerminalSlot` glue.
 
 ## The product premise
 
@@ -168,6 +168,40 @@ and reattach, so this case is rare. When it does bite, the
 recovery path is the same as the friendly case: type, get
 control.
 
+## Why a crashed controller is non-disruptive
+
+A controller's process can die (laptop sleep, OS kill, NIC
+stuck) while the OS keeps the underlying TCP socket in
+`ESTABLISHED` for minutes or hours. Without intervention the
+server would still believe that `(userId, clientId)` is
+connected, the slot's controller would stay pinned to the
+dead client, and every sibling viewer would be stranded in
+viewer mode with no path to auto-claim.
+
+A per-`clientId` heartbeat closes this gap:
+
+- The renderer emits `{ type: 'heartbeat', at: <ms> }` on the
+  realtime socket every `HEARTBEAT_INTERVAL_MS` (30 s) while
+  the socket is `OPEN`. The envelope is small (a few bytes),
+  has no request id, and does not generate a response.
+- The server's `TerminalRealtimeBroker` records
+  `lastHeartbeatAtByClientKey` on every receipt and scans it
+  every `HEARTBEAT_INTERVAL_MS`. A `(userId, clientId)` whose
+  last beat is older than `HEARTBEAT_DEADLINE_MS` (90 s, i.e.
+  3 missed beats) gets a synthetic `onClientDisconnected`,
+  which clears the slot's controller slot and emits
+  `controller: null` to every sibling.
+- The next `attach` from any sibling (or from a freshly
+  reconnected A) takes the auto-claim path — same as the
+  friendly-reconnect case above — and the user perceives
+  no difference from a clean disconnect.
+
+The `HEARTBEAT_INTERVAL_MS` / `HEARTBEAT_DEADLINE_MS` constants
+are exported from
+`src/server/terminal/terminal-realtime-broker.ts` so the
+renderer (in `src/web/renderer-terminal-bridge.ts`) and the
+broker cannot drift out of sync.
+
 ## Known behavior: self-reconnect mid-flight
 
 The friendly reconnect case has one observable wrinkle. When A's
@@ -244,5 +278,5 @@ protects the user's mental model, not their secrets.
 
 - `terminal.md` — the terminal system overall.
 - `terminal-target-model.md` — target attachment shape and roles.
-- `terminal-session-lifecycle.md` — session birth, lifetime, close.
+- `terminal-slot-lifecycle.md` — session birth, lifetime, close.
 - `terminal-roadmap.md` — where this model sits in the refactor plan.

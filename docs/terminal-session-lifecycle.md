@@ -63,7 +63,7 @@ In scope:
 
 Out of scope:
 
-- Moving `TerminalSessionRegistry` to a renderer-level singleton
+- Moving `TerminalSlotRegistry` to a renderer-level singleton
   lifetime. Tracked as `terminal-roadmap.md` P1.7.
 - Transport-level reconnect / backoff design. Tracked as `terminal.md`
   / `realtime.md`.
@@ -94,7 +94,7 @@ The combined symptom list across the three root causes:
   treat it as the authoritative handshake. The renderer reconstructed
   the first frame from multiple asynchronous sources.
 - **R1 — Close is fire-and-forget and silent on failure.**
-  `ManagedTerminalSession.dispose()` calls
+  `ManagedTerminalSlot.dispose()` calls
   `void terminalBridge.close(...).catch(() => {})`. A WebSocket
   mid-request teardown or a race with `closeSocketIfIdle` can drop
   the close before the server sees it. The PTY stays alive.
@@ -219,16 +219,16 @@ catalog append).
 ### Status
 
 Implemented on `main` (landed via `fa67adb`). Registry state
-`pendingCloseBySessionId` (`TerminalSessionRegistry.ts:88`),
+`pendingCloseBySessionId` (`TerminalSlotRegistry.ts:88`),
 `enqueueDurableClose` (488), `flushPendingClosesForRepo` (517),
-`destroy` rejection (149–160), and the `ManagedTerminalSession.dispose`
+`destroy` rejection (149–160), and the `ManagedTerminalSlot.dispose`
 rewire (851). Coverage in
-`TerminalSessionRegistry.create.test.ts` (durable close describe
+`TerminalSlotRegistry.create.test.ts` (durable close describe
 block, lines 215 onward).
 
 ### Why
 
-`ManagedTerminalSession.dispose()` today:
+`ManagedTerminalSlot.dispose()` today:
 
 ```ts
 for (const ptySessionId of sessionIds) {
@@ -257,7 +257,7 @@ shape as the existing `pendingCreateByWorktree` registry pattern.
 Mirror the existing `pendingCreateByWorktree` triple
 (`enqueuePendingCreate` / `flushPendingCreate` / `destroy`) for closes.
 
-**New registry state** (`TerminalSessionRegistry.ts`):
+**New registry state** (`TerminalSlotRegistry.ts`):
 
 ```ts
 private readonly pendingCloseBySessionId = new Map<
@@ -269,7 +269,7 @@ private readonly pendingCloseBySessionId = new Map<
 **New registry methods**:
 
 - `enqueueDurableClose({ ptySessionId, worktreeTerminalKey })` —
-  called from `ManagedTerminalSession.dispose()`. Records a pending
+  called from `ManagedTerminalSlot.dispose()`. Records a pending
   entry, kicks off `terminalBridge.close` in the background, resolves
   on server ack, rejects on socket error. The entry is removed from
   the map on either outcome.
@@ -286,7 +286,7 @@ private readonly pendingCloseBySessionId = new Map<
 - `destroy()` — reject and clear the new map, mirroring the
   `pendingCreateByWorktree` rejection at `destroy()`.
 
-**Caller change** (`ManagedTerminalSession.ts`):
+**Caller change** (`ManagedTerminalSlot.ts`):
 
 - Replace the fire-and-forget loop with
   `registry.enqueueDurableClose({ ptySessionId, worktreeTerminalKey: this.descriptor.worktreeTerminalKey })`.
@@ -329,10 +329,10 @@ Implemented on `main` (landed via `fa67adb`). Protocol variant in
 `terminal-runtime-actions.ts:144-156`. Renderer dispatcher branch
 in `renderer-terminal-bridge.ts:186`. Registry handler
 `handleSessionClosed` in
-`TerminalSessionRegistry.ts:210`. Coverage in
+`TerminalSlotRegistry.ts:210`. Coverage in
 `terminal-runtime-actions.test.ts` (emits both broadcasts on
 successful close; non-owner close does not leak a phantom
-event) and `TerminalSessionRegistry.create.test.ts`
+event) and `TerminalSlotRegistry.create.test.ts`
 (handleSessionClosed drops the matching local session).
 
 ### Why
@@ -386,7 +386,7 @@ returns it on the close result, or we look it up via
 
 ### Registry subscribes
 
-`TerminalSessionProvider.tsx`: mirror the `onExit` pattern. On
+`TerminalSlotProvider.tsx`: mirror the `onExit` pattern. On
 `slot-closed`:
 
 ```ts
@@ -444,7 +444,7 @@ with a "New terminal" button.
 - Compute `terminalBase` from the slot's `repoRoot` / `branch` /
   `worktreePath` props (already on `TerminalSlotProps`).
 - The button calls `createTerminal(base)` from the slot's
-  `useTerminalSessionContext`.
+  `useTerminalSlotContext`.
 - On failure, toast via the existing `sonner` import in
   `TerminalSlot.tsx`.
 
@@ -479,7 +479,7 @@ Before this change, `terminal.takeover` returned only
 `{ ok, ptySessionId, controller }`. The renderer treated the
 realtime `ownership` event as the authority and used the bridge
 response only to "trigger the server-side handoff". The
-comment in `ManagedTerminalSession.takeover()` was explicit:
+comment in `ManagedTerminalSlot.takeover()` was explicit:
 
 > "Ownership changes are applied exclusively via authoritative
 > onOwnership realtime messages. The bridge response is only used
@@ -516,22 +516,22 @@ response.
    stays shape-consistent with the takeover response. Both
    surfaces carry the same fields, and the renderer can apply
    either without re-checking what fields it has.
-3. The server-side `TerminalSessionManager.takeoverResult`
+3. The server-side `TerminalSlotManager.takeoverResult`
    builder now reads `session.cols`, `session.rows`,
    `session.phase` synchronously after `applyOwnershipEffect`
    runs and packs them into the response. The realtime
    `emitOwnership` payload carries `phase: session.phase` for
    the non-takeover paths.
-4. `TerminalSessionState.applyOwnership` accepts `phase` and
+4. `TerminalSlotState.applyOwnership` accepts `phase` and
    routes it through `setPhaseAndMessage` so role / geometry /
    phase are applied in the same atomic patch.
-5. `ManagedTerminalSession.takeover()` now awaits the response
+5. `ManagedTerminalSlot.takeover()` now awaits the response
    and calls `runtime.applyTakeover(result)`, a new method that
    feeds the response into the existing `applyOwnership` path.
    The previous `.catch(() => {})` becomes
    `terminalLog.warn('takeover failed ...')` to mirror the
    `terminal.ts:resize` rejection pattern.
-6. `TerminalSessionRegistry.handleOwnership` and the bridge
+6. `TerminalSlotRegistry.handleOwnership` and the bridge
    conversion in `renderer-terminal-bridge.ts` were aligned to
    carry the new `phase` field through.
 
@@ -568,7 +568,7 @@ arrive at the same final state.
   behavior).
 - `bun run typecheck` — clean (the new fields propagate through
   every typed surface; the inline `TerminalOwnershipViewModel`
-  literal at `TerminalSessionRegistry.handleOwnership` and in
+  literal at `TerminalSlotRegistry.handleOwnership` and in
   the test files were collapsed to the named type so future
   field additions propagate automatically).
 - `terminal.test.ts` — wire-format ownership message updated to
@@ -634,7 +634,7 @@ R2: `slot-closed` broadcast.
 
 R1: durable close.
 
-- Required injecting the registry into `ManagedTerminalSession`'s
+- Required injecting the registry into `ManagedTerminalSlot`'s
   constructor.
 - Changed `dispose()` semantics — every dispose path now goes
   through the pending-close map. Existing dispose tests had to be
@@ -654,13 +654,13 @@ R1: durable close.
 
 **R0**:
 
-- `TerminalSessionProvider.test.tsx` test mocks supply the new
+- `TerminalSlotProvider.test.tsx` test mocks supply the new
   first-frame hydration fields on both `created` and `reused`
   paths. Registry-side validation in
-  `TerminalSessionRegistry.create.test.ts` covers the
+  `TerminalSlotRegistry.create.test.ts` covers the
   `create.ptySessionId` + `snapshot` + `snapshotSeq` rule.
 
-**R1** — `TerminalSessionRegistry.create.test.ts`
+**R1** — `TerminalSlotRegistry.create.test.ts`
 (`describe('durable close')`):
 
 - `awaits an in-flight close for the same worktree before creating`
@@ -679,7 +679,7 @@ close` (56).
     event (84).
   - A failed close path does not synthesize a `slot-closed`
     with a fake repoRoot (100, 129).
-- `TerminalSessionProvider.test.tsx`: `slot-closed` mocks feed
+- `TerminalSlotProvider.test.tsx`: `slot-closed` mocks feed
   the registry's `handleSessionClosed` path (already exercised by
   the R1 durable-close test above).
 
@@ -751,7 +751,7 @@ any individual implementation:
    not only by renderer-side validation. (See §Type-level atomicity.)
 2. **Done (rolled back via `282ea76`)** — Decide explicitly whether
    the same-session snapshot reapply patch (broadened
-   `ManagedTerminalSession.hydrate()`) should stay as a supported
+   `ManagedTerminalSlot.hydrate()`) should stay as a supported
    repair path. The broadened hydrate was rolled back: it
    re-painted xterm mid-session and caused terminal-emulator
    protocol replies (OSC color queries) to leak into the PTY
@@ -762,11 +762,11 @@ any individual implementation:
    re-hydration is a no-op.
 3. **Done (P1.7)** — Decide explicitly whether the delayed
    provider-destroy heuristic (one-macrotask delay on
-   `TerminalSessionProvider` cleanup) should remain until P1.7
+   `TerminalSlotProvider` cleanup) should remain until P1.7
    lands. P1.7 (`ebb88ef`) supersedes it — the registry is now a
    renderer-level singleton, so per-provider destroy debouncing is
    not needed. The debounce was removed in `f19eba1`.
-4. **Done (P1.7)** — Move `TerminalSessionRegistry` to a renderer-
+4. **Done (P1.7)** — Move `TerminalSlotRegistry` to a renderer-
    level singleton lifetime. (See `terminal-roadmap.md` P1.7.)
 5. **Done** — collapse the takeover two-step handshake (response +
    realtime `ownership` event) into a single authoritative

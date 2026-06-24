@@ -1118,6 +1118,43 @@ describe('ManagedTerminalSlot', () => {
     expect(session.snapshot().phase).toBe('open')
   })
 
+  test('resize is gated by AuthorityGate — denied gate never calls bridge.resize', async () => {
+    // Attach as a viewer: the gate's role lands on `viewer` so a
+    // subsequent gate denial can be forced by returning a
+    // 'slot-closed' result from the takeover. We patch the gate
+    // after attach so we don't fight the auto-claim.
+    terminalCalls.attach.mockResolvedValueOnce(
+      attachResult('pty_session_1_aaaaaaaaa', {
+        controller: { clientId: 'client_local', status: 'connected' },
+        canonicalCols: 100,
+        canonicalRows: 30,
+      }),
+    )
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
+    hydrateManagedSession(session)
+    session.attach(host)
+    await flushTerminalStart()
+    await flushUntil(() => session.snapshot().phase === 'open')
+
+    // Force the gate to deny with `slot-closed` on the next
+    // `authorize` call. The accessor lazy-builds the gate, so we
+    // have to reach into the slot's private field.
+    const gate = (session as unknown as { authorityGate?: { setRole: (r: 'viewer' | 'unowned') => void } })
+      .authorityGate
+    expect(gate).toBeDefined()
+    gate!.setRole('unowned')
+
+    terminalCalls.resize.mockClear()
+    xtermMocks.terminals[0]!.resize(120, 40)
+    await flushResizeDispatch()
+    // Give the gate's authorize promise one more microtask to settle.
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(terminalCalls.resize).not.toHaveBeenCalled()
+  })
+
   test('does not send resize or input while attached as a mirror page before explicit takeover', async () => {
     terminalCalls.attach.mockResolvedValueOnce(
       attachResult('pty_session_1_aaaaaaaaa', {
@@ -1280,7 +1317,7 @@ describe('ManagedTerminalSlot', () => {
     // T1.5: applyHydratedSnapshotToActiveView now passes a callback as the
     // second arg so it can clear the field after the write resolves.
     expect(term.write).toHaveBeenCalledWith('remote-screen', expect.any(Function))
-    expect(session.currentSessionId()).toBe('session-remote')
+    expect(session.currentPtySessionId()).toBe('session-remote')
   })
 
   test('does not rewrite an existing terminal view when hydrate refreshes the same session snapshot', async () => {
@@ -1312,7 +1349,7 @@ describe('ManagedTerminalSlot', () => {
 
     expect(term.reset).not.toHaveBeenCalled()
     expect(term.write).not.toHaveBeenCalled()
-    expect(session.currentSessionId()).toBe('pty_session_1_aaaaaaaaa')
+    expect(session.currentPtySessionId()).toBe('pty_session_1_aaaaaaaaa')
   })
 
   test('stale active hydrate replay callback does not close a newer replay boundary', async () => {

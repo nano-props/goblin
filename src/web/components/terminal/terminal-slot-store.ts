@@ -12,7 +12,7 @@ import type {
 const EMPTY_WORKTREE_TERMINAL_SNAPSHOT: WorktreeTerminalSnapshot = {
   worktreeTerminalKey: '',
   selectedDescriptor: null,
-  sessions: [],
+  slots: [],
   count: 0,
   bellCount: 0,
   pendingCreate: false,
@@ -85,14 +85,14 @@ export function useWorktreeTerminalSelectedDescriptor(worktreeTerminalKey: strin
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 }
 
-export function useTerminalSessionSummaries(worktreeTerminalKey: string | null): TerminalSlotSummary[] {
+export function useTerminalSlotSummaries(worktreeTerminalKey: string | null): TerminalSlotSummary[] {
   const { worktreeSnapshot, subscribeWorktree } = useTerminalSlotReadContext()
   const subscribe = useCallback(
     (listener: () => void) => (worktreeTerminalKey ? subscribeWorktree(worktreeTerminalKey, listener) : () => {}),
     [worktreeTerminalKey, subscribeWorktree],
   )
   const getSnapshot = useCallback(
-    () => (worktreeTerminalKey ? worktreeSnapshot(worktreeTerminalKey).sessions : []),
+    () => (worktreeTerminalKey ? worktreeSnapshot(worktreeTerminalKey).slots : []),
     [worktreeTerminalKey, worktreeSnapshot],
   )
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)

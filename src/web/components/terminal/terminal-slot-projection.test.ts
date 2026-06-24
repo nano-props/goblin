@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import {
-  projectServerTerminalSession,
+  projectServerTerminalSlot,
   projectTerminalAttachResultForClient,
 } from '#/web/components/terminal/terminal-slot-projection.ts'
 import type { TerminalRepoIndex } from '#/web/components/terminal/types.ts'
@@ -17,13 +17,13 @@ function makeRepoIndex(): TerminalRepoIndex {
   }
 }
 
-describe('terminal session projection helpers', () => {
-  test('projects server session summaries into renderer hydration input', () => {
-    const projected = projectServerTerminalSession({
+describe('terminal slot projection helpers', () => {
+  test('projects server slot summaries into renderer hydration input', () => {
+    const projected = projectServerTerminalSlot({
       repoIndex: makeRepoIndex(),
       repoRoot: REPO_ROOT,
       clientId: 'client_a',
-      serverSession: {
+      serverSlot: {
         ptySessionId: 'pty_session_123_aaaaaaaaa',
         key: `${REPO_ROOT}\0${WORKTREE_PATH}\0slot-2`,
         viewType: 'terminal',
@@ -71,11 +71,11 @@ describe('terminal session projection helpers', () => {
   })
 
   test('falls back to reattach snapshot cache only for matching session ids', () => {
-    const projected = projectServerTerminalSession({
+    const projected = projectServerTerminalSlot({
       repoIndex: makeRepoIndex(),
       repoRoot: REPO_ROOT,
       clientId: 'client_b',
-      serverSession: {
+      serverSlot: {
         ptySessionId: 'pty_session_123_aaaaaaaaa',
         key: `${REPO_ROOT}\0${WORKTREE_PATH}\0slot-1`,
         viewType: 'terminal',

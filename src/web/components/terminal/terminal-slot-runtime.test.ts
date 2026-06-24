@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'vitest'
-import { TerminalSessionRuntime } from '#/web/components/terminal/terminal-slot-runtime.ts'
+import { TerminalSlotRuntime } from '#/web/components/terminal/terminal-slot-runtime.ts'
 
-describe('TerminalSessionRuntime', () => {
+describe('TerminalSlotRuntime', () => {
   test('tracks restart flow and replacing session ids', () => {
-    const runtime = new TerminalSessionRuntime()
+    const runtime = new TerminalSlotRuntime()
 
     runtime.applyAttachResult(
       {
@@ -25,20 +25,20 @@ describe('TerminalSessionRuntime', () => {
     )
     runtime.markAttached()
 
-    expect(runtime.currentSessionId()).toBe('pty_session_1_aaaaaaaaa')
+    expect(runtime.currentPtySessionId()).toBe('pty_session_1_aaaaaaaaa')
     expect(runtime.snapshot().attachment).toMatchObject({ active: true, canTakeover: false })
 
     runtime.prepareRestart()
 
-    expect(runtime.currentSessionId()).toBeNull()
+    expect(runtime.currentPtySessionId()).toBeNull()
     expect(runtime.phase()).toBe('restarting')
     expect(runtime.snapshot().attachment).toBeUndefined()
     expect(runtime.consumeRestartFlag()).toBe(true)
-    expect(runtime.closeReplacingSessionId()).toBe('pty_session_1_aaaaaaaaa')
+    expect(runtime.closeReplacingPtySessionId()).toBe('pty_session_1_aaaaaaaaa')
   })
 
   test('routes output, ownership, replay, and takeover through runtime state', () => {
-    const runtime = new TerminalSessionRuntime()
+    const runtime = new TerminalSlotRuntime()
     runtime.applyAttachResult(
       {
         ok: true,
@@ -79,7 +79,7 @@ describe('TerminalSessionRuntime', () => {
     // `drainReplay` to clear the preload's replay window when the
     // attach fails partway through. drainReplay must not surface
     // captured events to the term.
-    const runtime = new TerminalSessionRuntime()
+    const runtime = new TerminalSlotRuntime()
     runtime.applyAttachResult(
       {
         ok: true,
@@ -116,7 +116,7 @@ describe('TerminalSessionRuntime', () => {
     // boundary. Events older than the new snapshot are dropped (they
     // are in the new snapshot), events newer than the new snapshot
     // are kept (they are live output since the snapshot).
-    const runtime = new TerminalSessionRuntime()
+    const runtime = new TerminalSlotRuntime()
     runtime.applyAttachResult(
       {
         ok: true,
@@ -156,7 +156,7 @@ describe('TerminalSessionRuntime', () => {
   })
 
   test('preserves server-provided title when attaching an existing session', () => {
-    const runtime = new TerminalSessionRuntime()
+    const runtime = new TerminalSlotRuntime()
 
     runtime.applyAttachResult(
       {
@@ -186,7 +186,7 @@ describe('TerminalSessionRuntime', () => {
   })
 
   test('hydrates externally created sessions into open mirror state', () => {
-    const runtime = new TerminalSessionRuntime()
+    const runtime = new TerminalSlotRuntime()
 
     expect(
       runtime.hydrateSession({
@@ -201,7 +201,7 @@ describe('TerminalSessionRuntime', () => {
       }),
     ).toBe(true)
 
-    expect(runtime.currentSessionId()).toBe('session-remote')
+    expect(runtime.currentPtySessionId()).toBe('session-remote')
     expect(runtime.phase()).toBe('open')
     expect(runtime.snapshot().attachment).toMatchObject({
       role: 'viewer',
@@ -218,7 +218,7 @@ describe('TerminalSessionRuntime', () => {
   })
 
   test('resetTransientState clears transient terminal state without dropping runtime metadata', () => {
-    const runtime = new TerminalSessionRuntime()
+    const runtime = new TerminalSlotRuntime()
     runtime.hydrateSession({
       ptySessionId: 'pty_session_1_aaaaaaaaa',
       phase: 'open',
