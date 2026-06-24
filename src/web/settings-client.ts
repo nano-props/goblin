@@ -54,13 +54,10 @@ export async function getThemeState(): Promise<ThemeState> {
 }
 
 async function updateSettingsPrefsPatch(settings: Record<string, unknown>): Promise<SettingsPrefsUpdateResponse> {
-  const result = await fetchServerJson<SettingsPrefsUpdateResponse>('/api/settings/prefs', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({ settings }),
-  })
+  const result = await postServerJson<{ settings: Record<string, unknown> }, SettingsPrefsUpdateResponse>(
+    '/api/settings/prefs',
+    { settings },
+  )
   const patch = pickNativeSettingsProjectionPatch(settings as Partial<SettingsPrefs>)
   if (!patch || !canUseNativeIpcBridge()) return result
   // The embedded server is the authority for settings — the
