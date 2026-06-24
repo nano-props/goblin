@@ -1,11 +1,12 @@
 import type { RendererBootstrapSnapshot } from '#/shared/bootstrap.ts'
-import { emptyRendererBridgeBootstrap, getRendererBridge } from '#/web/renderer-bridge.ts'
+import { getRendererBridge } from '#/web/renderer-bridge.ts'
+import { emptyBootstrapSnapshot } from '#/web/renderer-bootstrap-bridge.ts'
 
 function readInitialBootstrap(): RendererBootstrapSnapshot {
   try {
     return getRendererBridge().getBootstrap()
   } catch {
-    return emptyRendererBridgeBootstrap()
+    return emptyBootstrapSnapshot()
   }
 }
 

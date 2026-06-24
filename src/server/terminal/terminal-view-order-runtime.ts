@@ -1,26 +1,26 @@
-interface TerminalViewOrderRecord<TOwner extends string | number> {
-  ownerId: TOwner
+interface TerminalViewOrderRecord<TUser extends string | number> {
+  userId: TUser
   scope: string
   worktreePath: string
   id: string
   displayOrder: number
 }
 
-export interface TerminalViewOrderWorktreeInput<TOwner extends string | number> {
-  ownerId: TOwner
+export interface TerminalViewOrderWorktreeInput<TUser extends string | number> {
+  userId: TUser
   scope: string
   worktreePath: string
 }
 
-export interface TerminalViewOrderInput<TOwner extends string | number>
-  extends TerminalViewOrderWorktreeInput<TOwner> {
+export interface TerminalViewOrderInput<TUser extends string | number>
+  extends TerminalViewOrderWorktreeInput<TUser> {
   id: string
 }
 
-export class TerminalViewOrderRuntime<TOwner extends string | number> {
-  private readonly viewsByWorktree = new Map<string, Map<string, TerminalViewOrderRecord<TOwner>>>()
+export class TerminalViewOrderRuntime<TUser extends string | number> {
+  private readonly viewsByWorktree = new Map<string, Map<string, TerminalViewOrderRecord<TUser>>>()
 
-  registerTerminalView(input: TerminalViewOrderInput<TOwner>): void {
+  registerTerminalView(input: TerminalViewOrderInput<TUser>): void {
     const worktreeKey = this.worktreeKey(input)
     const views = this.viewsByWorktree.get(worktreeKey) ?? new Map()
     if (views.has(input.id)) {
@@ -28,7 +28,7 @@ export class TerminalViewOrderRuntime<TOwner extends string | number> {
       return
     }
     views.set(input.id, {
-      ownerId: input.ownerId,
+      userId: input.userId,
       scope: input.scope,
       worktreePath: input.worktreePath,
       id: input.id,
@@ -37,7 +37,7 @@ export class TerminalViewOrderRuntime<TOwner extends string | number> {
     this.viewsByWorktree.set(worktreeKey, views)
   }
 
-  unregisterTerminalView(input: TerminalViewOrderInput<TOwner>): void {
+  unregisterTerminalView(input: TerminalViewOrderInput<TUser>): void {
     const worktreeKey = this.worktreeKey(input)
     const views = this.viewsByWorktree.get(worktreeKey)
     if (!views) return
@@ -45,28 +45,28 @@ export class TerminalViewOrderRuntime<TOwner extends string | number> {
     if (views.size === 0) this.viewsByWorktree.delete(worktreeKey)
   }
 
-  viewDisplayOrder(input: TerminalViewOrderInput<TOwner>): number | null {
+  viewDisplayOrder(input: TerminalViewOrderInput<TUser>): number | null {
     return this.viewsByWorktree.get(this.worktreeKey(input))?.get(input.id)?.displayOrder ?? null
   }
 
-  closeViewsForOwner(ownerId: TOwner): void {
+  closeViewsForUser(userId: TUser): void {
     for (const [key, views] of Array.from(this.viewsByWorktree.entries())) {
-      const hasOwnerViews = Array.from(views.values()).some((view) => view.ownerId === ownerId)
-      if (hasOwnerViews) this.viewsByWorktree.delete(key)
+      const hasUserViews = Array.from(views.values()).some((view) => view.userId === userId)
+      if (hasUserViews) this.viewsByWorktree.delete(key)
     }
   }
 
-  private worktreeKey(input: TerminalViewOrderWorktreeInput<TOwner>): string {
-    return `${String(input.ownerId)}\0${input.scope}\0${input.worktreePath}`
+  private worktreeKey(input: TerminalViewOrderWorktreeInput<TUser>): string {
+    return `${String(input.userId)}\0${input.scope}\0${input.worktreePath}`
   }
 }
 
-export function createTerminalViewOrderRuntime<TOwner extends string | number>(): TerminalViewOrderRuntime<TOwner> {
-  return new TerminalViewOrderRuntime<TOwner>()
+export function createTerminalViewOrderRuntime<TUser extends string | number>(): TerminalViewOrderRuntime<TUser> {
+  return new TerminalViewOrderRuntime<TUser>()
 }
 
-function nextDisplayOrder<TOwner extends string | number>(
-  views: ReadonlyMap<string, TerminalViewOrderRecord<TOwner>>,
+function nextDisplayOrder<TUser extends string | number>(
+  views: ReadonlyMap<string, TerminalViewOrderRecord<TUser>>,
 ): number {
   let max = -1
   for (const view of views.values()) {

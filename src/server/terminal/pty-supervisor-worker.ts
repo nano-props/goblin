@@ -92,27 +92,27 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
     if (this.shuttingDown) return
     const worker = this.worker
     if (!worker) return
-    worker.send({ type: 'pty-write', sessionId: handle.sessionId, data })
+    worker.send({ type: 'pty-write', ptySessionId: handle.ptySessionId, data })
   }
 
   resize(handle: PtyHandle, cols: number, rows: number): void {
     if (this.shuttingDown) return
     const worker = this.worker
     if (!worker) return
-    worker.send({ type: 'pty-resize', sessionId: handle.sessionId, cols, rows })
+    worker.send({ type: 'pty-resize', ptySessionId: handle.ptySessionId, cols, rows })
   }
 
   kill(handle: PtyHandle): void {
     if (this.shuttingDown) return
-    this.ensureWorker().send({ type: 'pty-kill', sessionId: handle.sessionId })
+    this.ensureWorker().send({ type: 'pty-kill', ptySessionId: handle.ptySessionId })
   }
 
   onData(handle: PtyHandle, listener: (data: string) => void): { dispose(): void } {
-    const session = this.getOrCreateSession(handle.sessionId, 'terminal')
+    const session = this.getOrCreateSession(handle.ptySessionId, 'terminal')
     session.listeners.data.add(listener)
     return {
       dispose: () => {
-        const current = this.sessions.get(handle.sessionId)
+        const current = this.sessions.get(handle.ptySessionId)
         current?.listeners.data.delete(listener)
       },
     }
@@ -122,18 +122,18 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
     handle: PtyHandle,
     listener: (code: number | null, signal: NodeJS.Signals | null) => void,
   ): { dispose(): void } {
-    const session = this.getOrCreateSession(handle.sessionId, 'terminal')
+    const session = this.getOrCreateSession(handle.ptySessionId, 'terminal')
     session.listeners.exit.add(listener)
     return {
       dispose: () => {
-        const current = this.sessions.get(handle.sessionId)
+        const current = this.sessions.get(handle.ptySessionId)
         current?.listeners.exit.delete(listener)
       },
     }
   }
 
   processName(handle: PtyHandle): string {
-    return this.sessions.get(handle.sessionId)?.processName ?? 'terminal'
+    return this.sessions.get(handle.ptySessionId)?.processName ?? 'terminal'
   }
 
   getDiagnostics(): PtySupervisorDiagnostics {
@@ -250,8 +250,8 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
       if (message.ok) {
         this.lastSuccessfulResponseAt = this.now()
         this.restartAttempts = 0
-        const handle = createPtyHandle(message.sessionId)
-        const session = this.getOrCreateSession(message.sessionId, message.processName)
+        const handle = createPtyHandle(message.ptySessionId)
+        const session = this.getOrCreateSession(message.ptySessionId, message.processName)
         session.processName = message.processName
         pending.resolve({ ok: true, handle, processName: message.processName })
       } else {
@@ -260,22 +260,22 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
       return
     }
     if (message.type === 'pty-data') {
-      const session = this.sessions.get(message.sessionId)
+      const session = this.sessions.get(message.ptySessionId)
       if (!session) return
       for (const listener of Array.from(session.listeners.data)) listener(message.data)
       return
     }
     if (message.type === 'pty-process-name-changed') {
-      const session = this.sessions.get(message.sessionId)
+      const session = this.sessions.get(message.ptySessionId)
       if (!session) return
       session.processName = message.processName
       return
     }
     if (message.type === 'pty-exit') {
-      const session = this.sessions.get(message.sessionId)
+      const session = this.sessions.get(message.ptySessionId)
       if (!session) return
       for (const listener of Array.from(session.listeners.exit)) listener(message.code, message.signal)
-      this.sessions.delete(message.sessionId)
+      this.sessions.delete(message.ptySessionId)
     }
   }
 
@@ -323,11 +323,11 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
     return Math.min(MIN_RESTART_BACKOFF_MS * 2 ** Math.max(0, this.restartAttempts - 1), MAX_RESTART_BACKOFF_MS)
   }
 
-  private getOrCreateSession(sessionId: string, defaultProcessName: string) {
-    let session = this.sessions.get(sessionId)
+  private getOrCreateSession(ptySessionId: string, defaultProcessName: string) {
+    let session = this.sessions.get(ptySessionId)
     if (!session) {
       session = { processName: defaultProcessName, listeners: { data: new Set(), exit: new Set() } }
-      this.sessions.set(sessionId, session)
+      this.sessions.set(ptySessionId, session)
     }
     return session
   }

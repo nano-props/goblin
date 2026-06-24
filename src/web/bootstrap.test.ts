@@ -167,13 +167,13 @@ describe('renderer bootstrap', () => {
         resize: async () => false,
         takeover: async () => ({ ok: false as const, message: 'error.invalid-arguments' }),
         close: async () => false,
-        create: async (input?: { kind?: string }) =>
-          input?.kind === 'primary'
+        create: async (input: { kind: 'primary' | 'additional' }) =>
+          input.kind === 'primary'
             ? {
                 ok: true as const,
                 action: 'reused' as const,
-                key: 'repo\0worktree\0terminal-1',
-                sessionId: 'session-1',
+                key: 'repo\0worktree\0slot-1',
+                ptySessionId: 'pty_session_1_aaaaaaaaa',
                 processName: 'zsh',
                 canonicalTitle: null,
                 phase: 'open' as const,
@@ -188,8 +188,8 @@ describe('renderer bootstrap', () => {
             : {
                 ok: true as const,
                 action: 'created' as const,
-                key: 'repo\0worktree\0terminal-2',
-                sessionId: 'session-2',
+                key: 'repo\0worktree\0slot-2',
+                ptySessionId: 'pty_session_2_aaaaaaaaa',
                 processName: 'zsh',
                 canonicalTitle: null,
                 phase: 'open' as const,
@@ -205,16 +205,17 @@ describe('renderer bootstrap', () => {
         listSessions: async () => [],
         prewarm: async () => {},
         kickReconnect: () => {},
-        getSessionSnapshot: async () => null,
+        getSlotSnapshot: async () => null,
         notifyBell: async () => false,
         sendTestNotification: async () => false,
         setBadge: () => {},
         onOutput: () => () => {},
         onTitle: () => () => {},
         onExit: () => () => {},
-        onOwnership: () => () => {},
+        onIdentity: () => () => {},
+        onLifecycle: () => () => {},
         onSessionsChanged: () => () => {},
-        onSessionClosed: () => () => {},
+        onSlotClosed: () => () => {},
       }),
     })
 
@@ -282,7 +283,7 @@ describe('renderer bootstrap', () => {
       initialServer: {
         url: 'http://127.0.0.1:32100/',
         accessToken: 'test-secret',
-        clientId: expect.stringMatching(/^web_/),
+        clientId: expect.stringMatching(/^client_/),
       },
     })
   })

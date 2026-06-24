@@ -75,7 +75,7 @@ describe('settings snapshot partitions', () => {
         activeRepo: '/tmp/repo-b',
         workspaceFocused: false,
         workspacePaneSize: 50,
-        selectedTerminalByWorktree: { '/tmp/repo-b\0/tmp/repo-b': 'terminal-1' },
+        selectedTerminalByWorktree: { '/tmp/repo-b\0/tmp/repo-b': 'slot-1' },
         workspacePaneTabOrderByBranchByRepo: {
           '/tmp/repo-b': {
             main: [],
@@ -95,7 +95,7 @@ describe('settings snapshot partitions', () => {
       activeRepo: '/tmp/repo-b',
       workspaceFocused: false,
       workspacePaneSize: 50,
-      selectedTerminalByWorktree: { '/tmp/repo-b\0/tmp/repo-b': 'terminal-1' },
+      selectedTerminalByWorktree: { '/tmp/repo-b\0/tmp/repo-b': 'slot-1' },
       workspacePaneTabOrderByBranchByRepo: {
         '/tmp/repo-b': {
           main: [],

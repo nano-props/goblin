@@ -2,10 +2,9 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { defaultSettingsPrefs, defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 
 const mocks = vi.hoisted(() => ({
-  getEmbeddedServerRuntime: vi.fn<() => { url: string; accessToken: string; clientId: string } | null>(() => ({
+  getEmbeddedServerRuntime: vi.fn<() => { url: string; accessToken: string } | null>(() => ({
     url: 'http://127.0.0.1:32100/',
     accessToken: 'secret',
-    clientId: 'client_sharedterminal',
   })),
   requestEmbeddedServerJson: vi.fn(),
   postEmbeddedServerJson: vi.fn(),
@@ -27,7 +26,6 @@ describe('main settings server client', () => {
     mocks.getEmbeddedServerRuntime.mockReturnValue({
       url: 'http://127.0.0.1:32100/',
       accessToken: 'secret',
-      clientId: 'client_sharedterminal',
     })
   })
 
@@ -38,7 +36,7 @@ describe('main settings server client', () => {
     const mod = await import('#/main/settings-server-client.ts')
     await expect(mod.getSettingsSnapshot()).resolves.toBe(snapshot)
     expect(mocks.requestEmbeddedServerJson).toHaveBeenCalledWith(
-      { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
+      { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
       '/api/settings',
       undefined,
     )
@@ -51,7 +49,7 @@ describe('main settings server client', () => {
     const mod = await import('#/main/settings-server-client.ts')
     await expect(mod.getSettingsPrefs()).resolves.toBe(prefs)
     expect(mocks.requestEmbeddedServerJson).toHaveBeenCalledWith(
-      { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
+      { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
       '/api/settings/prefs',
       undefined,
     )
@@ -64,7 +62,7 @@ describe('main settings server client', () => {
     const mod = await import('#/main/settings-server-client.ts')
     await expect(mod.updateSettingsPrefs({ theme: 'dark' })).resolves.toBe(prefs)
     expect(mocks.postEmbeddedServerJson).toHaveBeenCalledWith(
-      { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
+      { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
       '/api/settings/prefs',
       { settings: { theme: 'dark' } },
     )
@@ -76,7 +74,7 @@ describe('main settings server client', () => {
     const mod = await import('#/main/settings-server-client.ts')
     await expect(mod.setSettingsGlobalShortcutState(true)).resolves.toBe(true)
     expect(mocks.postEmbeddedServerJson).toHaveBeenCalledWith(
-      { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
+      { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
       '/api/settings/global-shortcut-state',
       { registered: true },
     )

@@ -3,16 +3,17 @@ import type {
   TerminalAttachResult,
   TerminalCatalogMutationResult,
   TerminalCreateInput,
+  TerminalIdentityEvent,
+  TerminalLifecycleEvent,
   TerminalListSessionsInput,
   TerminalMutationResult,
   TerminalOutputEvent,
-  TerminalOwnershipEvent,
   TerminalResizeInput,
   TerminalRestartInput,
-  TerminalSessionInput,
-  TerminalSessionSnapshot,
-  TerminalSessionSnapshotInput,
-  TerminalSessionSummary,
+  TerminalSlotInput,
+  TerminalSlotSnapshot,
+  TerminalSlotSnapshotInput,
+  TerminalSlotSummary,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
   TerminalTitleEvent,
@@ -24,16 +25,22 @@ export type TerminalRealtimeMessage =
   | { type: 'output'; event: TerminalOutputEvent }
   | { type: 'title'; event: TerminalTitleEvent }
   | { type: 'exit'; event: TerminalExitEvent }
-  | { type: 'ownership'; event: TerminalOwnershipEvent }
+  // Identity and lifecycle are split at the wire. The renderer's
+  // `applyIdentity` only sees the identity event; `applyLifecycle`
+  // only sees the lifecycle event. A transitional phase update
+  // (e.g. `'opening'` during a pre-spawn broadcast) cannot look
+  // like a role change to the renderer.
+  | { type: 'identity'; event: TerminalIdentityEvent }
+  | { type: 'lifecycle'; event: TerminalLifecycleEvent }
   | { type: 'sessions-changed'; repoRoot: string }
-  // Targeted per-session close. Emitted by the server after a
+  // Targeted per-slot close. Emitted by the server after a
   // successful `close` request, alongside the existing
   // `sessions-changed` global broadcast. Multi-window clients use
-  // this to drop the local session immediately, without waiting for
+  // this to drop the local slot immediately, without waiting for
   // a full list-rescan. The `repoRoot` is included so the renderer
   // can route the event to the right worktree without a manager
   // lookup.
-  | { type: 'session-closed'; sessionId: string; repoRoot: string }
+  | { type: 'slot-closed'; ptySessionId: string; repoRoot: string }
 
 export interface TerminalSocketRequestInputs {
   attach: TerminalAttachInput
@@ -41,11 +48,11 @@ export interface TerminalSocketRequestInputs {
   write: TerminalWriteInput
   resize: TerminalResizeInput
   takeover: TerminalTakeoverInput
-  close: TerminalSessionInput
+  close: TerminalSlotInput
   'list-sessions': TerminalListSessionsInput
   create: TerminalCreateInput
   prune: { repoRoot: string }
-  'session-snapshot': TerminalSessionSnapshotInput
+  'slot-snapshot': TerminalSlotSnapshotInput
 }
 
 export interface TerminalSocketResponseOutputs {
@@ -55,10 +62,10 @@ export interface TerminalSocketResponseOutputs {
   resize: TerminalMutationResult
   takeover: TerminalTakeoverResult
   close: TerminalMutationResult
-  'list-sessions': TerminalSessionSummary[]
+  'list-sessions': TerminalSlotSummary[]
   create: TerminalCatalogMutationResult
   prune: { pruned: number; remaining: number }
-  'session-snapshot': TerminalSessionSnapshot | null
+  'slot-snapshot': TerminalSlotSnapshot | null
 }
 
 export type TerminalSocketRequestAction = keyof TerminalSocketRequestInputs
@@ -93,4 +100,20 @@ export type TerminalSocketResponseMessage =
     }[TerminalSocketRequestAction]
 
 export type TerminalSocketServerMessage = TerminalRealtimeMessage | TerminalSocketResponseMessage
-export type TerminalClientMessage = TerminalSocketRequestMessage
+/**
+ * Heartbeat envelope. Sent renderer→server every
+ * `HEARTBEAT_INTERVAL_MS` while the realtime socket is `OPEN`. Carries
+ * no payload — the server already knows the `(clientId, userId)` from
+ * the upgrade — but a discriminating `type` keeps the union closed so
+ * the existing `normalizeTerminalClientMessage` path rejects anything
+ * malformed at the WS layer. The server uses the receipt time to drive
+ * the broker's per-`clientId` liveness timer; a missed beat
+ * (longer than `HEARTBEAT_DEADLINE_MS`) fires a synthetic
+ * `onClientDisconnected` so the next `attach` can auto-claim instead
+ * of being stranded in viewer mode.
+ */
+export interface TerminalHeartbeatMessage {
+  type: 'heartbeat'
+  at: number
+}
+export type TerminalClientMessage = TerminalSocketRequestMessage | TerminalHeartbeatMessage

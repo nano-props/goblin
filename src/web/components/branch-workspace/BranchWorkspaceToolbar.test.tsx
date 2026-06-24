@@ -7,9 +7,9 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { BranchWorkspaceToolbar } from '#/web/components/branch-workspace/BranchWorkspaceToolbar.tsx'
 import { getSelectedBranchWorkspacePresentation } from '#/web/components/branch-workspace/model.ts'
 import {
-  TerminalSessionContext,
-  TerminalSessionReadContext,
-} from '#/web/components/terminal/terminal-session-context.ts'
+  TerminalSlotContext,
+  TerminalSlotReadContext,
+} from '#/web/components/terminal/terminal-slot-context.ts'
 import type {
   WorkspacePaneStaticViewType,
   WorkspacePaneTabOrderEntry,
@@ -17,14 +17,15 @@ import type {
 } from '#/shared/workspace-pane.ts'
 import { workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
 import type {
-  TerminalSessionContextValue,
-  TerminalSessionReadContextValue,
-  TerminalSessionSummary,
+  TerminalSlotContextValue,
+  TerminalSlotReadContextValue,
+  TerminalSlotSummary,
   TerminalDescriptor,
   WorktreeTerminalSnapshot,
 } from '#/web/components/terminal/types.ts'
 import { MainWindowNavigationProvider, type MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
-import { emptyRendererBridgeBootstrap, setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
+import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
+import { emptyBootstrapSnapshot } from '#/web/renderer-bootstrap-bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
@@ -33,7 +34,7 @@ import {
   workspacePaneStaticViewsForBranch,
   workspacePaneTabOrderForBranch,
 } from '#/web/stores/repos/workspace-pane-tabs.ts'
-import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import { setTerminalSlotCommandBridge } from '#/web/components/terminal/terminal-slot-command-bridge.ts'
 
 let compactUi = false
 
@@ -87,7 +88,7 @@ afterEach(() => {
   queryClient = null
   toastMocks.error.mockClear()
   setRendererBridgeForTests(null)
-  setTerminalSessionCommandBridge(null)
+  setTerminalSlotCommandBridge(null)
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
@@ -648,7 +649,7 @@ describe('BranchWorkspaceToolbar', () => {
     expect(busyNewButton?.disabled).toBe(true)
 
     // Once the provider calls markReady() (which the real Provider
-    // does at the end of syncServerSessions' finally block), the
+    // does at the end of syncServerSlots' finally block), the
     // busy state clears and the real button appears.
     useRepoSyncStore.getState().markReady(REPO_ID, 0)
     await flush()
@@ -752,12 +753,12 @@ function renderToolbar(options: {
     statusLoaded: true,
   })
   const detail = getSelectedBranchWorkspacePresentation(repo)
-  const sessions: TerminalSessionSummary[] = Array.from({ length: options.terminalCount }, (_, index) => ({
+  const sessions: TerminalSlotSummary[] = Array.from({ length: options.terminalCount }, (_, index) => ({
     type: 'terminal',
     id: `t${index + 1}`,
     key: `t${index + 1}`,
     worktreeTerminalKey: `${REPO_ID}\0${WORKTREE_PATH}`,
-    terminalId: `t${index + 1}`,
+    slotId: `t${index + 1}`,
     index: index + 1,
     displayOrder: index + 1,
     title: `term-${index + 1}`,
@@ -770,7 +771,7 @@ function renderToolbar(options: {
     ? {
         key: sessions[0].key,
         worktreeTerminalKey: sessions[0].worktreeTerminalKey,
-        terminalId: sessions[0].terminalId,
+        slotId: sessions[0].slotId,
         index: sessions[0].index,
         repoRoot: REPO_ID,
         branch: branchName,
@@ -780,13 +781,13 @@ function renderToolbar(options: {
   const worktreeSnapshot: WorktreeTerminalSnapshot = {
     worktreeTerminalKey: `${REPO_ID}\0${WORKTREE_PATH}`,
     selectedDescriptor,
-    sessions,
+    slots: sessions,
     count: options.terminalCount,
     bellCount: sessions.filter((session) => session.hasBell).length,
     pendingCreate: options.pendingCreate ?? false,
   }
   const terminalSnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
-  const readContext: TerminalSessionReadContextValue = {
+  const readContext: TerminalSlotReadContextValue = {
     worktreeSnapshot: () => worktreeSnapshot,
     subscribeWorktree: () => () => {},
     snapshot: () => terminalSnapshot,
@@ -797,7 +798,7 @@ function renderToolbar(options: {
   const scrollToBottom = vi.fn()
   const closeTerminalByDescriptor = vi.fn()
   const showRepoWorkspacePaneView = vi.fn(options.navigation.showRepoWorkspacePaneView)
-  const commandContext: TerminalSessionContextValue = {
+  const commandContext: TerminalSlotContextValue = {
     createTerminal,
     registerHost: vi.fn(),
     unregisterHost: vi.fn(),
@@ -817,7 +818,7 @@ function renderToolbar(options: {
     takeover: vi.fn(),
     serialize: vi.fn(() => ''),
   }
-  setTerminalSessionCommandBridge({
+  setTerminalSlotCommandBridge({
     worktreeSnapshot: readContext.worktreeSnapshot,
     createTerminal,
     selectTerminal,
@@ -832,11 +833,11 @@ function renderToolbar(options: {
     root!.render(
       <QueryClientProvider client={queryClient!}>
         <MainWindowNavigationProvider value={options.navigation}>
-          <TerminalSessionContext.Provider value={commandContext}>
-            <TerminalSessionReadContext.Provider value={readContext}>
+          <TerminalSlotContext.Provider value={commandContext}>
+            <TerminalSlotReadContext.Provider value={readContext}>
               <BranchWorkspaceToolbar repo={repo} detail={detail} workspacePaneId="workspace" />
-            </TerminalSessionReadContext.Provider>
-          </TerminalSessionContext.Provider>
+            </TerminalSlotReadContext.Provider>
+          </TerminalSlotContext.Provider>
         </MainWindowNavigationProvider>
       </QueryClientProvider>,
     )

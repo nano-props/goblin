@@ -38,7 +38,11 @@ vi.mock('#/web/components/branch-workspace/open-workspace-pane-view.ts', () => (
   openWorkspacePaneView: vi.fn(),
 }))
 
-vi.mock('#/web/components/terminal/terminal-session-store.ts', () => ({
+vi.mock('#/web/components/BranchActionsMenu.tsx', () => ({
+  BranchActionsMenu: () => null,
+}))
+
+vi.mock('#/web/components/terminal/terminal-slot-store.ts', () => ({
   useWorktreeTerminalBellCount: () => 0,
 }))
 

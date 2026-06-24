@@ -10,7 +10,7 @@ import { settingsSnapshotQueryKey } from '#/web/settings-queries.ts'
 const descriptor: TerminalDescriptor = {
   key: 'terminal-key',
   worktreeTerminalKey: 'worktree-key',
-  terminalId: 'terminal-1',
+  slotId: 'slot-1',
   index: 1,
   repoRoot: '/tmp/repo',
   branch: 'feature/test',

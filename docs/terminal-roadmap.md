@@ -5,7 +5,7 @@ Use this doc for the next-stage terminal refactor roadmap.
 ## Goal
 
 - Finish the move from a PTY-coupled terminal stack to a stable server-first terminal platform.
-- Reduce ambiguity around ownership, restart, reconnect, and geometry.
+- Reduce ambiguity around control, restart, reconnect, and geometry.
 - Strengthen invariants before adding more product behavior on top of terminals.
 
 ## Current assessment
@@ -14,8 +14,8 @@ The current terminal refactor is directionally correct:
 
 - business runtime is separated from PTY execution
 - renderer projection is separated from local xterm view work
-- ownership, mirroring, and takeover are explicit concepts
-- the server remains the runtime-coherent owner of terminal truth
+- control, mirroring, and takeover are explicit concepts
+- the server remains the runtime-coherent source of terminal truth
 
 The remaining work is not a ground-up rewrite.
 It is a second-stage consolidation that makes the current design more explicit and harder to misuse.
@@ -33,9 +33,9 @@ Today, several important terminal states are represented implicitly through comb
 
 The next stage should make terminal lifecycle states explicit so create, restart, reconnect, and failure behavior become easier to reason about.
 
-### 2. Upgrade ownership from a single-attachment model to a multi-attachment model
+### 2. Upgrade control from a single-attachment model to a multi-attachment model
 
-The current design already talks in client and attachment terms, but the server-side ownership model is still narrower than the product model it wants to support.
+The current design already talks in client and attachment terms, but the server-side control model is still narrower than the product model it wants to support.
 
 The next stage should model multiple attachments per session directly.
 
@@ -50,12 +50,12 @@ The terminal feature now has enough structure that contract tests become more va
 
 ## Priorities
 
-## P1: Ownership and lifecycle model
+## P1: Control and lifecycle model
 
 ### Outcome
 
 - explicit session lifecycle phases on the server
-- explicit multi-attachment ownership state
+- explicit multi-attachment control state
 - clearer restart and reconnect semantics
 
 ### Why
@@ -71,8 +71,8 @@ This is the highest-leverage work because it affects:
 ### Deliverables
 
 - session phase model
-- multi-attachment ownership model
-- ownership transition rules
+- multi-attachment control model
+- control transition rules
 - clarified attach, takeover, resize, release, and reconnect semantics
 
 ## P1: Clarify restart failure semantics
@@ -107,11 +107,11 @@ This is manageable now, but it will become a maintenance bottleneck as the featu
 
 ## P1.7: Decouple terminal runtime lifetime from React provider lifetime
 
-Keep `TerminalSessionRegistry` / shared terminal runtime state on a renderer-level lifetime rather than a provider-owned lifetime. This remains the preferred next-stage cleanup, but it should not block the current first-frame protocol fix. See `docs/terminal-session-lifecycle.md` for the bug analysis and why this work is related but separate.
+Keep `TerminalSlotRegistry` / shared terminal runtime state on a renderer-level lifetime rather than a provider-owned lifetime. This remains the preferred next-stage cleanup, but it should not block the current first-frame protocol fix. See `docs/terminal-slot-lifecycle.md` for the bug analysis and why this work is related but separate.
 
 ## P1.8: Make create deliver an atomic first frame
 
-`create` should follow the same first-frame contract shape as `attach` / `restart`: return snapshot hydration data directly, and let the renderer treat that payload as the authoritative first-frame handshake. `create.sessions` should remain projection data only. See `docs/terminal-session-lifecycle.md` for the detailed bug write-up and contract rules.
+`create` should follow the same first-frame contract shape as `attach` / `restart`: return snapshot hydration data directly, and let the renderer treat that payload as the authoritative first-frame handshake. `create.sessions` should remain projection data only. See `docs/terminal-slot-lifecycle.md` for the detailed bug write-up and contract rules.
 
 ## P2: Further tighten renderer projection boundaries
 
@@ -128,7 +128,7 @@ This is not yet a crisis, so it should follow the server-side lifecycle work rat
 
 ### Outcome
 
-- tests for ownership invariants
+- tests for control invariants
 - tests for reconnect behavior
 - tests for restart failure behavior
 - tests for geometry invariants
@@ -142,16 +142,16 @@ The next stage needs tests that verify the product model, not only helper behavi
 
 ### Outcome
 
-- clearer separation of protocol, ownership types, realtime messages, and validation
+- clearer separation of protocol, control types, realtime messages, and validation
 
 ### Why
 
-This improves readability and long-term maintainability, but it is less urgent than ownership and lifecycle clarity.
+This improves readability and long-term maintainability, but it is less urgent than control and lifecycle clarity.
 
 ## Suggested order
 
-1. Define target lifecycle and ownership semantics
-2. Refactor server session and ownership model to match them
+1. Define target lifecycle and control semantics
+2. Refactor server session and control model to match them
 3. Clarify restart failure and reconnect behavior
 4. Split runtime orchestration into smaller modules
 5. Add contract-level tests
@@ -168,7 +168,7 @@ This improves readability and long-term maintainability, but it is less urgent t
 ## Rules of thumb
 
 - Prefer explicit lifecycle states over implicit combinations of fields.
-- Prefer explicit ownership transitions over heuristic control changes.
+- Prefer explicit control transitions over heuristic control changes.
 - Prefer server truth over renderer inference.
 - Prefer geometry correctness over post-hoc rendering fixes.
 - Prefer contract tests over implementation-shaped tests for terminal behavior.

@@ -1,11 +1,11 @@
 # Terminal Target Model
 
-Use this doc for the target terminal session and ownership model.
+Use this doc for the target terminal session and control model.
 
 ## Goal
 
 - Make terminal lifecycle explicit.
-- Make attachment ownership explicit.
+- Make attachment control explicit.
 - Keep the server as the source of truth for terminal business state.
 - Keep renderer behavior as a projection of that model.
 
@@ -65,7 +65,7 @@ Controller state should be derived from:
 
 A view is renderer-local xterm state.
 
-Views should never be treated as authoritative session or ownership state.
+Views should never be treated as authoritative session or control state.
 
 ## Target server session shape
 
@@ -127,11 +127,11 @@ This allows the server to reason about:
 - viewer attachments
 - reconnect of the same attachment
 - takeover by a different attachment
-- release on disconnect (the controller slot clears immediately; ownership survives via the per-session `claimedByOwner` flag, not via a per-attachment grace timer)
+- release on disconnect (the controller slot clears immediately; control survives via the per-session `userSticky` flag, not via a per-attachment grace timer)
 
-## Ownership roles as renderer projection
+## Control roles as renderer projection
 
-The renderer should still consume a simple ownership projection:
+The renderer should still consume a simple control projection:
 
 - controller
 - viewer
@@ -141,7 +141,7 @@ But those roles should be **derived views** of the richer session + attachment m
 
 That keeps the UI simple while keeping the business model accurate.
 
-## Ownership rules
+## Control rules
 
 ### Control authority
 
@@ -159,14 +159,14 @@ That keeps the UI simple while keeping the business model accurate.
 ### Disconnect behavior
 
 - disconnect should clear the controller slot immediately, not preserve it
-- a subsequent attach from the same owner (any attachment) auto-claims when no controller is present, because `claimedByOwner` is sticky per session
+- a subsequent attach from the same user (any attachment) auto-claims when no controller is present, because `userSticky` is sticky per session
 - releasing control should not require the renderer to guess what happened
 
 ### Takeover behavior
 
 - takeover is an explicit control transition
 - takeover should update canonical geometry coherently with the new controller
-- renderer optimism should stay minimal; server ownership events remain authoritative
+- renderer optimism should stay minimal; server identity events remain authoritative
 
 ## Geometry in the target model
 
@@ -210,7 +210,7 @@ The renderer does not need the full server model.
 It mainly needs:
 
 - session summary
-- current ownership projection for this attachment
+- current control projection for this attachment
 - canonical geometry
 - replay snapshot
 - lifecycle phase
@@ -222,7 +222,7 @@ The renderer should not have to infer hidden lifecycle meaning from missing PTY 
 All five steps are landed as of this revision. The renderer-side
 projection (steps 3 + 5) is centralized in
 `src/web/components/terminal/authority-gate.ts`; see
-`terminal-takeover.md` for the resulting ownership model.
+`terminal-takeover.md` for the resulting control model.
 
 ## Success criteria
 

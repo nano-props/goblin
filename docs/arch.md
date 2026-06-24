@@ -1,6 +1,6 @@
 # Architecture
 
-Use this doc for app shell and process ownership rules.
+Use this doc for app shell and process control rules.
 
 - Keep one main `BrowserWindow` by default. Add extra windows only when the product really needs a separate surface.
 - Put app logic in `src/server/` or `src/shared/`.

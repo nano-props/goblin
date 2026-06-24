@@ -8,16 +8,16 @@ import { getRepositoryLog } from '#/web/repo-client.ts'
 import type { LogEntry } from '#/web/types.ts'
 import { BranchStatus } from '#/web/components/branch-workspace/BranchStatus.tsx'
 import { TerminalSlot } from '#/web/components/terminal/TerminalSlot.tsx'
-import type { TerminalSessionBase } from '#/web/components/terminal/types.ts'
+import type { TerminalSlotBase } from '#/web/components/terminal/types.ts'
 import type {
   BranchWorkspaceRepo,
   SelectedBranchWorkspacePresentation,
 } from '#/web/components/branch-workspace/model.ts'
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
+import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
 import {
   useTerminalRepoSyncReady,
   useWorktreeTerminalSnapshot,
-} from '#/web/components/terminal/terminal-session-store.ts'
+} from '#/web/components/terminal/terminal-slot-store.ts'
 import { workspacePaneViewButtonId } from '#/web/components/workspace-pane/workspace-pane-view-model.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { workspacePaneStaticViewButtonId } from '#/web/components/branch-workspace/workspace-pane-views.ts'
@@ -30,7 +30,7 @@ import {
   type BranchWorkspacePaneSelection,
 } from '#/web/components/branch-workspace/workspace-pane-tab-model.ts'
 import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
-import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
+import { useTerminalSlotContext } from '#/web/components/terminal/terminal-slot-context.ts'
 import { createWorkspacePaneTerminalTab } from '#/web/stores/repos/workspace-pane-terminal-write-paths.ts'
 
 const DEFAULT_BRANCH_HISTORY_ERROR_KEY = 'error.failed-read-repo'
@@ -72,7 +72,7 @@ export function BranchWorkspaceContent({ repo, detail, workspacePaneId }: Props)
     worktreePath: branch?.worktree?.path ?? null,
     preferredView: preferredWorkspacePaneViewForBranch(repo.ui, branch?.name),
     tabOrder: workspacePaneTabOrder,
-    runtimeTerminalViews: worktreeSnapshot.sessions,
+    runtimeTerminalViews: worktreeSnapshot.slots,
     terminalSessionCount: worktreeSnapshot.count,
     terminalCreatePending: worktreeSnapshot.pendingCreate,
     terminalSyncReady,
@@ -353,9 +353,9 @@ function BranchTerminalTab({
   terminalSyncReady: boolean
   branch: BranchWorkspaceBranch
 }) {
-  const { createTerminal } = useTerminalSessionContext()
+  const { createTerminal } = useTerminalSlotContext()
   const createTerminalForSlot = useCallback(
-    (base: TerminalSessionBase) =>
+    (base: TerminalSlotBase) =>
       createWorkspacePaneTerminalTab({
         base,
         createTerminal,

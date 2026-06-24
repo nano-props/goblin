@@ -1,5 +1,5 @@
 import type {
-  TerminalAttachmentRole,
+  TerminalClientRole,
   TerminalControllerStatus,
   TerminalExitEvent,
   TerminalOutputEvent,
@@ -10,7 +10,7 @@ export type TerminalPhase = 'opening' | 'restarting' | 'open' | 'error' | 'close
 export interface TerminalDescriptor {
   key: string
   worktreeTerminalKey: string
-  terminalId: string
+  slotId: string
   index: number
   repoRoot: string
   branch: string
@@ -31,35 +31,45 @@ export interface TerminalBellEvent {
   visible: boolean
 }
 
-export interface TerminalAttachmentOwnershipViewModel {
-  role: TerminalAttachmentRole
+export interface TerminalControllerViewModel {
+  role: TerminalClientRole
   controllerStatus: TerminalControllerStatus
 }
 
-export interface TerminalAttachmentSnapshot extends TerminalAttachmentOwnershipViewModel {
+export interface TerminalClientSnapshot extends TerminalControllerViewModel {
   active: boolean
   canTakeover: boolean
   canonicalCols: number | null
   canonicalRows: number | null
-  phase: TerminalPhase
 }
 
 /**
- * Ownership state delivered by either the realtime `ownership` event
- * (controller crash / grace expiry / controller reconnect) or the
- * `terminal.takeover` response (now an authoritative handshake — see
- * `TerminalTakeoverResult` in `src/shared/terminal-types.ts`). Both
- * surfaces carry the same fields so the renderer can apply either
- * without re-checking the shape.
+ * Identity view-model: the stable controller + geometry fields the
+ * renderer needs to decide who controls the PTY and at what size.
+ * No `phase` — phase lives on the lifecycle channel so a transitional
+ * phase update can never be confused with a role change at the
+ * renderer's `applyIdentity` boundary.
  */
-export interface TerminalOwnershipViewModel extends TerminalAttachmentOwnershipViewModel {
-  sessionId: string
+export interface TerminalIdentityViewModel extends TerminalControllerViewModel {
+  ptySessionId: string
   canonicalCols: number
   canonicalRows: number
-  phase: TerminalPhase
 }
 
-export interface TerminalSessionHydrationInput extends TerminalOwnershipViewModel {
+/**
+ * Lifecycle view-model: the transient phase + message +
+ * takeover-pending flag. No role — role lives on the identity
+ * channel so the teardown decision can never be triggered by a
+ * transitional phase update alone.
+ */
+export interface TerminalLifecycleViewModel {
+  ptySessionId: string
+  phase: TerminalPhase
+  message: string | null
+  takeoverPending: boolean
+}
+
+export interface TerminalSlotHydrationInput extends TerminalIdentityViewModel {
   phase: TerminalPhase
   message: string | null
   processName: string
@@ -74,10 +84,10 @@ export interface TerminalSnapshot {
   processName: string
   /** Server-canonical terminal title from attach hydration or realtime title events. */
   canonicalTitle?: string | null
-  attachment?: TerminalAttachmentSnapshot | null
+  attachment?: TerminalClientSnapshot | null
   search?: TerminalSearchResult | null
   progress?: TerminalProgressState | null
-  /** True while a takeover request has been sent but ownership has not yet been confirmed. */
+  /** True while a takeover request has been sent but control has not yet been confirmed. */
   takeoverPending?: boolean
 }
 
@@ -87,7 +97,7 @@ export interface TerminalSearchResult {
   found: boolean
 }
 
-export interface TerminalSessionBase {
+export interface TerminalSlotBase {
   repoRoot: string
   branch: string
   worktreePath: string
@@ -100,12 +110,12 @@ export interface TerminalRepoSnapshot {
 
 export type TerminalRepoIndex = Record<string, TerminalRepoSnapshot>
 
-export interface TerminalSessionSummary {
+export interface TerminalSlotSummary {
   type: 'terminal'
   id: string
   key: string
   worktreeTerminalKey: string
-  terminalId: string
+  slotId: string
   index: number
   displayOrder: number
   title: string
@@ -116,26 +126,26 @@ export interface TerminalSessionSummary {
   hasBell: boolean
 }
 
-export type WorkspacePaneViewSummary = TerminalSessionSummary
+export type WorkspacePaneViewSummary = TerminalSlotSummary
 
 export interface WorktreeTerminalSnapshot {
   worktreeTerminalKey: string
   selectedDescriptor: TerminalDescriptor | null
-  sessions: TerminalSessionSummary[]
+  slots: TerminalSlotSummary[]
   count: number
   bellCount: number
   pendingCreate: boolean
 }
 
-export interface TerminalSessionContextValue {
-  createTerminal: (base: TerminalSessionBase) => Promise<string>
+export interface TerminalSlotContextValue {
+  createTerminal: (base: TerminalSlotBase) => Promise<string>
   registerHost: (worktreeTerminalKey: string, host: HTMLElement) => void
   unregisterHost: (worktreeTerminalKey: string, host: HTMLElement) => void
   selectTerminal: (worktreeTerminalKey: string, key: string) => void
   scrollToBottom: (key: string) => void
   scrollLines: (key: string, amount: number) => void
   clearBell: (key: string) => boolean
-  closeTerminalByDescriptor: (key: string, base: TerminalSessionBase) => void
+  closeTerminalByDescriptor: (key: string, base: TerminalSlotBase) => void
   attach: (descriptor: TerminalDescriptor, host: HTMLElement) => void
   detach: (key: string, host: HTMLElement) => void
   restart: (key: string) => void
@@ -149,20 +159,20 @@ export interface TerminalSessionContextValue {
   serialize: (key: string) => string
 }
 
-export interface TerminalSessionReadContextValue {
+export interface TerminalSlotReadContextValue {
   worktreeSnapshot: (worktreeTerminalKey: string) => WorktreeTerminalSnapshot
   subscribeWorktree: (worktreeTerminalKey: string, listener: () => void) => () => void
   snapshot: (key: string) => TerminalSnapshot
   subscribeSnapshot: (key: string, listener: () => void) => () => void
 }
 
-export interface ManagedTerminalSessionLike {
+export interface ManagedTerminalSlotLike {
   descriptor: TerminalDescriptor
   updateDescriptor: (descriptor: TerminalDescriptor) => void
   attach: (host: HTMLElement) => void
   detach: (host: HTMLElement, parkingRoot: HTMLElement) => void
   restart: () => void
-  dispose: (options?: { closeSession?: boolean }) => void
+  dispose: (options?: { closeSlot?: boolean }) => void
   snapshot: () => TerminalSnapshot
   isTerminalFocusTarget: (target: EventTarget | null) => boolean
   findNext: (term: string, incremental?: boolean) => TerminalSearchResult
@@ -172,7 +182,8 @@ export interface ManagedTerminalSessionLike {
   scrollLines: (amount: number) => void
   writeInput: (input: TerminalInput) => void
   takeover: () => void
-  handleOwnership: (event: TerminalOwnershipViewModel) => void
+  handleIdentity: (event: TerminalIdentityViewModel) => void
+  handleLifecycle: (event: TerminalLifecycleViewModel) => void
   /** Serializes xterm framebuffer state as VT sequences; not plain-text output for copy UI. */
   serialize: () => string
   handleOutput: (event: TerminalOutputEvent) => void
@@ -180,13 +191,12 @@ export interface ManagedTerminalSessionLike {
   handleExit: (event: TerminalExitEvent) => boolean
 }
 
-export function createTerminalAttachmentSnapshot(input: {
-  role: TerminalAttachmentRole
+export function createTerminalClientSnapshot(input: {
+  role: TerminalClientRole
   controllerStatus: TerminalControllerStatus
-  canonicalCols: number
-  canonicalRows: number
-  phase: TerminalPhase
-}): TerminalAttachmentSnapshot {
+  canonicalCols: number | null
+  canonicalRows: number | null
+}): TerminalClientSnapshot {
   const active = input.role === 'controller'
   return {
     role: input.role,
@@ -195,6 +205,5 @@ export function createTerminalAttachmentSnapshot(input: {
     canTakeover: !active,
     canonicalCols: input.canonicalCols || null,
     canonicalRows: input.canonicalRows || null,
-    phase: input.phase,
   }
 }

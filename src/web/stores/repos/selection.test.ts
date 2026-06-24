@@ -389,17 +389,17 @@ describe('setWorkspacePaneView', () => {
     seedRepo({
       selectedBranch: 'main',
       preferredWorkspacePaneView: 'history',
-      workspacePaneTabOrder: [workspacePaneStaticTabOrderEntry('status'), terminalEntry('terminal-1'), workspacePaneStaticTabOrderEntry('history')],
+      workspacePaneTabOrder: [workspacePaneStaticTabOrderEntry('status'), terminalEntry('slot-1'), workspacePaneStaticTabOrderEntry('history')],
     })
 
     useReposStore
       .getState()
-      .reorderWorkspacePaneTabs(REPO_ID, [workspacePaneStaticTabOrderEntry('history'), terminalEntry('terminal-1'), workspacePaneStaticTabOrderEntry('status')])
+      .reorderWorkspacePaneTabs(REPO_ID, [workspacePaneStaticTabOrderEntry('history'), terminalEntry('slot-1'), workspacePaneStaticTabOrderEntry('status')])
 
     expect(openViewsFor('main')).toEqual(['history', 'status'])
     expect(tabOrderFor('main')).toEqual([
       workspacePaneStaticTabOrderEntry('history'),
-      terminalEntry('terminal-1'),
+      terminalEntry('slot-1'),
       workspacePaneStaticTabOrderEntry('status'),
     ])
 
@@ -414,12 +414,12 @@ describe('setWorkspacePaneView', () => {
   test('adds a terminal tab at the end even when a stale entry already exists', () => {
     seedRepo({
       selectedBranch: 'main',
-      workspacePaneTabOrder: [terminalEntry('terminal-1'), workspacePaneStaticTabOrderEntry('status')],
+      workspacePaneTabOrder: [terminalEntry('slot-1'), workspacePaneStaticTabOrderEntry('status')],
     })
 
-    useReposStore.getState().addWorkspacePaneTerminalTab(REPO_ID, 'terminal-1')
+    useReposStore.getState().addWorkspacePaneTerminalTab(REPO_ID, 'slot-1')
 
-    expect(tabOrderFor('main')).toEqual([workspacePaneStaticTabOrderEntry('status'), terminalEntry('terminal-1')])
+    expect(tabOrderFor('main')).toEqual([workspacePaneStaticTabOrderEntry('status'), terminalEntry('slot-1')])
   })
 
   test('removes a terminal tab order entry when its terminal closes', () => {
@@ -427,12 +427,12 @@ describe('setWorkspacePaneView', () => {
       selectedBranch: 'main',
       workspacePaneTabOrder: [
         workspacePaneStaticTabOrderEntry('status'),
-        terminalEntry('terminal-1'),
+        terminalEntry('slot-1'),
         workspacePaneStaticTabOrderEntry('history'),
       ],
     })
 
-    useReposStore.getState().removeWorkspacePaneTerminalTab(REPO_ID, 'terminal-1')
+    useReposStore.getState().removeWorkspacePaneTerminalTab(REPO_ID, 'slot-1')
 
     expect(tabOrderFor('main')).toEqual([
       workspacePaneStaticTabOrderEntry('status'),

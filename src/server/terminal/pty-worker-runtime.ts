@@ -54,13 +54,13 @@ export class PtyWorkerRuntime {
         this.handleSpawn(message.requestId, message.input)
         return
       case 'pty-write':
-        this.ptys.get(message.sessionId)?.runtime.write(message.data)
+        this.ptys.get(message.ptySessionId)?.runtime.write(message.data)
         return
       case 'pty-resize':
-        this.ptys.get(message.sessionId)?.runtime.resize(message.cols, message.rows)
+        this.ptys.get(message.ptySessionId)?.runtime.resize(message.cols, message.rows)
         return
       case 'pty-kill':
-        this.ptys.get(message.sessionId)?.runtime.kill()
+        this.ptys.get(message.ptySessionId)?.runtime.kill()
         return
       case 'shutdown':
         this.shutdown()
@@ -74,40 +74,40 @@ export class PtyWorkerRuntime {
       this.options.emit({ type: 'pty-spawn-result', requestId, ok: false, error: result.message })
       return
     }
-    const sessionId = createSessionId()
+    const ptySessionId = createPtySessionId()
     // Defer the initial sample to the first onData chunk: node-pty's
     // macOS spawn-helper briefly holds the PTY before exec'ing the
     // shell, so term.process read in the same tick as pty.spawn returns
     // the helper's comm. By the time the shell has produced output,
     // the helper is gone and the comm is the real name.
-    this.ptys.set(sessionId, { runtime: result.runtime, processName: 'terminal' })
+    this.ptys.set(ptySessionId, { runtime: result.runtime, processName: 'terminal' })
     this.options.emit({
       type: 'pty-spawn-result',
       requestId,
       ok: true,
-      sessionId,
+      ptySessionId,
       processName: 'terminal',
     })
-    this.wireDataAndExitEvents(sessionId, result.runtime)
+    this.wireDataAndExitEvents(ptySessionId, result.runtime)
   }
 
-  private wireDataAndExitEvents(sessionId: string, runtime: TerminalPtyRuntime): void {
+  private wireDataAndExitEvents(ptySessionId: string, runtime: TerminalPtyRuntime): void {
     runtime.onData((data) => {
       // Always sample process name so the main process has a fresh view
       // of the foreground process, even after a child exits without
       // setting a title-OSC. Emit the name-change BEFORE pty-data so
       // the main process's cache is updated when it processes this chunk.
       const nextName = safeProcessName(runtime)
-      const entry = this.ptys.get(sessionId)
+      const entry = this.ptys.get(ptySessionId)
       if (entry && nextName && nextName !== entry.processName) {
         entry.processName = nextName
-        this.options.emit({ type: 'pty-process-name-changed', sessionId, processName: nextName })
+        this.options.emit({ type: 'pty-process-name-changed', ptySessionId, processName: nextName })
       }
-      this.options.emit({ type: 'pty-data', sessionId, data })
+      this.options.emit({ type: 'pty-data', ptySessionId, data })
     })
     runtime.onExit(() => {
-      this.options.emit({ type: 'pty-exit', sessionId, code: null, signal: null })
-      this.ptys.delete(sessionId)
+      this.options.emit({ type: 'pty-exit', ptySessionId, code: null, signal: null })
+      this.ptys.delete(ptySessionId)
     })
   }
 
@@ -121,8 +121,8 @@ export class PtyWorkerRuntime {
   }
 }
 
-function createSessionId(): string {
-  return `ptyw_${crypto.randomUUID()}`
+function createPtySessionId(): string {
+  return `pty_${crypto.randomUUID()}`
 }
 
 function defaultSpawnPty(input: PtySpawnInput): PtySpawnOutcome {

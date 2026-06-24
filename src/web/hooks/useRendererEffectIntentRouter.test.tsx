@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { useRendererEffectIntentRouter } from '#/web/hooks/useRendererEffectIntentRouter.ts'
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
+import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
@@ -174,7 +174,7 @@ describe('useRendererEffectIntentRouter', () => {
       ],
     })
     currentRepoId = repo.id
-    const key = '/tmp/repo\0/tmp/repo-feature\0terminal-2'
+    const key = '/tmp/repo\0/tmp/repo-feature\0slot-2'
 
     await renderHookHost()
 
@@ -213,7 +213,7 @@ describe('useRendererEffectIntentRouter', () => {
       },
     }
     currentRepoId = repo.id
-    const key = '/tmp/repo\0/tmp/repo-feature\0terminal-2'
+    const key = '/tmp/repo\0/tmp/repo-feature\0slot-2'
 
     await renderHookHost()
 

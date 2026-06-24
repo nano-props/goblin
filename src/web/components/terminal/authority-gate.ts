@@ -1,4 +1,4 @@
-import { readOrCreateWebTerminalAttachmentId } from '#/web/renderer-terminal-bridge.ts'
+import { readOrCreateWebTerminalClientId } from '#/web/renderer-terminal-bridge.ts'
 import { terminalLog } from '#/web/logger.ts'
 import type { RendererTerminalBridge } from '#/web/renderer-bridge-types.ts'
 import type { TerminalTakeoverResult } from '#/shared/terminal-types.ts'
@@ -10,9 +10,9 @@ import type { TerminalTakeoverResult } from '#/shared/terminal-types.ts'
  * "接管" button — so the auto-promote behavior lives in one place
  * instead of being duplicated across call sites.
  *
- * Model (matches `src/server/terminal/terminal-ownership.ts`):
- * the server is owner-scoped. Every attachmentId from the same
- * ownerId is the same logical user. If the server believes the
+ * Model (matches `src/server/terminal/terminal-controller.ts`):
+ * the server is user-scoped. Every clientId from the same
+ * userId is the same logical user. If the server believes the
  * caller is the controller, writes pass through; if the caller is
  * a viewer (someone else — including a sibling device — is
  * currently the controller), the gate issues an explicit takeover
@@ -21,7 +21,7 @@ import type { TerminalTakeoverResult } from '#/shared/terminal-types.ts'
  * UI can show a toast on the rare failure path.
  *
  * The gate is intentionally synchronous for "is controller?": the
- * realtime ownership event pushes role changes into `setRole`, and
+ * realtime identity event pushes role changes into `setRole`, and
  * read paths (`isController`, `canWrite`) just return the cached
  * value. The only async path is `authorize` / `takeover`, both of
  * which hit the bridge.
@@ -31,27 +31,27 @@ import type { TerminalTakeoverResult } from '#/shared/terminal-types.ts'
  * right toast can be shown (and to logs so the failure mode is
  * diagnosable from production).
  *
- * - `session-closed` — gate-internal: the runtime no longer has a
- *   sessionId, or the session was disposed mid-call. The takeover
+ * - `slot-closed` — gate-internal: the runtime no longer has a
+ *   ptySessionId, or the session was disposed mid-call. The takeover
  *   round-trip never started.
  * - `no-bridge` — gate-internal: the renderer bridge is unavailable
  *   (typically only in tests / startup). The takeover round-trip
  *   never started.
- * - `session-unknown` — the server reported the sessionId is not
- *   known to this owner. The renderer's catalog is stale; the user
+ * - `session-unknown` — the server reported the ptySessionId is not
+ *   known to this user. The renderer's catalog is stale; the user
  *   needs to re-list before retrying.
- * - `attachment-offline` — the server's broker has no live socket
- *   for `(ownerId, attachmentId)`. The renderer is reconnecting.
+ * - `client-offline` — the server's broker has no live socket
+ *   for `(userId, clientId)`. The renderer is reconnecting.
  *   Retrying after a moment usually works.
  * - `takeover-rejected` — catch-all for any other server-side
  *   refusal (size out of range, validator rejection, etc.). The
  *   `message` field carries the server's i18n key.
  */
 export type AuthorizationDenialReason =
-  | 'session-closed'
+  | 'slot-closed'
   | 'no-bridge'
   | 'session-unknown'
-  | 'attachment-offline'
+  | 'client-offline'
   | 'takeover-rejected'
 
 export type AuthorizationResult =
@@ -89,11 +89,11 @@ export interface TerminalAuthorityGate {
    * write-specific) so the caller can surface a specific toast for
    * the failure mode and log the server's i18n key.
    */
-  takeover(): Promise<AuthorizationResult>
+  takeover(): Promise<Exclude<AuthorizationResult, { kind: 'promoted' }>>
   /**
-   * Push the latest role the server believes this attachmentId has.
-   * Called by the realtime ownership event handler in
-   * `ManagedTerminalSession.handleOwnership`.
+   * Push the latest role the server believes this clientId has.
+   * Called by the realtime identity event handler in
+   * `ManagedTerminalSlot.handleIdentity`.
    */
   setRole(role: 'controller' | 'viewer' | 'unowned'): void
   /**
@@ -115,8 +115,8 @@ interface XtermAuthorityGateOptions {
    * round-trip resolving. The previous name `assertSessionAlive`
    * was misleading — this never throws, it just returns false.
    */
-  isSessionAlive: (sessionId: string) => boolean
-  getSessionId: () => string | null
+  isSessionAlive: (ptySessionId: string) => boolean
+  getPtySessionId: () => string | null
   /** Called after a successful auto-promote so the caller can apply
    *  the post-takeover frame (similar to `applyTakeover` on the
    *  runtime) without coupling the gate to the runtime type. */
@@ -124,14 +124,14 @@ interface XtermAuthorityGateOptions {
 }
 
 /**
- * Default implementation. One instance per `ManagedTerminalSession`
+ * Default implementation. One instance per `ManagedTerminalSlot`
  * — the registry constructs them when a session becomes active.
  */
 export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): TerminalAuthorityGate {
   let role: 'controller' | 'viewer' | 'unowned' = 'unowned'
 
-  function readAttachmentId(): string {
-    return readOrCreateWebTerminalAttachmentId()
+  function readClientId(): string {
+    return readOrCreateWebTerminalClientId()
   }
 
   return {
@@ -145,7 +145,7 @@ export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): Termi
 
     async authorize(action) {
       if (role === 'controller') return { kind: 'allowed' }
-      if (role === 'unowned') return { kind: 'denied', reason: 'session-closed' }
+      if (role === 'unowned') return { kind: 'denied', reason: 'slot-closed' }
       // role === 'viewer': auto-promote
       const takeover = await doTakeover()
       if (takeover.kind === 'allowed') return { kind: 'promoted' }
@@ -153,7 +153,10 @@ export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): Termi
     },
 
     async takeover() {
-      return await doTakeover()
+      // `doTakeover` only ever returns `allowed` or `denied` —
+      // `promoted` is `authorize` only. The `takeover` interface
+      // narrows the public type to match.
+      return (await doTakeover()) as Exclude<AuthorizationResult, { kind: 'promoted' }>
     },
   }
 
@@ -169,12 +172,12 @@ export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): Termi
   function deny(
     reason: AuthorizationDenialReason,
     stage: string,
-    extra: { sessionId?: string; message?: string; err?: unknown } = {},
+    extra: { ptySessionId?: string; message?: string; err?: unknown } = {},
   ): { kind: 'denied'; reason: AuthorizationDenialReason; message?: string } {
     terminalLog.warn('authority gate: takeover denied', {
       reason,
       stage,
-      ...(extra.sessionId !== undefined ? { sessionId: extra.sessionId } : {}),
+      ...(extra.ptySessionId !== undefined ? { ptySessionId: extra.ptySessionId } : {}),
       ...(extra.message !== undefined ? { message: extra.message } : {}),
       ...(extra.err !== undefined ? { err: extra.err } : {}),
     })
@@ -184,36 +187,45 @@ export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): Termi
   }
 
   async function doTakeover(): Promise<AuthorizationResult> {
-    const sessionId = opts.getSessionId()
-    if (!sessionId) return deny('session-closed', 'preflight')
-    if (!opts.isSessionAlive(sessionId)) return deny('session-closed', 'isSessionAlive', { sessionId })
+    const ptySessionId = opts.getPtySessionId()
+    if (!ptySessionId) return deny('slot-closed', 'preflight')
+    if (!opts.isSessionAlive(ptySessionId)) return deny('slot-closed', 'isSessionAlive', { ptySessionId })
     let size: { cols: number; rows: number }
     try {
       size = await opts.resolveSize()
     } catch (err) {
-      return deny('takeover-rejected', 'resolveSize', { sessionId, err })
+      return deny('takeover-rejected', 'resolveSize', { ptySessionId, err })
     }
     let result: TerminalTakeoverResult
     try {
       result = await opts.bridge.takeover({
-        sessionId,
+        ptySessionId,
         cols: size.cols,
         rows: size.rows,
-        attachmentId: readAttachmentId(),
+        clientId: readClientId(),
       })
     } catch (err) {
-      return deny('no-bridge', 'bridge', { sessionId, err })
+      return deny('no-bridge', 'bridge', { ptySessionId, err })
     }
     if (!result.ok) {
       return deny(classifyTakeoverRejection(result.message), 'server', {
-        sessionId,
+        ptySessionId,
         message: result.message,
       })
+    }
+    // Post-await dispose guard: the bridge's takeover round-trip
+    // can resolve after the slot was disposed (e.g. the user
+    // navigated away mid-takeover). Without this re-check the
+    // `onPromoted` callback would mutate a destroyed runtime and
+    // flip the gate's role to `controller`, leaving stale state
+    // for the next sibling attach on the same `ptySessionId`.
+    if (!opts.isSessionAlive(ptySessionId)) {
+      return deny('slot-closed', 'post-await isSessionAlive', { ptySessionId })
     }
     // ORDERING CONTRACT: `onPromoted` MUST run before `role` is
     // flipped to 'controller'. Callers of `takeover()` /
     // `authorize('write')` rely on the post-call `canWrite()`
-    // returning true without a separate realtime ownership event.
+    // returning true without a separate realtime identity event.
     // The runtime's `applyTakeover` (wired through `onPromoted`)
     // updates the runtime's controller cache synchronously, so by
     // the time the gate sets `role = 'controller'`, both layers
@@ -237,7 +249,7 @@ export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): Termi
  * message key can land without a renderer change.
  */
 function classifyTakeoverRejection(message: string): AuthorizationDenialReason {
-  if (message === 'error.unavailable') return 'attachment-offline'
+  if (message === 'error.unavailable') return 'client-offline'
   if (message === 'error.invalid-arguments') return 'session-unknown'
   return 'takeover-rejected'
 }

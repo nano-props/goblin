@@ -24,7 +24,7 @@ vi.mock('#/web/components/BranchActionsMenu.tsx', () => ({
   BranchActionsMenu: () => null,
 }))
 
-vi.mock('#/web/components/terminal/terminal-session-store.ts', () => ({
+vi.mock('#/web/components/terminal/terminal-slot-store.ts', () => ({
   useWorktreeTerminalBellCount: () => 0,
 }))
 

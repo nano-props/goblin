@@ -134,10 +134,10 @@ describe('terminal web host bridge', () => {
     const dispose = terminalBridge.onOutput(() => {})
     const socket = MockWebSocket.instances[0]
     expect(socket?.url).toMatch(
-      /^ws:\/\/127\.0\.0\.1:32100\/ws\/terminal\?t=secret&clientId=client_sharedterminal&attachmentId=attachment_/,
+      /^ws:\/\/127\.0\.0\.1:32100\/ws\/terminal\?t=secret&clientId=client_sharedterminal$/,
     )
     const attachPromise = terminalBridge.attach({
-      sessionId: 'term_1234567890123456',
+      ptySessionId: 'pty_1234567890123456',
       cols: 100,
       rows: 30,
     })
@@ -148,7 +148,7 @@ describe('terminal web host bridge', () => {
       type: 'request',
       action: 'attach',
       input: {
-        sessionId: 'term_1234567890123456',
+        ptySessionId: 'pty_1234567890123456',
         cols: 100,
         rows: 30,
       },
@@ -161,7 +161,7 @@ describe('terminal web host bridge', () => {
         action: 'attach',
         payload: {
           ok: true,
-          sessionId: 'term_1234567890123456',
+          ptySessionId: 'pty_1234567890123456',
           snapshot: '',
           snapshotSeq: 0,
           processName: 'zsh',
@@ -186,7 +186,7 @@ describe('terminal web host bridge', () => {
     const dispose = terminalBridge.onOutput(() => {})
     const socket = MockWebSocket.instances[0]
     const attachPromise = terminalBridge.attach({
-      sessionId: 'term_1234567890123456',
+      ptySessionId: 'pty_1234567890123456',
       cols: 100,
       rows: 30,
     })
@@ -201,7 +201,7 @@ describe('terminal web host bridge', () => {
         action: 'attach',
         payload: {
           ok: true,
-          sessionId: 'term_1234567890123456',
+          ptySessionId: 'pty_1234567890123456',
           snapshot: '',
           snapshotSeq: 0,
           processName: 'zsh',
@@ -228,7 +228,7 @@ describe('terminal web host bridge', () => {
     const dispose = terminalBridge.onOutput(() => {})
     const socket = MockWebSocket.instances[0]
     const attachPromise = terminalBridge.attach({
-      sessionId: 'term_1234567890123456',
+      ptySessionId: 'pty_1234567890123456',
       cols: 100,
       rows: 30,
     })
@@ -247,7 +247,7 @@ describe('terminal web host bridge', () => {
     const dispose = terminalBridge.onOutput(() => {})
     const socket = MockWebSocket.instances[0]
     const writePromise = terminalBridge.write({
-      sessionId: 'term_1234567890123456',
+      ptySessionId: 'pty_1234567890123456',
       data: 'pwd',
     })
 
@@ -293,7 +293,7 @@ describe('terminal web host bridge', () => {
         payload: {
           ok: true,
           action: 'created',
-          key: '/tmp/repo\u0000/tmp/repo\u0000terminal-1',
+          key: '/tmp/repo\u0000/tmp/repo\u0000slot-1',
           sessions: [],
         },
       }),
@@ -334,7 +334,7 @@ describe('terminal web host bridge', () => {
         requestId: request?.requestId,
         ok: true,
         action: 'list-sessions',
-        payload: [{ sessionId: 'term_1', key: 123 }],
+        payload: [{ ptySessionId: 'pty_1', key: 123 }],
       }),
     )
 
@@ -350,17 +350,17 @@ describe('terminal web host bridge', () => {
     const dispose = terminalBridge.onOutput(() => {})
     const socket = MockWebSocket.instances[0]
 
-    const snapshotPromise = terminalBridge.getSessionSnapshot({ sessionId: 'term_1234567890123456' })
+    const snapshotPromise = terminalBridge.getSlotSnapshot({ ptySessionId: 'pty_1234567890123456' })
     socket?.emitOpen()
     await Promise.resolve()
     const request = socket?.sent
       .map((payload) => JSON.parse(payload))
-      .find((message) => message.action === 'session-snapshot')
+      .find((message) => message.action === 'slot-snapshot')
     expect(request).toMatchObject({
       type: 'request',
-      action: 'session-snapshot',
+      action: 'slot-snapshot',
       input: {
-        sessionId: 'term_1234567890123456',
+        ptySessionId: 'pty_1234567890123456',
       },
     })
     socket?.emitMessage(
@@ -368,8 +368,8 @@ describe('terminal web host bridge', () => {
         type: 'response',
         requestId: request?.requestId,
         ok: true,
-        action: 'session-snapshot',
-        payload: { sessionId: 'term_1', snapshotSeq: 'bad' },
+        action: 'slot-snapshot',
+        payload: { ptySessionId: 'pty_1', snapshotSeq: 'bad' },
       }),
     )
 
@@ -419,7 +419,7 @@ describe('terminal web host bridge', () => {
     const { terminalBridge } = await import('#/web/terminal.ts')
     const dispose = terminalBridge.onOutput(() => {})
     const socket = MockWebSocket.instances[0]
-    const snapshotPromise = terminalBridge.getSessionSnapshot({ sessionId: 'term_1234567890123456' })
+    const snapshotPromise = terminalBridge.getSlotSnapshot({ ptySessionId: 'pty_1234567890123456' })
 
     socket?.close()
 
@@ -532,13 +532,15 @@ describe('terminal web host bridge', () => {
     const onOutput = vi.fn()
     const onTitle = vi.fn()
     const onExit = vi.fn()
-    const onOwnership = vi.fn()
+    const onIdentity = vi.fn()
+    const onLifecycle = vi.fn()
     const onSessionsChanged = vi.fn()
 
     const disposeOutput = terminalBridge.onOutput(onOutput)
     const disposeTitle = terminalBridge.onTitle(onTitle)
     const disposeExit = terminalBridge.onExit(onExit)
-    const disposeOwnership = terminalBridge.onOwnership(onOwnership)
+    const disposeIdentity = terminalBridge.onIdentity(onIdentity)
+    const disposeLifecycle = terminalBridge.onLifecycle(onLifecycle)
     const disposeSessionsChanged = terminalBridge.onSessionsChanged(onSessionsChanged)
     const socket = MockWebSocket.instances[0]
     if (!socket) throw new Error('missing web terminal socket')
@@ -546,25 +548,31 @@ describe('terminal web host bridge', () => {
     socket.emitMessage(
       JSON.stringify({
         type: 'title',
-        event: { sessionId: 'term_1', canonicalTitle: '~/Developer/goblin — npm run dev' },
+        event: { ptySessionId: 'pty_1', canonicalTitle: '~/Developer/goblin — npm run dev' },
       }),
     )
     socket.emitMessage(
       JSON.stringify({
         type: 'output',
-        event: { sessionId: 'term_1', data: 'hello', seq: 1, processName: 'zsh' },
+        event: { ptySessionId: 'pty_1', data: 'hello', seq: 1, processName: 'zsh' },
       }),
     )
     socket.emitMessage(
       JSON.stringify({
         type: 'exit',
-        event: { sessionId: 'term_1' },
+        event: { ptySessionId: 'pty_1' },
       }),
     )
     socket.emitMessage(
       JSON.stringify({
-        type: 'ownership',
-        event: { sessionId: 'term_1', controller: null, cols: 100, rows: 30, phase: 'open' },
+        type: 'identity',
+        event: { ptySessionId: 'pty_1', controller: null, canonicalCols: 100, canonicalRows: 30 },
+      }),
+    )
+    socket.emitMessage(
+      JSON.stringify({
+        type: 'lifecycle',
+        event: { ptySessionId: 'pty_1', phase: 'open', message: null, takeoverPending: false },
       }),
     )
     socket.emitMessage(
@@ -574,23 +582,29 @@ describe('terminal web host bridge', () => {
       }),
     )
 
-    expect(onOutput).toHaveBeenCalledWith({ sessionId: 'term_1', data: 'hello', seq: 1, processName: 'zsh' })
-    expect(onTitle).toHaveBeenCalledWith({ sessionId: 'term_1', canonicalTitle: '~/Developer/goblin — npm run dev' })
-    expect(onExit).toHaveBeenCalledWith({ sessionId: 'term_1' })
-    expect(onOwnership).toHaveBeenCalledWith({
-      sessionId: 'term_1',
+    expect(onOutput).toHaveBeenCalledWith({ ptySessionId: 'pty_1', data: 'hello', seq: 1, processName: 'zsh' })
+    expect(onTitle).toHaveBeenCalledWith({ ptySessionId: 'pty_1', canonicalTitle: '~/Developer/goblin — npm run dev' })
+    expect(onExit).toHaveBeenCalledWith({ ptySessionId: 'pty_1' })
+    expect(onIdentity).toHaveBeenCalledWith({
+      ptySessionId: 'pty_1',
       role: 'unowned',
       controllerStatus: 'none',
       canonicalCols: 100,
       canonicalRows: 30,
+    })
+    expect(onLifecycle).toHaveBeenCalledWith({
+      ptySessionId: 'pty_1',
       phase: 'open',
+      message: null,
+      takeoverPending: false,
     })
     expect(onSessionsChanged).toHaveBeenCalledWith('/tmp/repo')
 
     disposeOutput()
     disposeTitle()
     disposeExit()
-    disposeOwnership()
+    disposeIdentity()
+    disposeLifecycle()
     disposeSessionsChanged()
   })
 
@@ -611,7 +625,7 @@ describe('terminal web host bridge', () => {
     socket.emitMessage(
       JSON.stringify({
         type: 'output',
-        event: { sessionId: 'term_1', data: 'hello', seq: 1, processName: 'zsh' },
+        event: { ptySessionId: 'pty_1', data: 'hello', seq: 1, processName: 'zsh' },
       }),
     )
 
@@ -637,18 +651,18 @@ describe('terminal web host bridge', () => {
     firstSocket.emitMessage(
       JSON.stringify({
         type: 'output',
-        event: { sessionId: 'term_old', data: 'stale', seq: 1, processName: 'zsh' },
+        event: { ptySessionId: 'term_old', data: 'stale', seq: 1, processName: 'zsh' },
       }),
     )
     secondSocket.emitMessage(
       JSON.stringify({
         type: 'output',
-        event: { sessionId: 'term_new', data: 'fresh', seq: 2, processName: 'zsh' },
+        event: { ptySessionId: 'term_new', data: 'fresh', seq: 2, processName: 'zsh' },
       }),
     )
 
     expect(onOutput).toHaveBeenCalledTimes(1)
-    expect(onOutput).toHaveBeenCalledWith({ sessionId: 'term_new', data: 'fresh', seq: 2, processName: 'zsh' })
+    expect(onOutput).toHaveBeenCalledWith({ ptySessionId: 'term_new', data: 'fresh', seq: 2, processName: 'zsh' })
     dispose()
     vi.useRealTimers()
   })
@@ -675,7 +689,7 @@ describe('terminal web host bridge', () => {
     const { onRendererLocalEventType, resetRendererLocalEventsForTests } = await import('#/web/local-events.ts')
     const bellClick = vi.fn()
     const dispose = onRendererLocalEventType('terminal-bell-click', bellClick)
-    const key = '/tmp/repo\0/tmp/repo\0terminal-2'
+    const key = '/tmp/repo\0/tmp/repo\0slot-2'
 
     await expect(
       terminalBridge.notifyBell({ title: 'repo', body: 'feature/test\\nzsh', key, repoRoot: '/tmp/repo' }),

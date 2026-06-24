@@ -7,7 +7,7 @@ Use this doc for the terminal system design.
 - Provide a server-backed terminal model that works the same way across web and Electron renderers.
 - Keep terminal sessions long-lived and reconnectable instead of tying them to one visible view.
 - Separate business lifecycle from PTY execution details.
-- Make terminal ownership, mirroring, and takeover explicit parts of the model.
+- Make terminal control, mirroring, and takeover explicit parts of the model.
 - Preserve fast interactive behavior while keeping the server as the runtime-coherent source of truth.
 
 ## Core model
@@ -37,7 +37,7 @@ Only one attachment may control the session at a time.
 ### Stable business boundary over PTY boundary
 
 - PTY execution is an implementation detail behind a supervisor interface.
-- Session lifecycle, ownership, replay, and catalog rules live above the PTY layer.
+- Session lifecycle, control, replay, and catalog rules live above the PTY layer.
 - Switching between in-process PTY execution and worker-backed PTY execution must not change the terminal product model.
 
 ### Reconnect over recreation
@@ -46,7 +46,7 @@ Only one attachment may control the session at a time.
 - New terminal creation should be explicit.
 - Existing sessions should be restored or reattached whenever possible.
 
-### Explicit ownership
+### Explicit control
 
 - Mirroring is a first-class mode, not an accidental side effect.
 - Input and resize authority belong to the current controller only.
@@ -71,11 +71,11 @@ The terminal feature spans `shared`, `server`, and `web`, but it still behaves a
 ### Shared layer
 
 - Defines protocol types, message shapes, identities, and session key rules.
-- Gives both server and renderer a common language for session, ownership, and realtime events.
+- Gives both server and renderer a common language for session, control, and realtime events.
 
 ### Server runtime
 
-- Owns business state for sessions, ownership, catalog behavior, connection tracking, and realtime dispatch.
+- Owns business state for sessions, control, catalog behavior, connection tracking, and realtime dispatch.
 - Exposes the terminal host boundary used by routes and realtime transport.
 - Treats PTY execution as a dependency, not as the place where product behavior lives.
 
@@ -83,7 +83,7 @@ The terminal feature spans `shared`, `server`, and `web`, but it still behaves a
 
 - Owns spawn, write, resize, kill, and PTY event forwarding.
 - Hides whether PTYs run in-process or in a worker.
-- Does not own catalog, ownership, or renderer-facing policy.
+- Does not own catalog, control, or renderer-facing policy.
 
 ### Renderer projection
 
@@ -96,7 +96,7 @@ The terminal feature spans `shared`, `server`, and `web`, but it still behaves a
 
 - Owns xterm instances, DOM attachment, local search UI, and rendering lifecycle.
 - Should stay focused on view concerns such as layout, input capture, and rendering behavior.
-- Should not become the home of session policy or ownership rules.
+- Should not become the home of session policy or control rules.
 
 ## Session lifecycle
 
@@ -106,7 +106,7 @@ At a high level, the lifecycle is:
 2. The server catalog resolves whether that request means create, reuse, or restore.
 3. The session manager ensures a session exists and that a PTY is running for it.
 4. The renderer attaches a local view to the session.
-5. Realtime output, title, exit, and ownership events keep renderers up to date.
+5. Realtime output, title, exit, and identity events keep renderers up to date.
 6. Detach removes a local view without necessarily killing the session.
 7. Close or TTL cleanup ends the session and frees PTY resources.
 
@@ -119,10 +119,10 @@ Closing a session should be an explicit business action or the result of server-
 
 The terminal system relies on four identity scopes:
 
-- **ownerId**: the server-side terminal owner derived from the authenticated access token. Session visibility, lifecycle cleanup, and realtime fanout are partitioned by this id.
+- **userId**: the server-side terminal user derived from the authenticated access token. Session visibility, lifecycle cleanup, and realtime fanout are partitioned by this id.
 - **clientId**: the logical renderer client for one browser tab or Electron renderer. It validates and routes requests, but it does not own terminal sessions.
-- **attachmentId**: one terminal view/socket attachment under an owner.
-- **sessionId**: the server-owned identifier for one live terminal session.
+- **clientId**: one terminal view/socket attachment under a user.
+- **ptySessionId**: the server-owned identifier for one live terminal session.
 
 In addition, terminal keys encode repo and worktree scope so the system can reason about:
 
@@ -132,9 +132,9 @@ In addition, terminal keys encode repo and worktree scope so the system can reas
 
 This identity model is the basis for reconnect, mirror mode, controller handoff, and multi-window coherence.
 
-## Ownership and takeover
+## Control and takeover
 
-Ownership is a business concept, not just a transport detail.
+Control is a business concept, not just a transport detail.
 
 ### Roles
 
@@ -146,18 +146,18 @@ Ownership is a business concept, not just a transport detail.
 
 - Only the controller may drive PTY writes and PTY resize.
 - Attach may result in controller, viewer, or unowned state.
-- On disconnect, the controller slot clears immediately; the per-session `claimedByOwner` flag stays set so a subsequent attach from any of the owner's attachments auto-claims when no controller is present.
-- Takeover should be explicit and confirmed by server-owned ownership state. See `terminal-takeover.md` for the model.
+- On disconnect, the controller slot clears immediately; the per-session `userSticky` flag stays set so a subsequent attach from any of the user's attachments auto-claims when no controller is present.
+- Takeover should be explicit and confirmed by server-owned control state. See `terminal-takeover.md` for the model.
 
 ### Why this matters
 
-Without explicit ownership:
+Without explicit control:
 
 - multiple views can fight over PTY size
 - input authority becomes ambiguous
 - reconnect and mirror behavior become unpredictable
 
-With explicit ownership:
+With explicit control:
 
 - the server can arbitrate one source of input and resize truth
 - mirror mode becomes safe and understandable
@@ -204,7 +204,7 @@ The system supports replay and snapshot hydration so users can reattach to runni
 
 - Replay is a rendering concern built on top of server-owned session state.
 - Hydration should help the user see the latest known state quickly, but authoritative session state still comes from the server.
-- Replay should not redefine ownership or session identity.
+- Replay should not redefine control or session identity.
 - Replay must run inside an explicit local boundary so any terminal-emulator replies it causes can be identified as replay side effects.
 - Same-session active-view replay is not a generic repair mechanism; re-enable it only when the attribution boundary can prove replay side effects cannot reach PTY stdin.
 
@@ -230,7 +230,7 @@ They should therefore share the same high-level rule:
 
 For `create` specifically:
 
-- `sessionId` plus `snapshot` / `snapshotSeq` are the authoritative created-session handshake
+- `ptySessionId` plus `snapshot` / `snapshotSeq` are the authoritative created-session handshake
 - any returned `sessions` list is useful for tab-strip and projection updates, but is not the created session's primary truth source
 
 This keeps `create`, `attach`, and `restart` aligned and prevents blank first paint, prompt tearing, and false create failures caused by projection lag.
@@ -244,7 +244,7 @@ The terminal feature uses realtime transport for continuous, UX-critical flows.
 - terminal output
 - title updates
 - exit notifications
-- ownership changes
+- control changes
 
 ### Non-streaming flows
 
@@ -271,7 +271,7 @@ The terminal feature uses all three app state classes:
 ### Runtime-coherent state
 
 - session existence
-- session ownership
+- session control
 - canonical terminal title
 - session ordering
 - canonical geometry
@@ -294,13 +294,13 @@ The terminal system should optimize for continuity, but it still needs clear fai
 - PTY spawn failure
 - attachment disconnect
 - renderer teardown while a session remains alive
-- resize or write rejection due to lost ownership
+- resize or write rejection due to lost control
 - session exit during reconnect or replay
 
 ### Design expectations
 
 - Failed create or restart must not leave zombie sessions presented as healthy terminals.
-- Disconnect should not destroy the session itself: a 24h detached TTL keeps the catalog alive so a later attach from the same owner can re-enter via auto-claim. The controller slot, however, clears on disconnect so siblings can claim it without waiting.
+- Disconnect should not destroy the session itself: a 24h detached TTL keeps the catalog alive so a later attach from the same user can re-enter via auto-claim. The controller slot, however, clears on disconnect so siblings can claim it without waiting.
 - View destruction should clean up local resources without corrupting session state.
 - Server shutdown should end the runtime cleanly and stop further dispatch.
 
@@ -308,7 +308,7 @@ The terminal system should optimize for continuity, but it still needs clear fai
 
 - The PTY worker direction is the right architectural boundary.
 - The server-first model is appropriate for terminal state.
-- Ownership is modeled explicitly instead of being hidden in UI heuristics.
+- Control is modeled explicitly instead of being hidden in UI heuristics.
 - Renderer code already separates registry/projection concerns from xterm view concerns.
 - The design supports mirroring, reconnect, and takeover without requiring Electron-specific assumptions.
 
@@ -322,10 +322,10 @@ The terminal system should optimize for continuity, but it still needs clear fai
 
 ## Rules of thumb
 
-- Keep the server as the owner of terminal business truth.
+- Keep the server as the source of terminal business truth.
 - Keep PTY execution behind the supervisor boundary.
 - Keep renderer registry code as projection and orchestration, not as an alternative authority.
 - Keep xterm view code focused on rendering and local interaction.
 - Treat geometry as a correctness path, not as optional polish.
-- Prefer explicit ownership transitions over implicit heuristics.
+- Prefer explicit control transitions over implicit heuristics.
 - Prefer reconnect and restore over destructive recreation.

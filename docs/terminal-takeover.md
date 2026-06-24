@@ -12,14 +12,14 @@ The answer to that question is what this document is about.
 This is a principles-level document. It does not describe fields,
 methods, timers, or flags. It describes the *shape* of the answer
 and the *constraints* the answer has to respect. Implementation
-lives in `src/server/terminal/terminal-ownership.ts`,
+lives in `src/server/terminal/terminal-controller.ts`,
 `src/web/components/terminal/authority-gate.ts`, and the
-`ManagedTerminalSession` glue.
+`ManagedTerminalSlot` glue.
 
 ## The product premise
 
 Goblin is a single-user application. The user signs in once with
-an access token and that token derives a stable owner identity for
+an access token and that token derives a stable user identity for
 every server-side resource they touch — including terminal
 sessions. There is no notion of two distinct humans sharing a
 session.
@@ -49,9 +49,9 @@ keystrokes are echoed back? where does my Ctrl+C go?
 So the design is: **at any instant, exactly one window is the
 controller.**
 
-## The principle: intent-recent, owner-scoped
+## The principle: intent-recent, user-scoped
 
-Control is bound to the **owner's most recent write intent**, not
+Control is bound to the **user's most recent write intent**, not
 to any specific window. From the user's point of view, the
 following all mean the same thing:
 
@@ -80,7 +80,7 @@ reloading).
 The main path is:
 
 1. User opens a terminal in a fresh window.
-2. Window attaches; the server recognizes that this owner has
+2. Window attaches; the server recognizes that this user has
    touched the session before and grants control.
 3. Window is now the controller.
 4. User types. Keystrokes flow through the local gate.
@@ -92,22 +92,22 @@ The main path is:
 The button is no longer load-bearing. It exists for accessibility
 and for the rare "I want control without typing" case.
 
-## The ownership flag, lifted to the owner
+## The control flag, lifted to the user
 
 The server remembers, for the lifetime of a session, that **this
-owner has touched this session**. That single bit of sticky
+user has touched this session**. That single bit of sticky
 memory is what makes the roam scenarios work:
 
 - User closes the controller window. The controller slot is
   cleared at once.
 - User opens a new window elsewhere, attached to the same session.
-- The server sees: "owner has been here before, no live
+- The server sees: "user has been here before, no live
   controller, new attachment wants in" → grants control.
 
 This is why "I closed Electron, then opened a new Electron window,
-and the previous terminal state was still mine" works. The owner
+and the previous terminal state was still mine" works. The user
 sticky bit carries the claim across window lifetimes. The window
-identity is ephemeral; the owner identity is durable.
+identity is ephemeral; the user identity is durable.
 
 ## Output fans out; only input is exclusive
 
@@ -128,12 +128,12 @@ When a window's network briefly drops and comes back to the same
 attachment, the user perceives no interruption: the new attach is
 recognized as a continuation of the same window, the slot is
 cleared on disconnect, and the reattach re-claims through the
-owner-sticky path. Because the reconnect and the reclaim happen
+user-sticky path. Because the reconnect and the reclaim happen
 back-to-back, the user sees their next keystroke flow as expected.
 
 This works because **window identity is per-sessionStorage, which
 survives a socket-level reconnect within the same window**, and
-**owner identity is per-access-token, which is even more durable**.
+**user identity is per-access-token, which is even more durable**.
 The two-tier identity means the model can tell "same window, brief
 network issue" apart from "different window, deliberate switch".
 
@@ -147,7 +147,7 @@ case is a small but real race:
    the same event (no grace period).
 3. Window B — a sibling tab, an Electron window on another
    machine, anything the user opened while A was away — attaches
-   first. B auto-claims because the slot is empty and the owner
+   first. B auto-claims because the slot is empty and the user
    has touched this session before.
 4. A's network comes back. A reconnects, but the slot is held by
    B. A is now a viewer.
@@ -168,6 +168,40 @@ and reattach, so this case is rare. When it does bite, the
 recovery path is the same as the friendly case: type, get
 control.
 
+## Why a crashed controller is non-disruptive
+
+A controller's process can die (laptop sleep, OS kill, NIC
+stuck) while the OS keeps the underlying TCP socket in
+`ESTABLISHED` for minutes or hours. Without intervention the
+server would still believe that `(userId, clientId)` is
+connected, the slot's controller would stay pinned to the
+dead client, and every sibling viewer would be stranded in
+viewer mode with no path to auto-claim.
+
+A per-`clientId` heartbeat closes this gap:
+
+- The renderer emits `{ type: 'heartbeat', at: <ms> }` on the
+  realtime socket every `HEARTBEAT_INTERVAL_MS` (30 s) while
+  the socket is `OPEN`. The envelope is small (a few bytes),
+  has no request id, and does not generate a response.
+- The server's `TerminalRealtimeBroker` records
+  `lastHeartbeatAtByClientKey` on every receipt and scans it
+  every `HEARTBEAT_INTERVAL_MS`. A `(userId, clientId)` whose
+  last beat is older than `HEARTBEAT_DEADLINE_MS` (90 s, i.e.
+  3 missed beats) gets a synthetic `onClientDisconnected`,
+  which clears the slot's controller slot and emits
+  `controller: null` to every sibling.
+- The next `attach` from any sibling (or from a freshly
+  reconnected A) takes the auto-claim path — same as the
+  friendly-reconnect case above — and the user perceives
+  no difference from a clean disconnect.
+
+The `HEARTBEAT_INTERVAL_MS` / `HEARTBEAT_DEADLINE_MS` constants
+are exported from
+`src/server/terminal/terminal-realtime-broker.ts` so the
+renderer (in `src/web/renderer-terminal-bridge.ts`) and the
+broker cannot drift out of sync.
+
 ## Known behavior: self-reconnect mid-flight
 
 The friendly reconnect case has one observable wrinkle. When A's
@@ -175,32 +209,45 @@ socket drops, the server clears the slot and emits a
 `controller: null` event. When A's socket comes back, the
 server re-emits `controller: A` after the auto-claim. Between
 those two events — typically a few milliseconds — A's renderer
-sees its cached role transition from `controller` to `viewer`
-(per `handleOwnership` collapsing unowned to viewer) and back
-to `controller`.
+sees its cached role transition from `controller` to `unowned`
+(per the realtime `identity` event carrying `controller: null`)
+and back to `controller`.
 
-If the user types in that window, the gate's `authorize('write')`
-takes the viewer branch and fires a takeover round-trip, which
-succeeds against the just-reclaimed slot. The first keystroke
-after A returns therefore costs one extra round-trip — same
-shape as the "lost the race to B" case above, but for a
-session that was always A's.
+A's `ManagedTerminalSlot` reacts to the `unowned` event in
+`handleIdentity` by calling `start()` immediately if the view
+is connected, so the next identity event (carrying `controller:
+A`) lands while the auto-attach round-trip is already in
+flight. The `unowned` window in the runtime / gate is therefore
+very short — a few hundred microseconds at most, bounded by
+the microtask queue rather than the round-trip.
+
+If the user types **during** the `unowned` window, the gate's
+`authorize('write')` returns `{ kind: 'denied', reason:
+'slot-closed' }` — the gate deliberately distinguishes `unowned`
+from `viewer` so it does not auto-promote a write against a slot
+the server has just cleared. The keystroke is dropped at the
+gate. (Pre-PR, the gate collapsed `unowned` to `viewer` and
+auto-promoted, which caused the spurious takeover round-trip
+this PR's identity/lifecycle split fixes.) Once the second
+identity event lands and the role flips back to `controller`,
+the next keystroke goes through without any extra round-trip.
 
 This is not a bug; it is the cost of a model that has no grace
 timer. A renderer-side coalescing window (e.g. "wait 100ms
 after a self-reconnect before firing takeover on write") would
-hide the round-trip but would re-introduce a small grace period
-on the client, which is exactly what the server-side no-grace
-design exists to avoid. The right answer is to accept the
-rare extra round-trip and document the behavior so it doesn't
-surprise future contributors.
+hide the dropped keystroke but would re-introduce a small grace
+period on the client, which is exactly what the server-side
+no-grace design exists to avoid. The right answer is to accept
+the rare dropped keystroke (it is recoverable — the next
+keystroke always works) and document the behavior so it
+doesn't surprise future contributors.
 
 ## Boundaries this model respects
 
 - **One writer at a time.** The shell sees one input stream.
 - **Output fans out to everyone.** No window loses its view of the
   shell.
-- **Owner-scoped, never device-scoped.** Two devices of the same
+- **User-scoped, never device-scoped.** Two devices of the same
   user are not "competing clients" — they are one user with two
   viewpoints.
 - **Server-authoritative for who is currently writing.** The
@@ -244,5 +291,5 @@ protects the user's mental model, not their secrets.
 
 - `terminal.md` — the terminal system overall.
 - `terminal-target-model.md` — target attachment shape and roles.
-- `terminal-session-lifecycle.md` — session birth, lifetime, close.
+- `terminal-slot-lifecycle.md` — session birth, lifetime, close.
 - `terminal-roadmap.md` — where this model sits in the refactor plan.

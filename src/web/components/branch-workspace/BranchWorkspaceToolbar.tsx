@@ -6,12 +6,12 @@ import { Toolbar } from '#/web/components/Layout.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
 import { Tip } from '#/web/components/Tip.tsx'
 import { terminalLog } from '#/web/logger.ts'
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
+import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
 import {
   useTerminalRepoSyncReady,
   useWorktreeTerminalSnapshot,
-} from '#/web/components/terminal/terminal-session-store.ts'
-import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
+} from '#/web/components/terminal/terminal-slot-store.ts'
+import { useTerminalSlotContext } from '#/web/components/terminal/terminal-slot-context.ts'
 import {
   WorkspacePaneViewStrip,
   EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY,
@@ -25,7 +25,7 @@ import {
 } from '#/web/components/workspace-pane/WorkspacePaneViewStrip.tsx'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
 import type { WorkspacePaneStaticViewType, WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
-import type { WorkspacePaneViewSummary, TerminalSessionBase } from '#/web/components/terminal/types.ts'
+import type { WorkspacePaneViewSummary, TerminalSlotBase } from '#/web/components/terminal/types.ts'
 import type {
   BranchWorkspaceRepo,
   SelectedBranchWorkspacePresentation,
@@ -62,7 +62,7 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
   // While the first server-side session list for this repo is in flight,
   // keep the New Terminal affordance visible but busy. Hooks into the
   // repo-sync store which the Provider updates via markReady() at the end
-  // of every syncServerSessions.
+  // of every syncServerSlots.
   const isInitialSyncInFlight = useIsInitialSyncInFlight(repo.id)
   const terminalWorktreeKey = detail.branch?.worktree?.path
     ? worktreeTerminalKey(repo.id, detail.branch.worktree.path)
@@ -72,7 +72,7 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
   const preferredWorkspacePaneView = preferredWorkspacePaneViewForBranch(repo.ui, branchName)
   const showBranchLevelTabs = !!detail.branch
 
-  const { createTerminal, selectTerminal, scrollToBottom } = useTerminalSessionContext()
+  const { createTerminal, selectTerminal, scrollToBottom } = useTerminalSlotContext()
 
   const worktreeSnapshot = useWorktreeTerminalSnapshot(terminalWorktreeKey)
   const terminalSyncReady = useTerminalRepoSyncReady(repo.id)
@@ -88,7 +88,7 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
         worktreePath,
         preferredView: preferredWorkspacePaneView,
         tabOrder: workspacePaneTabOrder,
-        runtimeTerminalViews: worktreeSnapshot.sessions,
+        runtimeTerminalViews: worktreeSnapshot.slots,
         terminalSessionCount: worktreeSnapshot.count,
         terminalCreatePending: worktreeSnapshot.pendingCreate,
         terminalSyncReady,
@@ -103,13 +103,13 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
       worktreePath,
       worktreeSnapshot.count,
       worktreeSnapshot.pendingCreate,
-      worktreeSnapshot.sessions,
+      worktreeSnapshot.slots,
       repo.ui.lastClosedTabContextByBranch,
     ],
   )
   const workspacePaneTabFocusRegistry = useFocusRegistry<string, HTMLButtonElement>()
 
-  const terminalBase = useMemo<TerminalSessionBase | null>(
+  const terminalBase = useMemo<TerminalSlotBase | null>(
     () =>
       detail.branch?.worktree?.path
         ? { repoRoot: repo.id, branch: detail.branch.name, worktreePath: detail.branch.worktree.path }

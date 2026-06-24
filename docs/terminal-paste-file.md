@@ -93,7 +93,7 @@ There's one observable consequence of this split: a _single_ 12+ MiB file from a
 
 ### 2. Web: capture-phase paste on the slot
 
-Add a capture-phase `paste` listener on the slot root in `TerminalSlot.tsx`, parallel to the existing `onDrop` handler. xterm renders _inside_ the slot root (`TerminalSlot.tsx:265` → `terminal-session-view.ts:69-73` → xterm host), so a capture-phase handler on the root fires first by the standard DOM dispatch order — there's no need to call `stopPropagation()` to "beat" xterm, and `preventDefault()` alone is enough to suppress xterm's built-in paste. (Don't `stopPropagation`: it would silently break any future bubble-phase paste listener above the slot — toast region, focus tracker, error boundary.)
+Add a capture-phase `paste` listener on the slot root in `TerminalSlot.tsx`, parallel to the existing `onDrop` handler. xterm renders _inside_ the slot root (`TerminalSlot.tsx:265` → `terminal-slot-view.ts:69-73` → xterm host), so a capture-phase handler on the root fires first by the standard DOM dispatch order — there's no need to call `stopPropagation()` to "beat" xterm, and `preventDefault()` alone is enough to suppress xterm's built-in paste. (Don't `stopPropagation`: it would silently break any future bubble-phase paste listener above the slot — toast region, focus tracker, error boundary.)
 
 The slot already uses `onFocusCapture`/`onBlurCapture`/`onKeyDownCapture` (lines 242-244), so the same `on<Event>Capture` JSX prop works for paste — no `useEffect + addEventListener('paste', ..., true)` needed.
 

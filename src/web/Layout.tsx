@@ -3,7 +3,7 @@ import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { ErrorBoundary } from '#/web/components/ErrorBoundary.tsx'
-import { TerminalSessionProvider } from '#/web/components/terminal/TerminalSessionProvider.tsx'
+import { TerminalSlotProvider } from '#/web/components/terminal/TerminalSlotProvider.tsx'
 import { TokenGate } from '#/web/components/TokenGate.tsx'
 import { RepoCloneDialog } from '#/web/components/RepoCloneDialog.tsx'
 import { RepoOpenDialog } from '#/web/components/RepoOpenDialog.tsx'
@@ -105,7 +105,7 @@ export function Layout() {
               openCreateWorktree: overlays.openCreateWorktree,
             }}
           >
-            <TerminalSessionProvider>
+            <TerminalSlotProvider>
               <div
                 className="relative flex h-full flex-col"
                 onDragEnter={repoDrop.onDragEnter}
@@ -121,7 +121,7 @@ export function Layout() {
                   activeBranchName={activeBranchName}
                 />
               </div>
-            </TerminalSessionProvider>
+            </TerminalSlotProvider>
           </LayoutOverlayActions.Provider>
         </MainWindowNavigationProvider>
         {import.meta.env.DEV ? <TanStackRouterDevtools /> : null}

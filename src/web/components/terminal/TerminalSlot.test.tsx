@@ -5,13 +5,13 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { TerminalSlot } from '#/web/components/terminal/TerminalSlot.tsx'
 import {
-  TerminalSessionContext,
-  TerminalSessionReadContext,
-} from '#/web/components/terminal/terminal-session-context.ts'
+  TerminalSlotContext,
+  TerminalSlotReadContext,
+} from '#/web/components/terminal/terminal-slot-context.ts'
 import type {
-  TerminalSessionContextValue,
-  TerminalSessionReadContextValue,
-  TerminalSessionSummary,
+  TerminalSlotContextValue,
+  TerminalSlotReadContextValue,
+  TerminalSlotSummary,
   WorktreeTerminalSnapshot,
 } from '#/web/components/terminal/types.ts'
 
@@ -36,19 +36,19 @@ afterEach(() => {
   document.body.innerHTML = ''
 })
 
-type TestTerminalSummary = Omit<TerminalSessionSummary, 'type' | 'id' | 'displayOrder'> &
-  Partial<Pick<TerminalSessionSummary, 'type' | 'id' | 'displayOrder'>>
+type TestTerminalSummary = Omit<TerminalSlotSummary, 'type' | 'id' | 'displayOrder'> &
+  Partial<Pick<TerminalSlotSummary, 'type' | 'id' | 'displayOrder'>>
 
 type TestWorktreeSnapshot = Omit<
   WorktreeTerminalSnapshot,
-  'sessions' | 'bellCount'
+  'slots' | 'bellCount'
 > & {
-  sessions: TestTerminalSummary[]
+  slots: TestTerminalSummary[]
   bellCount?: number
 }
 
 function completeWorktreeSnapshot(snapshot: TestWorktreeSnapshot): WorktreeTerminalSnapshot {
-  const sessions = snapshot.sessions.map((session, index) => ({
+  const slots = snapshot.slots.map((session, index) => ({
     ...session,
     type: 'terminal' as const,
     id: session.id ?? session.key,
@@ -56,8 +56,8 @@ function completeWorktreeSnapshot(snapshot: TestWorktreeSnapshot): WorktreeTermi
   }))
   return {
     ...snapshot,
-    sessions,
-    bellCount: snapshot.bellCount ?? sessions.filter((session) => session.hasBell).length,
+    slots,
+    bellCount: snapshot.bellCount ?? slots.filter((session) => session.hasBell).length,
   }
 }
 
@@ -68,9 +68,9 @@ async function renderControllerSlot() {
   const root: Root = createRoot(container)
   const writeInput = vi.fn()
   const descriptor = {
-    key: 'terminal-1',
+    key: 'slot-1',
     worktreeTerminalKey: '/repo\0/worktree',
-    terminalId: 'terminal-1',
+    slotId: 'slot-1',
     index: 1,
     repoRoot: '/repo',
     branch: 'feature',
@@ -79,11 +79,11 @@ async function renderControllerSlot() {
   const worktreeSnapshot = {
     worktreeTerminalKey: '/repo\0/worktree',
     selectedDescriptor: descriptor,
-    sessions: [
+    slots: [
       {
-        key: 'terminal-1',
+        key: 'slot-1',
         worktreeTerminalKey: '/repo\0/worktree',
-        terminalId: 'terminal-1',
+        slotId: 'slot-1',
         index: 1,
         title: 'zsh',
         phase: 'open' as const,
@@ -108,8 +108,8 @@ async function renderControllerSlot() {
       phase: 'open' as const,
     },
   }
-  const context: TerminalSessionContextValue = {
-    createTerminal: async () => 'terminal-1',
+  const context: TerminalSlotContextValue = {
+    createTerminal: async () => 'slot-1',
     registerHost: vi.fn(),
     unregisterHost: vi.fn(),
     selectTerminal: vi.fn(),
@@ -128,7 +128,7 @@ async function renderControllerSlot() {
     takeover: vi.fn(),
     serialize: vi.fn(() => ''),
   }
-  const readContext: TerminalSessionReadContextValue = {
+  const readContext: TerminalSlotReadContextValue = {
     worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
     subscribeWorktree: () => () => {},
     snapshot: () => snapshot,
@@ -137,11 +137,11 @@ async function renderControllerSlot() {
 
   await act(async () => {
     root.render(
-      <TerminalSessionContext.Provider value={context}>
-        <TerminalSessionReadContext.Provider value={readContext}>
+      <TerminalSlotContext.Provider value={context}>
+        <TerminalSlotReadContext.Provider value={readContext}>
           <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-        </TerminalSessionReadContext.Provider>
-      </TerminalSessionContext.Provider>,
+        </TerminalSlotReadContext.Provider>
+      </TerminalSlotContext.Provider>,
     )
   })
 
@@ -183,9 +183,9 @@ describe('TerminalSlot', () => {
     const takeover = vi.fn().mockResolvedValue(true)
     const summaries = [
       {
-        key: 'terminal-1',
+        key: 'slot-1',
         worktreeTerminalKey: '/repo\0/worktree',
-        terminalId: 'terminal-1',
+        slotId: 'slot-1',
         index: 1,
         title: 'zsh',
         phase: 'open' as const,
@@ -194,9 +194,9 @@ describe('TerminalSlot', () => {
       },
     ]
     const descriptor = {
-      key: 'terminal-1',
+      key: 'slot-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      terminalId: 'terminal-1',
+      slotId: 'slot-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -205,7 +205,7 @@ describe('TerminalSlot', () => {
     const worktreeSnapshot = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
-      sessions: summaries,
+      slots: summaries,
       count: 1,
       pendingCreate: false,
     }
@@ -223,8 +223,8 @@ describe('TerminalSlot', () => {
         phase: 'open' as const,
       },
     }
-    const context: TerminalSessionContextValue = {
-      createTerminal: async () => 'terminal-1',
+    const context: TerminalSlotContextValue = {
+      createTerminal: async () => 'slot-1',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -243,7 +243,7 @@ describe('TerminalSlot', () => {
       takeover,
       serialize: vi.fn(() => ''),
     }
-    const readContext: TerminalSessionReadContextValue = {
+    const readContext: TerminalSlotReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => snapshot,
@@ -252,11 +252,11 @@ describe('TerminalSlot', () => {
 
     await act(async () => {
       root.render(
-        <TerminalSessionContext.Provider value={context}>
-          <TerminalSessionReadContext.Provider value={readContext}>
+        <TerminalSlotContext.Provider value={context}>
+          <TerminalSlotReadContext.Provider value={readContext}>
             <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-          </TerminalSessionReadContext.Provider>
-        </TerminalSessionContext.Provider>,
+          </TerminalSlotReadContext.Provider>
+        </TerminalSlotContext.Provider>,
       )
     })
 
@@ -274,7 +274,7 @@ describe('TerminalSlot', () => {
         button?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       })
 
-      expect(takeover).toHaveBeenCalledWith('terminal-1')
+      expect(takeover).toHaveBeenCalledWith('slot-1')
     } finally {
       await act(async () => root.unmount())
       container.remove()
@@ -289,13 +289,13 @@ describe('TerminalSlot', () => {
     const emptyWorktreeSnapshot = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: null,
-      sessions: [],
+      slots: [],
       count: 0,
       pendingCreate: false,
     }
     const emptySnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
-    const context: TerminalSessionContextValue = {
-      createTerminal: vi.fn(async () => 'terminal-2'),
+    const context: TerminalSlotContextValue = {
+      createTerminal: vi.fn(async () => 'slot-2'),
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -314,7 +314,7 @@ describe('TerminalSlot', () => {
       takeover: vi.fn(),
       serialize: vi.fn(() => ''),
     }
-    const readContext: TerminalSessionReadContextValue = {
+    const readContext: TerminalSlotReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(emptyWorktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => emptySnapshot,
@@ -323,11 +323,11 @@ describe('TerminalSlot', () => {
 
     await act(async () => {
       root.render(
-        <TerminalSessionContext.Provider value={context}>
-          <TerminalSessionReadContext.Provider value={readContext}>
+        <TerminalSlotContext.Provider value={context}>
+          <TerminalSlotReadContext.Provider value={readContext}>
             <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-          </TerminalSessionReadContext.Provider>
-        </TerminalSessionContext.Provider>,
+          </TerminalSlotReadContext.Provider>
+        </TerminalSlotContext.Provider>,
       )
     })
 
@@ -335,11 +335,11 @@ describe('TerminalSlot', () => {
       expect(container.querySelector('.goblin-terminal-slot__empty')).toBeNull()
       await act(async () => {
         root.render(
-          <TerminalSessionContext.Provider value={context}>
-            <TerminalSessionReadContext.Provider value={readContext}>
+          <TerminalSlotContext.Provider value={context}>
+            <TerminalSlotReadContext.Provider value={readContext}>
               <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-            </TerminalSessionReadContext.Provider>
-          </TerminalSessionContext.Provider>,
+            </TerminalSlotReadContext.Provider>
+          </TerminalSlotContext.Provider>,
         )
       })
     } finally {
@@ -360,9 +360,9 @@ describe('TerminalSlot', () => {
     const takeover = vi.fn().mockResolvedValue(true)
     const restart = vi.fn()
     const descriptor = {
-      key: 'terminal-1',
+      key: 'slot-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      terminalId: 'terminal-1',
+      slotId: 'slot-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -371,11 +371,11 @@ describe('TerminalSlot', () => {
     const worktreeSnapshot = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
-      sessions: [
+      slots: [
         {
-          key: 'terminal-1',
+          key: 'slot-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          terminalId: 'terminal-1',
+          slotId: 'slot-1',
           index: 1,
           title: 'zsh',
           phase: 'error' as const,
@@ -400,8 +400,8 @@ describe('TerminalSlot', () => {
         phase: 'error' as const,
       },
     }
-    const context: TerminalSessionContextValue = {
-      createTerminal: async () => 'terminal-1',
+    const context: TerminalSlotContextValue = {
+      createTerminal: async () => 'slot-1',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -420,7 +420,7 @@ describe('TerminalSlot', () => {
       takeover,
       serialize: vi.fn(() => ''),
     }
-    const readContext: TerminalSessionReadContextValue = {
+    const readContext: TerminalSlotReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => snapshot,
@@ -429,11 +429,11 @@ describe('TerminalSlot', () => {
 
     await act(async () => {
       root.render(
-        <TerminalSessionContext.Provider value={context}>
-          <TerminalSessionReadContext.Provider value={readContext}>
+        <TerminalSlotContext.Provider value={context}>
+          <TerminalSlotReadContext.Provider value={readContext}>
             <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-          </TerminalSessionReadContext.Provider>
-        </TerminalSessionContext.Provider>,
+          </TerminalSlotReadContext.Provider>
+        </TerminalSlotContext.Provider>,
       )
     })
 
@@ -476,9 +476,9 @@ describe('TerminalSlot', () => {
     const root: Root = createRoot(container)
     const writeInput = vi.fn()
     const descriptor = {
-      key: 'terminal-1',
+      key: 'slot-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      terminalId: 'terminal-1',
+      slotId: 'slot-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -487,11 +487,11 @@ describe('TerminalSlot', () => {
     const worktreeSnapshot = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
-      sessions: [
+      slots: [
         {
-          key: 'terminal-1',
+          key: 'slot-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          terminalId: 'terminal-1',
+          slotId: 'slot-1',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -518,8 +518,8 @@ describe('TerminalSlot', () => {
         phase: 'open' as const,
       },
     }
-    const context: TerminalSessionContextValue = {
-      createTerminal: async () => 'terminal-1',
+    const context: TerminalSlotContextValue = {
+      createTerminal: async () => 'slot-1',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -538,7 +538,7 @@ describe('TerminalSlot', () => {
       takeover: vi.fn(),
       serialize: vi.fn(() => ''),
     }
-    const readContext: TerminalSessionReadContextValue = {
+    const readContext: TerminalSlotReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => snapshot,
@@ -547,11 +547,11 @@ describe('TerminalSlot', () => {
 
     await act(async () => {
       root.render(
-        <TerminalSessionContext.Provider value={context}>
-          <TerminalSessionReadContext.Provider value={readContext}>
+        <TerminalSlotContext.Provider value={context}>
+          <TerminalSlotReadContext.Provider value={readContext}>
             <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-          </TerminalSessionReadContext.Provider>
-        </TerminalSessionContext.Provider>,
+          </TerminalSlotReadContext.Provider>
+        </TerminalSlotContext.Provider>,
       )
     })
 
@@ -597,9 +597,9 @@ describe('TerminalSlot', () => {
     const root: Root = createRoot(container)
     const writeInput = vi.fn()
     const descriptor = {
-      key: 'terminal-1',
+      key: 'slot-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      terminalId: 'terminal-1',
+      slotId: 'slot-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -608,11 +608,11 @@ describe('TerminalSlot', () => {
     const worktreeSnapshot = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
-      sessions: [
+      slots: [
         {
-          key: 'terminal-1',
+          key: 'slot-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          terminalId: 'terminal-1',
+          slotId: 'slot-1',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -639,8 +639,8 @@ describe('TerminalSlot', () => {
         phase: 'open' as const,
       },
     }
-    const context: TerminalSessionContextValue = {
-      createTerminal: async () => 'terminal-1',
+    const context: TerminalSlotContextValue = {
+      createTerminal: async () => 'slot-1',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -659,7 +659,7 @@ describe('TerminalSlot', () => {
       takeover: vi.fn(),
       serialize: vi.fn(() => ''),
     }
-    const readContext: TerminalSessionReadContextValue = {
+    const readContext: TerminalSlotReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => snapshot,
@@ -678,11 +678,11 @@ describe('TerminalSlot', () => {
     try {
       await act(async () => {
         root.render(
-          <TerminalSessionContext.Provider value={context}>
-            <TerminalSessionReadContext.Provider value={readContext}>
+          <TerminalSlotContext.Provider value={context}>
+            <TerminalSlotReadContext.Provider value={readContext}>
               <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-            </TerminalSessionReadContext.Provider>
-          </TerminalSessionContext.Provider>,
+            </TerminalSlotReadContext.Provider>
+          </TerminalSlotContext.Provider>,
         )
       })
 
@@ -709,7 +709,7 @@ describe('TerminalSlot', () => {
       // quotes — if the escape regresses to plain concat this
       // assertion catches it.
       expect(writeInput).toHaveBeenCalledTimes(1)
-      expect(writeInput).toHaveBeenCalledWith('terminal-1', "'/resolved/shot with space.png'", 'drop')
+      expect(writeInput).toHaveBeenCalledWith('slot-1', "'/resolved/shot with space.png'", 'drop')
       // The path-attempt tier succeeded, so the blob-save backend
       // was never consulted.
       expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
@@ -737,9 +737,9 @@ describe('TerminalSlot', () => {
     const root: Root = createRoot(container)
     const writeInput = vi.fn()
     const descriptor = {
-      key: 'terminal-1',
+      key: 'slot-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      terminalId: 'terminal-1',
+      slotId: 'slot-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -748,11 +748,11 @@ describe('TerminalSlot', () => {
     const worktreeSnapshot = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
-      sessions: [
+      slots: [
         {
-          key: 'terminal-1',
+          key: 'slot-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          terminalId: 'terminal-1',
+          slotId: 'slot-1',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -777,8 +777,8 @@ describe('TerminalSlot', () => {
         phase: 'open' as const,
       },
     }
-    const context: TerminalSessionContextValue = {
-      createTerminal: async () => 'terminal-1',
+    const context: TerminalSlotContextValue = {
+      createTerminal: async () => 'slot-1',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -797,7 +797,7 @@ describe('TerminalSlot', () => {
       takeover: vi.fn(),
       serialize: vi.fn(() => ''),
     }
-    const readContext: TerminalSessionReadContextValue = {
+    const readContext: TerminalSlotReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => snapshot,
@@ -807,11 +807,11 @@ describe('TerminalSlot', () => {
     try {
       await act(async () => {
         root.render(
-          <TerminalSessionContext.Provider value={context}>
-            <TerminalSessionReadContext.Provider value={readContext}>
+          <TerminalSlotContext.Provider value={context}>
+            <TerminalSlotReadContext.Provider value={readContext}>
               <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-            </TerminalSessionReadContext.Provider>
-          </TerminalSessionContext.Provider>,
+            </TerminalSlotReadContext.Provider>
+          </TerminalSlotContext.Provider>,
         )
       })
       const slotRoot = container.querySelector('.goblin-terminal-slot') as HTMLElement
@@ -847,9 +847,9 @@ describe('TerminalSlot', () => {
     const root: Root = createRoot(container)
     const writeInput = vi.fn()
     const descriptor = {
-      key: 'terminal-1',
+      key: 'slot-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      terminalId: 'terminal-1',
+      slotId: 'slot-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -858,11 +858,11 @@ describe('TerminalSlot', () => {
     const worktreeSnapshot = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
-      sessions: [
+      slots: [
         {
-          key: 'terminal-1',
+          key: 'slot-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          terminalId: 'terminal-1',
+          slotId: 'slot-1',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -887,8 +887,8 @@ describe('TerminalSlot', () => {
         phase: 'open' as const,
       },
     }
-    const context: TerminalSessionContextValue = {
-      createTerminal: async () => 'terminal-1',
+    const context: TerminalSlotContextValue = {
+      createTerminal: async () => 'slot-1',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -907,7 +907,7 @@ describe('TerminalSlot', () => {
       takeover: vi.fn(),
       serialize: vi.fn(() => ''),
     }
-    const readContext: TerminalSessionReadContextValue = {
+    const readContext: TerminalSlotReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => snapshot,
@@ -921,11 +921,11 @@ describe('TerminalSlot', () => {
     try {
       await act(async () => {
         root.render(
-          <TerminalSessionContext.Provider value={context}>
-            <TerminalSessionReadContext.Provider value={readContext}>
+          <TerminalSlotContext.Provider value={context}>
+            <TerminalSlotReadContext.Provider value={readContext}>
               <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-            </TerminalSessionReadContext.Provider>
-          </TerminalSessionContext.Provider>,
+            </TerminalSlotReadContext.Provider>
+          </TerminalSlotContext.Provider>,
         )
       })
 
@@ -950,7 +950,7 @@ describe('TerminalSlot', () => {
       // both of which `shellEscapePath` wraps in single quotes — if
       // the escape regresses to plain concat this catches it.
       expect(writeInput).toHaveBeenCalledTimes(1)
-      expect(writeInput).toHaveBeenCalledWith('terminal-1', "'/resolved/weird name & space.png'", 'paste')
+      expect(writeInput).toHaveBeenCalledWith('slot-1', "'/resolved/weird name & space.png'", 'paste')
       expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
     } finally {
       await act(async () => root.unmount())
@@ -970,9 +970,9 @@ describe('TerminalSlot', () => {
     const root: Root = createRoot(container)
     const writeInput = vi.fn()
     const descriptor = {
-      key: 'terminal-1',
+      key: 'slot-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      terminalId: 'terminal-1',
+      slotId: 'slot-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -981,11 +981,11 @@ describe('TerminalSlot', () => {
     const worktreeSnapshot = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
-      sessions: [
+      slots: [
         {
-          key: 'terminal-1',
+          key: 'slot-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          terminalId: 'terminal-1',
+          slotId: 'slot-1',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -1010,8 +1010,8 @@ describe('TerminalSlot', () => {
         phase: 'open' as const,
       },
     }
-    const context: TerminalSessionContextValue = {
-      createTerminal: async () => 'terminal-1',
+    const context: TerminalSlotContextValue = {
+      createTerminal: async () => 'slot-1',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -1030,7 +1030,7 @@ describe('TerminalSlot', () => {
       takeover: vi.fn(),
       serialize: vi.fn(() => ''),
     }
-    const readContext: TerminalSessionReadContextValue = {
+    const readContext: TerminalSlotReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => snapshot,
@@ -1047,11 +1047,11 @@ describe('TerminalSlot', () => {
     try {
       await act(async () => {
         root.render(
-          <TerminalSessionContext.Provider value={context}>
-            <TerminalSessionReadContext.Provider value={readContext}>
+          <TerminalSlotContext.Provider value={context}>
+            <TerminalSlotReadContext.Provider value={readContext}>
               <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-            </TerminalSessionReadContext.Provider>
-          </TerminalSessionContext.Provider>,
+            </TerminalSlotReadContext.Provider>
+          </TerminalSlotContext.Provider>,
         )
       })
 
@@ -1154,7 +1154,7 @@ describe('TerminalSlot', () => {
         new File([new Uint8Array([1])], 'c.png'),
       ])
 
-      expect(rendered.writeInput).toHaveBeenCalledWith('terminal-1', "'/abs/a.png' '/tmp/b.png'", 'paste')
+      expect(rendered.writeInput).toHaveBeenCalledWith('slot-1', "'/abs/a.png' '/tmp/b.png'", 'paste')
       expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-partial')
       expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('terminal.paste-file-failed')
     } finally {
@@ -1177,9 +1177,9 @@ describe('TerminalSlot', () => {
     const root: Root = createRoot(container)
     const writeInput = vi.fn()
     const descriptor = {
-      key: 'terminal-1',
+      key: 'slot-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      terminalId: 'terminal-1',
+      slotId: 'slot-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -1188,11 +1188,11 @@ describe('TerminalSlot', () => {
     const worktreeSnapshot = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
-      sessions: [
+      slots: [
         {
-          key: 'terminal-1',
+          key: 'slot-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          terminalId: 'terminal-1',
+          slotId: 'slot-1',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -1217,8 +1217,8 @@ describe('TerminalSlot', () => {
         phase: 'open' as const,
       },
     }
-    const context: TerminalSessionContextValue = {
-      createTerminal: async () => 'terminal-1',
+    const context: TerminalSlotContextValue = {
+      createTerminal: async () => 'slot-1',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -1237,7 +1237,7 @@ describe('TerminalSlot', () => {
       takeover: vi.fn(),
       serialize: vi.fn(() => ''),
     }
-    const readContext: TerminalSessionReadContextValue = {
+    const readContext: TerminalSlotReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => snapshot,
@@ -1257,11 +1257,11 @@ describe('TerminalSlot', () => {
     try {
       await act(async () => {
         root.render(
-          <TerminalSessionContext.Provider value={context}>
-            <TerminalSessionReadContext.Provider value={readContext}>
+          <TerminalSlotContext.Provider value={context}>
+            <TerminalSlotReadContext.Provider value={readContext}>
               <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-            </TerminalSessionReadContext.Provider>
-          </TerminalSessionContext.Provider>,
+            </TerminalSlotReadContext.Provider>
+          </TerminalSlotContext.Provider>,
         )
       })
       vi.mocked(toast.error).mockClear()
@@ -1288,7 +1288,7 @@ describe('TerminalSlot', () => {
       // the order the resolver returns them (path-attempt tier first,
       // then blob-save). paste-file-partial toasts once.
       expect(writeInput).toHaveBeenCalledTimes(1)
-      expect(writeInput).toHaveBeenCalledWith('terminal-1', "'/abs/a.png' '/tmp/b.png'", 'drop')
+      expect(writeInput).toHaveBeenCalledWith('slot-1', "'/abs/a.png' '/tmp/b.png'", 'drop')
       expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-partial')
       expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('terminal.paste-file-failed')
     } finally {
@@ -1302,7 +1302,7 @@ describe('TerminalSlot', () => {
     // controller-drop path. The blob-save tier is a real roundtrip
     // (HTTP POST in web, IPC in Electron), so the user has a real
     // window to switch worktrees before the resolver returns. The
-    // captured `sessionKey` would otherwise be typed into a session
+    // captured `slotKey` would otherwise be typed into a session
     // the user is no longer looking at — invisible to them, or worse,
     // into a now-detached session that the registry silently drops.
     // The fix: capture `key` at handler invocation time, compare to
@@ -1314,18 +1314,18 @@ describe('TerminalSlot', () => {
     const root: Root = createRoot(container)
     const writeInput = vi.fn()
     const descriptorA = {
-      key: 'terminal-1',
+      key: 'slot-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      terminalId: 'terminal-1',
+      slotId: 'slot-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
       worktreePath: '/worktree',
     }
     const descriptorB = {
-      key: 'terminal-2',
+      key: 'slot-2',
       worktreeTerminalKey: '/repo\0/worktree-other',
-      terminalId: 'terminal-2',
+      slotId: 'slot-2',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -1334,11 +1334,11 @@ describe('TerminalSlot', () => {
     const worktreeSnapshotA = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: descriptorA,
-      sessions: [
+      slots: [
         {
-          key: 'terminal-1',
+          key: 'slot-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          terminalId: 'terminal-1',
+          slotId: 'slot-1',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -1352,11 +1352,11 @@ describe('TerminalSlot', () => {
     const worktreeSnapshotB = {
       worktreeTerminalKey: '/repo\0/worktree-other',
       selectedDescriptor: descriptorB,
-      sessions: [
+      slots: [
         {
-          key: 'terminal-2',
+          key: 'slot-2',
           worktreeTerminalKey: '/repo\0/worktree-other',
-          terminalId: 'terminal-2',
+          slotId: 'slot-2',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -1381,8 +1381,8 @@ describe('TerminalSlot', () => {
         phase: 'open' as const,
       },
     }
-    const context: TerminalSessionContextValue = {
-      createTerminal: async () => 'terminal-1',
+    const context: TerminalSlotContextValue = {
+      createTerminal: async () => 'slot-1',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -1402,7 +1402,7 @@ describe('TerminalSlot', () => {
       serialize: vi.fn(() => ''),
     }
     let activeWorktreeSnapshot = worktreeSnapshotA
-    const readContext: TerminalSessionReadContextValue = {
+    const readContext: TerminalSlotReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(activeWorktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => snapshotOpen,
@@ -1426,11 +1426,11 @@ describe('TerminalSlot', () => {
     try {
       await act(async () => {
         root.render(
-          <TerminalSessionContext.Provider value={context}>
-            <TerminalSessionReadContext.Provider value={readContext}>
+          <TerminalSlotContext.Provider value={context}>
+            <TerminalSlotReadContext.Provider value={readContext}>
               <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-            </TerminalSessionReadContext.Provider>
-          </TerminalSessionContext.Provider>,
+            </TerminalSlotReadContext.Provider>
+          </TerminalSlotContext.Provider>,
         )
       })
 
@@ -1457,11 +1457,11 @@ describe('TerminalSlot', () => {
       activeWorktreeSnapshot = worktreeSnapshotB
       await act(async () => {
         root.render(
-          <TerminalSessionContext.Provider value={context}>
-            <TerminalSessionReadContext.Provider value={readContext}>
+          <TerminalSlotContext.Provider value={context}>
+            <TerminalSlotReadContext.Provider value={readContext}>
               <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree-other" />
-            </TerminalSessionReadContext.Provider>
-          </TerminalSessionContext.Provider>,
+            </TerminalSlotReadContext.Provider>
+          </TerminalSlotContext.Provider>,
         )
       })
 
@@ -1493,16 +1493,16 @@ describe('TerminalSlot', () => {
     const container = document.createElement('div')
     document.body.appendChild(container)
     const root: Root = createRoot(container)
-    const createTerminal = vi.fn(async () => 'terminal-1')
+    const createTerminal = vi.fn(async () => 'slot-1')
     const emptyWorktreeSnapshot = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: null,
-      sessions: [],
+      slots: [],
       count: 0,
       pendingCreate: false,
     }
     const emptySnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
-    const context: TerminalSessionContextValue = {
+    const context: TerminalSlotContextValue = {
       createTerminal,
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
@@ -1522,7 +1522,7 @@ describe('TerminalSlot', () => {
       takeover: vi.fn(),
       serialize: vi.fn(() => ''),
     }
-    const readContext: TerminalSessionReadContextValue = {
+    const readContext: TerminalSlotReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(emptyWorktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => emptySnapshot,
@@ -1531,11 +1531,11 @@ describe('TerminalSlot', () => {
 
     await act(async () => {
       root.render(
-        <TerminalSessionContext.Provider value={context}>
-          <TerminalSessionReadContext.Provider value={readContext}>
+        <TerminalSlotContext.Provider value={context}>
+          <TerminalSlotReadContext.Provider value={readContext}>
             <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-          </TerminalSessionReadContext.Provider>
-        </TerminalSessionContext.Provider>,
+          </TerminalSlotReadContext.Provider>
+        </TerminalSlotContext.Provider>,
       )
     })
 
@@ -1584,12 +1584,12 @@ describe('TerminalSlot', () => {
     const emptyWorktreeSnapshot = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: null,
-      sessions: [],
+      slots: [],
       count: 0,
       pendingCreate: false,
     }
     const emptySnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
-    const context: TerminalSessionContextValue = {
+    const context: TerminalSlotContextValue = {
       createTerminal,
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
@@ -1609,7 +1609,7 @@ describe('TerminalSlot', () => {
       takeover: vi.fn(),
       serialize: vi.fn(() => ''),
     }
-    const readContext: TerminalSessionReadContextValue = {
+    const readContext: TerminalSlotReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(emptyWorktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => emptySnapshot,
@@ -1618,11 +1618,11 @@ describe('TerminalSlot', () => {
 
     await act(async () => {
       root.render(
-        <TerminalSessionContext.Provider value={context}>
-          <TerminalSessionReadContext.Provider value={readContext}>
+        <TerminalSlotContext.Provider value={context}>
+          <TerminalSlotReadContext.Provider value={readContext}>
             <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-          </TerminalSessionReadContext.Provider>
-        </TerminalSessionContext.Provider>,
+          </TerminalSlotReadContext.Provider>
+        </TerminalSlotContext.Provider>,
       )
     })
 

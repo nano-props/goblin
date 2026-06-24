@@ -15,8 +15,8 @@
 //   - Dev: Info. Full visibility while iterating.
 //
 // Tagged children are pre-bound so call sites stay one symbol:
-//   `terminalLog.warn('write failed', { sessionId, err })`
-//   renders as `[terminal] write failed { sessionId: ..., err: ... }`.
+//   `terminalLog.warn('write failed', { ptySessionId, err })`
+//   renders as `[terminal] write failed { ptySessionId: ..., err: ... }`.
 
 import { createConsola, LogLevels, type ConsolaInstance } from 'consola'
 
@@ -41,4 +41,4 @@ export const deriveConnectivityLog = log.withTag('deriveConnectivity')
 export const refreshPullRequestsLog = log.withTag('refreshPullRequests')
 export const refreshStatusLog = log.withTag('refreshStatus')
 export const reposLog = log.withTag('repos')
-export const terminalSessionProviderLog = log.withTag('TerminalSessionProvider')
+export const terminalSlotProviderLog = log.withTag('TerminalSlotProvider')

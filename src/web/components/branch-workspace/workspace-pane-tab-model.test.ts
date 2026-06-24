@@ -19,12 +19,12 @@ describe('branch workspace pane tab model', () => {
       worktreePath: WORKTREE_PATH,
       preferredView: 'status',
       tabOrder: [
-        terminalEntry('terminal-1'),
+        terminalEntry('slot-1'),
         staticEntry('status'),
         staticEntry('changes'),
         staticEntry('history'),
       ],
-      runtimeTerminalViews: [terminalView('terminal-1', 1, true)],
+      runtimeTerminalViews: [terminalView('slot-1', 1, true)],
       terminalSessionCount: 1,
       terminalSyncReady: true,
       lastClosedTabContext: null,
@@ -34,7 +34,7 @@ describe('branch workspace pane tab model', () => {
     expect(model.terminalViews.map((view) => view.type)).toEqual(['terminal'])
     expect(model.staticViews).toEqual(['status', 'changes', 'history'])
     expect(model.tabs.map((tab) => [tab.identity, tab.kind])).toEqual([
-      ['terminal:terminal-1', 'terminal'],
+      ['terminal:slot-1', 'terminal'],
       ['status:status', 'static'],
       ['changes:changes', 'static'],
       ['history:history', 'static'],
@@ -49,7 +49,7 @@ describe('branch workspace pane tab model', () => {
       worktreePath: WORKTREE_PATH,
       preferredView: 'terminal',
       tabOrder: [staticEntry('status')],
-      runtimeTerminalViews: [terminalView('terminal-1', 1, false), terminalView('terminal-2', 2, true)],
+      runtimeTerminalViews: [terminalView('slot-1', 1, false), terminalView('slot-2', 2, true)],
       terminalSessionCount: 2,
       terminalSyncReady: true,
       lastClosedTabContext: null,
@@ -57,8 +57,8 @@ describe('branch workspace pane tab model', () => {
 
     expect(model.renderedView).toBe('terminal')
     expect(model.selection).toMatchObject({ kind: 'materialized-tab', view: 'terminal' })
-    expect(model.activeTab?.identity).toBe('terminal:terminal-2')
-    expect(model.activeTab?.kind === 'terminal' ? model.activeTab.key : null).toBe('terminal-2')
+    expect(model.activeTab?.identity).toBe('terminal:slot-2')
+    expect(model.activeTab?.kind === 'terminal' ? model.activeTab.key : null).toBe('slot-2')
   })
 
   test('keeps terminal selected without a runtime tab while creation is pending', () => {
@@ -137,8 +137,8 @@ describe('branch workspace pane tab model', () => {
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredView: 'history',
-      tabOrder: [staticEntry('status'), terminalEntry('terminal-1')],
-      runtimeTerminalViews: [terminalView('terminal-1', 1, true)],
+      tabOrder: [staticEntry('status'), terminalEntry('slot-1')],
+      runtimeTerminalViews: [terminalView('slot-1', 1, true)],
       terminalSessionCount: 1,
       terminalSyncReady: true,
       lastClosedTabContext: null,
@@ -176,7 +176,7 @@ describe('branch workspace pane tab model', () => {
   })
 
   test('falls back to the first materialized tab when the last terminal exits a [status, terminal] strip', () => {
-    // The user is on a [status, terminal-1] strip with preferred=terminal.
+    // The user is on a [status, slot-1] strip with preferred=terminal.
     // The terminal exits, the runtime snapshot is empty, sync is ready, no
     // pending create. Old behavior: empty pane. New behavior: the model
     // falls back to status (the first materialized tab) so the user does
@@ -204,19 +204,19 @@ describe('branch workspace pane tab model', () => {
   })
 
   test('lands on the remaining terminal when the active terminal is closed among many', () => {
-    // The user has [status, terminal-1, terminal-2] with terminal-1 selected.
-    // The user closes terminal-1 (X click) — terminal-1 is removed from
-    // tabOrder, terminal-2 stays selected in the registry. The model
-    // re-resolves: preferred=terminal, count=1, terminal-2 is selected.
+    // The user has [status, slot-1, slot-2] with slot-1 selected.
+    // The user closes slot-1 (X click) — slot-1 is removed from
+    // tabOrder, slot-2 stays selected in the registry. The model
+    // re-resolves: preferred=terminal, count=1, slot-2 is selected.
     // This is the "natural" case: no fallback needed, the new active
-    // terminal is terminal-2.
+    // terminal is slot-2.
     const model = createBranchWorkspacePaneTabModel({
       repoId: REPO_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredView: 'terminal',
-      tabOrder: [staticEntry('status'), terminalEntry('terminal-2')],
-      runtimeTerminalViews: [terminalView('terminal-2', 2, true)],
+      tabOrder: [staticEntry('status'), terminalEntry('slot-2')],
+      runtimeTerminalViews: [terminalView('slot-2', 2, true)],
       terminalSessionCount: 1,
       terminalSyncReady: true,
       lastClosedTabContext: null,
@@ -227,7 +227,7 @@ describe('branch workspace pane tab model', () => {
       view: 'terminal',
     })
     expect(model.renderedView).toBe('terminal')
-    expect(model.activeTab?.kind === 'terminal' ? model.activeTab.key : null).toBe('terminal-2')
+    expect(model.activeTab?.kind === 'terminal' ? model.activeTab.key : null).toBe('slot-2')
   })
 
   test('keeps the terminal-host view while a terminal create is pending', () => {
@@ -299,10 +299,10 @@ describe('branch workspace pane tab model', () => {
   })
 
   test('lands on the spatial neighbor via lastClosedTabContext when the only terminal in a mixed strip is closed', () => {
-    // Regression: preferred=terminal + tabOrder=[status, terminal-1, changes] +
-    // the last terminal exits. The store records closingIdentity=terminal-1
+    // Regression: preferred=terminal + tabOrder=[status, slot-1, changes] +
+    // the last terminal exits. The store records closingIdentity=slot-1
     // with the pre-close tab identities; the model uses it to surface changes
-    // (the spatial neighbor of terminal-1) instead of status (tabs[0]).
+    // (the spatial neighbor of slot-1) instead of status (tabs[0]).
     const model = createBranchWorkspacePaneTabModel({
       repoId: REPO_ID,
       branchName: 'feature/model',
@@ -313,8 +313,8 @@ describe('branch workspace pane tab model', () => {
       terminalSessionCount: 0,
       terminalSyncReady: true,
       lastClosedTabContext: {
-        closingIdentity: 'terminal:terminal-1',
-        previousTabIdentities: ['status:status', 'terminal:terminal-1', 'changes:changes'],
+        closingIdentity: 'terminal:slot-1',
+        previousTabIdentities: ['status:status', 'terminal:slot-1', 'changes:changes'],
       },
     })
 
@@ -378,7 +378,7 @@ describe('branch workspace pane tab model', () => {
   })
 
   test('falls back to tabs[0] for server-side exits with no lastClosedTabContext', () => {
-    // The last terminal exits externally (registry onTerminalSessionRemoved),
+    // The last terminal exits externally (registry onTerminalSlotRemoved),
     // no user-initiated close recorded. The model has no adjacency hint, so
     // it uses the generic tabs[0] fallback.
     const model = createBranchWorkspacePaneTabModel({
@@ -406,15 +406,15 @@ describe('branch workspace pane tab model', () => {
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredView: 'status',
-      tabOrder: [staticEntry('status'), terminalEntry('terminal-1'), staticEntry('changes')],
-      runtimeTerminalViews: [terminalView('terminal-1', 1, true)],
+      tabOrder: [staticEntry('status'), terminalEntry('slot-1'), staticEntry('changes')],
+      runtimeTerminalViews: [terminalView('slot-1', 1, true)],
       terminalSessionCount: 1,
       terminalSyncReady: true,
       lastClosedTabContext: null,
     })
 
-    expect(nextBranchWorkspacePaneTabAfterClose(model.tabs, 'status:status')?.identity).toBe('terminal:terminal-1')
-    expect(nextBranchWorkspacePaneTabAfterClose(model.tabs, 'changes:changes')?.identity).toBe('terminal:terminal-1')
+    expect(nextBranchWorkspacePaneTabAfterClose(model.tabs, 'status:status')?.identity).toBe('terminal:slot-1')
+    expect(nextBranchWorkspacePaneTabAfterClose(model.tabs, 'changes:changes')?.identity).toBe('terminal:slot-1')
     expect(nextBranchWorkspacePaneTabAfterClose(model.tabs, 'missing:missing')).toBeNull()
   })
 
@@ -443,11 +443,11 @@ describe('branch workspace pane tab model', () => {
       preferredView: 'terminal',
       tabOrder: [
         staticEntry('status'),
-        terminalEntry('terminal-1'),
-        terminalEntry('terminal-2'),
+        terminalEntry('slot-1'),
+        terminalEntry('slot-2'),
         staticEntry('changes'),
       ],
-      runtimeTerminalViews: [terminalView('terminal-1', 1, false), terminalView('terminal-2', 2, true)],
+      runtimeTerminalViews: [terminalView('slot-1', 1, false), terminalView('slot-2', 2, true)],
       terminalSessionCount: 2,
       terminalSyncReady: true,
       lastClosedTabContext: null,
@@ -455,7 +455,7 @@ describe('branch workspace pane tab model', () => {
 
     expect(adjacentBranchWorkspacePaneTab(model.tabs, model.activeTab?.identity, 1)?.identity).toBe('changes:changes')
     expect(adjacentBranchWorkspacePaneTab(model.tabs, model.activeTab?.identity, -1)?.identity).toBe(
-      'terminal:terminal-1',
+      'terminal:slot-1',
     )
     expect(adjacentBranchWorkspacePaneTab(model.tabs, null, -1)).toBeNull()
     expect(adjacentBranchWorkspacePaneTab(model.tabs, 'missing:missing', 1)).toBeNull()
@@ -476,7 +476,7 @@ function terminalView(key: string, displayOrder: number, selected: boolean): Wor
     id: key,
     key,
     worktreeTerminalKey: WORKTREE_KEY,
-    terminalId: key,
+    slotId: key,
     index: displayOrder,
     displayOrder,
     title: key,

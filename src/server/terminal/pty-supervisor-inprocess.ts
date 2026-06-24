@@ -24,41 +24,41 @@ export function createInProcessPtySupervisor(): PtySupervisor {
       if (!result.ok) return { ok: false, message: result.message }
       const handle = createPtyHandle(createPtySessionId())
       const entry: PtyEntry = { runtime: result.runtime }
-      entries.set(handle.sessionId, entry)
+      entries.set(handle.ptySessionId, entry)
       return { ok: true, handle, processName: entry.runtime.processName() || 'terminal' }
     },
     write(handle, data) {
-      entries.get(handle.sessionId)?.runtime.write(data)
+      entries.get(handle.ptySessionId)?.runtime.write(data)
     },
     resize(handle, cols, rows) {
-      entries.get(handle.sessionId)?.runtime.resize(cols, rows)
+      entries.get(handle.ptySessionId)?.runtime.resize(cols, rows)
     },
     kill(handle) {
-      const entry = entries.get(handle.sessionId)
-      entries.delete(handle.sessionId)
+      const entry = entries.get(handle.ptySessionId)
+      entries.delete(handle.ptySessionId)
       entry?.runtime.kill()
     },
     onData(handle, listener) {
-      const entry = entries.get(handle.sessionId)
+      const entry = entries.get(handle.ptySessionId)
       if (!entry) return { dispose: () => {} }
       return entry.runtime.onData((data) => {
         listener(data)
       })
     },
     onExit(handle, listener) {
-      const entry = entries.get(handle.sessionId)
+      const entry = entries.get(handle.ptySessionId)
       if (!entry) return { dispose: () => {} }
       // node-pty's onExit only signals "exited" without (code, signal).
       // The supervisor contract carries both; we pass nulls because the
       // worker is the source of truth for exit metadata and the in-process
       // variant cannot recover it after the fact.
       return entry.runtime.onExit(() => {
-        entries.delete(handle.sessionId)
+        entries.delete(handle.ptySessionId)
         listener(null, null)
       })
     },
     processName(handle) {
-      const entry = entries.get(handle.sessionId)
+      const entry = entries.get(handle.ptySessionId)
       if (!entry) return 'terminal'
       try {
         return entry.runtime.processName() || 'terminal'

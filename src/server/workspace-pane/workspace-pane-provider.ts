@@ -1,7 +1,7 @@
 type MaybePromise<T> = T | Promise<T>
 
-export interface WorkspacePaneProviderWorktreeInput<TOwner extends string | number> {
-  ownerId: TOwner
+export interface WorkspacePaneProviderWorktreeInput<TUser extends string | number> {
+  userId: TUser
   scope: string
   worktreePath: string
 }
@@ -12,13 +12,13 @@ export interface WorkspacePaneProviderViewIdentity<TType extends string = string
 }
 
 export interface WorkspacePaneProviderOpenInput<
-  TOwner extends string | number,
-> extends WorkspacePaneProviderWorktreeInput<TOwner> {
+  TUser extends string | number,
+> extends WorkspacePaneProviderWorktreeInput<TUser> {
   id?: string
 }
 
-export interface WorkspacePaneProviderCloseInput<TOwner extends string | number, TType extends string = string>
-  extends WorkspacePaneProviderWorktreeInput<TOwner>, WorkspacePaneProviderViewIdentity<TType> {}
+export interface WorkspacePaneProviderCloseInput<TUser extends string | number, TType extends string = string>
+  extends WorkspacePaneProviderWorktreeInput<TUser>, WorkspacePaneProviderViewIdentity<TType> {}
 
 export interface WorkspacePaneProviderViewMetadata<
   TType extends string = string,
@@ -29,11 +29,11 @@ export interface WorkspacePaneProviderViewMetadata<
   state?: string | null
 }
 
-export interface WorkspacePaneViewProvider<TOwner extends string | number, TType extends string = string> {
+export interface WorkspacePaneViewProvider<TUser extends string | number, TType extends string = string> {
   readonly type: TType
-  open(input: WorkspacePaneProviderOpenInput<TOwner>): MaybePromise<WorkspacePaneProviderViewIdentity<TType> | null>
-  close(input: WorkspacePaneProviderCloseInput<TOwner, TType>): MaybePromise<boolean>
+  open(input: WorkspacePaneProviderOpenInput<TUser>): MaybePromise<WorkspacePaneProviderViewIdentity<TType> | null>
+  close(input: WorkspacePaneProviderCloseInput<TUser, TType>): MaybePromise<boolean>
   metadata(
-    input: WorkspacePaneProviderCloseInput<TOwner, TType>,
+    input: WorkspacePaneProviderCloseInput<TUser, TType>,
   ): MaybePromise<WorkspacePaneProviderViewMetadata<TType> | null>
 }

@@ -8,13 +8,13 @@ import { BranchActionSurfaceContext } from '#/web/components/branch-workspace/br
 import { getSelectedBranchWorkspacePresentation } from '#/web/components/branch-workspace/model.ts'
 import type { BranchCopyPatchAction } from '#/web/hooks/branch-action-state.ts'
 import {
-  TerminalSessionContext,
-  TerminalSessionReadContext,
-} from '#/web/components/terminal/terminal-session-context.ts'
+  TerminalSlotContext,
+  TerminalSlotReadContext,
+} from '#/web/components/terminal/terminal-slot-context.ts'
 import type {
-  TerminalSessionContextValue,
-  TerminalSessionSummary,
-  TerminalSessionReadContextValue,
+  TerminalSlotContextValue,
+  TerminalSlotSummary,
+  TerminalSlotReadContextValue,
   WorktreeTerminalSnapshot,
 } from '#/web/components/terminal/types.ts'
 import {
@@ -123,7 +123,7 @@ describe('BranchWorkspaceContent', () => {
 
     act(() => {
       root!.render(
-        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
+        <TerminalSlotReadContext.Provider value={emptyTerminalReadContext}>
           <BranchActionSurfaceContext.Provider
             value={branchActionSurfaceWithCopyPatch({
               label: 'status.copy-patch',
@@ -135,7 +135,7 @@ describe('BranchWorkspaceContent', () => {
           >
             <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
           </BranchActionSurfaceContext.Provider>
-        </TerminalSessionReadContext.Provider>,
+        </TerminalSlotReadContext.Provider>,
       )
     })
 
@@ -183,7 +183,7 @@ describe('BranchWorkspaceContent', () => {
 
     act(() => {
       root!.render(
-        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
+        <TerminalSlotReadContext.Provider value={emptyTerminalReadContext}>
           <BranchActionSurfaceContext.Provider
             value={branchActionSurfaceWithCopyPatch({
               label: 'status.copy-patch',
@@ -195,7 +195,7 @@ describe('BranchWorkspaceContent', () => {
           >
             <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
           </BranchActionSurfaceContext.Provider>
-        </TerminalSessionReadContext.Provider>,
+        </TerminalSlotReadContext.Provider>,
       )
     })
 
@@ -241,7 +241,7 @@ describe('BranchWorkspaceContent', () => {
 
     act(() => {
       root!.render(
-        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
+        <TerminalSlotReadContext.Provider value={emptyTerminalReadContext}>
           <BranchActionSurfaceContext.Provider
             value={branchActionSurfaceWithCopyPatch({
               label: 'status.copy-patch',
@@ -253,7 +253,7 @@ describe('BranchWorkspaceContent', () => {
           >
             <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
           </BranchActionSurfaceContext.Provider>
-        </TerminalSessionReadContext.Provider>,
+        </TerminalSlotReadContext.Provider>,
       )
     })
 
@@ -291,7 +291,7 @@ describe('BranchWorkspaceContent', () => {
 
     act(() => {
       root!.render(
-        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
+        <TerminalSlotReadContext.Provider value={emptyTerminalReadContext}>
           <BranchActionSurfaceContext.Provider
             value={branchActionSurfaceWithCopyPatch({
               label: 'status.copy-patch',
@@ -303,7 +303,7 @@ describe('BranchWorkspaceContent', () => {
           >
             <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
           </BranchActionSurfaceContext.Provider>
-        </TerminalSessionReadContext.Provider>,
+        </TerminalSlotReadContext.Provider>,
       )
     })
 
@@ -330,11 +330,11 @@ describe('BranchWorkspaceContent', () => {
 
     act(() => {
       root!.render(
-        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
+        <TerminalSlotReadContext.Provider value={emptyTerminalReadContext}>
           <BranchActionSurfaceContext.Provider value={defaultBranchActionSurface()}>
             <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
           </BranchActionSurfaceContext.Provider>
-        </TerminalSessionReadContext.Provider>,
+        </TerminalSlotReadContext.Provider>,
       )
     })
 
@@ -364,9 +364,9 @@ describe('BranchWorkspaceContent', () => {
 
     act(() => {
       root!.render(
-        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
+        <TerminalSlotReadContext.Provider value={emptyTerminalReadContext}>
           <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
-        </TerminalSessionReadContext.Provider>,
+        </TerminalSlotReadContext.Provider>,
       )
     })
 
@@ -386,11 +386,11 @@ describe('BranchWorkspaceContent', () => {
 
     act(() => {
       root!.render(
-        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
+        <TerminalSlotReadContext.Provider value={emptyTerminalReadContext}>
           <BranchActionSurfaceContext.Provider value={defaultBranchActionSurface()}>
             <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
           </BranchActionSurfaceContext.Provider>
-        </TerminalSessionReadContext.Provider>,
+        </TerminalSlotReadContext.Provider>,
       )
     })
 
@@ -416,11 +416,11 @@ describe('BranchWorkspaceContent', () => {
 
     act(() => {
       root!.render(
-        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
+        <TerminalSlotReadContext.Provider value={emptyTerminalReadContext}>
           <BranchActionSurfaceContext.Provider value={defaultBranchActionSurface()}>
             <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
           </BranchActionSurfaceContext.Provider>
-        </TerminalSessionReadContext.Provider>,
+        </TerminalSlotReadContext.Provider>,
       )
     })
 
@@ -451,18 +451,18 @@ describe('BranchWorkspaceContent', () => {
       worktreeTerminalKey: worktreeKey,
       pendingCreate: true,
     }
-    const readContext: TerminalSessionReadContextValue = {
+    const readContext: TerminalSlotReadContextValue = {
       ...emptyTerminalReadContext,
       worktreeSnapshot: () => worktreeSnapshot,
     }
 
     act(() => {
       root!.render(
-        <TerminalSessionContext.Provider value={terminalCommandContextWith({ registerHost })}>
-          <TerminalSessionReadContext.Provider value={readContext}>
+        <TerminalSlotContext.Provider value={terminalCommandContextWith({ registerHost })}>
+          <TerminalSlotReadContext.Provider value={readContext}>
             <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
-          </TerminalSessionReadContext.Provider>
-        </TerminalSessionContext.Provider>,
+          </TerminalSlotReadContext.Provider>
+        </TerminalSlotContext.Provider>,
       )
     })
 
@@ -487,25 +487,25 @@ describe('BranchWorkspaceContent', () => {
       workspacePaneTabOrderByBranch: { 'feature/terminal-loading': [staticEntry('status')] },
     })
     const detail = getSelectedBranchWorkspacePresentation(repo)
-    const createTerminal = vi.fn(async () => 'terminal-1')
+    const createTerminal = vi.fn(async () => 'slot-1')
     const registerHost = vi.fn()
     const worktreeSnapshot: WorktreeTerminalSnapshot = {
       ...emptyWorktreeSnapshot,
       worktreeTerminalKey: worktreeKey,
       pendingCreate: false,
     }
-    const readContext: TerminalSessionReadContextValue = {
+    const readContext: TerminalSlotReadContextValue = {
       ...emptyTerminalReadContext,
       worktreeSnapshot: () => worktreeSnapshot,
     }
 
     act(() => {
       root!.render(
-        <TerminalSessionContext.Provider value={terminalCommandContextWith({ createTerminal, registerHost })}>
-          <TerminalSessionReadContext.Provider value={readContext}>
+        <TerminalSlotContext.Provider value={terminalCommandContextWith({ createTerminal, registerHost })}>
+          <TerminalSlotReadContext.Provider value={readContext}>
             <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
-          </TerminalSessionReadContext.Provider>
-        </TerminalSessionContext.Provider>,
+          </TerminalSlotReadContext.Provider>
+        </TerminalSlotContext.Provider>,
       )
     })
 
@@ -538,21 +538,21 @@ describe('BranchWorkspaceContent', () => {
     const worktreeSnapshot: WorktreeTerminalSnapshot = {
       ...emptyWorktreeSnapshot,
       worktreeTerminalKey: worktreeKey,
-      sessions: [terminalSession('t1', 1, false, worktreeKey), terminalSession('t2', 2, true, worktreeKey)],
+      slots: [terminalSession('t1', 1, false, worktreeKey), terminalSession('t2', 2, true, worktreeKey)],
       count: 2,
     }
-    const readContext: TerminalSessionReadContextValue = {
+    const readContext: TerminalSlotReadContextValue = {
       ...emptyTerminalReadContext,
       worktreeSnapshot: () => worktreeSnapshot,
     }
 
     act(() => {
       root!.render(
-        <TerminalSessionContext.Provider value={terminalCommandContextWith({ registerHost })}>
-          <TerminalSessionReadContext.Provider value={readContext}>
+        <TerminalSlotContext.Provider value={terminalCommandContextWith({ registerHost })}>
+          <TerminalSlotReadContext.Provider value={readContext}>
             <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
-          </TerminalSessionReadContext.Provider>
-        </TerminalSessionContext.Provider>,
+          </TerminalSlotReadContext.Provider>
+        </TerminalSlotContext.Provider>,
       )
     })
 
@@ -576,11 +576,11 @@ describe('BranchWorkspaceContent', () => {
 
     act(() => {
       root!.render(
-        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
+        <TerminalSlotReadContext.Provider value={emptyTerminalReadContext}>
           <BranchActionSurfaceContext.Provider value={defaultBranchActionSurface()}>
             <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
           </BranchActionSurfaceContext.Provider>
-        </TerminalSessionReadContext.Provider>,
+        </TerminalSlotReadContext.Provider>,
       )
     })
     await flushAsyncWork()
@@ -619,9 +619,9 @@ describe('BranchWorkspaceContent', () => {
 
     act(() => {
       root!.render(
-        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
+        <TerminalSlotReadContext.Provider value={emptyTerminalReadContext}>
           <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
-        </TerminalSessionReadContext.Provider>,
+        </TerminalSlotReadContext.Provider>,
       )
     })
     await flushAsyncWork()
@@ -673,9 +673,9 @@ describe('BranchWorkspaceContent', () => {
 
     act(() => {
       root!.render(
-        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
+        <TerminalSlotReadContext.Provider value={emptyTerminalReadContext}>
           <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
-        </TerminalSessionReadContext.Provider>,
+        </TerminalSlotReadContext.Provider>,
       )
     })
     await flushAsyncWork()
@@ -698,9 +698,9 @@ describe('BranchWorkspaceContent', () => {
 
     act(() => {
       root!.render(
-        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
+        <TerminalSlotReadContext.Provider value={emptyTerminalReadContext}>
           <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
-        </TerminalSessionReadContext.Provider>,
+        </TerminalSlotReadContext.Provider>,
       )
     })
     await flushAsyncWork()
@@ -713,22 +713,22 @@ describe('BranchWorkspaceContent', () => {
 const emptyWorktreeSnapshot: WorktreeTerminalSnapshot = {
   worktreeTerminalKey: '',
   selectedDescriptor: null,
-  sessions: [],
+  slots: [],
   count: 0,
   bellCount: 0,
   pendingCreate: false,
 }
 
-const emptyTerminalReadContext: TerminalSessionReadContextValue = {
+const emptyTerminalReadContext: TerminalSlotReadContextValue = {
   worktreeSnapshot: () => emptyWorktreeSnapshot,
   subscribeWorktree: () => () => {},
   snapshot: () => ({ phase: 'opening', message: null, processName: 'terminal' }),
   subscribeSnapshot: () => () => {},
 }
 
-function terminalCommandContextWith(overrides: Partial<TerminalSessionContextValue> = {}): TerminalSessionContextValue {
+function terminalCommandContextWith(overrides: Partial<TerminalSlotContextValue> = {}): TerminalSlotContextValue {
   return {
-    createTerminal: vi.fn(async () => 'terminal-1'),
+    createTerminal: vi.fn(async () => 'slot-1'),
     registerHost: vi.fn(),
     unregisterHost: vi.fn(),
     selectTerminal: vi.fn(),
@@ -769,13 +769,13 @@ function terminalSession(
   index: number,
   selected: boolean,
   worktreeTerminalKey: string,
-): TerminalSessionSummary {
+): TerminalSlotSummary {
   return {
     type: 'terminal',
     id: key,
     key,
     worktreeTerminalKey,
-    terminalId: key,
+    slotId: key,
     index,
     displayOrder: index,
     title: key,

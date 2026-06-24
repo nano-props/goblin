@@ -1,13 +1,13 @@
 import type { WorkspacePaneStaticViewType, WorkspacePaneTabOrderEntry, WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import { resolveRenderableWorkspacePaneView } from '#/web/lib/workspace-pane-view.ts'
-import type { TerminalSessionBase, WorkspacePaneViewSummary } from '#/web/components/terminal/types.ts'
+import type { TerminalSlotBase, WorkspacePaneViewSummary } from '#/web/components/terminal/types.ts'
 import {
   PENDING_TERMINAL_WORKSPACE_PANE_VIEW_IDENTITY,
   isTerminalWorkspacePaneView,
   staticWorkspacePaneViewIdentity,
   workspacePaneViewIdentity,
 } from '#/web/components/workspace-pane/workspace-pane-view-model.ts'
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
+import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
 import { normalizeWorkspacePaneTabOrder } from '#/web/stores/repos/workspace-pane-tabs.ts'
 
 export type BranchWorkspacePaneTabKind = 'static' | 'terminal' | 'pending'
@@ -64,7 +64,7 @@ export interface BranchWorkspacePaneTabModel {
   branchName: string | null
   worktreePath: string | null
   worktreeTerminalKey: string | null
-  terminalBase: TerminalSessionBase | null
+  terminalBase: TerminalSlotBase | null
   /** Single branch-scoped workspace pane tab strip order. */
   tabOrder: WorkspacePaneTabOrderEntry[]
   /** Open static workspace pane views derived from tabOrder. */

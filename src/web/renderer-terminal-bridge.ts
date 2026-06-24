@@ -3,10 +3,10 @@ import { resolveWebSocketProtocol } from '#/web/lib/websocket-url.ts'
 import { ACCESS_TOKEN_QUERY } from '#/shared/access-token.ts'
 import {
   normalizeTerminalSocketServerMessage,
-  normalizeTerminalSessionSnapshot,
-  normalizeTerminalSessionSummaryList,
+  normalizeTerminalSlotSnapshot,
+  normalizeTerminalSlotSummaryList,
 } from '#/shared/terminal-validators.ts'
-import { resolveTerminalOwnership } from '#/shared/terminal-ownership.ts'
+import { resolveTerminalController } from '#/shared/terminal-controller.ts'
 import type {
   TerminalClientMessage,
   TerminalSocketRequestAction,
@@ -23,16 +23,21 @@ import type {
   TerminalMutationResult,
   TerminalNotifyBellInput,
   TerminalOutputEvent,
-  TerminalSessionSnapshot,
-  TerminalSessionSnapshotInput,
-  TerminalSessionSummary,
+  TerminalSlotSnapshot,
+  TerminalSlotSnapshotInput,
+  TerminalSlotSummary,
   TerminalTakeoverResult,
   TerminalTitleEvent,
   TerminalRestartInput,
 } from '#/shared/terminal-types.ts'
 import type { RendererTerminalBridge } from '#/web/renderer-bridge-types.ts'
-import type { TerminalOwnershipViewModel } from '#/web/components/terminal/types.ts'
+import type { TerminalIdentityViewModel, TerminalLifecycleViewModel } from '#/web/components/terminal/types.ts'
 import { isAppQuitting, subscribeAppQuitting } from '#/web/app-lifecycle.ts'
+
+// Matches the server-side `HEARTBEAT_INTERVAL_MS`. Kept as a
+// renderer-local constant so the renderer doesn't need to import a
+// server module to know its own beat cadence.
+const TERMINAL_RENDERER_HEARTBEAT_INTERVAL_MS = 30_000
 
 export interface RendererServerTerminalConfig {
   url: string
@@ -40,12 +45,12 @@ export interface RendererServerTerminalConfig {
   clientId: string
 }
 
-const WEB_TERMINAL_ATTACHMENT_ID_STORAGE_KEY = 'goblin:web-terminal-attachment-id'
+const WEB_TERMINAL_CLIENT_ID_STORAGE_KEY = 'goblin:web-terminal-client-id'
 const TERMINAL_REQUEST_TIMEOUT_MS = 30_000
 
 export function createServerTerminalBridge(options: {
   getServerConfig: () => RendererServerTerminalConfig
-  getAttachmentId: () => string
+  getClientId: () => string
   // `notifyBell` returning `undefined` (rather than a `Promise<false>`)
   // is the *deliberate* signal to fall through to the bridge's
   // built-in browser-notification path. The renderer-bridge wrapper
@@ -66,12 +71,18 @@ export function createServerTerminalBridge(options: {
   const outputSubscribers = new Set<(event: TerminalOutputEvent) => void>()
   const titleSubscribers = new Set<(event: TerminalTitleEvent) => void>()
   const exitSubscribers = new Set<(event: TerminalExitEvent) => void>()
-  const ownershipSubscribers = new Set<(event: TerminalOwnershipViewModel) => void>()
+  const identitySubscribers = new Set<(event: TerminalIdentityViewModel) => void>()
+  const lifecycleSubscribers = new Set<(event: TerminalLifecycleViewModel) => void>()
   const sessionsChangedSubscribers = new Set<(repoRoot: string) => void>()
-  const sessionClosedSubscribers = new Set<(event: { sessionId: string; repoRoot: string }) => void>()
-  const attachmentId = options.getAttachmentId()
+  const slotClosedSubscribers = new Set<(event: { ptySessionId: string; repoRoot: string }) => void>()
+  const clientId = options.getClientId()
   let socket: WebSocket | null = null
   let reconnectTimer: number | null = null
+  // Renderer→server liveness heartbeat. Sent while the socket is
+  // OPEN; the server's broker uses receipts to drive its per-`clientId`
+  // deadline scan. Tied to the socket lifetime so it cannot outlive
+  // the connection it's measuring.
+  let heartbeatTimer: ReturnType<typeof globalThis.setInterval> | null = null
   let manualSocketClose = false
   let socketGeneration = 0
   let quitting = isAppQuitting()
@@ -82,9 +93,10 @@ export function createServerTerminalBridge(options: {
       outputSubscribers.size > 0 ||
       titleSubscribers.size > 0 ||
       exitSubscribers.size > 0 ||
-      ownershipSubscribers.size > 0 ||
+      identitySubscribers.size > 0 ||
+      lifecycleSubscribers.size > 0 ||
       sessionsChangedSubscribers.size > 0 ||
-      sessionClosedSubscribers.size > 0
+      slotClosedSubscribers.size > 0
     )
   }
 
@@ -150,7 +162,7 @@ export function createServerTerminalBridge(options: {
     let socketUrl: string
     try {
       const server = options.getServerConfig()
-      socketUrl = createTerminalWebSocketUrl(server.url, server.accessToken, server.clientId, attachmentId)
+      socketUrl = createTerminalWebSocketUrl(server.url, server.accessToken, server.clientId)
     } catch {
       return
     }
@@ -164,7 +176,9 @@ export function createServerTerminalBridge(options: {
         try {
           currentSocket.close()
         } catch {}
+        return
       }
+      startHeartbeat(currentSocket, generation)
     })
     currentSocket.addEventListener('message', (event) => {
       if (!isActiveSocket(currentSocket, generation)) return
@@ -182,33 +196,79 @@ export function createServerTerminalBridge(options: {
         for (const subscriber of exitSubscribers) subscriber(message.event)
       } else if (message.type === 'sessions-changed') {
         for (const subscriber of sessionsChangedSubscribers) subscriber(message.repoRoot)
-      } else if (message.type === 'session-closed') {
-        for (const subscriber of sessionClosedSubscribers)
-          subscriber({ sessionId: message.sessionId, repoRoot: message.repoRoot })
-      } else {
-        const ownershipEvent = {
-          sessionId: message.event.sessionId,
-          ...resolveTerminalOwnership(message.event.controller, attachmentId),
-          canonicalCols: message.event.cols,
-          canonicalRows: message.event.rows,
-          // Phase arrives from the server's realtime ownership event
-          // (non-takeover paths). Takeover itself carries phase on
-          // its response (see `TerminalTakeoverResult`) and applies
-          // it synchronously via `runtime.applyTakeover` — the event
-          // here is the authority for the other paths only.
-          phase: message.event.phase,
+      } else if (message.type === 'slot-closed') {
+        for (const subscriber of slotClosedSubscribers)
+          subscriber({ ptySessionId: message.ptySessionId, repoRoot: message.repoRoot })
+      } else if (message.type === 'identity') {
+        const identityEvent = {
+          ptySessionId: message.event.ptySessionId,
+          ...resolveTerminalController(message.event.controller, clientId),
+          canonicalCols: message.event.canonicalCols,
+          canonicalRows: message.event.canonicalRows,
         }
-        for (const subscriber of ownershipSubscribers) subscriber(ownershipEvent)
+        for (const subscriber of identitySubscribers) subscriber(identityEvent)
+      } else if (message.type === 'lifecycle') {
+        for (const subscriber of lifecycleSubscribers) subscriber(message.event)
+      } else {
+        // Unknown realtime message — ignore.
       }
     })
     currentSocket.addEventListener('close', () => {
       if (!isActiveSocket(currentSocket, generation)) return
+      stopHeartbeat()
       handleSocketDisconnection('Terminal socket closed')
     })
     currentSocket.addEventListener('error', () => {
       if (!isActiveSocket(currentSocket, generation)) return
+      stopHeartbeat()
       handleSocketDisconnection('Terminal socket error')
     })
+  }
+
+  function startHeartbeat(currentSocket: WebSocket, generation: number): void {
+    stopHeartbeat()
+    // The 30 s cadence matches `HEARTBEAT_INTERVAL_MS` on the server
+    // broker (`src/server/terminal/terminal-realtime-broker.ts`).
+    // The 90 s deadline (3 missed beats) is what fires a synthetic
+    // `onClientDisconnected`, which in turn lets the next `attach`
+    // auto-claim the slot under the new user-sticky model.
+    // Use `globalThis.setInterval` (not `window.setInterval`) so the
+    // node-env test suite — which mocks `WebSocket` but does not
+    // install `window` — does not crash on this line when the
+    // mock socket fires its synthetic `open` event.
+    heartbeatTimer = globalThis.setInterval(() => {
+      if (!isActiveSocket(currentSocket, generation)) {
+        stopHeartbeat()
+        return
+      }
+      if (currentSocket.readyState !== WebSocket.OPEN) {
+        // Defensive: the close handler should have stopped us, but
+        // if a transition slipped through, don't send on a non-open
+        // socket (the browser will throw).
+        return
+      }
+      try {
+        currentSocket.send(JSON.stringify({ type: 'heartbeat', at: Date.now() }))
+      } catch {
+        // Send failure is a signal that the socket is half-broken
+        // — the `error` event *should* fire, but on some browser
+        // implementations a `send` throw lands without a
+        // corresponding `error` event, leaving the user silently
+        // wedged until the OS closes the TCP. Kick the reconnect
+        // path explicitly so the worst-case latency is the
+        // existing reconnect backoff instead of a TCP timeout
+        // (which can be hours on a healthy-looking half-open
+        // connection).
+        stopHeartbeat()
+        handleSocketDisconnection('Terminal heartbeat send failed')
+      }
+    }, TERMINAL_RENDERER_HEARTBEAT_INTERVAL_MS)
+  }
+
+  function stopHeartbeat(): void {
+    if (heartbeatTimer === null) return
+    globalThis.clearInterval(heartbeatTimer)
+    heartbeatTimer = null
   }
 
   function handleSocketDisconnection(reason: string) {
@@ -275,7 +335,7 @@ export function createServerTerminalBridge(options: {
     },
     listSessions(input) {
       return requestOverSocket('list-sessions', input).then((value) => {
-        const sessions = normalizeTerminalSessionSummaryList(value)
+        const sessions = normalizeTerminalSlotSummaryList(value)
         if (!sessions) throw new Error('Terminal socket response failed: invalid terminal sessions response')
         return sessions
       })
@@ -292,10 +352,10 @@ export function createServerTerminalBridge(options: {
         .then(() => undefined)
         .catch(() => {})
     },
-    getSessionSnapshot(input) {
-      return requestOverSocket('session-snapshot', input satisfies TerminalSessionSnapshotInput).then((value) => {
+    getSlotSnapshot(input) {
+      return requestOverSocket('slot-snapshot', input satisfies TerminalSlotSnapshotInput).then((value) => {
         if (value === null) return null
-        const snapshot = normalizeTerminalSessionSnapshot(value)
+        const snapshot = normalizeTerminalSlotSnapshot(value)
         if (!snapshot) throw new Error('Terminal socket response failed: invalid terminal session snapshot response')
         return snapshot
       })
@@ -349,12 +409,21 @@ export function createServerTerminalBridge(options: {
         closeSocketIfIdle()
       }
     },
-    onOwnership(cb) {
-      ownershipSubscribers.add(cb)
+    onIdentity(cb) {
+      identitySubscribers.add(cb)
       manualSocketClose = false
       ensureSocket()
       return () => {
-        ownershipSubscribers.delete(cb)
+        identitySubscribers.delete(cb)
+        closeSocketIfIdle()
+      }
+    },
+    onLifecycle(cb) {
+      lifecycleSubscribers.add(cb)
+      manualSocketClose = false
+      ensureSocket()
+      return () => {
+        lifecycleSubscribers.delete(cb)
         closeSocketIfIdle()
       }
     },
@@ -367,12 +436,12 @@ export function createServerTerminalBridge(options: {
         closeSocketIfIdle()
       }
     },
-    onSessionClosed(cb) {
-      sessionClosedSubscribers.add(cb)
+    onSlotClosed(cb) {
+      slotClosedSubscribers.add(cb)
       manualSocketClose = false
       ensureSocket()
       return () => {
-        sessionClosedSubscribers.delete(cb)
+        slotClosedSubscribers.delete(cb)
         closeSocketIfIdle()
       }
     },
@@ -401,11 +470,11 @@ export function createServerTerminalBridge(options: {
   async function requestOverSocket(
     action: 'list-sessions',
     input: { repoRoot: string },
-  ): Promise<TerminalSessionSummary[]>
+  ): Promise<TerminalSlotSummary[]>
   async function requestOverSocket(
-    action: 'session-snapshot',
-    input: TerminalSessionSnapshotInput,
-  ): Promise<TerminalSessionSnapshot | null>
+    action: 'slot-snapshot',
+    input: TerminalSlotSnapshotInput,
+  ): Promise<TerminalSlotSnapshot | null>
   async function requestOverSocket(
     action: 'write',
     input: TerminalSocketRequestInputs['write'],
@@ -488,7 +557,6 @@ export function createTerminalWebSocketUrl(
   baseUrl: string,
   accessToken: string,
   clientId: string,
-  attachmentId: string,
 ): string {
   const httpUrl = new URL('/ws/terminal', baseUrl)
   httpUrl.protocol = resolveWebSocketProtocol()
@@ -500,7 +568,6 @@ export function createTerminalWebSocketUrl(
   // (cookie / header / `?t=`).
   httpUrl.searchParams.set(ACCESS_TOKEN_QUERY, accessToken)
   httpUrl.searchParams.set('clientId', clientId)
-  httpUrl.searchParams.set('attachmentId', attachmentId)
   return httpUrl.toString()
 }
 
@@ -522,17 +589,17 @@ function createSocketRequestId(): string {
     : `request_${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`
 }
 
-export function readOrCreateWebTerminalAttachmentId(): string {
-  const fallback = `attachment_${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`
+export function readOrCreateWebTerminalClientId(): string {
+  const fallback = `client_${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`
   try {
     const storage = window.sessionStorage
-    const existing = storage?.getItem(WEB_TERMINAL_ATTACHMENT_ID_STORAGE_KEY)?.trim()
+    const existing = storage?.getItem(WEB_TERMINAL_CLIENT_ID_STORAGE_KEY)?.trim()
     if (existing) return existing
     const created =
       typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-        ? `attachment_${crypto.randomUUID().replace(/-/g, '')}`
+        ? `client_${crypto.randomUUID().replace(/-/g, '')}`
         : fallback
-    storage?.setItem(WEB_TERMINAL_ATTACHMENT_ID_STORAGE_KEY, created)
+    storage?.setItem(WEB_TERMINAL_CLIENT_ID_STORAGE_KEY, created)
     return created
   } catch {
     return fallback

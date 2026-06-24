@@ -100,7 +100,7 @@ export function readWebBootstrap(createWebTerminalClientId: () => string): Rende
   return readInjectedWebBootstrap() ?? readQueryBootstrap(createWebTerminalClientId) ?? EMPTY_BOOTSTRAP
 }
 
-export function emptyRendererBridgeBootstrap(): RendererBootstrapSnapshot {
+export function emptyBootstrapSnapshot(): RendererBootstrapSnapshot {
   return EMPTY_BOOTSTRAP
 }
 

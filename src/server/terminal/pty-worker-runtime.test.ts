@@ -83,7 +83,7 @@ beforeEach(() => {
 })
 
 describe('PtyWorkerRuntime', () => {
-  test('pty-spawn returns a sessionId and a placeholder process name', () => {
+  test('pty-spawn returns a ptySessionId and a placeholder process name', () => {
     const { runtime, emitted } = buildRuntime()
     runtime.handleMessage({ type: 'pty-spawn', requestId: 'req_1', input: { cwd: '/repo', cols: 80, rows: 24 } })
 
@@ -92,7 +92,7 @@ describe('PtyWorkerRuntime', () => {
       type: 'pty-spawn-result',
       requestId: 'req_1',
       ok: true,
-      sessionId: expect.stringMatching(/^ptyw_/),
+      ptySessionId: expect.stringMatching(/^pty_/),
       // The initial processName is a placeholder; the real name is
       // sampled on the first onData chunk so the macOS spawn-helper
       // comm never leaks. See "samples the real process name on the
@@ -106,14 +106,14 @@ describe('PtyWorkerRuntime', () => {
     runtime.handleMessage({ type: 'pty-spawn', requestId: 'req', input: { cwd: '/repo', cols: 80, rows: 24 } })
     const pty = mockPtys[0]
     if (!pty) throw new Error('no pty')
-    const sessionId = (emitted.find((m) => m.type === 'pty-spawn-result' && m.ok) as { sessionId: string } | undefined)
-      ?.sessionId
-    if (!sessionId) throw new Error('no session id')
+    const ptySessionId = (emitted.find((m) => m.type === 'pty-spawn-result' && m.ok) as { ptySessionId: string } | undefined)
+      ?.ptySessionId
+    if (!ptySessionId) throw new Error('no session id')
 
     pty.emitData('hello')
 
     const nameChanges = emitted.filter((m) => m.type === 'pty-process-name-changed')
-    expect(nameChanges).toEqual([{ type: 'pty-process-name-changed', sessionId, processName: 'zsh' }])
+    expect(nameChanges).toEqual([{ type: 'pty-process-name-changed', ptySessionId, processName: 'zsh' }])
   })
 
   test('does not re-sample on subsequent plain chunks when the title is unchanged', () => {
@@ -152,13 +152,13 @@ describe('PtyWorkerRuntime', () => {
     const pty = mockPtys[0]
     expect(pty).toBeDefined()
     if (!pty) return
-    const sessionId = (emitted.find((m) => m.type === 'pty-spawn-result' && m.ok) as { sessionId: string } | undefined)
-      ?.sessionId
-    expect(sessionId).toBeDefined()
-    if (!sessionId) return
-    runtime.handleMessage({ type: 'pty-write', sessionId, data: 'ls\n' })
-    runtime.handleMessage({ type: 'pty-resize', sessionId, cols: 100, rows: 30 })
-    runtime.handleMessage({ type: 'pty-kill', sessionId })
+    const ptySessionId = (emitted.find((m) => m.type === 'pty-spawn-result' && m.ok) as { ptySessionId: string } | undefined)
+      ?.ptySessionId
+    expect(ptySessionId).toBeDefined()
+    if (!ptySessionId) return
+    runtime.handleMessage({ type: 'pty-write', ptySessionId, data: 'ls\n' })
+    runtime.handleMessage({ type: 'pty-resize', ptySessionId, cols: 100, rows: 30 })
+    runtime.handleMessage({ type: 'pty-kill', ptySessionId })
 
     expect(pty.write).toHaveBeenCalledWith('ls\n')
     expect(pty.resize).toHaveBeenCalledWith(100, 30)
@@ -170,26 +170,26 @@ describe('PtyWorkerRuntime', () => {
     runtime.handleMessage({ type: 'pty-spawn', requestId: 'req', input: { cwd: '/repo', cols: 80, rows: 24 } })
     const pty = mockPtys[0]
     if (!pty) throw new Error('no pty')
-    const sessionId = (emitted.find((m) => m.type === 'pty-spawn-result' && m.ok) as { sessionId: string } | undefined)
-      ?.sessionId
-    expect(sessionId).toBeDefined()
-    if (!sessionId) return
+    const ptySessionId = (emitted.find((m) => m.type === 'pty-spawn-result' && m.ok) as { ptySessionId: string } | undefined)
+      ?.ptySessionId
+    expect(ptySessionId).toBeDefined()
+    if (!ptySessionId) return
 
     pty.emitData('hello')
     pty.emitExit()
 
-    expect(emitted.filter((m) => m.type === 'pty-data')).toEqual([{ type: 'pty-data', sessionId, data: 'hello' }])
+    expect(emitted.filter((m) => m.type === 'pty-data')).toEqual([{ type: 'pty-data', ptySessionId, data: 'hello' }])
     expect(emitted.filter((m) => m.type === 'pty-exit')).toEqual([
-      { type: 'pty-exit', sessionId, code: null, signal: null },
+      { type: 'pty-exit', ptySessionId, code: null, signal: null },
     ])
   })
 
   test('emits a title-OSC-driven process-name change on subsequent data chunks', () => {
     const { runtime, emitted } = buildRuntime()
     runtime.handleMessage({ type: 'pty-spawn', requestId: 'req', input: { cwd: '/repo', cols: 80, rows: 24 } })
-    const sessionId = (emitted.find((m) => m.type === 'pty-spawn-result' && m.ok) as { sessionId: string } | undefined)
-      ?.sessionId
-    if (!sessionId) throw new Error('no session id')
+    const ptySessionId = (emitted.find((m) => m.type === 'pty-spawn-result' && m.ok) as { ptySessionId: string } | undefined)
+      ?.ptySessionId
+    if (!ptySessionId) throw new Error('no session id')
 
     const pty = mockPtys[0]
     if (!pty) throw new Error('no pty')
@@ -198,8 +198,8 @@ describe('PtyWorkerRuntime', () => {
     pty.emitData('\x1b]0;vim\x07')
     const nameChanges = emitted.filter((m) => m.type === 'pty-process-name-changed')
     expect(nameChanges).toEqual([
-      { type: 'pty-process-name-changed', sessionId, processName: 'zsh' },
-      { type: 'pty-process-name-changed', sessionId, processName: 'vim' },
+      { type: 'pty-process-name-changed', ptySessionId, processName: 'zsh' },
+      { type: 'pty-process-name-changed', ptySessionId, processName: 'vim' },
     ])
   })
 

@@ -21,7 +21,7 @@ const resolveRemoteTargetMock = vi.hoisted(() => vi.fn())
 const resolveTrackedRemoteTargetMock = vi.hoisted(() => vi.fn())
 const runRemoteCommandMock = vi.hoisted(() => vi.fn())
 const getEmbeddedServerRuntimeMock = vi.hoisted(() =>
-  vi.fn<() => { url: string; accessToken: string; clientId: string } | null>(() => null),
+  vi.fn<() => { url: string; accessToken: string } | null>(() => null),
 )
 
 function settingsPrefs(overrides: Partial<SettingsPrefs> = {}): SettingsPrefs {
@@ -340,7 +340,6 @@ describe('main repo ipc cancellation', () => {
     getEmbeddedServerRuntimeMock.mockReturnValue({
       url: 'http://127.0.0.1:32100',
       accessToken: 'secret',
-      clientId: 'client_sharedterminal',
     })
     const fetchMock = vi.fn(async () => ({
       ok: true,
@@ -362,7 +361,6 @@ describe('main repo ipc cancellation', () => {
     getEmbeddedServerRuntimeMock.mockReturnValue({
       url: 'http://127.0.0.1:32100',
       accessToken: 'secret',
-      clientId: 'client_sharedterminal',
     })
     const fetchMock = vi.fn(async () => ({
       ok: true,
@@ -403,7 +401,6 @@ describe('main repo ipc cancellation', () => {
     getEmbeddedServerRuntimeMock.mockReturnValue({
       url: 'http://127.0.0.1:32100',
       accessToken: 'secret',
-      clientId: 'client_sharedterminal',
     })
     let observedSignal: AbortSignal | undefined
     const fetchMock = vi.fn(

@@ -7,7 +7,7 @@ import { useKeyboard } from '#/web/hooks/useKeyboard.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
-import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import { setTerminalSlotCommandBridge } from '#/web/components/terminal/terminal-slot-command-bridge.ts'
 import type { WorktreeTerminalSnapshot } from '#/web/components/terminal/types.ts'
 import { workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
 
@@ -36,7 +36,7 @@ afterEach(() => {
   act(() => {
     root?.unmount()
   })
-  setTerminalSessionCommandBridge(null)
+  setTerminalSlotCommandBridge(null)
   delete testWindow.goblinNative
   container?.remove()
   root = null
@@ -70,9 +70,9 @@ describe('useKeyboard', () => {
     })
     const selectTerminal = vi.fn()
     const showRepoWorkspacePaneView = vi.fn()
-    setTerminalSessionCommandBridge({
+    setTerminalSlotCommandBridge({
       worktreeSnapshot: () => worktreeSnapshot(),
-      createTerminal: vi.fn(async () => 'terminal-1'),
+      createTerminal: vi.fn(async () => 'slot-1'),
       selectTerminal,
     })
     await renderHookHost({
@@ -86,7 +86,7 @@ describe('useKeyboard', () => {
     })
 
     expect(showRepoWorkspacePaneView).toHaveBeenCalledWith(REPO_ID, 'terminal')
-    expect(selectTerminal).toHaveBeenCalledWith(WORKTREE_KEY, 'terminal-1')
+    expect(selectTerminal).toHaveBeenCalledWith(WORKTREE_KEY, 'slot-1')
   })
 
   test('workspace pane view shortcuts move through branch tabs without a worktree', async () => {
@@ -129,9 +129,9 @@ describe('useKeyboard', () => {
     })
     const selectTerminal = vi.fn()
     const showRepoWorkspacePaneView = vi.fn()
-    setTerminalSessionCommandBridge({
+    setTerminalSlotCommandBridge({
       worktreeSnapshot: () => worktreeSnapshot(),
-      createTerminal: vi.fn(async () => 'terminal-1'),
+      createTerminal: vi.fn(async () => 'slot-1'),
       selectTerminal,
     })
     await renderHookHost({
@@ -150,7 +150,7 @@ describe('useKeyboard', () => {
     })
 
     expect(showRepoWorkspacePaneView).toHaveBeenCalledWith(REPO_ID, 'terminal')
-    expect(selectTerminal).toHaveBeenCalledWith(WORKTREE_KEY, 'terminal-1')
+    expect(selectTerminal).toHaveBeenCalledWith(WORKTREE_KEY, 'slot-1')
     terminalHost.remove()
   })
 
@@ -163,9 +163,9 @@ describe('useKeyboard', () => {
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneView: 'terminal',
     })
-    const createTerminal = vi.fn(async () => 'terminal-2')
+    const createTerminal = vi.fn(async () => 'slot-2')
     const closeTerminalByDescriptor = vi.fn()
-    setTerminalSessionCommandBridge({
+    setTerminalSlotCommandBridge({
       worktreeSnapshot: () => worktreeSnapshot(),
       createTerminal,
       selectTerminal: vi.fn(),
@@ -192,9 +192,9 @@ describe('useKeyboard', () => {
       preferredWorkspacePaneView: 'terminal',
     })
     const closeTerminalByDescriptor = vi.fn()
-    setTerminalSessionCommandBridge({
+    setTerminalSlotCommandBridge({
       worktreeSnapshot: () => worktreeSnapshot(),
-      createTerminal: vi.fn(async () => 'terminal-1'),
+      createTerminal: vi.fn(async () => 'slot-1'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor,
     })
@@ -205,7 +205,7 @@ describe('useKeyboard', () => {
       await Promise.resolve()
     })
 
-    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('terminal-1', {
+    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('slot-1', {
       repoRoot: REPO_ID,
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
@@ -264,21 +264,21 @@ function worktreeSnapshot(): WorktreeTerminalSnapshot {
   return {
     worktreeTerminalKey: WORKTREE_KEY,
     selectedDescriptor: {
-      key: 'terminal-1',
+      key: 'slot-1',
       worktreeTerminalKey: WORKTREE_KEY,
-      terminalId: 'terminal-1',
+      slotId: 'slot-1',
       index: 1,
       repoRoot: REPO_ID,
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     },
-    sessions: [
+    slots: [
       {
         type: 'terminal',
-        id: 'terminal-1',
-        key: 'terminal-1',
+        id: 'slot-1',
+        key: 'slot-1',
         worktreeTerminalKey: WORKTREE_KEY,
-        terminalId: 'terminal-1',
+        slotId: 'slot-1',
         index: 1,
         displayOrder: 1,
         title: 'terminal 1',

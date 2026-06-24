@@ -75,7 +75,7 @@ describe('app bootstrap hooks', () => {
       activeRepo: '/tmp/repo',
       workspaceFocused: false,
       workspacePaneSize: 45,
-      selectedTerminalByWorktree: { '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0terminal-2' },
+      selectedTerminalByWorktree: { '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0slot-2' },
       workspacePaneTabOrderByBranchByRepo: {
         '/tmp/repo': {
           main: [],
@@ -95,7 +95,7 @@ describe('app bootstrap hooks', () => {
     expect(state.workspaceFocused).toBe(false)
     expect(state.workspacePaneSize).toBe(45)
     expect(state.selectedTerminalByWorktree).toEqual({
-      '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0terminal-2',
+      '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0slot-2',
     })
     expect(hydrateSession).toHaveBeenCalledWith([{ kind: 'local', id: '/tmp/repo' }], '/tmp/repo', {
       workspacePaneRestoreState: {

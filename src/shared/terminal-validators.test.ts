@@ -1,10 +1,10 @@
 import { describe, expect, test } from 'vitest'
 import {
-  isValidTerminalAttachmentId,
+  isValidTerminalClientId,
   isValidTerminalNotifyBellInput,
   isTerminalWsMessageWithinLimit,
   isValidTerminalSize,
-  isValidTerminalSessionId,
+  isValidTerminalPtySessionId,
   normalizeTerminalClientMessage,
   normalizeTerminalSize,
   normalizeTerminalSocketServerMessage,
@@ -23,13 +23,13 @@ describe('shared terminal validators', () => {
   })
 
   test('validates attachment ids and bell payloads', () => {
-    expect(isValidTerminalSessionId('term_1234567890abcdef')).toBe(true)
-    expect(isValidTerminalSessionId('short')).toBe(false)
-    expect(isValidTerminalSessionId('bad id')).toBe(false)
+    expect(isValidTerminalPtySessionId('pty_1234567890abcdef')).toBe(true)
+    expect(isValidTerminalPtySessionId('short')).toBe(false)
+    expect(isValidTerminalPtySessionId('bad id')).toBe(false)
 
-    expect(isValidTerminalAttachmentId(undefined)).toBe(true)
-    expect(isValidTerminalAttachmentId('attachment_a')).toBe(true)
-    expect(isValidTerminalAttachmentId('bad id')).toBe(false)
+    expect(isValidTerminalClientId(undefined)).toBe(true)
+    expect(isValidTerminalClientId('client_a')).toBe(true)
+    expect(isValidTerminalClientId('bad id')).toBe(false)
 
     expect(
       isValidTerminalNotifyBellInput({
@@ -62,13 +62,13 @@ describe('shared terminal validators', () => {
         type: 'request',
         requestId: 'req_1',
         action: 'attach',
-        input: { sessionId: 'term_1234567890abcdef', cols: 80, rows: 24, attachmentId: 'attachment_a' },
+        input: { ptySessionId: 'pty_1234567890abcdef', cols: 80, rows: 24, clientId: 'client_a' },
       }),
     ).toEqual({
       type: 'request',
       requestId: 'req_1',
       action: 'attach',
-      input: { sessionId: 'term_1234567890abcdef', cols: 80, rows: 24, attachmentId: 'attachment_a' },
+      input: { ptySessionId: 'pty_1234567890abcdef', cols: 80, rows: 24, clientId: 'client_a' },
     })
 
     expect(
@@ -76,7 +76,7 @@ describe('shared terminal validators', () => {
         type: 'request',
         requestId: 'bad id',
         action: 'attach',
-        input: { sessionId: 'term_1234567890abcdef', cols: 80, rows: 24 },
+        input: { ptySessionId: 'pty_1234567890abcdef', cols: 80, rows: 24 },
       }),
     ).toBeNull()
   })
@@ -85,11 +85,11 @@ describe('shared terminal validators', () => {
     expect(
       normalizeTerminalSocketServerMessage({
         type: 'output',
-        event: { sessionId: 'term_1234567890abcdef', data: 'hi', seq: 1, processName: 'zsh' },
+        event: { ptySessionId: 'pty_1234567890abcdef', data: 'hi', seq: 1, processName: 'zsh' },
       }),
     ).toEqual({
       type: 'output',
-      event: { sessionId: 'term_1234567890abcdef', data: 'hi', seq: 1, processName: 'zsh' },
+      event: { ptySessionId: 'pty_1234567890abcdef', data: 'hi', seq: 1, processName: 'zsh' },
     })
 
     expect(
@@ -102,16 +102,16 @@ describe('shared terminal validators', () => {
     ).toBeNull()
   })
 
-  test('normalizes targeted session-closed realtime messages', () => {
+  test('normalizes targeted slot-closed realtime messages', () => {
     expect(
       normalizeTerminalSocketServerMessage({
-        type: 'session-closed',
-        sessionId: 'session-1',
+        type: 'slot-closed',
+        ptySessionId: 'pty_session_1_aaaaaaaaa',
         repoRoot: '/repo',
       }),
     ).toEqual({
-      type: 'session-closed',
-      sessionId: 'session-1',
+      type: 'slot-closed',
+      ptySessionId: 'pty_session_1_aaaaaaaaa',
       repoRoot: '/repo',
     })
   })

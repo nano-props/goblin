@@ -13,16 +13,16 @@ import type {
   TerminalOutputEvent,
   TerminalResizeInput,
   TerminalRestartInput,
-  TerminalSessionSnapshot,
-  TerminalSessionSnapshotInput,
-  TerminalSessionSummary,
-  TerminalSessionInput,
+  TerminalSlotSnapshot,
+  TerminalSlotSnapshotInput,
+  TerminalSlotSummary,
+  TerminalSlotInput,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
   TerminalTitleEvent,
   TerminalWriteInput,
 } from '#/shared/terminal-types.ts'
-import type { TerminalOwnershipViewModel } from '#/web/components/terminal/types.ts'
+import type { TerminalIdentityViewModel, TerminalLifecycleViewModel } from '#/web/components/terminal/types.ts'
 
 export interface RendererTerminalBridge {
   attach: (input: TerminalAttachInput) => Promise<TerminalAttachResult>
@@ -30,10 +30,10 @@ export interface RendererTerminalBridge {
   write: (input: TerminalWriteInput) => Promise<TerminalMutationResult>
   resize: (input: TerminalResizeInput) => Promise<TerminalMutationResult>
   takeover: (input: TerminalTakeoverInput) => Promise<TerminalTakeoverResult>
-  close: (input: TerminalSessionInput) => Promise<TerminalMutationResult>
+  close: (input: TerminalSlotInput) => Promise<TerminalMutationResult>
   create: (input: TerminalCreateInput) => Promise<TerminalCatalogMutationResult>
   pruneTerminals: (repoRoot: string) => Promise<{ pruned: number; remaining: number }>
-  listSessions: (input: { repoRoot: string }) => Promise<TerminalSessionSummary[]>
+  listSessions: (input: { repoRoot: string }) => Promise<TerminalSlotSummary[]>
   /**
    * Open the underlying WebSocket (if not already open) and resolve
    * once it reaches the OPEN state. Used as a T1.2 prewarm when the
@@ -53,25 +53,26 @@ export interface RendererTerminalBridge {
    * already healthy. Never force-closes a working socket.
    */
   kickReconnect: () => void
-  getSessionSnapshot: (input: TerminalSessionSnapshotInput) => Promise<TerminalSessionSnapshot | null>
+  getSlotSnapshot: (input: TerminalSlotSnapshotInput) => Promise<TerminalSlotSnapshot | null>
   notifyBell: (input: TerminalNotifyBellInput) => Promise<TerminalMutationResult>
   sendTestNotification: () => Promise<boolean>
   setBadge: (count: number) => void
   onOutput: (cb: (event: TerminalOutputEvent) => void) => () => void
   onTitle: (cb: (event: TerminalTitleEvent) => void) => () => void
   onExit: (cb: (event: TerminalExitEvent) => void) => () => void
-  onOwnership: (cb: (event: TerminalOwnershipViewModel) => void) => () => void
+  onIdentity: (cb: (event: TerminalIdentityViewModel) => void) => () => void
+  onLifecycle: (cb: (event: TerminalLifecycleViewModel) => void) => () => void
   onSessionsChanged: (cb: (repoRoot: string) => void) => () => void
   /**
    * Subscribe to per-session close broadcasts from the server. Emitted
    * after a successful `close` IPC alongside the broader
-   * `sessions-changed` event. The `TerminalSessionRegistry` uses this
+   * `sessions-changed` event. The `TerminalSlotRegistry` uses this
    * to drop a stale local entry immediately, without waiting for the
    * next reconcile — the critical fix for the "open new terminal and
    * see the previous shell's `Restored session: …` line print twice"
    * bug, where a lost close request left the server PTY alive.
    */
-  onSessionClosed: (cb: (event: { sessionId: string; repoRoot: string }) => void) => () => void
+  onSlotClosed: (cb: (event: { ptySessionId: string; repoRoot: string }) => void) => () => void
 }
 
 export interface RendererShellBridge {

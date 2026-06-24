@@ -47,7 +47,7 @@ describe('WorkerBackedPtySupervisor', () => {
     worker = new FakeWorker()
   })
 
-  test('spawn sends pty-spawn and resolves with the worker-issued sessionId', async () => {
+  test('spawn sends pty-spawn and resolves with the worker-issued ptySessionId', async () => {
     const supervisor = buildSupervisor(worker)
     const promise = supervisor.spawn({ cwd: '/repo', cols: 80, rows: 24 })
 
@@ -58,13 +58,13 @@ describe('WorkerBackedPtySupervisor', () => {
       type: 'pty-spawn-result',
       requestId: request.requestId,
       ok: true,
-      sessionId: 'ptyw_abc',
+      ptySessionId: 'pty_abc',
       processName: 'zsh',
     } satisfies PtyWorkerMessage)
 
     await expect(promise).resolves.toEqual({
       ok: true,
-      handle: { sessionId: 'ptyw_abc' },
+      handle: { ptySessionId: 'pty_abc' },
       processName: 'zsh',
     })
   })
@@ -90,15 +90,15 @@ describe('WorkerBackedPtySupervisor', () => {
     const supervisor = buildSupervisor(worker)
     // Force a spawn so the supervisor is initialized
     void supervisor.spawn({ cwd: '/repo', cols: 80, rows: 24 })
-    const handle = { sessionId: 'ptyw_abc' }
+    const handle = { ptySessionId: 'pty_abc' }
     supervisor.write(handle, 'ls\n')
     supervisor.resize(handle, 100, 30)
     supervisor.kill(handle)
 
     expect(worker.sent.slice(1)).toEqual([
-      { type: 'pty-write', sessionId: 'ptyw_abc', data: 'ls\n' },
-      { type: 'pty-resize', sessionId: 'ptyw_abc', cols: 100, rows: 30 },
-      { type: 'pty-kill', sessionId: 'ptyw_abc' },
+      { type: 'pty-write', ptySessionId: 'pty_abc', data: 'ls\n' },
+      { type: 'pty-resize', ptySessionId: 'pty_abc', cols: 100, rows: 30 },
+      { type: 'pty-kill', ptySessionId: 'pty_abc' },
     ])
   })
 
@@ -111,18 +111,18 @@ describe('WorkerBackedPtySupervisor', () => {
       type: 'pty-spawn-result',
       requestId: spawnReq.requestId,
       ok: true,
-      sessionId: 'ptyw_abc',
+      ptySessionId: 'pty_abc',
       processName: 'zsh',
     } satisfies PtyWorkerMessage)
 
-    const handle = { sessionId: 'ptyw_abc' }
+    const handle = { ptySessionId: 'pty_abc' }
     const a = vi.fn()
     const b = vi.fn()
     const disposeA = supervisor.onData(handle, a)
     supervisor.onData(handle, b)
     disposeA.dispose()
 
-    worker.emit('message', { type: 'pty-data', sessionId: 'ptyw_abc', data: 'hello' } satisfies PtyWorkerMessage)
+    worker.emit('message', { type: 'pty-data', ptySessionId: 'pty_abc', data: 'hello' } satisfies PtyWorkerMessage)
     expect(a).not.toHaveBeenCalled()
     expect(b).toHaveBeenCalledWith('hello')
   })
@@ -136,18 +136,18 @@ describe('WorkerBackedPtySupervisor', () => {
       type: 'pty-spawn-result',
       requestId: spawnReq.requestId,
       ok: true,
-      sessionId: 'ptyw_abc',
+      ptySessionId: 'pty_abc',
       processName: 'zsh',
     } satisfies PtyWorkerMessage)
 
-    const handle = { sessionId: 'ptyw_abc' }
+    const handle = { ptySessionId: 'pty_abc' }
     const exit = vi.fn()
     supervisor.onExit(handle, exit)
     expect(supervisor.processName(handle)).toBe('zsh')
 
     worker.emit('message', {
       type: 'pty-exit',
-      sessionId: 'ptyw_abc',
+      ptySessionId: 'pty_abc',
       code: null,
       signal: null,
     } satisfies PtyWorkerMessage)
@@ -165,16 +165,16 @@ describe('WorkerBackedPtySupervisor', () => {
       type: 'pty-spawn-result',
       requestId: spawnReq.requestId,
       ok: true,
-      sessionId: 'ptyw_abc',
+      ptySessionId: 'pty_abc',
       processName: 'zsh',
     } satisfies PtyWorkerMessage)
 
-    const handle = { sessionId: 'ptyw_abc' }
+    const handle = { ptySessionId: 'pty_abc' }
     expect(supervisor.processName(handle)).toBe('zsh')
 
     worker.emit('message', {
       type: 'pty-process-name-changed',
-      sessionId: 'ptyw_abc',
+      ptySessionId: 'pty_abc',
       processName: 'vim',
     } satisfies PtyWorkerMessage)
     expect(supervisor.processName(handle)).toBe('vim')
@@ -183,7 +183,7 @@ describe('WorkerBackedPtySupervisor', () => {
   test('rejects in-flight spawns and fires exit listeners when the worker crashes', async () => {
     const supervisor = buildSupervisor(worker)
     const promise = supervisor.spawn({ cwd: '/repo', cols: 80, rows: 24 })
-    const handle = { sessionId: 'ptyw_abc' }
+    const handle = { ptySessionId: 'pty_abc' }
     const exit = vi.fn()
     supervisor.onExit(handle, exit)
 
@@ -213,7 +213,7 @@ describe('WorkerBackedPtySupervisor', () => {
       type: 'pty-spawn-result',
       requestId: request.requestId,
       ok: true,
-      sessionId: 'ptyw_abc',
+      ptySessionId: 'pty_abc',
       processName: 'zsh',
     } satisfies PtyWorkerMessage)
     await promise
@@ -247,7 +247,7 @@ describe('WorkerBackedPtySupervisor', () => {
       type: 'pty-spawn-result',
       requestId: request.requestId,
       ok: true,
-      sessionId: 'ptyw_abc',
+      ptySessionId: 'pty_abc',
       processName: 'zsh',
     } satisfies PtyWorkerMessage)
     await promise
@@ -276,7 +276,7 @@ describe('WorkerBackedPtySupervisor', () => {
   test("'error' from the worker is treated like an exit: pending spawns rejected, exit listeners fired, failure recorded", async () => {
     const supervisor = buildSupervisor(worker)
     const promise = supervisor.spawn({ cwd: '/repo', cols: 80, rows: 24 })
-    const handle = { sessionId: 'ptyw_abc' }
+    const handle = { ptySessionId: 'pty_abc' }
     const exit = vi.fn()
     supervisor.onExit(handle, exit)
 

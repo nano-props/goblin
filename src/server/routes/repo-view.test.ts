@@ -14,6 +14,7 @@ import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 function makeTerminalHost(): ServerTerminalHost {
   return {
     isValidClientId: ((value: unknown): value is string => typeof value === 'string') as never,
+    isClientConnected: ((_userId: string, _clientId: string): boolean => true) as never,
     getDiagnostics: vi.fn(() => ({}) as never),
     registerSocket: vi.fn(),
     unregisterSocket: vi.fn(),
@@ -26,7 +27,7 @@ function makeTerminalHost(): ServerTerminalHost {
     listSessions: vi.fn(async () => []),
     create: vi.fn(async () => ({ ok: true }) as never),
     prune: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
-    getSessionSnapshot: vi.fn(async () => null),
+    getSlotSnapshot: vi.fn(async () => null),
     handleRealtimeMessage: vi.fn(),
     shutdown: vi.fn(),
   }
