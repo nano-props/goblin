@@ -126,7 +126,7 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
   const pathDisabledHint = t('action.create-worktree-path-disabled-hint')
   const pathHintText = !pathName ? pathDisabledHint : effectivePath ? displayEffectivePath : ''
 
-  const pathSuggestions = useRemotePathSuggestions({
+  const remotePathSuggestions = useRemotePathSuggestions({
     enabled: open && !!remoteTarget && pathName.length > 0,
     alias: remoteTarget?.alias ?? '',
     remotePath: remoteTarget?.remotePath ?? '/',
@@ -397,8 +397,9 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
               value={worktreePath}
               disabled={!pathName}
               onChange={setWorktreePath}
-              suggestions={pathSuggestions}
-              groupLabel={t('repo-picker.open-remote-path-suggestions')}
+              suggestions={remotePathSuggestions.suggestions}
+              isLoading={remotePathSuggestions.isLoading}
+              hasFetched={remotePathSuggestions.hasFetched}
               emptyLabel={t('repo-picker.open-remote-path-no-matches')}
               placeholder={displayDefaultPath}
               aria-describedby="cwt-path-hint"

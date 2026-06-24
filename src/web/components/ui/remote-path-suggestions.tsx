@@ -5,12 +5,12 @@
 //
 // Visual + interaction parity with the Select dropdown used by
 // CreateWorktreeDialog's branch pickers:
-//   • floating surface shares the SelectContent chrome (border, shadow,
-//     padding, slide/fade animations)
-//   • one labelled "Suggestions" group with SelectItem-style rows
+//   • floating surface shares the same border, shadow, and p-1 inner
+//     padding rhythm
+//   • rows use the SelectItem layout verbatim: pr-8 / pl-2, rounded-sm,
+//     accent fill on the active row, ✓ CheckIcon on the right rail
 //   • keyboard nav: ↓/↑ move the highlight, Home/End jump to ends,
-//     Enter commits, Esc/click-out dismisses (Esc handled by Radix
-//     DismissableLayer on document), focus re-opens
+//     Enter commits, Esc/click-out dismisses, focus re-opens
 //   • the highlighted option is scrolled into view (block: nearest) so
 //     it stays visible while the user pages through long lists
 //
@@ -21,10 +21,10 @@
 // commits one and continues typing from the committed path.
 
 import { forwardRef, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { MutableRefObject, Ref } from 'react'
-import { ChevronDownIcon, CornerDownLeftIcon } from 'lucide-react'
-import { Popover, PopoverAnchor, PopoverContent } from '#/web/components/ui/popover.tsx'
+import type { ReactNode, Ref, RefObject } from 'react'
+import { CheckIcon, ChevronDownIcon, Loader2Icon } from 'lucide-react'
 import { Input } from '#/web/components/ui/input.tsx'
+import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { cn } from '#/web/lib/cn.ts'
 
 interface RemotePathSuggestionsProps {
@@ -33,8 +33,10 @@ interface RemotePathSuggestionsProps {
   onChange: (next: string) => void
   /** Suggestion strings to render in the dropdown. */
   suggestions: readonly string[]
-  /** i18n label rendered as the section heading. */
-  groupLabel: string
+  /** Whether a suggestions request is currently in flight. */
+  isLoading?: boolean
+  /** Whether at least one suggestions request has completed. */
+  hasFetched?: boolean
   /** i18n label for the empty state when `suggestions` is empty but the
    *  dropdown is shown (e.g. the user typed something with no matches). */
   emptyLabel: string
@@ -56,7 +58,8 @@ export const RemotePathSuggestions = forwardRef<HTMLInputElement, RemotePathSugg
       value,
       onChange,
       suggestions,
-      groupLabel,
+      isLoading = false,
+      hasFetched = false,
       emptyLabel,
       disabled,
       id,
@@ -68,6 +71,7 @@ export const RemotePathSuggestions = forwardRef<HTMLInputElement, RemotePathSugg
     forwardedRef,
   ) {
     const innerRef = useRef<HTMLInputElement | null>(null)
+    const containerRef = useRef<HTMLDivElement | null>(null)
     // Combine our internal ref (used by `commit` and `onChange`) with
     // the parent's forwarded ref. `useImperativeHandle` with a `null`
     // initial value would TypeScript-lie about the ref type; using a
@@ -78,19 +82,23 @@ export const RemotePathSuggestions = forwardRef<HTMLInputElement, RemotePathSugg
         innerRef.current = node
         if (!forwardedRef) return
         if (typeof forwardedRef === 'function') forwardedRef(node)
-        else (forwardedRef as MutableRefObject<HTMLInputElement | null>).current = node
+        else (forwardedRef as RefObject<HTMLInputElement | null>).current = node
       },
       [forwardedRef],
     )
     const [open, setOpen] = useState(false)
     const [activeIndex, setActiveIndex] = useState(0)
     const optionRefs = useRef<(HTMLDivElement | null)[]>([])
+    const shouldScrollActiveIntoViewRef = useRef(false)
 
-    // Clamp the highlight when the list shrinks. Only depends on the
-    // list shape — re-running on every `activeIndex` change is wasted
-    // work and would create a setState loop on every keystroke.
+    // Clamp the highlight when the list shrinks, and drop refs to
+    // options that have fallen off the end so the array doesn't carry
+    // stale entries. Only depends on the list shape — re-running on
+    // every `activeIndex` change is wasted work and would create a
+    // setState loop on every keystroke.
     useEffect(() => {
       setActiveIndex((idx) => (idx >= suggestions.length ? 0 : idx))
+      optionRefs.current.length = suggestions.length
     }, [suggestions.length])
 
     // Keep the highlighted row in view as the user pages through long
@@ -98,6 +106,8 @@ export const RemotePathSuggestions = forwardRef<HTMLInputElement, RemotePathSugg
     // flashes off-screen. `block: 'nearest'` avoids unnecessary scroll
     // when the row is already visible.
     useLayoutEffect(() => {
+      if (!shouldScrollActiveIntoViewRef.current) return
+      shouldScrollActiveIntoViewRef.current = false
       const activeEl = optionRefs.current[activeIndex]
       if (activeEl && typeof activeEl.scrollIntoView === 'function') {
         activeEl.scrollIntoView({ block: 'nearest' })
@@ -106,15 +116,35 @@ export const RemotePathSuggestions = forwardRef<HTMLInputElement, RemotePathSugg
 
     // Whether the popover is visible. The popover surfaces two states
     // inside: the suggestion list, or a "no matches" row (the latter
-    // only once the user has typed something — we don't want to flash
-    // "no matches" before the first server response has landed, since
-    // an empty `suggestions` initially just means "haven't queried
-    // yet").
+    // only once the user has typed something and a server response has
+    // landed — an empty `suggestions` before the first response just
+    // means "haven't queried yet". During loading we keep showing the
+    // prior list, if any, and otherwise keep the popup closed.
     const hasMatches = suggestions.length > 0
     const hasTypedQuery = value.trim().length > 0
-    const showEmptyState = !hasMatches && hasTypedQuery
+    const showEmptyState = !hasMatches && hasTypedQuery && hasFetched && !isLoading
     const showContent = !disabled && (hasMatches || showEmptyState)
     const isOpen = open && showContent
+
+    useEffect(() => {
+      if (!isOpen) return
+      function onPointerDown(event: PointerEvent) {
+        const target = event.target as Node | null
+        if (target && containerRef.current?.contains(target)) return
+        setOpen(false)
+      }
+      function onFocusIn(event: FocusEvent) {
+        const target = event.target as Node | null
+        if (target && containerRef.current?.contains(target)) return
+        setOpen(false)
+      }
+      document.addEventListener('pointerdown', onPointerDown, true)
+      document.addEventListener('focusin', onFocusIn)
+      return () => {
+        document.removeEventListener('pointerdown', onPointerDown, true)
+        document.removeEventListener('focusin', onFocusIn)
+      }
+    }, [isOpen])
 
     // Stable ids for the listbox and its options. The listbox id is
     // hoisted into a const so the input's `aria-controls` /
@@ -133,6 +163,10 @@ export const RemotePathSuggestions = forwardRef<HTMLInputElement, RemotePathSugg
 
     const onKeyDown = useCallback(
       (event: React.KeyboardEvent<HTMLInputElement>) => {
+        if (event.key === 'Escape') {
+          setOpen(false)
+          return
+        }
         if (disabled) return
         const wantsNav =
           event.key === 'ArrowDown' ||
@@ -148,24 +182,28 @@ export const RemotePathSuggestions = forwardRef<HTMLInputElement, RemotePathSugg
         if (event.key === 'ArrowDown') {
           if (suggestions.length === 0) return
           event.preventDefault()
+          shouldScrollActiveIntoViewRef.current = true
           setActiveIndex((idx) => (idx + 1) % suggestions.length)
           return
         }
         if (event.key === 'ArrowUp') {
           if (suggestions.length === 0) return
           event.preventDefault()
+          shouldScrollActiveIntoViewRef.current = true
           setActiveIndex((idx) => (idx - 1 + suggestions.length) % suggestions.length)
           return
         }
         if (event.key === 'Home') {
           if (suggestions.length === 0) return
           event.preventDefault()
+          shouldScrollActiveIntoViewRef.current = true
           setActiveIndex(0)
           return
         }
         if (event.key === 'End') {
           if (suggestions.length === 0) return
           event.preventDefault()
+          shouldScrollActiveIntoViewRef.current = true
           setActiveIndex(suggestions.length - 1)
           return
         }
@@ -176,138 +214,122 @@ export const RemotePathSuggestions = forwardRef<HTMLInputElement, RemotePathSugg
           if (candidate !== undefined) commit(candidate)
           return
         }
-        // Escape is handled by Radix DismissableLayer (document-level
-        // listener) — nothing for us to do here.
       },
-      [activeIndex, commit, disabled, open],
+      [activeIndex, commit, disabled, open, suggestions],
     )
 
-    const setOptionRef = useCallback(
-      (index: number) => (node: HTMLDivElement | null) => {
-        optionRefs.current[index] = node
-      },
-      [],
-    )
+    const setOptionRef = useCallback((index: number, node: HTMLDivElement | null) => {
+      optionRefs.current[index] = node
+    }, [])
 
     return (
-      <Popover open={isOpen} onOpenChange={setOpen} modal={false}>
-        <PopoverAnchor asChild>
-          <div className="relative">
-            <Input
-              id={id}
-              ref={setInputRef}
-              value={value}
-              onChange={(event) => {
-                onChange(event.target.value)
-                setOpen(true)
-                setActiveIndex(0)
-              }}
-              onFocus={() => {
-                if (!disabled && suggestions.length > 0) setOpen(true)
-              }}
-              onKeyDown={onKeyDown}
-              disabled={disabled}
-              placeholder={placeholder}
-              spellCheck={false}
-              autoCapitalize="off"
-              autoCorrect="off"
-              aria-invalid={ariaInvalid}
-              aria-describedby={ariaDescribedBy}
-              aria-autocomplete="list"
-              aria-expanded={isOpen}
-              aria-controls={isOpen ? listboxId : undefined}
-              // WAI-ARIA combobox pattern: focus stays on the input,
-              // `aria-activedescendant` points at the currently
-              // highlighted option so screen readers announce the move
-              // as the user presses ↑/↓. Only set when the popup is
-              // open and there's a real option to point at.
-              aria-activedescendant={isOpen && activeOptionId ? activeOptionId : undefined}
-              className={cn('h-10 pr-8 font-mono text-sm', className)}
-            />
-            <ChevronDownIcon
-              aria-hidden
-              className={cn(
-                'pointer-events-none absolute right-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground transition-transform',
-                isOpen && 'rotate-180',
-              )}
-            />
-          </div>
-        </PopoverAnchor>
-        <PopoverContent
-          align="start"
-          sideOffset={6}
-          collisionPadding={8}
-          onOpenAutoFocus={(event) => event.preventDefault()}
-          className="w-[var(--radix-popover-trigger-width)] min-w-0 p-0"
-        >
-          <div id={listboxId} role="listbox" className="max-h-72 overflow-auto p-1">
-            <SuggestionGroup label={groupLabel}>
-              {showEmptyState ? (
-                <SuggestionRow active={false}>
-                  <span className="truncate text-muted-foreground">{emptyLabel}</span>
-                </SuggestionRow>
-              ) : (
-                suggestions.map((item, index) => (
-                  <SuggestionRow
-                    // Server-side `getServerRemotePathSuggestions` does
-                    // not dedupe; prefix the index so a pathological
-                    // duplicate pair doesn't trip React's key warning.
-                    key={`${index}-${item}`}
-                    id={`${listboxId}-option-${index}`}
-                    active={index === activeIndex}
-                    hint={
-                      index === activeIndex ? (
-                        <CornerDownLeftIcon aria-hidden className="size-3.5 text-muted-foreground" />
-                      ) : null
-                    }
-                    rowRef={setOptionRef(index)}
-                    onMouseEnter={() => setActiveIndex(index)}
-                    onMouseDown={(event) => {
-                      // mousedown so the input keeps focus and the click
-                      // doesn't first blur the input and lose state.
-                      event.preventDefault()
-                      commit(item)
-                    }}
-                  >
-                    <span className="truncate font-mono text-sm">{item}</span>
+      <div ref={containerRef} className="relative">
+        <Input
+          id={id}
+          ref={setInputRef}
+          value={value}
+          onChange={(event) => {
+            onChange(event.target.value)
+            setOpen(true)
+            setActiveIndex(0)
+          }}
+          onFocus={() => {
+            if (showContent) setOpen(true)
+          }}
+          onKeyDown={onKeyDown}
+          disabled={disabled}
+          placeholder={placeholder}
+          spellCheck={false}
+          autoCapitalize="off"
+          autoCorrect="off"
+          aria-invalid={ariaInvalid}
+          aria-describedby={ariaDescribedBy}
+          aria-autocomplete="list"
+          aria-haspopup="listbox"
+          aria-expanded={isOpen}
+          aria-controls={isOpen ? listboxId : undefined}
+          // WAI-ARIA combobox pattern: focus stays on the input,
+          // `aria-activedescendant` points at the currently
+          // highlighted option so screen readers announce the move
+          // as the user presses ↑/↓. Only set when the popup is
+          // open and there's a real option to point at.
+          aria-activedescendant={isOpen && activeOptionId ? activeOptionId : undefined}
+          className={cn('h-10 pr-8 font-mono text-sm', className)}
+        />
+        {isLoading ? (
+          <Loader2Icon
+            aria-hidden
+            className="pointer-events-none absolute right-2 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground"
+          />
+        ) : (
+          <ChevronDownIcon
+            aria-hidden
+            className={cn(
+              'pointer-events-none absolute right-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground transition-transform',
+              isOpen && 'rotate-180',
+            )}
+          />
+        )}
+        {isOpen ? (
+          <div className="bg-popover text-popover-foreground absolute top-[calc(100%+6px)] z-50 w-full min-w-0 overflow-hidden rounded-md border p-0 shadow-md">
+            <ScrollArea className="max-h-72" scrollbarMode="compact">
+              <div id={listboxId} role="listbox" className="p-1">
+                {showEmptyState ? (
+                  <SuggestionRow active={false}>
+                    <span className="truncate text-muted-foreground">{emptyLabel}</span>
                   </SuggestionRow>
-                ))
-              )}
-            </SuggestionGroup>
+                ) : (
+                  suggestions.map((item, index) => (
+                    <SuggestionRow
+                      // Suggestions are deduped in useRemotePathSuggestions,
+                      // so the path itself is a stable key.
+                      key={item}
+                      id={`${listboxId}-option-${index}`}
+                      active={index === activeIndex}
+                      rowRef={(node) => setOptionRef(index, node)}
+                      onMouseMove={() => {
+                        if (index === activeIndex) return
+                        setActiveIndex(index)
+                      }}
+                      onMouseDown={(event) => {
+                        // mousedown so the input keeps focus and the click
+                        // doesn't first blur the input and lose state.
+                        event.preventDefault()
+                        commit(item)
+                      }}
+                    >
+                      <span className="truncate font-mono text-sm">{item}</span>
+                    </SuggestionRow>
+                  ))
+                )}
+              </div>
+            </ScrollArea>
           </div>
-        </PopoverContent>
-      </Popover>
+        ) : null}
+      </div>
     )
   },
 )
 
-function SuggestionGroup({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div role="group" aria-label={label} className="flex flex-col gap-0.5">
-      <div className="px-2 pb-1 pt-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-        {label}
-      </div>
-      <div className="flex flex-col gap-0.5">{children}</div>
-    </div>
-  )
-}
-
+// Row chrome mirrors SelectItem verbatim — pr-8 / pl-2, rounded-sm,
+// accent fill on the active row, and an absolutely-positioned ✓
+// CheckIcon on the right rail. Keeping the layout identical to
+// SelectItem is what makes the dropdown read as the same UI family as
+// the branch picker.
 function SuggestionRow({
   active,
-  hint,
   id,
   rowRef,
   onMouseDown,
-  onMouseEnter,
+  onMouseMove,
   children,
 }: {
   active: boolean
-  hint?: React.ReactNode
   id?: string
   rowRef?: (node: HTMLDivElement | null) => void
   onMouseDown?: React.MouseEventHandler<HTMLDivElement>
-  onMouseEnter?: React.MouseEventHandler<HTMLDivElement>
-  children: React.ReactNode
+  onMouseMove?: React.MouseEventHandler<HTMLDivElement>
+  children: ReactNode
 }) {
   return (
     <div
@@ -316,14 +338,16 @@ function SuggestionRow({
       id={id}
       aria-selected={active}
       onMouseDown={onMouseDown}
-      onMouseEnter={onMouseEnter}
+      onMouseMove={onMouseMove}
       className={cn(
-        'flex w-full cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none',
+        'relative flex w-full cursor-default items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none',
         active && 'bg-accent text-accent-foreground',
       )}
     >
       <span className="flex-1 truncate">{children}</span>
-      {hint ? <span className="flex shrink-0 items-center">{hint}</span> : null}
+      <span className="absolute right-2 flex size-3.5 items-center justify-center">
+        {active ? <CheckIcon className="size-4 text-current" /> : null}
+      </span>
     </div>
   )
 }
