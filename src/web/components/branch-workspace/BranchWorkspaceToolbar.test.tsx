@@ -649,7 +649,7 @@ describe('BranchWorkspaceToolbar', () => {
     expect(busyNewButton?.disabled).toBe(true)
 
     // Once the provider calls markReady() (which the real Provider
-    // does at the end of syncServerSessions' finally block), the
+    // does at the end of syncServerSlots' finally block), the
     // busy state clears and the real button appears.
     useRepoSyncStore.getState().markReady(REPO_ID, 0)
     await flush()

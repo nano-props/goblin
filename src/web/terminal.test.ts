@@ -294,7 +294,7 @@ describe('terminal web host bridge', () => {
           ok: true,
           action: 'created',
           key: '/tmp/repo\u0000/tmp/repo\u0000slot-1',
-          slots: [],
+          sessions: [],
         },
       }),
     )

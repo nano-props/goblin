@@ -1316,4 +1316,44 @@ describe('server terminal runtime', () => {
       shutdown()
     }
   })
+
+  test('runtime: a silent client (no heartbeats) is synthetically disconnected past the deadline', async () => {
+    // Companion to the previous test: the previous one asserts a
+    // chatty client survives the deadline; this one asserts a
+    // silent client is dropped. End-to-end through the runtime:
+    // `registerSocket` only, no `handleRealtimeMessage` calls,
+    // advance past `HEARTBEAT_DEADLINE_MS + HEARTBEAT_INTERVAL_MS`,
+    // and assert `host.isClientConnected` flips to `false`.
+    //
+    // The fake timers must be installed BEFORE `buildRuntime()`,
+    // because the broker's `setInterval` is created in its
+    // constructor; a real setInterval created before
+    // `vi.useFakeTimers()` is not driven by fake time.
+    vi.useFakeTimers()
+    let host: ReturnType<typeof buildRuntime>['host'] | undefined
+    let shutdownFn: (() => void) | undefined
+    try {
+      vi.setSystemTime(new Date('2026-06-24T00:00:00Z'))
+      const handle = buildRuntime()
+      host = handle.host
+      shutdownFn = handle.shutdown
+      const socket = { send: vi.fn(), close: vi.fn() }
+      host.registerSocket('client_silent', USER_1, socket)
+
+      // `registerSocket` seeds the heartbeat clock to `Date.now()`
+      // (t=0). The broker's own `setInterval` fires every
+      // `HEARTBEAT_INTERVAL_MS` (30 s); the scan at t=120 s sees
+      // the client as stale and fires the synthetic disconnect.
+      vi.advanceTimersByTime(HEARTBEAT_DEADLINE_MS + HEARTBEAT_INTERVAL_MS)
+
+      // The socket is still registered (the OS hasn't closed it),
+      // but the broker clock has aged out, so the host reports
+      // disconnected. This is the new `isClientConnected`
+      // semantics — see `terminal-realtime-broker.ts:143-160`.
+      expect(handle.isClientConnected('client_silent')).toBe(false)
+    } finally {
+      vi.useRealTimers()
+      shutdownFn?.()
+    }
+  })
 })

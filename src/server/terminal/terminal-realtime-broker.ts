@@ -20,6 +20,13 @@ interface TerminalBrokerOptions {
  * died but whose OS socket is still in `ESTABLISHED` would strand
  * siblings in viewer mode for as long as the OS keeps the half-open
  * socket alive (laptop sleep, OS kill, NIC never notified).
+ *
+ * The actual disconnect latency is `HEARTBEAT_DEADLINE_MS +
+ * HEARTBEAT_INTERVAL_MS` = 120 s in the worst case: if a beat lands
+ * at t=89.9 s, the next scan at t=90 s sees the deadline as
+ * unbreached; the scan at t=120 s (the next `setInterval` tick)
+ * finally fires. The 90 s figure is the *guaranteed* floor; 120 s
+ * is the observed upper bound.
  */
 export const HEARTBEAT_INTERVAL_MS = 30_000
 export const HEARTBEAT_DEADLINE_MS = 90_000
@@ -33,6 +40,11 @@ export class TerminalRealtimeBroker {
   >()
   private readonly socketCountByUserClientKey = new Map<string, number>()
   private readonly lastHeartbeatAtByClientKey = new Map<string, number>()
+  // Tracks clientKeys whose `onClientDisconnected` has been fired
+  // by the heartbeat scan. `unregisterSocket` consults this set
+  // to avoid double-firing the same event when the OS eventually
+  // closes the half-open socket. Cleared on the next `registerSocket`.
+  private readonly syntheticDisconnectedKeys = new Set<string>()
   private readonly heartbeatTimer: ReturnType<typeof setInterval>
 
   constructor(options: TerminalBrokerOptions) {
@@ -55,6 +67,11 @@ export class TerminalRealtimeBroker {
     sockets.add(socket)
     this.socketMetaBySocket.set(socket, { clientId, userId })
     const clientKey = userClientKey(userId, clientId)
+    // A fresh registration clears any synthetic-disconnected
+    // marker from a prior session so the next `unregisterSocket`
+    // for this clientKey is treated as a normal disconnect, not
+    // a duplicate of a previously-fired synthetic one.
+    this.syntheticDisconnectedKeys.delete(clientKey)
     const nextCount = (this.socketCountByUserClientKey.get(clientKey) ?? 0) + 1
     this.socketCountByUserClientKey.set(clientKey, nextCount)
     // Seed the heartbeat clock to "now" so the renderer is never
@@ -73,7 +90,19 @@ export class TerminalRealtimeBroker {
   recordHeartbeat(userId: string, clientId: string, at: number): void {
     const clientKey = userClientKey(userId, clientId)
     if (!this.socketCountByUserClientKey.has(clientKey)) return
-    this.lastHeartbeatAtByClientKey.set(clientKey, at)
+    // Reject malformed `at` values: a non-finite number would
+    // poison `Date.now() - lastBeat` in `scanHeartbeats` (yielding
+    // `NaN`, which fails the `< HEARTBEAT_DEADLINE_MS` check and
+    // drops the client immediately). A future-dated `at` (clock
+    // skew after laptop wake, or a hostile client) would also
+    // look like "stale" and trigger a premature synthetic
+    // disconnect. Clamp the upper bound to "now + 60 s" (generous
+    // slack for a slowly-synced renderer clock); clamp the lower
+    // bound to `lastBeat ?? 0` so a backwards-clock skew never
+    // resets the deadline.
+    if (!Number.isFinite(at)) return
+    const clampedAt = Math.min(Math.max(at, this.lastHeartbeatAtByClientKey.get(clientKey) ?? 0), Date.now() + 60_000)
+    this.lastHeartbeatAtByClientKey.set(clientKey, clampedAt)
   }
 
   /**
@@ -102,6 +131,7 @@ export class TerminalRealtimeBroker {
       }
       const { userId, clientId } = splitUserClientKey(clientKey)
       this.lastHeartbeatAtByClientKey.delete(clientKey)
+      this.syntheticDisconnectedKeys.add(clientKey)
       this.options.onClientDisconnected(clientId, userId)
     }
   }
@@ -119,7 +149,14 @@ export class TerminalRealtimeBroker {
     if (nextCount === 0) {
       this.socketCountByUserClientKey.delete(clientKey)
       this.lastHeartbeatAtByClientKey.delete(clientKey)
-      this.options.onClientDisconnected(clientId, userId)
+      // Skip the second `onClientDisconnected` if the heartbeat
+      // scan already fired it for this clientKey. A late OS-level
+      // close on a half-open socket would otherwise re-emit the
+      // event, confusing sibling windows and the catalog
+      // reconciliation log.
+      if (!this.syntheticDisconnectedKeys.delete(clientKey)) {
+        this.options.onClientDisconnected(clientId, userId)
+      }
     } else this.socketCountByUserClientKey.set(clientKey, nextCount)
     if (sockets.size > 0) return
     this.socketsByUserId.delete(userId)
@@ -140,9 +177,25 @@ export class TerminalRealtimeBroker {
     for (const socket of Array.from(sockets)) this.sendOrUnregister(socket, payload)
   }
 
+  /**
+   * `true` iff the broker has a live socket for `(userId, clientId)`
+   * AND the client has heartbeated within the deadline. Sockets
+   * whose renderer has died but whose OS half-open connection is
+   * still in `ESTABLISHED` are reported as disconnected so the
+   * next attach can auto-claim.
+   */
   isClientConnected(userId: string, clientId?: string): boolean | undefined {
     if (!clientId) return undefined
-    return (this.socketCountByUserClientKey.get(userClientKey(userId, clientId)) ?? 0) > 0
+    const clientKey = userClientKey(userId, clientId)
+    if ((this.socketCountByUserClientKey.get(clientKey) ?? 0) === 0) return false
+    const lastBeat = this.lastHeartbeatAtByClientKey.get(clientKey)
+    // A registered socket that has never heartbeated (e.g. the
+    // renderer was killed before its first beat) is treated as
+    // disconnected. The deadline-anchor seeded by `registerSocket`
+    // is "now" so this only fires for the race between register
+    // and the first real beat.
+    if (lastBeat === undefined) return false
+    return Date.now() - lastBeat < HEARTBEAT_DEADLINE_MS
   }
 
   hasOwnerSockets(userId: string): boolean {
@@ -168,6 +221,7 @@ export class TerminalRealtimeBroker {
     this.socketMetaBySocket.clear()
     this.socketCountByUserClientKey.clear()
     this.lastHeartbeatAtByClientKey.clear()
+    this.syntheticDisconnectedKeys.clear()
   }
 
   private sendOrUnregister(socket: TerminalRealtimeSocket, payload: string): void {

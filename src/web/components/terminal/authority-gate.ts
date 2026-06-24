@@ -89,7 +89,7 @@ export interface TerminalAuthorityGate {
    * write-specific) so the caller can surface a specific toast for
    * the failure mode and log the server's i18n key.
    */
-  takeover(): Promise<AuthorizationResult>
+  takeover(): Promise<Exclude<AuthorizationResult, { kind: 'promoted' }>>
   /**
    * Push the latest role the server believes this clientId has.
    * Called by the realtime ownership event handler in
@@ -153,7 +153,10 @@ export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): Termi
     },
 
     async takeover() {
-      return await doTakeover()
+      // `doTakeover` only ever returns `allowed` or `denied` —
+      // `promoted` is `authorize` only. The `takeover` interface
+      // narrows the public type to match.
+      return (await doTakeover()) as Exclude<AuthorizationResult, { kind: 'promoted' }>
     },
   }
 
@@ -209,6 +212,15 @@ export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): Termi
         ptySessionId,
         message: result.message,
       })
+    }
+    // Post-await dispose guard: the bridge's takeover round-trip
+    // can resolve after the slot was disposed (e.g. the user
+    // navigated away mid-takeover). Without this re-check the
+    // `onPromoted` callback would mutate a destroyed runtime and
+    // flip the gate's role to `controller`, leaving stale state
+    // for the next sibling attach on the same `ptySessionId`.
+    if (!opts.isSessionAlive(ptySessionId)) {
+      return deny('slot-closed', 'post-await isSessionAlive', { ptySessionId })
     }
     // ORDERING CONTRACT: `onPromoted` MUST run before `role` is
     // flipped to 'controller'. Callers of `takeover()` /

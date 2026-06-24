@@ -185,8 +185,25 @@ export class TerminalSlotManager<TUser extends string | number> {
       id: input.key,
     })
     if (input.clientId) {
+      // The new-session path defaults `clientConnected` to `true`
+      // when undefined, while the existing-session path (line 148)
+      // lets it fall through to `registerTerminalClient`'s own
+      // fallback (which resolves to the existing slot's stored
+      // value, defaulting to `false` if unknown). For a brand-new
+      // slot there is no existing value to consult, so the `?? true`
+      // here reflects "no prior liveness info; treat as live" — the
+      // same optimistic default the broker uses for the first
+      // `registerSocket`. The asymmetry is intentional, not a bug.
       registerTerminalClient(session, input.clientId, size.cols, size.rows, input.clientConnected ?? true)
-      attachTerminalClient(session, input.clientId)
+      // Mirror the existing-session path: route the `attach` through
+      // `applyOwnershipEffect` so the returned `emitOwnership` flag
+      // (true for the auto-claim case where the new clientId picks
+      // up an unowned slot) actually broadcasts the realtime
+      // `ownership` event to siblings. Without this the slot's
+      // controller and `ownerSticky` flags are set correctly but
+      // sibling windows only learn about the new controller via the
+      // next `sessions-changed` list-rescan.
+      this.applyOwnershipEffect(session, attachTerminalClient(session, input.clientId))
     }
     const result = await this.spawnSessionPty(session)
     if (!result.ok) {

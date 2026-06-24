@@ -250,9 +250,17 @@ export function createServerTerminalBridge(options: {
       try {
         currentSocket.send(JSON.stringify({ type: 'heartbeat', at: Date.now() }))
       } catch {
-        // Send failure is the same signal as `error` — let the
-        // existing close path handle it.
+        // Send failure is a signal that the socket is half-broken
+        // — the `error` event *should* fire, but on some browser
+        // implementations a `send` throw lands without a
+        // corresponding `error` event, leaving the user silently
+        // wedged until the OS closes the TCP. Kick the reconnect
+        // path explicitly so the worst-case latency is the
+        // existing reconnect backoff instead of a TCP timeout
+        // (which can be hours on a healthy-looking half-open
+        // connection).
         stopHeartbeat()
+        handleSocketDisconnection('Terminal heartbeat send failed')
       }
     }, TERMINAL_RENDERER_HEARTBEAT_INTERVAL_MS)
   }

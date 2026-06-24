@@ -141,7 +141,7 @@ export class ManagedTerminalSlot {
     this.geometryAbortController = null
     this.clearTerminalFocusIfOwned()
     this.view.blurIfFocused()
-    const sessionIds = this.runtime.disposePtySessionIds()
+    const ptySessionIds = this.runtime.disposePtySessionIds()
     if (options.closeSlot !== false) {
       // Hand the close to the registry's durable queue instead of
       // firing `terminalBridge.close` directly. The queue fires the
@@ -150,7 +150,7 @@ export class ManagedTerminalSlot {
       // the still-alive orphan. Failures are logged inside the queue
       // — the old `void … .catch(() => {})` path silently swallowed
       // the rejection and let the bug hide.
-      for (const ptySessionId of sessionIds) {
+      for (const ptySessionId of ptySessionIds) {
         void this.requestDurableClose(ptySessionId).catch(() => {
           // Already logged at the queue site. Swallow here so a
           // misbehaving registry hook can never bubble out of
@@ -208,6 +208,12 @@ export class ManagedTerminalSlot {
     void this.authority()
       .authorize('write')
       .then((result) => {
+        // Post-dispose guard: the gate's takeover round-trip can
+        // resolve after `dispose()` ran, in which case the slot no
+        // longer owns this ptySessionId. Drop the write — the
+        // registry's durable-close queue has already taken ownership
+        // of the actual close.
+        if (this.disposed || this.runtime.currentPtySessionId() !== ptySessionId) return
         if (result.kind === 'denied') {
           this.reportGateDenial('write', result.reason, ptySessionId)
           return
@@ -237,6 +243,12 @@ export class ManagedTerminalSlot {
     void this.authority()
       .authorize('resize')
       .then((result) => {
+        // Post-dispose guard: see `flushInput` for the same
+        // race. Without this, a resize queued before `dispose()`
+        // could land on a torn-down slot's ptySessionId and the
+        // server would echo the resize back to whichever sibling
+        // tab is now the controller.
+        if (this.disposed || this.runtime.currentPtySessionId() !== ptySessionId) return
         if (result.kind === 'denied') {
           this.reportGateDenial('resize', result.reason, ptySessionId)
           return
@@ -261,7 +273,7 @@ export class ManagedTerminalSlot {
    * `null` in that case.
    */
   private reportGateDenial(
-    action: 'write' | 'resize',
+    action: 'write' | 'resize' | 'takeover',
     reason: AuthorizationDenialReason,
     ptySessionId: string,
   ): void {
@@ -450,6 +462,12 @@ export class ManagedTerminalSlot {
       if (!wasController && this.runtime.canResize()) this.ensureControllerViewStarted()
     } else {
       this.clearTakeoverPendingWithNotify()
+      // Mirror the write/resize paths: surface the structured
+      // denial reason to the user so the silent failure is
+      // observable. Without this, the 接管 button click appears
+      // to do nothing on a session-unknown or client-offline
+      // condition.
+      if (ptySessionId) this.reportGateDenial('takeover', result.reason, ptySessionId)
     }
     return ok
   }
@@ -675,6 +693,16 @@ export class ManagedTerminalSlot {
     try {
       term.reset()
       if (hydratedSnapshot.snapshot) await termWrite(term, hydratedSnapshot.snapshot)
+      // Post-await dispose guard: `termWrite` may have resolved
+      // after `dispose()` ran (the slot is no longer the current
+      // owner of this ptySessionId, the term is destroyed, and any
+      // `term.write` callback would land on a freed term and throw
+      // an unhandled-rejection). Drop the replay window before
+      // letting the callback path touch anything.
+      if (this.disposed) {
+        this.runtime.drainReplay(replayGeneration)
+        return null
+      }
       const stillCurrent = this.currentStart(token, term)
       // Identity check: a concurrent hydrate() between termWrite start
       // and resolve may have already replaced this.hydratedSnapshot
@@ -708,6 +736,15 @@ export class ManagedTerminalSlot {
         return
       }
       term.write(hydratedSnapshot.snapshot, () => {
+        // Post-dispose guard: see `preloadHydratedSnapshot` for
+        // the same race. The `term.write` callback is async; if
+        // `dispose()` ran between the call and the resolve, the
+        // term is destroyed and `finishActiveHydratedSnapshotReplay`
+        // would dereference a dead `XTermTerminal`.
+        if (this.disposed) {
+          this.runtime.drainReplay(replayGeneration)
+          return
+        }
         this.finishActiveHydratedSnapshotReplay(term, hydratedSnapshot, replayGeneration)
       })
     } catch (err) {

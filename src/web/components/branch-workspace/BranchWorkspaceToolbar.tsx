@@ -62,7 +62,7 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
   // While the first server-side session list for this repo is in flight,
   // keep the New Terminal affordance visible but busy. Hooks into the
   // repo-sync store which the Provider updates via markReady() at the end
-  // of every syncServerSessions.
+  // of every syncServerSlots.
   const isInitialSyncInFlight = useIsInitialSyncInFlight(repo.id)
   const terminalWorktreeKey = detail.branch?.worktree?.path
     ? worktreeTerminalKey(repo.id, detail.branch.worktree.path)

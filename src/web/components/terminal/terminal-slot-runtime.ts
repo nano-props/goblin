@@ -231,11 +231,11 @@ export class TerminalSlotRuntime {
   }
 
   disposePtySessionIds(): string[] {
-    const sessionIds = new Set([this.ptySessionId, this.replacingPtySessionId].filter((id): id is string => !!id))
+    const ptySessionIds = new Set([this.ptySessionId, this.replacingPtySessionId].filter((id): id is string => !!id))
     this.ptySessionId = null
     this.replacingPtySessionId = null
     this.restartOnStart = false
-    return Array.from(sessionIds)
+    return Array.from(ptySessionIds)
   }
 
   closeReplacingPtySessionId(): string | null {
