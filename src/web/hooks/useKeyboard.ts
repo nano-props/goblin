@@ -12,6 +12,7 @@
 
 import { useEffect, useRef } from 'react'
 import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useUiTransitionStore } from '#/web/stores/ui-transition.ts'
 import { visibleBranches } from '#/web/stores/repos/branch-view-mode.ts'
 import { isShortcutBlockingLayerOpen } from '#/web/lib/layers.ts'
 import { runBranchActionShortcut } from '#/web/keyboard/branch-action-shortcuts.ts'
@@ -127,7 +128,11 @@ export function useKeyboard({
       if (e.defaultPrevented) return
       if (getRuntimeShortcutSettings().shortcutsDisabled) return
       const settingsOpen = isSettingsOpenRef.current()
-      const workspaceShortcutsSuppressed = isWorkspaceShortcutSuppressedRef.current() || isShortcutBlockingLayerOpen()
+      const compactWorkspaceTransitioning = useUiTransitionStore.getState().isCompactWorkspaceTransitioning
+      const workspaceShortcutsSuppressed =
+        isWorkspaceShortcutSuppressedRef.current() ||
+        isShortcutBlockingLayerOpen() ||
+        compactWorkspaceTransitioning
       const action = matchRendererKeyboardShortcut(e)
 
       if (settingsOpen && action === 'dismiss') {

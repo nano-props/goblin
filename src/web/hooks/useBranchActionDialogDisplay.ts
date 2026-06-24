@@ -41,24 +41,29 @@
 // store update. The host hoists the subscription and passes the map
 // in — one listener, five consumers.
 //
-// Trade-off — `displayContext` can become null mid-fade-out:
+// Trade-off — `displayContext` and live-context drift:
 //
-// If the user clicks Confirm and the backend IPC completes within the
-// Radix close-animation window (~200 ms) and that completion removes
-// the branch from `useReposStore` (e.g. `git worktree remove` on the
-// last ref), `displayContext` becomes null while `entry` is still
-// retained. For the push dialog (`pushConfirmView`), the host reads
-// the title directly from `entry.payload`, so the title stays
-// visible — only the body collapses. For the other four dialogs, the
-// host's IIFE body guard (`if (!entry || !displayContext) return
-// empty fallback`) short-circuits to a `<ConfirmDialog title=""
-// message="" />` shell, so both title AND body collapse in lockstep
-// for the rest of the fade. We accept this: the alternative — caching
-// the last non-null `(repo, branch)` snapshot inside the hook —
-// would extend stale `hasUpstream` / `tracking` past a real repo
-// mutation. The current behaviour is "show the title where the host
-// reads it from entry, drop the body" and is preferable to "show a
-// body that lies about upstream state".
+// The slot is cleared on close (`closeDialog`, `closeStaleDialogs`)
+// so the data layer never carries stale payloads — that is the
+// right model. But Radix AlertDialog needs the inner content (title,
+// body, checkboxes) to keep rendering for the duration of the close
+// animation; otherwise the dialog visibly snaps in height for the
+// fade-out window. This hook retains both `entry` (the slot payload)
+// and the last non-null `liveContext` for the close-animation
+// window, so the host can render a fully stable view of the dialog
+// until Radix finishes its exit transition.
+//
+// What if the IPC completes within the close-animation window and
+// removes the branch from `useReposStore`? The retained context
+// snapshot is from before the removal, so the body shows a
+// `hasUpstream` / `tracking` value that is now stale. We accept
+// this: the alternative — collapsing the body to empty mid-fade —
+// produced a "title stays, body vanishes" jank that visually
+// contradicts the static title. The stale-data window is at most
+// ~200 ms (Radix's exit transition) and the user has already
+// confirmed the action, so the body is informational at that point.
+// The data layer is never lied to — the IPC has already committed,
+// and the store has the post-mutation state.
 
 import {
   EMPTY_CHECKBOXES,
@@ -110,15 +115,25 @@ export function useBranchActionDialogDisplay<P>(
 ): BranchActionDialogDisplay<P> {
   const entry = useLastNonNull(slot)
   const liveContext = slot ? resolveContext(repos, slot) : null
+  // Retain the last non-null `liveContext` for the close-animation
+  // window. After the user clicks Confirm/Cancel, `slot` is null and
+  // `liveContext` is null, but the host still needs a stable context
+  // to render the body for the duration of Radix's exit transition.
+  // Without this, the body would collapse to `''` mid-fade whenever
+  // the backend IPC completed within the close-animation window and
+  // removed the branch from `repos` — visually contradicting the
+  // static title that the host now keeps visible.
+  const retainedLiveContext = useLastNonNull(liveContext)
   // While the dialog is open, `slot === entry` and the two contexts
   // are the same object lookup. Sharing the result saves one
   // `repo.data.branches.find(...)` per render per slot. After close
-  // `slot === null` and `entry` is the retained value — the two paths
-  // resolve independently.
+  // `slot === null` and `entry` is the retained value — we use the
+  // retained `liveContext` (which was resolved from `entry` before
+  // close) instead of re-resolving against the post-mutation `repos`.
   const displayContext = entry
     ? entry === slot
       ? liveContext
-      : resolveContext(repos, entry)
+      : retainedLiveContext
     : null
   const displayCheckboxes = useBranchActionDialogsStore((s) =>
     entry ? branchCheckboxesFor(s, entry.repoId, entry.branchName) : EMPTY_CHECKBOXES,

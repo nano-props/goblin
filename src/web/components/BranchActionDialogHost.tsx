@@ -162,236 +162,206 @@ export function BranchActionDialogHost({ activeRepoId, activeBranchName }: Props
         }}
       />
 
-      {(() => {
-        const { entry, displayContext, displayCheckboxes } = deleteConfirmView
-        if (!entry || !displayContext) {
-          return (
-            <ConfirmDialog
-              open={deleteConfirm !== null && deleteConfirmView.liveContext !== null}
-              title=""
-              message=""
-              confirmLabel={t('action.confirm-delete-branch-confirm')}
-              destructive
-              onCancel={() => closeDialog('deleteConfirm')}
-              onConfirm={() => closeDialog('deleteConfirm')}
+      <ConfirmDialog
+        open={deleteConfirm !== null && deleteConfirmView.liveContext !== null}
+        title={t('action.confirm-delete-branch-title')}
+        message={
+          deleteConfirmView.entry && deleteConfirmView.displayContext ? (
+            <DeleteBranchConfirmBody
+              body={t('action.confirm-delete-branch-body')}
+              branchName={deleteConfirmView.entry.payload}
+              note={t('action.confirm-delete-branch-note')}
+              hasUpstream={hasUpstream(deleteConfirmView.displayContext.branch)}
+              deleteAlsoUpstream={deleteConfirmView.displayCheckboxes.deleteAlsoUpstream}
+              tracking={deleteConfirmView.displayContext.branch.tracking}
+              onDeleteAlsoUpstreamChange={(value) =>
+                setDeleteAlsoUpstream(
+                  deleteConfirmView.entry!.repoId,
+                  deleteConfirmView.entry!.branchName,
+                  value,
+                )
+              }
+              upstreamLabel={t('action.confirm-delete-branch-also-delete-upstream')}
             />
+          ) : (
+            ''
           )
         }
-        return (
-          <ConfirmDialog
-            open={deleteConfirm !== null && deleteConfirmView.liveContext !== null}
-            title={t('action.confirm-delete-branch-title')}
-            message={
-              <DeleteBranchConfirmBody
-                body={t('action.confirm-delete-branch-body')}
-                branchName={entry.payload}
-                note={t('action.confirm-delete-branch-note')}
-                hasUpstream={hasUpstream(displayContext.branch)}
-                deleteAlsoUpstream={displayCheckboxes.deleteAlsoUpstream}
-                tracking={displayContext.branch.tracking}
-                onDeleteAlsoUpstreamChange={(value) =>
-                  setDeleteAlsoUpstream(entry.repoId, entry.branchName, value)
-                }
-                upstreamLabel={t('action.confirm-delete-branch-also-delete-upstream')}
-              />
-            }
-            confirmLabel={t('action.confirm-delete-branch-confirm')}
-            destructive
-            onCancel={() => closeDialog('deleteConfirm')}
-            onConfirm={() => {
-              const liveContext = deleteConfirmView.liveContext
-              closeDialog('deleteConfirm')
-              if (liveContext) {
-                return dispatchDeleteBranch({
-                  repo: liveContext.repo,
-                  branchName: entry.payload,
-                  force: false,
-                  alsoDeleteUpstream: displayCheckboxes.deleteAlsoUpstream,
-                })
-              }
-              return undefined
-            }}
-          />
-        )
-      })()}
+        confirmLabel={t('action.confirm-delete-branch-confirm')}
+        destructive
+        onCancel={() => closeDialog('deleteConfirm')}
+        onConfirm={() => {
+          const liveContext = deleteConfirmView.liveContext
+          closeDialog('deleteConfirm')
+          if (liveContext) {
+            return dispatchDeleteBranch({
+              repo: liveContext.repo,
+              branchName: deleteConfirmView.entry!.payload,
+              force: false,
+              alsoDeleteUpstream: deleteConfirmView.displayCheckboxes.deleteAlsoUpstream,
+            })
+          }
+          return undefined
+        }}
+      />
 
-      {(() => {
-        const { entry, displayContext, displayCheckboxes } = forceDeleteConfirmView
-        if (!entry || !displayContext) {
-          return (
-            <ConfirmDialog
-              open={forceDeleteConfirm !== null && forceDeleteConfirmView.liveContext !== null}
-              title=""
-              message=""
-              confirmLabel={t('action.confirm-force-delete-unmerged-confirm')}
-              destructive
-              onCancel={() => closeDialog('forceDeleteConfirm')}
-              onConfirm={() => closeDialog('forceDeleteConfirm')}
+      <ConfirmDialog
+        open={forceDeleteConfirm !== null && forceDeleteConfirmView.liveContext !== null}
+        title={t('action.confirm-force-delete-unmerged-title')}
+        message={
+          forceDeleteConfirmView.entry && forceDeleteConfirmView.displayContext ? (
+            <DeleteBranchConfirmBody
+              body={t('action.confirm-force-delete-unmerged-body')}
+              branchName={forceDeleteConfirmView.entry.payload}
+              note={t('action.confirm-force-delete-unmerged-note')}
+              hasUpstream={hasUpstream(forceDeleteConfirmView.displayContext.branch)}
+              deleteAlsoUpstream={forceDeleteConfirmView.displayCheckboxes.deleteAlsoUpstream}
+              tracking={forceDeleteConfirmView.displayContext.branch.tracking}
+              onDeleteAlsoUpstreamChange={(value) =>
+                setDeleteAlsoUpstream(
+                  forceDeleteConfirmView.entry!.repoId,
+                  forceDeleteConfirmView.entry!.branchName,
+                  value,
+                )
+              }
+              upstreamLabel={t('action.confirm-delete-branch-also-delete-upstream')}
             />
+          ) : (
+            ''
           )
         }
-        return (
-          <ConfirmDialog
-            open={forceDeleteConfirm !== null && forceDeleteConfirmView.liveContext !== null}
-            title={t('action.confirm-force-delete-unmerged-title')}
-            message={
-              <DeleteBranchConfirmBody
-                body={t('action.confirm-force-delete-unmerged-body')}
-                branchName={entry.payload}
-                note={t('action.confirm-force-delete-unmerged-note')}
-                hasUpstream={hasUpstream(displayContext.branch)}
-                deleteAlsoUpstream={displayCheckboxes.deleteAlsoUpstream}
-                tracking={displayContext.branch.tracking}
-                onDeleteAlsoUpstreamChange={(value) =>
-                  setDeleteAlsoUpstream(entry.repoId, entry.branchName, value)
-                }
-                upstreamLabel={t('action.confirm-delete-branch-also-delete-upstream')}
-              />
-            }
-            confirmLabel={t('action.confirm-force-delete-unmerged-confirm')}
-            destructive
-            onCancel={() => closeDialog('forceDeleteConfirm')}
-            onConfirm={() => {
-              const liveContext = forceDeleteConfirmView.liveContext
-              closeDialog('forceDeleteConfirm')
-              if (liveContext) {
-                return dispatchDeleteBranch({
-                  repo: liveContext.repo,
-                  branchName: entry.payload,
-                  force: true,
-                  alsoDeleteUpstream: displayCheckboxes.deleteAlsoUpstream,
-                })
-              }
-              return undefined
-            }}
-          />
-        )
-      })()}
+        confirmLabel={t('action.confirm-force-delete-unmerged-confirm')}
+        destructive
+        onCancel={() => closeDialog('forceDeleteConfirm')}
+        onConfirm={() => {
+          const liveContext = forceDeleteConfirmView.liveContext
+          closeDialog('forceDeleteConfirm')
+          if (liveContext) {
+            return dispatchDeleteBranch({
+              repo: liveContext.repo,
+              branchName: forceDeleteConfirmView.entry!.payload,
+              force: true,
+              alsoDeleteUpstream: forceDeleteConfirmView.displayCheckboxes.deleteAlsoUpstream,
+            })
+          }
+          return undefined
+        }}
+      />
 
-      {(() => {
-        const { entry, displayContext, displayCheckboxes } = removeConfirmView
-        if (!entry || !displayContext) {
-          return (
-            <ConfirmDialog
-              open={removeConfirm !== null && removeConfirmView.liveContext !== null}
-              title=""
-              message=""
-              confirmLabel={t('action.confirm-remove-worktree-confirm')}
-              destructive
-              onCancel={() => closeDialog('removeConfirm')}
-              onConfirm={() => closeDialog('removeConfirm')}
+      <ConfirmDialog
+        open={removeConfirm !== null && removeConfirmView.liveContext !== null}
+        title={t('action.confirm-remove-worktree-title')}
+        message={
+          removeConfirmView.entry && removeConfirmView.displayContext ? (
+            <RemoveWorktreeConfirmBody
+              body={t('action.confirm-remove-worktree-body')}
+              path={formatWorktreePath(
+                removeConfirmView.entry.payload.path,
+                remoteRepoTarget(
+                  removeConfirmView.displayContext.repo.id,
+                  removeConfirmView.displayContext.repo.remote.lifecycle,
+                ),
+              )}
+              branchName={removeConfirmView.entry.payload.branch}
+              protectedHint={t('action.confirm-remove-worktree-protected-hint')}
+              removeAlsoDeletes={removeConfirmView.displayCheckboxes.removeAlsoDeletes}
+              removeConfirmProtected={removeConfirmProtected}
+              hasUpstream={hasUpstream(removeConfirmView.displayContext.branch)}
+              tracking={removeConfirmView.displayContext.branch.tracking}
+              removeAlsoUpstream={removeConfirmView.displayCheckboxes.removeAlsoUpstream}
+              onRemoveAlsoDeletesChange={(value) =>
+                setRemoveAlsoDeletes(
+                  removeConfirmView.entry!.repoId,
+                  removeConfirmView.entry!.branchName,
+                  value,
+                )
+              }
+              onRemoveAlsoUpstreamChange={(value) =>
+                setRemoveAlsoUpstream(
+                  removeConfirmView.entry!.repoId,
+                  removeConfirmView.entry!.branchName,
+                  value,
+                )
+              }
+              alsoDeleteBranchLabel={t('action.confirm-remove-worktree-also-delete-branch')}
+              alsoDeleteUpstreamLabel={t('action.confirm-delete-branch-also-delete-upstream')}
             />
+          ) : (
+            ''
           )
         }
-        return (
-          <ConfirmDialog
-            open={removeConfirm !== null && removeConfirmView.liveContext !== null}
-            title={t('action.confirm-remove-worktree-title')}
-            message={
-              <RemoveWorktreeConfirmBody
-                body={t('action.confirm-remove-worktree-body')}
-                path={formatWorktreePath(
-                  entry.payload.path,
-                  remoteRepoTarget(displayContext.repo.id, displayContext.repo.remote.lifecycle),
-                )}
-                branchName={entry.payload.branch}
-                protectedHint={t('action.confirm-remove-worktree-protected-hint')}
-                removeAlsoDeletes={displayCheckboxes.removeAlsoDeletes}
-                removeConfirmProtected={removeConfirmProtected}
-                hasUpstream={hasUpstream(displayContext.branch)}
-                tracking={displayContext.branch.tracking}
-                removeAlsoUpstream={displayCheckboxes.removeAlsoUpstream}
-                onRemoveAlsoDeletesChange={(value) =>
-                  setRemoveAlsoDeletes(entry.repoId, entry.branchName, value)
-                }
-                onRemoveAlsoUpstreamChange={(value) =>
-                  setRemoveAlsoUpstream(entry.repoId, entry.branchName, value)
-                }
-                alsoDeleteBranchLabel={t('action.confirm-remove-worktree-also-delete-branch')}
-                alsoDeleteUpstreamLabel={t('action.confirm-delete-branch-also-delete-upstream')}
-              />
-            }
-            confirmLabel={t('action.confirm-remove-worktree-confirm')}
-            destructive
-            onCancel={() => closeDialog('removeConfirm')}
-            onConfirm={() => {
-              const liveContext = removeConfirmView.liveContext
-              if (!liveContext) {
-                closeDialog('removeConfirm')
-                return undefined
-              }
-              closeDialog('removeConfirm')
-              return dispatchRemoveWorktree({
-                repo: liveContext.repo,
-                target: entry.payload,
-                alsoDeleteBranch: displayCheckboxes.removeAlsoDeletes,
-                forceDeleteBranch: false,
-                alsoDeleteUpstream: displayCheckboxes.removeAlsoUpstream,
-              })
-            }}
-          />
-        )
-      })()}
+        confirmLabel={t('action.confirm-remove-worktree-confirm')}
+        destructive
+        onCancel={() => closeDialog('removeConfirm')}
+        onConfirm={() => {
+          const liveContext = removeConfirmView.liveContext
+          if (!liveContext) {
+            closeDialog('removeConfirm')
+            return undefined
+          }
+          closeDialog('removeConfirm')
+          return dispatchRemoveWorktree({
+            repo: liveContext.repo,
+            target: removeConfirmView.entry!.payload,
+            alsoDeleteBranch: removeConfirmView.displayCheckboxes.removeAlsoDeletes,
+            forceDeleteBranch: false,
+            alsoDeleteUpstream: removeConfirmView.displayCheckboxes.removeAlsoUpstream,
+          })
+        }}
+      />
 
-      {(() => {
-        const { entry, displayContext, displayCheckboxes } = forceRemoveConfirmView
-        if (!entry || !displayContext) {
-          return (
-            <ConfirmDialog
-              open={forceRemoveConfirm !== null && forceRemoveConfirmView.liveContext !== null}
-              title=""
-              message=""
-              confirmLabel={t('action.confirm-force-delete-branch-confirm')}
-              destructive
-              onCancel={() => closeDialog('forceRemoveConfirm')}
-              onConfirm={() => closeDialog('forceRemoveConfirm')}
+      <ConfirmDialog
+        open={forceRemoveConfirm !== null && forceRemoveConfirmView.liveContext !== null}
+        title={t('action.confirm-force-delete-branch-title')}
+        message={
+          forceRemoveConfirmView.entry && forceRemoveConfirmView.displayContext ? (
+            <ForceRemoveWorktreeConfirmBody
+              removeBody={t('action.confirm-remove-worktree-body')}
+              path={formatWorktreePath(
+                forceRemoveConfirmView.entry.payload.path,
+                remoteRepoTarget(
+                  forceRemoveConfirmView.displayContext.repo.id,
+                  forceRemoveConfirmView.displayContext.repo.remote.lifecycle,
+                ),
+              )}
+              forceDeleteBody={t('action.confirm-force-delete-branch-body')}
+              branchName={forceRemoveConfirmView.entry.payload.branch}
+              note={t('action.confirm-force-delete-branch-note')}
+              hasUpstream={hasUpstream(forceRemoveConfirmView.displayContext.branch)}
+              tracking={forceRemoveConfirmView.displayContext.branch.tracking}
+              removeAlsoUpstream={forceRemoveConfirmView.displayCheckboxes.removeAlsoUpstream}
+              onRemoveAlsoUpstreamChange={(value) =>
+                setRemoveAlsoUpstream(
+                  forceRemoveConfirmView.entry!.repoId,
+                  forceRemoveConfirmView.entry!.branchName,
+                  value,
+                )
+              }
+              alsoDeleteUpstreamLabel={t('action.confirm-delete-branch-also-delete-upstream')}
             />
+          ) : (
+            ''
           )
         }
-        return (
-          <ConfirmDialog
-            open={forceRemoveConfirm !== null && forceRemoveConfirmView.liveContext !== null}
-            title={t('action.confirm-force-delete-branch-title')}
-            message={
-              <ForceRemoveWorktreeConfirmBody
-                removeBody={t('action.confirm-remove-worktree-body')}
-                path={formatWorktreePath(
-                  entry.payload.path,
-                  remoteRepoTarget(displayContext.repo.id, displayContext.repo.remote.lifecycle),
-                )}
-                forceDeleteBody={t('action.confirm-force-delete-branch-body')}
-                branchName={entry.payload.branch}
-                note={t('action.confirm-force-delete-branch-note')}
-                hasUpstream={hasUpstream(displayContext.branch)}
-                tracking={displayContext.branch.tracking}
-                removeAlsoUpstream={displayCheckboxes.removeAlsoUpstream}
-                onRemoveAlsoUpstreamChange={(value) =>
-                  setRemoveAlsoUpstream(entry.repoId, entry.branchName, value)
-                }
-                alsoDeleteUpstreamLabel={t('action.confirm-delete-branch-also-delete-upstream')}
-              />
-            }
-            confirmLabel={t('action.confirm-force-delete-branch-confirm')}
-            destructive
-            onCancel={() => closeDialog('forceRemoveConfirm')}
-            onConfirm={() => {
-              const liveContext = forceRemoveConfirmView.liveContext
-              if (!liveContext) {
-                closeDialog('forceRemoveConfirm')
-                return undefined
-              }
-              closeDialog('forceRemoveConfirm')
-              return dispatchRemoveWorktree({
-                repo: liveContext.repo,
-                target: entry.payload,
-                alsoDeleteBranch: true,
-                forceDeleteBranch: true,
-                alsoDeleteUpstream: displayCheckboxes.removeAlsoUpstream,
-              })
-            }}
-          />
-        )
-      })()}
+        confirmLabel={t('action.confirm-force-delete-branch-confirm')}
+        destructive
+        onCancel={() => closeDialog('forceRemoveConfirm')}
+        onConfirm={() => {
+          const liveContext = forceRemoveConfirmView.liveContext
+          if (!liveContext) {
+            closeDialog('forceRemoveConfirm')
+            return undefined
+          }
+          closeDialog('forceRemoveConfirm')
+          return dispatchRemoveWorktree({
+            repo: liveContext.repo,
+            target: forceRemoveConfirmView.entry!.payload,
+            alsoDeleteBranch: true,
+            forceDeleteBranch: true,
+            alsoDeleteUpstream: forceRemoveConfirmView.displayCheckboxes.removeAlsoUpstream,
+          })
+        }}
+      />
     </>
   )
 }

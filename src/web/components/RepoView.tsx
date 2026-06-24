@@ -3,6 +3,7 @@
 // and `App.tsx` — so the workspace below the topbar is just the
 // branch navigator and the branch workspace pane.
 
+import { useEffect } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { isRepoUnavailable } from '#/web/stores/repos/helpers.ts'
@@ -17,6 +18,7 @@ import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
 import { useRetainedValueDuringExit } from '#/web/hooks/useRetainedValueDuringExit.ts'
+import { useUiTransitionStore } from '#/web/stores/ui-transition.ts'
 
 interface Props {
   repoId: string
@@ -63,6 +65,28 @@ export function RepoView({ repoId }: Props) {
     retainMs: WORKSPACE_PANE_TRANSITION_MS,
     resetKey: repoId,
   })
+
+  // Publish "compact-workspace is mid-transition" to a global store
+  // so the keyboard handler can suppress branch-action shortcuts for
+  // the duration. Without this, the user sees branch X in the
+  // workspace but pressing 'P' (pull) acts on the new live branch Y,
+  // because the keyboard handler reads `repo.ui.selectedBranch`
+  // directly. The transition is short (WORKSPACE_PANE_TRANSITION_MS
+  // = 240 ms) and the suppression is imperceptible.
+  const setCompactWorkspaceTransitioning = useUiTransitionStore((s) => s.setCompactWorkspaceTransitioning)
+  const compactWorkspaceTransitioning =
+    compact && compactWorkspaceSelectedBranch !== null && compactWorkspaceSelectedBranch !== selectedBranch
+  useEffect(() => {
+    if (!compactWorkspaceTransitioning) {
+      setCompactWorkspaceTransitioning(false)
+      return
+    }
+    setCompactWorkspaceTransitioning(true)
+    const timeout = window.setTimeout(() => {
+      setCompactWorkspaceTransitioning(false)
+    }, WORKSPACE_PANE_TRANSITION_MS)
+    return () => window.clearTimeout(timeout)
+  }, [compactWorkspaceTransitioning, setCompactWorkspaceTransitioning])
 
   if (!view.exists || !repo) return <div />
   if (isRepoUnavailable(repo)) return <UnavailableRepoView repo={repo} />

@@ -34,6 +34,62 @@ vi.mock('#/web/stores/i18n.ts', () => ({
   useT: () => (key: string) => key,
 }))
 
+// Mock ConfirmDialog to record the `title` and `message` props on
+// every render, so the close-animation regression tests can observe
+// the host's prop choices even when Radix has hidden the dialog
+// (jsdom has no exit-animation timing, so the dialog content would
+// otherwise vanish as soon as `open` flips to false).
+const titlePropsByDialog: Record<string, { title: string; message: unknown }> = {
+  pushConfirm: { title: '', message: '' },
+  deleteConfirm: { title: '', message: '' },
+  forceDeleteConfirm: { title: '', message: '' },
+  removeConfirm: { title: '', message: '' },
+  forceRemoveConfirm: { title: '', message: '' },
+}
+
+vi.mock('#/web/components/ConfirmDialog.tsx', () => ({
+  ConfirmDialog: ({ open, title, message, confirmLabel, onConfirm, onCancel }: {
+    open: boolean
+    title: string
+    message: unknown
+    confirmLabel: string
+    onConfirm: () => void | Promise<unknown>
+    onCancel: () => void
+  }) => {
+    // Identify which of the five slots the host is rendering by
+    // matching the confirmLabel. The labels are unique per slot:
+    //   push-confirm, delete-branch-confirm, force-delete-unmerged,
+    //   remove-worktree-confirm, force-delete-branch-confirm.
+    const slotByLabel: Record<string, keyof typeof titlePropsByDialog> = {
+      'action.confirm-push-confirm': 'pushConfirm',
+      'action.confirm-delete-branch-confirm': 'deleteConfirm',
+      'action.confirm-force-delete-unmerged-confirm': 'forceDeleteConfirm',
+      'action.confirm-remove-worktree-confirm': 'removeConfirm',
+      'action.confirm-force-delete-branch-confirm': 'forceRemoveConfirm',
+    }
+    const slot = slotByLabel[confirmLabel]
+    if (slot) titlePropsByDialog[slot] = { title, message }
+    // Mimic the real Radix AlertDialog: only mount the dialog
+    // content when `open` is true. The existing integration tests
+    // rely on this — they find the Cancel button via
+    // `findButtonByText('dialog.cancel')` and the FIRST match in
+    // the DOM is the only open dialog's cancel button.
+    if (!open) return null
+    return (
+      <div data-testid={`confirm-dialog-${confirmLabel}`} data-open="true">
+        <h2>{title}</h2>
+        <div>{message as React.ReactNode}</div>
+        <button type="button" onClick={() => void onConfirm()}>
+          {confirmLabel}
+        </button>
+        <button type="button" onClick={onCancel}>
+          dialog.cancel
+        </button>
+      </div>
+    )
+  },
+}))
+
 const REPO_ID = '/tmp/gbl-dialog-host-test'
 let container: HTMLDivElement | null = null
 let root: Root | null = null
@@ -569,5 +625,231 @@ describe('BranchActionDialogHost', () => {
     // the dispatch with the correct args.
     expect(dispatch.dispatchPush).toHaveBeenCalledTimes(1)
     expect(confirmButton?.getAttribute('aria-busy')).toBeNull() // mock resolved sync
+  })
+
+  // The title-flip regression. Pre-fix, the four non-push dialogs
+  // used an IIFE that short-circuited to `<ConfirmDialog title=""
+  // message="" />` whenever `displayContext` was null. When the
+  // backend IPC completes within the Radix close-animation window
+  // (~200 ms) and removes the branch from the repo, `displayContext`
+  // becomes null while `entry` is still retained. Pre-fix the user
+  // saw the title text disappear mid-fade; post-fix the title stays
+  // and only the body collapses. Covers all four non-push dialogs.
+  //
+  // We can't observe the bug through `document.body.textContent`
+  // because Radix's `AlertDialog` unmounts its content as soon as
+  // `open` flips to false in jsdom (no exit-animation timing). So
+  // we mock `ConfirmDialog` to record the `title` prop on every
+  // render, letting us assert what the host passed to the dialog
+  // even when Radix would have hidden it in the browser.
+  describe('regression: title stays visible when displayContext goes null mid-fade-out', () => {
+    function dropBranchFromRepo(branchName: string): void {
+      act(() => {
+        useReposStore.setState((state) => {
+          const next = state.repos[REPO_ID]!.data.branches.filter(
+            (b: { name: string }) => b.name !== branchName,
+          )
+          return {
+            repos: {
+              ...state.repos,
+              [REPO_ID]: {
+                ...state.repos[REPO_ID]!,
+                data: { ...state.repos[REPO_ID]!.data, branches: next },
+              },
+            },
+          }
+        })
+      })
+    }
+
+    test('removeConfirm: title is the static i18n key, not "", when the branch is removed mid-fade', () => {
+      const { repo, branch } = setupRepo()
+      const payload: RemoveWorktreeDialogPayload = { branch: branch.name, path: branch.worktree!.path }
+      act(() => {
+        useBranchActionDialogsStore.getState().openRemoveWorktreeConfirm(
+          { repoId: repo.id, branchName: branch.name, payload },
+          { isProtectedBranch: false },
+        )
+      })
+      render(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branch.name} />)
+      // Pre-close: title is the static i18n key.
+      expect(titlePropsByDialog.removeConfirm.title).toBe('action.confirm-remove-worktree-title')
+
+      // Close the slot (entry retained), then drop the branch from
+      // the repo so `displayContext` becomes null. The host's
+      // render here is the structural one that would have rendered
+      // `title=""` under the pre-fix IIFE.
+      act(() => {
+        useBranchActionDialogsStore.getState().closeDialog('removeConfirm')
+      })
+      dropBranchFromRepo(branch.name)
+
+      // Post-fix: title is still the static i18n key. Pre-fix it
+      // would be `""`.
+      expect(titlePropsByDialog.removeConfirm.title).toBe('action.confirm-remove-worktree-title')
+    })
+
+    test('deleteConfirm: title is the static i18n key, not "", when the branch is removed mid-fade', () => {
+      const { repo, branch } = setupRepo()
+      act(() => {
+        useBranchActionDialogsStore.getState().openDeleteConfirm({
+          repoId: repo.id,
+          branchName: branch.name,
+          payload: branch.name,
+        })
+      })
+      render(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branch.name} />)
+      expect(titlePropsByDialog.deleteConfirm.title).toBe('action.confirm-delete-branch-title')
+
+      act(() => {
+        useBranchActionDialogsStore.getState().closeDialog('deleteConfirm')
+      })
+      dropBranchFromRepo(branch.name)
+
+      expect(titlePropsByDialog.deleteConfirm.title).toBe('action.confirm-delete-branch-title')
+    })
+
+    test('forceDeleteConfirm: title is the static i18n key, not "", when the branch is removed mid-fade', () => {
+      const { repo, branch } = setupRepo()
+      act(() => {
+        useBranchActionDialogsStore.getState().openForceDeleteConfirm({
+          repoId: repo.id,
+          branchName: branch.name,
+          payload: branch.name,
+        })
+      })
+      render(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branch.name} />)
+      expect(titlePropsByDialog.forceDeleteConfirm.title).toBe('action.confirm-force-delete-unmerged-title')
+
+      act(() => {
+        useBranchActionDialogsStore.getState().closeDialog('forceDeleteConfirm')
+      })
+      dropBranchFromRepo(branch.name)
+
+      expect(titlePropsByDialog.forceDeleteConfirm.title).toBe('action.confirm-force-delete-unmerged-title')
+    })
+
+    test('forceRemoveConfirm: title is the static i18n key, not "", when the branch is removed mid-fade', () => {
+      const { repo, branch } = setupRepo()
+      const payload: RemoveWorktreeDialogPayload = { branch: branch.name, path: branch.worktree!.path }
+      act(() => {
+        useBranchActionDialogsStore.getState().openForceRemoveWorktreeConfirm({
+          repoId: repo.id,
+          branchName: branch.name,
+          payload,
+        })
+      })
+      render(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branch.name} />)
+      expect(titlePropsByDialog.forceRemoveConfirm.title).toBe('action.confirm-force-delete-branch-title')
+
+      act(() => {
+        useBranchActionDialogsStore.getState().closeDialog('forceRemoveConfirm')
+      })
+      dropBranchFromRepo(branch.name)
+
+      expect(titlePropsByDialog.forceRemoveConfirm.title).toBe('action.confirm-force-delete-branch-title')
+    })
+  })
+
+  // The body-collapse regression. Pre-fix, the four non-push dialogs
+  // also collapsed the body (gated on `displayContext`) when the
+  // branch was removed mid-fade, even after the title was already
+  // static. The user would see a title with an empty body for the
+  // rest of the close animation — visually contradicting the static
+  // title. Post-fix, the body's `displayContext` is retained across
+  // the close-animation window via `useLastNonNull(liveContext)` in
+  // `useBranchActionDialogDisplay`, so the body stays stable while
+  // the dialog fades out.
+  describe('regression: body stays visible when the branch is removed mid-fade-out', () => {
+    function dropBranchFromRepo(branchName: string): void {
+      act(() => {
+        useReposStore.setState((state) => {
+          const next = state.repos[REPO_ID]!.data.branches.filter(
+            (b: { name: string }) => b.name !== branchName,
+          )
+          return {
+            repos: {
+              ...state.repos,
+              [REPO_ID]: {
+                ...state.repos[REPO_ID]!,
+                data: { ...state.repos[REPO_ID]!.data, branches: next },
+              },
+            },
+          }
+        })
+      })
+    }
+
+    test('removeConfirm: body is not collapsed to empty when the worktree branch is removed mid-fade', () => {
+      const { repo, branch } = setupRepo()
+      const payload: RemoveWorktreeDialogPayload = { branch: branch.name, path: branch.worktree!.path }
+      act(() => {
+        useBranchActionDialogsStore.getState().openRemoveWorktreeConfirm(
+          { repoId: repo.id, branchName: branch.name, payload },
+          { isProtectedBranch: false },
+        )
+      })
+      render(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branch.name} />)
+      // Pre-close: message is the full body (a React element, not
+      // the empty string).
+      expect(titlePropsByDialog.removeConfirm.message).toBeTruthy()
+      expect(titlePropsByDialog.removeConfirm.message).not.toBe('')
+
+      // Close the slot (entry retained), then drop the branch.
+      act(() => {
+        useBranchActionDialogsStore.getState().closeDialog('removeConfirm')
+      })
+      dropBranchFromRepo(branch.name)
+
+      // Post-fix: message is still a non-empty body. Pre-fix it
+      // would be the string `''` (the IIFE fallback).
+      expect(titlePropsByDialog.removeConfirm.message).toBeTruthy()
+      expect(titlePropsByDialog.removeConfirm.message).not.toBe('')
+    })
+
+    test('deleteConfirm: body is not collapsed to empty when the branch is removed mid-fade', () => {
+      const { repo, branch } = setupRepo()
+      act(() => {
+        useBranchActionDialogsStore.getState().openDeleteConfirm({
+          repoId: repo.id,
+          branchName: branch.name,
+          payload: branch.name,
+        })
+      })
+      render(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branch.name} />)
+      expect(titlePropsByDialog.deleteConfirm.message).toBeTruthy()
+      expect(titlePropsByDialog.deleteConfirm.message).not.toBe('')
+
+      act(() => {
+        useBranchActionDialogsStore.getState().closeDialog('deleteConfirm')
+      })
+      dropBranchFromRepo(branch.name)
+
+      expect(titlePropsByDialog.deleteConfirm.message).toBeTruthy()
+      expect(titlePropsByDialog.deleteConfirm.message).not.toBe('')
+    })
+
+    test('forceRemoveConfirm: body is not collapsed to empty when the worktree branch is removed mid-fade', () => {
+      const { repo, branch } = setupRepo()
+      const payload: RemoveWorktreeDialogPayload = { branch: branch.name, path: branch.worktree!.path }
+      act(() => {
+        useBranchActionDialogsStore.getState().openForceRemoveWorktreeConfirm({
+          repoId: repo.id,
+          branchName: branch.name,
+          payload,
+        })
+      })
+      render(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branch.name} />)
+      expect(titlePropsByDialog.forceRemoveConfirm.message).toBeTruthy()
+      expect(titlePropsByDialog.forceRemoveConfirm.message).not.toBe('')
+
+      act(() => {
+        useBranchActionDialogsStore.getState().closeDialog('forceRemoveConfirm')
+      })
+      dropBranchFromRepo(branch.name)
+
+      expect(titlePropsByDialog.forceRemoveConfirm.message).toBeTruthy()
+      expect(titlePropsByDialog.forceRemoveConfirm.message).not.toBe('')
+    })
   })
 })
