@@ -49,7 +49,7 @@ describe('registerTerminalClient', () => {
   })
 })
 
-describe('attachTerminalClient (single-owner model)', () => {
+describe('attachTerminalClient (single-user model)', () => {
   test('first attach auto-claims and sets userSticky', () => {
     const state = createState({ attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]) })
     const effect = attachTerminalClient(state, 'a1')

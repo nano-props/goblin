@@ -22,7 +22,7 @@ export interface ReattachSnapshotCacheEntry {
   snapshotSeq: number
 }
 
-export type TerminalAttachResultWithOwnership = Extract<TerminalAttachResult, { ok: true }> & {
+export type TerminalAttachResultWithController = Extract<TerminalAttachResult, { ok: true }> & {
   role: TerminalIdentityViewModel['role']
   controllerStatus: TerminalIdentityViewModel['controllerStatus']
 }
@@ -38,7 +38,7 @@ export interface ProjectedServerTerminalSlot {
 export function projectTerminalAttachResultForClient(
   result: Extract<TerminalAttachResult, { ok: true }>,
   clientId: string,
-): TerminalAttachResultWithOwnership {
+): TerminalAttachResultWithController {
   return {
     ...result,
     ...resolveTerminalController(result.controller, clientId),

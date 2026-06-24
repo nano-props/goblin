@@ -18,7 +18,7 @@ import {
 } from '#/web/components/terminal/terminal-slot-geometry.ts'
 import {
   projectTerminalAttachResultForClient,
-  type TerminalAttachResultWithOwnership,
+  type TerminalAttachResultWithController,
 } from '#/web/components/terminal/terminal-slot-projection.ts'
 import { TerminalSlotRuntime } from '#/web/components/terminal/terminal-slot-runtime.ts'
 import { TerminalSlotView } from '#/web/components/terminal/terminal-slot-view.ts'
@@ -397,13 +397,22 @@ export class ManagedTerminalSlot {
     // here — the type-level boundary at `applyIdentity` enforces it.
     const wasRole = this.runtime.clientRole()
     const changed = this.runtime.handleIdentity(event)
-    const pendingCleared = applies ? this.runtime.clearTakeoverPending() : false
     if (changed) {
       const newRole = this.runtime.clientRole()
       const isControllerNow = this.runtime.isController()
       const isUnowned = this.runtime.phase() === 'open' && newRole === 'unowned'
-      // The gate only distinguishes pass-through vs takeover.
-      this.authority().setRole(isControllerNow ? 'controller' : 'viewer')
+      // Sync the gate's role cache. Pass `newRole` through directly
+      // (not the boolean `isControllerNow` collapsed form) so the
+      // gate can distinguish 'unowned' from 'viewer' — the gate
+      // returns `denied: slot-closed` for unowned and triggers an
+      // auto-promote for viewer.
+      this.authority().setRole(newRole)
+      // Note: the takeover-pending flag is owned by the takeover
+      // round-trip itself (success clears it inline, failure clears
+      // it via `clearTakeoverPendingWithNotify`). Clearing it here
+      // would race with an in-flight takeover and turn the banner
+      // off the moment the server's identity confirmation arrives,
+      // before the round-trip has had a chance to resolve.
       if (wasRole === 'controller' && newRole !== 'controller') {
         if (this.view.currentTerminal()) {
           this.destroyActiveView({ preserveTransientState: true })
@@ -438,7 +447,7 @@ export class ManagedTerminalSlot {
         this.start()
       }
     }
-    if (changed || pendingCleared) {
+    if (changed) {
       this.notify('metadata')
     }
   }
@@ -538,6 +547,11 @@ export class ManagedTerminalSlot {
         // into the next start.
         if (preloadReplayGeneration !== null) this.runtime.drainReplay(preloadReplayGeneration)
         const changed = this.runtime.applyAttachResult(result, { cols: term.cols, rows: term.rows })
+        // Sync the gate so writes/resizes that race the next identity
+        // event use the correct role. The first-frame payload is
+        // authoritative for the new ptySessionId, so a successful
+        // attach always lands here before any keystroke.
+        this.authority().setRole(result.role)
         this.destroyActiveView()
         if (changed) this.notify('metadata')
         return
@@ -622,7 +636,7 @@ export class ManagedTerminalSlot {
     }
   }
 
-  private async ipcPhase(token: number, term: XTermTerminal): Promise<TerminalAttachResultWithOwnership> {
+  private async ipcPhase(token: number, term: XTermTerminal): Promise<TerminalAttachResultWithController> {
     const restart = this.runtime.consumeRestartFlag()
     const ptySessionId = restart ? this.runtime.restartingPtySessionId() : this.runtime.currentPtySessionId()
     if (!ptySessionId) {
@@ -645,15 +659,21 @@ export class ManagedTerminalSlot {
       if (this.runtime.failAttachAttempt(result.message)) this.notify('metadata')
       throw new StartCancelledError()
     }
-    return this.withLocalOwnership(result)
+    return this.withLocalController(result)
   }
 
   private async replayPhase(
     token: number,
     term: XTermTerminal,
-    result: TerminalAttachResultWithOwnership,
+    result: TerminalAttachResultWithController,
   ): Promise<boolean> {
     const changed = this.runtime.applyAttachResult(result, { cols: term.cols, rows: term.rows })
+    // Sync the gate. Without this, a controller→unowned→recreate
+    // cycle leaves the gate at 'viewer' even though the runtime
+    // already reflects 'controller', and the next write would
+    // spuriously trigger a takeover round-trip to a server that
+    // already considers us the controller.
+    this.authority().setRole(result.role)
     if (!this.runtime.isController()) {
       this.applyCanonicalSizeToView()
     } else {
@@ -696,7 +716,7 @@ export class ManagedTerminalSlot {
     }
   }
 
-  private withLocalOwnership(result: Extract<TerminalAttachResult, { ok: true }>): TerminalAttachResultWithOwnership {
+  private withLocalController(result: Extract<TerminalAttachResult, { ok: true }>): TerminalAttachResultWithController {
     const clientId = readOrCreateWebTerminalClientId()
     return projectTerminalAttachResultForClient(result, clientId)
   }

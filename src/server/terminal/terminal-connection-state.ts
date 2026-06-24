@@ -8,12 +8,12 @@ interface TerminalConnectionStateOptions {
    * resume doesn't lose the session catalog.
    */
   detachedTtlMs: number
-  onOwnerExpired(userId: string): void
+  onUserExpired(userId: string): void
 }
 
 type TimerHandle = ReturnType<typeof setTimeout>
 
-interface OwnerTimerEntry {
+interface UserTimerEntry {
   timer: TimerHandle
   userId: string
 }
@@ -27,27 +27,27 @@ interface OwnerTimerEntry {
  */
 export class TerminalConnectionState {
   private readonly options: TerminalConnectionStateOptions
-  private readonly disconnectTimerByUserId = new Map<string, OwnerTimerEntry>()
+  private readonly disconnectTimerByUserId = new Map<string, UserTimerEntry>()
 
   constructor(options: TerminalConnectionStateOptions) {
     this.options = options
   }
 
-  clearOwnerDisconnect(userId: string): void {
+  clearUserDisconnect(userId: string): void {
     const entry = this.disconnectTimerByUserId.get(userId)
     if (!entry) return
     clearTimeout(entry.timer)
     this.disconnectTimerByUserId.delete(userId)
   }
 
-  scheduleOwnerDisconnect(userId: string, hasSockets: () => boolean): void {
-    this.clearOwnerDisconnect(userId)
-    const entry: OwnerTimerEntry = {
+  scheduleUserDisconnect(userId: string, hasSockets: () => boolean): void {
+    this.clearUserDisconnect(userId)
+    const entry: UserTimerEntry = {
       userId,
       timer: setTimeout(() => {
         this.disconnectTimerByUserId.delete(userId)
         if (hasSockets()) return
-        this.options.onOwnerExpired(userId)
+        this.options.onUserExpired(userId)
       }, this.options.detachedTtlMs),
     }
     this.disconnectTimerByUserId.set(userId, entry)

@@ -61,7 +61,7 @@ export class TerminalSlotRuntime {
   }
 
   clientRole(): TerminalClientRole {
-    return this.state.getClientOwnership().role
+    return this.state.getClientController().role
   }
 
   startAttaching(): boolean {

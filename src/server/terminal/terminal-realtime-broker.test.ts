@@ -24,7 +24,7 @@ describe('terminal realtime broker', () => {
 
     expect(first.close).toHaveBeenCalledWith(1001, 'server shutting down')
     expect(second.close).toHaveBeenCalledWith(1001, 'server shutting down')
-    expect(broker.hasOwnerSockets(USER_A)).toBe(false)
+    expect(broker.hasUserSockets(USER_A)).toBe(false)
     expect(broker.isClientConnected(USER_A, 'client_a')).toBe(false)
     expect(broker.isClientConnected(USER_A, 'client_b')).toBe(false)
   })

@@ -942,7 +942,7 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
-  test('after the controller disconnects, a sibling attachment auto-claims on attach (single-owner)', async () => {
+  test('after the controller disconnects, a sibling attachment auto-claims on attach (single-user)', async () => {
     // Device-switch scenario in the new model: A was the controller
     // (from create); A's socket closes; B (a different clientId)
     // attaches. The previous revision refused the auto-claim because
@@ -991,7 +991,7 @@ describe('server terminal runtime', () => {
   })
 
   test('a late-returning original controller stays a viewer once a sibling has claimed the slot (no grace restore)', async () => {
-    // The new owner-sticky model clears the controller slot on
+    // The new user-sticky model clears the controller slot on
     // disconnect with no grace period. If a sibling attachment
     // attaches in the window before the original controller
     // reconnects, the sibling claims the slot. When the original

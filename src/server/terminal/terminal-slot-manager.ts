@@ -372,7 +372,7 @@ export class TerminalSlotManager<TUser extends string | number> {
     this.disposeSessionResources(session)
   }
 
-  closeSessionsForOwner(userId: TUser): void {
+  closeSessionsForUser(userId: TUser): void {
     for (const session of Array.from(this.slotsByPtySessionId.values())) {
       if (session.userId === userId) this.closeSlot(session.id)
     }

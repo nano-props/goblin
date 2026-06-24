@@ -36,7 +36,7 @@ import type { GoblinTerminalCommandRuntime } from '#/server/terminal/g-command.t
 // the background so users can leave builds or long-running tasks unattended.
 // 24 hours gives a full day for the user to reconnect before sessions are
 // forcibly cleaned up. (The previous revision also kept a 30s controller grace
-// grace timer here; it has been removed — see `terminal-controller.ts` for
+// timer here; it has been removed — see `terminal-controller.ts` for
 // the new disconnect-clears-controller semantics.)
 const TERMINAL_DETACHED_TTL_MS = 24 * 60 * 60 * 1000
 const terminalRuntimeLogger = serverLogger.child({ module: 'terminal-runtime' })

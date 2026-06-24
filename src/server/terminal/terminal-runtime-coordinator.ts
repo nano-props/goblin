@@ -24,15 +24,15 @@ export function createTerminalRuntimeCoordinator(
   // the access-token-derived userId.
   const connectionState = new TerminalConnectionState({
     detachedTtlMs,
-    onOwnerExpired(userId) {
-      manager.closeSessionsForOwner(userId)
+    onUserExpired(userId) {
+      manager.closeSessionsForUser(userId)
       terminalViewOrder.closeViewsForUser(userId)
     },
   })
 
   const broker = new TerminalRealtimeBroker({
     onClientConnected(clientId, userId) {
-      connectionState.clearOwnerDisconnect(userId)
+      connectionState.clearUserDisconnect(userId)
       manager.setClientConnected(userId, clientId, true)
     },
     onClientDisconnected(clientId, userId) {
@@ -42,10 +42,10 @@ export function createTerminalRuntimeCoordinator(
       // is the only timer we still schedule on disconnect — it
       // covers the "all sockets gone, drop the catalog" path.
       manager.setClientConnected(userId, clientId, false)
-      connectionState.scheduleOwnerDisconnect(userId, () => broker.hasOwnerSockets(userId))
+      connectionState.scheduleUserDisconnect(userId, () => broker.hasUserSockets(userId))
     },
     onUserDisconnected(userId) {
-      connectionState.scheduleOwnerDisconnect(userId, () => broker.hasOwnerSockets(userId))
+      connectionState.scheduleUserDisconnect(userId, () => broker.hasUserSockets(userId))
     },
   })
 

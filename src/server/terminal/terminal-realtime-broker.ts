@@ -198,7 +198,7 @@ export class TerminalRealtimeBroker {
     return Date.now() - lastBeat < HEARTBEAT_DEADLINE_MS
   }
 
-  hasOwnerSockets(userId: string): boolean {
+  hasUserSockets(userId: string): boolean {
     return (this.socketsByUserId.get(userId)?.size ?? 0) > 0
   }
 

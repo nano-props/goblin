@@ -1881,6 +1881,17 @@ describe('ManagedTerminalSlot', () => {
       canTakeover: false,
     })
     expect(xtermMocks.terminals.at(-1)!.write).toHaveBeenCalledWith('reclaimed-screen', expect.any(Function))
+
+    // Bug 1+2 regression: after the controller→unowned→recreate
+    // cycle, the gate's role cache must reflect the runtime's
+    // current role. Otherwise the next write would spuriously
+    // trigger a takeover round-trip to a server that already
+    // considers us the controller. The runtime is now 'controller'
+    // (asserted above); the gate must agree.
+    const gate = (session as unknown as { authorityGate?: { currentRole(): 'controller' | 'viewer' | 'unowned' } })
+      .authorityGate
+    expect(gate).toBeDefined()
+    expect(gate!.currentRole()).toBe('controller')
   })
 
   test('applies identity updates from realtime messages', async () => {

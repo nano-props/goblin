@@ -76,7 +76,7 @@ describe('TerminalSlotState', () => {
     }
     expect(state.applyIdentity(identityOnly)).toBe(true)
     expect(state.getPhase()).toBe('open')
-    expect(state.getClientOwnership().role).toBe('viewer')
+    expect(state.getClientController().role).toBe('viewer')
 
     // Lifecycle-only update: role is unchanged.
     const lifecycleOnly: TerminalLifecycleViewModel = {
@@ -87,7 +87,7 @@ describe('TerminalSlotState', () => {
     }
     expect(state.applyLifecycle(lifecycleOnly)).toBe(true)
     expect(state.getPhase()).toBe('opening')
-    expect(state.getClientOwnership().role).toBe('viewer')
+    expect(state.getClientController().role).toBe('viewer')
     expect(state.isTakeoverPending()).toBe(true)
   })
 

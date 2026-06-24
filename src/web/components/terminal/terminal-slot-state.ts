@@ -94,7 +94,7 @@ export class TerminalSlotState {
     return this.runtimeState.clientController.role === 'controller' && this.runtimeState.phase === 'open'
   }
 
-  getClientOwnership(): TerminalControllerViewModel {
+  getClientController(): TerminalControllerViewModel {
     return this.runtimeState.clientController
   }
 
