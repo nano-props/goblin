@@ -80,7 +80,7 @@ export class TerminalSessionRegistry {
   private readonly selectedKeyByWorktree = new Map<string, string>()
   private readonly preferredSelectedKeyByWorktree = new Map<string, string>()
   private readonly hostByWorktree = new Map<string, HTMLElement>()
-  private readonly hostWaitersByWorktree = new Map<string, Set<() => void>>()
+  private readonly hostWaitersByWorktree = new Map<string, () => void>()
   private readonly geometryByWorktree = new Map<string, { cols: number; rows: number }>()
   private readonly pendingCreateByWorktree = new Map<
     string,
@@ -407,11 +407,8 @@ export class TerminalSessionRegistry {
 
   registerHost = (worktreeTerminalKey: string, host: HTMLElement): void => {
     this.hostByWorktree.set(worktreeTerminalKey, host)
-    const waiters = this.hostWaitersByWorktree.get(worktreeTerminalKey)
-    if (waiters) {
-      this.hostWaitersByWorktree.delete(worktreeTerminalKey)
-      for (const waiter of Array.from(waiters)) waiter()
-    }
+    const waiter = this.hostWaitersByWorktree.get(worktreeTerminalKey)
+    if (waiter) waiter()
     void captureTerminalHostGeometry({
       worktreeTerminalKey,
       hostByWorktree: this.hostByWorktree,
@@ -490,7 +487,14 @@ export class TerminalSessionRegistry {
         reject(signal.reason ?? new Error('aborted'))
         return
       }
-      const waiters = this.hostWaitersByWorktree.get(worktreeTerminalKey) ?? new Set()
+      const cleanup = () => {
+        this.hostWaitersByWorktree.delete(worktreeTerminalKey)
+        signal.removeEventListener('abort', onAbort)
+      }
+      // `enqueuePendingCreate` dedupes per worktree, so at most one
+      // waiter is ever outstanding. The callback owns its map entry:
+      // `registerHost` reads + calls, and the same callback (via
+      // `onAbort`) cleans up on cancel. No iteration, no Set bookkeeping.
       const waiter = () => {
         cleanup()
         if (signal.aborted) {
@@ -499,18 +503,11 @@ export class TerminalSessionRegistry {
         }
         resolve()
       }
-      const cleanup = () => {
-        const current = this.hostWaitersByWorktree.get(worktreeTerminalKey)
-        current?.delete(waiter)
-        if (current && current.size === 0) this.hostWaitersByWorktree.delete(worktreeTerminalKey)
-        signal.removeEventListener('abort', onAbort)
-      }
       const onAbort = () => {
         cleanup()
         reject(signal.reason ?? new Error('aborted'))
       }
-      waiters.add(waiter)
-      this.hostWaitersByWorktree.set(worktreeTerminalKey, waiters)
+      this.hostWaitersByWorktree.set(worktreeTerminalKey, waiter)
       signal.addEventListener('abort', onAbort)
     })
   }
