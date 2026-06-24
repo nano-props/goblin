@@ -2,7 +2,7 @@
 
 ## Background
 
-Today the terminal slot accepts external content only via drag-and-drop. `Cmd/Ctrl+V` falls through to xterm.js's native text-only paste — copying a file in Finder and pasting produces nothing. Web renderers have the same gap (`pathForDroppedFile` returns `''`, no equivalent IPC for paste). This PR closes the paste path on both Electron and web by routing paste through the same resolver drag-and-drop already uses.
+Today the terminal slot accepts external content only via drag-and-drop. `Cmd/Ctrl+V` falls through to xterm.js's native text-only paste — copying a file in Finder and pasting produces nothing. Web clients have the same gap (`pathForDroppedFile` returns `''`, no equivalent IPC for paste). This PR closes the paste path on both Electron and web by routing paste through the same resolver drag-and-drop already uses.
 
 ## Goal
 
@@ -65,7 +65,7 @@ The router itself is `previewPaste({ text, files }) → PastePreview` in `src/we
 
 ## Size cap
 
-`PASTE_FILE_MAX_BYTES = 10 MiB` in `src/shared/clipboard-paste.ts`, enforced at three layers (renderer → IPC → server `bodyLimit`). Server batch limit is `PASTE_FILE_MAX_BYTES + 2 MiB` to cover multipart overhead. The renderer per-file check produces a user-friendly `terminal.paste-file-too-large` toast before any IPC traffic; the server batch limit produces a generic 413 — defense-in-depth against bypassed renderers.
+`PASTE_FILE_MAX_BYTES = 10 MiB` in `src/shared/clipboard-paste.ts`, enforced at three layers (client → IPC → server `bodyLimit`). Server batch limit is `PASTE_FILE_MAX_BYTES + 2 MiB` to cover multipart overhead. The client per-file check produces a user-friendly `terminal.paste-file-too-large` toast before any IPC traffic; the server batch limit produces a generic 413 — defense-in-depth against bypassed clients.
 
 ## Error surface
 

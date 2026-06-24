@@ -4,7 +4,7 @@ Use this doc for the terminal system design.
 
 ## Goal
 
-- Provide a server-backed terminal model that works the same way across web and Electron renderers.
+- Provide a server-backed terminal model that works the same way across web and Electron clients.
 - Keep terminal sessions long-lived and reconnectable instead of tying them to one visible view.
 - Separate business lifecycle from PTY execution details.
 - Make terminal control, mirroring, and takeover explicit parts of the model.
@@ -15,14 +15,14 @@ Use this doc for the terminal system design.
 The terminal feature is built around four different concepts:
 
 - **Session**: the long-lived shell process and its server-owned lifecycle.
-- **Attachment**: one renderer attachment to a session.
+- **Attachment**: one client attachment to a session.
 - **Controller**: the attachment that currently has write and resize authority.
 - **View**: one local xterm instance that renders a session in a particular UI surface.
 
 These concepts should not be collapsed into each other.
 
 A session may outlive any one view.
-A renderer may reconnect through a new attachment.
+A client may reconnect through a new attachment.
 Multiple attachments may observe the same session.
 Only one attachment may control the session at a time.
 
@@ -31,7 +31,7 @@ Only one attachment may control the session at a time.
 ### Server-first runtime
 
 - The server owns runtime-coherent terminal truth.
-- Renderers are projections of server state plus local interaction state.
+- Clients are projections of server state plus local interaction state.
 - Terminal behavior should be described in client and attachment terms, not in window terms.
 
 ### Stable business boundary over PTY boundary
@@ -54,7 +54,7 @@ Only one attachment may control the session at a time.
 
 ### Attributed input
 
-- PTY writes must carry renderer-side provenance before they cross the terminal bridge.
+- PTY writes must carry client-side provenance before they cross the terminal bridge.
 - User intent, terminal-emulator replies, and replay side effects are different classes of input.
 - Replay side effects are local rendering artifacts and must never be forwarded as user stdin.
 
@@ -71,7 +71,7 @@ The terminal feature spans `shared`, `server`, and `web`, but it still behaves a
 ### Shared layer
 
 - Defines protocol types, message shapes, identities, and session key rules.
-- Gives both server and renderer a common language for session, control, and realtime events.
+- Gives both server and client a common language for session, control, and realtime events.
 
 ### Server runtime
 
@@ -83,16 +83,16 @@ The terminal feature spans `shared`, `server`, and `web`, but it still behaves a
 
 - Owns spawn, write, resize, kill, and PTY event forwarding.
 - Hides whether PTYs run in-process or in a worker.
-- Does not own catalog, control, or renderer-facing policy.
+- Does not own catalog, control, or client-facing policy.
 
-### Renderer projection
+### Client projection
 
-- Maintains the renderer-local projection of live sessions, selection, bells, and local reattach state.
+- Maintains the client-local projection of live sessions, selection, bells, and local reattach state.
 - Coordinates create, attach, detach, select, restart, takeover, and local session lifecycle.
 - Treats the bridge as the transport to server truth, not as the source of truth itself.
 - Owns input provenance before writes are sent to the server.
 
-### Renderer view layer
+### Client view layer
 
 - Owns xterm instances, DOM attachment, local search UI, and rendering lifecycle.
 - Should stay focused on view concerns such as layout, input capture, and rendering behavior.
@@ -102,11 +102,11 @@ The terminal feature spans `shared`, `server`, and `web`, but it still behaves a
 
 At a high level, the lifecycle is:
 
-1. A renderer requests create or restore for a worktree terminal.
+1. A client requests create or restore for a worktree terminal.
 2. The server catalog resolves whether that request means create, reuse, or restore.
 3. The session manager ensures a session exists and that a PTY is running for it.
-4. The renderer attaches a local view to the session.
-5. Realtime output, title, exit, and identity events keep renderers up to date.
+4. The client attaches a local view to the session.
+5. Realtime output, title, exit, and identity events keep clients up to date.
 6. Detach removes a local view without necessarily killing the session.
 7. Close or TTL cleanup ends the session and frees PTY resources.
 
@@ -120,7 +120,7 @@ Closing a session should be an explicit business action or the result of server-
 The terminal system relies on four identity scopes:
 
 - **userId**: the server-side terminal user derived from the authenticated access token. Session visibility, lifecycle cleanup, and realtime fanout are partitioned by this id.
-- **clientId**: the logical renderer client for one browser tab or Electron renderer. It validates and routes requests, but it does not own terminal sessions.
+- **clientId**: the logical client for one browser tab or Electron client. It validates and routes requests, but it does not own terminal sessions.
 - **clientId**: one terminal view/socket attachment under a user.
 - **ptySessionId**: the server-owned identifier for one live terminal session.
 
@@ -170,7 +170,7 @@ Geometry should be treated as part of terminal correctness.
 ### Principles
 
 - Session creation should use measured host geometry whenever available.
-- The renderer and server should use a coherent geometry model, not unrelated guesses.
+- The client and server should use a coherent geometry model, not unrelated guesses.
 - PTY resize should closely follow the active controller view geometry.
 - Geometry should flow through create, attach, resize, restart, and takeover consistently.
 
@@ -198,7 +198,7 @@ The system supports replay and snapshot hydration so users can reattach to runni
 
 - restore visible content after reconnect
 - avoid blank terminals during attach
-- preserve continuity across renderer lifecycle changes
+- preserve continuity across client lifecycle changes
 
 ### Rules
 
@@ -210,9 +210,9 @@ The system supports replay and snapshot hydration so users can reattach to runni
 
 ### Input attribution during replay
 
-Server snapshots are serialized from the server-side headless xterm screen. Hydrating a renderer still means writing terminal-control sequences into local xterm, and those sequences can legitimately cause the emulator to emit protocol replies such as device, cursor-position, focus, mouse, or color reports. During live operation those replies are part of the terminal protocol and may need to reach the PTY. During local snapshot hydration they are renderer-created side effects of redrawing a server-authored screen, not user input.
+Server snapshots are serialized from the server-side headless xterm screen. Hydrating a client still means writing terminal-control sequences into local xterm, and those sequences can legitimately cause the emulator to emit protocol replies such as device, cursor-position, focus, mouse, or color reports. During live operation those replies are part of the terminal protocol and may need to reach the PTY. During local snapshot hydration they are client-created side effects of redrawing a server-authored screen, not user input.
 
-The renderer input pipeline therefore uses an internal envelope:
+The client input pipeline therefore uses an internal envelope:
 
 - **user intent**: keyboard input, text paste, file paste/drop resolution, mobile toolbar helpers, and explicit UI command writes
 - **terminal-emulator input**: data emitted by xterm as terminal protocol traffic
@@ -225,7 +225,7 @@ Replay boundaries suppress terminal-emulator input while replay is in progress, 
 They should therefore share the same high-level rule:
 
 - the mutation response itself should carry the authoritative first-frame hydration payload
-- the renderer should hydrate from that response instead of reconstructing first paint from a race between live output, list updates, and later snapshot fetches
+- the client should hydrate from that response instead of reconstructing first paint from a race between live output, list updates, and later snapshot fetches
 - projection data returned alongside the mutation should not be used as the success criterion for first paint
 
 For `create` specifically:
@@ -280,10 +280,10 @@ The terminal feature uses all three app state classes:
 ### Restorable state
 
 - preferred selected terminal per worktree
-- renderer-side reattach hints that improve continuity across UI movement
+- client-side reattach hints that improve continuity across UI movement
 
 The server should own runtime-coherent terminal truth.
-The renderer may cache and project it, but should not invent parallel business truth.
+The client may cache and project it, but should not invent parallel business truth.
 
 ## Failure model
 
@@ -293,7 +293,7 @@ The terminal system should optimize for continuity, but it still needs clear fai
 
 - PTY spawn failure
 - attachment disconnect
-- renderer teardown while a session remains alive
+- client teardown while a session remains alive
 - resize or write rejection due to lost control
 - session exit during reconnect or replay
 
@@ -309,14 +309,14 @@ The terminal system should optimize for continuity, but it still needs clear fai
 - The PTY worker direction is the right architectural boundary.
 - The server-first model is appropriate for terminal state.
 - Control is modeled explicitly instead of being hidden in UI heuristics.
-- Renderer code already separates registry/projection concerns from xterm view concerns.
+- Client code already separates registry/projection concerns from xterm view concerns.
 - The design supports mirroring, reconnect, and takeover without requiring Electron-specific assumptions.
 
 ## Main risks to watch
 
 - Letting geometry drift between create, attach, and resize phases.
 - Exposing sessions to the UI before their lifecycle is truly ready.
-- Allowing renderer-local state to silently diverge from server truth.
+- Allowing client-local state to silently diverge from server truth.
 - Treating replay or redraw as a fix for lifecycle or geometry bugs.
 - Allowing PTY implementation differences to leak into product behavior.
 
@@ -324,7 +324,7 @@ The terminal system should optimize for continuity, but it still needs clear fai
 
 - Keep the server as the source of terminal business truth.
 - Keep PTY execution behind the supervisor boundary.
-- Keep renderer registry code as projection and orchestration, not as an alternative authority.
+- Keep client registry code as projection and orchestration, not as an alternative authority.
 - Keep xterm view code focused on rendering and local interaction.
 - Treat geometry as a correctness path, not as optional polish.
 - Prefer explicit control transitions over implicit heuristics.

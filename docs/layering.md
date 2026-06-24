@@ -102,7 +102,7 @@ Do not mix read and write concerns unless the feature is still trivial.
 
 ## Server-side layering
 
-Server-side features follow the same layering logic as the renderer side. Do not let route files accumulate business orchestration just because they are on the server.
+Server-side features follow the same layering logic as the client side. Do not let route files accumulate business orchestration just because they are on the server.
 
 | Layer    | Server responsibility                                    | Typical files                                                         |
 | -------- | -------------------------------------------------------- | --------------------------------------------------------------------- |
@@ -218,11 +218,11 @@ It also shows that not every complex feature needs a separate runtime facade lay
 
 - boundary: `src/server/routes/realtime.ts`, `src/web/terminal.ts`
 - read: `src/web/terminal-slot-queries.ts` (loader helper), `src/web/components/terminal/TerminalSlotRegistry.ts` (read projection)
-- write: `src/server/terminal/terminal-runtime.ts` (factory; the authoritative source for session/catalog/broker/dispatch), `src/web/components/terminal/TerminalSlotRegistry.ts` (renderer-side write paths for `attach`/`select`/`create`)
+- write: `src/server/terminal/terminal-runtime.ts` (factory; the authoritative source for session/catalog/broker/dispatch), `src/web/components/terminal/TerminalSlotRegistry.ts` (client-side write paths for `attach`/`select`/`create`)
 - source: `src/server/terminal/terminal-slot-manager.ts` (in-process state for sessions, control, render), `src/server/terminal/pty-supervisor.ts` (PtySupervisor interface), `src/server/terminal/pty-supervisor-inprocess.ts` + `pty-supervisor-worker.ts` (PTY pool impls)
 - protocol types: `src/shared/terminal-types.ts`, `src/shared/terminal-socket.ts`, `src/shared/terminal-validators.ts`, `src/shared/terminal-controller.ts`, `src/shared/slot-ids.ts` (client↔server wire types, validation, controller helpers), `src/shared/terminal-slot-key.ts` (canonical session/worktree key encoding), `src/server/terminal/pty-worker-protocol.ts` (main↔PTY-worker wire types)
 
-The server-side terminal runtime is created by `createServerTerminalRuntime({ ptySupervisor })` and is the only place that implements `ServerTerminalHost`. The realtime route receives the host via dependency injection from the server factory. The TerminalSlotProvider on the renderer side keeps `TerminalSlotRegistry` as the single source of truth for live session state and uses the bridge only for fetches and mutations.
+The server-side terminal runtime is created by `createServerTerminalRuntime({ ptySupervisor })` and is the only place that implements `ServerTerminalHost`. The realtime route receives the host via dependency injection from the server factory. The TerminalSlotProvider on the client side keeps `TerminalSlotRegistry` as the single source of truth for live session state and uses the bridge only for fetches and mutations.
 
 **PtySupervisor exit metadata — deliberate asymmetry.** The in-process supervisor (`pty-supervisor-inprocess.ts`) reports `pty-exit` to listeners as `(code, signal) = (null, null)` because `node-pty`'s `onExit` only signals "exited" without those values, and by the time the callback fires the underlying term is already gone. The worker-backed supervisor delivers the real values carried by the IPC `pty-exit` event. The session manager does not currently branch on `code`/`signal` — `pty === null` is the canonical "session ended" signal — so the asymmetry is invisible at higher layers. A future need for `code`/`signal` (e.g. for status-bar UI) would require a more invasive change: the in-process supervisor would have to register an `onExit` listener at spawn time and persist the metadata, similar to how it currently caches the process name.
 

@@ -180,7 +180,7 @@ viewer mode with no path to auto-claim.
 
 A per-`clientId` heartbeat closes this gap:
 
-- The renderer emits `{ type: 'heartbeat', at: <ms> }` on the
+- The client emits `{ type: 'heartbeat', at: <ms> }` on the
   realtime socket every `HEARTBEAT_INTERVAL_MS` (30 s) while
   the socket is `OPEN`. The envelope is small (a few bytes),
   has no request id, and does not generate a response.
@@ -199,7 +199,7 @@ A per-`clientId` heartbeat closes this gap:
 The `HEARTBEAT_INTERVAL_MS` / `HEARTBEAT_DEADLINE_MS` constants
 are exported from
 `src/server/terminal/terminal-realtime-broker.ts` so the
-renderer (in `src/web/renderer-terminal-bridge.ts`) and the
+client (in `src/web/renderer-terminal-bridge.ts`) and the
 broker cannot drift out of sync.
 
 ## Known behavior: self-reconnect mid-flight
@@ -208,7 +208,7 @@ The friendly reconnect case has one observable wrinkle. When A's
 socket drops, the server clears the slot and emits a
 `controller: null` event. When A's socket comes back, the
 server re-emits `controller: A` after the auto-claim. Between
-those two events — typically a few milliseconds — A's renderer
+those two events — typically a few milliseconds — A's client
 sees its cached role transition from `controller` to `unowned`
 (per the realtime `identity` event carrying `controller: null`)
 and back to `controller`.
@@ -233,7 +233,7 @@ identity event lands and the role flips back to `controller`,
 the next keystroke goes through without any extra round-trip.
 
 This is not a bug; it is the cost of a model that has no grace
-timer. A renderer-side coalescing window (e.g. "wait 100ms
+timer. A client-side coalescing window (e.g. "wait 100ms
 after a self-reconnect before firing takeover on write") would
 hide the dropped keystroke but would re-introduce a small grace
 period on the client, which is exactly what the server-side
@@ -251,8 +251,8 @@ doesn't surprise future contributors.
   user are not "competing clients" — they are one user with two
   viewpoints.
 - **Server-authoritative for who is currently writing.** The
-  renderer's local cache is best-effort; the server is the source
-  of truth. If the renderer is wrong about who controls, the next
+  client's local cache is best-effort; the server is the source
+  of truth. If the client is wrong about who controls, the next
   keystroke will be auto-promoted or dropped, never silently sent
   to the wrong place.
 - **No "first to blink wins".** A new window opening cannot
@@ -268,7 +268,7 @@ windows literally cannot both be writing. The model chooses
 **which one** and the loser becomes a viewer.
 
 This is also not a security boundary. A malicious local script
-with access to the renderer could bypass the gate. The gate
+with access to the client could bypass the gate. The gate
 protects the user's mental model, not their secrets.
 
 ## Rules of thumb
