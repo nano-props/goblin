@@ -213,16 +213,36 @@ export interface TerminalExitEvent {
 }
 
 /**
- * Realtime ownership-change event (controller crash, grace expiry,
- * controller reconnect, etc.). For takeover specifically, see
- * `TerminalTakeoverResult` — that response is authoritative and
- * carries the same fields so the renderer can apply either without
- * re-checking the shape.
+ * Realtime identity-change event (controller crash, controller
+ * reconnect, sibling-tab claim, etc.). Carries the stable identity
+ * fields only — no phase, no message, no title. Lifecycle travels on
+ * its own dedicated `lifecycle` event so a phase update can never be
+ * confused with a role update at the wire or the renderer's
+ * `applyIdentity` boundary.
+ *
+ * For takeover specifically, see `TerminalTakeoverResult` — that
+ * response is authoritative and carries both identity and lifecycle
+ * fields in a single payload so the renderer can apply either
+ * without re-checking the shape.
  */
-export interface TerminalOwnershipEvent {
+export interface TerminalIdentityEvent {
   ptySessionId: string
   controller: TerminalController | null
-  cols: number
-  rows: number
+  canonicalCols: number
+  canonicalRows: number
+}
+
+/**
+ * Realtime lifecycle-change event (phase transitions, takeover-pending
+ * toggles). Carries only the transient lifecycle fields — no role,
+ * no controller, no geometry. The renderer's `applyLifecycle` boundary
+ * never sees a role change, so a transitional phase (e.g. `'opening'`
+ * during a pre-spawn identity broadcast) cannot trigger a
+ * controller→viewer teardown decision.
+ */
+export interface TerminalLifecycleEvent {
+  ptySessionId: string
   phase: TerminalSlotPhase
+  message: string | null
+  takeoverPending: boolean
 }

@@ -36,8 +36,9 @@ import { toast } from 'sonner'
 import type {
   TerminalBellEvent,
   TerminalDescriptor,
+  TerminalIdentityViewModel,
+  TerminalLifecycleViewModel,
   TerminalSlotHydrationInput,
-  TerminalOwnershipViewModel,
   TerminalSearchResult,
 } from '#/web/components/terminal/types.ts'
 const EMPTY_SEARCH_RESULT: TerminalSearchResult = { resultIndex: -1, resultCount: 0, found: false }
@@ -113,11 +114,11 @@ export class ManagedTerminalSlot {
         this.start()
       }
     }
-    if (this.runtime.phase() === 'open' && this.runtime.canResize() && this.view.isVisible()) this.view.focus()
+    if (this.runtime.phase() === 'open' && this.runtime.isOwner() && this.view.isVisible()) this.view.focus()
   }
 
   private shouldStartAttachedSession(): boolean {
-    if (this.runtime.canResize()) return true
+    if (this.runtime.isOwner()) return true
     return this.runtime.phase() === 'open' && this.runtime.clientRole() === 'unowned'
   }
 
@@ -174,7 +175,7 @@ export class ManagedTerminalSlot {
 
   writeInput(input: TerminalInput): void {
     const ptySessionId = this.runtime.currentPtySessionId()
-    if (!ptySessionId || !this.runtime.canResize()) return
+    if (!ptySessionId || !this.runtime.canSendInput()) return
     if (this.runtime.isReplaying() && isTerminalEmulatorInput(input)) return
     this.pendingWriteBuffer += input.data
     this.scheduleInputFlush()
@@ -192,7 +193,7 @@ export class ManagedTerminalSlot {
   private flushInput(): void {
     if (this.disposed) return
     const ptySessionId = this.runtime.currentPtySessionId()
-    if (!ptySessionId || !this.runtime.canResize()) return
+    if (!ptySessionId || !this.runtime.canSendInput()) return
     const data = this.pendingWriteBuffer
     this.pendingWriteBuffer = ''
     if (!data) return
@@ -229,7 +230,7 @@ export class ManagedTerminalSlot {
     const ptySessionId = this.runtime.currentPtySessionId()
     const resize = this.pendingResize
     if (!ptySessionId || !resize) return
-    if (!this.runtime.canResize()) return
+    if (!this.runtime.canSendInput()) return
     this.pendingResize = null
     const { cols, rows } = resize
     const canonicalSize = this.runtime.currentCanonicalSize()
@@ -382,37 +383,27 @@ export class ManagedTerminalSlot {
   handleOutput(event: TerminalOutputEvent): void {
     const result = this.runtime.handleOutput(event)
     if (result.changed) this.notify('metadata')
-    if (result.output && this.runtime.canResize()) this.queueOutput(result.output)
+    if (result.output && this.runtime.isOwner()) this.queueOutput(result.output)
   }
 
-  handleOwnership(event: TerminalOwnershipViewModel): void {
+  handleIdentity(event: TerminalIdentityViewModel): void {
     const applies = this.runtime.currentPtySessionId() === event.ptySessionId
-    // Check the role *before* applying the event so the controller→viewer
-    // transition is detected even when the event also moves the phase to
-    // a transitional value like `'opening'`. `canResize()` would be false
-    // in that case (it requires `phase === 'open'`) and the transition
-    // would silently re-mount the xterm into a parked host, leaving the
-    // tab blank. `wasRole` is the role-based signal we actually want: it
-    // answers "did the user *lose* control" rather than "is the PTY fully
-    // open right now".
+    // Identity is the only signal the teardown decision uses. The
+    // pre-event role (`wasRole`) is sampled before `handleIdentity`
+    // mutates the state so a controller→viewer transition is
+    // detected even if the next identity event arrives immediately.
+    // The split from lifecycle (`handleLifecycle`) means a
+    // transitional phase update can never look like a role change
+    // here — the type-level boundary at `applyIdentity` enforces it.
     const wasRole = this.runtime.clientRole()
-    const changed = this.runtime.handleOwnership(event)
+    const changed = this.runtime.handleIdentity(event)
     const pendingCleared = applies ? this.runtime.clearTakeoverPending() : false
     if (changed) {
       const newRole = this.runtime.clientRole()
-      const isController = this.runtime.canResize()
+      const isOwner = this.runtime.isOwner()
       const isUnowned = this.runtime.phase() === 'open' && newRole === 'unowned'
       // The gate only distinguishes pass-through vs takeover.
-      this.authority().setRole(isController ? 'controller' : 'viewer')
-      // Use the role (not `canResize()`) to detect the controller→viewer
-      // transition. The realtime event can carry a transitional phase
-      // (`opening`, `restarting`) that races with our local `start()` call
-      // and makes `canResize()` flap between true and false across events
-      // for the same user. The role is the authoritative signal of who
-      // owns the PTY; the phase just reflects whether the PTY is fully
-      // started. The pre-event `wasRole` is what avoids a controller
-      // holding a slot for themselves being re-mounted just because the
-      // server pushed a phase='opening' tick.
+      this.authority().setRole(isOwner ? 'controller' : 'viewer')
       if (wasRole === 'controller' && newRole !== 'controller') {
         if (this.view.currentTerminal()) {
           this.destroyActiveView({ preserveTransientState: true })
@@ -420,7 +411,7 @@ export class ManagedTerminalSlot {
         if (isUnowned && this.view.isConnected()) {
           this.start()
         }
-      } else if (wasRole !== 'controller' && isController) {
+      } else if (wasRole !== 'controller' && isOwner) {
         // Bug E: a viewer → controller transition must always
         // notify, even when the xterm view is already mounted.
         // The previous gate (`!this.view.currentTerminal()`) only
@@ -451,6 +442,18 @@ export class ManagedTerminalSlot {
     }
   }
 
+  handleLifecycle(event: TerminalLifecycleViewModel): void {
+    // Lifecycle updates never touch the xterm. They are pure state
+    // mutations: phase, message, takeover-pending. The teardown
+    // decision is gated by `handleIdentity`; a phase-only change
+    // is rendered into the snapshot (and only the snapshot) so
+    // the user sees the new phase banner without losing the
+    // existing xterm.
+    if (this.runtime.handleLifecycle(event)) {
+      this.notify('metadata')
+    }
+  }
+
   handleServerTitle(canonicalTitle: string | null): void {
     if (this.runtime.setCanonicalTitle(canonicalTitle)) this.notify('metadata')
   }
@@ -471,7 +474,7 @@ export class ManagedTerminalSlot {
     // when the caller was a viewer and is now a controller. Reading
     // `wasController` after the gate returns would always be `true`
     // and the view-start branch would be skipped.
-    const wasController = this.runtime.canResize()
+    const wasController = this.runtime.isOwner()
     if (this.runtime.setTakeoverPending(true)) this.notify('metadata')
     // The takeover response is the authoritative handshake for the
     // new controller's view (see TerminalTakeoverResult in
@@ -489,7 +492,7 @@ export class ManagedTerminalSlot {
       this.notify('metadata')
       // `applyTakeover` was called inside the gate's onPromoted
       // hook, so the runtime already reflects the new role.
-      if (!wasController && this.runtime.canResize()) this.ensureControllerViewStarted()
+      if (!wasController && this.runtime.isOwner()) this.ensureControllerViewStarted()
     } else {
       this.clearTakeoverPendingWithNotify()
       // Mirror the write/resize paths: surface the structured
@@ -509,7 +512,7 @@ export class ManagedTerminalSlot {
   }
 
   private ensureControllerViewStarted(): void {
-    if (!this.runtime.canResize()) return
+    if (!this.runtime.isOwner()) return
     if (this.view.isConnected()) this.start()
     if (this.view.isVisible()) this.view.focus()
   }
@@ -650,7 +653,7 @@ export class ManagedTerminalSlot {
     result: TerminalAttachResultWithOwnership,
   ): Promise<boolean> {
     const changed = this.runtime.applyAttachResult(result, { cols: term.cols, rows: term.rows })
-    if (!this.runtime.canResize()) {
+    if (!this.runtime.isOwner()) {
       this.applyCanonicalSizeToView()
     } else {
       const canonicalSize = this.runtime.currentCanonicalSize()
@@ -803,7 +806,7 @@ export class ManagedTerminalSlot {
   }
 
   private queueResize(cols: number, rows: number): void {
-    if (!this.runtime.currentPtySessionId() || !this.runtime.canResize()) return
+    if (!this.runtime.currentPtySessionId() || !this.runtime.canSendInput()) return
     const canonicalSize = this.runtime.currentCanonicalSize()
     if (canonicalSize.cols === cols && canonicalSize.rows === rows && !this.pendingResize) return
     this.pendingResize = { cols, rows }

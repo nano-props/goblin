@@ -41,25 +41,35 @@ export interface TerminalClientSnapshot extends TerminalClientOwnershipViewModel
   canTakeover: boolean
   canonicalCols: number | null
   canonicalRows: number | null
-  phase: TerminalPhase
 }
 
 /**
- * Ownership state delivered by either the realtime `ownership` event
- * (controller crash / grace expiry / controller reconnect) or the
- * `terminal.takeover` response (now an authoritative handshake — see
- * `TerminalTakeoverResult` in `src/shared/terminal-types.ts`). Both
- * surfaces carry the same fields so the renderer can apply either
- * without re-checking the shape.
+ * Identity view-model: the stable ownership + geometry fields the
+ * renderer needs to decide who controls the PTY and at what size.
+ * No `phase` — phase lives on the lifecycle channel so a transitional
+ * phase update can never be confused with a role change at the
+ * renderer's `applyIdentity` boundary.
  */
-export interface TerminalOwnershipViewModel extends TerminalClientOwnershipViewModel {
+export interface TerminalIdentityViewModel extends TerminalClientOwnershipViewModel {
   ptySessionId: string
   canonicalCols: number
   canonicalRows: number
-  phase: TerminalPhase
 }
 
-export interface TerminalSlotHydrationInput extends TerminalOwnershipViewModel {
+/**
+ * Lifecycle view-model: the transient phase + message +
+ * takeover-pending flag. No role — role lives on the identity
+ * channel so the teardown decision can never be triggered by a
+ * transitional phase update alone.
+ */
+export interface TerminalLifecycleViewModel {
+  ptySessionId: string
+  phase: TerminalPhase
+  message: string | null
+  takeoverPending: boolean
+}
+
+export interface TerminalSlotHydrationInput extends TerminalIdentityViewModel {
   phase: TerminalPhase
   message: string | null
   processName: string
@@ -172,7 +182,8 @@ export interface ManagedTerminalSlotLike {
   scrollLines: (amount: number) => void
   writeInput: (input: TerminalInput) => void
   takeover: () => void
-  handleOwnership: (event: TerminalOwnershipViewModel) => void
+  handleIdentity: (event: TerminalIdentityViewModel) => void
+  handleLifecycle: (event: TerminalLifecycleViewModel) => void
   /** Serializes xterm framebuffer state as VT sequences; not plain-text output for copy UI. */
   serialize: () => string
   handleOutput: (event: TerminalOutputEvent) => void
@@ -183,9 +194,8 @@ export interface ManagedTerminalSlotLike {
 export function createTerminalClientSnapshot(input: {
   role: TerminalClientRole
   controllerStatus: TerminalControllerStatus
-  canonicalCols: number
-  canonicalRows: number
-  phase: TerminalPhase
+  canonicalCols: number | null
+  canonicalRows: number | null
 }): TerminalClientSnapshot {
   const active = input.role === 'controller'
   return {
@@ -195,6 +205,5 @@ export function createTerminalClientSnapshot(input: {
     canTakeover: !active,
     canonicalCols: input.canonicalCols || null,
     canonicalRows: input.canonicalRows || null,
-    phase: input.phase,
   }
 }

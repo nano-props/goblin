@@ -4,7 +4,8 @@ import {
   type TerminalAttachResult,
   type TerminalController,
   type TerminalExitEvent,
-  type TerminalOwnershipEvent,
+  type TerminalIdentityEvent,
+  type TerminalLifecycleEvent,
   type TerminalOutputEvent,
   type TerminalSlotPhase,
   type TerminalSlotSnapshot,
@@ -96,6 +97,10 @@ interface TerminalSlot<TUser extends string | number> {
   ownerSticky: boolean
   phase: TerminalSlotPhase
   message: string | null
+  /** Mirrors the renderer's `takeoverPending` flag so a lifecycle
+   *  realtime event can tell siblings to disable the write path
+   *  the moment the takeover starts. */
+  takeoverPending: boolean
   /** Input queue ensures ordered PTY writes even with multiple concurrent callers. */
   inputQueue: string[]
   /** True when a microtask flush has already been scheduled for this session. */
@@ -106,7 +111,12 @@ export interface TerminalEventSink<TUser extends string | number> {
   onOutput(userId: TUser, event: TerminalOutputEvent): void
   onTitle?(userId: TUser, event: { ptySessionId: string; canonicalTitle: string | null }): void
   onExit(userId: TUser, event: TerminalExitEvent): void
-  onOwnership?(userId: TUser, event: TerminalOwnershipEvent): void
+  // Identity and lifecycle are emitted on separate channels so the
+  // renderer's teardown decision can subscribe to identity only.
+  // A transitional phase update arrives as `onLifecycle` and never
+  // looks like a role change.
+  onIdentity?(userId: TUser, event: TerminalIdentityEvent): void
+  onLifecycle?(userId: TUser, event: TerminalLifecycleEvent): void
 }
 
 export class TerminalSlotManager<TUser extends string | number> {
@@ -146,7 +156,7 @@ export class TerminalSlotManager<TUser extends string | number> {
       })
       if (input.clientId) {
         registerTerminalClient(existing, input.clientId, size.cols, size.rows, input.clientConnected)
-        this.applyOwnershipEffect(existing, attachTerminalClient(existing, input.clientId))
+        this.applyIdentityEffect(existing, attachTerminalClient(existing, input.clientId))
       }
       return await this.attachResult(existing)
     }
@@ -173,6 +183,10 @@ export class TerminalSlotManager<TUser extends string | number> {
       ownerSticky: false,
       phase: 'opening',
       message: null,
+      // Travel on the lifecycle realtime event so a takeover
+      // pending flag set on one tab can immediately disable the
+      // write path on the others without an identity round-trip.
+      takeoverPending: false,
       inputQueue: [],
       inputFlushScheduled: false,
     }
@@ -196,14 +210,14 @@ export class TerminalSlotManager<TUser extends string | number> {
       // `registerSocket`. The asymmetry is intentional, not a bug.
       registerTerminalClient(session, input.clientId, size.cols, size.rows, input.clientConnected ?? true)
       // Mirror the existing-session path: route the `attach` through
-      // `applyOwnershipEffect` so the returned `emitOwnership` flag
+      // `applyIdentityEffect` so the returned `emitIdentity` flag
       // (true for the auto-claim case where the new clientId picks
       // up an unowned slot) actually broadcasts the realtime
       // `ownership` event to siblings. Without this the slot's
       // controller and `ownerSticky` flags are set correctly but
       // sibling windows only learn about the new controller via the
       // next `sessions-changed` list-rescan.
-      this.applyOwnershipEffect(session, attachTerminalClient(session, input.clientId))
+      this.applyIdentityEffect(session, attachTerminalClient(session, input.clientId))
     }
     const result = await this.spawnSessionPty(session)
     if (!result.ok) {
@@ -247,7 +261,7 @@ export class TerminalSlotManager<TUser extends string | number> {
     const session = this.getSlot(userId, ptySessionId)
     if (!session) return { ok: false, message: 'error.invalid-arguments' }
     registerTerminalClient(session, clientId, size.cols, size.rows, clientConnected)
-    this.applyOwnershipEffect(session, attachTerminalClient(session, clientId))
+    this.applyIdentityEffect(session, attachTerminalClient(session, clientId))
     return await this.attachResult(session)
   }
 
@@ -290,7 +304,7 @@ export class TerminalSlotManager<TUser extends string | number> {
       return { ok: false, message: 'error.invalid-arguments' }
     }
     const effect = claimTerminalClientControl(session, clientId)
-    this.applyOwnershipEffect(session, effect)
+    this.applyIdentityEffect(session, effect)
     // Bug D: when the attachment isn't `connected`, the effect
     // is empty (no resize, no ownership event) — the caller is
     // known but not authoritative yet (the WS hasn't been
@@ -301,7 +315,7 @@ export class TerminalSlotManager<TUser extends string | number> {
     // `role: 'controller'` and `controllerStatus: 'connected'`,
     // masking the no-op. Reject with the same key the renderer
     // maps to "session lost" so the user can retry.
-    if (!effect.emitOwnership && !effect.resizeTo) {
+    if (!effect.emitIdentity && !effect.resizeTo) {
       return { ok: false, message: 'error.unavailable' }
     }
     return this.takeoverResult(session)
@@ -327,9 +341,11 @@ export class TerminalSlotManager<TUser extends string | number> {
     }
     restartTerminalClientControl(session, clientId)
     this.resetSessionState(session, size.cols, size.rows, 'restarting')
+    // `resetSessionState` itself just called
+    // `markTerminalSlotRestarting` and broadcast the lifecycle event.
     const result = await this.spawnSessionPty(session)
     if (!result.ok) {
-      markTerminalSlotError(session, result.message)
+      if (markTerminalSlotError(session, result.message)) this.emitLifecycle(session)
     }
     return result
   }
@@ -343,7 +359,7 @@ export class TerminalSlotManager<TUser extends string | number> {
   closeSlot(ptySessionId: string): void {
     const session = this.slotsByPtySessionId.get(ptySessionId)
     if (!session) return
-    markTerminalSlotClosed(session)
+    if (markTerminalSlotClosed(session)) this.emitLifecycle(session)
     this.slotsByPtySessionId.delete(ptySessionId)
     const ownerKey = this.userSlotKey(session.userId, session.key)
     if (this.ptySessionIdByUserSlotKey.get(ownerKey) === ptySessionId) this.ptySessionIdByUserSlotKey.delete(ownerKey)
@@ -365,7 +381,7 @@ export class TerminalSlotManager<TUser extends string | number> {
   setClientConnected(userId: TUser, clientId: string, connected: boolean): void {
     for (const session of Array.from(this.slotsByPtySessionId.values())) {
       if (session.userId !== userId) continue
-      this.applyOwnershipEffect(session, updateTerminalClientConnection(session, clientId, connected))
+      this.applyIdentityEffect(session, updateTerminalClientConnection(session, clientId, connected))
     }
   }
 
@@ -464,7 +480,7 @@ export class TerminalSlotManager<TUser extends string | number> {
       resizeRender(session.render, cols, rows)
       session.cols = cols
       session.rows = rows
-      this.emitOwnership(session)
+      this.emitIdentity(session)
       return true
     } catch (err) {
       slotManagerLogger.warn({ ptySessionId: session.id, err }, 'failed to resize PTY')
@@ -473,7 +489,7 @@ export class TerminalSlotManager<TUser extends string | number> {
   }
 
   private takeoverResult(session: TerminalSlot<TUser>): TerminalTakeoverResult {
-    // By the time we get here, `applyOwnershipEffect` has already
+    // By the time we get here, `applyIdentityEffect` has already
     // executed in `takeoverSlot()` — the requesting attachment
     // is the controller and `session.cols`/`session.rows` reflect
     // any resize effect that ran during the ownership claim. We
@@ -515,22 +531,36 @@ export class TerminalSlotManager<TUser extends string | number> {
     return `${String(userId)}\0${key}`
   }
 
-  private emitOwnership(session: TerminalSlot<TUser>): void {
-    this.sink.onOwnership?.(session.userId, {
+  private emitIdentity(session: TerminalSlot<TUser>): void {
+    this.sink.onIdentity?.(session.userId, {
       ptySessionId: session.id,
       controller: cloneTerminalController(session.controller),
-      cols: session.cols,
-      rows: session.rows,
-      phase: session.phase,
+      canonicalCols: session.cols,
+      canonicalRows: session.rows,
     })
   }
 
-  private applyOwnershipEffect(
+  // Lifecycle emits a single, identity-free event whenever the
+  // slot's phase, message, or takeover-pending flag changes. A
+  // controller→viewer teardown decision in the renderer must not
+  // subscribe to this channel; the wire keeps the two concerns on
+  // separate paths so the type-level separation in the renderer
+  // (`applyIdentity` vs `applyLifecycle`) cannot be circumvented.
+  private emitLifecycle(session: TerminalSlot<TUser>): void {
+    this.sink.onLifecycle?.(session.userId, {
+      ptySessionId: session.id,
+      phase: session.phase,
+      message: session.message,
+      takeoverPending: session.takeoverPending,
+    })
+  }
+
+  private applyIdentityEffect(
     session: TerminalSlot<TUser>,
-    effect: { resizeTo?: { cols: number; rows: number }; emitOwnership: boolean },
+    effect: { resizeTo?: { cols: number; rows: number }; emitIdentity: boolean },
   ): void {
     if (effect.resizeTo) this.resizeSessionPty(session, effect.resizeTo.cols, effect.resizeTo.rows)
-    if (effect.emitOwnership) this.emitOwnership(session)
+    if (effect.emitIdentity) this.emitIdentity(session)
   }
 
   private resetSessionState(
@@ -542,11 +572,12 @@ export class TerminalSlotManager<TUser extends string | number> {
     this.disposeSessionResources(session)
     session.cols = cols
     session.rows = rows
-    if (phase === 'restarting') markTerminalSlotRestarting(session)
-    else markTerminalSlotOpening(session)
+    const phaseChanged =
+      phase === 'restarting' ? markTerminalSlotRestarting(session) : markTerminalSlotOpening(session)
     resetRender(session.render, cols, rows)
     session.inputQueue = []
     session.inputFlushScheduled = false
+    if (phaseChanged) this.emitLifecycle(session)
   }
 
   private async spawnSessionPty(session: TerminalSlot<TUser>): Promise<TerminalAttachResult> {
@@ -575,7 +606,7 @@ export class TerminalSlotManager<TUser extends string | number> {
       return resolved
     }
     session.pty = resolved.handle
-    markTerminalSlotOpen(session)
+    if (markTerminalSlotOpen(session)) this.emitLifecycle(session)
     const handle = resolved.handle
     const supervisor = this.ptySupervisor
     let lastBroadcastTitle: string | null = session.render.title

@@ -75,7 +75,7 @@ export interface TerminalOwnershipState {
 
 export interface TerminalOwnershipEffect {
   resizeTo?: { cols: number; rows: number }
-  emitOwnership: boolean
+  emitIdentity: boolean
 }
 
 export function registerTerminalClient(
@@ -110,7 +110,7 @@ export function registerTerminalClient(
  */
 export function attachTerminalClient(state: TerminalOwnershipState, clientId: string): TerminalOwnershipEffect {
   const attachment = state.attachments.get(clientId)
-  if (!attachment?.connected) return { emitOwnership: false }
+  if (!attachment?.connected) return { emitIdentity: false }
 
   if (state.controller?.clientId === clientId) {
     // Reattaching as the same attachment that previously controlled
@@ -121,7 +121,7 @@ export function attachTerminalClient(state: TerminalOwnershipState, clientId: st
     state.ownerSticky = true
     return {
       resizeTo: sizeChanged ? { cols: attachment.cols, rows: attachment.rows } : undefined,
-      emitOwnership: !sizeChanged,
+      emitIdentity: !sizeChanged,
     }
   }
 
@@ -131,7 +131,7 @@ export function attachTerminalClient(state: TerminalOwnershipState, clientId: st
     // the first time — both paths produce a controller here.
     return claimTerminalClientControl(state, clientId)
   }
-  return { emitOwnership: false }
+  return { emitIdentity: false }
 }
 
 /**
@@ -149,13 +149,13 @@ export function claimTerminalClientControl(
   clientId: string,
 ): TerminalOwnershipEffect {
   const attachment = state.attachments.get(clientId)
-  if (!attachment?.connected) return { emitOwnership: false }
+  if (!attachment?.connected) return { emitIdentity: false }
   const sizeChanged = state.cols !== attachment.cols || state.rows !== attachment.rows
   state.controller = { clientId, status: 'connected' }
   state.ownerSticky = true
   return {
     resizeTo: sizeChanged ? { cols: attachment.cols, rows: attachment.rows } : undefined,
-    emitOwnership: !sizeChanged,
+    emitIdentity: !sizeChanged,
   }
 }
 
@@ -197,7 +197,7 @@ export function updateTerminalClientConnection(
   connected: boolean,
 ): TerminalOwnershipEffect {
   const attachment = state.attachments.get(clientId)
-  if (!attachment) return { emitOwnership: false }
+  if (!attachment) return { emitIdentity: false }
 
   const wasConnected = attachment.connected
   attachment.connected = connected
@@ -208,16 +208,16 @@ export function updateTerminalClientConnection(
     if (connected && !wasConnected) {
       // Came back online; emit so the renderer's viewer sees the
       // promotion. We already updated the connection flag above.
-      return { emitOwnership: true }
+      return { emitIdentity: true }
     }
     if (!connected && wasConnected) {
-      // Disconnected: clear the slot immediately. emitOwnership so
+      // Disconnected: clear the slot immediately. emitIdentity so
       // sibling viewers (including the disconnected tab if it ever
       // comes back) see controller=null.
       state.controller = null
-      return { emitOwnership: true }
+      return { emitIdentity: true }
     }
-    return { emitOwnership: false }
+    return { emitIdentity: false }
   }
 
   // Non-controller transition: only auto-claim on a fresh connect
@@ -229,5 +229,5 @@ export function updateTerminalClientConnection(
   if (connected && !wasConnected && state.controller === null && state.ownerSticky) {
     return claimTerminalClientControl(state, clientId)
   }
-  return { emitOwnership: false }
+  return { emitIdentity: false }
 }

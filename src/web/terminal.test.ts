@@ -532,13 +532,15 @@ describe('terminal web host bridge', () => {
     const onOutput = vi.fn()
     const onTitle = vi.fn()
     const onExit = vi.fn()
-    const onOwnership = vi.fn()
+    const onIdentity = vi.fn()
+    const onLifecycle = vi.fn()
     const onSessionsChanged = vi.fn()
 
     const disposeOutput = terminalBridge.onOutput(onOutput)
     const disposeTitle = terminalBridge.onTitle(onTitle)
     const disposeExit = terminalBridge.onExit(onExit)
-    const disposeOwnership = terminalBridge.onOwnership(onOwnership)
+    const disposeIdentity = terminalBridge.onIdentity(onIdentity)
+    const disposeLifecycle = terminalBridge.onLifecycle(onLifecycle)
     const disposeSessionsChanged = terminalBridge.onSessionsChanged(onSessionsChanged)
     const socket = MockWebSocket.instances[0]
     if (!socket) throw new Error('missing web terminal socket')
@@ -563,8 +565,14 @@ describe('terminal web host bridge', () => {
     )
     socket.emitMessage(
       JSON.stringify({
-        type: 'ownership',
-        event: { ptySessionId: 'pty_1', controller: null, cols: 100, rows: 30, phase: 'open' },
+        type: 'identity',
+        event: { ptySessionId: 'pty_1', controller: null, canonicalCols: 100, canonicalRows: 30 },
+      }),
+    )
+    socket.emitMessage(
+      JSON.stringify({
+        type: 'lifecycle',
+        event: { ptySessionId: 'pty_1', phase: 'open', message: null, takeoverPending: false },
       }),
     )
     socket.emitMessage(
@@ -577,20 +585,26 @@ describe('terminal web host bridge', () => {
     expect(onOutput).toHaveBeenCalledWith({ ptySessionId: 'pty_1', data: 'hello', seq: 1, processName: 'zsh' })
     expect(onTitle).toHaveBeenCalledWith({ ptySessionId: 'pty_1', canonicalTitle: '~/Developer/goblin — npm run dev' })
     expect(onExit).toHaveBeenCalledWith({ ptySessionId: 'pty_1' })
-    expect(onOwnership).toHaveBeenCalledWith({
+    expect(onIdentity).toHaveBeenCalledWith({
       ptySessionId: 'pty_1',
       role: 'unowned',
       controllerStatus: 'none',
       canonicalCols: 100,
       canonicalRows: 30,
+    })
+    expect(onLifecycle).toHaveBeenCalledWith({
+      ptySessionId: 'pty_1',
       phase: 'open',
+      message: null,
+      takeoverPending: false,
     })
     expect(onSessionsChanged).toHaveBeenCalledWith('/tmp/repo')
 
     disposeOutput()
     disposeTitle()
     disposeExit()
-    disposeOwnership()
+    disposeIdentity()
+    disposeLifecycle()
     disposeSessionsChanged()
   })
 

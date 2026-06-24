@@ -6,7 +6,8 @@ import type {
   TerminalSearchResult,
   TerminalSnapshot,
   TerminalClientOwnershipViewModel,
-  TerminalOwnershipViewModel,
+  TerminalIdentityViewModel,
+  TerminalLifecycleViewModel,
 } from '#/web/components/terminal/types.ts'
 export class TerminalSlotState {
   /** Terminal runtime metadata mirrored from attach/session/ownership events.
@@ -70,8 +71,24 @@ export class TerminalSlotState {
     return this.transientViewState.searchResult
   }
 
-  getCanResize(): boolean {
-    return this.runtimeState.phase === 'open' && this.runtimeState.clientOwnership.role === 'controller'
+  // **Role-only** ownership predicate. Use this for any decision
+  // about whether the user "owns" the PTY (teardown on role change,
+  // render-time role banner, focus, etc.). A transitional phase
+  // update must never make this return false for a slot whose role
+  // is still `'controller'`.
+  isOwner(): boolean {
+    return this.runtimeState.clientOwnership.role === 'controller'
+  }
+
+  // Write-path predicate. Use this only at the actual input gate
+  // — never as a stand-in for "owns the PTY". A slot that is
+  // 'controller' but still in `'opening'` cannot accept writes
+  // (the PTY is still starting up) but is still owned by the
+  // same client; the teardown decision must use `isOwner()` and
+  // the write decision must use this method. The two are
+  // intentionally separate.
+  canSendInput(): boolean {
+    return this.runtimeState.clientOwnership.role === 'controller' && this.runtimeState.phase === 'open'
   }
 
   getClientOwnership(): TerminalClientOwnershipViewModel {
@@ -89,12 +106,15 @@ export class TerminalSlotState {
       processName: this.runtimeState.processName,
       canonicalTitle: this.runtimeState.canonicalTitle,
     }
+    // The `attachment` slot is only populated when the slot is
+    // open AND we have a ptySessionId, matching the previous
+    // behaviour. The fields are identity-only — phase is at the
+    // top level of the snapshot already.
     if (this.runtimeState.phase === 'open' && ptySessionId) {
       snapshot.attachment = createTerminalClientSnapshot({
         ...this.runtimeState.clientOwnership,
         canonicalCols: this.runtimeState.canonicalSize.cols,
         canonicalRows: this.runtimeState.canonicalSize.rows,
-        phase: this.runtimeState.phase,
       })
     }
     if (this.transientViewState.searchResult) snapshot.search = this.transientViewState.searchResult
@@ -143,22 +163,34 @@ export class TerminalSlotState {
     canonicalCols: number
     canonicalRows: number
   }): boolean {
+    // The first-frame payload carries both identity and lifecycle
+    // in one shape. Apply them through their respective boundaries
+    // so the `applyIdentity` / `applyLifecycle` separation is
+    // preserved even on the synchronous create/attach/takeover
+    // path. Identity first, then lifecycle — order is irrelevant
+    // because they touch disjoint state.
     let changed = false
-    changed = this.setPhaseAndMessage(input.phase ?? 'open', input.message ?? null) || changed
+    changed =
+      this.applyIdentity({
+        ptySessionId: '', // The runtime stamps the actual ptySessionId itself; the first-frame path carries it via `currentPtySessionId` set by the caller.
+        role: input.role,
+        controllerStatus: input.controllerStatus,
+        canonicalCols: input.canonicalCols,
+        canonicalRows: input.canonicalRows,
+      }) || changed
+    changed =
+      this.applyLifecycle({
+        ptySessionId: '',
+        phase: input.phase ?? 'open',
+        message: input.message ?? null,
+        takeoverPending: false,
+      }) || changed
     changed = this.setProcessName(input.processName) || changed
     changed = this.setCanonicalTitle(input.canonicalTitle ?? null) || changed
-    if (
-      this.runtimeState.clientOwnership.role !== input.role ||
-      this.runtimeState.clientOwnership.controllerStatus !== input.controllerStatus
-    ) {
-      this.runtimeState.clientOwnership = { role: input.role, controllerStatus: input.controllerStatus }
-      changed = true
-    }
-    changed = this.setCanonicalSize(input.canonicalCols, input.canonicalRows) || changed
     return changed
   }
 
-  applyOwnership(event: TerminalOwnershipViewModel): boolean {
+  applyIdentity(event: TerminalIdentityViewModel): boolean {
     let changed = false
     if (
       this.runtimeState.clientOwnership.role !== event.role ||
@@ -168,11 +200,16 @@ export class TerminalSlotState {
       changed = true
     }
     changed = this.setCanonicalSize(event.canonicalCols, event.canonicalRows) || changed
-    // Phase arrives on the same authority surface as role/geometry
-    // (either the realtime ownership event or the authoritative
-    // takeover response). Apply it consistently so the view model
-    // is shape-uniform regardless of which path updated it.
-    changed = this.setPhaseAndMessage(event.phase, null) || changed
+    return changed
+  }
+
+  applyLifecycle(event: TerminalLifecycleViewModel): boolean {
+    let changed = false
+    changed = this.setPhaseAndMessage(event.phase, event.message) || changed
+    if (this.runtimeState.takeoverPending !== event.takeoverPending) {
+      this.runtimeState.takeoverPending = event.takeoverPending
+      changed = true
+    }
     return changed
   }
 

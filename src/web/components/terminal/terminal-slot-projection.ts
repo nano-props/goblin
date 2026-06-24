@@ -13,7 +13,7 @@ import type {
   TerminalDescriptor,
   TerminalRepoIndex,
   TerminalSlotHydrationInput,
-  TerminalOwnershipViewModel,
+  TerminalIdentityViewModel,
 } from '#/web/components/terminal/types.ts'
 
 export interface ReattachSnapshotCacheEntry {
@@ -23,8 +23,8 @@ export interface ReattachSnapshotCacheEntry {
 }
 
 export type TerminalAttachResultWithOwnership = Extract<TerminalAttachResult, { ok: true }> & {
-  role: TerminalOwnershipViewModel['role']
-  controllerStatus: TerminalOwnershipViewModel['controllerStatus']
+  role: TerminalIdentityViewModel['role']
+  controllerStatus: TerminalIdentityViewModel['controllerStatus']
 }
 
 export interface ProjectedServerTerminalSlot {

@@ -3,10 +3,11 @@ import type {
   TerminalAttachResult,
   TerminalCatalogMutationResult,
   TerminalCreateInput,
+  TerminalIdentityEvent,
+  TerminalLifecycleEvent,
   TerminalListSessionsInput,
   TerminalMutationResult,
   TerminalOutputEvent,
-  TerminalOwnershipEvent,
   TerminalResizeInput,
   TerminalRestartInput,
   TerminalSlotInput,
@@ -24,7 +25,13 @@ export type TerminalRealtimeMessage =
   | { type: 'output'; event: TerminalOutputEvent }
   | { type: 'title'; event: TerminalTitleEvent }
   | { type: 'exit'; event: TerminalExitEvent }
-  | { type: 'ownership'; event: TerminalOwnershipEvent }
+  // Identity and lifecycle are split at the wire. The renderer's
+  // `applyIdentity` only sees the identity event; `applyLifecycle`
+  // only sees the lifecycle event. A transitional phase update
+  // (e.g. `'opening'` during a pre-spawn broadcast) cannot look
+  // like a role change to the renderer.
+  | { type: 'identity'; event: TerminalIdentityEvent }
+  | { type: 'lifecycle'; event: TerminalLifecycleEvent }
   | { type: 'sessions-changed'; repoRoot: string }
   // Targeted per-slot close. Emitted by the server after a
   // successful `close` request, alongside the existing

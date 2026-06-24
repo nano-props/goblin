@@ -22,7 +22,7 @@ import type {
   TerminalTitleEvent,
   TerminalWriteInput,
 } from '#/shared/terminal-types.ts'
-import type { TerminalOwnershipViewModel } from '#/web/components/terminal/types.ts'
+import type { TerminalIdentityViewModel, TerminalLifecycleViewModel } from '#/web/components/terminal/types.ts'
 
 export interface RendererTerminalBridge {
   attach: (input: TerminalAttachInput) => Promise<TerminalAttachResult>
@@ -60,7 +60,8 @@ export interface RendererTerminalBridge {
   onOutput: (cb: (event: TerminalOutputEvent) => void) => () => void
   onTitle: (cb: (event: TerminalTitleEvent) => void) => () => void
   onExit: (cb: (event: TerminalExitEvent) => void) => () => void
-  onOwnership: (cb: (event: TerminalOwnershipViewModel) => void) => () => void
+  onIdentity: (cb: (event: TerminalIdentityViewModel) => void) => () => void
+  onLifecycle: (cb: (event: TerminalLifecycleViewModel) => void) => () => void
   onSessionsChanged: (cb: (repoRoot: string) => void) => () => void
   /**
    * Subscribe to per-session close broadcasts from the server. Emitted

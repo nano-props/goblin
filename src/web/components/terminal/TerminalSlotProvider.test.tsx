@@ -27,7 +27,8 @@ import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import type {
   TerminalBellEvent,
   TerminalDescriptor,
-  TerminalOwnershipViewModel,
+  TerminalIdentityViewModel,
+  TerminalLifecycleViewModel,
   TerminalSearchResult,
   TerminalSlotContextValue,
   TerminalSnapshot,
@@ -52,7 +53,8 @@ const mockSessions = vi.hoisted(
       hydrate: ReturnType<typeof vi.fn>
       handleOutput: ReturnType<typeof vi.fn>
       handleServerTitle: ReturnType<typeof vi.fn>
-      handleOwnership: ReturnType<typeof vi.fn>
+      handleIdentity: ReturnType<typeof vi.fn>
+      handleLifecycle: ReturnType<typeof vi.fn>
     }>,
 )
 
@@ -80,7 +82,8 @@ vi.mock('#/web/components/terminal/ManagedTerminalSlot.ts', () => {
     private readonly notify: () => void
     private readonly handleOutputSpy = vi.fn()
     private readonly handleServerTitleSpy = vi.fn()
-    private readonly handleOwnershipSpy = vi.fn()
+    private readonly handleIdentitySpy = vi.fn()
+    private readonly handleLifecycleSpy = vi.fn()
     private readonly hydrateSpy = vi.fn()
     private readonly detachSpy = vi.fn()
     private serializeValue = ''
@@ -111,7 +114,8 @@ vi.mock('#/web/components/terminal/ManagedTerminalSlot.ts', () => {
         hydrate: this.hydrateSpy,
         handleOutput: this.handleOutputSpy,
         handleServerTitle: this.handleServerTitleSpy,
-        handleOwnership: this.handleOwnershipSpy,
+        handleIdentity: this.handleIdentitySpy,
+        handleLifecycle: this.handleLifecycleSpy,
       })
     }
 
@@ -188,7 +192,6 @@ vi.mock('#/web/components/terminal/ManagedTerminalSlot.ts', () => {
           canTakeover: input.role !== 'controller',
           canonicalCols: input.canonicalCols,
           canonicalRows: input.canonicalRows,
-          phase: input.phase,
         },
       }
       this.serializeValue = input.snapshot ?? this.serializeValue
@@ -213,14 +216,23 @@ vi.mock('#/web/components/terminal/ManagedTerminalSlot.ts', () => {
       this.notify()
     }
 
-    handleOwnership(event: {
+    handleIdentity(event: {
       ptySessionId: string
       role: 'controller' | 'viewer' | 'unowned'
       controllerStatus: 'connected' | 'none'
       canonicalCols: number
       canonicalRows: number
     }) {
-      this.handleOwnershipSpy(event)
+      this.handleIdentitySpy(event)
+    }
+
+    handleLifecycle(event: {
+      ptySessionId: string
+      phase: 'opening' | 'restarting' | 'open' | 'error' | 'closed'
+      message: string | null
+      takeoverPending: boolean
+    }) {
+      this.handleLifecycleSpy(event)
     }
 
     handleExit(_event: TerminalExitEvent): boolean {
@@ -239,7 +251,8 @@ const SECOND_WORKTREE_PATH = '/tmp/gbl-terminal-provider-worktree-2'
 let exitHandler: ((event: TerminalExitEvent) => void) | null = null
 let outputHandler: ((event: TerminalOutputEvent) => void) | null = null
 let titleHandler: ((event: TerminalTitleEvent) => void) | null = null
-let ownershipHandler: ((event: TerminalOwnershipViewModel) => void) | null = null
+let identityHandler: ((event: TerminalIdentityViewModel) => void) | null = null
+let lifecycleHandler: ((event: TerminalLifecycleViewModel) => void) | null = null
 let sessionsChangedHandler: ((repoRoot: string) => void) | null = null
 let workspacePaneChangedHandler: ((repoRoot: string) => void) | null = null
 let sessionClosedHandler: ((event: { ptySessionId: string; repoRoot: string }) => void) | null = null
@@ -306,7 +319,7 @@ beforeEach(() => {
   exitHandler = null
   outputHandler = null
   titleHandler = null
-  ownershipHandler = null
+  identityHandler = null
   sessionsChangedHandler = null
   workspacePaneChangedHandler = null
   sessionClosedHandler = null
@@ -476,8 +489,12 @@ beforeEach(() => {
           exitHandler = cb
           return () => {}
         }),
-        onOwnership: vi.fn((cb: (event: TerminalOwnershipViewModel) => void) => {
-          ownershipHandler = cb
+        onIdentity: vi.fn((cb: (event: TerminalIdentityViewModel) => void) => {
+          identityHandler = cb
+          return () => {}
+        }),
+        onLifecycle: vi.fn((cb: (event: TerminalLifecycleViewModel) => void) => {
+          lifecycleHandler = cb
           return () => {}
         }),
         onSessionsChanged: vi.fn((cb: (repoRoot: string) => void) => {
@@ -573,8 +590,12 @@ beforeEach(() => {
         exitHandler = cb
         return () => {}
       }),
-      onOwnership: vi.fn((cb: (event: TerminalOwnershipViewModel) => void) => {
-        ownershipHandler = cb
+      onIdentity: vi.fn((cb: (event: TerminalIdentityViewModel) => void) => {
+        identityHandler = cb
+        return () => {}
+      }),
+      onLifecycle: vi.fn((cb: (event: TerminalLifecycleViewModel) => void) => {
+        lifecycleHandler = cb
         return () => {}
       }),
       onSessionsChanged: vi.fn((cb: (repoRoot: string) => void) => {
@@ -760,13 +781,18 @@ describe('TerminalSlotProvider', () => {
       await act(async () => {
         outputHandler?.({ ptySessionId: 'slot-1', data: 'hello', seq: 1, processName: 'zsh' })
         titleHandler?.({ ptySessionId: 'slot-1', canonicalTitle: '~/Developer/goblin — npm run dev' })
-        ownershipHandler?.({
+        identityHandler?.({
           ptySessionId: 'slot-2',
           role: 'controller',
           controllerStatus: 'connected',
           canonicalCols: 100,
           canonicalRows: 30,
+        })
+        lifecycleHandler?.({
+          ptySessionId: 'slot-2',
           phase: 'open',
+          message: null,
+          takeoverPending: false,
         })
       })
 
@@ -779,16 +805,21 @@ describe('TerminalSlotProvider', () => {
       })
       expect(first.handleServerTitle).toHaveBeenCalledTimes(1)
       expect(first.handleServerTitle).toHaveBeenCalledWith('~/Developer/goblin — npm run dev')
-      expect(second.handleOwnership).toHaveBeenCalledTimes(1)
-      expect(second.handleOwnership).toHaveBeenCalledWith({
+      expect(second.handleIdentity).toHaveBeenCalledTimes(1)
+      expect(second.handleIdentity).toHaveBeenCalledWith({
         ptySessionId: 'slot-2',
         role: 'controller',
         controllerStatus: 'connected',
         canonicalCols: 100,
         canonicalRows: 30,
-        phase: 'open',
       })
-      expect(first.handleOwnership).not.toHaveBeenCalled()
+      expect(second.handleLifecycle).toHaveBeenCalledWith({
+        ptySessionId: 'slot-2',
+        phase: 'open',
+        message: null,
+        takeoverPending: false,
+      })
+      expect(first.handleIdentity).not.toHaveBeenCalled()
     } finally {
       await unmount()
     }
@@ -1792,7 +1823,8 @@ describe('TerminalSlotProvider', () => {
         onOutput: () => () => {},
         onTitle: () => () => {},
         onExit: () => () => {},
-        onOwnership: () => () => {},
+        onIdentity: () => () => {},
+        onLifecycle: () => () => {},
         onSessionsChanged: () => () => {},
         onWorkspacePaneChanged: () => () => {},
         onSlotClosed: () => () => {},
@@ -1891,7 +1923,8 @@ describe('TerminalSlotProvider', () => {
         onOutput: () => () => {},
         onTitle: () => () => {},
         onExit: () => () => {},
-        onOwnership: () => () => {},
+        onIdentity: () => () => {},
+        onLifecycle: () => () => {},
         onSessionsChanged: () => () => {},
         onWorkspacePaneChanged: () => () => {},
         onSlotClosed: () => () => {},

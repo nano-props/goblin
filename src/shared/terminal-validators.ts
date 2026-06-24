@@ -131,18 +131,24 @@ const TerminalSlotClosedEventSchema = v.object({
 export function isValidTerminalPtySessionId(value: unknown): value is string {
   return typeof value === 'string' && TERMINAL_PTY_SESSION_ID_RE.test(value)
 }
-const TerminalOwnershipEventSchema = v.object({
+const TerminalIdentityEventSchema = v.object({
   ptySessionId: v.string(),
   controller: v.nullable(TerminalControllerSchema),
-  cols: v.number(),
-  rows: v.number(),
+  canonicalCols: v.number(),
+  canonicalRows: v.number(),
+})
+const TerminalLifecycleEventSchema = v.object({
+  ptySessionId: v.string(),
   phase: v.picklist(TERMINAL_SLOT_PHASE_VALUES),
+  message: v.nullable(v.string()),
+  takeoverPending: v.boolean(),
 })
 const TerminalRealtimeMessageVariants = [
   v.object({ type: v.literal('output'), event: TerminalOutputEventSchema }),
   v.object({ type: v.literal('title'), event: TerminalTitleEventSchema }),
   v.object({ type: v.literal('exit'), event: TerminalExitEventSchema }),
-  v.object({ type: v.literal('ownership'), event: TerminalOwnershipEventSchema }),
+  v.object({ type: v.literal('identity'), event: TerminalIdentityEventSchema }),
+  v.object({ type: v.literal('lifecycle'), event: TerminalLifecycleEventSchema }),
   v.object({ type: v.literal('sessions-changed'), repoRoot: v.string() }),
   TerminalSlotClosedEventSchema,
 ] as const

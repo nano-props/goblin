@@ -580,7 +580,8 @@ beforeEach(() => {
         onOutput: vi.fn(),
         onTitle: vi.fn(),
         onExit: vi.fn(),
-        onOwnership: vi.fn(),
+        onIdentity: vi.fn(),
+        onLifecycle: vi.fn(),
         onSessionsChanged: vi.fn(),
         onSlotClosed: vi.fn(),
       },
@@ -647,7 +648,8 @@ beforeEach(() => {
       onOutput: vi.fn(() => () => {}),
       onTitle: vi.fn(() => () => {}),
       onExit: vi.fn(() => () => {}),
-      onOwnership: vi.fn(() => () => {}),
+      onIdentity: vi.fn(() => () => {}),
+      onLifecycle: vi.fn(() => () => {}),
       onSessionsChanged: vi.fn(() => () => {}),
       onSlotClosed: vi.fn(() => () => {}),
     }),
@@ -1532,13 +1534,13 @@ describe('ManagedTerminalSlot', () => {
     // A later realtime ownership event for the same session is a
     // benign re-apply — the runtime treats it as idempotent because
     // every field already matches.
-    session.handleOwnership({
+    session.handleIdentity({
       ptySessionId: 'pty_session_1_aaaaaaaaa',
       role: 'controller',
       controllerStatus: 'connected',
       canonicalCols: 101,
       canonicalRows: 31,
-      phase: 'open',
+
     })
 
     expect(session.snapshot().attachment).toMatchObject({
@@ -1808,13 +1810,13 @@ describe('ManagedTerminalSlot', () => {
     session.takeover()
     await flushUntil(() => terminalCalls.takeover.mock.calls.length > 0)
 
-    session.handleOwnership({
+    session.handleIdentity({
       ptySessionId: 'pty_session_1_aaaaaaaaa',
       role: 'unowned',
       controllerStatus: 'none',
       canonicalCols: 120,
       canonicalRows: 40,
-      phase: 'open',
+
     })
 
     expect(session.snapshot().attachment).toMatchObject({
@@ -1858,13 +1860,13 @@ describe('ManagedTerminalSlot', () => {
       canTakeover: true,
     })
 
-    session.handleOwnership({
+    session.handleIdentity({
       ptySessionId: 'pty_session_1_aaaaaaaaa',
       role: 'unowned',
       controllerStatus: 'none',
       canonicalCols: 120,
       canonicalRows: 40,
-      phase: 'open',
+
     })
     await flushTerminalStart()
 
@@ -1897,13 +1899,13 @@ describe('ManagedTerminalSlot', () => {
     await flushTerminalStart()
     await flushUntil(() => session.snapshot().phase === 'open')
 
-    session.handleOwnership({
+    session.handleIdentity({
       ptySessionId: 'pty_session_1_aaaaaaaaa',
       role: 'controller',
       controllerStatus: 'connected',
       canonicalCols: 101,
       canonicalRows: 31,
-      phase: 'open',
+
     })
 
     expect(session.snapshot().attachment).toMatchObject({
@@ -2315,17 +2317,17 @@ describe('ManagedTerminalSlot', () => {
       await flushUntil(() => terminalCalls.takeover.mock.calls.length > 0)
       expect(session.snapshot().phase).toBe('open')
 
-      // PTY crashes mid-takeover — server pushes a realtime ownership
-      // event with phase=restarting. The realtime event is the
-      // authority on the non-takeover paths, so it overrides the
-      // takeover response's phase.
-      session.handleOwnership({
+      // PTY crashes mid-takeover — server pushes a realtime lifecycle
+      // event with phase=restarting. After the identity/lifecycle
+      // split, phase is on its own channel; the identity event no
+      // longer carries phase at all. The renderer applies the
+      // lifecycle event through `handleLifecycle` and the new
+      // phase replaces the takeover response's phase.
+      session.handleLifecycle({
         ptySessionId: 'pty_session_1_aaaaaaaaa',
-        role: 'controller',
-        controllerStatus: 'connected',
-        canonicalCols: 100,
-        canonicalRows: 30,
         phase: 'restarting',
+        message: null,
+        takeoverPending: false,
       })
       expect(session.snapshot().phase).toBe('restarting')
     })
@@ -2359,27 +2361,35 @@ describe('ManagedTerminalSlot', () => {
       // phase just reflects whether the PTY is fully started. The
       // previous `!canResize()` gate misread this as a downgrade
       // because canResize() requires `phase === 'open'`.
-      session.handleOwnership({
+      session.handleIdentity({
         ptySessionId: 'pty_session_1_aaaaaaaaa',
         role: 'controller',
         controllerStatus: 'connected',
         canonicalCols: 100,
         canonicalRows: 30,
-        phase: 'opening',
+
       })
 
       // The role did not change, so the controller xterm must still
-      // be mounted and attached. The old behavior destroyed it here
-      // because canResize() flipped to false (phase was 'opening'),
-      // and the user saw a blank tab until refresh.
+      // be mounted and attached. The pre-split `!canResize()` gate
+      // misread a transitional phase update as a controller→viewer
+      // transition; the post-split identity-only gate does not.
       const xtermAfter = host.querySelector('.goblin-managed-terminal-host .xterm')
       expect(xtermAfter).not.toBeNull()
       expect(xtermAfter).toBe(xtermBefore)
-      // The role is still 'controller' — only the phase moved to
-      // 'opening'. Once the orchestrator's start() completes its
-      // final phase transition, the role-gated gate stays closed
-      // (no destroyActiveView), the xterm is preserved, and the
-      // tab is not blank.
+      // A subsequent lifecycle event with a transitional phase
+      // (`opening` during a pre-spawn identity broadcast) is also
+      // safe: the xterm is still preserved because `handleLifecycle`
+      // never tears it down.
+      session.handleLifecycle({
+        ptySessionId: 'pty_session_1_aaaaaaaaa',
+        phase: 'opening',
+        message: null,
+        takeoverPending: false,
+      })
+      const xtermAfterLifecycle = host.querySelector('.goblin-managed-terminal-host .xterm')
+      expect(xtermAfterLifecycle).not.toBeNull()
+      expect(xtermAfterLifecycle).toBe(xtermBefore)
       expect(session.snapshot().phase).toBe('opening')
     })
 
@@ -2403,13 +2413,13 @@ describe('ManagedTerminalSlot', () => {
       // 'open' here (not the transitional case), so canResize()
       // would also have flipped — the test exercises the role
       // signal independently of phase.
-      session.handleOwnership({
+      session.handleIdentity({
         ptySessionId: 'pty_session_1_aaaaaaaaa',
         role: 'viewer',
         controllerStatus: 'connected',
         canonicalCols: 100,
         canonicalRows: 30,
-        phase: 'open',
+
       })
 
       expect(session.snapshot().attachment).toMatchObject({ role: 'viewer' })

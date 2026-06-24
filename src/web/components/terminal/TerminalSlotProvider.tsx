@@ -195,8 +195,11 @@ export function TerminalSlotProvider({ children }: TerminalSlotProviderProps) {
     const offExit = terminalBridge.onExit((event) => {
       registry.handleExit(event)
     })
-    const offOwnership = terminalBridge.onOwnership((event) => {
-      registry.handleOwnership(event)
+    const offIdentity = terminalBridge.onIdentity((event) => {
+      registry.handleIdentity(event)
+    })
+    const offLifecycle = terminalBridge.onLifecycle((event) => {
+      registry.handleLifecycle(event)
     })
     // Per-session close broadcast. When the server confirms a close,
     // drop the matching local entry immediately so a sibling window
@@ -219,7 +222,8 @@ export function TerminalSlotProvider({ children }: TerminalSlotProviderProps) {
       offOutput()
       offTitle()
       offExit()
-      offOwnership()
+      offIdentity()
+      offLifecycle()
       offSlotClosed()
     }
   }, [registry])

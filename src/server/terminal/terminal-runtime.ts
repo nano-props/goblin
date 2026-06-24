@@ -75,8 +75,11 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
         broker.broadcastToOwner(userId, { type: 'exit', event })
         if (repoRoot) broadcastRepoSessionsChanged(userId, repoRoot)
       },
-      onOwnership(userId, event) {
-        broker.broadcastToOwner(userId, { type: 'ownership', event })
+      onIdentity(userId, event) {
+        broker.broadcastToOwner(userId, { type: 'identity', event })
+      },
+      onLifecycle(userId, event) {
+        broker.broadcastToOwner(userId, { type: 'lifecycle', event })
       },
     },
     terminalViewOrder,

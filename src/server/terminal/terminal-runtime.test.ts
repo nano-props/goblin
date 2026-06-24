@@ -801,7 +801,7 @@ describe('server terminal runtime', () => {
       (message) => message.type === 'response' && message.requestId === 'req_takeover',
     )
     const ownershipIndex = messages.findIndex(
-      (message) => message.type === 'ownership' && message.event.ptySessionId === ptySessionId,
+      (message) => message.type === 'identity' && message.event.ptySessionId === ptySessionId,
     )
     expect(responseIndex).toBeGreaterThanOrEqual(0)
     expect(ownershipIndex).toBeGreaterThan(responseIndex)
@@ -1201,16 +1201,16 @@ describe('server terminal runtime', () => {
     expect(result.ok).toBe(true)
     await new Promise((resolve) => setTimeout(resolve, 0))
 
-    const ownershipMessages = socket.send.mock.calls
+    const identityMessages = socket.send.mock.calls
       .map(([payload]) => JSON.parse(String(payload)))
-      .filter((message) => message.type === 'ownership')
-    expect(ownershipMessages.length).toBeGreaterThan(0)
-    expect(ownershipMessages.at(-1)).toMatchObject({
+      .filter((message) => message.type === 'identity')
+    expect(identityMessages.length).toBeGreaterThan(0)
+    expect(identityMessages.at(-1)).toMatchObject({
       event: {
         ptySessionId,
         controller: { clientId: 'client_a', status: 'connected' },
-        cols: 100,
-        rows: 30,
+        canonicalCols: 100,
+        canonicalRows: 30,
       },
     })
 

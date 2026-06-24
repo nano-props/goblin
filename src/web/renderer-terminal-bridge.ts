@@ -31,7 +31,7 @@ import type {
   TerminalRestartInput,
 } from '#/shared/terminal-types.ts'
 import type { RendererTerminalBridge } from '#/web/renderer-bridge-types.ts'
-import type { TerminalOwnershipViewModel } from '#/web/components/terminal/types.ts'
+import type { TerminalIdentityViewModel, TerminalLifecycleViewModel } from '#/web/components/terminal/types.ts'
 import { isAppQuitting, subscribeAppQuitting } from '#/web/app-lifecycle.ts'
 
 // Matches the server-side `HEARTBEAT_INTERVAL_MS`. Kept as a
@@ -71,7 +71,8 @@ export function createServerTerminalBridge(options: {
   const outputSubscribers = new Set<(event: TerminalOutputEvent) => void>()
   const titleSubscribers = new Set<(event: TerminalTitleEvent) => void>()
   const exitSubscribers = new Set<(event: TerminalExitEvent) => void>()
-  const ownershipSubscribers = new Set<(event: TerminalOwnershipViewModel) => void>()
+  const identitySubscribers = new Set<(event: TerminalIdentityViewModel) => void>()
+  const lifecycleSubscribers = new Set<(event: TerminalLifecycleViewModel) => void>()
   const sessionsChangedSubscribers = new Set<(repoRoot: string) => void>()
   const slotClosedSubscribers = new Set<(event: { ptySessionId: string; repoRoot: string }) => void>()
   const clientId = options.getClientId()
@@ -92,7 +93,8 @@ export function createServerTerminalBridge(options: {
       outputSubscribers.size > 0 ||
       titleSubscribers.size > 0 ||
       exitSubscribers.size > 0 ||
-      ownershipSubscribers.size > 0 ||
+      identitySubscribers.size > 0 ||
+      lifecycleSubscribers.size > 0 ||
       sessionsChangedSubscribers.size > 0 ||
       slotClosedSubscribers.size > 0
     )
@@ -197,20 +199,18 @@ export function createServerTerminalBridge(options: {
       } else if (message.type === 'slot-closed') {
         for (const subscriber of slotClosedSubscribers)
           subscriber({ ptySessionId: message.ptySessionId, repoRoot: message.repoRoot })
-      } else {
-        const ownershipEvent = {
+      } else if (message.type === 'identity') {
+        const identityEvent = {
           ptySessionId: message.event.ptySessionId,
           ...resolveTerminalOwnership(message.event.controller, clientId),
-          canonicalCols: message.event.cols,
-          canonicalRows: message.event.rows,
-          // Phase arrives from the server's realtime ownership event
-          // (non-takeover paths). Takeover itself carries phase on
-          // its response (see `TerminalTakeoverResult`) and applies
-          // it synchronously via `runtime.applyTakeover` — the event
-          // here is the authority for the other paths only.
-          phase: message.event.phase,
+          canonicalCols: message.event.canonicalCols,
+          canonicalRows: message.event.canonicalRows,
         }
-        for (const subscriber of ownershipSubscribers) subscriber(ownershipEvent)
+        for (const subscriber of identitySubscribers) subscriber(identityEvent)
+      } else if (message.type === 'lifecycle') {
+        for (const subscriber of lifecycleSubscribers) subscriber(message.event)
+      } else {
+        // Unknown realtime message — ignore.
       }
     })
     currentSocket.addEventListener('close', () => {
@@ -409,12 +409,21 @@ export function createServerTerminalBridge(options: {
         closeSocketIfIdle()
       }
     },
-    onOwnership(cb) {
-      ownershipSubscribers.add(cb)
+    onIdentity(cb) {
+      identitySubscribers.add(cb)
       manualSocketClose = false
       ensureSocket()
       return () => {
-        ownershipSubscribers.delete(cb)
+        identitySubscribers.delete(cb)
+        closeSocketIfIdle()
+      }
+    },
+    onLifecycle(cb) {
+      lifecycleSubscribers.add(cb)
+      manualSocketClose = false
+      ensureSocket()
+      return () => {
+        lifecycleSubscribers.delete(cb)
         closeSocketIfIdle()
       }
     },

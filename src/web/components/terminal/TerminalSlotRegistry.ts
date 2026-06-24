@@ -32,7 +32,8 @@ import { resolveSelectedTerminalKey } from '#/web/components/terminal/terminal-s
 import { buildWorktreeTerminalSnapshot } from '#/web/components/terminal/terminal-slot-worktree-snapshot.ts'
 import type {
   TerminalDescriptor,
-  TerminalOwnershipViewModel,
+  TerminalIdentityViewModel,
+  TerminalLifecycleViewModel,
   TerminalRepoIndex,
   WorktreeTerminalSnapshot,
   TerminalSlotBase,
@@ -273,11 +274,19 @@ export class TerminalSlotRegistry {
     this.discardLocalSessionAndDismissDetailIfLast(directKey, session.descriptor)
   }
 
-  handleOwnership(event: TerminalOwnershipViewModel): void {
+  handleIdentity(event: TerminalIdentityViewModel): void {
     const directKey = this.slotKeyByPtySessionId.get(event.ptySessionId)
     const directSession = directKey ? this.sessions.get(directKey) : null
     if (directSession) {
-      directSession.handleOwnership(event)
+      directSession.handleIdentity(event)
+    }
+  }
+
+  handleLifecycle(event: TerminalLifecycleViewModel): void {
+    const directKey = this.slotKeyByPtySessionId.get(event.ptySessionId)
+    const directSession = directKey ? this.sessions.get(directKey) : null
+    if (directSession) {
+      directSession.handleLifecycle(event)
     }
   }
 

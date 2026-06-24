@@ -6,7 +6,11 @@ import type {
   TerminalTakeoverResult,
 } from '#/shared/terminal-types.ts'
 import { TerminalSlotState } from '#/web/components/terminal/terminal-slot-state.ts'
-import type { TerminalOwnershipViewModel, TerminalSearchResult } from '#/web/components/terminal/types.ts'
+import type {
+  TerminalIdentityViewModel,
+  TerminalLifecycleViewModel,
+  TerminalSearchResult,
+} from '#/web/components/terminal/types.ts'
 export class TerminalSlotRuntime {
   private readonly state = new TerminalSlotState()
   private ptySessionId: string | null = null
@@ -41,8 +45,18 @@ export class TerminalSlotRuntime {
     return this.state.getCanonicalSize()
   }
 
-  canResize(): boolean {
-    return this.state.getCanResize()
+  // Role-only ownership predicate. The teardown decision in
+  // `ManagedTerminalSlot.handleIdentity` must use this — never
+  // `canSendInput` — so a transitional phase update cannot be
+  // misread as a controller→viewer transition.
+  isOwner(): boolean {
+    return this.state.isOwner()
+  }
+
+  // Write-path predicate. Used at the actual input gate; never
+  // as a stand-in for "owns the PTY".
+  canSendInput(): boolean {
+    return this.state.canSendInput()
   }
 
   clientRole(): TerminalClientRole {
@@ -71,8 +85,8 @@ export class TerminalSlotRuntime {
 
   applyAttachResult(
     result: Extract<TerminalAttachResult, { ok: true }> & {
-      role: TerminalOwnershipViewModel['role']
-      controllerStatus: TerminalOwnershipViewModel['controllerStatus']
+      role: TerminalIdentityViewModel['role']
+      controllerStatus: TerminalIdentityViewModel['controllerStatus']
     },
     fallbackSize: { cols: number; rows: number },
   ): boolean {
@@ -96,8 +110,8 @@ export class TerminalSlotRuntime {
     message: string | null
     processName: string
     canonicalTitle?: string | null
-    role: TerminalOwnershipViewModel['role']
-    controllerStatus: TerminalOwnershipViewModel['controllerStatus']
+    role: TerminalIdentityViewModel['role']
+    controllerStatus: TerminalIdentityViewModel['controllerStatus']
     canonicalCols: number
     canonicalRows: number
   }): boolean {
@@ -166,20 +180,23 @@ export class TerminalSlotRuntime {
     return { changed, output: event.data }
   }
 
-  handleOwnership(event: TerminalOwnershipViewModel): boolean {
+  handleIdentity(event: TerminalIdentityViewModel): boolean {
     if (event.ptySessionId !== this.ptySessionId) return false
-    return this.state.applyOwnership(event)
+    return this.state.applyIdentity(event)
+  }
+
+  handleLifecycle(event: TerminalLifecycleViewModel): boolean {
+    if (event.ptySessionId !== this.ptySessionId) return false
+    return this.state.applyLifecycle(event)
   }
 
   /**
-   * Authoritative handshake for the takeover path.
-   *
-   * Replaces the previous "wait for the realtime `ownership` event"
-   * pattern: the `terminal.takeover` response now carries the same
-   * frame fields (`role`, `controllerStatus`, `canonicalCols`,
-   * `canonicalRows`, `phase`) and is applied synchronously. The
-   * later realtime `ownership` event for the same session is
-   * idempotent — re-applying the same values is a no-op.
+   * Authoritative handshake for the takeover path. The takeover
+   * response carries identity (role + canonicalCols/Rows) and
+   * lifecycle (phase + message) in a single payload — both
+   * `applyIdentity` and `applyLifecycle` are idempotent, so the
+   * later realtime `identity` event for the same session is a
+   * no-op.
    *
    * Returns `false` if the result is for a different session (the
    * caller must already have a current ptySessionId for the takeover
@@ -187,14 +204,20 @@ export class TerminalSlotRuntime {
    */
   applyTakeover(result: Extract<TerminalTakeoverResult, { ok: true }>): boolean {
     if (result.ptySessionId !== this.ptySessionId) return false
-    return this.state.applyOwnership({
+    const idChanged = this.state.applyIdentity({
       ptySessionId: result.ptySessionId,
       role: result.role,
       controllerStatus: result.controllerStatus,
       canonicalCols: result.canonicalCols,
       canonicalRows: result.canonicalRows,
-      phase: result.phase,
     })
+    const lcChanged = this.state.applyLifecycle({
+      ptySessionId: result.ptySessionId,
+      phase: result.phase,
+      message: null,
+      takeoverPending: false,
+    })
+    return idChanged || lcChanged
   }
 
   setCanonicalTitle(canonicalTitle: string | null): boolean {
