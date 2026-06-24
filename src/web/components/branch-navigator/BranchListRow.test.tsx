@@ -16,7 +16,7 @@ vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
   useIsCompactUi: () => false,
 }))
 
-vi.mock('#/web/components/terminal/terminal-session-store.ts', () => ({
+vi.mock('#/web/components/terminal/terminal-slot-store.ts', () => ({
   useWorktreeTerminalBellCount: () => 0,
 }))
 
