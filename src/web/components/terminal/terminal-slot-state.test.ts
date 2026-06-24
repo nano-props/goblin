@@ -91,8 +91,8 @@ describe('TerminalSlotState', () => {
     expect(state.isTakeoverPending()).toBe(true)
   })
 
-  test('isOwner reflects role only — a transitional phase does not flip it', () => {
-    // The split: `isOwner` is the role-only ownership predicate the
+  test('isController reflects role only — a transitional phase does not flip it', () => {
+    // The split: `isController` is the role-only ownership predicate the
     // teardown decision uses. A `canSendInput` (which adds the phase
     // requirement) is the write-path gate. They are intentionally
     // separate so the conflation in the pre-split `canResize()` is
@@ -106,7 +106,7 @@ describe('TerminalSlotState', () => {
       canonicalCols: 100,
       canonicalRows: 30,
     })
-    expect(state.isOwner()).toBe(true)
+    expect(state.isController()).toBe(true)
     expect(state.canSendInput()).toBe(true)
 
     // Move to a transitional phase but keep the controller role.
@@ -116,7 +116,7 @@ describe('TerminalSlotState', () => {
       message: null,
       takeoverPending: false,
     })
-    expect(state.isOwner()).toBe(true) // Role-only — still controller.
+    expect(state.isController()).toBe(true) // Role-only — still controller.
     expect(state.canSendInput()).toBe(false) // Write-path — phase is transitional.
   })
 

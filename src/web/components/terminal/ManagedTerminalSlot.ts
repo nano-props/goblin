@@ -114,11 +114,11 @@ export class ManagedTerminalSlot {
         this.start()
       }
     }
-    if (this.runtime.phase() === 'open' && this.runtime.isOwner() && this.view.isVisible()) this.view.focus()
+    if (this.runtime.phase() === 'open' && this.runtime.isController() && this.view.isVisible()) this.view.focus()
   }
 
   private shouldStartAttachedSession(): boolean {
-    if (this.runtime.isOwner()) return true
+    if (this.runtime.isController()) return true
     return this.runtime.phase() === 'open' && this.runtime.clientRole() === 'unowned'
   }
 
@@ -383,7 +383,7 @@ export class ManagedTerminalSlot {
   handleOutput(event: TerminalOutputEvent): void {
     const result = this.runtime.handleOutput(event)
     if (result.changed) this.notify('metadata')
-    if (result.output && this.runtime.isOwner()) this.queueOutput(result.output)
+    if (result.output && this.runtime.isController()) this.queueOutput(result.output)
   }
 
   handleIdentity(event: TerminalIdentityViewModel): void {
@@ -400,10 +400,10 @@ export class ManagedTerminalSlot {
     const pendingCleared = applies ? this.runtime.clearTakeoverPending() : false
     if (changed) {
       const newRole = this.runtime.clientRole()
-      const isOwner = this.runtime.isOwner()
+      const isControllerNow = this.runtime.isController()
       const isUnowned = this.runtime.phase() === 'open' && newRole === 'unowned'
       // The gate only distinguishes pass-through vs takeover.
-      this.authority().setRole(isOwner ? 'controller' : 'viewer')
+      this.authority().setRole(isControllerNow ? 'controller' : 'viewer')
       if (wasRole === 'controller' && newRole !== 'controller') {
         if (this.view.currentTerminal()) {
           this.destroyActiveView({ preserveTransientState: true })
@@ -411,7 +411,7 @@ export class ManagedTerminalSlot {
         if (isUnowned && this.view.isConnected()) {
           this.start()
         }
-      } else if (wasRole !== 'controller' && isOwner) {
+      } else if (wasRole !== 'controller' && isControllerNow) {
         // Bug E: a viewer → controller transition must always
         // notify, even when the xterm view is already mounted.
         // The previous gate (`!this.view.currentTerminal()`) only
@@ -474,7 +474,7 @@ export class ManagedTerminalSlot {
     // when the caller was a viewer and is now a controller. Reading
     // `wasController` after the gate returns would always be `true`
     // and the view-start branch would be skipped.
-    const wasController = this.runtime.isOwner()
+    const wasController = this.runtime.isController()
     if (this.runtime.setTakeoverPending(true)) this.notify('metadata')
     // The takeover response is the authoritative handshake for the
     // new controller's view (see TerminalTakeoverResult in
@@ -492,7 +492,7 @@ export class ManagedTerminalSlot {
       this.notify('metadata')
       // `applyTakeover` was called inside the gate's onPromoted
       // hook, so the runtime already reflects the new role.
-      if (!wasController && this.runtime.isOwner()) this.ensureControllerViewStarted()
+      if (!wasController && this.runtime.isController()) this.ensureControllerViewStarted()
     } else {
       this.clearTakeoverPendingWithNotify()
       // Mirror the write/resize paths: surface the structured
@@ -512,7 +512,7 @@ export class ManagedTerminalSlot {
   }
 
   private ensureControllerViewStarted(): void {
-    if (!this.runtime.isOwner()) return
+    if (!this.runtime.isController()) return
     if (this.view.isConnected()) this.start()
     if (this.view.isVisible()) this.view.focus()
   }
@@ -653,7 +653,7 @@ export class ManagedTerminalSlot {
     result: TerminalAttachResultWithOwnership,
   ): Promise<boolean> {
     const changed = this.runtime.applyAttachResult(result, { cols: term.cols, rows: term.rows })
-    if (!this.runtime.isOwner()) {
+    if (!this.runtime.isController()) {
       this.applyCanonicalSizeToView()
     } else {
       const canonicalSize = this.runtime.currentCanonicalSize()

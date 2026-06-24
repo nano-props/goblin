@@ -71,22 +71,25 @@ export class TerminalSlotState {
     return this.transientViewState.searchResult
   }
 
-  // **Role-only** ownership predicate. Use this for any decision
-  // about whether the user "owns" the PTY (teardown on role change,
-  // render-time role banner, focus, etc.). A transitional phase
-  // update must never make this return false for a slot whose role
-  // is still `'controller'`.
-  isOwner(): boolean {
+  // **Role-only** predicate: is this client the active `controller`
+  // of the PTY? Use this for any decision that should track the
+  // controller role alone — teardown on role change, render-time
+  // role banner, focus, etc. A transitional phase update must
+  // never make this return false for a slot whose role is still
+  // `'controller'`. Named after the role enum value (not the
+  // older "owner" terminology) to match the userId/clientId/
+  // ptySessionId identity split: the role is `controller`, not
+  // `owner`.
+  isController(): boolean {
     return this.runtimeState.clientOwnership.role === 'controller'
   }
 
   // Write-path predicate. Use this only at the actual input gate
-  // — never as a stand-in for "owns the PTY". A slot that is
+  // — never as a stand-in for "is the controller". A slot that is
   // 'controller' but still in `'opening'` cannot accept writes
-  // (the PTY is still starting up) but is still owned by the
-  // same client; the teardown decision must use `isOwner()` and
-  // the write decision must use this method. The two are
-  // intentionally separate.
+  // (the PTY is still starting up) but is still the controller;
+  // the teardown decision uses `isController()` and the write
+  // decision uses this method. The two are intentionally separate.
   canSendInput(): boolean {
     return this.runtimeState.clientOwnership.role === 'controller' && this.runtimeState.phase === 'open'
   }

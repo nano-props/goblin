@@ -45,16 +45,17 @@ export class TerminalSlotRuntime {
     return this.state.getCanonicalSize()
   }
 
-  // Role-only ownership predicate. The teardown decision in
+  // Role-only predicate: is this client the active controller of
+  // the PTY? The teardown decision in
   // `ManagedTerminalSlot.handleIdentity` must use this — never
   // `canSendInput` — so a transitional phase update cannot be
   // misread as a controller→viewer transition.
-  isOwner(): boolean {
-    return this.state.isOwner()
+  isController(): boolean {
+    return this.state.isController()
   }
 
   // Write-path predicate. Used at the actual input gate; never
-  // as a stand-in for "owns the PTY".
+  // as a stand-in for "is the controller".
   canSendInput(): boolean {
     return this.state.canSendInput()
   }
