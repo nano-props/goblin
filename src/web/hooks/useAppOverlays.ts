@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from 'react'
 import { useOverlayRegistry } from '#/web/hooks/useOverlayRegistry.ts'
+import { useReposStore } from '#/web/stores/repos/store.ts'
 export const APP_OVERLAY_KEYS = ['clone', 'openRepo', 'openRemoteRepo', 'createWorktree'] as const
 export type AppOverlayKey = (typeof APP_OVERLAY_KEYS)[number]
 
@@ -77,6 +78,15 @@ export function useAppOverlays(options: AppOverlayRouteOptions = {}) {
   )
 
   const openCreateWorktree = useCallback(() => {
+    // The create-worktree dialog is repo-scoped — it has nothing to
+    // render without an active repo. Guard against a future caller
+    // (e.g. a command-palette entry) that invokes this without
+    // `activeId` set, so we don't leave `state.createWorktree.open`
+    // stuck `true` until a later `useEffect([activeId])` clears it.
+    // Currently only the Topbar button calls this, and the Topbar
+    // button is itself hidden when no repo is active — this is a
+    // defensive guard for future surface expansion.
+    if (!useReposStore.getState().activeId) return
     if (routeDriven) {
       options.onRouteOverlayChange?.('createWorktree')
       return

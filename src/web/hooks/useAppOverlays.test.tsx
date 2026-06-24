@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { useAppOverlays } from '#/web/hooks/useAppOverlays.ts'
+import { resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 
 let container: HTMLDivElement | null = null
 let root: Root | null = null
@@ -62,6 +63,7 @@ function RoutedHarness() {
 
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
+  resetReposStore()
 })
 
 afterEach(() => {
@@ -79,6 +81,12 @@ describe('useAppOverlays', () => {
     container = document.createElement('div')
     document.body.append(container)
     root = createRoot(container)
+
+    // Seed an active repo so the openCreateWorktree defensive
+    // guard (in production) does not short-circuit the test.
+    act(() => {
+      seedRepoState({ id: '/tmp/gbl-overlay-test', branches: [] })
+    })
 
     act(() => {
       root!.render(<Harness />)
@@ -121,6 +129,35 @@ describe('useAppOverlays', () => {
     expect(text('#clone-open')).toBe('closed')
     expect(text('#open-repo-open')).toBe('closed')
     expect(text('#any-open')).toBe('closed')
+  })
+
+  test('openCreateWorktree no-ops when no active repo (defensive guard)', () => {
+    // The create-worktree dialog is repo-scoped — it renders nothing
+    // when no active repo. If a future surface (e.g. command-palette
+    // entry) calls openCreateWorktree with no active repo, the
+    // naive behaviour is `state.createWorktree.open = true` with no
+    // dialog visible, and a later `useEffect([activeId])` clears it
+    // when a repo is finally activated. The guard short-circuits at
+    // the action so the intent is never silently lost.
+    container = document.createElement('div')
+    document.body.append(container)
+    root = createRoot(container)
+
+    // Active repo is null (resetReposStore in beforeEach).
+    act(() => {
+      root!.render(<Harness />)
+    })
+
+    click('#open-create-worktree')
+    expect(text('#create-worktree-open')).toBe('closed')
+    expect(text('#any-open')).toBe('closed')
+
+    // Now seed an active repo; opening should now work.
+    act(() => {
+      seedRepoState({ id: '/tmp/gbl-overlay-test', branches: [] })
+    })
+    click('#open-create-worktree')
+    expect(text('#create-worktree-open')).toBe('open')
   })
 })
 
