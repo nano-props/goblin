@@ -5,7 +5,10 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   createMock: vi.fn(),
   closeMock: vi.fn(),
-  proposeTerminalGeometryMock: vi.fn(() => ({ cols: 101, rows: 31 })),
+  proposeTerminalGeometryMock: vi.fn<() => { cols: number; rows: number } | null>(() => ({
+    cols: 101,
+    rows: 31,
+  })),
   preloadTerminalFontMock: vi.fn(async () => {}),
   attachmentIdMock: vi.fn(() => 'attachment_local'),
 }))
@@ -112,6 +115,23 @@ const WORKTREE_PATH = '/repo'
 const BRANCH = 'main'
 const WORKTREE_KEY = `${REPO_ROOT}\0${WORKTREE_PATH}`
 
+class MockResizeObserver {
+  static instances: MockResizeObserver[] = []
+  observe = vi.fn()
+  disconnect = vi.fn()
+  unobserve = vi.fn()
+  private readonly callback: () => void
+  constructor(callback: () => void) {
+    this.callback = callback
+    MockResizeObserver.instances.push(this)
+  }
+  trigger(): void {
+    this.callback()
+  }
+}
+
+let originalResizeObserver: typeof ResizeObserver | undefined
+
 function makeRepoIndex() {
   return {
     [REPO_ROOT]: {
@@ -169,12 +189,27 @@ describe('TerminalSessionRegistry create flow', () => {
     registry = new TerminalSessionRegistry(() => REPO_ROOT)
     registry.setRepoIndex(makeRepoIndex())
     setTerminalSessionRegistryForTests(registry)
+    originalResizeObserver = globalThis.ResizeObserver
+    Object.defineProperty(globalThis, 'ResizeObserver', {
+      configurable: true,
+      value: MockResizeObserver,
+    })
+    MockResizeObserver.instances = []
   })
 
   afterEach(() => {
     registry.destroy()
     setTerminalSessionRegistryForTests(null)
     document.body.innerHTML = ''
+    if (originalResizeObserver) {
+      Object.defineProperty(globalThis, 'ResizeObserver', {
+        configurable: true,
+        value: originalResizeObserver,
+      })
+    } else {
+      delete (globalThis as any).ResizeObserver
+    }
+    MockResizeObserver.instances = []
   })
 
   test('creates a terminal with the registered host geometry', async () => {
@@ -250,6 +285,66 @@ describe('TerminalSessionRegistry create flow', () => {
       rows: 31,
       attachmentId: 'attachment_local',
     })
+  })
+
+  test('pending create rejected on destroy while waiting for host registration', async () => {
+    const pending = registry.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
+
+    expect(registry.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(true)
+    expect((registry as any).pendingCreateByWorktree.size).toBe(1)
+    // The waiter is registered only after the flush reaches
+    // `waitForHostRegistration` — that's several await boundaries past
+    // the synchronous `enqueuePendingCreate`, so we must wait for it.
+    await vi.waitFor(() => expect((registry as any).hostWaitersByWorktree.size).toBe(1))
+
+    // Attach the rejection handler before destroy() so the rejected
+    // promise is not flagged as unhandled between the synchronous
+    // `destroy()` call and the later `expect(...).rejects` chain.
+    const expectation = expect(pending).rejects.toThrow('terminal registry destroyed')
+    registry.destroy()
+    await expectation
+    expect((registry as any).hostWaitersByWorktree.size).toBe(0)
+    expect((registry as any).pendingCreateByWorktree.size).toBe(0)
+    expect(registry.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
+  })
+
+  test('retries creating until host geometry becomes measurable', async () => {
+    mocks.proposeTerminalGeometryMock.mockReturnValue(null)
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    registry.registerHost(WORKTREE_KEY, host)
+
+    const pending = registry.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
+
+    await vi.waitFor(() => expect(MockResizeObserver.instances).toHaveLength(1))
+    const observer = MockResizeObserver.instances[0]!
+    observer.trigger()
+    expect(mocks.createMock).not.toHaveBeenCalled()
+
+    mocks.proposeTerminalGeometryMock.mockReturnValue({ cols: 101, rows: 31 })
+    observer.trigger()
+
+    await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
+    expect(registry.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
+    await expect(pending).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0terminal-1`)
+  })
+
+  test('fails create when terminal host is permanently unmeasurable', async () => {
+    mocks.proposeTerminalGeometryMock.mockReturnValue(null)
+
+    const container = document.createElement('div')
+    container.style.display = 'none'
+    document.body.appendChild(container)
+    const host = document.createElement('div')
+    container.appendChild(host)
+    registry.registerHost(WORKTREE_KEY, host)
+
+    const pending = registry.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
+
+    await expect(pending).rejects.toThrow('host is inside a display:none subtree')
+    expect(registry.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
+    expect(mocks.createMock).not.toHaveBeenCalled()
   })
 
   test('durable close: awaits an in-flight close for the same worktree before creating', async () => {

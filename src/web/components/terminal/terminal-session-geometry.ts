@@ -46,12 +46,11 @@ export async function resolveTerminalCreateGeometry(input: {
  * their prompt layout from `$COLUMNS` at prompt-render time and many
  * configurations do not redraw the visible prompt on SIGWINCH.
  *
- * The wait has no hardcoded timeout. It is driven entirely by the host's
- * `ResizeObserver` callbacks; if the host is in a `display:none` subtree
- * (and therefore cannot ever produce a size) the function rejects
- * immediately instead of waiting. The caller controls cancellation via an
- * `AbortSignal` — typically wired to session disposal so an aborted attach
- * does not leak the observer subscription.
+ * The wait is driven by `ResizeObserver` callbacks and is cancelable. If the
+ * host is in a `display:none` subtree (and therefore cannot ever produce a
+ * size), the function rejects immediately. The caller can pass `timeoutMs` to
+ * bound the wait, or `signal` for explicit cancellation (for example on
+ * registry teardown), so neither attach nor resize-driven waits leak subscriptions.
  *
  * `measure` is dependency-injected so tests can drive the host without
  * relying on jsdom layout. In production it defaults to `proposeTerminalGeometry`.
@@ -61,6 +60,7 @@ export function waitForMeasurableHost(
   options: {
     signal?: AbortSignal
     measure?: (host: HTMLElement) => { cols: number; rows: number } | null
+    timeoutMs?: number
   } = {},
 ): Promise<{ cols: number; rows: number }> {
   // An aborted caller should not be told the host is unmeasurable —
@@ -79,12 +79,16 @@ export function waitForMeasurableHost(
       new TerminalHostNotMeasurableError('ResizeObserver unavailable; cannot wait for host to become measurable'),
     )
   }
+  let timeoutId: ReturnType<typeof setTimeout> | null = null
   return new Promise<{ cols: number; rows: number }>((resolve, reject) => {
     let settled = false
     const settle = (fn: () => void) => {
       if (settled) return
       settled = true
       observer.disconnect()
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId)
+      }
       options.signal?.removeEventListener('abort', onAbort)
       fn()
     }
@@ -95,6 +99,10 @@ export function waitForMeasurableHost(
     })
     observer.observe(host)
     options.signal?.addEventListener('abort', onAbort)
+    const timeoutMs = options.timeoutMs
+    if (timeoutMs != null && timeoutMs > 0) {
+      timeoutId = setTimeout(() => settle(() => reject(new Error(`terminal host measurable wait timed out after ${timeoutMs}ms`))), timeoutMs)
+    }
   })
 }
 
