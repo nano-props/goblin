@@ -293,7 +293,7 @@ export const ko: Record<DictKey, string> = {
   'status.stale-title': '오래된 변경 내용을 표시 중',
   'status.copy-patch': '패치',
   'status.copy-patch-label': '패치 복사',
-  'status.copy-patch-title': '이 워크트리의 git apply --binary 패치를 클립보드에 복사',
+  'status.copy-patch-title': '패치 복사',
   'status.copy-patch-ok': '패치를 클립보드에 복사했습니다',
   'status.copy-patch-empty': '복사할 내용 없음 — 워크트리가 깨끗합니다',
   'status.copy-patch-success': '복사됨',

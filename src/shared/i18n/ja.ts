@@ -300,7 +300,7 @@ export const ja: Record<DictKey, string> = {
   'status.stale-title': '古い変更データを表示しています',
   'status.copy-patch': 'パッチ',
   'status.copy-patch-label': 'パッチをコピー',
-  'status.copy-patch-title': 'このワークツリーの git apply --binary 用パッチをクリップボードにコピー',
+  'status.copy-patch-title': 'パッチをコピー',
   'status.copy-patch-ok': 'パッチをクリップボードにコピーしました',
   'status.copy-patch-empty': 'コピー対象なし — ワークツリーはクリーンです',
   'status.copy-patch-success': 'コピーしました',

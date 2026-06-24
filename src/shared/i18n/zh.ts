@@ -284,7 +284,7 @@ export const zh: Record<DictKey, string> = {
   'status.stale-title': '正在显示旧的改动数据',
   'status.copy-patch': '补丁',
   'status.copy-patch-label': '复制补丁',
-  'status.copy-patch-title': '将该工作树的 git apply --binary 补丁复制到剪贴板',
+  'status.copy-patch-title': '复制补丁',
   'status.copy-patch-ok': '补丁已复制到剪贴板',
   'status.copy-patch-empty': '无需复制 — 工作树是干净的',
   'status.copy-patch-success': '已复制',
