@@ -2,6 +2,10 @@ import { forwardRef, type ComponentPropsWithoutRef, type ComponentRef, type Ref 
 import { ScrollArea as ScrollAreaPrimitive } from 'radix-ui'
 import { cn } from '#/web/lib/cn.ts'
 type Orientation = 'vertical' | 'horizontal' | 'both'
+// 'compact' omits the 11×11 transparent hit-target applied in the
+// 'default' mode; use it for popovers and short lists where the
+// scrollbar should feel lighter, and 'default' for persistent panes
+// that the user scrolls often.
 type ScrollbarMode = 'default' | 'compact'
 
 interface ScrollAreaProps extends ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.Root> {
