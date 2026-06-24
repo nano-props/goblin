@@ -55,8 +55,8 @@ export function Toolbar({ children, className, variant = 'plain', ...props }: To
     <div
       className={cn(
         'flex h-9 shrink-0 items-center',
-        variant === 'repo' && 'gap-3 bg-card px-4',
-        variant === 'workspace' && 'min-w-0 justify-between gap-2 bg-card px-1',
+        variant === 'repo' && 'gap-3 border-b border-border/60 bg-card px-4',
+        variant === 'workspace' && 'min-w-0 justify-between gap-2 border-b border-border/60 bg-card px-1',
         className,
       )}
       {...props}

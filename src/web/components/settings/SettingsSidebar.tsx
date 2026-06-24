@@ -37,7 +37,7 @@ export function SettingsSidebar<TPage extends string>({
   return (
     <aside
       className={cn(
-        'flex shrink-0 flex-col bg-muted/30 pb-3',
+        'flex shrink-0 flex-col border-r border-border/60 bg-muted/20 pb-3',
         compact ? 'w-14 px-2' : 'w-48 px-3',
       )}
       style={{ paddingTop: topInset > 0 ? topInset + 12 : 12 }}

@@ -69,6 +69,8 @@ html[data-host='electron']:not([data-chrome='overlay']) .topbar {
 html[data-host='electron'][data-chrome='overlay'] .topbar {
   padding: 0 150px 0 16px;
 }
+
+
 button,
 [data-interactive] {
   -webkit-app-region: no-drag;
