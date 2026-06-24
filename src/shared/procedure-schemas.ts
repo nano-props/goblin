@@ -85,6 +85,16 @@ export const REPO_PROCEDURE_SCHEMAS = {
   openEditor: v.object({ path: v.string() }),
   backgroundSyncRepos: v.object({ repoIds: StringArray }),
   abort: CwdInput,
+  probe: CwdInput,
+  snapshot: CwdInput,
+  status: CwdInput,
+  log: v.object({
+    cwd: v.string(),
+    branch: v.string(),
+    count: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(200))),
+    skip: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(100_000))),
+  }),
+  patch: v.object({ cwd: v.string(), worktreePath: v.string() }),
   pullRequests: v.object({
     cwd: v.string(),
     branches: v.optional(StringArray),
@@ -118,36 +128,6 @@ export const REMOTE_PROCEDURE_SCHEMAS = {
   testRepository: v.object({ target: RemoteTargetSchema }),
   openEditor: v.object({ repoId: v.string(), worktreePath: v.string() }),
   openTerminal: v.object({ repoId: v.string(), worktreePath: v.string() }),
-} as const
-
-// Query-string schemas for the GET repo read endpoints. `parseHttpQuery`
-// flattens the URLSearchParams into a `{ key: string | string[] }` object
-// before validating, so multi-value keys (e.g. `branches`) accept arrays.
-export const REPO_QUERY_SCHEMAS = {
-  probe: v.object({ cwd: v.string() }),
-  snapshot: v.object({ cwd: v.string() }),
-  status: v.object({ cwd: v.string() }),
-  log: v.object({
-    cwd: v.string(),
-    branch: v.string(),
-    count: v.optional(
-      v.pipe(
-        v.union([v.number(), v.pipe(v.string(), v.transform(Number))]),
-        v.integer(),
-        v.minValue(1),
-        v.maxValue(200),
-      ),
-    ),
-    skip: v.optional(
-      v.pipe(
-        v.union([v.number(), v.pipe(v.string(), v.transform(Number))]),
-        v.integer(),
-        v.minValue(0),
-        v.maxValue(100_000),
-      ),
-    ),
-  }),
-  patch: v.object({ cwd: v.string(), worktreePath: v.string() }),
 } as const
 
 // Schemas for the settings write paths. Each shape matches the typed

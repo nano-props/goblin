@@ -58,10 +58,16 @@ vi.mock('#/server/modules/settings-source.ts', () => ({
   getServerFetchIntervalSec: mocks.getServerFetchIntervalSec,
 }))
 
-describe('repo routes — GET query validation', () => {
-  test('returns 400 when the query is missing required fields', async () => {
+describe('repo routes — POST body validation (read endpoints)', () => {
+  test('returns 400 when the body is missing required fields', async () => {
     const app = createRepoRoutes()
-    const response = await app.request(new Request('http://localhost/probe'))
+    const response = await app.request(
+      new Request('http://localhost/probe', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      }),
+    )
     expect(response.status).toBe(400)
     const json = (await response.json()) as { ok: boolean; code: string; message: string }
     expect(json).toMatchObject({ ok: false, code: 'BAD_REQUEST' })
@@ -84,10 +90,16 @@ describe('repo routes — GET query validation', () => {
     expect(mocks.getRepositoryPullRequests).not.toHaveBeenCalled()
   })
 
-  test('passes a valid query through to the module layer', async () => {
+  test('passes a valid body through to the module layer', async () => {
     mocks.probeRepository.mockResolvedValue({ ok: true, root: '/tmp/repo', name: 'repo' })
     const app = createRepoRoutes()
-    const response = await app.request(new Request('http://localhost/probe?cwd=/tmp/repo'))
+    const response = await app.request(
+      new Request('http://localhost/probe', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: '/tmp/repo' }),
+      }),
+    )
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ ok: true, root: '/tmp/repo', name: 'repo' })
     expect(mocks.probeRepository).toHaveBeenCalledWith('/tmp/repo')
@@ -110,11 +122,15 @@ describe('repo routes — GET query validation', () => {
     })
   })
 
-  test('passes patch query through to getRepositoryPatch', async () => {
+  test('passes patch body through to getRepositoryPatch', async () => {
     mocks.getRepositoryPatch.mockResolvedValue({ ok: true, message: 'diff --git a b' })
     const app = createRepoRoutes()
     const response = await app.request(
-      new Request('http://localhost/patch?cwd=/tmp/repo&worktreePath=/tmp/repo/.worktrees%2Ffeature'),
+      new Request('http://localhost/patch', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: '/tmp/repo', worktreePath: '/tmp/repo/.worktrees/feature' }),
+      }),
     )
     expect(response.status).toBe(200)
     expect(mocks.getRepositoryPatch).toHaveBeenCalledWith(
@@ -127,7 +143,13 @@ describe('repo routes — GET query validation', () => {
   test('returns an error envelope when repo log reading fails', async () => {
     mocks.getRepositoryLog.mockRejectedValueOnce(new Error('fatal: bad revision'))
     const app = createRepoRoutes()
-    const response = await app.request(new Request('http://localhost/log?cwd=/tmp/repo&branch=feature%2Fwork'))
+    const response = await app.request(
+      new Request('http://localhost/log', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: '/tmp/repo', branch: 'feature/work' }),
+      }),
+    )
 
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ ok: false, message: 'error.failed-read-repo' })

@@ -148,10 +148,11 @@ describe('repo-client', () => {
     const { getRepositoryLog } = await import('#/web/repo-client.ts')
     await expect(getRepositoryLog('/tmp/repo', 'feature/work')).rejects.toThrow('error.failed-read-repo')
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://127.0.0.1:32100/api/repo/log?cwd=%2Ftmp%2Frepo&branch=feature%2Fwork&count=50&skip=0',
+      'http://127.0.0.1:32100/api/repo/log',
       expect.objectContaining({
-        method: 'GET',
+        method: 'POST',
         headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
+        body: JSON.stringify({ cwd: '/tmp/repo', branch: 'feature/work', count: 50, skip: 0 }),
       }),
     )
   })
