@@ -14,10 +14,10 @@ import { Button } from '#/web/components/ui/button.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { setTerminalFocused } from '#/web/terminal-focus.ts'
 import { collectClipboardFiles, isNonPlaceholderClipboardFile } from '#/web/clipboard/collect-clipboard-files.ts'
-import { processDrop, processPaste } from '#/web/clipboard/process.ts'
+import { previewPaste, processDrop } from '#/web/clipboard/process.ts'
+import { resolvePastedFiles } from '#/web/clipboard/resolver.ts'
 import { planTerminalPathWrite } from '#/web/clipboard/terminal-path-write.ts'
 import type { PasteResolution } from '#/web/clipboard/resolver.ts'
-import { PASTE_FILE_MAX_BYTES } from '#/shared/clipboard-paste.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { terminalLog } from '#/web/logger.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
@@ -301,59 +301,84 @@ export function TerminalSlot({
       // worktree switch during resolve would otherwise route the
       // write to a session the user is no longer looking at.
       const slotKey = key
-      void processDrop({ files }).then((outcome) => {
-        if (keyRef.current !== slotKey) return
-        // `no-op` is unreachable at this call site: `handleDrop`
-        // filters zero-byte files before calling `processDrop`, so
-        // `processDrop` can only return `files` or `too-large`.
-        // `handlePasteCapture` uses the same if-narrowing shape.
-        if (outcome.kind === 'files') {
-          writeResolutionToPty(outcome.resolution, slotKey, 'drop')
-          return
-        }
-        if (outcome.kind === 'too-large') {
-          toast.error(t('terminal.paste-file-too-large'))
-        }
-      })
+      void processDrop({ files }).then(
+        (outcome) => {
+          if (keyRef.current !== slotKey) return
+          // `no-op` is unreachable at this call site: `handleDrop`
+          // filters zero-byte files before calling `processDrop`, so
+          // `processDrop` can only return `files` or `too-large`.
+          // `handlePasteCapture` uses the same if-narrowing shape.
+          if (outcome.kind === 'files') {
+            writeResolutionToPty(outcome.resolution, slotKey, 'drop')
+            return
+          }
+          if (outcome.kind === 'too-large') {
+            toast.error(t('terminal.paste-file-too-large'))
+          }
+        },
+        (err) => {
+          // IPC / network / server failure. Surface it instead of
+          // silently swallowing the rejection.
+          terminalLog.warn('drop resolver failed', { err })
+          if (keyRef.current === slotKey) toast.error(t('terminal.paste-file-failed'))
+        },
+      )
     },
     [isController, key, t, writeResolutionToPty],
   )
   const handlePasteCapture = useCallback(
     (event: ClipboardEvent<HTMLDivElement>) => {
       if (!key || !isController) return
-      const files = collectClipboardFiles(event.clipboardData)
-      // Files-first: a Linux file copy carries both `text/uri-list`
-      // and a `text/plain` rendering of the same URI list. If we let
-      // text win, the user pastes a literal `file:///…` string.
-      if (files.length > 0) {
-        if (files.some((f) => f.size > PASTE_FILE_MAX_BYTES)) {
-          event.preventDefault()
-          toast.error(t('terminal.paste-file-too-large'))
-          return
-        }
-        // preventDefault() in capture phase is enough to stop xterm —
-        // xterm renders inside this slot's root, so the bubble-phase
-        // listener never sees the event. Do NOT call stopPropagation:
-        // it would silently break any future bubble-phase paste
-        // listener mounted higher in the tree.
-        event.preventDefault()
-        // Capture the session key the user pasted into. See
-        // `handleDrop` for the worktree-switch rationale.
-        const slotKey = key
-        void processPaste({ files }).then((outcome) => {
-          if (keyRef.current !== slotKey) return
-          if (outcome.kind === 'files') {
-            writeResolutionToPty(outcome.resolution, slotKey, 'paste')
-            return
-          }
-          if (outcome.kind === 'too-large') {
-            toast.error(t('terminal.paste-file-too-large'))
-          }
-        })
+      const clipboardData = event.clipboardData
+      if (!clipboardData) return
+
+      // Synchronous routing. The capture-phase listener must call
+      // preventDefault/stopPropagation BEFORE awaiting anything,
+      // because xterm.js's descendant textarea listener fires
+      // immediately after us.
+      const files = collectClipboardFiles(clipboardData)
+      const text = clipboardData.getData('text/plain')
+      const preview = previewPaste({ text, files })
+
+      // Text wins → defer to xterm.js's native paste handler. It
+      // reads `text/plain` itself and wraps with bracketed-paste
+      // sequences when the shell has enabled mode 2004. We do NOT
+      // preventDefault here so the native path runs. The file
+      // blobs on the same event (e.g. Excel's incidental thumbnail)
+      // are discarded — see `shouldPreferFilesOverText`.
+      if (preview.kind === 'text') return
+      if (preview.kind === 'no-op') return
+
+      // From here we own the paste. `stopPropagation` (not just
+      // `preventDefault`) is what stops xterm.js's descendant
+      // listener from also writing the text/plain content (URI list
+      // from Linux file copy, or single-line path text from
+      // Windows file copy) to the PTY in addition to our
+      // shell-escaped path.
+      event.preventDefault()
+      event.stopPropagation()
+
+      if (preview.kind === 'too-large') {
+        toast.error(t('terminal.paste-file-too-large'))
         return
       }
-      // No files: let xterm handle text paste as today. Do NOT
-      // preventDefault — that would block xterm's own text path.
+
+      // 'files' — resolve paths asynchronously. Capture the session
+      // key (see `handleDrop` for the worktree-switch rationale).
+      const slotKey = key
+      void resolvePastedFiles(files).then(
+        (resolution) => {
+          if (keyRef.current !== slotKey) return
+          writeResolutionToPty(resolution, slotKey, 'paste')
+        },
+        (err) => {
+          // IPC / network / server failure. Surface it instead of
+          // silently swallowing the rejection — the user needs to
+          // know their paste didn't land.
+          terminalLog.warn('paste resolver failed', { err })
+          if (keyRef.current === slotKey) toast.error(t('terminal.paste-file-failed'))
+        },
+      )
     },
     [isController, key, t, writeResolutionToPty],
   )
