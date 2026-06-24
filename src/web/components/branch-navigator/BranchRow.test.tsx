@@ -95,7 +95,7 @@ describe('BranchRow', () => {
       </ul>,
     )
 
-    expect(document.body.textContent).toContain('有改动')
+    expect(document.querySelector('[data-testid="branch-summary-icon"][aria-label="有改动"]')).not.toBeNull()
   })
 
   test('keeps the generic dirty label even when exact counts are unavailable', () => {
@@ -122,7 +122,7 @@ describe('BranchRow', () => {
       </ul>,
     )
 
-    expect(document.body.textContent).toContain('有改动')
+    expect(document.querySelector('[data-testid="branch-summary-icon"][aria-label="有改动"]')).not.toBeNull()
   })
 
   test('shows a terminal bell count badge for branches with unread terminal bells', () => {
