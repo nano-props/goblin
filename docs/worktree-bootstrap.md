@@ -1,12 +1,13 @@
 # Worktree Bootstrap
 
-Use this doc for repo-configured file materialization when creating a worktree.
+Use this doc for repo-configured file materialization and post-create setup when creating a worktree.
 
 ## Goal
 
 - Let a repo declare which local-only paths should appear in a new worktree.
+- Let a repo declare a single setup command to run after the worktree is created.
 - Keep the config explicit, small, and safe.
-- Support `copy`, `symlink`, and `hardlink`.
+- Support `copy`, `symlink`, `hardlink`, `exclude`, and `setup`.
 
 ## Config
 
@@ -20,7 +21,6 @@ copy = [
 ]
 
 symlink = [
-  "node_modules",
   "config/*.json",
 ]
 
@@ -32,7 +32,10 @@ hardlink = [
 exclude = [
   "*.log",
   "*.tmp",
+  "node_modules",
 ]
+
+setup = "bun install"
 ```
 
 ## Rules
@@ -40,6 +43,7 @@ exclude = [
 - Read `goblin.toml` from the repo root of the worktree that initiated create.
 - Resolve all paths and globs relative to that same repo root.
 - After `git worktree add`, expand `copy` / `symlink` / `hardlink`, then subtract `exclude`, then materialize into the new worktree.
+- After materialization, run `setup` once in the new worktree root if it is defined.
 
 ## Semantics
 
@@ -47,6 +51,7 @@ exclude = [
 - `symlink`: create a symbolic link back to the source path.
 - `hardlink`: create a hard link for files only; directory hardlinks are invalid.
 - `exclude`: removes matches from all materialization sets.
+- `setup`: a single shell command string, executed once in the new worktree root after materialization.
 
 ## Safety
 
@@ -55,11 +60,13 @@ exclude = [
 - Never overwrite an existing destination path.
 - Missing source paths are skipped and reported.
 - If one concrete path matches more than one of `copy`, `symlink`, or `hardlink`, fail the bootstrap as a config error.
+- `setup` runs an arbitrary command on the user's machine; treat `goblin.toml` as trusted input only.
 
 ## v1 bias
 
 - If `goblin.toml` is absent, create behaves exactly as today.
-- Keep v1 to `copy`, `symlink`, `hardlink`, and `exclude`.
+- Keep v1 to `copy`, `symlink`, `hardlink`, `exclude`, and `setup`.
+- `setup` is a single string; multi-step workflows should use shell composition (`&&`, `;`).
 - Do not infer rules from untracked files.
 - Do not turn worktree create into a general sync engine.
-
+- For large dependency directories like `node_modules`, prefer `exclude` + `setup` over `symlink` / `hardlink`. Path-based modes do not fit package-manager-owned trees.
