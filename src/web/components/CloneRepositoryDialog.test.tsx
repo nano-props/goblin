@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { CloneRepositoryDialog } from '#/web/components/CloneRepositoryDialog.tsx'
 import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
-import { ELECTRON_RENDERER_CAPABILITIES, RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import type { CloneRepoResult } from '#/shared/api-types.ts'
 
 let container: HTMLDivElement | null = null
@@ -29,8 +29,8 @@ beforeEach(() => {
   testWindow.__GOBLIN_BOOTSTRAP__ = {
     runtime: {
       kind: 'electron',
-      bridgeVersion: RENDERER_BRIDGE_VERSION,
-      capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+      bridgeVersion: CLIENT_BRIDGE_VERSION,
+      capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
     },
     initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
   }
@@ -54,8 +54,8 @@ beforeEach(() => {
     value: {
       runtime: {
         kind: 'electron',
-        bridgeVersion: RENDERER_BRIDGE_VERSION,
-        capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+        bridgeVersion: CLIENT_BRIDGE_VERSION,
+        capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
       },
       pathForFile: () => '',
       invokeIpc: async (request: { path: string; input?: unknown }) => {

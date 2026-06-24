@@ -1,6 +1,6 @@
-import type { RendererBootstrapSnapshot, RendererNativeCapability, RendererRuntimeKind } from '#/shared/bootstrap.ts'
+import type { ClientBootstrapSnapshot, ClientNativeCapability, ClientRuntimeKind } from '#/shared/bootstrap.ts'
 import type { IpcEvent, IpcRequest, SettingsPage } from '#/shared/api-types.ts'
-import type { RendererEffectIntent } from '#/shared/renderer-effect-intents.ts'
+import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
 import type {
   TerminalCatalogMutationResult,
@@ -84,13 +84,13 @@ export interface RendererShellBridge {
 }
 
 export interface RendererBridge {
-  kind(): RendererRuntimeKind
-  hasCapability(capability: RendererNativeCapability): boolean
-  getBootstrap(): RendererBootstrapSnapshot
+  kind(): ClientRuntimeKind
+  hasCapability(capability: ClientNativeCapability): boolean
+  getBootstrap(): ClientBootstrapSnapshot
   invokeIpc(request: IpcRequest): Promise<unknown>
   abortIpc(requestId: string): Promise<boolean>
   onIpcEvent(cb: (event: IpcEvent) => void): () => void
-  onEffectIntent(cb: (event: RendererEffectIntent) => void): () => void
+  onEffectIntent(cb: (event: ClientEffectIntent) => void): () => void
   pathForFile(file: File): string
   /**
    * Persist clipboard / drop file blobs to a runtime-resolved location and

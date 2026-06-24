@@ -29,7 +29,7 @@ function extractIpcChannelLiterals(source: string): string[] {
   return [...seen]
 }
 import {
-  RENDERER_EFFECT_INTENT_CHANNEL,
+  CLIENT_EFFECT_INTENT_CHANNEL,
   IPC_ABORT_CHANNEL,
   IPC_CHANNEL,
   IPC_EVENT_CHANNEL,
@@ -255,20 +255,20 @@ describe('preload goblinNative bridge', () => {
     const off1 = goblinNative.onIntent(cb1)
     const off2 = goblinNative.onIntent(cb2)
 
-    expect(ipcRenderer.on).toHaveBeenCalledWith(RENDERER_EFFECT_INTENT_CHANNEL, expect.any(Function))
+    expect(ipcRenderer.on).toHaveBeenCalledWith(CLIENT_EFFECT_INTENT_CHANNEL, expect.any(Function))
 
     const intentListener = ipcRenderer.on.mock.calls.find(
-      ([channel]) => channel === RENDERER_EFFECT_INTENT_CHANNEL,
+      ([channel]) => channel === CLIENT_EFFECT_INTENT_CHANNEL,
     )?.[1] as ((event: unknown, payload: unknown) => void) | undefined
     intentListener?.(null, { type: 'external-open-enqueued' })
     expect(cb1).toHaveBeenCalledWith({ type: 'external-open-enqueued' })
     expect(cb2).toHaveBeenCalledWith({ type: 'external-open-enqueued' })
 
     off1()
-    expect(ipcRenderer.off).not.toHaveBeenCalledWith(RENDERER_EFFECT_INTENT_CHANNEL, intentListener)
+    expect(ipcRenderer.off).not.toHaveBeenCalledWith(CLIENT_EFFECT_INTENT_CHANNEL, intentListener)
 
     off2()
-    expect(ipcRenderer.off).toHaveBeenCalledWith(RENDERER_EFFECT_INTENT_CHANNEL, intentListener)
+    expect(ipcRenderer.off).toHaveBeenCalledWith(CLIENT_EFFECT_INTENT_CHANNEL, intentListener)
   })
 
   test('forwards clipboard blob save and access-token rotation to their IPC channels', async () => {
@@ -317,7 +317,7 @@ describe('preload goblinNative bridge', () => {
         'native-only RPC dispatch — currently used for global-shortcut registration, native menu rebuilds, and workspace-layout menu gating',
       [IPC_ABORT_CHANNEL]: 'paired with IPC_CHANNEL for cancellation',
       [IPC_EVENT_CHANNEL]: 'main → renderer event broadcast (Electron-only transport)',
-      [RENDERER_EFFECT_INTENT_CHANNEL]: 'renderer effect intent dispatch (paired with the IPC dispatch channel)',
+      [CLIENT_EFFECT_INTENT_CHANNEL]: 'renderer effect intent dispatch (paired with the IPC dispatch channel)',
       [SHELL_OPEN_SETTINGS_WINDOW_CHANNEL]: 'BrowserWindow management — open the settings window as its own OS window',
       [SHELL_OPEN_EXTERNAL_URL_CHANNEL]:
         'Electron shell.openExternal — protocol-handler restrictions the browser API cannot enforce',

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { IpcEvent } from '#/shared/api-types.ts'
-import { ELECTRON_RENDERER_CAPABILITIES, RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
 
 describe('renderer ingress', () => {
@@ -23,8 +23,8 @@ describe('renderer ingress', () => {
         goblinNative: {
           runtime: {
             kind: 'electron',
-            bridgeVersion: RENDERER_BRIDGE_VERSION,
-            capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+            bridgeVersion: CLIENT_BRIDGE_VERSION,
+            capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
           },
           invokeIpc: vi.fn(),
           abortIpc: vi.fn(async () => false),
@@ -62,8 +62,8 @@ describe('renderer ingress', () => {
         goblinNative: {
           runtime: {
             kind: 'electron',
-            bridgeVersion: RENDERER_BRIDGE_VERSION,
-            capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+            bridgeVersion: CLIENT_BRIDGE_VERSION,
+            capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
           },
           invokeIpc: vi.fn(),
           abortIpc: vi.fn(async () => false),
@@ -79,9 +79,9 @@ describe('renderer ingress', () => {
       },
     })
 
-    const { subscribeRendererEffectIntentType } = await import('#/web/renderer-ingress.ts')
+    const { subscribeClientEffectIntentType } = await import('#/web/renderer-ingress.ts')
     const cb = vi.fn()
-    const unsubscribe = subscribeRendererEffectIntentType('external-open-enqueued', cb)
+    const unsubscribe = subscribeClientEffectIntentType('external-open-enqueued', cb)
 
     expect(cb).toHaveBeenCalledWith({ type: 'external-open-enqueued' })
     expect(cb).not.toHaveBeenCalledWith({ type: 'settings-write-error', message: 'failed' })

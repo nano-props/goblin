@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import type { RendererBridge } from '#/web/renderer-bridge-types.ts'
 
 function installWindow(openReturn: unknown = {}) {
@@ -30,7 +30,7 @@ function testBridge(overrides: Partial<RendererBridge> = {}): RendererBridge {
       return false
     },
     getBootstrap: () => ({
-      runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
+      runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
       initialServer: null,
     }),
     invokeIpc: vi.fn(),

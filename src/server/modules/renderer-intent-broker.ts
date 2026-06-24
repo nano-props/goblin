@@ -1,4 +1,4 @@
-import type { RendererEffectIntent } from '#/shared/renderer-effect-intents.ts'
+import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 
 interface RendererIntentSocket {
   send(data: string): unknown
@@ -52,7 +52,7 @@ export function disconnectAllRendererIntentSockets(): void {
 // invalidation broker's fanout semantics. If a future intent needs
 // per-owner routing, layer it on top — but don't repurpose this
 // broker; the simpler shape is the right default.
-export function publishRendererIntent(intent: RendererEffectIntent): boolean {
+export function publishRendererIntent(intent: ClientEffectIntent): boolean {
   if (sockets.size === 0) return false
   const payload = JSON.stringify({ type: 'renderer-effect-intent', intent })
   for (const socket of Array.from(sockets)) {

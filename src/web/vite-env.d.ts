@@ -1,8 +1,8 @@
 /// <reference types="vite/client" />
 
-import type { RendererBootstrapSnapshot } from '#/shared/bootstrap.ts'
+import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
 import type { IpcEvent, IpcRequest, SettingsPage } from '#/shared/api-types.ts'
-import type { RendererEffectIntent } from '#/shared/renderer-effect-intents.ts'
+import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
 import type { TerminalMutationResult, TerminalNotifyBellInput } from '#/shared/terminal-types.ts'
 
@@ -16,7 +16,7 @@ interface GoblinNativeBridge {
   invokeIpc: (request: IpcRequest) => Promise<unknown>
   abortIpc: (requestId: string) => Promise<boolean>
   onEvent: (cb: (event: IpcEvent) => void) => () => void
-  onIntent?: (cb: (event: RendererEffectIntent) => void) => () => void
+  onIntent?: (cb: (event: ClientEffectIntent) => void) => () => void
   pathForFile: (file: File) => string
   shell?: {
     openSettingsWindow: (input?: { page?: SettingsPage }) => Promise<boolean>
@@ -59,7 +59,7 @@ interface GoblinNativeBridge {
 declare global {
   interface Window {
     goblinNative: GoblinNativeBridge
-    __GOBLIN_BOOTSTRAP__?: RendererBootstrapSnapshot
+    __GOBLIN_BOOTSTRAP__?: ClientBootstrapSnapshot
   }
   /** Injected by vite.config.ts `define`. */
   const __APP_VERSION__: string

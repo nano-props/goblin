@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { onRendererLocalEventType } from '#/web/local-events.ts'
-import { subscribeRendererEffectIntent } from '#/web/renderer-ingress.ts'
+import { subscribeClientEffectIntent } from '#/web/renderer-ingress.ts'
 import { subscribeServerRendererIntentIngress } from '#/web/server-renderer-intent-ingress.ts'
 import { intentLog } from '#/web/logger.ts'
 import { useT } from '#/web/stores/i18n.ts'
@@ -14,13 +14,13 @@ import {
 } from '#/web/hooks/renderer-effect-intent-handlers.ts'
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
-import type { RendererEffectIntent } from '#/shared/renderer-effect-intents.ts'
+import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import {
   rendererEffectIntentStoreActionsEqual,
   rendererEffectIntentStoreActionsFromStore,
 } from '#/web/stores/repos/selector-actions.ts'
 
-interface RendererEffectIntentRouterOptions {
+interface ClientEffectIntentRouterOptions {
   navigation: MainWindowNavigationActions
   currentRepoId: string | null
   closeAllOverlays: () => void
@@ -40,7 +40,7 @@ export function useRendererEffectIntentRouter({
   openRemoteRepo,
   isOverlayOpen,
   isWorkspaceShortcutSuppressed,
-}: RendererEffectIntentRouterOptions) {
+}: ClientEffectIntentRouterOptions) {
   // This hook is the single renderer-side subscription point for native effect
   // intents. Routing stays centralized here; intent-specific behavior lives in
   // the handler/plan helpers so components do not subscribe independently.
@@ -90,7 +90,7 @@ export function useRendererEffectIntentRouter({
     // producer (Electron IPC, server WS, future transports) is a
     // one-line `subscribe*(dispatch)` below — no copy of the
     // switch / handler chain.
-    const dispatch = (intent: RendererEffectIntent) => {
+    const dispatch = (intent: ClientEffectIntent) => {
       void (async () => {
         try {
           switch (intent.type) {
@@ -109,7 +109,7 @@ export function useRendererEffectIntentRouter({
       })()
     }
 
-    const offIntent = subscribeRendererEffectIntent(dispatch)
+    const offIntent = subscribeClientEffectIntent(dispatch)
     const offServerIntent = subscribeServerRendererIntentIngress(dispatch)
     const offLocalBellClick = onRendererLocalEventType('terminal-bell-click', (event) => {
       handleTerminalBellClickIntent(event, sharedDeps())

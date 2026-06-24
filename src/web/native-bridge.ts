@@ -1,4 +1,4 @@
-import type { RendererEffectIntent } from '#/shared/renderer-effect-intents.ts'
+import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 
 export function readNativeBridge(): Window['goblinNative'] | null {
   try {
@@ -8,7 +8,7 @@ export function readNativeBridge(): Window['goblinNative'] | null {
   }
 }
 
-export function subscribeNativeEffectIntent(cb: (event: RendererEffectIntent) => void): () => void {
+export function subscribeNativeEffectIntent(cb: (event: ClientEffectIntent) => void): () => void {
   // Pure web / serve.sh renderers do not have a native bridge. Callers should
   // treat the returned noop disposer as "native lifecycle unavailable" rather
   // than as an error condition.

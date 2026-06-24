@@ -19,12 +19,12 @@ import { app, Menu, type MenuItemConstructorOptions } from 'electron'
 import { activateMainWindow, getMainWindow, resetMainWindowToDefault } from '#/main/window.ts'
 import { menuNodeLog } from '#/node/logger.ts'
 import { openDataFolderMenuKey, t } from '#/main/i18n/index.ts'
-import { sendRendererEffectIntent } from '#/main/renderer-surface-events.ts'
+import { sendClientEffectIntent } from '#/main/renderer-surface-events.ts'
 import { getTheme } from '#/main/theme.ts'
 import { tildifyPath } from '#/shared/paths.ts'
 import type { LangPref, ThemePref } from '#/shared/api-types.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
-import type { RendererEffectIntent } from '#/shared/renderer-effect-intents.ts'
+import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import { focusedRegisteredSurface } from '#/main/window-registry.ts'
 import { applyMenuRuntimeState, readMenuRuntimeState } from '#/main/menu-state.ts'
 import {
@@ -64,14 +64,14 @@ const LANGUAGE_MENU_OPTIONS = [
   { pref: 'ja', labelKey: 'settings.lang.ja' },
 ] as const
 
-function send(intent: RendererEffectIntent): void {
+function send(intent: ClientEffectIntent): void {
   void sendRendererIntent(intent)
 }
 
-async function sendRendererIntent(intent: RendererEffectIntent): Promise<void> {
+async function sendRendererIntent(intent: ClientEffectIntent): Promise<void> {
   try {
     const win = getMainWindow() ?? focusedRegisteredSurface()?.window ?? (await activateMainWindow())
-    sendRendererEffectIntent(win, intent)
+    sendClientEffectIntent(win, intent)
   } catch (err) {
     menuNodeLog.warn({ err }, 'failed to send renderer intent')
   }

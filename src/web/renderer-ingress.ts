@@ -1,6 +1,6 @@
 import type { IpcEvent } from '#/shared/api-types.ts'
-import { isRendererEffectIntent } from '#/shared/renderer-effect-intents.ts'
-import type { RendererEffectIntent, RendererEffectIntentType } from '#/shared/renderer-effect-intents.ts'
+import { isClientEffectIntent } from '#/shared/client-effect-intents.ts'
+import type { ClientEffectIntent, ClientEffectIntentType } from '#/shared/client-effect-intents.ts'
 import { getRendererBridge } from '#/web/renderer-bridge.ts'
 
 // Native-host ingress for Electron renderers. Keep this separate from server
@@ -16,16 +16,16 @@ export function subscribeNativeHostEventType<TType extends NativeHostEventType>(
   })
 }
 
-export function subscribeRendererEffectIntent(cb: (event: RendererEffectIntent) => void): () => void {
+export function subscribeClientEffectIntent(cb: (event: ClientEffectIntent) => void): () => void {
   return getRendererBridge().onEffectIntent(cb)
 }
 
-export function subscribeRendererEffectIntentType<TType extends RendererEffectIntentType>(
+export function subscribeClientEffectIntentType<TType extends ClientEffectIntentType>(
   type: TType,
-  cb: (event: Extract<RendererEffectIntent, { type: TType }>) => void,
+  cb: (event: Extract<ClientEffectIntent, { type: TType }>) => void,
 ): () => void {
-  return subscribeRendererEffectIntent((event) => {
-    if (!isRendererEffectIntent(event) || event.type !== type) return
-    cb(event as Extract<RendererEffectIntent, { type: TType }>)
+  return subscribeClientEffectIntent((event) => {
+    if (!isClientEffectIntent(event) || event.type !== type) return
+    cb(event as Extract<ClientEffectIntent, { type: TType }>)
   })
 }

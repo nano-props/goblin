@@ -1,22 +1,22 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
-import type { RendererBootstrapSnapshot } from '#/shared/bootstrap.ts'
-import { ELECTRON_RENDERER_CAPABILITIES, RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
+import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 
-function webBootstrap(overrides: Partial<RendererBootstrapSnapshot> = {}): RendererBootstrapSnapshot {
+function webBootstrap(overrides: Partial<ClientBootstrapSnapshot> = {}): ClientBootstrapSnapshot {
   return {
-    runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
+    runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
     initialServer: null,
     ...overrides,
   }
 }
 
-function electronBootstrap(overrides: Partial<RendererBootstrapSnapshot> = {}): RendererBootstrapSnapshot {
+function electronBootstrap(overrides: Partial<ClientBootstrapSnapshot> = {}): ClientBootstrapSnapshot {
   return {
     runtime: {
       kind: 'electron',
-      bridgeVersion: RENDERER_BRIDGE_VERSION,
-      capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+      bridgeVersion: CLIENT_BRIDGE_VERSION,
+      capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
     },
     initialServer: null,
     ...overrides,
@@ -32,7 +32,7 @@ describe('renderer bootstrap', () => {
   })
 
   test('reads bootstrap snapshots from the goblin bridge', async () => {
-    const bootstrap: RendererBootstrapSnapshot = electronBootstrap({
+    const bootstrap: ClientBootstrapSnapshot = electronBootstrap({
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
     })
     Object.defineProperty(globalThis, 'window', {
@@ -54,7 +54,7 @@ describe('renderer bootstrap', () => {
   test('falls back when the goblin bridge is unavailable', async () => {
     const { getInitialBootstrap } = await import('#/web/bootstrap.ts')
     expect(getInitialBootstrap()).toEqual({
-      runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
+      runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
       initialServer: null,
     })
   })
@@ -68,7 +68,7 @@ describe('renderer bootstrap', () => {
     // server handoff yet).
     const { getInitialBootstrap } = await import('#/web/bootstrap.ts')
     expect(getInitialBootstrap()).toEqual({
-      runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
+      runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
       initialServer: null,
     })
 
@@ -79,7 +79,7 @@ describe('renderer bootstrap', () => {
       configurable: true,
       value: {
         __GOBLIN_BOOTSTRAP__: {
-          runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
+          runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
           initialServer: null,
         },
         location: { href: 'http://127.0.0.1:32100/', origin: 'http://127.0.0.1:32100', search: '' },
@@ -87,7 +87,7 @@ describe('renderer bootstrap', () => {
     })
 
     expect(getInitialBootstrap()).toEqual({
-      runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
+      runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
       initialServer: null,
     })
   })
@@ -95,7 +95,7 @@ describe('renderer bootstrap', () => {
   test('re-detects the Electron bridge after an early web-host bootstrap', async () => {
     const { getInitialBootstrap } = await import('#/web/bootstrap.ts')
     expect(getInitialBootstrap()).toEqual({
-      runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
+      runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
       initialServer: null,
     })
 
@@ -105,8 +105,8 @@ describe('renderer bootstrap', () => {
         __GOBLIN_BOOTSTRAP__: {
           runtime: {
             kind: 'electron',
-            bridgeVersion: RENDERER_BRIDGE_VERSION,
-            capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+            bridgeVersion: CLIENT_BRIDGE_VERSION,
+            capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
           },
           initialServer: null,
         },
@@ -137,15 +137,15 @@ describe('renderer bootstrap', () => {
     expect(getInitialBootstrap()).toEqual({
       runtime: {
         kind: 'electron',
-        bridgeVersion: RENDERER_BRIDGE_VERSION,
-        capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+        bridgeVersion: CLIENT_BRIDGE_VERSION,
+        capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
       },
       initialServer: null,
     })
   })
 
   test('prefers the configured renderer bridge over directly reading window.goblinNative', async () => {
-    const bootstrap: RendererBootstrapSnapshot = webBootstrap({
+    const bootstrap: ClientBootstrapSnapshot = webBootstrap({
       initialServer: { url: 'http://127.0.0.1:32100', accessToken: 'secret', clientId: 'client_sharedterminal' },
     })
     const bridgeModule = await import('#/web/renderer-bridge.ts')
@@ -224,7 +224,7 @@ describe('renderer bootstrap', () => {
   })
 
   test('reads injected web bootstrap when the Electron bridge is unavailable', async () => {
-    const bootstrap: RendererBootstrapSnapshot = webBootstrap({
+    const bootstrap: ClientBootstrapSnapshot = webBootstrap({
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
     })
     Object.defineProperty(globalThis, 'window', {
@@ -240,7 +240,7 @@ describe('renderer bootstrap', () => {
   })
 
   test('reads injected web bootstrap from the html json script when the Electron bridge is unavailable', async () => {
-    const bootstrap: RendererBootstrapSnapshot = webBootstrap({
+    const bootstrap: ClientBootstrapSnapshot = webBootstrap({
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
     })
     Object.defineProperty(globalThis, 'window', {
@@ -279,7 +279,7 @@ describe('renderer bootstrap', () => {
 
     const { getInitialBootstrap } = await import('#/web/bootstrap.ts')
     expect(getInitialBootstrap()).toEqual({
-      runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
+      runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
       initialServer: {
         url: 'http://127.0.0.1:32100/',
         accessToken: 'test-secret',

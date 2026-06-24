@@ -1,8 +1,8 @@
-import type { RendererBootstrapSnapshot } from '#/shared/bootstrap.ts'
+import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
 import { getRendererBridge } from '#/web/renderer-bridge.ts'
 import { emptyBootstrapSnapshot } from '#/web/renderer-bootstrap-bridge.ts'
 
-function readInitialBootstrap(): RendererBootstrapSnapshot {
+function readInitialBootstrap(): ClientBootstrapSnapshot {
   try {
     return getRendererBridge().getBootstrap()
   } catch {
@@ -36,11 +36,11 @@ function readInitialBootstrap(): RendererBootstrapSnapshot {
 
 let initialBootstrap = readInitialBootstrap()
 
-function isPartial(b: RendererBootstrapSnapshot): boolean {
+function isPartial(b: ClientBootstrapSnapshot): boolean {
   return b.initialServer === null
 }
 
-export function getInitialBootstrap(): RendererBootstrapSnapshot {
+export function getInitialBootstrap(): ClientBootstrapSnapshot {
   if (!isPartial(initialBootstrap)) return initialBootstrap
   initialBootstrap = readInitialBootstrap()
   return initialBootstrap

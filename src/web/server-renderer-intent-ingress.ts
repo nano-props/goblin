@@ -1,4 +1,4 @@
-import { isRendererEffectIntent, type RendererEffectIntent } from '#/shared/renderer-effect-intents.ts'
+import { isClientEffectIntent, type ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import { createServerWebSocketIngress } from '#/web/lib/server-ws-ingress.ts'
 
 // Server-controlled ingress for renderer effect intents (e.g. those
@@ -7,9 +7,9 @@ import { createServerWebSocketIngress } from '#/web/lib/server-ws-ingress.ts'
 // `#/server/routes/realtime.ts` (`/ws/renderer-intent`). The server
 // fans intents out as envelopes of the form
 //
-//   { type: 'renderer-effect-intent', intent: RendererEffectIntent }
+//   { type: 'renderer-effect-intent', intent: ClientEffectIntent }
 //
-// The envelope wraps `RendererEffectIntent` so the same wire format
+// The envelope wraps `ClientEffectIntent` so the same wire format
 // can later carry additional control messages without collision with
 // data-plane invalidations on `/ws/invalidation`.
 
@@ -18,7 +18,7 @@ interface RendererIntentEnvelope {
   intent: unknown
 }
 
-function parseRendererIntentMessage(data: unknown): RendererEffectIntent | null {
+function parseRendererIntentMessage(data: unknown): ClientEffectIntent | null {
   if (typeof data !== 'string') return null
   let parsed: unknown
   try {
@@ -29,11 +29,11 @@ function parseRendererIntentMessage(data: unknown): RendererEffectIntent | null 
   if (!parsed || typeof parsed !== 'object') return null
   const envelope = parsed as Partial<RendererIntentEnvelope>
   if (envelope.type !== 'renderer-effect-intent') return null
-  if (!isRendererEffectIntent(envelope.intent)) return null
+  if (!isClientEffectIntent(envelope.intent)) return null
   return envelope.intent
 }
 
-const ingress = createServerWebSocketIngress<RendererEffectIntent>({
+const ingress = createServerWebSocketIngress<ClientEffectIntent>({
   path: '/ws/renderer-intent',
   parseMessage: parseRendererIntentMessage,
 })

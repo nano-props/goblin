@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { ELECTRON_RENDERER_CAPABILITIES, RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
 
 function installBridge(calls: Array<{ path: string; input?: unknown }>, result = new Promise(() => {})): void {
@@ -9,8 +9,8 @@ function installBridge(calls: Array<{ path: string; input?: unknown }>, result =
       goblinNative: {
         runtime: {
           kind: 'electron',
-          bridgeVersion: RENDERER_BRIDGE_VERSION,
-          capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+          bridgeVersion: CLIENT_BRIDGE_VERSION,
+          capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
         },
         invokeIpc: ({ path, input }: { path: string; input?: unknown }) => {
           calls.push({ path, input })

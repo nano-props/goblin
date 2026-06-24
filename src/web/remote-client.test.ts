@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
 
 describe('remote client web helpers', () => {
@@ -11,7 +11,7 @@ describe('remote client web helpers', () => {
       configurable: true,
       value: {
         __GOBLIN_BOOTSTRAP__: {
-          runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
+          runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
           initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         },
         location: {

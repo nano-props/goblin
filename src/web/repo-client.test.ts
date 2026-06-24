@@ -1,30 +1,30 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import type { RendererBootstrapSnapshot } from '#/shared/bootstrap.ts'
-import { ELECTRON_RENDERER_CAPABILITIES, RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
+import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import type { RendererBridge } from '#/web/renderer-bridge-types.ts'
 import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
 
-function webBootstrap(overrides: Partial<RendererBootstrapSnapshot> = {}): RendererBootstrapSnapshot {
+function webBootstrap(overrides: Partial<ClientBootstrapSnapshot> = {}): ClientBootstrapSnapshot {
   return {
-    runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
+    runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
     initialServer: null,
     ...overrides,
   }
 }
 
-function electronBootstrap(overrides: Partial<RendererBootstrapSnapshot> = {}): RendererBootstrapSnapshot {
+function electronBootstrap(overrides: Partial<ClientBootstrapSnapshot> = {}): ClientBootstrapSnapshot {
   return {
     runtime: {
       kind: 'electron',
-      bridgeVersion: RENDERER_BRIDGE_VERSION,
-      capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+      bridgeVersion: CLIENT_BRIDGE_VERSION,
+      capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
     },
     initialServer: null,
     ...overrides,
   }
 }
 
-function installWebBootstrap(bootstrap: RendererBootstrapSnapshot): void {
+function installWebBootstrap(bootstrap: ClientBootstrapSnapshot): void {
   Object.defineProperty(globalThis, 'window', {
     configurable: true,
     value: {
@@ -173,8 +173,8 @@ describe('repo-client', () => {
         goblinNative: {
           runtime: {
             kind: 'electron',
-            bridgeVersion: RENDERER_BRIDGE_VERSION,
-            capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+            bridgeVersion: CLIENT_BRIDGE_VERSION,
+            capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
           },
           invokeIpc: vi.fn(),
           abortIpc: async () => true,

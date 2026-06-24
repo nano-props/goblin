@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
-  broadcastRendererEffectIntent: vi.fn(),
+  broadcastClientEffectIntent: vi.fn(),
 }))
 
 vi.mock('#/main/renderer-surface-events.ts', () => ({
-  broadcastRendererEffectIntent: mocks.broadcastRendererEffectIntent,
+  broadcastClientEffectIntent: mocks.broadcastClientEffectIntent,
 }))
 
 describe('external open queue', () => {
@@ -22,7 +22,7 @@ describe('external open queue', () => {
     expect(enqueueExternalOpenPath('/tmp/repo-b')).toBe(true)
     expect(enqueueExternalOpenPath('')).toBe(false)
 
-    expect(mocks.broadcastRendererEffectIntent).toHaveBeenCalledTimes(2)
+    expect(mocks.broadcastClientEffectIntent).toHaveBeenCalledTimes(2)
     expect(consumeExternalOpenPaths()).toEqual(['/tmp/repo-a', '/tmp/repo-b'])
     expect(consumeExternalOpenPaths()).toEqual([])
   })

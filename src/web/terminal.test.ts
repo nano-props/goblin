@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
 
 class MockWebSocket {
@@ -112,7 +112,7 @@ describe('terminal web host bridge', () => {
     Object.defineProperty(window, '__GOBLIN_BOOTSTRAP__', {
       configurable: true,
       value: {
-        runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
+        runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
         initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
       },
     })

@@ -1,6 +1,6 @@
-import type { RendererBootstrapSnapshot, RendererNativeCapability } from '#/shared/bootstrap.ts'
+import type { ClientBootstrapSnapshot, ClientNativeCapability } from '#/shared/bootstrap.ts'
 import type { IpcEvent, IpcRequest } from '#/shared/api-types.ts'
-import type { RendererEffectIntent } from '#/shared/renderer-effect-intents.ts'
+import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { RendererShellBridge, RendererBridge, RendererTerminalBridge } from '#/web/renderer-bridge-types.ts'
 import { readNativeBridge } from '#/web/native-bridge.ts'
 import { createHttpClipboardBackend } from '#/web/clipboard/http-backend.ts'
@@ -28,8 +28,8 @@ import {
  * separate `electronBridge` factory" into a single source of truth:
  * what the bridge is *capable* of is what the bridge *has*.
  */
-function capabilitiesFromBridge(bridge: NonNullable<Window['goblinNative']>): ReadonlySet<RendererNativeCapability> {
-  const caps = new Set<RendererNativeCapability>()
+function capabilitiesFromBridge(bridge: NonNullable<Window['goblinNative']>): ReadonlySet<ClientNativeCapability> {
+  const caps = new Set<ClientNativeCapability>()
   if (typeof bridge.invokeIpc === 'function') caps.add('settings-ipc')
   if (bridge.shell?.openSettingsWindow) caps.add('open-settings-window')
   if (bridge.shell?.openExternalUrl) caps.add('open-external-url')
@@ -191,7 +191,7 @@ function createRendererBridge(): RendererBridge {
       if (!bridge) return () => {}
       return bridge.onEvent(cb)
     },
-    onEffectIntent(cb: (event: RendererEffectIntent) => void) {
+    onEffectIntent(cb: (event: ClientEffectIntent) => void) {
       const bridge = readNativeBridge()
       return bridge?.onIntent?.(cb) ?? (() => {})
     },

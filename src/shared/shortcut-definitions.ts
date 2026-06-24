@@ -1,4 +1,4 @@
-import type { RendererEffectIntent } from '#/shared/renderer-effect-intents.ts'
+import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { DictKey } from '#/shared/i18n/dictionaries.ts'
 
 export type BranchActionShortcutAction = 'pull' | 'push' | 'terminal' | 'editor' | 'remote'
@@ -58,7 +58,7 @@ export interface RendererMenuCommandDefinition {
   helpLabelKey?: DictKey
   accelerator?: string | ((context: RendererMenuCommandContext) => string | undefined)
   enabled?: (context: RendererMenuCommandContext) => boolean
-  intent: RendererEffectIntent | ((context: RendererMenuCommandContext) => RendererEffectIntent)
+  intent: ClientEffectIntent | ((context: RendererMenuCommandContext) => ClientEffectIntent)
 }
 
 export interface BranchActionShortcutDefinition {
@@ -303,7 +303,7 @@ export function resolveRendererMenuCommandAccelerator(
 export function resolveRendererMenuCommandIntent(
   command: Pick<RendererMenuCommandDefinition, 'intent'>,
   context: RendererMenuCommandContext,
-): RendererEffectIntent {
+): ClientEffectIntent {
   return typeof command.intent === 'function' ? command.intent(context) : command.intent
 }
 
@@ -335,7 +335,7 @@ function branchActionShortcut(
 function rendererMenuCommand(
   id: RendererMenuCommandId,
   menuLabelKey: DictKey,
-  intent: RendererEffectIntent,
+  intent: ClientEffectIntent,
   options: Omit<Partial<RendererMenuCommandDefinition>, 'id' | 'menuLabelKey' | 'intent'> = {},
 ): RendererMenuCommandDefinition {
   return { id, menuLabelKey, intent, ...options }

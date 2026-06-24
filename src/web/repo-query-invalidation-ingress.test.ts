@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { ELECTRON_RENDERER_CAPABILITIES, RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 
 class FakeWebSocket {
   static instances: FakeWebSocket[] = []
@@ -55,14 +55,14 @@ describe('repo query invalidation source', () => {
   test('uses server invalidation stream when Electron shell and embedded server are both present', async () => {
     installWindow({
       __GOBLIN_BOOTSTRAP__: {
-        runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
+        runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
         initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
       },
       goblinNative: {
         runtime: {
           kind: 'electron',
-          bridgeVersion: RENDERER_BRIDGE_VERSION,
-          capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+          bridgeVersion: CLIENT_BRIDGE_VERSION,
+          capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
         },
         invokeIpc: vi.fn(),
         abortIpc: vi.fn(),
@@ -109,7 +109,7 @@ describe('repo query invalidation source', () => {
   test('uses server invalidation stream in pure web mode', async () => {
     installWindow({
       __GOBLIN_BOOTSTRAP__: {
-        runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
+        runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
         initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
       },
       location: {
@@ -141,7 +141,7 @@ describe('repo query invalidation source', () => {
   test('uses same-origin invalidation stream when bootstrap has no server handoff', async () => {
     installWindow({
       __GOBLIN_BOOTSTRAP__: {
-        runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
+        runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
         initialServer: null,
       },
       location: {
@@ -175,7 +175,7 @@ describe('repo query invalidation source', () => {
   test('reconnects invalidation socket with a short delay after unexpected close', async () => {
     installWindow({
       __GOBLIN_BOOTSTRAP__: {
-        runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
+        runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
         initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
       },
       location: {

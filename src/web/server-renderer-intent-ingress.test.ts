@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 
 class MockWebSocket {
   static readonly CONNECTING = 0
@@ -50,7 +50,7 @@ function installBootstrap(url: string | null, accessToken: string | null) {
   Object.defineProperty(window, '__GOBLIN_BOOTSTRAP__', {
     configurable: true,
     value: {
-      runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
+      runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
       initialServer: url && accessToken !== null ? { url, accessToken, clientId: 'cid' } : null,
     },
   })

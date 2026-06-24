@@ -2,7 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ILinkHandler } from '@xterm/xterm'
-import { ELECTRON_RENDERER_CAPABILITIES, RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { ManagedTerminalSlot } from '#/web/components/terminal/ManagedTerminalSlot.ts'
 import { terminalLog } from '#/web/logger.ts'
 import { installTerminalThemeStyles } from '#/web/components/terminal/terminal-theme-test-utils.ts'
@@ -554,8 +554,8 @@ beforeEach(() => {
       abortIpc: vi.fn(),
       runtime: {
         kind: 'electron',
-        bridgeVersion: RENDERER_BRIDGE_VERSION,
-        capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+        bridgeVersion: CLIENT_BRIDGE_VERSION,
+        capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
       },
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
       pathForFile: vi.fn(),
@@ -601,8 +601,8 @@ beforeEach(() => {
     getBootstrap: () => ({
       runtime: {
         kind: 'electron',
-        bridgeVersion: RENDERER_BRIDGE_VERSION,
-        capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+        bridgeVersion: CLIENT_BRIDGE_VERSION,
+        capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
       },
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
     }),

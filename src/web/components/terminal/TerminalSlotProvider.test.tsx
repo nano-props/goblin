@@ -3,7 +3,7 @@
 import { act, useEffect, useRef } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { ELECTRON_RENDERER_CAPABILITIES, RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { TerminalSlotProvider } from '#/web/components/terminal/TerminalSlotProvider.tsx'
 import { setTerminalSlotRegistryForTests } from '#/web/components/terminal/TerminalSlotRegistry.ts'
 import { terminalSlotProviderLog } from '#/web/logger.ts'
@@ -428,8 +428,8 @@ beforeEach(() => {
     value: {
       runtime: {
         kind: 'electron',
-        bridgeVersion: RENDERER_BRIDGE_VERSION,
-        capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+        bridgeVersion: CLIENT_BRIDGE_VERSION,
+        capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
       },
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
       invokeIpc: vi.fn(async () => []),
@@ -517,7 +517,7 @@ beforeEach(() => {
     value: {
       runtime: {
         kind: 'web',
-        bridgeVersion: RENDERER_BRIDGE_VERSION,
+        bridgeVersion: CLIENT_BRIDGE_VERSION,
         capabilities: [],
       },
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
@@ -537,8 +537,8 @@ beforeEach(() => {
     getBootstrap: () => ({
       runtime: {
         kind: 'electron',
-        bridgeVersion: RENDERER_BRIDGE_VERSION,
-        capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+        bridgeVersion: CLIENT_BRIDGE_VERSION,
+        capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
       },
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
     }),
@@ -1773,8 +1773,8 @@ describe('TerminalSlotProvider', () => {
       getBootstrap: () => ({
         runtime: {
           kind: 'electron',
-          bridgeVersion: RENDERER_BRIDGE_VERSION,
-          capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+          bridgeVersion: CLIENT_BRIDGE_VERSION,
+          capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
         },
         initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
       }),
@@ -1873,8 +1873,8 @@ describe('TerminalSlotProvider', () => {
       getBootstrap: () => ({
         runtime: {
           kind: 'electron',
-          bridgeVersion: RENDERER_BRIDGE_VERSION,
-          capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+          bridgeVersion: CLIENT_BRIDGE_VERSION,
+          capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
         },
         initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
       }),
