@@ -153,7 +153,6 @@ export const zh: Record<DictKey, string> = {
   'repo-picker.open-remote-port-error': '端口无效',
   'repo-picker.open-remote-path-required': '请输入路径',
   'repo-picker.open-remote-path-absolute': '路径必须以 / 或 ~/ 开头',
-  'repo-picker.open-remote-path-suggestions': '建议',
   'repo-picker.open-remote-path-no-matches': '没有匹配的路径',
   'repo-picker.open-remote-home-unavailable': '无法解析远程主目录',
   'repo-picker.tooltip.last-sync-label': '上次同步',

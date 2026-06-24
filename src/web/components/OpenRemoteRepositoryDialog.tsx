@@ -44,7 +44,7 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
   const pathFieldError = remotePath.trim() ? pathError.errorKey : null
   const canSubmit = canSubmitRemoteRepository({ alias, remotePath, pending })
   const error = actionError ?? loadError
-  const pathSuggestions = useRemotePathSuggestions({
+  const remotePathSuggestions = useRemotePathSuggestions({
     enabled: open && !pending,
     alias,
     remotePath: remotePath.trim() || '/',
@@ -247,8 +247,9 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
               setRemotePath(next)
               clearResolvedRemoteState()
             }}
-            suggestions={pathSuggestions}
-            groupLabel={t('repo-picker.open-remote-path-suggestions')}
+            suggestions={remotePathSuggestions.suggestions}
+            isLoading={remotePathSuggestions.isLoading}
+            hasFetched={remotePathSuggestions.hasFetched}
             emptyLabel={t('repo-picker.open-remote-path-no-matches')}
             placeholder={t('repo-picker.open-remote-path-placeholder')}
             aria-invalid={!!pathFieldError}

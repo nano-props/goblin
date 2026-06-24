@@ -165,7 +165,6 @@ export const ja: Record<DictKey, string> = {
   'repo-picker.open-remote-port-error': '無効なポート',
   'repo-picker.open-remote-path-required': 'パスを入力してください',
   'repo-picker.open-remote-path-absolute': 'パスは / または ~/ で始まる必要があります',
-  'repo-picker.open-remote-path-suggestions': '候補',
   'repo-picker.open-remote-path-no-matches': '一致するパスがありません',
   'repo-picker.open-remote-home-unavailable': 'リモートのホームディレクトリを解決できませんでした',
   'repo-picker.tooltip.last-sync-label': '最終同期',

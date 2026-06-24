@@ -3,8 +3,8 @@
 // Tests for the styled path-suggestions combobox. Covers the cases that
 // the previous <datalist>-based UX didn't expose as testable surfaces:
 //
-//   • the dropdown's suggestion list is rendered into a Popover portal
-//     when there's at least one matching suggestion,
+//   • the dropdown's suggestion list is rendered once there's at least
+//     one matching suggestion,
 //   • keyboard navigation moves a single highlight through the list and
 //     commits it on Enter,
 //   • clicking a suggestion commits it without blurring the input first,
@@ -43,25 +43,27 @@ describe('RemotePathSuggestions', () => {
     await flush()
 
     expect(input().getAttribute('aria-expanded')).toBe('false')
-    expect(document.body.textContent).not.toContain('Suggestions')
+    // Empty suggestions + empty value: nothing should be rendered into
+    // the body — no listbox, no options, no labels.
+    expect(document.body.textContent).not.toContain('/srv/repo')
+    expect(document.body.querySelector('[role="listbox"]')).toBeNull()
   })
 
   test('opens the dropdown when the input gains focus with suggestions available', async () => {
-    render(<Harness suggestions={['/srv/repo', '/srv/other']} />)
+    render(<Harness suggestions={['/srv/repo', '/srv/other']} hasFetched />)
     await flush()
 
     focusInput()
     await flush()
 
     expect(input().getAttribute('aria-expanded')).toBe('true')
-    expect(screenText()).toContain('Suggestions')
     expect(screenText()).toContain('/srv/repo')
     expect(screenText()).toContain('/srv/other')
   })
 
   test('commits the first suggestion when the user presses Enter', async () => {
     const onChange = vi.fn()
-    render(<Harness suggestions={['/srv/repo', '/srv/other']} onChange={onChange} />)
+    render(<Harness suggestions={['/srv/repo', '/srv/other']} onChange={onChange} hasFetched />)
     await flush()
 
     focusInput()
@@ -74,7 +76,7 @@ describe('RemotePathSuggestions', () => {
 
   test('ArrowDown advances and ArrowUp at the top wraps to the last entry', async () => {
     const onChange = vi.fn()
-    render(<Harness suggestions={['/srv/a', '/srv/b', '/srv/c']} onChange={onChange} />)
+    render(<Harness suggestions={['/srv/a', '/srv/b', '/srv/c']} onChange={onChange} hasFetched />)
     await flush()
 
     focusInput()
@@ -107,7 +109,7 @@ describe('RemotePathSuggestions', () => {
 
   test('Home jumps to the first suggestion and End jumps to the last', async () => {
     const onChange = vi.fn()
-    render(<Harness suggestions={['/srv/a', '/srv/b', '/srv/c']} onChange={onChange} />)
+    render(<Harness suggestions={['/srv/a', '/srv/b', '/srv/c']} onChange={onChange} hasFetched />)
     await flush()
 
     focusInput()
@@ -138,7 +140,7 @@ describe('RemotePathSuggestions', () => {
     const original = HTMLElement.prototype.scrollIntoView
     HTMLElement.prototype.scrollIntoView = scrollSpy
     try {
-      render(<Harness suggestions={['/srv/a', '/srv/b', '/srv/c']} />)
+      render(<Harness suggestions={['/srv/a', '/srv/b', '/srv/c']} hasFetched />)
       await flush()
       focusInput()
       await flush()
@@ -159,7 +161,7 @@ describe('RemotePathSuggestions', () => {
 
   test('clicking a suggestion commits it and keeps the input focused', async () => {
     const onChange = vi.fn()
-    render(<Harness suggestions={['/srv/repo', '/srv/other']} onChange={onChange} />)
+    render(<Harness suggestions={['/srv/repo', '/srv/other']} onChange={onChange} hasFetched />)
     await flush()
 
     focusInput()
@@ -178,8 +180,56 @@ describe('RemotePathSuggestions', () => {
     expect(document.activeElement).toBe(input())
   })
 
+  test('pointer movement updates the active suggestion', async () => {
+    const onChange = vi.fn()
+    render(<Harness suggestions={['/srv/repo', '/srv/other']} onChange={onChange} hasFetched />)
+    await flush()
+
+    focusInput()
+    await flush()
+
+    const row = [...document.body.querySelectorAll('[role="option"]')].find((el) =>
+      el.textContent?.includes('/srv/other'),
+    )
+    if (!row) throw new Error('Missing /srv/other row')
+    act(() => {
+      row.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }))
+    })
+    await flush()
+    pressKey('Enter')
+    await flush()
+
+    expect(onChange).toHaveBeenCalledWith('/srv/other')
+  })
+
+  test('pointer movement does not scroll the active suggestion into view', async () => {
+    const scrollSpy = vi.fn()
+    const original = HTMLElement.prototype.scrollIntoView
+    HTMLElement.prototype.scrollIntoView = scrollSpy
+    try {
+      render(<Harness suggestions={['/srv/repo', '/srv/other']} hasFetched />)
+      await flush()
+      focusInput()
+      await flush()
+      scrollSpy.mockClear()
+
+      const row = [...document.body.querySelectorAll('[role="option"]')].find((el) =>
+        el.textContent?.includes('/srv/other'),
+      )
+      if (!row) throw new Error('Missing /srv/other row')
+      act(() => {
+        row.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }))
+      })
+      await flush()
+
+      expect(scrollSpy).not.toHaveBeenCalled()
+    } finally {
+      HTMLElement.prototype.scrollIntoView = original
+    }
+  })
+
   test('shows every suggestion the host provides regardless of typed value', async () => {
-    render(<Harness suggestions={['/srv/repo', '/srv/other', '/home/alice']} />)
+    render(<Harness suggestions={['/srv/repo', '/srv/other', '/home/alice']} hasFetched />)
     await flush()
 
     focusInput()
@@ -195,7 +245,7 @@ describe('RemotePathSuggestions', () => {
   })
 
   test('points aria-activedescendant at the highlighted option while open', async () => {
-    render(<Harness suggestions={['/srv/a', '/srv/b', '/srv/c']} />)
+    render(<Harness suggestions={['/srv/a', '/srv/b', '/srv/c']} hasFetched />)
     await flush()
 
     focusInput()
@@ -212,20 +262,14 @@ describe('RemotePathSuggestions', () => {
   })
 
   test('drops aria-activedescendant once the dropdown closes via Escape', async () => {
-    render(<Harness suggestions={['/srv/a', '/srv/b']} />)
+    render(<Harness suggestions={['/srv/a', '/srv/b']} hasFetched />)
     await flush()
 
     focusInput()
     await flush()
     expect(input().getAttribute('aria-activedescendant')).not.toBeNull()
 
-    // Radix DismissableLayer (document listener) closes the popover
-    // on Escape. The component itself does not handle Escape — this
-    // test locks in that contract so a future regression in the
-    // DismissableLayer wiring is caught here.
-    act(() => {
-      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
-    })
+    pressKey('Escape')
     await flush()
 
     expect(input().getAttribute('aria-expanded')).toBe('false')
@@ -233,14 +277,14 @@ describe('RemotePathSuggestions', () => {
   })
 
   test('forwards aria-invalid onto the underlying input', async () => {
-    render(<Harness suggestions={['/srv/repo']} ariaInvalid />)
+    render(<Harness suggestions={['/srv/repo']} ariaInvalid hasFetched />)
     await flush()
 
     expect(input().getAttribute('aria-invalid')).toBe('true')
   })
 
   test('shows the empty-state label when the host provides no suggestions at all', async () => {
-    render(<Harness suggestions={[]} />)
+    render(<Harness suggestions={[]} hasFetched />)
     await flush()
 
     focusInput()
@@ -251,8 +295,30 @@ describe('RemotePathSuggestions', () => {
     expect(screenText()).toContain('No matching paths')
   })
 
+  test('does not show the empty-state label before the first fetch resolves', async () => {
+    render(<Harness suggestions={[]} isLoading />)
+    await flush()
+
+    focusInput()
+    await flush()
+    setInputValue('/srv/repo')
+    await flush()
+
+    expect(screenText()).not.toContain('No matching paths')
+    expect(document.body.querySelector('[role="listbox"]')).toBeNull()
+  })
+
+  test('shows a loading spinner in place of the chevron while fetching', async () => {
+    render(<Harness suggestions={[]} isLoading />)
+    await flush()
+
+    const spinner = document.body.querySelector('svg.animate-spin')
+    expect(spinner).not.toBeNull()
+    expect(input().getAttribute('aria-expanded')).toBe('false')
+  })
+
   test('hides the dropdown when the host marks the input disabled', async () => {
-    render(<Harness suggestions={['/srv/repo']} disabled />)
+    render(<Harness suggestions={['/srv/repo']} disabled hasFetched />)
     await flush()
 
     focusInput()
@@ -260,21 +326,75 @@ describe('RemotePathSuggestions', () => {
 
     expect(document.body.querySelector('[role="listbox"]')).toBeNull()
   })
+
+  test('re-focusing the input after blur reopens the dropdown without flickering closed', async () => {
+    render(
+      <>
+        <button type="button" id="outside-focus-target">
+          outside
+        </button>
+        <Harness suggestions={['/srv/repo', '/srv/other']} hasFetched />
+      </>,
+    )
+    await flush()
+
+    // Open, then move focus outside so the dropdown dismisses.
+    focusInput()
+    await flush()
+    expect(input().getAttribute('aria-expanded')).toBe('true')
+
+    focusOutside()
+    await flush()
+    expect(input().getAttribute('aria-expanded')).toBe('false')
+
+    focusInput()
+    await flush()
+
+    expect(input().getAttribute('aria-expanded')).toBe('true')
+    expect(screenText()).toContain('/srv/repo')
+  })
+
+  test('re-focusing the input after blur reopens the empty-state dropdown', async () => {
+    render(
+      <>
+        <button type="button" id="outside-focus-target">
+          outside
+        </button>
+        <Harness suggestions={[]} hasFetched />
+      </>,
+    )
+    await flush()
+
+    focusInput()
+    await flush()
+    setInputValue('/srv/repo')
+    await flush()
+    expect(screenText()).toContain('No matching paths')
+
+    focusOutside()
+    await flush()
+    expect(input().getAttribute('aria-expanded')).toBe('false')
+
+    focusInput()
+    await flush()
+
+    expect(input().getAttribute('aria-expanded')).toBe('true')
+    expect(screenText()).toContain('No matching paths')
+  })
 })
 
 interface HarnessProps {
   suggestions: readonly string[]
   onChange?: (next: string) => void
   disabled?: boolean
+  isLoading?: boolean
+  hasFetched?: boolean
   /** Forwarded to the underlying input. */
   ariaInvalid?: boolean
-  /** Initial controlled value. Real consumers always drive `value`
-   *  from state — exercise the same shape here. */
-  initialValue?: string
 }
 
-function Harness({ suggestions, onChange = () => {}, disabled, ariaInvalid, initialValue = '' }: HarnessProps) {
-  const [value, setValue] = useState(initialValue)
+function Harness({ suggestions, onChange = () => {}, disabled, isLoading, hasFetched, ariaInvalid }: HarnessProps) {
+  const [value, setValue] = useState('')
   return (
     <RemotePathSuggestions
       id="rps-test"
@@ -284,7 +404,8 @@ function Harness({ suggestions, onChange = () => {}, disabled, ariaInvalid, init
         onChange(next)
       }}
       suggestions={suggestions}
-      groupLabel="Suggestions"
+      isLoading={isLoading}
+      hasFetched={hasFetched}
       emptyLabel="No matching paths"
       disabled={disabled}
       aria-invalid={ariaInvalid}
@@ -310,6 +431,14 @@ function input(): HTMLInputElement {
 function focusInput() {
   act(() => {
     input().focus()
+  })
+}
+
+function focusOutside() {
+  const target = document.querySelector('#outside-focus-target')
+  if (!(target instanceof HTMLButtonElement)) throw new Error('Missing outside focus target')
+  act(() => {
+    target.focus()
   })
 }
 
