@@ -209,25 +209,38 @@ socket drops, the server clears the slot and emits a
 `controller: null` event. When A's socket comes back, the
 server re-emits `controller: A` after the auto-claim. Between
 those two events — typically a few milliseconds — A's renderer
-sees its cached role transition from `controller` to `viewer`
-(per `handleIdentity` collapsing unowned to viewer) and back
-to `controller`.
+sees its cached role transition from `controller` to `unowned`
+(per the realtime `identity` event carrying `controller: null`)
+and back to `controller`.
 
-If the user types in that window, the gate's `authorize('write')`
-takes the viewer branch and fires a takeover round-trip, which
-succeeds against the just-reclaimed slot. The first keystroke
-after A returns therefore costs one extra round-trip — same
-shape as the "lost the race to B" case above, but for a
-session that was always A's.
+A's `ManagedTerminalSlot` reacts to the `unowned` event in
+`handleIdentity` by calling `start()` immediately if the view
+is connected, so the next identity event (carrying `controller:
+A`) lands while the auto-attach round-trip is already in
+flight. The `unowned` window in the runtime / gate is therefore
+very short — a few hundred microseconds at most, bounded by
+the microtask queue rather than the round-trip.
+
+If the user types **during** the `unowned` window, the gate's
+`authorize('write')` returns `{ kind: 'denied', reason:
+'slot-closed' }` — the gate deliberately distinguishes `unowned`
+from `viewer` so it does not auto-promote a write against a slot
+the server has just cleared. The keystroke is dropped at the
+gate. (Pre-PR, the gate collapsed `unowned` to `viewer` and
+auto-promoted, which caused the spurious takeover round-trip
+this PR's identity/lifecycle split fixes.) Once the second
+identity event lands and the role flips back to `controller`,
+the next keystroke goes through without any extra round-trip.
 
 This is not a bug; it is the cost of a model that has no grace
 timer. A renderer-side coalescing window (e.g. "wait 100ms
 after a self-reconnect before firing takeover on write") would
-hide the round-trip but would re-introduce a small grace period
-on the client, which is exactly what the server-side no-grace
-design exists to avoid. The right answer is to accept the
-rare extra round-trip and document the behavior so it doesn't
-surprise future contributors.
+hide the dropped keystroke but would re-introduce a small grace
+period on the client, which is exactly what the server-side
+no-grace design exists to avoid. The right answer is to accept
+the rare dropped keystroke (it is recoverable — the next
+keystroke always works) and document the behavior so it
+doesn't surprise future contributors.
 
 ## Boundaries this model respects
 
