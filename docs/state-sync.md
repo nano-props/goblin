@@ -1,6 +1,6 @@
 # State and Sync
 
-Use this doc for state ownership and sync rules.
+Use this doc for state control and sync rules.
 
 ## Model
 
@@ -38,7 +38,7 @@ Representative examples:
 - `useI18nStore`
 - recent repos
 - repo snapshot, status, and pull request state
-- terminal sessions and ownership
+- terminal sessions and control
 
 Notes:
 

@@ -312,7 +312,7 @@ registry.enqueueDurableClose({ ptySessionId, worktreeTerminalKey }).catch((err) 
 
 - No timeout / retry logic added.
 - Each piece of state (pending close, flush, destroy) has a single
-  owner.
+  keeper.
 - The create path does not change; it only waits for the close path
   to settle before issuing. The catalog can still return `action:
 'restored'` — that is correct behavior when an orphan exists; the
@@ -331,7 +331,7 @@ in `renderer-terminal-bridge.ts:186`. Registry handler
 `handleSessionClosed` in
 `TerminalSlotRegistry.ts:210`. Coverage in
 `terminal-runtime-actions.test.ts` (emits both broadcasts on
-successful close; non-owner close does not leak a phantom
+successful close; non-user close does not leak a phantom
 event) and `TerminalSlotRegistry.create.test.ts`
 (handleSessionClosed drops the matching local session).
 
@@ -354,11 +354,11 @@ Add to `TerminalRealtimeMessage` in `src/shared/terminal-socket.ts`:
 
 ### Server emit
 
-In `terminal-runtime-actions.ts`, after `manager.closeSessionForOwner(...)`
+In `terminal-runtime-actions.ts`, after `manager.closeSessionForUser(...)`
 returns `true`:
 
 ```ts
-broker.broadcastToOwner(userId, {
+broker.broadcastToUser(userId, {
   type: 'slot-closed',
   ptySessionId: input.ptySessionId,
   repoRoot,
@@ -366,7 +366,7 @@ broker.broadcastToOwner(userId, {
 ```
 
 The `repoRoot` is derived from the session's scope. The message is
-sent only to sockets for the same `userId`; other owners never see
+sent only to sockets for the same `userId`; other users never see
 the closed session id. The manager
 returns it on the close result, or we look it up via
 `manager.findSessionById(ptySessionId)` before closing.
@@ -379,7 +379,7 @@ returns it on the close result, or we look it up via
   it in `hasRealtimeSubscribers()`.
 - Add a dispatcher branch for `message.type === 'slot-closed'`
   in the same switch that handles `output` / `title` / `exit` /
-  `ownership` / `sessions-changed`.
+  `identity` / `lifecycle` / `sessions-changed`.
 - Expose `onSessionClosed(cb)` on the returned bridge and add a
   matching method to `RendererTerminalBridge` in
   `src/web/renderer-bridge-types.ts`.
@@ -467,30 +467,31 @@ report.
 
 Implemented on `main`. The `terminal.takeover` response is now
 the authoritative handshake for the new controller's view; the
-realtime `ownership` event keeps the same shape (and the same
-authority role) for the _other_ ownership-change paths
+realtime `identity` event keeps the same shape (and the same
+authority role) for the _other_ control-change paths
 (controller crash, sibling auto-claim after disconnect, fresh
 attach). The renderer no longer waits for a follow-up
-`ownership` event before painting the post-takeover frame.
+`identity` event before painting the post-takeover frame.
 
 ### The two-step handshake that was
 
 Before this change, `terminal.takeover` returned only
 `{ ok, ptySessionId, controller }`. The renderer treated the
-realtime `ownership` event as the authority and used the bridge
+realtime `identity` event as the authority and used the bridge
 response only to "trigger the server-side handoff". The
 comment in `ManagedTerminalSlot.takeover()` was explicit:
 
-> "Ownership changes are applied exclusively via authoritative
-> onOwnership realtime messages. The bridge response is only used
+> "Identity changes are applied exclusively via authoritative
+> onIdentity realtime messages. The bridge response is only used
 > to trigger the server-side handoff."
 
 The cost was a stale window between the response settling and the
-`onOwnership` event arriving:
+`onIdentity` event arriving:
 
-- `runtime.canResize()` returned `false` (viewer gate), so any
-  resize the user fired in that window was short-circuited at
-  `flushResize` and never reached the PTY.
+- `runtime.canSendInput()` returned `false` (controller gate
+  required `phase === 'open'`), so any resize the user fired in
+  that window was short-circuited at `flushResize` and never
+  reached the PTY.
 - User keystrokes typed in that window were dropped at the
   input gate.
 - The takeover spinner cleared only after the realtime event
@@ -511,35 +512,38 @@ response.
    (`snapshot`, `snapshotSeq`) — takeover doesn't return a fresh
    snapshot because the new controller keeps whatever the viewer
    was already showing (no need to re-fetch the buffer).
-2. `TerminalOwnershipEvent` and the renderer-side
-   `TerminalOwnershipViewModel` gain `phase` so the realtime path
-   stays shape-consistent with the takeover response. Both
-   surfaces carry the same fields, and the renderer can apply
-   either without re-checking what fields it has.
+2. `TerminalIdentityEvent` and the renderer-side
+   `TerminalIdentityViewModel` keep the same role/geometry shape
+   as the takeover response. Both surfaces carry the same
+   fields, and the renderer can apply either without re-checking
+   what fields it has.
 3. The server-side `TerminalSlotManager.takeoverResult`
    builder now reads `session.cols`, `session.rows`,
-   `session.phase` synchronously after `applyOwnershipEffect`
+   `session.phase` synchronously after the identity effect
    runs and packs them into the response. The realtime
-   `emitOwnership` payload carries `phase: session.phase` for
-   the non-takeover paths.
-4. `TerminalSlotState.applyOwnership` accepts `phase` and
-   routes it through `setPhaseAndMessage` so role / geometry /
-   phase are applied in the same atomic patch.
+   `emitIdentity` payload carries `canonicalCols` and
+   `canonicalRows` (no `phase`) for the non-takeover paths.
+4. `TerminalSlotState.applyIdentity` accepts role, status, and
+   canonical size, while `applyLifecycle` accepts phase and
+   message. The two are disjoint, so a transitional phase update
+   can never look like a role change at the apply boundary.
 5. `ManagedTerminalSlot.takeover()` now awaits the response
    and calls `runtime.applyTakeover(result)`, a new method that
-   feeds the response into the existing `applyOwnership` path.
-   The previous `.catch(() => {})` becomes
+   feeds the response into the identity + lifecycle apply
+   path. The previous `.catch(() => {})` becomes
    `terminalLog.warn('takeover failed ...')` to mirror the
    `terminal.ts:resize` rejection pattern.
-6. `TerminalSlotRegistry.handleOwnership` and the bridge
+6. `ManagedTerminalSlot.handleIdentity` and the bridge
    conversion in `renderer-terminal-bridge.ts` were aligned to
-   carry the new `phase` field through.
+   route the role / status / canonical-size fields through the
+   new identity channel, with `handleLifecycle` carrying phase
+   and message on a separate channel.
 
 ### What is _not_ changed
 
-The realtime `ownership` event keeps its authority role on the
+The realtime `identity` event keeps its authority role on the
 non-takeover paths (controller crash, controller reconnect,
-sibling auto-claim). For those, ownership-event-as-authority
+sibling auto-claim). For those, identity-event-as-authority
 is the only choice — there is no response to be authoritative.
 A subsequent realtime event for the _same_ ptySessionId after a
 successful takeover is treated as a benign re-apply with
@@ -551,7 +555,7 @@ the new values arrive one round-trip sooner.
 
 ### Multi-window safety
 
-The authoritative takeover response and the realtime `ownership`
+The authoritative takeover response and the realtime `identity`
 event for the same session carry the same fields. If two windows
 take over in parallel, the server resolves the conflict (one
 window becomes controller, the other becomes viewer); both
@@ -567,16 +571,17 @@ arrive at the same final state.
   tests that asserted the old "wait for the realtime event"
   behavior).
 - `bun run typecheck` — clean (the new fields propagate through
-  every typed surface; the inline `TerminalOwnershipViewModel`
-  literal at `TerminalSlotRegistry.handleOwnership` and in
+  every typed surface; the inline `TerminalIdentityViewModel`
+  literal at `TerminalSlotRegistry.handleIdentity` and in
   the test files were collapsed to the named type so future
   field additions propagate automatically).
-- `terminal.test.ts` — wire-format ownership message updated to
-  include `phase` so the validator accepts it.
+- `terminal.test.ts` — wire-format identity message carries
+  role/status/canonical-size only, with phase on the separate
+  `lifecycle` channel.
 - `terminal-runtime.test.ts` — two takeover success assertions
   updated to the new 7-field shape; the existing
-  `expect(ownershipMessage).toMatchObject({...})` for the
-  realtime emission already accepts the new `phase` field as an
+  `expect(identityMessage).toMatchObject({...})` for the
+  realtime emission already accepts the new fields as an
   additive change.
 
 ### Out of scope
@@ -604,7 +609,7 @@ All four roots landed on `main`:
   planning.
 
 Follow-up #5 from §Suggested follow-ups also landed: takeover's
-two-step handshake (response + realtime `ownership` event) was
+two-step handshake (response + realtime `identity` event) was
 collapsed into a single authoritative handshake, with the realtime
 event kept as the authority only on the non-takeover paths. See
 §Takeover atomicity (follow-up #5).
@@ -675,7 +680,7 @@ R1: durable close.
 - `terminal-runtime-actions.test.ts`:
   - `emits BOTH sessions-changed and session-closed on a successful
 close` (56).
-  - A non-owner close does not leak a phantom `slot-closed`
+  - A non-user close does not leak a phantom `slot-closed`
     event (84).
   - A failed close path does not synthesize a `slot-closed`
     with a fake repoRoot (100, 129).
@@ -769,7 +774,7 @@ any individual implementation:
 4. **Done (P1.7)** — Move `TerminalSlotRegistry` to a renderer-
    level singleton lifetime. (See `terminal-roadmap.md` P1.7.)
 5. **Done** — collapse the takeover two-step handshake (response +
-   realtime `ownership` event) into a single authoritative
+   realtime `identity` event) into a single authoritative
    handshake, keeping the realtime event as authority only on the
    non-takeover paths. (See §Takeover atomicity.)
 6. Add a contract-test pass over the terminal invariants listed in
@@ -783,6 +788,6 @@ any individual implementation:
 - `docs/terminal-roadmap.md` — refactor roadmap (P1.7, P1.8, P2
   contract tests)
 - `docs/terminal-target-model.md` — terminal target lifecycle and
-  ownership model
+  control model
 - `docs/realtime.md` — realtime channel discipline that R2's
   `slot-closed` broadcast inherits from

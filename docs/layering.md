@@ -6,7 +6,7 @@ Use this doc for feature layering rules.
 
 - Organize code by feature first.
 - Split by concern only when needed.
-- Keep ownership and read/write direction clear.
+- Keep control and read/write direction clear.
 
 ## Two axes
 
@@ -152,7 +152,7 @@ When naming types, modules, or slices, keep these state classes visible when the
 - runtime-coherent
 - restorable
 
-Use those distinctions to decide ownership first, then choose the layer.
+Use those distinctions to decide control first, then choose the layer.
 
 ## Naming rule
 
@@ -218,8 +218,8 @@ It also shows that not every complex feature needs a separate runtime facade lay
 
 - boundary: `src/server/routes/realtime.ts`, `src/web/terminal.ts`
 - read: `src/web/terminal-slot-queries.ts` (loader helper), `src/web/components/terminal/TerminalSlotRegistry.ts` (read projection)
-- write: `src/server/terminal/terminal-runtime.ts` (factory; the only owner of session/catalog/broker/dispatch), `src/web/components/terminal/TerminalSlotRegistry.ts` (renderer-side write paths for `attach`/`select`/`create`)
-- source: `src/server/terminal/terminal-slot-manager.ts` (in-process state for sessions, ownership, render), `src/server/terminal/pty-supervisor.ts` (PtySupervisor interface), `src/server/terminal/pty-supervisor-inprocess.ts` + `pty-supervisor-worker.ts` (PTY pool impls)
+- write: `src/server/terminal/terminal-runtime.ts` (factory; the authoritative source for session/catalog/broker/dispatch), `src/web/components/terminal/TerminalSlotRegistry.ts` (renderer-side write paths for `attach`/`select`/`create`)
+- source: `src/server/terminal/terminal-slot-manager.ts` (in-process state for sessions, control, render), `src/server/terminal/pty-supervisor.ts` (PtySupervisor interface), `src/server/terminal/pty-supervisor-inprocess.ts` + `pty-supervisor-worker.ts` (PTY pool impls)
 - protocol types: `src/shared/terminal-types.ts`, `src/shared/terminal-socket.ts`, `src/shared/terminal-validators.ts`, `src/shared/terminal-controller.ts`, `src/shared/slot-ids.ts` (client↔server wire types, validation, controller helpers), `src/shared/terminal-slot-key.ts` (canonical session/worktree key encoding), `src/server/terminal/pty-worker-protocol.ts` (main↔PTY-worker wire types)
 
 The server-side terminal runtime is created by `createServerTerminalRuntime({ ptySupervisor })` and is the only place that implements `ServerTerminalHost`. The realtime route receives the host via dependency injection from the server factory. The TerminalSlotProvider on the renderer side keeps `TerminalSlotRegistry` as the single source of truth for live session state and uses the bridge only for fetches and mutations.

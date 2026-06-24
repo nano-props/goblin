@@ -19,7 +19,7 @@ lives in `src/server/terminal/terminal-controller.ts`,
 ## The product premise
 
 Goblin is a single-user application. The user signs in once with
-an access token and that token derives a stable owner identity for
+an access token and that token derives a stable user identity for
 every server-side resource they touch — including terminal
 sessions. There is no notion of two distinct humans sharing a
 session.
@@ -49,9 +49,9 @@ keystrokes are echoed back? where does my Ctrl+C go?
 So the design is: **at any instant, exactly one window is the
 controller.**
 
-## The principle: intent-recent, owner-scoped
+## The principle: intent-recent, user-scoped
 
-Control is bound to the **owner's most recent write intent**, not
+Control is bound to the **user's most recent write intent**, not
 to any specific window. From the user's point of view, the
 following all mean the same thing:
 
@@ -80,7 +80,7 @@ reloading).
 The main path is:
 
 1. User opens a terminal in a fresh window.
-2. Window attaches; the server recognizes that this owner has
+2. Window attaches; the server recognizes that this user has
    touched the session before and grants control.
 3. Window is now the controller.
 4. User types. Keystrokes flow through the local gate.
@@ -92,22 +92,22 @@ The main path is:
 The button is no longer load-bearing. It exists for accessibility
 and for the rare "I want control without typing" case.
 
-## The ownership flag, lifted to the owner
+## The control flag, lifted to the user
 
 The server remembers, for the lifetime of a session, that **this
-owner has touched this session**. That single bit of sticky
+user has touched this session**. That single bit of sticky
 memory is what makes the roam scenarios work:
 
 - User closes the controller window. The controller slot is
   cleared at once.
 - User opens a new window elsewhere, attached to the same session.
-- The server sees: "owner has been here before, no live
+- The server sees: "user has been here before, no live
   controller, new attachment wants in" → grants control.
 
 This is why "I closed Electron, then opened a new Electron window,
-and the previous terminal state was still mine" works. The owner
+and the previous terminal state was still mine" works. The user
 sticky bit carries the claim across window lifetimes. The window
-identity is ephemeral; the owner identity is durable.
+identity is ephemeral; the user identity is durable.
 
 ## Output fans out; only input is exclusive
 
@@ -128,12 +128,12 @@ When a window's network briefly drops and comes back to the same
 attachment, the user perceives no interruption: the new attach is
 recognized as a continuation of the same window, the slot is
 cleared on disconnect, and the reattach re-claims through the
-owner-sticky path. Because the reconnect and the reclaim happen
+user-sticky path. Because the reconnect and the reclaim happen
 back-to-back, the user sees their next keystroke flow as expected.
 
 This works because **window identity is per-sessionStorage, which
 survives a socket-level reconnect within the same window**, and
-**owner identity is per-access-token, which is even more durable**.
+**user identity is per-access-token, which is even more durable**.
 The two-tier identity means the model can tell "same window, brief
 network issue" apart from "different window, deliberate switch".
 
@@ -147,7 +147,7 @@ case is a small but real race:
    the same event (no grace period).
 3. Window B — a sibling tab, an Electron window on another
    machine, anything the user opened while A was away — attaches
-   first. B auto-claims because the slot is empty and the owner
+   first. B auto-claims because the slot is empty and the user
    has touched this session before.
 4. A's network comes back. A reconnects, but the slot is held by
    B. A is now a viewer.
@@ -210,7 +210,7 @@ socket drops, the server clears the slot and emits a
 server re-emits `controller: A` after the auto-claim. Between
 those two events — typically a few milliseconds — A's renderer
 sees its cached role transition from `controller` to `viewer`
-(per `handleOwnership` collapsing unowned to viewer) and back
+(per `handleIdentity` collapsing unowned to viewer) and back
 to `controller`.
 
 If the user types in that window, the gate's `authorize('write')`
@@ -234,7 +234,7 @@ surprise future contributors.
 - **One writer at a time.** The shell sees one input stream.
 - **Output fans out to everyone.** No window loses its view of the
   shell.
-- **Owner-scoped, never device-scoped.** Two devices of the same
+- **User-scoped, never device-scoped.** Two devices of the same
   user are not "competing clients" — they are one user with two
   viewpoints.
 - **Server-authoritative for who is currently writing.** The
