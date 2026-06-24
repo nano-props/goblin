@@ -75,6 +75,24 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     expect(mocks.probeRepository).not.toHaveBeenCalled()
   })
 
+  test('returns 400 when the body is empty (no content-length)', async () => {
+    // `parseHttpBody` treats an empty body as `undefined` and lets the
+    // schema decide — a required-field schema must still 400 even
+    // without a JSON envelope.
+    const app = createRepoRoutes()
+    const response = await app.request(
+      new Request('http://localhost/probe', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '',
+      }),
+    )
+    expect(response.status).toBe(400)
+    const json = (await response.json()) as { code: string }
+    expect(json.code).toBe('BAD_REQUEST')
+    expect(mocks.probeRepository).not.toHaveBeenCalled()
+  })
+
   test('returns 400 for invalid picklist values in the body (e.g. pull-requests mode)', async () => {
     const app = createRepoRoutes()
     const response = await app.request(
@@ -158,6 +176,52 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       skip: 0,
       signal: expect.any(AbortSignal),
     })
+  })
+
+  test('returns 400 when count is below the minimum (1)', async () => {
+    // Body schema is `v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(200))`
+    // — POST body has no string coercion, so a wrong type also 400s.
+    const app = createRepoRoutes()
+    const response = await app.request(
+      new Request('http://localhost/log', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: '/tmp/repo', branch: 'main', count: 0 }),
+      }),
+    )
+    expect(response.status).toBe(400)
+    const json = (await response.json()) as { code: string }
+    expect(json.code).toBe('BAD_REQUEST')
+  })
+
+  test('returns 400 when count is a non-integer number', async () => {
+    const app = createRepoRoutes()
+    const response = await app.request(
+      new Request('http://localhost/log', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: '/tmp/repo', branch: 'main', count: 2.5 }),
+      }),
+    )
+    expect(response.status).toBe(400)
+    const json = (await response.json()) as { code: string }
+    expect(json.code).toBe('BAD_REQUEST')
+  })
+
+  test('returns 400 when count is not a number', async () => {
+    // Query-string mode coerced strings to numbers; POST body doesn't,
+    // so this is a new boundary the migration introduces.
+    const app = createRepoRoutes()
+    const response = await app.request(
+      new Request('http://localhost/log', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: '/tmp/repo', branch: 'main', count: '50' }),
+      }),
+    )
+    expect(response.status).toBe(400)
+    const json = (await response.json()) as { code: string }
+    expect(json.code).toBe('BAD_REQUEST')
   })
 })
 

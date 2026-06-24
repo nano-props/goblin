@@ -1,5 +1,5 @@
 import { openExternalUrl } from '#/web/app-shell-client.ts'
-import { getServerJson, postServerJson } from '#/web/lib/server-fetch.ts'
+import { postServerJson } from '#/web/lib/server-fetch.ts'
 import type { CloneRepoResult, PullRequestEntry, RepoSnapshot, RepositoryLogResponse } from '#/shared/api-types.ts'
 import type { ExecResult, LogEntry, PullRequestFetchMode, WorktreeStatus } from '#/shared/git-types.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'

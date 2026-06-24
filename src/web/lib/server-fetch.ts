@@ -48,25 +48,3 @@ export async function postServerJson<TInput extends object, TOutput>(
     body: JSON.stringify(input),
   })
 }
-
-type QueryParamValue = string | number | boolean | undefined | null
-
-function appendQueryParam(url: URL, key: string, value: string | number | boolean): void {
-  url.searchParams.append(key, String(value))
-}
-
-export async function getServerJson<TParams extends Record<string, QueryParamValue>, TOutput>(
-  path: string,
-  params: TParams,
-  options?: { signal?: AbortSignal },
-): Promise<TOutput> {
-  const url = new URL(path, resolveApiBaseUrl(requireRendererServerConfig().url))
-  for (const [key, value] of Object.entries(params)) {
-    if (value === undefined || value === null) continue
-    appendQueryParam(url, key, value)
-  }
-  return await fetchServerJson<TOutput>(url, {
-    method: 'GET',
-    signal: options?.signal,
-  })
-}

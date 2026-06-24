@@ -191,4 +191,24 @@ describe('settings routes', () => {
     await expect(emptyResponse.json()).resolves.toEqual(state)
     expect(mocks.getServerGitHubCliState).toHaveBeenLastCalledWith(expect.any(AbortSignal), undefined)
   })
+
+  test('returns 400 when hosts is a string instead of an array', async () => {
+    // Schema is `v.optional(v.array(v.string()))`. The previous
+    // query-string mode coerced query values to strings, so this
+    // shape was unreachable; POST body makes it possible to send
+    // a bare string and now the schema must reject it.
+    const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
+    const app = createSettingsRoutes(createServerSettingsState())
+    const response = await app.request(
+      new Request('http://127.0.0.1:32100/github-cli', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ hosts: 'github.example.com' }),
+      }),
+    )
+    expect(response.status).toBe(400)
+    const json = (await response.json()) as { code: string }
+    expect(json.code).toBe('BAD_REQUEST')
+    expect(mocks.getServerGitHubCliState).not.toHaveBeenCalled()
+  })
 })
