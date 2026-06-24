@@ -136,7 +136,7 @@ function BranchNavigatorSkeletonRow({ showActions }: { showActions: boolean }) {
   return (
     <li
       className={cn(
-        'grid min-h-9 items-stretch rounded-md bg-muted/35',
+        'grid min-h-9 items-stretch rounded-md bg-muted/30',
         showActions ? 'grid-cols-[minmax(0,1fr)_auto]' : 'grid-cols-1',
       )}
     >

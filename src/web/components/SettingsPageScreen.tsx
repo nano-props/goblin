@@ -19,7 +19,7 @@ export function SettingsPageScreen({ page, onBack, onPageChange }: SettingsPageS
   return (
     <div className="flex h-full flex-col bg-background">
       <div
-        className="topbar grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-separator/70 bg-background text-sm"
+        className="topbar grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-2 bg-background text-sm"
         style={{ height: WINDOW_TOPBAR_HEIGHT_PX }}
       >
         <Tip label={t('settings.back')}>

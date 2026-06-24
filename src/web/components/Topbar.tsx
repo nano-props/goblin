@@ -52,7 +52,7 @@ export function Topbar({ onOpenSettings, repoId, children }: Props) {
   const showFocusToggle = !!repoId && !compact
   return (
     <div
-      className="topbar relative flex items-center gap-2 border-b border-separator bg-background text-sm"
+      className="topbar relative flex items-center gap-2 bg-background text-sm"
       style={{ height: WINDOW_TOPBAR_HEIGHT_PX }}
     >
       {children}

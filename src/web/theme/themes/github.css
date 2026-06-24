@@ -1,7 +1,7 @@
 html[data-color-theme='github'][data-theme='light'] {
   color-scheme: light;
 
-  --goblin-surface-canvas: #ffffff;
+  --goblin-surface-canvas: #f6f8fa;
   --goblin-surface-base: #f6f8fa;
   --goblin-surface-raised: #ffffff;
   --goblin-surface-overlay: #ffffff;
@@ -14,7 +14,7 @@ html[data-color-theme='github'][data-theme='light'] {
   --goblin-text-secondary-strong: #3d444d;
   --goblin-text-secondary: #59636e;
   --goblin-text-selected-secondary: #4b535d;
-  --goblin-border-subtle: #d8dee4;
+  --goblin-border-subtle: #dadfe6;
   --goblin-border-default: #d0d7de;
   --goblin-border-strong: #afb8c1;
   --goblin-focus-ring: #0969da;
@@ -84,8 +84,8 @@ html[data-color-theme='github'][data-theme='dark'] {
 
   --goblin-surface-canvas: #0d1117;
   --goblin-surface-base: #161b22;
-  --goblin-surface-raised: #161b22;
-  --goblin-surface-overlay: #161b22;
+  --goblin-surface-raised: #1c2128;
+  --goblin-surface-overlay: #262a31;
   --goblin-surface-muted: #21262d;
   --goblin-surface-hover: #30363d;
   --goblin-surface-segmented-track: #30363d;
@@ -95,7 +95,7 @@ html[data-color-theme='github'][data-theme='dark'] {
   --goblin-text-secondary-strong: #c9d1d9;
   --goblin-text-secondary: #8b949e;
   --goblin-text-selected-secondary: #c9d1d9;
-  --goblin-border-subtle: #30363d;
+  --goblin-border-subtle: #21262d;
   --goblin-border-default: #30363d;
   --goblin-border-strong: #484f58;
   --goblin-focus-ring: #1f6feb;

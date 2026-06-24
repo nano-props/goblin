@@ -16,7 +16,7 @@ html[data-color-theme='macos'][data-theme='light'] {
   --goblin-text-secondary-strong: #3c3c43;
   --goblin-text-secondary: #6e6e73;
   --goblin-text-selected-secondary: rgb(60 60 67 / 0.68);
-  --goblin-border-subtle: rgb(60 60 67 / 0.14);
+  --goblin-border-subtle: rgb(60 60 67 / 0.10);
   --goblin-border-default: rgb(60 60 67 / 0.22);
   --goblin-border-strong: rgb(60 60 67 / 0.26);
   --goblin-focus-ring: #007aff;
@@ -99,7 +99,7 @@ html[data-color-theme='macos'][data-theme='dark'] {
   --goblin-text-secondary-strong: rgb(235 235 245 / 0.86);
   --goblin-text-secondary: rgb(235 235 245 / 0.6);
   --goblin-text-selected-secondary: rgb(235 235 245 / 0.72);
-  --goblin-border-subtle: rgb(84 84 88 / 0.42);
+  --goblin-border-subtle: rgb(84 84 88 / 0.16);
   --goblin-border-default: rgb(84 84 88 / 0.55);
   --goblin-border-strong: rgb(84 84 88 / 0.65);
   --goblin-focus-ring: #0a84ff;
