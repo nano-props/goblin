@@ -86,12 +86,14 @@ const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENV
 const testWindow = window as unknown as { goblinNative?: unknown; __GOBLIN_BOOTSTRAP__?: unknown }
 const sendTestNotification = vi.fn(async () => true)
 const invokeIpc = vi.fn(async ({ path, input }: { path: string; input?: unknown }) => defaultIpcResult(path, input))
-const fetchMock = vi.fn(async (input: string | URL) => {
+const fetchMock = vi.fn(async (input: string | URL, init?: RequestInit) => {
   const url = new URL(typeof input === 'string' ? input : input.toString())
+  const rawBody = typeof init?.body === 'string' && init.body.length > 0 ? init.body : ''
+  const body = rawBody ? (JSON.parse(rawBody) as Record<string, unknown>) : {}
   let result: unknown = null
-  if (url.pathname === '/api/settings/github-cli/refresh') result = defaultIpcResult('githubCli.refresh')
+  if (url.pathname === '/api/settings/github-cli/refresh') result = defaultIpcResult('githubCli.refresh', body)
   else if (url.pathname === '/api/settings/github-cli') {
-    result = defaultIpcResult('githubCli.get', { hosts: url.searchParams.getAll('host') })
+    result = defaultIpcResult('githubCli.get', body)
   } else if (url.pathname === '/api/settings') result = defaultIpcResult('settings.get')
   else if (url.pathname === '/api/settings/external-apps') result = defaultIpcResult('externalApps.get')
   return {
@@ -211,8 +213,10 @@ describe('SettingsSurface', () => {
   })
 
   test('reflects notification preference from the settings query', async () => {
-    fetchMock.mockImplementation(async (input: string | URL) => {
+    fetchMock.mockImplementation(async (input: string | URL, init?: RequestInit) => {
       const url = new URL(typeof input === 'string' ? input : input.toString())
+      const rawBody = typeof init?.body === 'string' && init.body.length > 0 ? init.body : ''
+      const body = rawBody ? (JSON.parse(rawBody) as Record<string, unknown>) : {}
       let result: unknown = null
       if (url.pathname === '/api/settings') {
         result = {
@@ -220,7 +224,7 @@ describe('SettingsSurface', () => {
           terminalNotificationsEnabled: true,
         }
       } else if (url.pathname === '/api/settings/github-cli') {
-        result = defaultIpcResult('githubCli.get', { hosts: url.searchParams.getAll('host') })
+        result = defaultIpcResult('githubCli.get', body)
       } else if (url.pathname === '/api/settings/external-apps') {
         result = defaultIpcResult('externalApps.get')
       }

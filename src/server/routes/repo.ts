@@ -25,8 +25,8 @@ import {
   removeRepositoryWorktree,
 } from '#/server/modules/repo-write-paths.ts'
 import { getServerFetchIntervalSec } from '#/server/modules/settings-source.ts'
-import { createRouteApp, parseHttpBody, parseHttpQuery } from '#/server/common/http-validate.ts'
-import { REPO_PROCEDURE_SCHEMAS, REPO_QUERY_SCHEMAS } from '#/shared/procedure-schemas.ts'
+import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'
+import { REPO_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 import type { RepositoryLogResponse } from '#/shared/api-types.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 
@@ -47,20 +47,20 @@ export function createRepoRoutes() {
     }
   }
 
-  app.get('/probe', async (c) => {
-    const { cwd } = parseHttpQuery(REPO_QUERY_SCHEMAS.probe, c)
+  app.post('/probe', async (c) => {
+    const { cwd } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.probe, c)
     return c.json(await jsonOr(() => probeRepository(cwd), READ_REPO_ERROR, 'probe'))
   })
-  app.get('/snapshot', async (c) => {
-    const { cwd } = parseHttpQuery(REPO_QUERY_SCHEMAS.snapshot, c)
+  app.post('/snapshot', async (c) => {
+    const { cwd } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.snapshot, c)
     return c.json(await jsonOr(() => getRepositorySnapshot(cwd, c.req.raw.signal), null, 'snapshot'))
   })
-  app.get('/status', async (c) => {
-    const { cwd } = parseHttpQuery(REPO_QUERY_SCHEMAS.status, c)
+  app.post('/status', async (c) => {
+    const { cwd } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.status, c)
     return c.json(await jsonOr(() => getRepositoryStatus(cwd, c.req.raw.signal), [], 'status'))
   })
-  app.get('/log', async (c) => {
-    const { cwd, branch, count, skip } = parseHttpQuery(REPO_QUERY_SCHEMAS.log, c)
+  app.post('/log', async (c) => {
+    const { cwd, branch, count, skip } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.log, c)
     return c.json(
       await jsonOr<RepositoryLogResponse>(
         () =>
@@ -78,12 +78,12 @@ export function createRepoRoutes() {
     const { cwd } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.getRemoteBranches, c)
     return c.json(await jsonOr(() => getRepositoryRemoteBranches(cwd, c.req.raw.signal), [], 'remote-branches'))
   })
-  app.get('/patch', async (c) => {
-    const { cwd, worktreePath } = parseHttpQuery(REPO_QUERY_SCHEMAS.patch, c)
+  app.post('/patch', async (c) => {
+    const { cwd, worktreePath } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.patch, c)
     return c.json(await jsonOr(() => getRepositoryPatch(cwd, worktreePath, c.req.raw.signal), READ_REPO_ERROR, 'patch'))
   })
-  app.get('/pull-requests', async (c) => {
-    const { cwd, branches, mode } = parseHttpQuery(REPO_QUERY_SCHEMAS.pullRequests, c)
+  app.post('/pull-requests', async (c) => {
+    const { cwd, branches, mode } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.pullRequests, c)
     return c.json(
       await jsonOr(
         () => getRepositoryPullRequests(cwd, branches, { mode: mode ?? 'full', signal: c.req.raw.signal }),
@@ -92,14 +92,8 @@ export function createRepoRoutes() {
       ),
     )
   })
-  app.get('/composite', async (c) => {
-    const { cwd, include, branches, mode, timeoutMs } = parseHttpQuery(REPO_QUERY_SCHEMAS.composite, c)
-    // `include` is a `string[]` per the schema; `parseHttpQuery`
-    // materialises it from `searchParams.getAll('include')`, so the
-    // wire format is repeated keys:
-    //   `?include=snapshot&include=status`
-    // Comma-separated values (`?include=snapshot,status`) are not
-    // supported — the renderer always sends repeated keys.
+  app.post('/composite', async (c) => {
+    const { cwd, include, branches, mode, timeoutMs } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.composite, c)
     const wants = (include ?? ['snapshot', 'status', 'pullRequests']) as ReadonlyArray<
       'snapshot' | 'status' | 'pullRequests'
     >

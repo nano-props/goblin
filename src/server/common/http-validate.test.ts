@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import * as v from 'valibot'
 import { IpcError } from '#/shared/api-types.ts'
-import { parseHttpBody, parseHttpInput, parseHttpQuery } from '#/server/common/http-validate.ts'
+import { parseHttpBody, parseHttpInput } from '#/server/common/http-validate.ts'
 
 describe('parseHttpInput', () => {
   test('returns the parsed output for valid input', () => {
@@ -32,42 +32,6 @@ describe('parseHttpInput', () => {
     expect(() => parseHttpInput(schema, null)).toThrow(IpcError)
     expect(() => parseHttpInput(schema, 'string')).toThrow(IpcError)
     expect(() => parseHttpInput(schema, 42)).toThrow(IpcError)
-  })
-})
-
-describe('parseHttpQuery', () => {
-  function makeContext(url: string) {
-    return { req: { url } }
-  }
-
-  test('parses single-value query params into strings', () => {
-    const schema = v.object({ cwd: v.string() })
-    const result = parseHttpQuery(schema, makeContext('http://localhost/x?cwd=/tmp/repo'))
-    expect(result).toEqual({ cwd: '/tmp/repo' })
-  })
-
-  test('groups repeated keys into arrays', () => {
-    const schema = v.object({ branches: v.array(v.string()) })
-    const result = parseHttpQuery(schema, makeContext('http://localhost/x?branches=main&branches=feature'))
-    expect(result).toEqual({ branches: ['main', 'feature'] })
-  })
-
-  test('returns an empty array for repeated keys with no values', () => {
-    const schema = v.object({ branches: v.optional(v.array(v.string())) })
-    const result = parseHttpQuery(schema, makeContext('http://localhost/x'))
-    expect(result).toEqual({ branches: undefined })
-  })
-
-  test('throws BAD_REQUEST for missing required fields', () => {
-    const schema = v.object({ cwd: v.string() })
-    try {
-      parseHttpQuery(schema, makeContext('http://localhost/x'))
-      expect.fail('expected to throw')
-    } catch (err) {
-      expect(err).toBeInstanceOf(IpcError)
-      expect((err as IpcError).code).toBe('BAD_REQUEST')
-      expect((err as IpcError).message).toContain('cwd')
-    }
   })
 })
 

@@ -283,10 +283,10 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
 
     /**
      * Combined snapshot + status refresh backed by the
-     * `GET /api/repo/composite?include=snapshot,status` endpoint. Saves
-     * a round trip on initial repo load by folding the two reads into
-     * one. Pull requests are still fetched separately (different lane,
-     * different retry semantics, different priority).
+     * `POST /api/repo/composite` endpoint. Saves a round trip on
+     * initial repo load by folding the two reads into one. Pull
+     * requests are still fetched separately (different lane, different
+     * retry semantics, different priority).
      */
     async refreshSnapshotAndStatus(id: string, options?: { skipLogBackfill?: boolean; token?: number }) {
       const resolved = resolveActionToken(get, id, options?.token)

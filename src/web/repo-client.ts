@@ -1,5 +1,5 @@
 import { openExternalUrl } from '#/web/app-shell-client.ts'
-import { getServerJson, postServerJson } from '#/web/lib/server-fetch.ts'
+import { postServerJson } from '#/web/lib/server-fetch.ts'
 import type { CloneRepoResult, PullRequestEntry, RepoSnapshot, RepositoryLogResponse } from '#/shared/api-types.ts'
 import type { ExecResult, LogEntry, PullRequestFetchMode, WorktreeStatus } from '#/shared/git-types.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
@@ -7,7 +7,7 @@ import type { ProbeResult } from '#/shared/api-types.ts'
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 
 export async function probeRepository(cwd: string, signal?: AbortSignal): Promise<ProbeResult> {
-  return await getServerJson('/api/repo/probe', { cwd }, { signal })
+  return await postServerJson('/api/repo/probe', { cwd }, { signal })
 }
 
 export async function cloneRepository(input: {
@@ -24,11 +24,11 @@ export async function abortCloneOperation(operationId: string): Promise<boolean>
 }
 
 export async function getRepositorySnapshot(cwd: string, signal?: AbortSignal): Promise<RepoSnapshot | null> {
-  return await getServerJson('/api/repo/snapshot', { cwd }, { signal })
+  return await postServerJson('/api/repo/snapshot', { cwd }, { signal })
 }
 
 export async function getRepositoryStatus(cwd: string, signal?: AbortSignal): Promise<WorktreeStatus[]> {
-  return await getServerJson('/api/repo/status', { cwd }, { signal })
+  return await postServerJson('/api/repo/status', { cwd }, { signal })
 }
 
 export async function getRepositoryLog(
@@ -36,7 +36,7 @@ export async function getRepositoryLog(
   branch: string,
   options?: { count?: number; skip?: number; signal?: AbortSignal },
 ): Promise<LogEntry[]> {
-  const result = await getServerJson(
+  const result = await postServerJson(
     '/api/repo/log',
     { cwd, branch, count: options?.count ?? DEFAULT_REPOSITORY_LOG_COUNT, skip: options?.skip ?? 0 },
     { signal: options?.signal },
@@ -56,7 +56,11 @@ export async function getRepositoryPullRequests(
   options?: { mode?: PullRequestFetchMode },
   signal?: AbortSignal,
 ): Promise<PullRequestEntry[] | null> {
-  return await getServerJson('/api/repo/pull-requests', { cwd, branches, mode: options?.mode }, { signal })
+  return await postServerJson(
+    '/api/repo/pull-requests',
+    { cwd, branches, mode: options?.mode },
+    { signal },
+  )
 }
 
 export async function abortRepositoryOperation(cwd: string): Promise<boolean> {
@@ -130,7 +134,7 @@ export async function removeRepositoryWorktree(
 }
 
 export async function getRepositoryPatch(cwd: string, worktreePath: string, signal?: AbortSignal): Promise<ExecResult> {
-  return await getServerJson('/api/repo/patch', { cwd, worktreePath }, { signal })
+  return await postServerJson('/api/repo/patch', { cwd, worktreePath }, { signal })
 }
 
 export interface RepositoryComposite {
@@ -155,11 +159,11 @@ export async function getRepositoryComposite(
     timeoutMs?: number
   } = {},
 ): Promise<RepositoryComposite> {
-  return await getServerJson(
+  return await postServerJson(
     '/api/repo/composite',
     {
       cwd,
-      include: [...(options.include ?? ['snapshot', 'status', 'pullRequests'])],
+      include: options.include ? [...options.include] : undefined,
       branches: options.branches,
       mode: options.mode,
       timeoutMs: options.timeoutMs,

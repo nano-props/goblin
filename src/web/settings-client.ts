@@ -54,13 +54,10 @@ export async function getThemeState(): Promise<ThemeState> {
 }
 
 async function updateSettingsPrefsPatch(settings: Record<string, unknown>): Promise<SettingsPrefsUpdateResponse> {
-  const result = await fetchServerJson<SettingsPrefsUpdateResponse>('/api/settings/prefs', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({ settings }),
-  })
+  const result = await postServerJson<{ settings: Record<string, unknown> }, SettingsPrefsUpdateResponse>(
+    '/api/settings/prefs',
+    { settings },
+  )
   const patch = pickNativeSettingsProjectionPatch(settings as Partial<SettingsPrefs>)
   if (!patch || !canUseNativeIpcBridge()) return result
   // The embedded server is the authority for settings — the
@@ -111,12 +108,11 @@ export async function setI18nPref(pref: LangPref): Promise<I18nSnapshot> {
 }
 
 export async function getGitHubCliState(hosts?: string[]): Promise<GitHubCliState> {
-  const params = new URLSearchParams()
-  for (const host of hosts ?? []) {
-    if (host.trim()) params.append('host', host.trim())
-  }
-  const suffix = params.size > 0 ? `?${params.toString()}` : ''
-  return await fetchServerJson<GitHubCliState>(`/api/settings/github-cli${suffix}`)
+  const filtered = hosts?.filter((host) => host.trim().length > 0)
+  return await postServerJson(
+    '/api/settings/github-cli',
+    filtered && filtered.length > 0 ? { hosts: filtered } : {},
+  )
 }
 
 export async function refreshGitHubCliState(hosts?: string[]): Promise<GitHubCliState> {

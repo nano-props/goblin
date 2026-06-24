@@ -24,10 +24,8 @@ import {
 export function createSettingsRoutes(settingsState: ServerSettingsState) {
   const app = createRouteApp()
   app.get('/', async (c) => c.json(await getSettingsSnapshot(settingsState)))
-  app.get('/github-cli', async (c) => {
-    const hosts = (c.req.queries('host') ?? []).filter(
-      (host): host is string => typeof host === 'string' && host.length > 0,
-    )
+  app.post('/github-cli', async (c) => {
+    const { hosts } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.githubCli, c)
     return c.json(await getServerGitHubCliState(c.req.raw.signal, hosts))
   })
   app.post('/github-cli/refresh', async (c) => {
