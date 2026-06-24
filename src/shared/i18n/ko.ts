@@ -158,6 +158,8 @@ export const ko: Record<DictKey, string> = {
   'repo-picker.open-remote-port-error': '잘못된 포트',
   'repo-picker.open-remote-path-required': '경로가 필요합니다',
   'repo-picker.open-remote-path-absolute': '경로는 / 또는 ~/로 시작해야 합니다',
+  'repo-picker.open-remote-path-suggestions': '추천',
+  'repo-picker.open-remote-path-no-matches': '일치하는 경로가 없습니다',
   'repo-picker.open-remote-home-unavailable': '원격 홈 디렉터리를 확인할 수 없습니다',
   'repo-picker.tooltip.last-sync-label': '마지막 동기화',
   'repo-picker.connecting-title': 'SSH에 연결 중…',

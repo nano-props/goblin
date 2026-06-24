@@ -18,6 +18,7 @@ import { FormDialog } from '#/web/components/ui/form-dialog.tsx'
 import { Field, FieldDescription, FieldError, FieldLabel } from '#/web/components/ui/field.tsx'
 import { AnimateHeight } from '#/web/components/ui/animate-height.tsx'
 import { Input } from '#/web/components/ui/input.tsx'
+import { RemotePathSuggestions } from '#/web/components/ui/remote-path-suggestions.tsx'
 import { ToggleGroup, ToggleGroupItem } from '#/web/components/ui/toggle-group.tsx'
 import { useRemotePathSuggestions } from '#/web/hooks/useRemotePathSuggestions.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
@@ -393,22 +394,28 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
 
         <Field className="gap-2">
           <FieldLabel htmlFor="cwt-path">{t('action.create-worktree-path-label')}</FieldLabel>
-          <Input
-            id="cwt-path"
-            value={worktreePath}
-            disabled={!pathName}
-            onChange={(e) => setWorktreePath(e.target.value)}
-            placeholder={displayDefaultPath}
-            aria-describedby="cwt-path-hint"
-            className="h-10 font-mono text-sm"
-            list={pathSuggestions.length > 0 ? 'create-worktree-path-suggestions' : undefined}
-          />
-          {pathSuggestions.length > 0 && (
-            <datalist id="create-worktree-path-suggestions">
-              {pathSuggestions.map((item) => (
-                <option key={item} value={item} />
-              ))}
-            </datalist>
+          {remoteTarget ? (
+            <RemotePathSuggestions
+              id="cwt-path"
+              value={worktreePath}
+              disabled={!pathName}
+              onChange={setWorktreePath}
+              suggestions={pathSuggestions}
+              groupLabel={t('repo-picker.open-remote-path-suggestions')}
+              emptyLabel={t('repo-picker.open-remote-path-no-matches')}
+              placeholder={displayDefaultPath}
+              aria-describedby="cwt-path-hint"
+            />
+          ) : (
+            <Input
+              id="cwt-path"
+              value={worktreePath}
+              disabled={!pathName}
+              onChange={(e) => setWorktreePath(e.target.value)}
+              placeholder={displayDefaultPath}
+              aria-describedby="cwt-path-hint"
+              className="h-10 font-mono text-sm"
+            />
           )}
           <FieldDescription
             id="cwt-path-hint"

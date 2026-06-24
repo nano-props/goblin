@@ -4,6 +4,7 @@ import { Button } from '#/web/components/ui/button.tsx'
 import { FormDialog } from '#/web/components/ui/form-dialog.tsx'
 import { Field, FieldDescription, FieldError, FieldLabel } from '#/web/components/ui/field.tsx'
 import { Input } from '#/web/components/ui/input.tsx'
+import { RemotePathSuggestions } from '#/web/components/ui/remote-path-suggestions.tsx'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/web/components/ui/select.tsx'
 import { useRemotePathSuggestions } from '#/web/hooks/useRemotePathSuggestions.ts'
@@ -237,27 +238,21 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
 
         <Field className="gap-2" data-invalid={pathFieldError ? true : undefined}>
           <FieldLabel htmlFor="remote-path">{t('repo-picker.open-remote-path-label')}</FieldLabel>
-          <Input
+          <RemotePathSuggestions
             id="remote-path"
             ref={pathInputRef}
-            autoFocus={!hasInclude && hosts.length > 0}
             disabled={pending}
             value={remotePath}
-            onChange={(event) => {
-              setRemotePath(event.target.value)
+            onChange={(next) => {
+              setRemotePath(next)
               clearResolvedRemoteState()
             }}
+            suggestions={pathSuggestions}
+            groupLabel={t('repo-picker.open-remote-path-suggestions')}
+            emptyLabel={t('repo-picker.open-remote-path-no-matches')}
             placeholder={t('repo-picker.open-remote-path-placeholder')}
-            className="h-10 font-mono text-sm"
-            list={pathSuggestions.length > 0 ? 'open-remote-path-suggestions' : undefined}
+            aria-invalid={!!pathFieldError}
           />
-          {pathSuggestions.length > 0 && (
-            <datalist id="open-remote-path-suggestions">
-              {pathSuggestions.map((item) => (
-                <option key={item} value={item} />
-              ))}
-            </datalist>
-          )}
           {pathFieldError ? (
             <FieldError reserveHeight>{t(pathFieldError)}</FieldError>
           ) : (

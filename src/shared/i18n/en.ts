@@ -167,6 +167,8 @@ export const en = {
   'repo-picker.open-remote-port-error': 'Invalid port',
   'repo-picker.open-remote-path-required': 'Path required',
   'repo-picker.open-remote-path-absolute': 'Path must start with / or ~/',
+  'repo-picker.open-remote-path-suggestions': 'Suggestions',
+  'repo-picker.open-remote-path-no-matches': 'No matching paths',
   'repo-picker.open-remote-home-unavailable': 'Could not resolve the remote home directory',
   'repo-picker.tooltip.last-sync-label': 'Last synced',
   'repo-picker.connecting-title': 'Connecting to SSH…',
