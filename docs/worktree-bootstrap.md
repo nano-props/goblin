@@ -32,7 +32,6 @@ hardlink = [
 exclude = [
   "*.log",
   "*.tmp",
-  "node_modules",
 ]
 
 setup = "bun install"
@@ -69,4 +68,4 @@ setup = "bun install"
 - `setup` is a single string; multi-step workflows should use shell composition (`&&`, `;`).
 - Do not infer rules from untracked files.
 - Do not turn worktree create into a general sync engine.
-- For large dependency directories like `node_modules`, prefer `exclude` + `setup` over `symlink` / `hardlink`. Path-based modes do not fit package-manager-owned trees.
+- For large dependency directories like `node_modules`, do not list them in `copy` / `symlink` / `hardlink` at all. Let `setup` run the package manager install instead; path-based modes do not fit package-manager-owned trees.
