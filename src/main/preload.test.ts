@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import vm from 'node:vm'
 import { describe, expect, test, vi } from 'vitest'
+import { CLIPBOARD_FALLBACK_FILE_NAME } from '#/shared/clipboard-paste.ts'
 
 /**
  * Pull every single-quoted string literal out of `preload.cjs` that
@@ -284,7 +285,7 @@ describe('preload goblinNative bridge', () => {
     const unnamed = new Uint8Array([4])
     const files = [
       { name: 'a.png', bytes: blob.buffer },
-      { name: 'clipboard.bin', bytes: unnamed.buffer },
+      { name: CLIPBOARD_FALLBACK_FILE_NAME, bytes: unnamed.buffer },
     ]
     await goblinNative.saveClipboardFiles([
       { name: 'a.png', arrayBuffer: async () => blob.buffer } as unknown as File,
