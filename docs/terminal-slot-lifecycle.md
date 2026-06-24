@@ -488,10 +488,11 @@ comment in `ManagedTerminalSlot.takeover()` was explicit:
 The cost was a stale window between the response settling and the
 `onIdentity` event arriving:
 
-- `runtime.canSendInput()` returned `false` (controller gate
-  required `phase === 'open'`), so any resize the user fired in
-  that window was short-circuited at `flushResize` and never
-  reached the PTY.
+- `runtime.canResize()` returned `false` (the pre-PR gate, the
+  same `phase === 'open' && role === 'controller'` predicate
+  later renamed to `canSendInput()` by the identity/lifecycle
+  split), so any resize the user fired in that window was
+  short-circuited at `flushResize` and never reached the PTY.
 - User keystrokes typed in that window were dropped at the
   input gate.
 - The takeover spinner cleared only after the realtime event
