@@ -1,5 +1,5 @@
 import * as v from 'valibot'
-import { publishRendererIntent } from '#/server/modules/renderer-intent-broker.ts'
+import { publishRendererIntent } from '#/server/modules/client-intent-broker.ts'
 import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'
 import { WORKSPACE_PANE_STATIC_VIEW_TYPES } from '#/shared/workspace-pane.ts'
 import type { RepoViewResult } from '#/shared/repo-view.ts'

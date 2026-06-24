@@ -63,13 +63,13 @@ describe('server renderer intent source', () => {
     Object.defineProperty(globalThis, 'WebSocket', { configurable: true, value: MockWebSocket })
   })
 
-  test('connects to /ws/renderer-intent on the resolved server URL', async () => {
+  test('connects to /ws/client-intent on the resolved server URL', async () => {
     installBootstrap('http://127.0.0.1:32100/', 'tok')
     const { resetServerRendererIntentIngressForTests, subscribeServerRendererIntentIngress } =
       await import('#/web/server-renderer-intent-ingress.ts')
 
     const dispose = subscribeServerRendererIntentIngress(() => {})
-    const expected = new URL('/ws/renderer-intent', 'http://127.0.0.1:32100/')
+    const expected = new URL('/ws/client-intent', 'http://127.0.0.1:32100/')
     expected.protocol = 'ws:'
     expected.searchParams.set('t', 'tok')
     expect(MockWebSocket.instances).toHaveLength(1)

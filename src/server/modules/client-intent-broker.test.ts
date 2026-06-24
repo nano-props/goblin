@@ -6,7 +6,7 @@ import {
   registerRendererIntentSocket,
   RendererIntentSocketLimitError,
   unregisterRendererIntentSocket,
-} from '#/server/modules/renderer-intent-broker.ts'
+} from '#/server/modules/client-intent-broker.ts'
 
 describe('renderer intent broker', () => {
   beforeEach(() => {

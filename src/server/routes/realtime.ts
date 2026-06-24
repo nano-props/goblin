@@ -9,7 +9,7 @@ import {
   RendererIntentSocketLimitError,
   registerRendererIntentSocket,
   unregisterRendererIntentSocket,
-} from '#/server/modules/renderer-intent-broker.ts'
+} from '#/server/modules/client-intent-broker.ts'
 import { createAccessTokenMiddleware } from '#/server/common/auth.ts'
 import { userIdFromContext } from '#/server/common/identity.ts'
 import { errorJson } from '#/server/common/responses.ts'
@@ -34,7 +34,7 @@ interface RealtimeRouteOptions {
 //
 // `/ws/invalidation` and `/ws/terminal` remain data-plane — they push server-
 // owned state changes (repo invalidations, terminal stream events) to
-// subscribers. `/ws/renderer-intent` is a control-plane relay: the server
+// subscribers. `/ws/client-intent` is a control-plane relay: the server
 // receives a `ClientEffectIntent` over HTTP (e.g. from `g delta`), wraps it
 // in a JSON envelope, and fans it out to subscribed renderers. The server
 // does not interpret intent semantics — it just forwards. Interpretation

@@ -7,7 +7,7 @@ interface RendererIntentSocket {
 
 // Cap the number of concurrent renderer-intent subscribers. Same
 // rationale as `invalidation-broker.ts`: a hostile client that
-// keeps opening `/ws/renderer-intent` connections shouldn't pin
+// keeps opening `/ws/client-intent` connections shouldn't pin
 // file descriptors or fanout cost in the server. 32 is generous
 // for a desktop app with at most a few tabs / windows.
 export const MAX_RENDERER_INTENT_SOCKETS = 32

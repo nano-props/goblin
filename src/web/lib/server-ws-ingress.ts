@@ -1,6 +1,6 @@
 // Generic renderer-side WebSocket subscription for the server's
 // per-purpose `/ws/*` channels (`/ws/invalidation`,
-// `/ws/renderer-intent`, future ones).
+// `/ws/client-intent`, future ones).
 //
 // Owns a single WebSocket connection per ingress instance:
 //   - Lazy: opens on the first subscriber, closes when the last

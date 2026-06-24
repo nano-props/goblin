@@ -3,7 +3,7 @@ import { serve, type ServerType } from '@hono/node-server'
 import { WebSocketServer } from 'ws'
 import { serverLogger } from '#/server/logger.ts'
 import { disconnectAllInvalidationSockets } from '#/server/modules/invalidation-broker.ts'
-import { disconnectAllRendererIntentSockets } from '#/server/modules/renderer-intent-broker.ts'
+import { disconnectAllRendererIntentSockets } from '#/server/modules/client-intent-broker.ts'
 import { createServerRuntime } from '#/server/runtime.ts'
 import { readOrCreateAccessToken } from '#/shared/access-token-file.ts'
 

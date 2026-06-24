@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   disconnectAllRendererIntentSockets,
   registerRendererIntentSocket,
-} from '#/server/modules/renderer-intent-broker.ts'
+} from '#/server/modules/client-intent-broker.ts'
 import { createRepoViewRoutes } from '#/server/routes/repo-view.ts'
 import { createApp } from '#/server/app-factory.ts'
 import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'

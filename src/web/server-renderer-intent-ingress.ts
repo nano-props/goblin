@@ -3,8 +3,8 @@ import { createServerWebSocketIngress } from '#/web/lib/server-ws-ingress.ts'
 
 // Server-controlled ingress for renderer effect intents (e.g. those
 // dispatched by `g delta` from a Goblin PTY). Renderer-side counterpart
-// to `#/server/modules/renderer-intent-broker.ts` and
-// `#/server/routes/realtime.ts` (`/ws/renderer-intent`). The server
+// to `#/server/modules/client-intent-broker.ts` and
+// `#/server/routes/realtime.ts` (`/ws/client-intent`). The server
 // fans intents out as envelopes of the form
 //
 //   { type: 'renderer-effect-intent', intent: ClientEffectIntent }
@@ -34,7 +34,7 @@ function parseRendererIntentMessage(data: unknown): ClientEffectIntent | null {
 }
 
 const ingress = createServerWebSocketIngress<ClientEffectIntent>({
-  path: '/ws/renderer-intent',
+  path: '/ws/client-intent',
   parseMessage: parseRendererIntentMessage,
 })
 
