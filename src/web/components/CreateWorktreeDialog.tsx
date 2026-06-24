@@ -327,9 +327,6 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
                     {repo.data.branches.map((b) => (
                       <SelectItem key={b.name} value={b.name} textValue={b.name}>
                         <span className="truncate">{b.name}</span>
-                        {b.worktree && (
-                          <span className="ml-1 text-[10px] text-muted-foreground/60">{tildify(b.worktree.path)}</span>
-                        )}
                       </SelectItem>
                     ))}
                   </SelectContent>
