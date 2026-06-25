@@ -55,6 +55,7 @@ export function CreateWorktreeRowAction({ repoId }: Props) {
       }}
       disabled={disabled}
       aria-label={label}
+      size="dense"
       leading={<FolderPlus size={16} />}
     >
       {label}

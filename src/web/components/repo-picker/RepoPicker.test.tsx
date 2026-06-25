@@ -29,7 +29,7 @@ describe('RepoPicker', () => {
   test('keeps the current repo button as the only repo chrome inside the current repo group', () => {
     render(
       <RepoPicker
-        repos={[repo('repo-a', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
+        repos={[repo('Repo-A', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
         activeId="/tmp/repo-a"
         labels={labels}
         onActivate={() => {}}
@@ -52,7 +52,7 @@ describe('RepoPicker', () => {
   test('exposes the current repo button as a selected tab in a horizontal tablist', () => {
     render(
       <RepoPicker
-        repos={[repo('repo-a', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
+        repos={[repo('Repo-A', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
         activeId="/tmp/repo-a"
         labels={labels}
         onActivate={() => {}}
@@ -77,7 +77,7 @@ describe('RepoPicker', () => {
   test('renders the sidebar surface as a plain full-width picker button instead of a tab strip', () => {
     render(
       <RepoPicker
-        repos={[repo('repo-a', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
+        repos={[repo('Repo-A', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
         activeId="/tmp/repo-a"
         labels={labels}
         onActivate={() => {}}
@@ -98,8 +98,10 @@ describe('RepoPicker', () => {
     expect(currentRepoButton.className).toContain('w-full')
     expect(currentRepoButton.className).toContain('shrink-0')
     expect(currentRepoButton.className).not.toContain('flex-1')
-    expect(currentRepoButton.querySelector('.uppercase')).not.toBeNull()
-    expect(currentRepoButton.textContent).toContain('repo-a')
+    const repoLabel = currentRepoButton.querySelector('.uppercase')
+    expect(repoLabel).not.toBeNull()
+    expect(repoLabel?.className).not.toContain('font-medium')
+    expect(currentRepoButton.textContent).toContain('Repo-A')
     expect(currentRepoButton.hasAttribute('data-interactive')).toBe(true)
     expect(currentRepoButton.closest('nav')?.hasAttribute('data-interactive')).toBe(false)
   })
