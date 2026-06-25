@@ -36,7 +36,7 @@ export function EmptyRepoView({ onOpenSettings }: EmptyRepoViewProps) {
           <WorkspaceChrome />
           <div className="flex flex-1 items-center justify-center">
             <div className="max-w-sm text-center">
-              <FolderGit2 className="mx-auto mb-4 h-12 w-12 text-muted-foreground/50" strokeWidth={1.5} aria-hidden />
+              <FolderGit2 className="mx-auto mb-3 h-10 w-10 text-muted-foreground/50" strokeWidth={1.5} aria-hidden />
               <div className="mb-1 text-sm font-medium text-foreground">{t('empty.title')}</div>
               <div className="text-xs leading-relaxed text-muted-foreground">{t('empty.body')}</div>
             </div>

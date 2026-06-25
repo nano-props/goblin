@@ -177,7 +177,7 @@ export const zh: Record<DictKey, string> = {
 
   // ---- Empty state -------------------------------------------------------
   'empty.title': '未打开仓库',
-  'empty.body': '从左侧选择仓库，或拖入 Git 文件夹。',
+  'empty.body': '从边栏选择仓库，或拖入 Git 文件夹。',
 
   // ---- Drag and drop -----------------------------------------------------
   'drop.title': '松手打开本地仓库',
