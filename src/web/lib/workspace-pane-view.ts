@@ -3,9 +3,12 @@ import {
   isWorkspacePaneViewType,
   type WorkspacePaneBranchViewType,
   type WorkspacePaneView,
+  type WorkspacePaneViewScope,
+  workspacePaneViewRequiresWorktree as sharedWorkspacePaneViewRequiresWorktree,
+  workspacePaneViewScope as sharedWorkspacePaneViewScope,
 } from '#/shared/workspace-pane.ts'
+import { workspacePaneTabProvider } from '#/web/workspace-pane/workspace-pane-tab-providers.ts'
 
-export type WorkspacePaneViewScope = 'branch' | 'worktree'
 export type BranchLevelWorkspacePaneView = WorkspacePaneBranchViewType
 export type WorktreeLevelWorkspacePaneView = Exclude<WorkspacePaneView, BranchLevelWorkspacePaneView>
 
@@ -14,7 +17,7 @@ export function isWorkspacePaneView(value: string | null | undefined): value is 
 }
 
 export function workspacePaneViewScope(view: WorkspacePaneView): WorkspacePaneViewScope {
-  return isWorkspacePaneBranchViewType(view) ? 'branch' : 'worktree'
+  return sharedWorkspacePaneViewScope(view)
 }
 
 export function isBranchLevelWorkspacePaneView(view: WorkspacePaneView): view is BranchLevelWorkspacePaneView {
@@ -26,7 +29,7 @@ export function isWorktreeLevelWorkspacePaneView(view: WorkspacePaneView): view 
 }
 
 export function workspacePaneViewRequiresWorktree(view: WorkspacePaneView): boolean {
-  return workspacePaneViewScope(view) === 'worktree'
+  return sharedWorkspacePaneViewRequiresWorktree(view)
 }
 
 /**
@@ -56,8 +59,5 @@ export function resolveRenderableWorkspacePaneView(
   preferred: WorkspacePaneView,
   context: WorkspacePaneRenderabilityContext,
 ): WorkspacePaneView | null {
-  if (!context.hasWorktree && workspacePaneViewRequiresWorktree(preferred)) return null
-  if (preferred !== 'terminal') return preferred
-  if (!context.terminalSyncReady || context.terminalCreatePending) return 'terminal'
-  return context.terminalSessionCount > 0 ? 'terminal' : null
+  return workspacePaneTabProvider(preferred).isRenderable(context) ? preferred : null
 }

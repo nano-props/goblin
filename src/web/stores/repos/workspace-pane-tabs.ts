@@ -88,7 +88,10 @@ export function normalizeWorkspacePaneTabOrder(
   const seen = new Set<string>()
   for (const raw of order) {
     if (!isWorkspacePaneTabOrderEntry(raw)) continue
-    const entry = raw.type === 'terminal' ? { type: 'terminal' as const, id: raw.id } : workspacePaneStaticTabOrderEntry(raw.type)
+    const entry =
+      raw.type === 'terminal'
+        ? workspacePaneTerminalTabOrderEntry(raw.id)
+        : workspacePaneStaticTabOrderEntry(raw.type)
     const identity = workspacePaneTabOrderEntryIdentity(entry)
     if (seen.has(identity)) continue
     seen.add(identity)

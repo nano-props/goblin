@@ -117,6 +117,9 @@ describe('server renderer intent source', () => {
     socket.emitMessage(JSON.stringify({ type: 'something-else', intent: {} }))
     // Right discriminator but invalid intent shape.
     socket.emitMessage(JSON.stringify({ type: 'renderer-effect-intent', intent: { type: 'banana' } }))
+    socket.emitMessage(
+      JSON.stringify({ type: 'renderer-effect-intent', intent: { type: 'show-workspace-pane-view-requested', tab: 'bad' } }),
+    )
     // Garbage payload.
     socket.emitMessage('not json')
 

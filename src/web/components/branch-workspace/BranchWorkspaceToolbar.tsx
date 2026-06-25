@@ -25,19 +25,11 @@ import {
 } from '#/web/components/workspace-pane/WorkspacePaneViewStrip.tsx'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
 import type { WorkspacePaneStaticViewType, WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
-import type { WorkspacePaneViewSummary, TerminalSlotBase } from '#/web/components/terminal/types.ts'
+import type { TerminalSlotBase } from '#/web/components/terminal/types.ts'
 import type {
   BranchWorkspaceRepo,
   SelectedBranchWorkspacePresentation,
 } from '#/web/components/branch-workspace/model.ts'
-import {
-  branchWorkspacePaneViewCloseLabel,
-  branchWorkspacePaneViewLabel,
-  branchWorkspacePaneViewTooltip,
-  workspacePaneStaticViewCloseLabel,
-  workspacePaneStaticViewLabel,
-  workspacePaneStaticViewTooltip,
-} from '#/web/components/branch-workspace/workspace-pane-views.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import { useIsInitialSyncInFlight } from '#/web/stores/repo-sync.ts'
@@ -47,6 +39,10 @@ import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspac
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
 import { createBranchWorkspacePaneTabModel } from '#/web/components/branch-workspace/workspace-pane-tab-model.ts'
 import { createWorkspacePaneTerminalTab } from '#/web/stores/repos/workspace-pane-terminal-write-paths.ts'
+import {
+  terminalWorkspacePaneTabProvider,
+  workspacePaneStaticTabProvider,
+} from '#/web/workspace-pane/workspace-pane-tab-providers.ts'
 
 interface Props {
   repo: Pick<BranchWorkspaceRepo, 'id' | 'ui' | 'data'>
@@ -170,79 +166,53 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
     [branchName, repo.id],
   )
 
-  const labelForWorkspacePaneView = useCallback(
-    (tab: WorkspacePaneViewSummary) => branchWorkspacePaneViewLabel(tab, t, detail.statusCount),
-    [detail.statusCount, t],
-  )
-  const tooltipForWorkspacePaneView = useCallback(
-    (tab: WorkspacePaneViewSummary) =>
-      branchWorkspacePaneViewTooltip({
-        tab,
-        branchName: branchName ?? '',
-        statusCount: detail.statusCount,
-        t,
-      }),
-    [branchName, detail.statusCount, t],
-  )
-  const closeLabelForWorkspacePaneView = useCallback(
-    (tab: WorkspacePaneViewSummary) => branchWorkspacePaneViewCloseLabel(tab, t),
-    [t],
-  )
-  const labelForStaticWorkspacePaneView = useCallback(
-    (tab: WorkspacePaneStaticViewType) => workspacePaneStaticViewLabel(tab, t, detail.statusCount),
-    [detail.statusCount, t],
-  )
-  const tooltipForStaticWorkspacePaneView = useCallback(
-    (tab: WorkspacePaneStaticViewType) =>
-      workspacePaneStaticViewTooltip({
-        tab,
-        branchName: branchName ?? '',
-        statusCount: detail.statusCount,
-        t,
-      }),
-    [branchName, detail.statusCount, t],
-  )
-
   const workspacePaneTabItems = useMemo<WorkspacePaneTabItem[]>(
     () =>
       workspacePaneTabModel.tabs.map((tab) => {
         if (tab.kind === 'static') {
+          const metadata = { t, branchName: branchName ?? '', statusCount: detail.statusCount }
           const type = tab.type as WorkspacePaneStaticViewType
+          const provider = workspacePaneStaticTabProvider(type)
           return createStaticWorkspacePaneTabItem({
             type,
-            label: labelForStaticWorkspacePaneView(type),
-            tooltip: tooltipForStaticWorkspacePaneView(type),
-            closeLabel: workspacePaneStaticViewCloseLabel(type, t),
-            panelId: `${workspacePaneId}-${type}-panel`,
+            label: provider.label(metadata),
+            tooltip: provider.tooltip(metadata),
+            closeLabel: provider.closeLabel(metadata),
+            panelId: provider.panelId(workspacePaneId),
           })
         }
         if (tab.kind === 'pending') {
-          const pendingTerminalLabelKey =
-            worktreeSnapshot.pendingCreate || terminalSyncReady ? 'terminal.opening' : 'terminal.loading'
-          const label = t(pendingTerminalLabelKey)
+          const label = terminalWorkspacePaneTabProvider.pendingLabel({
+            t,
+            terminalCreatePending: worktreeSnapshot.pendingCreate,
+            terminalSyncReady,
+          })
           return createPendingWorkspacePaneTabItem({
             type: tab.type,
             label,
             tooltip: label,
-            panelId: `${workspacePaneId}-${tab.type}-panel`,
+            panelId: terminalWorkspacePaneTabProvider.panelId(workspacePaneId),
           })
+        }
+        const metadata = {
+          t,
+          branchName: branchName ?? '',
+          statusCount: detail.statusCount,
+          view: tab.view,
         }
         return createTerminalWorkspacePaneTabItem({
           view: tab.view,
-          label: labelForWorkspacePaneView(tab.view),
-          tooltip: tooltipForWorkspacePaneView(tab.view),
-          closeLabel: closeLabelForWorkspacePaneView(tab.view),
-          panelId: `${workspacePaneId}-${tab.type}-panel`,
+          label: terminalWorkspacePaneTabProvider.label(metadata),
+          tooltip: terminalWorkspacePaneTabProvider.tooltip(metadata),
+          closeLabel: terminalWorkspacePaneTabProvider.closeLabel(metadata),
+          panelId: terminalWorkspacePaneTabProvider.panelId(workspacePaneId),
         })
       }),
     [
-      closeLabelForWorkspacePaneView,
-      labelForStaticWorkspacePaneView,
-      labelForWorkspacePaneView,
-      t,
-      tooltipForStaticWorkspacePaneView,
-      tooltipForWorkspacePaneView,
+      branchName,
+      detail.statusCount,
       terminalSyncReady,
+      t,
       worktreeSnapshot.pendingCreate,
       workspacePaneTabModel.tabs,
       workspacePaneId,

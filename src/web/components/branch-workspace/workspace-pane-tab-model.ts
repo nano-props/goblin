@@ -4,11 +4,14 @@ import type { TerminalSlotBase, WorkspacePaneViewSummary } from '#/web/component
 import {
   PENDING_TERMINAL_WORKSPACE_PANE_VIEW_IDENTITY,
   isTerminalWorkspacePaneView,
-  staticWorkspacePaneViewIdentity,
-  workspacePaneViewIdentity,
 } from '#/web/components/workspace-pane/workspace-pane-view-model.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
 import { normalizeWorkspacePaneTabOrder } from '#/web/stores/repos/workspace-pane-tabs.ts'
+import {
+  terminalWorkspacePaneTabProvider,
+  workspacePaneStaticTabProvider,
+  workspacePaneTabProvider,
+} from '#/web/workspace-pane/workspace-pane-tab-providers.ts'
 
 export type BranchWorkspacePaneTabKind = 'static' | 'terminal' | 'pending'
 
@@ -114,9 +117,7 @@ export function createBranchWorkspacePaneTabModel(
   const worktreeKey = worktreePath ? worktreeTerminalKey(input.repoId, worktreePath) : null
   const terminalViews = worktreeKey ? input.runtimeTerminalViews.filter(isTerminalWorkspacePaneView) : []
   const materializedTabs = materializedWorkspacePaneTabs({ tabOrder, terminalViews, hasWorktree: !!worktreeKey })
-  const staticViews = materializedTabs.flatMap((tab) =>
-    tab.kind === 'static' ? [tab.type as WorkspacePaneStaticViewType] : [],
-  )
+  const staticViews = materializedTabs.flatMap((tab) => (tab.kind === 'static' ? [tab.type] : []))
   const candidateView = resolveRenderableWorkspacePaneView(input.preferredView, {
     hasWorktree: !!worktreeKey,
     terminalSessionCount: input.terminalSessionCount,
@@ -178,8 +179,9 @@ export function adjacentBranchWorkspacePaneTab(
 }
 
 function staticWorkspacePaneTab(type: WorkspacePaneStaticViewType): BranchWorkspacePaneStaticTab {
+  const provider = workspacePaneStaticTabProvider(type)
   return {
-    identity: staticWorkspacePaneViewIdentity(type),
+    identity: provider.identity(),
     type,
     kind: 'static',
     view: null,
@@ -188,7 +190,7 @@ function staticWorkspacePaneTab(type: WorkspacePaneStaticViewType): BranchWorksp
 
 function terminalWorkspacePaneTab(view: TerminalWorkspacePaneTabView): BranchWorkspacePaneTerminalTab {
   return {
-    identity: workspacePaneViewIdentity(view),
+    identity: terminalWorkspacePaneTabProvider.identity(view.id),
     type: 'terminal',
     kind: 'terminal',
     view,
@@ -236,10 +238,11 @@ function materializedWorkspacePaneTabs(input: {
 
   for (const entry of input.tabOrder) {
     if (entry.type !== 'terminal') {
-      if (entry.type === 'changes' && !input.hasWorktree) continue
+      if (!workspacePaneTabProvider(entry.type).canOpen({ hasWorktree: input.hasWorktree })) continue
       tabs.push(staticWorkspacePaneTab(entry.type))
       continue
     }
+    if (!terminalWorkspacePaneTabProvider.canOpen({ hasWorktree: input.hasWorktree })) continue
     const terminal = terminalById.get(entry.id)
     if (!terminal || seenTerminals.has(entry.id)) continue
     seenTerminals.add(entry.id)

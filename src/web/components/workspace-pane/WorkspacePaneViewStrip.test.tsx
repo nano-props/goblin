@@ -11,7 +11,7 @@ import {
   isTerminalWorkspacePaneTabItem,
   type WorkspacePaneTabItem,
 } from '#/web/components/workspace-pane/WorkspacePaneViewStrip.tsx'
-import { terminalWorkspacePaneViewIdentity } from '#/web/components/workspace-pane/workspace-pane-view-model.ts'
+import { terminalWorkspacePaneTabProvider } from '#/web/workspace-pane/workspace-pane-tab-providers.ts'
 import type { WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
 import type { TerminalSlotSummary } from '#/web/components/terminal/types.ts'
 
@@ -838,7 +838,7 @@ function TestWorkspacePaneViewStrip(props: {
     <WorkspacePaneViewStrip
       {...workspacePaneProps}
       items={items}
-      activeTabIdentity={selected ? terminalWorkspacePaneViewIdentity(selected.key) : null}
+      activeTabIdentity={selected ? terminalWorkspacePaneTabProvider.identity(selected.key) : null}
       onSelect={(item) => {
         if (isTerminalWorkspacePaneTabItem(item)) props.onSelect(props.worktreeTerminalKey, item.view)
       }}

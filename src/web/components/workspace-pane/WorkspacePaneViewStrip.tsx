@@ -1,4 +1,4 @@
-import { Check, ChevronDown, FileText, GitBranch, History, Loader2, Plus, Terminal, X } from 'lucide-react'
+import { Check, ChevronDown, Loader2, Plus, X, type LucideIcon } from 'lucide-react'
 import {
   useCallback,
   useLayoutEffect,
@@ -43,10 +43,12 @@ import { useFocusRegistry, type FocusRegistry } from '#/web/components/tab-strip
 import { useSortableTab } from '#/web/components/tab-strip/useSortableTab.ts'
 import {
   PENDING_TERMINAL_WORKSPACE_PANE_VIEW_IDENTITY,
-  staticWorkspacePaneViewIdentity,
-  workspacePaneViewIdentity,
-  workspacePaneViewButtonId,
 } from '#/web/components/workspace-pane/workspace-pane-view-model.ts'
+import {
+  terminalWorkspacePaneTabProvider,
+  workspacePaneStaticTabProvider,
+  workspacePaneTabProvider,
+} from '#/web/workspace-pane/workspace-pane-tab-providers.ts'
 
 type TerminalWorkspacePaneViewSummary = Extract<WorkspacePaneViewSummary, { type: 'terminal' }>
 
@@ -71,7 +73,6 @@ interface WorkspacePaneViewStripProps {
 }
 
 export type WorkspacePaneTabKind = 'static' | 'terminal' | 'pending'
-type WorkspacePaneTabIcon = 'status' | 'changes' | 'history' | 'terminal'
 
 interface WorkspacePaneTabItemBase {
   identity: string
@@ -79,7 +80,7 @@ interface WorkspacePaneTabItemBase {
   kind: WorkspacePaneTabKind
   label: string
   tooltip: string
-  icon: WorkspacePaneTabIcon
+  icon: LucideIcon
   panelId?: string
 }
 
@@ -116,18 +117,19 @@ export function createStaticWorkspacePaneTabItem(input: {
   closeLabel: string
   panelId?: string
 }): WorkspacePaneStaticTabItem {
+  const provider = workspacePaneStaticTabProvider(input.type)
   return {
-    identity: staticWorkspacePaneViewIdentity(input.type),
+    identity: provider.identity(),
     type: input.type,
     kind: 'static',
     staticViewType: input.type,
     label: input.label,
     tooltip: input.tooltip,
     closeLabel: input.closeLabel,
-    icon: input.type,
+    icon: provider.icon,
     panelId: input.panelId,
-    sortableId: staticWorkspacePaneViewIdentity(input.type),
-    orderEntry: { type: input.type, id: input.type },
+    sortableId: provider.identity(),
+    orderEntry: provider.orderEntry(),
   }
 }
 
@@ -139,17 +141,17 @@ export function createTerminalWorkspacePaneTabItem(input: {
   panelId?: string
 }): WorkspacePaneTerminalTabItem {
   return {
-    identity: workspacePaneViewIdentity(input.view),
+    identity: terminalWorkspacePaneTabProvider.identity(input.view.id),
     type: input.view.type,
     kind: 'terminal',
     view: input.view,
     label: input.label,
     tooltip: input.tooltip,
     closeLabel: input.closeLabel,
-    icon: input.view.type,
+    icon: terminalWorkspacePaneTabProvider.icon,
     panelId: input.panelId,
-    sortableId: workspacePaneViewIdentity(input.view),
-    orderEntry: { type: 'terminal', id: input.view.id },
+    sortableId: terminalWorkspacePaneTabProvider.identity(input.view.id),
+    orderEntry: terminalWorkspacePaneTabProvider.orderEntry(input.view.id),
   }
 }
 
@@ -167,7 +169,7 @@ export function createPendingWorkspacePaneTabItem(input: {
     kind: 'pending',
     label: input.label,
     tooltip: input.tooltip,
-    icon: input.type === 'terminal' ? 'terminal' : input.type,
+    icon: workspacePaneTabProvider(input.type).icon,
     panelId: input.panelId,
     busy: true,
   }
@@ -456,10 +458,12 @@ export function WorkspacePaneViewStrip({
 
   const tabIdForItem = useCallback(
     (item: WorkspacePaneTabItem) => {
-      if (isStaticWorkspacePaneTabItem(item)) return `${workspacePaneId}-${item.staticViewType}-tab`
+      if (isStaticWorkspacePaneTabItem(item)) {
+        return workspacePaneStaticTabProvider(item.staticViewType).buttonId(workspacePaneId)
+      }
       if (isPendingWorkspacePaneTabItem(item)) return `${workspacePaneId}-${item.type}-pending-tab`
       const index = terminalItems.findIndex((candidate) => candidate.identity === item.identity)
-      return workspacePaneViewButtonId(workspacePaneId, Math.max(0, index))
+      return terminalWorkspacePaneTabProvider.buttonId(workspacePaneId, Math.max(0, index))
     },
     [workspacePaneId, terminalItems],
   )
@@ -576,7 +580,7 @@ export function WorkspacePaneViewStrip({
             tabId={
               isStaticWorkspacePaneTabItem(compactItem) || isPendingWorkspacePaneTabItem(compactItem)
                 ? tabIdForItem(compactItem)
-                : workspacePaneViewButtonId(workspacePaneId, 0)
+                : terminalWorkspacePaneTabProvider.buttonId(workspacePaneId, 0)
             }
             focusRegistry={focusRegistry}
             onSelect={handleSelect}
@@ -964,10 +968,8 @@ function WorkspacePaneViewIcon({
   compact?: boolean
 }) {
   const className = toolbarTabIconClassName(active, compact)
-  if (item.icon === 'status') return <GitBranch size={13} className={className} />
-  if (item.icon === 'changes') return <FileText size={13} className={className} />
-  if (item.icon === 'history') return <History size={13} className={className} />
-  return <Terminal size={13} className={className} />
+  const Icon = item.icon
+  return <Icon size={13} className={className} />
 }
 
 export function isStaticWorkspacePaneTabItem(item: WorkspacePaneTabItem): item is WorkspacePaneStaticTabItem {

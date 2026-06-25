@@ -4,15 +4,30 @@ export const WORKSPACE_PANE_VIEW_TYPES = [...WORKSPACE_PANE_STATIC_VIEW_TYPES, '
 export type WorkspacePaneStaticViewType = (typeof WORKSPACE_PANE_STATIC_VIEW_TYPES)[number]
 export type WorkspacePaneViewType = (typeof WORKSPACE_PANE_VIEW_TYPES)[number]
 export type WorkspacePaneView = WorkspacePaneViewType
-export const WORKSPACE_PANE_BRANCH_VIEW_TYPES = ['status', 'history'] as const satisfies readonly WorkspacePaneStaticViewType[]
-export type WorkspacePaneBranchViewType = (typeof WORKSPACE_PANE_BRANCH_VIEW_TYPES)[number]
-export const WORKSPACE_PANE_WORKTREE_STATIC_VIEW_TYPES = ['changes'] as const satisfies readonly WorkspacePaneStaticViewType[]
-export type WorkspacePaneWorktreeStaticViewType = (typeof WORKSPACE_PANE_WORKTREE_STATIC_VIEW_TYPES)[number]
+export type WorkspacePaneViewScope = 'branch' | 'worktree'
+export const WORKSPACE_PANE_STATIC_VIEW_SCOPES = {
+  status: 'branch',
+  changes: 'worktree',
+  history: 'branch',
+} as const satisfies Record<WorkspacePaneStaticViewType, WorkspacePaneViewScope>
+type WorkspacePaneStaticViewTypeWithScope<TScope extends WorkspacePaneViewScope> = {
+  [TType in WorkspacePaneStaticViewType]: (typeof WORKSPACE_PANE_STATIC_VIEW_SCOPES)[TType] extends TScope
+    ? TType
+    : never
+}[WorkspacePaneStaticViewType]
+export type WorkspacePaneBranchViewType = WorkspacePaneStaticViewTypeWithScope<'branch'>
+export type WorkspacePaneWorktreeStaticViewType = WorkspacePaneStaticViewTypeWithScope<'worktree'>
+export type WorkspacePaneWorktreeViewType = WorkspacePaneWorktreeStaticViewType | 'terminal'
+export const WORKSPACE_PANE_BRANCH_VIEW_TYPES = WORKSPACE_PANE_STATIC_VIEW_TYPES.filter(
+  (type): type is WorkspacePaneBranchViewType => WORKSPACE_PANE_STATIC_VIEW_SCOPES[type] === 'branch',
+)
+export const WORKSPACE_PANE_WORKTREE_STATIC_VIEW_TYPES = WORKSPACE_PANE_STATIC_VIEW_TYPES.filter(
+  (type): type is WorkspacePaneWorktreeStaticViewType => WORKSPACE_PANE_STATIC_VIEW_SCOPES[type] === 'worktree',
+)
 export const WORKSPACE_PANE_WORKTREE_VIEW_TYPES = [
   ...WORKSPACE_PANE_WORKTREE_STATIC_VIEW_TYPES,
   'terminal',
-] as const satisfies readonly WorkspacePaneViewType[]
-export type WorkspacePaneWorktreeViewType = (typeof WORKSPACE_PANE_WORKTREE_VIEW_TYPES)[number]
+] as readonly WorkspacePaneWorktreeViewType[]
 export const WORKSPACE_PANE_SESSION_VIEW_TYPES = WORKSPACE_PANE_VIEW_TYPES
 export type WorkspacePaneSessionView = (typeof WORKSPACE_PANE_SESSION_VIEW_TYPES)[number]
 
@@ -48,6 +63,18 @@ export function isWorkspacePaneWorktreeStaticViewType(
   value: string | null | undefined,
 ): value is WorkspacePaneWorktreeStaticViewType {
   return typeof value === 'string' && (WORKSPACE_PANE_WORKTREE_STATIC_VIEW_TYPES as readonly string[]).includes(value)
+}
+
+export function workspacePaneStaticViewScope(view: WorkspacePaneStaticViewType): WorkspacePaneViewScope {
+  return WORKSPACE_PANE_STATIC_VIEW_SCOPES[view]
+}
+
+export function workspacePaneViewScope(view: WorkspacePaneViewType): WorkspacePaneViewScope {
+  return view === 'terminal' ? 'worktree' : workspacePaneStaticViewScope(view)
+}
+
+export function workspacePaneViewRequiresWorktree(view: WorkspacePaneViewType): boolean {
+  return workspacePaneViewScope(view) === 'worktree'
 }
 
 export function isWorkspacePaneSessionViewType(
