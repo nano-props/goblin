@@ -22,15 +22,11 @@ const appDataClientMocks = vi.hoisted(() => ({
   clearRecentRepos: vi.fn(async () => {}),
   refreshExternalAppsSnapshot: vi.fn(async () => ({
     terminal: {
-      pref: 'auto',
-      resolved: null,
       available: false,
       appAvailability: { ghostty: false, terminal: false, windowsTerminal: false },
       detectedAt: 0,
     },
     editor: {
-      pref: 'auto',
-      resolved: null,
       available: false,
       appAvailability: { vscode: false, cursor: false, windsurf: false },
       detectedAt: 0,
@@ -46,20 +42,6 @@ const appDataClientMocks = vi.hoisted(() => ({
   setGlobalShortcut: vi.fn(async (accelerator) => ({ accelerator, registered: true })),
   setGlobalShortcutDisabled: vi.fn(async () => {}),
   setLanEnabled: vi.fn(async () => {}),
-  setPreferredEditorApp: vi.fn(async (pref) => ({
-    pref,
-    resolved: null,
-    available: false,
-    appAvailability: { vscode: false, cursor: false, windsurf: false },
-    detectedAt: 0,
-  })),
-  setPreferredTerminalApp: vi.fn(async (pref) => ({
-    pref,
-    resolved: null,
-    available: false,
-    appAvailability: { ghostty: false, terminal: false, windowsTerminal: false },
-    detectedAt: 0,
-  })),
   setSettingsFetchInterval: vi.fn(async (sec) => sec),
   setShortcutsDisabled: vi.fn(async () => {}),
   setTerminalNotificationsEnabled: vi.fn(async () => {}),
@@ -74,8 +56,6 @@ vi.mock('#/web/settings-client.ts', () => ({
   setGlobalShortcut: appDataClientMocks.setGlobalShortcut,
   setGlobalShortcutDisabled: appDataClientMocks.setGlobalShortcutDisabled,
   setLanEnabled: appDataClientMocks.setLanEnabled,
-  setPreferredEditorApp: appDataClientMocks.setPreferredEditorApp,
-  setPreferredTerminalApp: appDataClientMocks.setPreferredTerminalApp,
   setSettingsFetchInterval: appDataClientMocks.setSettingsFetchInterval,
   setShortcutsDisabled: appDataClientMocks.setShortcutsDisabled,
   setTerminalNotificationsEnabled: appDataClientMocks.setTerminalNotificationsEnabled,
@@ -91,15 +71,11 @@ describe('settings write paths', () => {
     appDataClientMocks.refreshExternalAppsSnapshot.mockReset()
     appDataClientMocks.refreshExternalAppsSnapshot.mockResolvedValue({
       terminal: {
-        pref: 'auto',
-        resolved: null,
         available: false,
         appAvailability: { ghostty: false, terminal: false, windowsTerminal: false },
         detectedAt: 0,
       },
       editor: {
-        pref: 'auto',
-        resolved: null,
         available: false,
         appAvailability: { vscode: false, cursor: false, windsurf: false },
         detectedAt: 0,
@@ -120,22 +96,6 @@ describe('settings write paths', () => {
     appDataClientMocks.setGlobalShortcutDisabled.mockResolvedValue(undefined)
     appDataClientMocks.setLanEnabled.mockReset()
     appDataClientMocks.setLanEnabled.mockResolvedValue(undefined)
-    appDataClientMocks.setPreferredEditorApp.mockReset()
-    appDataClientMocks.setPreferredEditorApp.mockImplementation(async (pref) => ({
-      pref,
-      resolved: null,
-      available: false,
-      appAvailability: { vscode: false, cursor: false, windsurf: false },
-      detectedAt: 0,
-    }))
-    appDataClientMocks.setPreferredTerminalApp.mockReset()
-    appDataClientMocks.setPreferredTerminalApp.mockImplementation(async (pref) => ({
-      pref,
-      resolved: null,
-      available: false,
-      appAvailability: { ghostty: false, terminal: false, windowsTerminal: false },
-      detectedAt: 0,
-    }))
     appDataClientMocks.setSettingsFetchInterval.mockReset()
     appDataClientMocks.setSettingsFetchInterval.mockImplementation(async (sec) => sec)
     appDataClientMocks.setShortcutsDisabled.mockReset()
@@ -187,34 +147,6 @@ describe('settings write paths', () => {
 
     expect(mainWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
       session,
-    })
-  })
-
-  test('setTerminalAppPreference updates both external apps and runtime settings caches', async () => {
-    mainWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
-    mainWindowQueryClient.setQueryData(externalAppsQueryKey(), {
-      terminal: {
-        pref: 'auto',
-        resolved: null,
-        available: false,
-        appAvailability: { ghostty: false, terminal: false, windowsTerminal: false },
-        detectedAt: 0,
-      },
-      editor: {
-        pref: 'auto',
-        resolved: null,
-        available: false,
-        appAvailability: { vscode: false, cursor: false, windsurf: false },
-        detectedAt: 0,
-      },
-    })
-    const { setTerminalAppPreference } = await import('#/web/settings-write-paths.ts')
-
-    await setTerminalAppPreference('ghostty')
-
-    expect(mainWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({ terminalApp: 'ghostty' })
-    expect(mainWindowQueryClient.getQueryData(externalAppsQueryKey())).toMatchObject({
-      terminal: expect.objectContaining({ pref: 'ghostty' }),
     })
   })
 

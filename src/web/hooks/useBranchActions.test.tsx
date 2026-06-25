@@ -160,10 +160,10 @@ describe('useBranchActions', () => {
     })
 
     await act(async () => {
-      await actions?.openTerminal?.()
+      await actions?.openTerminal?.('ghostty')
     })
 
-    expect(mocks.openRemoteRepositoryTerminal).toHaveBeenCalledWith(target!.id, '/srv/repo-feature')
+    expect(mocks.openRemoteRepositoryTerminal).toHaveBeenCalledWith(target!.id, '/srv/repo-feature', 'ghostty')
     expect(mocks.openRepositoryTerminal).not.toHaveBeenCalled()
   })
 
@@ -199,10 +199,10 @@ describe('useBranchActions', () => {
     })
 
     await act(async () => {
-      await actions?.openEditor?.()
+      await actions?.openEditor?.('windsurf')
     })
 
-    expect(mocks.openRemoteRepositoryEditor).toHaveBeenCalledWith(target!.id, '/srv/repo-feature')
+    expect(mocks.openRemoteRepositoryEditor).toHaveBeenCalledWith(target!.id, '/srv/repo-feature', 'windsurf')
     expect(mocks.openRepositoryEditor).not.toHaveBeenCalled()
   })
 
@@ -266,10 +266,10 @@ describe('useBranchActions', () => {
     })
 
     await act(async () => {
-      await actions?.openTerminal?.()
+      await actions?.openTerminal?.('ghostty')
     })
 
-    expect(mocks.openRepositoryTerminal).toHaveBeenCalledWith('/tmp/local-feature')
+    expect(mocks.openRepositoryTerminal).toHaveBeenCalledWith('/tmp/local-feature', 'ghostty')
     expect(mocks.openRemoteRepositoryTerminal).not.toHaveBeenCalled()
   })
 

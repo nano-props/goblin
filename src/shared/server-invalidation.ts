@@ -33,6 +33,5 @@ export function settingsInvalidationScopesForPrefsPatch(patch: Record<string, un
   const scopes = new Set<SettingsInvalidationScope>(['settings-snapshot'])
   if ('lang' in patch) scopes.add('i18n')
   if ('theme' in patch || 'colorTheme' in patch) scopes.add('theme')
-  if ('terminalApp' in patch || 'editorApp' in patch) scopes.add('external-apps')
   return [...scopes]
 }

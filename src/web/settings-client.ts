@@ -3,8 +3,6 @@ import { invokeNativeIpcPath } from '#/web/native-host-client.ts'
 import { sessionLog } from '#/web/logger.ts'
 import { fetchServerJson, postServerJson } from '#/web/lib/server-fetch.ts'
 import type {
-  EditorAppState,
-  EditorPref,
   ExternalAppsSnapshot,
   GitHubCliState,
   GlobalShortcutState,
@@ -16,8 +14,6 @@ import type {
   SettingsPrefs,
   SettingsPrefsUpdateResponse,
   SettingsSnapshot,
-  TerminalAppState,
-  TerminalPref,
   ThemePref,
   ThemeState,
 } from '#/shared/api-types.ts'
@@ -210,14 +206,4 @@ export async function setGlobalShortcutDisabled(disabled: boolean): Promise<void
 export async function setGlobalShortcut(accelerator: string): Promise<GlobalShortcutState> {
   if (!canUseGlobalShortcutSettings()) throw new Error('Global shortcut unavailable')
   return await invokeNativeIpcPath<GlobalShortcutState>('settings.setGlobalShortcut', { accelerator })
-}
-
-export async function setPreferredTerminalApp(pref: TerminalPref): Promise<TerminalAppState> {
-  const result = await updateSettingsPrefsPatch({ terminalApp: pref })
-  return result.externalApps?.terminal ?? (await getExternalAppsSnapshot()).terminal
-}
-
-export async function setPreferredEditorApp(pref: EditorPref): Promise<EditorAppState> {
-  const result = await updateSettingsPrefsPatch({ editorApp: pref })
-  return result.externalApps?.editor ?? (await getExternalAppsSnapshot()).editor
 }

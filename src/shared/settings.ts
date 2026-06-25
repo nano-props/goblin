@@ -4,12 +4,10 @@ export type ThemePref = 'auto' | 'light' | 'dark'
 export type ResolvedTheme = 'light' | 'dark'
 export type LangPref = 'auto' | 'en' | 'zh' | 'ko' | 'ja'
 export type Lang = 'en' | 'zh' | 'ko' | 'ja'
-export type TerminalPref = 'auto' | 'ghostty' | 'terminal' | 'windowsTerminal'
-export type EditorPref = 'auto' | 'vscode' | 'cursor' | 'windsurf'
-export type ResolvedTerminalApp = Exclude<TerminalPref, 'auto'>
-export type ResolvedEditorApp = Exclude<EditorPref, 'auto'>
-export type TerminalAppAvailability = Record<ResolvedTerminalApp, boolean>
-export type EditorAppAvailability = Record<ResolvedEditorApp, boolean>
+export type TerminalApp = 'ghostty' | 'terminal' | 'windowsTerminal'
+export type EditorApp = 'vscode' | 'cursor' | 'windsurf'
+export type TerminalAppAvailability = Record<TerminalApp, boolean>
+export type EditorAppAvailability = Record<EditorApp, boolean>
 
 export interface SettingsPrefs {
   theme: ThemePref
@@ -20,7 +18,5 @@ export interface SettingsPrefs {
   shortcutsDisabled: boolean
   globalShortcutDisabled: boolean
   globalShortcut: string
-  terminalApp: TerminalPref
-  editorApp: EditorPref
   lanEnabled: boolean
 }

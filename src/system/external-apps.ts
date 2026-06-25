@@ -1,6 +1,6 @@
-import type { EditorAppState, EditorPref, TerminalAppState, TerminalPref } from '#/shared/api-types.ts'
-import { getEditorAppAvailability, resolveEditorApp } from '#/system/editors.ts'
-import { getTerminalAppAvailability, resolveTerminalApp } from '#/system/terminals.ts'
+import type { EditorAppState, TerminalAppState } from '#/shared/api-types.ts'
+import { getEditorAppAvailability } from '#/system/editors.ts'
+import { getTerminalAppAvailability } from '#/system/terminals.ts'
 
 export interface ExternalAppsProbe {
   terminals: TerminalAppState
@@ -15,42 +15,35 @@ function nextDetectedAt(now = Date.now()): number {
   return detectedAt
 }
 
+function isAnyAvailable(availability: Record<string, boolean>): boolean {
+  return Object.values(availability).some(Boolean)
+}
+
 export async function probeTerminalApps(
-  pref: TerminalPref,
   signal?: AbortSignal,
   detectedAt = nextDetectedAt(),
 ): Promise<TerminalAppState> {
   const appAvailability = await getTerminalAppAvailability(signal)
-  const resolved = resolveTerminalApp(pref, appAvailability)
   return {
-    pref,
-    resolved,
-    available: resolved !== null,
+    available: isAnyAvailable(appAvailability),
     appAvailability,
     detectedAt,
   }
 }
 
-export function probeEditorApps(pref: EditorPref, detectedAt = nextDetectedAt()): EditorAppState {
+export function probeEditorApps(detectedAt = nextDetectedAt()): EditorAppState {
   const appAvailability = getEditorAppAvailability()
-  const resolved = resolveEditorApp(pref, appAvailability)
   return {
-    pref,
-    resolved,
-    available: resolved !== null,
+    available: isAnyAvailable(appAvailability),
     appAvailability,
     detectedAt,
   }
 }
 
-export async function probeExternalApps(
-  terminalPref: TerminalPref,
-  editorPref: EditorPref,
-  signal?: AbortSignal,
-): Promise<ExternalAppsProbe> {
+export async function probeExternalApps(signal?: AbortSignal): Promise<ExternalAppsProbe> {
   const detectedAt = nextDetectedAt()
-  const terminals = await probeTerminalApps(terminalPref, signal, detectedAt)
-  const editors = probeEditorApps(editorPref, detectedAt)
+  const terminals = await probeTerminalApps(signal, detectedAt)
+  const editors = probeEditorApps(detectedAt)
   return {
     terminals,
     editors,

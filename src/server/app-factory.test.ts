@@ -24,8 +24,6 @@ const mocks = vi.hoisted(() => ({
     shortcutsDisabled: false,
     globalShortcutDisabled: false,
     globalShortcut: 'CommandOrControl+Shift+G',
-    terminalApp: 'auto',
-    editorApp: 'auto',
     lanEnabled: false,
   })),
 }))

@@ -21,8 +21,6 @@ describe('settings snapshot partitions', () => {
           shortcutsDisabled: true,
           globalShortcutDisabled: false,
           globalShortcut: 'CommandOrControl+Shift+K',
-          terminalApp: 'ghostty',
-          editorApp: 'cursor',
           lanEnabled: true,
         },
         globalShortcutRegistered: true,
@@ -37,8 +35,6 @@ describe('settings snapshot partitions', () => {
       globalShortcutDisabled: false,
       globalShortcut: 'CommandOrControl+Shift+K',
       globalShortcutRegistered: true,
-      terminalApp: 'ghostty',
-      editorApp: 'cursor',
       lanEnabled: true,
     })
   })
@@ -64,8 +60,6 @@ describe('settings snapshot partitions', () => {
         shortcutsDisabled: false,
         globalShortcutDisabled: true,
         globalShortcut: 'CommandOrControl+Shift+G',
-        terminalApp: 'auto',
-        editorApp: 'auto',
         lanEnabled: false,
       },
       globalShortcutRegistered: false,

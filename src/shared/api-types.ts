@@ -17,16 +17,14 @@ import type { WorkspacePaneSessionView, WorkspacePaneTabOrderEntry } from '#/sha
 import type { ColorTheme } from '#/shared/color-theme.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import type {
+  EditorApp,
   EditorAppAvailability,
-  EditorPref,
   Lang,
   LangPref,
-  ResolvedEditorApp,
-  ResolvedTerminalApp,
   ResolvedTheme,
   SettingsPrefs,
+  TerminalApp,
   TerminalAppAvailability,
-  TerminalPref,
   ThemePref,
 } from '#/shared/settings.ts'
 import type {
@@ -46,16 +44,14 @@ import type { CreateWorktreeIpcInput } from '#/shared/worktree-create.ts'
 
 export type { SettingsPage } from '#/shared/settings-pages.ts'
 export type {
+  EditorApp,
   EditorAppAvailability,
-  EditorPref,
   Lang,
   LangPref,
-  ResolvedEditorApp,
-  ResolvedTerminalApp,
   ResolvedTheme,
   SettingsPrefs,
+  TerminalApp,
   TerminalAppAvailability,
-  TerminalPref,
   ThemePref,
 } from '#/shared/settings.ts'
 export type {
@@ -128,16 +124,12 @@ export interface GitHubCliHostState {
 }
 
 export interface TerminalAppState {
-  pref: TerminalPref
-  resolved: ResolvedTerminalApp | null
   available: boolean
   appAvailability: TerminalAppAvailability
   detectedAt: number
 }
 
 export interface EditorAppState {
-  pref: EditorPref
-  resolved: ResolvedEditorApp | null
   available: boolean
   appAvailability: EditorAppAvailability
   detectedAt: number
@@ -213,8 +205,6 @@ export type IpcEvent =
   | { type: 'terminal-notifications-changed'; enabled: boolean }
   | { type: 'shortcuts-disabled-changed'; disabled: boolean }
   | { type: 'global-shortcut-disabled-changed'; disabled: boolean }
-  | ({ type: 'terminal-app-changed' } & TerminalAppState)
-  | ({ type: 'editor-app-changed' } & EditorAppState)
   | { type: 'github-cli-changed'; state: GitHubCliState }
   | { type: 'settings-write-error'; message: string }
   | I18nChangedEvent
@@ -278,8 +268,6 @@ export interface AppIpcHandlers {
     setShortcutsDisabled: (input: { disabled: boolean }) => Promise<void>
     setGlobalShortcutDisabled: (input: { disabled: boolean }) => Promise<void>
     setGlobalShortcut: (input: { accelerator: string }) => Promise<GlobalShortcutState>
-    setTerminalApp: (input: { pref: TerminalPref }) => Promise<TerminalAppState>
-    setEditorApp: (input: { pref: EditorPref }) => Promise<EditorAppState>
     saveSession: (input: { session: SessionState }) => Promise<void>
     applyShellProjection: (input: NativeShellProjection) => Promise<void>
     addRecentRepo: (input: { repo: RepoSessionEntry }) => Promise<RepoSessionEntry[]>

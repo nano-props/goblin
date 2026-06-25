@@ -13,7 +13,6 @@ describe('native shell projection helpers', () => {
         lang: 'ja',
         shortcutsDisabled: true,
         terminalNotificationsEnabled: true,
-        terminalApp: 'ghostty',
       }),
     ).toEqual({
       lang: 'ja',
@@ -40,8 +39,6 @@ describe('native shell projection helpers', () => {
         shortcutsDisabled: true,
         globalShortcutDisabled: true,
         globalShortcut: 'Alt+K',
-        terminalApp: 'auto',
-        editorApp: 'auto',
         lanEnabled: false,
       }),
     ).toEqual({

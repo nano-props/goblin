@@ -1,12 +1,10 @@
 import { DEFAULT_GLOBAL_SHORTCUT } from '#/shared/accelerator.ts'
 import { DEFAULT_COLOR_THEME, type ColorTheme } from '#/shared/color-theme.ts'
 import type {
-  EditorPref,
   LangPref,
   SessionState,
   SettingsPrefs,
   SettingsSnapshot,
-  TerminalPref,
   ThemePref,
 } from '#/shared/api-types.ts'
 import { DEFAULT_WORKSPACE_FOCUSED, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
@@ -18,8 +16,6 @@ export const DEFAULT_THEME_PREF: ThemePref = 'auto'
 export const DEFAULT_TERMINAL_NOTIFICATIONS_ENABLED = false
 export const DEFAULT_SHORTCUTS_DISABLED = false
 export const DEFAULT_GLOBAL_SHORTCUT_DISABLED = false
-export const DEFAULT_TERMINAL_APP: TerminalPref = 'auto'
-export const DEFAULT_EDITOR_APP: EditorPref = 'auto'
 export const DEFAULT_LAN_ENABLED = false
 
 export function defaultSessionState(): SessionState {
@@ -43,8 +39,6 @@ export function defaultSettingsPrefs(overrides: Partial<SettingsPrefs> = {}): Se
     shortcutsDisabled: overrides.shortcutsDisabled ?? DEFAULT_SHORTCUTS_DISABLED,
     globalShortcutDisabled: overrides.globalShortcutDisabled ?? DEFAULT_GLOBAL_SHORTCUT_DISABLED,
     globalShortcut: overrides.globalShortcut ?? DEFAULT_GLOBAL_SHORTCUT,
-    terminalApp: overrides.terminalApp ?? DEFAULT_TERMINAL_APP,
-    editorApp: overrides.editorApp ?? DEFAULT_EDITOR_APP,
     lanEnabled: overrides.lanEnabled ?? DEFAULT_LAN_ENABLED,
   }
 }

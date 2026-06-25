@@ -1,13 +1,6 @@
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import { settingsLog } from '#/web/logger.ts'
-import type {
-  EditorAppState,
-  EditorPref,
-  GlobalShortcutState,
-  SessionState,
-  TerminalAppState,
-  TerminalPref,
-} from '#/shared/api-types.ts'
+import type { GlobalShortcutState, SessionState } from '#/shared/api-types.ts'
 import {
   addRecentRepo,
   clearRecentRepos,
@@ -17,8 +10,6 @@ import {
   setGlobalShortcut,
   setGlobalShortcutDisabled,
   setLanEnabled,
-  setPreferredEditorApp,
-  setPreferredTerminalApp,
   setSettingsFetchInterval,
   setShortcutsDisabled,
   setTerminalNotificationsEnabled,
@@ -83,20 +74,6 @@ export async function setGlobalShortcutPreference(accelerator: string): Promise<
     globalShortcut: state.accelerator,
     globalShortcutRegistered: state.registered,
   }))
-  return state
-}
-
-export async function setTerminalAppPreference(pref: TerminalPref): Promise<TerminalAppState> {
-  const state = await setPreferredTerminalApp(pref)
-  updateExternalAppsCache(mainWindowQueryClient, (current) => ({ ...current, terminal: state }))
-  updateRuntimeSettingsSnapshotCache(mainWindowQueryClient, (current) => ({ ...current, terminalApp: state.pref }))
-  return state
-}
-
-export async function setEditorAppPreference(pref: EditorPref): Promise<EditorAppState> {
-  const state = await setPreferredEditorApp(pref)
-  updateExternalAppsCache(mainWindowQueryClient, (current) => ({ ...current, editor: state }))
-  updateRuntimeSettingsSnapshotCache(mainWindowQueryClient, (current) => ({ ...current, editorApp: state.pref }))
   return state
 }
 

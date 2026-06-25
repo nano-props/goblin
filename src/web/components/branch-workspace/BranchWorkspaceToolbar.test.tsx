@@ -36,12 +36,8 @@ import { setTerminalSlotCommandBridge } from '#/web/components/terminal/terminal
 let compactUi = false
 const runtimeExternalAppSettings = vi.hoisted(() => ({
   value: {
-    terminalApp: 'auto',
-    resolvedTerminalApp: 'ghostty',
     terminalAvailable: true,
     terminalAppAvailability: { ghostty: true, terminal: true, windowsTerminal: false },
-    editorApp: 'auto',
-    resolvedEditorApp: 'vscode',
     editorAvailable: true,
     editorAppAvailability: { vscode: true, cursor: true, windsurf: true },
   },
@@ -94,12 +90,8 @@ compactUi = false
 
 function defaultRuntimeExternalAppSettings() {
   return {
-    terminalApp: 'auto' as const,
-    resolvedTerminalApp: 'ghostty' as const,
     terminalAvailable: true,
     terminalAppAvailability: { ghostty: true, terminal: true, windowsTerminal: false },
-    editorApp: 'auto' as const,
-    resolvedEditorApp: 'vscode' as const,
     editorAvailable: true,
     editorAppAvailability: { vscode: true, cursor: true, windsurf: true },
   }

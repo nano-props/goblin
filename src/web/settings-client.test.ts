@@ -81,8 +81,6 @@ describe('settings-client', () => {
           globalShortcutDisabled: false,
           globalShortcut: 'CommandOrControl+Shift+G',
           globalShortcutRegistered: false,
-          terminalApp: 'auto',
-          editorApp: 'auto',
           lanEnabled: false,
           session: {
             openRepos: [],
@@ -116,8 +114,6 @@ describe('settings-client', () => {
           shortcutsDisabled: false,
           globalShortcutDisabled: false,
           globalShortcut: 'CommandOrControl+Shift+G',
-          terminalApp: 'auto',
-          editorApp: 'auto',
           lanEnabled: false,
         },
       }),
@@ -254,8 +250,6 @@ describe('settings-client', () => {
           shortcutsDisabled: false,
           globalShortcutDisabled: false,
           globalShortcut: 'CommandOrControl+Shift+G',
-          terminalApp: 'auto',
-          editorApp: 'auto',
           lanEnabled: false,
         },
         i18n: { lang: 'ja', pref: 'ja', dict: { hello: 'こんにちは' } },
@@ -398,106 +392,6 @@ describe('settings-client', () => {
         input: { recentRepos: { recentRepos: [] } },
       }),
     )
-  })
-
-  test('returns authoritative terminal app state directly from the settings write response', async () => {
-    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
-    const fetchMock = vi.fn(async () => ({
-      ok: true,
-      json: async () => ({
-        ok: true,
-        settings: {
-          lang: 'auto',
-          theme: 'auto',
-          colorTheme: 'macos',
-          fetchIntervalSec: 120,
-          terminalNotificationsEnabled: false,
-          shortcutsDisabled: false,
-          globalShortcutDisabled: false,
-          globalShortcut: 'CommandOrControl+Shift+G',
-          terminalApp: 'ghostty',
-          editorApp: 'auto',
-          lanEnabled: false,
-        },
-        externalApps: {
-          terminal: {
-            pref: 'ghostty',
-            resolved: 'ghostty',
-            available: true,
-            appAvailability: { ghostty: true, terminal: false, windowsTerminal: false },
-            detectedAt: 1,
-          },
-          editor: {
-            pref: 'auto',
-            resolved: null,
-            available: false,
-            appAvailability: { vscode: false, cursor: false, windsurf: false },
-            detectedAt: 1,
-          },
-        },
-      }),
-    }))
-    vi.stubGlobal('fetch', fetchMock)
-
-    const { setPreferredTerminalApp } = await import('#/web/settings-client.ts')
-    await expect(setPreferredTerminalApp('ghostty')).resolves.toEqual({
-      pref: 'ghostty',
-      resolved: 'ghostty',
-      available: true,
-      appAvailability: { ghostty: true, terminal: false, windowsTerminal: false },
-      detectedAt: 1,
-    })
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-  })
-
-  test('returns authoritative editor app state directly from the settings write response', async () => {
-    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
-    const fetchMock = vi.fn(async () => ({
-      ok: true,
-      json: async () => ({
-        ok: true,
-        settings: {
-          lang: 'auto',
-          theme: 'auto',
-          colorTheme: 'macos',
-          fetchIntervalSec: 120,
-          terminalNotificationsEnabled: false,
-          shortcutsDisabled: false,
-          globalShortcutDisabled: false,
-          globalShortcut: 'CommandOrControl+Shift+G',
-          terminalApp: 'auto',
-          editorApp: 'cursor',
-          lanEnabled: false,
-        },
-        externalApps: {
-          terminal: {
-            pref: 'auto',
-            resolved: null,
-            available: false,
-            appAvailability: { ghostty: false, terminal: false, windowsTerminal: false },
-            detectedAt: 1,
-          },
-          editor: {
-            pref: 'cursor',
-            resolved: 'cursor',
-            available: true,
-            appAvailability: { vscode: true, cursor: true, windsurf: false },
-            detectedAt: 1,
-          },
-        },
-      }),
-    }))
-    vi.stubGlobal('fetch', fetchMock)
-
-    const { setPreferredEditorApp } = await import('#/web/settings-client.ts')
-    await expect(setPreferredEditorApp('cursor')).resolves.toEqual({
-      pref: 'cursor',
-      resolved: 'cursor',
-      available: true,
-      appAvailability: { vscode: true, cursor: true, windsurf: false },
-      detectedAt: 1,
-    })
-    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
   test('does not project an added recent repo when the embedded server rejects the candidate', async () => {

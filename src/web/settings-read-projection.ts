@@ -6,7 +6,6 @@ import type {
   RuntimeSettingsSnapshot,
   SettingsSnapshot,
 } from '#/shared/api-types.ts'
-import type { EditorPref, TerminalPref } from '#/shared/api-types.ts'
 import {
   runtimeRecentReposStateFromSettingsSnapshot,
   runtimeSettingsSnapshotFromSettingsSnapshot,
@@ -68,16 +67,12 @@ export function readRuntimeFetchSettings(data: RuntimeSettingsSnapshot | undefin
 
 export function readRuntimeExternalAppSettings(data: ExternalAppsSnapshot | undefined) {
   return {
-    terminalApp: data?.terminal.pref ?? ('auto' as TerminalPref),
-    resolvedTerminalApp: data?.terminal.resolved ?? null,
     terminalAvailable: data?.terminal.available ?? false,
     terminalAppAvailability: data?.terminal.appAvailability ?? {
       ghostty: false,
       terminal: false,
       windowsTerminal: false,
     },
-    editorApp: data?.editor.pref ?? ('auto' as EditorPref),
-    resolvedEditorApp: data?.editor.resolved ?? null,
     editorAvailable: data?.editor.available ?? false,
     editorAppAvailability: data?.editor.appAvailability ?? { vscode: false, cursor: false, windsurf: false },
   }

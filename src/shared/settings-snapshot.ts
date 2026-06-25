@@ -21,8 +21,6 @@ export function buildRuntimeSettingsSnapshot(input: {
     globalShortcutDisabled: input.prefs.globalShortcutDisabled,
     globalShortcut: input.prefs.globalShortcut,
     globalShortcutRegistered: input.globalShortcutRegistered,
-    terminalApp: input.prefs.terminalApp,
-    editorApp: input.prefs.editorApp,
     lanEnabled: input.prefs.lanEnabled,
   }
 }
@@ -61,8 +59,6 @@ export function runtimeSettingsSnapshotFromSettingsSnapshot(
     | 'globalShortcutDisabled'
     | 'globalShortcut'
     | 'globalShortcutRegistered'
-    | 'terminalApp'
-    | 'editorApp'
     | 'lanEnabled'
   >,
 ): RuntimeSettingsSnapshot {
@@ -76,8 +72,6 @@ export function runtimeSettingsSnapshotFromSettingsSnapshot(
     globalShortcutDisabled: snapshot.globalShortcutDisabled,
     globalShortcut: snapshot.globalShortcut,
     globalShortcutRegistered: snapshot.globalShortcutRegistered,
-    terminalApp: snapshot.terminalApp,
-    editorApp: snapshot.editorApp,
     lanEnabled: snapshot.lanEnabled,
   }
 }

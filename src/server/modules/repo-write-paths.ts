@@ -2,13 +2,13 @@ import path from 'node:path'
 import { runServerCancellable, abortServerNetworkOp } from '#/server/common/network-ops.ts'
 import { publishRepoQueryInvalidation } from '#/server/modules/invalidation-broker.ts'
 import { resolveRepoBackend, runWithRepoBackend, type RepoMutationResult } from '#/server/modules/repo-backend.ts'
-import { getServerSettingsPrefs } from '#/server/modules/settings-source.ts'
 import { cloneRepository as cloneGitRepository } from '#/system/git/clone.ts'
 import { openInPreferredEditor } from '#/system/editors.ts'
 import { openInPreferredTerminal } from '#/system/terminals.ts'
 import { openInFinder } from '#/system/finder.ts'
 import { type ExecResult } from '#/shared/git-types.ts'
-import { type EditorPref, type NetworkOpKind, type TerminalPref } from '#/shared/api-types.ts'
+import { type NetworkOpKind } from '#/shared/api-types.ts'
+import type { EditorApp, TerminalApp } from '#/shared/api-types.ts'
 import { checkGitAvailable } from '#/system/git/helper.ts'
 import { isValidCwd, isValidRepoLocator } from '#/shared/input-validation.ts'
 import { type CloneRepoResult, type ProbeResult } from '#/shared/api-types.ts'
@@ -325,14 +325,12 @@ export async function openRepositoryRemote(cwd: string, branch?: string, signal?
   return url ? { ok: true, message: url } : { ok: false, message: 'error.no-remote-url' }
 }
 
-export async function openRepositoryTerminal(path: string, app?: TerminalPref): Promise<ExecResult> {
-  const prefs = await getServerSettingsPrefs()
-  return await openInPreferredTerminal(path, app ?? prefs.terminalApp)
+export async function openRepositoryTerminal(path: string, app: TerminalApp): Promise<ExecResult> {
+  return await openInPreferredTerminal(path, app)
 }
 
-export async function openRepositoryEditor(path: string, app?: EditorPref): Promise<ExecResult> {
-  const prefs = await getServerSettingsPrefs()
-  return await openInPreferredEditor(path, app ?? prefs.editorApp)
+export async function openRepositoryEditor(path: string, app: EditorApp): Promise<ExecResult> {
+  return await openInPreferredEditor(path, app)
 }
 
 export async function openRepositoryInFinder(path: string): Promise<ExecResult> {
