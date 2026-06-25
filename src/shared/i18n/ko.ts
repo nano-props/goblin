@@ -532,7 +532,6 @@ export const ko: Record<DictKey, string> = {
   'settings.group.apps': '외부 앱',
   'settings.group.sync': '동기화',
   'settings.nav.github': 'GitHub',
-  'settings.nav.integrations': '연동',
   'settings.nav.notifications': '알림',
   'settings.nav.ssh': 'SSH',
   'settings.nav.refresh': '새로 고침',

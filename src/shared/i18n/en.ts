@@ -549,7 +549,6 @@ export const en = {
   'settings.group.apps': 'External apps',
   'settings.group.sync': 'Sync',
   'settings.nav.github': 'GitHub',
-  'settings.nav.integrations': 'Integrations',
   'settings.nav.notifications': 'Notifications',
   'settings.nav.ssh': 'SSH',
   'settings.nav.refresh': 'Refresh',

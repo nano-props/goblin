@@ -540,7 +540,6 @@ export const ja: Record<DictKey, string> = {
   'settings.group.apps': '外部アプリ',
   'settings.group.sync': '同期',
   'settings.nav.github': 'GitHub',
-  'settings.nav.integrations': '連携',
   'settings.nav.notifications': '通知',
   'settings.nav.ssh': 'SSH',
   'settings.nav.refresh': '更新',

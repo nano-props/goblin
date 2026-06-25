@@ -514,7 +514,6 @@ export const zh: Record<DictKey, string> = {
   'settings.group.apps': '外部应用',
   'settings.group.sync': '同步',
   'settings.nav.github': 'GitHub',
-  'settings.nav.integrations': '集成',
   'settings.nav.notifications': '通知',
   'settings.nav.ssh': 'SSH',
   'settings.nav.refresh': '刷新',
