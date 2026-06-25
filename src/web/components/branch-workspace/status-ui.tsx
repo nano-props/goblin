@@ -6,13 +6,13 @@ export type Tone = StatusTone
 export type StatusRowValueLayout = 'inline' | 'fill' | 'chips'
 
 const ROW_CLASS = 'grid h-9 grid-cols-[1.25rem_5.75rem_minmax(0,1fr)] items-center gap-3 px-4'
-const ROW_ICON_CLASS = 'flex size-5 items-center justify-center'
-const ROW_LABEL_CLASS = 'truncate text-[11px] font-semibold uppercase tracking-wider text-muted-foreground'
+const ROW_ICON_CLASS = 'flex size-5 items-center justify-center text-muted-foreground/75'
+const ROW_LABEL_CLASS = 'truncate text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/75'
 const MONO_VALUE_CLASS = 'font-mono'
 const INLINE_TRUNCATE_CLASS = 'block min-w-0 flex-1 truncate'
 export const STATUS_INLINE_GROUP_CLASS = 'inline-flex max-w-full min-w-0 items-center gap-1.5 align-middle'
 export const STATUS_CHIP_CLASS =
-  'inline-flex h-5 shrink-0 cursor-default items-center gap-1 rounded-sm border px-1.5 text-[11px] font-medium leading-none'
+  'inline-flex h-5 shrink-0 cursor-default items-center gap-1 rounded-sm border px-1.5 text-[11px] font-normal leading-none'
 const ROW_VALUE_CLASS: Record<StatusRowValueLayout, string> = {
   inline: 'min-w-0 max-w-full text-sm text-foreground',
   fill: 'min-w-0 flex-1 text-sm text-foreground',
@@ -35,7 +35,7 @@ export const StatusChip = forwardRef<HTMLSpanElement, StatusChipProps>(function 
 
 export function StatusRows({ children }: { children: ReactNode }) {
   return (
-    <div role="list" className="divide-y divide-separator border-b border-separator">
+    <div role="list" className="divide-y divide-separator/60 border-b border-separator/70">
       {children}
     </div>
   )

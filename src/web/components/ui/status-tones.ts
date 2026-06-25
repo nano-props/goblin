@@ -10,10 +10,10 @@ export const STATUS_TONE_TEXT_CLASS: Record<StatusTone, string> = {
 }
 
 export const STATUS_TONE_CHIP_CLASS: Record<StatusTone, string> = {
-  neutral: 'border-border bg-muted text-muted-foreground',
-  success: 'border-success-border bg-success-surface text-success',
-  attention: 'border-attention-border bg-attention-surface text-attention',
-  warning: 'border-warning-border bg-warning-surface text-warning',
-  danger: 'border-danger-border bg-danger-surface text-danger',
-  brand: 'border-brand-border bg-brand-surface text-brand-text',
+  neutral: 'border-separator/80 bg-muted/35 text-muted-foreground',
+  success: 'border-success-border/55 bg-success-surface/50 text-success',
+  attention: 'border-attention-border/55 bg-attention-surface/50 text-attention',
+  warning: 'border-warning-border/55 bg-warning-surface/50 text-warning',
+  danger: 'border-danger-border/55 bg-danger-surface/50 text-danger',
+  brand: 'border-brand-border/55 bg-brand-surface/50 text-brand-text',
 }
