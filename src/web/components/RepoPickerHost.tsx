@@ -78,7 +78,8 @@ export function RepoPickerHost({
       labels={{
         repositories: t('repo-picker.repos'),
         closeWithName: (name) => t('repo-picker.close-named', { name }),
-        open: t('topbar.open'),
+        open: t('app-chrome.open'),
+        placeholder: t('repo-picker.placeholder'),
         openLocal: t('repo-picker.open-local'),
         openLocalShortcut: shortcutsDisabled ? null : '⌘O',
         openRemote: t('repo-picker.open-remote'),

@@ -75,17 +75,18 @@ export const en = {
   // ---- Menu — Help --------------------------------------------------------
   'menu.help.shortcuts': 'Keyboard Shortcuts',
 
-  // ---- Topbar -------------------------------------------------------------
-  'topbar.open': 'Open',
-  'topbar.menu': 'Menu',
-  'topbar.settings': 'Settings (⌘,)',
-  'topbar.settings-tooltip': 'Settings',
+  // ---- App chrome --------------------------------------------------------
+  'app-chrome.open': 'Open',
+  'app-chrome.menu': 'Menu',
+  'app-chrome.settings': 'Settings (⌘,)',
+  'app-chrome.settings-tooltip': 'Settings',
 
   // ---- Dependencies -------------------------------------------------------
 
   // ---- Repository picker ----------------------------------------------------
   'repo-picker.repos': 'Repositories',
   'repo-picker.close-named': 'Close {name}',
+  'repo-picker.placeholder': 'Select repository',
   'repo-picker.open-local': 'Open local repository…',
   'repo-picker.open-remote': 'Open remote repository…',
   'repo-picker.open-title': 'Open local repository',
@@ -193,10 +194,7 @@ export const en = {
 
   // ---- Empty state --------------------------------------------------------
   'empty.title': 'No repository open',
-  // Body uses <Trans> so React renders the highlighted label as a real
-  // element (no dangerouslySetInnerHTML).
-  'empty.body':
-    'Click <open>Open</open> in the toolbar to add a Git repository, or drop a repository folder into this window.',
+  'empty.body': 'Choose a repository from the sidebar, or drop a Git folder here.',
 
   // ---- Drag and drop ------------------------------------------------------
   'drop.title': 'Drop to open local repository',

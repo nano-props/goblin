@@ -26,20 +26,9 @@ Use this doc for UI language and presentation rules.
   parent add `absolute left-0|right-0 top-1/2 -translate-y-1/2` via
   `className` when the seam must overlay without consuming layout width.
   The chunkier `size="md"` (`h-5`) is reserved for any future 40px+
-  toolbar — no current caller. Larger surface dividers (the topbar's
-  own `border-b`, the sidebar's `border-r`, list `divide-y`) stay on
-  Tailwind border utilities; they belong to the surrounding container's
-  box, not a separate child element. All separators read their color
-  from `--color-separator` (= `--goblin-border-subtle`, one notch
-  weaker than `--color-border`).
-- The topbar's `flex-1` spacer between the per-repo actions cluster
-  (repo picker + Refresh / Filter / CreateWorktree) and the app-level
-  cluster (Focus Mode toggle + Settings) is the only intentional
-  exception to the inline-divider rule: the two clusters are
-  separated by layout distance alone, not by `<Separator>`. The icon
-  styles already differ enough on their own (the per-repo actions sit
-  in the repo picker's tab family; the app-level buttons sit in the
-  global ghost-button family), and a 1px line would just split a
-  visual gap that already reads as a group break. If a future layout
-  pulls the two clusters closer together, re-evaluate before reaching
-  for `<Separator>`.
+  toolbar — no current caller. Larger surface dividers (the workspace
+  toolbar's own `border-b`, the sidebar's `border-r`, list `divide-y`)
+  stay on Tailwind border utilities; they belong to the surrounding
+  container's box, not a separate child element. All separators read
+  their color from `--color-separator` (= `--goblin-border-subtle`,
+  one notch weaker than `--color-border`).

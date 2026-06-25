@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { WorkspaceChrome, WorkspaceToolbar } from '#/web/components/workspace-toolbar-chrome.tsx'
-import { WINDOW_TOPBAR_HEIGHT_PX } from '#/shared/window-chrome.ts'
+import { WINDOW_CHROME_HEIGHT_PX } from '#/shared/window-chrome.ts'
 
 let container: HTMLDivElement | null = null
 let root: Root | null = null
@@ -45,7 +45,7 @@ describe('WorkspaceToolbar', () => {
     expect(toolbar?.className).toContain('border-border/60')
     expect(toolbar?.className).not.toContain('gap-2')
     expect(toolbar?.className).not.toContain('px-2')
-    expect(toolbar?.style.height).toBe(`${WINDOW_TOPBAR_HEIGHT_PX}px`)
+    expect(toolbar?.style.height).toBe(`${WINDOW_CHROME_HEIGHT_PX}px`)
     expect(container?.querySelector('[data-testid="body"]')).not.toBeNull()
   })
 
@@ -59,7 +59,7 @@ describe('WorkspaceToolbar', () => {
     const toolbar = workspaceToolbar()
     expect(toolbar?.className).toContain('px-2')
     expect(toolbar?.className).not.toContain('app-drag-region')
-    expect(toolbar?.className).not.toContain('topbar')
+    expect(toolbar?.className).not.toContain('window-chrome')
   })
 
   test('reserves traffic-light chrome through WorkspaceChrome only when requested', () => {
@@ -67,7 +67,7 @@ describe('WorkspaceToolbar', () => {
 
     const toolbar = workspaceToolbar()
     const spacer = container?.querySelector('[data-testid="workspace-toolbar-leading-spacer"]')
-    expect(toolbar?.className).toContain('topbar')
+    expect(toolbar?.className).toContain('window-chrome')
     expect(toolbar?.className).not.toContain('app-drag-region')
     expect(spacer?.className).toContain('goblin-workspace-toolbar__leading-spacer--reserved')
   })

@@ -17,7 +17,7 @@ import {
 } from '#/web/components/repo-shell/sidebar-sizing.ts'
 import { ResizeHandleLine, resizeHandleClassNames } from '#/web/components/ui/resizable.tsx'
 import { useElementInlineSize } from '#/web/hooks/useElementInlineSize.ts'
-import { WINDOW_TOPBAR_HEIGHT_PX } from '#/shared/window-chrome.ts'
+import { WINDOW_CHROME_HEIGHT_PX } from '#/shared/window-chrome.ts'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
 
 const FOCUS_REVEAL_SURFACE_SELECTOR = '[data-floating-surface],[data-focus-reveal-surface]'
@@ -35,7 +35,7 @@ interface FocusModeSidebarRevealState {
 }
 
 interface FocusModeSidebarRevealProps {
-  repoId: string
+  repoId?: string
   open: boolean
   sidebarSize: number
   onSidebarSizeChange: (sidebarSize: number) => void
@@ -274,12 +274,15 @@ export function FocusModeSidebarReveal({
       setPanelVisualState('closed')
     }, FOCUS_REVEAL_CLOSE_MS)
   }, [clearCloseAnimationTimer, clearOpenAnimationFrame, open, setPanelVisualState])
-  const handleSurfaceLeave = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
-    if (resizingRef.current) return
-    if (isPointerInsideRevealBounds(event, hostRef.current, panelRef.current)) return
-    if (isFocusRevealSurfaceTarget(event.relatedTarget, panelRef.current, hitAreaRef.current)) return
-    onSurfaceLeave()
-  }, [onSurfaceLeave])
+  const handleSurfaceLeave = useCallback(
+    (event: ReactMouseEvent<HTMLDivElement>) => {
+      if (resizingRef.current) return
+      if (isPointerInsideRevealBounds(event, hostRef.current, panelRef.current)) return
+      if (isFocusRevealSurfaceTarget(event.relatedTarget, panelRef.current, hitAreaRef.current)) return
+      onSurfaceLeave()
+    },
+    [onSurfaceLeave],
+  )
   useEffect(() => {
     if (!open) return
 
@@ -318,7 +321,7 @@ export function FocusModeSidebarReveal({
         data-focus-reveal-surface=""
         data-testid="focus-mode-sidebar-hit-area"
         className="pointer-events-auto absolute bottom-0 left-0 w-3"
-        style={{ top: WINDOW_TOPBAR_HEIGHT_PX }}
+        style={{ top: WINDOW_CHROME_HEIGHT_PX }}
         onMouseEnter={onSurfaceEnter}
         onMouseLeave={handleSurfaceLeave}
         aria-hidden

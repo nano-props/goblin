@@ -223,9 +223,11 @@ describe('RepoView workspace navigation', () => {
     expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
     expect(focusModeSidebarReveal()?.getAttribute('aria-hidden')).toBeNull()
     expect(focusModeSidebarReveal()?.hasAttribute('inert')).toBe(false)
-    expect(focusModeSidebarReveal()?.querySelector('[data-testid="repo-shell-sidebar-top"]')?.hasAttribute('data-interactive')).toBe(
-      true,
-    )
+    expect(
+      focusModeSidebarReveal()
+        ?.querySelector('[data-testid="repo-shell-sidebar-top"]')
+        ?.hasAttribute('data-interactive'),
+    ).toBe(true)
   })
 
   test('large-screen collapsed Focus Mode reveals the sidebar when the focus toggle is hovered', () => {
@@ -236,7 +238,7 @@ describe('RepoView workspace navigation', () => {
     expect(focusModeToggleOverlay()?.hasAttribute('data-interactive')).toBe(true)
     expect(focusModeToggleOverlay()?.hasAttribute('data-focus-reveal-surface')).toBe(true)
     expect(focusModeToggleOverlay()?.className).toContain('goblin-focus-reveal-trigger-layer')
-    expect(focusModeToggleOverlay()?.className).not.toContain('topbar')
+    expect(focusModeToggleOverlay()?.className).not.toContain('window-chrome')
     expect(focusModeSidebarReveal()?.dataset.open).toBe('false')
 
     act(() => {
@@ -248,7 +250,7 @@ describe('RepoView workspace navigation', () => {
     expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
   })
 
-  test('large-screen collapsed Focus Mode keeps the sidebar open across the topbar reveal surface', () => {
+  test('large-screen collapsed Focus Mode keeps the sidebar open across the window-chrome reveal surface', () => {
     useReposStore.getState().setWorkspaceFocused(true)
     useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
     render(<RepoView repoId={REPO_ID} />)
@@ -655,7 +657,7 @@ describe('RepoView workspace navigation', () => {
     expect(workspace()?.dataset.mode).toBe('split')
     expect(container?.querySelector('[data-testid="repo-picker"]')).not.toBeNull()
     expect(container?.querySelector('[data-testid="create-worktree-row-action"]')).not.toBeNull()
-    expect(container?.querySelector('button[aria-label="topbar.settings"]')).not.toBeNull()
+    expect(container?.querySelector('button[aria-label="app-chrome.settings"]')).not.toBeNull()
     expect(document.body.textContent).toContain('repo-unavailable.title')
   })
 

@@ -8,7 +8,7 @@
 import { cn } from '#/web/lib/cn.ts'
 
 interface Props {
-  /** Cap height of the wordmark in pixels. Default 13 (fits the topbar). */
+  /** Cap height of the wordmark in pixels. Default 13 (fits the window chrome toolbar). */
   size?: number
   className?: string
 }

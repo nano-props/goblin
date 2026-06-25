@@ -17,12 +17,8 @@ vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
   useIsCompactUi: () => responsiveMocks.mode === 'compact',
 }))
 
-vi.mock('#/web/components/Topbar.tsx', () => ({
-  Topbar: ({ children }: { children: React.ReactNode }) => <div data-testid="topbar">{children}</div>,
-}))
-
-vi.mock('#/web/components/RepoPickerHost.tsx', () => ({
-  RepoPickerHost: () => <div data-testid="repo-picker" />,
+vi.mock('#/web/components/EmptyRepoView.tsx', () => ({
+  EmptyRepoView: () => <div data-testid="empty-repo-view" />,
 }))
 
 vi.mock('#/web/components/RepoView.tsx', () => ({
@@ -35,15 +31,6 @@ vi.mock('#/web/components/SettingsPageScreen.tsx', () => ({
 
 vi.mock('#/web/components/ErrorBoundary.tsx', () => ({
   ErrorBoundary: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}))
-
-vi.mock('#/web/components/SplitPane.tsx', () => ({
-  SplitPane: ({ before, after }: { before: React.ReactNode; after: React.ReactNode }) => (
-    <div data-testid="mock-split-pane">
-      {before}
-      {after}
-    </div>
-  ),
 }))
 
 let container: HTMLDivElement | null = null
@@ -70,23 +57,22 @@ afterEach(() => {
 })
 
 describe('App boot skeleton', () => {
-  test('keeps the legacy topbar repo picker while no repository is open', () => {
+  test('renders the empty repo shell while no repository is open', () => {
     useReposStore.setState({ sessionReady: true })
 
     render(<App />)
 
-    expect(container?.querySelector('[data-testid="topbar"]')).not.toBeNull()
-    expect(container?.querySelector('[data-testid="repo-picker"]')).not.toBeNull()
+    expect(container?.querySelector('[data-testid="empty-repo-view"]')).not.toBeNull()
     expect(container?.querySelector('[data-testid="repo-view"]')).toBeNull()
   })
 
-  test('does not render the legacy topbar for an active repository shell', () => {
+  test('renders the active repository shell when a repository is open', () => {
     seedRepoState({ id: '/tmp/repo' })
 
     render(<App />)
 
     expect(container?.querySelector('[data-testid="repo-view"]')).not.toBeNull()
-    expect(container?.querySelector('[data-testid="topbar"]')).toBeNull()
+    expect(container?.querySelector('[data-testid="empty-repo-view"]')).toBeNull()
   })
 
   test('uses a single-pane navigator skeleton in compact mode before session restore is ready', () => {
@@ -94,7 +80,6 @@ describe('App boot skeleton', () => {
 
     render(<App />)
 
-    expect(container?.querySelector('[data-testid="mock-split-pane"]')).toBeNull()
     expect(container?.querySelectorAll('[data-testid="branch-navigator-skeleton-action"]')).toHaveLength(6)
     expect(container?.querySelector('[data-testid="branch-workspace-empty-skeleton"]')).toBeNull()
   })

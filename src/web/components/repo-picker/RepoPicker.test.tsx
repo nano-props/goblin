@@ -255,6 +255,37 @@ describe('RepoPicker', () => {
     expect(locator?.textContent?.trim()).toBe('/tmp/repo-a')
   })
 
+  test('renders a placeholder button on the sidebar surface when no repo is open', async () => {
+    const onOpenLocal = vi.fn()
+
+    render(
+      <RepoPicker
+        repos={[]}
+        activeId={null}
+        labels={labels}
+        onActivate={() => {}}
+        onClose={() => {}}
+        onOpenLocal={onOpenLocal}
+        onOpenRemote={() => {}}
+        onClone={() => {}}
+        surface="sidebar"
+      />,
+    )
+
+    const placeholder = document.body.querySelector('[data-testid="repo-picker-placeholder"]')
+    expect(placeholder).not.toBeNull()
+    expect(placeholder?.textContent).toContain('Select repository')
+    expect(placeholder?.className).toContain('w-full')
+
+    await act(async () => {
+      placeholder!.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+      placeholder!.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
+      await Promise.resolve()
+    })
+
+    expect(document.body.textContent).toContain('Open local repository…')
+  })
+
   test('shows a + button that opens the action popover when no repo is open', async () => {
     const onOpenLocal = vi.fn()
     const onOpenRemote = vi.fn()
@@ -319,6 +350,7 @@ const labels = {
   repositories: 'Repositories',
   closeWithName: (name: string) => `Close ${name}`,
   open: 'Open',
+  placeholder: 'Select repository',
   openLocal: 'Open local repository…',
   openLocalShortcut: '⌘O',
   openRemote: 'Open remote repository…',

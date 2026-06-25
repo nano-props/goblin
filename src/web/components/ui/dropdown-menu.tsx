@@ -5,14 +5,14 @@ import { cn } from '#/web/lib/cn.ts'
 
 // Known issue: in Goblin's frameless window, title-bar drag regions
 // (`-webkit-app-region: drag`) swallow pointer events, so clicking a draggable
-// topbar gap will not behave like a normal "outside click" for dropdown
+// title-bar gap will not behave like a normal "outside click" for dropdown
 // dismissal. Keep this file as a thin Radix/shadcn-style primitive wrapper;
 // do not bake Goblin-specific drag-region workarounds into this shared
 // component.
 //
 // Positioning: DropdownMenu is the command/navigation dropdown. The trigger
 // is a ghost button or icon button (e.g. a chevron on a tab, an icon in the
-// topbar) — used for switching the active repo/terminal/branch or opening
+// toolbar) — used for switching the active repo/terminal/branch or opening
 // a menu of actions. Items use `bg-selected text-selected-foreground`
 // (applied via `SelectedDropdownMenuItem`) to mark the currently-active
 // entry. Do NOT reach for this in form fields — that's `select.tsx`,
@@ -220,7 +220,7 @@ function DropdownMenuSubContent({
 // active repo/terminal/branch in their tab-strip dropdowns); the selected
 // item remains focusable so it still picks up the hover accent. The same
 // `bg-selected text-selected-foreground` className is also applied directly
-// (without this wrapper) by the topbar's active menu item and the settings
+// (without this wrapper) by the active toolbar menu item and the settings
 // sidebar nav, where the underlying element isn't a DropdownMenuItem.
 // If you want a built-in selection indicator and keyboard-driven single-select
 // semantics, prefer `DropdownMenuRadioGroup` + `DropdownMenuRadioItem`.
@@ -229,12 +229,7 @@ function SelectedDropdownMenuItem({
   className,
   ...props
 }: React.ComponentProps<typeof DropdownMenuItem> & { selected: boolean }) {
-  return (
-    <DropdownMenuItem
-      className={cn(selected && 'bg-selected text-selected-foreground', className)}
-      {...props}
-    />
-  )
+  return <DropdownMenuItem className={cn(selected && 'bg-selected text-selected-foreground', className)} {...props} />
 }
 
 export {

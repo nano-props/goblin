@@ -243,7 +243,7 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId, trafficL
 
   // No selected branch means there is no tab/action target; keep the
   // workspace chrome mounted so the right pane still contributes a
-  // draggable top region after the global topbar is removed.
+  // draggable top region.
   if (!detail.branch) {
     return (
       <WorkspaceToolbar draggable={!compact} trafficLightOffset={trafficLightOffset}>

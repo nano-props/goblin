@@ -64,17 +64,18 @@ export const zh: Record<DictKey, string> = {
 
   'menu.help.shortcuts': '键盘快捷键',
 
-  // ---- Topbar ------------------------------------------------------------
-  'topbar.open': '打开',
-  'topbar.menu': '菜单',
-  'topbar.settings': '设置 (⌘,)',
-  'topbar.settings-tooltip': '设置',
+  // ---- 应用顶栏 ------------------------------------------------------------
+  'app-chrome.open': '打开',
+  'app-chrome.menu': '菜单',
+  'app-chrome.settings': '设置 (⌘,)',
+  'app-chrome.settings-tooltip': '设置',
 
   // ---- Dependencies ------------------------------------------------------
 
   // ---- Repository picker ---------------------------------------------------
   'repo-picker.repos': '仓库',
   'repo-picker.close-named': '关闭 {name}',
+  'repo-picker.placeholder': '选择仓库',
   'repo-picker.open-local': '打开本地仓库…',
   'repo-picker.open-remote': '打开远程仓库…',
   'repo-picker.open-title': '打开本地仓库',
@@ -175,8 +176,8 @@ export const zh: Record<DictKey, string> = {
   'repo-unavailable.close': '关闭仓库',
 
   // ---- Empty state -------------------------------------------------------
-  'empty.title': '没有打开的仓库',
-  'empty.body': '点击顶部工具栏的 <open>打开</open> 添加一个 Git 仓库，或把仓库文件夹拖到窗口中。',
+  'empty.title': '未打开仓库',
+  'empty.body': '从左侧选择仓库，或拖入 Git 文件夹。',
 
   // ---- Drag and drop -----------------------------------------------------
   'drop.title': '松手打开本地仓库',

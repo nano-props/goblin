@@ -57,7 +57,24 @@ describe('RepoShellSidebar', () => {
     expect(branchTitle).not.toBeNull()
     expect(document.body.querySelector('[data-testid="branch-content"]')).not.toBeNull()
 
-    const settings = document.body.querySelector('button[aria-label="topbar.settings"]')
+    const settings = document.body.querySelector('button[aria-label="app-chrome.settings"]')
+    expect(settings).not.toBeNull()
+  })
+
+  test('renders placeholder state when no repo is open', () => {
+    render(<RepoShellSidebar compact={false} />)
+
+    expect(document.body.querySelector('[data-testid="repo-picker-host"]')).not.toBeNull()
+
+    const createWorktree = document.body.querySelector('button[aria-label="action.create-worktree-title"]')
+    expect(createWorktree).toBeNull()
+
+    const branchTitle = [...document.body.querySelectorAll('div')].find(
+      (element) => element.children.length === 0 && element.textContent?.trim() === 'tab.branches',
+    )
+    expect(branchTitle).toBeUndefined()
+
+    const settings = document.body.querySelector('button[aria-label="app-chrome.settings"]')
     expect(settings).not.toBeNull()
   })
 })

@@ -8,8 +8,8 @@
 // this primitive consolidates them.
 //
 // Variants are kept narrow on purpose: this is *only* the 1px line
-// between two sibling elements. Larger surface dividers (the topbar's
-// own `border-b`, the sidebar's `border-r`, list `divide-y`) continue
+// between two sibling elements. Larger surface dividers (the workspace
+// toolbar's own `border-b`, the sidebar's `border-r`, list `divide-y`) continue
 // to use Tailwind border utilities — they belong to the surrounding
 // container's box, not to a separate child element.
 //
@@ -26,7 +26,7 @@
 // Size:
 //   • sm (default): vertical = h-4 (16px). Matches the tab-strip /
 //     leading-action chrome height (h-7 / h-8 wrappers) across
-//     RepoPicker, WorkspacePane, and the Topbar's Focus Mode seam.
+//     RepoPicker, WorkspacePane, and the Focus Mode seam.
 //   • md: vertical = h-5 (20px). Reserved for any future 40px+
 //     toolbar that needs a chunkier seam — no current caller.
 //
