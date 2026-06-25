@@ -61,6 +61,7 @@ afterEach(() => {
   act(() => {
     root?.unmount()
   })
+  vi.useRealTimers()
   container?.remove()
   root = null
   container = null
@@ -198,6 +199,37 @@ describe('BranchRow', () => {
     expect(branchIcon).toBeNull()
     expect(branchLabel).not.toBeUndefined()
     expect(badge!.compareDocumentPosition(branchLabel!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  test('shows the relative commit time without the last commit author', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-05T12:00:00.000Z'))
+    const repo = emptyRepo('/tmp/repo', 'repo')
+    const branch = createRepoBranch('feature/a', {
+      lastCommitAuthor: 'Example Author',
+      lastCommitDate: '2026-06-05T10:00:00.000Z',
+    })
+
+    render(
+      <ul>
+        <BranchRow
+          repo={repo}
+          branch={branch}
+          selected={null}
+          onSelectBranch={vi.fn()}
+          onOpenBranchStatus={vi.fn()}
+          selectedRef={createRef<HTMLLIElement>()}
+          showActions={false}
+        />
+      </ul>,
+    )
+
+    const rowText = document.body.textContent ?? ''
+    const summaryTitle = document.querySelector('[title*="feature/a"]')?.getAttribute('title') ?? ''
+    expect(rowText).toContain('2 小时前')
+    expect(rowText).not.toContain('Example Author')
+    expect(summaryTitle).toContain('2 小时前')
+    expect(summaryTitle).not.toContain('Example Author')
   })
 
   test('hides the actions wrapper by default and reveals it on row hover in non-compact mode', () => {

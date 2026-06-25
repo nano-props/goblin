@@ -4,7 +4,7 @@
 // the list.
 //
 // Layout (left to right):
-//   [icon]  [name]  [meta…]  <badges · deltas · last-commit author/time>
+//   [icon]  [name]  [meta…]  <badges · deltas · last-commit time>
 //
 // The icon and meta are exported as standalone subcomponents so callers
 // that need a different name trigger
@@ -49,7 +49,7 @@ function Delta({ direction, count, label }: { direction: 'ahead' | 'behind'; cou
   )
 }
 
-// Derives the visual-state predicates and last-commit meta for a
+// Derives the visual-state predicates and last-commit time for a
 // (branch, repo) pair. Single source of truth shared by the icon, the
 // meta strip, and the outer title — recomputing these in three places
 // is what originally kept this file sprawling.
@@ -57,12 +57,7 @@ export function computeBranchSummaryState(branch: RepoBranchState, repo: BranchS
   const hasWorktree = !!branch.worktree?.path
   const worktreeState = getBranchWorktreeState(repo, branch)
   const worktreeDirty = worktreeState?.dirty ?? false
-  const commitTime = formatRelativeTimeOrNull(branch.lastCommitDate, lang)
-  const commitMeta = commitTime
-    ? branch.lastCommitAuthor
-      ? `${branch.lastCommitAuthor} · ${commitTime}`
-      : commitTime
-    : null
+  const commitMeta = formatRelativeTimeOrNull(branch.lastCommitDate, lang)
   return { hasWorktree, worktreeDirty, commitMeta }
 }
 
