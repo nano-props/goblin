@@ -118,6 +118,40 @@ describe('workspace commands', () => {
     expect(openViewsFor('feature/worktree')).toEqual(['changes'])
   })
 
+  test.each(['status', 'changes'] as const)(
+    'show workspace pane view command refreshes status when opening %s',
+    async (tab) => {
+      seedRepoState({
+        id: REPO_ID,
+        branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+        selectedBranch: 'feature/worktree',
+        preferredWorkspacePaneView: 'history',
+        workspacePaneTabOrderByBranch: { 'feature/worktree': [] },
+      })
+      setTerminalSlotCommandBridge({
+        worktreeSnapshot: () => ({
+          worktreeTerminalKey: WORKTREE_KEY,
+          selectedDescriptor: null,
+          slots: [],
+          count: 0,
+          bellCount: 0,
+          pendingCreate: false,
+        }),
+        createTerminal: vi.fn(async () => 'slot-1'),
+        selectTerminal: vi.fn(),
+      })
+      const refreshStatus = vi.fn(async () => {})
+      const token = useReposStore.getState().repos[REPO_ID]!.instanceToken
+      useReposStore.setState({ refreshStatus: refreshStatus as ReturnType<typeof useReposStore.getState>['refreshStatus'] })
+
+      await expect(runShowWorkspacePaneViewCommand({ repoId: REPO_ID, tab, navigation: navigationWith() })).resolves.toBe(
+        true,
+      )
+
+      expect(refreshStatus).toHaveBeenCalledWith(REPO_ID, { token })
+    },
+  )
+
   test('show workspace pane view command keeps the previous view when changes has no worktree', async () => {
     seedRepoState({
       id: REPO_ID,

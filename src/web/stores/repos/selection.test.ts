@@ -3,7 +3,7 @@ import { replaceRepo } from '#/web/stores/repos/helpers.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { RepoState, SessionWorkspacePaneRestoreState } from '#/web/stores/repos/types.ts'
 import type { WorkspacePaneStaticViewType, WorkspacePaneTabOrderEntry, WorkspacePaneView } from '#/shared/workspace-pane.ts'
-import { workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
+import { WORKSPACE_PANE_WORKTREE_STATIC_VIEW_TYPES, workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
 import {
   createRepoBranch as branch,
   installGoblinTestBridge,
@@ -440,12 +440,13 @@ describe('setWorkspacePaneView', () => {
     ])
   })
 
-  test('reorders visible tabs while preserving hidden changes on branches without worktrees', () => {
+  test('reorders visible tabs while preserving hidden worktree-scoped static tabs', () => {
+    const hiddenWorktreeEntries = WORKSPACE_PANE_WORKTREE_STATIC_VIEW_TYPES.map(workspacePaneStaticTabOrderEntry)
     seedRepo({
       selectedBranch: 'feature/plain',
       workspacePaneTabOrder: [
         workspacePaneStaticTabOrderEntry('status'),
-        workspacePaneStaticTabOrderEntry('changes'),
+        ...hiddenWorktreeEntries,
         workspacePaneStaticTabOrderEntry('history'),
       ],
     })
@@ -459,7 +460,7 @@ describe('setWorkspacePaneView', () => {
 
     expect(tabOrderFor('feature/plain')).toEqual([
       workspacePaneStaticTabOrderEntry('history'),
-      workspacePaneStaticTabOrderEntry('changes'),
+      ...hiddenWorktreeEntries,
       workspacePaneStaticTabOrderEntry('status'),
     ])
   })

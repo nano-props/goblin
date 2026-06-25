@@ -7,7 +7,12 @@ import {
   normalizeWorkspaceSessionLayoutState,
 } from '#/shared/workspace-layout.ts'
 import type { BranchViewMode, RepoState, ReposGet, ReposSet, ReposStore } from '#/web/stores/repos/types.ts'
-import type { WorkspacePaneStaticViewType, WorkspacePaneTabOrderEntry, WorkspacePaneView } from '#/shared/workspace-pane.ts'
+import {
+  WORKSPACE_PANE_WORKTREE_STATIC_VIEW_TYPES,
+  type WorkspacePaneStaticViewType,
+  type WorkspacePaneTabOrderEntry,
+  type WorkspacePaneView,
+} from '#/shared/workspace-pane.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
 import {
   normalizeWorkspacePaneTabOrder,
@@ -368,7 +373,8 @@ function workspacePaneTabOrdersEqual(
 
 function hiddenWorkspacePaneStaticViews(repo: RepoState, branchName: string): ReadonlySet<WorkspacePaneStaticViewType> {
   const branch = repo.data.branches.find((candidate) => candidate.name === branchName)
-  return branch?.worktree?.path ? new Set() : new Set<WorkspacePaneStaticViewType>(['changes'])
+  if (branch?.worktree?.path) return new Set()
+  return new Set(WORKSPACE_PANE_WORKTREE_STATIC_VIEW_TYPES)
 }
 
 function mergeHiddenWorkspacePaneStaticTabs(

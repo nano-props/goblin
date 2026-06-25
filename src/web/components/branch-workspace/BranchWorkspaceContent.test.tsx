@@ -311,6 +311,55 @@ describe('BranchWorkspaceContent', () => {
     expect(container?.querySelector('button[aria-label="status.copy-patch-title"]')).toBeNull()
   })
 
+  test('renders the changes panel with status entries and tab labelling', () => {
+    const worktreePath = '/tmp/changes-panel-worktree'
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branchSnapshots: [
+        createBranchSnapshot('feature/changes-panel', {
+          worktree: { path: worktreePath, summary: { dirty: true, changeCount: 2 } },
+        }),
+      ],
+      selectedBranch: 'feature/changes-panel',
+      preferredWorkspacePaneView: 'changes',
+      workspacePaneTabOrderByBranch: {
+        'feature/changes-panel': [staticEntry('status'), staticEntry('changes')],
+      },
+      statusLoaded: true,
+      status: [
+        {
+          path: worktreePath,
+          branch: 'feature/changes-panel',
+          isMain: false,
+          entries: [
+            { x: 'M', y: ' ', path: 'src/alpha.ts' },
+            { x: '?', y: '?', path: 'src/beta.ts' },
+          ],
+        },
+      ],
+    })
+    const detail = getSelectedBranchWorkspacePresentation(repo)
+
+    act(() => {
+      root!.render(
+        <TerminalSlotReadContext.Provider value={emptyTerminalReadContext}>
+          <BranchActionSurfaceContext.Provider value={defaultBranchActionSurface()}>
+            <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
+          </BranchActionSurfaceContext.Provider>
+        </TerminalSlotReadContext.Provider>,
+      )
+    })
+
+    const panel = container?.querySelector('#workspace-changes-panel')
+    expect(panel).not.toBeNull()
+    expect(panel?.getAttribute('role')).toBe('tabpanel')
+    expect(panel?.getAttribute('aria-labelledby')).toBe('workspace-changes-tab')
+    expect(panel?.querySelector('[aria-label="M "]')).not.toBeNull()
+    expect(panel?.querySelector('[aria-label="??"]')).not.toBeNull()
+    expect(panel?.querySelector('[aria-label="src/alpha.ts"]')).not.toBeNull()
+    expect(panel?.querySelector('[aria-label="src/beta.ts"]')).not.toBeNull()
+  })
+
   test('renders branch status for a selected branch without a worktree', () => {
     const repo = seedRepoState({
       id: REPO_ID,

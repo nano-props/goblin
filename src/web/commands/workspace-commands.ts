@@ -4,7 +4,6 @@ import { openWorkspacePaneView } from '#/web/components/branch-workspace/open-wo
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
-import { isWorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
 import type { TerminalSlotBase } from '#/web/components/terminal/types.ts'
 import { workspacePaneTabOrderForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
 import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
@@ -16,6 +15,10 @@ import {
   type BranchWorkspacePaneTabModel,
 } from '#/web/components/branch-workspace/workspace-pane-tab-model.ts'
 import { createWorkspacePaneTerminalTab } from '#/web/stores/repos/workspace-pane-terminal-write-paths.ts'
+import {
+  isWorkspacePaneStaticTabProvider,
+  workspacePaneTabProvider,
+} from '#/web/workspace-pane/workspace-pane-tab-providers.ts'
 
 interface ShowWorkspacePaneViewCommandOptions {
   repoId: string | null
@@ -61,14 +64,15 @@ export async function runShowWorkspacePaneViewCommand({
   navigation,
 }: ShowWorkspacePaneViewCommandOptions): Promise<boolean> {
   if (!repoId) return false
-  if (isWorkspacePaneStaticViewType(tab)) {
+  const provider = workspacePaneTabProvider(tab)
+  if (isWorkspacePaneStaticTabProvider(provider)) {
     const target = selectedBranchWorkspaceTarget(repoId)
     if (target) {
       return openWorkspacePaneView({
         repoId,
         branchName: target.branchName,
         worktreePath: target.worktreePath,
-        type: tab,
+        type: provider.type,
         navigation,
       })
     }
@@ -207,9 +211,7 @@ function closeWorkspacePaneCommandTab(
   if (tab.kind === 'terminal') return closeTerminalWorkspacePaneCommandTab(target, tab)
   const branchName = target.branchName
   if (!branchName) return Promise.resolve(false)
-  if (isWorkspacePaneStaticViewType(tab.type)) {
-    useReposStore.getState().closeWorkspacePaneStaticView(target.repoId, tab.type, branchName)
-  }
+  useReposStore.getState().closeWorkspacePaneStaticView(target.repoId, tab.type, branchName)
   return Promise.resolve(true)
 }
 
