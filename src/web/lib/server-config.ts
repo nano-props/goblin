@@ -14,7 +14,7 @@ function sameOriginServerUrl(): string | null {
 }
 
 // QR-code/bootstrap handoffs carry an explicit server URL. Embedded and
-// same-origin web renderers do not: they are already loaded from the server
+// same-origin web clients do not: they are already loaded from the server
 // origin and authenticate with the cookie the server planted.
 export function resolveClientServerConfig(): ClientServerConfig | null {
   const fromBootstrap = getInitialBootstrap().initialServer

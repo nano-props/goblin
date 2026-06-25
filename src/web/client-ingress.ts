@@ -3,7 +3,7 @@ import { isClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { ClientEffectIntent, ClientEffectIntentType } from '#/shared/client-effect-intents.ts'
 import { getClientBridge } from '#/web/client-bridge.ts'
 
-// Native-host ingress for Electron renderers. Keep this separate from server
+// Native-host ingress for Electron clients. Keep this separate from server
 // ingress modules so browser- and Electron-owned downlinks stay explicit.
 type NativeHostEventType = IpcEvent['type']
 

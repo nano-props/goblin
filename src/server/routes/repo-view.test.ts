@@ -71,7 +71,7 @@ describe('POST /api/repo/view', () => {
     expect(res.status).toBe(503)
     const json = (await res.json()) as { ok: false; code: string; message: string }
     expect(json.ok).toBe(false)
-    expect(json.code).toBe('NO_RENDERER')
+    expect(json.code).toBe('NO_CLIENT')
     // Message must be the raw reason — the CLI prefixes it with `g:`,
     // so the contract forbids `g:` here. See `shared/repo-view.ts` for
     // the rationale.

@@ -26,7 +26,7 @@
  *    to rewrite it (the SPA fallback is allowed to read it but
  *    must serve it untouched).
  *  - `injectBootstrapIntoHtml` / `buildWebBootstrap` /
- *    `renderRendererIndexHtml` / `shouldInlineAccessTokenInBootstrap`
+ *    `renderClientIndexHtml` / `shouldInlineAccessTokenInBootstrap`
  *    — the legacy function names.
  *  - `GOBLIN_EMBEDDED_RUNTIME` / `GOBLIN_DEV_BOOTSTRAP_INCLUDES_TOKEN`
  *    — the env vars whose only purpose was to gate HTML inlining.
@@ -90,7 +90,7 @@ const RULES: Rule[] = [
     match: /\.replace\(['"]<html lang=/,
     commentAware: false,
   },
-  // Reading the built renderer HTML to rewrite it. The new
+  // Reading the built client HTML to rewrite it. The new
   // architecture serves `dist/web/index.html` untouched via
   // `serveStatic`; a `readFile` of `index.html` from a server
   // route handler is the smoking gun for the old path.
@@ -115,8 +115,8 @@ const RULES: Rule[] = [
     commentAware: true,
   },
   {
-    label: 'legacy renderRendererIndexHtml helper',
-    match: 'renderRendererIndexHtml',
+    label: 'legacy renderClientIndexHtml helper',
+    match: 'renderClientIndexHtml',
     commentAware: true,
   },
   {

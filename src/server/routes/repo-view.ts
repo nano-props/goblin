@@ -27,7 +27,7 @@ export function createRepoViewRoutes() {
       ? { ok: true }
       : {
           ok: false,
-          code: 'NO_RENDERER',
+          code: 'NO_CLIENT',
           // No CLI-level `g:` prefix here — the CLI prefixes every
           // error message it surfaces, and the contract is "this
           // string is the raw reason; CLI decorates".
