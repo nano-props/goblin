@@ -31,6 +31,7 @@ import {
 import { MobileTerminalToolbar } from '#/web/components/terminal/mobile-terminal-toolbar.tsx'
 import { isMobileDevice } from '#/web/components/terminal/mobile-detection.ts'
 import type { TerminalSlotBase } from '#/web/components/terminal/types.ts'
+import { showTerminalCreateErrorToast } from '#/web/components/terminal/terminal-create-feedback.ts'
 
 const DEFAULT_TERMINAL_ERROR_MESSAGE_KEY = 'error.unknown'
 
@@ -39,7 +40,7 @@ interface TerminalSlotProps {
   branch: string
   worktreePath: string
   syncReady?: boolean
-  createTerminalForSlot?: (base: TerminalSlotBase) => Promise<string>
+  createTerminalForSlot?: (base: TerminalSlotBase) => Promise<unknown>
 }
 
 export function TerminalSlot({
@@ -493,8 +494,8 @@ export function TerminalSlot({
             try {
               await (createTerminalForSlot ?? createTerminal)({ repoRoot, branch, worktreePath })
             } catch (err) {
-              terminalLog.warn('empty-state terminal create failed', { err })
-              toast.error(t('error.terminal-create-failed'))
+              const messageKey = showTerminalCreateErrorToast(err, t)
+              terminalLog.warn('empty-state terminal create failed', { err, messageKey })
             }
           }}
           emptyLabel={t('terminal.empty')}

@@ -51,6 +51,10 @@ class MockWebSocket {
     this.emit('message', { data })
   }
 
+  emitError() {
+    this.emit('error', {})
+  }
+
   private emit(type: string, event: any) {
     for (const listener of this.listeners.get(type) ?? []) listener(event)
   }
@@ -398,6 +402,73 @@ describe('terminal web host bridge', () => {
     dispose()
   })
 
+  test('rejects create when websocket errors before opening', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const { terminalBridge } = await import('#/web/terminal.ts')
+    const createPromise = terminalBridge.create({
+      repoRoot: '/tmp/repo',
+      branch: 'feature',
+      worktreePath: '/tmp/repo',
+      kind: 'primary',
+    })
+    const socket = MockWebSocket.instances[0]
+    if (!socket) throw new Error('missing web terminal socket')
+    const expectation = expect(createPromise).rejects.toThrow('Terminal socket error before open')
+
+    socket.emitError()
+
+    await expectation
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  test('times out create when websocket stays connecting', async () => {
+    vi.useFakeTimers()
+    try {
+      const fetchMock = vi.fn()
+      vi.stubGlobal('fetch', fetchMock)
+      const { terminalBridge } = await import('#/web/terminal.ts')
+      const createPromise = terminalBridge.create({
+        repoRoot: '/tmp/repo',
+        branch: 'feature',
+        worktreePath: '/tmp/repo',
+        kind: 'primary',
+      })
+      const socket = MockWebSocket.instances[0]
+      if (!socket) throw new Error('missing web terminal socket')
+      const expectation = expect(createPromise).rejects.toThrow('Terminal socket open timed out')
+
+      await vi.advanceTimersByTimeAsync(10_000)
+
+      await expectation
+      expect(fetchMock).not.toHaveBeenCalled()
+      expect(socket.readyState).toBe(MockWebSocket.CLOSED)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  test('times out session list loading when websocket stays connecting', async () => {
+    vi.useFakeTimers()
+    try {
+      const fetchMock = vi.fn()
+      vi.stubGlobal('fetch', fetchMock)
+      const { terminalBridge } = await import('#/web/terminal.ts')
+      const listPromise = terminalBridge.listSessions({ repoRoot: '/tmp/repo' })
+      const socket = MockWebSocket.instances[0]
+      if (!socket) throw new Error('missing web terminal socket')
+      const expectation = expect(listPromise).rejects.toThrow('Terminal socket open timed out')
+
+      await vi.advanceTimersByTimeAsync(10_000)
+
+      await expectation
+      expect(fetchMock).not.toHaveBeenCalled()
+      expect(socket.readyState).toBe(MockWebSocket.CLOSED)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   test('does not fall back to http when list websocket cannot open', async () => {
     const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
@@ -494,6 +565,29 @@ describe('terminal web host bridge', () => {
 
     await expect(prunePromise).resolves.toEqual({ pruned: 1, remaining: 0 })
     expect(socket.readyState).toBe(MockWebSocket.CLOSED)
+  })
+
+  test('closes an idle terminal socket after a one-shot websocket request times out without subscribers', async () => {
+    vi.useFakeTimers()
+    try {
+      const { terminalBridge } = await import('#/web/terminal.ts')
+      const prunePromise = terminalBridge.pruneTerminals('/tmp/repo')
+      const socket = MockWebSocket.instances[0]
+      if (!socket) throw new Error('missing web terminal socket')
+
+      socket.emitOpen()
+      await Promise.resolve()
+      const request = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'prune')
+      expect(request).toMatchObject({ type: 'request', action: 'prune' })
+      const expectation = expect(prunePromise).rejects.toThrow('Terminal request timed out')
+
+      await vi.advanceTimersByTimeAsync(30_000)
+
+      await expectation
+      expect(socket.readyState).toBe(MockWebSocket.CLOSED)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   test('does not fall back to http when create/list/snapshot/prune websocket payloads resolve successfully', async () => {
@@ -632,6 +726,40 @@ describe('terminal web host bridge', () => {
     expect(onOutput).toHaveBeenCalledTimes(1)
     secondDispose()
     disposeMessage()
+  })
+
+  test('keeps a connecting terminal socket open when a one-shot request arrives after subscribers drop', async () => {
+    const { terminalBridge } = await import('#/web/terminal.ts')
+    const dispose = terminalBridge.onOutput(() => {})
+    expect(MockWebSocket.instances).toHaveLength(1)
+    const socket = MockWebSocket.instances[0]
+    if (!socket) throw new Error('missing web terminal socket')
+
+    dispose()
+    const createPromise = terminalBridge.create({
+      repoRoot: '/tmp/repo',
+      branch: 'feature',
+      worktreePath: '/tmp/repo',
+      kind: 'primary',
+    })
+    socket.emitOpen()
+    await Promise.resolve()
+
+    expect(socket.readyState).toBe(MockWebSocket.OPEN)
+    const request = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'create')
+    expect(request).toMatchObject({ type: 'request', action: 'create' })
+    socket.emitMessage(
+      JSON.stringify({
+        type: 'response',
+        requestId: request?.requestId,
+        ok: true,
+        action: 'create',
+        payload: { ok: true, action: 'created', key: 'key_1', sessions: [] },
+      }),
+    )
+
+    await expect(createPromise).resolves.toMatchObject({ ok: true, key: 'key_1' })
+    expect(socket.readyState).toBe(MockWebSocket.CLOSED)
   })
 
   test('ignores stale terminal socket events after reconnect creates a newer socket', async () => {

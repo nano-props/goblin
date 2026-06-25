@@ -1672,7 +1672,7 @@ describe('TerminalSlot', () => {
     }
   })
 
-  test('empty-state CTA failure toasts error.terminal-create-failed', async () => {
+  test('empty-state CTA failure uses terminal create feedback toast', async () => {
     // Locks the failure path of the new empty-state CTA. The create
     // throws (e.g., server rejected with error.terminal-create-failed),
     // and the slot surfaces that to the user via sonner.error so they
@@ -1740,7 +1740,9 @@ describe('TerminalSlot', () => {
         button?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
         await new Promise((r) => setTimeout(r, 0))
       })
-      expect(toast.error).toHaveBeenCalledWith('error.terminal-create-failed')
+      expect(toast.error).toHaveBeenCalledWith('action.result-error', {
+        description: 'error.terminal-create-failed',
+      })
     } finally {
       await act(async () => root.unmount())
       container.remove()

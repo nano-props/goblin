@@ -23,6 +23,16 @@ import type { WorktreeTerminalSnapshot } from '#/web/components/terminal/types.t
 import type { WorkspacePaneStaticViewType, WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
 
+const toastMocks = vi.hoisted(() => ({
+  error: vi.fn(),
+}))
+
+vi.mock('sonner', () => ({
+  toast: {
+    error: toastMocks.error,
+  },
+}))
+
 const REPO_ID = '/tmp/gbl-workspace-command-repo'
 const WORKTREE_PATH = '/tmp/gbl-workspace-command-worktree'
 const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
@@ -34,6 +44,7 @@ beforeEach(() => {
 
 afterEach(() => {
   setTerminalSlotCommandBridge(null)
+  toastMocks.error.mockClear()
 })
 
 describe('workspace commands', () => {
@@ -339,6 +350,39 @@ describe('workspace commands', () => {
     await runNewTerminalTabCommand({ repoId: REPO_ID, navigation: navigationWith() })
 
     expect(tabOrderFor('feature/worktree')).toEqual([staticEntry('status'), terminalEntry('slot-1')])
+  })
+
+  test('new terminal tab command catches create failures and shows feedback', async () => {
+    seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      selectedBranch: 'feature/worktree',
+      preferredWorkspacePaneView: 'status',
+      workspacePaneTabOrderByBranch: {
+        'feature/worktree': [staticEntry('status')],
+      },
+    })
+    const createTerminal = vi.fn(async () => {
+      throw new Error('Terminal socket open timed out')
+    })
+    setTerminalSlotCommandBridge({
+      worktreeSnapshot: () => emptyWorktreeSnapshot(),
+      createTerminal,
+      selectTerminal: vi.fn(),
+    })
+
+    await expect(
+      runNewTerminalTabCommand({
+        repoId: REPO_ID,
+        navigation: navigationWith(),
+        t: (key) => key,
+      }),
+    ).resolves.toBe(false)
+
+    expect(toastMocks.error).toHaveBeenCalledWith('action.result-error', {
+      description: 'error.terminal-connection-timeout',
+    })
+    expect(tabOrderFor('feature/worktree')).toEqual([staticEntry('status')])
   })
 
   test('close workspace tab command closes the selected terminal when terminal is active', async () => {

@@ -14,7 +14,8 @@ import {
   type BranchWorkspacePaneTab,
   type BranchWorkspacePaneTabModel,
 } from '#/web/components/branch-workspace/workspace-pane-tab-model.ts'
-import { createWorkspacePaneTerminalTab } from '#/web/stores/repos/workspace-pane-terminal-write-paths.ts'
+import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
+import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
 import {
   isWorkspacePaneStaticTabProvider,
   workspacePaneTabProvider,
@@ -29,11 +30,13 @@ interface ShowWorkspacePaneViewCommandOptions {
 interface TerminalPrimaryActionCommandOptions {
   repoId: string | null
   navigation: MainWindowNavigationActions
+  t?: TerminalCreateTranslator
 }
 
 interface NewTerminalTabCommandOptions {
   repoId: string | null
   navigation: MainWindowNavigationActions
+  t?: TerminalCreateTranslator
 }
 
 interface CloseWorkspacePaneTabCommandOptions {
@@ -84,6 +87,7 @@ export async function runShowWorkspacePaneViewCommand({
 export async function runTerminalPrimaryActionCommand({
   repoId,
   navigation,
+  t,
 }: TerminalPrimaryActionCommandOptions): Promise<boolean> {
   if (!repoId) return false
   await runShowWorkspacePaneViewCommand({ repoId, tab: 'terminal', navigation })
@@ -101,19 +105,32 @@ export async function runTerminalPrimaryActionCommand({
     if (firstSession) bridge.selectTerminal(worktreeKey, firstSession.key)
     return true
   }
-  await createWorkspacePaneTerminalTab({ base, createTerminal: bridge.createTerminal })
-  return true
+  const result = await runCreateTerminalTabCommand({
+    base,
+    createTerminal: bridge.createTerminal,
+    t,
+    logMessage: 'terminal primary action create failed',
+  })
+  return result.ok
 }
 
-export async function runNewTerminalTabCommand({ repoId, navigation }: NewTerminalTabCommandOptions): Promise<boolean> {
+export async function runNewTerminalTabCommand({
+  repoId,
+  navigation,
+  t,
+}: NewTerminalTabCommandOptions): Promise<boolean> {
   if (!repoId) return false
   const base = selectedTerminalBase(repoId)
   if (!base) return false
   await runShowWorkspacePaneViewCommand({ repoId, tab: 'terminal', navigation })
   const bridge = readTerminalSlotCommandBridge()
   if (!bridge) return true
-  await createWorkspacePaneTerminalTab({ base, createTerminal: bridge.createTerminal })
-  return true
+  const result = await runCreateTerminalTabCommand({
+    base,
+    createTerminal: bridge.createTerminal,
+    t,
+  })
+  return result.ok
 }
 
 export async function runCloseWorkspacePaneTabCommand({

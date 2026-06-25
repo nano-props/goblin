@@ -1,11 +1,9 @@
 import { useCallback, useMemo } from 'react'
 import { ArrowLeft } from 'lucide-react'
-import { toast } from 'sonner'
 import { useT } from '#/web/stores/i18n.ts'
 import { Toolbar } from '#/web/components/Layout.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
 import { Tip } from '#/web/components/Tip.tsx'
-import { terminalLog } from '#/web/logger.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
 import { useTerminalRepoSyncReady, useWorktreeTerminalSnapshot } from '#/web/components/terminal/terminal-slot-store.ts'
 import { useTerminalSlotContext } from '#/web/components/terminal/terminal-slot-context.ts'
@@ -35,7 +33,7 @@ import { workspacePaneTabOrderForBranch } from '#/web/stores/repos/workspace-pan
 import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
 import { createBranchWorkspacePaneTabModel } from '#/web/components/branch-workspace/workspace-pane-tab-model.ts'
-import { createWorkspacePaneTerminalTab } from '#/web/stores/repos/workspace-pane-terminal-write-paths.ts'
+import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
 import {
   terminalWorkspacePaneTabProvider,
   workspacePaneStaticTabProvider,
@@ -131,10 +129,10 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId, trafficL
   const handleNewTerminal = useCallback(() => {
     if (!terminalBase) return
     enterTerminalTab()
-    void createWorkspacePaneTerminalTab({ base: terminalBase, createTerminal }).catch((err) => {
-      terminalLog.warn('failed to create terminal', { err })
-      const message = err instanceof Error ? err.message : 'error.terminal-create-failed'
-      toast.error(t('action.result-error'), { description: t(message) })
+    void runCreateTerminalTabCommand({
+      base: terminalBase,
+      createTerminal,
+      t,
     })
   }, [createTerminal, terminalBase, enterTerminalTab, t])
 

@@ -16,7 +16,7 @@ import type {
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import { useTerminalSlotContext } from '#/web/components/terminal/terminal-slot-context.ts'
-import { createWorkspacePaneTerminalTab } from '#/web/stores/repos/workspace-pane-terminal-write-paths.ts'
+import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
 import type { WorkspacePanePanelLabel } from '#/web/workspace-pane/workspace-pane-tab-providers.ts'
 
 const DEFAULT_BRANCH_HISTORY_ERROR_KEY = 'error.failed-read-repo'
@@ -279,13 +279,17 @@ function BranchTerminalTab({
   branch: BranchWorkspaceBranch
 }) {
   const { createTerminal } = useTerminalSlotContext()
+  const t = useT()
   const createTerminalForSlot = useCallback(
-    (base: TerminalSlotBase) =>
-      createWorkspacePaneTerminalTab({
+    async (base: TerminalSlotBase) => {
+      await runCreateTerminalTabCommand({
         base,
         createTerminal,
-      }),
-    [createTerminal],
+        t,
+        logMessage: 'workspace pane terminal create failed',
+      })
+    },
+    [createTerminal, t],
   )
   if (!branch.worktree?.path) return null
   return (

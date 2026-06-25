@@ -29,6 +29,7 @@ import {
   runSelectWorkspacePaneTabByIndexCommand,
 } from '#/web/commands/workspace-commands.ts'
 import { getClientBridge } from '#/web/client-bridge.ts'
+import { translate } from '#/web/stores/i18n.ts'
 
 type MoveDirection = 1 | -1
 const INTERACTIVE_SHORTCUT_TARGET_SELECTOR =
@@ -146,7 +147,7 @@ export function useKeyboard({
         const menuBackedShortcut = hasNativeMenuAccelerators()
         if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyN') {
           e.preventDefault()
-          void runNewTerminalTabCommand({ repoId, navigation })
+          void runNewTerminalTabCommand({ repoId, navigation, t: translate })
           return
         }
         if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyW') {

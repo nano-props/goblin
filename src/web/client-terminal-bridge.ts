@@ -46,6 +46,7 @@ export interface ClientServerTerminalConfig {
 }
 
 const WEB_TERMINAL_CLIENT_ID_STORAGE_KEY = 'goblin:web-terminal-client-id'
+const TERMINAL_SOCKET_OPEN_TIMEOUT_MS = 10_000
 const TERMINAL_REQUEST_TIMEOUT_MS = 30_000
 
 export function createServerTerminalBridge(options: {
@@ -86,6 +87,7 @@ export function createServerTerminalBridge(options: {
   let manualSocketClose = false
   let socketGeneration = 0
   let quitting = isAppQuitting()
+  let pendingSocketOpenRequests = 0
   const pendingSocketRequests = new Map<string, PendingSocketRequest>()
 
   function hasRealtimeSubscribers(): boolean {
@@ -101,7 +103,7 @@ export function createServerTerminalBridge(options: {
   }
 
   function shouldKeepSocketOpen(): boolean {
-    return hasRealtimeSubscribers() || pendingSocketRequests.size > 0
+    return hasRealtimeSubscribers() || pendingSocketOpenRequests > 0 || pendingSocketRequests.size > 0
   }
 
   function isActiveSocket(currentSocket: WebSocket, generation: number): boolean {
@@ -495,7 +497,13 @@ export function createServerTerminalBridge(options: {
     action: TAction,
     input: TerminalSocketRequestInputs[TAction],
   ): Promise<TerminalSocketResponseOutputs[TAction]> {
-    const ws = await waitForSocketOpen()
+    pendingSocketOpenRequests += 1
+    let ws: WebSocket
+    try {
+      ws = await waitForSocketOpen()
+    } finally {
+      pendingSocketOpenRequests = Math.max(0, pendingSocketOpenRequests - 1)
+    }
     return await new Promise<TerminalSocketResponseOutputs[TAction]>((resolve, reject) => {
       const requestId = createSocketRequestId()
       const timeout = setTimeout(() => {
@@ -503,6 +511,7 @@ export function createServerTerminalBridge(options: {
         if (!pending) return
         pendingSocketRequests.delete(requestId)
         clearTimeout(pending.timeout)
+        closeSocketIfIdle()
         reject(new Error('Terminal request timed out'))
       }, TERMINAL_REQUEST_TIMEOUT_MS)
       pendingSocketRequests.set(requestId, {
@@ -533,22 +542,45 @@ export function createServerTerminalBridge(options: {
     const currentSocket = socket
     if (!currentSocket) return Promise.reject(new Error('Terminal socket unavailable'))
     if (currentSocket.readyState === WebSocket.OPEN) return Promise.resolve(currentSocket)
+    if (currentSocket.readyState === WebSocket.CLOSED || currentSocket.readyState === WebSocket.CLOSING) {
+      return Promise.reject(new Error('Terminal socket closed before open'))
+    }
     return new Promise<WebSocket>((resolve, reject) => {
+      let timeout: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+        settle(() => {
+          if (socket === currentSocket) {
+            handleSocketDisconnection('Terminal socket open timed out')
+            try {
+              currentSocket.close()
+            } catch {}
+          }
+          reject(new Error('Terminal socket open timed out'))
+        })
+      }, TERMINAL_SOCKET_OPEN_TIMEOUT_MS)
+      const settle = (fn: () => void) => {
+        cleanup()
+        fn()
+      }
       const handleOpen = () => {
-        cleanup()
-        if (socket === currentSocket && currentSocket.readyState === WebSocket.OPEN) resolve(currentSocket)
-        else reject(new Error('Terminal socket replaced before open'))
+        settle(() => {
+          if (socket === currentSocket && currentSocket.readyState === WebSocket.OPEN) resolve(currentSocket)
+          else reject(new Error('Terminal socket replaced before open'))
+        })
       }
-      const handleClose = () => {
-        cleanup()
-        reject(new Error('Terminal socket closed before open'))
-      }
+      const handleClose = () => settle(() => reject(new Error('Terminal socket closed before open')))
+      const handleError = () => settle(() => reject(new Error('Terminal socket error before open')))
       const cleanup = () => {
+        if (timeout !== null) {
+          clearTimeout(timeout)
+          timeout = null
+        }
         currentSocket.removeEventListener?.('open', handleOpen)
         currentSocket.removeEventListener?.('close', handleClose)
+        currentSocket.removeEventListener?.('error', handleError)
       }
       currentSocket.addEventListener('open', handleOpen)
       currentSocket.addEventListener('close', handleClose)
+      currentSocket.addEventListener('error', handleError)
     })
   }
 }

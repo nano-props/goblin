@@ -147,6 +147,7 @@ export async function handleWorkspaceClientIntent(
       return await runNewTerminalTabCommand({
         repoId: plan.repoId,
         navigation: deps.navigation,
+        t: deps.t,
       })
     case 'close-workspace-pane-tab-or-window':
       return await runCloseWorkspacePaneTabOrWindowCommand({ repoId: plan.repoId, navigation: deps.navigation })
@@ -176,6 +177,7 @@ export async function handleWorkspaceClientIntent(
       return await runTerminalPrimaryActionCommand({
         repoId: plan.repoId,
         navigation: deps.navigation,
+        t: deps.t,
       })
     case 'toggle-workspace-focus':
       deps.toggleWorkspaceFocused()
