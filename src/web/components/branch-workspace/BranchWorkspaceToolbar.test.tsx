@@ -407,6 +407,7 @@ describe('BranchWorkspaceToolbar', () => {
 
     expect(pendingView).not.toBeNull()
     expect(pendingView?.className).toContain('flex-1')
+    expect(pendingView?.textContent).not.toContain('terminal.opening')
     expect(tab?.getAttribute('aria-busy')).toBe('true')
     expect(c.querySelector('button[aria-label="terminal.loading"]')).toBeNull()
     expect(c.querySelector('button[aria-label="workspace-pane-views.tabs"]')).not.toBeNull()
@@ -424,6 +425,7 @@ describe('BranchWorkspaceToolbar', () => {
     const tabs = Array.from(c.querySelectorAll('[role="tab"]'))
 
     expect(pendingView).not.toBeNull()
+    expect(pendingView?.textContent).not.toContain('terminal.opening')
     expect(tabs.map((tab) => tab.getAttribute('aria-label'))).toEqual(['tab.status', 'terminal.opening'])
     expect(c.querySelector('[role="tab"][aria-label="terminal.opening"]')?.getAttribute('aria-busy')).toBe('true')
     expect(c.querySelector('button[aria-label="terminal.loading"]')).not.toBeNull()

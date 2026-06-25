@@ -281,7 +281,7 @@ function WorkspacePaneViewSwitcherPopover({
                         <WorkspacePaneViewIcon item={item} active={false} />
                       )}
                     </span>
-                    <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                    <span className="min-w-0 flex-1 truncate">{item.label || item.tooltip}</span>
                     {isTerminalWorkspacePaneTabItem(item) && item.view.hasBell && (
                       <>
                         <span className="h-2 w-2 shrink-0 rounded-full bg-notification" aria-hidden="true" />
@@ -779,10 +779,11 @@ function WorkspacePaneViewChrome({
   onHoverChange,
 }: WorkspacePaneViewChromeProps) {
   const bellUnreadLabel = t('terminal.bell-unread')
+  const accessibleLabel = item.label || item.tooltip
   const ariaLabel =
     isTerminalWorkspacePaneTabItem(item) && item.view.hasBell
-      ? `${item.label} — ${bellUnreadLabel}`
-      : item.label
+      ? `${accessibleLabel} — ${bellUnreadLabel}`
+      : accessibleLabel
   const closeProps = isPendingWorkspacePaneTabItem(item)
     ? ({ closeButton: false } as const)
     : ({
@@ -838,7 +839,9 @@ function WorkspacePaneViewChrome({
       ) : (
         <WorkspacePaneViewIcon item={item} active={isActive} compact={compact} />
       )}
-      <span className="truncate">{item.label}</span>
+      {isPendingWorkspacePaneTabItem(item) && item.busy ? null : item.label ? (
+        <span className="truncate">{item.label}</span>
+      ) : null}
       {isTerminalWorkspacePaneTabItem(item) && item.view.hasBell && (
         <>
           <span className="relative flex h-2 w-2 shrink-0">

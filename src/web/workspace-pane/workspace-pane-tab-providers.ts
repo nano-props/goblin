@@ -179,15 +179,23 @@ export class TerminalWorkspacePaneTabProvider extends WorkspacePaneTabProvider<'
   }
 
   label(input: WorkspacePaneRuntimeTabMetadataInput): string {
+    if (isPlaceholderTerminalTitle(input.view)) {
+      // The server uses "terminal" as a short-lived process-name
+      // placeholder before the shell reports its real name. Keep that
+      // implementation detail out of visible tab text.
+      return ''
+    }
     return input.view.title
   }
 
   tooltip(input: WorkspacePaneRuntimeTabMetadataInput): string {
+    if (isPlaceholderTerminalTitle(input.view)) return input.t('terminal.opening')
     return input.view.originalTitle ?? input.view.fullTitle ?? input.view.title
   }
 
   closeLabel(input: WorkspacePaneRuntimeTabMetadataInput): string {
-    return input.t('terminal.close-named', { name: input.view.title })
+    const name = isPlaceholderTerminalTitle(input.view) ? this.tooltip(input) : input.view.title
+    return input.t('terminal.close-named', { name })
   }
 
   pendingLabel(input: WorkspacePanePendingTabMetadataInput): string {
@@ -213,6 +221,10 @@ export const statusWorkspacePaneTabProvider = new StatusWorkspacePaneTabProvider
 export const changesWorkspacePaneTabProvider = new ChangesWorkspacePaneTabProvider()
 export const historyWorkspacePaneTabProvider = new HistoryWorkspacePaneTabProvider()
 export const terminalWorkspacePaneTabProvider = new TerminalWorkspacePaneTabProvider()
+
+function isPlaceholderTerminalTitle(view: WorkspacePaneViewSummary): boolean {
+  return view.type === 'terminal' && !view.originalTitle && view.title.trim().toLowerCase() === 'terminal'
+}
 
 const STATIC_WORKSPACE_PANE_TAB_PROVIDERS = [
   statusWorkspacePaneTabProvider,

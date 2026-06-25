@@ -771,6 +771,7 @@ describe('WorkspacePaneViewStrip', () => {
     expect(pendingView?.className).toContain('flex-1')
     expect(tablist?.className).toContain('flex-1')
     expect(tab?.getAttribute('aria-busy')).toBe('true')
+    expect(pendingView?.textContent).not.toContain('terminal.opening')
     expect(document.body.querySelectorAll('[role="tab"]')).toHaveLength(1)
     expect(document.body.querySelector('button[aria-label="terminal.loading"]')).toBeNull()
     expect(document.body.querySelector('button[aria-label="workspace-pane-views.tabs"]')).not.toBeNull()
@@ -799,7 +800,44 @@ describe('WorkspacePaneViewStrip', () => {
     expect(pendingView).not.toBeNull()
     expect(tabs).toHaveLength(2)
     expect(tabs.map((tab) => tab.getAttribute('aria-label'))).toEqual(['term-1', 'terminal.opening'])
+    expect(pendingView?.textContent).not.toContain('terminal.opening')
     expect(document.body.querySelector('button[aria-label="terminal.loading"]')).not.toBeNull()
+  })
+
+  test('keeps placeholder terminal titles out of materialized tab text', () => {
+    const placeholderView: TerminalSlotSummary = {
+      ...session({ key: 't1', title: 'terminal', selected: true }),
+      fullTitle: 'terminal',
+      originalTitle: null,
+    }
+    const item = createTerminalWorkspacePaneTabItem({
+      view: placeholderView,
+      label: '',
+      tooltip: 'terminal.opening',
+      closeLabel: 'terminal.close-named',
+    })
+
+    render(
+      <WorkspacePaneViewStrip
+        worktreeTerminalKey="/repo\0/repo/worktree"
+        workspacePaneId="workspace"
+        panelActive
+        items={[item]}
+        activeTabIdentity={terminalWorkspacePaneTabProvider.identity(placeholderView.key)}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    )
+
+    const tab = document.body.querySelector('[role="tab"][aria-label="terminal.opening"]')
+    const terminalView = document.body.querySelector('[data-workspace-pane-view-tooltip-id="terminal:t1"]')
+
+    expect(tab).not.toBeNull()
+    expect(terminalView?.textContent).not.toContain('terminal')
+    expect(terminalView?.textContent).not.toContain('terminal.opening')
   })
 })
 
