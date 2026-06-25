@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { toSafeRepoLocator, toSafeSessionRepoEntry } from '#/shared/input-validation.ts'
 import { serverDataFile } from '#/shared/data-dir.ts'
-import type { EditorPref, LangPref, SessionState, SettingsPrefs, TerminalPref, ThemePref } from '#/shared/api-types.ts'
+import type { LangPref, SessionState, SettingsPrefs, ThemePref } from '#/shared/api-types.ts'
 import { DEFAULT_WORKSPACE_FOCUSED, normalizeWorkspacePaneSize } from '#/shared/workspace-layout.ts'
 import { repoSessionEntryId, type RepoSessionEntry } from '#/shared/remote-repo.ts'
 import {
@@ -18,13 +18,11 @@ import { normalizeGlobalShortcut } from '#/shared/accelerator.ts'
 import { isColorTheme, type ColorTheme } from '#/shared/color-theme.ts'
 import {
   DEFAULT_COLOR_THEME,
-  DEFAULT_EDITOR_APP,
   DEFAULT_FETCH_INTERVAL_SEC,
   DEFAULT_GLOBAL_SHORTCUT,
   DEFAULT_GLOBAL_SHORTCUT_DISABLED,
   DEFAULT_LANG_PREF,
   DEFAULT_SHORTCUTS_DISABLED,
-  DEFAULT_TERMINAL_APP,
   DEFAULT_TERMINAL_NOTIFICATIONS_ENABLED,
   DEFAULT_THEME_PREF,
   MAX_RECENT_REPOS,
@@ -42,8 +40,6 @@ interface ServerSettingsData {
   shortcutsDisabled: boolean
   globalShortcutDisabled: boolean
   globalShortcut: string
-  terminalApp: TerminalPref
-  editorApp: EditorPref
   lanEnabled: boolean
   session: SessionState
   recentRepos: RepoSessionEntry[]
@@ -75,22 +71,6 @@ function normalizeColorTheme(value: unknown): ColorTheme {
   return isColorTheme(value) ? value : DEFAULT_COLOR_THEME
 }
 
-function normalizeTerminalPref(value: unknown): TerminalPref {
-  // `windowsTerminal` is a win32-only option. If a synced settings.json
-  // hands us this value on macOS or Linux, fall back to the default rather
-  // than persisting an unreachable preference. (On win32 we accept it
-  // so the user can explicitly pick Windows Terminal.)
-  if (value === 'auto' || value === 'ghostty' || value === 'terminal') return value
-  if (value === 'windowsTerminal') return process.platform === 'win32' ? value : DEFAULT_TERMINAL_APP
-  return DEFAULT_TERMINAL_APP
-}
-
-function normalizeEditorPref(value: unknown): EditorPref {
-  return value === 'auto' || value === 'vscode' || value === 'cursor' || value === 'windsurf'
-    ? value
-    : DEFAULT_EDITOR_APP
-}
-
 function normalizeTerminalNotificationsEnabled(value: unknown): boolean {
   return value === true
 }
@@ -109,8 +89,6 @@ function settingsPrefsFromData(data: ServerSettingsData): SettingsPrefs {
     shortcutsDisabled: data.shortcutsDisabled,
     globalShortcutDisabled: data.globalShortcutDisabled,
     globalShortcut: data.globalShortcut,
-    terminalApp: data.terminalApp,
-    editorApp: data.editorApp,
     lanEnabled: data.lanEnabled,
   }
 }
@@ -271,8 +249,6 @@ async function readServerSettingsFile(): Promise<ServerSettingsData | null> {
       shortcutsDisabled: parsed.shortcutsDisabled === true,
       globalShortcutDisabled: parsed.globalShortcutDisabled === true,
       globalShortcut: normalizeGlobalShortcut(parsed.globalShortcut),
-      terminalApp: normalizeTerminalPref(parsed.terminalApp),
-      editorApp: normalizeEditorPref(parsed.editorApp),
       lanEnabled: normalizeLanEnabled(parsed.lanEnabled),
       session: normalizeSession(parsed.session),
       recentRepos: normalizeRecentRepos(parsed.recentRepos),
@@ -344,8 +320,6 @@ export async function updateServerSettingsPrefs(patch: ServerSettingsPrefsPatch)
     patch.globalShortcutDisabled === undefined ? data.globalShortcutDisabled : patch.globalShortcutDisabled === true
   const nextGlobalShortcut =
     patch.globalShortcut === undefined ? data.globalShortcut : normalizeGlobalShortcut(patch.globalShortcut)
-  const nextTerminalApp = patch.terminalApp === undefined ? data.terminalApp : normalizeTerminalPref(patch.terminalApp)
-  const nextEditorApp = patch.editorApp === undefined ? data.editorApp : normalizeEditorPref(patch.editorApp)
   const nextLanEnabled = patch.lanEnabled === undefined ? data.lanEnabled : normalizeLanEnabled(patch.lanEnabled)
   const changed =
     data.lang !== nextLang ||
@@ -356,8 +330,6 @@ export async function updateServerSettingsPrefs(patch: ServerSettingsPrefsPatch)
     data.shortcutsDisabled !== nextShortcutsDisabled ||
     data.globalShortcutDisabled !== nextGlobalShortcutDisabled ||
     data.globalShortcut !== nextGlobalShortcut ||
-    data.terminalApp !== nextTerminalApp ||
-    data.editorApp !== nextEditorApp ||
     data.lanEnabled !== nextLanEnabled
   data.lang = nextLang
   data.theme = nextTheme
@@ -367,8 +339,6 @@ export async function updateServerSettingsPrefs(patch: ServerSettingsPrefsPatch)
   data.shortcutsDisabled = nextShortcutsDisabled
   data.globalShortcutDisabled = nextGlobalShortcutDisabled
   data.globalShortcut = nextGlobalShortcut
-  data.terminalApp = nextTerminalApp
-  data.editorApp = nextEditorApp
   data.lanEnabled = nextLanEnabled
   if (changed) await writeServerSettingsFile(data)
   if (cachedFetchIntervalSec !== nextFetchIntervalSec) {

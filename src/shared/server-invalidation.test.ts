@@ -11,8 +11,7 @@ describe('settingsInvalidationScopesForPrefsPatch', () => {
       settingsInvalidationScopesForPrefsPatch({
         lang: 'ko',
         colorTheme: 'macos',
-        terminalApp: 'ghostty',
       }),
-    ).toEqual(['settings-snapshot', 'i18n', 'theme', 'external-apps'])
+    ).toEqual(['settings-snapshot', 'i18n', 'theme'])
   })
 })

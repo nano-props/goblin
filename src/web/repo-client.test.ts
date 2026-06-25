@@ -200,8 +200,11 @@ describe('repo-client', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     const { openRepositoryEditor, openRepositoryInFinder, openRepositoryTerminal } = await import('#/web/repo-client.ts')
-    await expect(openRepositoryTerminal('/tmp/repo')).resolves.toEqual({ ok: true, message: 'server-terminal' })
-    await expect(openRepositoryEditor('/tmp/repo')).resolves.toEqual({ ok: true, message: 'server-editor' })
+    await expect(openRepositoryTerminal('/tmp/repo', 'ghostty')).resolves.toEqual({
+      ok: true,
+      message: 'server-terminal',
+    })
+    await expect(openRepositoryEditor('/tmp/repo', 'windsurf')).resolves.toEqual({ ok: true, message: 'server-editor' })
     await expect(openRepositoryInFinder('/tmp/repo')).resolves.toEqual({ ok: true, message: 'server-finder' })
     expect(openTerminal).not.toHaveBeenCalled()
     expect(openEditor).not.toHaveBeenCalled()
@@ -211,7 +214,7 @@ describe('repo-client', () => {
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
-        body: JSON.stringify({ path: '/tmp/repo' }),
+        body: JSON.stringify({ path: '/tmp/repo', app: 'ghostty' }),
       }),
     )
     expect(fetchMock).toHaveBeenNthCalledWith(
@@ -220,7 +223,7 @@ describe('repo-client', () => {
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
-        body: JSON.stringify({ path: '/tmp/repo' }),
+        body: JSON.stringify({ path: '/tmp/repo', app: 'windsurf' }),
       }),
     )
     expect(fetchMock).toHaveBeenNthCalledWith(

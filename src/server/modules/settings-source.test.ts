@@ -34,8 +34,6 @@ test('initializes server-settings.json with defaults when no persisted settings 
     shortcutsDisabled: false,
     globalShortcutDisabled: false,
     globalShortcut: 'Alt+G',
-    terminalApp: 'auto',
-    editorApp: 'auto',
     lanEnabled: false,
   })
   expect(await mod.getServerSessionState()).toMatchObject({
@@ -67,8 +65,6 @@ test('persists updates and notifies subscribers from the server settings store',
     shortcutsDisabled: true,
     globalShortcutDisabled: true,
     globalShortcut: 'CommandOrControl+Alt+G',
-    terminalApp: 'ghostty',
-    editorApp: 'cursor',
     lanEnabled: false,
   })
   await mod.setServerSessionState({
@@ -99,8 +95,6 @@ test('persists updates and notifies subscribers from the server settings store',
     shortcutsDisabled: true,
     globalShortcutDisabled: true,
     globalShortcut: 'Alt+G',
-    terminalApp: 'ghostty',
-    editorApp: 'cursor',
     lanEnabled: false,
   })
   expect(await reloaded.getServerSessionState()).toMatchObject({

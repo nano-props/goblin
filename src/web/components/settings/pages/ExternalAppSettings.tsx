@@ -13,16 +13,14 @@ import {
   SettingsCard,
   SettingsGroup,
   SettingsListItem,
-  SettingsSelect,
   SettingsList,
-  SettingsRow,
 } from '#/web/components/settings/SettingsPrimitives.tsx'
 import { useHostInfoStore, type ClientPlatform } from '#/web/stores/host-info.ts'
 import { useExternalAppsQuery } from '#/web/settings-queries.ts'
 import { useExternalAppSettingsController } from '#/web/runtime-settings-external-apps.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import type { EditorPref, TerminalPref } from '#/shared/api-types.ts'
 import { cn } from '#/web/lib/cn.ts'
+
 interface ExternalToolItem {
   id: string
   Icon: ComponentType<{ className?: string }>
@@ -50,13 +48,6 @@ const ALL_TERMINAL_APPS: ExternalToolItem[] = [
     titleKey: 'settings.apps.tool.windows-terminal.title',
     commandKey: 'settings.apps.tool.windows-terminal.command',
   },
-]
-
-const ALL_TERMINAL_OPTIONS: { value: TerminalPref; labelKey: string }[] = [
-  { value: 'auto', labelKey: 'settings.terminal.auto' },
-  { value: 'ghostty', labelKey: 'settings.terminal.ghostty' },
-  { value: 'terminal', labelKey: 'settings.terminal.terminal' },
-  { value: 'windowsTerminal', labelKey: 'settings.terminal.windows-terminal' },
 ]
 
 /**
@@ -163,11 +154,9 @@ export function ExternalAppSettings() {
   const t = useT()
   const { data } = useExternalAppsQuery()
   if (!data) return null
-  const terminalApp = data.terminal.pref
   const terminalAppAvailability = data.terminal.appAvailability
-  const editorApp = data.editor.pref
   const editorAppAvailability = data.editor.appAvailability
-  const { refreshExternalApps, refreshing, setTerminalApp, setEditorApp } = useExternalAppSettingsController()
+  const { refreshExternalApps, refreshing } = useExternalAppSettingsController()
   // Read the platform from the host-info store, not `process.platform`:
   // the client is sandboxed and does not have `process` at runtime, so
   // the only reliable source is the public `/api/host` endpoint fetched
@@ -176,45 +165,8 @@ export function ExternalAppSettings() {
   // resolves — the settings page is gated behind login anyway.
   const visibleTerminalIds = PLATFORM_TERMINAL_IDS[useHostInfoStore((s) => s.snapshot?.platform ?? 'web')]
   const terminalApps = ALL_TERMINAL_APPS.filter((item) => visibleTerminalIds.has(item.id))
-  const terminalOptions = ALL_TERMINAL_OPTIONS.filter(
-    (opt) => opt.value === 'auto' || visibleTerminalIds.has(opt.value),
-  )
-  const editorOptions: { value: EditorPref; labelKey: string }[] = [
-    { value: 'auto', labelKey: 'settings.editor.auto' },
-    { value: 'vscode', labelKey: 'settings.editor.vscode' },
-    { value: 'cursor', labelKey: 'settings.editor.cursor' },
-    { value: 'windsurf', labelKey: 'settings.editor.windsurf' },
-  ]
   return (
     <>
-      <SettingsGroup label={t('settings.group.apps')}>
-        <SettingsList>
-          <SettingsRow
-            controlId="settings-terminal"
-            label={t('settings.terminal')}
-            control={
-              <SettingsSelect
-                id="settings-terminal"
-                value={terminalApp}
-                options={terminalOptions.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
-                onChange={(v) => void setTerminalApp(v)}
-              />
-            }
-          />
-          <SettingsRow
-            controlId="settings-editor"
-            label={t('settings.editor')}
-            control={
-              <SettingsSelect
-                id="settings-editor"
-                value={editorApp}
-                options={editorOptions.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
-                onChange={(v) => void setEditorApp(v)}
-              />
-            }
-          />
-        </SettingsList>
-      </SettingsGroup>
       <SettingsGroup
         label={t('settings.apps.group.terminals')}
         action={

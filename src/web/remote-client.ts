@@ -1,6 +1,6 @@
 import { fetchServerJson, postServerJson } from '#/web/lib/server-fetch.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
-import type { EditorPref, TerminalPref } from '#/shared/api-types.ts'
+import type { EditorApp, TerminalApp } from '#/shared/api-types.ts'
 import type {
   RemoteDiagnosticsResult,
   RemotePathSuggestionsInput,
@@ -59,18 +59,15 @@ export async function testRemoteRepositoryConnection(
 export async function openRemoteRepositoryEditor(
   repoId: string,
   worktreePath: string,
-  app?: EditorPref,
+  app: EditorApp,
 ): Promise<ExecResult> {
-  return await postServerJson('/api/remote/open-editor', app ? { repoId, worktreePath, app } : { repoId, worktreePath })
+  return await postServerJson('/api/remote/open-editor', { repoId, worktreePath, app })
 }
 
 export async function openRemoteRepositoryTerminal(
   repoId: string,
   worktreePath: string,
-  app?: TerminalPref,
+  app: TerminalApp,
 ): Promise<ExecResult> {
-  return await postServerJson(
-    '/api/remote/open-terminal',
-    app ? { repoId, worktreePath, app } : { repoId, worktreePath },
-  )
+  return await postServerJson('/api/remote/open-terminal', { repoId, worktreePath, app })
 }

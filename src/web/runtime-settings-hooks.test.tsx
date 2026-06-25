@@ -104,15 +104,11 @@ describe('runtime settings hooks', () => {
   test('reads external app runtime settings from the runtime external apps snapshot', async () => {
     mainWindowQueryClient.setQueryData(externalAppsQueryKey(), {
       terminal: {
-        pref: 'ghostty',
-        resolved: 'ghostty',
         available: true,
         appAvailability: { ghostty: true, terminal: false, windowsTerminal: false },
         detectedAt: 1,
       },
       editor: {
-        pref: 'cursor',
-        resolved: 'cursor',
         available: true,
         appAvailability: { vscode: true, cursor: true, windsurf: false },
         detectedAt: 1,
@@ -128,11 +124,7 @@ describe('runtime settings hooks', () => {
     await renderWithMainWindowQueryClient(<HookHost />)
 
     expect(result).toMatchObject({
-      terminalApp: 'ghostty',
-      resolvedTerminalApp: 'ghostty',
       terminalAvailable: true,
-      editorApp: 'cursor',
-      resolvedEditorApp: 'cursor',
       editorAvailable: true,
     })
   })

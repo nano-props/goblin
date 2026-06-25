@@ -1,8 +1,8 @@
 import type { ComponentType } from 'react'
 import type {
   EditorAppAvailability,
-  ResolvedEditorApp,
-  ResolvedTerminalApp,
+  EditorApp,
+  TerminalApp,
   TerminalAppAvailability,
 } from '#/shared/api-types.ts'
 import {
@@ -14,8 +14,8 @@ import {
   WindsurfIcon,
 } from '#/web/components/ExternalAppIcon/index.tsx'
 
-export type WorkspaceExternalTerminalApp = Extract<ResolvedTerminalApp, 'ghostty' | 'terminal'>
-export type WorkspaceExternalEditorApp = ResolvedEditorApp
+export type WorkspaceExternalTerminalApp = Extract<TerminalApp, 'ghostty' | 'terminal'>
+export type WorkspaceExternalEditorApp = EditorApp
 
 interface WorkspaceExternalAppBase<TKind extends 'terminal' | 'editor' | 'finder'> {
   kind: TKind

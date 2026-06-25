@@ -23,8 +23,6 @@ function installBridge(sessionOverrides: Record<string, unknown> = {}) {
             globalShortcutDisabled: false,
             globalShortcut: 'CommandOrControl+Shift+G',
             globalShortcutRegistered: false,
-            terminalApp: 'auto',
-            editorApp: 'auto',
             lanEnabled: false,
             session: {
               openRepos: [],

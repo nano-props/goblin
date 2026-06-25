@@ -1,7 +1,7 @@
 import { openExternalUrl } from '#/web/app-shell-client.ts'
 import { postServerJson } from '#/web/lib/server-fetch.ts'
 import type { CloneRepoResult, PullRequestEntry, RepoSnapshot, RepositoryLogResponse } from '#/shared/api-types.ts'
-import type { EditorPref, TerminalPref } from '#/shared/api-types.ts'
+import type { EditorApp, TerminalApp } from '#/shared/api-types.ts'
 import type { ExecResult, LogEntry, PullRequestFetchMode, WorktreeStatus } from '#/shared/git-types.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import type { ProbeResult } from '#/shared/api-types.ts'
@@ -183,12 +183,12 @@ export async function openRepositoryRemote(cwd: string, branch?: string): Promis
   return opened.ok ? { ok: true, message: '' } : opened
 }
 
-export async function openRepositoryTerminal(path: string, app?: TerminalPref): Promise<ExecResult> {
-  return await postServerJson('/api/repo/open-terminal', app ? { path, app } : { path })
+export async function openRepositoryTerminal(path: string, app: TerminalApp): Promise<ExecResult> {
+  return await postServerJson('/api/repo/open-terminal', { path, app })
 }
 
-export async function openRepositoryEditor(path: string, app?: EditorPref): Promise<ExecResult> {
-  return await postServerJson('/api/repo/open-editor', app ? { path, app } : { path })
+export async function openRepositoryEditor(path: string, app: EditorApp): Promise<ExecResult> {
+  return await postServerJson('/api/repo/open-editor', { path, app })
 }
 
 export async function openRepositoryInFinder(path: string): Promise<ExecResult> {

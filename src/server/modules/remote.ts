@@ -25,10 +25,9 @@ import {
   resolveRemoteTarget as resolveSshRemoteTarget,
   resolveTrackedRemoteTarget,
 } from '#/system/ssh/config.ts'
-import { getServerSettingsPrefs } from '#/server/modules/settings-source.ts'
 import { isSafeRemoteAbsolutePath } from '#/system/remote-shell.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
-import type { EditorPref, TerminalPref } from '#/shared/api-types.ts'
+import type { EditorApp, TerminalApp } from '#/shared/api-types.ts'
 
 async function resolveRemoteHomeDirectory(target: RemoteRepoTarget, signal?: AbortSignal): Promise<string> {
   const homeResult = await runRemoteCommand(target, { type: 'printHome' }, { signal })
@@ -251,7 +250,7 @@ export async function testServerRemoteRepository(
  *  parsed back into its alias / remotePath parts, then re-resolved so the
  *  SSH config hasn't been edited out from under us. */
 export async function openServerRemoteEditor(
-  input: { repoId: string; worktreePath: string; app?: EditorPref },
+  input: { repoId: string; worktreePath: string; app: EditorApp },
   signal?: AbortSignal,
 ): Promise<ExecResult> {
   if (!isRemoteRepoId(input.repoId) || !isSafeRemoteAbsolutePath(input.worktreePath)) {
@@ -267,12 +266,11 @@ export async function openServerRemoteEditor(
     return { ok: false, message: 'error.ssh-config-changed' }
   }
 
-  const prefs = await getServerSettingsPrefs()
-  return await openRemoteInPreferredEditor(resolved.target.alias, input.worktreePath, input.app ?? prefs.editorApp)
+  return await openRemoteInPreferredEditor(resolved.target.alias, input.worktreePath, input.app)
 }
 
 export async function openServerRemoteTerminal(
-  input: { repoId: string; worktreePath: string; app?: TerminalPref },
+  input: { repoId: string; worktreePath: string; app: TerminalApp },
   signal?: AbortSignal,
 ): Promise<ExecResult> {
   if (!isRemoteRepoId(input.repoId) || !isSafeRemoteAbsolutePath(input.worktreePath)) {
@@ -288,8 +286,7 @@ export async function openServerRemoteTerminal(
     return { ok: false, message: 'error.ssh-config-changed' }
   }
 
-  const prefs = await getServerSettingsPrefs()
-  return await openRemoteInPreferredTerminal(resolved.target.alias, input.worktreePath, input.app ?? prefs.terminalApp)
+  return await openRemoteInPreferredTerminal(resolved.target.alias, input.worktreePath, input.app)
 }
 
 function classifyResolutionFailure(message: string): RemoteDiagnosticCategory {

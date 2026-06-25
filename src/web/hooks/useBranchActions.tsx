@@ -2,7 +2,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { remoteRepoTarget } from '#/web/stores/repos/helpers.ts'
 import type { RepoBranchState } from '#/web/stores/repos/types.ts'
 import type { ExecResult } from '#/web/types.ts'
-import type { EditorPref, TerminalPref } from '#/shared/api-types.ts'
+import type { EditorApp, TerminalApp } from '#/shared/api-types.ts'
 import { PROTECTED_BRANCHES } from '#/shared/git-types.ts'
 import {
   getRepositoryPatch,
@@ -158,34 +158,22 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
     runRepoAction({ kind: 'push', branch: branch.name })
   }
 
-  function openTerminal(app?: TerminalPref) {
+  function openTerminal(app: TerminalApp) {
     if (!branch.worktree?.path) return
     const worktreePath = branch.worktree.path
     if (remoteRepoTarget(repo.id, repo.remote.lifecycle)) {
-      return runUiAction('terminal', () =>
-        app
-          ? openRemoteRepositoryTerminal(repo.id, worktreePath, app)
-          : openRemoteRepositoryTerminal(repo.id, worktreePath),
-      )
+      return runUiAction('terminal', () => openRemoteRepositoryTerminal(repo.id, worktreePath, app))
     }
-    return runUiAction('terminal', () =>
-      app ? openRepositoryTerminal(worktreePath, app) : openRepositoryTerminal(worktreePath),
-    )
+    return runUiAction('terminal', () => openRepositoryTerminal(worktreePath, app))
   }
 
-  function openEditor(app?: EditorPref) {
+  function openEditor(app: EditorApp) {
     if (!branch.worktree?.path) return
     const worktreePath = branch.worktree.path
     if (remoteRepoTarget(repo.id, repo.remote.lifecycle)) {
-      return runUiAction('editor', () =>
-        app
-          ? openRemoteRepositoryEditor(repo.id, worktreePath, app)
-          : openRemoteRepositoryEditor(repo.id, worktreePath),
-      )
+      return runUiAction('editor', () => openRemoteRepositoryEditor(repo.id, worktreePath, app))
     }
-    return runUiAction('editor', () =>
-      app ? openRepositoryEditor(worktreePath, app) : openRepositoryEditor(worktreePath),
-    )
+    return runUiAction('editor', () => openRepositoryEditor(worktreePath, app))
   }
 
   function openFinder() {

@@ -1,5 +1,4 @@
 import { publishSettingsInvalidation } from '#/server/modules/invalidation-broker.ts'
-import { buildServerExternalAppsSnapshot } from '#/server/modules/external-apps.ts'
 import {
   addServerRecentRepo,
   clearServerRecentRepos,
@@ -59,9 +58,6 @@ export async function applyServerSettingsPrefsWrite(
     ok: true,
     settings,
     ...('lang' in patch ? { i18n: resolveI18nSnapshot(settings.lang, options.acceptLanguage) } : {}),
-    ...(patch.terminalApp !== undefined || patch.editorApp !== undefined
-      ? { externalApps: await buildServerExternalAppsSnapshot(settings, options.signal) }
-      : {}),
   }
 }
 

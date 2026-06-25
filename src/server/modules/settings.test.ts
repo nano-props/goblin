@@ -30,8 +30,6 @@ describe('server settings snapshot runtime state', () => {
       shortcutsDisabled: false,
       globalShortcutDisabled: false,
       globalShortcut: 'Alt+G',
-      terminalApp: 'auto',
-      editorApp: 'auto',
       lanEnabled: false,
     })
     mocks.getServerSessionState.mockResolvedValue(defaultSessionState())

@@ -34,8 +34,6 @@ function settingsPrefs(overrides: Partial<SettingsPrefs> = {}): SettingsPrefs {
     shortcutsDisabled: false,
     globalShortcutDisabled: false,
     globalShortcut: '',
-    terminalApp: 'auto',
-    editorApp: 'auto',
     lanEnabled: false,
     ...overrides,
   }
@@ -161,28 +159,15 @@ vi.mock('#/main/menu-state.ts', () => ({
 }))
 
 vi.mock('#/system/terminals.ts', () => ({
-  getResolvedTerminalApp: vi.fn(() => Promise.resolve(null)),
-  getTerminalActionAvailability: vi.fn(() => ({ ghostty: false, terminal: true, windowsTerminal: false })),
   getTerminalAppAvailability: vi.fn(() => Promise.resolve({ ghostty: false, terminal: true, windowsTerminal: false })),
   openInPreferredTerminal: vi.fn(),
-  resolveTerminalApp: vi.fn((_pref, availability) =>
-    availability.ghostty
-      ? 'ghostty'
-      : availability.terminal
-        ? 'terminal'
-        : availability.windowsTerminal
-          ? 'windowsTerminal'
-          : null,
-  ),
+  openRemoteInPreferredTerminal: vi.fn(),
 }))
 
 vi.mock('#/system/editors.ts', () => ({
-  getResolvedEditorApp: vi.fn(() => null),
   getEditorAppAvailability: vi.fn(() => ({ vscode: false, cursor: false, windsurf: false })),
   openInPreferredEditor: vi.fn(),
-  resolveEditorApp: vi.fn((_pref, availability) =>
-    availability.vscode ? 'vscode' : availability.cursor ? 'cursor' : availability.windsurf ? 'windsurf' : null,
-  ),
+  openRemoteInPreferredEditor: vi.fn(),
 }))
 
 vi.mock('#/main/client-surface-events.ts', () => ({
@@ -538,15 +523,6 @@ describe('main repo ipc cancellation', () => {
     expect(result).toEqual({
       ok: true,
       data: { accelerator: 'Alt+G', registered: false },
-    })
-  })
-
-  test('returns NOT_FOUND for settings mutations that now belong to the embedded server path', async () => {
-    const result = await invokeIpc('settings.setEditorApp', { pref: 'cursor' })
-
-    expect(result).toEqual({
-      ok: false,
-      error: { name: 'IpcError', code: 'NOT_FOUND', message: 'Unknown IPC procedure: settings.setEditorApp' },
     })
   })
 

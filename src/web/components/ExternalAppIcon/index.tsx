@@ -1,5 +1,5 @@
-import type { ResolvedEditorApp, ResolvedTerminalApp } from '#/shared/api-types.ts'
-import { Code2, SquareTerminal, Terminal } from 'lucide-react'
+import type { EditorApp, TerminalApp } from '#/shared/api-types.ts'
+import { SquareTerminal } from 'lucide-react'
 import { AppleTerminalIcon } from '#/web/components/ExternalAppIcon/AppleTerminalIcon.tsx'
 import { CursorIcon } from '#/web/components/ExternalAppIcon/CursorIcon.tsx'
 import { GhosttyIcon } from '#/web/components/ExternalAppIcon/GhosttyIcon.tsx'
@@ -7,18 +7,14 @@ import type { AppIconProps } from '#/web/components/ExternalAppIcon/types.ts'
 import { VSCodeIcon } from '#/web/components/ExternalAppIcon/VSCodeIcon.tsx'
 import { WindsurfIcon } from '#/web/components/ExternalAppIcon/WindsurfIcon.tsx'
 import { svgClass } from '#/web/components/ExternalAppIcon/svg-class.ts'
-type TerminalIconPref = ResolvedTerminalApp | 'auto'
-type EditorIconPref = ResolvedEditorApp | 'auto'
 
-export function TerminalAppIcon({ pref, className }: AppIconProps & { pref: TerminalIconPref }) {
-  if (pref === 'auto') return <Terminal className={svgClass(className)} />
+export function TerminalAppIcon({ pref, className }: AppIconProps & { pref: TerminalApp }) {
   if (pref === 'terminal') return <AppleTerminalIcon className={className} />
   if (pref === 'windowsTerminal') return <SquareTerminal className={svgClass(className)} />
   return <GhosttyIcon className={className} />
 }
 
-export function EditorAppIcon({ pref, className }: AppIconProps & { pref: EditorIconPref }) {
-  if (pref === 'auto') return <Code2 className={svgClass(className)} />
+export function EditorAppIcon({ pref, className }: AppIconProps & { pref: EditorApp }) {
   if (pref === 'cursor') return <CursorIcon className={className} />
   if (pref === 'windsurf') return <WindsurfIcon className={className} />
   return <VSCodeIcon className={className} />

@@ -26,11 +26,7 @@ vi.mock('#/web/main-window-navigation.tsx', () => ({
 
 vi.mock('#/web/runtime-settings-external-apps.ts', () => ({
   useRuntimeExternalAppSettings: () => ({
-    terminalApp: 'auto',
-    resolvedTerminalApp: 'terminal',
     terminalAvailable: true,
-    editorApp: 'auto',
-    resolvedEditorApp: 'vscode',
     editorAvailable: true,
   }),
 }))

@@ -39,8 +39,6 @@ function defaultIpcResult(path: string, input?: unknown) {
       globalShortcutDisabled: false,
       globalShortcut: 'CommandOrControl+Shift+G',
       globalShortcutRegistered: true,
-      terminalApp: 'auto',
-      editorApp: 'auto',
       lanEnabled: false,
       session: {
         openRepos: [],
@@ -54,22 +52,17 @@ function defaultIpcResult(path: string, input?: unknown) {
   if (path === 'externalApps.get' || path === 'externalApps.refresh') {
     return {
       terminal: {
-        pref: 'auto',
-        resolved: null,
         available: false,
         appAvailability: { ghostty: false, terminal: false, windowsTerminal: false },
         detectedAt: 0,
       },
       editor: {
-        pref: 'auto',
-        resolved: null,
         available: false,
         appAvailability: { vscode: false, cursor: false, windsurf: false },
         detectedAt: 0,
       },
     }
   }
-  if (path === 'settings.setTerminalApp' || path === 'settings.setEditorApp') return input ?? null
   return null
 }
 
