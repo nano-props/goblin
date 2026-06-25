@@ -81,7 +81,7 @@ function RepoShellBranchHeader({ repoId, title }: { repoId: string; title: strin
   return (
     <div className="shrink-0 px-3 pb-2 pt-3">
       <div className="flex h-8 min-w-0 items-center gap-2 px-3">
-        <div className="min-w-0 flex-1 truncate text-xs font-medium text-muted-foreground/70">{title}</div>
+        <div className="min-w-0 flex-1 truncate text-[13px] font-semibold text-muted-foreground">{title}</div>
         <BranchFilterAction repoId={repoId} />
         <RepoSyncAction repoId={repoId} />
       </div>
