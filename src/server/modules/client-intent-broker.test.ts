@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   disconnectAllClientIntentSockets,
-  MAX_RENDERER_INTENT_SOCKETS,
-  publishRendererIntent,
+  MAX_CLIENT_INTENT_SOCKETS,
+  publishClientIntent,
   registerClientIntentSocket,
   ClientIntentSocketLimitError,
   unregisterClientIntentSocket,
@@ -15,7 +15,7 @@ describe('client intent broker', () => {
 
   test('returns false when no subscriber is attached', () => {
     expect(
-      publishRendererIntent({ type: 'show-workspace-pane-view-requested', tab: 'changes' }),
+      publishClientIntent({ type: 'show-workspace-pane-view-requested', tab: 'changes' }),
     ).toBe(false)
   })
 
@@ -25,7 +25,7 @@ describe('client intent broker', () => {
     registerClientIntentSocket(first)
     registerClientIntentSocket(second)
 
-    const ok = publishRendererIntent({ type: 'show-workspace-pane-view-requested', tab: 'changes' })
+    const ok = publishClientIntent({ type: 'show-workspace-pane-view-requested', tab: 'changes' })
     expect(ok).toBe(true)
 
     const expected = JSON.stringify({
@@ -43,7 +43,7 @@ describe('client intent broker', () => {
     registerClientIntentSocket(second)
 
     disconnectAllClientIntentSockets()
-    publishRendererIntent({ type: 'show-workspace-pane-view-requested', tab: 'changes' })
+    publishClientIntent({ type: 'show-workspace-pane-view-requested', tab: 'changes' })
 
     expect(first.close).toHaveBeenCalledWith(1001, 'server shutting down')
     expect(second.close).toHaveBeenCalledWith(1001, 'server shutting down')
@@ -52,7 +52,7 @@ describe('client intent broker', () => {
   })
 
   test('rejects the (N+1)th subscriber to prevent socket floods', () => {
-    for (let i = 0; i < MAX_RENDERER_INTENT_SOCKETS; i += 1) {
+    for (let i = 0; i < MAX_CLIENT_INTENT_SOCKETS; i += 1) {
       registerClientIntentSocket({ send: vi.fn(), close: vi.fn() })
     }
     const overflow = { send: vi.fn(), close: vi.fn() }
@@ -60,7 +60,7 @@ describe('client intent broker', () => {
   })
 
   test('frees a slot when a subscriber disconnects', () => {
-    const sockets = Array.from({ length: MAX_RENDERER_INTENT_SOCKETS }, () => ({
+    const sockets = Array.from({ length: MAX_CLIENT_INTENT_SOCKETS }, () => ({
       send: vi.fn(),
       close: vi.fn(),
     }))

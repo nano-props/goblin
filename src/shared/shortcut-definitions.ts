@@ -2,16 +2,16 @@ import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { DictKey } from '#/shared/i18n/dictionaries.ts'
 
 export type BranchActionShortcutAction = 'pull' | 'push' | 'terminal' | 'editor' | 'remote'
-export type RendererNavigationShortcutAction =
+export type ClientNavigationShortcutAction =
   | 'next-branch'
   | 'prev-branch'
   | 'next-workspace-pane-view'
   | 'prev-workspace-pane-view'
-export type RendererAppShortcutAction = 'show-help' | 'dismiss'
-export type RendererKeyboardShortcutAction =
+export type ClientAppShortcutAction = 'show-help' | 'dismiss'
+export type ClientKeyboardShortcutAction =
   | BranchActionShortcutAction
-  | RendererNavigationShortcutAction
-  | RendererAppShortcutAction
+  | ClientNavigationShortcutAction
+  | ClientAppShortcutAction
 export type ClientMenuCommandId =
   | 'app-settings'
   | 'file-new-terminal-tab'
@@ -68,8 +68,8 @@ export interface BranchActionShortcutDefinition {
   labelKey: DictKey
 }
 
-export interface RendererKeyboardShortcutDefinition<
-  Action extends RendererKeyboardShortcutAction = RendererKeyboardShortcutAction,
+export interface ClientKeyboardShortcutDefinition<
+  Action extends ClientKeyboardShortcutAction = ClientKeyboardShortcutAction,
 > {
   matches: KeyboardShortcutMatch[]
   action: Action
@@ -77,7 +77,7 @@ export interface RendererKeyboardShortcutDefinition<
   labelKey: DictKey
 }
 
-export const RENDERER_NAVIGATION_SHORTCUTS: RendererKeyboardShortcutDefinition<RendererNavigationShortcutAction>[] = [
+export const CLIENT_NAVIGATION_SHORTCUTS: ClientKeyboardShortcutDefinition<ClientNavigationShortcutAction>[] = [
   keyboardShortcut([{ key: 'j' }, { key: 'ArrowDown' }], 'next-branch', [['j'], ['↓']], 'help.row.next-branch'),
   keyboardShortcut([{ key: 'k' }, { key: 'ArrowUp' }], 'prev-branch', [['k'], ['↑']], 'help.row.prev-branch'),
   keyboardShortcut([{ key: 'ArrowRight' }], 'next-workspace-pane-view', [['→']], 'help.row.switch-workspace-pane-view'),
@@ -92,7 +92,7 @@ export const BRANCH_ACTION_SHORTCUTS: BranchActionShortcutDefinition[] = [
   branchActionShortcut([{ code: 'KeyG', shiftKey: true }], 'remote', [['⇧', 'G']], 'action.remote'),
 ]
 
-export const RENDERER_APP_SHORTCUTS: RendererKeyboardShortcutDefinition<RendererAppShortcutAction>[] = [
+export const CLIENT_APP_SHORTCUTS: ClientKeyboardShortcutDefinition<ClientAppShortcutAction>[] = [
   keyboardShortcut([{ key: '?' }], 'show-help', [['?']], 'help.row.this-help'),
   keyboardShortcut([{ key: 'Escape' }], 'dismiss', [['Esc']], 'help.row.dismiss'),
 ]
@@ -103,7 +103,7 @@ export const NEW_TERMINAL_TAB_SHORTCUT = 'CmdOrCtrl+N'
 export const CLOSE_WORKSPACE_TAB_OR_WINDOW_SHORTCUT = 'CmdOrCtrl+W'
 export const CLOSE_REPO_SHORTCUT = 'CmdOrCtrl+Shift+W'
 
-export const RENDERER_MENU_COMMANDS: ClientMenuCommandDefinition[] = [
+export const CLIENT_MENU_COMMANDS: ClientMenuCommandDefinition[] = [
   clientMenuCommand(
     'app-settings',
     'menu.app.settings',
@@ -250,26 +250,26 @@ export const RENDERER_MENU_COMMANDS: ClientMenuCommandDefinition[] = [
   clientMenuCommand('help-shortcuts', 'menu.help.shortcuts', { type: 'open-settings-requested', page: 'shortcuts' }),
 ]
 
-export const APP_SHORTCUTS: AcceleratorShortcutDefinition[] = rendererMenuAcceleratorShortcuts([
+export const APP_SHORTCUTS: AcceleratorShortcutDefinition[] = clientMenuAcceleratorShortcuts([
   'file-new-terminal-tab',
   'file-open-local-repo',
   'file-clone-repo',
   'view-refresh',
 ]).concat([{ accelerator: 'CmdOrCtrl+R', labelKey: 'help.row.reload-page' }])
 
-export const WINDOW_REPO_SHORTCUTS: AcceleratorShortcutDefinition[] = rendererMenuAcceleratorShortcuts([
+export const WINDOW_REPO_SHORTCUTS: AcceleratorShortcutDefinition[] = clientMenuAcceleratorShortcuts([
   'window-next-repo',
   'window-prev-repo',
 ])
 
-export const VIEW_SHORTCUTS: AcceleratorShortcutDefinition[] = rendererMenuAcceleratorShortcuts([
+export const VIEW_SHORTCUTS: AcceleratorShortcutDefinition[] = clientMenuAcceleratorShortcuts([
   'view-toggle-focus-mode',
 ])
 
-export const RENDERER_KEYBOARD_SHORTCUTS: RendererKeyboardShortcutDefinition[] = [
-  ...RENDERER_NAVIGATION_SHORTCUTS,
+export const CLIENT_KEYBOARD_SHORTCUTS: ClientKeyboardShortcutDefinition[] = [
+  ...CLIENT_NAVIGATION_SHORTCUTS,
   ...BRANCH_ACTION_SHORTCUTS,
-  ...RENDERER_APP_SHORTCUTS,
+  ...CLIENT_APP_SHORTCUTS,
 ]
 
 export function matchBranchActionShortcut(input: {
@@ -279,16 +279,16 @@ export function matchBranchActionShortcut(input: {
   return matchKeyboardShortcut(BRANCH_ACTION_SHORTCUTS, input)
 }
 
-export function matchRendererKeyboardShortcut(input: {
+export function matchClientKeyboardShortcut(input: {
   key: string
   code: string
   shiftKey: boolean
-}): RendererKeyboardShortcutAction | null {
-  return matchKeyboardShortcut(RENDERER_KEYBOARD_SHORTCUTS, input)
+}): ClientKeyboardShortcutAction | null {
+  return matchKeyboardShortcut(CLIENT_KEYBOARD_SHORTCUTS, input)
 }
 
 export function clientMenuCommandById(id: ClientMenuCommandId): ClientMenuCommandDefinition {
-  const command = RENDERER_MENU_COMMANDS.find((candidate) => candidate.id === id)
+  const command = CLIENT_MENU_COMMANDS.find((candidate) => candidate.id === id)
   if (!command) throw new Error(`Unknown client menu command: ${id}`)
   return command
 }
@@ -314,12 +314,12 @@ export function resolveClientMenuCommandEnabled(
   return command.enabled?.(context)
 }
 
-function keyboardShortcut<Action extends RendererKeyboardShortcutAction>(
+function keyboardShortcut<Action extends ClientKeyboardShortcutAction>(
   matches: KeyboardShortcutMatch[],
   action: Action,
   combos: string[][],
   labelKey: DictKey,
-): RendererKeyboardShortcutDefinition<Action> {
+): ClientKeyboardShortcutDefinition<Action> {
   return { matches, action, combos, labelKey }
 }
 
@@ -361,7 +361,7 @@ function keyboardShortcutMatch(
   return true
 }
 
-function rendererMenuAcceleratorShortcuts(ids: ClientMenuCommandId[]): AcceleratorShortcutDefinition[] {
+function clientMenuAcceleratorShortcuts(ids: ClientMenuCommandId[]): AcceleratorShortcutDefinition[] {
   return ids.map((id) => {
     const command = clientMenuCommandById(id)
     const accelerator = resolveClientMenuCommandAccelerator(command, {})

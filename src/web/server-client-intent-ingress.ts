@@ -13,12 +13,12 @@ import { createServerWebSocketIngress } from '#/web/lib/server-ws-ingress.ts'
 // can later carry additional control messages without collision with
 // data-plane invalidations on `/ws/invalidation`.
 
-interface RendererIntentEnvelope {
+interface ClientIntentEnvelope {
   type: 'client-effect-intent'
   intent: unknown
 }
 
-function parseRendererIntentMessage(data: unknown): ClientEffectIntent | null {
+function parseServerClientIntentMessage(data: unknown): ClientEffectIntent | null {
   if (typeof data !== 'string') return null
   let parsed: unknown
   try {
@@ -27,7 +27,7 @@ function parseRendererIntentMessage(data: unknown): ClientEffectIntent | null {
     return null
   }
   if (!parsed || typeof parsed !== 'object') return null
-  const envelope = parsed as Partial<RendererIntentEnvelope>
+  const envelope = parsed as Partial<ClientIntentEnvelope>
   if (envelope.type !== 'client-effect-intent') return null
   if (!isClientEffectIntent(envelope.intent)) return null
   return envelope.intent
@@ -35,8 +35,8 @@ function parseRendererIntentMessage(data: unknown): ClientEffectIntent | null {
 
 const ingress = createServerWebSocketIngress<ClientEffectIntent>({
   path: '/ws/client-intent',
-  parseMessage: parseRendererIntentMessage,
+  parseMessage: parseServerClientIntentMessage,
 })
 
-export const subscribeServerRendererIntentIngress = ingress.subscribe
-export const resetServerRendererIntentIngressForTests = ingress.resetForTests
+export const subscribeServerClientIntentIngress = ingress.subscribe
+export const resetServerClientIntentIngressForTests = ingress.resetForTests

@@ -1,4 +1,4 @@
-import { emitRendererLocalEvent } from '#/web/local-events.ts'
+import { emitClientLocalEvent } from '#/web/local-events.ts'
 import { resolveWebSocketProtocol } from '#/web/lib/websocket-url.ts'
 import { ACCESS_TOKEN_QUERY } from '#/shared/access-token.ts'
 import {
@@ -37,9 +37,9 @@ import { isAppQuitting, subscribeAppQuitting } from '#/web/app-lifecycle.ts'
 // Matches the server-side `HEARTBEAT_INTERVAL_MS`. Kept as a
 // client-local constant so the client doesn't need to import a
 // server module to know its own beat cadence.
-const TERMINAL_RENDERER_HEARTBEAT_INTERVAL_MS = 30_000
+const TERMINAL_CLIENT_HEARTBEAT_INTERVAL_MS = 30_000
 
-export interface RendererServerTerminalConfig {
+export interface ClientServerTerminalConfig {
   url: string
   accessToken: string
   clientId: string
@@ -49,7 +49,7 @@ const WEB_TERMINAL_CLIENT_ID_STORAGE_KEY = 'goblin:web-terminal-client-id'
 const TERMINAL_REQUEST_TIMEOUT_MS = 30_000
 
 export function createServerTerminalBridge(options: {
-  getServerConfig: () => RendererServerTerminalConfig
+  getServerConfig: () => ClientServerTerminalConfig
   getClientId: () => string
   // `notifyBell` returning `undefined` (rather than a `Promise<false>`)
   // is the *deliberate* signal to fall through to the bridge's
@@ -262,7 +262,7 @@ export function createServerTerminalBridge(options: {
         stopHeartbeat()
         handleSocketDisconnection('Terminal heartbeat send failed')
       }
-    }, TERMINAL_RENDERER_HEARTBEAT_INTERVAL_MS)
+    }, TERMINAL_CLIENT_HEARTBEAT_INTERVAL_MS)
   }
 
   function stopHeartbeat(): void {
@@ -371,7 +371,7 @@ export function createServerTerminalBridge(options: {
         if (native !== undefined) return native
       }
       return showBrowserNotification(input.title, input.body, () => {
-        emitRendererLocalEvent({ type: 'terminal-bell-click', repoRoot: input.repoRoot, key: input.key })
+        emitClientLocalEvent({ type: 'terminal-bell-click', repoRoot: input.repoRoot, key: input.key })
       })
     },
     sendTestNotification() {

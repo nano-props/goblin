@@ -125,8 +125,8 @@ vi.mock('#/main/window.ts', () => ({
 vi.mock('#/main/window-registry.ts', () => ({
   focusedRegisteredSurface: vi.fn(() => null),
   allRegisteredSurfacesWithCapability: vi.fn(() => []),
-  isRegisteredRendererSurfaceId: vi.fn(() => false),
-  registeredRendererSurfaceByWebContentsId: vi.fn(() => null),
+  isRegisteredClientSurfaceId: vi.fn(() => false),
+  registeredClientSurfaceByWebContentsId: vi.fn(() => null),
 }))
 
 vi.mock('#/main/theme.ts', () => ({

@@ -85,7 +85,7 @@ vi.mock('#/main/client-surface-events.ts', () => ({
 }))
 
 vi.mock('#/main/window-shell.ts', () => ({
-  getRendererBaseUrl: vi.fn(() => 'http://127.0.0.1:32100'),
+  getClientBaseUrl: vi.fn(() => 'http://127.0.0.1:32100'),
   getEmbeddedServerUrl: vi.fn(() => 'http://127.0.0.1:32100'),
 }))
 

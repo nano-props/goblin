@@ -686,9 +686,9 @@ describe('terminal web host bridge', () => {
 
   test('emits terminal bell click events from browser notifications in web host mode', async () => {
     const { terminalBridge } = await import('#/web/terminal.ts')
-    const { onRendererLocalEventType, resetRendererLocalEventsForTests } = await import('#/web/local-events.ts')
+    const { onClientLocalEventType, resetClientLocalEventsForTests } = await import('#/web/local-events.ts')
     const bellClick = vi.fn()
-    const dispose = onRendererLocalEventType('terminal-bell-click', bellClick)
+    const dispose = onClientLocalEventType('terminal-bell-click', bellClick)
     const key = '/tmp/repo\0/tmp/repo\0slot-2'
 
     await expect(
@@ -698,6 +698,6 @@ describe('terminal web host bridge', () => {
 
     expect(bellClick).toHaveBeenCalledWith({ type: 'terminal-bell-click', repoRoot: '/tmp/repo', key })
     dispose()
-    resetRendererLocalEventsForTests()
+    resetClientLocalEventsForTests()
   })
 })

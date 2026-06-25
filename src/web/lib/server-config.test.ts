@@ -25,9 +25,9 @@ describe('client server config', () => {
       },
     })
 
-    const { resolveRendererServerConfig } = await import('#/web/lib/server-config.ts')
+    const { resolveClientServerConfig } = await import('#/web/lib/server-config.ts')
 
-    expect(resolveRendererServerConfig()).toEqual({
+    expect(resolveClientServerConfig()).toEqual({
       url: 'http://127.0.0.1:32100',
       accessToken: '',
     })
@@ -50,9 +50,9 @@ describe('client server config', () => {
       },
     })
 
-    const { resolveRendererServerConfig } = await import('#/web/lib/server-config.ts')
+    const { resolveClientServerConfig } = await import('#/web/lib/server-config.ts')
 
-    expect(resolveRendererServerConfig()).toEqual({
+    expect(resolveClientServerConfig()).toEqual({
       url: 'http://127.0.0.1:32100/',
       accessToken: 'secret',
     })

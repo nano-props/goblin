@@ -19,7 +19,7 @@
 import { isAppQuitting, subscribeAppQuitting } from '#/web/app-lifecycle.ts'
 import { resolveWebSocketProtocol } from '#/web/lib/websocket-url.ts'
 import { ACCESS_TOKEN_QUERY } from '#/shared/access-token.ts'
-import { resolveRendererServerConfig } from '#/web/lib/server-config.ts'
+import { resolveClientServerConfig } from '#/web/lib/server-config.ts'
 
 const DEFAULT_RECONNECT_DELAY_MS = 300
 
@@ -76,7 +76,7 @@ export function createServerWebSocketIngress<T>(
   }
 
   function ensureSocket(): void {
-    const server = resolveRendererServerConfig()
+    const server = resolveClientServerConfig()
     if (!server || typeof WebSocket === 'undefined' || socket || listeners.size === 0 || isAppQuitting()) return
     clearReconnectTimer()
     manualSocketClose = false

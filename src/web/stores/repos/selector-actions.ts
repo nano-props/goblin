@@ -132,7 +132,7 @@ export function repoPickerStoreActionsFromStore(
   }
 }
 
-export function rendererEffectIntentStoreActionsFromStore(
+export function clientEffectIntentStoreActionsFromStore(
   state: Pick<ReposStore, 'ensureWorkspaceOpen' | 'setSelectedTerminal' | 'resetLayout' | 'toggleWorkspaceFocused'>,
 ): ClientEffectIntentStoreActions {
   const runtimeCoherent = runtimeCoherentRepoOpenStoreActionsFromStore({
@@ -163,7 +163,7 @@ export function repoPickerStoreActionsEqual(a: RepoPickerStoreActions, b: RepoPi
   return a.ensureWorkspaceOpen === b.ensureWorkspaceOpen
 }
 
-export function rendererEffectIntentStoreActionsEqual(
+export function clientEffectIntentStoreActionsEqual(
   a: ClientEffectIntentStoreActions,
   b: ClientEffectIntentStoreActions,
 ): boolean {

@@ -3,8 +3,8 @@ import type { DictKey } from '#/shared/i18n/dictionaries.ts'
 import {
   APP_SHORTCUTS,
   BRANCH_ACTION_SHORTCUTS,
-  RENDERER_APP_SHORTCUTS,
-  RENDERER_NAVIGATION_SHORTCUTS,
+  CLIENT_APP_SHORTCUTS,
+  CLIENT_NAVIGATION_SHORTCUTS,
   SETTINGS_SHORTCUT_MAC,
   SETTINGS_SHORTCUT_NON_MAC,
   VIEW_SHORTCUTS,
@@ -28,7 +28,7 @@ export function helpShortcutSections(globalShortcut: string, isMac = inferIsMacP
     {
       titleKey: 'help.section.nav',
       rows: [
-        ...RENDERER_NAVIGATION_SHORTCUTS.map(helpRowFromKeyboardDefinition),
+        ...CLIENT_NAVIGATION_SHORTCUTS.map(helpRowFromKeyboardDefinition),
         ...WINDOW_REPO_SHORTCUTS.map((shortcut) => helpRowFromAccelerator(shortcut, isMac)),
       ],
     },
@@ -57,7 +57,7 @@ export function helpShortcutSections(globalShortcut: string, isMac = inferIsMacP
           combos: [acceleratorToKeyLabelsForHelp(isMac ? SETTINGS_SHORTCUT_MAC : SETTINGS_SHORTCUT_NON_MAC, isMac)],
           labelKey: 'help.row.settings',
         },
-        ...RENDERER_APP_SHORTCUTS.map(helpRowFromKeyboardDefinition),
+        ...CLIENT_APP_SHORTCUTS.map(helpRowFromKeyboardDefinition),
       ],
     },
   ]

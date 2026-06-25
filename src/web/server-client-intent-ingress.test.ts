@@ -65,26 +65,26 @@ describe('server client intent source', () => {
 
   test('connects to /ws/client-intent on the resolved server URL', async () => {
     installBootstrap('http://127.0.0.1:32100/', 'tok')
-    const { resetServerRendererIntentIngressForTests, subscribeServerRendererIntentIngress } =
+    const { resetServerClientIntentIngressForTests, subscribeServerClientIntentIngress } =
       await import('#/web/server-client-intent-ingress.ts')
 
-    const dispose = subscribeServerRendererIntentIngress(() => {})
+    const dispose = subscribeServerClientIntentIngress(() => {})
     const expected = new URL('/ws/client-intent', 'http://127.0.0.1:32100/')
     expected.protocol = 'ws:'
     expected.searchParams.set('t', 'tok')
     expect(MockWebSocket.instances).toHaveLength(1)
     expect(MockWebSocket.instances[0]?.url).toBe(expected.toString())
     dispose()
-    resetServerRendererIntentIngressForTests()
+    resetServerClientIntentIngressForTests()
   })
 
   test('dispatches a valid client-effect-intent envelope to the listener', async () => {
     installBootstrap('http://127.0.0.1:32100/', 'tok')
-    const { resetServerRendererIntentIngressForTests, subscribeServerRendererIntentIngress } =
+    const { resetServerClientIntentIngressForTests, subscribeServerClientIntentIngress } =
       await import('#/web/server-client-intent-ingress.ts')
 
     const listener = vi.fn()
-    const dispose = subscribeServerRendererIntentIngress(listener)
+    const dispose = subscribeServerClientIntentIngress(listener)
     const socket = MockWebSocket.instances[0]
     if (!socket) throw new Error('missing socket')
 
@@ -100,16 +100,16 @@ describe('server client intent source', () => {
       tab: 'changes',
     })
     dispose()
-    resetServerRendererIntentIngressForTests()
+    resetServerClientIntentIngressForTests()
   })
 
   test('silently drops malformed envelopes', async () => {
     installBootstrap('http://127.0.0.1:32100/', 'tok')
-    const { resetServerRendererIntentIngressForTests, subscribeServerRendererIntentIngress } =
+    const { resetServerClientIntentIngressForTests, subscribeServerClientIntentIngress } =
       await import('#/web/server-client-intent-ingress.ts')
 
     const listener = vi.fn()
-    const dispose = subscribeServerRendererIntentIngress(listener)
+    const dispose = subscribeServerClientIntentIngress(listener)
     const socket = MockWebSocket.instances[0]
     if (!socket) throw new Error('missing socket')
 
@@ -122,17 +122,17 @@ describe('server client intent source', () => {
 
     expect(listener).not.toHaveBeenCalled()
     dispose()
-    resetServerRendererIntentIngressForTests()
+    resetServerClientIntentIngressForTests()
   })
 
   test('reconnects after unexpected close and ignores stale socket events', async () => {
     vi.useFakeTimers()
     installBootstrap('http://127.0.0.1:32100/', 'tok')
-    const { resetServerRendererIntentIngressForTests, subscribeServerRendererIntentIngress } =
+    const { resetServerClientIntentIngressForTests, subscribeServerClientIntentIngress } =
       await import('#/web/server-client-intent-ingress.ts')
 
     const listener = vi.fn()
-    const dispose = subscribeServerRendererIntentIngress(listener)
+    const dispose = subscribeServerClientIntentIngress(listener)
     const firstSocket = MockWebSocket.instances[0]
     if (!firstSocket) throw new Error('missing initial socket')
 
@@ -155,7 +155,7 @@ describe('server client intent source', () => {
       tab: 'changes',
     })
     dispose()
-    resetServerRendererIntentIngressForTests()
+    resetServerClientIntentIngressForTests()
     vi.useRealTimers()
   })
 
@@ -163,10 +163,10 @@ describe('server client intent source', () => {
     vi.useFakeTimers()
     installBootstrap('http://127.0.0.1:32100/', 'tok')
     const { markAppQuitting } = await import('#/web/app-lifecycle.ts')
-    const { resetServerRendererIntentIngressForTests, subscribeServerRendererIntentIngress } =
+    const { resetServerClientIntentIngressForTests, subscribeServerClientIntentIngress } =
       await import('#/web/server-client-intent-ingress.ts')
 
-    const dispose = subscribeServerRendererIntentIngress(() => {})
+    const dispose = subscribeServerClientIntentIngress(() => {})
     const socket = MockWebSocket.instances[0]
     if (!socket) throw new Error('missing socket')
 
@@ -176,7 +176,7 @@ describe('server client intent source', () => {
     expect(socket.readyState).toBe(MockWebSocket.CLOSED)
     expect(MockWebSocket.instances).toHaveLength(1)
     dispose()
-    resetServerRendererIntentIngressForTests()
+    resetServerClientIntentIngressForTests()
     vi.useRealTimers()
   })
 })

@@ -53,7 +53,7 @@ function resolvePreloadPath(): string {
   return path.join(PRELOAD_DIST_DIR, manifest.file)
 }
 
-function resolveRendererBuildCacheKey(): string | null {
+function resolveClientBuildCacheKey(): string | null {
   if (webDevUrl) return null
   try {
     return createHash('sha256')
@@ -70,7 +70,7 @@ interface ClientEntryUrlOptions {
   routePath?: string
 }
 
-export function getRendererBaseUrl(): string | null {
+export function getClientBaseUrl(): string | null {
   const runtime = getEmbeddedServerRuntime()
   return webDevUrl || runtime?.url || null
 }
@@ -83,7 +83,7 @@ export function getEmbeddedServerUrl(): string | null {
 export function createClientEntryUrl({ entryHtml = 'index.html', routePath = '/' }: ClientEntryUrlOptions): {
   url: URL
 } {
-  const baseUrl = getRendererBaseUrl()
+  const baseUrl = getClientBaseUrl()
   if (!baseUrl) {
     throw new Error(
       app.isPackaged
@@ -96,8 +96,8 @@ export function createClientEntryUrl({ entryHtml = 'index.html', routePath = '/'
     baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`,
   )
   const { resolved, colorTheme } = getTheme()
-  const rendererBuild = resolveRendererBuildCacheKey()
-  if (rendererBuild) url.searchParams.set('appBuild', rendererBuild)
+  const clientBuild = resolveClientBuildCacheKey()
+  if (clientBuild) url.searchParams.set('appBuild', clientBuild)
   registerTrustedAppUrl(url.toString())
   url.searchParams.set('theme', resolved)
   url.searchParams.set('colorTheme', colorTheme || DEFAULT_COLOR_THEME)

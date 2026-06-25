@@ -34,7 +34,7 @@ import { fetchServerJson } from '#/web/lib/server-fetch.ts'
  * client uses when the hydrate hasn't completed (or the host
  * somehow doesn't expose `process.platform`).
  */
-export type RendererPlatform = NodeJS.Platform | 'web'
+export type ClientPlatform = NodeJS.Platform | 'web'
 
 export interface HostInfoSnapshot {
   /** Absolute path of the user's home directory. `''` if the server couldn't determine it. */
@@ -107,6 +107,6 @@ export function homeDirectory(): string {
  * OS-specific UI. Falls back to `'web'` (the same sentinel the
  * old bootstrap used) when the hydrate hasn't completed.
  */
-export function getPlatform(): RendererPlatform {
+export function getPlatform(): ClientPlatform {
   return useHostInfoStore.getState().snapshot?.platform ?? 'web'
 }

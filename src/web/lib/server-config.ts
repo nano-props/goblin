@@ -1,6 +1,6 @@
 import { getInitialBootstrap } from '#/web/bootstrap.ts'
 
-export interface RendererServerConfig {
+export interface ClientServerConfig {
   url: string
   accessToken: string
 }
@@ -16,7 +16,7 @@ function sameOriginServerUrl(): string | null {
 // QR-code/bootstrap handoffs carry an explicit server URL. Embedded and
 // same-origin web renderers do not: they are already loaded from the server
 // origin and authenticate with the cookie the server planted.
-export function resolveRendererServerConfig(): RendererServerConfig | null {
+export function resolveClientServerConfig(): ClientServerConfig | null {
   const fromBootstrap = getInitialBootstrap().initialServer
   if (fromBootstrap?.url) {
     return { url: fromBootstrap.url, accessToken: fromBootstrap.accessToken ?? '' }
@@ -28,12 +28,12 @@ export function resolveRendererServerConfig(): RendererServerConfig | null {
   return null
 }
 
-export function hasRendererServerConfig(): boolean {
-  return resolveRendererServerConfig() !== null
+export function hasClientServerConfig(): boolean {
+  return resolveClientServerConfig() !== null
 }
 
-export function requireRendererServerConfig(): RendererServerConfig {
-  const server = resolveRendererServerConfig()
+export function requireClientServerConfig(): ClientServerConfig {
+  const server = resolveClientServerConfig()
   if (!server) throw new Error('Embedded server unavailable')
   return server
 }

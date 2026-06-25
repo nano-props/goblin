@@ -5,7 +5,7 @@ import type { RepoState, ReposStore } from '#/web/stores/repos/types.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { activeRepoFromStore } from '#/web/stores/repos/selector-state.ts'
 import { useRuntimeFetchSettings } from '#/web/runtime-settings-fetch.ts'
-import { hasRendererServerConfig } from '#/web/lib/server-config.ts'
+import { hasClientServerConfig } from '#/web/lib/server-config.ts'
 
 function isBackgroundSyncEligible(repo: RepoState | null | undefined): repo is RepoState {
   return !!repo && !isRepoUnavailable(repo) && repo.remote.hasRemotes === true
@@ -19,7 +19,7 @@ export function backgroundSyncRepoIdsFromStore(state: Pick<ReposStore, 'activeId
 export function useBackgroundFetch() {
   const eligibleRepoIdsKey = useReposStore((s) => backgroundSyncRepoIdsFromStore(s).join('\0'))
   const { fetchIntervalSec } = useRuntimeFetchSettings()
-  const hasServer = hasRendererServerConfig()
+  const hasServer = hasClientServerConfig()
 
   useEffect(() => {
     if (!hasServer) return

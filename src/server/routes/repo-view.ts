@@ -1,5 +1,5 @@
 import * as v from 'valibot'
-import { publishRendererIntent } from '#/server/modules/client-intent-broker.ts'
+import { publishClientIntent } from '#/server/modules/client-intent-broker.ts'
 import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'
 import { WORKSPACE_PANE_STATIC_VIEW_TYPES } from '#/shared/workspace-pane.ts'
 import type { RepoViewResult } from '#/shared/repo-view.ts'
@@ -22,7 +22,7 @@ export function createRepoViewRoutes() {
     // queue: a queued intent that lands in a stale UI state is
     // worse than no-op, and `g` is human-triggered so the user can
     // simply rerun it.
-    const delivered = publishRendererIntent({ type: 'show-workspace-pane-view-requested', tab })
+    const delivered = publishClientIntent({ type: 'show-workspace-pane-view-requested', tab })
     const result: RepoViewResult = delivered
       ? { ok: true }
       : {

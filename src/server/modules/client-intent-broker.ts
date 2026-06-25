@@ -10,11 +10,11 @@ interface ClientIntentSocket {
 // keeps opening `/ws/client-intent` connections shouldn't pin
 // file descriptors or fanout cost in the server. 32 is generous
 // for a desktop app with at most a few tabs / windows.
-export const MAX_RENDERER_INTENT_SOCKETS = 32
+export const MAX_CLIENT_INTENT_SOCKETS = 32
 
 export class ClientIntentSocketLimitError extends Error {
   constructor() {
-    super(`Too many client-intent subscribers (max ${MAX_RENDERER_INTENT_SOCKETS})`)
+    super(`Too many client-intent subscribers (max ${MAX_CLIENT_INTENT_SOCKETS})`)
     this.name = 'ClientIntentSocketLimitError'
   }
 }
@@ -22,7 +22,7 @@ export class ClientIntentSocketLimitError extends Error {
 const sockets = new Set<ClientIntentSocket>()
 
 export function registerClientIntentSocket(ws: ClientIntentSocket): void {
-  if (sockets.size >= MAX_RENDERER_INTENT_SOCKETS) {
+  if (sockets.size >= MAX_CLIENT_INTENT_SOCKETS) {
     throw new ClientIntentSocketLimitError()
   }
   sockets.add(ws)
@@ -52,7 +52,7 @@ export function disconnectAllClientIntentSockets(): void {
 // invalidation broker's fanout semantics. If a future intent needs
 // per-owner routing, layer it on top — but don't repurpose this
 // broker; the simpler shape is the right default.
-export function publishRendererIntent(intent: ClientEffectIntent): boolean {
+export function publishClientIntent(intent: ClientEffectIntent): boolean {
   if (sockets.size === 0) return false
   const payload = JSON.stringify({ type: 'client-effect-intent', intent })
   for (const socket of Array.from(sockets)) {

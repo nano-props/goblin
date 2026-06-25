@@ -1,9 +1,9 @@
 import { resolveApiBaseUrl } from '#/web/lib/websocket-url.ts'
 import { ACCESS_TOKEN_HEADER } from '#/shared/access-token.ts'
-import { requireRendererServerConfig } from '#/web/lib/server-config.ts'
+import { requireClientServerConfig } from '#/web/lib/server-config.ts'
 
 export async function fetchServerJson<T>(path: string | URL, init?: RequestInit): Promise<T> {
-  const server = requireRendererServerConfig()
+  const server = requireClientServerConfig()
   const url = typeof path === 'string' ? new URL(path, resolveApiBaseUrl(server.url)).toString() : path.toString()
   const { headers: extraHeaders, ...rest } = init ?? {}
   const headers: Record<string, string> = {}

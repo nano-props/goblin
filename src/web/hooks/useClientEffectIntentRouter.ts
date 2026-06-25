@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { onRendererLocalEventType } from '#/web/local-events.ts'
+import { onClientLocalEventType } from '#/web/local-events.ts'
 import { subscribeClientEffectIntent } from '#/web/client-ingress.ts'
-import { subscribeServerRendererIntentIngress } from '#/web/server-client-intent-ingress.ts'
+import { subscribeServerClientIntentIngress } from '#/web/server-client-intent-ingress.ts'
 import { intentLog } from '#/web/logger.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import {
@@ -16,8 +16,8 @@ import type { MainWindowNavigationActions } from '#/web/main-window-navigation.t
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import {
-  rendererEffectIntentStoreActionsEqual,
-  rendererEffectIntentStoreActionsFromStore,
+  clientEffectIntentStoreActionsEqual,
+  clientEffectIntentStoreActionsFromStore,
 } from '#/web/stores/repos/selector-actions.ts'
 
 interface ClientEffectIntentRouterOptions {
@@ -46,8 +46,8 @@ export function useClientEffectIntentRouter({
   // the handler/plan helpers so components do not subscribe independently.
   const { ensureWorkspaceOpen, setSelectedTerminal, resetLayout, toggleWorkspaceFocused } = useStoreWithEqualityFn(
     useReposStore,
-    rendererEffectIntentStoreActionsFromStore,
-    rendererEffectIntentStoreActionsEqual,
+    clientEffectIntentStoreActionsFromStore,
+    clientEffectIntentStoreActionsEqual,
   )
   const t = useT()
   const navigationRef = useRef(navigation)
@@ -110,8 +110,8 @@ export function useClientEffectIntentRouter({
     }
 
     const offIntent = subscribeClientEffectIntent(dispatch)
-    const offServerIntent = subscribeServerRendererIntentIngress(dispatch)
-    const offLocalBellClick = onRendererLocalEventType('terminal-bell-click', (event) => {
+    const offServerIntent = subscribeServerClientIntentIngress(dispatch)
+    const offLocalBellClick = onClientLocalEventType('terminal-bell-click', (event) => {
       handleTerminalBellClickIntent(event, sharedDeps())
     })
 

@@ -3,10 +3,10 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 
 const mocks = vi.hoisted(() => {
-  const rendererIndexHtml = '<!doctype html><script type="module" src="./assets/index-testhash.js"></script>'
+  const clientIndexHtml = '<!doctype html><script type="module" src="./assets/index-testhash.js"></script>'
   const state = {
     isPackaged: false,
-    rendererIndexHtml,
+    clientIndexHtml,
     windows: [] as any[],
     windowOptions: [] as any[],
     webContentsOn: vi.fn(),
@@ -31,7 +31,7 @@ const mocks = vi.hoisted(() => {
     })),
     readFileSync: vi.fn((filePath: string) =>
       filePath.endsWith('/dist/web/index.html')
-        ? rendererIndexHtml
+        ? clientIndexHtml
         : JSON.stringify({ file: 'preload-0.1.0-testhash.cjs' }),
     ),
   }
@@ -145,7 +145,7 @@ describe('main window navigation boundaries', () => {
     mocks.readFileSync.mockReset()
     mocks.readFileSync.mockImplementation((filePath: string) =>
       filePath.endsWith('/dist/web/index.html')
-        ? mocks.rendererIndexHtml
+        ? mocks.clientIndexHtml
         : JSON.stringify({ file: 'preload-0.1.0-testhash.cjs' }),
     )
     mocks.getSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())
@@ -235,7 +235,7 @@ describe('main window navigation boundaries', () => {
     await getOrCreateMainWindow()
 
     const loadedUrl = new URL(mocks.loadURL.mock.calls[0]?.[0])
-    const expectedBuild = createHash('sha256').update(mocks.rendererIndexHtml).digest('hex').slice(0, 12)
+    const expectedBuild = createHash('sha256').update(mocks.clientIndexHtml).digest('hex').slice(0, 12)
     expect(loadedUrl.origin).toBe('http://127.0.0.1:32100')
     expect(loadedUrl.searchParams.get('appBuild')).toBe(expectedBuild)
     expect(loadedUrl.searchParams.get('theme')).toBe('light')

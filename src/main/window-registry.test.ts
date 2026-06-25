@@ -36,8 +36,8 @@ describe('window registry', () => {
     registry.registerClientWindowSurface(main, { windowKey: 'main' })
 
     expect(registry.getMainWindow()).toBe(main)
-    expect(registry.isRegisteredRendererSurfaceId(main.webContents.id)).toBe(true)
-    expect(registry.registeredRendererSurfaceByWebContentsId(main.webContents.id)).toEqual({
+    expect(registry.isRegisteredClientSurfaceId(main.webContents.id)).toBe(true)
+    expect(registry.registeredClientSurfaceByWebContentsId(main.webContents.id)).toEqual({
       windowKey: 'main',
       capabilities: {
         ipcBroadcast: true,

@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import {
   matchBranchActionShortcut,
-  matchRendererKeyboardShortcut,
+  matchClientKeyboardShortcut,
   clientMenuCommandById,
   resolveClientMenuCommandAccelerator,
 } from '#/shared/shortcut-definitions.ts'
@@ -17,13 +17,13 @@ describe('shortcut definitions', () => {
   })
 
   test('matches client navigation and app shortcuts from keyboard input', () => {
-    expect(matchRendererKeyboardShortcut({ key: 'j', code: 'KeyJ', shiftKey: false })).toBe('next-branch')
-    expect(matchRendererKeyboardShortcut({ key: 'ArrowLeft', code: 'ArrowLeft', shiftKey: false })).toBe(
+    expect(matchClientKeyboardShortcut({ key: 'j', code: 'KeyJ', shiftKey: false })).toBe('next-branch')
+    expect(matchClientKeyboardShortcut({ key: 'ArrowLeft', code: 'ArrowLeft', shiftKey: false })).toBe(
       'prev-workspace-pane-view',
     )
-    expect(matchRendererKeyboardShortcut({ key: 'Enter', code: 'Enter', shiftKey: false })).toBeNull()
-    expect(matchRendererKeyboardShortcut({ key: '?', code: 'Slash', shiftKey: true })).toBe('show-help')
-    expect(matchRendererKeyboardShortcut({ key: 'Escape', code: 'Escape', shiftKey: false })).toBe('dismiss')
+    expect(matchClientKeyboardShortcut({ key: 'Enter', code: 'Enter', shiftKey: false })).toBeNull()
+    expect(matchClientKeyboardShortcut({ key: '?', code: 'Slash', shiftKey: true })).toBe('show-help')
+    expect(matchClientKeyboardShortcut({ key: 'Escape', code: 'Escape', shiftKey: false })).toBe('dismiss')
   })
 
   test('resolves fixed close and workspace tab accelerators from shared definitions', () => {

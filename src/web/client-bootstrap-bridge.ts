@@ -104,6 +104,6 @@ export function emptyBootstrapSnapshot(): ClientBootstrapSnapshot {
   return EMPTY_BOOTSTRAP
 }
 
-export function normalizeRendererServerClientId(value: string | null | undefined): string | null {
+export function normalizeClientServerClientId(value: string | null | undefined): string | null {
   return normalizeServerClientId(value)
 }

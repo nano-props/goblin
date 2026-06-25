@@ -6,13 +6,13 @@ import { readNativeBridge } from '#/web/native-bridge.ts'
 import { createHttpClipboardBackend } from '#/web/clipboard/http-backend.ts'
 import {
   emptyBootstrapSnapshot,
-  normalizeRendererServerClientId,
+  normalizeClientServerClientId,
   readWebBootstrap,
 } from '#/web/client-bootstrap-bridge.ts'
 import {
   createServerTerminalBridge,
   readOrCreateWebTerminalClientId,
-  type RendererServerTerminalConfig,
+  type ClientServerTerminalConfig,
 } from '#/web/client-terminal-bridge.ts'
 
 /**
@@ -51,7 +51,7 @@ function capabilitiesFromBridge(bridge: NonNullable<Window['goblinNative']>): Re
  * the same `window.location.origin` + cookie auth flow, so there is
  * no longer an Electron-specific fork here.
  */
-function readServerTerminalConfig(): RendererServerTerminalConfig | null {
+function readServerTerminalConfig(): ClientServerTerminalConfig | null {
   // Two paths can populate the bootstrap's `initialServer`:
   //
   //  - QR-code URL bootstrap (`?accessToken=…`) drops a token on
@@ -72,7 +72,7 @@ function readServerTerminalConfig(): RendererServerTerminalConfig | null {
   // `?t=` query in that case.
   const fromBootstrap = readWebBootstrap(readOrCreateWebTerminalClientId).initialServer
   if (fromBootstrap?.url) {
-    const clientId = normalizeRendererServerClientId(fromBootstrap.clientId) ?? readOrCreateWebTerminalClientId()
+    const clientId = normalizeClientServerClientId(fromBootstrap.clientId) ?? readOrCreateWebTerminalClientId()
     if (!clientId) return null
     return { url: fromBootstrap.url, accessToken: fromBootstrap.accessToken ?? '', clientId }
   }
