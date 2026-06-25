@@ -1,4 +1,4 @@
-import { forwardRef, type ComponentPropsWithoutRef, type HTMLAttributes, type ReactNode } from 'react'
+import { forwardRef, type ComponentPropsWithoutRef, type ReactNode } from 'react'
 import { cn } from '#/web/lib/cn.ts'
 import { focusRing } from '#/web/components/ui/focus.ts'
 
@@ -12,18 +12,8 @@ interface SidebarRowButtonProps extends Omit<ComponentPropsWithoutRef<'button'>,
 }
 
 export const SIDEBAR_ROW_ICON_CLASS = 'flex size-4 shrink-0 items-center justify-center'
-export const SIDEBAR_CHROME_SECTION_CLASS = 'flex shrink-0 flex-col gap-2 p-2'
-export const SIDEBAR_SECTION_HEADER_CLASS = 'flex h-9 items-center gap-2 px-3'
 export const SIDEBAR_ROW_BUTTON_CLASS =
-  'flex h-11 min-w-0 cursor-pointer items-center gap-2.5 rounded-md border border-transparent bg-transparent px-3 text-left text-sm font-medium outline-none transition-colors duration-100 disabled:pointer-events-none disabled:opacity-50'
-
-export function SidebarChromeSection({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn(SIDEBAR_CHROME_SECTION_CLASS, className)} {...props} />
-}
-
-export function SidebarSectionHeader({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn(SIDEBAR_SECTION_HEADER_CLASS, className)} {...props} />
-}
+  'flex h-12 min-w-0 cursor-pointer items-center gap-2.5 rounded-md border border-transparent bg-transparent px-3 text-left text-sm font-medium outline-none transition-colors duration-100 disabled:pointer-events-none disabled:opacity-50'
 
 export const SidebarRowButton = forwardRef<HTMLButtonElement, SidebarRowButtonProps>(function SidebarRowButton(
   {

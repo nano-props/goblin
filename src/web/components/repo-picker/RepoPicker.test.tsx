@@ -96,7 +96,7 @@ describe('RepoPicker', () => {
     expect(currentRepoButton.getAttribute('role')).toBeNull()
     expect(currentRepoButton.getAttribute('aria-selected')).toBeNull()
     expect(currentRepoButton.className).toContain('w-full')
-    expect(currentRepoButton.className).toContain('h-11')
+    expect(currentRepoButton.className).toContain('h-12')
     expect(currentRepoButton.className).toContain('text-sm')
     expect(currentRepoButton.querySelector('.uppercase')).toBeNull()
     expect(currentRepoButton.textContent).toContain('repo-a')

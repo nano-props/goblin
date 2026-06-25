@@ -11,11 +11,7 @@ import {
 import { Tip } from '#/web/components/Tip.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
-import {
-  SidebarChromeSection,
-  SidebarRowButton,
-  SidebarSectionHeader,
-} from '#/web/components/ui/sidebar-row-button.tsx'
+import { SidebarRowButton } from '#/web/components/ui/sidebar-row-button.tsx'
 import { WINDOW_TOPBAR_HEIGHT_PX } from '#/shared/window-chrome.ts'
 
 const NOOP = () => {}
@@ -48,17 +44,8 @@ export function RepoShellSidebar({
           <WorkspaceFocusToggle />
         </div>
       )}
-      <SidebarChromeSection>
-        <RepoPickerRow repoId={repoId} />
-        <CreateWorktreeRowAction repoId={repoId} />
-        <SidebarSectionHeader>
-          <div className="min-w-0 flex-1 truncate text-xs font-medium text-muted-foreground/70">
-            {t('tab.branches')}
-          </div>
-          <RepoSyncAction repoId={repoId} />
-          <BranchFilterAction repoId={repoId} />
-        </SidebarSectionHeader>
-      </SidebarChromeSection>
+      <RepoShellPrimaryActions repoId={repoId} />
+      <RepoShellBranchHeader repoId={repoId} title={t('tab.branches')} />
       <div className="flex min-h-0 flex-1 bg-card">
         {branchContent ?? <BranchNavigator repoId={repoId} />}
       </div>
@@ -67,10 +54,21 @@ export function RepoShellSidebar({
   )
 }
 
+function RepoShellPrimaryActions({ repoId }: { repoId: string }) {
+  return (
+    <div className="shrink-0 px-3 pt-5">
+      <div className="flex min-w-0 flex-col gap-1">
+        <RepoPickerRow repoId={repoId} />
+        <CreateWorktreeRowAction repoId={repoId} />
+      </div>
+    </div>
+  )
+}
+
 function RepoPickerRow({ repoId }: { repoId: string }) {
   const overlayActions = useContext(LayoutOverlayActions)
   return (
-    <div className="flex h-11 min-w-0 shrink-0 items-center">
+    <div className="flex h-12 min-w-0 shrink-0 items-center">
       <RepoPickerHost
         currentRepoId={repoId}
         onOpenRepoPathDialog={overlayActions?.openRepoPathDialog ?? NOOP}
@@ -78,6 +76,18 @@ function RepoPickerRow({ repoId }: { repoId: string }) {
         onClone={overlayActions?.openCloneRepo ?? NOOP}
         surface="sidebar"
       />
+    </div>
+  )
+}
+
+function RepoShellBranchHeader({ repoId, title }: { repoId: string; title: string }) {
+  return (
+    <div className="shrink-0 px-3 pb-2 pt-6">
+      <div className="flex h-9 min-w-0 items-center gap-2 px-3">
+        <div className="min-w-0 flex-1 truncate text-xs font-medium text-muted-foreground/70">{title}</div>
+        <RepoSyncAction repoId={repoId} />
+        <BranchFilterAction repoId={repoId} />
+      </div>
     </div>
   )
 }
