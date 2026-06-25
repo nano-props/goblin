@@ -160,7 +160,7 @@ function CurrentRepoButtonText({
   const connectingTitle = t('repo-picker.connecting-title')
   return (
     <>
-      <span className="truncate font-medium">{repo.name}</span>
+      <span className="truncate font-medium uppercase">{repo.name}</span>
       {state.showConnecting && (
         <span className="shrink-0 text-muted-foreground" aria-label={connectingTitle} title={connectingTitle}>
           <Loader2 size={12} className="animate-spin" aria-hidden />

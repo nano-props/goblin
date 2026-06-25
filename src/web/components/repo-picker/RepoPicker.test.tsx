@@ -98,7 +98,7 @@ describe('RepoPicker', () => {
     expect(currentRepoButton.className).toContain('w-full')
     expect(currentRepoButton.className).toContain('shrink-0')
     expect(currentRepoButton.className).not.toContain('flex-1')
-    expect(currentRepoButton.querySelector('.uppercase')).toBeNull()
+    expect(currentRepoButton.querySelector('.uppercase')).not.toBeNull()
     expect(currentRepoButton.textContent).toContain('repo-a')
     expect(currentRepoButton.hasAttribute('data-interactive')).toBe(true)
     expect(currentRepoButton.closest('nav')?.hasAttribute('data-interactive')).toBe(false)
