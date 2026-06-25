@@ -1030,7 +1030,7 @@ function renderToolbar(options: {
   const createTerminal = vi.fn(async () => 'key')
   const selectTerminal = vi.fn()
   const scrollToBottom = vi.fn()
-  const closeTerminalByDescriptor = vi.fn()
+  const closeTerminalByDescriptor = vi.fn(async () => true)
   const showRepoWorkspacePaneView = vi.fn(options.navigation.showRepoWorkspacePaneView)
   const commandContext: TerminalSlotContextValue = {
     createTerminal,

@@ -30,6 +30,7 @@ import {
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import type { ExecResult } from '#/web/types.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
+import { closeWorkspacePaneTabsForWorktree } from '#/web/workspace-pane/workspace-pane-tab-close.ts'
 
 interface BranchActionDispatchContext {
   repo: BranchActionRepo
@@ -79,7 +80,7 @@ export function dispatchDeleteBranch({
  * Dispatch a `removeWorktree` action against the resolved repo. See
  * `dispatchDeleteBranch` for why this lives outside the hook.
  */
-export function dispatchRemoveWorktree({
+export async function dispatchRemoveWorktree({
   repo,
   target,
   alsoDeleteBranch,
@@ -91,7 +92,22 @@ export function dispatchRemoveWorktree({
   forceDeleteBranch: boolean
   alsoDeleteUpstream: boolean
 }): Promise<ExecResult | null> {
-  return dispatchRepoBranchAction(
+  const preflightFailure = removeWorktreePreflightFailure(repo, target)
+  if (preflightFailure) {
+    recordRemoveWorktreeResult(repo, target, alsoDeleteBranch, preflightFailure)
+    return preflightFailure
+  }
+  const tabsClosed = await closeWorkspacePaneTabsForWorktree({
+    repoId: repo.id,
+    branchName: target.branch,
+    worktreePath: target.path,
+  })
+  if (!tabsClosed) {
+    const result = { ok: false as const, message: 'error.workspace-tab-close-failed' }
+    recordRemoveWorktreeResult(repo, target, alsoDeleteBranch, result)
+    return result
+  }
+  return await dispatchRepoBranchAction(
     repo.id,
     repo.instanceToken,
     {
@@ -119,6 +135,34 @@ export function dispatchRemoveWorktree({
       },
     },
   )
+}
+
+function removeWorktreePreflightFailure(
+  repo: BranchActionRepo,
+  target: RemoveWorktreeDialogPayload,
+): ExecResult | null {
+  const worktree = repo.data.worktreesByPath[target.path]
+  if (!worktree) return null
+  if (worktree.isMain) return { ok: false, message: 'error.cannot-remove-main-worktree' }
+  if (worktree.isLocked === true) return { ok: false, message: 'error.cannot-remove-locked-worktree' }
+  if (worktree.isDirty === true) return { ok: false, message: 'error.cannot-remove-dirty-worktree' }
+  return null
+}
+
+function recordRemoveWorktreeResult(
+  repo: BranchActionRepo,
+  target: RemoveWorktreeDialogPayload,
+  alsoDeleteBranch: boolean,
+  result: ExecResult,
+): void {
+  useReposStore.getState().setLastResult(repo.id, result, repo.instanceToken, {
+    action: {
+      kind: 'removeWorktree',
+      branch: target.branch,
+      worktreePath: target.path,
+      alsoDeleteBranch,
+    },
+  })
 }
 
 /**

@@ -5,12 +5,8 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import type { TerminalSlotBase } from '#/web/components/terminal/types.ts'
-import { workspacePaneTabOrderForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
-import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
-import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import {
   adjacentBranchWorkspacePaneTab,
-  createBranchWorkspacePaneTabModel,
   type BranchWorkspacePaneTab,
   type BranchWorkspacePaneTabModel,
 } from '#/web/components/branch-workspace/workspace-pane-tab-model.ts'
@@ -20,6 +16,10 @@ import {
   isWorkspacePaneStaticTabProvider,
   workspacePaneTabProvider,
 } from '#/web/workspace-pane/workspace-pane-tab-providers.ts'
+import {
+  closeWorkspacePaneTab,
+  workspacePaneTabTargetForBranch,
+} from '#/web/workspace-pane/workspace-pane-tab-close.ts'
 
 interface ShowWorkspacePaneViewCommandOptions {
   repoId: string | null
@@ -154,7 +154,7 @@ export async function runCloseWorkspacePaneTabCommand({
   const previousTabIdentities = target.tabs.map((t) => t.identity)
   const closingIdentity = tab.identity
 
-  const handled = await closeWorkspacePaneCommandTab(target, tab)
+  const handled = await closeWorkspacePaneTab(target, tab)
   if (!handled) return false
 
   if (target.branchName) {
@@ -220,29 +220,6 @@ function selectedBranchWorkspaceTarget(repoId: string): { branchName: string; wo
   return { branchName: branch.name, worktreePath: branch.worktree?.path ?? null }
 }
 
-function closeWorkspacePaneCommandTab(
-  target: BranchWorkspacePaneTabModel,
-  tab: BranchWorkspacePaneTab,
-): Promise<boolean> {
-  if (tab.kind === 'pending') return Promise.resolve(false)
-  if (tab.kind === 'terminal') return closeTerminalWorkspacePaneCommandTab(target, tab)
-  const branchName = target.branchName
-  if (!branchName) return Promise.resolve(false)
-  useReposStore.getState().closeWorkspacePaneStaticView(target.repoId, tab.type, branchName)
-  return Promise.resolve(true)
-}
-
-function closeTerminalWorkspacePaneCommandTab(
-  target: BranchWorkspacePaneTabModel,
-  tab: Extract<BranchWorkspacePaneTab, { kind: 'terminal' }>,
-): Promise<boolean> {
-  if (!target.terminalBase) return Promise.resolve(false)
-  const bridge = readTerminalSlotCommandBridge()
-  if (!bridge?.closeTerminalByDescriptor) return Promise.resolve(false)
-  bridge.closeTerminalByDescriptor(tab.key, target.terminalBase)
-  return Promise.resolve(true)
-}
-
 function showWorkspacePaneCommandTab(
   target: BranchWorkspacePaneTabModel,
   tab: BranchWorkspacePaneTab,
@@ -258,23 +235,5 @@ function workspacePaneCommandTarget(repoId: string): BranchWorkspacePaneTabModel
   const state = useReposStore.getState()
   const repo = state.repos[repoId]
   if (!repo?.ui.selectedBranch) return null
-  const branchName = repo.ui.selectedBranch
-  const branch = repo.data.branches.find((candidate) => candidate.name === branchName)
-  if (!branch) return null
-  const worktreePath = branch.worktree?.path
-  const terminalSyncReady = useRepoSyncStore.getState().ready.get(repoId) === repo.instanceToken
-  const worktreeKey = worktreePath ? worktreeTerminalKey(repo.id, worktreePath) : null
-  const snapshot = worktreeKey ? (readTerminalSlotCommandBridge()?.worktreeSnapshot(worktreeKey) ?? null) : null
-  return createBranchWorkspacePaneTabModel({
-    repoId,
-    branchName,
-    worktreePath: worktreePath ?? null,
-    preferredView: preferredWorkspacePaneViewForBranch(repo.ui, branchName),
-    tabOrder: workspacePaneTabOrderForBranch(repo.ui, branchName),
-    runtimeTerminalViews: snapshot?.slots ?? [],
-    terminalSessionCount: snapshot?.count ?? 0,
-    terminalCreatePending: snapshot?.pendingCreate ?? false,
-    terminalSyncReady,
-    lastClosedTabContext: repo.ui.lastClosedTabContextByBranch[branchName] ?? null,
-  })
+  return workspacePaneTabTargetForBranch(repoId, repo.ui.selectedBranch)
 }

@@ -4,7 +4,8 @@ interface TerminalSlotCommandBridge {
   worktreeSnapshot: (worktreeTerminalKey: string) => WorktreeTerminalSnapshot
   createTerminal: (base: TerminalSlotBase) => Promise<string>
   selectTerminal: (worktreeTerminalKey: string, key: string) => void
-  closeTerminalByDescriptor?: (key: string, base: TerminalSlotBase) => void
+  closeTerminalByDescriptor?: (key: string, base: TerminalSlotBase) => Promise<boolean>
+  closeTerminalsForWorktree?: (base: TerminalSlotBase) => Promise<boolean>
 }
 
 let bridge: TerminalSlotCommandBridge | null = null

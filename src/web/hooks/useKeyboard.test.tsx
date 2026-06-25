@@ -164,7 +164,7 @@ describe('useKeyboard', () => {
       preferredWorkspacePaneView: 'terminal',
     })
     const createTerminal = vi.fn(async () => 'slot-2')
-    const closeTerminalByDescriptor = vi.fn()
+    const closeTerminalByDescriptor = vi.fn(async () => true)
     setTerminalSlotCommandBridge({
       worktreeSnapshot: () => worktreeSnapshot(),
       createTerminal,
@@ -191,7 +191,7 @@ describe('useKeyboard', () => {
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneView: 'terminal',
     })
-    const closeTerminalByDescriptor = vi.fn()
+    const closeTerminalByDescriptor = vi.fn(async () => true)
     setTerminalSlotCommandBridge({
       worktreeSnapshot: () => worktreeSnapshot(),
       createTerminal: vi.fn(async () => 'slot-1'),

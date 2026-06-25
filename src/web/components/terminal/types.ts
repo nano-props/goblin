@@ -145,7 +145,7 @@ export interface TerminalSlotContextValue {
   scrollToBottom: (key: string) => void
   scrollLines: (key: string, amount: number) => void
   clearBell: (key: string) => boolean
-  closeTerminalByDescriptor: (key: string, base: TerminalSlotBase) => void
+  closeTerminalByDescriptor: (key: string, base: TerminalSlotBase) => Promise<boolean>
   attach: (descriptor: TerminalDescriptor, host: HTMLElement) => void
   detach: (key: string, host: HTMLElement) => void
   restart: (key: string) => void
@@ -173,6 +173,7 @@ export interface ManagedTerminalSlotLike {
   detach: (host: HTMLElement, parkingRoot: HTMLElement) => void
   restart: () => void
   dispose: (options?: { closeSlot?: boolean }) => void
+  disposeAndWait: (options?: { closeSlot?: boolean }) => Promise<void>
   snapshot: () => TerminalSnapshot
   isTerminalFocusTarget: (target: EventTarget | null) => boolean
   findNext: (term: string, incremental?: boolean) => TerminalSearchResult

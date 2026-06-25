@@ -9,6 +9,7 @@ import {
   runShowWorkspacePaneViewCommand,
   runTerminalPrimaryActionCommand,
 } from '#/web/commands/workspace-commands.ts'
+import { closeWorkspacePaneTabsForWorktree } from '#/web/workspace-pane/workspace-pane-tab-close.ts'
 import { setTerminalSlotCommandBridge } from '#/web/components/terminal/terminal-slot-command-bridge.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -395,7 +396,7 @@ describe('workspace commands', () => {
         'feature/worktree': [staticEntry('status'), terminalEntry('slot-1')],
       },
     })
-    const closeTerminalByDescriptor = vi.fn()
+    const closeTerminalByDescriptor = vi.fn(async () => true)
     const closeWindow = vi.fn()
     setTerminalSlotCommandBridge({
       worktreeSnapshot: () => worktreeSnapshotWithTerminal(),
@@ -418,6 +419,63 @@ describe('workspace commands', () => {
     expect(closeWindow).not.toHaveBeenCalled()
   })
 
+  test('close workspace tab command waits for terminal resources before recording close context', async () => {
+    seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      selectedBranch: 'feature/worktree',
+      preferredWorkspacePaneView: 'terminal',
+      workspacePaneTabOrderByBranch: {
+        'feature/worktree': [staticEntry('status'), terminalEntry('slot-1')],
+      },
+    })
+    let resolveClose!: (value: boolean) => void
+    const closeTerminalByDescriptor = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveClose = resolve
+        }),
+    )
+    const closeWindow = vi.fn()
+    setTerminalSlotCommandBridge({
+      worktreeSnapshot: () => worktreeSnapshotWithTerminal(),
+      createTerminal: vi.fn(async () => 'slot-2'),
+      selectTerminal: vi.fn(),
+      closeTerminalByDescriptor,
+    })
+
+    let settled = false
+    const closePromise = runCloseWorkspacePaneTabOrWindowCommand({
+      repoId: REPO_ID,
+      navigation: navigationWith(),
+      closeWindow,
+    }).then((result) => {
+      settled = true
+      return result
+    })
+    await Promise.resolve()
+
+    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('slot-1', {
+      repoRoot: REPO_ID,
+      branch: 'feature/worktree',
+      worktreePath: WORKTREE_PATH,
+    })
+    expect(settled).toBe(false)
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.lastClosedTabContextByBranch['feature/worktree'])
+      .toBeUndefined()
+
+    resolveClose(true)
+    await expect(closePromise).resolves.toBe(true)
+
+    expect(settled).toBe(true)
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.lastClosedTabContextByBranch['feature/worktree'])
+      .toEqual({
+        closingIdentity: 'terminal:slot-1',
+        previousTabIdentities: ['status:status', 'terminal:slot-1'],
+      })
+    expect(closeWindow).not.toHaveBeenCalled()
+  })
+
   test('close workspace tab command closes the selected terminal when it is not the first terminal', async () => {
     seedRepoState({
       id: REPO_ID,
@@ -425,7 +483,7 @@ describe('workspace commands', () => {
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneView: 'terminal',
     })
-    const closeTerminalByDescriptor = vi.fn()
+    const closeTerminalByDescriptor = vi.fn(async () => true)
     const closeWindow = vi.fn()
     setTerminalSlotCommandBridge({
       worktreeSnapshot: () => worktreeSnapshotWithSecondTerminalSelected(),
@@ -459,7 +517,7 @@ describe('workspace commands', () => {
       worktreeSnapshot: () => worktreeSnapshotWithTerminal(),
       createTerminal: vi.fn(async () => 'slot-2'),
       selectTerminal: vi.fn(),
-      closeTerminalByDescriptor: vi.fn(),
+      closeTerminalByDescriptor: vi.fn(async () => true),
     })
 
     expect(
@@ -499,7 +557,7 @@ describe('workspace commands', () => {
       worktreeSnapshot: () => worktreeSnapshotWithTerminal(),
       createTerminal: vi.fn(async () => 'slot-2'),
       selectTerminal: vi.fn(),
-      closeTerminalByDescriptor: vi.fn(),
+      closeTerminalByDescriptor: vi.fn(async () => true),
     })
 
     expect(
@@ -546,7 +604,7 @@ describe('workspace commands', () => {
       worktreeSnapshot: () => worktreeSnapshotWithTerminal(),
       createTerminal: vi.fn(async () => 'slot-2'),
       selectTerminal: vi.fn(),
-      closeTerminalByDescriptor: vi.fn(),
+      closeTerminalByDescriptor: vi.fn(async () => true),
     })
 
     expect(
@@ -577,7 +635,7 @@ describe('workspace commands', () => {
       workspacePaneTabOrderByBranch: { 'feature/worktree': [] },
     })
     useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceToken)
-    const closeTerminalByDescriptor = vi.fn()
+    const closeTerminalByDescriptor = vi.fn(async () => true)
     const closeWindow = vi.fn()
     setTerminalSlotCommandBridge({
       worktreeSnapshot: () => emptyWorktreeSnapshot(),
@@ -608,7 +666,7 @@ describe('workspace commands', () => {
       worktreeSnapshot: () => ({ ...emptyWorktreeSnapshot(), pendingCreate: true }),
       createTerminal: vi.fn(async () => 'slot-1'),
       selectTerminal: vi.fn(),
-      closeTerminalByDescriptor: vi.fn(),
+      closeTerminalByDescriptor: vi.fn(async () => true),
     })
 
     expect(
@@ -633,7 +691,7 @@ describe('workspace commands', () => {
       worktreeSnapshot: () => emptyWorktreeSnapshot(),
       createTerminal: vi.fn(async () => 'slot-1'),
       selectTerminal: vi.fn(),
-      closeTerminalByDescriptor: vi.fn(),
+      closeTerminalByDescriptor: vi.fn(async () => true),
     })
 
     expect(
@@ -642,6 +700,81 @@ describe('workspace commands', () => {
 
     expect(closeWindow).not.toHaveBeenCalled()
     expect(preferredWorkspacePaneView()).toBe('terminal')
+    expect(openViewsFor('feature/worktree')).toEqual(['status'])
+  })
+
+  test('close workspace tabs for worktree closes worktree-scoped tabs only', async () => {
+    seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      selectedBranch: 'feature/worktree',
+      preferredWorkspacePaneView: 'status',
+      workspacePaneTabOrderByBranch: {
+        'feature/worktree': [
+          staticEntry('status'),
+          terminalEntry('slot-1'),
+          staticEntry('changes'),
+          staticEntry('history'),
+        ],
+      },
+    })
+    const closeTerminalsForWorktree = vi.fn(async () => true)
+    setTerminalSlotCommandBridge({
+      worktreeSnapshot: () => worktreeSnapshotWithTerminal(),
+      createTerminal: vi.fn(async () => 'slot-2'),
+      selectTerminal: vi.fn(),
+      closeTerminalByDescriptor: vi.fn(async () => true),
+      closeTerminalsForWorktree,
+    })
+
+    await expect(
+      closeWorkspacePaneTabsForWorktree({
+        repoId: REPO_ID,
+        branchName: 'feature/worktree',
+        worktreePath: WORKTREE_PATH,
+      }),
+    ).resolves.toBe(true)
+
+    expect(closeTerminalsForWorktree).toHaveBeenCalledWith({
+      repoRoot: REPO_ID,
+      branch: 'feature/worktree',
+      worktreePath: WORKTREE_PATH,
+    })
+    expect(openViewsFor('feature/worktree')).toEqual(['status', 'history'])
+  })
+
+  test('close workspace tabs for worktree releases pending terminal resources even without a terminal tab', async () => {
+    seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      selectedBranch: 'feature/worktree',
+      preferredWorkspacePaneView: 'status',
+      workspacePaneTabOrderByBranch: {
+        'feature/worktree': [staticEntry('status')],
+      },
+    })
+    const closeTerminalsForWorktree = vi.fn(async () => true)
+    setTerminalSlotCommandBridge({
+      worktreeSnapshot: () => ({ ...emptyWorktreeSnapshot(), pendingCreate: true }),
+      createTerminal: vi.fn(async () => 'slot-1'),
+      selectTerminal: vi.fn(),
+      closeTerminalByDescriptor: vi.fn(async () => true),
+      closeTerminalsForWorktree,
+    })
+
+    await expect(
+      closeWorkspacePaneTabsForWorktree({
+        repoId: REPO_ID,
+        branchName: 'feature/worktree',
+        worktreePath: WORKTREE_PATH,
+      }),
+    ).resolves.toBe(true)
+
+    expect(closeTerminalsForWorktree).toHaveBeenCalledWith({
+      repoRoot: REPO_ID,
+      branch: 'feature/worktree',
+      worktreePath: WORKTREE_PATH,
+    })
     expect(openViewsFor('feature/worktree')).toEqual(['status'])
   })
 

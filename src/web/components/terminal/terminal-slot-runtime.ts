@@ -254,12 +254,18 @@ export class TerminalSlotRuntime {
     this.state.setCanonicalSize(cols, rows)
   }
 
+  ptySessionIdsForClose(): string[] {
+    return Array.from(
+      new Set([this.ptySessionId, this.replacingPtySessionId].filter((id): id is string => !!id)),
+    )
+  }
+
   disposePtySessionIds(): string[] {
-    const ptySessionIds = new Set([this.ptySessionId, this.replacingPtySessionId].filter((id): id is string => !!id))
+    const ptySessionIds = this.ptySessionIdsForClose()
     this.ptySessionId = null
     this.replacingPtySessionId = null
     this.restartOnStart = false
-    return Array.from(ptySessionIds)
+    return ptySessionIds
   }
 
   closeReplacingPtySessionId(): string | null {

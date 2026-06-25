@@ -136,6 +136,14 @@ export class ManagedTerminalSlot {
   }
 
   dispose(options: { closeSlot?: boolean } = {}): void {
+    void this.disposeAndWait(options).catch(() => {
+      // Durable close failures are logged at the registry queue. The
+      // synchronous dispose surface intentionally preserves the old
+      // fire-and-forget behaviour for callers that are not resource gates.
+    })
+  }
+
+  async disposeAndWait(options: { closeSlot?: boolean } = {}): Promise<void> {
     if (this.disposed) return
     this.disposed = true
     this.geometryAbortController?.abort()
@@ -143,26 +151,25 @@ export class ManagedTerminalSlot {
     this.clearTerminalFocusIfOwned()
     this.view.blurIfFocused()
     const ptySessionIds = this.runtime.disposePtySessionIds()
+    const closePromises: Promise<void>[] = []
     if (options.closeSlot !== false) {
       // Hand the close to the registry's durable queue instead of
-      // firing `terminalBridge.close` directly. The queue fires the
-      // close in the background and the next `createTerminal` for
-      // this worktree awaits it, so the next PTY can't reattach to
-      // the still-alive orphan. Failures are logged inside the queue
-      // — the old `void … .catch(() => {})` path silently swallowed
-      // the rejection and let the bug hide.
+      // firing `terminalBridge.close` directly. The queue resolves
+      // only after the server close settles, so async close callers
+      // can use this method as a resource-release barrier.
       for (const ptySessionId of ptySessionIds) {
-        void this.requestDurableClose(ptySessionId).catch(() => {
-          // Already logged at the queue site. Swallow here so a
-          // misbehaving registry hook can never bubble out of
-          // dispose() — the user has already navigated away and a
-          // rejection would just land in an unhandled-rejection log
-          // with no context.
-        })
+        closePromises.push(this.requestDurableClose(ptySessionId))
       }
     }
     this.destroyActiveView()
     this.view.disposeFrame()
+    await Promise.all(closePromises)
+  }
+
+  async closeServerResourcesAndWait(): Promise<void> {
+    if (this.disposed) return
+    const ptySessionIds = this.runtime.ptySessionIdsForClose()
+    await Promise.all(ptySessionIds.map((ptySessionId) => this.requestDurableClose(ptySessionId)))
   }
 
   snapshot() {

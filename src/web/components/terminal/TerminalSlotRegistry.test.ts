@@ -336,7 +336,7 @@ describe('TerminalSlotRegistry', () => {
       ])
     })
 
-    test('session removal callback removes the owned workspace pane tab', () => {
+    test('session removal callback removes the owned workspace pane tab', async () => {
       const descriptor = makeDescriptor('slot-1', 1)
       seedRepoState({
         id: REPO_ROOT,
@@ -365,8 +365,10 @@ describe('TerminalSlotRegistry', () => {
           'client_local',
           new Map(),
         )
+        const session = (registryWithStore as any).sessions.get(descriptor.key)
+        vi.spyOn(session, 'closeServerResourcesAndWait').mockResolvedValue(undefined)
 
-        registryWithStore.closeTerminalByDescriptor(descriptor.key, descriptor)
+        await registryWithStore.closeTerminalByDescriptor(descriptor.key, descriptor)
 
         const repo = useReposStore.getState().repos[REPO_ROOT]
         expect(repo ? workspacePaneTabOrderForBranch(repo.ui, BRANCH) : []).toEqual([
@@ -378,7 +380,7 @@ describe('TerminalSlotRegistry', () => {
       }
     })
 
-    test('session removal callback failures do not block terminal disposal', () => {
+    test('session removal callback failures do not block terminal disposal', async () => {
       const registryWithThrowingCallback = new TerminalSlotRegistry(
         () => REPO_ROOT,
         () => {},
@@ -396,21 +398,88 @@ describe('TerminalSlotRegistry', () => {
         )
         const key = registryWithThrowingCallback.worktreeSnapshot(WORKTREE_KEY).slots[0]!.key
         const session = (registryWithThrowingCallback as any).sessions.get(key)
-        const dispose = vi.spyOn(session, 'dispose')
+        const closeServerResourcesAndWait = vi.spyOn(session, 'closeServerResourcesAndWait').mockResolvedValue(undefined)
+        const dispose = vi.spyOn(session, 'dispose').mockImplementation(() => {})
 
-        expect(() =>
+        await expect(
           registryWithThrowingCallback.closeTerminalByDescriptor(key, {
             repoRoot: REPO_ROOT,
             branch: BRANCH,
             worktreePath: WORKTREE_PATH,
           }),
-        ).not.toThrow()
+        ).resolves.toBe(true)
 
-        expect(dispose).toHaveBeenCalledWith({ closeSlot: true })
+        expect(closeServerResourcesAndWait).toHaveBeenCalled()
+        expect(dispose).toHaveBeenCalledWith({ closeSlot: false })
         expect(registryWithThrowingCallback.isKnownSession(key)).toBe(false)
       } finally {
         registryWithThrowingCallback.destroy()
       }
+    })
+
+    test('closeTerminalByDescriptor resolves after server terminal resources close', async () => {
+      registry.setRepoIndex(makeRepoIndex())
+      registry.reconcileServerSlots(
+        REPO_ROOT,
+        [makeServerSession('pty_session_1_aaaaaaaaa', 'slot-1')],
+        'client_local',
+        new Map(),
+      )
+      const key = registry.worktreeSnapshot(WORKTREE_KEY).slots[0]!.key
+      const session = (registry as any).sessions.get(key)
+      let resolveClose!: () => void
+      vi.spyOn(session, 'closeServerResourcesAndWait').mockImplementation(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveClose = resolve
+          }),
+      )
+
+      let settled = false
+      const closePromise = registry
+        .closeTerminalByDescriptor(key, {
+          repoRoot: REPO_ROOT,
+          branch: BRANCH,
+          worktreePath: WORKTREE_PATH,
+        })
+        .then((result) => {
+          settled = true
+          return result
+        })
+      await Promise.resolve()
+
+      expect(registry.isKnownSession(key)).toBe(true)
+      expect(settled).toBe(false)
+
+      resolveClose()
+      await expect(closePromise).resolves.toBe(true)
+      expect(settled).toBe(true)
+      expect(registry.isKnownSession(key)).toBe(false)
+    })
+
+    test('closeTerminalByDescriptor keeps the session when server resource close fails', async () => {
+      registry.setRepoIndex(makeRepoIndex())
+      registry.reconcileServerSlots(
+        REPO_ROOT,
+        [makeServerSession('pty_session_1_aaaaaaaaa', 'slot-1')],
+        'client_local',
+        new Map(),
+      )
+      const key = registry.worktreeSnapshot(WORKTREE_KEY).slots[0]!.key
+      const session = (registry as any).sessions.get(key)
+      vi.spyOn(session, 'closeServerResourcesAndWait').mockRejectedValue(new Error('close failed'))
+      const dispose = vi.spyOn(session, 'dispose')
+
+      await expect(
+        registry.closeTerminalByDescriptor(key, {
+          repoRoot: REPO_ROOT,
+          branch: BRANCH,
+          worktreePath: WORKTREE_PATH,
+        }),
+      ).resolves.toBe(false)
+
+      expect(registry.isKnownSession(key)).toBe(true)
+      expect(dispose).not.toHaveBeenCalled()
     })
 
     test('preserves current selection and falls back to controller when current is lost', () => {

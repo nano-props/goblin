@@ -480,6 +480,7 @@ export const en = {
   'error.terminal-create-timeout': 'Timed out creating the terminal. Try again.',
   'error.terminal-connection-unavailable': 'Terminal service is not available. Try again.',
   'error.terminal-host-not-measurable': 'Terminal host is not visible',
+  'error.workspace-tab-close-failed': 'Could not close workspace resources. Try again.',
   'error.vscode-not-installed': 'VS Code not installed',
   'error.editor-not-installed': 'No editor found',
   'error.finder-not-available': 'Finder is only available on macOS',

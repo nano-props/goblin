@@ -115,6 +115,22 @@ The important design rule is that **session lifecycle is independent from view l
 Destroying a local view should not imply closing the shell.
 Closing a session should be an explicit business action or the result of server-side cleanup policy.
 
+### Workspace Pane tab lifecycle
+
+The Workspace Pane tab is a UI lifecycle boundary above both the local xterm view and the server session.
+
+It is useful to keep three lifetimes separate:
+
+- **Session lifetime**: server-owned terminal business state and PTY resources.
+- **View lifetime**: client-local xterm and DOM resources for rendering a session.
+- **Tab lifetime**: user-visible workspace surface that decides which feature resources must be released before the tab is considered closed.
+
+A Workspace Pane tab is not the authoritative owner of a terminal session. The terminal registry and slot own terminal resource cleanup. The tab close path is the orchestration boundary that waits for those owners to finish.
+
+This distinction matters for destructive worktree operations. Before a worktree directory is removed, the client should close every worktree-scoped Workspace Pane tab for that worktree and await each tab's close contract. For terminal tabs, that close contract delegates to the terminal registry's worktree release barrier: cancel pending creates that have not reached the server, wait for in-flight creates that cannot be cancelled, close materialized sessions, and wait for pending durable closes to settle. For future worktree-scoped tabs, such as a file tree or another long-lived tool surface, the same tab close contract should release that tab's resources before the worktree mutation starts.
+
+Repo routes and server-side repo write paths should not know about Workspace Pane tabs or terminal UI resources. They remain responsible for repository mutation. UI resource release belongs to the Workspace Pane tab lifecycle on the client.
+
 ## Identity model
 
 The terminal system relies on four identity scopes:

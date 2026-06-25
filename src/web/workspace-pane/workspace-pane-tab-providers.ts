@@ -10,7 +10,7 @@ import {
   workspacePaneStaticTabOrderEntry,
   workspacePaneTerminalTabOrderEntry,
 } from '#/shared/workspace-pane.ts'
-import type { WorkspacePaneViewSummary } from '#/web/components/terminal/types.ts'
+import type { TerminalSlotBase, WorkspacePaneViewSummary } from '#/web/components/terminal/types.ts'
 
 type T = (key: string, params?: Record<string, string | number>) => string
 
@@ -48,6 +48,16 @@ export interface WorkspacePanePanelLabel {
   label?: string
 }
 
+export interface WorkspacePaneTabCloseInput {
+  repoId: string
+  branchName: string | null
+  terminalKey?: string
+  terminalBase?: TerminalSlotBase | null
+  closeStaticView?: (repoId: string, type: WorkspacePaneStaticViewType, branchName: string) => void
+  closeTerminalByDescriptor?: (key: string, base: TerminalSlotBase) => Promise<boolean>
+  closeTerminalsForWorktree?: (base: TerminalSlotBase) => Promise<boolean>
+}
+
 export abstract class WorkspacePaneTabProvider<TType extends WorkspacePaneView = WorkspacePaneView> {
   readonly type: TType
   readonly icon: LucideIcon
@@ -82,6 +92,12 @@ export abstract class WorkspacePaneTabProvider<TType extends WorkspacePaneView =
   isRenderable(context: WorkspacePaneTabAvailabilityContext): boolean {
     return this.canOpen(context)
   }
+
+  abstract close(input: WorkspacePaneTabCloseInput): Promise<boolean>
+
+  closeWorktree(input: WorkspacePaneTabCloseInput): Promise<boolean> {
+    return this.close(input)
+  }
 }
 
 export abstract class WorkspacePaneStaticTabProvider<
@@ -102,6 +118,12 @@ export abstract class WorkspacePaneStaticTabProvider<
 
   closeLabel(input: WorkspacePaneStaticTabMetadataInput): string {
     return input.t('workspace-pane-views.close-named', { name: this.label({ ...input, statusCount: 0 }) })
+  }
+
+  close(input: WorkspacePaneTabCloseInput): Promise<boolean> {
+    if (!input.branchName || !input.closeStaticView) return Promise.resolve(false)
+    input.closeStaticView(input.repoId, this.type, input.branchName)
+    return Promise.resolve(true)
   }
 }
 
@@ -203,6 +225,17 @@ export class TerminalWorkspacePaneTabProvider extends WorkspacePaneTabProvider<'
       ? 'terminal.opening'
       : 'terminal.loading'
     return input.t(pendingLabelKey)
+  }
+
+  async close(input: WorkspacePaneTabCloseInput): Promise<boolean> {
+    if (!input.terminalKey || !input.terminalBase || !input.closeTerminalByDescriptor) return false
+    return await input.closeTerminalByDescriptor(input.terminalKey, input.terminalBase)
+  }
+
+  override async closeWorktree(input: WorkspacePaneTabCloseInput): Promise<boolean> {
+    if (!input.terminalBase) return true
+    if (!input.closeTerminalsForWorktree) return true
+    return await input.closeTerminalsForWorktree(input.terminalBase)
   }
 }
 

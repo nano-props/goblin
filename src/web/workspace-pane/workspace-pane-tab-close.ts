@@ -1,0 +1,105 @@
+import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
+import { readTerminalSlotCommandBridge } from '#/web/components/terminal/terminal-slot-command-bridge.ts'
+import {
+  createBranchWorkspacePaneTabModel,
+  type BranchWorkspacePaneTab,
+  type BranchWorkspacePaneTabModel,
+} from '#/web/components/branch-workspace/workspace-pane-tab-model.ts'
+import { workspacePaneTabOrderForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
+import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
+import { useReposStore } from '#/web/stores/repos/store.ts'
+import {
+  isWorkspacePaneStaticTabProvider,
+  workspacePaneTabProvider,
+  workspacePaneTabProviders,
+} from '#/web/workspace-pane/workspace-pane-tab-providers.ts'
+
+interface CloseWorkspacePaneTabsForWorktreeOptions {
+  repoId: string
+  branchName: string
+  worktreePath: string
+}
+
+export async function closeWorkspacePaneTab(
+  target: BranchWorkspacePaneTabModel,
+  tab: BranchWorkspacePaneTab,
+): Promise<boolean> {
+  if (tab.kind === 'pending') return false
+  const provider = workspacePaneTabProvider(tab.type)
+  const bridge = readTerminalSlotCommandBridge()
+  return await provider.close({
+    repoId: target.repoId,
+    branchName: target.branchName,
+    terminalKey: tab.kind === 'terminal' ? tab.key : undefined,
+    terminalBase: target.terminalBase,
+    closeStaticView: useReposStore.getState().closeWorkspacePaneStaticView,
+    closeTerminalByDescriptor: bridge?.closeTerminalByDescriptor,
+    closeTerminalsForWorktree: bridge?.closeTerminalsForWorktree,
+  })
+}
+
+export async function closeWorkspacePaneTabsForWorktree({
+  repoId,
+  branchName,
+  worktreePath,
+}: CloseWorkspacePaneTabsForWorktreeOptions): Promise<boolean> {
+  const target = workspacePaneTabTargetForBranch(repoId, branchName)
+  if (target && target.worktreePath !== worktreePath) return true
+  const terminalBase = target?.terminalBase ?? { repoRoot: repoId, branch: branchName, worktreePath }
+  const openStaticWorktreeTabs = new Set(
+    (target?.tabs ?? []).flatMap((tab) => {
+      if (tab.kind !== 'static') return []
+      const provider = workspacePaneTabProvider(tab.type)
+      return provider.scope === 'worktree' ? [tab.type] : []
+    }),
+  )
+  const bridge = readTerminalSlotCommandBridge()
+  const closeInput = {
+    repoId,
+    branchName,
+    terminalBase,
+    closeStaticView: useReposStore.getState().closeWorkspacePaneStaticView,
+    closeTerminalByDescriptor: bridge?.closeTerminalByDescriptor,
+    closeTerminalsForWorktree: bridge?.closeTerminalsForWorktree,
+  }
+  const worktreeProviders = workspacePaneTabProviders.filter((provider) => provider.scope === 'worktree')
+  try {
+    const results = await Promise.all(
+      worktreeProviders.map((provider) => {
+        if (isWorkspacePaneStaticTabProvider(provider) && !openStaticWorktreeTabs.has(provider.type)) return true
+        return provider.closeWorktree(closeInput)
+      }),
+    )
+    return results.every(Boolean)
+  } catch {
+    return false
+  }
+}
+
+export function workspacePaneTabTargetForBranch(
+  repoId: string,
+  branchName: string,
+): BranchWorkspacePaneTabModel | null {
+  const state = useReposStore.getState()
+  const repo = state.repos[repoId]
+  if (!repo) return null
+  const branch = repo.data.branches.find((candidate) => candidate.name === branchName)
+  if (!branch) return null
+  const worktreePath = branch.worktree?.path
+  const terminalSyncReady = useRepoSyncStore.getState().ready.get(repoId) === repo.instanceToken
+  const worktreeKey = worktreePath ? worktreeTerminalKey(repo.id, worktreePath) : null
+  const snapshot = worktreeKey ? (readTerminalSlotCommandBridge()?.worktreeSnapshot(worktreeKey) ?? null) : null
+  return createBranchWorkspacePaneTabModel({
+    repoId,
+    branchName,
+    worktreePath: worktreePath ?? null,
+    preferredView: preferredWorkspacePaneViewForBranch(repo.ui, branchName),
+    tabOrder: workspacePaneTabOrderForBranch(repo.ui, branchName),
+    runtimeTerminalViews: snapshot?.slots ?? [],
+    terminalSessionCount: snapshot?.count ?? 0,
+    terminalCreatePending: snapshot?.pendingCreate ?? false,
+    terminalSyncReady,
+    lastClosedTabContext: repo.ui.lastClosedTabContextByBranch[branchName] ?? null,
+  })
+}

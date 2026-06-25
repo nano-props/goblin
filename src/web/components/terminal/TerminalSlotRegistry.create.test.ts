@@ -51,6 +51,9 @@ vi.mock('#/web/components/terminal/ManagedTerminalSlot.ts', () => {
     detach(): void {}
     restart(): void {}
     dispose(): void {}
+    closeServerResourcesAndWait(): Promise<void> {
+      return Promise.resolve()
+    }
     isTerminalFocusTarget(): boolean {
       return false
     }
@@ -303,6 +306,24 @@ describe('TerminalSlotRegistry create flow', () => {
     const expectation = expect(pending).rejects.toThrow('terminal registry destroyed')
     registry.destroy()
     await expectation
+    expect((registry as any).hostWaitersByWorktree.size).toBe(0)
+    expect((registry as any).pendingCreateByWorktree.size).toBe(0)
+    expect(registry.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
+  })
+
+  test('closeTerminalsForWorktree cancels a pending create before deleting a worktree', async () => {
+    const pending = registry.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
+
+    expect(registry.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(true)
+    await vi.waitFor(() => expect((registry as any).hostWaitersByWorktree.size).toBe(1))
+
+    const expectation = expect(pending).rejects.toThrow('terminal create request canceled')
+    await expect(
+      registry.closeTerminalsForWorktree({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH }),
+    ).resolves.toBe(true)
+    await expectation
+
+    expect(mocks.createMock).not.toHaveBeenCalled()
     expect((registry as any).hostWaitersByWorktree.size).toBe(0)
     expect((registry as any).pendingCreateByWorktree.size).toBe(0)
     expect(registry.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)

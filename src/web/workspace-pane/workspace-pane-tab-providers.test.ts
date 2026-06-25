@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
 import {
   changesWorkspacePaneTabProvider,
   historyWorkspacePaneTabProvider,
@@ -152,5 +152,66 @@ describe('workspace pane tab providers', () => {
     expect(terminalWorkspacePaneTabProvider.closeLabel(input)).toBe(
       'terminal.close-named:{"name":"terminal.opening"}',
     )
+  })
+
+  test('closes static tabs through the static view lifecycle callback', async () => {
+    const closeStaticView = vi.fn()
+
+    await expect(
+      statusWorkspacePaneTabProvider.close({
+        repoId: '/repo',
+        branchName: 'main',
+        closeStaticView,
+      }),
+    ).resolves.toBe(true)
+
+    expect(closeStaticView).toHaveBeenCalledWith('/repo', 'status', 'main')
+  })
+
+  test('rejects static tab close without a branch owner', async () => {
+    const closeStaticView = vi.fn()
+
+    await expect(
+      statusWorkspacePaneTabProvider.close({
+        repoId: '/repo',
+        branchName: null,
+        closeStaticView,
+      }),
+    ).resolves.toBe(false)
+
+    expect(closeStaticView).not.toHaveBeenCalled()
+  })
+
+  test('closes terminal tabs through the terminal lifecycle callback', async () => {
+    const closeTerminalByDescriptor = vi.fn(async () => true)
+    const terminalBase = { repoRoot: '/repo', branch: 'main', worktreePath: '/repo-worktree' }
+
+    await expect(
+      terminalWorkspacePaneTabProvider.close({
+        repoId: '/repo',
+        branchName: 'main',
+        terminalKey: 'slot-1',
+        terminalBase,
+        closeTerminalByDescriptor,
+      }),
+    ).resolves.toBe(true)
+
+    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('slot-1', terminalBase)
+  })
+
+  test('closes terminal worktree resources through the worktree lifecycle callback', async () => {
+    const closeTerminalsForWorktree = vi.fn(async () => true)
+    const terminalBase = { repoRoot: '/repo', branch: 'main', worktreePath: '/repo-worktree' }
+
+    await expect(
+      terminalWorkspacePaneTabProvider.closeWorktree({
+        repoId: '/repo',
+        branchName: 'main',
+        terminalBase,
+        closeTerminalsForWorktree,
+      }),
+    ).resolves.toBe(true)
+
+    expect(closeTerminalsForWorktree).toHaveBeenCalledWith(terminalBase)
   })
 })

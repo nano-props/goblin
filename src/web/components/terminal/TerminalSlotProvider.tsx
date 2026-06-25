@@ -216,6 +216,7 @@ export function TerminalSlotProvider({ children }: TerminalSlotProviderProps) {
       createTerminal: registry.createTerminal,
       selectTerminal: registry.selectTerminal,
       closeTerminalByDescriptor: registry.closeTerminalByDescriptor,
+      closeTerminalsForWorktree: registry.closeTerminalsForWorktree,
     })
 
     return () => {

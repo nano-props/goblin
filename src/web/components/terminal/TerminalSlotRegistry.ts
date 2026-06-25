@@ -87,6 +87,7 @@ export class TerminalSlotRegistry {
       resolve: (key: string) => void
       reject: (error: unknown) => void
       flushing: boolean
+      creating: boolean
       geometryAbortController: AbortController | null
     }
   >()
@@ -567,6 +568,7 @@ export class TerminalSlotRegistry {
       resolve,
       reject,
       flushing: false,
+      creating: false,
       geometryAbortController: null,
     })
     this.notifyWorktree(worktreeTerminalKey)
@@ -594,10 +596,12 @@ export class TerminalSlotRegistry {
       if (this.pendingCreateByWorktree.get(worktreeTerminalKey) !== pending) {
         throw new Error('terminal create request canceled')
       }
+      pending.creating = true
       pending.resolve(await this.performCreateTerminal(pending.base, geometry))
     } catch (error) {
       pending.reject(error)
     } finally {
+      pending.creating = false
       if (this.pendingCreateByWorktree.get(worktreeTerminalKey) === pending) {
         this.pendingCreateByWorktree.delete(worktreeTerminalKey)
         this.notifyWorktree(worktreeTerminalKey)
@@ -671,6 +675,36 @@ export class TerminalSlotRegistry {
     }
   }
 
+  private async settlePendingCreateForWorktree(worktreeTerminalKey: string): Promise<void> {
+    const pending = this.pendingCreateByWorktree.get(worktreeTerminalKey)
+    if (!pending) return
+    if (!pending.creating) {
+      const error = new Error('terminal create request canceled')
+      pending.geometryAbortController?.abort(error)
+      if (this.pendingCreateByWorktree.get(worktreeTerminalKey) === pending) {
+        this.pendingCreateByWorktree.delete(worktreeTerminalKey)
+        pending.reject(error)
+        this.notifyWorktree(worktreeTerminalKey)
+      }
+    }
+    try {
+      await pending.promise
+    } catch {
+      // A rejected create means no terminal session was created for this
+      // pending request. The release barrier can continue to close any
+      // sessions that were already present or that did get materialized.
+    }
+  }
+
+  private async waitForPendingClosesForWorktree(worktreeTerminalKey: string): Promise<boolean> {
+    const pendingForWorktree = Array.from(this.pendingCloseByPtySessionId.values()).filter(
+      (entry) => entry.worktreeTerminalKey === worktreeTerminalKey,
+    )
+    if (pendingForWorktree.length === 0) return true
+    const results = await Promise.allSettled(pendingForWorktree.map((entry) => entry.promise))
+    return results.every((result) => result.status === 'fulfilled')
+  }
+
   private selectedDescriptor(worktreeTerminalKey: string): TerminalDescriptor | null {
     const selectedKey = this.selectedKeyByWorktree.get(worktreeTerminalKey)
     return selectedKey ? (this.sessions.get(selectedKey)?.descriptor ?? null) : null
@@ -737,11 +771,20 @@ export class TerminalSlotRegistry {
     this.sessions.get(key)?.scrollLines(amount)
   }
 
-  closeTerminalByDescriptor = (key: string, base: TerminalSlotBase): void => {
+  closeTerminalByDescriptor = async (key: string, base: TerminalSlotBase): Promise<boolean> => {
     const session = this.sessions.get(key)
     if (!session || session.descriptor.worktreeTerminalKey !== worktreeTerminalKey(base.repoRoot, base.worktreePath))
-      return
-    this.closeTerminal(key)
+      return false
+    return await this.closeTerminal(key)
+  }
+
+  closeTerminalsForWorktree = async (base: TerminalSlotBase): Promise<boolean> => {
+    const terminalWorktreeKey = worktreeTerminalKey(base.repoRoot, base.worktreePath)
+    await this.settlePendingCreateForWorktree(terminalWorktreeKey)
+    const keys = this.sortedSlotsForWorktree(terminalWorktreeKey).map((session) => session.descriptor.key)
+    const results = await Promise.all(keys.map((key) => this.closeTerminal(key)))
+    const pendingClosesSettled = await this.waitForPendingClosesForWorktree(terminalWorktreeKey)
+    return results.every(Boolean) && pendingClosesSettled
   }
 
   attach = (descriptor: TerminalDescriptor, host: HTMLElement): void => {
@@ -932,8 +975,17 @@ export class TerminalSlotRegistry {
     }
   }
 
-  private closeTerminal(key: string): void {
-    this.removeSession(key, { dispose: true, closeSlot: true })
+  private async closeTerminal(key: string): Promise<boolean> {
+    const session = this.sessions.get(key)
+    if (!session) return false
+    try {
+      await session.closeServerResourcesAndWait()
+    } catch (err) {
+      terminalSlotProviderLog.warn('terminal close failed', { key, err })
+      return false
+    }
+    if (this.sessions.get(key) !== session) return true
+    return this.removeSession(key, { dispose: true, closeSlot: false })
   }
 
   private discardLocalSessionAndDismissDetailIfLast(key: string, base: TerminalSlotBase): void {

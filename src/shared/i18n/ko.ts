@@ -467,6 +467,7 @@ export const ko: Record<DictKey, string> = {
   'error.terminal-create-timeout': '터미널 생성 시간이 초과되었습니다. 다시 시도하세요.',
   'error.terminal-connection-unavailable': '터미널 서비스를 사용할 수 없습니다. 다시 시도하세요.',
   'error.terminal-host-not-measurable': '터미널 패널이 보이지 않습니다',
+  'error.workspace-tab-close-failed': '작업 영역 리소스를 닫을 수 없습니다. 다시 시도하세요.',
   'error.vscode-not-installed': 'VS Code가 설치되어 있지 않습니다',
   'error.editor-not-installed': '에디터를 찾을 수 없습니다',
   'error.finder-not-available': 'Finder는 macOS에서만 사용할 수 있습니다',

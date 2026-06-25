@@ -784,7 +784,7 @@ function terminalCommandContextWith(overrides: Partial<TerminalSlotContextValue>
     scrollToBottom: vi.fn(),
     scrollLines: vi.fn(),
     clearBell: vi.fn(() => false),
-    closeTerminalByDescriptor: vi.fn(),
+    closeTerminalByDescriptor: vi.fn(async () => true),
     attach: vi.fn(),
     detach: vi.fn(),
     restart: vi.fn(),
