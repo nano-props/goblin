@@ -6,10 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { BranchWorkspaceToolbar } from '#/web/components/branch-workspace/BranchWorkspaceToolbar.tsx'
 import { getSelectedBranchWorkspacePresentation } from '#/web/components/branch-workspace/model.ts'
-import {
-  TerminalSlotContext,
-  TerminalSlotReadContext,
-} from '#/web/components/terminal/terminal-slot-context.ts'
+import { TerminalSlotContext, TerminalSlotReadContext } from '#/web/components/terminal/terminal-slot-context.ts'
 import type {
   WorkspacePaneStaticViewType,
   WorkspacePaneTabOrderEntry,
@@ -25,11 +22,11 @@ import type {
 } from '#/web/components/terminal/types.ts'
 import { MainWindowNavigationProvider, type MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
-import { emptyBootstrapSnapshot } from '#/web/client-bootstrap-bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
+import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
-import type { ClientBridge } from '#/web/client-bridge-types.ts'
+import { WORKSPACE_EXTERNAL_APP_RECENT_STORAGE_KEY } from '#/web/workspace-external-apps-recent.ts'
 import {
   workspacePaneStaticViewsForBranch,
   workspacePaneTabOrderForBranch,
@@ -37,10 +34,44 @@ import {
 import { setTerminalSlotCommandBridge } from '#/web/components/terminal/terminal-slot-command-bridge.ts'
 
 let compactUi = false
+const runtimeExternalAppSettings = vi.hoisted(() => ({
+  value: {
+    terminalApp: 'auto',
+    resolvedTerminalApp: 'ghostty',
+    terminalAvailable: true,
+    terminalAppAvailability: { ghostty: true, terminal: true, windowsTerminal: false },
+    editorApp: 'auto',
+    resolvedEditorApp: 'vscode',
+    editorAvailable: true,
+    editorAppAvailability: { vscode: true, cursor: true, windsurf: true },
+  },
+}))
+const appShellMocks = vi.hoisted(() => ({
+  openExternalUrl: vi.fn(),
+}))
+const repoClientMocks = vi.hoisted(() => ({
+  openRepositoryInFinder: vi.fn(async (path: string) => ({ ok: true, message: path })),
+}))
 
 vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
   useIsCompactUi: () => compactUi,
 }))
+
+vi.mock('#/web/runtime-settings-external-apps.ts', () => ({
+  useRuntimeExternalAppSettings: () => runtimeExternalAppSettings.value,
+}))
+
+vi.mock('#/web/app-shell-client.ts', () => ({
+  openExternalUrl: appShellMocks.openExternalUrl,
+}))
+
+vi.mock('#/web/repo-client.ts', async () => {
+  const actual = (await vi.importActual('#/web/repo-client.ts')) as typeof import('#/web/repo-client.ts')
+  return {
+    ...actual,
+    openRepositoryInFinder: repoClientMocks.openRepositoryInFinder,
+  }
+})
 
 vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {
   cb(0)
@@ -61,6 +92,19 @@ const REPO_ID = '/tmp/gbl-branch-workspace-toolbar-repo'
 const WORKTREE_PATH = '/tmp/gbl-branch-workspace-toolbar-worktree'
 compactUi = false
 
+function defaultRuntimeExternalAppSettings() {
+  return {
+    terminalApp: 'auto' as const,
+    resolvedTerminalApp: 'ghostty' as const,
+    terminalAvailable: true,
+    terminalAppAvailability: { ghostty: true, terminal: true, windowsTerminal: false },
+    editorApp: 'auto' as const,
+    resolvedEditorApp: 'vscode' as const,
+    editorAvailable: true,
+    editorAppAvailability: { vscode: true, cursor: true, windsurf: true },
+  }
+}
+
 let container: HTMLDivElement | null = null
 let root: Root | null = null
 let queryClient: QueryClient | null = null
@@ -69,6 +113,15 @@ const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENV
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   compactUi = false
+  runtimeExternalAppSettings.value = defaultRuntimeExternalAppSettings()
+  appShellMocks.openExternalUrl.mockReset()
+  repoClientMocks.openRepositoryInFinder.mockReset()
+  repoClientMocks.openRepositoryInFinder.mockImplementation(async (path: string) => ({ ok: true, message: path }))
+  useHostInfoStore.setState({
+    snapshot: { homeDir: '/Users/tester', platform: 'darwin', hostname: 'test-host', pid: 1 },
+    hydrated: true,
+  })
+  window.localStorage.clear()
   resetReposStore()
   setClientBridgeForTests(null)
   // T6.1: the toolbar reads `isInitialSyncInFlight` from
@@ -87,6 +140,10 @@ afterEach(() => {
   container = null
   queryClient = null
   toastMocks.error.mockClear()
+  appShellMocks.openExternalUrl.mockReset()
+  repoClientMocks.openRepositoryInFinder.mockReset()
+  useHostInfoStore.setState({ snapshot: null, hydrated: false })
+  window.localStorage.clear()
   setClientBridgeForTests(null)
   setTerminalSlotCommandBridge(null)
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
@@ -175,6 +232,101 @@ describe('BranchWorkspaceToolbar', () => {
     expect(emptyButton?.getAttribute('title')).toBe('terminal.new')
     expect(c.querySelector('[data-workspace-pane-view-tooltip-id="status:status"]')).not.toBeNull()
     expect(c.querySelector('[data-workspace-pane-view-tooltip-id="changes:changes"]')).toBeNull()
+  })
+
+  test('renders the external app launcher at the workspace toolbar right edge', async () => {
+    runtimeExternalAppSettings.value = {
+      ...defaultRuntimeExternalAppSettings(),
+      editorAppAvailability: { vscode: true, cursor: true, windsurf: false },
+    }
+    const { container: c } = renderToolbar({
+      terminalCount: 0,
+      navigation: navigationWith({}),
+    })
+
+    const trigger = c.querySelector<HTMLButtonElement>('button[aria-label="workspace.external-apps.open"]')
+    expect(trigger).not.toBeNull()
+    const trailingActions = c.querySelector('[data-workspace-toolbar-trailing-actions]')
+    expect(trailingActions).not.toBeNull()
+    expect(trailingActions?.contains(trigger)).toBe(true)
+
+    await act(async () => {
+      trigger?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+      trigger?.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
+      await Promise.resolve()
+    })
+
+    const menuItems = Array.from(document.body.querySelectorAll<HTMLButtonElement>('[role="listitem"] button')).map(
+      (button) => button.textContent,
+    )
+    expect(menuItems).toEqual([
+      'settings.terminal.ghostty',
+      'settings.terminal.terminal',
+      'settings.editor.vscode',
+      'settings.editor.cursor',
+      'worktrees.reveal-title',
+    ])
+    expect(document.body.textContent).not.toContain('settings.editor.windsurf')
+  })
+
+  test('uses the first visible external app as the split-button primary action without recent state', () => {
+    const { container: c } = renderToolbar({
+      terminalCount: 0,
+      navigation: navigationWith({}),
+    })
+
+    expect(c.querySelector<HTMLButtonElement>('button[aria-label="settings.terminal.ghostty"]')).not.toBeNull()
+    expect(c.querySelector<HTMLButtonElement>('button[aria-label="settings.editor.vscode"]')).toBeNull()
+  })
+
+  test('uses the global recent external app as the split-button primary action', async () => {
+    const { container: c } = renderToolbar({
+      terminalCount: 0,
+      navigation: navigationWith({}),
+    })
+
+    const trigger = c.querySelector<HTMLButtonElement>('button[aria-label="workspace.external-apps.open"]')
+    expect(trigger).not.toBeNull()
+
+    await act(async () => {
+      trigger?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+      trigger?.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
+      await Promise.resolve()
+    })
+
+    const finderItem = Array.from(document.body.querySelectorAll<HTMLButtonElement>('button')).find(
+      (button) => button.textContent === 'worktrees.reveal-title',
+    )
+    expect(finderItem).not.toBeNull()
+
+    await act(async () => {
+      finderItem?.click()
+      await Promise.resolve()
+    })
+
+    expect(window.localStorage.getItem(WORKSPACE_EXTERNAL_APP_RECENT_STORAGE_KEY)).toBe('finder')
+    expect(repoClientMocks.openRepositoryInFinder).toHaveBeenCalledWith(WORKTREE_PATH)
+
+    const primary = c.querySelector<HTMLButtonElement>('button[aria-label="worktrees.reveal-title"]')
+    expect(primary).not.toBeNull()
+
+    await act(async () => {
+      primary?.click()
+      await Promise.resolve()
+    })
+
+    expect(repoClientMocks.openRepositoryInFinder).toHaveBeenCalledTimes(2)
+  })
+
+  test('hides the external app launcher in compact mode', () => {
+    compactUi = true
+    const { container: c } = renderToolbar({
+      terminalCount: 1,
+      preferredWorkspacePaneView: 'terminal',
+      navigation: navigationWith({}),
+    })
+
+    expect(c.querySelector('button[aria-label="workspace.external-apps.open"]')).toBeNull()
   })
 
   test('renders status and terminal views in one workspace tab strip with a separator', () => {
@@ -274,11 +426,10 @@ describe('BranchWorkspaceToolbar', () => {
     // model. The model itself decides where to land — the close command does
     // not imperatively navigate, so navigation is untouched here.
     expect(showRepoWorkspacePaneView).not.toHaveBeenCalled()
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.lastClosedTabContextByBranch['feature/worktree'])
-      .toEqual({
-        closingIdentity: 'status:status',
-        previousTabIdentities: ['status:status', 'terminal:t1'],
-      })
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.lastClosedTabContextByBranch['feature/worktree']).toEqual({
+      closingIdentity: 'status:status',
+      previousTabIdentities: ['status:status', 'terminal:t1'],
+    })
   })
 
   test('closes a static tab without routing through runtime close', async () => {
@@ -711,11 +862,10 @@ describe('BranchWorkspaceToolbar', () => {
     // can land on changes (the spatial neighbor) at read time. Navigation is
     // untouched here — the model is the single source of truth.
     expect(showRepoWorkspacePaneView).not.toHaveBeenCalled()
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.lastClosedTabContextByBranch['feature/worktree'])
-      .toEqual({
-        closingIdentity: 'terminal:t1',
-        previousTabIdentities: ['status:status', 'terminal:t1', 'changes:changes'],
-      })
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.lastClosedTabContextByBranch['feature/worktree']).toEqual({
+      closingIdentity: 'terminal:t1',
+      previousTabIdentities: ['status:status', 'terminal:t1', 'changes:changes'],
+    })
   })
 
   test('T6.1: renders a busy new-terminal button while the initial session sync is in flight', async () => {

@@ -531,7 +531,6 @@ beforeEach(() => {
       capability === 'open-external-url' ||
       capability === 'open-directory-dialog' ||
       capability === 'consume-external-open-paths' ||
-      capability === 'open-in-finder' ||
       capability === 'terminal-notifications' ||
       capability === 'terminal-badge',
     getBootstrap: () => ({

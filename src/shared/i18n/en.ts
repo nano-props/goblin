@@ -242,6 +242,7 @@ export const en = {
   'workspace.focus-toggle-label': 'Toggle Focus Mode',
   'workspace.focus-toggle-tooltip.enable': 'Focus Mode',
   'workspace.back-to-branch-navigator': 'Back to Branch Navigator',
+  'workspace.external-apps.open': 'Open in external app',
   'branches.gone': 'gone',
   'branches.dirty': 'dirty',
   'branches.worktree': 'worktree',
@@ -349,7 +350,7 @@ export const en = {
   'terminal.paste-file-overflow': 'Pasted paths are too long for the terminal.',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) ---
-  'worktrees.reveal-title': 'Reveal in Finder',
+  'worktrees.reveal-title': 'Finder',
   'worktrees.open-in-terminal-title': 'Open in terminal',
   'worktrees.open-in-terminal-label': 'Terminal',
   'worktrees.open-in-editor-title': 'Open in editor',
@@ -481,6 +482,7 @@ export const en = {
   'error.terminal-host-not-measurable': 'Terminal host is not visible',
   'error.vscode-not-installed': 'VS Code not installed',
   'error.editor-not-installed': 'No editor found',
+  'error.finder-not-available': 'Finder is only available on macOS',
   'error.remote-editor-not-supported': 'The selected editor cannot open remote SSH workspaces',
   'error.remote-terminal-not-supported': 'The selected terminal cannot open remote SSH workspaces',
   'error.render-crash-title': 'Something broke while rendering this view',

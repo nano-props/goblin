@@ -231,6 +231,7 @@ export const ko: Record<DictKey, string> = {
   'workspace.focus-toggle-label': '집중 모드 전환',
   'workspace.focus-toggle-tooltip.enable': '집중 모드',
   'workspace.back-to-branch-navigator': 'Branch Navigator로 돌아가기',
+  'workspace.external-apps.open': '외부 앱에서 열기',
   'branches.gone': '원격 사라짐',
   'branches.dirty': '변경',
   'branches.worktree': '워크트리',
@@ -335,7 +336,7 @@ export const ko: Record<DictKey, string> = {
   'terminal.paste-file-overflow': '붙여넣은 경로가 너무 길어 터미널로 보낼 수 없습니다.',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) --
-  'worktrees.reveal-title': 'Finder 에서 보기',
+  'worktrees.reveal-title': 'Finder',
   'worktrees.open-in-terminal-title': '터미널에서 열기',
   'worktrees.open-in-terminal-label': '터미널',
   'worktrees.open-in-editor-title': '에디터에서 열기',
@@ -468,6 +469,7 @@ export const ko: Record<DictKey, string> = {
   'error.terminal-host-not-measurable': '터미널 패널이 보이지 않습니다',
   'error.vscode-not-installed': 'VS Code가 설치되어 있지 않습니다',
   'error.editor-not-installed': '에디터를 찾을 수 없습니다',
+  'error.finder-not-available': 'Finder는 macOS에서만 사용할 수 있습니다',
   'error.remote-editor-not-supported': '선택한 에디터는 원격 SSH 작업 영역을 열 수 없습니다',
   'error.remote-terminal-not-supported': '선택한 터미널은 원격 SSH 작업 영역을 열 수 없습니다',
   'error.render-crash-title': '이 화면을 렌더링하는 중에 오류가 발생했습니다',

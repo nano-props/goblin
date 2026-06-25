@@ -222,6 +222,7 @@ export const zh: Record<DictKey, string> = {
   'workspace.focus-toggle-label': '切换专注模式',
   'workspace.focus-toggle-tooltip.enable': '专注模式',
   'workspace.back-to-branch-navigator': '返回 Branch Navigator',
+  'workspace.external-apps.open': '在外部应用中打开',
   'branches.gone': '已失联',
   'branches.dirty': '有改动',
   'branches.worktree': '工作树',
@@ -325,7 +326,7 @@ export const zh: Record<DictKey, string> = {
   'terminal.paste-file-overflow': '粘贴的路径过长，无法发送到终端。',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) --
-  'worktrees.reveal-title': '在访达中显示',
+  'worktrees.reveal-title': '访达',
   'worktrees.open-in-terminal-title': '在终端中打开',
   'worktrees.open-in-terminal-label': '终端',
   'worktrees.open-in-editor-title': '在编辑器中打开',
@@ -453,6 +454,7 @@ export const zh: Record<DictKey, string> = {
   'error.terminal-host-not-measurable': '终端面板不可见',
   'error.vscode-not-installed': '未安装 VS Code',
   'error.editor-not-installed': '未找到编辑器',
+  'error.finder-not-available': '访达仅在 macOS 上可用',
   'error.remote-editor-not-supported': '所选编辑器无法打开远程 SSH 工作区',
   'error.remote-terminal-not-supported': '所选终端无法打开远程 SSH 工作区',
   'error.render-crash-title': '渲染该视图时出错',

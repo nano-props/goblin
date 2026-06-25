@@ -131,9 +131,7 @@ export function useKeyboard({
       const settingsOpen = isSettingsOpenRef.current()
       const compactWorkspaceTransitioning = useUiTransitionStore.getState().isCompactWorkspaceTransitioning
       const workspaceShortcutsSuppressed =
-        isWorkspaceShortcutSuppressedRef.current() ||
-        isShortcutBlockingLayerOpen() ||
-        compactWorkspaceTransitioning
+        isWorkspaceShortcutSuppressedRef.current() || isShortcutBlockingLayerOpen() || compactWorkspaceTransitioning
       const action = matchClientKeyboardShortcut(e)
 
       if (settingsOpen && action === 'dismiss') {
@@ -192,8 +190,6 @@ export function useKeyboard({
         }
         case 'pull':
         case 'push':
-        case 'terminal':
-        case 'editor':
         case 'remote': {
           if (overlayOpen || !repo || !repo.ui.selectedBranch) break
           e.preventDefault()

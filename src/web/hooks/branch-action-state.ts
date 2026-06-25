@@ -9,8 +9,6 @@ export type BranchActionItemId =
   | 'pull'
   | 'push'
   | 'remote'
-  | 'terminal'
-  | 'editor'
   | 'deleteBranch'
   | 'removeWorktree'
 

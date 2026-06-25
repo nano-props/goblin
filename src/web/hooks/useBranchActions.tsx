@@ -2,10 +2,12 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { remoteRepoTarget } from '#/web/stores/repos/helpers.ts'
 import type { RepoBranchState } from '#/web/stores/repos/types.ts'
 import type { ExecResult } from '#/web/types.ts'
+import type { EditorPref, TerminalPref } from '#/shared/api-types.ts'
 import { PROTECTED_BRANCHES } from '#/shared/git-types.ts'
 import {
   getRepositoryPatch,
   openRepositoryEditor,
+  openRepositoryInFinder,
   openRepositoryRemote,
   openRepositoryTerminal,
 } from '#/web/repo-client.ts'
@@ -13,7 +15,11 @@ import { openRemoteRepositoryEditor, openRemoteRepositoryTerminal } from '#/web/
 import { openBranchExternalTarget } from '#/web/hooks/openBranchExternalTarget.ts'
 import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
 import { getBranchWorktreeState } from '#/web/stores/repos/worktree-state.ts'
-import { dispatchRepoBranchAction, dispatchRepoUiAction, isPushProtected } from '#/web/stores/repos/branch-action-write-paths.ts'
+import {
+  dispatchRepoBranchAction,
+  dispatchRepoUiAction,
+  isPushProtected,
+} from '#/web/stores/repos/branch-action-write-paths.ts'
 import { useBranchActionDialogsStore } from '#/web/stores/repos/branch-action-dialogs.ts'
 import {
   branchActionBusyItemId,
@@ -24,8 +30,8 @@ import {
 
 export type { BranchActionItemId } from '#/web/hooks/branch-action-state.ts'
 
-const SILENT_SUCCESS_OPS = new Set<BranchActionItemId>(['remote', 'terminal', 'editor'])
-type LocalBranchActionItemId = 'copyPatch' | 'remote' | 'terminal' | 'editor'
+const SILENT_SUCCESS_OPS = new Set<string>(['remote', 'terminal', 'editor', 'finder'])
+type BranchUiActionOpId = 'copyPatch' | 'remote' | 'terminal' | 'editor' | 'finder'
 
 export interface BranchActionCapabilities {
   canRemoveWorktree: boolean
@@ -36,6 +42,7 @@ export interface BranchActionCapabilities {
   canOpenRemote: boolean
   canOpenTerminal: boolean
   canOpenEditor: boolean
+  canOpenFinder: boolean
 }
 
 export function getBranchActionCapabilities(repo: BranchActionRepo, branch: RepoBranchState): BranchActionCapabilities {
@@ -45,6 +52,8 @@ export function getBranchActionCapabilities(repo: BranchActionRepo, branch: Repo
   const worktreeState = getBranchWorktreeState(repo, branch)
   const canRemoveWorktree = !!branch.worktree?.path && !worktreeState?.isMain
   const canCopyPatch = !!branch.worktree?.path && (worktreeState?.dirty ?? false)
+  const hasWorktree = !!branch.worktree?.path
+  const isRemoteRepo = remoteRepoTarget(repo.id, repo.remote.lifecycle) !== null
   return {
     canRemoveWorktree,
     isRegularBranch,
@@ -52,8 +61,9 @@ export function getBranchActionCapabilities(repo: BranchActionRepo, branch: Repo
     canPull: !!branch.tracking,
     canPush: repo.remote.hasRemotes === true,
     canOpenRemote: repo.remote.hasBrowserRemote === true || repo.remote.hasGitHubRemote === true,
-    canOpenTerminal: !!branch.worktree?.path,
-    canOpenEditor: !!branch.worktree?.path,
+    canOpenTerminal: hasWorktree,
+    canOpenEditor: hasWorktree,
+    canOpenFinder: hasWorktree && !isRemoteRepo,
   }
 }
 
@@ -74,7 +84,7 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
     pending: pendingLocalAction,
     hasPending: hasPendingLocalAction,
     run: runPendingLocalAction,
-  } = useAsyncPending<LocalBranchActionItemId>()
+  } = useAsyncPending<BranchUiActionOpId>()
 
   function guardBusy(): boolean {
     return branchActionBusy || hasPendingLocalAction()
@@ -92,7 +102,7 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
   }
 
   function runUiAction(
-    op: LocalBranchActionItemId,
+    op: BranchUiActionOpId,
     fn: () => Promise<ExecResult>,
     options?: { handleResult?: (result: ExecResult) => boolean },
   ): Promise<ExecResult | null> {
@@ -148,22 +158,41 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
     runRepoAction({ kind: 'push', branch: branch.name })
   }
 
-  function openTerminal() {
+  function openTerminal(app?: TerminalPref) {
     if (!branch.worktree?.path) return
     const worktreePath = branch.worktree.path
     if (remoteRepoTarget(repo.id, repo.remote.lifecycle)) {
-      return runUiAction('terminal', () => openRemoteRepositoryTerminal(repo.id, worktreePath))
+      return runUiAction('terminal', () =>
+        app
+          ? openRemoteRepositoryTerminal(repo.id, worktreePath, app)
+          : openRemoteRepositoryTerminal(repo.id, worktreePath),
+      )
     }
-    return runUiAction('terminal', () => openRepositoryTerminal(worktreePath))
+    return runUiAction('terminal', () =>
+      app ? openRepositoryTerminal(worktreePath, app) : openRepositoryTerminal(worktreePath),
+    )
   }
 
-  function openEditor() {
+  function openEditor(app?: EditorPref) {
     if (!branch.worktree?.path) return
     const worktreePath = branch.worktree.path
     if (remoteRepoTarget(repo.id, repo.remote.lifecycle)) {
-      return runUiAction('editor', () => openRemoteRepositoryEditor(repo.id, worktreePath))
+      return runUiAction('editor', () =>
+        app
+          ? openRemoteRepositoryEditor(repo.id, worktreePath, app)
+          : openRemoteRepositoryEditor(repo.id, worktreePath),
+      )
     }
-    return runUiAction('editor', () => openRepositoryEditor(worktreePath))
+    return runUiAction('editor', () =>
+      app ? openRepositoryEditor(worktreePath, app) : openRepositoryEditor(worktreePath),
+    )
+  }
+
+  function openFinder() {
+    if (!branch.worktree?.path) return
+    const worktreePath = branch.worktree.path
+    if (remoteRepoTarget(repo.id, repo.remote.lifecycle)) return
+    return runUiAction('finder', () => openRepositoryInFinder(worktreePath))
   }
 
   function openRemote() {
@@ -203,6 +232,7 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
       push,
       openTerminal,
       openEditor,
+      openFinder,
       openRemote,
       requestDeleteBranch,
       requestRemoveWorktree,

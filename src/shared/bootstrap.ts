@@ -5,7 +5,6 @@ export type ClientNativeCapability =
   | 'open-external-url'
   | 'open-directory-dialog'
   | 'consume-external-open-paths'
-  | 'open-in-finder'
   | 'terminal-notifications'
   | 'terminal-badge'
 
@@ -16,7 +15,6 @@ export const ELECTRON_CLIENT_CAPABILITIES = [
   'open-external-url',
   'open-directory-dialog',
   'consume-external-open-paths',
-  'open-in-finder',
   'terminal-notifications',
   'terminal-badge',
 ] as const satisfies readonly ClientNativeCapability[]

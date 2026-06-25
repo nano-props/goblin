@@ -1,7 +1,7 @@
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { DictKey } from '#/shared/i18n/dictionaries.ts'
 
-export type BranchActionShortcutAction = 'pull' | 'push' | 'terminal' | 'editor' | 'remote'
+export type BranchActionShortcutAction = 'pull' | 'push' | 'remote'
 export type ClientNavigationShortcutAction =
   | 'next-branch'
   | 'prev-branch'
@@ -87,8 +87,6 @@ export const CLIENT_NAVIGATION_SHORTCUTS: ClientKeyboardShortcutDefinition<Clien
 export const BRANCH_ACTION_SHORTCUTS: BranchActionShortcutDefinition[] = [
   branchActionShortcut([{ code: 'KeyP', shiftKey: false }], 'pull', [['p']], 'action.pull'),
   branchActionShortcut([{ code: 'KeyP', shiftKey: true }], 'push', [['⇧', 'P']], 'action.push'),
-  branchActionShortcut([{ code: 'KeyG', shiftKey: false }], 'terminal', [['g']], 'worktrees.open-in-terminal-label'),
-  branchActionShortcut([{ code: 'KeyV', shiftKey: false }], 'editor', [['v']], 'worktrees.open-in-editor-label'),
   branchActionShortcut([{ code: 'KeyG', shiftKey: true }], 'remote', [['⇧', 'G']], 'action.remote'),
 ]
 

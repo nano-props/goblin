@@ -60,7 +60,7 @@ vi.mock('electron', () => ({
     }),
   },
   shell: {
-    showItemInFolder: vi.fn(),
+    openPath: vi.fn(),
   },
 }))
 

@@ -70,7 +70,6 @@ function seedElectronBootstrap() {
         'open-external-url',
         'open-directory-dialog',
         'consume-external-open-paths',
-        'open-in-finder',
         'terminal-notifications',
         'terminal-badge',
       ],

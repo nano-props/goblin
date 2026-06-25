@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { createRepoRoutes } from '#/server/routes/repo.ts'
 
 const mocks = vi.hoisted(() => ({
@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   openRepositoryRemote: vi.fn(),
   openRepositoryTerminal: vi.fn(),
   openRepositoryEditor: vi.fn(),
+  openRepositoryInFinder: vi.fn(),
   setBackgroundSyncRepos: vi.fn(),
   getBackgroundSyncRepos: vi.fn(),
   getServerFetchIntervalSec: vi.fn(),
@@ -53,10 +54,15 @@ vi.mock('#/server/modules/repo-write-paths.ts', () => ({
   openRepositoryRemote: mocks.openRepositoryRemote,
   openRepositoryTerminal: mocks.openRepositoryTerminal,
   openRepositoryEditor: mocks.openRepositoryEditor,
+  openRepositoryInFinder: mocks.openRepositoryInFinder,
 }))
 vi.mock('#/server/modules/settings-source.ts', () => ({
   getServerFetchIntervalSec: mocks.getServerFetchIntervalSec,
 }))
+
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('repo routes — POST body validation (read endpoints)', () => {
   test('returns 400 when the body is missing required fields', async () => {
@@ -404,5 +410,52 @@ describe('repo routes — POST body validation (action endpoints)', () => {
     )
     expect(response.status).toBe(200)
     expect(mocks.cloneRepository).toHaveBeenCalledWith('op_1', 'https://example.com/r.git', '/tmp', 'r')
+  })
+
+  test('forwards external workspace app open routes', async () => {
+    mocks.openRepositoryTerminal.mockResolvedValue({ ok: true, message: '' })
+    mocks.openRepositoryEditor.mockResolvedValue({ ok: true, message: '' })
+    mocks.openRepositoryInFinder.mockResolvedValue({ ok: true, message: '' })
+    const app = createRepoRoutes()
+
+    await app.request(
+      new Request('http://localhost/open-terminal', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ path: '/tmp/repo', app: 'ghostty' }),
+      }),
+    )
+    await app.request(
+      new Request('http://localhost/open-editor', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ path: '/tmp/repo', app: 'windsurf' }),
+      }),
+    )
+    await app.request(
+      new Request('http://localhost/open-in-finder', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ path: '/tmp/repo' }),
+      }),
+    )
+
+    expect(mocks.openRepositoryTerminal).toHaveBeenCalledWith('/tmp/repo', 'ghostty')
+    expect(mocks.openRepositoryEditor).toHaveBeenCalledWith('/tmp/repo', 'windsurf')
+    expect(mocks.openRepositoryInFinder).toHaveBeenCalledWith('/tmp/repo')
+  })
+
+  test('returns 400 for invalid external app choices', async () => {
+    const app = createRepoRoutes()
+    const response = await app.request(
+      new Request('http://localhost/open-editor', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ path: '/tmp/repo', app: 'not-an-editor' }),
+      }),
+    )
+
+    expect(response.status).toBe(400)
+    expect(mocks.openRepositoryEditor).not.toHaveBeenCalled()
   })
 })

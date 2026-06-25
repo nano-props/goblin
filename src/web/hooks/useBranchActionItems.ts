@@ -3,9 +3,7 @@ import { createElement, type ReactNode } from 'react'
 import { GitHubOutlineIcon } from '#/web/components/GitHubOutlineIcon.tsx'
 import { GitLabLogoIcon } from '#/web/components/GitLabLogoIcon.tsx'
 import type { RepoBranchState } from '#/web/stores/repos/types.ts'
-import { remoteRepoTarget } from '#/web/stores/repos/helpers.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import { EditorAppIcon, TerminalAppIcon } from '#/web/components/ExternalAppIcon/index.tsx'
 import { useBranchActions, type BranchActionItemId } from '#/web/hooks/useBranchActions.tsx'
 import {
   branchActionDisplayPhase,
@@ -14,7 +12,6 @@ import {
 } from '#/web/hooks/branch-action-state.ts'
 import { branchPullRequestBelongsToBranch } from '#/shared/git-types.ts'
 import type { BrowserRemoteProvider } from '#/web/types.ts'
-import { useRuntimeExternalAppSettings } from '#/web/runtime-settings-external-apps.ts'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
 import type { WorkspacePaneBranchViewType, WorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
 import { openWorkspacePaneView } from '#/web/components/branch-workspace/open-workspace-pane-view.ts'
@@ -71,8 +68,6 @@ function browserRemoteIcon(provider: BrowserRemoteProvider | undefined) {
 export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchState): BranchActionSurface {
   const t = useT()
   const navigation = useMainWindowNavigation()
-  const { terminalApp, resolvedTerminalApp, terminalAvailable, editorApp, resolvedEditorApp, editorAvailable } =
-    useRuntimeExternalAppSettings()
   const { blocked, busyAction, capabilities, actions } = useBranchActions(repo, branch)
   const disabled = blocked
   const busy = (id: BranchActionItemId) => busyAction === id
@@ -90,27 +85,6 @@ export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchS
   const pullRequest =
     branch.pullRequest && branchPullRequestBelongsToBranch(branch, branch.pullRequest) ? branch.pullRequest : undefined
   const remoteIcon = pullRequest ? GitPullRequest : browserRemoteIcon(branchBrowserRemoteProvider(repo, branch))
-  const isRemoteRepo = remoteRepoTarget(repo.id, repo.remote.lifecycle) !== null
-  // For remote repos the SSH invocation runs on the user's machine, so we
-  // don't need the local terminal/editor to be installed — the menu item
-  // stays visible regardless of `terminalAvailable` / `editorAvailable`.
-  const showTerminalAction = capabilities.canOpenTerminal && (isRemoteRepo || terminalAvailable)
-  const showEditorAction = capabilities.canOpenEditor && (isRemoteRepo || editorAvailable)
-  const terminalIconPref = isRemoteRepo ? 'auto' : (resolvedTerminalApp ?? terminalApp)
-  const editorIconPref = isRemoteRepo ? 'auto' : (resolvedEditorApp ?? editorApp)
-  const terminalActionLabelText = (() => {
-    if (isRemoteRepo || !resolvedTerminalApp) return t('worktrees.open-in-terminal-label')
-    if (resolvedTerminalApp === 'ghostty') return t('settings.terminal.ghostty')
-    if (resolvedTerminalApp === 'terminal') return t('settings.terminal.terminal')
-    return t('settings.terminal.windows-terminal')
-  })()
-  const editorActionLabelText = (() => {
-    if (isRemoteRepo || !resolvedEditorApp) return t('worktrees.open-in-editor-label')
-    if (resolvedEditorApp === 'vscode') return t('settings.editor.vscode')
-    if (resolvedEditorApp === 'cursor') return t('settings.editor.cursor')
-    return t('settings.editor.windsurf')
-  })()
-
   const openStaticWorkspacePaneView = (type: WorkspacePaneBranchViewType | WorkspacePaneStaticViewType) => {
     void openWorkspacePaneView({
       repoId: repo.id,
@@ -175,38 +149,6 @@ export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchS
       icon: createElement(FileText),
       onSelect: () => openStaticWorkspacePaneView('changes'),
     },
-    ...(showTerminalAction
-      ? [
-          {
-            id: 'terminal' as const,
-            label: terminalActionLabelText,
-            disabled,
-            busy: busy('terminal'),
-            visible: true,
-            shortcut: 'G',
-            icon: createElement(TerminalAppIcon, { pref: terminalIconPref }),
-            onSelect: () => {
-              void actions.openTerminal()
-            },
-          },
-        ]
-      : []),
-    ...(showEditorAction
-      ? [
-          {
-            id: 'editor' as const,
-            label: editorActionLabelText,
-            disabled,
-            busy: busy('editor'),
-            visible: true,
-            shortcut: 'V',
-            icon: createElement(EditorAppIcon, { pref: editorIconPref }),
-            onSelect: () => {
-              void actions.openEditor()
-            },
-          },
-        ]
-      : []),
     {
       id: 'remote',
       label: pullRequest ? t('action.remote-pr', { n: pullRequest.number }) : t('action.remote'),

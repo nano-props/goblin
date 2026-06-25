@@ -40,6 +40,7 @@ The project runs in Node.js strip-only mode (no `tsc` emit). Do not use these un
   - `src/main/**` must not import `src/web/**` or `src/server/**`.
   - `src/web/**` must not import `src/main/**`.
   - `src/server/**` and `src/shared/**` must not import `electron`.
+- Prefer server-first implementations for app behavior. Do not add IPC unless the behavior truly requires an Electron-only capability that cannot reasonably live behind the server/browser path; document the reason at the call site when IPC is necessary.
 
 ## HTTP request conventions
 
