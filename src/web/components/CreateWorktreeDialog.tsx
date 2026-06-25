@@ -248,7 +248,7 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
                   value={option.id}
                   className={cn(
                     'flex min-h-8 flex-1 items-center justify-center gap-1 px-2 text-xs',
-                    selected && 'bg-accent text-accent-foreground',
+                    selected && 'bg-selected text-selected-foreground',
                   )}
                 >
                   <Icon size={14} />
