@@ -56,23 +56,38 @@ body,
   box-sizing: border-box;
 }
 
+html {
+  --goblin-window-chrome-left: 16px;
+  --goblin-window-chrome-right: 16px;
+}
+
+html[data-host='electron']:not([data-chrome='overlay']) {
+  --goblin-window-chrome-left: 92px;
+}
+
+html[data-host='electron'][data-chrome='overlay'] {
+  --goblin-window-chrome-left: 16px;
+  --goblin-window-chrome-right: 150px;
+}
+
 /* Topbar — leaves room for macOS traffic lights on the left.
  * Acts as the Electron drag region; child buttons opt out via
  * -webkit-app-region: no-drag (set on `button` and `[data-interactive]`). */
 .topbar {
   -webkit-app-region: drag;
-  padding: 0 16px;
-}
-html[data-host='electron']:not([data-chrome='overlay']) .topbar {
-  padding-left: 92px;
-}
-html[data-host='electron'][data-chrome='overlay'] .topbar {
-  padding: 0 150px 0 16px;
+  padding-left: var(--goblin-window-chrome-left);
+  padding-right: var(--goblin-window-chrome-right);
 }
 
 button,
 [data-interactive] {
   -webkit-app-region: no-drag;
+}
+
+.goblin-focus-reveal-trigger-layer {
+  -webkit-app-region: no-drag;
+  padding-left: var(--goblin-window-chrome-left);
+  padding-right: var(--goblin-window-chrome-right);
 }
 
 .app-drag-region {
@@ -146,7 +161,7 @@ button,
   container-type: inline-size;
 }
 
-.goblin-split-pane[data-collapse-transition='true']
+.goblin-split-pane[data-collapse-transition]
   > [data-slot='resizable-panel-group']
   > [data-slot='resizable-panel'] {
   transition:
@@ -186,6 +201,65 @@ button,
   opacity: 0;
   pointer-events: none;
   width: 0;
+}
+
+.goblin-workspace-toolbar {
+  transition:
+    padding-left var(--goblin-workspace-pane-transition-duration, 240ms)
+      var(--goblin-workspace-pane-transition-easing, cubic-bezier(0.2, 0, 0, 1)),
+    padding-right var(--goblin-workspace-pane-transition-duration, 240ms)
+      var(--goblin-workspace-pane-transition-easing, cubic-bezier(0.2, 0, 0, 1));
+}
+
+.goblin-workspace-toolbar__leading-spacer {
+  width: 0;
+  transition: width var(--goblin-workspace-pane-transition-duration, 240ms)
+    var(--goblin-workspace-pane-transition-easing, cubic-bezier(0.2, 0, 0, 1));
+}
+
+.goblin-workspace-toolbar__leading-spacer--reserved {
+  width: 2.5rem;
+}
+
+.goblin-focus-reveal-panel {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-100%);
+  transition-property: transform, opacity, box-shadow;
+  transition-duration: 240ms;
+  transition-timing-function: var(--goblin-workspace-pane-transition-easing, cubic-bezier(0.2, 0, 0, 1));
+  will-change: transform, opacity, box-shadow;
+  box-shadow: none;
+}
+
+.goblin-focus-reveal-panel[data-state='open'] {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+  box-shadow: 8px 0 24px rgb(15 23 42 / 14%);
+}
+
+html[data-theme='dark'] .goblin-focus-reveal-panel[data-state='open'] {
+  box-shadow: 8px 0 24px rgb(0 0 0 / 35%);
+}
+
+.goblin-focus-reveal-panel[data-state='opening'] {
+  opacity: 0;
+  pointer-events: auto;
+  transform: translateX(-14px);
+  transition: none;
+}
+
+.goblin-focus-reveal-panel[data-state='closing'] {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-14px);
+  transition-duration: 260ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.goblin-focus-reveal-panel[data-state='closed'] {
+  transition: none;
 }
 
 /* Compact workspace page transition. Mirrors the split-pane Focus Mode

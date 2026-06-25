@@ -13,7 +13,7 @@ interface SidebarRowButtonProps extends Omit<ComponentPropsWithoutRef<'button'>,
 
 export const SIDEBAR_ROW_ICON_CLASS = 'flex size-4 shrink-0 items-center justify-center'
 export const SIDEBAR_ROW_BUTTON_CLASS =
-  'flex h-12 min-w-0 cursor-pointer items-center gap-2.5 rounded-md border border-transparent bg-transparent px-3 text-left text-sm font-medium outline-none transition-colors duration-100 disabled:pointer-events-none disabled:opacity-50'
+  'flex h-10 min-w-0 cursor-pointer items-center gap-2.5 rounded-md border border-transparent bg-transparent px-3 text-left text-sm font-medium outline-none transition-colors duration-100 disabled:pointer-events-none disabled:opacity-50'
 
 export const SidebarRowButton = forwardRef<HTMLButtonElement, SidebarRowButtonProps>(function SidebarRowButton(
   {
@@ -38,7 +38,7 @@ export const SidebarRowButton = forwardRef<HTMLButtonElement, SidebarRowButtonPr
       className={cn(
         SIDEBAR_ROW_BUTTON_CLASS,
         focusRing,
-        fill ? 'w-full flex-1' : 'max-w-64 shrink-0',
+        fill ? 'w-full shrink-0' : 'max-w-64 shrink-0',
         selected
           ? 'bg-selected text-selected-foreground hover:bg-selected'
           : 'text-foreground hover:bg-accent hover:text-accent-foreground',

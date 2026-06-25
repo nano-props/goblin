@@ -10,7 +10,6 @@ import {
 import { WorkspaceFocusToggle } from '#/web/components/WorkspaceFocusToggle.tsx'
 import { RepoShellSidebar } from '#/web/components/repo-shell/RepoShellSidebar.tsx'
 import { cn } from '#/web/lib/cn.ts'
-import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
 import {
   clampRepoSidebarSizePercent,
   repoSidebarWidthExpression,
@@ -19,9 +18,12 @@ import {
 import { ResizeHandleLine, resizeHandleClassNames } from '#/web/components/ui/resizable.tsx'
 import { useElementInlineSize } from '#/web/hooks/useElementInlineSize.ts'
 import { WINDOW_TOPBAR_HEIGHT_PX } from '#/shared/window-chrome.ts'
+import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
 
-const FOCUS_SIDEBAR_CLOSE_DELAY_MS = WORKSPACE_PANE_TRANSITION_MS
+const FOCUS_REVEAL_SURFACE_SELECTOR = '[data-floating-surface],[data-focus-reveal-surface]'
+const FOCUS_REVEAL_CLOSE_MS = 260
 type ResizeRailState = 'idle' | 'hover' | 'active'
+type RevealPanelState = 'closed' | 'opening' | 'open' | 'closing'
 
 interface FocusModeSidebarRevealState {
   open: boolean
@@ -43,63 +45,64 @@ interface FocusModeSidebarRevealProps {
 }
 
 interface FocusModeSidebarRevealTriggerProps {
-  onMouseEnter: () => void
-  onMouseLeave: () => void
+  revealEnabled?: boolean
+  onMouseEnter?: () => void
+  onMouseLeave?: () => void
 }
 
-export function useFocusModeSidebarReveal(active: boolean): FocusModeSidebarRevealState {
+export function useFocusModeSidebarReveal(enabled: boolean): FocusModeSidebarRevealState {
   const [open, setOpen] = useState(false)
   const [triggerArmed, setTriggerArmed] = useState(true)
-  const closeTimer = useRef<number | null>(null)
-  const previousActive = useRef(active)
+  const previousEnabled = useRef(enabled)
+  const exitRetainTimer = useRef<number | null>(null)
+  const exitRetaining = useRef(false)
 
-  const clearCloseTimer = useCallback(() => {
-    if (closeTimer.current === null) return
-    window.clearTimeout(closeTimer.current)
-    closeTimer.current = null
+  const clearExitRetain = useCallback(() => {
+    if (exitRetainTimer.current !== null) {
+      window.clearTimeout(exitRetainTimer.current)
+      exitRetainTimer.current = null
+    }
+    exitRetaining.current = false
   }, [])
 
   const openSidebar = useCallback(() => {
-    clearCloseTimer()
+    clearExitRetain()
     setTriggerArmed(true)
     setOpen(true)
-  }, [clearCloseTimer])
+  }, [clearExitRetain])
 
-  const closeSoon = useCallback(() => {
-    clearCloseTimer()
-    closeTimer.current = window.setTimeout(() => {
-      closeTimer.current = null
-      setOpen(false)
-    }, FOCUS_SIDEBAR_CLOSE_DELAY_MS)
-  }, [clearCloseTimer])
+  const closeSidebar = useCallback(() => {
+    if (exitRetaining.current) return
+    setOpen(false)
+  }, [])
 
   useEffect(() => {
-    const wasActive = previousActive.current
-    if (wasActive === active) return
-    previousActive.current = active
+    const wasEnabled = previousEnabled.current
+    if (wasEnabled === enabled) return
+    previousEnabled.current = enabled
 
-    clearCloseTimer()
-    if (active) {
+    clearExitRetain()
+    if (enabled) {
       setOpen(false)
       setTriggerArmed(false)
       return
     }
 
     setTriggerArmed(true)
-    closeTimer.current = window.setTimeout(() => {
-      closeTimer.current = null
+    if (!open) {
+      setOpen(false)
+      return
+    }
+
+    exitRetaining.current = true
+    exitRetainTimer.current = window.setTimeout(() => {
+      exitRetainTimer.current = null
+      exitRetaining.current = false
       setOpen(false)
     }, WORKSPACE_PANE_TRANSITION_MS)
-  }, [active, clearCloseTimer])
+  }, [clearExitRetain, enabled, open])
 
-  useEffect(() => {
-    if (active || open) return
-    if (!triggerArmed) {
-      setTriggerArmed(true)
-    }
-  }, [active, open, triggerArmed])
-
-  useEffect(() => clearCloseTimer, [clearCloseTimer])
+  useEffect(() => clearExitRetain, [clearExitRetain])
 
   const onTriggerEnter = useCallback(() => {
     if (!triggerArmed) return
@@ -108,27 +111,31 @@ export function useFocusModeSidebarReveal(active: boolean): FocusModeSidebarReve
 
   const onTriggerLeave = useCallback(() => {
     setTriggerArmed(true)
-    closeSoon()
-  }, [closeSoon])
+  }, [])
 
   return {
     open,
-    rendered: active || open,
+    rendered: enabled || open,
     onTriggerEnter,
     onTriggerLeave,
     onSurfaceEnter: openSidebar,
-    onSurfaceLeave: closeSoon,
+    onSurfaceLeave: closeSidebar,
   }
 }
 
-export function FocusModeSidebarRevealTrigger({ onMouseEnter, onMouseLeave }: FocusModeSidebarRevealTriggerProps) {
+export function FocusModeSidebarRevealTrigger({
+  revealEnabled = false,
+  onMouseEnter,
+  onMouseLeave,
+}: FocusModeSidebarRevealTriggerProps) {
   return (
     <div
       data-interactive
-      data-focus-reveal-surface=""
+      data-focus-reveal-surface={revealEnabled ? '' : undefined}
       data-testid="focus-mode-sidebar-trigger"
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
+      className="pointer-events-auto"
+      onMouseEnter={revealEnabled ? onMouseEnter : undefined}
+      onMouseLeave={revealEnabled ? onMouseLeave : undefined}
     >
       <WorkspaceFocusToggle />
     </div>
@@ -149,8 +156,12 @@ export function FocusModeSidebarReveal({
   const hitAreaRef = useRef<HTMLDivElement | null>(null)
   const resizingRef = useRef(false)
   const resizeDragCleanupRef = useRef<(() => void) | null>(null)
+  const closeAnimationTimerRef = useRef<number | null>(null)
+  const openAnimationFrameRef = useRef<number | null>(null)
+  const panelStateRef = useRef<RevealPanelState>(open ? 'open' : 'closed')
   const lastPointerRef = useRef({ x: 0, y: 0 })
   const [resizeRailState, setResizeRailState] = useState<ResizeRailState>('idle')
+  const [panelState, setPanelState] = useState<RevealPanelState>(() => (open ? 'open' : 'closed'))
   const rootFontSizePx = useRootFontSizePx()
   const hostWidth = useElementInlineSize(hostRef, true)
   const measuredWidthPx =
@@ -164,8 +175,21 @@ export function FocusModeSidebarReveal({
   const width = measuredWidthPx === null ? repoSidebarWidthExpression(sidebarSize) : `${measuredWidthPx}px`
   const style = {
     width,
-    transform: open ? 'translateX(0)' : 'translateX(-100%)',
   } as CSSProperties
+  const setPanelVisualState = useCallback((next: RevealPanelState) => {
+    panelStateRef.current = next
+    setPanelState(next)
+  }, [])
+  const clearCloseAnimationTimer = useCallback(() => {
+    if (closeAnimationTimerRef.current === null) return
+    window.clearTimeout(closeAnimationTimerRef.current)
+    closeAnimationTimerRef.current = null
+  }, [])
+  const clearOpenAnimationFrame = useCallback(() => {
+    if (openAnimationFrameRef.current === null) return
+    window.cancelAnimationFrame(openAnimationFrameRef.current)
+    openAnimationFrameRef.current = null
+  }, [])
   const handleResizePointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
       const rect = focusRevealHostRect(hostRef.current)
@@ -223,12 +247,35 @@ export function FocusModeSidebarReveal({
   useEffect(() => {
     return () => {
       resizeDragCleanupRef.current?.()
+      clearCloseAnimationTimer()
+      clearOpenAnimationFrame()
       resizeDragCleanupRef.current = null
       resizingRef.current = false
     }
-  }, [])
+  }, [clearCloseAnimationTimer, clearOpenAnimationFrame])
+  useEffect(() => {
+    clearCloseAnimationTimer()
+    clearOpenAnimationFrame()
+    if (open) {
+      if (panelStateRef.current === 'open') return
+      setPanelVisualState('opening')
+      openAnimationFrameRef.current = window.requestAnimationFrame(() => {
+        openAnimationFrameRef.current = null
+        setPanelVisualState('open')
+      })
+      return
+    }
+
+    if (panelStateRef.current === 'closed') return
+    setPanelVisualState('closing')
+    closeAnimationTimerRef.current = window.setTimeout(() => {
+      closeAnimationTimerRef.current = null
+      setPanelVisualState('closed')
+    }, FOCUS_REVEAL_CLOSE_MS)
+  }, [clearCloseAnimationTimer, clearOpenAnimationFrame, open, setPanelVisualState])
   const handleSurfaceLeave = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
     if (resizingRef.current) return
+    if (isPointerInsideRevealBounds(event, hostRef.current, panelRef.current)) return
     if (isFocusRevealSurfaceTarget(event.relatedTarget, panelRef.current, hitAreaRef.current)) return
     onSurfaceLeave()
   }, [onSurfaceLeave])
@@ -237,7 +284,11 @@ export function FocusModeSidebarReveal({
 
     const handlePointerMove = (event: PointerEvent) => {
       if (resizingRef.current) return
-      if (isFocusRevealSurfaceTarget(event.target, panelRef.current, hitAreaRef.current)) {
+      if (
+        isFocusRevealSurfaceTarget(event.target, panelRef.current, hitAreaRef.current) ||
+        isPointerInsideRevealBounds(event, hostRef.current, panelRef.current) ||
+        isPointerInsideElement(event, hitAreaRef.current)
+      ) {
         onSurfaceEnter()
         return
       }
@@ -268,23 +319,23 @@ export function FocusModeSidebarReveal({
     >
       <div
         ref={hitAreaRef}
+        data-focus-reveal-surface=""
         data-testid="focus-mode-sidebar-hit-area"
         className="pointer-events-auto absolute bottom-0 left-0 w-3"
         style={{ top: WINDOW_TOPBAR_HEIGHT_PX }}
         onMouseEnter={onSurfaceEnter}
-        onMouseLeave={onSurfaceLeave}
+        onMouseLeave={handleSurfaceLeave}
         aria-hidden
       />
       <div
         ref={panelRef}
+        data-focus-reveal-surface=""
         data-testid="focus-mode-sidebar-reveal"
         data-open={open ? 'true' : 'false'}
+        data-state={panelState}
         aria-hidden={open ? undefined : true}
         inert={open ? undefined : true}
-        className={cn(
-          'pointer-events-auto absolute inset-y-0 left-0 flex min-w-0 overflow-hidden bg-card transition-[transform,box-shadow,border-color] duration-200 ease-out',
-          open ? 'border-r border-border/60 shadow-lg' : 'border-r border-transparent shadow-none',
-        )}
+        className="goblin-focus-reveal-panel absolute inset-y-0 left-0 flex min-w-0 overflow-hidden bg-card"
         style={style}
         onMouseEnter={onSurfaceEnter}
         onMouseLeave={handleSurfaceLeave}
@@ -319,6 +370,37 @@ function focusRevealHostRect(host: HTMLElement | null): DOMRect | null {
   return parentRect && parentRect.width > 0 ? parentRect : null
 }
 
+function isPointerInsideElement(event: PointerEvent, element: HTMLElement | null): boolean {
+  if (!element) return false
+  const rect = element.getBoundingClientRect()
+  if (rect.width <= 0 || rect.height <= 0) return false
+  return (
+    event.clientX >= rect.left &&
+    event.clientX <= rect.right &&
+    event.clientY >= rect.top &&
+    event.clientY <= rect.bottom
+  )
+}
+
+function isPointerInsideRevealBounds(
+  event: Pick<MouseEvent | PointerEvent, 'clientX' | 'clientY'>,
+  host: HTMLElement | null,
+  panel: HTMLElement | null,
+): boolean {
+  if (!host || !panel) return false
+  const hostRect = host.getBoundingClientRect()
+  const panelRect = panel.getBoundingClientRect()
+  const width = panel.offsetWidth || panelRect.width
+  if (hostRect.height <= 0 || width <= 0) return false
+
+  return (
+    event.clientX >= hostRect.left &&
+    event.clientX <= hostRect.left + width &&
+    event.clientY >= hostRect.top &&
+    event.clientY <= hostRect.bottom
+  )
+}
+
 function isFocusRevealSurfaceTarget(
   target: EventTarget | null,
   panel: HTMLElement | null,
@@ -328,7 +410,7 @@ function isFocusRevealSurfaceTarget(
   if (panel?.contains(target) || hitArea?.contains(target)) return true
 
   const targetElement = target instanceof Element ? target : target.parentElement
-  return !!targetElement?.closest('[data-floating-surface],[data-focus-reveal-surface]')
+  return !!targetElement?.closest(FOCUS_REVEAL_SURFACE_SELECTOR)
 }
 
 function useRootFontSizePx(): number {

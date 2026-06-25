@@ -42,16 +42,19 @@ vi.mock('#/web/components/BranchWorkspace.tsx', () => ({
     selectedBranchName,
     shortcutsEnabled = true,
     toolbarLeading,
+    toolbarTrafficLightOffset = false,
   }: {
     selectedBranchName?: string | null
     shortcutsEnabled?: boolean
     toolbarLeading?: React.ReactNode
+    toolbarTrafficLightOffset?: boolean
   }) => (
     <div
       data-testid="branch-workspace"
       data-selected-branch-name={selectedBranchName ?? ''}
       data-shortcuts-enabled={shortcutsEnabled ? 'true' : 'false'}
       data-has-toolbar-leading={toolbarLeading ? 'true' : 'false'}
+      data-traffic-light-offset={toolbarTrafficLightOffset ? 'true' : 'false'}
     >
       {toolbarLeading ? <div data-testid="branch-workspace-toolbar-leading">{toolbarLeading}</div> : null}
     </div>
@@ -200,7 +203,9 @@ describe('RepoView workspace navigation', () => {
     expect(workspace()?.dataset.mode).toBe('split')
     expect(workspace()?.dataset.branchNavigatorCollapsed).toBe('true')
     expect(branchWorkspace()).not.toBeNull()
-    expect(branchWorkspace()?.dataset.hasToolbarLeading).toBe('true')
+    expect(branchWorkspace()?.dataset.hasToolbarLeading).toBe('false')
+    expect(branchWorkspace()?.dataset.trafficLightOffset).toBe('true')
+    expect(focusModeSidebarTrigger()).not.toBeNull()
   })
 
   test('large-screen collapsed Focus Mode reveals the sidebar on left-edge hover', () => {
@@ -212,8 +217,9 @@ describe('RepoView workspace navigation', () => {
     const reveal = focusModeSidebarReveal()
     expect(reveal).not.toBeNull()
     expect(reveal?.dataset.open).toBe('false')
-    expect(reveal?.style.transform).toBe('translateX(-100%)')
+    expect(reveal?.dataset.state).toBe('closed')
     expect(focusModeSidebarLayer()?.className).toContain('right-0')
+    expect(reveal?.className).not.toContain('border-r')
     expect(reveal?.getAttribute('aria-hidden')).toBe('true')
     expect(reveal?.hasAttribute('inert')).toBe(true)
 
@@ -234,10 +240,14 @@ describe('RepoView workspace navigation', () => {
     useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
     render(<RepoView repoId={REPO_ID} />)
 
+    expect(focusModeToggleOverlay()?.hasAttribute('data-interactive')).toBe(true)
+    expect(focusModeToggleOverlay()?.hasAttribute('data-focus-reveal-surface')).toBe(true)
+    expect(focusModeToggleOverlay()?.className).toContain('goblin-focus-reveal-trigger-layer')
+    expect(focusModeToggleOverlay()?.className).not.toContain('topbar')
     expect(focusModeSidebarReveal()?.dataset.open).toBe('false')
 
     act(() => {
-      workspaceToolbarLeading()
+      focusModeSidebarTrigger()
         ?.querySelector('[data-testid="workspace-focus-toggle"]')
         ?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
     })
@@ -245,26 +255,76 @@ describe('RepoView workspace navigation', () => {
     expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
   })
 
+  test('large-screen collapsed Focus Mode keeps the sidebar open across the topbar reveal surface', () => {
+    useReposStore.getState().setWorkspaceFocused(true)
+    useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
+    render(<RepoView repoId={REPO_ID} />)
+
+    act(() => {
+      focusModeSidebarTrigger()
+        ?.querySelector('[data-testid="workspace-focus-toggle"]')
+        ?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+    })
+    expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
+
+    mockFocusRevealLayout({
+      panelLeft: -14,
+      panelWidth: 360,
+    })
+
+    act(() => {
+      focusModeSidebarReveal()?.dispatchEvent(
+        new MouseEvent('mouseout', {
+          bubbles: true,
+          relatedTarget: focusModeToggleOverlay(),
+          clientX: 355,
+          clientY: 24,
+        }),
+      )
+      focusModeToggleOverlay()?.dispatchEvent(
+        new PointerEvent('pointermove', { bubbles: true, clientX: 355, clientY: 24 }),
+      )
+    })
+
+    expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
+  })
+
+  test('large-screen collapsed Focus Mode does not close from the trigger mouseout alone', () => {
+    useReposStore.getState().setWorkspaceFocused(true)
+    useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
+    render(<RepoView repoId={REPO_ID} />)
+
+    const toggle = focusModeSidebarTrigger()?.querySelector('[data-testid="workspace-focus-toggle"]')
+    act(() => {
+      toggle?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+    })
+    expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
+
+    act(() => {
+      toggle?.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body }))
+    })
+    expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
+
+    act(() => {
+      document.body.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: 800, clientY: 24 }))
+    })
+    expect(focusModeSidebarReveal()?.dataset.open).toBe('false')
+  })
+
   test('large-screen collapsed Focus Mode stays open while the pointer remains on the focus trigger', () => {
-    vi.useFakeTimers()
-    try {
-      useReposStore.getState().setWorkspaceFocused(true)
-      useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
-      render(<RepoView repoId={REPO_ID} />)
+    useReposStore.getState().setWorkspaceFocused(true)
+    useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
+    render(<RepoView repoId={REPO_ID} />)
 
-      const trigger = focusModeSidebarTrigger()
-      expect(trigger?.hasAttribute('data-focus-reveal-surface')).toBe(true)
+    const trigger = focusModeSidebarTrigger()
+    expect(trigger?.hasAttribute('data-focus-reveal-surface')).toBe(true)
 
-      act(() => {
-        trigger?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
-        trigger?.dispatchEvent(new PointerEvent('pointermove', { bubbles: true }))
-        vi.advanceTimersByTime(WORKSPACE_PANE_TRANSITION_MS)
-      })
+    act(() => {
+      trigger?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+      trigger?.dispatchEvent(new PointerEvent('pointermove', { bubbles: true }))
+    })
 
-      expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
-    } finally {
-      vi.useRealTimers()
-    }
+    expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
   })
 
   test('large-screen collapsed Focus Mode arms trigger hover only after the pointer leaves once', () => {
@@ -294,39 +354,34 @@ describe('RepoView workspace navigation', () => {
   })
 
   test('large-screen collapsed Focus Mode stays open while moving from trigger into the revealed sidebar', () => {
-    vi.useFakeTimers()
-    try {
-      useReposStore.getState().setWorkspaceFocused(true)
-      useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
-      render(<RepoView repoId={REPO_ID} />)
+    useReposStore.getState().setWorkspaceFocused(true)
+    useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
+    render(<RepoView repoId={REPO_ID} />)
 
-      const toggle = workspaceToolbarLeading()?.querySelector('[data-testid="workspace-focus-toggle"]')
-      act(() => {
-        toggle?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
-      })
-      expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
+    const toggle = focusModeSidebarTrigger()?.querySelector('[data-testid="workspace-focus-toggle"]')
+    act(() => {
+      toggle?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+    })
+    expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
 
-      act(() => {
-        toggle?.dispatchEvent(new MouseEvent('mouseout', { bubbles: true }))
-        focusModeSidebarReveal()?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
-        vi.advanceTimersByTime(200)
-      })
+    const reveal = focusModeSidebarReveal()
+    act(() => {
+      toggle?.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: reveal }))
+      reveal?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+    })
 
-      expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
+    expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
 
-      act(() => {
-        focusModeSidebarReveal()?.dispatchEvent(new MouseEvent('mouseout', { bubbles: true }))
-        vi.advanceTimersByTime(WORKSPACE_PANE_TRANSITION_MS)
-      })
+    act(() => {
+      focusModeSidebarReveal()?.dispatchEvent(
+        new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body }),
+      )
+    })
 
-      expect(focusModeSidebarReveal()?.dataset.open).toBe('false')
-    } finally {
-      vi.useRealTimers()
-    }
+    expect(focusModeSidebarReveal()?.dataset.open).toBe('false')
   })
 
   test('large-screen collapsed Focus Mode stays open while pointer moves into a portal floating surface', () => {
-    vi.useFakeTimers()
     const floatingSurface = document.createElement('div')
     floatingSurface.setAttribute('data-floating-surface', '')
     document.body.appendChild(floatingSurface)
@@ -346,21 +401,40 @@ describe('RepoView workspace navigation', () => {
           new MouseEvent('mouseout', { bubbles: true, relatedTarget: floatingSurface }),
         )
         floatingSurface.dispatchEvent(new PointerEvent('pointermove', { bubbles: true }))
-        vi.advanceTimersByTime(WORKSPACE_PANE_TRANSITION_MS)
       })
 
       expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
 
       act(() => {
         document.body.dispatchEvent(new PointerEvent('pointermove', { bubbles: true }))
-        vi.advanceTimersByTime(WORKSPACE_PANE_TRANSITION_MS)
       })
 
       expect(focusModeSidebarReveal()?.dataset.open).toBe('false')
     } finally {
       floatingSurface.remove()
-      vi.useRealTimers()
     }
+  })
+
+  test('large-screen collapsed Focus Mode stays open when pointer coordinates remain inside the reveal', () => {
+    useReposStore.getState().setWorkspaceFocused(true)
+    useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
+    render(<RepoView repoId={REPO_ID} />)
+
+    act(() => {
+      focusModeSidebarHitArea()?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+    })
+    expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
+
+    mockFocusRevealLayout({
+      panelLeft: -14,
+      panelWidth: 360,
+    })
+
+    act(() => {
+      document.body.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: 355, clientY: 24 }))
+    })
+
+    expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
   })
 
   test('large-screen collapsed Focus Mode resizes the same sidebar width state from the reveal edge', () => {
@@ -444,9 +518,14 @@ describe('RepoView workspace navigation', () => {
       expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
 
       act(() => {
-        vi.advanceTimersByTime(WORKSPACE_PANE_TRANSITION_MS)
+        document.body.dispatchEvent(new PointerEvent('pointermove', { bubbles: true }))
+        vi.advanceTimersByTime(WORKSPACE_PANE_TRANSITION_MS - 1)
       })
+      expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
 
+      act(() => {
+        vi.advanceTimersByTime(1)
+      })
       expect(focusModeSidebarReveal()).toBeNull()
     } finally {
       vi.useRealTimers()
@@ -634,10 +713,6 @@ function workspaceFocusToggle(): HTMLButtonElement | null {
   return container?.querySelector<HTMLButtonElement>('[data-testid="workspace-focus-toggle"]') ?? null
 }
 
-function workspaceToolbarLeading(): HTMLElement | null {
-  return container?.querySelector<HTMLElement>('[data-testid="branch-workspace-toolbar-leading"]') ?? null
-}
-
 function focusModeSidebarHitArea(): HTMLElement | null {
   return container?.querySelector<HTMLElement>('[data-testid="focus-mode-sidebar-hit-area"]') ?? null
 }
@@ -656,6 +731,61 @@ function focusModeSidebarResizeHandle(): HTMLElement | null {
 
 function focusModeSidebarTrigger(): HTMLElement | null {
   return container?.querySelector<HTMLElement>('[data-testid="focus-mode-sidebar-trigger"]') ?? null
+}
+
+function focusModeToggleOverlay(): HTMLElement | null {
+  return container?.querySelector<HTMLElement>('[data-testid="focus-mode-toggle-overlay"]') ?? null
+}
+
+function mockFocusRevealLayout({
+  panelLeft = 0,
+  panelWidth = 360,
+  panelTop = 0,
+  panelHeight = 800,
+  hostLeft = 0,
+  hostTop = 0,
+  hostWidth = 1000,
+  hostHeight = 800,
+}: {
+  panelLeft?: number
+  panelWidth?: number
+  panelTop?: number
+  panelHeight?: number
+  hostLeft?: number
+  hostTop?: number
+  hostWidth?: number
+  hostHeight?: number
+}) {
+  const layer = focusModeSidebarLayer()
+  const reveal = focusModeSidebarReveal()
+  if (!layer || !reveal) throw new Error('missing focus reveal')
+
+  Object.defineProperty(layer, 'getBoundingClientRect', {
+    configurable: true,
+    value: () => domRect({ left: hostLeft, top: hostTop, width: hostWidth, height: hostHeight }),
+  })
+  Object.defineProperty(reveal, 'getBoundingClientRect', {
+    configurable: true,
+    value: () => domRect({ left: panelLeft, top: panelTop, width: panelWidth, height: panelHeight }),
+  })
+  Object.defineProperty(reveal, 'offsetWidth', {
+    configurable: true,
+    value: panelWidth,
+  })
+}
+
+function domRect({ left, top, width, height }: { left: number; top: number; width: number; height: number }) {
+  return {
+    left,
+    top,
+    width,
+    height,
+    right: left + width,
+    bottom: top + height,
+    x: left,
+    y: top,
+    toJSON: () => ({}),
+  }
 }
 
 function setSnapshotLoading(repoId: string) {

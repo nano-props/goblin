@@ -27,6 +27,7 @@ interface SplitPaneProps {
 const BEFORE_PANEL_ID = 'before'
 const AFTER_PANEL_ID = 'after'
 const RESIZE_TARGET_MINIMUM_SIZE = { fine: 7, coarse: 20 }
+type CollapseTransitionDirection = 'collapsing' | 'expanding'
 
 export function SplitPane({
   before,
@@ -47,7 +48,8 @@ export function SplitPane({
   const groupRef = useGroupRef()
   const splitPaneRef = useRef<HTMLDivElement | null>(null)
   const beforeClipRef = useRef<HTMLDivElement | null>(null)
-  const collapseTransitioning = useCollapseTransition(beforeCollapsed, animateBeforeCollapse)
+  const collapseTransition = useCollapseTransition(beforeCollapsed, animateBeforeCollapse)
+  const collapseTransitioning = collapseTransition !== null
   const measuredBeforeContentSize = useStableBeforeContentSize({
     beforeClipRef,
     splitPaneRef,
@@ -91,7 +93,7 @@ export function SplitPane({
     <div
       ref={splitPaneRef}
       data-before-collapsed={beforeCollapsed ? 'true' : undefined}
-      data-collapse-transition={collapseTransitioning ? 'true' : undefined}
+      data-collapse-transition={collapseTransition ?? undefined}
       style={splitPaneStyle}
       className={cn('goblin-split-pane min-h-0 min-w-0', className)}
     >
@@ -146,26 +148,33 @@ export function SplitPane({
   )
 }
 
-function useCollapseTransition(collapsed: boolean, enabled: boolean): boolean {
+function useCollapseTransition(collapsed: boolean, enabled: boolean): CollapseTransitionDirection | null {
   const previousCollapsedRef = useRef(collapsed)
-  const [transitioning, setTransitioning] = useState(false)
+  const [transition, setTransition] = useState<CollapseTransitionDirection | null>(null)
   const changedThisRender = enabled && previousCollapsedRef.current !== collapsed
+  const changeDirection: CollapseTransitionDirection | null = changedThisRender
+    ? collapsed
+      ? 'collapsing'
+      : 'expanding'
+    : null
 
   useEffect(() => {
     if (!enabled) {
       previousCollapsedRef.current = collapsed
-      setTransitioning(false)
+      setTransition(null)
       return
     }
-    if (!changedThisRender) return
+    if (previousCollapsedRef.current === collapsed) return
 
+    const direction: CollapseTransitionDirection = collapsed ? 'collapsing' : 'expanding'
     previousCollapsedRef.current = collapsed
-    setTransitioning(true)
-    const timeout = window.setTimeout(() => setTransitioning(false), WORKSPACE_PANE_TRANSITION_MS)
+    setTransition(direction)
+    const timeout = window.setTimeout(() => setTransition(null), WORKSPACE_PANE_TRANSITION_MS)
     return () => window.clearTimeout(timeout)
   }, [collapsed, enabled])
 
-  return enabled && (changedThisRender || transitioning)
+  if (!enabled) return null
+  return changeDirection ?? transition
 }
 
 function useStableBeforeContentSize({

@@ -23,6 +23,7 @@ import {
   useFocusModeSidebarReveal,
 } from '#/web/components/repo-shell/FocusModeSidebarReveal.tsx'
 import { RepoShellSidebar } from '#/web/components/repo-shell/RepoShellSidebar.tsx'
+import { WINDOW_TOPBAR_HEIGHT_PX } from '#/shared/window-chrome.ts'
 
 interface Props {
   repoId: string
@@ -65,14 +66,8 @@ export function RepoView({ repoId, onOpenSettings }: Props) {
   const sidebarPaneSize = 100 - workspacePaneSize
   const selectedBranch = repo?.ui.selectedBranch ?? null
   const singlePane = selectedBranch ? 'workspace' : 'navigator'
-  const focusSidebar = useFocusModeSidebarReveal(!compact && behavior.branchNavigatorCollapsed)
-  const toolbarLeading =
-    !compact && behavior.branchNavigatorCollapsed ? (
-      <FocusModeSidebarRevealTrigger
-        onMouseEnter={focusSidebar.onTriggerEnter}
-        onMouseLeave={focusSidebar.onTriggerLeave}
-      />
-    ) : undefined
+  const focusRevealEnabled = !compact && behavior.branchNavigatorCollapsed
+  const focusSidebar = useFocusModeSidebarReveal(focusRevealEnabled)
   const compactWorkspaceSelectedBranch = useRetainedValueDuringExit({
     value: selectedBranch,
     active: compact && singlePane === 'workspace',
@@ -151,6 +146,21 @@ export function RepoView({ repoId, onOpenSettings }: Props) {
   const renderWorkspaceSection = (workspaceBody: ReactNode, revealSidebar = false) => (
     <section className="relative flex min-w-0 flex-1 flex-col">
       {workspaceBody}
+      {!compact ? (
+        <div
+          data-testid="focus-mode-toggle-overlay"
+          data-interactive
+          data-focus-reveal-surface={focusRevealEnabled ? '' : undefined}
+          className="goblin-focus-reveal-trigger-layer pointer-events-none absolute left-0 top-0 z-40 flex items-center bg-transparent"
+          style={{ height: WINDOW_TOPBAR_HEIGHT_PX }}
+        >
+          <FocusModeSidebarRevealTrigger
+            revealEnabled={focusRevealEnabled}
+            onMouseEnter={focusSidebar.onTriggerEnter}
+            onMouseLeave={focusSidebar.onTriggerLeave}
+          />
+        </div>
+      ) : null}
       {revealSidebar && !compact && focusSidebar.rendered ? (
         <FocusModeSidebarReveal
           repoId={repoId}
@@ -205,7 +215,6 @@ export function RepoView({ repoId, onOpenSettings }: Props) {
         repoId={repoId}
         selectedBranchName={compact ? compactWorkspaceSelectedBranch : undefined}
         shortcutsEnabled={!compact || singlePane === 'workspace'}
-        toolbarLeading={toolbarLeading}
         toolbarTrafficLightOffset={!compact && behavior.branchNavigatorCollapsed}
       />
     </RepoWorkspacePane>

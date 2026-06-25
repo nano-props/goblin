@@ -1,7 +1,6 @@
 import { useContext, type ReactNode } from 'react'
 import { Settings } from 'lucide-react'
 import { BranchNavigator } from '#/web/components/BranchNavigator.tsx'
-import { WorkspaceFocusToggle } from '#/web/components/WorkspaceFocusToggle.tsx'
 import { RepoPickerHost } from '#/web/components/RepoPickerHost.tsx'
 import {
   BranchFilterAction,
@@ -41,7 +40,6 @@ export function RepoShellSidebar({
           data-testid="repo-shell-sidebar-top"
           style={{ height: WINDOW_TOPBAR_HEIGHT_PX }}
         >
-          <WorkspaceFocusToggle />
         </div>
       )}
       <RepoShellPrimaryActions repoId={repoId} />
@@ -56,7 +54,7 @@ export function RepoShellSidebar({
 
 function RepoShellPrimaryActions({ repoId }: { repoId: string }) {
   return (
-    <div className="shrink-0 px-3 pt-5">
+    <div className="shrink-0 px-3 pt-4">
       <div className="flex min-w-0 flex-col gap-1">
         <RepoPickerRow repoId={repoId} />
         <CreateWorktreeRowAction repoId={repoId} />
@@ -68,7 +66,7 @@ function RepoShellPrimaryActions({ repoId }: { repoId: string }) {
 function RepoPickerRow({ repoId }: { repoId: string }) {
   const overlayActions = useContext(LayoutOverlayActions)
   return (
-    <div className="flex h-12 min-w-0 shrink-0 items-center">
+    <div className="flex h-10 min-w-0 shrink-0 items-center">
       <RepoPickerHost
         currentRepoId={repoId}
         onOpenRepoPathDialog={overlayActions?.openRepoPathDialog ?? NOOP}
@@ -82,8 +80,8 @@ function RepoPickerRow({ repoId }: { repoId: string }) {
 
 function RepoShellBranchHeader({ repoId, title }: { repoId: string; title: string }) {
   return (
-    <div className="shrink-0 px-3 pb-2 pt-6">
-      <div className="flex h-9 min-w-0 items-center gap-2 px-3">
+    <div className="shrink-0 px-3 pb-2 pt-4">
+      <div className="flex h-8 min-w-0 items-center gap-2 px-3">
         <div className="min-w-0 flex-1 truncate text-xs font-medium text-muted-foreground/70">{title}</div>
         <RepoSyncAction repoId={repoId} />
         <BranchFilterAction repoId={repoId} />

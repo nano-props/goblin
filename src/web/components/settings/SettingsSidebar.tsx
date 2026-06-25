@@ -6,6 +6,7 @@ import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { WINDOW_TOPBAR_HEIGHT_PX } from '#/shared/window-chrome.ts'
+import { SidebarRowButton } from '#/web/components/ui/sidebar-row-button.tsx'
 
 export interface SettingsSidebarItem<TPage extends string> {
   page: TPage
@@ -71,33 +72,29 @@ export function SettingsSidebar<TPage extends string>({
       <ScrollArea className="min-h-0 flex-1" scrollbarMode="compact">
         <nav className="space-y-1.5 pb-3" aria-label={ariaLabel}>
           {items.map((item) => (
-            <Button
+            <SidebarRowButton
               key={item.page}
               ref={page === item.page ? selectedPageButtonRef : undefined}
-              type="button"
-              data-interactive
-              variant="ghost"
               onClick={() => onPageChange(item.page)}
+              selected={page === item.page}
               className={cn(
-                'h-9 w-full gap-2 text-left text-sm font-normal',
-                compact ? 'justify-center px-2' : 'justify-start px-2.5',
-                page === item.page
-                  ? 'bg-selected text-selected-foreground hover:bg-selected'
-                  : 'text-foreground hover:bg-accent hover:text-accent-foreground',
+                'h-9 gap-2 font-normal',
+                compact ? 'mx-auto size-9 justify-center px-0' : 'justify-start px-2.5',
               )}
+              contentClassName={cn(compact ? 'hidden' : 'truncate', page === item.page ? 'font-medium' : 'font-normal')}
+              leading={
+                <item.Icon
+                  className={cn(
+                    'size-4 shrink-0',
+                    page === item.page ? 'text-selected-foreground' : 'text-muted-foreground',
+                  )}
+                />
+              }
               aria-label={item.label}
               aria-current={page === item.page ? 'page' : undefined}
             >
-              <item.Icon
-                className={cn(
-                  'size-4 shrink-0',
-                  page === item.page ? 'text-selected-foreground' : 'text-muted-foreground',
-                )}
-              />
-              <span className={cn(compact ? 'hidden' : 'truncate', page === item.page ? 'font-medium' : 'font-normal')}>
-                {item.label}
-              </span>
-            </Button>
+              {item.label}
+            </SidebarRowButton>
           ))}
         </nav>
       </ScrollArea>

@@ -242,7 +242,11 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId, leading,
     [navigation, repo.id],
   )
 
-  const toolbarClassName = cn(trafficLightOffset ? 'topbar' : 'app-drag-region px-2', 'border-border/60 bg-card')
+  const toolbarClassName = cn(
+    'goblin-workspace-toolbar',
+    trafficLightOffset ? 'topbar' : 'app-drag-region px-2',
+    'border-border/60 bg-card',
+  )
 
   // No selected branch means there is no tab/action target; keep the
   // workspace chrome mounted so the right pane still contributes a
@@ -250,7 +254,7 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId, leading,
   if (!detail.branch) {
     return (
       <Toolbar variant="workspace" className={toolbarClassName} style={{ height: WINDOW_TOPBAR_HEIGHT_PX }}>
-        {leading && <div className="flex h-full min-w-0 shrink-0 items-center gap-1 pr-2">{leading}</div>}
+        <ToolbarLeadingSlot leading={leading} reserve={trafficLightOffset} />
         <div className="min-w-0 flex-1" />
       </Toolbar>
     )
@@ -279,7 +283,7 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId, leading,
       className={toolbarClassName}
       style={{ height: WINDOW_TOPBAR_HEIGHT_PX }}
     >
-      {leading && <div className="flex h-full min-w-0 shrink-0 items-center gap-1 pr-2">{leading}</div>}
+      <ToolbarLeadingSlot leading={leading} reserve={trafficLightOffset} />
       <div className="flex h-full min-w-0 flex-1 items-center gap-1 overflow-hidden">
         {/* Compact UI only: back-to-branch-navigator is the user's escape hatch
             from the branch workspace. It must stay visible even when the tab
@@ -310,5 +314,19 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId, leading,
         )}
       </div>
     </Toolbar>
+  )
+}
+
+function ToolbarLeadingSlot({ leading, reserve }: { leading?: ReactNode; reserve: boolean }) {
+  if (leading) return <div className="flex h-full min-w-0 shrink-0 items-center gap-1 pr-2">{leading}</div>
+  return (
+    <div
+      data-testid="workspace-toolbar-leading-spacer"
+      className={cn(
+        'goblin-workspace-toolbar__leading-spacer h-full shrink-0',
+        reserve && 'goblin-workspace-toolbar__leading-spacer--reserved',
+      )}
+      aria-hidden
+    />
   )
 }

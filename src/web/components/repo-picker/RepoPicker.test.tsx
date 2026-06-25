@@ -96,8 +96,8 @@ describe('RepoPicker', () => {
     expect(currentRepoButton.getAttribute('role')).toBeNull()
     expect(currentRepoButton.getAttribute('aria-selected')).toBeNull()
     expect(currentRepoButton.className).toContain('w-full')
-    expect(currentRepoButton.className).toContain('h-12')
-    expect(currentRepoButton.className).toContain('text-sm')
+    expect(currentRepoButton.className).toContain('shrink-0')
+    expect(currentRepoButton.className).not.toContain('flex-1')
     expect(currentRepoButton.querySelector('.uppercase')).toBeNull()
     expect(currentRepoButton.textContent).toContain('repo-a')
     expect(currentRepoButton.hasAttribute('data-interactive')).toBe(true)
@@ -235,6 +235,10 @@ describe('RepoPicker', () => {
     expect(closeButton).not.toBeNull()
     expect(closeButton?.className).not.toContain('opacity-0')
     expect(closeButton?.className).not.toContain('group-hover:opacity-100')
+    const popoverContent = document.body.querySelector('[data-slot="popover-content"]')
+    expect((popoverContent as HTMLElement | null)?.style.minWidth).toBe(
+      'max(16rem, var(--radix-popover-trigger-width))',
+    )
 
     // Each popover row is now two lines: name on top, locator (path
     // or remote target) below in mono muted text. The locator for a
