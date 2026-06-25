@@ -7,7 +7,6 @@ import {
   CreateWorktreeRowAction,
   RepoSyncAction,
 } from '#/web/components/repo-toolbar/RepoToolbarActions.tsx'
-import { Tip } from '#/web/components/Tip.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
 import { SidebarRowButton } from '#/web/components/ui/sidebar-row-button.tsx'
@@ -102,7 +101,7 @@ function SidebarSettingsButton({ onOpenSettings }: { onOpenSettings?: () => void
   )
   return (
     <div className="relative z-10 shrink-0 bg-card p-2">
-      <Tip label={t('topbar.settings-tooltip')}>{button}</Tip>
+      {button}
     </div>
   )
 }
