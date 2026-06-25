@@ -5,6 +5,8 @@ import { BranchSummaryInline } from '#/web/components/repo-workspace/BranchSumma
 import { cn } from '#/web/lib/cn.ts'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
+import { TerminalBellBadge } from '#/web/components/terminal/TerminalBellBadge.tsx'
+
 export interface BranchRowProps {
   repo: BranchActionRepo
   branch: RepoBranchState
@@ -12,7 +14,6 @@ export interface BranchRowProps {
   onSelectBranch: (branch: string) => void
   onOpenBranchStatus: (branch: string) => void
   selectedRef: RefObject<HTMLLIElement | null>
-  showActions?: boolean
   actionMenuOpen?: boolean
   onActionMenuOpenChange?: (open: boolean) => void
   terminalBellCount?: number
@@ -33,7 +34,6 @@ export function BranchRow({
   onSelectBranch,
   onOpenBranchStatus,
   selectedRef,
-  showActions = true,
   actionMenuOpen,
   onActionMenuOpenChange,
   terminalBellCount = 0,
@@ -46,6 +46,8 @@ export function BranchRow({
   // the spinner stays anchored to the menu button the user just
   // clicked, instead of fading out from under the in-flight action.
   const isActionsHidden = !compact && !actionMenuOpen && !branchActionBusy
+  const leadingTerminalBellCount = compact ? terminalBellCount : 0
+  const actionTerminalBellCount = compact ? 0 : terminalBellCount
 
   return (
     <li
@@ -53,33 +55,63 @@ export function BranchRow({
       onClick={() => onSelectBranch(branch.name)}
       onDoubleClick={() => onOpenBranchStatus(branch.name)}
       className={cn(
-        'group relative grid min-h-9 items-stretch cursor-pointer rounded-md',
-        showActions ? 'grid-cols-[minmax(0,1fr)_auto]' : 'grid-cols-1',
+        'group relative grid min-h-9 grid-cols-[minmax(0,1fr)_auto] items-stretch rounded-md cursor-pointer',
         'transition-colors duration-100',
         isSelected ? 'bg-selected text-selected-foreground hover:bg-selected' : 'hover:bg-muted',
       )}
     >
       <div className="pointer-events-none relative z-10 flex min-w-0 items-center px-4 py-1.5">
-        <BranchSummaryInline repo={repo} branch={branch} selected={isSelected} terminalBellCount={terminalBellCount} />
+        <BranchSummaryInline
+          repo={repo}
+          branch={branch}
+          selected={isSelected}
+          leadingTerminalBellCount={leadingTerminalBellCount}
+        />
       </div>
-      {showActions && (
+      <BranchRowActionSlot
+        repo={repo}
+        branch={branch}
+        actionMenuOpen={actionMenuOpen}
+        onActionMenuOpenChange={onActionMenuOpenChange}
+        actionHidden={isActionsHidden}
+        terminalBellCount={actionTerminalBellCount}
+      />
+    </li>
+  )
+}
+
+function BranchRowActionSlot({
+  repo,
+  branch,
+  actionMenuOpen,
+  onActionMenuOpenChange,
+  actionHidden,
+  terminalBellCount,
+}: Pick<BranchRowProps, 'repo' | 'branch' | 'actionMenuOpen' | 'onActionMenuOpenChange'> & {
+  actionHidden: boolean
+  terminalBellCount: number
+}) {
+  const showBellBadge = terminalBellCount > 0 && actionHidden
+
+  return (
+    <div className="pointer-events-none relative z-20 flex shrink-0 items-center py-1.5 pr-4">
+      <div className="relative flex h-6 min-w-6 items-center justify-center">
+        {showBellBadge && (
+          <div className="absolute inset-0 flex items-center justify-center transition-opacity duration-100 group-hover:opacity-0 group-focus-within:opacity-0">
+            <TerminalBellBadge count={terminalBellCount} />
+          </div>
+        )}
         <div
           className={cn(
-            'pointer-events-none relative z-20 flex shrink-0 items-center py-1.5 pr-4',
-            isActionsHidden &&
-              'opacity-0 transition-opacity duration-100 group-hover:opacity-100 focus-visible:opacity-100',
+            'relative',
+            !actionHidden && 'pointer-events-auto',
+            actionHidden &&
+              'pointer-events-none opacity-0 transition-opacity duration-100 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100',
           )}
         >
-          <div className="pointer-events-auto">
-            <BranchActionsMenu
-              repo={repo}
-              branch={branch}
-              open={actionMenuOpen}
-              onOpenChange={onActionMenuOpenChange}
-            />
-          </div>
+          <BranchActionsMenu repo={repo} branch={branch} open={actionMenuOpen} onOpenChange={onActionMenuOpenChange} />
         </div>
-      )}
-    </li>
+      </div>
+    </div>
   )
 }

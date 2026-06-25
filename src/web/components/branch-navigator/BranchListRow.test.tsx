@@ -92,7 +92,6 @@ function baseProps(
     onSelectBranch: vi.fn(),
     onOpenBranchStatus: vi.fn(),
     selectedRef: createRef<HTMLLIElement>(),
-    showActions: true,
     onActionMenuOpenChange: vi.fn(),
   }
 }

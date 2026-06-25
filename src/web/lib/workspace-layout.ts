@@ -6,13 +6,11 @@ export interface RepoWorkspaceBehavior {
   compact: boolean
   workspaceFocused: boolean
   branchNavigatorCollapsed: boolean
-  branchNavigatorActionsVisible: boolean
   /** Whether the branch navigator pane is actually rendered to the user
    * (not collapsed and not hidden behind the workspace pane). The
    * worktree-filter toggle only makes sense when there is a branch
    * list to filter, so it should not render when this is false. */
   branchNavigatorVisible: boolean
-  prTooltipSide: 'right' | 'bottom'
 }
 
 export function repoWorkspaceBehavior({
@@ -40,8 +38,6 @@ export function repoWorkspaceBehavior({
     compact,
     workspaceFocused,
     branchNavigatorCollapsed,
-    branchNavigatorActionsVisible: true,
     branchNavigatorVisible,
-    prTooltipSide: 'bottom',
   }
 }

@@ -18,8 +18,6 @@ import { openWorkspacePaneView } from '#/web/components/branch-workspace/open-wo
 
 interface Props {
   repoId: string
-  /** Whether the inline `...` action menu is rendered. */
-  showActions?: boolean
   /** Run after the user picks a row. The popover uses this to close;
    *  the pane leaves it unset so selection is silent. */
   onAfterSelect?: (branch: string) => void
@@ -28,7 +26,7 @@ interface Props {
   onAfterOpenStatus?: (branch: string) => void
 }
 
-export function BranchView({ repoId, showActions = true, onAfterSelect, onAfterOpenStatus }: Props) {
+export function BranchView({ repoId, onAfterSelect, onAfterOpenStatus }: Props) {
   const t = useT()
   const navigation = useMainWindowNavigation()
   const repo = useBranchListRepo(repoId)
@@ -79,7 +77,6 @@ export function BranchView({ repoId, showActions = true, onAfterSelect, onAfterO
       highlightedBranch={highlightedBranch}
       onSelectBranch={handleSelectBranch}
       onOpenBranchStatus={handleOpenBranchStatus}
-      showActions={showActions}
       emptyState={<EmptyState title={t(emptyLabel)} />}
     />
   )

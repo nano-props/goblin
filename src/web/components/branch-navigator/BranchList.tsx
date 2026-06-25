@@ -32,7 +32,6 @@ interface Props {
   highlightedBranch: string | null
   onSelectBranch: (branch: string) => void
   onOpenBranchStatus: (branch: string) => void
-  showActions?: boolean
   /** Rendered when `branches` is empty. */
   emptyState: ReactNode
 }
@@ -43,7 +42,6 @@ export function BranchList({
   highlightedBranch,
   onSelectBranch,
   onOpenBranchStatus,
-  showActions = true,
   emptyState,
 }: Props) {
   const [actionMenuOpen, setActionMenuOpen] = useState<string | null>(null)
@@ -84,7 +82,6 @@ export function BranchList({
           onSelectBranch={onSelectBranch}
           onOpenBranchStatus={onOpenBranchStatus}
           selectedRef={selectedRef}
-          showActions={showActions}
           actionMenuOpen={actionMenuOpen === branch.name}
           onActionMenuOpenChange={(open) => setActionMenuOpen(open ? branch.name : null)}
         />

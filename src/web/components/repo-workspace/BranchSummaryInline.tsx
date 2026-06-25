@@ -1,15 +1,13 @@
-// Read-only branch "status strip" used in two places: the branch navigator
-// rows (BranchRow). It is
-// intentionally non-interactive; clicking the row selects the branch in
-// the list.
+// Read-only branch status strip used by branch navigator rows. It is
+// intentionally non-interactive; clicking the row selects the branch in the
+// list.
 //
 // Layout (left to right):
-//   [icon]  [name]  [meta…]  <badges · deltas · last-commit time>
+//   [icon / leading alert]  [name]  [meta…]  <badges · deltas · last-commit time>
 //
-// The icon and meta are exported as standalone subcomponents so callers
-// that need a different name trigger
-// can reuse the visual primitives without re-deriving the branch-state
-// predicates.
+// The icon and meta are exported as standalone subcomponents so callers that
+// need a different name trigger can reuse the visual primitives without
+// re-deriving the branch-state predicates.
 
 import { ArrowDown, ArrowUp, FolderTree, GitBranch } from 'lucide-react'
 import { useI18nStore, useT, type Lang } from '#/web/stores/i18n.ts'
@@ -18,6 +16,7 @@ import { Badge } from '#/web/components/ui/badge.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { formatRelativeTimeOrNull } from '#/web/lib/dates.ts'
 import { getBranchWorktreeState, type BranchWorktreeRepo } from '#/web/stores/repos/worktree-state.ts'
+import { TerminalBellBadge } from '#/web/components/terminal/TerminalBellBadge.tsx'
 
 export type BranchSummaryInlineRepo = BranchWorktreeRepo & {
   data: BranchWorktreeRepo['data']
@@ -27,7 +26,7 @@ interface BranchSummaryInlineProps {
   repo: BranchSummaryInlineRepo
   branch: RepoBranchState
   selected?: boolean
-  terminalBellCount?: number
+  leadingTerminalBellCount?: number
   className?: string
 }
 
@@ -69,14 +68,14 @@ export function buildBranchSummaryTitle(
   state: BranchSummaryState,
   branch: RepoBranchState,
   t: (key: string, params?: Record<string, string | number>) => string,
-  terminalBellCount = 0,
+  leadingTerminalBellCount = 0,
 ): string {
   const worktreeStateLabelKey = state.worktreeDirty ? 'branches.dirty' : 'branches.worktree'
   return [
     branch.name,
     branch.isDefault ? t('branches.default') : null,
     state.hasWorktree ? t(worktreeStateLabelKey) : null,
-    terminalBellCount > 0 ? t('terminal.bell-unread-count', { count: terminalBellCount }) : null,
+    leadingTerminalBellCount > 0 ? t('terminal.bell-unread-count', { count: leadingTerminalBellCount }) : null,
     branch.trackingGone ? t('branches.gone') : null,
     branch.ahead > 0 ? t('branch-status.sync.ahead', { n: branch.ahead }) : null,
     branch.behind > 0 ? t('branch-status.sync.behind', { n: branch.behind }) : null,
@@ -117,14 +116,18 @@ export function BranchSummaryIcon({
       {hasWorktree ? (
         <FolderTree size={14} className={worktreeDirty ? 'text-attention' : 'text-brand-text'} aria-hidden="true" />
       ) : (
-        <GitBranch size={14} className={selected ? 'text-selected-muted-foreground' : 'text-muted-foreground'} aria-hidden="true" />
+        <GitBranch
+          size={14}
+          className={selected ? 'text-selected-muted-foreground' : 'text-muted-foreground'}
+          aria-hidden="true"
+        />
       )}
     </span>
   )
 }
 
 // The trailing metadata strip: optional badges (default / gone),
-// ahead/behind deltas, and the last-commit author + relative time.
+// ahead/behind deltas, and the last-commit relative time.
 // Worktree-vs-branch and dirty-vs-clean are both carried by the
 // leading BranchSummaryIcon glyph — no worktree / dirty badges here.
 // Read-only by design — none of the inner spans are interactive.
@@ -172,34 +175,18 @@ export function BranchSummaryMeta({
   )
 }
 
-function BranchTerminalBellBadge({ count }: { count: number }) {
-  const t = useT()
-  if (count <= 0) return null
-  const label = t('terminal.bell-unread-count', { count })
-  const displayCount = count > 99 ? '99+' : String(count)
-  return (
-    <span
-      aria-label={label}
-      title={label}
-      className="inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-notification px-1 font-mono text-[10px] font-semibold leading-none text-notification-foreground tabular-nums"
-    >
-      {displayCount}
-    </span>
-  )
-}
-
 export function BranchSummaryInline({
   repo,
   branch,
   selected = false,
-  terminalBellCount = 0,
+  leadingTerminalBellCount = 0,
   className,
 }: BranchSummaryInlineProps) {
   const t = useT()
   const lang = useI18nStore((s) => s.lang)
   const state = computeBranchSummaryState(branch, repo, lang)
   const { hasWorktree, worktreeDirty } = state
-  const title = buildBranchSummaryTitle(state, branch, t, terminalBellCount)
+  const title = buildBranchSummaryTitle(state, branch, t, leadingTerminalBellCount)
   // Surface the worktree state to screen readers via the icon's
   // aria-label — the meta strip no longer renders worktree / dirty
   // badges, so this is the only textual cue left.
@@ -207,9 +194,9 @@ export function BranchSummaryInline({
 
   return (
     <div title={title} className={cn('flex min-w-0 items-center gap-2', className)}>
-      {terminalBellCount > 0 ? (
+      {leadingTerminalBellCount > 0 ? (
         <span className="flex w-4 shrink-0 items-center justify-center">
-          <BranchTerminalBellBadge count={terminalBellCount} />
+          <TerminalBellBadge count={leadingTerminalBellCount} />
         </span>
       ) : (
         <BranchSummaryIcon

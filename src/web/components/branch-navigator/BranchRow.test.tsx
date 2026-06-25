@@ -91,7 +91,6 @@ describe('BranchRow', () => {
           onSelectBranch={vi.fn()}
           onOpenBranchStatus={vi.fn()}
           selectedRef={createRef<HTMLLIElement>()}
-          showActions={false}
         />
       </ul>,
     )
@@ -118,7 +117,6 @@ describe('BranchRow', () => {
           onSelectBranch={vi.fn()}
           onOpenBranchStatus={vi.fn()}
           selectedRef={createRef<HTMLLIElement>()}
-          showActions={false}
         />
       </ul>,
     )
@@ -126,7 +124,7 @@ describe('BranchRow', () => {
     expect(document.querySelector('[data-testid="branch-summary-icon"][aria-label="有改动"]')).not.toBeNull()
   })
 
-  test('shows a terminal bell count badge for branches with unread terminal bells', () => {
+  test('shows terminal bell count badges in the action slot in non-compact mode', () => {
     const repo = emptyRepo('/tmp/repo', 'repo')
     const branch = createRepoBranch('feature/a', { worktree: { path: '/tmp/worktree-a' } })
 
@@ -139,14 +137,18 @@ describe('BranchRow', () => {
           onSelectBranch={vi.fn()}
           onOpenBranchStatus={vi.fn()}
           selectedRef={createRef<HTMLLIElement>()}
-          showActions={false}
           terminalBellCount={3}
         />
       </ul>,
     )
 
     const badge = document.querySelector('[aria-label="3 个未读终端提醒"]')
+    const branchIcon = document.querySelector('[data-testid="branch-summary-icon"]')
+    const actionArea = document.querySelector('li')?.children[1]
     expect(badge?.textContent).toBe('3')
+    expect(badge?.className).toContain('bg-notification')
+    expect(branchIcon).not.toBeNull()
+    expect(actionArea?.contains(badge ?? null)).toBe(true)
   })
 
   test('keeps the branch icon when there are no unread terminal bells', () => {
@@ -162,7 +164,6 @@ describe('BranchRow', () => {
           onSelectBranch={vi.fn()}
           onOpenBranchStatus={vi.fn()}
           selectedRef={createRef<HTMLLIElement>()}
-          showActions={false}
         />
       </ul>,
     )
@@ -171,7 +172,8 @@ describe('BranchRow', () => {
     expect(document.querySelector('[aria-label="0 个未读终端提醒"]')).toBeNull()
   })
 
-  test('replaces the branch icon with the terminal bell badge', () => {
+  test('keeps the leading terminal bell badge behavior in compact mode', () => {
+    responsiveMocks.compact = true
     const repo = emptyRepo('/tmp/repo', 'repo')
     const branch = createRepoBranch('feature/a')
 
@@ -184,7 +186,6 @@ describe('BranchRow', () => {
           onSelectBranch={vi.fn()}
           onOpenBranchStatus={vi.fn()}
           selectedRef={createRef<HTMLLIElement>()}
-          showActions={false}
           terminalBellCount={3}
         />
       </ul>,
@@ -193,11 +194,13 @@ describe('BranchRow', () => {
     const badge = document.querySelector('[aria-label="3 个未读终端提醒"]')
     const branchIcon = document.querySelector('[data-testid="branch-summary-icon"]')
     const branchLabel = Array.from(document.querySelectorAll('span')).find((node) => node.textContent === 'feature/a')
+    const actionArea = document.querySelector('li')?.children[1]
 
     expect(badge).not.toBeNull()
     expect(badge?.className).toContain('bg-notification')
     expect(branchIcon).toBeNull()
     expect(branchLabel).not.toBeUndefined()
+    expect(actionArea?.contains(badge ?? null)).toBe(false)
     expect(badge!.compareDocumentPosition(branchLabel!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
@@ -219,7 +222,6 @@ describe('BranchRow', () => {
           onSelectBranch={vi.fn()}
           onOpenBranchStatus={vi.fn()}
           selectedRef={createRef<HTMLLIElement>()}
-          showActions={false}
         />
       </ul>,
     )
@@ -236,8 +238,10 @@ describe('BranchRow', () => {
     const className = renderRow(false)?.className ?? ''
     expect(document.querySelector('li')?.className).toContain('group')
     expect(className).toContain('opacity-0')
+    expect(className).toContain('pointer-events-none')
+    expect(className).toContain('group-hover:pointer-events-auto')
     expect(className).toContain('group-hover:opacity-100')
-    expect(className).toContain('focus-visible:opacity-100')
+    expect(className).toContain('group-focus-within:opacity-100')
     expect(className).toContain('transition-opacity')
   })
 
@@ -245,21 +249,21 @@ describe('BranchRow', () => {
     const className = renderRow(false, { actionMenuOpen: true })?.className ?? ''
     expect(className).not.toContain('opacity-0')
     expect(className).not.toContain('group-hover:opacity-100')
-    expect(className).not.toContain('focus-visible:opacity-100')
+    expect(className).not.toContain('group-focus-within:opacity-100')
   })
 
   test('keeps the actions wrapper fully visible in compact mode', () => {
     const className = renderRow(true)?.className ?? ''
     expect(className).not.toContain('opacity-0')
     expect(className).not.toContain('group-hover:opacity-100')
-    expect(className).not.toContain('focus-visible:opacity-100')
+    expect(className).not.toContain('group-focus-within:opacity-100')
   })
 
   test('keeps the actions wrapper visible while the row reports a busy branch action', () => {
     const className = renderRow(false, { branchActionBusy: true })?.className ?? ''
     expect(className).not.toContain('opacity-0')
     expect(className).not.toContain('group-hover:opacity-100')
-    expect(className).not.toContain('focus-visible:opacity-100')
+    expect(className).not.toContain('group-focus-within:opacity-100')
   })
 })
 
@@ -285,12 +289,16 @@ function renderRow(
         onSelectBranch={vi.fn()}
         onOpenBranchStatus={vi.fn()}
         selectedRef={createRef<HTMLLIElement>()}
-        showActions
         actionMenuOpen={options.actionMenuOpen}
         onActionMenuOpenChange={vi.fn()}
         branchActionBusy={options.branchActionBusy}
       />
     </ul>,
   )
-  return document.querySelector('li')?.children[1] as HTMLDivElement | undefined
+  return branchActionMenuShell()
+}
+
+function branchActionMenuShell(): HTMLDivElement | undefined {
+  const actionArea = document.querySelector('li')?.children[1]
+  return actionArea?.firstElementChild?.lastElementChild as HTMLDivElement | undefined
 }
