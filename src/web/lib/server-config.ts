@@ -15,7 +15,8 @@ function sameOriginServerUrl(): string | null {
 
 // QR-code/bootstrap handoffs carry an explicit server URL. Embedded and
 // same-origin web clients do not: they are already loaded from the server
-// origin and authenticate with the cookie the server planted.
+// origin and authenticate with the cookie the server planted. In Electron
+// terms, this is the same origin/path as the renderer-process client page.
 export function resolveClientServerConfig(): ClientServerConfig | null {
   const fromBootstrap = getInitialBootstrap().initialServer
   if (fromBootstrap?.url) {
