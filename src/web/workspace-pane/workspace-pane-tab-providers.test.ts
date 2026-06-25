@@ -135,4 +135,22 @@ describe('workspace pane tab providers', () => {
       'Terminal 1 full',
     )
   })
+
+  test('keeps the internal terminal process placeholder out of runtime tab labels', () => {
+    const placeholderTerminalView: WorkspacePaneViewSummary = {
+      ...terminalView,
+      title: 'terminal',
+      fullTitle: 'terminal',
+      originalTitle: null,
+      phase: 'open',
+    }
+
+    const input = { t, branchName: 'main', statusCount: 0, view: placeholderTerminalView }
+
+    expect(terminalWorkspacePaneTabProvider.label(input)).toBe('')
+    expect(terminalWorkspacePaneTabProvider.tooltip(input)).toBe('terminal.opening')
+    expect(terminalWorkspacePaneTabProvider.closeLabel(input)).toBe(
+      'terminal.close-named:{"name":"terminal.opening"}',
+    )
+  })
 })
