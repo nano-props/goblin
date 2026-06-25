@@ -22,7 +22,7 @@ afterEach(() => {
 describe('replantEmbedAuthCookieForRotation', () => {
   test('plants the cookie with the new access token and same host scope', async () => {
     // Regression: before this helper existed, a token rotation
-    // left the renderer's `webContents.session.cookies` holding
+    // left the client's `webContents.session.cookies` holding
     // the OLD token. The next authenticated request fired with
     // a stale cookie and the server rejected it, re-prompting
     // the gate. The rotation flow now calls this helper so the
@@ -40,7 +40,7 @@ describe('replantEmbedAuthCookieForRotation', () => {
     // cookies to host *and* port — a port-stripped URL like
     // `http://127.0.0.1` would default the port to 80, and the
     // browser would refuse to send the cookie on requests to
-    // `http://127.0.0.1:32100/`. In dev the renderer loads from
+    // `http://127.0.0.1:32100/`. In dev the client loads from
     // the Vite port (5173), in prod from the embedded server
     // port (32100); both need an explicit port in the cookie URL.
     expect(cookieArg).toMatchObject({
@@ -54,9 +54,9 @@ describe('replantEmbedAuthCookieForRotation', () => {
     expect(cookieArg.expirationDate).toBeGreaterThan(Math.floor(Date.now() / 1000))
   })
 
-  test('marks the cookie as secure when the renderer URL is https', async () => {
+  test('marks the cookie as secure when the client URL is https', async () => {
     // The production preload's entry URL is `https://...` when
-    // the renderer is served over TLS (e.g. on a LAN HTTPS
+    // the client is served over TLS (e.g. on a LAN HTTPS
     // bind). The cookie must carry `secure: true` so the
     // browser refuses to send it on a downgrade.
     const { replantEmbedAuthCookieForRotation } = await import('#/main/cookie-bootstrap.ts')
@@ -74,7 +74,7 @@ describe('replantEmbedAuthCookieForRotation', () => {
   test('plants the cookie with the Vite dev URL so dev-mode whoami probes authenticate', async () => {
     // Regression: the cookie bootstrap used to strip the port
     // (`new URL(url).hostname`), which silently defaulted the
-    // cookie's port to 80. In dev, the renderer loads from
+    // cookie's port to 80. In dev, the client loads from
     // `http://127.0.0.1:5173/` (Vite), which proxies `/api/*` to
     // the embedded server. The browser must see a cookie scoped
     // to the Vite origin, otherwise the very first whoami probe

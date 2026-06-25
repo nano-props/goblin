@@ -3,7 +3,7 @@
 import { act, useEffect, useRef } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { ELECTRON_RENDERER_CAPABILITIES, RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { TerminalSlotProvider } from '#/web/components/terminal/TerminalSlotProvider.tsx'
 import { setTerminalSlotRegistryForTests } from '#/web/components/terminal/TerminalSlotRegistry.ts'
 import { terminalSlotProviderLog } from '#/web/logger.ts'
@@ -13,7 +13,7 @@ import {
   useTerminalSlotSummaries,
 } from '#/web/components/terminal/terminal-slot-store.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
-import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
+import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-queries.ts'
@@ -392,7 +392,7 @@ beforeEach(() => {
     ]
     // New first-frame hydration contract: `create` returns
     // `ptySessionId` + `snapshot` + `snapshotSeq` directly so the
-    // renderer can paint without a follow-up snapshot fetch.
+    // client can paint without a follow-up snapshot fetch.
     // The fields are still optional on the shared type (transitional
     // shape — see docs/terminal-first-frame-fix.md) but the
     // registry validates them at runtime, so the test mock has to
@@ -428,8 +428,8 @@ beforeEach(() => {
     value: {
       runtime: {
         kind: 'electron',
-        bridgeVersion: RENDERER_BRIDGE_VERSION,
-        capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+        bridgeVersion: CLIENT_BRIDGE_VERSION,
+        capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
       },
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
       invokeIpc: vi.fn(async () => []),
@@ -517,13 +517,13 @@ beforeEach(() => {
     value: {
       runtime: {
         kind: 'web',
-        bridgeVersion: RENDERER_BRIDGE_VERSION,
+        bridgeVersion: CLIENT_BRIDGE_VERSION,
         capabilities: [],
       },
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
     },
   })
-  setRendererBridgeForTests({
+  setClientBridgeForTests({
     kind: () => 'electron',
     hasCapability: (capability) =>
       capability === 'settings-ipc' ||
@@ -537,8 +537,8 @@ beforeEach(() => {
     getBootstrap: () => ({
       runtime: {
         kind: 'electron',
-        bridgeVersion: RENDERER_BRIDGE_VERSION,
-        capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+        bridgeVersion: CLIENT_BRIDGE_VERSION,
+        capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
       },
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
     }),
@@ -621,7 +621,7 @@ beforeEach(() => {
 })
 
 describe('TerminalSlotProvider', () => {
-  // The Provider reaches the registry via the renderer-level singleton.
+  // The Provider reaches the registry via the client-level singleton.
   // Each test must clear the slot so a previous test's bridge wiring
   // doesn't leak into the next one. Mirrors
   // `setTerminalSlotRegistryForTests(null)` in the registry tests.
@@ -1767,14 +1767,14 @@ describe('TerminalSlotProvider', () => {
 
   test('T1.2: prewarms the terminal WebSocket when the active repo is set', async () => {
     const prewarm = vi.fn(async () => {})
-    setRendererBridgeForTests({
+    setClientBridgeForTests({
       kind: () => 'electron',
       hasCapability: () => false,
       getBootstrap: () => ({
         runtime: {
           kind: 'electron',
-          bridgeVersion: RENDERER_BRIDGE_VERSION,
-          capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+          bridgeVersion: CLIENT_BRIDGE_VERSION,
+          capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
         },
         initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
       }),
@@ -1867,14 +1867,14 @@ describe('TerminalSlotProvider', () => {
 
   test('T5.1: kicks reconnect on visibilitychange:visible and on persisted pageshow', async () => {
     const kickReconnect = vi.fn(() => {})
-    setRendererBridgeForTests({
+    setClientBridgeForTests({
       kind: () => 'electron',
       hasCapability: () => false,
       getBootstrap: () => ({
         runtime: {
           kind: 'electron',
-          bridgeVersion: RENDERER_BRIDGE_VERSION,
-          capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+          bridgeVersion: CLIENT_BRIDGE_VERSION,
+          capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
         },
         initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
       }),
@@ -1983,7 +1983,7 @@ describe('TerminalSlotProvider', () => {
 
   test('P1.7: registry state survives a Provider unmount + remount via the singleton', async () => {
     // Before P1.7, the Provider owned its registry and destroyed it
-    // on unmount. After P1.7, the registry is a renderer-level
+    // on unmount. After P1.7, the registry is a client-level
     // singleton — a remount must reuse the same instance with its
     // session list intact. This test mounts, creates a terminal,
     // unmounts, remounts, and confirms the prior session is still

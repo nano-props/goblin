@@ -37,7 +37,7 @@ export const en = {
   'menu.file.open-in-browser': 'Open in Browser',
   'menu.file.open-data-folder': 'Open Data Folder',
   // Platform variants picked at menu-build time in the main process
-  // (where `process.platform` is the source of truth — the renderer is
+  // (where `process.platform` is the source of truth — the client is
   // sandboxed and only sees `bootstrap.platform`).
   'menu.file.open-data-folder.mac': 'Open Data Folder in Finder',
   'menu.file.open-data-folder.win': 'Open Data Folder in Explorer',
@@ -514,7 +514,7 @@ export const en = {
   'settings.terminal-notifications-test-sent': 'Test notification sent',
   'settings.terminal-notifications-test-failed': 'Unable to show test notification',
   'settings.terminal-notifications-test-failed-hint': 'Allow notifications for Goblin in your system settings.',
-  // Platform variants picked at render time in the renderer using
+  // Platform variants picked at render time in the client using
   // bootstrap.platform. macOS notifications live under
   // System Settings → Notifications; Windows under Settings →
   // System → Notifications.

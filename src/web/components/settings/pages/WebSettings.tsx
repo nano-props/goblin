@@ -5,7 +5,7 @@ import { SettingsGroup, SettingsList, SettingsRow } from '#/web/components/setti
 import { Switch } from '#/web/components/ui/switch.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
 import { getInitialBootstrap } from '#/web/bootstrap.ts'
-import { getRendererBridge } from '#/web/renderer-bridge.ts'
+import { getClientBridge } from '#/web/client-bridge.ts'
 import { useLanInfoQuery } from '#/web/settings-queries.ts'
 import { useLanSettingsController, useRuntimeLanSettings } from '#/web/runtime-settings-lan.ts'
 import { useT } from '#/web/stores/i18n.ts'
@@ -13,7 +13,7 @@ import { fetchServerJson } from '#/web/lib/server-fetch.ts'
 
 /**
  * Settings page for everything related to the embedded / standalone
- * server that the renderer talks to. Visible in both runtimes:
+ * server that the client talks to. Visible in both runtimes:
  *
  * - Both: the server URL, the access token (with copy + auto-rotate
  *   QR), and any LAN URLs the server is currently bound to.
@@ -31,7 +31,7 @@ import { fetchServerJson } from '#/web/lib/server-fetch.ts'
  */
 export function WebSettings() {
   const t = useT()
-  const bridge = getRendererBridge()
+  const bridge = getClientBridge()
   const isElectron = bridge.kind() === 'electron'
   const { lanEnabled } = useRuntimeLanSettings()
   const { data: lanInfo } = useLanInfoQuery()
@@ -86,11 +86,11 @@ export function WebSettings() {
     try {
       const { accessToken: next } = await bridge.rotateAccessToken()
       setFetchedToken(next)
-      // The main process replants the embedded renderer's auth
+      // The main process replants the embedded client's auth
       // cookie with the new token before this IPC returns, so the
       // cookie path is now self-consistent. A full reload is still
       // required because the preload's `__GOBLIN_BOOTSTRAP__` was
-      // captured once with the OLD token; the renderer's HTTP
+      // captured once with the OLD token; the client's HTTP
       // client (`server-fetch`) prefers the bootstrap header when
       // present. After the reload the preload runs again, captures
       // the new token via IPC, and the gate stays clear.

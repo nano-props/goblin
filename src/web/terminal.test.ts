@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
-import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
+import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 
 class MockWebSocket {
   static readonly CONNECTING = 0
@@ -98,7 +98,7 @@ describe('terminal web host bridge', () => {
     Object.defineProperty(window, 'sessionStorage', { value: createStorage(), configurable: true })
     vi.restoreAllMocks()
     vi.resetModules()
-    setRendererBridgeForTests(null)
+    setClientBridgeForTests(null)
     MockWebSocket.instances.length = 0
     mockNotifications.length = 0
     window.localStorage.clear()
@@ -112,7 +112,7 @@ describe('terminal web host bridge', () => {
     Object.defineProperty(window, '__GOBLIN_BOOTSTRAP__', {
       configurable: true,
       value: {
-        runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
+        runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
         initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
       },
     })
@@ -686,9 +686,9 @@ describe('terminal web host bridge', () => {
 
   test('emits terminal bell click events from browser notifications in web host mode', async () => {
     const { terminalBridge } = await import('#/web/terminal.ts')
-    const { onRendererLocalEventType, resetRendererLocalEventsForTests } = await import('#/web/local-events.ts')
+    const { onClientLocalEventType, resetClientLocalEventsForTests } = await import('#/web/local-events.ts')
     const bellClick = vi.fn()
-    const dispose = onRendererLocalEventType('terminal-bell-click', bellClick)
+    const dispose = onClientLocalEventType('terminal-bell-click', bellClick)
     const key = '/tmp/repo\0/tmp/repo\0slot-2'
 
     await expect(
@@ -698,6 +698,6 @@ describe('terminal web host bridge', () => {
 
     expect(bellClick).toHaveBeenCalledWith({ type: 'terminal-bell-click', repoRoot: '/tmp/repo', key })
     dispose()
-    resetRendererLocalEventsForTests()
+    resetClientLocalEventsForTests()
   })
 })

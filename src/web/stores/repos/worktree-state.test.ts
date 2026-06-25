@@ -12,21 +12,21 @@ function assertRepoBranchStateTypeGuards() {
   createRepoBranch('feature/a', {
     worktree: {
       path: '/tmp/worktree-a',
-      // @ts-expect-error renderer branch state must not include snapshot worktree summary
+      // @ts-expect-error client branch state must not include snapshot worktree summary
       summary: { dirty: true },
     },
   })
   createRepoBranch('feature/a', {
     worktree: {
       path: '/tmp/worktree-a',
-      // @ts-expect-error renderer branch state must not include snapshot worktree metadata
+      // @ts-expect-error client branch state must not include snapshot worktree metadata
       isPrimary: true,
     },
   })
   createRepoBranch('feature/a', {
     worktree: {
       path: '/tmp/worktree-a',
-      // @ts-expect-error renderer branch state must not include snapshot worktree metadata
+      // @ts-expect-error client branch state must not include snapshot worktree metadata
       isLocked: true,
     },
   })

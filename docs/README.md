@@ -6,7 +6,7 @@ Use these docs for app-level product and architecture decisions:
 - `arch.md`: app shell and process control
 - `layering.md`: feature layering rules
 - `state-sync.md`: state control and sync model
-- `renderer-model.md`: renderer model
+- `client-model.md`: client model
 - `realtime.md`: realtime rules
 - `g-command.md`: `g` shell command architecture (registry, control vs. data plane, error envelope)
 - `terminal.md`: terminal system design

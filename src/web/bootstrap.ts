@@ -1,16 +1,16 @@
-import type { RendererBootstrapSnapshot } from '#/shared/bootstrap.ts'
-import { getRendererBridge } from '#/web/renderer-bridge.ts'
-import { emptyBootstrapSnapshot } from '#/web/renderer-bootstrap-bridge.ts'
+import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
+import { getClientBridge } from '#/web/client-bridge.ts'
+import { emptyBootstrapSnapshot } from '#/web/client-bootstrap-bridge.ts'
 
-function readInitialBootstrap(): RendererBootstrapSnapshot {
+function readInitialBootstrap(): ClientBootstrapSnapshot {
   try {
-    return getRendererBridge().getBootstrap()
+    return getClientBridge().getBootstrap()
   } catch {
     return emptyBootstrapSnapshot()
   }
 }
 
-// The renderer bridge populates asynchronously: the Electron preload
+// The client bridge populates asynchronously: the Electron preload
 // may register `window.goblinNative` after this module is first
 // imported, and the server-rendered `<script id="goblin-bootstrap">`
 // may not have run yet. The first read at module-load time can
@@ -22,7 +22,7 @@ function readInitialBootstrap(): RendererBootstrapSnapshot {
 // state, so one re-read is enough to detect "the bootstrap just
 // populated" without going through the sameSnapshot dance.
 //
-// A bare cache (no re-read at all) would lock the renderer into
+// A bare cache (no re-read at all) would lock the client into
 // the first read forever, which is the bug this function exists
 // to prevent.
 //
@@ -36,11 +36,11 @@ function readInitialBootstrap(): RendererBootstrapSnapshot {
 
 let initialBootstrap = readInitialBootstrap()
 
-function isPartial(b: RendererBootstrapSnapshot): boolean {
+function isPartial(b: ClientBootstrapSnapshot): boolean {
   return b.initialServer === null
 }
 
-export function getInitialBootstrap(): RendererBootstrapSnapshot {
+export function getInitialBootstrap(): ClientBootstrapSnapshot {
   if (!isPartial(initialBootstrap)) return initialBootstrap
   initialBootstrap = readInitialBootstrap()
   return initialBootstrap

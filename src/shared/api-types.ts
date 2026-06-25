@@ -1,5 +1,5 @@
 // HTTP API response types and native bridge IPC types shared by
-// main, server, and renderer. Domain types live in their own
+// main, server, and client. Domain types live in their own
 // modules (#/shared/git-types.ts, #/shared/settings.ts, etc.);
 // this file aggregates what crosses process/transport boundaries.
 
@@ -207,7 +207,7 @@ export type IpcResponse =
 
 export type I18nChangedEvent = { type: 'i18n-changed'; snapshot: I18nSnapshot }
 
-/** Events pushed from the native Electron bridge to the renderer. */
+/** Events pushed from the native Electron bridge to the client. */
 export type IpcEvent =
   | { type: 'fetch-interval-changed'; sec: number }
   | { type: 'terminal-notifications-changed'; enabled: boolean }

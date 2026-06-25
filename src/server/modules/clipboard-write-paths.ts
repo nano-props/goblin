@@ -4,12 +4,12 @@ import { serverDataDir } from '#/shared/data-dir.ts'
 import { CLIPBOARD_TEMP_FILE_MAX_AGE_MS, PASTE_FILE_MAX_BYTES } from '#/shared/clipboard-paste.ts'
 
 /**
- * Web counterpart to `src/main/clipboard-bridge.ts`. Web renderers reach
+ * Web counterpart to `src/main/clipboard-bridge.ts`. Web clients reach
  * the server over HTTP via `POST /api/clipboard/files`; the route layer
  * normalises the multipart body and hands a `File[]` to this module.
  *
  * Server-written paths live on the *server* machine. In `serve.sh` /
- * LAN deployments the renderer and server may be on different hosts —
+ * LAN deployments the client and server may be on different hosts —
  * the PTY (which lives on the server) can still read these paths, but
  * the user cannot double-click them on their own machine. That tradeoff
  * is acknowledged in the design doc.
@@ -67,9 +67,9 @@ export interface SaveClipboardFilesResult {
  *
  * Throws if any single file exceeds `PASTE_FILE_MAX_BYTES` — the route
  * layer maps this to a 413. The bodyLimit middleware bounds the *batch*,
- * so a single oversized file still surfaces here only when the renderer
+ * so a single oversized file still surfaces here only when the client
  * is bypassed (a misbehaving client) or when the per-file check in the
- * renderer was skipped.
+ * client was skipped.
  */
 export async function saveClipboardFiles(files: File[]): Promise<SaveClipboardFilesResult> {
   if (files.length === 0) return { paths: [] }

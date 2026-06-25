@@ -3,7 +3,7 @@
 // Every layer — web (dialog), server (IPC + repo backend), system (git
 // worktree add / SSH command script) — speaks the same shape. The trust
 // boundary is `normalizeCreateWorktreeInput`: anything coming in from the
-// renderer is re-validated here, then re-validated again by the system
+// client is re-validated here, then re-validated again by the system
 // layer that maps it to argv or a shell script. Two layers of validation
 // keep a malformed payload from ever reaching `git worktree add`.
 //

@@ -23,13 +23,13 @@ Examples:
 - dialog input values
 - hover and open state
 - temporary search state
-- renderer-only branch filter state such as `branchSearchQueries`
+- client-only branch filter state such as `branchSearchQueries`
 
 ## Runtime-coherent state
 
 - Use this for state that should converge across windows during the current run.
 - Let the server coordinate it.
-- Treat renderer state as a projection, cache, or specialized runtime view of server truth.
+- Treat client state as a projection, cache, or specialized runtime view of server truth.
 
 Representative examples:
 
@@ -44,11 +44,11 @@ Notes:
 
 - `useReposStore` is not a shared cross-window store.
 - `RuntimeCoherentRepoProjectionState` names the runtime-coherent repo projection slice.
-- `useReposStore.repos` is a renderer-local projection of runtime-coherent repo truth.
+- `useReposStore.repos` is a client-local projection of runtime-coherent repo truth.
 - `ReposStore` actions are also grouped by local, restorable, runtime-coherent, and mutation responsibilities.
 - Transport payloads may bundle multiple classes together; consumers should split them back into runtime-coherent and restorable views before use.
 - Runtime-coherent repo actions should prefer orchestration entrypoints plus focused helper modules for projection/state transitions and sync pipelines.
-- Settings truth lives on the server; renderers read it through query snapshots or specialized runtime projections.
+- Settings truth lives on the server; clients read it through query snapshots or specialized runtime projections.
 - Runtime-coherent state may use invalidation plus refetch or realtime streaming.
 
 ## Restorable state
@@ -73,7 +73,7 @@ Notes:
 - Restorable helpers should focus on boot restore and persistence boundaries, not on live runtime convergence.
 - `hydrateSession` belongs to the restorable boot path, while `ensureWorkspaceOpen` and `closeRepo` belong to runtime repo lifecycle.
 - Restorable state is not runtime-coherent shared state.
-- Session writes are renderer -> persistence only after boot restore; they do not publish runtime invalidation.
+- Session writes are client -> persistence only after boot restore; they do not publish runtime invalidation.
 - Native-only validation or registration may feed back into server-owned runtime settings and then converge through invalidation/refetch.
 
 ## Sync rules
@@ -81,7 +81,7 @@ Notes:
 - Use invalidation plus refetch for runtime-coherent state that changes occasionally.
 - Use streaming only for continuous flows such as terminal output.
 - Treat session restore as boot-only.
-- Suppress self-echo when a renderer mutation causes its own invalidation event.
+- Suppress self-echo when a client mutation causes its own invalidation event.
 
 ## Rules of thumb
 

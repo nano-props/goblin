@@ -456,7 +456,7 @@ export function TerminalSlot({
           takeoverKey={key}
           onTakeover={(takeoverKey) => {
             // `takeover` returns `false` when the server rejected the
-            // request. The renderer cannot reliably distinguish a
+            // request. The client cannot reliably distinguish a
             // closed session from an attachment that has not connected
             // yet, so surface a concise retry hint instead of silently
             // clearing the pending state.

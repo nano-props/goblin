@@ -68,7 +68,7 @@ describe('useHostInfoStore', () => {
   test('returns safe defaults before the hydrate resolves', async () => {
     // No hydrate called yet — `homeDirectory()` should be `''` and
     // `getPlatform()` should be `'web'`, matching the pre-refactor
-    // bootstrap defaults. This is the contract the renderer's
+    // bootstrap defaults. This is the contract the client's
     // first-paint consumers depend on.
     const { homeDirectory, getPlatform } = await import('#/web/stores/host-info.ts')
     expect(homeDirectory()).toBe('')

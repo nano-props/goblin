@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { handleWorkspaceRendererIntent } from '#/web/hooks/renderer-effect-intent-handlers.ts'
+import { handleWorkspaceClientIntent } from '#/web/hooks/client-effect-intent-handlers.ts'
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 
-const REPO_ID = '/tmp/gbl-renderer-intent-handlers-repo'
+const REPO_ID = '/tmp/gbl-client-intent-handlers-repo'
 
 beforeEach(() => {
   resetReposStore()
@@ -17,7 +17,7 @@ afterEach(() => {
   resetReposStore()
 })
 
-describe('renderer effect intent handlers', () => {
+describe('client effect intent handlers', () => {
   test('returns false when changes cannot be shown for a branch without a worktree', async () => {
     seedRepoState({
       id: REPO_ID,
@@ -27,7 +27,7 @@ describe('renderer effect intent handlers', () => {
     })
 
     await expect(
-      handleWorkspaceRendererIntent({ type: 'show-workspace-pane-view-requested', tab: 'changes' }, deps(REPO_ID)),
+      handleWorkspaceClientIntent({ type: 'show-workspace-pane-view-requested', tab: 'changes' }, deps(REPO_ID)),
     ).resolves.toBe(false)
 
     const repo = useReposStore.getState().repos[REPO_ID]

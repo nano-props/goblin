@@ -8,7 +8,7 @@ import type { TerminalController } from '#/shared/terminal-types.ts'
  * user. `write` and `resize` are restricted to whichever attachment
  * currently holds the controller slot — every other attachment is a
  * viewer. `takeover` is the one action that can preempt the existing
- * controller, and (in the renderer) it is the action the AuthorityGate
+ * controller, and (in the client) it is the action the AuthorityGate
  * fires automatically when a viewer issues a write. `restart` reuses
  * the takeover path because the session is torn down and rebuilt;
  * callers without the controller must acquire control first.
@@ -144,7 +144,7 @@ export function attachTerminalClient(state: TerminalControllerState, clientId: s
  * Forcefully claims control for `clientId`, preempting any
  * existing controller. This is the only path that can preempt; it
  * is what `takeoverSlot` calls server-side, and (transitively)
- * what the renderer's AuthorityGate fires when a viewer issues a
+ * what the client's AuthorityGate fires when a viewer issues a
  * write. Because the model is user-scoped there is no cross-user
  * ambiguity — every attachment from the session's userId is the
  * same user. The `userSticky` flag is set on takeover so that
@@ -212,7 +212,7 @@ export function updateTerminalClientConnection(
   // currently holds the slot.
   if (state.controller?.clientId === clientId) {
     if (connected && !wasConnected) {
-      // Came back online; emit so the renderer's viewer sees the
+      // Came back online; emit so the client's viewer sees the
       // promotion. We already updated the connection flag above.
       return { emitIdentity: true }
     }

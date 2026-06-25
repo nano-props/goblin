@@ -2,7 +2,7 @@
  * Per-file ceiling for clipboard paste / drop into the terminal slot.
  *
  * Read by:
- * - `TerminalSlot` paste / drop handlers (renderer): early bail-out with
+ * - `TerminalSlot` paste / drop handlers (client): early bail-out with
  *   `terminal.paste-file-too-large` toast before any IPC / HTTP traffic.
  * - `src/main/clipboard-bridge.ts` (Electron main): defence in depth, reject
  *   oversized payloads before writing to disk.

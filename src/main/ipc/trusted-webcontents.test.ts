@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest'
-import { registerRendererWindowSurface } from '#/main/window-registry.ts'
+import { registerClientWindowSurface } from '#/main/window-registry.ts'
 import {
   allowTrustedAppUrlForWebContents,
   isTrustedAppUrl,
@@ -55,7 +55,7 @@ describe('trusted app web contents', () => {
 
   test('trusts IPC from a registered window surface without explicit webContents registration', () => {
     registerTrustedAppUrl('http://127.0.0.1:5173/')
-    registerRendererWindowSurface(
+    registerClientWindowSurface(
       {
         isDestroyed: () => false,
         webContents: { id: 17, isDestroyed: () => false },

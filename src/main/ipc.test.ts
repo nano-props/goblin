@@ -125,8 +125,8 @@ vi.mock('#/main/window.ts', () => ({
 vi.mock('#/main/window-registry.ts', () => ({
   focusedRegisteredSurface: vi.fn(() => null),
   allRegisteredSurfacesWithCapability: vi.fn(() => []),
-  isRegisteredRendererSurfaceId: vi.fn(() => false),
-  registeredRendererSurfaceByWebContentsId: vi.fn(() => null),
+  isRegisteredClientSurfaceId: vi.fn(() => false),
+  registeredClientSurfaceByWebContentsId: vi.fn(() => null),
 }))
 
 vi.mock('#/main/theme.ts', () => ({
@@ -185,7 +185,7 @@ vi.mock('#/system/editors.ts', () => ({
   ),
 }))
 
-vi.mock('#/main/renderer-surface-events.ts', () => ({
+vi.mock('#/main/client-surface-events.ts', () => ({
   broadcastIpcEvent: vi.fn(),
   sendIpcEvent: vi.fn(),
 }))
@@ -455,7 +455,7 @@ describe('main repo ipc cancellation', () => {
     expect(app.addRecentDocument).toHaveBeenCalledWith('/repo')
   })
 
-  test('projects server-owned prefs into native shell state when the renderer updates them', async () => {
+  test('projects server-owned prefs into native shell state when the client updates them', async () => {
     const result = await invokeIpc('settings.applyShellProjection', {
       prefs: {
         patch: {

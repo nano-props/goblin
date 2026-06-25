@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import type { RendererBootstrapSnapshot } from '#/shared/bootstrap.ts'
-import { RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
+import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 
 class FakeWebSocket {
@@ -32,7 +32,7 @@ class FakeWebSocket {
   }
 }
 
-function installWebBootstrap(bootstrap: RendererBootstrapSnapshot): void {
+function installWebBootstrap(bootstrap: ClientBootstrapSnapshot): void {
   const documentElement = {
     attrs: new Map<string, string>(),
     setAttribute(name: string, value: string) {
@@ -67,9 +67,9 @@ function installWebBootstrap(bootstrap: RendererBootstrapSnapshot): void {
   vi.stubGlobal('WebSocket', FakeWebSocket as unknown as typeof WebSocket)
 }
 
-function webBootstrap(overrides: Partial<RendererBootstrapSnapshot> = {}): RendererBootstrapSnapshot {
+function webBootstrap(overrides: Partial<ClientBootstrapSnapshot> = {}): ClientBootstrapSnapshot {
   return {
-    runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
+    runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
     initialServer: null,
     ...overrides,
   }

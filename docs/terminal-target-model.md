@@ -7,7 +7,7 @@ Use this doc for the target terminal session and control model.
 - Make terminal lifecycle explicit.
 - Make attachment control explicit.
 - Keep the server as the source of truth for terminal business state.
-- Keep renderer behavior as a projection of that model.
+- Keep client behavior as a projection of that model.
 
 ## Why this model is needed
 
@@ -37,11 +37,11 @@ It owns:
 - render snapshot state
 - lifecycle phase
 
-A session is not the same thing as a renderer view.
+A session is not the same thing as a client view.
 
 ### Attachment
 
-An attachment represents one renderer attachment to a session.
+An attachment represents one client attachment to a session.
 
 It owns:
 
@@ -63,7 +63,7 @@ Controller state should be derived from:
 
 ### View
 
-A view is renderer-local xterm state.
+A view is client-local xterm state.
 
 Views should never be treated as authoritative session or control state.
 
@@ -107,7 +107,7 @@ Without explicit phases, behavior gets inferred indirectly from:
 
 - whether a session is still in a map
 - whether a PTY handle exists
-- whether the renderer last saw an open state
+- whether the client last saw an open state
 
 That leads to ambiguity during restart failure, reconnect races, and delayed cleanup.
 
@@ -129,9 +129,9 @@ This allows the server to reason about:
 - takeover by a different attachment
 - release on disconnect (the controller slot clears immediately; control survives via the per-session `userSticky` flag, not via a per-attachment grace timer)
 
-## Control roles as renderer projection
+## Control roles as client projection
 
-The renderer should still consume a simple control projection:
+The client should still consume a simple control projection:
 
 - controller
 - viewer
@@ -160,13 +160,13 @@ That keeps the UI simple while keeping the business model accurate.
 
 - disconnect should clear the controller slot immediately, not preserve it
 - a subsequent attach from the same user (any attachment) auto-claims when no controller is present, because `userSticky` is sticky per session
-- releasing control should not require the renderer to guess what happened
+- releasing control should not require the client to guess what happened
 
 ### Takeover behavior
 
 - takeover is an explicit control transition
 - takeover should update canonical geometry coherently with the new controller
-- renderer optimism should stay minimal; server identity events remain authoritative
+- client optimism should stay minimal; server identity events remain authoritative
 
 ## Geometry in the target model
 
@@ -204,9 +204,9 @@ That means the model should be able to answer:
 - is this a different attachment attaching as a viewer?
 - should control be restored, preserved, or released?
 
-## Renderer implications
+## Client implications
 
-The renderer does not need the full server model.
+The client does not need the full server model.
 It mainly needs:
 
 - session summary
@@ -215,11 +215,11 @@ It mainly needs:
 - replay snapshot
 - lifecycle phase
 
-The renderer should not have to infer hidden lifecycle meaning from missing PTY state.
+The client should not have to infer hidden lifecycle meaning from missing PTY state.
 
 ## Migration direction
 
-All five steps are landed as of this revision. The renderer-side
+All five steps are landed as of this revision. The client-side
 projection (steps 3 + 5) is centralized in
 `src/web/components/terminal/authority-gate.ts`; see
 `terminal-takeover.md` for the resulting control model.
@@ -232,4 +232,4 @@ The target model is successful when:
 - reconnect behavior is attachment-aware
 - mirror and takeover semantics remain clear
 - canonical geometry is owned and updated consistently
-- renderer logic becomes simpler because server lifecycle is clearer
+- client logic becomes simpler because server lifecycle is clearer

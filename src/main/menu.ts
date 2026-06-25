@@ -3,9 +3,9 @@
 //   2) Wire global keyboard shortcuts that should work regardless of
 //      which element has focus — e.g. ⌘O always opens a repo.
 //
-// Renderer-driven actions (Open / Close Tab / Switch Tab / Refresh /
+// Client-driven actions (Open / Close Tab / Switch Tab / Refresh /
 // Toggle View) are dispatched as typed IPC events so the
-// renderer can run them in its existing store/state, instead of
+// client can run them in its existing store/state, instead of
 // duplicating that logic in main.
 // A small number of truly native menu actions (for example open data
 // folder, open in browser, and native-only projections) still run in
@@ -19,19 +19,19 @@ import { app, Menu, type MenuItemConstructorOptions } from 'electron'
 import { activateMainWindow, getMainWindow, resetMainWindowToDefault } from '#/main/window.ts'
 import { menuNodeLog } from '#/node/logger.ts'
 import { openDataFolderMenuKey, t } from '#/main/i18n/index.ts'
-import { sendRendererEffectIntent } from '#/main/renderer-surface-events.ts'
+import { sendClientEffectIntent } from '#/main/client-surface-events.ts'
 import { getTheme } from '#/main/theme.ts'
 import { tildifyPath } from '#/shared/paths.ts'
 import type { LangPref, ThemePref } from '#/shared/api-types.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
-import type { RendererEffectIntent } from '#/shared/renderer-effect-intents.ts'
+import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import { focusedRegisteredSurface } from '#/main/window-registry.ts'
 import { applyMenuRuntimeState, readMenuRuntimeState } from '#/main/menu-state.ts'
 import {
-  rendererMenuCommandById,
-  resolveRendererMenuCommandAccelerator,
-  resolveRendererMenuCommandEnabled,
-  resolveRendererMenuCommandIntent,
+  clientMenuCommandById,
+  resolveClientMenuCommandAccelerator,
+  resolveClientMenuCommandEnabled,
+  resolveClientMenuCommandIntent,
 } from '#/shared/shortcut-definitions.ts'
 import {
   openDataFolder as runOpenDataFolder,
@@ -64,16 +64,16 @@ const LANGUAGE_MENU_OPTIONS = [
   { pref: 'ja', labelKey: 'settings.lang.ja' },
 ] as const
 
-function send(intent: RendererEffectIntent): void {
-  void sendRendererIntent(intent)
+function send(intent: ClientEffectIntent): void {
+  void sendClientIntent(intent)
 }
 
-async function sendRendererIntent(intent: RendererEffectIntent): Promise<void> {
+async function sendClientIntent(intent: ClientEffectIntent): Promise<void> {
   try {
     const win = getMainWindow() ?? focusedRegisteredSurface()?.window ?? (await activateMainWindow())
-    sendRendererEffectIntent(win, intent)
+    sendClientEffectIntent(win, intent)
   } catch (err) {
-    menuNodeLog.warn({ err }, 'failed to send renderer intent')
+    menuNodeLog.warn({ err }, 'failed to send client intent')
   }
 }
 
@@ -117,7 +117,7 @@ function createMacAppMenu(state: AppMenuState): MenuItemConstructorOptions {
         click: () => send({ type: 'open-settings-requested', page: 'about' }),
       },
       separator(),
-      createRendererCommandMenuItem(state, 'app-settings'),
+      createClientCommandMenuItem(state, 'app-settings'),
       createAppearanceMenu(state.themePref),
       createLanguageMenu(state.langPref),
       separator(),
@@ -136,16 +136,16 @@ function createFileMenu(state: AppMenuState): MenuItemConstructorOptions {
   return {
     label: t('menu.file'),
     submenu: [
-      createRendererCommandMenuItem(state, 'file-new-terminal-tab'),
+      createClientCommandMenuItem(state, 'file-new-terminal-tab'),
       separator(),
-      createRendererCommandMenuItem(state, 'file-open-local-repo'),
-      createRendererCommandMenuItem(state, 'file-open-local-repo-path'),
-      createRendererCommandMenuItem(state, 'file-clone-repo'),
-      createRendererCommandMenuItem(state, 'file-open-remote-repo'),
+      createClientCommandMenuItem(state, 'file-open-local-repo'),
+      createClientCommandMenuItem(state, 'file-open-local-repo-path'),
+      createClientCommandMenuItem(state, 'file-clone-repo'),
+      createClientCommandMenuItem(state, 'file-open-remote-repo'),
       { label: t('menu.file.open-recent'), submenu: createRecentReposMenu(state.recentRepos) },
       separator(),
-      createRendererCommandMenuItem(state, 'file-close-workspace-tab-or-window'),
-      createRendererCommandMenuItem(state, 'file-close-tab'),
+      createClientCommandMenuItem(state, 'file-close-workspace-tab-or-window'),
+      createClientCommandMenuItem(state, 'file-close-tab'),
       { label: t('menu.file.close-window'), click: () => focusedRegisteredSurface()?.window.close() },
       separator(),
       { label: t('menu.file.open-in-browser'), click: () => void openWebVersionFromMenu() },
@@ -157,7 +157,7 @@ function createFileMenu(state: AppMenuState): MenuItemConstructorOptions {
         ? []
         : [
             separator(),
-            createRendererCommandMenuItem(state, 'file-settings'),
+            createClientCommandMenuItem(state, 'file-settings'),
             separator(),
             { role: 'quit' as const, label: t('menu.file.quit') },
           ]),
@@ -203,18 +203,18 @@ function createViewMenu(state: AppMenuState): MenuItemConstructorOptions {
   return {
     label: t('menu.view'),
     submenu: [
-      createRendererCommandMenuItem(state, 'view-status'),
-      createRendererCommandMenuItem(state, 'view-history'),
-      createRendererCommandMenuItem(state, 'view-changes'),
+      createClientCommandMenuItem(state, 'view-status'),
+      createClientCommandMenuItem(state, 'view-history'),
+      createClientCommandMenuItem(state, 'view-changes'),
       // Single Terminal entry. Clicking it mirrors what happens when the
       // user clicks the first terminal view on the page: open the terminal
       // tab, focus the first existing session, or create one when the
       // worktree has no terminals yet.
-      createRendererCommandMenuItem(state, 'view-terminal'),
-      createRendererCommandMenuItem(state, 'view-toggle-focus-mode'),
+      createClientCommandMenuItem(state, 'view-terminal'),
+      createClientCommandMenuItem(state, 'view-toggle-focus-mode'),
       ...(state.isMac ? [] : [separator(), createAppearanceMenu(state.themePref), createLanguageMenu(state.langPref)]),
       separator(),
-      createRendererCommandMenuItem(state, 'view-refresh'),
+      createClientCommandMenuItem(state, 'view-refresh'),
       {
         label: t('menu.view.reload-page'),
         accelerator: accelerator(state, 'CmdOrCtrl+R'),
@@ -249,10 +249,10 @@ function createWindowMenu(state: AppMenuState): MenuItemConstructorOptions {
       { role: 'minimize', label: t('menu.window.minimize') },
       { role: 'zoom', label: t('menu.window.zoom') },
       separator(),
-      createRendererCommandMenuItem(state, 'window-next-repo'),
-      createRendererCommandMenuItem(state, 'window-prev-repo'),
+      createClientCommandMenuItem(state, 'window-next-repo'),
+      createClientCommandMenuItem(state, 'window-prev-repo'),
       separator(),
-      createRendererCommandMenuItem(state, 'window-reset-layout', {
+      createClientCommandMenuItem(state, 'window-reset-layout', {
         // Reset Window also restores the main window itself to its default
         // size, so users have a one-click escape from an awkward
         // drag-resize — not just from an awkward pane split.
@@ -266,7 +266,7 @@ function createWindowMenu(state: AppMenuState): MenuItemConstructorOptions {
 function createHelpMenu(state: AppMenuState): MenuItemConstructorOptions {
   return {
     label: t('menu.help'),
-    submenu: [createRendererCommandMenuItem(state, 'help-shortcuts')],
+    submenu: [createClientCommandMenuItem(state, 'help-shortcuts')],
   }
 }
 
@@ -298,25 +298,25 @@ function accelerator(state: AppMenuState, value: string): string | undefined {
   return state.shortcutsDisabled ? undefined : value
 }
 
-function createRendererCommandMenuItem(
+function createClientCommandMenuItem(
   state: AppMenuState,
-  id: Parameters<typeof rendererMenuCommandById>[0],
-  // `beforeIntent` runs a main-side side effect before the renderer
+  id: Parameters<typeof clientMenuCommandById>[0],
+  // `beforeIntent` runs a main-side side effect before the client
   // intent is dispatched — for actions like Reset Window that need to
-  // touch the Electron window itself, not just the renderer state.
+  // touch the Electron window itself, not just the client state.
   options?: { beforeIntent?: () => void },
 ): MenuItemConstructorOptions {
-  const command = rendererMenuCommandById(id)
+  const command = clientMenuCommandById(id)
   const context = menuCommandContext(state)
-  const resolvedAccelerator = resolveRendererMenuCommandAccelerator(command, context)
-  const resolvedEnabled = resolveRendererMenuCommandEnabled(command, context)
+  const resolvedAccelerator = resolveClientMenuCommandAccelerator(command, context)
+  const resolvedEnabled = resolveClientMenuCommandEnabled(command, context)
   return {
     label: t(command.menuLabelKey),
     ...(resolvedAccelerator ? { accelerator: accelerator(state, resolvedAccelerator) } : {}),
     ...(resolvedEnabled !== undefined ? { enabled: resolvedEnabled } : {}),
     click: () => {
       options?.beforeIntent?.()
-      send(resolveRendererMenuCommandIntent(command, context))
+      send(resolveClientMenuCommandIntent(command, context))
     },
   }
 }

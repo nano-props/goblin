@@ -12,7 +12,7 @@ import { ACCESS_TOKEN_COOKIE, ACCESS_TOKEN_HEADER, ACCESS_TOKEN_QUERY } from '#/
  * requires auth, and on `/ws/invalidation` / `/ws/terminal`.
  *
  * Cookie is the canonical channel for browser clients. Header is
- * the canonical channel for the embedded Electron renderer.
+ * the canonical channel for the embedded Electron client.
  * Query is the fallback for WebSocket clients (browsers can't set
  * WS headers; non-browser clients don't have a cookie jar).
  *

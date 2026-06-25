@@ -1,17 +1,17 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
-import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
+import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 
 describe('remote client web helpers', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     vi.resetModules()
-    setRendererBridgeForTests(null)
+    setClientBridgeForTests(null)
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
         __GOBLIN_BOOTSTRAP__: {
-          runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
+          runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
           initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         },
         location: {

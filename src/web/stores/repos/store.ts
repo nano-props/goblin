@@ -92,7 +92,7 @@ const repoStorage: PersistStorage<PersistedReposStore, void> = {
 export const useReposStore = create<ReposStore>()(
   persist(
     (set, get) => ({
-      // Runtime-coherent renderer projection.
+      // Runtime-coherent client projection.
       repos: {},
 
       // Restorable warm-start cache.
@@ -105,7 +105,7 @@ export const useReposStore = create<ReposStore>()(
       workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
       selectedTerminalByWorktree: {},
 
-      // Local renderer-only state.
+      // Local client-only state.
       sessionReady: false,
 
       ...createLifecycleActions(set, get),

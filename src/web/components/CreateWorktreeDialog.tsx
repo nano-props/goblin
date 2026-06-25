@@ -5,7 +5,7 @@
 //                        override the local branch name it should track.
 //
 // Errors are surfaced raw from git: path already exists, branch checked
-// out elsewhere, missing parent directory, etc. The renderer gates
+// out elsewhere, missing parent directory, etc. The client gates
 // obvious branch / ref name problems up front; anything else stays
 // git's responsibility.
 

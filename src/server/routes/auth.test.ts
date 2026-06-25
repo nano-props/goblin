@@ -4,7 +4,7 @@ import { ACCESS_TOKEN_COOKIE } from '#/shared/access-token.ts'
 
 /**
  * The auth routes are the only way to obtain (login) or clear
- * (logout) the session cookie, and the only way for the renderer
+ * (logout) the session cookie, and the only way for the client
  * to probe auth state (whoami) and read its own token
  * (access-token). The middleware that gates /api/whoami and
  * /api/access-token is the same one used for every other authed

@@ -8,12 +8,12 @@ import {
   SHELL_OPEN_SETTINGS_WINDOW_CHANNEL,
 } from '#/shared/ipc-channels.ts'
 
-const { ipcHandlers, browserWindowFromWebContents, showOpenDialog, sendRendererEffectIntent, activateMainWindow } =
+const { ipcHandlers, browserWindowFromWebContents, showOpenDialog, sendClientEffectIntent, activateMainWindow } =
   vi.hoisted(() => ({
     ipcHandlers: new Map<string, (_event: unknown, input: any) => unknown>(),
     browserWindowFromWebContents: vi.fn(),
     showOpenDialog: vi.fn(),
-    sendRendererEffectIntent: vi.fn(),
+    sendClientEffectIntent: vi.fn(),
     activateMainWindow: vi.fn(),
   }))
 
@@ -33,8 +33,8 @@ vi.mock('#/main/window.ts', () => ({
   getMainWindow: vi.fn(() => null),
 }))
 
-vi.mock('#/main/renderer-surface-events.ts', () => ({
-  sendRendererEffectIntent,
+vi.mock('#/main/client-surface-events.ts', () => ({
+  sendClientEffectIntent,
 }))
 
 const trustedSender = { id: 1, once: vi.fn() }
@@ -83,7 +83,7 @@ describe('shell bridge IPC', () => {
     const result = await invoke(SHELL_OPEN_SETTINGS_WINDOW_CHANNEL, { page: 'about' })
 
     expect(result).toBe(true)
-    expect(sendRendererEffectIntent).toHaveBeenCalledWith(mainWindow, {
+    expect(sendClientEffectIntent).toHaveBeenCalledWith(mainWindow, {
       type: 'open-settings-requested',
       page: 'about',
     })

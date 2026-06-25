@@ -1,6 +1,6 @@
-// Generic renderer-side WebSocket subscription for the server's
+// Generic client-side WebSocket subscription for the server's
 // per-purpose `/ws/*` channels (`/ws/invalidation`,
-// `/ws/renderer-intent`, future ones).
+// `/ws/client-intent`, future ones).
 //
 // Owns a single WebSocket connection per ingress instance:
 //   - Lazy: opens on the first subscriber, closes when the last
@@ -12,14 +12,14 @@
 //
 // The two consumers today are
 //   `#/web/server-invalidation-ingress.ts` and
-//   `#/web/server-renderer-intent-ingress.ts`; both reduce to
+//   `#/web/server-client-intent-ingress.ts`; both reduce to
 //   ~25 lines once they pick the path + parser and forward to this
 // factory.
 
 import { isAppQuitting, subscribeAppQuitting } from '#/web/app-lifecycle.ts'
 import { resolveWebSocketProtocol } from '#/web/lib/websocket-url.ts'
 import { ACCESS_TOKEN_QUERY } from '#/shared/access-token.ts'
-import { resolveRendererServerConfig } from '#/web/lib/server-config.ts'
+import { resolveClientServerConfig } from '#/web/lib/server-config.ts'
 
 const DEFAULT_RECONNECT_DELAY_MS = 300
 
@@ -76,7 +76,7 @@ export function createServerWebSocketIngress<T>(
   }
 
   function ensureSocket(): void {
-    const server = resolveRendererServerConfig()
+    const server = resolveClientServerConfig()
     if (!server || typeof WebSocket === 'undefined' || socket || listeners.size === 0 || isAppQuitting()) return
     clearReconnectTimer()
     manualSocketClose = false

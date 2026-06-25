@@ -4,10 +4,10 @@ import { useT } from '#/web/stores/i18n.ts'
 import { postServerJson } from '#/web/lib/server-fetch.ts'
 
 /**
- * Auth gate for the renderer. Mounts above the app's normal
+ * Auth gate for the client. Mounts above the app's normal
  * children; reads the shared auth state from `useAuth()` and
  * either passes through (authenticated) or shows a one-field
- * login form (unauthenticated). Embedded renderers have the
+ * login form (unauthenticated). Embedded clients have the
  * access token in the bootstrap and never see the form.
  *
  * The form is intentionally minimal — single text input + submit —
@@ -23,7 +23,7 @@ import { postServerJson } from '#/web/lib/server-fetch.ts'
  * run only after the user has a valid session. This is what
  * keeps the server log quiet on first load.
  *
- * i18n is intentionally not gated here. The renderer entrypoint
+ * i18n is intentionally not gated here. The client entrypoint
  * hydrates `/api/i18n` before mounting the normal React tree, so
  * this component can stay focused on auth state instead of owning
  * another boot dependency.

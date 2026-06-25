@@ -11,7 +11,7 @@ import type {
 } from '#/web/components/terminal/types.ts'
 export class TerminalSlotState {
   /** Terminal runtime metadata mirrored from attach/session/identity events.
-   *  This is authoritative runtime shape for the renderer, but it is not
+   *  This is authoritative runtime shape for the client, but it is not
    *  the same thing as workspace/session persistence. */
   private runtimeState: {
     phase: TerminalPhase
@@ -33,7 +33,7 @@ export class TerminalSlotState {
     canonicalSize: { cols: 0, rows: 0 },
     takeoverPending: false,
   }
-  /** Renderer-only replay bookkeeping used to merge buffered output around
+  /** Client-only replay bookkeeping used to merge buffered output around
    *  attaches/replays. This is transient buffering, not server runtime
    *  identity and not persisted workspace state. */
   private replayBufferState: {
@@ -45,7 +45,7 @@ export class TerminalSlotState {
     replayPendingOutput: [],
     replayGeneration: 0,
   }
-  /** Renderer-only terminal UI state such as search/progress. This is safe
+  /** Client-only terminal UI state such as search/progress. This is safe
    *  to discard when the active terminal view is torn down. */
   private transientViewState: {
     searchResult: TerminalSearchResult | null

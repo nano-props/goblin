@@ -32,7 +32,7 @@ import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 
 // Soft-fail envelope returned by `jsonOr` for every repo action that
 // doesn't have a more specific success shape. Keep this in one place
-// so the renderer sees a stable contract — `err.message` is the
+// so the client sees a stable contract — `err.message` is the
 // human-readable i18n key, `err.ok === false` is the branch.
 const READ_REPO_ERROR = { ok: false as const, message: 'error.failed-read-repo' }
 

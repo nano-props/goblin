@@ -21,7 +21,7 @@ export interface AuthRouteOptions {
  * - `POST /api/login`  [unauth] — submit `{ token }`, get a cookie.
  * - `POST /api/logout` [unauth] — clear the cookie.
  * - `GET  /api/whoami` [auth]   — `{ ok: true }`, used by the
- *   renderer's gate UI to decide whether to show the login form.
+ *   client's gate UI to decide whether to show the login form.
  *
  * The login endpoint is intentionally unauthenticated: the only way
  * to *get* a cookie is to prove you already know the token. The

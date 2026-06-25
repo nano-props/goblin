@@ -332,7 +332,7 @@ describe('repo routes — composite read', () => {
     // Mirrors the existing jsonOr behaviour for /snapshot, /status,
     // and /pull-requests: a backend failure on the composite
     // endpoint returns the empty default rather than a 5xx, so
-    // the renderer can keep rendering whatever it already has.
+    // the client can keep rendering whatever it already has.
     mocks.getRepositoryComposite.mockRejectedValue(new Error('backend exploded'))
     const app = createRepoRoutes()
     const response = await app.request(

@@ -36,7 +36,7 @@ export function generateAccessToken(): string {
  * Read the access token from `<dataDir>/server-token`, or create
  * it (with `0o600` mode) if missing or corrupt. The token is the
  * single source of truth for both browser (cookie) and embedded
- * renderer (header / `?t=` query) authentication.
+ * client (header / `?t=` query) authentication.
  *
  * Atomicity: writes go to `<file>.tmp.<pid>.<rand>` and are
  * `rename()`d onto the final path so a concurrent reader never sees

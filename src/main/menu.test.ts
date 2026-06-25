@@ -30,7 +30,7 @@ const mocks = vi.hoisted(() => {
     focusedRegisteredSurface: vi.fn((): any => null),
     getMainWindow: vi.fn((): any => null),
     resetMainWindowToDefault: vi.fn(),
-    sendRendererEffectIntent: vi.fn(),
+    sendClientEffectIntent: vi.fn(),
     buildFromTemplate: vi.fn((nextTemplate: any[]) => {
       template.splice(0, template.length, ...nextTemplate)
       return nextTemplate
@@ -79,13 +79,13 @@ vi.mock('#/main/menu-state.ts', () => ({
   applyMenuRuntimeState: mocks.applyMenuRuntimeState,
 }))
 
-vi.mock('#/main/renderer-surface-events.ts', () => ({
+vi.mock('#/main/client-surface-events.ts', () => ({
   broadcastIpcEvent: vi.fn(),
-  sendRendererEffectIntent: mocks.sendRendererEffectIntent,
+  sendClientEffectIntent: mocks.sendClientEffectIntent,
 }))
 
 vi.mock('#/main/window-shell.ts', () => ({
-  getRendererBaseUrl: vi.fn(() => 'http://127.0.0.1:32100'),
+  getClientBaseUrl: vi.fn(() => 'http://127.0.0.1:32100'),
   getEmbeddedServerUrl: vi.fn(() => 'http://127.0.0.1:32100'),
 }))
 
@@ -123,7 +123,7 @@ describe('app menu actions', () => {
     await Promise.resolve()
 
     expect(mocks.activateMainWindow).toHaveBeenCalledTimes(1)
-    expect(mocks.sendRendererEffectIntent).toHaveBeenCalledWith(mocks.win, { type: 'open-repo-requested' })
+    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, { type: 'open-repo-requested' })
   })
 
   test('reuses an existing main window for menu actions', async () => {
@@ -135,7 +135,7 @@ describe('app menu actions', () => {
     await Promise.resolve()
 
     expect(mocks.activateMainWindow).not.toHaveBeenCalled()
-    expect(mocks.sendRendererEffectIntent).toHaveBeenCalledWith(mocks.win, { type: 'open-repo-requested' })
+    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, { type: 'open-repo-requested' })
   })
 
   test('sends the path dialog action from the file menu', async () => {
@@ -146,7 +146,7 @@ describe('app menu actions', () => {
     clickMenuItem('menu.file', 'menu.file.open-local-repo-path')
     await Promise.resolve()
 
-    expect(mocks.sendRendererEffectIntent).toHaveBeenCalledWith(mocks.win, { type: 'open-repo-path-requested' })
+    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, { type: 'open-repo-path-requested' })
   })
 
   test('tildifies Windows home paths in the recent repos menu', async () => {
@@ -179,7 +179,7 @@ describe('app menu actions', () => {
     shortcutsItem.click()
     await Promise.resolve()
 
-    expect(mocks.sendRendererEffectIntent).toHaveBeenCalledWith(mocks.win, {
+    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, {
       type: 'open-settings-requested',
       page: 'shortcuts',
     })
@@ -192,33 +192,33 @@ describe('app menu actions', () => {
     clickMenuItem('Goblin', 'menu.app.settings')
     await Promise.resolve()
 
-    expect(mocks.sendRendererEffectIntent).toHaveBeenCalledWith(mocks.win, {
+    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, {
       type: 'open-settings-requested',
       page: 'general',
     })
   })
 
-  test('routes appearance changes through renderer intent instead of mutating settings in main', async () => {
+  test('routes appearance changes through client intent instead of mutating settings in main', async () => {
     const { buildAppMenu } = await import('#/main/menu.ts')
 
     buildAppMenu()
     clickNestedMenuItem('Goblin', 'settings.appearance', 'settings.appearance.dark')
     await Promise.resolve()
 
-    expect(mocks.sendRendererEffectIntent).toHaveBeenCalledWith(mocks.win, {
+    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, {
       type: 'theme-pref-set-requested',
       pref: 'dark',
     })
   })
 
-  test('routes language changes through renderer intent instead of mutating settings in main', async () => {
+  test('routes language changes through client intent instead of mutating settings in main', async () => {
     const { buildAppMenu } = await import('#/main/menu.ts')
 
     buildAppMenu()
     clickNestedMenuItem('Goblin', 'settings.lang', 'settings.lang.ko')
     await Promise.resolve()
 
-    expect(mocks.sendRendererEffectIntent).toHaveBeenCalledWith(mocks.win, {
+    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, {
       type: 'lang-pref-set-requested',
       pref: 'ko',
     })
@@ -279,14 +279,14 @@ describe('app menu actions', () => {
     terminalItem.click()
     await Promise.resolve()
 
-    expect(mocks.sendRendererEffectIntent).toHaveBeenCalledWith(mocks.win, {
+    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, {
       type: 'terminal-primary-action-requested',
     })
 
     focusModeItem.click()
     await Promise.resolve()
 
-    expect(mocks.sendRendererEffectIntent).toHaveBeenCalledWith(mocks.win, {
+    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, {
       type: 'workspace-focus-toggle-requested',
     })
   })
@@ -371,12 +371,12 @@ describe('app menu actions', () => {
     await Promise.resolve()
 
     expect(mocks.resetMainWindowToDefault).toHaveBeenCalledTimes(1)
-    expect(mocks.sendRendererEffectIntent).toHaveBeenCalledWith(mocks.win, {
+    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, {
       type: 'layout-reset-requested',
     })
   })
 
-  test('routes clear recent through renderer intent', async () => {
+  test('routes clear recent through client intent', async () => {
     mocks.readMenuRuntimeState.mockReturnValue({
       ...defaultMenuRuntimeState(),
       recentRepos: [{ kind: 'local', id: '/tmp/repo' }],
@@ -391,7 +391,7 @@ describe('app menu actions', () => {
     clearItem.click()
     await Promise.resolve()
 
-    expect(mocks.sendRendererEffectIntent).toHaveBeenCalledWith(mocks.win, {
+    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, {
       type: 'clear-recent-repos-requested',
     })
   })

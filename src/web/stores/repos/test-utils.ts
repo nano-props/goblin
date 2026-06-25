@@ -2,8 +2,8 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
 import { emptyRepo } from '#/web/stores/repos/helpers.ts'
 import { disposeAllRepoRuntimes } from '#/web/stores/repos/runtime.ts'
-import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
-import { ELECTRON_RENDERER_CAPABILITIES, RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import { setClientBridgeForTests } from '#/web/client-bridge.ts'
+import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { vi } from 'vitest'
 import { stripBranchWorktreeMetadata, worktreeStatesFromBranches } from '#/web/stores/repos/worktree-state.ts'
 import { normalizeWorkspacePaneTabOrderRecord } from '#/web/stores/repos/workspace-pane-tabs.ts'
@@ -345,14 +345,14 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
     }
   }
   Object.defineProperty(globalThis, 'WebSocket', { configurable: true, value: MockWebSocket })
-  setRendererBridgeForTests({
+  setClientBridgeForTests({
     kind: () => 'electron',
     hasCapability: () => false,
     getBootstrap: () => ({
       runtime: {
         kind: 'electron',
-        bridgeVersion: RENDERER_BRIDGE_VERSION,
-        capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+        bridgeVersion: CLIENT_BRIDGE_VERSION,
+        capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
       },
       homeDir: '/Users/test',
       platform: 'web',
@@ -481,7 +481,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       }
     }),
   )
-  setRendererBridgeForTests(null)
+  setClientBridgeForTests(null)
 }
 
 export function seedRepoState(options: {

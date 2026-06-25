@@ -5,7 +5,7 @@ import { createTerminalBellController } from '#/web/components/terminal/terminal
 import { terminalDescriptor } from '#/web/components/terminal/terminal-descriptor.ts'
 import { parseWorktreeKey, worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
 import { terminalBridge } from '#/web/terminal.ts'
-import { readOrCreateWebTerminalClientId } from '#/web/renderer-terminal-bridge.ts'
+import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-bridge.ts'
 import { parseTerminalSlotKey } from '#/shared/terminal-slot-key.ts'
 import type {
   TerminalSlotSnapshot,
@@ -47,9 +47,9 @@ const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = {
   canonicalTitle: null,
 }
 /**
- * Renderer-level authority for terminal session state.
+ * Client-level authority for terminal session state.
  *
- * **Lifetime**: renderer-level singleton — one instance per renderer
+ * **Lifetime**: client-level singleton — one instance per client
  * process, created on first access via `getTerminalSlotRegistry(...)`,
  * lives until the process tears down. The class is intentionally
  * Provider-independent: `TerminalSlotProvider` is just a wiring
@@ -171,8 +171,8 @@ export class TerminalSlotRegistry {
   /**
    * Test-only / explicit-teardown path.
    *
-   * Production code does NOT call this. The registry is a renderer-
-   * level singleton and is meant to live for the renderer's entire
+   * Production code does NOT call this. The registry is a client-
+   * level singleton and is meant to live for the client's entire
    * lifetime. The Provider never invokes `destroy()` on unmount; the
    * `pendingRegistryDestroyRef + setTimeout` debounce that used to
    * gate a Provider-unmount destroy has been removed.
@@ -1035,7 +1035,7 @@ export interface TerminalSlotRegistryDeps {
 let registryInstance: TerminalSlotRegistry | null = null
 
 /**
- * Lazy getter for the renderer-level terminal session registry.
+ * Lazy getter for the client-level terminal session registry.
  *
  * First call constructs the singleton with `deps` (only the first
  * call's deps are honored — subsequent calls return the existing
@@ -1043,8 +1043,8 @@ let registryInstance: TerminalSlotRegistry | null = null
  * outlive any Provider remount). The Provider is the canonical
  * caller; tests inject via `setTerminalSlotRegistryForTests`.
  *
- * Mirrors the `getRendererBridge()` shape at
- * `src/web/renderer-bridge.ts`.
+ * Mirrors the `getClientBridge()` shape at
+ * `src/web/client-bridge.ts`.
  */
 export function getTerminalSlotRegistry(deps: TerminalSlotRegistryDeps): TerminalSlotRegistry {
   if (!registryInstance) {
@@ -1068,7 +1068,7 @@ export function getTerminalSlotRegistry(deps: TerminalSlotRegistryDeps): Termina
  *    reference before clearing the slot.
  *
  * Production code never calls this. Mirrors
- * `setRendererBridgeForTests()` at `src/web/renderer-bridge.ts`.
+ * `setClientBridgeForTests()` at `src/web/client-bridge.ts`.
  */
 export function setTerminalSlotRegistryForTests(instance: TerminalSlotRegistry | null): void {
   registryInstance = instance

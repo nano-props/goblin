@@ -1,30 +1,30 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import type { RendererBootstrapSnapshot } from '#/shared/bootstrap.ts'
-import { ELECTRON_RENDERER_CAPABILITIES, RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
-import type { RendererBridge } from '#/web/renderer-bridge-types.ts'
-import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
+import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
+import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import type { ClientBridge } from '#/web/client-bridge-types.ts'
+import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 
-function webBootstrap(overrides: Partial<RendererBootstrapSnapshot> = {}): RendererBootstrapSnapshot {
+function webBootstrap(overrides: Partial<ClientBootstrapSnapshot> = {}): ClientBootstrapSnapshot {
   return {
-    runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
+    runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
     initialServer: null,
     ...overrides,
   }
 }
 
-function electronBootstrap(overrides: Partial<RendererBootstrapSnapshot> = {}): RendererBootstrapSnapshot {
+function electronBootstrap(overrides: Partial<ClientBootstrapSnapshot> = {}): ClientBootstrapSnapshot {
   return {
     runtime: {
       kind: 'electron',
-      bridgeVersion: RENDERER_BRIDGE_VERSION,
-      capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+      bridgeVersion: CLIENT_BRIDGE_VERSION,
+      capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
     },
     initialServer: null,
     ...overrides,
   }
 }
 
-function installWebBootstrap(bootstrap: RendererBootstrapSnapshot): void {
+function installWebBootstrap(bootstrap: ClientBootstrapSnapshot): void {
   Object.defineProperty(globalThis, 'window', {
     configurable: true,
     value: {
@@ -40,7 +40,7 @@ function installWebBootstrap(bootstrap: RendererBootstrapSnapshot): void {
   })
 }
 
-function testBridge(overrides: Partial<RendererBridge> = {}): RendererBridge {
+function testBridge(overrides: Partial<ClientBridge> = {}): ClientBridge {
   return {
     kind: () => 'web',
     hasCapability: () => false,
@@ -63,15 +63,15 @@ describe('repo-client', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.restoreAllMocks()
-    setRendererBridgeForTests(null)
+    setClientBridgeForTests(null)
   })
 
   test('opens repository remote through the native shell bridge when available', async () => {
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
     window.open = vi.fn(() => null)
-    const bridgeModule = await import('#/web/renderer-bridge.ts')
+    const bridgeModule = await import('#/web/client-bridge.ts')
     const openExternalUrl = vi.fn(async () => ({ ok: true, message: 'https://github.com/acme/repo/tree/feature/test' }))
-    bridgeModule.setRendererBridgeForTests(
+    bridgeModule.setClientBridgeForTests(
       testBridge({
         getBootstrap: () => ({
           ...webBootstrap(),
@@ -173,8 +173,8 @@ describe('repo-client', () => {
         goblinNative: {
           runtime: {
             kind: 'electron',
-            bridgeVersion: RENDERER_BRIDGE_VERSION,
-            capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+            bridgeVersion: CLIENT_BRIDGE_VERSION,
+            capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
           },
           invokeIpc: vi.fn(),
           abortIpc: async () => true,

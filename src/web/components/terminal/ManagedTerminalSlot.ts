@@ -23,7 +23,7 @@ import {
 import { TerminalSlotRuntime } from '#/web/components/terminal/terminal-slot-runtime.ts'
 import { TerminalSlotView } from '#/web/components/terminal/terminal-slot-view.ts'
 import { isTerminalEmulatorInput, type TerminalInput } from '#/web/components/terminal/terminal-input.ts'
-import { readOrCreateWebTerminalClientId } from '#/web/renderer-terminal-bridge.ts'
+import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-bridge.ts'
 import {
   createXtermAuthorityGate,
   type AuthorizationDenialReason,

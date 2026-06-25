@@ -2,7 +2,7 @@ import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { activateMainWindow, getMainWindow } from '#/main/window.ts'
 import { consumeExternalOpenPaths } from '#/main/external-open.ts'
 import { focusedRegisteredSurface } from '#/main/window-registry.ts'
-import { sendRendererEffectIntent } from '#/main/renderer-surface-events.ts'
+import { sendClientEffectIntent } from '#/main/client-surface-events.ts'
 import { isValidAbsolutePath } from '#/shared/input-validation.ts'
 import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
 import { openHttpExternal, openHttpsExternal } from '#/main/external-url.ts'
@@ -23,7 +23,7 @@ export function wireShellBridgeIpc(): void {
   ipcMain.handle(SHELL_OPEN_SETTINGS_WINDOW_CHANNEL, async (event, input?: { page?: SettingsPage }) => {
     if (!isTrustedIpcEvent(event)) return false
     const win = await activateMainWindow()
-    sendRendererEffectIntent(win, {
+    sendClientEffectIntent(win, {
       type: 'open-settings-requested',
       page: input?.page ?? 'general',
     })

@@ -1,4 +1,4 @@
-// Renderer-side logger.
+// Client-side logger.
 //
 // Built on `consola` so the [component] prefix pattern already used across
 // the codebase (`console.warn('[terminal] ...')`, etc.) becomes a typed,

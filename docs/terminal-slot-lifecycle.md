@@ -43,7 +43,7 @@ created session's lifecycle end to end.
 None of these are one-off workarounds. They are three faces of the
 same gap:
 
-> **`create` returns the handshake, but the renderer's view of the
+> **`create` returns the handshake, but the client's view of the
 > session's lifecycle — including close, broadcast, and rendering the
 > empty slot — was treated as a series of unrelated follow-ups.**
 
@@ -63,7 +63,7 @@ In scope:
 
 Out of scope:
 
-- Moving `TerminalSlotRegistry` to a renderer-level singleton
+- Moving `TerminalSlotRegistry` to a client-level singleton
   lifetime. Tracked as `terminal-roadmap.md` P1.7.
 - Transport-level reconnect / backoff design. Tracked as `terminal.md`
   / `realtime.md`.
@@ -91,7 +91,7 @@ The combined symptom list across the three root causes:
 
 - **R0 — `create` had no atomic first-frame protocol.** The server
   knew the snapshot during `create`, but the public response did not
-  treat it as the authoritative handshake. The renderer reconstructed
+  treat it as the authoritative handshake. The client reconstructed
   the first frame from multiple asynchronous sources.
 - **R1 — Close is fire-and-forget and silent on failure.**
   `ManagedTerminalSlot.dispose()` calls
@@ -122,7 +122,7 @@ is intentionally retained in summary form.
 
 1. `create` now returns the created session's first-frame hydration
    data directly. The success payload carries the same class of
-   information the renderer already relied on for `attach` /
+   information the client already relied on for `attach` /
    `restart`:
    - `ptySessionId`
    - `processName`
@@ -144,7 +144,7 @@ is intentionally retained in summary form.
    the authoritative boundary; live output around it follows the
    same discipline as `attach` / `restart`.
 
-3. The renderer hydrates directly from the `create` response. There
+3. The client hydrates directly from the `create` response. There
    is no follow-up snapshot fetch to paint the first frame.
 
 ### `create.sessions` is projection data, not the success oracle
@@ -161,19 +161,19 @@ below.
 
 ### False failure after a successful create
 
-After R0 landed, a renderer-side bug surfaced more clearly: the
+After R0 landed, a client-side bug surfaced more clearly: the
 terminal could appear successfully but the create promise rejected
 with "failed to create terminal", triggering an empty-state CTA
 toast.
 
-The renderer was doing an overly strict validation step:
+The client was doing an overly strict validation step:
 
 - required `ptySessionId`, `snapshot`, `snapshotSeq` from `create`, **and**
 - required the returned `sessions` list to already include the
   created session.
 
 That extra requirement was removed. When the returned session list
-lags the created session, the renderer now:
+lags the created session, the client now:
 
 1. trusts the authoritative `create` payload for first paint,
 2. synthesizes temporary projection data if needed,
@@ -198,12 +198,12 @@ crash. Two changes:
 3. `TerminalCatalogMutationResult` intersects with `TerminalFirstFrame`
    instead of `Partial<Extract<TerminalAttachResult, { ok: true }>>`,
    so every `create` success carries the full first-frame payload at
-   the type level. The renderer's runtime "missing ptySessionId" check
+   the type level. The client's runtime "missing ptySessionId" check
    is now redundant for the type-checked paths (and stays as a
    belt-and-suspenders guard against `unknown`/JSON-blob shapes
    arriving from the bridge layer).
 
-The renderer-side fabrication path in `performCreateTerminal` is
+The client-side fabrication path in `performCreateTerminal` is
 removed: if the server claims `action: 'created'` but the catalog
 `sessions[]` does not echo that session, the create is rejected with
 `error.terminal-create-failed` instead of silently inventing a
@@ -239,7 +239,7 @@ for (const ptySessionId of sessionIds) {
 Two problems:
 
 - `.catch(() => {})` swallows rejections. A WebSocket mid-request
-  teardown (`renderer-terminal-bridge.ts:104
+  teardown (`client-terminal-bridge.ts:104
 rejectPendingSocketRequests`, called from `handleSocketDisconnection`)
   or a race with `closeSocketIfIdle` can drop the close before the
   server sees it.
@@ -326,8 +326,8 @@ registry.enqueueDurableClose({ ptySessionId, worktreeTerminalKey }).catch((err) 
 
 Implemented on `main` (landed via `fa67adb`). Protocol variant in
 `src/shared/terminal-socket.ts:30-37`. Server emit in
-`terminal-runtime-actions.ts:144-156`. Renderer dispatcher branch
-in `renderer-terminal-bridge.ts:186`. Registry handler
+`terminal-runtime-actions.ts:144-156`. Client dispatcher branch
+in `client-terminal-bridge.ts:186`. Registry handler
 `handleSessionClosed` in
 `TerminalSlotRegistry.ts:210`. Coverage in
 `terminal-runtime-actions.test.ts` (emits both broadcasts on
@@ -371,9 +371,9 @@ the closed session id. The manager
 returns it on the close result, or we look it up via
 `manager.findSessionById(ptySessionId)` before closing.
 
-### Renderer dispatcher
+### Client dispatcher
 
-`src/web/renderer-terminal-bridge.ts`:
+`src/web/client-terminal-bridge.ts`:
 
 - Add `sessionClosedSubscribers: Set<(event) => void>` and include
   it in `hasRealtimeSubscribers()`.
@@ -381,8 +381,8 @@ returns it on the close result, or we look it up via
   in the same switch that handles `output` / `title` / `exit` /
   `identity` / `lifecycle` / `sessions-changed`.
 - Expose `onSessionClosed(cb)` on the returned bridge and add a
-  matching method to `RendererTerminalBridge` in
-  `src/web/renderer-bridge-types.ts`.
+  matching method to `ClientTerminalBridge` in
+  `src/web/client-bridge-types.ts`.
 
 ### Registry subscribes
 
@@ -470,13 +470,13 @@ the authoritative handshake for the new controller's view; the
 realtime `identity` event keeps the same shape (and the same
 authority role) for the _other_ control-change paths
 (controller crash, sibling auto-claim after disconnect, fresh
-attach). The renderer no longer waits for a follow-up
+attach). The client no longer waits for a follow-up
 `identity` event before painting the post-takeover frame.
 
 ### The two-step handshake that was
 
 Before this change, `terminal.takeover` returned only
-`{ ok, ptySessionId, controller }`. The renderer treated the
+`{ ok, ptySessionId, controller }`. The client treated the
 realtime `identity` event as the authority and used the bridge
 response only to "trigger the server-side handoff". The
 comment in `ManagedTerminalSlot.takeover()` was explicit:
@@ -499,7 +499,7 @@ The cost was a stale window between the response settling and the
   arrived (~50–100ms after the response).
 
 This violated the same "atomicity" R0 enforced for `create` /
-`attach` / `restart`: the renderer had to wait for a separate
+`attach` / `restart`: the client had to wait for a separate
 round-trip to know the new frame state, instead of trusting the
 response.
 
@@ -513,10 +513,10 @@ response.
    (`snapshot`, `snapshotSeq`) — takeover doesn't return a fresh
    snapshot because the new controller keeps whatever the viewer
    was already showing (no need to re-fetch the buffer).
-2. `TerminalIdentityEvent` and the renderer-side
+2. `TerminalIdentityEvent` and the client-side
    `TerminalIdentityViewModel` keep the same role/geometry shape
    as the takeover response. Both surfaces carry the same
-   fields, and the renderer can apply either without re-checking
+   fields, and the client can apply either without re-checking
    what fields it has.
 3. The server-side `TerminalSlotManager.takeoverResult`
    builder now reads `session.cols`, `session.rows`,
@@ -535,7 +535,7 @@ response.
    `terminalLog.warn('takeover failed ...')` to mirror the
    `terminal.ts:resize` rejection pattern.
 6. `ManagedTerminalSlot.handleIdentity` and the bridge
-   conversion in `renderer-terminal-bridge.ts` were aligned to
+   conversion in `client-terminal-bridge.ts` were aligned to
    route the role / status / canonical-size fields through the
    new identity channel, with `handleLifecycle` carrying phase
    and message on a separate channel.
@@ -619,11 +619,11 @@ For reference, the notional landing order _had_ this fix set been
 split into separate commits (it was not, due to the wip-snapshot
 baseline):
 
-### P1 — Renderer-only, lowest risk
+### P1 — Client-only, lowest risk
 
 R3: empty-state CTA.
 
-- Renderer-only. No protocol change, no registry change.
+- Client-only. No protocol change, no registry change.
 - i18n key already defined in all four locales.
 - No risk of regressing existing terminal flows.
 - Visible UX win on its own.
@@ -754,7 +754,7 @@ any individual implementation:
 
 1. **Done** — tighten the shared `TerminalCatalogMutationResult`
    type so the first-frame fields are required at the type level,
-   not only by renderer-side validation. (See §Type-level atomicity.)
+   not only by client-side validation. (See §Type-level atomicity.)
 2. **Done (rolled back via `282ea76`)** — Decide explicitly whether
    the same-session snapshot reapply patch (broadened
    `ManagedTerminalSlot.hydrate()`) should stay as a supported
@@ -770,9 +770,9 @@ any individual implementation:
    provider-destroy heuristic (one-macrotask delay on
    `TerminalSlotProvider` cleanup) should remain until P1.7
    lands. P1.7 (`ebb88ef`) supersedes it — the registry is now a
-   renderer-level singleton, so per-provider destroy debouncing is
+   client-level singleton, so per-provider destroy debouncing is
    not needed. The debounce was removed in `f19eba1`.
-4. **Done (P1.7)** — Move `TerminalSlotRegistry` to a renderer-
+4. **Done (P1.7)** — Move `TerminalSlotRegistry` to a client-
    level singleton lifetime. (See `terminal-roadmap.md` P1.7.)
 5. **Done** — collapse the takeover two-step handshake (response +
    realtime `identity` event) into a single authoritative

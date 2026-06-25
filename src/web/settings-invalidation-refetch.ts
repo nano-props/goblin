@@ -10,7 +10,7 @@ interface SettingsInvalidationSubscriptionOptions<T> {
 }
 
 // Settings-specific server ingress adapter that turns invalidation events into
-// coalesced refetch work for renderer stores.
+// coalesced refetch work for client stores.
 export function subscribeSettingsInvalidationRefetch<T>({
   scope,
   fetch,

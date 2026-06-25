@@ -31,7 +31,7 @@ export interface MainWindowNavigationStoreActions extends Pick<
 
 export interface RepoPickerStoreActions extends Pick<ReposStore, 'ensureWorkspaceOpen'> {}
 
-export interface RendererEffectIntentStoreActions extends Pick<
+export interface ClientEffectIntentStoreActions extends Pick<
   ReposStore,
   'ensureWorkspaceOpen' | 'setSelectedTerminal' | 'resetLayout' | 'toggleWorkspaceFocused'
 > {}
@@ -132,9 +132,9 @@ export function repoPickerStoreActionsFromStore(
   }
 }
 
-export function rendererEffectIntentStoreActionsFromStore(
+export function clientEffectIntentStoreActionsFromStore(
   state: Pick<ReposStore, 'ensureWorkspaceOpen' | 'setSelectedTerminal' | 'resetLayout' | 'toggleWorkspaceFocused'>,
-): RendererEffectIntentStoreActions {
+): ClientEffectIntentStoreActions {
   const runtimeCoherent = runtimeCoherentRepoOpenStoreActionsFromStore({
     ensureWorkspaceOpen: state.ensureWorkspaceOpen,
   })
@@ -163,9 +163,9 @@ export function repoPickerStoreActionsEqual(a: RepoPickerStoreActions, b: RepoPi
   return a.ensureWorkspaceOpen === b.ensureWorkspaceOpen
 }
 
-export function rendererEffectIntentStoreActionsEqual(
-  a: RendererEffectIntentStoreActions,
-  b: RendererEffectIntentStoreActions,
+export function clientEffectIntentStoreActionsEqual(
+  a: ClientEffectIntentStoreActions,
+  b: ClientEffectIntentStoreActions,
 ): boolean {
   return (
     a.ensureWorkspaceOpen === b.ensureWorkspaceOpen &&

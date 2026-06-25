@@ -20,7 +20,7 @@ import type { RepoOperationsState } from '#/web/stores/repos/operations.ts'
 import type { RepoResourcesState } from '#/web/stores/repos/resources.ts'
 export type BranchViewMode = 'all' | 'worktrees'
 export type RepoDataSource = 'cache' | 'fresh'
-// Renderer branches keep only the worktree reference; metadata lives in worktreesByPath.
+// Client branches keep only the worktree reference; metadata lives in worktreesByPath.
 export type RepoBranchState = Omit<BranchSnapshotInfo, 'worktree'> & {
   worktree?: Pick<NonNullable<BranchSnapshotInfo['worktree']>, 'path'>
 }
@@ -151,7 +151,7 @@ export interface RepoState {
   name: string
   /** Bumped on every fresh open so async writers can detect close-and-reopen. */
   instanceToken: number
-  /** Renderer-local projection of runtime-coherent repo truth. */
+  /** Client-local projection of runtime-coherent repo truth. */
   data: RepoDataState
   resources: RepoResourcesState
   operations: RepoOperationsState
@@ -163,7 +163,7 @@ export interface RepoState {
 }
 
 export interface RuntimeCoherentRepoProjectionState {
-  /** Renderer-local projection of runtime-coherent repo state. */
+  /** Client-local projection of runtime-coherent repo state. */
   repos: Record<string, RepoState>
 }
 
@@ -173,7 +173,7 @@ export interface RestorableRepoCacheState {
 }
 
 export interface RestorableWorkspaceState {
-  /** Renderer workspace UI state that is serialized into SessionState for
+  /** Client workspace UI state that is serialized into SessionState for
    *  next-launch restore. This is restorable state, not runtime-coherent
    *  shared state. */
   /** Open repository order restored from SessionState.openRepos. */
@@ -198,7 +198,7 @@ export interface RepoSessionHydrationOptions {
 }
 
 export interface LocalWorkspaceState {
-  /** Renderer-only workspace UI state that should never be serialized into
+  /** Client-only workspace UI state that should never be serialized into
    *  SessionState or treated as restorable workspace state. */
   /** Hydration flag — true once boot session is restored, so we don't
    *  overwrite the saved session with an empty one before restore. */

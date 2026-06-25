@@ -1,5 +1,5 @@
 import type { NativeIpcPath, IpcRequest } from '#/shared/api-types.ts'
-import { getRendererBridge } from '#/web/renderer-bridge.ts'
+import { getClientBridge } from '#/web/client-bridge.ts'
 
 let nextNativeRequestId = 1
 
@@ -9,7 +9,7 @@ function createNativeRequestId(): string {
 
 function abortNativeRequest(requestId: string): void {
   try {
-    void Promise.resolve(getRendererBridge().abortIpc(requestId)).catch(() => {})
+    void Promise.resolve(getClientBridge().abortIpc(requestId)).catch(() => {})
   } catch {}
 }
 
@@ -34,7 +34,7 @@ async function invokeNativeIpc(request: IpcRequest, signal?: AbortSignal): Promi
   cleanupAbort = () => signal?.removeEventListener('abort', abort)
 
   try {
-    return await Promise.race([Promise.resolve(getRendererBridge().invokeIpc({ ...request, requestId })), abortPromise])
+    return await Promise.race([Promise.resolve(getClientBridge().invokeIpc({ ...request, requestId })), abortPromise])
   } catch (cause) {
     throw cause instanceof Error ? cause : new Error(String(cause))
   } finally {

@@ -15,7 +15,7 @@ import { windowNodeLog, windowStateNodeLog, serverNodeLog } from '#/node/logger.
 import { wireTerminalIpc } from '#/main/terminal.ts'
 import { syncGlobalShortcuts, unregisterAppShortcuts } from '#/main/shortcuts.ts'
 import { enqueueExternalOpenPath } from '#/main/external-open.ts'
-import { broadcastRendererEffectIntent } from '#/main/renderer-surface-events.ts'
+import { broadcastClientEffectIntent } from '#/main/client-surface-events.ts'
 import { getSettingsSnapshot, setSettingsGlobalShortcutState } from '#/main/settings-server-client.ts'
 import { startEmbeddedServer, stopEmbeddedServer } from '#/main/server-manager.ts'
 
@@ -80,7 +80,7 @@ async function main(): Promise<void> {
 
 async function finalizeMainProcessExit(): Promise<void> {
   try {
-    broadcastRendererEffectIntent({ type: 'app-quitting' })
+    broadcastClientEffectIntent({ type: 'app-quitting' })
     const windowStateFlushed = await flushWindowState()
     if (!windowStateFlushed) windowStateNodeLog.error('final flush failed before quit')
     await stopEmbeddedServer()

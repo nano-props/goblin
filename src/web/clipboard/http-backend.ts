@@ -14,7 +14,7 @@ export interface HttpClipboardBackendConfig {
   /** Bootstrap-derived server origin, e.g. `http://127.0.0.1:32100/`. */
   url: string
   /**
-   * Bootstrap-derived access token. When present (embedded renderer
+   * Bootstrap-derived access token. When present (embedded client
    * or Vite dev), sent as the access-token header. When
    * absent (standalone browser), the request is sent without the
    * header and relies on the http-only cookie set by `POST /api/login`.
