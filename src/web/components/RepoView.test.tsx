@@ -120,7 +120,6 @@ vi.mock('#/web/components/Layout.tsx', () => ({
       </div>
     </div>
   ),
-  Toolbar: ({ children }: { children: React.ReactNode }) => <div data-testid="mock-toolbar">{children}</div>,
   EmptyState: ({ title, body }: { title: React.ReactNode; body?: React.ReactNode }) => (
     <div data-testid="empty-state">
       {title}

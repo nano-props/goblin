@@ -14,14 +14,6 @@ vi.mock('#/web/components/SplitPane.tsx', () => ({
   ),
 }))
 
-vi.mock('#/web/components/Layout.tsx', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('#/web/components/Layout.tsx')>()
-  return {
-    ...actual,
-    Toolbar: ({ children }: { children: React.ReactNode }) => <div data-testid="mock-toolbar">{children}</div>,
-  }
-})
-
 let container: HTMLDivElement | null = null
 let root: Root | null = null
 

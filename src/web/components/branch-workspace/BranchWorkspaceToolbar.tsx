@@ -1,7 +1,6 @@
 import { useCallback, useMemo } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { useT } from '#/web/stores/i18n.ts'
-import { Toolbar } from '#/web/components/Layout.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
 import { Tip } from '#/web/components/Tip.tsx'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
@@ -39,9 +38,8 @@ import {
   workspacePaneStaticTabProvider,
 } from '#/web/workspace-pane/workspace-pane-tab-providers.ts'
 import {
-  WORKSPACE_TOOLBAR_STYLE,
+  WorkspaceToolbar,
   WorkspaceToolbarLeadingSpacer,
-  workspaceToolbarClassName,
 } from '#/web/components/workspace-toolbar-chrome.tsx'
 import { WorkspaceExternalAppsMenu } from '#/web/components/branch-workspace/WorkspaceExternalAppsMenu.tsx'
 
@@ -243,17 +241,15 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId, trafficL
     [navigation, repo.id],
   )
 
-  const toolbarClassName = workspaceToolbarClassName({ draggable: !compact, trafficLightOffset })
-
   // No selected branch means there is no tab/action target; keep the
   // workspace chrome mounted so the right pane still contributes a
   // draggable top region after the global topbar is removed.
   if (!detail.branch) {
     return (
-      <Toolbar variant="workspace" className={toolbarClassName} style={WORKSPACE_TOOLBAR_STYLE}>
+      <WorkspaceToolbar draggable={!compact} trafficLightOffset={trafficLightOffset}>
         <WorkspaceToolbarLeadingSpacer reserve={trafficLightOffset} />
         <div className="min-w-0 flex-1" />
-      </Toolbar>
+      </WorkspaceToolbar>
     )
   }
 
@@ -275,11 +271,7 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId, trafficL
   ) : null
 
   return (
-    <Toolbar
-      variant="workspace"
-      className={toolbarClassName}
-      style={WORKSPACE_TOOLBAR_STYLE}
-    >
+    <WorkspaceToolbar draggable={!compact} trafficLightOffset={trafficLightOffset}>
       <WorkspaceToolbarLeadingSpacer reserve={trafficLightOffset} />
       <div className="flex h-full min-w-0 flex-1 items-center gap-1 overflow-hidden">
         <div className="flex h-full min-w-0 flex-1 items-center gap-1 overflow-hidden">
@@ -317,6 +309,6 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId, trafficL
           </div>
         )}
       </div>
-    </Toolbar>
+    </WorkspaceToolbar>
   )
 }

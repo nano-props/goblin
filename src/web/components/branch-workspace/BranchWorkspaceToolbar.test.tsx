@@ -182,7 +182,9 @@ describe('BranchWorkspaceToolbar', () => {
       trafficLightOffset: true,
     })
 
-    expect(c.querySelector('.goblin-workspace-toolbar')?.className).toContain('topbar')
+    const toolbarClassName = c.querySelector('.goblin-workspace-toolbar')?.className ?? ''
+    expect(toolbarClassName).toContain('topbar')
+    expect(toolbarClassName).toContain('gap-0')
     expect(c.querySelector('[data-testid="workspace-toolbar-leading-spacer"]')?.className).toContain(
       'goblin-workspace-toolbar__leading-spacer--reserved',
     )
@@ -196,7 +198,10 @@ describe('BranchWorkspaceToolbar', () => {
       trafficLightOffset: false,
     })
 
-    expect(c.querySelector('.goblin-workspace-toolbar')?.className).not.toContain('topbar')
+    const toolbarClassName = c.querySelector('.goblin-workspace-toolbar')?.className ?? ''
+    expect(toolbarClassName).not.toContain('topbar')
+    expect(toolbarClassName).not.toContain('px-2')
+    expect(toolbarClassName).toContain('gap-0')
     expect(c.querySelector('[data-testid="workspace-toolbar-leading-spacer"]')).not.toBeNull()
     expect(c.querySelector('[data-testid="workspace-toolbar-leading-spacer"]')?.className).not.toContain(
       'goblin-workspace-toolbar__leading-spacer--reserved',
@@ -369,6 +374,8 @@ describe('BranchWorkspaceToolbar', () => {
     if (!(stripHost instanceof HTMLElement)) throw new Error('missing workspace tab strip host')
 
     expect(toolbar.children).toHaveLength(2)
+    expect(toolbar.className).toContain('gap-0')
+    expect(toolbar.className).not.toContain('gap-2')
     expect(spacer.className).toContain('goblin-workspace-toolbar__leading-spacer')
     expect(spacer.className).not.toContain('goblin-workspace-toolbar__leading-spacer--reserved')
     expect(stripHost.className).toContain('flex-1')

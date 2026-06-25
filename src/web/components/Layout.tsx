@@ -1,4 +1,4 @@
-import type { HTMLAttributes, ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { SplitPane } from '#/web/components/SplitPane.tsx'
 import { cn } from '#/web/lib/cn.ts'
@@ -26,20 +26,8 @@ interface CompactRepoWorkspaceProps {
   branchWorkspacePane: ReactNode
 }
 
-interface ToolbarProps extends HTMLAttributes<HTMLDivElement> {
-  children: ReactNode
-  className?: string
-  variant?: 'plain' | 'repo' | 'workspace'
-}
-
 interface PaneProps {
   children: ReactNode
-}
-
-interface ToolbarTitleProps {
-  title: ReactNode
-  description?: ReactNode
-  after?: ReactNode
 }
 
 interface EmptyStateProps {
@@ -47,38 +35,6 @@ interface EmptyStateProps {
   title: ReactNode
   body?: ReactNode
   tone?: 'neutral' | 'success'
-}
-
-export function Toolbar({ children, className, variant = 'plain', ...props }: ToolbarProps) {
-  return (
-    <div
-      className={cn(
-        'flex h-9 shrink-0 items-center',
-        variant === 'repo' && 'gap-3 border-b border-border/60 bg-card px-4',
-        // In-panel seam: bg matches the workspace canvas below, and the
-        // hairline uses `border-separator` (lighter than the topbar's
-        // `border-border/60`) so the strip + content read as one panel.
-        // See `docs/ui-conventions.md` for the surface-divider convention.
-        variant === 'workspace' && 'min-w-0 justify-between gap-2 border-b border-separator bg-background px-1',
-        className,
-      )}
-      {...props}
-    >
-      {children}
-    </div>
-  )
-}
-
-export function ToolbarTitle({ title, description, after }: ToolbarTitleProps) {
-  return (
-    <div className="min-w-0 flex-1 flex items-center gap-2">
-      <div className="flex min-w-0 flex-1 items-baseline gap-2">
-        <div className="shrink-0 truncate text-sm font-semibold text-foreground">{title}</div>
-        {description && <div className="min-w-0 truncate text-xs text-muted-foreground">{description}</div>}
-      </div>
-      {after}
-    </div>
-  )
 }
 
 export function RepoWorkspace({
