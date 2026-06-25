@@ -66,10 +66,11 @@ export function useFocusModeSidebarReveal(enabled: boolean): FocusModeSidebarRev
   }, [])
 
   const openSidebar = useCallback(() => {
+    if (!enabled) return
     clearExitRetain()
     setTriggerArmed(true)
     setOpen(true)
-  }, [clearExitRetain])
+  }, [clearExitRetain, enabled])
 
   const closeSidebar = useCallback(() => {
     if (exitRetaining.current) return
@@ -301,13 +302,8 @@ export function FocusModeSidebarReveal({
   const handleResizeRailMouseEnter = useCallback(() => {
     if (!resizingRef.current) setResizeRailState('hover')
   }, [])
-  const handleResizeRailMouseLeave = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
+  const handleResizeRailMouseLeave = useCallback(() => {
     if (resizingRef.current) return
-    const nextTarget = event.relatedTarget
-    if (nextTarget instanceof Node && panelRef.current?.contains(nextTarget)) {
-      setResizeRailState('idle')
-      return
-    }
     setResizeRailState('idle')
   }, [])
 

@@ -41,23 +41,18 @@ vi.mock('#/web/components/BranchWorkspace.tsx', () => ({
   BranchWorkspace: ({
     selectedBranchName,
     shortcutsEnabled = true,
-    toolbarLeading,
     toolbarTrafficLightOffset = false,
   }: {
     selectedBranchName?: string | null
     shortcutsEnabled?: boolean
-    toolbarLeading?: React.ReactNode
     toolbarTrafficLightOffset?: boolean
   }) => (
     <div
       data-testid="branch-workspace"
       data-selected-branch-name={selectedBranchName ?? ''}
       data-shortcuts-enabled={shortcutsEnabled ? 'true' : 'false'}
-      data-has-toolbar-leading={toolbarLeading ? 'true' : 'false'}
       data-traffic-light-offset={toolbarTrafficLightOffset ? 'true' : 'false'}
-    >
-      {toolbarLeading ? <div data-testid="branch-workspace-toolbar-leading">{toolbarLeading}</div> : null}
-    </div>
+    />
   ),
 }))
 
@@ -203,7 +198,6 @@ describe('RepoView workspace navigation', () => {
     expect(workspace()?.dataset.mode).toBe('split')
     expect(workspace()?.dataset.branchNavigatorCollapsed).toBe('true')
     expect(branchWorkspace()).not.toBeNull()
-    expect(branchWorkspace()?.dataset.hasToolbarLeading).toBe('false')
     expect(branchWorkspace()?.dataset.trafficLightOffset).toBe('true')
     expect(focusModeSidebarTrigger()).not.toBeNull()
   })
@@ -526,6 +520,37 @@ describe('RepoView workspace navigation', () => {
       act(() => {
         vi.advanceTimersByTime(1)
       })
+      expect(focusModeSidebarReveal()).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  test('large-screen collapsed Focus Mode does not reopen the reveal while focus mode is exiting', () => {
+    vi.useFakeTimers()
+    try {
+      useReposStore.getState().setWorkspaceFocused(true)
+      useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
+      render(<RepoView repoId={REPO_ID} />)
+
+      act(() => {
+        focusModeSidebarHitArea()?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+      })
+      expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
+
+      mockFocusRevealLayout({ panelLeft: 0, panelWidth: 360 })
+
+      act(() => {
+        useReposStore.getState().setWorkspaceFocused(false)
+      })
+
+      expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
+
+      act(() => {
+        document.body.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: 120, clientY: 24 }))
+        vi.advanceTimersByTime(WORKSPACE_PANE_TRANSITION_MS)
+      })
+
       expect(focusModeSidebarReveal()).toBeNull()
     } finally {
       vi.useRealTimers()

@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from 'react'
+import { useId } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import {
@@ -15,7 +15,6 @@ interface Props {
   repoId: string
   selectedBranchName?: string | null
   shortcutsEnabled?: boolean
-  toolbarLeading?: ReactNode
   toolbarTrafficLightOffset?: boolean
 }
 
@@ -52,7 +51,6 @@ export function BranchWorkspace({
   repoId,
   selectedBranchName,
   shortcutsEnabled = true,
-  toolbarLeading,
   toolbarTrafficLightOffset = false,
 }: Props) {
   const workspacePaneId = useId()
@@ -116,7 +114,6 @@ export function BranchWorkspace({
           branch={detail.branch}
           workspacePaneId={workspacePaneId}
           shortcutsEnabled={shortcutsEnabled}
-          toolbarLeading={toolbarLeading}
           toolbarTrafficLightOffset={toolbarTrafficLightOffset}
         />
       ) : (
@@ -125,7 +122,6 @@ export function BranchWorkspace({
             repo={repo}
             detail={detail}
             workspacePaneId={workspacePaneId}
-            leading={toolbarLeading}
             trafficLightOffset={toolbarTrafficLightOffset}
           />
           <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId={workspacePaneId} />
@@ -141,7 +137,6 @@ interface BranchShortcutHandlerProps {
   branch: NonNullable<SelectedBranchWorkspacePresentation['branch']>
   workspacePaneId: string
   shortcutsEnabled: boolean
-  toolbarLeading?: ReactNode
   toolbarTrafficLightOffset?: boolean
 }
 
@@ -151,7 +146,6 @@ function BranchShortcutHandler({
   branch,
   workspacePaneId,
   shortcutsEnabled,
-  toolbarLeading,
   toolbarTrafficLightOffset = false,
 }: BranchShortcutHandlerProps) {
   const actions = useBranchActionItems(repo, branch)
@@ -163,7 +157,6 @@ function BranchShortcutHandler({
         repo={repo}
         detail={detail}
         workspacePaneId={workspacePaneId}
-        leading={toolbarLeading}
         trafficLightOffset={toolbarTrafficLightOffset}
       />
       <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId={workspacePaneId} />

@@ -14,6 +14,11 @@ import {
   BRANCH_ROW_GRID_CLASS,
   BRANCH_ROW_LIST_CLASS,
 } from '#/web/components/branch-navigator/branch-row-metrics.ts'
+import {
+  WORKSPACE_TOOLBAR_STYLE,
+  WorkspaceToolbarLeadingSpacer,
+  workspaceToolbarClassName,
+} from '#/web/components/workspace-toolbar-chrome.tsx'
 
 interface BranchNavigatorSkeletonProps {
   rows?: number
@@ -84,10 +89,24 @@ export function RepoWorkspaceSkeleton({
   )
 }
 
-export function BranchWorkspaceSkeleton() {
+export function BranchWorkspaceSkeleton({
+  toolbarDraggable = true,
+  toolbarTrafficLightOffset = false,
+}: {
+  toolbarDraggable?: boolean
+  toolbarTrafficLightOffset?: boolean
+}) {
   return (
     <section data-testid="branch-workspace-skeleton" className="flex min-h-0 flex-1 flex-col bg-background">
-      <Toolbar variant="workspace">
+      <Toolbar
+        variant="workspace"
+        className={workspaceToolbarClassName({
+          draggable: toolbarDraggable,
+          trafficLightOffset: toolbarTrafficLightOffset,
+        })}
+        style={WORKSPACE_TOOLBAR_STYLE}
+      >
+        <WorkspaceToolbarLeadingSpacer reserve={toolbarTrafficLightOffset} />
         <div className="flex min-w-0 flex-1 items-center gap-1">
           <div className="flex shrink-0 gap-1">
             <Skeleton className="h-7 w-20" />

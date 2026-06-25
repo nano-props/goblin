@@ -9,7 +9,7 @@
 // and the typed name is still there. Active repo switches still
 // close the dialog to match the previous per-repo trigger behaviour.
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { CreateWorktreeDialog, type CreateWorktreeRequest } from '#/web/components/CreateWorktreeDialog.tsx'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 
@@ -22,24 +22,16 @@ interface Props {
 export function CreateWorktreeDialogHost({ open, onOpenChange, activeId }: Props) {
   const repo = useReposStore((s) => (activeId ? s.repos[activeId] : undefined))
   const submitBranchAction = useReposStore((s) => s.submitBranchAction)
+  const previousActiveIdRef = useRef(activeId)
 
   // Force-close when the active repo changes. Without this a
   // half-typed branch name from repo A could leak into a submission
   // against repo B. Same contract as the previous per-repo trigger.
-  //
-  // `open` and `onOpenChange` are deliberately NOT in the dep array:
-  //   - `open` would cause the effect to fire on the dialog's own
-  //     false→true transition (when the user opens it) and
-  //     immediately close it via `onOpenChange(false)`. The previous
-  //     previous trigger implementation only depended on `repoId`.
-  //   - `onOpenChange` is recreated every Layout render
-  //     (`useAppOverlays` returns a fresh callback chain because
-  //     `options = {}` is a fresh object each call); including it
-  //     would re-fire the effect on every Layout re-render.
   useEffect(() => {
-    if (open) onOpenChange(false)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeId])
+    const previousActiveId = previousActiveIdRef.current
+    previousActiveIdRef.current = activeId
+    if (previousActiveId !== activeId && open) onOpenChange(false)
+  }, [activeId, onOpenChange, open])
 
   if (!repo) return null
 

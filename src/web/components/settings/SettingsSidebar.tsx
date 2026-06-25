@@ -77,10 +77,8 @@ export function SettingsSidebar<TPage extends string>({
               ref={page === item.page ? selectedPageButtonRef : undefined}
               onClick={() => onPageChange(item.page)}
               selected={page === item.page}
-              className={cn(
-                'h-9 gap-2 font-normal',
-                compact ? 'mx-auto size-9 justify-center px-0' : 'justify-start px-2.5',
-              )}
+              size={compact ? 'icon' : 'compact'}
+              className={cn('font-normal', compact ? 'mx-auto' : 'justify-start')}
               contentClassName={cn(compact ? 'hidden' : 'truncate', page === item.page ? 'font-medium' : 'font-normal')}
               leading={
                 <item.Icon

@@ -24,6 +24,7 @@ import {
 } from '#/web/components/repo-shell/FocusModeSidebarReveal.tsx'
 import { RepoShellSidebar } from '#/web/components/repo-shell/RepoShellSidebar.tsx'
 import { WINDOW_TOPBAR_HEIGHT_PX } from '#/shared/window-chrome.ts'
+import { WorkspaceChrome } from '#/web/components/workspace-toolbar-chrome.tsx'
 
 interface Props {
   repoId: string
@@ -67,6 +68,7 @@ export function RepoView({ repoId, onOpenSettings }: Props) {
   const selectedBranch = repo?.ui.selectedBranch ?? null
   const singlePane = selectedBranch ? 'workspace' : 'navigator'
   const focusRevealEnabled = !compact && behavior.branchNavigatorCollapsed
+  const workspaceTrafficLightOffset = !compact && behavior.branchNavigatorCollapsed
   const focusSidebar = useFocusModeSidebarReveal(focusRevealEnabled)
   const compactWorkspaceSelectedBranch = useRetainedValueDuringExit({
     value: selectedBranch,
@@ -109,6 +111,8 @@ export function RepoView({ repoId, onOpenSettings }: Props) {
       />
     </RepoWorkspacePane>
   )
+  const renderWorkspaceChrome = () =>
+    compact ? null : <WorkspaceChrome trafficLightOffset={workspaceTrafficLightOffset} />
 
   const renderWorkspaceBody = ({
     branchWorkspacePane,
@@ -178,6 +182,7 @@ export function RepoView({ repoId, onOpenSettings }: Props) {
   if (isRepoUnavailable(repo)) {
     const unavailablePane = (
       <RepoWorkspacePane>
+        {renderWorkspaceChrome()}
         <UnavailableRepoView repo={repo} />
       </RepoWorkspacePane>
     )
@@ -194,7 +199,17 @@ export function RepoView({ repoId, onOpenSettings }: Props) {
   if (view.initialLoading) {
     const loadingPane = (
       <RepoWorkspacePane>
-        {selectedBranch ? <BranchWorkspaceSkeleton /> : <BranchWorkspaceEmptySkeleton />}
+        {selectedBranch ? (
+          <BranchWorkspaceSkeleton
+            toolbarDraggable={!compact}
+            toolbarTrafficLightOffset={workspaceTrafficLightOffset}
+          />
+        ) : (
+          <>
+            {renderWorkspaceChrome()}
+            <BranchWorkspaceEmptySkeleton />
+          </>
+        )}
       </RepoWorkspacePane>
     )
     return renderWorkspaceSection(
@@ -215,7 +230,7 @@ export function RepoView({ repoId, onOpenSettings }: Props) {
         repoId={repoId}
         selectedBranchName={compact ? compactWorkspaceSelectedBranch : undefined}
         shortcutsEnabled={!compact || singlePane === 'workspace'}
-        toolbarTrafficLightOffset={!compact && behavior.branchNavigatorCollapsed}
+        toolbarTrafficLightOffset={workspaceTrafficLightOffset}
       />
     </RepoWorkspacePane>
   )

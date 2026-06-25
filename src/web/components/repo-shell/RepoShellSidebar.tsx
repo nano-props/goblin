@@ -39,8 +39,7 @@ export function RepoShellSidebar({
           data-interactive={surface === 'floating' ? true : undefined}
           data-testid="repo-shell-sidebar-top"
           style={{ height: WINDOW_TOPBAR_HEIGHT_PX }}
-        >
-        </div>
+        />
       )}
       <RepoShellPrimaryActions repoId={repoId} />
       <RepoShellBranchHeader repoId={repoId} title={t('tab.branches')} />

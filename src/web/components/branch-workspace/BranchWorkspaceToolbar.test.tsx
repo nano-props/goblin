@@ -146,6 +146,19 @@ describe('BranchWorkspaceToolbar', () => {
     )
   })
 
+  test('does not opt compact toolbar chrome into window dragging', () => {
+    compactUi = true
+    const { container: c } = renderToolbar({
+      terminalCount: 0,
+      worktree: false,
+      navigation: navigationWith({}),
+    })
+
+    expect(c.querySelector('.goblin-workspace-toolbar')?.className).not.toContain('app-drag-region')
+    expect(c.querySelector('.goblin-workspace-toolbar')?.className).not.toContain('topbar')
+    expect(c.querySelector('.goblin-workspace-toolbar')?.className).toContain('px-2')
+  })
+
   test('renders status and terminal affordance without a default changes tab', () => {
     const { container: c } = renderToolbar({ terminalCount: 0, changeCount: 3, navigation: navigationWith({}) })
 

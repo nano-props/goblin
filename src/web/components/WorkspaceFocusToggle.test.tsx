@@ -45,6 +45,19 @@ describe('WorkspaceFocusToggle', () => {
     expect(focusToggle()).toBe(button)
     expect(focusToggle()?.getAttribute('aria-pressed')).toBe('true')
   })
+
+  test('toggles focus mode when clicked', () => {
+    render(<WorkspaceFocusToggle />)
+
+    expect(useReposStore.getState().workspaceFocused).toBe(false)
+
+    act(() => {
+      focusToggle()?.click()
+    })
+
+    expect(useReposStore.getState().workspaceFocused).toBe(true)
+    expect(focusToggle()?.getAttribute('aria-pressed')).toBe('true')
+  })
 })
 
 function render(element: ReactNode) {

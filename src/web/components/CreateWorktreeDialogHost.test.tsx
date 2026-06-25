@@ -7,12 +7,9 @@
 // host to `Layout.MainWindowOverlays` (outside `<Outlet />`), so the
 // dialog survives settings ⇄ workspace navigation.
 //
-// The most subtle P0 the previous PR hit was a `useEffect([activeId,
-// onOpenChange, open])` in the host that closed the dialog on its
-// own false→true transition. The fix drops `open` (and the unstable
-// `onOpenChange`) from the dep array, so the effect only fires on
-// `activeId` change. This test asserts the dialog stays open after
-// the user opens it.
+// The subtle regression this protects against is closing the dialog
+// on its own false→true transition. The host should only force-close
+// when the active repo changes.
 
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -55,7 +52,7 @@ function renderHost(open: boolean, onOpenChange: (open: boolean) => void) {
 }
 
 describe('CreateWorktreeDialogHost', () => {
-  test('regression: dialog stays open after the false→true transition (P0 from prior PR)', () => {
+  test('regression: dialog stays open after the false→true transition', () => {
     // The bug: useEffect had `[activeId, onOpenChange, open]` in its
     // deps. When the user clicked the "create worktree" button, the
     // parent's `open` state flipped false→true, the host re-rendered,
@@ -81,6 +78,14 @@ describe('CreateWorktreeDialogHost', () => {
     act(() => {
       root!.render(<CreateWorktreeDialogHost open={true} onOpenChange={onOpenChange} activeId={REPO_ID} />)
     })
+    expect(onOpenChange).not.toHaveBeenCalledWith(false)
+  })
+
+  test('does not close merely because it mounted open', () => {
+    const onOpenChange = vi.fn()
+
+    renderHost(true, onOpenChange)
+
     expect(onOpenChange).not.toHaveBeenCalledWith(false)
   })
 

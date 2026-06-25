@@ -1,4 +1,4 @@
-import { useCallback, useMemo, type ReactNode } from 'react'
+import { useCallback, useMemo } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '#/web/stores/i18n.ts'
@@ -40,18 +40,20 @@ import {
   terminalWorkspacePaneTabProvider,
   workspacePaneStaticTabProvider,
 } from '#/web/workspace-pane/workspace-pane-tab-providers.ts'
-import { WINDOW_TOPBAR_HEIGHT_PX } from '#/shared/window-chrome.ts'
-import { cn } from '#/web/lib/cn.ts'
+import {
+  WORKSPACE_TOOLBAR_STYLE,
+  WorkspaceToolbarLeadingSpacer,
+  workspaceToolbarClassName,
+} from '#/web/components/workspace-toolbar-chrome.tsx'
 
 interface Props {
   repo: Pick<BranchWorkspaceRepo, 'id' | 'ui' | 'data'>
   detail: SelectedBranchWorkspacePresentation
   workspacePaneId: string
-  leading?: ReactNode
   trafficLightOffset?: boolean
 }
 
-export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId, leading, trafficLightOffset = false }: Props) {
+export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId, trafficLightOffset = false }: Props) {
   const t = useT()
   const navigation = useMainWindowNavigation()
   const compact = useIsCompactUi()
@@ -242,19 +244,15 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId, leading,
     [navigation, repo.id],
   )
 
-  const toolbarClassName = cn(
-    'goblin-workspace-toolbar',
-    trafficLightOffset ? 'topbar' : 'app-drag-region px-2',
-    'border-border/60 bg-card',
-  )
+  const toolbarClassName = workspaceToolbarClassName({ draggable: !compact, trafficLightOffset })
 
   // No selected branch means there is no tab/action target; keep the
   // workspace chrome mounted so the right pane still contributes a
   // draggable top region after the global topbar is removed.
   if (!detail.branch) {
     return (
-      <Toolbar variant="workspace" className={toolbarClassName} style={{ height: WINDOW_TOPBAR_HEIGHT_PX }}>
-        <ToolbarLeadingSlot leading={leading} reserve={trafficLightOffset} />
+      <Toolbar variant="workspace" className={toolbarClassName} style={WORKSPACE_TOOLBAR_STYLE}>
+        <WorkspaceToolbarLeadingSpacer reserve={trafficLightOffset} />
         <div className="min-w-0 flex-1" />
       </Toolbar>
     )
@@ -281,9 +279,9 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId, leading,
     <Toolbar
       variant="workspace"
       className={toolbarClassName}
-      style={{ height: WINDOW_TOPBAR_HEIGHT_PX }}
+      style={WORKSPACE_TOOLBAR_STYLE}
     >
-      <ToolbarLeadingSlot leading={leading} reserve={trafficLightOffset} />
+      <WorkspaceToolbarLeadingSpacer reserve={trafficLightOffset} />
       <div className="flex h-full min-w-0 flex-1 items-center gap-1 overflow-hidden">
         {/* Compact UI only: back-to-branch-navigator is the user's escape hatch
             from the branch workspace. It must stay visible even when the tab
@@ -314,19 +312,5 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId, leading,
         )}
       </div>
     </Toolbar>
-  )
-}
-
-function ToolbarLeadingSlot({ leading, reserve }: { leading?: ReactNode; reserve: boolean }) {
-  if (leading) return <div className="flex h-full min-w-0 shrink-0 items-center gap-1 pr-2">{leading}</div>
-  return (
-    <div
-      data-testid="workspace-toolbar-leading-spacer"
-      className={cn(
-        'goblin-workspace-toolbar__leading-spacer h-full shrink-0',
-        reserve && 'goblin-workspace-toolbar__leading-spacer--reserved',
-      )}
-      aria-hidden
-    />
   )
 }
