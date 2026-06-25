@@ -45,6 +45,9 @@ describe('SidebarRowButton', () => {
         <SidebarRowButton aria-label="Compact row" size="compact">
           Compact row
         </SidebarRowButton>
+        <SidebarRowButton aria-label="Dense row" size="dense">
+          Dense row
+        </SidebarRowButton>
         <SidebarRowButton aria-label="Icon row" size="icon">
           Icon row
         </SidebarRowButton>
@@ -52,14 +55,24 @@ describe('SidebarRowButton', () => {
     )
 
     const compact = document.body.querySelector('button[aria-label="Compact row"]')
+    const dense = document.body.querySelector('button[aria-label="Dense row"]')
     const icon = document.body.querySelector('button[aria-label="Icon row"]')
-    if (!(compact instanceof HTMLButtonElement) || !(icon instanceof HTMLButtonElement)) {
+    if (
+      !(compact instanceof HTMLButtonElement) ||
+      !(dense instanceof HTMLButtonElement) ||
+      !(icon instanceof HTMLButtonElement)
+    ) {
       throw new Error('missing sidebar row button')
     }
 
     expect(compact.className).toContain('h-9')
     expect(compact.className).toContain('gap-2')
     expect(compact.className).toContain('px-2.5')
+    expect(dense.className).toContain('h-8')
+    expect(dense.className).toContain('gap-2')
+    expect(dense.className).toContain('px-3')
+    expect(dense.className).toContain('font-normal')
+    expect(dense.className).toContain('text-foreground/85')
     expect(icon.className).toContain('size-9')
     expect(icon.className).toContain('justify-center')
     expect(icon.className).not.toContain('w-full')

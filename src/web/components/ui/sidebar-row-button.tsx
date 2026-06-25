@@ -9,7 +9,7 @@ interface SidebarRowButtonProps extends Omit<ComponentPropsWithoutRef<'button'>,
   contentClassName?: string
   fill?: boolean
   selected?: boolean
-  size?: 'default' | 'compact' | 'icon'
+  size?: 'default' | 'compact' | 'dense' | 'icon'
 }
 
 export const SIDEBAR_ROW_ICON_CLASS = 'flex size-4 shrink-0 items-center justify-center'
@@ -42,11 +42,13 @@ export const SidebarRowButton = forwardRef<HTMLButtonElement, SidebarRowButtonPr
         focusRing,
         size === 'default' && 'h-10 gap-2.5 px-3',
         size === 'compact' && 'h-9 gap-2 px-2.5',
+        size === 'dense' && 'h-8 gap-2 px-3 font-normal',
         size === 'icon' && 'size-9 justify-center px-0',
         fill ? 'w-full shrink-0' : size === 'icon' ? 'shrink-0' : 'max-w-64 shrink-0',
         selected
           ? 'bg-selected text-selected-foreground hover:bg-selected'
           : 'text-foreground hover:bg-accent hover:text-accent-foreground',
+        size === 'dense' && !selected && 'text-foreground/85 hover:text-foreground',
         className,
       )}
     >
