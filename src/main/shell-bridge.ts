@@ -1,9 +1,8 @@
-import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { BrowserWindow, dialog, ipcMain } from 'electron'
 import { activateMainWindow, getMainWindow } from '#/main/window.ts'
 import { consumeExternalOpenPaths } from '#/main/external-open.ts'
 import { focusedRegisteredSurface } from '#/main/window-registry.ts'
 import { sendClientEffectIntent } from '#/main/client-surface-events.ts'
-import { isValidAbsolutePath } from '#/shared/input-validation.ts'
 import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
 import { openHttpExternal, openHttpsExternal } from '#/main/external-url.ts'
 import type { SettingsPage } from '#/shared/api-types.ts'
@@ -11,7 +10,6 @@ import {
   SHELL_CONSUME_EXTERNAL_OPEN_PATHS_CHANNEL,
   SHELL_OPEN_DIRECTORY_DIALOG_CHANNEL,
   SHELL_OPEN_EXTERNAL_URL_CHANNEL,
-  SHELL_OPEN_IN_FINDER_CHANNEL,
   SHELL_OPEN_SETTINGS_WINDOW_CHANNEL,
 } from '#/shared/ipc-channels.ts'
 
@@ -57,16 +55,5 @@ export function wireShellBridgeIpc(): void {
   ipcMain.handle(
     SHELL_CONSUME_EXTERNAL_OPEN_PATHS_CHANNEL,
     async (event): Promise<string[]> => (isTrustedIpcEvent(event) ? consumeExternalOpenPaths() : []),
-  )
-
-  ipcMain.handle(
-    SHELL_OPEN_IN_FINDER_CHANNEL,
-    async (event, input?: { path?: unknown }): Promise<{ ok: boolean; message: string }> => {
-      if (!isTrustedIpcEvent(event)) return { ok: false, message: 'error.invalid-path' }
-      const path = input?.path
-      if (!isValidAbsolutePath(path)) return { ok: false, message: 'error.invalid-path' }
-      shell.showItemInFolder(path)
-      return { ok: true, message: path }
-    },
   )
 }

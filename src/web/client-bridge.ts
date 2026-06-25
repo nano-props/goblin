@@ -35,7 +35,6 @@ function capabilitiesFromBridge(bridge: NonNullable<Window['goblinNative']>): Re
   if (bridge.shell?.openExternalUrl) caps.add('open-external-url')
   if (bridge.shell?.openDirectoryDialog) caps.add('open-directory-dialog')
   if (bridge.shell?.consumeExternalOpenPaths) caps.add('consume-external-open-paths')
-  if (bridge.shell?.openInFinder) caps.add('open-in-finder')
   // `terminal` is typed as required on `GoblinNativeBridge` but a
   // test or older preload may omit it; the `?.` keeps the runtime
   // safe without forcing every mock to declare a stub.

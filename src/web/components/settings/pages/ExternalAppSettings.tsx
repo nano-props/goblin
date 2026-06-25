@@ -246,12 +246,7 @@ export function ExternalAppSettings() {
         <DetectionList
           items={EDITOR_APPS.map((item) => ({
             ...item,
-            available:
-              item.id === 'vscode'
-                ? editorAppAvailability.vscode
-                : item.id === 'cursor'
-                  ? editorAppAvailability.cursor
-                  : editorAppAvailability.windsurf,
+            available: editorAppAvailability[item.id as keyof typeof editorAppAvailability] ?? false,
           }))}
         />
       </SettingsGroup>

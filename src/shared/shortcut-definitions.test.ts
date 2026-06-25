@@ -10,9 +10,9 @@ describe('shortcut definitions', () => {
   test('matches branch action shortcuts from keyboard input', () => {
     expect(matchBranchActionShortcut({ code: 'KeyP', shiftKey: false })).toBe('pull')
     expect(matchBranchActionShortcut({ code: 'KeyP', shiftKey: true })).toBe('push')
-    expect(matchBranchActionShortcut({ code: 'KeyG', shiftKey: false })).toBe('terminal')
+    expect(matchBranchActionShortcut({ code: 'KeyG', shiftKey: false })).toBeNull()
     expect(matchBranchActionShortcut({ code: 'KeyG', shiftKey: true })).toBe('remote')
-    expect(matchBranchActionShortcut({ code: 'KeyV', shiftKey: false })).toBe('editor')
+    expect(matchBranchActionShortcut({ code: 'KeyV', shiftKey: false })).toBeNull()
     expect(matchBranchActionShortcut({ code: 'KeyV', shiftKey: true })).toBeNull()
   })
 
@@ -27,15 +27,11 @@ describe('shortcut definitions', () => {
   })
 
   test('resolves fixed close and workspace tab accelerators from shared definitions', () => {
-    expect(resolveClientMenuCommandAccelerator(clientMenuCommandById('file-new-terminal-tab'), {})).toBe(
-      'CmdOrCtrl+N',
+    expect(resolveClientMenuCommandAccelerator(clientMenuCommandById('file-new-terminal-tab'), {})).toBe('CmdOrCtrl+N')
+    expect(resolveClientMenuCommandAccelerator(clientMenuCommandById('file-close-workspace-tab-or-window'), {})).toBe(
+      'CmdOrCtrl+W',
     )
-    expect(
-      resolveClientMenuCommandAccelerator(clientMenuCommandById('file-close-workspace-tab-or-window'), {}),
-    ).toBe('CmdOrCtrl+W')
-    expect(resolveClientMenuCommandAccelerator(clientMenuCommandById('file-close-tab'), {})).toBe(
-      'CmdOrCtrl+Shift+W',
-    )
+    expect(resolveClientMenuCommandAccelerator(clientMenuCommandById('file-close-tab'), {})).toBe('CmdOrCtrl+Shift+W')
   })
 
   test('defines the terminal primary action as the single terminal shortcut', () => {

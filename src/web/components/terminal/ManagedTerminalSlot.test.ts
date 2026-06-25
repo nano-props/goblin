@@ -565,7 +565,6 @@ beforeEach(() => {
         openExternalUrl: shellOpenExternalUrl.mockResolvedValue({ ok: true, message: 'https://example.com/path' }),
         openDirectoryDialog: vi.fn(),
         consumeExternalOpenPaths: vi.fn(),
-        openInFinder: vi.fn(),
       },
       terminal: {
         attach: terminalCalls.attach.mockResolvedValue(attachResult('pty_session_1_aaaaaaaaa')),
@@ -595,7 +594,6 @@ beforeEach(() => {
       capability === 'open-external-url' ||
       capability === 'open-directory-dialog' ||
       capability === 'consume-external-open-paths' ||
-      capability === 'open-in-finder' ||
       capability === 'terminal-notifications' ||
       capability === 'terminal-badge',
     getBootstrap: () => ({

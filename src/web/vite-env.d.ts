@@ -23,7 +23,6 @@ interface GoblinNativeBridge {
     openExternalUrl: (input: { url: string; allowHttp?: boolean }) => Promise<ExecResult>
     openDirectoryDialog: (input?: { title?: string }) => Promise<string | null>
     consumeExternalOpenPaths: () => Promise<string[]>
-    openInFinder: (input: { path: string }) => Promise<ExecResult>
   }
   terminal: {
     // Methods are typed as optional to reflect the fact that an

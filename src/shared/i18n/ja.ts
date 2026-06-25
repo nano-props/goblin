@@ -238,6 +238,7 @@ export const ja: Record<DictKey, string> = {
   'workspace.focus-toggle-label': '集中モードを切り替え',
   'workspace.focus-toggle-tooltip.enable': '集中モード',
   'workspace.back-to-branch-navigator': 'Branch Navigator に戻る',
+  'workspace.external-apps.open': '外部アプリで開く',
   'branches.gone': '消失',
   'branches.dirty': '変更あり',
   'branches.worktree': 'ワークツリー',
@@ -343,7 +344,7 @@ export const ja: Record<DictKey, string> = {
   'terminal.paste-file-overflow': '貼り付けたパスが長すぎてターミナルに送信できません。',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) --
-  'worktrees.reveal-title': 'Finder で表示',
+  'worktrees.reveal-title': 'Finder',
   'worktrees.open-in-terminal-title': 'ターミナルで開く',
   'worktrees.open-in-terminal-label': 'ターミナル',
   'worktrees.open-in-editor-title': 'エディタで開く',
@@ -476,6 +477,7 @@ export const ja: Record<DictKey, string> = {
   'error.terminal-host-not-measurable': 'ターミナルパネルが見えません',
   'error.vscode-not-installed': 'VS Code がインストールされていません',
   'error.editor-not-installed': 'エディタが見つかりません',
+  'error.finder-not-available': 'Finder は macOS でのみ利用できます',
   'error.remote-editor-not-supported': '選択したエディタはリモート SSH ワークスペースを開けません',
   'error.remote-terminal-not-supported': '選択したターミナルはリモート SSH ワークスペースを開けません',
   'error.render-crash-title': 'このビューの描画中にエラーが発生しました',

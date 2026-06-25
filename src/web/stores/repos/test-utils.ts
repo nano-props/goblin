@@ -152,10 +152,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
             shellConsumeExternalOpenPaths
               ? Promise.resolve(shellConsumeExternalOpenPaths(undefined))
               : Promise.resolve([]),
-          openInFinder: (input: unknown) =>
-            handlers['shell.openInFinder']
-              ? Promise.resolve(handlers['shell.openInFinder'](input))
-              : Promise.resolve({ ok: false, message: 'error.invalid-path' }),
         },
         terminal: {
           attach: () => Promise.resolve({ ok: false, message: 'unhandled terminal attach' }),

@@ -26,6 +26,7 @@ export function EditorAppIcon({ pref, className }: AppIconProps & { pref: Editor
 
 export { AppleTerminalIcon } from '#/web/components/ExternalAppIcon/AppleTerminalIcon.tsx'
 export { CursorIcon } from '#/web/components/ExternalAppIcon/CursorIcon.tsx'
+export { FinderIcon } from '#/web/components/ExternalAppIcon/FinderIcon.tsx'
 export { GhosttyIcon } from '#/web/components/ExternalAppIcon/GhosttyIcon.tsx'
 export { VSCodeIcon } from '#/web/components/ExternalAppIcon/VSCodeIcon.tsx'
 export { WindsurfIcon } from '#/web/components/ExternalAppIcon/WindsurfIcon.tsx'

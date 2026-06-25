@@ -80,7 +80,6 @@ export interface ClientShellBridge {
   openExternalUrl: (input: { url: string; allowHttp?: boolean }) => Promise<ExecResult>
   openDirectoryDialog: (input?: { title?: string }) => Promise<string | null>
   consumeExternalOpenPaths: () => Promise<string[]>
-  openInFinder: (input: { path: string }) => Promise<ExecResult>
 }
 
 export interface ClientBridge {

@@ -36,7 +36,6 @@ import {
   SHELL_CONSUME_EXTERNAL_OPEN_PATHS_CHANNEL,
   SHELL_OPEN_DIRECTORY_DIALOG_CHANNEL,
   SHELL_OPEN_EXTERNAL_URL_CHANNEL,
-  SHELL_OPEN_IN_FINDER_CHANNEL,
   SHELL_OPEN_SETTINGS_WINDOW_CHANNEL,
   TERMINAL_NOTIFY_BELL_CHANNEL,
   TERMINAL_SEND_TEST_NOTIFICATION_CHANNEL,
@@ -160,14 +159,12 @@ describe('preload goblinNative bridge', () => {
     await goblinNative.shell.openExternalUrl({ url: 'https://example.com', allowHttp: false })
     await goblinNative.shell.openDirectoryDialog({ title: 'Open Git Repository' })
     await goblinNative.shell.consumeExternalOpenPaths()
-    await goblinNative.shell.openInFinder({ path: '/repo' })
 
     expect(invocations.map((entry) => entry.channel)).toEqual([
       SHELL_OPEN_SETTINGS_WINDOW_CHANNEL,
       SHELL_OPEN_EXTERNAL_URL_CHANNEL,
       SHELL_OPEN_DIRECTORY_DIALOG_CHANNEL,
       SHELL_CONSUME_EXTERNAL_OPEN_PATHS_CHANNEL,
-      SHELL_OPEN_IN_FINDER_CHANNEL,
     ])
   })
 
@@ -324,7 +321,6 @@ describe('preload goblinNative bridge', () => {
       [SHELL_OPEN_DIRECTORY_DIALOG_CHANNEL]: 'native OS directory picker dialog (no browser equivalent)',
       [SHELL_CONSUME_EXTERNAL_OPEN_PATHS_CHANNEL]:
         'OS file-association handoff (Finder/Explorer "open with Goblin") — Electron-only queue',
-      [SHELL_OPEN_IN_FINDER_CHANNEL]: 'Electron shell.showItemInFolder — no browser equivalent',
       [TERMINAL_NOTIFY_BELL_CHANNEL]:
         'Electron Notification API — desktop-attached notifications with per-app identity',
       [TERMINAL_SEND_TEST_NOTIFICATION_CHANNEL]:

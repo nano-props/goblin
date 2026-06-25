@@ -34,12 +34,12 @@ export function createRemoteRoutes() {
     return c.json(await testServerRemoteRepository(target, c.req.raw.signal))
   })
   app.post('/open-editor', async (c) => {
-    const { repoId, worktreePath } = await parseHttpBody(REMOTE_PROCEDURE_SCHEMAS.openEditor, c)
-    return c.json(await openServerRemoteEditor({ repoId, worktreePath }, c.req.raw.signal))
+    const { repoId, worktreePath, app } = await parseHttpBody(REMOTE_PROCEDURE_SCHEMAS.openEditor, c)
+    return c.json(await openServerRemoteEditor({ repoId, worktreePath, app }, c.req.raw.signal))
   })
   app.post('/open-terminal', async (c) => {
-    const { repoId, worktreePath } = await parseHttpBody(REMOTE_PROCEDURE_SCHEMAS.openTerminal, c)
-    return c.json(await openServerRemoteTerminal({ repoId, worktreePath }, c.req.raw.signal))
+    const { repoId, worktreePath, app } = await parseHttpBody(REMOTE_PROCEDURE_SCHEMAS.openTerminal, c)
+    return c.json(await openServerRemoteTerminal({ repoId, worktreePath, app }, c.req.raw.signal))
   })
   return app
 }

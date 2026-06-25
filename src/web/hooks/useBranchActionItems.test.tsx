@@ -58,6 +58,7 @@ describe('useBranchActionItems', () => {
         copyPatch: vi.fn(),
         openTerminal: vi.fn(),
         openEditor: vi.fn(),
+        openFinder: vi.fn(),
         openRemote: vi.fn(),
         requestDeleteBranch: vi.fn(),
         requestRemoveWorktree: vi.fn(),
@@ -88,8 +89,6 @@ describe('useBranchActionItems', () => {
       'status',
       'history',
       'changes',
-      'terminal',
-      'editor',
       'remote',
       'removeWorktree',
       'deleteBranch',
@@ -161,6 +160,7 @@ function allVisibleCapabilities(): BranchActionCapabilities {
     canOpenRemote: true,
     canOpenTerminal: true,
     canOpenEditor: true,
+    canOpenFinder: true,
   }
 }
 

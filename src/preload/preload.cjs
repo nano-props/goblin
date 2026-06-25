@@ -34,7 +34,6 @@ const IPC = {
     openExternalUrl: 'goblin:shell-open-external-url',
     openDirectoryDialog: 'goblin:shell-open-directory-dialog',
     consumeExternalOpenPaths: 'goblin:shell-consume-external-open-paths',
-    openInFinder: 'goblin:shell-open-in-finder',
   },
   terminal: {
     notifyBell: 'goblin:terminal-notify-bell',
@@ -152,7 +151,6 @@ contextBridge.exposeInMainWorld('goblinNative', {
     openExternalUrl: (input) => safeInvoke(IPC.shell.openExternalUrl, input),
     openDirectoryDialog: (input) => safeInvoke(IPC.shell.openDirectoryDialog, input),
     consumeExternalOpenPaths: () => safeInvoke(IPC.shell.consumeExternalOpenPaths),
-    openInFinder: (input) => safeInvoke(IPC.shell.openInFinder, input),
   },
   terminal: {
     notifyBell: (input) => safeInvoke(IPC.terminal.notifyBell, input),

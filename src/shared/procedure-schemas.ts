@@ -19,6 +19,8 @@ import { isRemoteRepoId, parseRemoteRepoId } from '#/shared/remote-repo.ts'
 
 const SourceToken = v.optional(v.string())
 const StringArray = v.array(v.string())
+const TerminalPrefSchema = v.picklist(['auto', 'ghostty', 'terminal', 'windowsTerminal'])
+const EditorPrefSchema = v.picklist(['auto', 'vscode', 'cursor', 'windsurf'])
 
 const RemoteRepoRefSchema = v.object({
   id: v.string(),
@@ -81,8 +83,9 @@ export const REPO_PROCEDURE_SCHEMAS = {
     sourceToken: SourceToken,
   }),
   openRemote: v.object({ cwd: v.string(), branch: v.optional(v.string()) }),
-  openTerminal: v.object({ path: v.string() }),
-  openEditor: v.object({ path: v.string() }),
+  openTerminal: v.object({ path: v.string(), app: v.optional(TerminalPrefSchema) }),
+  openEditor: v.object({ path: v.string(), app: v.optional(EditorPrefSchema) }),
+  openInFinder: v.object({ path: v.string() }),
   backgroundSyncRepos: v.object({ repoIds: StringArray }),
   abort: CwdInput,
   probe: CwdInput,
@@ -126,8 +129,8 @@ export const REMOTE_PROCEDURE_SCHEMAS = {
   remoteLifecycle: v.object({ repoId: v.string() }),
   pathSuggestions: RemotePathSuggestionsInputSchema,
   testRepository: v.object({ target: RemoteTargetSchema }),
-  openEditor: v.object({ repoId: v.string(), worktreePath: v.string() }),
-  openTerminal: v.object({ repoId: v.string(), worktreePath: v.string() }),
+  openEditor: v.object({ repoId: v.string(), worktreePath: v.string(), app: v.optional(EditorPrefSchema) }),
+  openTerminal: v.object({ repoId: v.string(), worktreePath: v.string(), app: v.optional(TerminalPrefSchema) }),
 } as const
 
 // Schemas for the settings write paths. Each shape matches the typed

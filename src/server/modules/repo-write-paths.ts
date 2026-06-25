@@ -6,8 +6,9 @@ import { getServerSettingsPrefs } from '#/server/modules/settings-source.ts'
 import { cloneRepository as cloneGitRepository } from '#/system/git/clone.ts'
 import { openInPreferredEditor } from '#/system/editors.ts'
 import { openInPreferredTerminal } from '#/system/terminals.ts'
+import { openInFinder } from '#/system/finder.ts'
 import { type ExecResult } from '#/shared/git-types.ts'
-import { type NetworkOpKind } from '#/shared/api-types.ts'
+import { type EditorPref, type NetworkOpKind, type TerminalPref } from '#/shared/api-types.ts'
 import { checkGitAvailable } from '#/system/git/helper.ts'
 import { isValidCwd, isValidRepoLocator } from '#/shared/input-validation.ts'
 import { type CloneRepoResult, type ProbeResult } from '#/shared/api-types.ts'
@@ -324,14 +325,18 @@ export async function openRepositoryRemote(cwd: string, branch?: string, signal?
   return url ? { ok: true, message: url } : { ok: false, message: 'error.no-remote-url' }
 }
 
-export async function openRepositoryTerminal(path: string): Promise<ExecResult> {
+export async function openRepositoryTerminal(path: string, app?: TerminalPref): Promise<ExecResult> {
   const prefs = await getServerSettingsPrefs()
-  return await openInPreferredTerminal(path, prefs.terminalApp)
+  return await openInPreferredTerminal(path, app ?? prefs.terminalApp)
 }
 
-export async function openRepositoryEditor(path: string): Promise<ExecResult> {
+export async function openRepositoryEditor(path: string, app?: EditorPref): Promise<ExecResult> {
   const prefs = await getServerSettingsPrefs()
-  return await openInPreferredEditor(path, prefs.editorApp)
+  return await openInPreferredEditor(path, app ?? prefs.editorApp)
+}
+
+export async function openRepositoryInFinder(path: string): Promise<ExecResult> {
+  return await openInFinder(path)
 }
 
 export function abortRepositoryOperation(cwd: string): boolean {

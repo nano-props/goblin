@@ -203,7 +203,9 @@ function normalizeWorkspacePaneTabOrderByBranchByRepo(
       for (const raw of rawOrder) {
         if (!isWorkspacePaneTabOrderEntry(raw)) continue
         const entry =
-          raw.type === 'terminal' ? { type: 'terminal' as const, id: raw.id } : workspacePaneStaticTabOrderEntry(raw.type)
+          raw.type === 'terminal'
+            ? { type: 'terminal' as const, id: raw.id }
+            : workspacePaneStaticTabOrderEntry(raw.type)
         const identity = `${entry.type}:${entry.id}`
         if (seen.has(identity)) continue
         seen.add(identity)

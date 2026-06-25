@@ -26,7 +26,6 @@ function testBridge(overrides: Partial<ClientBridge> = {}): ClientBridge {
       if (capability === 'open-external-url') return nativeShell?.openExternalUrl !== undefined
       if (capability === 'open-directory-dialog') return nativeShell?.openDirectoryDialog !== undefined
       if (capability === 'consume-external-open-paths') return nativeShell?.consumeExternalOpenPaths !== undefined
-      if (capability === 'open-in-finder') return nativeShell?.openInFinder !== undefined
       return false
     },
     getBootstrap: () => ({
@@ -64,7 +63,6 @@ describe('app shell client', () => {
           openExternalUrl: vi.fn(),
           openDirectoryDialog: vi.fn(),
           consumeExternalOpenPaths: vi.fn(),
-          openInFinder: vi.fn(),
         }),
       }),
     )
@@ -101,7 +99,6 @@ describe('app shell client', () => {
           openExternalUrl: shellOpenExternalUrl,
           openDirectoryDialog: vi.fn(),
           consumeExternalOpenPaths: vi.fn(),
-          openInFinder: vi.fn(),
         }),
       }),
     )
@@ -127,7 +124,6 @@ describe('app shell client', () => {
           openExternalUrl: vi.fn(),
           openDirectoryDialog,
           consumeExternalOpenPaths: vi.fn(),
-          openInFinder: vi.fn(),
         }),
       }),
     )

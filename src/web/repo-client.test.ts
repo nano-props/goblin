@@ -82,7 +82,6 @@ describe('repo-client', () => {
           openExternalUrl,
           openDirectoryDialog: vi.fn(),
           consumeExternalOpenPaths: vi.fn(),
-          openInFinder: vi.fn(),
         }),
       }),
     )
@@ -157,13 +156,14 @@ describe('repo-client', () => {
     )
   })
 
-  test('opens terminal and editor through embedded server routes even when a native shell exists', async () => {
+  test('opens external workspace apps through embedded server routes even when a native shell exists', async () => {
     const openTerminal = vi.fn(async () => ({ ok: true, message: 'native-terminal' }))
     const openEditor = vi.fn(async () => ({ ok: true, message: 'native-editor' }))
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, message: 'server-terminal' }) })
       .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, message: 'server-editor' }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, message: 'server-finder' }) })
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
@@ -185,7 +185,6 @@ describe('repo-client', () => {
             openExternalUrl: vi.fn(),
             openDirectoryDialog: vi.fn(),
             consumeExternalOpenPaths: vi.fn(),
-            openInFinder: vi.fn(),
             openTerminal,
             openEditor,
           },
@@ -200,9 +199,10 @@ describe('repo-client', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    const { openRepositoryEditor, openRepositoryTerminal } = await import('#/web/repo-client.ts')
+    const { openRepositoryEditor, openRepositoryInFinder, openRepositoryTerminal } = await import('#/web/repo-client.ts')
     await expect(openRepositoryTerminal('/tmp/repo')).resolves.toEqual({ ok: true, message: 'server-terminal' })
     await expect(openRepositoryEditor('/tmp/repo')).resolves.toEqual({ ok: true, message: 'server-editor' })
+    await expect(openRepositoryInFinder('/tmp/repo')).resolves.toEqual({ ok: true, message: 'server-finder' })
     expect(openTerminal).not.toHaveBeenCalled()
     expect(openEditor).not.toHaveBeenCalled()
     expect(fetchMock).toHaveBeenNthCalledWith(
@@ -221,6 +221,45 @@ describe('repo-client', () => {
         method: 'POST',
         headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
         body: JSON.stringify({ path: '/tmp/repo' }),
+      }),
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      'http://127.0.0.1:32100/api/repo/open-in-finder',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
+        body: JSON.stringify({ path: '/tmp/repo' }),
+      }),
+    )
+  })
+
+  test('sends explicit external app choices in open route bodies', async () => {
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, message: 'server-terminal' }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, message: 'server-editor' }) })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { openRepositoryEditor, openRepositoryTerminal } = await import('#/web/repo-client.ts')
+    await openRepositoryTerminal('/tmp/repo', 'ghostty')
+    await openRepositoryEditor('/tmp/repo', 'windsurf')
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      'http://127.0.0.1:32100/api/repo/open-terminal',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ path: '/tmp/repo', app: 'ghostty' }),
+      }),
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'http://127.0.0.1:32100/api/repo/open-editor',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ path: '/tmp/repo', app: 'windsurf' }),
       }),
     )
   })

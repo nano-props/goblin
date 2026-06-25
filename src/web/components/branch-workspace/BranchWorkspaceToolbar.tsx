@@ -43,9 +43,10 @@ import {
   WorkspaceToolbarLeadingSpacer,
   workspaceToolbarClassName,
 } from '#/web/components/workspace-toolbar-chrome.tsx'
+import { WorkspaceExternalAppsMenu } from '#/web/components/branch-workspace/WorkspaceExternalAppsMenu.tsx'
 
 interface Props {
-  repo: Pick<BranchWorkspaceRepo, 'id' | 'ui' | 'data'>
+  repo: BranchWorkspaceRepo
   detail: SelectedBranchWorkspacePresentation
   workspacePaneId: string
   trafficLightOffset?: boolean
@@ -281,32 +282,39 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId, trafficL
     >
       <WorkspaceToolbarLeadingSpacer reserve={trafficLightOffset} />
       <div className="flex h-full min-w-0 flex-1 items-center gap-1 overflow-hidden">
-        {/* Compact UI only: back-to-branch-navigator is the user's escape hatch
-            from the branch workspace. It must stay visible even when the tab
-            strip below is empty, so it lives at the toolbar level rather than
-            inside WorkspacePaneViewStrip's tab chrome. */}
-        {compact && branchWorkspaceBackAction}
-        {showBranchLevelTabs && (
-          <WorkspacePaneViewStrip
-            worktreeTerminalKey={terminalWorktreeKey}
-            items={workspacePaneTabItems}
-            workspacePaneId={workspacePaneId}
-            activeTabIdentity={activeTabIdentity}
-            responsiveCompact={compact}
-            panelActive
-            focusRegistry={workspacePaneTabFocusRegistry}
-            emptyFocusKey={EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY}
-            // While a real terminal create is in flight, the tab model
-            // contributes a pending terminal tab. Additional creates stay
-            // disabled through the New Terminal affordance.
-            newTerminalBusy={isInitialSyncInFlight || worktreeSnapshot.pendingCreate}
-            onNew={handleNewTerminal}
-            onSelect={handleSelectWorkspacePaneTabItem}
-            onScrollToBottom={handleScrollToBottom}
-            onClose={handleCloseWorkspacePaneView}
-            onReorder={handleReorderWorkspacePaneViewStrip}
-            activateKeyboardNavigationSelection
-          />
+        <div className="flex h-full min-w-0 flex-1 items-center gap-1 overflow-hidden">
+          {/* Compact UI only: back-to-branch-navigator is the user's escape hatch
+              from the branch workspace. It must stay visible even when the tab
+              strip below is empty, so it lives at the toolbar level rather than
+              inside WorkspacePaneViewStrip's tab chrome. */}
+          {compact && branchWorkspaceBackAction}
+          {showBranchLevelTabs && (
+            <WorkspacePaneViewStrip
+              worktreeTerminalKey={terminalWorktreeKey}
+              items={workspacePaneTabItems}
+              workspacePaneId={workspacePaneId}
+              activeTabIdentity={activeTabIdentity}
+              responsiveCompact={compact}
+              panelActive
+              focusRegistry={workspacePaneTabFocusRegistry}
+              emptyFocusKey={EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY}
+              // While a real terminal create is in flight, the tab model
+              // contributes a pending terminal tab. Additional creates stay
+              // disabled through the New Terminal affordance.
+              newTerminalBusy={isInitialSyncInFlight || worktreeSnapshot.pendingCreate}
+              onNew={handleNewTerminal}
+              onSelect={handleSelectWorkspacePaneTabItem}
+              onScrollToBottom={handleScrollToBottom}
+              onClose={handleCloseWorkspacePaneView}
+              onReorder={handleReorderWorkspacePaneViewStrip}
+              activateKeyboardNavigationSelection
+            />
+          )}
+        </div>
+        {!compact && detail.branch && (
+          <div className="flex h-full shrink-0 items-center" data-workspace-toolbar-trailing-actions="">
+            <WorkspaceExternalAppsMenu repo={repo} branch={detail.branch} />
+          </div>
         )}
       </div>
     </Toolbar>

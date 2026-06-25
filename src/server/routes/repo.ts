@@ -18,6 +18,7 @@ import {
   fetchRepository,
   getRepositoryRemoteBranches,
   openRepositoryEditor,
+  openRepositoryInFinder,
   openRepositoryRemote,
   openRepositoryTerminal,
   pullRepositoryBranch,
@@ -188,12 +189,16 @@ export function createRepoRoutes() {
     )
   })
   app.post('/open-terminal', async (c) => {
-    const { path } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openTerminal, c)
-    return c.json(await jsonOr(() => openRepositoryTerminal(path), READ_REPO_ERROR, 'open-terminal'))
+    const { path, app } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openTerminal, c)
+    return c.json(await jsonOr(() => openRepositoryTerminal(path, app), READ_REPO_ERROR, 'open-terminal'))
   })
   app.post('/open-editor', async (c) => {
-    const { path } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openEditor, c)
-    return c.json(await jsonOr(() => openRepositoryEditor(path), READ_REPO_ERROR, 'open-editor'))
+    const { path, app } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openEditor, c)
+    return c.json(await jsonOr(() => openRepositoryEditor(path, app), READ_REPO_ERROR, 'open-editor'))
+  })
+  app.post('/open-in-finder', async (c) => {
+    const { path } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openInFinder, c)
+    return c.json(await jsonOr(() => openRepositoryInFinder(path), READ_REPO_ERROR, 'open-in-finder'))
   })
   app.post('/background-sync-repos', async (c) => {
     const { repoIds } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.backgroundSyncRepos, c)

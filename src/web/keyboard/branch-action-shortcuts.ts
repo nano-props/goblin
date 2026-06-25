@@ -1,5 +1,5 @@
-import type { BranchActionItemId } from '#/web/hooks/useBranchActions.tsx'
-type BranchActionShortcutHandler = (action: BranchActionItemId) => void
+import type { BranchActionShortcutAction } from '#/shared/shortcut-definitions.ts'
+type BranchActionShortcutHandler = (action: BranchActionShortcutAction) => void
 
 let handler: BranchActionShortcutHandler | null = null
 
@@ -10,6 +10,6 @@ export function setBranchActionShortcutHandler(next: BranchActionShortcutHandler
   }
 }
 
-export function runBranchActionShortcut(action: BranchActionItemId) {
+export function runBranchActionShortcut(action: BranchActionShortcutAction) {
   handler?.(action)
 }

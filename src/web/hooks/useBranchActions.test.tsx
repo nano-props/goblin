@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   openExternalUrl: vi.fn(),
   openRepositoryRemote: vi.fn(),
   openRepositoryEditor: vi.fn(),
+  openRepositoryInFinder: vi.fn(),
   openRepositoryTerminal: vi.fn(),
   openRemoteRepositoryEditor: vi.fn(),
   openRemoteRepositoryTerminal: vi.fn(),
@@ -25,6 +26,7 @@ vi.mock('#/web/app-shell-client.ts', () => ({
 vi.mock('#/web/repo-client.ts', () => ({
   getRepositoryPatch: vi.fn(),
   openRepositoryEditor: mocks.openRepositoryEditor,
+  openRepositoryInFinder: mocks.openRepositoryInFinder,
   openRepositoryRemote: mocks.openRepositoryRemote,
   openRepositoryTerminal: mocks.openRepositoryTerminal,
 }))
@@ -45,6 +47,11 @@ describe('useBranchActions', () => {
     resetReposStore()
     mocks.openExternalUrl.mockReset()
     mocks.openRepositoryRemote.mockReset()
+    mocks.openRepositoryEditor.mockReset()
+    mocks.openRepositoryInFinder.mockReset()
+    mocks.openRepositoryTerminal.mockReset()
+    mocks.openRemoteRepositoryEditor.mockReset()
+    mocks.openRemoteRepositoryTerminal.mockReset()
     reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
     container = document.createElement('div')
     document.body.appendChild(container)
@@ -199,7 +206,52 @@ describe('useBranchActions', () => {
     expect(mocks.openRepositoryEditor).not.toHaveBeenCalled()
   })
 
-  test('openTerminal keeps the local IPC for non-remote repos', async () => {
+  test('openTerminal and openEditor forward explicit app choices for remote repos', async () => {
+    const target = normalizeRemoteTarget({
+      alias: 'example',
+      host: 'example.com',
+      user: 'alice',
+      port: 22,
+      remotePath: '/srv/repo',
+    })
+    expect(target).not.toBeNull()
+    const branch = createRepoBranch('feature/remote', { worktree: { path: '/srv/repo-feature' } })
+    const repo = seedRepoState({
+      id: target!.id,
+      branches: [branch],
+      remote: {
+        lifecycle: { kind: 'ready', target: target! },
+        remotes: ['origin'],
+        hasRemotes: true,
+        hasBrowserRemote: true,
+        browserRemoteProvider: 'github',
+        remoteProviders: { origin: 'github' },
+        hasGitHubRemote: true,
+      },
+    })
+    mocks.openRemoteRepositoryTerminal.mockResolvedValue({ ok: true, message: '' })
+    mocks.openRemoteRepositoryEditor.mockResolvedValue({ ok: true, message: '' })
+
+    let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
+    root = createRoot(container)
+    await act(async () => {
+      root!.render(<BranchActionsHarness repo={repo} onReady={(value) => (actions = value)} />)
+    })
+
+    await act(async () => {
+      await actions?.openTerminal?.('ghostty')
+    })
+    await act(async () => {
+      await actions?.openEditor?.('windsurf')
+    })
+
+    expect(mocks.openRemoteRepositoryTerminal).toHaveBeenCalledWith(target!.id, '/srv/repo-feature', 'ghostty')
+    expect(mocks.openRemoteRepositoryEditor).toHaveBeenCalledWith(target!.id, '/srv/repo-feature', 'windsurf')
+    expect(mocks.openRepositoryTerminal).not.toHaveBeenCalled()
+    expect(mocks.openRepositoryEditor).not.toHaveBeenCalled()
+  })
+
+  test('openTerminal uses the local server route for non-remote repos', async () => {
     const branch = createRepoBranch('feature/local', { worktree: { path: '/tmp/local-feature' } })
     const repo = seedRepoState({
       id: REPO_ID,
@@ -219,6 +271,49 @@ describe('useBranchActions', () => {
 
     expect(mocks.openRepositoryTerminal).toHaveBeenCalledWith('/tmp/local-feature')
     expect(mocks.openRemoteRepositoryTerminal).not.toHaveBeenCalled()
+  })
+
+  test('openEditor forwards an explicit editor app for local repos', async () => {
+    const branch = createRepoBranch('feature/local', { worktree: { path: '/tmp/local-feature' } })
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branches: [branch],
+    })
+    mocks.openRepositoryEditor.mockResolvedValue({ ok: true, message: '' })
+
+    let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
+    root = createRoot(container)
+    await act(async () => {
+      root!.render(<BranchActionsHarness repo={repo} onReady={(value) => (actions = value)} />)
+    })
+
+    await act(async () => {
+      await actions?.openEditor?.('windsurf')
+    })
+
+    expect(mocks.openRepositoryEditor).toHaveBeenCalledWith('/tmp/local-feature', 'windsurf')
+    expect(mocks.openRemoteRepositoryEditor).not.toHaveBeenCalled()
+  })
+
+  test('openFinder uses the local server route for non-remote repos', async () => {
+    const branch = createRepoBranch('feature/local', { worktree: { path: '/tmp/local-feature' } })
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branches: [branch],
+    })
+    mocks.openRepositoryInFinder.mockResolvedValue({ ok: true, message: '/tmp/local-feature' })
+
+    let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
+    root = createRoot(container)
+    await act(async () => {
+      root!.render(<BranchActionsHarness repo={repo} onReady={(value) => (actions = value)} />)
+    })
+
+    await act(async () => {
+      await actions?.openFinder?.()
+    })
+
+    expect(mocks.openRepositoryInFinder).toHaveBeenCalledWith('/tmp/local-feature')
   })
 })
 
