@@ -51,6 +51,7 @@ describe('ToolbarTabStrip', () => {
 
     expect(container?.firstElementChild?.className).toContain('h-full')
     expect(container?.firstElementChild?.className).toContain('flex-1')
+    expect(container?.firstElementChild?.hasAttribute('data-interactive')).toBe(true)
     expect(container?.querySelector('[data-testid="scroll-marker"]')).not.toBeNull()
     expect(container?.querySelector('[data-testid="compact-marker"]')).toBeNull()
   })

@@ -6,7 +6,7 @@ import type { CSSProperties, ReactNode } from 'react'
 // that comes from dozens of tiny bars pulsing in unison.
 
 import { Skeleton } from '#/web/components/ui/skeleton.tsx'
-import { RepoWorkspace, RepoWorkspacePane, Toolbar } from '#/web/components/Layout.tsx'
+import { RepoWorkspace, RepoWorkspacePane } from '#/web/components/Layout.tsx'
 import {
   BRANCH_ROW_ACTION_BOX_CLASS,
   BRANCH_ROW_ACTION_SLOT_CLASS,
@@ -15,9 +15,8 @@ import {
   BRANCH_ROW_LIST_CLASS,
 } from '#/web/components/branch-navigator/branch-row-metrics.ts'
 import {
-  WORKSPACE_TOOLBAR_STYLE,
+  WorkspaceToolbar,
   WorkspaceToolbarLeadingSpacer,
-  workspaceToolbarClassName,
 } from '#/web/components/workspace-toolbar-chrome.tsx'
 
 interface BranchNavigatorSkeletonProps {
@@ -98,14 +97,7 @@ export function BranchWorkspaceSkeleton({
 }) {
   return (
     <section data-testid="branch-workspace-skeleton" className="flex min-h-0 flex-1 flex-col bg-background">
-      <Toolbar
-        variant="workspace"
-        className={workspaceToolbarClassName({
-          draggable: toolbarDraggable,
-          trafficLightOffset: toolbarTrafficLightOffset,
-        })}
-        style={WORKSPACE_TOOLBAR_STYLE}
-      >
+      <WorkspaceToolbar draggable={toolbarDraggable} trafficLightOffset={toolbarTrafficLightOffset}>
         <WorkspaceToolbarLeadingSpacer reserve={toolbarTrafficLightOffset} />
         <div className="flex min-w-0 flex-1 items-center gap-1">
           <div className="flex shrink-0 gap-1">
@@ -115,7 +107,7 @@ export function BranchWorkspaceSkeleton({
           </div>
         </div>
         <div aria-hidden="true" className="min-w-2 flex-1 self-stretch" />
-      </Toolbar>
+      </WorkspaceToolbar>
 
       <div className="flex min-h-0 flex-1 flex-col">
         <StatusListSkeleton rows={8} />
