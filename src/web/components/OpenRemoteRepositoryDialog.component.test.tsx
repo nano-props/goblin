@@ -6,8 +6,8 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { OpenRemoteRepositoryDialog } from '#/web/components/OpenRemoteRepositoryDialog.tsx'
 import { MainWindowNavigationProvider, type MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
-import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
-import { ELECTRON_RENDERER_CAPABILITIES, RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import { setClientBridgeForTests } from '#/web/client-bridge.ts'
+import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { resetReposStore } from '#/web/stores/repos/test-utils.ts'
 
@@ -29,7 +29,7 @@ const target = {
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   resetReposStore()
-  setRendererBridgeForTests(null)
+  setClientBridgeForTests(null)
   vi.stubGlobal(
     'fetch',
     vi.fn(async (input: string | URL, init?: RequestInit) => {
@@ -57,8 +57,8 @@ beforeEach(() => {
   testWindow.__GOBLIN_BOOTSTRAP__ = {
     runtime: {
       kind: 'electron',
-      bridgeVersion: RENDERER_BRIDGE_VERSION,
-      capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+      bridgeVersion: CLIENT_BRIDGE_VERSION,
+      capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
     },
     initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
   }
@@ -67,8 +67,8 @@ beforeEach(() => {
     value: {
       runtime: {
         kind: 'electron',
-        bridgeVersion: RENDERER_BRIDGE_VERSION,
-        capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+        bridgeVersion: CLIENT_BRIDGE_VERSION,
+        capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
       },
       pathForFile: () => '',
       invokeIpc: async () => null,
@@ -87,7 +87,7 @@ afterEach(() => {
   container = null
   delete testWindow.goblinNative
   delete testWindow.__GOBLIN_BOOTSTRAP__
-  setRendererBridgeForTests(null)
+  setClientBridgeForTests(null)
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 

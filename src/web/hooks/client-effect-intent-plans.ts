@@ -1,13 +1,13 @@
 import { parseTerminalSlotKey, worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
-import type { RendererEffectIntent } from '#/shared/renderer-effect-intents.ts'
+import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import type { LangPref, ThemePref } from '#/shared/settings.ts'
 
-type WorkspaceRendererIntent = Extract<
-  RendererEffectIntent,
+type ClientWorkspaceIntent = Extract<
+  ClientEffectIntent,
   | { type: 'open-repo-requested' }
   | { type: 'open-repo-path-requested' }
   | { type: 'open-remote-repo-requested' }
@@ -74,7 +74,7 @@ interface WorkspaceIntentPlanContext {
 
 export function createTerminalBellIntentPlan(
   repo: RepoState | undefined,
-  event: Extract<RendererEffectIntent, { type: 'terminal-bell-click' }>,
+  event: Extract<ClientEffectIntent, { type: 'terminal-bell-click' }>,
 ): TerminalBellIntentPlan {
   if (!repo) return { kind: 'noop' }
   const parsedKey = event.key ? parseTerminalSlotKey(event.key) : null
@@ -94,7 +94,7 @@ export function createTerminalBellIntentPlan(
 }
 
 export function createAppLevelIntentPlan(
-  event: RendererEffectIntent,
+  event: ClientEffectIntent,
   context: AppLevelIntentPlanContext,
 ): AppLevelIntentPlan | null {
   switch (event.type) {
@@ -115,10 +115,10 @@ export function createAppLevelIntentPlan(
 }
 
 export function createWorkspaceIntentPlan(
-  event: RendererEffectIntent,
+  event: ClientEffectIntent,
   context: WorkspaceIntentPlanContext,
 ): WorkspaceIntentPlan | null {
-  if (!isWorkspaceRendererIntent(event)) return null
+  if (!isClientWorkspaceIntent(event)) return null
   if (event.type === 'workspace-pane-close-tab-or-window-requested') {
     if (context.overlayBlocked || context.workspaceShortcutSuppressed) return { kind: 'close-window' }
     return { kind: 'close-workspace-pane-tab-or-window', repoId: context.currentRepoId }
@@ -167,7 +167,7 @@ export function createExternalOpenDrainKickPlan(context: {
   return { kind: 'start-drain' }
 }
 
-function isWorkspaceRendererIntent(event: RendererEffectIntent): event is WorkspaceRendererIntent {
+function isClientWorkspaceIntent(event: ClientEffectIntent): event is ClientWorkspaceIntent {
   return (
     event.type === 'open-repo-requested' ||
     event.type === 'open-repo-path-requested' ||

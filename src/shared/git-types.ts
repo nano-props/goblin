@@ -1,6 +1,6 @@
-// Git domain types shared by main (which produces them) and renderer
+// Git domain types shared by main (which produces them) and client
 // (which consumes them via IPC). Putting these in `src/shared/` keeps
-// main/renderer bundles independent — neither side has to import the
+// main/client bundles independent — neither side has to import the
 // other's module graph just to know what a `BranchSnapshotInfo` looks like.
 
 export interface BranchSnapshotInfo {
@@ -134,6 +134,6 @@ export interface ExecResult {
 
 /** Branch names we treat as protected — direct push/delete/etc. require
  *  extra confirmation, and "delete branch" is forbidden outright. Shared
- *  between main (server-side enforcement in IPC handlers) and renderer
+ *  between main (server-side enforcement in IPC handlers) and client
  *  (UX gating in menus and dialogs) so both sides agree on the list. */
 export const PROTECTED_BRANCHES: ReadonlySet<string> = new Set(['main', 'master', 'develop', 'trunk'])

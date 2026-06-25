@@ -8,17 +8,17 @@ This document describes the architecture and the reasoning behind it. It does no
 
 `g`'s design recognises two distinct kinds of operation:
 
-- **Data plane** — read or modify server-owned state (repo info, settings, terminals). Goes over HTTP because that's the same transport the browser and Electron renderer already use, with the same auth and the same error shapes.
-- **Control plane** — push commands into the renderer (open this tab, focus this view, run that action). Goes over a dedicated WebSocket because rendering is not a query — the renderer subscribes to a stream and reacts.
+- **Data plane** — read or modify server-owned state (repo info, settings, terminals). Goes over HTTP because that's the same transport the browser and Electron client already use, with the same auth and the same error shapes.
+- **Control plane** — push commands into the client (open this tab, focus this view, run that action). Goes over a dedicated WebSocket because rendering is not a query — the client subscribes to a stream and reacts.
 
-The server sits between `g` and the renderer on the control plane. It does not interpret what an intent means; it envelopes and forwards. The renderer has one intent router that consumes intents from any source (Electron IPC, server WS, future producers) and applies them through the same handler chain.
+The server sits between `g` and the client on the control plane. It does not interpret what an intent means; it envelopes and forwards. The client has one intent router that consumes intents from any source (Electron IPC, server WS, future producers) and applies them through the same handler chain.
 
 ## Why the server brokers intents
 
 In a typical desktop app, a CLI would talk to the main process directly. Goblin puts the broker in the server because:
 
-- The server is the only process that exists in both Electron mode and standalone (`serve.sh`) mode. Putting the broker in the server means `g` works the same way in either mode — the renderer subscribes the same way regardless of how the server was launched.
-- The renderer's intent router already exists. Adding a new producer means adding a subscription, not a new router.
+- The server is the only process that exists in both Electron mode and standalone (`serve.sh`) mode. Putting the broker in the server means `g` works the same way in either mode — the client subscribes the same way regardless of how the server was launched.
+- The client's intent router already exists. Adding a new producer means adding a subscription, not a new router.
 - HTTP and WS share the same auth and lifecycle. Adding a separate IPC channel would mean a third transport with its own auth model and lifecycle.
 
 The cost is that the server knows about envelope shapes. The benefit is that the server doesn't — and never needs to — know what any specific intent does.
@@ -40,7 +40,7 @@ This shape scales linearly: the first command and the tenth command cost the sam
 
 Most `g` commands are target-state, not actions. `g delta` means "the changes tab is the active tab", not "switch to the changes tab and increment a counter". Two `g delta` calls produce the same final state as one.
 
-This makes commands safe to retry, easy to test (no setup-then-act sequences), and lets the renderer treat each intent as a pure assignment rather than a stateful transition. The renderer's existing intent plan for view-switching is already a pure assignment — `g` leans on that rather than introducing a new model.
+This makes commands safe to retry, easy to test (no setup-then-act sequences), and lets the client treat each intent as a pure assignment rather than a stateful transition. The client's existing intent plan for view-switching is already a pure assignment — `g` leans on that rather than introducing a new model.
 
 ## The error envelope
 
@@ -57,23 +57,23 @@ The CLI exit codes are conventional: `0` success, `1` server or transport error,
 
 Two runtime modes, identical from `g`'s perspective:
 
-- **Electron** — the main process spawns the server as a child. Renderers in BrowserWindows connect over HTTP + WS as usual.
+- **Electron** — the main process spawns the server as a child. Clients in BrowserWindows connect over HTTP + WS as usual.
 - **`serve.sh`** — a standalone server, no Electron process. Browser tabs (or a manually-launched Electron window) connect the same way.
 
-The only difference `g` can observe: when no renderer is listening on the control-plane WS, the server returns a clear "no renderer" error. This is the same error in both modes and is the intended behaviour — `g` is a frontend command, not a backend one.
+The only difference `g` can observe: when no client is listening on the control-plane WS, the server returns a clear "no client" error. This is the same error in both modes and is the intended behaviour — `g` is a frontend command, not a backend one.
 
 ## What this design is not
 
 - It is not a general CLI for repo operations. The server already exposes rich HTTP routes for those; `g` reuses them via the transport, but `g` itself is for *user-facing* actions that benefit from terminal ergonomics (open a tab, jump to a branch).
 - It is not a place for backend logic. Server-side operations stay in the existing repo / terminal / settings routes. `g` is a wrapper, not a peer.
-- It is not the only path for renderer intents. Electron IPC still works for menu-driven commands. `g` is one of several producers feeding the same intent router.
+- It is not the only path for client intents. Electron IPC still works for menu-driven commands. `g` is one of several producers feeding the same intent router.
 
 ## Adding a command
 
 The pattern for adding a new `g` command:
 
-1. Decide which plane it uses. Reads and writes that target server state go through the HTTP transport. Commands that should reach the renderer go through the WS broker.
-2. For control-plane commands, add a route on the server that validates the request and calls the intent publisher. The renderer side needs no changes — the existing intent router picks the intent up.
+1. Decide which plane it uses. Reads and writes that target server state go through the HTTP transport. Commands that should reach the client go through the WS broker.
+2. For control-plane commands, add a route on the server that validates the request and calls the intent publisher. The client side needs no changes — the existing intent router picks the intent up.
 3. Implement the command as a registry entry. Use the existing factory pattern if the new command shares shape with an existing one; otherwise write the `run` function inline.
 4. Add tests covering happy path, server-side failure, transport-level failure, and (for commands with arguments) bad arguments.
 
@@ -81,6 +81,6 @@ When in doubt, look at an existing command — the view commands are the canonic
 
 ## Why this is the right level of abstraction
 
-The temptation is to make `g` more powerful — add state, add subcommands, add interactivity. The right counter-pressure is: anything that requires persistent state belongs on the server (where state is shared with the renderer); anything that requires a server round-trip belongs on the server too; anything that is purely about presenting an action to the user belongs in `g`.
+The temptation is to make `g` more powerful — add state, add subcommands, add interactivity. The right counter-pressure is: anything that requires persistent state belongs on the server (where state is shared with the client); anything that requires a server round-trip belongs on the server too; anything that is purely about presenting an action to the user belongs in `g`.
 
-If a feature would require `g` to grow stateful semantics, it's usually a sign the feature belongs in the renderer or the server, not the CLI.
+If a feature would require `g` to grow stateful semantics, it's usually a sign the feature belongs in the client or the server, not the CLI.

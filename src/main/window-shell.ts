@@ -1,11 +1,11 @@
-// Shared shell policy for trusted renderer windows.
+// Shared shell policy for trusted client windows.
 //
 // Boundary:
 // - This module owns BrowserWindow shell concerns: preload, security
 //   options, trusted entry URL normalization, navigation blocking, and
 //   external link handling.
 // - It does NOT own surface identity/capabilities; that lives in
-//   window-registry.ts / renderer-surface.ts.
+//   window-registry.ts / client-surface.ts.
 
 import { app, type BrowserWindow, type BrowserWindowConstructorOptions } from 'electron'
 import { createHash } from 'node:crypto'
@@ -34,7 +34,7 @@ export function windowCanvasBackground(): string {
   return WINDOW_BACKGROUND_BY_COLOR_THEME[colorTheme][resolved]
 }
 
-export async function createRendererWindowWebPreferences(): Promise<BrowserWindowConstructorOptions['webPreferences']> {
+export async function createClientWindowWebPreferences(): Promise<BrowserWindowConstructorOptions['webPreferences']> {
   return {
     preload: resolvePreloadPath(),
     contextIsolation: true,
@@ -53,7 +53,7 @@ function resolvePreloadPath(): string {
   return path.join(PRELOAD_DIST_DIR, manifest.file)
 }
 
-function resolveRendererBuildCacheKey(): string | null {
+function resolveClientBuildCacheKey(): string | null {
   if (webDevUrl) return null
   try {
     return createHash('sha256')
@@ -65,12 +65,12 @@ function resolveRendererBuildCacheKey(): string | null {
   }
 }
 
-interface RendererEntryUrlOptions {
+interface ClientEntryUrlOptions {
   entryHtml?: string
   routePath?: string
 }
 
-export function getRendererBaseUrl(): string | null {
+export function getClientBaseUrl(): string | null {
   const runtime = getEmbeddedServerRuntime()
   return webDevUrl || runtime?.url || null
 }
@@ -80,15 +80,15 @@ export function getEmbeddedServerUrl(): string | null {
   return runtime?.url || null
 }
 
-export function createRendererEntryUrl({ entryHtml = 'index.html', routePath = '/' }: RendererEntryUrlOptions): {
+export function createClientEntryUrl({ entryHtml = 'index.html', routePath = '/' }: ClientEntryUrlOptions): {
   url: URL
 } {
-  const baseUrl = getRendererBaseUrl()
+  const baseUrl = getClientBaseUrl()
   if (!baseUrl) {
     throw new Error(
       app.isPackaged
-        ? 'Embedded renderer server is unavailable in packaged app mode'
-        : `Renderer base URL is unavailable for ${path.join(WEB_DIST_DIR, entryHtml)}`,
+        ? 'Embedded client server is unavailable in packaged app mode'
+        : `Client base URL is unavailable for ${path.join(WEB_DIST_DIR, entryHtml)}`,
     )
   }
   const url = new URL(
@@ -96,17 +96,17 @@ export function createRendererEntryUrl({ entryHtml = 'index.html', routePath = '
     baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`,
   )
   const { resolved, colorTheme } = getTheme()
-  const rendererBuild = resolveRendererBuildCacheKey()
-  if (rendererBuild) url.searchParams.set('appBuild', rendererBuild)
+  const clientBuild = resolveClientBuildCacheKey()
+  if (clientBuild) url.searchParams.set('appBuild', clientBuild)
   registerTrustedAppUrl(url.toString())
   url.searchParams.set('theme', resolved)
   url.searchParams.set('colorTheme', colorTheme || DEFAULT_COLOR_THEME)
   return { url }
 }
 
-export function configureTrustedRendererWindow(win: BrowserWindow, logLabel: string): void {
+export function configureTrustedClientWindow(win: BrowserWindow, logLabel: string): void {
   win.webContents.on('will-navigate', (event, nextUrl) => {
-    // Renderer windows are expected to stay on their bootstrap entry and
+    // Client windows are expected to stay on their bootstrap entry and
     // route internally via app state / browser-history updates, not
     // arbitrary full-frame navigations. We still allow the exact entry URL
     // that main explicitly bound to this webContents so dev/prod reloads and
@@ -127,8 +127,8 @@ export function configureTrustedRendererWindow(win: BrowserWindow, logLabel: str
   })
 }
 
-export function allowRendererWindowEntryUrl(win: BrowserWindow, value: string): void {
+export function allowClientWindowEntryUrl(win: BrowserWindow, value: string): void {
   // Scope trust per BrowserWindow, not just per app origin. Once Goblin has
-  // multiple renderer surfaces, a globally-trusted URL set is too broad.
+  // multiple client surfaces, a globally-trusted URL set is too broad.
   allowTrustedAppUrlForWebContents(win.webContents, value)
 }

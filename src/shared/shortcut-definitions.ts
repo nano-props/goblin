@@ -1,18 +1,18 @@
-import type { RendererEffectIntent } from '#/shared/renderer-effect-intents.ts'
+import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { DictKey } from '#/shared/i18n/dictionaries.ts'
 
 export type BranchActionShortcutAction = 'pull' | 'push' | 'terminal' | 'editor' | 'remote'
-export type RendererNavigationShortcutAction =
+export type ClientNavigationShortcutAction =
   | 'next-branch'
   | 'prev-branch'
   | 'next-workspace-pane-view'
   | 'prev-workspace-pane-view'
-export type RendererAppShortcutAction = 'show-help' | 'dismiss'
-export type RendererKeyboardShortcutAction =
+export type ClientAppShortcutAction = 'show-help' | 'dismiss'
+export type ClientKeyboardShortcutAction =
   | BranchActionShortcutAction
-  | RendererNavigationShortcutAction
-  | RendererAppShortcutAction
-export type RendererMenuCommandId =
+  | ClientNavigationShortcutAction
+  | ClientAppShortcutAction
+export type ClientMenuCommandId =
   | 'app-settings'
   | 'file-new-terminal-tab'
   | 'file-open-local-repo'
@@ -50,15 +50,15 @@ export interface AcceleratorShortcutDefinition {
   labelParams?: Record<string, string | number>
 }
 
-export interface RendererMenuCommandContext {}
+export interface ClientMenuCommandContext {}
 
-export interface RendererMenuCommandDefinition {
-  id: RendererMenuCommandId
+export interface ClientMenuCommandDefinition {
+  id: ClientMenuCommandId
   menuLabelKey: DictKey
   helpLabelKey?: DictKey
-  accelerator?: string | ((context: RendererMenuCommandContext) => string | undefined)
-  enabled?: (context: RendererMenuCommandContext) => boolean
-  intent: RendererEffectIntent | ((context: RendererMenuCommandContext) => RendererEffectIntent)
+  accelerator?: string | ((context: ClientMenuCommandContext) => string | undefined)
+  enabled?: (context: ClientMenuCommandContext) => boolean
+  intent: ClientEffectIntent | ((context: ClientMenuCommandContext) => ClientEffectIntent)
 }
 
 export interface BranchActionShortcutDefinition {
@@ -68,8 +68,8 @@ export interface BranchActionShortcutDefinition {
   labelKey: DictKey
 }
 
-export interface RendererKeyboardShortcutDefinition<
-  Action extends RendererKeyboardShortcutAction = RendererKeyboardShortcutAction,
+export interface ClientKeyboardShortcutDefinition<
+  Action extends ClientKeyboardShortcutAction = ClientKeyboardShortcutAction,
 > {
   matches: KeyboardShortcutMatch[]
   action: Action
@@ -77,7 +77,7 @@ export interface RendererKeyboardShortcutDefinition<
   labelKey: DictKey
 }
 
-export const RENDERER_NAVIGATION_SHORTCUTS: RendererKeyboardShortcutDefinition<RendererNavigationShortcutAction>[] = [
+export const CLIENT_NAVIGATION_SHORTCUTS: ClientKeyboardShortcutDefinition<ClientNavigationShortcutAction>[] = [
   keyboardShortcut([{ key: 'j' }, { key: 'ArrowDown' }], 'next-branch', [['j'], ['↓']], 'help.row.next-branch'),
   keyboardShortcut([{ key: 'k' }, { key: 'ArrowUp' }], 'prev-branch', [['k'], ['↑']], 'help.row.prev-branch'),
   keyboardShortcut([{ key: 'ArrowRight' }], 'next-workspace-pane-view', [['→']], 'help.row.switch-workspace-pane-view'),
@@ -92,7 +92,7 @@ export const BRANCH_ACTION_SHORTCUTS: BranchActionShortcutDefinition[] = [
   branchActionShortcut([{ code: 'KeyG', shiftKey: true }], 'remote', [['⇧', 'G']], 'action.remote'),
 ]
 
-export const RENDERER_APP_SHORTCUTS: RendererKeyboardShortcutDefinition<RendererAppShortcutAction>[] = [
+export const CLIENT_APP_SHORTCUTS: ClientKeyboardShortcutDefinition<ClientAppShortcutAction>[] = [
   keyboardShortcut([{ key: '?' }], 'show-help', [['?']], 'help.row.this-help'),
   keyboardShortcut([{ key: 'Escape' }], 'dismiss', [['Esc']], 'help.row.dismiss'),
 ]
@@ -103,8 +103,8 @@ export const NEW_TERMINAL_TAB_SHORTCUT = 'CmdOrCtrl+N'
 export const CLOSE_WORKSPACE_TAB_OR_WINDOW_SHORTCUT = 'CmdOrCtrl+W'
 export const CLOSE_REPO_SHORTCUT = 'CmdOrCtrl+Shift+W'
 
-export const RENDERER_MENU_COMMANDS: RendererMenuCommandDefinition[] = [
-  rendererMenuCommand(
+export const CLIENT_MENU_COMMANDS: ClientMenuCommandDefinition[] = [
+  clientMenuCommand(
     'app-settings',
     'menu.app.settings',
     { type: 'open-settings-requested', page: 'general' },
@@ -113,7 +113,7 @@ export const RENDERER_MENU_COMMANDS: RendererMenuCommandDefinition[] = [
       accelerator: () => SETTINGS_SHORTCUT_MAC,
     },
   ),
-  rendererMenuCommand(
+  clientMenuCommand(
     'file-new-terminal-tab',
     'terminal.new',
     { type: 'terminal-new-tab-requested' },
@@ -122,7 +122,7 @@ export const RENDERER_MENU_COMMANDS: RendererMenuCommandDefinition[] = [
       accelerator: NEW_TERMINAL_TAB_SHORTCUT,
     },
   ),
-  rendererMenuCommand(
+  clientMenuCommand(
     'file-open-local-repo',
     'menu.file.open-local-repo',
     { type: 'open-repo-requested' },
@@ -131,10 +131,10 @@ export const RENDERER_MENU_COMMANDS: RendererMenuCommandDefinition[] = [
       accelerator: 'CmdOrCtrl+O',
     },
   ),
-  rendererMenuCommand('file-open-local-repo-path', 'menu.file.open-local-repo-path', {
+  clientMenuCommand('file-open-local-repo-path', 'menu.file.open-local-repo-path', {
     type: 'open-repo-path-requested',
   }),
-  rendererMenuCommand(
+  clientMenuCommand(
     'file-clone-repo',
     'menu.file.clone-repo',
     { type: 'clone-repo-requested' },
@@ -143,7 +143,7 @@ export const RENDERER_MENU_COMMANDS: RendererMenuCommandDefinition[] = [
       accelerator: 'CmdOrCtrl+Shift+O',
     },
   ),
-  rendererMenuCommand(
+  clientMenuCommand(
     'file-open-remote-repo',
     'menu.file.open-remote-repo',
     { type: 'open-remote-repo-requested' },
@@ -151,7 +151,7 @@ export const RENDERER_MENU_COMMANDS: RendererMenuCommandDefinition[] = [
       accelerator: 'CmdOrCtrl+Shift+R',
     },
   ),
-  rendererMenuCommand(
+  clientMenuCommand(
     'file-close-workspace-tab-or-window',
     'menu.file.close-workspace-tab-or-window',
     { type: 'workspace-pane-close-tab-or-window-requested' },
@@ -160,7 +160,7 @@ export const RENDERER_MENU_COMMANDS: RendererMenuCommandDefinition[] = [
       accelerator: CLOSE_WORKSPACE_TAB_OR_WINDOW_SHORTCUT,
     },
   ),
-  rendererMenuCommand(
+  clientMenuCommand(
     'file-close-tab',
     'menu.file.close-tab',
     { type: 'close-repo-requested' },
@@ -169,7 +169,7 @@ export const RENDERER_MENU_COMMANDS: RendererMenuCommandDefinition[] = [
       accelerator: CLOSE_REPO_SHORTCUT,
     },
   ),
-  rendererMenuCommand(
+  clientMenuCommand(
     'file-settings',
     'menu.file.settings',
     { type: 'open-settings-requested', page: 'general' },
@@ -178,7 +178,7 @@ export const RENDERER_MENU_COMMANDS: RendererMenuCommandDefinition[] = [
       accelerator: () => SETTINGS_SHORTCUT_NON_MAC,
     },
   ),
-  rendererMenuCommand(
+  clientMenuCommand(
     'view-status',
     'menu.view.status',
     { type: 'show-workspace-pane-view-requested', tab: 'status' },
@@ -186,7 +186,7 @@ export const RENDERER_MENU_COMMANDS: RendererMenuCommandDefinition[] = [
       helpLabelKey: 'help.row.view-status',
     },
   ),
-  rendererMenuCommand(
+  clientMenuCommand(
     'view-history',
     'menu.view.history',
     { type: 'show-workspace-pane-view-requested', tab: 'history' },
@@ -194,7 +194,7 @@ export const RENDERER_MENU_COMMANDS: RendererMenuCommandDefinition[] = [
       helpLabelKey: 'help.row.view-log',
     },
   ),
-  rendererMenuCommand(
+  clientMenuCommand(
     'view-changes',
     'menu.view.changes',
     { type: 'show-workspace-pane-view-requested', tab: 'changes' },
@@ -202,7 +202,7 @@ export const RENDERER_MENU_COMMANDS: RendererMenuCommandDefinition[] = [
       helpLabelKey: 'help.row.view-changes',
     },
   ),
-  rendererMenuCommand(
+  clientMenuCommand(
     'view-terminal',
     'menu.view.terminal',
     { type: 'terminal-primary-action-requested' },
@@ -210,7 +210,7 @@ export const RENDERER_MENU_COMMANDS: RendererMenuCommandDefinition[] = [
       helpLabelKey: 'help.row.view-terminal',
     },
   ),
-  rendererMenuCommand(
+  clientMenuCommand(
     'view-toggle-focus-mode',
     'workspace.focus-toggle-label',
     { type: 'workspace-focus-toggle-requested' },
@@ -219,7 +219,7 @@ export const RENDERER_MENU_COMMANDS: RendererMenuCommandDefinition[] = [
       accelerator: 'CmdOrCtrl+B',
     },
   ),
-  rendererMenuCommand(
+  clientMenuCommand(
     'view-refresh',
     'menu.view.refresh',
     { type: 'repo-refresh-requested' },
@@ -228,7 +228,7 @@ export const RENDERER_MENU_COMMANDS: RendererMenuCommandDefinition[] = [
       accelerator: 'CmdOrCtrl+U',
     },
   ),
-  rendererMenuCommand(
+  clientMenuCommand(
     'window-next-repo',
     'menu.window.next-repo',
     { type: 'cycle-repo-requested', direction: 1 },
@@ -237,7 +237,7 @@ export const RENDERER_MENU_COMMANDS: RendererMenuCommandDefinition[] = [
       accelerator: 'CmdOrCtrl+]',
     },
   ),
-  rendererMenuCommand(
+  clientMenuCommand(
     'window-prev-repo',
     'menu.window.prev-repo',
     { type: 'cycle-repo-requested', direction: -1 },
@@ -246,30 +246,30 @@ export const RENDERER_MENU_COMMANDS: RendererMenuCommandDefinition[] = [
       accelerator: 'CmdOrCtrl+[',
     },
   ),
-  rendererMenuCommand('window-reset-layout', 'menu.window.reset-window', { type: 'layout-reset-requested' }),
-  rendererMenuCommand('help-shortcuts', 'menu.help.shortcuts', { type: 'open-settings-requested', page: 'shortcuts' }),
+  clientMenuCommand('window-reset-layout', 'menu.window.reset-window', { type: 'layout-reset-requested' }),
+  clientMenuCommand('help-shortcuts', 'menu.help.shortcuts', { type: 'open-settings-requested', page: 'shortcuts' }),
 ]
 
-export const APP_SHORTCUTS: AcceleratorShortcutDefinition[] = rendererMenuAcceleratorShortcuts([
+export const APP_SHORTCUTS: AcceleratorShortcutDefinition[] = clientMenuAcceleratorShortcuts([
   'file-new-terminal-tab',
   'file-open-local-repo',
   'file-clone-repo',
   'view-refresh',
 ]).concat([{ accelerator: 'CmdOrCtrl+R', labelKey: 'help.row.reload-page' }])
 
-export const WINDOW_REPO_SHORTCUTS: AcceleratorShortcutDefinition[] = rendererMenuAcceleratorShortcuts([
+export const WINDOW_REPO_SHORTCUTS: AcceleratorShortcutDefinition[] = clientMenuAcceleratorShortcuts([
   'window-next-repo',
   'window-prev-repo',
 ])
 
-export const VIEW_SHORTCUTS: AcceleratorShortcutDefinition[] = rendererMenuAcceleratorShortcuts([
+export const VIEW_SHORTCUTS: AcceleratorShortcutDefinition[] = clientMenuAcceleratorShortcuts([
   'view-toggle-focus-mode',
 ])
 
-export const RENDERER_KEYBOARD_SHORTCUTS: RendererKeyboardShortcutDefinition[] = [
-  ...RENDERER_NAVIGATION_SHORTCUTS,
+export const CLIENT_KEYBOARD_SHORTCUTS: ClientKeyboardShortcutDefinition[] = [
+  ...CLIENT_NAVIGATION_SHORTCUTS,
   ...BRANCH_ACTION_SHORTCUTS,
-  ...RENDERER_APP_SHORTCUTS,
+  ...CLIENT_APP_SHORTCUTS,
 ]
 
 export function matchBranchActionShortcut(input: {
@@ -279,47 +279,47 @@ export function matchBranchActionShortcut(input: {
   return matchKeyboardShortcut(BRANCH_ACTION_SHORTCUTS, input)
 }
 
-export function matchRendererKeyboardShortcut(input: {
+export function matchClientKeyboardShortcut(input: {
   key: string
   code: string
   shiftKey: boolean
-}): RendererKeyboardShortcutAction | null {
-  return matchKeyboardShortcut(RENDERER_KEYBOARD_SHORTCUTS, input)
+}): ClientKeyboardShortcutAction | null {
+  return matchKeyboardShortcut(CLIENT_KEYBOARD_SHORTCUTS, input)
 }
 
-export function rendererMenuCommandById(id: RendererMenuCommandId): RendererMenuCommandDefinition {
-  const command = RENDERER_MENU_COMMANDS.find((candidate) => candidate.id === id)
-  if (!command) throw new Error(`Unknown renderer menu command: ${id}`)
+export function clientMenuCommandById(id: ClientMenuCommandId): ClientMenuCommandDefinition {
+  const command = CLIENT_MENU_COMMANDS.find((candidate) => candidate.id === id)
+  if (!command) throw new Error(`Unknown client menu command: ${id}`)
   return command
 }
 
-export function resolveRendererMenuCommandAccelerator(
-  command: Pick<RendererMenuCommandDefinition, 'accelerator'>,
-  context: RendererMenuCommandContext,
+export function resolveClientMenuCommandAccelerator(
+  command: Pick<ClientMenuCommandDefinition, 'accelerator'>,
+  context: ClientMenuCommandContext,
 ): string | undefined {
   return typeof command.accelerator === 'function' ? command.accelerator(context) : command.accelerator
 }
 
-export function resolveRendererMenuCommandIntent(
-  command: Pick<RendererMenuCommandDefinition, 'intent'>,
-  context: RendererMenuCommandContext,
-): RendererEffectIntent {
+export function resolveClientMenuCommandIntent(
+  command: Pick<ClientMenuCommandDefinition, 'intent'>,
+  context: ClientMenuCommandContext,
+): ClientEffectIntent {
   return typeof command.intent === 'function' ? command.intent(context) : command.intent
 }
 
-export function resolveRendererMenuCommandEnabled(
-  command: Pick<RendererMenuCommandDefinition, 'enabled'>,
-  context: RendererMenuCommandContext,
+export function resolveClientMenuCommandEnabled(
+  command: Pick<ClientMenuCommandDefinition, 'enabled'>,
+  context: ClientMenuCommandContext,
 ): boolean | undefined {
   return command.enabled?.(context)
 }
 
-function keyboardShortcut<Action extends RendererKeyboardShortcutAction>(
+function keyboardShortcut<Action extends ClientKeyboardShortcutAction>(
   matches: KeyboardShortcutMatch[],
   action: Action,
   combos: string[][],
   labelKey: DictKey,
-): RendererKeyboardShortcutDefinition<Action> {
+): ClientKeyboardShortcutDefinition<Action> {
   return { matches, action, combos, labelKey }
 }
 
@@ -332,12 +332,12 @@ function branchActionShortcut(
   return { matches, action, combos, labelKey }
 }
 
-function rendererMenuCommand(
-  id: RendererMenuCommandId,
+function clientMenuCommand(
+  id: ClientMenuCommandId,
   menuLabelKey: DictKey,
-  intent: RendererEffectIntent,
-  options: Omit<Partial<RendererMenuCommandDefinition>, 'id' | 'menuLabelKey' | 'intent'> = {},
-): RendererMenuCommandDefinition {
+  intent: ClientEffectIntent,
+  options: Omit<Partial<ClientMenuCommandDefinition>, 'id' | 'menuLabelKey' | 'intent'> = {},
+): ClientMenuCommandDefinition {
   return { id, menuLabelKey, intent, ...options }
 }
 
@@ -361,12 +361,12 @@ function keyboardShortcutMatch(
   return true
 }
 
-function rendererMenuAcceleratorShortcuts(ids: RendererMenuCommandId[]): AcceleratorShortcutDefinition[] {
+function clientMenuAcceleratorShortcuts(ids: ClientMenuCommandId[]): AcceleratorShortcutDefinition[] {
   return ids.map((id) => {
-    const command = rendererMenuCommandById(id)
-    const accelerator = resolveRendererMenuCommandAccelerator(command, {})
+    const command = clientMenuCommandById(id)
+    const accelerator = resolveClientMenuCommandAccelerator(command, {})
     if (!accelerator || !command.helpLabelKey)
-      throw new Error(`Renderer menu command ${id} is missing help shortcut metadata`)
+      throw new Error(`Client menu command ${id} is missing help shortcut metadata`)
     return { accelerator, labelKey: command.helpLabelKey }
   })
 }

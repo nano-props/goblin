@@ -24,7 +24,7 @@ function installBridge() {
   })
 }
 
-describe('renderer bootstrap seeding', () => {
+describe('client bootstrap seeding', () => {
   beforeEach(() => {
     vi.resetModules()
   })

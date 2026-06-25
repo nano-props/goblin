@@ -111,7 +111,7 @@ export function RepoView({ repoId }: Props) {
   )
   const branchNavigatorPane = (
     <RepoWorkspacePane>
-      <BranchNavigator repoId={repoId} showActions={behavior.branchNavigatorActionsVisible} />
+      <BranchNavigator repoId={repoId} />
     </RepoWorkspacePane>
   )
   const singlePaneBody = singlePane === 'workspace' ? branchWorkspacePane : branchNavigatorPane

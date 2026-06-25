@@ -23,7 +23,7 @@ const RULES: Rule[] = [
   {
     fromPrefix: '/src/web/',
     disallow: ['#/main/'],
-    reason: 'web renderer must not directly import main; use preload bridge, native IPC, or server contract instead',
+    reason: 'web client must not directly import main; use preload bridge, native IPC, or server contract instead',
   },
   {
     fromPrefix: '/src/server/',

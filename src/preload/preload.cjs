@@ -1,9 +1,9 @@
 // Preload bridge. Exposes low-level IPC under `window.goblinNative` to the
-// renderer. The renderer no longer needs a bootstrap roundtrip here — the
+// client. The client no longer needs a bootstrap roundtrip here — the
 // server renders the full bootstrap JSON into the HTML response
 // (`<script id="goblin-bootstrap">`), which is read by `web/bootstrap.ts`
 // after page load. The preload is now strictly an IPC bridge: every
-// function it exposes corresponds to a capability that the renderer
+// function it exposes corresponds to a capability that the client
 // could not get from the server (open settings window, send IPC
 // requests to main, etc.).
 //
@@ -12,7 +12,7 @@
 // like `os`, `fs`, or `path`, and do NOT require `pino` / `consola`.
 // The `console.warn` calls below are intentionally raw: in sandboxed
 // preload we have no structured logger available, and these errors are
-// only visible in DevTools where the renderer-side `web/logger.ts` will
+// only visible in DevTools where the client-side `web/logger.ts` will
 // already be emitting its own (more detailed) records.
 const { contextBridge, ipcRenderer, webUtils } = require('electron')
 // Mirrors `src/shared/clipboard-paste.ts:CLIPBOARD_FALLBACK_FILE_NAME`.
@@ -27,7 +27,7 @@ const IPC = {
     call: 'goblin:ipc',
     abort: 'goblin:ipc-abort',
     event: 'goblin:event',
-    effectIntent: 'goblin:effect-intent',
+    effectIntent: 'goblin:client-effect-intent',
   },
   shell: {
     openSettingsWindow: 'goblin:shell-open-settings-window',
@@ -50,7 +50,7 @@ const IPC = {
 }
 
 // `ipcRenderer.invoke` rejects when the main handler throws. We log the
-// channel once at the bridge, then rethrow so renderer call sites can
+// channel once at the bridge, then rethrow so client call sites can
 // decide whether to surface a toast, fall back, or intentionally ignore
 // the failure with their own `.catch()`.
 function safeInvoke(channel, ...args) {
@@ -114,7 +114,7 @@ function ensureEffectIntentListener() {
       try {
         cb(payload)
       } catch (err) {
-        console.warn('[ipc] goblin:effect-intent subscriber failed', err)
+        console.warn('[ipc] goblin:client-effect-intent subscriber failed', err)
       }
     }
   }
@@ -137,7 +137,7 @@ contextBridge.exposeInMainWorld('goblinNative', {
     // That happens when a non-`File` object reaches us (synthetic
     // `File` from older test mocks, IPC proxies that lost the
     // prototype, etc.) or when an internal Electron check fails.
-    // Returning `''` matches the renderer's contract: an empty
+    // Returning `''` matches the client's contract: an empty
     // path-attempt result falls through to the blob-save tier, and
     // a `paste-file-failed` toast surfaces the loss to the user.
     try {
@@ -166,7 +166,7 @@ contextBridge.exposeInMainWorld('goblinNative', {
   // `{name, bytes: ArrayBuffer}` here in the preload before invoking IPC.
   // (Electron's IPC has no `transfer` list — `ArrayBuffer` and
   // `Uint8Array` both copy — so the choice is a typing/contract one.)
-  // Errors are swallowed to `[]` because the renderer-side resolver
+  // Errors are swallowed to `[]` because the client-side resolver
   // treats `[]` as "blob save failed for everything" and counts it
   // separately from unsafe path filtering.
   saveClipboardFiles: async (files) => {
@@ -210,20 +210,20 @@ contextBridge.exposeInMainWorld('goblinNative', {
   },
 })
 
-// Auth model: the renderer is identical in every runtime. The
-// embedded Electron main plants the auth cookie on the renderer's
-// `webContents.session` BEFORE the URL loads, so the renderer's
+// Auth model: the client is identical in every runtime. The
+// embedded Electron main plants the auth cookie on the client's
+// `webContents.session` BEFORE the URL loads, so the client's
 // first request (the `useAccessTokenStatus` whoami probe) already
 // carries the cookie and clears the gate without user input. The
 // web path skips the gate entirely — the user pastes the token
 // once and `useAccessTokenStatus` exchanges it for the same
-// cookie. After that, both paths look identical: the renderer
+// cookie. After that, both paths look identical: the client
 // calls `fetchServerJson('/api/whoami')`, the browser attaches
 // the cookie, the server returns 200.
 //
 // The preload does NOT seed `window.__GOBLIN_BOOTSTRAP__` with
 // anything — the bootstrap is empty on first paint in every
-// runtime, and the renderer fetches i18n before mounting the normal
+// runtime, and the client fetches i18n before mounting the normal
 // app tree, then fetches host info and settings from the dedicated
 // `/api/*` endpoints during the app bootstrap hooks. The embedded
 // path used to also seed

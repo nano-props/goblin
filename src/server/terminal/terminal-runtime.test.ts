@@ -1001,7 +1001,7 @@ describe('server terminal runtime', () => {
     // design-doc rule that wins here is "most recent write intent
     // wins" — the sibling's attach is the more recent intent.
     //
-    // The renderer's AuthorityGate handles the recovery path: a
+    // The client's AuthorityGate handles the recovery path: a
     // write from the late-returning attachment triggers a takeover
     // round-trip (asserted in the authority-gate tests). This
     // runtime test pins down the server-side state after the
@@ -1057,7 +1057,7 @@ describe('server terminal runtime', () => {
     })
 
     // And A's write is rejected — server-side authority check fails
-    // with not-controller. The renderer-side AuthorityGate catches
+    // with not-controller. The client-side AuthorityGate catches
     // this and fires a takeover before retrying; this test pins the
     // server invariant.
     const aWrite = host.write('client_a', USER_1, {
@@ -1306,7 +1306,7 @@ describe('server terminal runtime', () => {
         JSON.stringify({ type: 'heartbeat', at: Date.now() }),
       )
       // Advance past the original 90 s deadline. A correctly routed
-      // heartbeat (a real renderer sending every 30 s) means the
+      // heartbeat (a real client sending every 30 s) means the
       // broker clock is fresh, so the synthetic disconnect must NOT
       // fire and the registered socket must still be connected.
       vi.advanceTimersByTime(HEARTBEAT_INTERVAL_MS)

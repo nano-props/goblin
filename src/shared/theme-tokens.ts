@@ -1,7 +1,7 @@
 import type { ResolvedTheme } from '#/shared/api-types.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
 
-// Main needs a window background before renderer CSS loads. Keep these
+// Main needs a window background before client CSS loads. Keep these
 // values in sync with each theme's `--goblin-surface-canvas` until themes
 // become data-driven and main can read the persisted canvas token.
 export const WINDOW_BACKGROUND_BY_COLOR_THEME: Record<ColorTheme, Record<ResolvedTheme, string>> = {

@@ -4,7 +4,7 @@ import { useAccessTokenStatus, type AccessTokenStatusState } from '#/web/hooks/u
 const AuthContext = createContext<AccessTokenStatusState | null>(null)
 
 /**
- * Owns the auth lifecycle for the renderer.
+ * Owns the auth lifecycle for the client.
  *
  * Background: `useAccessTokenStatus` carries its own `useState`
  * and probe effect. Before this provider, every consumer (the

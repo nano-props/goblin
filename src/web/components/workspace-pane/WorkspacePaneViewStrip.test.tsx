@@ -707,7 +707,7 @@ describe('WorkspacePaneViewStrip', () => {
     expect(document.activeElement?.textContent).toContain('term-2')
   })
 
-  test('does not collapse to the first tab when compact mode has no active tab', () => {
+  test('compact mode renders an empty tab area but keeps the popover switcher reachable when no tab is active', () => {
     render(
       <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
@@ -726,19 +726,22 @@ describe('WorkspacePaneViewStrip', () => {
       />,
     )
 
+    // In compact mode, when no tab is active and there is no pending tab
+    // to anchor the selection, the strip renders an empty tab area + the
+    // popover switcher (chevron). The compact layout is a structural
+    // choice driven by screen size — it must not fall through to the
+    // scrollable (expanded) layout, which would render fixed-width
+    // `w-36` tabs. No fallback invents a "selected" tab out of
+    // items[0]: the toolbar must not lie about the user's active view
+    // when the body is rendering a non-materialized terminal panel.
     const tabs = Array.from(document.body.querySelectorAll<HTMLButtonElement>('[role="tab"]'))
-    expect(tabs).toHaveLength(2)
-    expect(tabs.map((tab) => tab.getAttribute('aria-selected'))).toEqual(['false', 'false'])
-    expect(tabs.map((tab) => tab.tabIndex)).toEqual([0, -1])
-    expect(document.body.querySelector('button[aria-label="workspace-pane-views.tabs"]')).toBeNull()
+    const tablist = document.body.querySelector('[role="tablist"][aria-label="workspace-pane-views.tabs"]')
+    const switcherTrigger = document.body.querySelector('button[aria-label="workspace-pane-views.tabs"]')
 
-    act(() => {
-      tabs[0]?.focus()
-      tabs[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
-      vi.runAllTimers()
-    })
-
-    expect(document.activeElement).toBe(tabs[1])
+    expect(tabs).toHaveLength(0)
+    expect(tablist).not.toBeNull()
+    expect(tablist?.className).toContain('flex-1')
+    expect(switcherTrigger).not.toBeNull()
   })
 
   test('renders a compact pending item across the available tab row', () => {

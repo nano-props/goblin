@@ -16,7 +16,7 @@ export function createClipboardRoutes() {
   void pruneExpiredClipboardTempFiles()
 
   // Persist binary blobs from a `ClipboardEvent` / `DragEvent` on the
-  // web renderer. The multipart body shape is fixed (repeated `files`),
+  // web client. The multipart body shape is fixed (repeated `files`),
   // so no valibot schema is needed — we normalise Hono's
   // `Record<string, string | File | (string | File)[]>` to a `File[]`
   // and hand it to the write-paths module.

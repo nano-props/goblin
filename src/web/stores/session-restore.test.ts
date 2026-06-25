@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
+import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useSessionRestoreStore } from '#/web/stores/session-restore.ts'
 
 function installBridge(sessionOverrides: Record<string, unknown> = {}) {
@@ -59,7 +59,7 @@ function installBridge(sessionOverrides: Record<string, unknown> = {}) {
       }
     }),
   )
-  setRendererBridgeForTests(null)
+  setClientBridgeForTests(null)
 }
 
 describe('session restore store', () => {

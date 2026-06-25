@@ -115,10 +115,10 @@ function sendRealtimeResponse(socket: TerminalRealtimeSocket, message: TerminalS
 // when the action's response carries the authoritative frame transition
 // for a terminal view. Without this, live realtime messages that arrive
 // during the request can race ahead of the authoritative response and
-// split the renderer's transition across two sources.
+// split the client's transition across two sources.
 //
 // `attach`, `restart`, and now `create` all return snapshot hydration
-// data that the renderer applies as one boundary. `slot-snapshot`
+// data that the client applies as one boundary. `slot-snapshot`
 // still remains excluded because that payload is consumed as a later
 // reconciliation path rather than the primary first-frame handshake.
 // `takeover` does not return a fresh snapshot, but its response is still

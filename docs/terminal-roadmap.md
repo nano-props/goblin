@@ -13,7 +13,7 @@ Use this doc for the next-stage terminal refactor roadmap.
 The current terminal refactor is directionally correct:
 
 - business runtime is separated from PTY execution
-- renderer projection is separated from local xterm view work
+- client projection is separated from local xterm view work
 - control, mirroring, and takeover are explicit concepts
 - the server remains the runtime-coherent source of terminal truth
 
@@ -29,7 +29,7 @@ Today, several important terminal states are represented implicitly through comb
 - session presence in maps
 - PTY presence or absence
 - controller presence
-- renderer-local open or error state
+- client-local open or error state
 
 The next stage should make terminal lifecycle states explicit so create, restart, reconnect, and failure behavior become easier to reason about.
 
@@ -41,8 +41,8 @@ The next stage should model multiple attachments per session directly.
 
 ### 3. Tighten the contract between runtime semantics and UI projection
 
-The renderer should stay a projection of server truth plus local interaction state.
-The next stage should reduce places where renderer logic must infer server lifecycle indirectly.
+The client should stay a projection of server truth plus local interaction state.
+The next stage should reduce places where client logic must infer server lifecycle indirectly.
 
 ### 4. Make invariants testable at the contract level
 
@@ -85,7 +85,7 @@ This is the highest-leverage work because it affects:
 ### Why
 
 This is currently one of the most important sources of ambiguity in the design.
-If restart failure remains implicit, renderer behavior will keep accumulating defensive logic.
+If restart failure remains implicit, client behavior will keep accumulating defensive logic.
 
 ## P1.5: Split terminal runtime orchestration into smaller server modules
 
@@ -107,13 +107,13 @@ This is manageable now, but it will become a maintenance bottleneck as the featu
 
 ## P1.7: Decouple terminal runtime lifetime from React provider lifetime
 
-Keep `TerminalSlotRegistry` / shared terminal runtime state on a renderer-level lifetime rather than a provider-owned lifetime. This remains the preferred next-stage cleanup, but it should not block the current first-frame protocol fix. See `docs/terminal-slot-lifecycle.md` for the bug analysis and why this work is related but separate.
+Keep `TerminalSlotRegistry` / shared terminal runtime state on a client-level lifetime rather than a provider-owned lifetime. This remains the preferred next-stage cleanup, but it should not block the current first-frame protocol fix. See `docs/terminal-slot-lifecycle.md` for the bug analysis and why this work is related but separate.
 
 ## P1.8: Make create deliver an atomic first frame
 
-`create` should follow the same first-frame contract shape as `attach` / `restart`: return snapshot hydration data directly, and let the renderer treat that payload as the authoritative first-frame handshake. `create.sessions` should remain projection data only. See `docs/terminal-slot-lifecycle.md` for the detailed bug write-up and contract rules.
+`create` should follow the same first-frame contract shape as `attach` / `restart`: return snapshot hydration data directly, and let the client treat that payload as the authoritative first-frame handshake. `create.sessions` should remain projection data only. See `docs/terminal-slot-lifecycle.md` for the detailed bug write-up and contract rules.
 
-## P2: Further tighten renderer projection boundaries
+## P2: Further tighten client projection boundaries
 
 ### Outcome
 
@@ -121,7 +121,7 @@ Keep `TerminalSlotRegistry` / shared terminal runtime state on a renderer-level 
 
 ### Why
 
-The current renderer-side registry is still healthy, but it is accumulating several kinds of responsibility.
+The current client-side registry is still healthy, but it is accumulating several kinds of responsibility.
 This is not yet a crisis, so it should follow the server-side lifecycle work rather than precede it.
 
 ## P2: Add contract tests for terminal invariants
@@ -155,13 +155,13 @@ This improves readability and long-term maintainability, but it is less urgent t
 3. Clarify restart failure and reconnect behavior
 4. Split runtime orchestration into smaller modules
 5. Add contract-level tests
-6. Revisit renderer-side projection cleanup
+6. Revisit client-side projection cleanup
 7. Split protocol modules only if still useful
 
 ## Non-goals
 
 - Do not rewrite the terminal feature around a new UI framework.
-- Do not move terminal truth into renderer-side stores.
+- Do not move terminal truth into client-side stores.
 - Do not paper over lifecycle bugs with redraw or timing heuristics.
 - Do not let PTY implementation details become the product model.
 
@@ -169,6 +169,6 @@ This improves readability and long-term maintainability, but it is less urgent t
 
 - Prefer explicit lifecycle states over implicit combinations of fields.
 - Prefer explicit control transitions over heuristic control changes.
-- Prefer server truth over renderer inference.
+- Prefer server truth over client inference.
 - Prefer geometry correctness over post-hoc rendering fixes.
 - Prefer contract tests over implementation-shaped tests for terminal behavior.

@@ -88,7 +88,7 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
 
     applySessionSelectedTerminalState(selectedTerminalByWorktree: Record<string, string>) {
       // One-shot boot/session restore of per-worktree terminal selection. This
-      // seeds renderer state; later selection changes remain renderer-owned.
+      // seeds client state; later selection changes remain client-owned.
       set((s) => {
         const current = s.selectedTerminalByWorktree
         const currentEntries = Object.entries(current)

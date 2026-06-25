@@ -28,7 +28,7 @@ describe('WRITE_BLOCKED_KEY_BY_REASON', () => {
   test('mapped keys are static dot-notation strings, no templates or concatenation', () => {
     // AGENTS.md requires i18n keys to be static — no
     // `t(\`foo.${bar}\`)` or `t(a + b)` patterns. The map is the
-    // canonical surface that the renderer reads from, so it must
+    // canonical surface that the client reads from, so it must
     // not contain computed keys.
     for (const [reason, key] of Object.entries(WRITE_BLOCKED_KEY_BY_REASON)) {
       if (key === null) continue

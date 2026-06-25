@@ -324,7 +324,7 @@ plan.verifyPrebuilds(process.arch === 'arm64' ? 'arm64' : 'x64')
 if (!options.skipTypecheck) {
   await $`bun run typecheck`
 }
-// Renderer bundle MUST exist before electron-builder packs it (the
+// Client bundle MUST exist before electron-builder packs it (the
 // `files` glob in electron-builder.ts expects `dist/web/`).
 await $`bun run build:web`
 await $`bun run build:preload`

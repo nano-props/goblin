@@ -20,23 +20,6 @@ import { isRemoteRepoId, parseRemoteRepoId } from '#/shared/remote-repo.ts'
 const SourceToken = v.optional(v.string())
 const StringArray = v.array(v.string())
 
-/**
- * Wrap an array schema for query-string parameters so that
- * `parseHttpQuery` can handle both single values (a lone
- * `?branches=main`) and multi-value arrays (`?branches=a&branches=b`)
- * transparently. `parseHttpQuery` collapses `URLSearchParams` entries
- * with a single value into a plain string; without this wrapper the
- * valibot `array()` validator would reject the string.
- *
- * Usage: `branches: v.optional(qArray(v.string()))`
- */
-function qArray<TItem extends v.GenericSchema>(item: TItem) {
-  return v.pipe(
-    v.union([v.array(item), item] as const),
-    v.transform((input: unknown) => (Array.isArray(input) ? input : [input])),
-  ) as v.GenericSchema<unknown, Array<v.InferOutput<TItem>>>
-}
-
 const RemoteRepoRefSchema = v.object({
   id: v.string(),
   alias: v.string(),
@@ -102,6 +85,35 @@ export const REPO_PROCEDURE_SCHEMAS = {
   openEditor: v.object({ path: v.string() }),
   backgroundSyncRepos: v.object({ repoIds: StringArray }),
   abort: CwdInput,
+  probe: CwdInput,
+  snapshot: CwdInput,
+  status: CwdInput,
+  log: v.object({
+    cwd: v.string(),
+    branch: v.string(),
+    count: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(200))),
+    skip: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(100_000))),
+  }),
+  patch: v.object({ cwd: v.string(), worktreePath: v.string() }),
+  pullRequests: v.object({
+    cwd: v.string(),
+    branches: v.optional(StringArray),
+    mode: v.optional(v.picklist(['summary', 'full'])),
+  }),
+  // Composite read — picks which sub-reads to fold into one round trip.
+  // Body shape: `{ cwd, include?, branches?, mode?, timeoutMs? }`. `include`
+  // and `branches` travel as JSON arrays; `timeoutMs` is a real number
+  // (no string coercion — query-string parsing is gone).
+  composite: v.object({
+    cwd: v.string(),
+    include: v.optional(v.array(v.picklist(['snapshot', 'status', 'pullRequests']))),
+    branches: v.optional(StringArray),
+    mode: v.optional(v.picklist(['summary', 'full'])),
+    // Per-section timeout in ms; non-integer / non-finite / negative
+    // values are clamped on the server side, so the perimeter only
+    // has to reject non-numbers.
+    timeoutMs: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(600_000))),
+  }),
 } as const
 
 export const REMOTE_PROCEDURE_SCHEMAS = {
@@ -110,67 +122,12 @@ export const REMOTE_PROCEDURE_SCHEMAS = {
   // repo id. The server parses the id, resolves the SSH target,
   // probes the remote repo, classifies the failure, and returns
   // a converged `RemoteRepoLifecycleResult`. NEVER returns
-  // 'connecting' — that's a renderer projection.
+  // 'connecting' — that's a client projection.
   remoteLifecycle: v.object({ repoId: v.string() }),
   pathSuggestions: RemotePathSuggestionsInputSchema,
   testRepository: v.object({ target: RemoteTargetSchema }),
   openEditor: v.object({ repoId: v.string(), worktreePath: v.string() }),
   openTerminal: v.object({ repoId: v.string(), worktreePath: v.string() }),
-} as const
-
-// Query-string schemas for the GET repo read endpoints. `parseHttpQuery`
-// flattens the URLSearchParams into a `{ key: string | string[] }` object
-// before validating, so multi-value keys (e.g. `branches`) accept arrays.
-export const REPO_QUERY_SCHEMAS = {
-  probe: v.object({ cwd: v.string() }),
-  snapshot: v.object({ cwd: v.string() }),
-  status: v.object({ cwd: v.string() }),
-  log: v.object({
-    cwd: v.string(),
-    branch: v.string(),
-    count: v.optional(
-      v.pipe(
-        v.union([v.number(), v.pipe(v.string(), v.transform(Number))]),
-        v.integer(),
-        v.minValue(1),
-        v.maxValue(200),
-      ),
-    ),
-    skip: v.optional(
-      v.pipe(
-        v.union([v.number(), v.pipe(v.string(), v.transform(Number))]),
-        v.integer(),
-        v.minValue(0),
-        v.maxValue(100_000),
-      ),
-    ),
-  }),
-  patch: v.object({ cwd: v.string(), worktreePath: v.string() }),
-  pullRequests: v.object({
-    cwd: v.string(),
-    branches: v.optional(qArray(v.string())),
-    mode: v.optional(v.picklist(['summary', 'full'])),
-  }),
-  // Composite read — picks which sub-reads to fold into one round trip.
-  composite: v.object({
-    cwd: v.string(),
-    include: v.optional(qArray(v.picklist(['snapshot', 'status', 'pullRequests']))),
-    branches: v.optional(qArray(v.string())),
-    mode: v.optional(v.picklist(['summary', 'full'])),
-    // Per-section timeout in ms; non-integer / non-finite / negative
-    // values are clamped on the server side, so the perimeter only
-    // has to reject non-numbers. Coerce the query string to a number
-    // before validating — `parseHttpQuery` always materialises
-    // values as strings.
-    timeoutMs: v.optional(
-      v.pipe(
-        v.union([v.number(), v.pipe(v.string(), v.transform(Number))]),
-        v.integer(),
-        v.minValue(0),
-        v.maxValue(600_000),
-      ),
-    ),
-  }),
 } as const
 
 // Schemas for the settings write paths. Each shape matches the typed
@@ -207,10 +164,18 @@ const SessionStateSchema = v.object({
   ),
 })
 
+// Shared shape for the GitHub CLI state endpoints (`/api/settings/github-cli`
+// and `/api/settings/github-cli/refresh`): both accept an optional `hosts`
+// filter so the client can scope detection to specific hostnames.
+export const GITHUB_CLI_REFRESH_SCHEMA = v.object({
+  hosts: v.optional(StringArray),
+})
+
 export const SETTINGS_PROCEDURE_SCHEMAS = {
   fetchInterval: v.object({ sec: v.number() }),
   globalShortcutState: v.object({ registered: v.boolean() }),
   recentReposAdd: v.object({ repo: RepoSessionEntrySchema }),
+  githubCli: GITHUB_CLI_REFRESH_SCHEMA,
 } as const
 
 // `prefs` accepts a permissive patch — the underlying
@@ -221,10 +186,6 @@ export const SETTINGS_PATCH_SCHEMAS = {
   prefs: v.object({ settings: v.record(v.string(), v.unknown()) }),
   session: v.object({ session: SessionStateSchema }),
 } as const
-
-export const GITHUB_CLI_REFRESH_SCHEMA = v.object({
-  hosts: v.optional(StringArray),
-})
 
 // Native bridge IPC procedures — Electron shell operations that bypass
 // the HTTP server entirely. Handlers live in `main/ipc.ts`.

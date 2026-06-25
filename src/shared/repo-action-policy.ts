@@ -2,7 +2,7 @@
 // repo actions. Callers pass already-validated primitives (branch name,
 // current branch, worktree metadata) and these helpers return either
 // null (allowed) or an `ExecResult` shape the IPC layer can hand back to
-// the renderer without translation.
+// the client without translation.
 
 import { PROTECTED_BRANCHES, type ExecResult, type WorktreeInfo } from '#/shared/git-types.ts'
 

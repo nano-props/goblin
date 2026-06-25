@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
-  disconnectAllRendererIntentSockets,
-  registerRendererIntentSocket,
-} from '#/server/modules/renderer-intent-broker.ts'
+  disconnectAllClientIntentSockets,
+  registerClientIntentSocket,
+} from '#/server/modules/client-intent-broker.ts'
 import { createRepoViewRoutes } from '#/server/routes/repo-view.ts'
 import { createApp } from '#/server/app-factory.ts'
 import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
@@ -35,12 +35,12 @@ function makeTerminalHost(): ServerTerminalHost {
 
 describe('POST /api/repo/view', () => {
   beforeEach(() => {
-    disconnectAllRendererIntentSockets()
+    disconnectAllClientIntentSockets()
   })
 
-  test('returns 200 and fans out an intent when a renderer is subscribed', async () => {
+  test('returns 200 and fans out an intent when a client is subscribed', async () => {
     const subscriber = { send: vi.fn(), close: vi.fn() }
-    registerRendererIntentSocket(subscriber)
+    registerClientIntentSocket(subscriber)
 
     const app = createRepoViewRoutes()
     const res = await app.request('http://localhost/view', {
@@ -54,13 +54,13 @@ describe('POST /api/repo/view', () => {
     expect(json).toEqual({ ok: true })
     expect(subscriber.send).toHaveBeenCalledWith(
       JSON.stringify({
-        type: 'renderer-effect-intent',
+        type: 'client-effect-intent',
         intent: { type: 'show-workspace-pane-view-requested', tab: 'changes' },
       }),
     )
   })
 
-  test('returns 503 with a clear code when no renderer is subscribed', async () => {
+  test('returns 503 with a clear code when no client is subscribed', async () => {
     const app = createRepoViewRoutes()
     const res = await app.request('http://localhost/view', {
       method: 'POST',
@@ -71,7 +71,7 @@ describe('POST /api/repo/view', () => {
     expect(res.status).toBe(503)
     const json = (await res.json()) as { ok: false; code: string; message: string }
     expect(json.ok).toBe(false)
-    expect(json.code).toBe('NO_RENDERER')
+    expect(json.code).toBe('NO_CLIENT')
     // Message must be the raw reason — the CLI prefixes it with `g:`,
     // so the contract forbids `g:` here. See `shared/repo-view.ts` for
     // the rationale.
@@ -80,7 +80,7 @@ describe('POST /api/repo/view', () => {
 
   test('rejects the terminal tab with 400 (terminal view is owned by the runtime)', async () => {
     const subscriber = { send: vi.fn(), close: vi.fn() }
-    registerRendererIntentSocket(subscriber)
+    registerClientIntentSocket(subscriber)
 
     const app = createRepoViewRoutes()
     const res = await app.request('http://localhost/view', {
@@ -153,7 +153,7 @@ describe('POST /api/repo/view — auth integration via createApp()', () => {
 
   test('accepts request with access token and fans out the intent (200)', async () => {
     const subscriber = { send: vi.fn(), close: vi.fn() }
-    registerRendererIntentSocket(subscriber)
+    registerClientIntentSocket(subscriber)
 
     const app = createApp({
       version: '0.1.0',
@@ -174,7 +174,7 @@ describe('POST /api/repo/view — auth integration via createApp()', () => {
     expect(res.status).toBe(200)
     expect(subscriber.send).toHaveBeenCalledWith(
       JSON.stringify({
-        type: 'renderer-effect-intent',
+        type: 'client-effect-intent',
         intent: { type: 'show-workspace-pane-view-requested', tab: 'changes' },
       }),
     )

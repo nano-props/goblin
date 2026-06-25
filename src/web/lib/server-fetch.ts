@@ -1,14 +1,14 @@
 import { resolveApiBaseUrl } from '#/web/lib/websocket-url.ts'
 import { ACCESS_TOKEN_HEADER } from '#/shared/access-token.ts'
-import { requireRendererServerConfig } from '#/web/lib/server-config.ts'
+import { requireClientServerConfig } from '#/web/lib/server-config.ts'
 
 export async function fetchServerJson<T>(path: string | URL, init?: RequestInit): Promise<T> {
-  const server = requireRendererServerConfig()
+  const server = requireClientServerConfig()
   const url = typeof path === 'string' ? new URL(path, resolveApiBaseUrl(server.url)).toString() : path.toString()
   const { headers: extraHeaders, ...rest } = init ?? {}
   const headers: Record<string, string> = {}
   if (server.accessToken) {
-    // Embedded renderer or dev mode: send the token as a header.
+    // Embedded client or dev mode: send the token as a header.
     // Standalone browser mode: leave the header off entirely; the
     // cookie is the only auth channel and the browser attaches it
     // automatically on same-origin requests.
@@ -46,31 +46,5 @@ export async function postServerJson<TInput extends object, TOutput>(
       'content-type': 'application/json',
     },
     body: JSON.stringify(input),
-  })
-}
-
-type QueryParamValue = string | number | boolean | undefined | null | Array<string | number>
-
-function appendQueryParam(url: URL, key: string, value: string | number | boolean): void {
-  url.searchParams.append(key, String(value))
-}
-
-export async function getServerJson<TParams extends Record<string, QueryParamValue>, TOutput>(
-  path: string,
-  params: TParams,
-  options?: { signal?: AbortSignal },
-): Promise<TOutput> {
-  const url = new URL(path, resolveApiBaseUrl(requireRendererServerConfig().url))
-  for (const [key, value] of Object.entries(params)) {
-    if (value === undefined || value === null) continue
-    if (Array.isArray(value)) {
-      for (const item of value) appendQueryParam(url, key, item)
-    } else {
-      appendQueryParam(url, key, value)
-    }
-  }
-  return await fetchServerJson<TOutput>(url, {
-    method: 'GET',
-    signal: options?.signal,
   })
 }

@@ -10,7 +10,7 @@ const APPLE_SCRIPT_TIMEOUT_MS = 5_000
 const OPEN_TIMEOUT_MS = 10_000
 
 /** Whether Ghostty.app exists in either of the two locations macOS users
- *  install GUI apps to. Main probes on demand; the current renderer UI
+ *  install GUI apps to. Main probes on demand; the current client UI
  *  asks once per mounted branch action area, so runtime install/removal
  *  may need a remount or app restart before buttons update. */
 export function isGhosttyInstalled(): boolean {

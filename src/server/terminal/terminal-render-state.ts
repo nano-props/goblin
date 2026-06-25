@@ -12,7 +12,7 @@ import type {
 // and bounded-tail recovery, but attach/takeover hydration is generated from
 // the server-side headless xterm state. That keeps "current screen" semantics
 // in xterm's parser instead of replaying historical erase/repaint bytes into
-// each newly-attached renderer.
+// each newly-attached client.
 
 const MAX_BUFFER_CHARS = 16 * 1024 * 1024
 const DEFAULT_COLS = 80

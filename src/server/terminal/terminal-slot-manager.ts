@@ -97,7 +97,7 @@ interface TerminalSlot<TUser extends string | number> {
   userSticky: boolean
   phase: TerminalSlotPhase
   message: string | null
-  /** Mirrors the renderer's `takeoverPending` flag so a lifecycle
+  /** Mirrors the client's `takeoverPending` flag so a lifecycle
    *  realtime event can tell siblings to disable the write path
    *  the moment the takeover starts. */
   takeoverPending: boolean
@@ -112,7 +112,7 @@ export interface TerminalEventSink<TUser extends string | number> {
   onTitle?(userId: TUser, event: { ptySessionId: string; canonicalTitle: string | null }): void
   onExit(userId: TUser, event: TerminalExitEvent): void
   // Identity and lifecycle are emitted on separate channels so the
-  // renderer's teardown decision can subscribe to identity only.
+  // client's teardown decision can subscribe to identity only.
   // A transitional phase update arrives as `onLifecycle` and never
   // looks like a role change.
   onIdentity?(userId: TUser, event: TerminalIdentityEvent): void
@@ -309,11 +309,11 @@ export class TerminalSlotManager<TUser extends string | number> {
     // is empty (no resize, no identity event) — the caller is
     // known but not authoritative yet (the WS hasn't been
     // observed as alive for this attachment). Surfacing `ok:
-    // true` here would tell the renderer it became controller
+    // true` here would tell the client it became controller
     // when nothing actually changed; the existing
     // `takeoverResult()` would still hardcode
     // `role: 'controller'` and `controllerStatus: 'connected'`,
-    // masking the no-op. Reject with the same key the renderer
+    // masking the no-op. Reject with the same key the client
     // maps to "session lost" so the user can retry.
     if (!effect.emitIdentity && !effect.resizeTo) {
       return { ok: false, message: 'error.unavailable' }
@@ -493,7 +493,7 @@ export class TerminalSlotManager<TUser extends string | number> {
     // executed in `takeoverSlot()` — the requesting attachment
     // is the controller and `session.cols`/`session.rows` reflect
     // any resize effect that ran during the control claim. We
-    // surface all four frame fields synchronously so the renderer
+    // surface all four frame fields synchronously so the client
     // doesn't have to wait for a follow-up realtime `identity`
     // event before painting the post-takeover frame. See
     // `docs/terminal-slot-lifecycle.md` §Takeover atomicity.
@@ -542,9 +542,9 @@ export class TerminalSlotManager<TUser extends string | number> {
 
   // Lifecycle emits a single, identity-free event whenever the
   // slot's phase, message, or takeover-pending flag changes. A
-  // controller→viewer teardown decision in the renderer must not
+  // controller→viewer teardown decision in the client must not
   // subscribe to this channel; the wire keeps the two concerns on
-  // separate paths so the type-level separation in the renderer
+  // separate paths so the type-level separation in the client
   // (`applyIdentity` vs `applyLifecycle`) cannot be circumvented.
   private emitLifecycle(session: TerminalSlot<TUser>): void {
     this.sink.onLifecycle?.(session.userId, {

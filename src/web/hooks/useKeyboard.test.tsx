@@ -154,7 +154,7 @@ describe('useKeyboard', () => {
     terminalHost.remove()
   })
 
-  test('does not run menu-backed primary shortcuts from the renderer in electron', async () => {
+  test('does not run menu-backed primary shortcuts from the client in electron', async () => {
     Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
     installNativeBridgeStub()
     seedRepoState({

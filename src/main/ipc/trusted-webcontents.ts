@@ -1,5 +1,5 @@
 import type { IpcMainInvokeEvent, WebContents } from 'electron'
-import { isRegisteredRendererSurfaceId } from '#/main/window-registry.ts'
+import { isRegisteredClientSurfaceId } from '#/main/window-registry.ts'
 
 const explicitlyTrustedWebContentsIds = new Set<number>()
 const trustedAppUrls = new Set<string>()
@@ -43,7 +43,7 @@ export function isTrustedAppUrlForWebContents(webContentsId: number, value: stri
 
 export function isTrustedIpcEvent(event: IpcMainInvokeEvent): boolean {
   return (
-    (isRegisteredRendererSurfaceId(event.sender.id) || explicitlyTrustedWebContentsIds.has(event.sender.id)) &&
+    (isRegisteredClientSurfaceId(event.sender.id) || explicitlyTrustedWebContentsIds.has(event.sender.id)) &&
     event.senderFrame !== null &&
     isTrustedAppUrlForWebContents(event.sender.id, event.senderFrame.url)
   )

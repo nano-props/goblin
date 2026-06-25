@@ -201,14 +201,14 @@ export function createApp(options: ServerAppOptions): Hono {
     }),
   )
   app.route('/api/settings', createSettingsRoutes(settingsState))
-  // i18n is mounted at a separate public path so the renderer can
+  // i18n is mounted at a separate public path so the client can
   // fetch it before the user is authenticated. The token gate's
   // labels are translated by this endpoint; if it were under
   // `/api/settings/*` the gate would be stuck in raw-key land
   // until the user pasted a token. The handler is unauthenticated
   // by design — the dictionary is not sensitive.
   app.get('/api/i18n', async (c) => c.json(await getServerI18nSnapshot(c.req.header('accept-language'))))
-  // Host info is public for the same reason i18n is: the renderer's
+  // Host info is public for the same reason i18n is: the client's
   // settings page mounts inside the token gate on first paint and
   // needs to know which OS-specific terminal entries to render
   // before the user is authenticated. The payload is non-sensitive
@@ -240,7 +240,7 @@ export function createApp(options: ServerAppOptions): Hono {
   if (typeof periodic.unref === 'function') periodic.unref()
 
   // The built web bundle is served as plain static files. The
-  // renderer pulls its bootstrap (i18n, settings, server URL) from
+  // client pulls its bootstrap (i18n, settings, server URL) from
   // `/api/settings/*` and the access token either from the Electron
   // preload's IPC or the `/api/login` cookie — the server no longer
   // rewrites `dist/web/index.html`. Skipping the middleware on a

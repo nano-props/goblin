@@ -25,11 +25,11 @@ export type TerminalRealtimeMessage =
   | { type: 'output'; event: TerminalOutputEvent }
   | { type: 'title'; event: TerminalTitleEvent }
   | { type: 'exit'; event: TerminalExitEvent }
-  // Identity and lifecycle are split at the wire. The renderer's
+  // Identity and lifecycle are split at the wire. The client's
   // `applyIdentity` only sees the identity event; `applyLifecycle`
   // only sees the lifecycle event. A transitional phase update
   // (e.g. `'opening'` during a pre-spawn broadcast) cannot look
-  // like a role change to the renderer.
+  // like a role change to the client.
   | { type: 'identity'; event: TerminalIdentityEvent }
   | { type: 'lifecycle'; event: TerminalLifecycleEvent }
   | { type: 'sessions-changed'; repoRoot: string }
@@ -37,7 +37,7 @@ export type TerminalRealtimeMessage =
   // successful `close` request, alongside the existing
   // `sessions-changed` global broadcast. Multi-window clients use
   // this to drop the local slot immediately, without waiting for
-  // a full list-rescan. The `repoRoot` is included so the renderer
+  // a full list-rescan. The `repoRoot` is included so the client
   // can route the event to the right worktree without a manager
   // lookup.
   | { type: 'slot-closed'; ptySessionId: string; repoRoot: string }
@@ -101,7 +101,7 @@ export type TerminalSocketResponseMessage =
 
 export type TerminalSocketServerMessage = TerminalRealtimeMessage | TerminalSocketResponseMessage
 /**
- * Heartbeat envelope. Sent renderer→server every
+ * Heartbeat envelope. Sent client→server every
  * `HEARTBEAT_INTERVAL_MS` while the realtime socket is `OPEN`. Carries
  * no payload — the server already knows the `(clientId, userId)` from
  * the upgrade — but a discriminating `type` keeps the union closed so

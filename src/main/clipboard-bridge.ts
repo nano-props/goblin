@@ -10,11 +10,11 @@ import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
  * Wire on `webUtils.getPathForFile`. This is the only Electron preload /
  * main-process surface that resolves a `File` (delivered via the
  * `ClipboardEvent` / `DragEvent`) back to an absolute filesystem path —
- * the renderer uses it transparently through `pathForDroppedFile`.
+ * the client uses it transparently through `pathForDroppedFile`.
  *
  * The main process only owns the *blob save* path: when a file has no
  * filesystem path (image copied from a browser tab, screenshot, etc.) the
- * renderer ships `{name, bytes}` over IPC and we persist it under a temp
+ * client ships `{name, bytes}` over IPC and we persist it under a temp
  * dir so the PTY can read it as a real file.
  */
 export interface BinaryClipboardFile {
@@ -82,7 +82,7 @@ let periodicPrune: NodeJS.Timeout | null = null
 /**
  * Persist clipboard / drop blobs to the per-process temp directory.
  *
- * Throws if any single payload exceeds `PASTE_FILE_MAX_BYTES`. The renderer
+ * Throws if any single payload exceeds `PASTE_FILE_MAX_BYTES`. The client
  * is supposed to short-circuit oversize files with a `paste-file-too-large`
  * toast *before* IPC; this guard is defence in depth for a misbehaving or
  * skipped preload.
@@ -188,12 +188,12 @@ export function wireClipboardBridgeIpc(): void {
       return await saveClipboardBinaryFiles(files)
     } catch (err) {
       // We collapse to `[]` so the resolver can count a backend-transfer
-      // failure, but the renderer can't tell *why*
+      // failure, but the client can't tell *why*
       // this bridge call failed. Log here so ops can diagnose (an oversized
       // payload routed through a misbehaving preload, a temp-dir
       // permission failure, etc.). Uses raw console.warn because
       // pino/consola isn't available in this module's import graph;
-      // the renderer-side `web/logger.ts` will already be emitting
+      // the client-side `web/logger.ts` will already be emitting
       // its own record of the toast.
       console.warn(`[clipboard-bridge] ${CLIPBOARD_SAVE_FILES_CHANNEL} failed`, err)
       return []
@@ -233,7 +233,7 @@ export function wireClipboardBridgeIpc(): void {
 
 // resolveOsClipboardPath was added during the design phase as a
 // forward-looking helper for a future "single-source the path-attempt
-// contract" refactor, but nothing ever imported it. The renderer's
+// contract" refactor, but nothing ever imported it. The client's
 // `pathForDroppedFile` calls `webUtils.getPathForFile` directly through
 // the preload, and pulling that into main buys nothing — `File` doesn't
 // survive the contextBridge boundary, so the call has to live in the

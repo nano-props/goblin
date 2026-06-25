@@ -56,7 +56,11 @@ export function Toolbar({ children, className, variant = 'plain', ...props }: To
       className={cn(
         'flex h-9 shrink-0 items-center',
         variant === 'repo' && 'gap-3 border-b border-border/60 bg-card px-4',
-        variant === 'workspace' && 'min-w-0 justify-between gap-2 border-b border-border/60 bg-card px-1',
+        // In-panel seam: bg matches the workspace canvas below, and the
+        // hairline uses `border-separator` (lighter than the topbar's
+        // `border-border/60`) so the strip + content read as one panel.
+        // See `docs/ui-conventions.md` for the surface-divider convention.
+        variant === 'workspace' && 'min-w-0 justify-between gap-2 border-b border-separator bg-background px-1',
         className,
       )}
       {...props}

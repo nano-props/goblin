@@ -5,13 +5,11 @@ import type { CSSProperties, ReactNode } from 'react'
 // (animate-pulse + bg-muted) and avoids the "fine-grained flicker"
 // that comes from dozens of tiny bars pulsing in unison.
 
-import { cn } from '#/web/lib/cn.ts'
 import { Skeleton } from '#/web/components/ui/skeleton.tsx'
 import { RepoWorkspace, RepoWorkspacePane, Toolbar } from '#/web/components/Layout.tsx'
 
 interface BranchNavigatorSkeletonProps {
   rows?: number
-  showBranchActions?: boolean
 }
 
 interface RowCountProps {
@@ -24,12 +22,12 @@ interface WorkspaceSkeletonProps {
   branchWorkspaceState?: 'empty' | 'content'
 }
 
-export function BranchNavigatorSkeleton({ rows = 6, showBranchActions = false }: BranchNavigatorSkeletonProps) {
+export function BranchNavigatorSkeleton({ rows = 6 }: BranchNavigatorSkeletonProps) {
   return (
     <SkeletonList
       rows={rows}
       className="flex flex-1 flex-col gap-1 p-1.5"
-      renderRow={(i) => <BranchNavigatorSkeletonRow key={i} showActions={showBranchActions} />}
+      renderRow={(i) => <BranchNavigatorSkeletonRow key={i} />}
     />
   )
 }
@@ -60,7 +58,7 @@ export function RepoWorkspaceSkeleton({
   )
   const branchNavigatorPane = (
     <RepoWorkspacePane>
-      <BranchNavigatorSkeleton showBranchActions />
+      <BranchNavigatorSkeleton />
     </RepoWorkspacePane>
   )
 
@@ -74,11 +72,7 @@ export function RepoWorkspaceSkeleton({
 
   return (
     <section className="flex min-w-0 flex-1 flex-col">
-      <RepoWorkspace
-        mode="split"
-        branchNavigatorPane={branchNavigatorPane}
-        branchWorkspacePane={branchWorkspacePane}
-      />
+      <RepoWorkspace mode="split" branchNavigatorPane={branchNavigatorPane} branchWorkspacePane={branchWorkspacePane} />
     </section>
   )
 }
@@ -132,25 +126,18 @@ function SkeletonList({
   )
 }
 
-function BranchNavigatorSkeletonRow({ showActions }: { showActions: boolean }) {
+function BranchNavigatorSkeletonRow() {
   return (
-    <li
-      className={cn(
-        'grid min-h-9 items-stretch rounded-md bg-muted/30',
-        showActions ? 'grid-cols-[minmax(0,1fr)_auto]' : 'grid-cols-1',
-      )}
-    >
+    <li className="grid min-h-9 grid-cols-[minmax(0,1fr)_auto] items-stretch rounded-md bg-muted/30">
       <div className="flex min-w-0 items-center gap-3 px-4">
         <Skeleton className="h-4 w-4 rounded-full" />
         <Skeleton className="h-4 w-3/5" />
       </div>
-      {showActions && (
-        <div className="flex shrink-0 items-center pr-4">
-          <div data-testid="branch-navigator-skeleton-action">
-            <Skeleton className="h-6 w-7" />
-          </div>
+      <div className="flex shrink-0 items-center pr-4">
+        <div data-testid="branch-navigator-skeleton-action">
+          <Skeleton className="h-6 w-7" />
         </div>
-      )}
+      </div>
     </li>
   )
 }

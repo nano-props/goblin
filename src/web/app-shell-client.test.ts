@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
-import type { RendererBridge } from '#/web/renderer-bridge-types.ts'
+import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import type { ClientBridge } from '#/web/client-bridge-types.ts'
 
 function installWindow(openReturn: unknown = {}) {
   Object.defineProperty(globalThis, 'window', {
@@ -16,7 +16,7 @@ function installWindow(openReturn: unknown = {}) {
   })
 }
 
-function testBridge(overrides: Partial<RendererBridge> = {}): RendererBridge {
+function testBridge(overrides: Partial<ClientBridge> = {}): ClientBridge {
   const nativeShell = overrides.shell?.() ?? null
   return {
     kind: () => 'web',
@@ -30,7 +30,7 @@ function testBridge(overrides: Partial<RendererBridge> = {}): RendererBridge {
       return false
     },
     getBootstrap: () => ({
-      runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
+      runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
       initialServer: null,
     }),
     invokeIpc: vi.fn(),
@@ -54,10 +54,10 @@ describe('app shell client', () => {
     installWindow()
   })
 
-  test('opens app settings through the renderer bridge shell', async () => {
-    const bridgeModule = await import('#/web/renderer-bridge.ts')
+  test('opens app settings through the client bridge shell', async () => {
+    const bridgeModule = await import('#/web/client-bridge.ts')
     const openSettingsWindow = vi.fn(async () => true)
-    bridgeModule.setRendererBridgeForTests(
+    bridgeModule.setClientBridgeForTests(
       testBridge({
         shell: () => ({
           openSettingsWindow,
@@ -83,7 +83,7 @@ describe('app shell client', () => {
   test('still reports success when window.open returns null under noopener', async () => {
     // window.open() with `noopener` returns null by spec even when the new
     // tab opens — that is the entire point of noopener (reverse-tabnabbing
-    // protection). The renderer cannot observe the outcome, so the URL
+    // protection). The client cannot observe the outcome, so the URL
     // handoff is treated as best-effort success.
     installWindow(null)
     const { openExternalUrl } = await import('#/web/app-shell-client.ts')
@@ -92,9 +92,9 @@ describe('app shell client', () => {
   })
 
   test('opens the project GitHub URL through the native shell with https-only policy', async () => {
-    const bridgeModule = await import('#/web/renderer-bridge.ts')
+    const bridgeModule = await import('#/web/client-bridge.ts')
     const shellOpenExternalUrl = vi.fn(async () => ({ ok: true, message: 'https://github.com/nano-props/goblin' }))
-    bridgeModule.setRendererBridgeForTests(
+    bridgeModule.setClientBridgeForTests(
       testBridge({
         shell: () => ({
           openSettingsWindow: vi.fn(),
@@ -115,12 +115,12 @@ describe('app shell client', () => {
     expect(window.open).not.toHaveBeenCalled()
   })
 
-  test('chooses repository paths through the renderer bridge shell', async () => {
-    const bridgeModule = await import('#/web/renderer-bridge.ts')
+  test('chooses repository paths through the client bridge shell', async () => {
+    const bridgeModule = await import('#/web/client-bridge.ts')
     const openDirectoryDialog = vi.fn(async (input?: { title?: string }) =>
       input?.title === 'Open Git Repository' ? '/tmp/repo' : '/tmp',
     )
-    bridgeModule.setRendererBridgeForTests(
+    bridgeModule.setClientBridgeForTests(
       testBridge({
         shell: () => ({
           openSettingsWindow: vi.fn(),
@@ -145,8 +145,8 @@ describe('app shell client', () => {
     // hit the paste-file-partial branch when only some files made
     // it across. Without this test, that contract relied on
     // coincidence.
-    const bridgeModule = await import('#/web/renderer-bridge.ts')
-    bridgeModule.setRendererBridgeForTests(testBridge({ saveClipboardFiles: vi.fn(async () => ['/tmp/a', '/tmp/b']) }))
+    const bridgeModule = await import('#/web/client-bridge.ts')
+    bridgeModule.setClientBridgeForTests(testBridge({ saveClipboardFiles: vi.fn(async () => ['/tmp/a', '/tmp/b']) }))
     const { saveClipboardFiles } = await import('#/web/app-shell-client.ts')
     await expect(saveClipboardFiles([new File([new Uint8Array([1])], 'a')])).resolves.toEqual(['/tmp/a', '/tmp/b'])
   })
@@ -156,8 +156,8 @@ describe('app shell client', () => {
     // throws (uninitialised, IPC channel down, etc.) must not bubble
     // the error out of app-shell-client — the resolver reads `[]`
     // and surfaces a single toast instead.
-    const bridgeModule = await import('#/web/renderer-bridge.ts')
-    bridgeModule.setRendererBridgeForTests(
+    const bridgeModule = await import('#/web/client-bridge.ts')
+    bridgeModule.setClientBridgeForTests(
       testBridge({
         saveClipboardFiles: vi.fn(() => {
           throw new Error('bridge unavailable')
@@ -169,8 +169,8 @@ describe('app shell client', () => {
   })
 
   test('saveClipboardFiles collapses bridge rejection to []', async () => {
-    const bridgeModule = await import('#/web/renderer-bridge.ts')
-    bridgeModule.setRendererBridgeForTests(
+    const bridgeModule = await import('#/web/client-bridge.ts')
+    bridgeModule.setClientBridgeForTests(
       testBridge({
         saveClipboardFiles: vi.fn(async () => {
           throw new Error('async bridge failure')

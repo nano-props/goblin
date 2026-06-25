@@ -2,12 +2,12 @@
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ILinkHandler } from '@xterm/xterm'
-import { ELECTRON_RENDERER_CAPABILITIES, RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { ManagedTerminalSlot } from '#/web/components/terminal/ManagedTerminalSlot.ts'
 import { terminalLog } from '#/web/logger.ts'
 import { installTerminalThemeStyles } from '#/web/components/terminal/terminal-theme-test-utils.ts'
 import { isTerminalFocused } from '#/web/terminal-focus.ts'
-import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
+import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import type {
   TerminalMutationResult,
   TerminalNotifyBellInput,
@@ -554,8 +554,8 @@ beforeEach(() => {
       abortIpc: vi.fn(),
       runtime: {
         kind: 'electron',
-        bridgeVersion: RENDERER_BRIDGE_VERSION,
-        capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+        bridgeVersion: CLIENT_BRIDGE_VERSION,
+        capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
       },
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
       pathForFile: vi.fn(),
@@ -587,7 +587,7 @@ beforeEach(() => {
       },
     },
   })
-  setRendererBridgeForTests({
+  setClientBridgeForTests({
     kind: () => 'electron',
     hasCapability: (capability) =>
       capability === 'settings-ipc' ||
@@ -601,8 +601,8 @@ beforeEach(() => {
     getBootstrap: () => ({
       runtime: {
         kind: 'electron',
-        bridgeVersion: RENDERER_BRIDGE_VERSION,
-        capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+        bridgeVersion: CLIENT_BRIDGE_VERSION,
+        capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
       },
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
     }),
@@ -1477,7 +1477,7 @@ describe('ManagedTerminalSlot', () => {
   test('takeover response is the authoritative handshake (no realtime event required)', async () => {
     // After the takeover atomicity follow-up, the `terminal.takeover`
     // response carries role/controllerStatus/canonicalCols/Rows/phase
-    // and is applied synchronously. The renderer does NOT have to
+    // and is applied synchronously. The client does NOT have to
     // wait for a realtime `identity` event before painting the
     // post-takeover frame. A subsequent realtime event for the same
     // session is idempotent.
@@ -2331,7 +2331,7 @@ describe('ManagedTerminalSlot', () => {
       // PTY crashes mid-takeover — server pushes a realtime lifecycle
       // event with phase=restarting. After the identity/lifecycle
       // split, phase is on its own channel; the identity event no
-      // longer carries phase at all. The renderer applies the
+      // longer carries phase at all. The client applies the
       // lifecycle event through `handleLifecycle` and the new
       // phase replaces the takeover response's phase.
       session.handleLifecycle({

@@ -1,5 +1,5 @@
-// Renderer-facing git domain types. Re-exports from the shared module
-// so adding a field on the main side reaches the renderer without a
+// Client-facing git domain types. Re-exports from the shared module
+// so adding a field on the main side reaches the client without a
 // manual mirror copy.
 
 export type {

@@ -21,7 +21,7 @@ interface EmbeddedServerRuntime {
    * Held in main-process memory so the IPC client
    * (`#/shared/embedded-server-client.ts`) can attach the header
    * when the main process calls into the embedded server's HTTP
-   * API (e.g. settings, session). Not exposed to the renderer.
+   * API (e.g. settings, session). Not exposed to the client.
    */
   accessToken: string
 }
@@ -149,7 +149,7 @@ export async function startEmbeddedServer(): Promise<EmbeddedServerRuntime | nul
         GOBLIN_SERVER_PORT: String(port),
         // The server child process reads this and uses it as the
         // shared auth secret for cookie / header / `?t=` middleware.
-        // The renderer does NOT see this env var — it gets the
+        // The client does NOT see this env var — it gets the
         // token via the http-only `goblin_access_token` cookie planted by `plantEmbedAuthCookie` (see `#/main/cookie-bootstrap.ts`)
         // backed by the `runtime.accessToken` field above.
         GOBLIN_SERVER_ACCESS_TOKEN: accessToken,

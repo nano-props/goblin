@@ -1,4 +1,4 @@
-// Renderer-side i18n. The app entrypoint hydrates this store from
+// Client-side i18n. The app entrypoint hydrates this store from
 // the public `/api/i18n` endpoint before mounting the normal React
 // tree; setPref writes through and the broadcast keeps every window
 // in sync. React components read translations through react-i18next,
@@ -7,7 +7,7 @@
 // fallback).
 //
 // No initial dictionary is read from the bootstrap: the server
-// stopped inlining it into HTML, so the renderer always starts
+// stopped inlining it into HTML, so the client always starts
 // with an empty English resource and the app entrypoint shows a
 // static loading/error state until the first hydrate call replaces
 // it with the user's preferred language. The `hydrated` flag flips

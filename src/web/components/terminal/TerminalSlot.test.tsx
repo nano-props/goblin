@@ -4,10 +4,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { TerminalSlot } from '#/web/components/terminal/TerminalSlot.tsx'
-import {
-  TerminalSlotContext,
-  TerminalSlotReadContext,
-} from '#/web/components/terminal/terminal-slot-context.ts'
+import { TerminalSlotContext, TerminalSlotReadContext } from '#/web/components/terminal/terminal-slot-context.ts'
 import type {
   TerminalSlotContextValue,
   TerminalSlotReadContextValue,
@@ -39,10 +36,7 @@ afterEach(() => {
 type TestTerminalSummary = Omit<TerminalSlotSummary, 'type' | 'id' | 'displayOrder'> &
   Partial<Pick<TerminalSlotSummary, 'type' | 'id' | 'displayOrder'>>
 
-type TestWorktreeSnapshot = Omit<
-  WorktreeTerminalSnapshot,
-  'slots' | 'bellCount'
-> & {
+type TestWorktreeSnapshot = Omit<WorktreeTerminalSnapshot, 'slots' | 'bellCount'> & {
   slots: TestTerminalSummary[]
   bellCount?: number
 }
@@ -156,13 +150,32 @@ async function renderControllerSlot() {
 }
 
 function clipboardDataWithFiles(files: File[]): DataTransfer {
-  return {
+  // jsdom's `DataTransfer` is a partial stub; we add `getData` so
+  // the slot's capture-phase handler can read `text/plain` and treat
+  // the absence of text as empty string (matching the real browser
+  // behaviour for a file-only clipboard).
+  const base = {
     files: {
       length: files.length,
       item: (i: number) => files[i] ?? null,
     } as unknown as FileList,
     items: [] as unknown as DataTransferItemList,
-  } as unknown as DataTransfer
+    getData: (_format: string) => '',
+  }
+  return base as unknown as DataTransfer
+}
+
+/**
+ * Build a `DataTransfer`-shaped object with both a `files` collection
+ * and `getData('text/plain')`. The slot's capture-phase paste handler
+ * reads both channels synchronously, so we need to fake both.
+ */
+function clipboardDataWithTextAndFiles(text: string, files: File[]): DataTransfer {
+  const base = clipboardDataWithFiles(files) as DataTransfer & {
+    getData: (format: string) => string
+  }
+  base.getData = (format: string) => (format === 'text/plain' ? text : '')
+  return base
 }
 
 async function dispatchPaste(slotRoot: HTMLElement, files: File[]): Promise<void> {
@@ -172,6 +185,22 @@ async function dispatchPaste(slotRoot: HTMLElement, files: File[]): Promise<void
     slotRoot.dispatchEvent(pasteEvent)
     await new Promise((r) => setTimeout(r, 0))
   })
+}
+
+/**
+ * Variant of `dispatchPaste` that also fakes `clipboardData.getData('text/plain')`
+ * and returns the event so tests can assert on `defaultPrevented`.
+ */
+async function dispatchPasteWithText(slotRoot: HTMLElement, text: string, files: File[] = []): Promise<Event> {
+  const pasteEvent = new Event('paste', { bubbles: true, cancelable: true })
+  Object.defineProperty(pasteEvent, 'clipboardData', {
+    value: clipboardDataWithTextAndFiles(text, files),
+  })
+  await act(async () => {
+    slotRoot.dispatchEvent(pasteEvent)
+    await new Promise((r) => setTimeout(r, 0))
+  })
+  return pasteEvent
 }
 
 describe('TerminalSlot', () => {
@@ -822,6 +851,7 @@ describe('TerminalSlot', () => {
           item: (i: number) => [file][i] ?? null,
         } as unknown as FileList,
         items: [] as unknown as DataTransferItemList,
+        getData: (_format: string) => '',
       } as unknown as DataTransfer
       const pasteEvent = new Event('paste', { bubbles: true, cancelable: true })
       Object.defineProperty(pasteEvent, 'clipboardData', { value: clipboardData })
@@ -937,6 +967,7 @@ describe('TerminalSlot', () => {
           item: (i: number) => [file][i] ?? null,
         } as unknown as FileList,
         items: [] as unknown as DataTransferItemList,
+        getData: (_format: string) => '',
       } as unknown as DataTransfer
       const pasteEvent = new Event('paste', { bubbles: true, cancelable: true })
       Object.defineProperty(pasteEvent, 'clipboardData', { value: clipboardData })
@@ -962,8 +993,8 @@ describe('TerminalSlot', () => {
     // The handler must call preventDefault() synchronously when it
     // sees an oversized file, so xterm doesn't also try to paste
     // the oversized clipboard data. We assert on `defaultPrevented`
-    // after the synchronous dispatch (processPaste is async but
-    // the size check runs first and returns).
+    // after the synchronous dispatch (the capture handler's size
+    // check runs before any async resolver work).
     ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
     const container = document.createElement('div')
     document.body.appendChild(container)
@@ -1062,6 +1093,7 @@ describe('TerminalSlot', () => {
           item: (i: number) => [oversized][i] ?? null,
         } as unknown as FileList,
         items: [] as unknown as DataTransferItemList,
+        getData: (_format: string) => '',
       } as unknown as DataTransfer
       const pasteEvent = new Event('paste', { bubbles: true, cancelable: true })
       Object.defineProperty(pasteEvent, 'clipboardData', { value: clipboardData })
@@ -1100,7 +1132,26 @@ describe('TerminalSlot', () => {
     }
   })
 
-  test('paste with an unsafe resolved path surfaces paste-file-unsafe without writing', async () => {
+  test('paste with an unsafe resolved path falls back to blob-save and writes the temp path', async () => {
+    const shellClient = await import('#/web/app-shell-client.ts')
+    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('/abs/bad\nname.png')
+    vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue(['/tmp/safe-name.png'])
+    const { toast } = await import('sonner')
+    vi.mocked(toast.error).mockClear()
+    const rendered = await renderControllerSlot()
+
+    try {
+      await dispatchPaste(rendered.slotRoot, [new File([new Uint8Array([1])], 'bad.png')])
+
+      expect(rendered.writeInput).toHaveBeenCalledWith('slot-1', "'/tmp/safe-name.png'", 'paste')
+      expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('terminal.paste-file-unsafe')
+      expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('terminal.paste-file-failed')
+    } finally {
+      await rendered.cleanup()
+    }
+  })
+
+  test('paste with an unsafe resolved path surfaces paste-file-failed when blob-save fallback also fails', async () => {
     const shellClient = await import('#/web/app-shell-client.ts')
     vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('/abs/bad\nname.png')
     vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
@@ -1112,8 +1163,61 @@ describe('TerminalSlot', () => {
       await dispatchPaste(rendered.slotRoot, [new File([new Uint8Array([1])], 'bad.png')])
 
       expect(rendered.writeInput).not.toHaveBeenCalled()
-      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-unsafe')
-      expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('terminal.paste-file-failed')
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-failed')
+      expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('terminal.paste-file-unsafe')
+    } finally {
+      await rendered.cleanup()
+    }
+  })
+
+  test('paste surfaces paste-file-failed when the resolver throws (no silent failure)', async () => {
+    // Defensive regression: if `resolvePastedFiles` rejects (IPC
+    // channel error, network failure, server 5xx) the slot must
+    // surface a toast instead of silently dropping the paste. Force
+    // the blob-save tier by giving path-attempt a no-path result.
+    const shellClient = await import('#/web/app-shell-client.ts')
+    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
+    vi.mocked(shellClient.saveClipboardFiles).mockRejectedValue(new Error('network down'))
+    const { toast } = await import('sonner')
+    vi.mocked(toast.error).mockClear()
+    const rendered = await renderControllerSlot()
+
+    try {
+      await dispatchPaste(rendered.slotRoot, [new File([new Uint8Array([1])], 'foo.png')])
+
+      expect(rendered.writeInput).not.toHaveBeenCalled()
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-failed')
+    } finally {
+      await rendered.cleanup()
+    }
+  })
+
+  test('drop surfaces paste-file-failed when the resolver throws', async () => {
+    // Same defensive regression for the drop path.
+    const shellClient = await import('#/web/app-shell-client.ts')
+    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
+    vi.mocked(shellClient.saveClipboardFiles).mockRejectedValue(new Error('network down'))
+    const { toast } = await import('sonner')
+    vi.mocked(toast.error).mockClear()
+    const rendered = await renderControllerSlot()
+    const file = new File([new Uint8Array([1])], 'foo.png')
+
+    try {
+      const slotRoot = rendered.slotRoot
+      const dataTransfer = {
+        types: ['Files'],
+        files: [file] as unknown as FileList,
+        dropEffect: '',
+      } as unknown as DataTransfer
+      const dropEvent = new Event('drop', { bubbles: true, cancelable: true })
+      Object.defineProperty(dropEvent, 'dataTransfer', { value: dataTransfer })
+      await act(async () => {
+        slotRoot.dispatchEvent(dropEvent)
+        await new Promise((r) => setTimeout(r, 0))
+      })
+
+      expect(rendered.writeInput).not.toHaveBeenCalled()
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-failed')
     } finally {
       await rendered.cleanup()
     }
@@ -1640,6 +1744,193 @@ describe('TerminalSlot', () => {
     } finally {
       await act(async () => root.unmount())
       container.remove()
+    }
+  })
+
+  // ---------------------------------------------------------------------
+  // Text-aware paste routing — the fix for the "Excel double-output" bug
+  // and the path-aware decision matrix in src/web/clipboard/process.ts.
+  // ---------------------------------------------------------------------
+
+  test('Excel-style paste (text + thumbnail blob) defers to xterm.js (text wins)', async () => {
+    // The bug: Excel `Cmd+C` puts TSV on the clipboard along with an
+    // incidental image/png thumbnail. The old code unconditionally
+    // routed through the file resolver, blob-saved the thumbnail,
+    // and wrote `/tmp/.../paste-...png` to the PTY *in addition to*
+    // xterm.js writing the TSV synchronously. The user saw both.
+    // The fix: when text is recognisably tabular text, drop the file
+    // blobs and let xterm.js's native paste handler pick up the text.
+    const shellClient = await import('#/web/app-shell-client.ts')
+    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
+    vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
+
+    const rendered = await renderControllerSlot()
+    const thumbnail = new File([new Uint8Array([1, 2, 3])], 'thumbnail.png', { type: 'image/png' })
+    const tsv = 'Header1\tHeader2\tHeader3\nValue1\tValue2\tValue3'
+
+    try {
+      const event = await dispatchPasteWithText(rendered.slotRoot, tsv, [thumbnail])
+
+      // We deliberately do NOT preventDefault here — xterm.js gets
+      // the event and writes the TSV to PTY itself. We must also
+      // NOT call writeInput with a path: that was the bug.
+      expect(event.defaultPrevented).toBe(false)
+      expect(rendered.writeInput).not.toHaveBeenCalled()
+      // And critically: the resolver was never consulted, so the
+      // thumbnail was never blob-saved (no /tmp write either).
+      expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
+    } finally {
+      await rendered.cleanup()
+    }
+  })
+
+  test('Linux file copy (URI-list text + real file) prefers files', async () => {
+    // The Linux file copy case the existing comment was trying to
+    // preserve: Nautilus etc. emit the URI list both as `text/uri-list`
+    // AND as `text/plain`. The text is a redundant rendering of the
+    // same URIs already in `Files`. We must still pick the file and
+    // let the resolver produce the shell-quoted path.
+    const shellClient = await import('#/web/app-shell-client.ts')
+    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('/home/user/foo.png')
+    vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
+
+    const rendered = await renderControllerSlot()
+    const file = new File([new Uint8Array([1])], 'foo.png')
+
+    try {
+      const event = await dispatchPasteWithText(rendered.slotRoot, 'file:///home/user/foo.png', [file])
+
+      expect(event.defaultPrevented).toBe(true)
+      expect(rendered.writeInput).toHaveBeenCalledWith('slot-1', "'/home/user/foo.png'", 'paste')
+      expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
+    } finally {
+      await rendered.cleanup()
+    }
+  })
+
+  test('Windows file copy (single-line path text + real file) prefers files', async () => {
+    // Windows Explorer typically renders just the path as `text/plain`
+    // with no URI list. The path-attempt tier resolves the real path
+    // and shell-quotes it. We preserve this behaviour.
+    const shellClient = await import('#/web/app-shell-client.ts')
+    vi.mocked(shellClient.pathForDroppedFile).mockImplementation((file: File) => `C:\\Users\\me\\${file.name}`)
+    vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
+
+    const rendered = await renderControllerSlot()
+    const file = new File([new Uint8Array([1])], 'bar.png')
+
+    try {
+      const event = await dispatchPasteWithText(rendered.slotRoot, 'C:\\Users\\me\\bar.png', [file])
+
+      expect(event.defaultPrevented).toBe(true)
+      expect(rendered.writeInput).toHaveBeenCalledWith('slot-1', "'C:\\Users\\me\\bar.png'", 'paste')
+    } finally {
+      await rendered.cleanup()
+    }
+  })
+
+  test('single-cell Excel paste (plain value + thumbnail blob) defers to xterm.js', async () => {
+    // Regression for Issue 1 (terminal pass): a single-cell Excel
+    // value (formatted cell with currency / date / borders) attaches
+    // a thumbnail blob. The text/plain is the value (no tab, no
+    // newline). Old code routed this to files and wrote the
+    // thumbnail's path; new code routes to text because the value
+    // doesn't look like a path.
+    const shellClient = await import('#/web/app-shell-client.ts')
+    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
+    vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
+
+    const rendered = await renderControllerSlot()
+    const thumbnail = new File([new Uint8Array([1, 2, 3])], 'thumbnail.png', { type: 'image/png' })
+
+    try {
+      const event = await dispatchPasteWithText(rendered.slotRoot, '42', [thumbnail])
+      expect(event.defaultPrevented).toBe(false)
+      expect(rendered.writeInput).not.toHaveBeenCalled()
+      expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
+    } finally {
+      await rendered.cleanup()
+    }
+  })
+
+  test('paste a URL alongside an image blob — URL reaches xterm, image is dropped', async () => {
+    // Regression for Issue 2 (terminal pass): a URL copied from a
+    // browser alongside an image blob. The URL is real text the user
+    // wants, not a filesystem path.
+    const shellClient = await import('#/web/app-shell-client.ts')
+    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
+    vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
+
+    const rendered = await renderControllerSlot()
+    const image = new File([new Uint8Array([1, 2, 3])], 'image.png', { type: 'image/png' })
+
+    try {
+      const event = await dispatchPasteWithText(rendered.slotRoot, 'https://example.com/foo', [image])
+      expect(event.defaultPrevented).toBe(false)
+      expect(rendered.writeInput).not.toHaveBeenCalled()
+      expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
+    } finally {
+      await rendered.cleanup()
+    }
+  })
+
+  test('single-row Excel paste (single-line TSV + thumbnail blob) defers to xterm.js', async () => {
+    // Regression for Issue 1: a single-row Excel copy used to be
+    // misclassified as "single-line non-URI → files" and the
+    // thumbnail got blob-saved. Tab is the load-bearing signal —
+    // single-row TSV has tabs without newlines.
+    const shellClient = await import('#/web/app-shell-client.ts')
+    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
+    vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
+
+    const rendered = await renderControllerSlot()
+    const thumbnail = new File([new Uint8Array([1, 2, 3])], 'thumbnail.png', { type: 'image/png' })
+    const tsv = 'Alice\t30\tNYC'
+
+    try {
+      const event = await dispatchPasteWithText(rendered.slotRoot, tsv, [thumbnail])
+      expect(event.defaultPrevented).toBe(false)
+      expect(rendered.writeInput).not.toHaveBeenCalled()
+      expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
+    } finally {
+      await rendered.cleanup()
+    }
+  })
+
+  test('pure-text paste (no files) does not preventDefault and does not call writeInput', async () => {
+    // The slot must NOT intercept a text-only paste. xterm.js's native
+    // paste handler reads `clipboardData.getData('text/plain')` and
+    // writes the text to PTY itself (with bracketed-paste wrap when
+    // applicable).
+    const shellClient = await import('#/web/app-shell-client.ts')
+    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
+    vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
+
+    const rendered = await renderControllerSlot()
+
+    try {
+      const event = await dispatchPasteWithText(rendered.slotRoot, 'echo hello', [])
+      expect(event.defaultPrevented).toBe(false)
+      expect(rendered.writeInput).not.toHaveBeenCalled()
+      expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
+    } finally {
+      await rendered.cleanup()
+    }
+  })
+
+  test('empty clipboard (no text, no files) is a no-op', async () => {
+    const shellClient = await import('#/web/app-shell-client.ts')
+    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
+    vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
+
+    const rendered = await renderControllerSlot()
+
+    try {
+      const event = await dispatchPasteWithText(rendered.slotRoot, '', [])
+      expect(event.defaultPrevented).toBe(false)
+      expect(rendered.writeInput).not.toHaveBeenCalled()
+    } finally {
+      await rendered.cleanup()
     }
   })
 })

@@ -1,4 +1,4 @@
-import { emitRendererLocalEvent } from '#/web/local-events.ts'
+import { emitClientLocalEvent } from '#/web/local-events.ts'
 import { resolveWebSocketProtocol } from '#/web/lib/websocket-url.ts'
 import { ACCESS_TOKEN_QUERY } from '#/shared/access-token.ts'
 import {
@@ -30,16 +30,16 @@ import type {
   TerminalTitleEvent,
   TerminalRestartInput,
 } from '#/shared/terminal-types.ts'
-import type { RendererTerminalBridge } from '#/web/renderer-bridge-types.ts'
+import type { ClientTerminalBridge } from '#/web/client-bridge-types.ts'
 import type { TerminalIdentityViewModel, TerminalLifecycleViewModel } from '#/web/components/terminal/types.ts'
 import { isAppQuitting, subscribeAppQuitting } from '#/web/app-lifecycle.ts'
 
 // Matches the server-side `HEARTBEAT_INTERVAL_MS`. Kept as a
-// renderer-local constant so the renderer doesn't need to import a
+// client-local constant so the client doesn't need to import a
 // server module to know its own beat cadence.
-const TERMINAL_RENDERER_HEARTBEAT_INTERVAL_MS = 30_000
+const TERMINAL_CLIENT_HEARTBEAT_INTERVAL_MS = 30_000
 
-export interface RendererServerTerminalConfig {
+export interface ClientServerTerminalConfig {
   url: string
   accessToken: string
   clientId: string
@@ -49,11 +49,11 @@ const WEB_TERMINAL_CLIENT_ID_STORAGE_KEY = 'goblin:web-terminal-client-id'
 const TERMINAL_REQUEST_TIMEOUT_MS = 30_000
 
 export function createServerTerminalBridge(options: {
-  getServerConfig: () => RendererServerTerminalConfig
+  getServerConfig: () => ClientServerTerminalConfig
   getClientId: () => string
   // `notifyBell` returning `undefined` (rather than a `Promise<false>`)
   // is the *deliberate* signal to fall through to the bridge's
-  // built-in browser-notification path. The renderer-bridge wrapper
+  // built-in browser-notification path. The client-bridge wrapper
   // uses that distinction so the web-runtime bell events get the
   // full Notification API + click handler — collapsing both paths
   // to `Promise.resolve(false)` would make the bell click test
@@ -61,7 +61,7 @@ export function createServerTerminalBridge(options: {
   notifyBell?: (input: TerminalNotifyBellInput) => Promise<TerminalMutationResult> | undefined
   sendTestNotification?: () => Promise<boolean> | undefined
   setBadge?: (count: number) => void
-}): RendererTerminalBridge {
+}): ClientTerminalBridge {
   type PendingSocketRequest = {
     action: TerminalSocketRequestAction
     resolve: (value: TerminalSocketResponseOutputs[TerminalSocketRequestAction]) => void
@@ -78,7 +78,7 @@ export function createServerTerminalBridge(options: {
   const clientId = options.getClientId()
   let socket: WebSocket | null = null
   let reconnectTimer: number | null = null
-  // Renderer→server liveness heartbeat. Sent while the socket is
+  // Client→server liveness heartbeat. Sent while the socket is
   // OPEN; the server's broker uses receipts to drive its per-`clientId`
   // deadline scan. Tied to the socket lifetime so it cannot outlive
   // the connection it's measuring.
@@ -262,7 +262,7 @@ export function createServerTerminalBridge(options: {
         stopHeartbeat()
         handleSocketDisconnection('Terminal heartbeat send failed')
       }
-    }, TERMINAL_RENDERER_HEARTBEAT_INTERVAL_MS)
+    }, TERMINAL_CLIENT_HEARTBEAT_INTERVAL_MS)
   }
 
   function stopHeartbeat(): void {
@@ -362,7 +362,7 @@ export function createServerTerminalBridge(options: {
     },
     notifyBell(input) {
       // First check whether the wrapper has a native handler at all
-      // (the renderer-bridge wrapper is always present, so this is
+      // (the client-bridge wrapper is always present, so this is
       // the "Electron preload registered" case). Then call it and
       // inspect the *result*: `undefined` means "no native bridge
       // right now, fall through to the browser notification path".
@@ -371,7 +371,7 @@ export function createServerTerminalBridge(options: {
         if (native !== undefined) return native
       }
       return showBrowserNotification(input.title, input.body, () => {
-        emitRendererLocalEvent({ type: 'terminal-bell-click', repoRoot: input.repoRoot, key: input.key })
+        emitClientLocalEvent({ type: 'terminal-bell-click', repoRoot: input.repoRoot, key: input.key })
       })
     },
     sendTestNotification() {

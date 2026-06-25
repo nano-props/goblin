@@ -24,12 +24,12 @@ import type {
   WorktreeTerminalSnapshot,
 } from '#/web/components/terminal/types.ts'
 import { MainWindowNavigationProvider, type MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
-import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
-import { emptyBootstrapSnapshot } from '#/web/renderer-bootstrap-bridge.ts'
+import { setClientBridgeForTests } from '#/web/client-bridge.ts'
+import { emptyBootstrapSnapshot } from '#/web/client-bootstrap-bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
-import type { RendererBridge } from '#/web/renderer-bridge-types.ts'
+import type { ClientBridge } from '#/web/client-bridge-types.ts'
 import {
   workspacePaneStaticViewsForBranch,
   workspacePaneTabOrderForBranch,
@@ -70,7 +70,7 @@ beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   compactUi = false
   resetReposStore()
-  setRendererBridgeForTests(null)
+  setClientBridgeForTests(null)
   // T6.1: the toolbar reads `isInitialSyncInFlight` from
   // useRepoSyncStore; existing tests assume the repo has been
   // synced. Mark ready by default so the "+ New" button renders; the
@@ -87,7 +87,7 @@ afterEach(() => {
   container = null
   queryClient = null
   toastMocks.error.mockClear()
-  setRendererBridgeForTests(null)
+  setClientBridgeForTests(null)
   setTerminalSlotCommandBridge(null)
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
@@ -353,6 +353,41 @@ describe('BranchWorkspaceToolbar', () => {
     })
 
     expect(c.querySelectorAll('[role="tab"]')).toHaveLength(1)
+    expect(c.querySelector('button[aria-label="terminal.new"]')).toBeNull()
+    expect(c.querySelector('button[aria-label="terminal.loading"]')).toBeNull()
+    expect(c.querySelector('button[aria-label="workspace-pane-views.tabs"]')).not.toBeNull()
+  })
+
+  test('compact workspace view keeps the popover switcher reachable while the terminal view is loading', () => {
+    // Regression: when the user is viewing the terminal panel while the
+    // terminal registry is still hydrating (`preferredWorkspacePaneView =
+    // 'terminal'`, no materialized terminal tabs), the toolbar's
+    // `activeTabIdentity` is null because the tab-model's selection is
+    // `terminal-host` with `tab: null`. The compact layout must still be
+    // used (a structural choice driven by screen size) — otherwise the
+    // strip falls through to the scrollable layout, which renders fixed
+    // `w-36` tabs and the busy `+ New` button. The compact body shows an
+    // empty tab area in this state and keeps the popover switcher
+    // reachable so the user can navigate to an existing tab.
+    compactUi = true
+    const { container: c } = renderToolbar({
+      terminalCount: 0,
+      preferredWorkspacePaneView: 'terminal',
+      navigation: navigationWith({}),
+      loading: true,
+    })
+
+    const tablist = c.querySelector('[role="tablist"][aria-label="workspace-pane-views.tabs"]')
+    const tabs = Array.from(c.querySelectorAll('[role="tab"]'))
+
+    expect(tablist).not.toBeNull()
+    expect(tablist?.className).toContain('flex-1')
+    // No tab is rendered because no tab is active and no terminal is
+    // materialized. The compact body renders an empty tab area + chevron.
+    expect(tabs).toHaveLength(0)
+    // The scrollable-layout affordances (the busy `+ New` button) must
+    // stay out of the compact strip — the chevron-driven tab switcher is
+    // the only way to reach the workspace pane views in compact mode.
     expect(c.querySelector('button[aria-label="terminal.new"]')).toBeNull()
     expect(c.querySelector('button[aria-label="terminal.loading"]')).toBeNull()
     expect(c.querySelector('button[aria-label="workspace-pane-views.tabs"]')).not.toBeNull()

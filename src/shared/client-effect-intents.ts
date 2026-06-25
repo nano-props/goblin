@@ -3,7 +3,7 @@ import { normalizeRepoSessionEntry, type RepoSessionEntry } from '#/shared/remot
 import type { LangPref, ThemePref } from '#/shared/settings.ts'
 import { isWorkspacePaneViewType, type WorkspacePaneView } from '#/shared/workspace-pane.ts'
 
-export type RendererEffectIntent =
+export type ClientEffectIntent =
   | { type: 'open-repo-requested' }
   | { type: 'open-repo-path-requested' }
   | { type: 'open-remote-repo-requested' }
@@ -26,9 +26,9 @@ export type RendererEffectIntent =
   | { type: 'terminal-bell-click'; repoRoot: string; key?: string }
   | { type: 'external-open-enqueued' }
 
-export type RendererEffectIntentType = RendererEffectIntent['type']
+export type ClientEffectIntentType = ClientEffectIntent['type']
 
-export function isRendererEffectIntent(event: unknown): event is RendererEffectIntent {
+export function isClientEffectIntent(event: unknown): event is ClientEffectIntent {
   if (!isRecord(event)) return false
   switch (event.type) {
     case 'open-repo-requested':

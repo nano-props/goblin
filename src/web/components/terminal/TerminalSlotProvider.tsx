@@ -11,7 +11,7 @@ import {
   TerminalSlotContext,
   TerminalSlotReadContext,
 } from '#/web/components/terminal/terminal-slot-context.ts'
-import { readOrCreateWebTerminalClientId } from '#/web/renderer-terminal-bridge.ts'
+import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-bridge.ts'
 import { preloadTerminalFont } from '#/web/components/terminal/terminal-geometry.ts'
 import { loadTerminalSlots } from '#/web/terminal-slot-queries.ts'
 import {
@@ -64,7 +64,7 @@ export function TerminalSlotProvider({ children }: TerminalSlotProviderProps) {
     void terminalBridge.prewarm()
   }, [currentRepoId])
 
-  // The registry is a renderer-level singleton (terminal-roadmap.md P1.7).
+  // The registry is a client-level singleton (terminal-roadmap.md P1.7).
   // The first Provider mount constructs it via `getTerminalSlotRegistry`;
   // subsequent mounts (StrictMode re-mount, route round-trip) reuse the
   // same instance. The ref is kept only so the rest of this component can
@@ -181,7 +181,7 @@ export function TerminalSlotProvider({ children }: TerminalSlotProviderProps) {
   }, [])
 
   // Registry event wiring (singleton lifecycle, see terminal-roadmap.md P1.7).
-  // The registry is renderer-level; we only subscribe / unsubscribe bridge
+  // The registry is client-level; we only subscribe / unsubscribe bridge
   // events on mount/unmount. We do NOT destroy the registry — the singleton
   // outlives the Provider. StrictMode re-mounts simply re-register the same
   // listeners against the same instance.

@@ -21,11 +21,11 @@ import {
   createExternalOpenDrainKickPlan,
   createTerminalBellIntentPlan,
   createWorkspaceIntentPlan,
-} from '#/web/hooks/renderer-effect-intent-plans.ts'
+} from '#/web/hooks/client-effect-intent-plans.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import type { OpenRepoResult } from '#/web/stores/repos/types.ts'
-import type { RendererEffectIntent } from '#/shared/renderer-effect-intents.ts'
+import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 
 interface TerminalBellIntentDeps {
   navigation: MainWindowNavigationActions
@@ -33,7 +33,7 @@ interface TerminalBellIntentDeps {
   setSelectedTerminal: (worktreeKey: string, key: string) => void
 }
 
-interface SharedRendererIntentDeps {
+interface SharedClientIntentDeps {
   navigation: MainWindowNavigationActions
   currentRepoId: string | null
   closeAllOverlays: () => void
@@ -56,7 +56,7 @@ interface ExternalOpenIntentDrainerDeps {
 }
 
 export function handleTerminalBellClickIntent(
-  event: Extract<RendererEffectIntent, { type: 'terminal-bell-click' }>,
+  event: Extract<ClientEffectIntent, { type: 'terminal-bell-click' }>,
   deps: TerminalBellIntentDeps,
 ): void {
   const plan = createTerminalBellIntentPlan(useReposStore.getState().repos[event.repoRoot], event)
@@ -73,9 +73,9 @@ export function handleTerminalBellClickIntent(
   }
 }
 
-export async function handleAppLevelRendererIntent(
-  event: RendererEffectIntent,
-  deps: SharedRendererIntentDeps,
+export async function handleAppLevelClientIntent(
+  event: ClientEffectIntent,
+  deps: SharedClientIntentDeps,
 ): Promise<boolean> {
   // App-level intents are allowed even when no workspace repo is visible.
   const plan = createAppLevelIntentPlan(event, {
@@ -108,9 +108,9 @@ export async function handleAppLevelRendererIntent(
   }
 }
 
-export async function handleWorkspaceRendererIntent(
-  event: RendererEffectIntent,
-  deps: SharedRendererIntentDeps,
+export async function handleWorkspaceClientIntent(
+  event: ClientEffectIntent,
+  deps: SharedClientIntentDeps,
 ): Promise<boolean> {
   // Workspace intents are route-aware and may be gated by overlays, shortcut
   // suppression, or terminal focus before they execute.

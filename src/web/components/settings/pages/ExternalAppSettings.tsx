@@ -17,7 +17,7 @@ import {
   SettingsList,
   SettingsRow,
 } from '#/web/components/settings/SettingsPrimitives.tsx'
-import { useHostInfoStore, type RendererPlatform } from '#/web/stores/host-info.ts'
+import { useHostInfoStore, type ClientPlatform } from '#/web/stores/host-info.ts'
 import { useExternalAppsQuery } from '#/web/settings-queries.ts'
 import { useExternalAppSettingsController } from '#/web/runtime-settings-external-apps.ts'
 import { useT } from '#/web/stores/i18n.ts'
@@ -77,7 +77,7 @@ const ALL_TERMINAL_OPTIONS: { value: TerminalPref; labelKey: string }[] = [
  * host platform. Mirrors the union in `shared/bootstrap.ts`; add new
  * platforms here when they get a Windows-Terminal-shaped backend.
  */
-type BootstrapPlatform = RendererPlatform
+type BootstrapPlatform = ClientPlatform
 const PLATFORM_TERMINAL_IDS: Record<BootstrapPlatform, ReadonlySet<string>> = {
   win32: new Set(['windowsTerminal']),
   darwin: new Set(['ghostty', 'terminal']),
@@ -94,7 +94,7 @@ const PLATFORM_TERMINAL_IDS: Record<BootstrapPlatform, ReadonlySet<string>> = {
   netbsd: new Set(['ghostty']),
   openbsd: new Set(['ghostty']),
   sunos: new Set(['ghostty']),
-  // Web-hosted renderers (the dev preview) have no real terminal; hide
+  // Web-hosted clients (the dev preview) have no real terminal; hide
   // every OS-specific entry.
   web: new Set<string>(),
 }
@@ -169,7 +169,7 @@ export function ExternalAppSettings() {
   const editorAppAvailability = data.editor.appAvailability
   const { refreshExternalApps, refreshing, setTerminalApp, setEditorApp } = useExternalAppSettingsController()
   // Read the platform from the host-info store, not `process.platform`:
-  // the renderer is sandboxed and does not have `process` at runtime, so
+  // the client is sandboxed and does not have `process` at runtime, so
   // the only reliable source is the public `/api/host` endpoint fetched
   // during public bootstrap. The store falls back to `'web'`
   // (which hides every OS-specific terminal entry) until the hydrate

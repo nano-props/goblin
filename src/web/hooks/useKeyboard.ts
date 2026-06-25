@@ -16,7 +16,7 @@ import { useUiTransitionStore } from '#/web/stores/ui-transition.ts'
 import { visibleBranches } from '#/web/stores/repos/branch-view-mode.ts'
 import { isShortcutBlockingLayerOpen } from '#/web/lib/layers.ts'
 import { runBranchActionShortcut } from '#/web/keyboard/branch-action-shortcuts.ts'
-import { matchRendererKeyboardShortcut } from '#/shared/shortcut-definitions.ts'
+import { matchClientKeyboardShortcut } from '#/shared/shortcut-definitions.ts'
 import { isTerminalFocused } from '#/web/terminal-focus.ts'
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import type { RepoState } from '#/web/stores/repos/types.ts'
@@ -28,7 +28,7 @@ import {
   runNewTerminalTabCommand,
   runSelectWorkspacePaneTabByIndexCommand,
 } from '#/web/commands/workspace-commands.ts'
-import { getRendererBridge } from '#/web/renderer-bridge.ts'
+import { getClientBridge } from '#/web/client-bridge.ts'
 
 type MoveDirection = 1 | -1
 const INTERACTIVE_SHORTCUT_TARGET_SELECTOR =
@@ -70,7 +70,7 @@ function digitShortcutIndex(event: KeyboardEvent): number | null {
 
 function hasNativeMenuAccelerators(): boolean {
   try {
-    return getRendererBridge().kind() === 'electron'
+    return getClientBridge().kind() === 'electron'
   } catch {
     return false
   }
@@ -133,7 +133,7 @@ export function useKeyboard({
         isWorkspaceShortcutSuppressedRef.current() ||
         isShortcutBlockingLayerOpen() ||
         compactWorkspaceTransitioning
-      const action = matchRendererKeyboardShortcut(e)
+      const action = matchClientKeyboardShortcut(e)
 
       if (settingsOpen && action === 'dismiss') {
         e.preventDefault()

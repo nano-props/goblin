@@ -12,7 +12,7 @@ interface TerminalBrokerOptions {
 }
 
 /**
- * Renderer is expected to send a heartbeat every
+ * Client is expected to send a heartbeat every
  * `HEARTBEAT_INTERVAL_MS` (30 s). If a `(userId, clientId)` goes
  * silent for `HEARTBEAT_DEADLINE_MS` (90 s) the broker fires a
  * synthetic `onClientDisconnected` so the next `attach` from a
@@ -74,7 +74,7 @@ export class TerminalRealtimeBroker {
     this.syntheticDisconnectedKeys.delete(clientKey)
     const nextCount = (this.socketCountByUserClientKey.get(clientKey) ?? 0) + 1
     this.socketCountByUserClientKey.set(clientKey, nextCount)
-    // Seed the heartbeat clock to "now" so the renderer is never
+    // Seed the heartbeat clock to "now" so the client is never
     // racing the deadline before its first beat lands. The first
     // real `recordHeartbeat` will overwrite this anyway.
     this.lastHeartbeatAtByClientKey.set(clientKey, Date.now())
@@ -83,7 +83,7 @@ export class TerminalRealtimeBroker {
 
   /**
    * Update the last-heartbeat timestamp for `(userId, clientId)`.
-   * Idempotent and cheap; called by the runtime on every renderer
+   * Idempotent and cheap; called by the runtime on every client
    * heartbeat. The deadline check is driven by `scanHeartbeats` on
    * the broker's own `setInterval`, not on each call.
    */
@@ -97,7 +97,7 @@ export class TerminalRealtimeBroker {
     // skew after laptop wake, or a hostile client) would also
     // look like "stale" and trigger a premature synthetic
     // disconnect. Clamp the upper bound to "now + 60 s" (generous
-    // slack for a slowly-synced renderer clock); clamp the lower
+    // slack for a slowly-synced client clock); clamp the lower
     // bound to `lastBeat ?? 0` so a backwards-clock skew never
     // resets the deadline.
     if (!Number.isFinite(at)) return
@@ -109,7 +109,7 @@ export class TerminalRealtimeBroker {
    * Walk the per-client heartbeat clock and fire synthetic
    * disconnects for any `(userId, clientId)` whose last beat is
    * older than `HEARTBEAT_DEADLINE_MS`. The reconnection case (the
-   * socket still up, the renderer just got back) is covered
+   * socket still up, the client just got back) is covered
    * implicitly: a fresh `registerSocket` resets the timestamp to
    * "now" and `recordHeartbeat` keeps it fresh, so the deadline
    * only fires for truly silent clients.
@@ -180,7 +180,7 @@ export class TerminalRealtimeBroker {
   /**
    * `true` iff the broker has a live socket for `(userId, clientId)`
    * AND the client has heartbeated within the deadline. Sockets
-   * whose renderer has died but whose OS half-open connection is
+   * whose client has died but whose OS half-open connection is
    * still in `ESTABLISHED` are reported as disconnected so the
    * next attach can auto-claim.
    */
@@ -190,7 +190,7 @@ export class TerminalRealtimeBroker {
     if ((this.socketCountByUserClientKey.get(clientKey) ?? 0) === 0) return false
     const lastBeat = this.lastHeartbeatAtByClientKey.get(clientKey)
     // A registered socket that has never heartbeated (e.g. the
-    // renderer was killed before its first beat) is treated as
+    // client was killed before its first beat) is treated as
     // disconnected. The deadline-anchor seeded by `registerSocket`
     // is "now" so this only fires for the race between register
     // and the first real beat.

@@ -54,17 +54,14 @@ export async function getThemeState(): Promise<ThemeState> {
 }
 
 async function updateSettingsPrefsPatch(settings: Record<string, unknown>): Promise<SettingsPrefsUpdateResponse> {
-  const result = await fetchServerJson<SettingsPrefsUpdateResponse>('/api/settings/prefs', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({ settings }),
-  })
+  const result = await postServerJson<{ settings: Record<string, unknown> }, SettingsPrefsUpdateResponse>(
+    '/api/settings/prefs',
+    { settings },
+  )
   const patch = pickNativeSettingsProjectionPatch(settings as Partial<SettingsPrefs>)
   if (!patch || !canUseNativeIpcBridge()) return result
   // The embedded server is the authority for settings — the
-  // renderer just mirrors them to the native menu. A projection
+  // client just mirrors them to the native menu. A projection
   // IPC failure here must NOT reject the caller's promise: the
   // server write already succeeded (otherwise `result` would
   // have thrown), the user-facing preference is committed, and
@@ -100,7 +97,7 @@ export async function setThemeColorTheme(colorTheme: ColorTheme): Promise<ThemeS
 export async function getI18nSnapshot(options?: { signal?: AbortSignal }): Promise<I18nSnapshot> {
   // Public endpoint — i18n has to be fetchable before the user is
   // authenticated, otherwise the token gate would render with raw
-  // i18n keys (the renderer never has a bootstrap on the web path
+  // i18n keys (the client never has a bootstrap on the web path
   // and the server is not inlining anything into HTML anymore).
   return await fetchServerJson<I18nSnapshot>('/api/i18n', { signal: options?.signal })
 }
@@ -111,12 +108,11 @@ export async function setI18nPref(pref: LangPref): Promise<I18nSnapshot> {
 }
 
 export async function getGitHubCliState(hosts?: string[]): Promise<GitHubCliState> {
-  const params = new URLSearchParams()
-  for (const host of hosts ?? []) {
-    if (host.trim()) params.append('host', host.trim())
-  }
-  const suffix = params.size > 0 ? `?${params.toString()}` : ''
-  return await fetchServerJson<GitHubCliState>(`/api/settings/github-cli${suffix}`)
+  const filtered = hosts?.filter((host) => host.trim().length > 0)
+  return await postServerJson(
+    '/api/settings/github-cli',
+    filtered && filtered.length > 0 ? { hosts: filtered } : {},
+  )
 }
 
 export async function refreshGitHubCliState(hosts?: string[]): Promise<GitHubCliState> {

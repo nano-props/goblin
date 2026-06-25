@@ -1,39 +1,39 @@
-// Registry of trusted renderer BrowserWindows and their capabilities.
+// Registry of trusted client BrowserWindows and their capabilities.
 //
 // Boundary:
-// - This module owns renderer-surface identity and capability lookup.
+// - This module owns client-surface identity and capability lookup.
 // - It does NOT own window shell policy (navigation/open-handler), which
 //   lives in window-shell.ts.
 
 import { BrowserWindow, type BrowserWindow as BrowserWindowType } from 'electron'
 import { windowRegistryNodeLog } from '#/node/logger.ts'
 
-export interface RegisteredRendererSurfaceCapabilities {
+export interface RegisteredClientSurfaceCapabilities {
   ipcBroadcast: boolean
   themeSync: boolean
 }
 
-export type RegisteredRendererSurfaceCapability = keyof RegisteredRendererSurfaceCapabilities
+export type RegisteredClientSurfaceCapability = keyof RegisteredClientSurfaceCapabilities
 
-export interface RendererSurfaceSpec {
+export interface ClientSurfaceSpec {
   windowKey: string
-  capabilities?: Partial<RegisteredRendererSurfaceCapabilities>
+  capabilities?: Partial<RegisteredClientSurfaceCapabilities>
 }
 
-export interface RegisteredRendererSurface {
+export interface RegisteredClientSurface {
   windowKey: string
-  capabilities: RegisteredRendererSurfaceCapabilities
+  capabilities: RegisteredClientSurfaceCapabilities
 }
 
-export interface RegisteredRendererSurfaceHandle extends RegisteredRendererSurface {
+export interface RegisteredClientSurfaceHandle extends RegisteredClientSurface {
   webContentsId: number
   window: BrowserWindowType
 }
 
 let mainWindow: BrowserWindowType | null = null
-const surfacesByWebContentsId = new Map<number, RegisteredRendererSurface>()
+const surfacesByWebContentsId = new Map<number, RegisteredClientSurface>()
 
-function defaultCapabilities(): RegisteredRendererSurfaceCapabilities {
+function defaultCapabilities(): RegisteredClientSurfaceCapabilities {
   return {
     ipcBroadcast: true,
     themeSync: true,
@@ -41,12 +41,12 @@ function defaultCapabilities(): RegisteredRendererSurfaceCapabilities {
 }
 
 function resolveCapabilities(
-  capabilities?: Partial<RegisteredRendererSurfaceCapabilities>,
-): RegisteredRendererSurfaceCapabilities {
+  capabilities?: Partial<RegisteredClientSurfaceCapabilities>,
+): RegisteredClientSurfaceCapabilities {
   return { ...defaultCapabilities(), ...capabilities }
 }
 
-function registerSurface(win: BrowserWindowType, surface: RegisteredRendererSurface): void {
+function registerSurface(win: BrowserWindowType, surface: RegisteredClientSurface): void {
   surfacesByWebContentsId.set(win.webContents.id, surface)
 }
 
@@ -75,8 +75,8 @@ function allRegisteredWindows(): BrowserWindowType[] {
   return main ? [main] : []
 }
 
-function allRegisteredSurfaces(): RegisteredRendererSurfaceHandle[] {
-  const handles: RegisteredRendererSurfaceHandle[] = []
+function allRegisteredSurfaces(): RegisteredClientSurfaceHandle[] {
+  const handles: RegisteredClientSurfaceHandle[] = []
   for (const win of allRegisteredWindows()) {
     const surface = surfacesByWebContentsId.get(win.webContents.id)
     if (!surface) continue
@@ -86,13 +86,13 @@ function allRegisteredSurfaces(): RegisteredRendererSurfaceHandle[] {
 }
 
 export function allRegisteredSurfacesWithCapability(
-  capability: RegisteredRendererSurfaceCapability,
-): RegisteredRendererSurfaceHandle[] {
+  capability: RegisteredClientSurfaceCapability,
+): RegisteredClientSurfaceHandle[] {
   return allRegisteredSurfaces().filter((surface) => surface.capabilities[capability])
 }
 
-export function isRegisteredRendererSurfaceId(webContentsId: number): boolean {
-  return registeredRendererSurfaceByWebContentsId(webContentsId) !== null
+export function isRegisteredClientSurfaceId(webContentsId: number): boolean {
+  return registeredClientSurfaceByWebContentsId(webContentsId) !== null
 }
 
 function registeredWindowByWebContentsId(webContentsId: number): BrowserWindowType | null {
@@ -101,7 +101,7 @@ function registeredWindowByWebContentsId(webContentsId: number): BrowserWindowTy
   return null
 }
 
-export function registeredRendererSurfaceByWebContentsId(webContentsId: number): RegisteredRendererSurface | null {
+export function registeredClientSurfaceByWebContentsId(webContentsId: number): RegisteredClientSurface | null {
   const win = registeredWindowByWebContentsId(webContentsId)
   if (!win) {
     surfacesByWebContentsId.delete(webContentsId)
@@ -110,16 +110,16 @@ export function registeredRendererSurfaceByWebContentsId(webContentsId: number):
   return surfacesByWebContentsId.get(webContentsId) ?? null
 }
 
-function registeredSurfaceHandleByWebContentsId(webContentsId: number): RegisteredRendererSurfaceHandle | null {
-  const surface = registeredRendererSurfaceByWebContentsId(webContentsId)
+function registeredClientSurfaceHandleByWebContentsId(webContentsId: number): RegisteredClientSurfaceHandle | null {
+  const surface = registeredClientSurfaceByWebContentsId(webContentsId)
   const win = registeredWindowByWebContentsId(webContentsId)
   return surface && win ? { ...surface, webContentsId, window: win } : null
 }
 
-export function focusedRegisteredSurface(): RegisteredRendererSurfaceHandle | null {
+export function focusedRegisteredSurface(): RegisteredClientSurfaceHandle | null {
   const focused = getFocusedRegisteredWindow()
   if (!focused) return null
-  return registeredSurfaceHandleByWebContentsId(focused.webContents.id)
+  return registeredClientSurfaceHandleByWebContentsId(focused.webContents.id)
 }
 
 export function getFocusedRegisteredWindow(): BrowserWindowType | null {
@@ -153,7 +153,7 @@ function broadcastToRegisteredWindows(
 }
 
 function sendToRegisteredSurface(
-  surface: RegisteredRendererSurfaceHandle | null | undefined,
+  surface: RegisteredClientSurfaceHandle | null | undefined,
   channel: string,
   args: unknown[] = [],
 ): void {
@@ -165,7 +165,7 @@ function broadcastToRegisteredSurfaces(
   args: unknown[] = [],
   options?: {
     excludeWebContentsId?: number
-    predicate?: (surface: RegisteredRendererSurfaceHandle) => boolean
+    predicate?: (surface: RegisteredClientSurfaceHandle) => boolean
   },
 ): void {
   for (const surface of allRegisteredSurfaces()) {
@@ -176,12 +176,12 @@ function broadcastToRegisteredSurfaces(
 }
 
 export function broadcastToSurfaceCapability(
-  capability: RegisteredRendererSurfaceCapability,
+  capability: RegisteredClientSurfaceCapability,
   channel: string,
   args: unknown[] = [],
   options?: {
     excludeWebContentsId?: number
-    predicate?: (surface: RegisteredRendererSurfaceHandle) => boolean
+    predicate?: (surface: RegisteredClientSurfaceHandle) => boolean
   },
 ): void {
   broadcastToRegisteredSurfaces(channel, args, {
@@ -190,7 +190,7 @@ export function broadcastToSurfaceCapability(
   })
 }
 
-export function registerRendererWindowSurface(win: BrowserWindowType, surface: RendererSurfaceSpec): void {
+export function registerClientWindowSurface(win: BrowserWindowType, surface: ClientSurfaceSpec): void {
   mainWindow = win
   registerSurface(win, {
     windowKey: surface.windowKey,
@@ -198,6 +198,6 @@ export function registerRendererWindowSurface(win: BrowserWindowType, surface: R
   })
 }
 
-export function unregisterRendererWindowSurface(_surface: RendererSurfaceSpec, win?: BrowserWindowType): void {
+export function unregisterClientWindowSurface(_surface: ClientSurfaceSpec, win?: BrowserWindowType): void {
   unregisterMainWindow(win)
 }

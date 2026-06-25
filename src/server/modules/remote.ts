@@ -52,7 +52,7 @@ export async function getServerSshHosts(): Promise<SshConfigHostsResult> {
 
 export type ResolveTargetResult =
   | { target: RemoteRepoTarget }
-  // Error is an i18n key — callers (route layer / renderer) translate.
+  // Error is an i18n key — callers (route layer / client) translate.
   | { error: string }
 
 export async function resolveServerRemoteTarget(
@@ -96,7 +96,7 @@ export async function resolveServerRemoteTarget(
  *   5. return a converged {@link RemoteRepoLifecycleResult}
  *
  * The function NEVER returns a `connecting` lifecycle — that's
- * a renderer-side projection written by the orchestrator before
+ * a client-side projection written by the orchestrator before
  * this RPC lands. The server's contract is "converged terminal
  * only".
  *
@@ -108,7 +108,7 @@ export async function resolveServerRemoteTarget(
  *     execas in `system/ssh/commands.ts:runRemoteCommand`)
  *
  * Aborting the signal is the only way a `runRemoteRepoLifecycle`
- * orchestrator run in the renderer can free the lane's
+ * orchestrator run in the client can free the lane's
  * concurrency slot before its natural timeout — see
  * `runLatestOperation` with the `lifecycle` lane.
  */
@@ -238,7 +238,7 @@ export async function testServerRemoteRepository(
     const resolved = await resolveTrackedRemoteTarget(normalized, signal)
     return await testRemoteRepository(resolved.target, { signal })
   } catch (err) {
-    // Translation key — renderer formats via i18n. resolveTrackedRemoteTarget
+    // Translation key — client formats via i18n. resolveTrackedRemoteTarget
     // raises either an i18n key (e.g. error.ssh-config-changed) or a real
     // diagnostic category. Anything else falls back to 'unknown'.
     const message = err instanceof Error ? err.message : 'error.ssh-config-changed'

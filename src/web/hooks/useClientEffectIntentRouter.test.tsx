@@ -3,9 +3,9 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { useRendererEffectIntentRouter } from '#/web/hooks/useRendererEffectIntentRouter.ts'
+import { useClientEffectIntentRouter } from '#/web/hooks/useClientEffectIntentRouter.ts'
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
-import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
+import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
@@ -43,7 +43,7 @@ const consumeExternalOpenPathsSpy = vi.fn<() => Promise<string[]>>(async () => [
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   resetReposStore()
-  setRendererBridgeForTests(null)
+  setClientBridgeForTests(null)
   closeAllOverlays.mockClear()
   activateRepoSpy.mockClear()
   closeRepoSpy.mockClear()
@@ -133,11 +133,11 @@ afterEach(() => {
   container = null
   ipcEventListeners.clear()
   intentListeners.clear()
-  setRendererBridgeForTests(null)
+  setClientBridgeForTests(null)
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
-describe('useRendererEffectIntentRouter', () => {
+describe('useClientEffectIntentRouter', () => {
   test('terminal bell clicks close all overlays and focus the repo terminal view', async () => {
     const repo = seedRepoState({
       id: '/tmp/repo',
@@ -379,7 +379,7 @@ describe('useRendererEffectIntentRouter', () => {
     expect(activateRepoSpy).toHaveBeenCalledWith('/tmp/repo-a')
   })
 
-  test('theme menu intents update theme through the renderer store', async () => {
+  test('theme menu intents update theme through the client store', async () => {
     const setPref = vi.fn(async () => {})
     useThemeStore.setState((state) => ({ ...state, setPref }))
 
@@ -393,7 +393,7 @@ describe('useRendererEffectIntentRouter', () => {
     expect(setPref).toHaveBeenCalledWith('dark')
   })
 
-  test('language menu intents update i18n through the renderer store', async () => {
+  test('language menu intents update i18n through the client store', async () => {
     const setPref = vi.fn(async () => {})
     useI18nStore.setState((state) => ({ ...state, setPref }))
 
@@ -407,7 +407,7 @@ describe('useRendererEffectIntentRouter', () => {
     expect(setPref).toHaveBeenCalledWith('ko')
   })
 
-  test('clear recent intent clears server-backed recents through the renderer client', async () => {
+  test('clear recent intent clears server-backed recents through the client client', async () => {
     await renderHookHost()
 
     await act(async () => {
@@ -435,7 +435,7 @@ async function renderHookHost() {
 }
 
 function HookHost() {
-  useRendererEffectIntentRouter({
+  useClientEffectIntentRouter({
     navigation,
     currentRepoId,
     closeAllOverlays,

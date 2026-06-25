@@ -3,7 +3,7 @@ import type { WorkspacePaneViewType } from '#/shared/workspace-pane.ts'
 /**
  * `controllerStatus === 'connected'` while the controller's client has
  * a live socket. The server clears the controller slot on disconnect
- * (no grace), so the only transient state the renderer needs to render is
+ * (no grace), so the only transient state the client needs to render is
  * `connected` vs `none`.
  */
 export type TerminalControllerStatus = 'connected' | 'none'
@@ -48,7 +48,7 @@ export interface TerminalRestartInput {
  * Successful `takeover` result.
  *
  * First-frame contract: takeover is the authoritative handshake for
- * the new controller's view. The renderer applies the response
+ * the new controller's view. The client applies the response
  * synchronously and does not need to wait for a follow-up realtime
  * `identity` event before painting the post-takeover frame. The
  * fields mirror `TerminalFirstFrame` minus the snapshot fields
@@ -60,7 +60,7 @@ export interface TerminalRestartInput {
  * non-takeover controller-change paths (controller crash, grace
  * expiry, etc.). For those paths there is no response to be
  * authoritative; the event remains the source of truth. Both
- * surfaces now carry the same fields so the renderer can apply
+ * surfaces now carry the same fields so the client can apply
  * either without re-checking what shape arrived.
  */
 export type TerminalTakeoverResult =
@@ -81,13 +81,13 @@ export type TerminalTakeoverResult =
  *
  * `snapshot`/`snapshotSeq` are the slot's server-side serialized
  * xterm screen and the last PTY output sequence included in that screen.
- * The renderer hydrates from these and re-replays any post-snapshot
+ * The client hydrates from these and re-replays any post-snapshot
  * events the runtime captures.
  *
  * First-frame contract: a successful `attach`/`restart` response is
  * the authoritative handshake for that slot's frame state. All
  * fields are required at the type level — the server must populate
- * them on every success path, and the renderer can hydrate the UI
+ * them on every success path, and the client can hydrate the UI
  * without waiting for any follow-up event. This mirrors the R0
  * first-frame atomicity contract for `create` (see
  * `docs/terminal-slot-lifecycle.md` §R0).
@@ -112,7 +112,7 @@ export type TerminalCatalogAction = 'created' | 'restored' | 'reused'
 
 /**
  * `create` carries the same first-frame fields as `attach`/`restart`
- * — the renderer must be able to paint without a follow-up snapshot
+ * — the client must be able to paint without a follow-up snapshot
  * fetch. The shared `TerminalFirstFrame` shape below is the single
  * source of truth for the first-frame contract.
  */
@@ -217,12 +217,12 @@ export interface TerminalExitEvent {
  * reconnect, sibling-tab claim, etc.). Carries the stable identity
  * fields only — no phase, no message, no title. Lifecycle travels on
  * its own dedicated `lifecycle` event so a phase update can never be
- * confused with a role update at the wire or the renderer's
+ * confused with a role update at the wire or the client's
  * `applyIdentity` boundary.
  *
  * For takeover specifically, see `TerminalTakeoverResult` — that
  * response is authoritative and carries both identity and lifecycle
- * fields in a single payload so the renderer can apply either
+ * fields in a single payload so the client can apply either
  * without re-checking the shape.
  */
 export interface TerminalIdentityEvent {
@@ -235,7 +235,7 @@ export interface TerminalIdentityEvent {
 /**
  * Realtime lifecycle-change event (phase transitions, takeover-pending
  * toggles). Carries only the transient lifecycle fields — no role,
- * no controller, no geometry. The renderer's `applyLifecycle` boundary
+ * no controller, no geometry. The client's `applyLifecycle` boundary
  * never sees a role change, so a transitional phase (e.g. `'opening'`
  * during a pre-spawn identity broadcast) cannot trigger a
  * controller→viewer teardown decision.

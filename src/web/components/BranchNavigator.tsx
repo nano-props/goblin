@@ -6,13 +6,12 @@ import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 
 interface Props {
   repoId: string
-  showActions?: boolean
 }
 
-export function BranchNavigator({ repoId, showActions = true }: Props) {
+export function BranchNavigator({ repoId }: Props) {
   return (
     <ScrollArea className="min-h-0 flex-1">
-      <BranchView repoId={repoId} showActions={showActions} />
+      <BranchView repoId={repoId} />
     </ScrollArea>
   )
 }

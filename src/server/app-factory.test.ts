@@ -225,7 +225,7 @@ describe('server app html static', () => {
     expect(response.headers.get('Cache-Control')).toBe('no-store')
     // The HTML is the raw dist/web/index.html (mocked above) with
     // no `<script id="goblin-bootstrap">` injection and no token in
-    // the response. The renderer reads i18n from
+    // the response. The client reads i18n from
     // `/api/i18n` and the access token either from the
     // Electron preload's IPC or the `/api/login` cookie.
     expect(html).not.toContain('goblin-bootstrap')
@@ -254,7 +254,7 @@ describe('server app html static', () => {
 
   test('exposes /api/host as a public, unauthenticated endpoint', async () => {
     // Host info is non-sensitive (home dir path + platform string)
-    // and is needed by the renderer's settings page on first paint,
+    // and is needed by the client's settings page on first paint,
     // before the user clears the token gate. The endpoint therefore
     // must not require `x-goblin-access-token` or a session cookie.
     const { createApp } = await import('#/server/app-factory.ts')

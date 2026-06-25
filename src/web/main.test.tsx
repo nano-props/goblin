@@ -61,7 +61,7 @@ afterEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
-describe('renderer entrypoint', () => {
+describe('client entrypoint', () => {
   test('mounts the app only after the initial i18n hydrate succeeds', async () => {
     let resolveHydrate!: () => void
     const hydratePromise = new Promise<void>((resolve) => {

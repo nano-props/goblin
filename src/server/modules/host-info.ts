@@ -1,18 +1,18 @@
 // Host info the server already knows about itself. The server
-// runs on the same OS as the embedded renderer, so the values
+// runs on the same OS as the embedded client, so the values
 // it returns match what the user's terminal sees (`uname`,
 // `echo $HOME`, etc.). Exposed as a public endpoint because the
 // info isn't sensitive — `homeDir` and `platform` are what the
 // app needs to render platform-aware UI, not secrets.
 //
-// Used to be ferried into the renderer via the Electron
+// Used to be ferried into the client via the Electron
 // preload's `goblin:get-home-dir` / `goblin:get-platform` IPC.
 // Moving it to a public endpoint:
 //  - collapses one more IPC surface
 //  - makes the Vite-served dev path identical to the embedded
 //    path (both go through HTTP; no "if Electron, then sync IPC"
 //    special case)
-//  - keeps the renderer identical across runtimes: it's
+//  - keeps the client identical across runtimes: it's
 //    just an HTTP fetch at boot
 
 import os from 'node:os'

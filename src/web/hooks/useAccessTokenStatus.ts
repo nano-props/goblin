@@ -45,10 +45,10 @@ function stripAccessTokenFromUrl(): void {
 }
 
 /**
- * Track whether the renderer is currently authenticated against the
+ * Track whether the client is currently authenticated against the
  * embedded server. The check is a single `GET /api/whoami`; the
  * server returns 200 when cookie / header / `?t=` is valid and 401
- * otherwise. The renderer's `server-fetch` already wires up the
+ * otherwise. The client's `server-fetch` already wires up the
  * right auth channel (header for embedded, cookie for browser) so
  * the caller doesn't need to think about it.
  *

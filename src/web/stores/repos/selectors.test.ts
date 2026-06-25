@@ -13,8 +13,8 @@ import {
 import {
   mainWindowNavigationStoreActionsEqual,
   mainWindowNavigationStoreActionsFromStore,
-  rendererEffectIntentStoreActionsEqual,
-  rendererEffectIntentStoreActionsFromStore,
+  clientEffectIntentStoreActionsEqual,
+  clientEffectIntentStoreActionsFromStore,
   repoPickerStoreActionsEqual,
   repoPickerStoreActionsFromStore,
   restorableWorkspaceLayoutPreferenceStoreActionsFromStore,
@@ -232,14 +232,14 @@ describe('repo selectors', () => {
       ),
     ).toBe(false)
     expect(
-      rendererEffectIntentStoreActionsEqual(
-        rendererEffectIntentStoreActionsFromStore({
+      clientEffectIntentStoreActionsEqual(
+        clientEffectIntentStoreActionsFromStore({
           ensureWorkspaceOpen: fnA as never,
           setSelectedTerminal: fnA as never,
           resetLayout: fnA as never,
           toggleWorkspaceFocused: fnA as never,
         }),
-        rendererEffectIntentStoreActionsFromStore({
+        clientEffectIntentStoreActionsFromStore({
           ensureWorkspaceOpen: fnA as never,
           setSelectedTerminal: fnA as never,
           resetLayout: fnB as never,

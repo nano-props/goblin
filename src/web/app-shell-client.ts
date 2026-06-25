@@ -1,12 +1,12 @@
 import type { SettingsPage } from '#/shared/api-types.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
-import { getRendererBridge } from '#/web/renderer-bridge.ts'
+import { getClientBridge } from '#/web/client-bridge.ts'
 import { homeDirectory as hostInfoHomeDirectory } from '#/web/stores/host-info.ts'
 const PROJECT_GITHUB_URL = 'https://github.com/nano-props/goblin'
 
 function nativeShell() {
   try {
-    return getRendererBridge().shell()
+    return getClientBridge().shell()
   } catch {
     return null
   }
@@ -14,7 +14,7 @@ function nativeShell() {
 
 export function canUseNativeIpcBridge(): boolean {
   try {
-    return getRendererBridge().hasCapability('settings-ipc')
+    return getClientBridge().hasCapability('settings-ipc')
   } catch {
     return false
   }
@@ -22,7 +22,7 @@ export function canUseNativeIpcBridge(): boolean {
 
 export function hasNativeDirectoryPicker(): boolean {
   try {
-    return getRendererBridge().hasCapability('open-directory-dialog')
+    return getClientBridge().hasCapability('open-directory-dialog')
   } catch {
     return false
   }
@@ -30,7 +30,7 @@ export function hasNativeDirectoryPicker(): boolean {
 
 export function canOpenAppSettings(): boolean {
   try {
-    return getRendererBridge().hasCapability('open-settings-window')
+    return getClientBridge().hasCapability('open-settings-window')
   } catch {
     return false
   }
@@ -51,14 +51,14 @@ export function homeDirectory(): string {
 
 export function pathForDroppedFile(file: File): string {
   try {
-    return getRendererBridge().pathForFile(file)
+    return getClientBridge().pathForFile(file)
   } catch {
     return ''
   }
 }
 
 /**
- * Persist clipboard / drop blobs via the active renderer bridge.
+ * Persist clipboard / drop blobs via the active client bridge.
  *
  * Returns absolute paths the PTY can read. On any failure (bridge
  * unavailable, IPC error, HTTP transport problem, server 4xx/5xx),
@@ -69,7 +69,7 @@ export function pathForDroppedFile(file: File): string {
  */
 export async function saveClipboardFiles(files: File[]): Promise<string[]> {
   try {
-    return await getRendererBridge().saveClipboardFiles(files)
+    return await getClientBridge().saveClipboardFiles(files)
   } catch {
     return []
   }

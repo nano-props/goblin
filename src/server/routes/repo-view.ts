@@ -1,5 +1,5 @@
 import * as v from 'valibot'
-import { publishRendererIntent } from '#/server/modules/renderer-intent-broker.ts'
+import { publishClientIntent } from '#/server/modules/client-intent-broker.ts'
 import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'
 import { WORKSPACE_PANE_STATIC_VIEW_TYPES } from '#/shared/workspace-pane.ts'
 import type { RepoViewResult } from '#/shared/repo-view.ts'
@@ -18,16 +18,16 @@ export function createRepoViewRoutes() {
 
   app.post('/view', async (c): Promise<Response> => {
     const { tab } = await parseHttpBody(RepoViewBodySchema, c)
-    // No renderer subscribed → 503 with a clear message. We don't
+    // No client subscribed → 503 with a clear message. We don't
     // queue: a queued intent that lands in a stale UI state is
     // worse than no-op, and `g` is human-triggered so the user can
     // simply rerun it.
-    const delivered = publishRendererIntent({ type: 'show-workspace-pane-view-requested', tab })
+    const delivered = publishClientIntent({ type: 'show-workspace-pane-view-requested', tab })
     const result: RepoViewResult = delivered
       ? { ok: true }
       : {
           ok: false,
-          code: 'NO_RENDERER',
+          code: 'NO_CLIENT',
           // No CLI-level `g:` prefix here — the CLI prefixes every
           // error message it surfaces, and the contract is "this
           // string is the raw reason; CLI decorates".

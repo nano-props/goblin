@@ -18,7 +18,7 @@ export function useSessionPersistence() {
   const lastImmediateKeyRef = useRef<string | null>(null)
 
   useEffect(() => {
-    // Renderer -> persistence only. Boot restore runs elsewhere first, and
+    // Client -> persistence only. Boot restore runs elsewhere first, and
     // sessionReady gates this effect so we never overwrite restorable session
     // state with an empty pre-bootstrap workspace.
     if (!sessionReady) return
