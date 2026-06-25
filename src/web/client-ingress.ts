@@ -3,9 +3,10 @@ import { isClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { ClientEffectIntent, ClientEffectIntentType } from '#/shared/client-effect-intents.ts'
 import { getClientBridge } from '#/web/client-bridge.ts'
 
-// Native-host ingress for Electron clients (Electron's renderer-process side).
-// In other words: "client" here is the same surface as "renderer" in Electron
-// docs, but the term stays cross-platform across web/native hosts.
+// Native-host ingress for Electron clients. In Electron terminology, this
+// client is the BrowserWindow renderer process receiving IPC downlinks from
+// main. Product code still calls it a client so the same surface model covers
+// Electron pages and plain browser tabs.
 // Keep this separate from server ingress modules so browser- and
 // Electron-owned downlinks stay explicit.
 type NativeHostEventType = IpcEvent['type']

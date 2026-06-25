@@ -43,16 +43,16 @@ The project runs in Node.js strip-only mode (no `tsc` emit). Do not use these un
 
 ## HTTP request conventions
 
-**POST is the default for all renderer→server traffic.** GET is the exception. (We don't follow REST conventions.) The embedded server runs on Node's `http.Server` via `@hono/node-server`, which inherits Node's default 16 KiB `maxHeaderSize`; past that, Node returns `431` *before* Hono runs — URL payloads are a structural footgun.
+**POST is the default for all client→server traffic.** GET is the exception. (We don't follow REST conventions.) The embedded server runs on Node's `http.Server` via `@hono/node-server`, which inherits Node's default 16 KiB `maxHeaderSize`; past that, Node returns `431` *before* Hono runs — URL payloads are a structural footgun.
 
 Rules:
 
-- **New renderer→server endpoints use `POST` + `postServerJson(path, body)`.** Reads are fine over POST.
+- **New client→server endpoints use `POST` + `postServerJson(path, body)`.** Reads are fine over POST.
 - **GET is allowed only for:** WebSocket upgrade (`/ws/*`), external-infrastructure health checks (`/api/health*`), or a browser-addressable URL with a real consumer.
 - **Never put arrays, unbounded long strings (> ~200 B), or `JSON.stringify`'d objects in the URL.** Bodies are bounded by `API_BODY_LIMIT_BYTES` (1 MiB) and the clipboard cap (12 MiB).
 - **New endpoints follow the existing POST shape:** `postServerJson` client-side, `*_PROCEDURE_SCHEMAS` in `src/shared/procedure-schemas.ts`, `parseHttpBody` server-side, plus a row in `src/shared/embedded-server-ipc-routes.ts` if it needs an IPC entry.
 
-Known GET endpoints that must migrate to POST: _none — every renderer→server endpoint that takes a payload now lives behind a POST body. The historical offenders (the three array-bearing endpoints plus the five `cwd`-bearing `/api/repo/{probe,snapshot,status,log,patch}` reads) all moved in this branch._
+Known GET endpoints that must migrate to POST: _none — every client→server endpoint that takes a payload now lives behind a POST body. The historical offenders (the three array-bearing endpoints plus the five `cwd`-bearing `/api/repo/{probe,snapshot,status,log,patch}` reads) all moved in this branch._
 
 **Any PR that changes a GET's payload must migrate it to POST in the same PR.** Internal-only refactors (logic, comments) don't trigger migration. The only remaining GETs are the parameter-free ones the rule carves out: WebSocket upgrade (`/ws/*`), external health checks (`/api/health*`), public-infrastructure reads (`/api/i18n`, `/api/host`, `/api/settings`, `/api/settings/prefs`, `/api/settings/lan`, `/api/settings/external-apps`, `/api/remote/ssh-hosts`, `/api/auth/{whoami,access-token}`), and the SPA wildcard `app.get('*')`.
 

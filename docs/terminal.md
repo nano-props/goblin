@@ -120,8 +120,8 @@ Closing a session should be an explicit business action or the result of server-
 The terminal system relies on four identity scopes:
 
 - **userId**: the server-side terminal user derived from the authenticated access token. Session visibility, lifecycle cleanup, and realtime fanout are partitioned by this id.
-- **clientId**: the logical client for one browser tab or Electron client. It validates and routes requests, but it does not own terminal sessions.
-- **clientId**: one terminal view/socket attachment under a user.
+- **clientId**: the logical client for one browser tab or Electron client. It validates and routes requests and is also the code-level controller identity (`TerminalController.clientId`).
+- **terminal attachment**: the conceptual relationship between a `clientId` and a terminal session. There is intentionally no separate `attachmentId` field, and none is planned. One client should have at most one Terminal View for a given `ptySessionId`; cross-client viewing/control is modeled with `clientId`, controller/viewer state, and explicit takeover.
 - **ptySessionId**: the server-owned identifier for one live terminal session.
 
 In addition, terminal keys encode repo and worktree scope so the system can reason about:
