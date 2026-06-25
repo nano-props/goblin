@@ -172,6 +172,30 @@ describe('BranchRow', () => {
     expect(document.querySelector('[aria-label="0 个未读终端提醒"]')).toBeNull()
   })
 
+  test('does not increase branch name font weight when the row is selected', () => {
+    const repo = emptyRepo('/tmp/repo', 'repo')
+    const branch = createRepoBranch('feature/a')
+
+    render(
+      <ul>
+        <BranchRow
+          repo={repo}
+          branch={branch}
+          selected="feature/a"
+          onSelectBranch={vi.fn()}
+          onOpenBranchStatus={vi.fn()}
+          selectedRef={createRef<HTMLLIElement>()}
+        />
+      </ul>,
+    )
+
+    const branchLabel = Array.from(document.querySelectorAll('span')).find(
+      (node) => node.textContent === 'feature/a' && node.className.includes('text-[13px]'),
+    )
+    expect(branchLabel?.className).toContain('font-normal')
+    expect(branchLabel?.className).not.toContain('font-medium')
+  })
+
   test('keeps the leading terminal bell badge behavior in compact mode', () => {
     responsiveMocks.compact = true
     const repo = emptyRepo('/tmp/repo', 'repo')

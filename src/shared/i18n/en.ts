@@ -489,7 +489,7 @@ export const en = {
 
   // ---- Settings panel -----------------------------------------------------
   'settings.title': 'Settings',
-  'settings.back': 'Back',
+  'settings.back': 'Back to app',
   'settings.theme-preset': 'Theme',
   'settings.theme-preset.macos': 'macOS',
   'settings.theme-preset.mono': 'Mono',

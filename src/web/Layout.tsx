@@ -159,11 +159,6 @@ function MainWindowOverlays({ overlays, repoDrop, activeId, activeBranchName }: 
 }
 
 /**
- * Hosts the create-worktree dialog at the layout level. The host
- * itself lives in `CreateWorktreeDialogHost`; this file only wires
- * the layout-level state into it.
- */
-/**
  * Auth-gated side effects. Mounts only when `<TokenGate>` lets
  * its children through (i.e. the user is authenticated), so the
  * hooks below — and the WebSocket connections they open — do

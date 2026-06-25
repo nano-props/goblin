@@ -1,11 +1,9 @@
 // @vitest-environment jsdom
 
-// Unit tests for the presentational BranchList. BranchList is the shared
-// piece between the persistent pane (BranchNavigator) and the focus-mode
-// popover (BranchListPopover); its contract is "given branches + a
-// highlighted name + callbacks, paint rows and bubble events up". We
-// stub BranchActionsMenu (popover-on-popover complexity not under test)
-// and the terminal bell hook so the suite stays focused on the list.
+// Unit tests for the presentational BranchList. Its contract is
+// "given branches + a highlighted name + callbacks, paint rows and
+// bubble events up". We stub BranchActionsMenu and the terminal bell
+// hook so the suite stays focused on the list.
 
 import { act } from 'react'
 import type { ReactNode } from 'react'
@@ -104,7 +102,7 @@ describe('BranchList', () => {
     expect(onSelect).not.toHaveBeenCalled()
   })
 
-  test('renders the emptyState slot when repo is null (popover pre-load)', () => {
+  test('renders the emptyState slot when repo is null', () => {
     // `branches` is non-empty so the `!repo` branch is the one that
     // short-circuits — passing `branches={[]}` would exercise the
     // empty-list early-return instead.

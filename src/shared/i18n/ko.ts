@@ -490,7 +490,7 @@ export const ko: Record<DictKey, string> = {
   'settings.lang.zh': '中文',
   'settings.lang.ko': '한국어',
   'settings.lang.ja': '日本語',
-  'settings.back': '뒤로',
+  'settings.back': '앱으로 돌아가기',
   'settings.terminal-notifications': '터미널 벨 알림',
   'settings.terminal-notifications-hint': '백그라운드 터미널 벨에 대해 시스템 알림을 표시합니다.',
   'settings.terminal-notifications-test': '시스템 알림 테스트',

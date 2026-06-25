@@ -1,15 +1,13 @@
-// Active-repo body. The per-repo actions (Refresh, worktree
-// filter, new worktree) live in the Topbar — see `Topbar.tsx`
-// and `App.tsx` — so the workspace below the topbar is just the
-// branch navigator and the branch workspace pane.
-
-import { useEffect } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { isRepoUnavailable } from '#/web/stores/repos/helpers.ts'
-import { BranchNavigator } from '#/web/components/BranchNavigator.tsx'
 import { BranchWorkspace } from '#/web/components/BranchWorkspace.tsx'
-import { RepoWorkspaceSkeleton } from '#/web/components/Skeleton.tsx'
+import {
+  BranchNavigatorSkeleton,
+  BranchWorkspaceEmptySkeleton,
+  BranchWorkspaceSkeleton,
+} from '#/web/components/Skeleton.tsx'
 import { CompactRepoWorkspace, RepoWorkspace, RepoWorkspacePane } from '#/web/components/Layout.tsx'
 import { useRepoToasts } from '#/web/hooks/useRepoToasts.tsx'
 import { getRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
@@ -19,12 +17,19 @@ import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
 import { useRetainedValueDuringExit } from '#/web/hooks/useRetainedValueDuringExit.ts'
 import { useUiTransitionStore } from '#/web/stores/ui-transition.ts'
+import {
+  FocusModeSidebarReveal,
+  FocusModeSidebarRevealTrigger,
+  useFocusModeSidebarReveal,
+} from '#/web/components/repo-shell/FocusModeSidebarReveal.tsx'
+import { RepoShellSidebar } from '#/web/components/repo-shell/RepoShellSidebar.tsx'
 
 interface Props {
   repoId: string
+  onOpenSettings?: () => void
 }
 
-export function RepoView({ repoId }: Props) {
+export function RepoView({ repoId, onOpenSettings }: Props) {
   const uiMode = useResponsiveUiMode()
   const compact = uiMode === 'compact'
   const view = useStoreWithEqualityFn(
@@ -57,8 +62,17 @@ export function RepoView({ repoId }: Props) {
   })
 
   const workspacePaneSize = view.workspacePaneSize
+  const sidebarPaneSize = 100 - workspacePaneSize
   const selectedBranch = repo?.ui.selectedBranch ?? null
   const singlePane = selectedBranch ? 'workspace' : 'navigator'
+  const focusSidebar = useFocusModeSidebarReveal(!compact && behavior.branchNavigatorCollapsed)
+  const toolbarLeading =
+    !compact && behavior.branchNavigatorCollapsed ? (
+      <FocusModeSidebarRevealTrigger
+        onMouseEnter={focusSidebar.onTriggerEnter}
+        onMouseLeave={focusSidebar.onTriggerLeave}
+      />
+    ) : undefined
   const compactWorkspaceSelectedBranch = useRetainedValueDuringExit({
     value: selectedBranch,
     active: compact && singlePane === 'workspace',
@@ -89,14 +103,99 @@ export function RepoView({ repoId }: Props) {
   }, [compactWorkspaceTransitioning, setCompactWorkspaceTransitioning])
 
   if (!view.exists || !repo) return <div />
-  if (isRepoUnavailable(repo)) return <UnavailableRepoView repo={repo} />
-  if (view.initialLoading) {
-    return (
-      <RepoWorkspaceSkeleton
-        singlePane={behavior.singlePane}
-        singlePaneView={selectedBranch ? 'workspace' : 'navigator'}
-        branchWorkspaceState={selectedBranch ? 'content' : 'empty'}
+
+  const renderBranchNavigatorPane = (branchContent?: ReactNode) => (
+    <RepoWorkspacePane>
+      <RepoShellSidebar
+        repoId={repoId}
+        compact={compact}
+        branchContent={branchContent}
+        onOpenSettings={onOpenSettings}
       />
+    </RepoWorkspacePane>
+  )
+
+  const renderWorkspaceBody = ({
+    branchWorkspacePane,
+    branchNavigatorPane = renderBranchNavigatorPane(),
+    compactActivePane = singlePane,
+  }: {
+    branchWorkspacePane: ReactNode
+    branchNavigatorPane?: ReactNode
+    compactActivePane?: 'navigator' | 'workspace'
+  }) => {
+    if (compact) {
+      return (
+        <CompactRepoWorkspace
+          activePane={compactActivePane}
+          branchNavigatorPane={branchNavigatorPane}
+          branchWorkspacePane={branchWorkspacePane}
+        />
+      )
+    }
+
+    if (behavior.singlePane) return compactActivePane === 'workspace' ? branchWorkspacePane : branchNavigatorPane
+
+    return (
+      <RepoWorkspace
+        mode="split"
+        workspacePaneSize={workspacePaneSize}
+        onWorkspacePaneSizeChange={setWorkspacePaneSize}
+        branchNavigatorCollapsed={behavior.branchNavigatorCollapsed}
+        branchNavigatorPane={branchNavigatorPane}
+        branchWorkspacePane={branchWorkspacePane}
+      />
+    )
+  }
+
+  const renderWorkspaceSection = (workspaceBody: ReactNode, revealSidebar = false) => (
+    <section className="relative flex min-w-0 flex-1 flex-col">
+      {workspaceBody}
+      {revealSidebar && !compact && focusSidebar.rendered ? (
+        <FocusModeSidebarReveal
+          repoId={repoId}
+          open={focusSidebar.open}
+          sidebarSize={sidebarPaneSize}
+          onSidebarSizeChange={(nextSidebarSize) => setWorkspacePaneSize(100 - nextSidebarSize)}
+          onSurfaceEnter={focusSidebar.onSurfaceEnter}
+          onSurfaceLeave={focusSidebar.onSurfaceLeave}
+          onOpenSettings={onOpenSettings}
+        />
+      ) : null}
+    </section>
+  )
+
+  if (isRepoUnavailable(repo)) {
+    const unavailablePane = (
+      <RepoWorkspacePane>
+        <UnavailableRepoView repo={repo} />
+      </RepoWorkspacePane>
+    )
+    return renderWorkspaceSection(
+      renderWorkspaceBody({
+        branchWorkspacePane: unavailablePane,
+        branchNavigatorPane: renderBranchNavigatorPane(compact ? <UnavailableRepoView repo={repo} /> : undefined),
+        compactActivePane: compact ? 'navigator' : singlePane,
+      }),
+      true,
+    )
+  }
+
+  if (view.initialLoading) {
+    const loadingPane = (
+      <RepoWorkspacePane>
+        {selectedBranch ? <BranchWorkspaceSkeleton /> : <BranchWorkspaceEmptySkeleton />}
+      </RepoWorkspacePane>
+    )
+    return renderWorkspaceSection(
+      renderWorkspaceBody({
+        branchWorkspacePane: loadingPane,
+        branchNavigatorPane: renderBranchNavigatorPane(
+          compact && selectedBranch ? undefined : <BranchNavigatorSkeleton />,
+        ),
+        compactActivePane: selectedBranch ? 'workspace' : 'navigator',
+      }),
+      true,
     )
   }
 
@@ -106,34 +205,10 @@ export function RepoView({ repoId }: Props) {
         repoId={repoId}
         selectedBranchName={compact ? compactWorkspaceSelectedBranch : undefined}
         shortcutsEnabled={!compact || singlePane === 'workspace'}
+        toolbarLeading={toolbarLeading}
+        toolbarTrafficLightOffset={!compact && behavior.branchNavigatorCollapsed}
       />
     </RepoWorkspacePane>
   )
-  const branchNavigatorPane = (
-    <RepoWorkspacePane>
-      <BranchNavigator repoId={repoId} />
-    </RepoWorkspacePane>
-  )
-  const singlePaneBody = singlePane === 'workspace' ? branchWorkspacePane : branchNavigatorPane
-
-  const workspaceBody = compact ? (
-    <CompactRepoWorkspace
-      activePane={singlePane}
-      branchNavigatorPane={branchNavigatorPane}
-      branchWorkspacePane={branchWorkspacePane}
-    />
-  ) : behavior.singlePane ? (
-    singlePaneBody
-  ) : (
-    <RepoWorkspace
-      mode="split"
-      workspacePaneSize={workspacePaneSize}
-      onWorkspacePaneSizeChange={setWorkspacePaneSize}
-      branchNavigatorCollapsed={behavior.branchNavigatorCollapsed}
-      branchNavigatorPane={branchNavigatorPane}
-      branchWorkspacePane={branchWorkspacePane}
-    />
-  )
-
-  return <section className="relative flex min-w-0 flex-1 flex-col">{workspaceBody}</section>
+  return renderWorkspaceSection(renderWorkspaceBody({ branchWorkspacePane }), true)
 }

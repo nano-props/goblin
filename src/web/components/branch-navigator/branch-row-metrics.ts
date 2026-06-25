@@ -1,0 +1,5 @@
+export const BRANCH_ROW_LIST_CLASS = 'flex min-w-0 flex-col gap-1 p-1.5'
+export const BRANCH_ROW_GRID_CLASS = 'grid min-h-8 grid-cols-[minmax(0,1fr)_auto] items-stretch rounded-md'
+export const BRANCH_ROW_CONTENT_CLASS = 'flex min-w-0 items-center px-3 py-1'
+export const BRANCH_ROW_ACTION_SLOT_CLASS = 'flex shrink-0 items-center py-1 pr-3'
+export const BRANCH_ROW_ACTION_BOX_CLASS = 'relative flex h-6 min-w-6 items-center justify-center'

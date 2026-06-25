@@ -193,7 +193,7 @@ export function BranchSummaryInline({
   const iconAriaLabel = hasWorktree ? (worktreeDirty ? t('branches.dirty') : t('branches.worktree')) : undefined
 
   return (
-    <div title={title} className={cn('flex min-w-0 items-center gap-2', className)}>
+    <div title={title} className={cn('flex min-w-0 items-center gap-1.5', className)}>
       {leadingTerminalBellCount > 0 ? (
         <span className="flex w-4 shrink-0 items-center justify-center">
           <TerminalBellBadge count={leadingTerminalBellCount} />
@@ -206,10 +206,10 @@ export function BranchSummaryInline({
           ariaLabel={iconAriaLabel}
         />
       )}
-      <span className="flex min-w-0 items-center gap-2 overflow-hidden">
+      <span className="flex min-w-0 items-center gap-1.5 overflow-hidden">
         <span
           className={cn(
-            'shrink-0 truncate text-sm font-medium',
+            'shrink-0 truncate text-[13px] font-normal leading-5',
             selected ? 'text-selected-foreground' : 'text-foreground',
           )}
         >

@@ -83,9 +83,9 @@ export function useAppOverlays(options: AppOverlayRouteOptions = {}) {
     // (e.g. a command-palette entry) that invokes this without
     // `activeId` set, so we don't leave `state.createWorktree.open`
     // stuck `true` until a later `useEffect([activeId])` clears it.
-    // Currently only the Topbar button calls this, and the Topbar
-    // button is itself hidden when no repo is active — this is a
-    // defensive guard for future surface expansion.
+    // Currently only active-repo chrome calls this, and that chrome
+    // is itself hidden when no repo is active — this is a defensive
+    // guard for future surface expansion.
     if (!useReposStore.getState().activeId) return
     if (routeDriven) {
       options.onRouteOverlayChange?.('createWorktree')

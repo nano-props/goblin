@@ -8,10 +8,10 @@ import { RepoView } from '#/web/components/RepoView.tsx'
 import { RepoWorkspaceSkeleton } from '#/web/components/Skeleton.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
 import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
+import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
 
 // NOTE: App-level lifecycle hooks (bootstrap, session persistence,
 // keyboard, event routing, overlays, file drop) live in the <Layout>
@@ -44,9 +44,29 @@ export function App({ routeSettingsPage = null, onRouteSettingsPageChange }: App
     )
   }
 
+  const body = (
+    <main className="flex flex-1 min-h-0 min-w-0">
+      <ErrorBoundary resetKey={activeId}>
+        {activeId ? (
+          <RepoView repoId={activeId} onOpenSettings={() => onRouteSettingsPageChange?.('general')} />
+        ) : !sessionReady ? (
+          <RepoWorkspaceSkeleton
+            singlePane={bootWorkspaceBehavior.singlePane}
+            singlePaneView="navigator"
+            branchWorkspaceState="empty"
+          />
+        ) : (
+          <EmptyState />
+        )}
+      </ErrorBoundary>
+    </main>
+  )
+
+  if (activeId) return body
+
   return (
     <>
-      <Topbar onOpenSettings={() => onRouteSettingsPageChange?.('general')} repoId={activeId}>
+      <Topbar onOpenSettings={() => onRouteSettingsPageChange?.('general')}>
         <RepoPickerHost
           currentRepoId={activeId}
           onOpenRepoPathDialog={overlayActions.openRepoPathDialog}
@@ -54,21 +74,7 @@ export function App({ routeSettingsPage = null, onRouteSettingsPageChange }: App
           onClone={overlayActions.openCloneRepo}
         />
       </Topbar>
-      <main className="flex flex-1 min-h-0 min-w-0">
-        <ErrorBoundary resetKey={activeId}>
-          {activeId ? (
-            <RepoView repoId={activeId} />
-          ) : !sessionReady ? (
-            <RepoWorkspaceSkeleton
-              singlePane={bootWorkspaceBehavior.singlePane}
-              singlePaneView="navigator"
-              branchWorkspaceState="empty"
-            />
-          ) : (
-            <EmptyState />
-          )}
-        </ErrorBoundary>
-      </main>
+      {body}
     </>
   )
 }

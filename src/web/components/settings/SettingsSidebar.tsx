@@ -1,7 +1,12 @@
 import { useEffect, useRef, type ComponentType } from 'react'
+import { ArrowLeft } from 'lucide-react'
 import { Button } from '#/web/components/ui/button.tsx'
+import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { cn } from '#/web/lib/cn.ts'
+import { useT } from '#/web/stores/i18n.ts'
+import { WINDOW_TOPBAR_HEIGHT_PX } from '#/shared/window-chrome.ts'
+
 export interface SettingsSidebarItem<TPage extends string> {
   page: TPage
   label: string
@@ -14,6 +19,7 @@ interface SettingsSidebarProps<TPage extends string> {
   topInset?: number
   autoFocusSelected?: boolean
   ariaLabel: string
+  onBack?: () => void
   onPageChange: (page: TPage) => void
 }
 
@@ -23,11 +29,14 @@ export function SettingsSidebar<TPage extends string>({
   topInset = 0,
   autoFocusSelected = true,
   ariaLabel,
+  onBack,
   onPageChange,
 }: SettingsSidebarProps<TPage>) {
+  const t = useT()
   const uiMode = useResponsiveUiMode()
   const compact = uiMode === 'compact'
   const selectedPageButtonRef = useRef<HTMLButtonElement | null>(null)
+  const chromeHeight = topInset > 0 ? topInset : WINDOW_TOPBAR_HEIGHT_PX
 
   useEffect(() => {
     if (!autoFocusSelected) return
@@ -37,44 +46,61 @@ export function SettingsSidebar<TPage extends string>({
   return (
     <aside
       className={cn(
-        'flex shrink-0 flex-col border-r border-border/60 bg-muted/20 pb-3',
-        compact ? 'w-14 px-2' : 'w-48 px-3',
+        'flex h-full shrink-0 flex-col border-r border-border/60 bg-card pb-3',
+        compact ? 'w-16 px-2' : 'w-64 px-3',
       )}
-      style={{ paddingTop: topInset > 0 ? topInset + 12 : 12 }}
     >
-      <nav className="space-y-1.5" aria-label={ariaLabel}>
-        {items.map((item) => (
-          <Button
-            key={item.page}
-            ref={page === item.page ? selectedPageButtonRef : undefined}
-            type="button"
-            data-interactive
-            variant="ghost"
-            onClick={() => onPageChange(item.page)}
-            className={cn(
-              'h-9 w-full gap-2 text-left text-sm font-normal',
-              compact ? 'justify-center px-2' : 'justify-start px-2.5',
-              page === item.page
-                ? 'bg-selected text-selected-foreground hover:bg-selected'
-                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-            )}
-            aria-label={item.label}
-            aria-current={page === item.page ? 'page' : undefined}
-          >
-            <item.Icon
-              className={cn(
-                'size-4 shrink-0',
-                page === item.page ? 'text-selected-foreground' : 'text-muted-foreground',
-              )}
-            />
-            <span className={cn(compact ? 'hidden' : 'truncate', page === item.page ? 'font-medium' : 'font-normal')}>
-              {item.label}
-            </span>
-          </Button>
-        ))}
-      </nav>
+      <div className="app-drag-region shrink-0" aria-hidden style={{ height: chromeHeight }} />
+      {onBack ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size={compact ? 'icon-lg' : 'default'}
+          className={cn(
+            'mb-3 text-muted-foreground',
+            compact ? 'mx-auto size-9' : 'h-9 w-full justify-start gap-2 px-2.5',
+          )}
+          aria-label={t('settings.back')}
+          onClick={onBack}
+        >
+          <ArrowLeft />
+          <span className={compact ? 'hidden' : 'truncate'}>{t('settings.back')}</span>
+        </Button>
+      ) : null}
 
-      <div className="mt-auto" />
+      <ScrollArea className="min-h-0 flex-1" scrollbarMode="compact">
+        <nav className="space-y-1.5 pb-3" aria-label={ariaLabel}>
+          {items.map((item) => (
+            <Button
+              key={item.page}
+              ref={page === item.page ? selectedPageButtonRef : undefined}
+              type="button"
+              data-interactive
+              variant="ghost"
+              onClick={() => onPageChange(item.page)}
+              className={cn(
+                'h-9 w-full gap-2 text-left text-sm font-normal',
+                compact ? 'justify-center px-2' : 'justify-start px-2.5',
+                page === item.page
+                  ? 'bg-selected text-selected-foreground hover:bg-selected'
+                  : 'text-foreground hover:bg-accent hover:text-accent-foreground',
+              )}
+              aria-label={item.label}
+              aria-current={page === item.page ? 'page' : undefined}
+            >
+              <item.Icon
+                className={cn(
+                  'size-4 shrink-0',
+                  page === item.page ? 'text-selected-foreground' : 'text-muted-foreground',
+                )}
+              />
+              <span className={cn(compact ? 'hidden' : 'truncate', page === item.page ? 'font-medium' : 'font-normal')}>
+                {item.label}
+              </span>
+            </Button>
+          ))}
+        </nav>
+      </ScrollArea>
     </aside>
   )
 }

@@ -70,10 +70,13 @@ html[data-host='electron'][data-chrome='overlay'] .topbar {
   padding: 0 150px 0 16px;
 }
 
-
 button,
 [data-interactive] {
   -webkit-app-region: no-drag;
+}
+
+.app-drag-region {
+  -webkit-app-region: drag;
 }
 
 /* Visible focus ring for keyboard users. Tailwind v4 preflight removes
@@ -164,13 +167,12 @@ button,
 
   width: var(--goblin-split-pane-before-content-size);
   flex-basis: var(--goblin-split-pane-before-content-size);
-  transform: translateX(0);
-  transition: transform var(--goblin-workspace-pane-transition-duration) var(--goblin-workspace-pane-transition-easing);
-  will-change: transform;
+  transition: opacity 140ms ease-out;
+  will-change: opacity;
 }
 
 .goblin-split-pane__before-content--collapsed {
-  transform: translateX(-100%);
+  opacity: 0;
   pointer-events: none;
 }
 

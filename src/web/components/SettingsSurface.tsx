@@ -8,30 +8,53 @@ import { NotificationSettings } from '#/web/components/settings/pages/Notificati
 import { SshRemoteSettings } from '#/web/components/settings/pages/SshRemoteSettings.tsx'
 import { SyncSettings } from '#/web/components/settings/pages/SyncSettings.tsx'
 import { WebSettings } from '#/web/components/settings/pages/WebSettings.tsx'
-import { useT } from '#/web/stores/i18n.ts'
-import type { SettingsPage } from '#/shared/api-types.ts'
+import type { SettingsPage } from '#/shared/settings-pages.ts'
 interface SettingsSurfaceProps {
   page: SettingsPage
+  onBack?: () => void
   onPageChange?: (page: SettingsPage) => void
   topInset?: number
   autoFocusSelected?: boolean
 }
-export function SettingsSurface({ page, onPageChange, topInset = 0, autoFocusSelected = true }: SettingsSurfaceProps) {
-  useT()
-
+export function SettingsSurface({
+  page,
+  onBack,
+  onPageChange,
+  topInset = 0,
+  autoFocusSelected = true,
+}: SettingsSurfaceProps) {
   return (
-    <SettingsLayout page={page} onPageChange={onPageChange} topInset={topInset} autoFocusSelected={autoFocusSelected}>
-      <>
-        {page === 'general' && <GeneralSettings />}
-        {page === 'github' && <GitHubSettings />}
-        {page === 'apps' && <ExternalAppSettings />}
-        {page === 'sync' && <SyncSettings />}
-        {page === 'ssh' && <SshRemoteSettings />}
-        {page === 'shortcuts' && <KeyboardShortcutSettings />}
-        {page === 'notifications' && <NotificationSettings />}
-        {page === 'web' && <WebSettings />}
-        {page === 'about' && <AboutSettings />}
-      </>
+    <SettingsLayout
+      page={page}
+      onBack={onBack}
+      onPageChange={onPageChange}
+      topInset={topInset}
+      autoFocusSelected={autoFocusSelected}
+    >
+      <SettingsPageContent page={page} />
     </SettingsLayout>
   )
+}
+
+function SettingsPageContent({ page }: { page: SettingsPage }) {
+  switch (page) {
+    case 'general':
+      return <GeneralSettings />
+    case 'github':
+      return <GitHubSettings />
+    case 'apps':
+      return <ExternalAppSettings />
+    case 'sync':
+      return <SyncSettings />
+    case 'ssh':
+      return <SshRemoteSettings />
+    case 'shortcuts':
+      return <KeyboardShortcutSettings />
+    case 'notifications':
+      return <NotificationSettings />
+    case 'web':
+      return <WebSettings />
+    case 'about':
+      return <AboutSettings />
+  }
 }

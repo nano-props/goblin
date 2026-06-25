@@ -1,11 +1,7 @@
-// Single source of truth for the branch list. Both the persistent
-// left pane (BranchNavigator) and the focus-mode hover card
-// (BranchListPopover) render this same view; the difference between
-// the two surfaces is captured entirely by:
-//   • the outer container (pane = flex ScrollArea, popover = max-h ScrollArea in compact mode)
-//   • whether clicking a row closes the surface afterwards
-// The list, store subscription, action-menu wiring, and empty state
-// live in one place, so the two surfaces can't drift.
+// Single source of truth for the left-pane branch list. The persistent
+// sidebar and the focus-mode reveal drawer both render BranchNavigator,
+// so branch selection, filtering, action menus, and empty state stay
+// in one data path.
 
 import { useMemo } from 'react'
 import { useT } from '#/web/stores/i18n.ts'
@@ -18,11 +14,10 @@ import { openWorkspacePaneView } from '#/web/components/branch-workspace/open-wo
 
 interface Props {
   repoId: string
-  /** Run after the user picks a row. The popover uses this to close;
-   *  the pane leaves it unset so selection is silent. */
+  /** Run after the user picks a row. Kept optional for embedded
+   * surfaces that need to react after selection. */
   onAfterSelect?: (branch: string) => void
-  /** Run after the user double-clicks a row to open its status pane.
-   *  The popover closes here too; the pane leaves it silent. */
+  /** Run after the user double-clicks a row to open its status pane. */
   onAfterOpenStatus?: (branch: string) => void
 }
 
@@ -65,9 +60,8 @@ export function BranchView({ repoId, onAfterSelect, onAfterOpenStatus }: Props) 
       : 'branches.filter-empty'
     : 'branches.empty'
 
-  // Highlight is the same single store field in both surfaces — read
-  // it from the projection here, not via a prop, so callers can't
-  // pass a stale or wrong value.
+  // Highlight comes from the same store projection as the list data,
+  // so callers can't pass a stale or wrong value.
   const highlightedBranch = repo?.ui.selectedBranch ?? null
 
   return (

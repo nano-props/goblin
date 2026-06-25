@@ -5,7 +5,8 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { App } from '#/web/App.tsx'
 import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
-import { resetReposStore } from '#/web/stores/repos/test-utils.ts'
+import { useReposStore } from '#/web/stores/repos/store.ts'
+import { resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 
 const responsiveMocks = vi.hoisted(() => ({
   mode: 'default' as 'default' | 'compact',
@@ -69,6 +70,25 @@ afterEach(() => {
 })
 
 describe('App boot skeleton', () => {
+  test('keeps the legacy topbar repo picker while no repository is open', () => {
+    useReposStore.setState({ sessionReady: true })
+
+    render(<App />)
+
+    expect(container?.querySelector('[data-testid="topbar"]')).not.toBeNull()
+    expect(container?.querySelector('[data-testid="repo-picker"]')).not.toBeNull()
+    expect(container?.querySelector('[data-testid="repo-view"]')).toBeNull()
+  })
+
+  test('does not render the legacy topbar for an active repository shell', () => {
+    seedRepoState({ id: '/tmp/repo' })
+
+    render(<App />)
+
+    expect(container?.querySelector('[data-testid="repo-view"]')).not.toBeNull()
+    expect(container?.querySelector('[data-testid="topbar"]')).toBeNull()
+  })
+
   test('uses a single-pane navigator skeleton in compact mode before session restore is ready', () => {
     responsiveMocks.mode = 'compact'
 

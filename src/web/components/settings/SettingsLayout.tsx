@@ -16,6 +16,7 @@ import {
   SlidersHorizontal,
   type LucideIcon,
 } from 'lucide-react'
+
 const SETTINGS_PAGE_ICONS = {
   general: Settings2,
   shortcuts: Keyboard,
@@ -33,6 +34,7 @@ interface SettingsLayoutProps {
   topInset?: number
   autoFocusSelected?: boolean
   children: ReactNode
+  onBack?: () => void
   onPageChange?: (page: SettingsPage) => void
 }
 
@@ -41,10 +43,11 @@ export function SettingsLayout({
   topInset = 0,
   autoFocusSelected = true,
   children,
+  onBack,
   onPageChange,
 }: SettingsLayoutProps) {
   const t = useT()
-  const pages = SETTINGS_PAGES.map((pageKey) => {
+  const items = SETTINGS_PAGES.map((pageKey) => {
     const config = SETTINGS_PAGE_CONFIG[pageKey]
     return {
       page: pageKey,
@@ -53,28 +56,24 @@ export function SettingsLayout({
       Icon: SETTINGS_PAGE_ICONS[pageKey],
     }
   })
-  const active = pages.find((item) => item.page === page) ?? pages[0]
+  const active = items.find((item) => item.page === page) ?? items[0]
 
   return (
-    <div className="relative flex h-full min-h-0 bg-background">
-      {topInset > 0 ? (
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 z-10 [-webkit-app-region:drag]"
-          style={{ height: topInset }}
-        />
-      ) : null}
+    <div className="relative flex h-full min-h-0 w-full min-w-0 flex-1 bg-background">
       <SettingsSidebar
         page={page}
-        items={pages}
+        items={items}
         topInset={topInset}
         autoFocusSelected={autoFocusSelected}
         ariaLabel={t('settings.title')}
+        onBack={onBack}
         onPageChange={(nextPage) => {
           onPageChange?.(nextPage)
         }}
       />
-      <SettingsContentFrame topInset={topInset}>{children}</SettingsContentFrame>
+      <SettingsContentFrame topInset={topInset} title={active.title}>
+        {children}
+      </SettingsContentFrame>
     </div>
   )
 }

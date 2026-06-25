@@ -10,7 +10,7 @@ interface Props {
 
 export function BranchNavigator({ repoId }: Props) {
   return (
-    <ScrollArea className="min-h-0 flex-1">
+    <ScrollArea className="h-full min-h-0 flex-1">
       <BranchView repoId={repoId} />
     </ScrollArea>
   )

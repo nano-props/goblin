@@ -498,7 +498,7 @@ export const ja: Record<DictKey, string> = {
   'settings.lang.zh': '中文',
   'settings.lang.ko': '한국어',
   'settings.lang.ja': '日本語',
-  'settings.back': '戻る',
+  'settings.back': 'アプリに戻る',
   'settings.terminal-notifications': 'ターミナルベル通知',
   'settings.terminal-notifications-hint': 'バックグラウンドのターミナルベルでシステム通知を表示します。',
   'settings.terminal-notifications-test': 'システム通知をテスト',

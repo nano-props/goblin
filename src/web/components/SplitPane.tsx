@@ -5,6 +5,7 @@ import type { Layout } from 'react-resizable-panels'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '#/web/components/ui/resizable.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { WORKSPACE_PANE_MOTION_STYLE, WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
+import { useElementInlineSize } from '#/web/hooks/useElementInlineSize.ts'
 
 interface SplitPaneProps {
   before: ReactNode
@@ -127,7 +128,10 @@ export function SplitPane({
         </ResizablePanel>
         <ResizableHandle
           disabled={disabled || beforeCollapsed}
-          className={cn('goblin-split-pane__handle', beforeCollapsed && 'goblin-split-pane__handle--collapsed')}
+          className={cn(
+            'goblin-split-pane__handle',
+            beforeCollapsed && !collapseTransitioning && 'goblin-split-pane__handle--collapsed',
+          )}
         />
         <ResizablePanel
           id={AFTER_PANEL_ID}
@@ -173,8 +177,8 @@ function useStableBeforeContentSize({
   splitPaneRef: RefObject<HTMLElement | null>
   frozen: boolean
 }): number | null {
-  const measuredBeforeSize = useMeasuredInlineSize(beforeClipRef, !frozen)
-  const splitPaneSize = useMeasuredInlineSize(splitPaneRef, true)
+  const measuredBeforeSize = useElementInlineSize(beforeClipRef, !frozen)
+  const splitPaneSize = useElementInlineSize(splitPaneRef, true)
   const measuredAtSplitPaneSizeRef = useRef<number | null>(null)
   const [stableBeforeSize, setStableBeforeSize] = useState<number | null>(null)
 
@@ -191,29 +195,4 @@ function useStableBeforeContentSize({
   }, [frozen, splitPaneSize])
 
   return stableBeforeSize
-}
-
-function useMeasuredInlineSize(ref: RefObject<HTMLElement | null>, enabled: boolean): number | null {
-  const [inlineSize, setInlineSize] = useState<number | null>(null)
-
-  useEffect(() => {
-    if (!enabled) return
-    const element = ref.current
-    if (!element) return
-    const update = (next: number) => {
-      if (next <= 0) return
-      setInlineSize((current) => (current !== null && Math.abs(current - next) <= 0.5 ? current : next))
-    }
-
-    update(element.getBoundingClientRect().width)
-    if (typeof ResizeObserver === 'undefined') return
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0]
-      if (entry) update(entry.contentRect.width)
-    })
-    observer.observe(element)
-    return () => observer.disconnect()
-  }, [enabled, ref])
-
-  return inlineSize
 }

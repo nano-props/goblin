@@ -7,6 +7,13 @@ import type { CSSProperties, ReactNode } from 'react'
 
 import { Skeleton } from '#/web/components/ui/skeleton.tsx'
 import { RepoWorkspace, RepoWorkspacePane, Toolbar } from '#/web/components/Layout.tsx'
+import {
+  BRANCH_ROW_ACTION_BOX_CLASS,
+  BRANCH_ROW_ACTION_SLOT_CLASS,
+  BRANCH_ROW_CONTENT_CLASS,
+  BRANCH_ROW_GRID_CLASS,
+  BRANCH_ROW_LIST_CLASS,
+} from '#/web/components/branch-navigator/branch-row-metrics.ts'
 
 interface BranchNavigatorSkeletonProps {
   rows?: number
@@ -26,7 +33,7 @@ export function BranchNavigatorSkeleton({ rows = 6 }: BranchNavigatorSkeletonPro
   return (
     <SkeletonList
       rows={rows}
-      className="flex flex-1 flex-col gap-1 p-1.5"
+      className={BRANCH_ROW_LIST_CLASS}
       renderRow={(i) => <BranchNavigatorSkeletonRow key={i} />}
     />
   )
@@ -44,8 +51,8 @@ export function StatusListSkeleton({ rows = 6 }: RowCountProps) {
 }
 
 // RepoWorkspaceSkeleton renders the branch navigator + workspace pane while
-// a repo is being hydrated. The per-repo toolbar lives in the Topbar,
-// so the workspace skeleton just shows the panes.
+// a repo is being hydrated. The active repo shell owns the sidebar
+// chrome, so the workspace skeleton just shows the panes.
 export function RepoWorkspaceSkeleton({
   singlePane = false,
   singlePaneView = 'navigator',
@@ -128,13 +135,13 @@ function SkeletonList({
 
 function BranchNavigatorSkeletonRow() {
   return (
-    <li className="grid min-h-9 grid-cols-[minmax(0,1fr)_auto] items-stretch rounded-md bg-muted/30">
-      <div className="flex min-w-0 items-center gap-3 px-4">
+    <li className={`${BRANCH_ROW_GRID_CLASS} bg-muted/30`}>
+      <div className={`${BRANCH_ROW_CONTENT_CLASS} gap-3`}>
         <Skeleton className="h-4 w-4 rounded-full" />
         <Skeleton className="h-4 w-3/5" />
       </div>
-      <div className="flex shrink-0 items-center pr-4">
-        <div data-testid="branch-navigator-skeleton-action">
+      <div className={BRANCH_ROW_ACTION_SLOT_CLASS}>
+        <div className={BRANCH_ROW_ACTION_BOX_CLASS} data-testid="branch-navigator-skeleton-action">
           <Skeleton className="h-6 w-7" />
         </div>
       </div>

@@ -6,7 +6,7 @@ type ResizableHandleProps = React.ComponentProps<typeof ResizablePrimitive.Separ
 // Keep the drag hit target and the visible splitter line separate: the
 // target stays transparent, while the 1px line paints the separator. This
 // avoids double-painting semi-transparent border tokens on light themes.
-const resizeHandle = {
+const resizeHandleClassNames = {
   hitTarget: [
     'group relative z-10 flex shrink-0 items-center justify-center bg-transparent outline-none',
     'before:absolute before:z-10 before:content-[""]',
@@ -36,12 +36,16 @@ function ResizableHandle({ className, ...props }: ResizableHandleProps) {
   return (
     <ResizablePrimitive.Separator
       data-slot="resizable-handle"
-      className={cn(resizeHandle.hitTarget, resizeHandle.horizontal, className)}
+      className={cn(resizeHandleClassNames.hitTarget, resizeHandleClassNames.horizontal, className)}
       {...props}
     >
-      <span aria-hidden className={cn(resizeHandle.visibleLine, resizeHandle.lineHorizontal)} />
+      <ResizeHandleLine />
     </ResizablePrimitive.Separator>
   )
 }
 
-export { ResizableHandle, ResizablePanel, ResizablePanelGroup }
+function ResizeHandleLine() {
+  return <span aria-hidden className={cn(resizeHandleClassNames.visibleLine, resizeHandleClassNames.lineHorizontal)} />
+}
+
+export { ResizableHandle, ResizablePanel, ResizablePanelGroup, ResizeHandleLine, resizeHandleClassNames }

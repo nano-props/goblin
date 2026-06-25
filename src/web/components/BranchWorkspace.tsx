@@ -1,4 +1,4 @@
-import { useId } from 'react'
+import { useId, type ReactNode } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import {
@@ -15,6 +15,8 @@ interface Props {
   repoId: string
   selectedBranchName?: string | null
   shortcutsEnabled?: boolean
+  toolbarLeading?: ReactNode
+  toolbarTrafficLightOffset?: boolean
 }
 
 // Keep this equality in sync with fields read by BranchWorkspace children.
@@ -46,7 +48,13 @@ function branchWorkspaceRepoEqual(a: BranchWorkspaceRepo | undefined, b: BranchW
   )
 }
 
-export function BranchWorkspace({ repoId, selectedBranchName, shortcutsEnabled = true }: Props) {
+export function BranchWorkspace({
+  repoId,
+  selectedBranchName,
+  shortcutsEnabled = true,
+  toolbarLeading,
+  toolbarTrafficLightOffset = false,
+}: Props) {
   const workspacePaneId = useId()
   const repo = useStoreWithEqualityFn(
     useReposStore,
@@ -108,10 +116,18 @@ export function BranchWorkspace({ repoId, selectedBranchName, shortcutsEnabled =
           branch={detail.branch}
           workspacePaneId={workspacePaneId}
           shortcutsEnabled={shortcutsEnabled}
+          toolbarLeading={toolbarLeading}
+          toolbarTrafficLightOffset={toolbarTrafficLightOffset}
         />
       ) : (
         <>
-          <BranchWorkspaceToolbar repo={repo} detail={detail} workspacePaneId={workspacePaneId} />
+          <BranchWorkspaceToolbar
+            repo={repo}
+            detail={detail}
+            workspacePaneId={workspacePaneId}
+            leading={toolbarLeading}
+            trafficLightOffset={toolbarTrafficLightOffset}
+          />
           <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId={workspacePaneId} />
         </>
       )}
@@ -125,6 +141,8 @@ interface BranchShortcutHandlerProps {
   branch: NonNullable<SelectedBranchWorkspacePresentation['branch']>
   workspacePaneId: string
   shortcutsEnabled: boolean
+  toolbarLeading?: ReactNode
+  toolbarTrafficLightOffset?: boolean
 }
 
 function BranchShortcutHandler({
@@ -133,13 +151,21 @@ function BranchShortcutHandler({
   branch,
   workspacePaneId,
   shortcutsEnabled,
+  toolbarLeading,
+  toolbarTrafficLightOffset = false,
 }: BranchShortcutHandlerProps) {
   const actions = useBranchActionItems(repo, branch)
   useBranchActionShortcutRegistry(actions, shortcutsEnabled)
 
   return (
     <BranchActionSurfaceContext.Provider value={actions}>
-      <BranchWorkspaceToolbar repo={repo} detail={detail} workspacePaneId={workspacePaneId} />
+      <BranchWorkspaceToolbar
+        repo={repo}
+        detail={detail}
+        workspacePaneId={workspacePaneId}
+        leading={toolbarLeading}
+        trafficLightOffset={toolbarTrafficLightOffset}
+      />
       <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId={workspacePaneId} />
     </BranchActionSurfaceContext.Provider>
   )

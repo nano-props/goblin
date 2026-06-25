@@ -1,15 +1,9 @@
-// Single-button worktree filter for the topbar. The previous
+// Single-button worktree filter for the sidebar branch list. The previous
 // SegmentedControl (all / worktrees) was hard to discover and the
 // "blue pill" reading of the selected thumb (low-opacity accent
-// tint) only ever landed muddy against the toolbar's gray
-// surroundings. This control is now a single toggle styled the
-// same as the rest of the topbar icon toggles
-// (variant="ghost" + size="icon-lg" + bg-accent on press) so the
-// topbar's icon toggles share one visual language: a flat ghost
-// button that paints a subtle accent fill when active. The
-// size="icon-lg" matches the rest of the topbar buttons so the
-// four controls (Refresh / Filter / CreateWorktree / Settings)
-// read as one row of equal-weight buttons.
+// tint) only ever landed muddy against the surrounding chrome. This
+// control is now a single ghost toggle that paints a subtle accent
+// fill when active.
 //
 // Behaviour:
 //   pressed   → branchViewMode === 'worktrees' (filter on, only
@@ -55,8 +49,7 @@ export function BranchViewModeControl({ value, disabled = false, onChange }: Pro
         aria-pressed={worktreesOnly}
         aria-label={t('branches.filter-label')}
         className={cn(
-          // Match the topbar toggle pressed treatment so the controls
-          // read as one family. `hover:bg-accent`
+          // Keep the pressed treatment stable. `hover:bg-accent`
           // sticks while pressed so the active state doesn't
           // flicker back to ghost on mouse-over.
           worktreesOnly && 'bg-accent text-accent-foreground shadow-xs hover:bg-accent hover:text-accent-foreground',

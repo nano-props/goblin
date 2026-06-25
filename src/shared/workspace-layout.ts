@@ -1,5 +1,5 @@
 export const DEFAULT_WORKSPACE_FOCUSED = false
-export const DEFAULT_WORKSPACE_PANE_SIZE = 64
+export const DEFAULT_WORKSPACE_PANE_SIZE = 70
 
 const MIN_WORKSPACE_PANE_SIZE = 10
 const MAX_WORKSPACE_PANE_SIZE = 90
@@ -17,8 +17,7 @@ export function normalizeWorkspaceSessionLayoutState(value: {
   workspacePaneSize: number
 } {
   return {
-    workspaceFocused:
-      typeof value.workspaceFocused === 'boolean' ? value.workspaceFocused : DEFAULT_WORKSPACE_FOCUSED,
+    workspaceFocused: typeof value.workspaceFocused === 'boolean' ? value.workspaceFocused : DEFAULT_WORKSPACE_FOCUSED,
     workspacePaneSize: normalizeWorkspacePaneSize(value.workspacePaneSize),
   }
 }

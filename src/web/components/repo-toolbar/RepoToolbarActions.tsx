@@ -1,71 +1,23 @@
-// Per-repo chrome buttons. These actions sit to the right of the
-// repo picker in the Topbar (see `Topbar.tsx`) — they are unrelated
-// to any single branch:
-//
-//   Refresh — see `RepoActivityControl`; syncs configured remotes when
-//             present, then rebuilds the local snapshot (branches,
-//             status, log) from disk. Local-only repositories skip
-//             remote sync and refresh from local reads only.
-//   Filter  — single-button toggle for `branchViewMode` (worktrees-only /
-//             all). Hidden when the branch navigator is off screen —
-//             there is no branch list to filter, so the toggle would
-//             just add noise to the topbar.
-//   Create  — open the new-worktree dialog. The dialog itself lives in
-//             `Layout.MainWindowOverlays` (see `Layout.tsx`) so its
-//             form state survives settings navigation — a half-typed
-//             branch name is not lost when the user opens Settings
-//             and returns. This trigger only fires
-//             `LayoutOverlayActions.openCreateWorktree()`.
-//
-// Branch-scoped operations (Pull / Push / Open in Terminal
-// / Open in GitHub) live with the selected-branch workspace, not here —
-// those need a branch context to be meaningful.
-
 import { useContext } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { FolderPlus } from 'lucide-react'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { useT } from '#/web/stores/i18n.ts'
-import { Tip } from '#/web/components/Tip.tsx'
-import { Button } from '#/web/components/ui/button.tsx'
 import { RepoActivityControl } from '#/web/components/repo-activity/RepoActivityControl.tsx'
 import { BranchViewModeControl } from '#/web/components/repo-toolbar/BranchViewModeControl.tsx'
 import type { BranchViewMode } from '#/web/stores/repos/types.ts'
-import { useBranchNavigatorVisible } from '#/web/hooks/useBranchNavigatorVisible.ts'
 import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
+import { SidebarRowButton } from '#/web/components/ui/sidebar-row-button.tsx'
+import { useT } from '#/web/stores/i18n.ts'
 
 interface Props {
   repoId: string
 }
 
-export function RepoToolbarActions({ repoId }: Props) {
-  // Render the three actions as direct children (no wrapper) so
-  // they pick up the parent topbar's `gap-2`. Wrapping them in a
-  // flex container with its own smaller `gap-1` made the spacing
-  // between the actions visibly tighter than the gap from the
-  // last action to the Settings button — the four topbar buttons
-  // should read as one row of equally-spaced peers.
-  return (
-    <>
-      <RepoActivityControl repoId={repoId} />
-      <WorktreeFilterAction repoId={repoId} />
-      <CreateWorktreeAction repoId={repoId} />
-    </>
-  )
+export function RepoSyncAction({ repoId }: Props) {
+  return <RepoActivityControl repoId={repoId} />
 }
 
-// Reads the worktree-filter state from the repos store and feeds it
-// into the BranchViewModeControl toggle. Sits between Refresh and
-// CreateWorktree in the topbar, the visual grouping is implied by
-// the row order rather than a separate flex container.
-//
-// The visibility check is split into its own component so the
-// store-reading hooks in `WorktreeFilterToggle` are never called
-// while the button is hidden — keeps the rules of hooks happy
-// (consistent hook order across renders) and avoids a needless
-// subscription on the rest of the store.
-function WorktreeFilterAction({ repoId }: Props) {
-  if (!useBranchNavigatorVisible(repoId)) return null
+export function BranchFilterAction({ repoId }: Props) {
   return <WorktreeFilterToggle repoId={repoId} />
 }
 
@@ -91,15 +43,26 @@ function WorktreeFilterToggle({ repoId }: Props) {
   )
 }
 
-/**
- * Topbar-mounted trigger for the create-worktree dialog. The dialog
- * itself is rendered by `Layout.MainWindowOverlays`; this component
- * only opens it. Disabled while a `createWorktree` action is in
- * flight on the active repo so the user cannot stack two submissions
- * by hammering the button.
- */
-function CreateWorktreeAction({ repoId }: Props) {
+export function CreateWorktreeRowAction({ repoId }: Props) {
   const t = useT()
+  const { disabled, openCreateWorktree } = useCreateWorktreeTrigger(repoId)
+  const label = t('action.create-worktree-title')
+
+  return (
+    <SidebarRowButton
+      onClick={() => {
+        if (!disabled) openCreateWorktree()
+      }}
+      disabled={disabled}
+      aria-label={label}
+      leading={<FolderPlus size={16} />}
+    >
+      {label}
+    </SidebarRowButton>
+  )
+}
+
+function useCreateWorktreeTrigger(repoId: string) {
   const overlayActions = useContext(LayoutOverlayActions)
   const branchAction = useStoreWithEqualityFn(
     useReposStore,
@@ -110,21 +73,8 @@ function CreateWorktreeAction({ repoId }: Props) {
     (a, b) => a === b || (!!a && !!b && a.phase === b.phase && a.reason === b.reason && a.target === b.target),
   )
   const branchActionBusy = branchAction ? branchAction.phase !== 'idle' : true
-  const createTip = t('action.create-worktree-title')
-
-  return (
-    <Tip label={createTip}>
-      <Button
-        variant="ghost"
-        size="icon-lg"
-        onClick={() => {
-          if (!branchActionBusy) overlayActions?.openCreateWorktree()
-        }}
-        disabled={branchActionBusy}
-        aria-label={createTip}
-      >
-        <FolderPlus />
-      </Button>
-    </Tip>
-  )
+  return {
+    disabled: branchActionBusy,
+    openCreateWorktree: () => overlayActions?.openCreateWorktree(),
+  }
 }

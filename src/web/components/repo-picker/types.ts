@@ -17,6 +17,8 @@ export interface RepoPickerRepo {
   lifecycle: RemoteRepoLifecycle | null
 }
 
+export type RepoPickerSurface = 'toolbar' | 'sidebar'
+
 export interface RepoPickerLabels {
   repositories: string
   closeWithName: (name: string) => string

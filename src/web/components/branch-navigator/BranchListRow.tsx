@@ -1,7 +1,5 @@
 // Branch list row wrapper. Resolves `terminalBellCount` from the
-// terminal-slot store and delegates rendering to BranchRow. Shared
-// between the persistent BranchNavigator pane and the focus-mode
-// BranchListPopover so the row behavior stays in lockstep.
+// terminal-slot store and delegates rendering to BranchRow.
 
 import { BranchRow, type BranchRowProps } from '#/web/components/branch-navigator/BranchRow.tsx'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
@@ -14,11 +12,5 @@ export function BranchListRow(props: BranchRowProps) {
     : null
   const terminalBellCount = useWorktreeTerminalBellCount(terminalKey)
   const branchActionBusy = branchActionDisplayPhase(props.repo, props.branch.name) !== null
-  return (
-    <BranchRow
-      {...props}
-      terminalBellCount={terminalBellCount}
-      branchActionBusy={branchActionBusy}
-    />
-  )
+  return <BranchRow {...props} terminalBellCount={terminalBellCount} branchActionBusy={branchActionBusy} />
 }

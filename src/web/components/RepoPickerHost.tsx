@@ -1,14 +1,13 @@
-// Top repository picker: the active repository stays visible in the toolbar
-// while every open repository and open/clone action lives in the switcher
-// popover. Keyboard users can still move between repos with Arrow/Home/End
-// from the current repo button.
+// Data-binding host for the repository picker. The picker itself owns
+// toolbar/sidebar presentation; this host only supplies repo summaries,
+// labels, and open/switch actions.
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { RepoPicker } from '#/web/components/repo-picker/RepoPicker.tsx'
 import { repoPickerReposEqual } from '#/web/components/repo-picker/summary-equality.ts'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
-import type { RepoPickerRepo } from '#/web/components/repo-picker/types.ts'
+import type { RepoPickerRepo, RepoPickerSurface } from '#/web/components/repo-picker/types.ts'
 import { openRepoFromDialog } from '#/web/lib/open-repo-dialog.ts'
 import { useRuntimeShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
 import { repoPickerStoreActionsEqual, repoPickerStoreActionsFromStore } from '#/web/stores/repos/selector-actions.ts'
@@ -19,9 +18,16 @@ interface RepoPickerHostProps {
   onOpenRepoPathDialog: () => void
   onOpenRemote: () => void
   onClone: () => void
+  surface?: RepoPickerSurface
 }
 
-export function RepoPickerHost({ currentRepoId, onOpenRepoPathDialog, onOpenRemote, onClone }: RepoPickerHostProps) {
+export function RepoPickerHost({
+  currentRepoId,
+  onOpenRepoPathDialog,
+  onOpenRemote,
+  onClone,
+  surface = 'toolbar',
+}: RepoPickerHostProps) {
   const t = useT()
   const { shortcutsDisabled } = useRuntimeShortcutSettings()
   // Build the summary array inside the selector but compare with our
@@ -86,6 +92,7 @@ export function RepoPickerHost({ currentRepoId, onOpenRepoPathDialog, onOpenRemo
       onOpenLocal={handleOpenLocal}
       onOpenRemote={onOpenRemote}
       onClone={onClone}
+      surface={surface}
     />
   )
 }

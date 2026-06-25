@@ -53,8 +53,8 @@ describe('RepoWorkspaceSkeleton', () => {
     expect(container?.querySelector('[data-testid="branch-workspace-empty-skeleton"]')).not.toBeNull()
     expect(container?.querySelector('[data-testid="branch-workspace-skeleton"]')).toBeNull()
     expect(container?.querySelector('[data-testid="branch-workspace-skeleton-action"]')).toBeNull()
-    // The per-repo toolbar moved up to the Topbar, so the
-    // workspace skeleton no longer carries its own toolbar —
+    // The active repo shell owns the sidebar chrome, so the
+    // workspace skeleton no longer carries repo-level controls —
     // including the worktree-filter and layout-control slots.
     expect(container?.querySelector('[data-testid="repo-toolbar-skeleton-branch-view"]')).toBeNull()
     expect(container?.querySelector('[data-testid="repo-toolbar-skeleton-layout-control"]')).toBeNull()
@@ -94,6 +94,19 @@ describe('RepoWorkspaceSkeleton', () => {
     const action = container?.querySelector('[data-testid="branch-navigator-skeleton-action"] > div')
     expect(action?.className).toContain('h-6')
     expect(action?.className).toContain('w-7')
+  })
+
+  test('uses the same row metrics as the real Branch Navigator list', () => {
+    render(<RepoWorkspaceSkeleton singlePane />)
+
+    const row = container?.querySelector('li')
+    const content = row?.firstElementChild
+    const actionSlot = row?.lastElementChild
+    expect(row?.className).toContain('min-h-8')
+    expect(row?.className).toContain('grid-cols-[minmax(0,1fr)_auto]')
+    expect(content?.className).toContain('px-3')
+    expect(content?.className).toContain('py-1')
+    expect(actionSlot?.className).toContain('pr-3')
   })
 })
 

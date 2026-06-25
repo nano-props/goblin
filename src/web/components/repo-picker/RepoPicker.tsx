@@ -6,9 +6,9 @@ import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { Tip } from '#/web/components/Tip.tsx'
 import { ToolbarTabList, ToolbarTabStripBody } from '#/web/components/tab-strip/ToolbarTabStrip.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '#/web/components/ui/popover.tsx'
-import { CurrentRepoButton } from '#/web/components/repo-picker/CurrentRepoButton.tsx'
+import { CurrentRepoSidebarButton, CurrentRepoToolbarButton } from '#/web/components/repo-picker/CurrentRepoButton.tsx'
 import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
-import type { RepoPickerLabels, RepoPickerRepo } from '#/web/components/repo-picker/types.ts'
+import type { RepoPickerLabels, RepoPickerRepo, RepoPickerSurface } from '#/web/components/repo-picker/types.ts'
 import { isRemoteRepoId, remoteRepoLifecycleTarget } from '#/shared/remote-repo.ts'
 import { formatRepoLocator } from '#/web/lib/paths.ts'
 
@@ -41,6 +41,7 @@ interface RepoPickerProps {
   onOpenLocal: () => void
   onOpenRemote: () => void
   onClone: () => void
+  surface?: RepoPickerSurface
 }
 
 function RepoSwitcherAction({
@@ -71,15 +72,6 @@ function RepoSwitcherAction({
   )
 }
 
-// Popover content for the repo menu. The Popover itself is owned by
-// `RepoPicker` so the tab strip can be the trigger and the popover
-// state can be reset on selection.
-//
-// Each row is a two-line entry: repo name on top, locator (path or
-// remote target) below in mono muted text. Rows grow from h-8 (32px)
-// to min-h-11 (44px) to fit both lines comfortably; the close button
-// stays absolutely positioned and centred vertically so it stays in
-// reach as the row grows.
 function RepoMenuContent({
   repos,
   activeId,
@@ -226,6 +218,7 @@ export function RepoPicker({
   onOpenLocal,
   onOpenRemote,
   onClone,
+  surface = 'toolbar',
 }: RepoPickerProps) {
   const focusRegistry = useFocusRegistry<string, HTMLButtonElement>()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -253,24 +246,30 @@ export function RepoPicker({
   const currentRepo = repos.find((r) => r.id === activeId) ?? repos[0] ?? null
 
   return (
-    <nav className="flex h-full min-w-0 items-center" aria-label={labels.repositories}>
+    <nav className="flex h-full min-w-0 flex-1 items-center" aria-label={labels.repositories}>
       <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-        {currentRepo ? (
+        {currentRepo && surface === 'sidebar' ? (
           <PopoverTrigger asChild>
-            <ToolbarTabStripBody>
-              {/* The tablist absorbs PopoverTrigger's onClick + data
-               * attributes; clicks anywhere in the tab area open the
-               * popover. The inner CurrentRepoButton keeps its focus
-               * and keyboard nav (ArrowLeft/Right) for repository
-               * switching without opening the popover. */}
-              <ToolbarTabList role="tablist" aria-orientation="horizontal" data-current-repo-group>
-                <CurrentRepoButton
+            <CurrentRepoSidebarButton
+              repo={currentRepo}
+              focusRegistry={focusRegistry}
+              onKeyboardNavigate={handleKeyboardNavigate}
+              unavailableLabel={labels.unavailable}
+              fill
+            />
+          </PopoverTrigger>
+        ) : currentRepo ? (
+          <PopoverTrigger asChild>
+            <ToolbarTabStripBody className="flex-1">
+              <ToolbarTabList role="tablist" aria-orientation="horizontal" data-current-repo-group className="flex-1">
+                <CurrentRepoToolbarButton
                   repo={currentRepo}
                   isCurrent={currentRepo.id === activeId}
                   focusRegistry={focusRegistry}
                   onActivate={onActivate}
                   onKeyboardNavigate={handleKeyboardNavigate}
                   unavailableLabel={labels.unavailable}
+                  fill
                 />
               </ToolbarTabList>
             </ToolbarTabStripBody>
