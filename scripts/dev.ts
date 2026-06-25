@@ -41,7 +41,7 @@ const viteProc = Bun.spawn(viteArgs, {
 })
 
 log(`starting Vite dev server at ${webDevUrl}`)
-log(`proxying renderer /api and /ws to embedded server at http://${webDevHost}:${embeddedServerPort}/`)
+log(`proxying client /api and /ws to embedded server at http://${webDevHost}:${embeddedServerPort}/`)
 
 void viteProc.exited.then((code) => {
   viteExited = true

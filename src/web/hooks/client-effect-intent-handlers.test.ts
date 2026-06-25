@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { handleWorkspaceRendererIntent } from '#/web/hooks/client-effect-intent-handlers.ts'
+import { handleWorkspaceClientIntent } from '#/web/hooks/client-effect-intent-handlers.ts'
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
@@ -27,7 +27,7 @@ describe('client effect intent handlers', () => {
     })
 
     await expect(
-      handleWorkspaceRendererIntent({ type: 'show-workspace-pane-view-requested', tab: 'changes' }, deps(REPO_ID)),
+      handleWorkspaceClientIntent({ type: 'show-workspace-pane-view-requested', tab: 'changes' }, deps(REPO_ID)),
     ).resolves.toBe(false)
 
     const repo = useReposStore.getState().repos[REPO_ID]

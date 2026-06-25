@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
     rows: 31,
   })),
   preloadTerminalFontMock: vi.fn(async () => {}),
-  attachmentIdMock: vi.fn(() => 'client_local'),
+  clientIdMock: vi.fn(() => 'client_local'),
 }))
 
 vi.mock('#/web/terminal.ts', () => ({
@@ -22,7 +22,7 @@ vi.mock('#/web/terminal.ts', () => ({
 }))
 
 vi.mock('#/web/client-terminal-bridge.ts', () => ({
-  readOrCreateWebTerminalClientId: mocks.attachmentIdMock,
+  readOrCreateWebTerminalClientId: mocks.clientIdMock,
 }))
 
 vi.mock('#/web/components/terminal/terminal-geometry.ts', () => ({
@@ -185,7 +185,7 @@ describe('TerminalSlotRegistry create flow', () => {
     mocks.closeMock.mockResolvedValue(true)
     mocks.proposeTerminalGeometryMock.mockClear()
     mocks.preloadTerminalFontMock.mockClear()
-    mocks.attachmentIdMock.mockClear()
+    mocks.clientIdMock.mockClear()
     registry = new TerminalSlotRegistry(() => REPO_ROOT)
     registry.setRepoIndex(makeRepoIndex())
     setTerminalSlotRegistryForTests(registry)

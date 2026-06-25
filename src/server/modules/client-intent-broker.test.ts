@@ -1,16 +1,16 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
-  disconnectAllRendererIntentSockets,
+  disconnectAllClientIntentSockets,
   MAX_RENDERER_INTENT_SOCKETS,
   publishRendererIntent,
-  registerRendererIntentSocket,
-  RendererIntentSocketLimitError,
-  unregisterRendererIntentSocket,
+  registerClientIntentSocket,
+  ClientIntentSocketLimitError,
+  unregisterClientIntentSocket,
 } from '#/server/modules/client-intent-broker.ts'
 
 describe('client intent broker', () => {
   beforeEach(() => {
-    disconnectAllRendererIntentSockets()
+    disconnectAllClientIntentSockets()
   })
 
   test('returns false when no subscriber is attached', () => {
@@ -22,8 +22,8 @@ describe('client intent broker', () => {
   test('broadcasts the enveloped intent to every subscriber and returns true', () => {
     const first = { send: vi.fn(), close: vi.fn() }
     const second = { send: vi.fn(), close: vi.fn() }
-    registerRendererIntentSocket(first)
-    registerRendererIntentSocket(second)
+    registerClientIntentSocket(first)
+    registerClientIntentSocket(second)
 
     const ok = publishRendererIntent({ type: 'show-workspace-pane-view-requested', tab: 'changes' })
     expect(ok).toBe(true)
@@ -39,10 +39,10 @@ describe('client intent broker', () => {
   test('disconnects every subscriber during shutdown', () => {
     const first = { send: vi.fn(), close: vi.fn() }
     const second = { send: vi.fn(), close: vi.fn() }
-    registerRendererIntentSocket(first)
-    registerRendererIntentSocket(second)
+    registerClientIntentSocket(first)
+    registerClientIntentSocket(second)
 
-    disconnectAllRendererIntentSockets()
+    disconnectAllClientIntentSockets()
     publishRendererIntent({ type: 'show-workspace-pane-view-requested', tab: 'changes' })
 
     expect(first.close).toHaveBeenCalledWith(1001, 'server shutting down')
@@ -53,10 +53,10 @@ describe('client intent broker', () => {
 
   test('rejects the (N+1)th subscriber to prevent socket floods', () => {
     for (let i = 0; i < MAX_RENDERER_INTENT_SOCKETS; i += 1) {
-      registerRendererIntentSocket({ send: vi.fn(), close: vi.fn() })
+      registerClientIntentSocket({ send: vi.fn(), close: vi.fn() })
     }
     const overflow = { send: vi.fn(), close: vi.fn() }
-    expect(() => registerRendererIntentSocket(overflow)).toThrow(RendererIntentSocketLimitError)
+    expect(() => registerClientIntentSocket(overflow)).toThrow(ClientIntentSocketLimitError)
   })
 
   test('frees a slot when a subscriber disconnects', () => {
@@ -64,8 +64,8 @@ describe('client intent broker', () => {
       send: vi.fn(),
       close: vi.fn(),
     }))
-    for (const s of sockets) registerRendererIntentSocket(s)
-    unregisterRendererIntentSocket(sockets[0]!)
-    expect(() => registerRendererIntentSocket({ send: vi.fn(), close: vi.fn() })).not.toThrow()
+    for (const s of sockets) registerClientIntentSocket(s)
+    unregisterClientIntentSocket(sockets[0]!)
+    expect(() => registerClientIntentSocket({ send: vi.fn(), close: vi.fn() })).not.toThrow()
   })
 })

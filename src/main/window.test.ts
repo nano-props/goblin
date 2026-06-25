@@ -310,7 +310,7 @@ describe('main window navigation boundaries', () => {
     // `webDevUrl` env override just changes which URL the client
     // window is pointed at (Vite vs the embedded server's static
     // file route). The dev-URL override flows through
-    // `createRendererEntryUrl`; the bootstrap-IPC behavior is
+    // `createClientEntryUrl`; the bootstrap-IPC behavior is
     // covered by the IPC handler tests.
     process.env.GOBLIN_WEB_DEV_URL = 'http://127.0.0.1:5173/'
     const { getOrCreateMainWindow } = await import('#/main/window.ts')

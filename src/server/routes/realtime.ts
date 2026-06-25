@@ -6,9 +6,9 @@ import {
   unregisterInvalidationSocket,
 } from '#/server/modules/invalidation-broker.ts'
 import {
-  RendererIntentSocketLimitError,
-  registerRendererIntentSocket,
-  unregisterRendererIntentSocket,
+  ClientIntentSocketLimitError,
+  registerClientIntentSocket,
+  unregisterClientIntentSocket,
 } from '#/server/modules/client-intent-broker.ts'
 import { createAccessTokenMiddleware } from '#/server/common/auth.ts'
 import { userIdFromContext } from '#/server/common/identity.ts'
@@ -107,9 +107,9 @@ export function createRealtimeRoutes({ accessToken, terminalHost }: RealtimeRout
       return {
         onOpen(_event, ws) {
           try {
-            registerRendererIntentSocket(ws)
+            registerClientIntentSocket(ws)
           } catch (err) {
-            if (err instanceof RendererIntentSocketLimitError) {
+            if (err instanceof ClientIntentSocketLimitError) {
               try {
                 ws.close(1013, 'subscriber limit reached')
               } catch {}
@@ -119,10 +119,10 @@ export function createRealtimeRoutes({ accessToken, terminalHost }: RealtimeRout
           }
         },
         onClose(_event, ws) {
-          unregisterRendererIntentSocket(ws)
+          unregisterClientIntentSocket(ws)
         },
         onError(_event, ws) {
-          unregisterRendererIntentSocket(ws)
+          unregisterClientIntentSocket(ws)
         },
       }
     }),

@@ -20,13 +20,13 @@ import {
 } from '#/main/window-chrome.ts'
 import { getMainWindow as getRegisteredMainWindow } from '#/main/window-registry.ts'
 import {
-  allowRendererWindowEntryUrl,
-  createRendererEntryUrl,
-  createRendererWindowWebPreferences,
+  allowClientWindowEntryUrl,
+  createClientEntryUrl,
+  createClientWindowWebPreferences,
   windowCanvasBackground,
 } from '#/main/window-shell.ts'
 import { getTheme } from '#/main/theme.ts'
-import { rendererNodeLog, windowNodeLog } from '#/node/logger.ts'
+import { clientNodeLog, windowNodeLog } from '#/node/logger.ts'
 import { WINDOW_TOPBAR_HEIGHT_PX } from '#/shared/window-chrome.ts'
 
 const DEFAULT_BOUNDS: WindowBounds = { width: 1100, height: 720 }
@@ -112,17 +112,17 @@ async function createMainWindow(): Promise<BrowserWindow> {
     titleBarOverlay: titleBarOverlayForTheme(resolved, colorTheme, WINDOW_TOPBAR_HEIGHT_PX),
     trafficLightPosition: macTrafficLightPosition(WINDOW_TOPBAR_HEIGHT_PX),
     autoHideMenuBar: process.platform !== 'darwin',
-    webPreferences: await createRendererWindowWebPreferences(),
+    webPreferences: await createClientWindowWebPreferences(),
   })
   win.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
-    rendererNodeLog.error({ validatedURL, errorCode, errorDescription }, 'failed to load')
+    clientNodeLog.error({ validatedURL, errorCode, errorDescription }, 'failed to load')
   })
   win.webContents.on('render-process-gone', (_event, details) => {
-    rendererNodeLog.error({ details }, 'process gone')
+    clientNodeLog.error({ details }, 'process gone')
   })
   attachClientSurfaceWindow(win, { logLabel: 'window', surface: MAIN_WINDOW_SURFACE })
-  const { url } = createRendererEntryUrl({ routePath: '/' })
-  allowRendererWindowEntryUrl(win, url.toString())
+  const { url } = createClientEntryUrl({ routePath: '/' })
+  allowClientWindowEntryUrl(win, url.toString())
   // Plant the auth cookie on the client's session BEFORE
   // `loadURL` so authenticated client requests are ready as
   // soon as the app mounts. The first boot request is public

@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 /**
  * Regression guard against the old "server reads dist/web/index.html
- * and rewrites it to inject the renderer bootstrap" anti-pattern.
+ * and rewrites it to inject the client bootstrap" anti-pattern.
  *
- * Why this exists: in the auth refactor (#59) the renderer bootstrap
+ * Why this exists: in the auth refactor (#59) the client bootstrap
  * moved from inlined HTML (token + i18n + settings baked into
  * `<script id="goblin-bootstrap">` at response-build time) to a
  * pure IPC model — the Electron preload seeds
@@ -12,7 +12,7 @@
  * dropped the i18n / settings inlining while we were at it.
  *
  * The HTML-injection path was an anti-pattern: it coupled the
- * server to the renderer's bundle format, it made the dev mode
+ * server to the client's bundle format, it made the dev mode
  * broken (Vite-served HTML can never carry the secret), and it
  * leaked long-lived credentials into the response body of every
  * page render. This guard makes sure none of it sneaks back in.
@@ -22,7 +22,7 @@
  *
  *  - `replace(...<script|...<head|...<html lang` — string-replace
  *    on HTML tags from inside server/handlers.
- *  - `readFile(...index.html` — reading the built renderer HTML
+ *  - `readFile(...index.html` — reading the built client HTML
  *    to rewrite it (the SPA fallback is allowed to read it but
  *    must serve it untouched).
  *  - `injectBootstrapIntoHtml` / `buildWebBootstrap` /
@@ -32,7 +32,7 @@
  *    — the env vars whose only purpose was to gate HTML inlining.
  *  - `GOBLIN_HOME_DIR` / `GOBLIN_PLATFORM` — passed to the server
  *    child process so it could bake the values into the bootstrap;
- *    the renderer now gets them via `goblin:get-home-dir` /
+ *    the client now gets them via `goblin:get-home-dir` /
  *    `goblin:get-platform` IPC. Allowed in the Electron main
  *    spawn-env (deprecated; harmless) but flagged in src/server.
  *

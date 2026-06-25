@@ -381,7 +381,7 @@ returns it on the close result, or we look it up via
   in the same switch that handles `output` / `title` / `exit` /
   `identity` / `lifecycle` / `sessions-changed`.
 - Expose `onSessionClosed(cb)` on the returned bridge and add a
-  matching method to `RendererTerminalBridge` in
+  matching method to `ClientTerminalBridge` in
   `src/web/client-bridge-types.ts`.
 
 ### Registry subscribes

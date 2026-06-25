@@ -33,7 +33,7 @@ interface TerminalBellIntentDeps {
   setSelectedTerminal: (worktreeKey: string, key: string) => void
 }
 
-interface SharedRendererIntentDeps {
+interface SharedClientIntentDeps {
   navigation: MainWindowNavigationActions
   currentRepoId: string | null
   closeAllOverlays: () => void
@@ -73,9 +73,9 @@ export function handleTerminalBellClickIntent(
   }
 }
 
-export async function handleAppLevelRendererIntent(
+export async function handleAppLevelClientIntent(
   event: ClientEffectIntent,
-  deps: SharedRendererIntentDeps,
+  deps: SharedClientIntentDeps,
 ): Promise<boolean> {
   // App-level intents are allowed even when no workspace repo is visible.
   const plan = createAppLevelIntentPlan(event, {
@@ -108,9 +108,9 @@ export async function handleAppLevelRendererIntent(
   }
 }
 
-export async function handleWorkspaceRendererIntent(
+export async function handleWorkspaceClientIntent(
   event: ClientEffectIntent,
-  deps: SharedRendererIntentDeps,
+  deps: SharedClientIntentDeps,
 ): Promise<boolean> {
   // Workspace intents are route-aware and may be gated by overlays, shortcut
   // suppression, or terminal focus before they execute.

@@ -1,6 +1,6 @@
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 
-interface RendererIntentSocket {
+interface ClientIntentSocket {
   send(data: string): unknown
   close(code?: number, reason?: string): unknown
 }
@@ -12,27 +12,27 @@ interface RendererIntentSocket {
 // for a desktop app with at most a few tabs / windows.
 export const MAX_RENDERER_INTENT_SOCKETS = 32
 
-export class RendererIntentSocketLimitError extends Error {
+export class ClientIntentSocketLimitError extends Error {
   constructor() {
     super(`Too many client-intent subscribers (max ${MAX_RENDERER_INTENT_SOCKETS})`)
-    this.name = 'RendererIntentSocketLimitError'
+    this.name = 'ClientIntentSocketLimitError'
   }
 }
 
-const sockets = new Set<RendererIntentSocket>()
+const sockets = new Set<ClientIntentSocket>()
 
-export function registerRendererIntentSocket(ws: RendererIntentSocket): void {
+export function registerClientIntentSocket(ws: ClientIntentSocket): void {
   if (sockets.size >= MAX_RENDERER_INTENT_SOCKETS) {
-    throw new RendererIntentSocketLimitError()
+    throw new ClientIntentSocketLimitError()
   }
   sockets.add(ws)
 }
 
-export function unregisterRendererIntentSocket(ws: RendererIntentSocket): void {
+export function unregisterClientIntentSocket(ws: ClientIntentSocket): void {
   sockets.delete(ws)
 }
 
-export function disconnectAllRendererIntentSockets(): void {
+export function disconnectAllClientIntentSockets(): void {
   for (const socket of Array.from(sockets)) {
     try {
       socket.close(1001, 'server shutting down')
@@ -59,7 +59,7 @@ export function publishRendererIntent(intent: ClientEffectIntent): boolean {
     try {
       socket.send(payload)
     } catch {
-      unregisterRendererIntentSocket(socket)
+      unregisterClientIntentSocket(socket)
     }
   }
   return true

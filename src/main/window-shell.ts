@@ -34,7 +34,7 @@ export function windowCanvasBackground(): string {
   return WINDOW_BACKGROUND_BY_COLOR_THEME[colorTheme][resolved]
 }
 
-export async function createRendererWindowWebPreferences(): Promise<BrowserWindowConstructorOptions['webPreferences']> {
+export async function createClientWindowWebPreferences(): Promise<BrowserWindowConstructorOptions['webPreferences']> {
   return {
     preload: resolvePreloadPath(),
     contextIsolation: true,
@@ -65,7 +65,7 @@ function resolveRendererBuildCacheKey(): string | null {
   }
 }
 
-interface RendererEntryUrlOptions {
+interface ClientEntryUrlOptions {
   entryHtml?: string
   routePath?: string
 }
@@ -80,7 +80,7 @@ export function getEmbeddedServerUrl(): string | null {
   return runtime?.url || null
 }
 
-export function createRendererEntryUrl({ entryHtml = 'index.html', routePath = '/' }: RendererEntryUrlOptions): {
+export function createClientEntryUrl({ entryHtml = 'index.html', routePath = '/' }: ClientEntryUrlOptions): {
   url: URL
 } {
   const baseUrl = getRendererBaseUrl()
@@ -127,7 +127,7 @@ export function configureTrustedClientWindow(win: BrowserWindow, logLabel: strin
   })
 }
 
-export function allowRendererWindowEntryUrl(win: BrowserWindow, value: string): void {
+export function allowClientWindowEntryUrl(win: BrowserWindow, value: string): void {
   // Scope trust per BrowserWindow, not just per app origin. Once Goblin has
   // multiple client surfaces, a globally-trusted URL set is too broad.
   allowTrustedAppUrlForWebContents(win.webContents, value)

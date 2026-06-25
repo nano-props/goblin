@@ -4,7 +4,7 @@ import { ROTATE_ACCESS_TOKEN_CHANNEL } from '#/shared/ipc-channels.ts'
 import { accessTokenFilePath, readOrCreateAccessToken } from '#/shared/access-token-file.ts'
 import { startEmbeddedServer, stopEmbeddedServer, getEmbeddedServerRuntime } from '#/main/server-manager.ts'
 import { getMainWindow } from '#/main/window.ts'
-import { createRendererEntryUrl } from '#/main/window-shell.ts'
+import { createClientEntryUrl } from '#/main/window-shell.ts'
 import { replantEmbedAuthCookieForRotation } from '#/main/cookie-bootstrap.ts'
 import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
 import { accessTokenNodeLog } from '#/node/logger.ts'
@@ -95,7 +95,7 @@ async function tryReplantEmbedAuthCookie(accessToken: string): Promise<void> {
   const main = getMainWindow()
   if (!main || runtime?.accessToken !== accessToken) return
   try {
-    const { url } = createRendererEntryUrl({ routePath: '/' })
+    const { url } = createClientEntryUrl({ routePath: '/' })
     await replantEmbedAuthCookieForRotation({
       accessToken,
       url: url.toString(),

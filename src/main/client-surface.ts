@@ -11,14 +11,14 @@ import {
 } from '#/main/window-registry.ts'
 import { configureTrustedClientWindow } from '#/main/window-shell.ts'
 
-interface AttachRendererSurfaceWindowOptions {
+interface AttachClientSurfaceWindowOptions {
   logLabel: string
   surface: ClientSurfaceSpec
 }
 
 export function attachClientSurfaceWindow(
   win: BrowserWindow,
-  { logLabel, surface }: AttachRendererSurfaceWindowOptions,
+  { logLabel, surface }: AttachClientSurfaceWindowOptions,
 ): void {
   configureTrustedClientWindow(win, logLabel)
   registerClientWindowSurface(win, surface)

@@ -8,9 +8,9 @@ import { intentLog } from '#/web/logger.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import {
   createExternalOpenIntentDrainer,
-  handleAppLevelRendererIntent,
+  handleAppLevelClientIntent,
   handleTerminalBellClickIntent,
-  handleWorkspaceRendererIntent,
+  handleWorkspaceClientIntent,
 } from '#/web/hooks/client-effect-intent-handlers.ts'
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
@@ -101,8 +101,8 @@ export function useClientEffectIntentRouter({
               externalOpenDrainer.drain()
               return
           }
-          if (await handleAppLevelRendererIntent(intent, sharedDeps())) return
-          if (await handleWorkspaceRendererIntent(intent, sharedDeps())) return
+          if (await handleAppLevelClientIntent(intent, sharedDeps())) return
+          if (await handleWorkspaceClientIntent(intent, sharedDeps())) return
         } catch (err) {
           intentLog.warn(`${intent.type} failed`, { err })
         }

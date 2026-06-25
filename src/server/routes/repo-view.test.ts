@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
-  disconnectAllRendererIntentSockets,
-  registerRendererIntentSocket,
+  disconnectAllClientIntentSockets,
+  registerClientIntentSocket,
 } from '#/server/modules/client-intent-broker.ts'
 import { createRepoViewRoutes } from '#/server/routes/repo-view.ts'
 import { createApp } from '#/server/app-factory.ts'
@@ -35,12 +35,12 @@ function makeTerminalHost(): ServerTerminalHost {
 
 describe('POST /api/repo/view', () => {
   beforeEach(() => {
-    disconnectAllRendererIntentSockets()
+    disconnectAllClientIntentSockets()
   })
 
   test('returns 200 and fans out an intent when a client is subscribed', async () => {
     const subscriber = { send: vi.fn(), close: vi.fn() }
-    registerRendererIntentSocket(subscriber)
+    registerClientIntentSocket(subscriber)
 
     const app = createRepoViewRoutes()
     const res = await app.request('http://localhost/view', {
@@ -80,7 +80,7 @@ describe('POST /api/repo/view', () => {
 
   test('rejects the terminal tab with 400 (terminal view is owned by the runtime)', async () => {
     const subscriber = { send: vi.fn(), close: vi.fn() }
-    registerRendererIntentSocket(subscriber)
+    registerClientIntentSocket(subscriber)
 
     const app = createRepoViewRoutes()
     const res = await app.request('http://localhost/view', {
@@ -153,7 +153,7 @@ describe('POST /api/repo/view — auth integration via createApp()', () => {
 
   test('accepts request with access token and fans out the intent (200)', async () => {
     const subscriber = { send: vi.fn(), close: vi.fn() }
-    registerRendererIntentSocket(subscriber)
+    registerClientIntentSocket(subscriber)
 
     const app = createApp({
       version: '0.1.0',
