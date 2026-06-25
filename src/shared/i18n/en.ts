@@ -489,7 +489,7 @@ export const en = {
 
   // ---- Settings panel -----------------------------------------------------
   'settings.title': 'Settings',
-  'settings.back': 'Back',
+  'settings.back': 'Back to app',
   'settings.theme-preset': 'Theme',
   'settings.theme-preset.macos': 'macOS',
   'settings.theme-preset.mono': 'Mono',
@@ -549,7 +549,6 @@ export const en = {
   'settings.group.apps': 'External apps',
   'settings.group.sync': 'Sync',
   'settings.nav.github': 'GitHub',
-  'settings.nav.integrations': 'Integrations',
   'settings.nav.notifications': 'Notifications',
   'settings.nav.ssh': 'SSH',
   'settings.nav.refresh': 'Refresh',

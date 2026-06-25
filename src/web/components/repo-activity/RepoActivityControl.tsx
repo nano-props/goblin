@@ -119,13 +119,7 @@ function useRepoCompletion(repoId: string): RepoCompletion | null {
   return completion
 }
 
-function RepoRefreshButton({
-  repo,
-  manualSyncBusy,
-}: {
-  repo: RepoState
-  manualSyncBusy: boolean
-}) {
+function RepoRefreshButton({ repo, manualSyncBusy }: { repo: RepoState; manualSyncBusy: boolean }) {
   const t = useT()
   const lang = useI18nStore((s) => s.lang)
   const label = t('action.refresh')
@@ -152,7 +146,7 @@ function RepoRefreshButton({
   // how stale the view is. We show "Last synced X ago" when we have
   // a timestamp, and fall back to the action title before the first
   // sync has happened. Single-line label so the font matches the
-  // rest of the topbar tooltips.
+  // rest of the repo chrome tooltips.
   const tooltipLabel = lastSyncedLabel
     ? `${t('repo-picker.tooltip.last-sync-label')} ${lastSyncedLabel}`
     : t(fetchTooltipKey)

@@ -5,8 +5,7 @@ import { cn } from '#/web/lib/cn.ts'
 import { DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
 import type { RepoWorkspaceMode } from '#/web/lib/workspace-layout.ts'
 import { WORKSPACE_PANE_MOTION_STYLE } from '#/web/components/workspace-motion.ts'
-const LEFT_RIGHT_BRANCH_MIN_SIZE = '14rem'
-const LEFT_RIGHT_WORKSPACE_MIN_SIZE = '22rem'
+import { REPO_SIDEBAR_MIN_WIDTH, REPO_WORKSPACE_MIN_WIDTH } from '#/web/components/repo-shell/sidebar-sizing.ts'
 
 interface ShellProps {
   children: ReactNode
@@ -100,9 +99,9 @@ export function RepoWorkspace({
       onAfterSizeChange={onWorkspacePaneSizeChange}
       beforeCollapsed={branchNavigatorCollapsed}
       animateBeforeCollapse
-      beforeMinSize={LEFT_RIGHT_BRANCH_MIN_SIZE}
-      beforeContentMinSize={LEFT_RIGHT_BRANCH_MIN_SIZE}
-      afterMinSize={LEFT_RIGHT_WORKSPACE_MIN_SIZE}
+      beforeMinSize={REPO_SIDEBAR_MIN_WIDTH}
+      beforeContentMinSize={REPO_SIDEBAR_MIN_WIDTH}
+      afterMinSize={REPO_WORKSPACE_MIN_WIDTH}
       afterMaxSize={branchNavigatorCollapsed ? undefined : '90%'}
       className="flex-1"
     />

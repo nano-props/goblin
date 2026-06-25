@@ -186,6 +186,23 @@ describe('SettingsSurface', () => {
     expect(document.body.textContent).not.toContain('settings.workspace-layout-hint')
   })
 
+  test('keeps settings navigation selected state and page changes wired', async () => {
+    const onPageChange = vi.fn()
+    await render(<SettingsSurface page="general" onPageChange={onPageChange} autoFocusSelected={false} />)
+
+    const general = document.body.querySelector('button[aria-label="settings.group.general"]')
+    if (!(general instanceof HTMLButtonElement)) throw new Error('missing general settings nav row')
+    expect(general.getAttribute('aria-current')).toBe('page')
+
+    const shortcuts = document.body.querySelector('button[aria-label="settings.nav.shortcuts"]')
+    if (!(shortcuts instanceof HTMLButtonElement)) throw new Error('missing shortcuts settings nav row')
+    await act(async () => {
+      shortcuts.click()
+      await Promise.resolve()
+    })
+    expect(onPageChange).toHaveBeenCalledWith('shortcuts')
+  })
+
   test('can trigger a test terminal notification from settings', async () => {
     await render(<SettingsSurface page="notifications" onPageChange={() => {}} />)
 

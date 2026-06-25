@@ -27,7 +27,7 @@ export function SettingsGroup({
 }) {
   const compact = useIsCompactUi()
   return (
-    <section className="space-y-1.5">
+    <section className="w-full space-y-1.5">
       <div className={cn('flex justify-between gap-3 px-3', compact ? 'items-start' : 'items-center')}>
         <h2 className="text-[11px] font-medium text-muted-foreground">{label}</h2>
         {action}
@@ -43,7 +43,7 @@ export function SettingsCard<T extends ElementType = 'div'>({ as, className, ...
   return (
     <Comp
       className={cn(
-        'overflow-hidden rounded-xl border border-border/60 bg-background/85 shadow-[var(--shadow-inset-highlight)]',
+        'w-full overflow-hidden rounded-lg border border-border/60 bg-background/85 shadow-[var(--shadow-inset-highlight)]',
         className,
       )}
       {...props}

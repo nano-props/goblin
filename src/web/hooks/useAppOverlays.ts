@@ -16,65 +16,64 @@ export function useAppOverlays(options: AppOverlayRouteOptions = {}) {
   const registry = useOverlayRegistry<AppOverlayKey>(APP_OVERLAY_KEYS)
   const { anyOpen, closeAll, open, setOpen, state: openByKey } = registry
   const routeOverlay = options.routeOverlay ?? null
-  const routeDriven = typeof options.onRouteOverlayChange === 'function'
+  const onRouteOverlayChange = options.onRouteOverlayChange
+  const routeDriven = typeof onRouteOverlayChange === 'function'
 
   const openCloneRepo = useCallback(() => {
     if (routeDriven) {
-      options.onRouteOverlayChange?.('clone')
+      onRouteOverlayChange?.('clone')
       return
     }
     open('clone')
-  }, [open, options, routeDriven])
+  }, [onRouteOverlayChange, open, routeDriven])
 
   const setCloneOpen = useCallback(
     (open: boolean) => {
       if (routeDriven) {
-        options.onRouteOverlayChange?.(open ? 'clone' : routeOverlay === 'clone' ? null : routeOverlay)
+        onRouteOverlayChange?.(open ? 'clone' : routeOverlay === 'clone' ? null : routeOverlay)
         return
       }
       setOpen('clone', open)
     },
-    [options, routeDriven, routeOverlay, setOpen],
+    [onRouteOverlayChange, routeDriven, routeOverlay, setOpen],
   )
 
   const openRepoPathDialog = useCallback(() => {
     if (routeDriven) {
-      options.onRouteOverlayChange?.('openRepo')
+      onRouteOverlayChange?.('openRepo')
       return
     }
     open('openRepo')
-  }, [open, options, routeDriven])
+  }, [onRouteOverlayChange, open, routeDriven])
 
   const setOpenRepoOpen = useCallback(
     (open: boolean) => {
       if (routeDriven) {
-        options.onRouteOverlayChange?.(open ? 'openRepo' : routeOverlay === 'openRepo' ? null : routeOverlay)
+        onRouteOverlayChange?.(open ? 'openRepo' : routeOverlay === 'openRepo' ? null : routeOverlay)
         return
       }
       setOpen('openRepo', open)
     },
-    [options, routeDriven, routeOverlay, setOpen],
+    [onRouteOverlayChange, routeDriven, routeOverlay, setOpen],
   )
 
   const openRemoteRepo = useCallback(() => {
     if (routeDriven) {
-      options.onRouteOverlayChange?.('openRemoteRepo')
+      onRouteOverlayChange?.('openRemoteRepo')
       return
     }
     open('openRemoteRepo')
-  }, [open, options, routeDriven])
+  }, [onRouteOverlayChange, open, routeDriven])
 
   const setOpenRemoteRepoOpen = useCallback(
     (open: boolean) => {
       if (routeDriven) {
-        options.onRouteOverlayChange?.(
-          open ? 'openRemoteRepo' : routeOverlay === 'openRemoteRepo' ? null : routeOverlay,
-        )
+        onRouteOverlayChange?.(open ? 'openRemoteRepo' : routeOverlay === 'openRemoteRepo' ? null : routeOverlay)
         return
       }
       setOpen('openRemoteRepo', open)
     },
-    [options, routeDriven, routeOverlay, setOpen],
+    [onRouteOverlayChange, routeDriven, routeOverlay, setOpen],
   )
 
   const openCreateWorktree = useCallback(() => {
@@ -83,37 +82,35 @@ export function useAppOverlays(options: AppOverlayRouteOptions = {}) {
     // (e.g. a command-palette entry) that invokes this without
     // `activeId` set, so we don't leave `state.createWorktree.open`
     // stuck `true` until a later `useEffect([activeId])` clears it.
-    // Currently only the Topbar button calls this, and the Topbar
-    // button is itself hidden when no repo is active — this is a
-    // defensive guard for future surface expansion.
+    // Currently only active-repo chrome calls this, and that chrome
+    // is itself hidden when no repo is active — this is a defensive
+    // guard for future surface expansion.
     if (!useReposStore.getState().activeId) return
     if (routeDriven) {
-      options.onRouteOverlayChange?.('createWorktree')
+      onRouteOverlayChange?.('createWorktree')
       return
     }
     open('createWorktree')
-  }, [open, options, routeDriven])
+  }, [onRouteOverlayChange, open, routeDriven])
 
   const setCreateWorktreeOpen = useCallback(
     (open: boolean) => {
       if (routeDriven) {
-        options.onRouteOverlayChange?.(
-          open ? 'createWorktree' : routeOverlay === 'createWorktree' ? null : routeOverlay,
-        )
+        onRouteOverlayChange?.(open ? 'createWorktree' : routeOverlay === 'createWorktree' ? null : routeOverlay)
         return
       }
       setOpen('createWorktree', open)
     },
-    [options, routeDriven, routeOverlay, setOpen],
+    [onRouteOverlayChange, routeDriven, routeOverlay, setOpen],
   )
 
   const closeAllOverlays = useCallback(() => {
     if (routeDriven) {
-      options.onRouteOverlayChange?.(null)
+      onRouteOverlayChange?.(null)
       return
     }
     closeAll()
-  }, [closeAll, options, routeDriven])
+  }, [closeAll, onRouteOverlayChange, routeDriven])
 
   const state = useMemo(
     () => ({

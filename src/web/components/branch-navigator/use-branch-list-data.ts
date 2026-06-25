@@ -1,8 +1,7 @@
-// Shared branch-list data layer. Both the persistent BranchNavigator
-// pane and the focus-mode BranchListPopover need the same store
-// projection — branches, current/selected branch, view-mode, branch
-// action state, and remote metadata — so we keep the selector and its
-// equality function here to avoid drift between the two callers.
+// Shared branch-list data layer for BranchNavigator. The persistent
+// sidebar and focus-mode reveal drawer both render that same pane, so
+// branches, current/selected branch, view-mode, branch action state,
+// and remote metadata stay on one selector.
 
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'

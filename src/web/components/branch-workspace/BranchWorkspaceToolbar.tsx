@@ -7,10 +7,7 @@ import { Button } from '#/web/components/ui/button.tsx'
 import { Tip } from '#/web/components/Tip.tsx'
 import { terminalLog } from '#/web/logger.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
-import {
-  useTerminalRepoSyncReady,
-  useWorktreeTerminalSnapshot,
-} from '#/web/components/terminal/terminal-slot-store.ts'
+import { useTerminalRepoSyncReady, useWorktreeTerminalSnapshot } from '#/web/components/terminal/terminal-slot-store.ts'
 import { useTerminalSlotContext } from '#/web/components/terminal/terminal-slot-context.ts'
 import {
   WorkspacePaneViewStrip,
@@ -43,14 +40,20 @@ import {
   terminalWorkspacePaneTabProvider,
   workspacePaneStaticTabProvider,
 } from '#/web/workspace-pane/workspace-pane-tab-providers.ts'
+import {
+  WORKSPACE_TOOLBAR_STYLE,
+  WorkspaceToolbarLeadingSpacer,
+  workspaceToolbarClassName,
+} from '#/web/components/workspace-toolbar-chrome.tsx'
 
 interface Props {
   repo: Pick<BranchWorkspaceRepo, 'id' | 'ui' | 'data'>
   detail: SelectedBranchWorkspacePresentation
   workspacePaneId: string
+  trafficLightOffset?: boolean
 }
 
-export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props) {
+export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId, trafficLightOffset = false }: Props) {
   const t = useT()
   const navigation = useMainWindowNavigation()
   const compact = useIsCompactUi()
@@ -128,12 +131,11 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
   const handleNewTerminal = useCallback(() => {
     if (!terminalBase) return
     enterTerminalTab()
-    void createWorkspacePaneTerminalTab({ base: terminalBase, createTerminal })
-      .catch((err) => {
-        terminalLog.warn('failed to create terminal', { err })
-        const message = err instanceof Error ? err.message : 'error.terminal-create-failed'
-        toast.error(t('action.result-error'), { description: t(message) })
-      })
+    void createWorkspacePaneTerminalTab({ base: terminalBase, createTerminal }).catch((err) => {
+      terminalLog.warn('failed to create terminal', { err })
+      const message = err instanceof Error ? err.message : 'error.terminal-create-failed'
+      toast.error(t('action.result-error'), { description: t(message) })
+    })
   }, [createTerminal, terminalBase, enterTerminalTab, t])
 
   const showWorkspacePaneTabItem = useCallback(
@@ -222,10 +224,7 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
   const handleSelectWorkspacePaneTabItem = useCallback(
     (item: WorkspacePaneTabItem) => {
       if (isPendingWorkspacePaneTabItem(item)) return
-      if (
-        isTerminalWorkspacePaneTabItem(item) &&
-        item.identity === activeTabIdentity
-      ) {
+      if (isTerminalWorkspacePaneTabItem(item) && item.identity === activeTabIdentity) {
         handleScrollToBottom(item.view.key)
         return
       }
@@ -245,8 +244,19 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
     [navigation, repo.id],
   )
 
-  // No selected branch means there is no tab/action target; BranchWorkspaceContent renders the empty state.
-  if (!detail.branch) return null
+  const toolbarClassName = workspaceToolbarClassName({ draggable: !compact, trafficLightOffset })
+
+  // No selected branch means there is no tab/action target; keep the
+  // workspace chrome mounted so the right pane still contributes a
+  // draggable top region after the global topbar is removed.
+  if (!detail.branch) {
+    return (
+      <Toolbar variant="workspace" className={toolbarClassName} style={WORKSPACE_TOOLBAR_STYLE}>
+        <WorkspaceToolbarLeadingSpacer reserve={trafficLightOffset} />
+        <div className="min-w-0 flex-1" />
+      </Toolbar>
+    )
+  }
 
   const backLabel = t('workspace.back-to-branch-navigator')
   const handleBackToBranchNavigator = () => clearSelectedBranch(repo.id)
@@ -266,7 +276,12 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
   ) : null
 
   return (
-    <Toolbar variant="workspace">
+    <Toolbar
+      variant="workspace"
+      className={toolbarClassName}
+      style={WORKSPACE_TOOLBAR_STYLE}
+    >
+      <WorkspaceToolbarLeadingSpacer reserve={trafficLightOffset} />
       <div className="flex h-full min-w-0 flex-1 items-center gap-1 overflow-hidden">
         {/* Compact UI only: back-to-branch-navigator is the user's escape hatch
             from the branch workspace. It must stay visible even when the tab

@@ -42,6 +42,7 @@ export function FloatingContent({
   return (
     <Component
       data-slot={slot}
+      data-floating-surface=""
       className={cn(FLOATING_CONTENT_BASE_CLASS, `origin-(${transformOriginVar})`, className)}
       {...rest}
     >

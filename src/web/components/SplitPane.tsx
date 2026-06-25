@@ -5,6 +5,7 @@ import type { Layout } from 'react-resizable-panels'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '#/web/components/ui/resizable.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { WORKSPACE_PANE_MOTION_STYLE, WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
+import { useElementInlineSize } from '#/web/hooks/useElementInlineSize.ts'
 
 interface SplitPaneProps {
   before: ReactNode
@@ -26,6 +27,7 @@ interface SplitPaneProps {
 const BEFORE_PANEL_ID = 'before'
 const AFTER_PANEL_ID = 'after'
 const RESIZE_TARGET_MINIMUM_SIZE = { fine: 7, coarse: 20 }
+type CollapseTransitionDirection = 'collapsing' | 'expanding'
 
 export function SplitPane({
   before,
@@ -46,7 +48,8 @@ export function SplitPane({
   const groupRef = useGroupRef()
   const splitPaneRef = useRef<HTMLDivElement | null>(null)
   const beforeClipRef = useRef<HTMLDivElement | null>(null)
-  const collapseTransitioning = useCollapseTransition(beforeCollapsed, animateBeforeCollapse)
+  const collapseTransition = useCollapseTransition(beforeCollapsed, animateBeforeCollapse)
+  const collapseTransitioning = collapseTransition !== null
   const measuredBeforeContentSize = useStableBeforeContentSize({
     beforeClipRef,
     splitPaneRef,
@@ -90,7 +93,7 @@ export function SplitPane({
     <div
       ref={splitPaneRef}
       data-before-collapsed={beforeCollapsed ? 'true' : undefined}
-      data-collapse-transition={collapseTransitioning ? 'true' : undefined}
+      data-collapse-transition={collapseTransition ?? undefined}
       style={splitPaneStyle}
       className={cn('goblin-split-pane min-h-0 min-w-0', className)}
     >
@@ -127,7 +130,10 @@ export function SplitPane({
         </ResizablePanel>
         <ResizableHandle
           disabled={disabled || beforeCollapsed}
-          className={cn('goblin-split-pane__handle', beforeCollapsed && 'goblin-split-pane__handle--collapsed')}
+          className={cn(
+            'goblin-split-pane__handle',
+            beforeCollapsed && !collapseTransitioning && 'goblin-split-pane__handle--collapsed',
+          )}
         />
         <ResizablePanel
           id={AFTER_PANEL_ID}
@@ -142,26 +148,33 @@ export function SplitPane({
   )
 }
 
-function useCollapseTransition(collapsed: boolean, enabled: boolean): boolean {
+function useCollapseTransition(collapsed: boolean, enabled: boolean): CollapseTransitionDirection | null {
   const previousCollapsedRef = useRef(collapsed)
-  const [transitioning, setTransitioning] = useState(false)
+  const [transition, setTransition] = useState<CollapseTransitionDirection | null>(null)
   const changedThisRender = enabled && previousCollapsedRef.current !== collapsed
+  const changeDirection: CollapseTransitionDirection | null = changedThisRender
+    ? collapsed
+      ? 'collapsing'
+      : 'expanding'
+    : null
 
   useEffect(() => {
     if (!enabled) {
       previousCollapsedRef.current = collapsed
-      setTransitioning(false)
+      setTransition(null)
       return
     }
-    if (!changedThisRender) return
+    if (previousCollapsedRef.current === collapsed) return
 
+    const direction: CollapseTransitionDirection = collapsed ? 'collapsing' : 'expanding'
     previousCollapsedRef.current = collapsed
-    setTransitioning(true)
-    const timeout = window.setTimeout(() => setTransitioning(false), WORKSPACE_PANE_TRANSITION_MS)
+    setTransition(direction)
+    const timeout = window.setTimeout(() => setTransition(null), WORKSPACE_PANE_TRANSITION_MS)
     return () => window.clearTimeout(timeout)
   }, [collapsed, enabled])
 
-  return enabled && (changedThisRender || transitioning)
+  if (!enabled) return null
+  return changeDirection ?? transition
 }
 
 function useStableBeforeContentSize({
@@ -173,8 +186,8 @@ function useStableBeforeContentSize({
   splitPaneRef: RefObject<HTMLElement | null>
   frozen: boolean
 }): number | null {
-  const measuredBeforeSize = useMeasuredInlineSize(beforeClipRef, !frozen)
-  const splitPaneSize = useMeasuredInlineSize(splitPaneRef, true)
+  const measuredBeforeSize = useElementInlineSize(beforeClipRef, !frozen)
+  const splitPaneSize = useElementInlineSize(splitPaneRef, true)
   const measuredAtSplitPaneSizeRef = useRef<number | null>(null)
   const [stableBeforeSize, setStableBeforeSize] = useState<number | null>(null)
 
@@ -191,29 +204,4 @@ function useStableBeforeContentSize({
   }, [frozen, splitPaneSize])
 
   return stableBeforeSize
-}
-
-function useMeasuredInlineSize(ref: RefObject<HTMLElement | null>, enabled: boolean): number | null {
-  const [inlineSize, setInlineSize] = useState<number | null>(null)
-
-  useEffect(() => {
-    if (!enabled) return
-    const element = ref.current
-    if (!element) return
-    const update = (next: number) => {
-      if (next <= 0) return
-      setInlineSize((current) => (current !== null && Math.abs(current - next) <= 0.5 ? current : next))
-    }
-
-    update(element.getBoundingClientRect().width)
-    if (typeof ResizeObserver === 'undefined') return
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0]
-      if (entry) update(entry.contentRect.width)
-    })
-    observer.observe(element)
-    return () => observer.disconnect()
-  }, [enabled, ref])
-
-  return inlineSize
 }

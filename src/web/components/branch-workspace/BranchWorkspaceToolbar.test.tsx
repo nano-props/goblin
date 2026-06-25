@@ -117,6 +117,48 @@ describe('BranchWorkspaceToolbar', () => {
     expect(showRepoWorkspacePaneView).toHaveBeenCalledWith(REPO_ID, 'status')
   })
 
+  test('keeps the focus-offset leading spacer mounted for width transitions', () => {
+    const { container: c } = renderToolbar({
+      terminalCount: 0,
+      worktree: false,
+      navigation: navigationWith({}),
+      trafficLightOffset: true,
+    })
+
+    expect(c.querySelector('.goblin-workspace-toolbar')?.className).toContain('topbar')
+    expect(c.querySelector('[data-testid="workspace-toolbar-leading-spacer"]')?.className).toContain(
+      'goblin-workspace-toolbar__leading-spacer--reserved',
+    )
+  })
+
+  test('keeps the leading spacer mounted when the focus offset is inactive', () => {
+    const { container: c } = renderToolbar({
+      terminalCount: 0,
+      worktree: false,
+      navigation: navigationWith({}),
+      trafficLightOffset: false,
+    })
+
+    expect(c.querySelector('.goblin-workspace-toolbar')?.className).not.toContain('topbar')
+    expect(c.querySelector('[data-testid="workspace-toolbar-leading-spacer"]')).not.toBeNull()
+    expect(c.querySelector('[data-testid="workspace-toolbar-leading-spacer"]')?.className).not.toContain(
+      'goblin-workspace-toolbar__leading-spacer--reserved',
+    )
+  })
+
+  test('does not opt compact toolbar chrome into window dragging', () => {
+    compactUi = true
+    const { container: c } = renderToolbar({
+      terminalCount: 0,
+      worktree: false,
+      navigation: navigationWith({}),
+    })
+
+    expect(c.querySelector('.goblin-workspace-toolbar')?.className).not.toContain('app-drag-region')
+    expect(c.querySelector('.goblin-workspace-toolbar')?.className).not.toContain('topbar')
+    expect(c.querySelector('.goblin-workspace-toolbar')?.className).toContain('px-2')
+  })
+
   test('renders status and terminal affordance without a default changes tab', () => {
     const { container: c } = renderToolbar({ terminalCount: 0, changeCount: 3, navigation: navigationWith({}) })
 
@@ -169,10 +211,14 @@ describe('BranchWorkspaceToolbar', () => {
 
     const toolbar = c.firstElementChild
     if (!(toolbar instanceof HTMLElement)) throw new Error('missing toolbar')
-    const stripHost = toolbar.firstElementChild
+    const spacer = toolbar.firstElementChild
+    const stripHost = toolbar.children[1]
+    if (!(spacer instanceof HTMLElement)) throw new Error('missing leading spacer')
     if (!(stripHost instanceof HTMLElement)) throw new Error('missing workspace tab strip host')
 
-    expect(toolbar.children).toHaveLength(1)
+    expect(toolbar.children).toHaveLength(2)
+    expect(spacer.className).toContain('goblin-workspace-toolbar__leading-spacer')
+    expect(spacer.className).not.toContain('goblin-workspace-toolbar__leading-spacer--reserved')
     expect(stripHost.className).toContain('flex-1')
   })
 
@@ -736,6 +782,7 @@ function renderToolbar(options: {
   worktree?: boolean
   collapsed?: boolean
   pendingCreate?: boolean
+  trafficLightOffset?: boolean
   /**
    * When true, do NOT mark the repo ready before mounting. The toolbar
    * reads `isInitialSyncInFlight` from the store and renders the
@@ -872,7 +919,12 @@ function renderToolbar(options: {
         <MainWindowNavigationProvider value={options.navigation}>
           <TerminalSlotContext.Provider value={commandContext}>
             <TerminalSlotReadContext.Provider value={readContext}>
-              <BranchWorkspaceToolbar repo={repo} detail={detail} workspacePaneId="workspace" />
+              <BranchWorkspaceToolbar
+                repo={repo}
+                detail={detail}
+                workspacePaneId="workspace"
+                trafficLightOffset={options.trafficLightOffset}
+              />
             </TerminalSlotReadContext.Provider>
           </TerminalSlotContext.Provider>
         </MainWindowNavigationProvider>

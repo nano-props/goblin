@@ -74,6 +74,67 @@ describe('RepoPicker', () => {
     expect(activeTab.tabIndex).toBe(0)
   })
 
+  test('renders the sidebar surface as a plain full-width picker button instead of a tab strip', () => {
+    render(
+      <RepoPicker
+        repos={[repo('repo-a', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
+        activeId="/tmp/repo-a"
+        labels={labels}
+        onActivate={() => {}}
+        onClose={() => {}}
+        onOpenLocal={() => {}}
+        onOpenRemote={() => {}}
+        onClone={() => {}}
+        surface="sidebar"
+      />,
+    )
+
+    expect(document.body.querySelector('[data-current-repo-group]')).toBeNull()
+
+    const currentRepoButton = document.body.querySelector('[data-current-repo-id="/tmp/repo-a"]')
+    if (!(currentRepoButton instanceof HTMLButtonElement)) throw new Error('missing current repo button')
+    expect(currentRepoButton.getAttribute('role')).toBeNull()
+    expect(currentRepoButton.getAttribute('aria-selected')).toBeNull()
+    expect(currentRepoButton.className).toContain('w-full')
+    expect(currentRepoButton.className).toContain('shrink-0')
+    expect(currentRepoButton.className).not.toContain('flex-1')
+    expect(currentRepoButton.querySelector('.uppercase')).toBeNull()
+    expect(currentRepoButton.textContent).toContain('repo-a')
+    expect(currentRepoButton.hasAttribute('data-interactive')).toBe(true)
+    expect(currentRepoButton.closest('nav')?.hasAttribute('data-interactive')).toBe(false)
+  })
+
+  test('opens the repo menu popover from the sidebar surface', async () => {
+    render(
+      <RepoPicker
+        repos={[repo('repo-a', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
+        activeId="/tmp/repo-a"
+        labels={labels}
+        onActivate={() => {}}
+        onClose={() => {}}
+        onOpenLocal={() => {}}
+        onOpenRemote={() => {}}
+        onClone={() => {}}
+        surface="sidebar"
+      />,
+    )
+
+    const trigger = document.body.querySelector('[data-current-repo-id="/tmp/repo-a"]')
+    if (!(trigger instanceof HTMLButtonElement)) throw new Error('missing sidebar repo trigger')
+
+    await act(async () => {
+      trigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+      trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
+      await Promise.resolve()
+    })
+
+    const selectedItem = [...document.body.querySelectorAll('button[aria-current="true"]')].find((item) =>
+      item.textContent?.includes('repo-a'),
+    )
+    expect(selectedItem).not.toBeNull()
+    expect(document.body.textContent).toContain('/tmp/repo-b')
+  })
+
   test('opens the repo menu popover when the current repo tab is clicked', async () => {
     render(
       <RepoPicker
@@ -174,6 +235,10 @@ describe('RepoPicker', () => {
     expect(closeButton).not.toBeNull()
     expect(closeButton?.className).not.toContain('opacity-0')
     expect(closeButton?.className).not.toContain('group-hover:opacity-100')
+    const popoverContent = document.body.querySelector('[data-slot="popover-content"]')
+    expect((popoverContent as HTMLElement | null)?.style.minWidth).toBe(
+      'max(16rem, var(--radix-popover-trigger-width))',
+    )
 
     // Each popover row is now two lines: name on top, locator (path
     // or remote target) below in mono muted text. The locator for a
@@ -208,6 +273,7 @@ describe('RepoPicker', () => {
 
     const plus = document.body.querySelector('button[aria-label="Open"]')
     expect(plus).not.toBeNull()
+    expect(plus?.closest('nav')?.hasAttribute('data-interactive')).toBe(false)
 
     await act(async () => {
       plus!.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))

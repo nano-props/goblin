@@ -8,7 +8,6 @@ describe('repoWorkspaceBehavior', () => {
       singlePane: false,
       workspaceFocused: false,
       branchNavigatorCollapsed: false,
-      branchNavigatorVisible: true,
     })
   })
 
@@ -18,7 +17,6 @@ describe('repoWorkspaceBehavior', () => {
       singlePane: true,
       workspaceFocused: true,
       branchNavigatorCollapsed: false,
-      branchNavigatorVisible: false,
     })
   })
 
@@ -34,7 +32,6 @@ describe('repoWorkspaceBehavior', () => {
       singlePane: false,
       workspaceFocused: true,
       branchNavigatorCollapsed: true,
-      branchNavigatorVisible: false,
     })
   })
 
@@ -45,7 +42,6 @@ describe('repoWorkspaceBehavior', () => {
       compact: true,
       workspaceFocused: false,
       branchNavigatorCollapsed: false,
-      branchNavigatorVisible: true,
     })
   })
 
@@ -61,7 +57,6 @@ describe('repoWorkspaceBehavior', () => {
       singlePane: true,
       compact: true,
       branchNavigatorCollapsed: false,
-      branchNavigatorVisible: false,
     })
   })
 })

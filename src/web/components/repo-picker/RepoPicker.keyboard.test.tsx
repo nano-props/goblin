@@ -64,6 +64,40 @@ describe('RepoPicker keyboard navigation', () => {
 
     expect(onActivate).toHaveBeenCalledWith('/tmp/repo-b')
   })
+
+  test('moves between repos from the sidebar current repo button', () => {
+    const onActivate = vi.fn()
+
+    container = document.createElement('div')
+    document.body.append(container)
+    root = createRoot(container)
+    act(() => {
+      root!.render(
+        <RepoPicker
+          repos={[repo('repo-a', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
+          activeId="/tmp/repo-a"
+          labels={labels}
+          onActivate={onActivate}
+          onClose={() => {}}
+          onOpenLocal={() => {}}
+          onOpenRemote={() => {}}
+          onClone={() => {}}
+          surface="sidebar"
+        />,
+      )
+    })
+
+    const currentRepoButton = document.body.querySelector('[data-current-repo-id="/tmp/repo-a"]')
+    if (!(currentRepoButton instanceof HTMLButtonElement)) throw new Error('missing current repo button')
+
+    act(() => {
+      currentRepoButton.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowRight', code: 'ArrowRight', bubbles: true }),
+      )
+    })
+
+    expect(onActivate).toHaveBeenCalledWith('/tmp/repo-b')
+  })
 })
 
 function repo(name: string, id: string): RepoPickerRepo {

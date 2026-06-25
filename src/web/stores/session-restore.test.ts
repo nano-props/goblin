@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useSessionRestoreStore } from '#/web/stores/session-restore.ts'
+import { DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
 
 function installBridge(sessionOverrides: Record<string, unknown> = {}) {
   Object.defineProperty(globalThis, 'window', {
@@ -100,7 +101,7 @@ describe('session restore store', () => {
       openRepos: [],
       activeRepo: null,
       workspaceFocused: false,
-      workspacePaneSize: 64,
+      workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
     })
   })
 })

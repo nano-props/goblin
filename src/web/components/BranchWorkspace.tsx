@@ -15,6 +15,7 @@ interface Props {
   repoId: string
   selectedBranchName?: string | null
   shortcutsEnabled?: boolean
+  toolbarTrafficLightOffset?: boolean
 }
 
 // Keep this equality in sync with fields read by BranchWorkspace children.
@@ -46,7 +47,12 @@ function branchWorkspaceRepoEqual(a: BranchWorkspaceRepo | undefined, b: BranchW
   )
 }
 
-export function BranchWorkspace({ repoId, selectedBranchName, shortcutsEnabled = true }: Props) {
+export function BranchWorkspace({
+  repoId,
+  selectedBranchName,
+  shortcutsEnabled = true,
+  toolbarTrafficLightOffset = false,
+}: Props) {
   const workspacePaneId = useId()
   const repo = useStoreWithEqualityFn(
     useReposStore,
@@ -108,10 +114,16 @@ export function BranchWorkspace({ repoId, selectedBranchName, shortcutsEnabled =
           branch={detail.branch}
           workspacePaneId={workspacePaneId}
           shortcutsEnabled={shortcutsEnabled}
+          toolbarTrafficLightOffset={toolbarTrafficLightOffset}
         />
       ) : (
         <>
-          <BranchWorkspaceToolbar repo={repo} detail={detail} workspacePaneId={workspacePaneId} />
+          <BranchWorkspaceToolbar
+            repo={repo}
+            detail={detail}
+            workspacePaneId={workspacePaneId}
+            trafficLightOffset={toolbarTrafficLightOffset}
+          />
           <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId={workspacePaneId} />
         </>
       )}
@@ -125,6 +137,7 @@ interface BranchShortcutHandlerProps {
   branch: NonNullable<SelectedBranchWorkspacePresentation['branch']>
   workspacePaneId: string
   shortcutsEnabled: boolean
+  toolbarTrafficLightOffset?: boolean
 }
 
 function BranchShortcutHandler({
@@ -133,13 +146,19 @@ function BranchShortcutHandler({
   branch,
   workspacePaneId,
   shortcutsEnabled,
+  toolbarTrafficLightOffset = false,
 }: BranchShortcutHandlerProps) {
   const actions = useBranchActionItems(repo, branch)
   useBranchActionShortcutRegistry(actions, shortcutsEnabled)
 
   return (
     <BranchActionSurfaceContext.Provider value={actions}>
-      <BranchWorkspaceToolbar repo={repo} detail={detail} workspacePaneId={workspacePaneId} />
+      <BranchWorkspaceToolbar
+        repo={repo}
+        detail={detail}
+        workspacePaneId={workspacePaneId}
+        trafficLightOffset={toolbarTrafficLightOffset}
+      />
       <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId={workspacePaneId} />
     </BranchActionSurfaceContext.Provider>
   )

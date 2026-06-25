@@ -1,18 +1,15 @@
 // @vitest-environment jsdom
 
 // Regression test for the create-worktree dialog host. The original
-// implementation mounted inside `RepoToolbarActions` (Topbar) and
+// implementation mounted inside the per-repo action subtree and
 // lost its form state every time the user navigated to Settings
-// because the entire Topbar subtree unmounted. The fix moved the
+// because that subtree unmounted. The fix moved the
 // host to `Layout.MainWindowOverlays` (outside `<Outlet />`), so the
 // dialog survives settings ⇄ workspace navigation.
 //
-// The most subtle P0 the previous PR hit was a `useEffect([activeId,
-// onOpenChange, open])` in the host that closed the dialog on its
-// own false→true transition. The fix drops `open` (and the unstable
-// `onOpenChange`) from the dep array, so the effect only fires on
-// `activeId` change. This test asserts the dialog stays open after
-// the user opens it.
+// The subtle regression this protects against is closing the dialog
+// on its own false→true transition. The host should only force-close
+// when the active repo changes.
 
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -50,14 +47,12 @@ afterEach(() => {
 
 function renderHost(open: boolean, onOpenChange: (open: boolean) => void) {
   act(() => {
-    root!.render(
-      <CreateWorktreeDialogHost open={open} onOpenChange={onOpenChange} activeId={REPO_ID} />,
-    )
+    root!.render(<CreateWorktreeDialogHost open={open} onOpenChange={onOpenChange} activeId={REPO_ID} />)
   })
 }
 
 describe('CreateWorktreeDialogHost', () => {
-  test('regression: dialog stays open after the false→true transition (P0 from prior PR)', () => {
+  test('regression: dialog stays open after the false→true transition', () => {
     // The bug: useEffect had `[activeId, onOpenChange, open]` in its
     // deps. When the user clicked the "create worktree" button, the
     // parent's `open` state flipped false→true, the host re-rendered,
@@ -68,23 +63,29 @@ describe('CreateWorktreeDialogHost', () => {
     // the dep array, so the effect only fires on `activeId` change.
     // In the real flow the host is mounted in Layout with `open=false`
     // initially; the parent flips to `true` when the user clicks the
-    // topbar button. This test reproduces that flow.
+    // create-worktree button. This test reproduces that flow.
     const onOpenChange = vi.fn()
 
     // (1) Initial mount: open=false (the host always starts closed).
     renderHost(false, onOpenChange)
     expect(onOpenChange).not.toHaveBeenCalled()
 
-    // (2) The user clicks the topbar button. Parent flips `open` to
+    // (2) The user clicks the create-worktree button. Parent flips `open` to
     // true. The host re-renders; only `open` changed, not
     // `activeId`. The effect's deps are `[activeId]`, so the effect
     // must NOT fire — pre-fix it did, and called `onOpenChange(false)`
     // in the same render.
     act(() => {
-      root!.render(
-        <CreateWorktreeDialogHost open={true} onOpenChange={onOpenChange} activeId={REPO_ID} />,
-      )
+      root!.render(<CreateWorktreeDialogHost open={true} onOpenChange={onOpenChange} activeId={REPO_ID} />)
     })
+    expect(onOpenChange).not.toHaveBeenCalledWith(false)
+  })
+
+  test('does not close merely because it mounted open', () => {
+    const onOpenChange = vi.fn()
+
+    renderHost(true, onOpenChange)
+
     expect(onOpenChange).not.toHaveBeenCalledWith(false)
   })
 
@@ -96,9 +97,7 @@ describe('CreateWorktreeDialogHost', () => {
     // `onOpenChange(false)` so the dialog doesn't leak across the
     // boundary. The `activeId` dep flips, so the effect fires.
     act(() => {
-      root!.render(
-        <CreateWorktreeDialogHost open={true} onOpenChange={onOpenChange} activeId="/tmp/other-repo" />,
-      )
+      root!.render(<CreateWorktreeDialogHost open={true} onOpenChange={onOpenChange} activeId="/tmp/other-repo" />)
     })
 
     expect(onOpenChange).toHaveBeenCalledWith(false)

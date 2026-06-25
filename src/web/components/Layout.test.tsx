@@ -1,10 +1,20 @@
 // @vitest-environment jsdom
 
 import { act } from 'react'
+import type { ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, test } from 'vitest'
-import { CompactRepoWorkspace } from '#/web/components/Layout.tsx'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { CompactRepoWorkspace, RepoWorkspace } from '#/web/components/Layout.tsx'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
+
+vi.mock('#/web/components/SplitPane.tsx', () => ({
+  SplitPane: ({ before, after, afterSize }: { before: ReactNode; after: ReactNode; afterSize: number }) => (
+    <div data-testid="mock-split-pane" data-after-size={afterSize}>
+      {before}
+      {after}
+    </div>
+  ),
+}))
 
 let container: HTMLDivElement | null = null
 let root: Root | null = null
@@ -50,6 +60,18 @@ describe('CompactRepoWorkspace', () => {
   })
 })
 
+describe('RepoWorkspace', () => {
+  test('defaults the split layout to a 30/70 sidebar/workspace ratio', () => {
+    act(() => {
+      root!.render(
+        <RepoWorkspace branchNavigatorPane={<div>navigator</div>} branchWorkspacePane={<div>workspace</div>} />,
+      )
+    })
+
+    expect(splitPane()?.dataset.afterSize).toBe('70')
+  })
+})
+
 function renderCompactWorkspace(activePane: 'navigator' | 'workspace') {
   act(() => {
     root!.render(
@@ -68,4 +90,8 @@ function compactWorkspace(): HTMLElement | null {
 
 function compactPane(pane: 'navigator' | 'workspace'): HTMLElement | null {
   return container?.querySelector<HTMLElement>(`[data-compact-workspace-pane="${pane}"]`) ?? null
+}
+
+function splitPane(): HTMLElement | null {
+  return container?.querySelector<HTMLElement>('[data-testid="mock-split-pane"]') ?? null
 }

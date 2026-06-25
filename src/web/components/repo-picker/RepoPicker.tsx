@@ -1,14 +1,14 @@
 import { type ReactNode, useCallback, useRef, useState } from 'react'
 import { Check, Download, FolderGit2, FolderOpen, Plus, Server, X } from 'lucide-react'
 import { Button } from '#/web/components/ui/button.tsx'
-import { cn } from '#/web/lib/cn.ts'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { Tip } from '#/web/components/Tip.tsx'
 import { ToolbarTabList, ToolbarTabStripBody } from '#/web/components/tab-strip/ToolbarTabStrip.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '#/web/components/ui/popover.tsx'
-import { CurrentRepoButton } from '#/web/components/repo-picker/CurrentRepoButton.tsx'
+import { MenuRowButton } from '#/web/components/ui/menu-row-button.tsx'
+import { CurrentRepoSidebarButton, CurrentRepoToolbarButton } from '#/web/components/repo-picker/CurrentRepoButton.tsx'
 import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
-import type { RepoPickerLabels, RepoPickerRepo } from '#/web/components/repo-picker/types.ts'
+import type { RepoPickerLabels, RepoPickerRepo, RepoPickerSurface } from '#/web/components/repo-picker/types.ts'
 import { isRemoteRepoId, remoteRepoLifecycleTarget } from '#/shared/remote-repo.ts'
 import { formatRepoLocator } from '#/web/lib/paths.ts'
 
@@ -41,6 +41,7 @@ interface RepoPickerProps {
   onOpenLocal: () => void
   onOpenRemote: () => void
   onClone: () => void
+  surface?: RepoPickerSurface
 }
 
 function RepoSwitcherAction({
@@ -55,31 +56,20 @@ function RepoSwitcherAction({
   onSelect: () => void
 }) {
   return (
-    <button
-      type="button"
-      className="flex h-7 w-full cursor-pointer items-center gap-2 rounded-sm px-2 text-left text-sm text-popover-foreground outline-none transition-colors duration-100 hover:bg-accent hover:text-accent-foreground"
+    <MenuRowButton
+      leading={icon}
+      trailing={
+        shortcut ? (
+          <span className="min-w-6 pl-8 text-right text-xs tracking-widest text-muted-foreground">{shortcut}</span>
+        ) : null
+      }
       onClick={onSelect}
     >
-      <span className="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground">{icon}</span>
-      <span className="min-w-0 flex-1 truncate">{label}</span>
-      {shortcut && (
-        <span className="ml-auto min-w-6 pl-8 text-right text-xs tracking-widest text-muted-foreground">
-          {shortcut}
-        </span>
-      )}
-    </button>
+      {label}
+    </MenuRowButton>
   )
 }
 
-// Popover content for the repo menu. The Popover itself is owned by
-// `RepoPicker` so the tab strip can be the trigger and the popover
-// state can be reset on selection.
-//
-// Each row is a two-line entry: repo name on top, locator (path or
-// remote target) below in mono muted text. Rows grow from h-8 (32px)
-// to min-h-11 (44px) to fit both lines comfortably; the close button
-// stays absolutely positioned and centred vertically so it stays in
-// reach as the row grows.
 function RepoMenuContent({
   repos,
   activeId,
@@ -107,7 +97,8 @@ function RepoMenuContent({
     <PopoverContent
       side="bottom"
       align="start"
-      className="flex w-max min-w-64 max-w-[calc(100vw-2rem)] flex-col overflow-hidden p-0"
+      className="flex w-max max-w-[calc(100vw-2rem)] flex-col overflow-hidden p-0"
+      style={{ minWidth: 'max(16rem, var(--radix-popover-trigger-width))' }}
       aria-label={labels.repositories}
       ref={contentRef}
       tabIndex={-1}
@@ -126,30 +117,25 @@ function RepoMenuContent({
                 const remoteTarget = remoteRepoLifecycleTarget(repo.lifecycle)
                 return (
                   <div key={repo.id} className="group relative flex items-center" role="listitem">
-                    <button
-                      type="button"
-                      className={cn(
-                        'flex w-full min-h-11 cursor-pointer items-center gap-2.5 rounded-sm py-1.5 pl-2 pr-8 text-left text-sm outline-none transition-colors duration-100 hover:bg-accent hover:text-accent-foreground',
-                        selected &&
-                          'bg-selected text-selected-foreground hover:bg-selected hover:text-selected-foreground',
-                      )}
+                    <MenuRowButton
+                      size="roomy"
+                      selected={selected}
                       onClick={() => onSelectRepo(repo.id)}
                       aria-current={selected ? 'true' : undefined}
-                    >
-                      <span className="flex size-3.5 shrink-0 items-center justify-center">
-                        {selected ? (
+                      leading={
+                        selected ? (
                           <Check size={13} aria-hidden />
                         ) : (
                           <RepoIcon size={13} className="text-muted-foreground" aria-hidden />
-                        )}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <div className="truncate font-medium leading-5">{repo.name}</div>
-                        <div className="truncate font-mono text-xs leading-4 text-muted-foreground">
-                          {formatRepoLocator(repo.id, remoteTarget)}
-                        </div>
-                      </span>
-                    </button>
+                        )
+                      }
+                      contentClassName="whitespace-normal"
+                    >
+                      <div className="truncate font-medium leading-5">{repo.name}</div>
+                      <div className="truncate font-mono text-xs leading-4 text-muted-foreground">
+                        {formatRepoLocator(repo.id, remoteTarget)}
+                      </div>
+                    </MenuRowButton>
                     <Button
                       type="button"
                       size="icon-sm"
@@ -226,6 +212,7 @@ export function RepoPicker({
   onOpenLocal,
   onOpenRemote,
   onClone,
+  surface = 'toolbar',
 }: RepoPickerProps) {
   const focusRegistry = useFocusRegistry<string, HTMLButtonElement>()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -253,24 +240,30 @@ export function RepoPicker({
   const currentRepo = repos.find((r) => r.id === activeId) ?? repos[0] ?? null
 
   return (
-    <nav className="flex h-full min-w-0 items-center" aria-label={labels.repositories}>
+    <nav className="flex h-full min-w-0 flex-1 items-center" aria-label={labels.repositories}>
       <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-        {currentRepo ? (
+        {currentRepo && surface === 'sidebar' ? (
           <PopoverTrigger asChild>
-            <ToolbarTabStripBody>
-              {/* The tablist absorbs PopoverTrigger's onClick + data
-               * attributes; clicks anywhere in the tab area open the
-               * popover. The inner CurrentRepoButton keeps its focus
-               * and keyboard nav (ArrowLeft/Right) for repository
-               * switching without opening the popover. */}
-              <ToolbarTabList role="tablist" aria-orientation="horizontal" data-current-repo-group>
-                <CurrentRepoButton
+            <CurrentRepoSidebarButton
+              repo={currentRepo}
+              focusRegistry={focusRegistry}
+              onKeyboardNavigate={handleKeyboardNavigate}
+              unavailableLabel={labels.unavailable}
+              fill
+            />
+          </PopoverTrigger>
+        ) : currentRepo ? (
+          <PopoverTrigger asChild>
+            <ToolbarTabStripBody className="flex-1">
+              <ToolbarTabList role="tablist" aria-orientation="horizontal" data-current-repo-group className="flex-1">
+                <CurrentRepoToolbarButton
                   repo={currentRepo}
                   isCurrent={currentRepo.id === activeId}
                   focusRegistry={focusRegistry}
                   onActivate={onActivate}
                   onKeyboardNavigate={handleKeyboardNavigate}
                   unavailableLabel={labels.unavailable}
+                  fill
                 />
               </ToolbarTabList>
             </ToolbarTabStripBody>

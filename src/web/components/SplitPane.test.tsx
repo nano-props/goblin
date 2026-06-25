@@ -226,26 +226,27 @@ describe('SplitPane', () => {
 
       render(splitPaneElement(true))
       await flushEffects()
-      expect(splitPane()?.dataset.collapseTransition).toBe('true')
+      expect(splitPane()?.dataset.collapseTransition).toBe('collapsing')
 
       act(() => {
         vi.advanceTimersByTime(120)
       })
-      expect(splitPane()?.dataset.collapseTransition).toBe('true')
+      expect(splitPane()?.dataset.collapseTransition).toBe('collapsing')
 
       render(splitPaneElement(false))
       await flushEffects()
-      expect(splitPane()?.dataset.collapseTransition).toBe('true')
+      expect(splitPane()?.dataset.collapseTransition).toBe('expanding')
       expect(resizableMocks.setLayout).toHaveBeenLastCalledWith({ before: 38, after: 62 })
 
       act(() => {
         vi.advanceTimersByTime(239)
       })
-      expect(splitPane()?.dataset.collapseTransition).toBe('true')
+      expect(splitPane()?.dataset.collapseTransition).toBe('expanding')
 
       act(() => {
         vi.advanceTimersByTime(1)
       })
+      await flushEffects()
       expect(splitPane()?.dataset.collapseTransition).toBeUndefined()
     } finally {
       vi.useRealTimers()

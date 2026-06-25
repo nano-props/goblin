@@ -6,6 +6,12 @@ import { cn } from '#/web/lib/cn.ts'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { TerminalBellBadge } from '#/web/components/terminal/TerminalBellBadge.tsx'
+import {
+  BRANCH_ROW_ACTION_BOX_CLASS,
+  BRANCH_ROW_ACTION_SLOT_CLASS,
+  BRANCH_ROW_CONTENT_CLASS,
+  BRANCH_ROW_GRID_CLASS,
+} from '#/web/components/branch-navigator/branch-row-metrics.ts'
 
 export interface BranchRowProps {
   repo: BranchActionRepo
@@ -55,12 +61,13 @@ export function BranchRow({
       onClick={() => onSelectBranch(branch.name)}
       onDoubleClick={() => onOpenBranchStatus(branch.name)}
       className={cn(
-        'group relative grid min-h-9 grid-cols-[minmax(0,1fr)_auto] items-stretch rounded-md cursor-pointer',
+        BRANCH_ROW_GRID_CLASS,
+        'group relative cursor-pointer',
         'transition-colors duration-100',
         isSelected ? 'bg-selected text-selected-foreground hover:bg-selected' : 'hover:bg-muted',
       )}
     >
-      <div className="pointer-events-none relative z-10 flex min-w-0 items-center px-4 py-1.5">
+      <div className={cn(BRANCH_ROW_CONTENT_CLASS, 'pointer-events-none relative z-10')}>
         <BranchSummaryInline
           repo={repo}
           branch={branch}
@@ -94,8 +101,8 @@ function BranchRowActionSlot({
   const showBellBadge = terminalBellCount > 0 && actionHidden
 
   return (
-    <div className="pointer-events-none relative z-20 flex shrink-0 items-center py-1.5 pr-4">
-      <div className="relative flex h-6 min-w-6 items-center justify-center">
+    <div className={cn(BRANCH_ROW_ACTION_SLOT_CLASS, 'pointer-events-none relative z-20')}>
+      <div className={BRANCH_ROW_ACTION_BOX_CLASS}>
         {showBellBadge && (
           <div className="absolute inset-0 flex items-center justify-center transition-opacity duration-100 group-hover:opacity-0 group-focus-within:opacity-0">
             <TerminalBellBadge count={terminalBellCount} />
