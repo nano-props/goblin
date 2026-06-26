@@ -10,7 +10,7 @@
 // git's responsibility.
 
 import { useEffect, useRef, useState } from 'react'
-import { GitBranch, GitBranchPlus, RadioTower, ShieldCheck, type LucideIcon } from 'lucide-react'
+import { GitBranch, GitBranchPlus, RadioTower, type LucideIcon } from 'lucide-react'
 import { DialogFooter } from '#/web/components/ui/dialog.tsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/web/components/ui/select.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
@@ -41,13 +41,6 @@ const MODE_OPTIONS = [
   { id: 'trackRemoteBranch', labelKey: 'action.create-worktree-mode-remote', icon: RadioTower },
 ] satisfies Array<{ id: CreateWorktreeDialogMode; labelKey: string; icon: LucideIcon }>
 
-export type WorktreeBootstrapChoice = 'skip' | 'run'
-
-const BOOTSTRAP_CHOICE_OPTIONS = [
-  { id: 'skip', labelKey: 'action.create-worktree-bootstrap-skip' },
-  { id: 'run', labelKey: 'action.create-worktree-bootstrap-run' },
-] satisfies Array<{ id: WorktreeBootstrapChoice; labelKey: string }>
-
 interface Props {
   open: boolean
   repo: RepoState
@@ -61,9 +54,7 @@ interface WorktreeBootstrapPromptState {
   preview: WorktreeBootstrapPreview | null
   error: boolean
   trusted: boolean
-  choice: WorktreeBootstrapChoice
   rememberTrust: boolean
-  onChoiceChange: (choice: WorktreeBootstrapChoice) => void
   onRememberTrustChange: (remember: boolean) => void
 }
 
@@ -370,7 +361,7 @@ export function CreateWorktreeDialog({ open, repo, worktreeBootstrap, onClose, o
           </FieldDescription>
         </Field>
 
-        <WorktreeBootstrapPrompt state={worktreeBootstrap} />
+        <WorktreeBootstrapTrustCheckbox state={worktreeBootstrap} />
 
         <DialogFooter className="gap-2 pt-2">
           <Button type="button" variant="outline" className={cn(compact && 'w-full')} onClick={onClose}>
@@ -385,100 +376,17 @@ export function CreateWorktreeDialog({ open, repo, worktreeBootstrap, onClose, o
   )
 }
 
-function WorktreeBootstrapPrompt({ state }: { state: WorktreeBootstrapPromptState | undefined }) {
+function WorktreeBootstrapTrustCheckbox({ state }: { state: WorktreeBootstrapPromptState | undefined }) {
   const t = useT()
   const preview = state?.preview ?? null
-  const showPrompt = state?.loading || state?.error || (preview?.hasOperations && preview.configHash)
+  const showPrompt = !state?.loading && !state?.error && !state?.trusted && preview?.hasOperations && preview.configHash
   if (!state || !showPrompt) return null
-  const rows = preview ? bootstrapRows(preview, t) : []
 
   return (
-    <div className="rounded-md border bg-muted/30 px-3 py-2.5 text-sm">
-      <div className="flex items-start gap-2">
-        <ShieldCheck aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-        <div className="min-w-0 flex-1 space-y-2">
-          <div className="font-medium leading-none">{t('action.create-worktree-bootstrap-title')}</div>
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            {state.loading
-              ? t('action.create-worktree-bootstrap-loading')
-              : state.error
-                ? t('action.create-worktree-bootstrap-error')
-                : t('action.create-worktree-bootstrap-body')}
-          </p>
-          {!state.loading && !state.error && preview && (
-            <>
-              {rows.length > 0 && (
-                <dl className="grid gap-1.5 border-y py-2 text-xs">
-                  {rows.map((row) => (
-                    <div key={row.label} className="grid grid-cols-[1fr_auto] items-center gap-3">
-                      <dt className="text-muted-foreground">{row.label}</dt>
-                      <dd className="font-mono text-foreground tabular-nums">{row.value}</dd>
-                    </div>
-                  ))}
-                </dl>
-              )}
-              {preview.setup && (
-                <div className="space-y-1">
-                  <span className="block text-xs text-muted-foreground">
-                    {t('action.create-worktree-bootstrap-setup-label')}
-                  </span>
-                  <code className="block max-h-20 overflow-auto rounded-md bg-muted px-2 py-1.5 font-mono text-xs break-all text-foreground">
-                    {preview.setup.command}
-                  </code>
-                </div>
-              )}
-              {state.trusted ? (
-                <p className="text-xs text-muted-foreground">{t('action.create-worktree-bootstrap-trusted')}</p>
-              ) : (
-                <>
-                  <ToggleGroup
-                    type="single"
-                    value={state.choice}
-                    onValueChange={(next) => {
-                      if (isWorktreeBootstrapChoice(next)) state.onChoiceChange(next)
-                    }}
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    aria-label={t('action.create-worktree-bootstrap-title')}
-                  >
-                    {BOOTSTRAP_CHOICE_OPTIONS.map((option) => (
-                      <ToggleGroupItem key={option.id} value={option.id} className="min-h-8 flex-1 px-2 text-xs">
-                        <span className="truncate">{t(option.labelKey)}</span>
-                      </ToggleGroupItem>
-                    ))}
-                  </ToggleGroup>
-                  <ConfirmCheckbox
-                    checked={state.choice === 'run' && state.rememberTrust}
-                    disabled={state.choice !== 'run'}
-                    onCheckedChange={state.onRememberTrustChange}
-                  >
-                    {t('action.create-worktree-bootstrap-remember')}
-                  </ConfirmCheckbox>
-                  <p className="text-xs text-muted-foreground">{t('action.create-worktree-bootstrap-note')}</p>
-                </>
-              )}
-            </>
-          )}
-        </div>
-      </div>
+    <div className="pt-0.5 text-sm">
+      <ConfirmCheckbox checked={state.rememberTrust} onCheckedChange={state.onRememberTrustChange}>
+        {t('action.create-worktree-bootstrap-remember')}
+      </ConfirmCheckbox>
     </div>
   )
-}
-
-function bootstrapRows(preview: WorktreeBootstrapPreview, t: (key: string) => string) {
-  const rows: Array<{ label: string; value: number }> = []
-  if (preview.copyCount > 0)
-    rows.push({ label: t('action.create-worktree-bootstrap-copy-label'), value: preview.copyCount })
-  if (preview.symlinkCount > 0)
-    rows.push({ label: t('action.create-worktree-bootstrap-symlink-label'), value: preview.symlinkCount })
-  if (preview.hardlinkCount > 0)
-    rows.push({ label: t('action.create-worktree-bootstrap-hardlink-label'), value: preview.hardlinkCount })
-  if (preview.excludeCount > 0)
-    rows.push({ label: t('action.create-worktree-bootstrap-exclude-label'), value: preview.excludeCount })
-  return rows
-}
-
-function isWorktreeBootstrapChoice(value: string): value is WorktreeBootstrapChoice {
-  return value === 'skip' || value === 'run'
 }

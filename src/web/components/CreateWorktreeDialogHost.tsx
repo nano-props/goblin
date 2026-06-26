@@ -10,10 +10,7 @@
 // close the dialog to match the previous per-repo trigger behaviour.
 
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import {
-  CreateWorktreeDialog,
-  type WorktreeBootstrapChoice,
-} from '#/web/components/create-worktree-dialog/CreateWorktreeDialog.tsx'
+import { CreateWorktreeDialog } from '#/web/components/create-worktree-dialog/CreateWorktreeDialog.tsx'
 import type { CreateWorktreeRequest } from '#/web/components/create-worktree-dialog/create-worktree-dialog.logic.ts'
 import { getRepositoryWorktreeBootstrapPreview } from '#/web/repo-client.ts'
 import { currentSettingsSnapshot } from '#/web/settings-read-projection.ts'
@@ -35,7 +32,6 @@ export function CreateWorktreeDialogHost({ open, onOpenChange, activeId }: Props
   const [bootstrapPreview, setBootstrapPreview] = useState<WorktreeBootstrapPreview | null>(null)
   const [bootstrapPreviewError, setBootstrapPreviewError] = useState(false)
   const [bootstrapPreviewLoading, setBootstrapPreviewLoading] = useState(false)
-  const [bootstrapChoice, setBootstrapChoice] = useState<WorktreeBootstrapChoice>('skip')
   const [rememberBootstrapTrust, setRememberBootstrapTrust] = useState(false)
   const settingsSnapshot = useCurrentSettingsSnapshot()
   const previousActiveIdRef = useRef(activeId)
@@ -44,7 +40,6 @@ export function CreateWorktreeDialogHost({ open, onOpenChange, activeId }: Props
     setBootstrapPreview(null)
     setBootstrapPreviewError(false)
     setBootstrapPreviewLoading(false)
-    setBootstrapChoice('skip')
     setRememberBootstrapTrust(false)
   }
 
@@ -74,7 +69,6 @@ export function CreateWorktreeDialogHost({ open, onOpenChange, activeId }: Props
     setBootstrapPreview(null)
     setBootstrapPreviewError(false)
     setBootstrapPreviewLoading(true)
-    setBootstrapChoice('skip')
     setRememberBootstrapTrust(false)
 
     void getRepositoryWorktreeBootstrapPreview(repoId, controller.signal)
@@ -134,8 +128,7 @@ export function CreateWorktreeDialogHost({ open, onOpenChange, activeId }: Props
     const configHash = bootstrapPreview?.hasOperations ? bootstrapPreview.configHash : null
     if (!configHash) return { kind: 'skip' }
     if (isCurrentBootstrapConfigTrusted(repoId, configHash)) return { kind: 'run', configHash, rememberTrust: false }
-    if (bootstrapChoice === 'run') return { kind: 'run', configHash, rememberTrust: rememberBootstrapTrust }
-    return { kind: 'skip' }
+    return { kind: 'run', configHash, rememberTrust: rememberBootstrapTrust }
   }
 
   function isCurrentBootstrapConfigTrusted(repoId: string, configHash: string | null | undefined): boolean {
@@ -144,11 +137,6 @@ export function CreateWorktreeDialogHost({ open, onOpenChange, activeId }: Props
 
   const bootstrapConfigHash = bootstrapPreview?.configHash ?? null
   const bootstrapTrusted = isCurrentBootstrapConfigTrusted(repo.id, bootstrapConfigHash)
-
-  function handleBootstrapChoiceChange(next: WorktreeBootstrapChoice): void {
-    setBootstrapChoice(next)
-    if (next !== 'run') setRememberBootstrapTrust(false)
-  }
 
   return (
     <CreateWorktreeDialog
@@ -159,9 +147,7 @@ export function CreateWorktreeDialogHost({ open, onOpenChange, activeId }: Props
         preview: bootstrapPreview,
         error: bootstrapPreviewError,
         trusted: bootstrapTrusted,
-        choice: bootstrapChoice,
         rememberTrust: rememberBootstrapTrust,
-        onChoiceChange: handleBootstrapChoiceChange,
         onRememberTrustChange: setRememberBootstrapTrust,
       }}
       onClose={() => onOpenChange(false)}

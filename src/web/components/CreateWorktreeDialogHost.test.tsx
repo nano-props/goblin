@@ -120,7 +120,7 @@ describe('CreateWorktreeDialogHost', () => {
     expect(container?.textContent ?? '').toBe('')
   })
 
-  test('forwards a trust-and-run bootstrap decision from the create dialog', async () => {
+  test('forwards a remembered bootstrap decision from the create dialog checkbox', async () => {
     const configHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
     mainWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
     const submitBranchAction = vi.spyOn(useReposStore.getState(), 'submitBranchAction').mockImplementation(() => {})
@@ -157,12 +157,10 @@ describe('CreateWorktreeDialogHost', () => {
     await flushReact()
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(document.body.textContent).toContain('action.create-worktree-bootstrap-title')
     expect(document.body.textContent).toContain('action.create-worktree-bootstrap-remember')
     expect(submitBranchAction).not.toHaveBeenCalled()
 
     setInputValue('cwt-branch', 'feature/bootstrap')
-    await clickButton('action.create-worktree-bootstrap-run')
     await clickLabel('action.create-worktree-bootstrap-remember')
     await clickButton('action.create-worktree-confirm')
     await flushReact()
@@ -182,7 +180,7 @@ describe('CreateWorktreeDialogHost', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  test('forwards a run-once bootstrap decision from the create dialog', async () => {
+  test('forwards a run-once bootstrap decision from the create dialog without checking trust', async () => {
     const configHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
     mainWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
     const submitBranchAction = vi.spyOn(useReposStore.getState(), 'submitBranchAction').mockImplementation(() => {})
@@ -208,7 +206,6 @@ describe('CreateWorktreeDialogHost', () => {
     renderHost(true, vi.fn())
     await flushReact()
     setInputValue('cwt-branch', 'feature/run-once')
-    await clickButton('action.create-worktree-bootstrap-run')
     await clickButton('action.create-worktree-confirm')
     await flushReact()
 
@@ -227,7 +224,7 @@ describe('CreateWorktreeDialogHost', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  test('skips goblin.toml bootstrap by default for untrusted configs', async () => {
+  test('runs goblin.toml bootstrap once by default for untrusted configs', async () => {
     const submitBranchAction = vi.spyOn(useReposStore.getState(), 'submitBranchAction').mockImplementation(() => {})
     const fetchMock = vi.fn(async () => {
       return new Response(
@@ -258,7 +255,11 @@ describe('CreateWorktreeDialogHost', () => {
       REPO_ID,
       expect.objectContaining({
         kind: 'createWorktree',
-        worktreeBootstrap: { kind: 'skip' },
+        worktreeBootstrap: {
+          kind: 'run',
+          configHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          rememberTrust: false,
+        },
       }),
       expect.objectContaining({ refreshOnError: false }),
     )
@@ -309,7 +310,7 @@ describe('CreateWorktreeDialogHost', () => {
     await flushReact()
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(document.body.textContent).toContain('action.create-worktree-bootstrap-trusted')
+    expect(document.body.textContent).not.toContain('action.create-worktree-bootstrap-remember')
     expect(submitBranchAction).toHaveBeenCalledWith(
       REPO_ID,
       expect.objectContaining({
@@ -336,8 +337,7 @@ describe('CreateWorktreeDialogHost', () => {
     renderHost(true, vi.fn())
     await flushReact()
 
-    expect(document.body.textContent).toContain('action.create-worktree-bootstrap-title')
-    expect(document.body.textContent).not.toContain('action.create-worktree-bootstrap-trusted')
+    expect(document.body.textContent).toContain('action.create-worktree-bootstrap-remember')
 
     act(() => {
       mainWindowQueryClient.setQueryData(
@@ -357,7 +357,7 @@ describe('CreateWorktreeDialogHost', () => {
     })
     await flushReact()
 
-    expect(document.body.textContent).toContain('action.create-worktree-bootstrap-trusted')
+    expect(document.body.textContent).not.toContain('action.create-worktree-bootstrap-remember')
 
     setInputValue('cwt-branch', 'feature/trusted-after-preview')
     await clickButton('action.create-worktree-confirm')
@@ -389,7 +389,8 @@ describe('CreateWorktreeDialogHost', () => {
     renderHost(true, vi.fn())
     await flushReact()
 
-    expect(document.body.textContent).toContain('action.create-worktree-bootstrap-error')
+    expect(document.body.textContent).not.toContain('action.create-worktree-bootstrap-error')
+    expect(document.body.textContent).not.toContain('action.create-worktree-bootstrap-remember')
     expect(document.body.textContent).not.toContain('action.create-worktree-bootstrap-run')
 
     setInputValue('cwt-branch', 'feature/preview-error')
