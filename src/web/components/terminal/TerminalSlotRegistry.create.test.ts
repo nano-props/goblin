@@ -189,7 +189,7 @@ describe('TerminalSlotRegistry create flow', () => {
     mocks.proposeTerminalGeometryMock.mockClear()
     mocks.preloadTerminalFontMock.mockClear()
     mocks.clientIdMock.mockClear()
-    registry = new TerminalSlotRegistry(() => REPO_ROOT)
+    registry = new TerminalSlotRegistry()
     registry.setRepoIndex(makeRepoIndex())
     setTerminalSlotRegistryForTests(registry)
     originalResizeObserver = globalThis.ResizeObserver

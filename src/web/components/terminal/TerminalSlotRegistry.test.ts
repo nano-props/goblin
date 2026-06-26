@@ -82,7 +82,6 @@ describe('TerminalSlotRegistry', () => {
     selectedChanges = []
     removedSessions = []
     registry = new TerminalSlotRegistry(
-      () => REPO_ROOT,
       (worktreeTerminalKey, key) => selectedChanges.push({ worktreeTerminalKey, key }),
       (key, base) =>
         removedSessions.push({
@@ -350,13 +349,9 @@ describe('TerminalSlotRegistry', () => {
           ],
         },
       })
-      const registryWithStore = new TerminalSlotRegistry(
-        () => REPO_ROOT,
-        () => {},
-        (key, base) => {
-          useReposStore.getState().removeWorkspacePaneTerminalTab(base.repoRoot, key, base.branch)
-        },
-      )
+      const registryWithStore = new TerminalSlotRegistry(() => {}, (key, base) => {
+        useReposStore.getState().removeWorkspacePaneTerminalTab(base.repoRoot, key, base.branch)
+      })
       try {
         registryWithStore.setRepoIndex(makeRepoIndex())
         registryWithStore.reconcileServerSlots(
@@ -381,13 +376,9 @@ describe('TerminalSlotRegistry', () => {
     })
 
     test('session removal callback failures do not block terminal disposal', async () => {
-      const registryWithThrowingCallback = new TerminalSlotRegistry(
-        () => REPO_ROOT,
-        () => {},
-        () => {
-          throw new Error('store write failed')
-        },
-      )
+      const registryWithThrowingCallback = new TerminalSlotRegistry(() => {}, () => {
+        throw new Error('store write failed')
+      })
       try {
         registryWithThrowingCallback.setRepoIndex(makeRepoIndex())
         registryWithThrowingCallback.reconcileServerSlots(
@@ -610,11 +601,9 @@ describe('TerminalSlotRegistry', () => {
       // `registry`. The getter must return that exact instance, not
       // construct a new one.
       const first = getTerminalSlotRegistry({
-        getCurrentRepoId: () => REPO_ROOT,
         onSelectedWorktreeChange: () => {},
       })
       const second = getTerminalSlotRegistry({
-        getCurrentRepoId: () => REPO_ROOT,
         onSelectedWorktreeChange: () => {},
       })
       expect(first).toBe(second)
@@ -625,7 +614,6 @@ describe('TerminalSlotRegistry', () => {
       const original = registry
       setTerminalSlotRegistryForTests(null)
       const fresh = getTerminalSlotRegistry({
-        getCurrentRepoId: () => REPO_ROOT,
         onSelectedWorktreeChange: () => {},
       })
       expect(fresh).not.toBe(original)
@@ -635,7 +623,6 @@ describe('TerminalSlotRegistry', () => {
 
     test('destroy clears the singleton slot when destroying the installed instance', () => {
       const original = getTerminalSlotRegistry({
-        getCurrentRepoId: () => REPO_ROOT,
         onSelectedWorktreeChange: () => {},
       })
       expect(original).toBe(registry)
@@ -643,7 +630,6 @@ describe('TerminalSlotRegistry', () => {
       original.destroy()
 
       const fresh = getTerminalSlotRegistry({
-        getCurrentRepoId: () => REPO_ROOT,
         onSelectedWorktreeChange: () => {},
       })
       expect(fresh).not.toBe(original)
@@ -667,7 +653,6 @@ describe('TerminalSlotRegistry', () => {
       // Synthesize a remount: re-fetch the singleton via the
       // getter (the Provider's mount effect does exactly this).
       const after = getTerminalSlotRegistry({
-        getCurrentRepoId: () => REPO_ROOT,
         onSelectedWorktreeChange: () => {},
       })
       expect(after).toBe(registry)

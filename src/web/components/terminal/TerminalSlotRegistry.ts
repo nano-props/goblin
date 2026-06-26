@@ -66,7 +66,6 @@ const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = {
  * survive StrictMode; the singleton removes that dance entirely.
  */
 export class TerminalSlotRegistry {
-  private readonly getCurrentRepoId: () => string | null
   private readonly onSelectedWorktreeChange: (worktreeTerminalKey: string, key: string | null) => void
   private readonly onTerminalSlotRemoved: (key: string, base: TerminalSlotBase) => void
   private repoIndex: TerminalRepoIndex = {}
@@ -151,11 +150,9 @@ export class TerminalSlotRegistry {
   )
 
   constructor(
-    getCurrentRepoId: () => string | null,
     onSelectedWorktreeChange: (worktreeTerminalKey: string, key: string | null) => void = () => {},
     onTerminalSlotRemoved: (key: string, base: TerminalSlotBase) => void = () => {},
   ) {
-    this.getCurrentRepoId = getCurrentRepoId
     this.onSelectedWorktreeChange = onSelectedWorktreeChange
     this.onTerminalSlotRemoved = onTerminalSlotRemoved
   }
@@ -1079,7 +1076,6 @@ export class TerminalSlotRegistry {
 }
 
 export interface TerminalSlotRegistryDeps {
-  getCurrentRepoId: () => string | null
   onSelectedWorktreeChange: (worktreeTerminalKey: string, key: string | null) => void
   onTerminalSlotRemoved?: (key: string, base: TerminalSlotBase) => void
 }
@@ -1101,7 +1097,6 @@ let registryInstance: TerminalSlotRegistry | null = null
 export function getTerminalSlotRegistry(deps: TerminalSlotRegistryDeps): TerminalSlotRegistry {
   if (!registryInstance) {
     registryInstance = new TerminalSlotRegistry(
-      deps.getCurrentRepoId,
       deps.onSelectedWorktreeChange,
       deps.onTerminalSlotRemoved,
     )
