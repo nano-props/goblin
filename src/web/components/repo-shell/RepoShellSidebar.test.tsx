@@ -46,7 +46,7 @@ describe('RepoShellSidebar', () => {
     const repoPicker = document.body.querySelector('[data-testid="repo-picker-host"]')
     expect(repoPicker).not.toBeNull()
 
-    const createWorktree = document.body.querySelector('button[aria-label="action.create-worktree-title"]')
+    const createWorktree = document.body.querySelector('[data-testid="create-worktree-button"]')
     if (!(createWorktree instanceof HTMLButtonElement)) throw new Error('missing create worktree button')
     expect(createWorktree.className).toContain('shrink-0')
     expect(createWorktree.className).not.toContain('flex-1')
@@ -66,7 +66,7 @@ describe('RepoShellSidebar', () => {
 
     expect(document.body.querySelector('[data-testid="repo-picker-host"]')).not.toBeNull()
 
-    const createWorktree = document.body.querySelector('button[aria-label="action.create-worktree-title"]')
+    const createWorktree = document.body.querySelector('[data-testid="create-worktree-button"]')
     expect(createWorktree).toBeNull()
 
     const branchTitle = [...document.body.querySelectorAll('div')].find(

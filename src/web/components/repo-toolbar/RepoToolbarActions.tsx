@@ -7,7 +7,10 @@ import { BranchViewModeControl } from '#/web/components/repo-toolbar/BranchViewM
 import type { BranchViewMode } from '#/web/stores/repos/types.ts'
 import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
 import { SidebarRowButton } from '#/web/components/ui/sidebar-row-button.tsx'
+import { InlineShortcut } from '#/web/components/InlineShortcut.tsx'
 import { useT } from '#/web/stores/i18n.ts'
+import { formatAccelerator } from '#/shared/accelerator.ts'
+import { CREATE_WORKTREE_SHORTCUT } from '#/shared/shortcut-definitions.ts'
 
 interface Props {
   repoId: string
@@ -47,6 +50,7 @@ export function CreateWorktreeRowAction({ repoId }: Props) {
   const t = useT()
   const { disabled, openCreateWorktree } = useCreateWorktreeTrigger(repoId)
   const label = t('action.create-worktree-title')
+  const shortcutLabel = formatAccelerator(CREATE_WORKTREE_SHORTCUT)
 
   return (
     <SidebarRowButton
@@ -54,9 +58,12 @@ export function CreateWorktreeRowAction({ repoId }: Props) {
         if (!disabled) openCreateWorktree()
       }}
       disabled={disabled}
-      aria-label={label}
+      aria-label={`${label} (${shortcutLabel})`}
+      data-testid="create-worktree-button"
       size="dense"
+      className="group"
       leading={<FolderPlus size={16} />}
+      trailing={<InlineShortcut shortcut={shortcutLabel} showOnHover={true} aria-hidden={true} />}
     >
       {label}
     </SidebarRowButton>

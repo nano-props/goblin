@@ -241,12 +241,14 @@ describe('app menu actions', () => {
 
     const fileMenu = mocks.template.find((entry) => entry.label === 'menu.file')
     const newTerminalItem = fileMenu?.submenu?.find((entry: any) => entry.label === 'terminal.new')
+    const createWorktreeItem = fileMenu?.submenu?.find((entry: any) => entry.label === 'menu.file.create-worktree')
     const closeWorkspaceTabItem = fileMenu?.submenu?.find(
       (entry: any) => entry.label === 'menu.file.close-workspace-tab-or-window',
     )
     const closeViewItem = fileMenu?.submenu?.find((entry: any) => entry.label === 'menu.file.close-tab')
     const closeWindowItem = fileMenu?.submenu?.find((entry: any) => entry.label === 'menu.file.close-window')
-    expect(newTerminalItem?.accelerator).toBe('CmdOrCtrl+N')
+    expect(newTerminalItem?.accelerator).toBe('CmdOrCtrl+T')
+    expect(createWorktreeItem?.accelerator).toBe('CmdOrCtrl+N')
     expect(closeWorkspaceTabItem?.accelerator).toBe('CmdOrCtrl+W')
     expect(closeViewItem?.accelerator).toBe('CmdOrCtrl+Shift+W')
     expect(closeWindowItem?.accelerator).toBeUndefined()

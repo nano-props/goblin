@@ -3,7 +3,15 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { toast } from 'sonner'
 import { useKeyboard } from '#/web/hooks/useKeyboard.ts'
+
+vi.mock('sonner', () => ({
+  toast: {
+    error: vi.fn(),
+    success: vi.fn(),
+  },
+}))
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
@@ -24,6 +32,7 @@ interface HookHostOptions {
   isWorkspaceShortcutSuppressed: () => boolean
   isSettingsOpen: () => boolean
   onExitSettings: () => void
+  openCreateWorktree: () => void
   navigation: MainWindowNavigationActions
 }
 
@@ -154,6 +163,121 @@ describe('useKeyboard', () => {
     terminalHost.remove()
   })
 
+  test('primary modifier plus t creates a new terminal tab', async () => {
+    Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
+    seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      selectedBranch: 'feature/worktree',
+      preferredWorkspacePaneView: 'terminal',
+    })
+    const createTerminal = vi.fn(async () => 'slot-2')
+    setTerminalSlotCommandBridge({
+      worktreeSnapshot: () => worktreeSnapshot(),
+      createTerminal,
+      selectTerminal: vi.fn(),
+    })
+    await renderHookHost({ currentRepoId: REPO_ID })
+
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 't', code: 'KeyT', ctrlKey: true, bubbles: true }))
+      await Promise.resolve()
+    })
+
+    expect(createTerminal).toHaveBeenCalledTimes(1)
+  })
+
+  test('primary modifier plus n opens the create worktree dialog', async () => {
+    Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
+    seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      selectedBranch: 'feature/worktree',
+    })
+    const openCreateWorktree = vi.fn()
+    await renderHookHost({ currentRepoId: REPO_ID, openCreateWorktree })
+
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', code: 'KeyN', ctrlKey: true, bubbles: true }))
+      await Promise.resolve()
+    })
+
+    expect(openCreateWorktree).toHaveBeenCalledTimes(1)
+    expect(toast.error).not.toHaveBeenCalled()
+  })
+
+  test('primary modifier plus n shows a busy toast when there is no active repo', async () => {
+    Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
+    const openCreateWorktree = vi.fn()
+    await renderHookHost({ currentRepoId: null, openCreateWorktree })
+
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', code: 'KeyN', ctrlKey: true, bubbles: true }))
+      await Promise.resolve()
+    })
+
+    expect(openCreateWorktree).not.toHaveBeenCalled()
+    expect(toast.error).toHaveBeenCalledWith('action.create-worktree-busy')
+  })
+
+  test('primary modifier plus n does not open create worktree while workspace shortcuts are suppressed', async () => {
+    Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
+    seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      selectedBranch: 'feature/worktree',
+    })
+    const openCreateWorktree = vi.fn()
+    await renderHookHost({ currentRepoId: REPO_ID, openCreateWorktree, isWorkspaceShortcutSuppressed: () => true })
+
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', code: 'KeyN', ctrlKey: true, bubbles: true }))
+      await Promise.resolve()
+    })
+
+    expect(openCreateWorktree).not.toHaveBeenCalled()
+  })
+
+  test('primary modifier plus n does not open create worktree while a branch action is busy', async () => {
+    Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
+    seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      selectedBranch: 'feature/worktree',
+    })
+    useReposStore.setState((state) => {
+      const repo = state.repos[REPO_ID]
+      if (!repo) return state
+      return {
+        repos: {
+          ...state.repos,
+          [REPO_ID]: {
+            ...repo,
+            operations: {
+              ...repo.operations,
+              branchAction: {
+                ...repo.operations.branchAction,
+                phase: 'running',
+                reason: 'branch:createWorktree',
+                target: 'feature/worktree',
+              },
+            },
+          },
+        },
+      }
+    })
+    const openCreateWorktree = vi.fn()
+    await renderHookHost({ currentRepoId: REPO_ID, openCreateWorktree })
+
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', code: 'KeyN', ctrlKey: true, bubbles: true }))
+      await Promise.resolve()
+    })
+
+    expect(openCreateWorktree).not.toHaveBeenCalled()
+    expect(toast.error).toHaveBeenCalledWith('action.create-worktree-busy')
+  })
+
   test('does not run menu-backed primary shortcuts from the client in electron', async () => {
     Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
     installNativeBridgeStub()
@@ -165,22 +289,26 @@ describe('useKeyboard', () => {
     })
     const createTerminal = vi.fn(async () => 'slot-2')
     const closeTerminalByDescriptor = vi.fn(async () => true)
+    const openCreateWorktree = vi.fn()
     setTerminalSlotCommandBridge({
       worktreeSnapshot: () => worktreeSnapshot(),
       createTerminal,
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor,
     })
-    await renderHookHost({ currentRepoId: REPO_ID })
+    await renderHookHost({ currentRepoId: REPO_ID, openCreateWorktree })
 
     await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 't', code: 'KeyT', ctrlKey: true, bubbles: true }))
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', code: 'KeyN', ctrlKey: true, bubbles: true }))
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', code: 'KeyW', ctrlKey: true, bubbles: true }))
       await Promise.resolve()
     })
 
     expect(createTerminal).not.toHaveBeenCalled()
+    expect(openCreateWorktree).not.toHaveBeenCalled()
     expect(closeTerminalByDescriptor).not.toHaveBeenCalled()
+    expect(toast.error).not.toHaveBeenCalled()
   })
 
   test('primary modifier plus w closes the selected terminal tab', async () => {
@@ -231,6 +359,7 @@ function HookHost(overrides: Partial<HookHostOptions>) {
     isWorkspaceShortcutSuppressed: overrides.isWorkspaceShortcutSuppressed ?? (() => false),
     isSettingsOpen: overrides.isSettingsOpen ?? (() => false),
     onExitSettings: overrides.onExitSettings ?? (() => {}),
+    openCreateWorktree: overrides.openCreateWorktree ?? (() => {}),
   })
   return null
 }

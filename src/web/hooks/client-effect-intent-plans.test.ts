@@ -149,6 +149,51 @@ describe('client effect intent plans', () => {
     expect(plan).toEqual({ kind: 'noop' })
   })
 
+  test('creates a create-worktree plan for the current workspace', () => {
+    const plan = createWorkspaceIntentPlan(
+      { type: 'create-worktree-requested' },
+      {
+        overlayBlocked: false,
+        workspaceShortcutSuppressed: false,
+        terminalFocused: false,
+        currentRepoId: '/tmp/repo',
+        currentRepo: { id: '/tmp/repo', instanceToken: 7 },
+      },
+    )
+
+    expect(plan).toEqual({ kind: 'create-worktree' })
+  })
+
+  test('suppresses create-worktree when there is no current repo', () => {
+    const plan = createWorkspaceIntentPlan(
+      { type: 'create-worktree-requested' },
+      {
+        overlayBlocked: false,
+        workspaceShortcutSuppressed: false,
+        terminalFocused: false,
+        currentRepoId: null,
+        currentRepo: null,
+      },
+    )
+
+    expect(plan).toEqual({ kind: 'noop' })
+  })
+
+  test('suppresses create-worktree when workspace shortcuts are blocked', () => {
+    const plan = createWorkspaceIntentPlan(
+      { type: 'create-worktree-requested' },
+      {
+        overlayBlocked: false,
+        workspaceShortcutSuppressed: true,
+        terminalFocused: false,
+        currentRepoId: '/tmp/repo',
+        currentRepo: { id: '/tmp/repo', instanceToken: 7 },
+      },
+    )
+
+    expect(plan).toEqual({ kind: 'noop' })
+  })
+
   test('external open drain kick plan schedules rerun when a drain is already active', () => {
     expect(createExternalOpenDrainKickPlan({ disposed: false, draining: true })).toEqual({
       kind: 'schedule-rerun',

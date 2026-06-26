@@ -12,6 +12,7 @@ type ClientWorkspaceIntent = Extract<
   | { type: 'open-repo-path-requested' }
   | { type: 'open-remote-repo-requested' }
   | { type: 'clone-repo-requested' }
+  | { type: 'create-worktree-requested' }
   | { type: 'terminal-new-tab-requested' }
   | { type: 'workspace-pane-close-tab-or-window-requested' }
   | { type: 'close-repo-requested' }
@@ -48,6 +49,7 @@ export type WorkspaceIntentPlan =
   | { kind: 'open-repo-path' }
   | { kind: 'open-clone-repo' }
   | { kind: 'open-remote-repo' }
+  | { kind: 'create-worktree' }
   | { kind: 'new-terminal-tab'; repoId: string }
   | { kind: 'close-workspace-pane-tab-or-window'; repoId: string | null }
   | { kind: 'close-repo'; repoId: string }
@@ -131,6 +133,9 @@ export function createWorkspaceIntentPlan(
       return { kind: 'open-repo-path' }
     case 'clone-repo-requested':
       return { kind: 'open-clone-repo' }
+    case 'create-worktree-requested':
+      if (context.workspaceShortcutSuppressed || !context.currentRepoId) return { kind: 'noop' }
+      return { kind: 'create-worktree' }
     case 'open-remote-repo-requested':
       return { kind: 'open-remote-repo' }
     case 'terminal-new-tab-requested':
@@ -173,6 +178,7 @@ function isClientWorkspaceIntent(event: ClientEffectIntent): event is ClientWork
     event.type === 'open-repo-path-requested' ||
     event.type === 'open-remote-repo-requested' ||
     event.type === 'clone-repo-requested' ||
+    event.type === 'create-worktree-requested' ||
     event.type === 'terminal-new-tab-requested' ||
     event.type === 'workspace-pane-close-tab-or-window-requested' ||
     event.type === 'close-repo-requested' ||

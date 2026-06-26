@@ -27,7 +27,8 @@ describe('shortcut definitions', () => {
   })
 
   test('resolves fixed close and workspace tab accelerators from shared definitions', () => {
-    expect(resolveClientMenuCommandAccelerator(clientMenuCommandById('file-new-terminal-tab'), {})).toBe('CmdOrCtrl+N')
+    expect(resolveClientMenuCommandAccelerator(clientMenuCommandById('file-new-terminal-tab'), {})).toBe('CmdOrCtrl+T')
+    expect(resolveClientMenuCommandAccelerator(clientMenuCommandById('file-create-worktree'), {})).toBe('CmdOrCtrl+N')
     expect(resolveClientMenuCommandAccelerator(clientMenuCommandById('file-close-workspace-tab-or-window'), {})).toBe(
       'CmdOrCtrl+W',
     )

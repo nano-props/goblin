@@ -442,6 +442,7 @@ function HookHost() {
     openRepoPathDialog: () => {},
     openCloneRepo: () => {},
     openRemoteRepo: () => {},
+    openCreateWorktree: () => {},
     isOverlayOpen: () => overlayOpen,
     isWorkspaceShortcutSuppressed: () => workspaceShortcutSuppressed,
   })
