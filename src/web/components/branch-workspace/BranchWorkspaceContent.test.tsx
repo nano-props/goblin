@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 
-import { act } from 'react'
+import { act, type ComponentProps } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { BranchWorkspaceContent } from '#/web/components/branch-workspace/BranchWorkspaceContent.tsx'
 import { BranchActionSurfaceContext } from '#/web/components/branch-workspace/branch-action-surface-context.ts'
 import { getSelectedBranchWorkspacePresentation } from '#/web/components/branch-workspace/model.ts'
+import { useBranchWorkspacePaneTabModel } from '#/web/components/branch-workspace/use-branch-workspace-pane-tab-model.ts'
 import type { BranchCopyPatchAction } from '#/web/hooks/branch-action-state.ts'
 import {
   TerminalSlotContext,
@@ -42,6 +43,16 @@ const REPO_ID = '/tmp/gbl-branch-workspace-content-repo'
 let container: HTMLDivElement | null = null
 let root: Root | null = null
 const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+
+type BranchWorkspaceContentHarnessProps = Omit<
+  ComponentProps<typeof BranchWorkspaceContent>,
+  'workspacePaneTabModel'
+>
+
+function BranchWorkspaceContentHarness(props: BranchWorkspaceContentHarnessProps) {
+  const workspacePaneTabModel = useBranchWorkspacePaneTabModel(props.repo, props.detail)
+  return <BranchWorkspaceContent {...props} workspacePaneTabModel={workspacePaneTabModel} />
+}
 
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
@@ -136,7 +147,7 @@ describe('BranchWorkspaceContent', () => {
               onSelect: onCopyPatch,
             })}
           >
-            <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
+            <BranchWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
           </BranchActionSurfaceContext.Provider>
         </TerminalSlotReadContext.Provider>,
       )
@@ -196,7 +207,7 @@ describe('BranchWorkspaceContent', () => {
               onSelect: onCopyPatch,
             })}
           >
-            <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
+            <BranchWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
           </BranchActionSurfaceContext.Provider>
         </TerminalSlotReadContext.Provider>,
       )
@@ -254,7 +265,7 @@ describe('BranchWorkspaceContent', () => {
               onSelect: vi.fn(),
             })}
           >
-            <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
+            <BranchWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
           </BranchActionSurfaceContext.Provider>
         </TerminalSlotReadContext.Provider>,
       )
@@ -304,7 +315,7 @@ describe('BranchWorkspaceContent', () => {
               onSelect: vi.fn(),
             })}
           >
-            <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
+            <BranchWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
           </BranchActionSurfaceContext.Provider>
         </TerminalSlotReadContext.Provider>,
       )
@@ -347,7 +358,7 @@ describe('BranchWorkspaceContent', () => {
       root!.render(
         <TerminalSlotReadContext.Provider value={emptyTerminalReadContext}>
           <BranchActionSurfaceContext.Provider value={defaultBranchActionSurface()}>
-            <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
+            <BranchWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
           </BranchActionSurfaceContext.Provider>
         </TerminalSlotReadContext.Provider>,
       )
@@ -384,7 +395,7 @@ describe('BranchWorkspaceContent', () => {
       root!.render(
         <TerminalSlotReadContext.Provider value={emptyTerminalReadContext}>
           <BranchActionSurfaceContext.Provider value={defaultBranchActionSurface()}>
-            <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
+            <BranchWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
           </BranchActionSurfaceContext.Provider>
         </TerminalSlotReadContext.Provider>,
       )
@@ -417,7 +428,7 @@ describe('BranchWorkspaceContent', () => {
     act(() => {
       root!.render(
         <TerminalSlotReadContext.Provider value={emptyTerminalReadContext}>
-          <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
+          <BranchWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
         </TerminalSlotReadContext.Provider>,
       )
     })
@@ -440,7 +451,7 @@ describe('BranchWorkspaceContent', () => {
       root!.render(
         <TerminalSlotReadContext.Provider value={emptyTerminalReadContext}>
           <BranchActionSurfaceContext.Provider value={defaultBranchActionSurface()}>
-            <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
+            <BranchWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
           </BranchActionSurfaceContext.Provider>
         </TerminalSlotReadContext.Provider>,
       )
@@ -470,7 +481,7 @@ describe('BranchWorkspaceContent', () => {
       root!.render(
         <TerminalSlotReadContext.Provider value={emptyTerminalReadContext}>
           <BranchActionSurfaceContext.Provider value={defaultBranchActionSurface()}>
-            <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
+            <BranchWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
           </BranchActionSurfaceContext.Provider>
         </TerminalSlotReadContext.Provider>,
       )
@@ -512,7 +523,7 @@ describe('BranchWorkspaceContent', () => {
       root!.render(
         <TerminalSlotContext.Provider value={terminalCommandContextWith({ registerHost })}>
           <TerminalSlotReadContext.Provider value={readContext}>
-            <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
+            <BranchWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
           </TerminalSlotReadContext.Provider>
         </TerminalSlotContext.Provider>,
       )
@@ -560,7 +571,7 @@ describe('BranchWorkspaceContent', () => {
     render(
       <TerminalSlotContext.Provider value={terminalCommandContextWith({ registerHost })}>
         <TerminalSlotReadContext.Provider value={readContext}>
-          <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
+          <BranchWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
         </TerminalSlotReadContext.Provider>
       </TerminalSlotContext.Provider>,
     )
@@ -597,7 +608,7 @@ describe('BranchWorkspaceContent', () => {
       root!.render(
         <TerminalSlotContext.Provider value={terminalCommandContextWith({ createTerminal, registerHost })}>
           <TerminalSlotReadContext.Provider value={readContext}>
-            <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
+            <BranchWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
           </TerminalSlotReadContext.Provider>
         </TerminalSlotContext.Provider>,
       )
@@ -644,7 +655,7 @@ describe('BranchWorkspaceContent', () => {
       root!.render(
         <TerminalSlotContext.Provider value={terminalCommandContextWith({ registerHost })}>
           <TerminalSlotReadContext.Provider value={readContext}>
-            <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
+            <BranchWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
           </TerminalSlotReadContext.Provider>
         </TerminalSlotContext.Provider>,
       )
@@ -672,7 +683,7 @@ describe('BranchWorkspaceContent', () => {
       root!.render(
         <TerminalSlotReadContext.Provider value={emptyTerminalReadContext}>
           <BranchActionSurfaceContext.Provider value={defaultBranchActionSurface()}>
-            <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
+            <BranchWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
           </BranchActionSurfaceContext.Provider>
         </TerminalSlotReadContext.Provider>,
       )
@@ -714,7 +725,7 @@ describe('BranchWorkspaceContent', () => {
     act(() => {
       root!.render(
         <TerminalSlotReadContext.Provider value={emptyTerminalReadContext}>
-          <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
+          <BranchWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
         </TerminalSlotReadContext.Provider>,
       )
     })
@@ -768,7 +779,7 @@ describe('BranchWorkspaceContent', () => {
     act(() => {
       root!.render(
         <TerminalSlotReadContext.Provider value={emptyTerminalReadContext}>
-          <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
+          <BranchWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
         </TerminalSlotReadContext.Provider>,
       )
     })
@@ -793,7 +804,7 @@ describe('BranchWorkspaceContent', () => {
     act(() => {
       root!.render(
         <TerminalSlotReadContext.Provider value={emptyTerminalReadContext}>
-          <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
+          <BranchWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
         </TerminalSlotReadContext.Provider>,
       )
     })

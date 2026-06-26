@@ -101,5 +101,6 @@ export function workspacePaneTabTargetForBranch(
     terminalCreatePending: snapshot?.pendingCreate ?? false,
     terminalSyncReady,
     lastClosedTabContext: repo.ui.lastClosedTabContextByBranch[branchName] ?? null,
+    selectedTerminalKey: worktreeKey ? (state.selectedTerminalByWorktree[worktreeKey] ?? null) : null,
   })
 }

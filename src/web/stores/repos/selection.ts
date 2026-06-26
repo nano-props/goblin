@@ -56,6 +56,23 @@ type RuntimeCoherentSelectionActions = Pick<
   | 'clearSelectedBranch'
 >
 
+function clearLastClosedTabContextForBranch(
+  set: ReposSet,
+  get: ReposGet,
+  id: string,
+  branchName?: string,
+): void {
+  const branch = branchName ?? get().repos[id]?.ui.selectedBranch
+  if (!branch) return
+  set((s) => {
+    const repo = s.repos[id]
+    if (!repo || !repo.ui.lastClosedTabContextByBranch[branch]) return s
+    return replaceRepoState(s, repo, (r) => {
+      delete r.ui.lastClosedTabContextByBranch[branch]
+    })
+  })
+}
+
 function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet): RestorableWorkspaceSelectionActions {
   return {
     setActive(id: string) {
@@ -175,6 +192,7 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
           r.ui.workspacePaneTabOrderByBranch = workspacePaneTabOrderRecordWith(r.ui, branch, next)
         })
       })
+      clearLastClosedTabContextForBranch(set, get, id, branchName)
     },
 
     closeWorkspacePaneStaticView(id: string, tab: WorkspacePaneStaticViewType, branchName?: string) {
@@ -189,6 +207,7 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
           r.ui.workspacePaneTabOrderByBranch = workspacePaneTabOrderRecordWith(r.ui, branch, next)
         })
       })
+      clearLastClosedTabContextForBranch(set, get, id, branchName)
     },
 
     addWorkspacePaneTerminalTab(id: string, terminalKey: string, branchName?: string) {
@@ -203,6 +222,7 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
           r.ui.workspacePaneTabOrderByBranch = workspacePaneTabOrderRecordWith(r.ui, branch, next)
         })
       })
+      clearLastClosedTabContextForBranch(set, get, id, branchName)
     },
 
     removeWorkspacePaneTerminalTab(id: string, terminalKey: string, branchName?: string) {
@@ -217,6 +237,7 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
           r.ui.workspacePaneTabOrderByBranch = workspacePaneTabOrderRecordWith(r.ui, branch, next)
         })
       })
+      clearLastClosedTabContextForBranch(set, get, id, branchName)
     },
 
     reorderWorkspacePaneTabs(id: string, orderedTabs: WorkspacePaneTabOrderEntry[], branchName?: string) {
@@ -240,12 +261,13 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
           r.ui.workspacePaneTabOrderByBranch = workspacePaneTabOrderRecordWith(r.ui, branch, nextOrder)
         })
       })
+      clearLastClosedTabContextForBranch(set, get, id, branchName)
     },
 
     setLastClosedTabContext(
       id: string,
       branchName: string,
-      context: { closingIdentity: string; previousTabIdentities: readonly string[] },
+      context: { closingIdentity: string; previousTabIdentities: readonly string[]; wasActive?: boolean },
     ) {
       set((s) => {
         const repo = s.repos[id]
@@ -254,6 +276,7 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
         if (
           current &&
           current.closingIdentity === context.closingIdentity &&
+          current.wasActive === context.wasActive &&
           current.previousTabIdentities.length === context.previousTabIdentities.length &&
           current.previousTabIdentities.every((id, i) => id === context.previousTabIdentities[i])
         ) {
@@ -263,6 +286,7 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
           r.ui.lastClosedTabContextByBranch[branchName] = {
             closingIdentity: context.closingIdentity,
             previousTabIdentities: context.previousTabIdentities as string[],
+            wasActive: context.wasActive,
           }
         })
       })
@@ -314,6 +338,7 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
       })
       if (!changed || token === undefined) return
       const repo = get().repos[id]
+      clearLastClosedTabContextForBranch(set, get, id)
       afterSelectionChange(
         id,
         token,

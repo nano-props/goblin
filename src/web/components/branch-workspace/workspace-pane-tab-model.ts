@@ -34,7 +34,6 @@ export interface BranchWorkspacePaneTerminalTab extends BranchWorkspacePaneTabBa
   kind: 'terminal'
   view: TerminalWorkspacePaneTabView
   key: string
-  selected: boolean
 }
 
 export interface BranchWorkspacePanePendingTab extends BranchWorkspacePaneTabBase {
@@ -68,6 +67,8 @@ export interface BranchWorkspacePaneTabModel {
   worktreePath: string | null
   worktreeTerminalKey: string | null
   terminalBase: TerminalSlotBase | null
+  terminalCreatePending: boolean
+  terminalSyncReady: boolean
   /** Single branch-scoped workspace pane tab strip order. */
   tabOrder: WorkspacePaneTabOrderEntry[]
   /** Open static workspace pane views derived from tabOrder. */
@@ -106,7 +107,16 @@ export interface BranchWorkspacePaneTabModelInput {
   lastClosedTabContext: {
     closingIdentity: string
     previousTabIdentities: readonly string[]
+    wasActive?: boolean
   } | null
+  /**
+   * Selected terminal slot key for the current worktree from the repos store.
+   * The model uses this as the canonical source for which terminal tab is
+   * active, making the workspace pane tab model the single authority for
+   * workspace tab selection. When null (no worktree or no explicit selection),
+   * the model falls back to the first available terminal tab.
+   */
+  selectedTerminalKey: string | null
 }
 
 export function createBranchWorkspacePaneTabModel(
@@ -124,7 +134,9 @@ export function createBranchWorkspacePaneTabModel(
     terminalCreatePending: input.terminalCreatePending,
     terminalSyncReady: input.terminalSyncReady,
   })
-  const materializedActiveTab = candidateView ? activeBranchWorkspacePaneTab(materializedTabs, candidateView) : null
+  const materializedActiveTab = candidateView
+    ? activeBranchWorkspacePaneTab(materializedTabs, candidateView, input.selectedTerminalKey)
+    : null
   const selection = workspacePaneSelection(
     candidateView,
     materializedActiveTab,
@@ -142,6 +154,8 @@ export function createBranchWorkspacePaneTabModel(
     worktreeTerminalKey: worktreeKey,
     terminalBase:
       input.branchName && worktreePath ? { repoRoot: input.repoId, branch: input.branchName, worktreePath } : null,
+    terminalCreatePending: input.terminalCreatePending ?? false,
+    terminalSyncReady: input.terminalSyncReady,
     tabOrder,
     staticViews,
     terminalViews,
@@ -195,7 +209,6 @@ function terminalWorkspacePaneTab(view: TerminalWorkspacePaneTabView): BranchWor
     kind: 'terminal',
     view,
     key: view.key,
-    selected: view.selected,
   }
 }
 
@@ -261,8 +274,23 @@ function workspacePaneSelection(
   renderableView: WorkspacePaneView | null,
   activeTab: BranchWorkspacePaneMaterializedTab | null,
   materializedTabs: readonly BranchWorkspacePaneMaterializedTab[],
-  lastClosedTabContext: { closingIdentity: string; previousTabIdentities: readonly string[] } | null,
+  lastClosedTabContext: { closingIdentity: string; previousTabIdentities: readonly string[]; wasActive?: boolean } | null,
 ): BranchWorkspacePaneSelection | null {
+  // User-initiated close of the active tab: prefer the spatial neighbor in the
+  // tab strip even if the user's preferred view is still renderable through
+  // another tab. Without this, closing the rightmost terminal when another
+  // terminal exists would let the terminal runtime's selection jump over
+  // intervening static tabs to a different terminal.
+  if (lastClosedTabContext?.wasActive) {
+    const neighborIdentity = adjacentIdentityAfterClose(
+      lastClosedTabContext.previousTabIdentities,
+      lastClosedTabContext.closingIdentity,
+    )
+    if (neighborIdentity) {
+      const neighbor = materializedTabs.find((tab) => tab.identity === neighborIdentity)
+      if (neighbor) return { kind: 'materialized-tab', view: neighbor.type, tab: neighbor }
+    }
+  }
   if (activeTab) return { kind: 'materialized-tab', view: activeTab.type, tab: activeTab }
   // Terminal-host is reserved for the "actively waiting" states — the user
   // wants the terminal view but no terminal session exists yet, so we keep
@@ -272,8 +300,8 @@ function workspacePaneSelection(
   if (renderableView === 'terminal') {
     return { kind: 'terminal-host', view: 'terminal', tab: null }
   }
-  // User-initiated close: when the user just closed a tab AND the preferred
-  // view became unrenderable as a result, prefer the spatial neighbor from
+  // User-initiated close of a background tab, or the preferred view became
+  // unrenderable as a result of the close: prefer the spatial neighbor from
   // the pre-close tab order. Falls back to the generic tabs[0] lookup below
   // if no neighbor exists or the neighbor was removed by a subsequent action.
   if (lastClosedTabContext) {
@@ -313,13 +341,14 @@ function adjacentIdentityAfterClose(
 function activeBranchWorkspacePaneTab(
   tabs: readonly BranchWorkspacePaneMaterializedTab[],
   renderableView: WorkspacePaneView,
+  selectedTerminalKey: string | null,
 ): BranchWorkspacePaneMaterializedTab | null {
   if (renderableView === 'terminal') {
-    return (
-      tabs.find((tab) => tab.kind === 'terminal' && tab.selected) ??
-      tabs.find((tab) => tab.kind === 'terminal') ??
-      null
-    )
+    if (selectedTerminalKey) {
+      const selected = tabs.find((tab) => tab.kind === 'terminal' && tab.key === selectedTerminalKey)
+      if (selected) return selected
+    }
+    return tabs.find((tab) => tab.kind === 'terminal') ?? null
   }
   return tabs.find((tab) => tab.type === renderableView) ?? null
 }

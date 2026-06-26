@@ -472,6 +472,7 @@ describe('workspace commands', () => {
       .toEqual({
         closingIdentity: 'terminal:slot-1',
         previousTabIdentities: ['status:status', 'terminal:slot-1'],
+        wasActive: true,
       })
     expect(closeWindow).not.toHaveBeenCalled()
   })
@@ -483,6 +484,7 @@ describe('workspace commands', () => {
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneView: 'terminal',
     })
+    useReposStore.getState().setSelectedTerminal(WORKTREE_KEY, 'slot-2')
     const closeTerminalByDescriptor = vi.fn(async () => true)
     const closeWindow = vi.fn()
     setTerminalSlotCommandBridge({
@@ -537,6 +539,7 @@ describe('workspace commands', () => {
       .toEqual({
         closingIdentity: 'status:status',
         previousTabIdentities: ['status:status', 'terminal:slot-1'],
+        wasActive: true,
       })
     expect(closeWindow).not.toHaveBeenCalled()
   })
@@ -578,6 +581,7 @@ describe('workspace commands', () => {
       .toEqual({
         closingIdentity: 'changes:changes',
         previousTabIdentities: ['status:status', 'terminal:slot-1', 'changes:changes'],
+        wasActive: true,
       })
     expect(closeWindow).not.toHaveBeenCalled()
   })
@@ -622,6 +626,7 @@ describe('workspace commands', () => {
       .toEqual({
         closingIdentity: 'terminal:slot-1',
         previousTabIdentities: ['status:status', 'terminal:slot-1', 'changes:changes'],
+        wasActive: true,
       })
     expect(closeWindow).not.toHaveBeenCalled()
   })
