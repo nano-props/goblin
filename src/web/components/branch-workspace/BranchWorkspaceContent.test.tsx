@@ -2,6 +2,7 @@
 
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { BranchWorkspaceContent } from '#/web/components/branch-workspace/BranchWorkspaceContent.tsx'
 import { BranchActionSurfaceContext } from '#/web/components/branch-workspace/branch-action-surface-context.ts'
@@ -23,6 +24,7 @@ import {
   resetReposStore,
   seedRepoState,
 } from '#/web/stores/repos/test-utils.ts'
+import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import type { WorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
 import { workspacePaneStaticTabOrderEntry, workspacePaneTerminalTabOrderEntry } from '#/shared/workspace-pane.ts'
@@ -55,6 +57,7 @@ afterEach(() => {
   act(() => {
     root?.unmount()
   })
+  cleanup()
   container?.remove()
   root = null
   container = null
@@ -522,6 +525,48 @@ describe('BranchWorkspaceContent', () => {
     expect(container?.querySelector('.goblin-terminal-slot__host')).not.toBeNull()
     expect(container?.textContent).toContain('terminal.opening')
     expect(container?.textContent).not.toContain('workspace-pane-views.empty')
+    expect(registerHost).toHaveBeenCalledWith(worktreeKey, expect.any(HTMLDivElement))
+  })
+
+  test('mounts the terminal slot while terminal creation is pending after every tab was closed', () => {
+    const worktreePath = '/tmp/terminal-pending-empty-strip-worktree'
+    const worktreeKey = `${REPO_ID}\0${worktreePath}`
+    const branchName = 'feature/terminal-pending-empty-strip'
+    const seededRepo = seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch(branchName, { worktree: { path: worktreePath } })],
+      selectedBranch: branchName,
+      preferredWorkspacePaneView: 'terminal',
+      workspacePaneTabOrderByBranch: { [branchName]: [] },
+    })
+    useRepoSyncStore.getState().markReady(REPO_ID, seededRepo.instanceToken)
+    useReposStore.getState().setLastClosedTabContext(REPO_ID, branchName, {
+      closingIdentity: 'status:status',
+      previousTabIdentities: ['status:status'],
+    })
+    const repo = useReposStore.getState().repos[REPO_ID]!
+    const detail = getSelectedBranchWorkspacePresentation(repo)
+    const registerHost = vi.fn()
+    const worktreeSnapshot: WorktreeTerminalSnapshot = {
+      ...emptyWorktreeSnapshot,
+      worktreeTerminalKey: worktreeKey,
+      pendingCreate: true,
+    }
+    const readContext: TerminalSlotReadContextValue = {
+      ...emptyTerminalReadContext,
+      worktreeSnapshot: () => worktreeSnapshot,
+    }
+
+    render(
+      <TerminalSlotContext.Provider value={terminalCommandContextWith({ registerHost })}>
+        <TerminalSlotReadContext.Provider value={readContext}>
+          <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
+        </TerminalSlotReadContext.Provider>
+      </TerminalSlotContext.Provider>,
+    )
+
+    expect(screen.getByRole('tabpanel').id).toBe('workspace-terminal-panel')
+    expect(screen.queryByText('workspace-pane-views.empty')).toBeNull()
     expect(registerHost).toHaveBeenCalledWith(worktreeKey, expect.any(HTMLDivElement))
   })
 
