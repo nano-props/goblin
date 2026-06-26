@@ -118,9 +118,9 @@ describe('g command cli', () => {
       expect(io.stdout).toHaveBeenCalledWith('Created goblin.toml')
       expect(postJson).not.toHaveBeenCalled()
       const config = await readFile(path.join(tmp, 'goblin.toml'), 'utf8')
-      expect(config.startsWith('# AI assistants:')).toBe(true)
-      expect(config).toContain('Add a [worktree] table')
-      expect(config).toContain('Use repo-relative paths only')
+      expect(config.startsWith('# Configure worktree bootstrap')).toBe(true)
+      expect(config).toContain('Add [worktree]')
+      expect(config).toContain('Paths are repo-relative.')
       expect(config).not.toContain('\n[worktree]')
     } finally {
       process.chdir(previousCwd)

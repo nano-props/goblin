@@ -4,9 +4,9 @@ import type { GoblinCommand, GoblinCommandContext } from '#/server/g-command/con
 
 const CONFIG_FILE = 'goblin.toml'
 
-const INITIAL_CONFIG = `# AI assistants: use this file only for local worktree bootstrap rules.
-# Add a [worktree] table with copy, symlink, hardlink, exclude, and setup when needed.
-# Use repo-relative paths only. Do not include secrets, .git, or dependency directories.
+const INITIAL_CONFIG = `# Configure worktree bootstrap for this repo.
+# Add [worktree] with copy, symlink, hardlink, exclude, and setup when needed.
+# Paths are repo-relative.
 `
 
 export const INIT_COMMAND: GoblinCommand = {

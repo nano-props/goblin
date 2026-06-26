@@ -6,7 +6,7 @@ Use this doc for repo-configured file materialization and post-create setup when
 
 - Let a repo declare which local-only paths should appear in a new worktree.
 - Let a repo declare a single setup command to run after the worktree is created.
-- Keep the config explicit, small, and safe.
+- Keep the config explicit, small, and predictable.
 - Support `copy`, `symlink`, `hardlink`, `exclude`, and `setup`.
 
 ## Config
@@ -55,15 +55,15 @@ setup = "bun install"
 - `exclude`: removes matches from all materialization sets.
 - `setup`: a single shell command string, executed once in the new worktree root after materialization.
 
-## Safety
+## Constraints
 
-- Never touch `.git` or `.git/**`.
-- Never allow paths to escape the repo root.
-- Never overwrite an existing destination path.
+- `.git` paths are reserved.
+- Paths are repo-relative.
+- Existing destination paths are left unchanged; bootstrap fails instead of overwriting.
 - Missing source paths are skipped and reported.
 - If one concrete path matches more than one of `copy`, `symlink`, or `hardlink`, fail the bootstrap as a config error.
 - Bootstrap failure does not roll back files already created in the new worktree.
-- `setup` runs an arbitrary command on the user's machine; treat `goblin.toml` as trusted input only.
+- `setup` runs exactly as written.
 
 ## v1 bias
 
@@ -72,4 +72,4 @@ setup = "bun install"
 - `setup` is a single string; multi-step workflows should use shell composition (`&&`, `;`).
 - Do not infer rules from untracked files.
 - Do not turn worktree create into a general sync engine.
-- For large dependency directories like `node_modules`, do not list them in `copy` / `symlink` / `hardlink` at all. Let `setup` run the package manager install instead; path-based modes do not fit package-manager-owned trees.
+- Let `setup` handle package-manager-owned trees such as `node_modules`.
