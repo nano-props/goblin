@@ -64,6 +64,15 @@ describe('settings snapshot partitions', () => {
       },
       globalShortcutRegistered: false,
       recentRepos: [{ kind: 'local', id: '/tmp/repo-b' }],
+      repoSettings: [
+        {
+          repoId: '/tmp/repo-b',
+          worktreeBootstrapTrust: {
+            configHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+            trustedAt: '2026-01-01T00:00:00.000Z',
+          },
+        },
+      ],
       session: {
         openRepos: [{ kind: 'local', id: '/tmp/repo-b' }],
         activeRepo: '/tmp/repo-b',
@@ -96,5 +105,14 @@ describe('settings snapshot partitions', () => {
         },
       },
     })
+    expect(snapshot.repoSettings).toEqual([
+      {
+        repoId: '/tmp/repo-b',
+        worktreeBootstrapTrust: {
+          configHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          trustedAt: '2026-01-01T00:00:00.000Z',
+        },
+      },
+    ])
   })
 })

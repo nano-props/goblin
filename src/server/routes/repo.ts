@@ -7,6 +7,7 @@ import {
   getRepositoryPullRequests,
   getRepositorySnapshot,
   getRepositoryStatus,
+  getRepositoryWorktreeBootstrapPreview,
   probeRepository,
 } from '#/server/modules/repo-read-paths.ts'
 import {
@@ -79,6 +80,16 @@ export function createRepoRoutes() {
     const { cwd } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.getRemoteBranches, c)
     return c.json(await jsonOr(() => getRepositoryRemoteBranches(cwd, c.req.raw.signal), [], 'remote-branches'))
   })
+  app.post('/worktree-bootstrap-preview', async (c) => {
+    const { cwd } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.worktreeBootstrapPreview, c)
+    return c.json(
+      await jsonOr(
+        () => getRepositoryWorktreeBootstrapPreview(cwd, c.req.raw.signal),
+        { ok: false as const, message: 'error.failed-read-repo' },
+        'worktree-bootstrap-preview',
+      ),
+    )
+  })
   app.post('/patch', async (c) => {
     const { cwd, worktreePath } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.patch, c)
     return c.json(await jsonOr(() => getRepositoryPatch(cwd, worktreePath, c.req.raw.signal), READ_REPO_ERROR, 'patch'))
@@ -143,10 +154,16 @@ export function createRepoRoutes() {
     )
   })
   app.post('/create-worktree', async (c) => {
-    const { cwd, worktreePath, mode, sourceToken } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.createWorktree, c)
+    const { cwd, worktreePath, mode, sourceToken, worktreeBootstrap } = await parseHttpBody(
+      REPO_PROCEDURE_SCHEMAS.createWorktree,
+      c,
+    )
     return c.json(
       await jsonOr(
-        () => createRepositoryWorktree(cwd, { worktreePath, mode }, c.req.raw.signal, sourceToken),
+        () =>
+          createRepositoryWorktree(cwd, { worktreePath, mode }, c.req.raw.signal, sourceToken, {
+            worktreeBootstrap,
+          }),
         READ_REPO_ERROR,
         'create-worktree',
       ),

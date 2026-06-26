@@ -105,10 +105,7 @@ export async function setI18nPref(pref: LangPref): Promise<I18nSnapshot> {
 
 export async function getGitHubCliState(hosts?: string[]): Promise<GitHubCliState> {
   const filtered = hosts?.filter((host) => host.trim().length > 0)
-  return await postServerJson(
-    '/api/settings/github-cli',
-    filtered && filtered.length > 0 ? { hosts: filtered } : {},
-  )
+  return await postServerJson('/api/settings/github-cli', filtered && filtered.length > 0 ? { hosts: filtered } : {})
 }
 
 export async function refreshGitHubCliState(hosts?: string[]): Promise<GitHubCliState> {

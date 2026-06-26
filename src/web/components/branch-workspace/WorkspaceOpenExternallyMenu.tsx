@@ -30,7 +30,6 @@ interface Props {
 
 export function WorkspaceOpenExternallyMenu({ repo, branch, branchActions }: Props) {
   const t = useT()
-  const worktreePath = branch.worktree?.path
   const [open, setOpen] = useState(false)
   const contentRef = useRef<HTMLDivElement>(null)
   const { pending, run } = useAsyncPending<string>()
@@ -60,7 +59,7 @@ export function WorkspaceOpenExternallyMenu({ repo, branch, branchActions }: Pro
     [recentItemId, localItems],
   )
 
-  if (!worktreePath || (localItems.length === 0 && !remoteOpenAction.visible)) return null
+  if (localItems.length === 0 && !remoteOpenAction.visible) return null
 
   const busy = pending !== null || blocked
   const menuLabel = t('workspace.open-externally.open')

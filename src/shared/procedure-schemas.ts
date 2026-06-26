@@ -15,12 +15,18 @@ import {
   RemoteTargetSchema,
 } from '#/shared/api-types.ts'
 import { NativeShellProjectionSchema } from '#/shared/native-shell-projection.ts'
+import { WORKTREE_BOOTSTRAP_CONFIG_HASH_RE } from '#/shared/repo-settings.ts'
 import { isRemoteRepoId, parseRemoteRepoId } from '#/shared/remote-repo.ts'
 
 const SourceToken = v.optional(v.string())
 const StringArray = v.array(v.string())
 const TerminalAppSchema = v.picklist(['ghostty', 'terminal', 'windowsTerminal'])
 const EditorAppSchema = v.picklist(['vscode', 'cursor', 'windsurf'])
+const WorktreeBootstrapConfigHashSchema = v.pipe(v.string(), v.regex(WORKTREE_BOOTSTRAP_CONFIG_HASH_RE))
+const WorktreeBootstrapDecisionSchema = v.variant('kind', [
+  v.object({ kind: v.literal('skip') }),
+  v.object({ kind: v.literal('run'), configHash: WorktreeBootstrapConfigHashSchema, rememberTrust: v.boolean() }),
+])
 
 const RemoteRepoRefSchema = v.object({
   id: v.string(),
@@ -63,9 +69,11 @@ export const REPO_PROCEDURE_SCHEMAS = {
       v.object({ kind: v.literal('existingBranch'), branch: v.string() }),
       v.object({ kind: v.literal('trackRemoteBranch'), remoteRef: v.string(), localBranch: v.string() }),
     ]),
+    worktreeBootstrap: WorktreeBootstrapDecisionSchema,
     sourceToken: SourceToken,
   }),
   getRemoteBranches: CwdInput,
+  worktreeBootstrapPreview: CwdInput,
   deleteBranch: v.object({
     cwd: v.string(),
     branch: v.string(),
@@ -160,9 +168,7 @@ const SessionStateSchema = v.object({
     v.string(),
     v.record(
       v.string(),
-      v.array(
-        v.union([WorkspacePaneStaticTabOrderEntrySchema, WorkspacePaneTerminalTabOrderEntrySchema]),
-      ),
+      v.array(v.union([WorkspacePaneStaticTabOrderEntrySchema, WorkspacePaneTerminalTabOrderEntrySchema])),
     ),
   ),
 })

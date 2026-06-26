@@ -10,6 +10,7 @@ export const EMBEDDED_SERVER_IPC_ROUTES = {
   'repo.deleteBranch': { route: '/api/repo/delete-branch', method: 'POST' },
   'repo.removeWorktree': { route: '/api/repo/remove-worktree', method: 'POST' },
   'repo.createWorktree': { route: '/api/repo/create-worktree', method: 'POST' },
+  'repo.worktreeBootstrapPreview': { route: '/api/repo/worktree-bootstrap-preview', method: 'POST' },
   'repo.remoteBranches': { route: '/api/repo/remote-branches', method: 'POST' },
   'repo.pull': { route: '/api/repo/pull', method: 'POST' },
   'repo.push': { route: '/api/repo/push', method: 'POST' },

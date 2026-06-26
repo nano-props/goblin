@@ -37,7 +37,7 @@ export interface RepoResultEventOptions {
 }
 
 export type RepoEvent =
-  | { id: number; kind: 'result'; result: { ok: boolean; message: string }; action?: RepoEventAction }
+  | { id: number; kind: 'result'; result: ExecResult; action?: RepoEventAction }
   | { id: number; kind: 'error'; message: string }
 
 /** Discriminated union: a successful open guarantees `id`; a failed
@@ -240,11 +240,7 @@ export interface RuntimeCoherentRepoProjectionActions {
   closeWorkspacePaneStaticView: (id: string, tab: WorkspacePaneStaticViewType, branchName?: string) => void
   addWorkspacePaneTerminalTab: (id: string, terminalKey: string, branchName?: string) => void
   removeWorkspacePaneTerminalTab: (id: string, terminalKey: string, branchName?: string) => void
-  reorderWorkspacePaneTabs: (
-    id: string,
-    orderedTabs: WorkspacePaneTabOrderEntry[],
-    branchName?: string,
-  ) => void
+  reorderWorkspacePaneTabs: (id: string, orderedTabs: WorkspacePaneTabOrderEntry[], branchName?: string) => void
   /** Records the most recent user-initiated close on a branch so the
    *  workspace pane tab model can prefer the spatial neighbor of the
    *  closed tab when the preferred view becomes unrenderable. The pre-close
@@ -272,12 +268,7 @@ export interface RuntimeCoherentRepoProjectionActions {
   refreshStatus: (id: string, options?: { token?: number }) => Promise<void>
   refreshCoreData: (id: string, options?: { token?: number }) => Promise<void>
   syncAndRefresh: (id: string, options?: { token?: number }) => Promise<void>
-  setLastResult: (
-    id: string,
-    result: { ok: boolean; message: string },
-    token: number,
-    options?: RepoResultEventOptions,
-  ) => void
+  setLastResult: (id: string, result: ExecResult, token: number, options?: RepoResultEventOptions) => void
   clearEvents: (id: string, eventIds: number[]) => void
   hydrateSession: (
     openRepos: RepoSessionEntry[],

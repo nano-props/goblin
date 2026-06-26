@@ -20,6 +20,7 @@ import { AnimateHeight } from '#/web/components/ui/animate-height.tsx'
 import { Input } from '#/web/components/ui/input.tsx'
 import { RemotePathSuggestions } from '#/web/components/ui/remote-path-suggestions.tsx'
 import { ToggleGroup, ToggleGroupItem } from '#/web/components/ui/toggle-group.tsx'
+import { ConfirmCheckbox } from '#/web/components/ConfirmCheckbox.tsx'
 import { useRemotePathSuggestions } from '#/web/hooks/useRemotePathSuggestions.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { remoteRepoTarget } from '#/web/stores/repos/helpers.ts'
@@ -32,6 +33,7 @@ import {
   type CreateWorktreeDialogMode,
   type CreateWorktreeRequest,
 } from '#/web/components/create-worktree-dialog/create-worktree-dialog.logic.ts'
+import type { WorktreeBootstrapPreview } from '#/shared/worktree-bootstrap-summary.ts'
 
 const MODE_OPTIONS = [
   { id: 'newBranch', labelKey: 'action.create-worktree-mode-new', icon: GitBranchPlus },
@@ -42,11 +44,21 @@ const MODE_OPTIONS = [
 interface Props {
   open: boolean
   repo: RepoState
+  worktreeBootstrap?: WorktreeBootstrapPromptState
   onClose: () => void
-  onCreate: (request: CreateWorktreeRequest) => void | Promise<void>
+  onCreate: (request: CreateWorktreeRequest) => boolean | void | Promise<boolean | void>
 }
 
-export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
+interface WorktreeBootstrapPromptState {
+  loading: boolean
+  preview: WorktreeBootstrapPreview | null
+  error: boolean
+  trusted: boolean
+  rememberTrust: boolean
+  onRememberTrustChange: (remember: boolean) => void
+}
+
+export function CreateWorktreeDialog({ open, repo, worktreeBootstrap, onClose, onCreate }: Props) {
   const t = useT()
   const compact = useIsCompactUi()
 
@@ -59,6 +71,7 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
   const [worktreePath, setWorktreePath] = useState('')
   const [remoteBranches, setRemoteBranches] = useState<string[]>([])
   const [remoteBranchesLoading, setRemoteBranchesLoading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
 
   // Reset on the rising edge of `open` only. A guard ref prevents snapshot
   // refreshes (which change repo.data.branches / currentBranch) from wiping
@@ -79,6 +92,7 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
     setWorktreePath('')
     setRemoteBranches([])
     setRemoteBranchesLoading(false)
+    setSubmitting(false)
   }, [open, repo.data.branches, repo.data.currentBranch])
 
   // Lazy-load remote-tracking branches the first time the user switches
@@ -112,13 +126,21 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
   )
 
   const branchActionBusy = repo.operations.branchAction.phase !== 'idle'
-  const canSubmit = !!derived.input && derived.validPath && !branchActionBusy
+  const bootstrapBusy = worktreeBootstrap?.loading === true
+  const canSubmit = !!derived.input && derived.validPath && !branchActionBusy && !bootstrapBusy && !submitting
 
-  function handleSubmit() {
+  async function handleSubmit(): Promise<void> {
     const nextInput = derived.input
-    if (!nextInput || branchActionBusy) return
-    void onCreate({ input: nextInput })
-    onClose()
+    if (!nextInput || branchActionBusy || bootstrapBusy || submitting) return
+    setSubmitting(true)
+    let shouldClose = false
+    try {
+      const result = await onCreate({ input: nextInput })
+      shouldClose = result !== false
+    } finally {
+      setSubmitting(false)
+    }
+    if (shouldClose) onClose()
   }
 
   const remotePathSuggestions = useRemotePathSuggestions({
@@ -141,7 +163,7 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
         className="space-y-3"
         onSubmit={(e) => {
           e.preventDefault()
-          handleSubmit()
+          void handleSubmit()
         }}
       >
         <Field className="gap-2">
@@ -338,6 +360,9 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
             {derived.pathHintText}
           </FieldDescription>
         </Field>
+
+        <WorktreeBootstrapTrustCheckbox state={worktreeBootstrap} />
+
         <DialogFooter className="gap-2 pt-2">
           <Button type="button" variant="outline" className={cn(compact && 'w-full')} onClick={onClose}>
             {t('dialog.cancel')}
@@ -348,5 +373,20 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
         </DialogFooter>
       </form>
     </FormDialog>
+  )
+}
+
+function WorktreeBootstrapTrustCheckbox({ state }: { state: WorktreeBootstrapPromptState | undefined }) {
+  const t = useT()
+  const preview = state?.preview ?? null
+  const showPrompt = !state?.loading && !state?.error && !state?.trusted && preview?.hasOperations && preview.configHash
+  if (!state || !showPrompt) return null
+
+  return (
+    <div className="pt-0.5 text-sm">
+      <ConfirmCheckbox checked={state.rememberTrust} onCheckedChange={state.onRememberTrustChange}>
+        {t('action.create-worktree-bootstrap-remember')}
+      </ConfirmCheckbox>
+    </div>
   )
 }

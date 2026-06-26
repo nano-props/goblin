@@ -2,6 +2,7 @@ import type { QueryClient } from '@tanstack/react-query'
 import type {
   ExternalAppsSnapshot,
   GitHubCliState,
+  RepoSettingsState,
   RuntimeRecentReposState,
   RuntimeSettingsSnapshot,
   SessionState,
@@ -55,6 +56,13 @@ export function updateRestorableSessionStateCache(queryClient: QueryClient, sess
   updateSettingsSnapshotCache(queryClient, (current) => ({
     ...current,
     session,
+  }))
+}
+
+export function updateRepoSettingsStateCache(queryClient: QueryClient, next: RepoSettingsState): void {
+  updateSettingsSnapshotCache(queryClient, (current) => ({
+    ...current,
+    repoSettings: next.repoSettings,
   }))
 }
 

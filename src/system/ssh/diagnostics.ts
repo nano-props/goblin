@@ -33,7 +33,7 @@ export async function testRemoteRepository(
   const shell = await run({ type: 'checkShell' }, target, runOptions)
   if (!shell.ok) return failDiagnosticAt(target, stages, 0, classifySshFailure(shell), shell)
   stages[0] = { ...stages[0]!, status: 'passed' }
-  if (shell.stdout.trim() !== 'ok') {
+  if (!hasOkMarker(shell.stdout)) {
     return failDiagnosticAt(target, stages, 1, 'shell-failed', { ...shell, message: 'shell-failed' })
   }
   stages[1] = { ...stages[1]!, status: 'passed' }
@@ -128,6 +128,10 @@ function createStages(): RemoteDiagnosticStage[] {
     label: name,
     status: 'pending',
   }))
+}
+
+function hasOkMarker(stdout: string): boolean {
+  return stdout.split(/\r?\n/).some((line) => line.trim() === 'ok')
 }
 
 /** Mark `stages[failedIndex]` as failed with the given category and

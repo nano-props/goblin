@@ -6,6 +6,7 @@ import type { ExecResult, LogEntry, PullRequestFetchMode, WorktreeStatus } from 
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import type { ProbeResult } from '#/shared/api-types.ts'
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
+import type { WorktreeBootstrapDecision, WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
 
 export async function probeRepository(cwd: string, signal?: AbortSignal): Promise<ProbeResult> {
   return await postServerJson('/api/repo/probe', { cwd }, { signal })
@@ -57,11 +58,7 @@ export async function getRepositoryPullRequests(
   options?: { mode?: PullRequestFetchMode },
   signal?: AbortSignal,
 ): Promise<PullRequestEntry[] | null> {
-  return await postServerJson(
-    '/api/repo/pull-requests',
-    { cwd, branches, mode: options?.mode },
-    { signal },
-  )
+  return await postServerJson('/api/repo/pull-requests', { cwd, branches, mode: options?.mode }, { signal })
 }
 
 export async function abortRepositoryOperation(cwd: string): Promise<boolean> {
@@ -99,10 +96,22 @@ export async function pushRepositoryBranch(
 export async function createRepositoryWorktree(
   cwd: string,
   input: CreateWorktreeInput,
+  worktreeBootstrap: WorktreeBootstrapDecision,
   signal?: AbortSignal,
   sourceToken?: string,
 ): Promise<ExecResult> {
-  return await postServerJson('/api/repo/create-worktree', { cwd, ...input, sourceToken }, { signal })
+  return await postServerJson(
+    '/api/repo/create-worktree',
+    { cwd, ...input, sourceToken, worktreeBootstrap },
+    { signal },
+  )
+}
+
+export async function getRepositoryWorktreeBootstrapPreview(
+  cwd: string,
+  signal?: AbortSignal,
+): Promise<WorktreeBootstrapPreviewResult> {
+  return await postServerJson('/api/repo/worktree-bootstrap-preview', { cwd }, { signal })
 }
 
 export async function deleteRepositoryBranch(
