@@ -8,7 +8,6 @@ export type BranchActionItemId =
   | 'copyPatch'
   | 'pull'
   | 'push'
-  | 'remote'
   | 'deleteBranch'
   | 'removeWorktree'
 

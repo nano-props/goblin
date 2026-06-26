@@ -77,6 +77,7 @@ export function Layout() {
     openRepoPathDialog: overlays.openRepoPathDialog,
     openCloneRepo: overlays.openCloneRepo,
     openRemoteRepo: overlays.openRemoteRepo,
+    openCreateWorktree: overlays.openCreateWorktree,
     isOverlayOpen: () => modalOpen,
     isWorkspaceShortcutSuppressed: () => workspaceShortcutsSuppressed,
   })
@@ -88,6 +89,7 @@ export function Layout() {
     isWorkspaceShortcutSuppressed: () => workspaceShortcutsSuppressed,
     isSettingsOpen: () => isSettingsOpen,
     onExitSettings: () => void navigate({ to: '/app' }),
+    openCreateWorktree: overlays.openCreateWorktree,
   })
 
   const repoDrop = useRepoDrop({ blocked: modalOpen })

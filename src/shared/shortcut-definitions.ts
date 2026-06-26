@@ -1,7 +1,7 @@
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { DictKey } from '#/shared/i18n/dictionaries.ts'
 
-export type BranchActionShortcutAction = 'pull' | 'push' | 'remote'
+export type BranchActionShortcutAction = 'pull' | 'push'
 export type ClientNavigationShortcutAction =
   | 'next-branch'
   | 'prev-branch'
@@ -15,6 +15,7 @@ export type ClientKeyboardShortcutAction =
 export type ClientMenuCommandId =
   | 'app-settings'
   | 'file-new-terminal-tab'
+  | 'file-create-worktree'
   | 'file-open-local-repo'
   | 'file-open-local-repo-path'
   | 'file-clone-repo'
@@ -87,7 +88,6 @@ export const CLIENT_NAVIGATION_SHORTCUTS: ClientKeyboardShortcutDefinition<Clien
 export const BRANCH_ACTION_SHORTCUTS: BranchActionShortcutDefinition[] = [
   branchActionShortcut([{ code: 'KeyP', shiftKey: false }], 'pull', [['p']], 'action.pull'),
   branchActionShortcut([{ code: 'KeyP', shiftKey: true }], 'push', [['⇧', 'P']], 'action.push'),
-  branchActionShortcut([{ code: 'KeyG', shiftKey: true }], 'remote', [['⇧', 'G']], 'action.remote'),
 ]
 
 export const CLIENT_APP_SHORTCUTS: ClientKeyboardShortcutDefinition<ClientAppShortcutAction>[] = [
@@ -97,7 +97,8 @@ export const CLIENT_APP_SHORTCUTS: ClientKeyboardShortcutDefinition<ClientAppSho
 
 export const SETTINGS_SHORTCUT_MAC = 'Cmd+,'
 export const SETTINGS_SHORTCUT_NON_MAC = 'Ctrl+,'
-export const NEW_TERMINAL_TAB_SHORTCUT = 'CmdOrCtrl+N'
+export const NEW_TERMINAL_TAB_SHORTCUT = 'CmdOrCtrl+T'
+export const CREATE_WORKTREE_SHORTCUT = 'CmdOrCtrl+N'
 export const CLOSE_WORKSPACE_TAB_OR_WINDOW_SHORTCUT = 'CmdOrCtrl+W'
 export const CLOSE_REPO_SHORTCUT = 'CmdOrCtrl+Shift+W'
 
@@ -118,6 +119,15 @@ export const CLIENT_MENU_COMMANDS: ClientMenuCommandDefinition[] = [
     {
       helpLabelKey: 'help.row.new-terminal',
       accelerator: NEW_TERMINAL_TAB_SHORTCUT,
+    },
+  ),
+  clientMenuCommand(
+    'file-create-worktree',
+    'menu.file.create-worktree',
+    { type: 'create-worktree-requested' },
+    {
+      helpLabelKey: 'help.row.create-worktree',
+      accelerator: CREATE_WORKTREE_SHORTCUT,
     },
   ),
   clientMenuCommand(
@@ -250,6 +260,7 @@ export const CLIENT_MENU_COMMANDS: ClientMenuCommandDefinition[] = [
 
 export const APP_SHORTCUTS: AcceleratorShortcutDefinition[] = clientMenuAcceleratorShortcuts([
   'file-new-terminal-tab',
+  'file-create-worktree',
   'file-open-local-repo',
   'file-clone-repo',
   'view-refresh',

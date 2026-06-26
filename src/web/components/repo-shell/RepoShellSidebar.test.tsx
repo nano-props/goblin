@@ -43,10 +43,14 @@ describe('RepoShellSidebar', () => {
   test('renders sidebar actions before the branch content without growing action rows', () => {
     render(<RepoShellSidebar repoId={REPO_ID} compact={false} branchContent={<div data-testid="branch-content" />} />)
 
+    const sidebarTop = document.body.querySelector<HTMLElement>('[data-testid="repo-shell-sidebar-top"]')
+    expect(sidebarTop?.dataset.windowChromeRegion).toBe('drag')
+    expect(sidebarTop?.querySelector('[data-window-chrome-region="no-drag"]')).toBeNull()
+
     const repoPicker = document.body.querySelector('[data-testid="repo-picker-host"]')
     expect(repoPicker).not.toBeNull()
 
-    const createWorktree = document.body.querySelector('button[aria-label="action.create-worktree-title"]')
+    const createWorktree = document.body.querySelector('[data-testid="create-worktree-button"]')
     if (!(createWorktree instanceof HTMLButtonElement)) throw new Error('missing create worktree button')
     expect(createWorktree.className).toContain('shrink-0')
     expect(createWorktree.className).not.toContain('flex-1')
@@ -66,7 +70,7 @@ describe('RepoShellSidebar', () => {
 
     expect(document.body.querySelector('[data-testid="repo-picker-host"]')).not.toBeNull()
 
-    const createWorktree = document.body.querySelector('button[aria-label="action.create-worktree-title"]')
+    const createWorktree = document.body.querySelector('[data-testid="create-worktree-button"]')
     expect(createWorktree).toBeNull()
 
     const branchTitle = [...document.body.querySelectorAll('div')].find(
@@ -76,6 +80,33 @@ describe('RepoShellSidebar', () => {
 
     const settings = document.body.querySelector('button[aria-label="app-chrome.settings"]')
     expect(settings).not.toBeNull()
+  })
+
+  test('renders focus reveal top chrome as draggable without owning focus-toggle geometry', () => {
+    render(<RepoShellSidebar repoId={REPO_ID} compact={false} branchContent={<div data-testid="branch-content" />} />)
+
+    const sidebarTop = document.body.querySelector<HTMLElement>('[data-testid="repo-shell-sidebar-top"]')
+    expect(sidebarTop?.dataset.windowChromeRegion).toBe('drag')
+    expect(sidebarTop?.className).toContain('window-chrome')
+    expect(sidebarTop?.className).not.toContain('relative')
+    expect(sidebarTop?.querySelector('[data-window-chrome-region="no-drag"]')).toBeNull()
+    expect(sidebarTop?.hasAttribute('data-interactive')).toBe(false)
+  })
+
+  test('can render the top chrome as neutral when the docked sidebar is collapsed', () => {
+    render(
+      <RepoShellSidebar
+        repoId={REPO_ID}
+        compact={false}
+        chromeRegion="none"
+        branchContent={<div data-testid="branch-content" />}
+      />,
+    )
+
+    const sidebarTop = document.body.querySelector<HTMLElement>('[data-testid="repo-shell-sidebar-top"]')
+    expect(sidebarTop?.dataset.windowChromeRegion).toBeUndefined()
+    expect(sidebarTop?.querySelector('[data-window-chrome-region="no-drag"]')).toBeNull()
+    expect(sidebarTop?.hasAttribute('data-interactive')).toBe(false)
   })
 })
 

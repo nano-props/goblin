@@ -41,6 +41,7 @@ test('initializes server-settings.json with defaults when no persisted settings 
     activeRepo: null,
   })
   expect(await mod.getServerRecentRepos()).toEqual([])
+  expect(await mod.getServerRepoSettings()).toEqual([])
   mod.resetServerSettingsSourceForTests()
   vi.resetModules()
   const reloaded = await import('#/server/modules/settings-source.ts')
@@ -79,6 +80,10 @@ test('persists updates and notifies subscribers from the server settings store',
     },
   })
   await mod.addServerRecentRepo({ kind: 'local', id: '/repo-b' })
+  await mod.trustServerRepoWorktreeBootstrapConfig({
+    repoId: '/repo-b',
+    configHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  })
   unsubscribe()
 
   expect(sec).toBe(42)
@@ -108,6 +113,46 @@ test('persists updates and notifies subscribers from the server settings store',
     },
   })
   expect(await reloaded.getServerRecentRepos()).toEqual([{ kind: 'local', id: '/repo-b' }])
+  expect(await reloaded.getServerRepoSettings()).toEqual([
+    {
+      repoId: '/repo-b',
+      worktreeBootstrapTrust: {
+        configHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        trustedAt: expect.any(String),
+      },
+    },
+  ])
+})
+
+test('updates repo-level worktree bootstrap trust by repo id', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+
+  const mod = await import('#/server/modules/settings-source.ts')
+
+  await mod.trustServerRepoWorktreeBootstrapConfig({
+    repoId: '/repo-a',
+    configHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  })
+  await mod.trustServerRepoWorktreeBootstrapConfig({
+    repoId: '/repo-a',
+    configHash: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+  })
+  await mod.trustServerRepoWorktreeBootstrapConfig({
+    repoId: '/repo-b',
+    configHash: 'not-a-hash',
+  })
+
+  expect(await mod.getServerRepoSettings()).toEqual([
+    {
+      repoId: '/repo-a',
+      worktreeBootstrapTrust: {
+        configHash: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        trustedAt: expect.any(String),
+      },
+    },
+  ])
 })
 
 test('normalizes branch-scoped workspace pane view preferences in server sessions', async () => {

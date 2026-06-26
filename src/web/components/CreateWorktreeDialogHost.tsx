@@ -9,10 +9,16 @@
 // and the typed name is still there. Active repo switches still
 // close the dialog to match the previous per-repo trigger behaviour.
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { CreateWorktreeDialog } from '#/web/components/create-worktree-dialog/CreateWorktreeDialog.tsx'
 import type { CreateWorktreeRequest } from '#/web/components/create-worktree-dialog/create-worktree-dialog.logic.ts'
+import { getRepositoryWorktreeBootstrapPreview } from '#/web/repo-client.ts'
+import { currentSettingsSnapshot } from '#/web/settings-read-projection.ts'
+import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
+import { isRepoWorktreeBootstrapConfigTrusted } from '#/shared/repo-settings.ts'
+import type { SettingsSnapshot } from '#/shared/api-types.ts'
+import type { WorktreeBootstrapDecision, WorktreeBootstrapPreview } from '#/shared/worktree-bootstrap-summary.ts'
 
 interface Props {
   open: boolean
@@ -23,7 +29,19 @@ interface Props {
 export function CreateWorktreeDialogHost({ open, onOpenChange, activeId }: Props) {
   const repo = useReposStore((s) => (activeId ? s.repos[activeId] : undefined))
   const submitBranchAction = useReposStore((s) => s.submitBranchAction)
+  const [bootstrapPreview, setBootstrapPreview] = useState<WorktreeBootstrapPreview | null>(null)
+  const [bootstrapPreviewError, setBootstrapPreviewError] = useState(false)
+  const [bootstrapPreviewLoading, setBootstrapPreviewLoading] = useState(false)
+  const [rememberBootstrapTrust, setRememberBootstrapTrust] = useState(false)
+  const settingsSnapshot = useCurrentSettingsSnapshot()
   const previousActiveIdRef = useRef(activeId)
+
+  function resetBootstrapPreflightState(): void {
+    setBootstrapPreview(null)
+    setBootstrapPreviewError(false)
+    setBootstrapPreviewLoading(false)
+    setRememberBootstrapTrust(false)
+  }
 
   // Force-close when the active repo changes. Without this a
   // half-typed branch name from repo A could leak into a submission
@@ -31,25 +49,117 @@ export function CreateWorktreeDialogHost({ open, onOpenChange, activeId }: Props
   useEffect(() => {
     const previousActiveId = previousActiveIdRef.current
     previousActiveIdRef.current = activeId
-    if (previousActiveId !== activeId && open) onOpenChange(false)
+    if (previousActiveId !== activeId) {
+      resetBootstrapPreflightState()
+      if (open) onOpenChange(false)
+    }
   }, [activeId, onOpenChange, open])
+
+  const repoId = repo?.id ?? null
+  const repoToken = repo?.instanceToken ?? null
+
+  useEffect(() => {
+    if (!open || !repoId || repoToken === null) {
+      resetBootstrapPreflightState()
+      return
+    }
+
+    const controller = new AbortController()
+    let ignore = false
+    setBootstrapPreview(null)
+    setBootstrapPreviewError(false)
+    setBootstrapPreviewLoading(true)
+    setRememberBootstrapTrust(false)
+
+    void getRepositoryWorktreeBootstrapPreview(repoId, controller.signal)
+      .then((result) => {
+        if (ignore) return
+        setBootstrapPreview(result.ok ? result.preview : null)
+        setBootstrapPreviewError(!result.ok)
+      })
+      .catch(() => {
+        if (ignore) return
+        setBootstrapPreview(null)
+        setBootstrapPreviewError(true)
+      })
+      .finally(() => {
+        if (ignore) return
+        setBootstrapPreviewLoading(false)
+      })
+    return () => {
+      ignore = true
+      controller.abort()
+    }
+  }, [open, repoId, repoToken])
 
   if (!repo) return null
 
-  function handleCreateWorktree(request: CreateWorktreeRequest): void {
+  function submitCreateWorktree(
+    repoId: string,
+    token: number,
+    request: CreateWorktreeRequest,
+    worktreeBootstrap: WorktreeBootstrapDecision,
+  ): boolean {
+    const currentRepo = useReposStore.getState().repos[repoId]
+    if (!currentRepo || currentRepo.instanceToken !== token) return false
+    if (currentRepo.operations.branchAction.phase !== 'idle') return false
+    submitBranchAction(
+      repoId,
+      { kind: 'createWorktree', input: request.input, worktreeBootstrap },
+      { token, refreshOnError: false },
+    )
+    return true
+  }
+
+  function handleCreateWorktree(request: CreateWorktreeRequest): boolean {
     // TypeScript narrows `repo` to non-null in the render body, but not inside
     // a nested function. The early return is a no-op at runtime because the
     // host already bails out above; it just satisfies the type checker.
-    if (!repo) return
-    if (repo.operations.branchAction.phase !== 'idle') return
-    submitBranchAction(
-      repo.id,
-      { kind: 'createWorktree', input: request.input },
-      { token: repo.instanceToken, refreshOnError: false },
-    )
+    if (!repo) return false
+    if (repo.operations.branchAction.phase !== 'idle' || bootstrapPreviewLoading) return false
+    const repoId = repo.id
+    const token = repo.instanceToken
+
+    const worktreeBootstrap = resolveWorktreeBootstrapDecision(repoId)
+    return submitCreateWorktree(repoId, token, request, worktreeBootstrap)
   }
 
+  function resolveWorktreeBootstrapDecision(repoId: string): WorktreeBootstrapDecision {
+    const configHash = bootstrapPreview?.hasOperations ? bootstrapPreview.configHash : null
+    if (!configHash) return { kind: 'skip' }
+    if (isCurrentBootstrapConfigTrusted(repoId, configHash)) return { kind: 'run', configHash, rememberTrust: false }
+    return { kind: 'run', configHash, rememberTrust: rememberBootstrapTrust }
+  }
+
+  function isCurrentBootstrapConfigTrusted(repoId: string, configHash: string | null | undefined): boolean {
+    return isRepoWorktreeBootstrapConfigTrusted(settingsSnapshot?.repoSettings ?? [], repoId, configHash)
+  }
+
+  const bootstrapConfigHash = bootstrapPreview?.configHash ?? null
+  const bootstrapTrusted = isCurrentBootstrapConfigTrusted(repo.id, bootstrapConfigHash)
+
   return (
-    <CreateWorktreeDialog open={open} repo={repo} onClose={() => onOpenChange(false)} onCreate={handleCreateWorktree} />
+    <CreateWorktreeDialog
+      open={open}
+      repo={repo}
+      worktreeBootstrap={{
+        loading: bootstrapPreviewLoading,
+        preview: bootstrapPreview,
+        error: bootstrapPreviewError,
+        trusted: bootstrapTrusted,
+        rememberTrust: rememberBootstrapTrust,
+        onRememberTrustChange: setRememberBootstrapTrust,
+      }}
+      onClose={() => onOpenChange(false)}
+      onCreate={handleCreateWorktree}
+    />
+  )
+}
+
+function useCurrentSettingsSnapshot(): SettingsSnapshot | undefined {
+  return useSyncExternalStore(
+    (onChange) => mainWindowQueryClient.getQueryCache().subscribe(() => onChange()),
+    currentSettingsSnapshot,
+    currentSettingsSnapshot,
   )
 }

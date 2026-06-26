@@ -4,7 +4,11 @@ import { act } from 'react'
 import type { ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
-import { WindowChromeDragRegion, WindowChromeInteractiveRegion } from '#/web/components/window-chrome-region.tsx'
+import {
+  WindowChromeDragRegion,
+  WindowChromeInteractiveRegion,
+  WindowChromeNoDragRegion,
+} from '#/web/components/window-chrome-region.tsx'
 
 let container: HTMLDivElement | null = null
 let root: Root | null = null
@@ -68,6 +72,28 @@ describe('window chrome regions', () => {
     expect(interactive?.dataset.windowChromeRegion).toBe('interactive')
     expect(interactive?.hasAttribute('data-interactive')).toBe(true)
     expect(interactive?.className).toContain('h-full')
+  })
+
+  test('marks a passive no-drag carve-out without making it interactive', () => {
+    render(<WindowChromeNoDragRegion data-testid="no-drag" className="size-8" />)
+
+    const noDrag = element('[data-testid="no-drag"]')
+    expect(noDrag?.dataset.windowChromeRegion).toBe('no-drag')
+    expect(noDrag?.hasAttribute('data-interactive')).toBe(false)
+    expect(noDrag?.className).toContain('size-8')
+  })
+
+  test('can mark a child component root as a passive no-drag carve-out', () => {
+    render(
+      <WindowChromeNoDragRegion asChild>
+        <div data-testid="no-drag-child" className="absolute" />
+      </WindowChromeNoDragRegion>,
+    )
+
+    const noDrag = element('[data-testid="no-drag-child"]')
+    expect(noDrag?.dataset.windowChromeRegion).toBe('no-drag')
+    expect(noDrag?.hasAttribute('data-interactive')).toBe(false)
+    expect(noDrag?.className).toContain('absolute')
   })
 })
 

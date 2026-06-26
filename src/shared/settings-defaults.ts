@@ -1,12 +1,6 @@
 import { DEFAULT_GLOBAL_SHORTCUT } from '#/shared/accelerator.ts'
 import { DEFAULT_COLOR_THEME, type ColorTheme } from '#/shared/color-theme.ts'
-import type {
-  LangPref,
-  SessionState,
-  SettingsPrefs,
-  SettingsSnapshot,
-  ThemePref,
-} from '#/shared/api-types.ts'
+import type { LangPref, SessionState, SettingsPrefs, SettingsSnapshot, ThemePref } from '#/shared/api-types.ts'
 import { DEFAULT_WORKSPACE_FOCUSED, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
 
 export const DEFAULT_FETCH_INTERVAL_SEC = 120
@@ -50,6 +44,7 @@ export function defaultSettingsSnapshot(overrides: Partial<SettingsSnapshot> = {
     globalShortcutRegistered: overrides.globalShortcutRegistered ?? false,
     session: overrides.session ?? defaultSessionState(),
     recentRepos: overrides.recentRepos ?? [],
+    repoSettings: overrides.repoSettings ?? [],
   }
 }
 

@@ -20,6 +20,7 @@ type AddRecentRepoResult = {
 const appDataClientMocks = vi.hoisted(() => ({
   addRecentRepo: vi.fn<() => Promise<AddRecentRepoResult>>(async () => ({ recentRepos: [], addedRepo: null })),
   clearRecentRepos: vi.fn(async () => {}),
+  getSettingsSnapshot: vi.fn(),
   refreshExternalAppsSnapshot: vi.fn(async () => ({
     terminal: {
       available: false,
@@ -50,6 +51,7 @@ const appDataClientMocks = vi.hoisted(() => ({
 vi.mock('#/web/settings-client.ts', () => ({
   addRecentRepo: appDataClientMocks.addRecentRepo,
   clearRecentRepos: appDataClientMocks.clearRecentRepos,
+  getSettingsSnapshot: appDataClientMocks.getSettingsSnapshot,
   refreshExternalAppsSnapshot: appDataClientMocks.refreshExternalAppsSnapshot,
   refreshGitHubCliState: appDataClientMocks.refreshGitHubCliState,
   saveSession: appDataClientMocks.saveSession,
@@ -68,6 +70,8 @@ describe('settings write paths', () => {
     appDataClientMocks.addRecentRepo.mockResolvedValue({ recentRepos: [], addedRepo: null })
     appDataClientMocks.clearRecentRepos.mockReset()
     appDataClientMocks.clearRecentRepos.mockResolvedValue(undefined)
+    appDataClientMocks.getSettingsSnapshot.mockReset()
+    appDataClientMocks.getSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())
     appDataClientMocks.refreshExternalAppsSnapshot.mockReset()
     appDataClientMocks.refreshExternalAppsSnapshot.mockResolvedValue({
       terminal: {

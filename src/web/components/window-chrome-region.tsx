@@ -2,6 +2,10 @@ import { Slot } from 'radix-ui'
 import { forwardRef, type ComponentPropsWithoutRef } from 'react'
 import { cn } from '#/web/lib/cn.ts'
 
+// Electron folds app-region rectangles in DOM order: drag rectangles are
+// unioned, then later no-drag rectangles are subtracted. Render broad drag
+// surfaces before interactive controls that must cut through them.
+
 interface WindowChromeDragRegionProps extends ComponentPropsWithoutRef<'div'> {
   reserveWindowControls?: boolean
 }
@@ -27,5 +31,16 @@ export const WindowChromeInteractiveRegion = forwardRef<HTMLDivElement, WindowCh
   function WindowChromeInteractiveRegion({ asChild = false, ...props }, ref) {
     const Comp = asChild ? Slot.Root : 'div'
     return <Comp ref={ref} {...props} data-interactive data-window-chrome-region="interactive" />
+  },
+)
+
+interface WindowChromeNoDragRegionProps extends ComponentPropsWithoutRef<'div'> {
+  asChild?: boolean
+}
+
+export const WindowChromeNoDragRegion = forwardRef<HTMLDivElement, WindowChromeNoDragRegionProps>(
+  function WindowChromeNoDragRegion({ asChild = false, ...props }, ref) {
+    const Comp = asChild ? Slot.Root : 'div'
+    return <Comp ref={ref} {...props} data-window-chrome-region="no-drag" />
   },
 )

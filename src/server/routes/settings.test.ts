@@ -166,7 +166,12 @@ describe('settings routes', () => {
   })
 
   test('delegates github-cli detection to the server module, scoping by hosts when provided', async () => {
-    const state = { available: true, version: '2.93.0', detectedAt: 1, hosts: { 'github.example.com': { authed: true } } }
+    const state = {
+      available: true,
+      version: '2.93.0',
+      detectedAt: 1,
+      hosts: { 'github.example.com': { authed: true } },
+    }
     mocks.getServerGitHubCliState.mockResolvedValue(state)
     const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
     const app = createSettingsRoutes(createServerSettingsState())

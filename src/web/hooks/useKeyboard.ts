@@ -4,7 +4,9 @@
 // Shortcuts wired through the Electron application menu are forwarded
 // as typed IPC events. Numbered workspace tab shortcuts are handled
 // here in the capture phase so terminal focus cannot swallow them;
-// Cmd/Ctrl+N and Cmd/Ctrl+W use this DOM path only in the web runtime.
+// Cmd/Ctrl+T (new terminal tab), Cmd/Ctrl+N (create worktree) and
+// Cmd/Ctrl+W (close workspace tab or window) use this DOM path only in
+// the web runtime.
 //
 // Modal awareness: when an overlay/dialog/menu is open every shortcut
 // is suppressed — including `?`, otherwise pressing it with Settings
@@ -30,6 +32,7 @@ import {
 } from '#/web/commands/workspace-commands.ts'
 import { getClientBridge } from '#/web/client-bridge.ts'
 import { translate } from '#/web/stores/i18n.ts'
+import { toast } from 'sonner'
 
 type MoveDirection = 1 | -1
 const INTERACTIVE_SHORTCUT_TARGET_SELECTOR =
@@ -43,6 +46,7 @@ interface Options {
   isWorkspaceShortcutSuppressed: () => boolean
   isSettingsOpen: () => boolean
   onExitSettings: () => void
+  openCreateWorktree: () => void
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -109,6 +113,7 @@ export function useKeyboard({
   isWorkspaceShortcutSuppressed,
   isSettingsOpen,
   onExitSettings,
+  openCreateWorktree,
 }: Options) {
   // Stash the latest closures in refs so the effect deps can be `[]` —
   // otherwise React adds + removes the window listener on every App
@@ -118,11 +123,13 @@ export function useKeyboard({
   const isSettingsOpenRef = useRef(isSettingsOpen)
   const onExitSettingsRef = useRef(onExitSettings)
   const currentRepoIdRef = useRef(currentRepoId)
+  const openCreateWorktreeRef = useRef(openCreateWorktree)
   onShowHelpRef.current = onShowHelp
   isWorkspaceShortcutSuppressedRef.current = isWorkspaceShortcutSuppressed
   isSettingsOpenRef.current = isSettingsOpen
   onExitSettingsRef.current = onExitSettings
   currentRepoIdRef.current = currentRepoId
+  openCreateWorktreeRef.current = openCreateWorktree
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -143,9 +150,20 @@ export function useKeyboard({
       if (primaryModifierPressed(e) && !e.altKey && !workspaceShortcutsSuppressed) {
         const repoId = currentRepoIdRef.current
         const menuBackedShortcut = hasNativeMenuAccelerators()
-        if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyN') {
+        if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyT') {
           e.preventDefault()
           void runNewTerminalTabCommand({ repoId, navigation, t: translate })
+          return
+        }
+        if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyN') {
+          e.preventDefault()
+          const repo = repoId ? useReposStore.getState().repos[repoId] : null
+          if (!repo) return
+          if (repo.operations.branchAction.phase === 'idle') {
+            openCreateWorktreeRef.current()
+          } else {
+            toast.error(translate('action.create-worktree-busy'))
+          }
           return
         }
         if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyW') {
@@ -189,8 +207,7 @@ export function useKeyboard({
           break
         }
         case 'pull':
-        case 'push':
-        case 'remote': {
+        case 'push': {
           if (overlayOpen || !repo || !repo.ui.selectedBranch) break
           e.preventDefault()
           runBranchActionShortcut(action)

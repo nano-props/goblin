@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   pullRepositoryBranch: vi.fn(),
   pushRepositoryBranch: vi.fn(),
   createRepositoryWorktree: vi.fn(),
+  getRepositoryWorktreeBootstrapPreview: vi.fn(),
   deleteRepositoryBranch: vi.fn(),
   removeRepositoryWorktree: vi.fn(),
   openRepositoryRemote: vi.fn(),
@@ -40,6 +41,7 @@ vi.mock('#/server/modules/repo-read-paths.ts', () => ({
   getRepositoryPatch: mocks.getRepositoryPatch,
   getRepositoryPullRequests: mocks.getRepositoryPullRequests,
   getRepositoryComposite: mocks.getRepositoryComposite,
+  getRepositoryWorktreeBootstrapPreview: mocks.getRepositoryWorktreeBootstrapPreview,
 }))
 vi.mock('#/server/modules/repo-write-paths.ts', () => ({
   cloneRepository: mocks.cloneRepository,
@@ -127,6 +129,34 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ ok: true, root: '/tmp/repo', name: 'repo' })
     expect(mocks.probeRepository).toHaveBeenCalledWith('/tmp/repo')
+  })
+
+  test('passes worktree bootstrap preview requests through to the module layer', async () => {
+    mocks.getRepositoryWorktreeBootstrapPreview.mockResolvedValueOnce({
+      ok: true,
+      preview: {
+        hasConfig: false,
+        hasOperations: false,
+        configHash: null,
+        copyCount: 0,
+        symlinkCount: 0,
+        hardlinkCount: 0,
+        excludeCount: 0,
+      },
+    })
+    const app = createRepoRoutes()
+
+    const response = await app.request(
+      new Request('http://localhost/worktree-bootstrap-preview', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: '/tmp/repo' }),
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ ok: true, preview: { hasOperations: false } })
+    expect(mocks.getRepositoryWorktreeBootstrapPreview).toHaveBeenCalledWith('/tmp/repo', expect.any(AbortSignal))
   })
 
   test('passes an array of branches through the body to the module layer', async () => {

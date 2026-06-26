@@ -58,6 +58,19 @@ describe('WorkspaceFocusToggle', () => {
     expect(useReposStore.getState().workspaceFocused).toBe(true)
     expect(focusToggle()?.getAttribute('aria-pressed')).toBe('true')
   })
+
+  test('can own the window-chrome interactive surface without changing visual size', () => {
+    render(
+      <WorkspaceFocusToggle data-interactive data-window-chrome-region="interactive" className="pointer-events-auto" />,
+    )
+
+    expect(focusToggle()?.dataset.windowChromeRegion).toBe('interactive')
+    expect(focusToggle()?.hasAttribute('data-interactive')).toBe(true)
+    expect(focusToggle()?.dataset.size).toBe('icon-lg')
+    expect(focusToggle()?.className).toContain('pointer-events-auto')
+    expect(focusToggle()?.className).toContain('size-8')
+    expect(focusToggle()?.className).not.toContain('size-10')
+  })
 })
 
 function render(element: ReactNode) {

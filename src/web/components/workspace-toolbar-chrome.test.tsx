@@ -69,10 +69,12 @@ describe('WorkspaceToolbar', () => {
 
     const toolbar = workspaceToolbar()
     const spacer = container?.querySelector('[data-testid="workspace-toolbar-leading-spacer"]')
+    const noDrag = container?.querySelector<HTMLElement>('[data-testid="workspace-toolbar-leading-no-drag"]')
     expect(toolbar?.className).toContain('window-chrome')
     expect(toolbar?.dataset.windowChromeRegion).toBe('drag')
     expect(toolbar?.className).not.toContain('app-drag-region')
     expect(spacer?.className).toContain('goblin-workspace-toolbar__leading-spacer--reserved')
+    expect(noDrag?.dataset.windowChromeRegion).toBe('no-drag')
   })
 })
 

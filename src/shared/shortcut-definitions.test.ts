@@ -11,7 +11,7 @@ describe('shortcut definitions', () => {
     expect(matchBranchActionShortcut({ code: 'KeyP', shiftKey: false })).toBe('pull')
     expect(matchBranchActionShortcut({ code: 'KeyP', shiftKey: true })).toBe('push')
     expect(matchBranchActionShortcut({ code: 'KeyG', shiftKey: false })).toBeNull()
-    expect(matchBranchActionShortcut({ code: 'KeyG', shiftKey: true })).toBe('remote')
+    expect(matchBranchActionShortcut({ code: 'KeyG', shiftKey: true })).toBeNull()
     expect(matchBranchActionShortcut({ code: 'KeyV', shiftKey: false })).toBeNull()
     expect(matchBranchActionShortcut({ code: 'KeyV', shiftKey: true })).toBeNull()
   })
@@ -27,7 +27,8 @@ describe('shortcut definitions', () => {
   })
 
   test('resolves fixed close and workspace tab accelerators from shared definitions', () => {
-    expect(resolveClientMenuCommandAccelerator(clientMenuCommandById('file-new-terminal-tab'), {})).toBe('CmdOrCtrl+N')
+    expect(resolveClientMenuCommandAccelerator(clientMenuCommandById('file-new-terminal-tab'), {})).toBe('CmdOrCtrl+T')
+    expect(resolveClientMenuCommandAccelerator(clientMenuCommandById('file-create-worktree'), {})).toBe('CmdOrCtrl+N')
     expect(resolveClientMenuCommandAccelerator(clientMenuCommandById('file-close-workspace-tab-or-window'), {})).toBe(
       'CmdOrCtrl+W',
     )

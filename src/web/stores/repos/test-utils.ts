@@ -15,10 +15,7 @@ import type {
   TerminalSlotSummary,
   TerminalTakeoverResult,
 } from '#/shared/terminal-types.ts'
-import type {
-  WorkspacePaneTabOrderEntry,
-  WorkspacePaneView,
-} from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabOrderEntry, WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import type { BranchSnapshotInfo, PullRequestInfo, WorktreeStatus } from '#/web/types.ts'
 import type { RepoBranchState, RepoState } from '#/web/stores/repos/types.ts'
 import { DEFAULT_WORKSPACE_FOCUSED, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
@@ -434,6 +431,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         if (url.pathname === '/api/repo/pull') return call('repo.pull', body)
         if (url.pathname === '/api/repo/push') return call('repo.push', body)
         if (url.pathname === '/api/repo/create-worktree') return call('repo.createWorktree', body)
+        if (url.pathname === '/api/repo/worktree-bootstrap-preview') return call('repo.worktreeBootstrapPreview', body)
         if (url.pathname === '/api/repo/delete-branch') return call('repo.deleteBranch', body)
         if (url.pathname === '/api/repo/remove-worktree') return call('repo.removeWorktree', body)
         if (url.pathname === '/api/repo/open-remote') return call('repo.openRemote', body)

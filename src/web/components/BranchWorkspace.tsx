@@ -11,6 +11,7 @@ import { BranchWorkspaceContent } from '#/web/components/branch-workspace/Branch
 import { useBranchWorkspacePaneTabModel } from '#/web/components/branch-workspace/use-branch-workspace-pane-tab-model.ts'
 import { useBranchActionItems } from '#/web/hooks/useBranchActionItems.ts'
 import { useBranchActionShortcutRegistry } from '#/web/hooks/useBranchActionShortcutRegistry.ts'
+import { useBranchActions, type BranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { BranchActionSurfaceContext } from '#/web/components/branch-workspace/branch-action-surface-context.ts'
 interface Props {
   repoId: string
@@ -134,6 +135,7 @@ interface BranchWorkspacePaneProps {
   detail: SelectedBranchWorkspacePresentation
   workspacePaneId: string
   toolbarTrafficLightOffset?: boolean
+  branchActions?: BranchActions
 }
 
 function BranchWorkspacePane({
@@ -141,6 +143,7 @@ function BranchWorkspacePane({
   detail,
   workspacePaneId,
   toolbarTrafficLightOffset = false,
+  branchActions,
 }: BranchWorkspacePaneProps) {
   const workspacePaneTabModel = useBranchWorkspacePaneTabModel(repo, detail)
 
@@ -152,6 +155,7 @@ function BranchWorkspacePane({
         workspacePaneId={workspacePaneId}
         trafficLightOffset={toolbarTrafficLightOffset}
         workspacePaneTabModel={workspacePaneTabModel}
+        branchActions={branchActions}
       />
       <BranchWorkspaceContent
         repo={repo}
@@ -180,7 +184,8 @@ function BranchShortcutHandler({
   shortcutsEnabled,
   toolbarTrafficLightOffset = false,
 }: BranchShortcutHandlerProps) {
-  const actions = useBranchActionItems(repo, branch)
+  const branchActions = useBranchActions(repo, branch)
+  const actions = useBranchActionItems(repo, branch, branchActions)
   useBranchActionShortcutRegistry(actions, shortcutsEnabled)
 
   return (
@@ -190,6 +195,7 @@ function BranchShortcutHandler({
         detail={detail}
         workspacePaneId={workspacePaneId}
         toolbarTrafficLightOffset={toolbarTrafficLightOffset}
+        branchActions={branchActions}
       />
     </BranchActionSurfaceContext.Provider>
   )

@@ -1,3 +1,6 @@
+import os from 'node:os'
+import path from 'node:path'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { describe, expect, test, vi } from 'vitest'
 import { runGoblinCommand } from '#/server/g-command/cli.ts'
 import type { GoblinCommandIo, GoblinCommandTransport } from '#/server/g-command/context.ts'
@@ -6,7 +9,11 @@ type PostJsonFn = (pathname: string, body: unknown) => Promise<unknown>
 type StdoutFn = (message: string) => void
 type StderrFn = (message: string) => void
 
-function makeIo(): { io: GoblinCommandIo; stdout: ReturnType<typeof vi.fn<StdoutFn>>; stderr: ReturnType<typeof vi.fn<StderrFn>> } {
+function makeIo(): {
+  io: GoblinCommandIo
+  stdout: ReturnType<typeof vi.fn<StdoutFn>>
+  stderr: ReturnType<typeof vi.fn<StderrFn>>
+} {
   const stdout = vi.fn<StdoutFn>()
   const stderr = vi.fn<StderrFn>()
   return {
@@ -36,6 +43,7 @@ describe('g command cli', () => {
 
     expect(code).toBe(0)
     expect(io.stdout).toHaveBeenCalledWith(expect.stringContaining('g help'))
+    expect(io.stdout).toHaveBeenCalledWith(expect.stringContaining('g init'))
     expect(io.stdout).toHaveBeenCalledWith(expect.stringContaining('Open the changes tab'))
     expect(io.stdout).toHaveBeenCalledWith(expect.stringContaining('g st'))
     expect(io.stdout).toHaveBeenCalledWith(expect.stringContaining('g log'))
@@ -94,6 +102,53 @@ describe('g command cli', () => {
 
     expect(code).toBe(0)
     expect(postJson).toHaveBeenCalledWith('/api/repo/view', { tab: 'history' })
+  })
+
+  test('g init creates an empty commented goblin.toml in the current directory', async () => {
+    const { io } = makeIo()
+    const { transport, postJson } = makeTransport()
+    const tmp = await mkdtemp(path.join(os.tmpdir(), 'g-command-init-test-'))
+    const previousCwd = process.cwd()
+    try {
+      process.chdir(tmp)
+
+      const code = await runGoblinCommand(['init'], {}, io, transport)
+
+      expect(code).toBe(0)
+      expect(io.stdout).toHaveBeenCalledWith('Created goblin.toml')
+      expect(postJson).not.toHaveBeenCalled()
+      const config = await readFile(path.join(tmp, 'goblin.toml'), 'utf8')
+      expect(config.startsWith('# Configure worktree bootstrap')).toBe(true)
+      expect(config).toContain('Add [worktree]')
+      expect(config).toContain('Paths are repo-relative.')
+      expect(config).toContain('# Example:')
+      expect(config).toContain('#   setup = "bun install"')
+      expect(config).not.toContain('\n[worktree]')
+    } finally {
+      process.chdir(previousCwd)
+      await rm(tmp, { recursive: true, force: true })
+    }
+  })
+
+  test('g init refuses to overwrite an existing goblin.toml', async () => {
+    const { io } = makeIo()
+    const { transport, postJson } = makeTransport()
+    const tmp = await mkdtemp(path.join(os.tmpdir(), 'g-command-init-test-'))
+    const previousCwd = process.cwd()
+    try {
+      process.chdir(tmp)
+      await writeFile(path.join(tmp, 'goblin.toml'), 'existing\n')
+
+      const code = await runGoblinCommand(['init'], {}, io, transport)
+
+      expect(code).toBe(1)
+      expect(io.stderr).toHaveBeenCalledWith('g: goblin.toml exists')
+      expect(postJson).not.toHaveBeenCalled()
+      await expect(readFile(path.join(tmp, 'goblin.toml'), 'utf8')).resolves.toBe('existing\n')
+    } finally {
+      process.chdir(previousCwd)
+      await rm(tmp, { recursive: true, force: true })
+    }
   })
 
   test('rejects extra positional arguments for view commands', async () => {

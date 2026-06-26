@@ -27,6 +27,7 @@ interface ClientEffectIntentRouterOptions {
   openRepoPathDialog: () => void
   openCloneRepo: () => void
   openRemoteRepo: () => void
+  openCreateWorktree: () => void
   isOverlayOpen: () => boolean
   isWorkspaceShortcutSuppressed: () => boolean
 }
@@ -38,6 +39,7 @@ export function useClientEffectIntentRouter({
   openRepoPathDialog,
   openCloneRepo,
   openRemoteRepo,
+  openCreateWorktree,
   isOverlayOpen,
   isWorkspaceShortcutSuppressed,
 }: ClientEffectIntentRouterOptions) {
@@ -77,6 +79,7 @@ export function useClientEffectIntentRouter({
       openRepoPathDialog,
       openCloneRepo,
       openRemoteRepo,
+      openCreateWorktree,
       isOverlayOpen: () => isOverlayOpenRef.current(),
       isWorkspaceShortcutSuppressed: () => isWorkspaceShortcutSuppressedRef.current(),
       ensureWorkspaceOpen: async (input: string | RepoSessionEntry) => await ensureWorkspaceOpenRef.current(input),
@@ -132,6 +135,7 @@ export function useClientEffectIntentRouter({
     ensureWorkspaceOpen,
     openCloneRepo,
     openRemoteRepo,
+    openCreateWorktree,
     openRepoPathDialog,
     resetLayout,
     setSelectedTerminal,

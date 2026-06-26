@@ -74,4 +74,23 @@ describe('testRemoteRepository parallel stages', () => {
     expect(path.status).toBe('passed')
     expect(repo.status).toBe('passed')
   })
+
+  test('accepts an ok shell marker when stdout has surrounding text', async () => {
+    const run = vi.fn<(command: RemoteCommandKind) => Promise<RemoteCommandResult>>()
+    run.mockImplementation(async (command) => {
+      if (command.type === 'checkShell')
+        return { ok: true, stdout: 'profile notice\nok\nready', stderr: '', message: 'ok', timedOut: false }
+      if (command.type === 'checkGit')
+        return { ok: true, stdout: '/usr/bin/git', stderr: '', message: 'ok', timedOut: false }
+      if (command.type === 'testDirectory') return { ok: true, stdout: '', stderr: '', message: 'ok', timedOut: false }
+      if (command.type === 'revParseTopLevel')
+        return { ok: true, stdout: '/srv/repo', stderr: '', message: 'ok', timedOut: false }
+      return { ok: false, stdout: '', stderr: '', message: 'unexpected command', timedOut: false }
+    })
+
+    const result = await testRemoteRepository(target, { run })
+
+    expect(result.ok).toBe(true)
+    expect(result.stages.find((stage) => stage.name === 'shell')?.status).toBe('passed')
+  })
 })

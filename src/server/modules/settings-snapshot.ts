@@ -1,5 +1,6 @@
 import {
   getServerRecentRepos,
+  getServerRepoSettings,
   getServerSessionState,
   getServerSettingsPrefs,
 } from '#/server/modules/settings-source.ts'
@@ -14,5 +15,6 @@ export async function getSettingsSnapshot(state: ServerSettingsState): Promise<S
     globalShortcutRegistered: state.globalShortcutRegistered,
     session: await getServerSessionState(),
     recentRepos: await getServerRecentRepos(),
+    repoSettings: await getServerRepoSettings(),
   })
 }

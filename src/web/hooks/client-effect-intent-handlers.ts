@@ -40,6 +40,7 @@ interface SharedClientIntentDeps {
   openRepoPathDialog: () => void
   openCloneRepo: () => void
   openRemoteRepo: () => void
+  openCreateWorktree: () => void
   isOverlayOpen: () => boolean
   isWorkspaceShortcutSuppressed: () => boolean
   ensureWorkspaceOpen: (input: string | RepoSessionEntry) => Promise<OpenRepoResult>
@@ -143,6 +144,15 @@ export async function handleWorkspaceClientIntent(
     case 'open-remote-repo':
       deps.openRemoteRepo()
       return true
+    case 'create-worktree': {
+      if (!currentRepo) return true
+      if (currentRepo.operations.branchAction.phase !== 'idle') {
+        toast.error(deps.t('action.create-worktree-busy'))
+        return true
+      }
+      deps.openCreateWorktree()
+      return true
+    }
     case 'new-terminal-tab':
       return await runNewTerminalTabCommand({
         repoId: plan.repoId,

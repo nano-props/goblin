@@ -38,6 +38,9 @@ interface FocusModeSidebarRevealState {
 interface FocusModeSidebarRevealProps {
   repoId?: string
   open: boolean
+  // The panel can stay visually mounted while focus mode exits; only an
+  // interactive panel may own pointer handlers or native drag regions.
+  interactive: boolean
   sidebarSize: number
   onSidebarSizeChange: (sidebarSize: number) => void
   onSurfaceEnter: () => void
@@ -51,7 +54,16 @@ interface FocusModeSidebarRevealTriggerProps {
   onMouseLeave?: () => void
 }
 
-export function useFocusModeSidebarReveal(enabled: boolean): FocusModeSidebarRevealState {
+interface FocusModeSidebarChromeProps {
+  repoId?: string
+  focusToggleEnabled: boolean
+  revealEnabled: boolean
+  sidebarSize: number
+  onSidebarSizeChange: (sidebarSize: number) => void
+  onOpenSettings?: () => void
+}
+
+function useFocusModeSidebarReveal(enabled: boolean): FocusModeSidebarRevealState {
   const [open, setOpen] = useState(false)
   const [triggerArmed, setTriggerArmed] = useState(true)
   const previousEnabled = useRef(enabled)
@@ -125,27 +137,85 @@ export function useFocusModeSidebarReveal(enabled: boolean): FocusModeSidebarRev
   }
 }
 
-export function FocusModeSidebarRevealTrigger({
+export function FocusModeSidebarChrome({
+  repoId,
+  focusToggleEnabled,
+  revealEnabled,
+  sidebarSize,
+  onSidebarSizeChange,
+  onOpenSettings,
+}: FocusModeSidebarChromeProps) {
+  const reveal = useFocusModeSidebarReveal(revealEnabled)
+  if (!focusToggleEnabled && !reveal.rendered) return null
+
+  return (
+    <>
+      {reveal.rendered ? (
+        <FocusModeSidebarReveal
+          repoId={repoId}
+          open={reveal.open}
+          interactive={revealEnabled}
+          sidebarSize={sidebarSize}
+          onSidebarSizeChange={onSidebarSizeChange}
+          onSurfaceEnter={reveal.onSurfaceEnter}
+          onSurfaceLeave={reveal.onSurfaceLeave}
+          onOpenSettings={onOpenSettings}
+        />
+      ) : null}
+      {focusToggleEnabled ? (
+        <FocusModeSidebarRevealTriggerLayer
+          revealEnabled={revealEnabled}
+          onMouseEnter={reveal.onTriggerEnter}
+          onMouseLeave={reveal.onTriggerLeave}
+        />
+      ) : null}
+    </>
+  )
+}
+
+function FocusModeSidebarRevealTriggerLayer({
   revealEnabled = false,
   onMouseEnter,
   onMouseLeave,
 }: FocusModeSidebarRevealTriggerProps) {
   return (
-    <WindowChromeInteractiveRegion
+    <div
+      data-testid="focus-mode-toggle-overlay"
       data-focus-reveal-surface={revealEnabled ? '' : undefined}
-      data-testid="focus-mode-sidebar-trigger"
-      className="pointer-events-auto"
-      onMouseEnter={revealEnabled ? onMouseEnter : undefined}
-      onMouseLeave={revealEnabled ? onMouseLeave : undefined}
+      className="goblin-focus-reveal-trigger-layer pointer-events-none absolute left-0 top-0 z-40 flex items-center bg-transparent"
+      style={{ height: WINDOW_CHROME_HEIGHT_PX }}
     >
-      <WorkspaceFocusToggle />
+      <FocusModeSidebarRevealTrigger
+        revealEnabled={revealEnabled}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
+      />
+    </div>
+  )
+}
+
+function FocusModeSidebarRevealTrigger({
+  revealEnabled = false,
+  onMouseEnter,
+  onMouseLeave,
+}: FocusModeSidebarRevealTriggerProps) {
+  return (
+    <WindowChromeInteractiveRegion asChild>
+      <WorkspaceFocusToggle
+        data-focus-reveal-surface={revealEnabled ? '' : undefined}
+        data-testid="focus-mode-sidebar-trigger"
+        className="pointer-events-auto"
+        onMouseEnter={revealEnabled ? onMouseEnter : undefined}
+        onMouseLeave={revealEnabled ? onMouseLeave : undefined}
+      />
     </WindowChromeInteractiveRegion>
   )
 }
 
-export function FocusModeSidebarReveal({
+function FocusModeSidebarReveal({
   repoId,
   open,
+  interactive,
   sidebarSize,
   onSidebarSizeChange,
   onSurfaceEnter,
@@ -177,6 +247,7 @@ export function FocusModeSidebarReveal({
   const style = {
     width,
   } as CSSProperties
+  const panelInteractive = open && interactive
   const setPanelVisualState = useCallback((next: RevealPanelState) => {
     panelStateRef.current = next
     setPanelState(next)
@@ -193,6 +264,7 @@ export function FocusModeSidebarReveal({
   }, [])
   const handleResizePointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (!panelInteractive) return
       const rect = focusRevealHostRect(hostRef.current)
       if (!rect || rect.width <= 0) return
 
@@ -243,7 +315,7 @@ export function FocusModeSidebarReveal({
       window.addEventListener('pointercancel', handlePointerUp)
       resizeDragCleanupRef.current = cleanupDragListeners
     },
-    [onSidebarSizeChange, onSurfaceEnter, onSurfaceLeave, rootFontSizePx],
+    [onSidebarSizeChange, onSurfaceEnter, onSurfaceLeave, panelInteractive, rootFontSizePx],
   )
   useEffect(() => {
     return () => {
@@ -284,7 +356,7 @@ export function FocusModeSidebarReveal({
     [onSurfaceLeave],
   )
   useEffect(() => {
-    if (!open) return
+    if (!panelInteractive) return
 
     const handlePointerMove = (event: PointerEvent) => {
       if (resizingRef.current) return
@@ -301,7 +373,7 @@ export function FocusModeSidebarReveal({
 
     document.addEventListener('pointermove', handlePointerMove)
     return () => document.removeEventListener('pointermove', handlePointerMove)
-  }, [open, onSurfaceEnter, onSurfaceLeave])
+  }, [onSurfaceEnter, onSurfaceLeave, panelInteractive])
   const handleResizeRailMouseEnter = useCallback(() => {
     if (!resizingRef.current) setResizeRailState('hover')
   }, [])
@@ -320,26 +392,32 @@ export function FocusModeSidebarReveal({
         ref={hitAreaRef}
         data-focus-reveal-surface=""
         data-testid="focus-mode-sidebar-hit-area"
-        className="pointer-events-auto absolute bottom-0 left-0 w-3"
+        className={cn('absolute bottom-0 left-0 w-3', interactive ? 'pointer-events-auto' : 'pointer-events-none')}
         style={{ top: WINDOW_CHROME_HEIGHT_PX }}
-        onMouseEnter={onSurfaceEnter}
-        onMouseLeave={handleSurfaceLeave}
+        onMouseEnter={interactive ? onSurfaceEnter : undefined}
+        onMouseLeave={interactive ? handleSurfaceLeave : undefined}
         aria-hidden
       />
       <div
         ref={panelRef}
-        data-focus-reveal-surface=""
+        data-focus-reveal-surface={panelInteractive ? '' : undefined}
         data-testid="focus-mode-sidebar-reveal"
         data-open={open ? 'true' : 'false'}
+        data-interactive={panelInteractive ? 'true' : 'false'}
         data-state={panelState}
-        aria-hidden={open ? undefined : true}
-        inert={open ? undefined : true}
+        aria-hidden={panelInteractive ? undefined : true}
+        inert={panelInteractive ? undefined : true}
         className="goblin-focus-reveal-panel absolute inset-y-0 left-0 flex min-w-0 overflow-hidden bg-card"
         style={style}
-        onMouseEnter={onSurfaceEnter}
-        onMouseLeave={handleSurfaceLeave}
+        onMouseEnter={panelInteractive ? onSurfaceEnter : undefined}
+        onMouseLeave={panelInteractive ? handleSurfaceLeave : undefined}
       >
-        <RepoShellSidebar repoId={repoId} compact={false} onOpenSettings={onOpenSettings} />
+        <RepoShellSidebar
+          repoId={repoId}
+          compact={false}
+          chromeRegion={panelInteractive ? 'drag' : 'none'}
+          onOpenSettings={onOpenSettings}
+        />
         <WindowChromeInteractiveRegion
           data-testid="focus-mode-sidebar-resize-handle"
           data-separator={resizeRailState === 'idle' ? undefined : resizeRailState}
@@ -350,9 +428,9 @@ export function FocusModeSidebarReveal({
             resizeHandleClassNames.horizontal,
             'absolute inset-y-0 right-0 z-20',
           )}
-          onPointerDown={handleResizePointerDown}
-          onMouseEnter={handleResizeRailMouseEnter}
-          onMouseLeave={handleResizeRailMouseLeave}
+          onPointerDown={panelInteractive ? handleResizePointerDown : undefined}
+          onMouseEnter={panelInteractive ? handleResizeRailMouseEnter : undefined}
+          onMouseLeave={panelInteractive ? handleResizeRailMouseLeave : undefined}
         >
           <ResizeHandleLine />
         </WindowChromeInteractiveRegion>

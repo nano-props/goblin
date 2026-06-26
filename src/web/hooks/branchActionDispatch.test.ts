@@ -136,6 +136,38 @@ describe('branch action dispatch', () => {
     })
   })
 
+  test('remove worktree proceeds when no workspace tabs are open', async () => {
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      selectedBranch: 'feature/worktree',
+      preferredWorkspacePaneView: 'status',
+      workspacePaneTabOrderByBranch: {},
+    })
+    const runBranchAction = vi.fn(async () => ({ ok: true, message: 'ok' }))
+    useReposStore.setState({ runBranchAction })
+    const closeTerminalsForWorktree = vi.fn(async () => true)
+    setTerminalSlotCommandBridge({
+      worktreeSnapshot: () => emptyWorktreeSnapshot(),
+      createTerminal: vi.fn(async () => 'slot-2'),
+      selectTerminal: vi.fn(),
+      closeTerminalByDescriptor: vi.fn(async () => true),
+      closeTerminalsForWorktree,
+    })
+
+    await expect(
+      dispatchRemoveWorktree({
+        repo,
+        target: { branch: 'feature/worktree', path: WORKTREE_PATH },
+        alsoDeleteBranch: false,
+        forceDeleteBranch: false,
+        alsoDeleteUpstream: false,
+      }),
+    ).resolves.toEqual({ ok: true, message: 'ok' })
+
+    expect(runBranchAction).toHaveBeenCalled()
+  })
+
   test('remove worktree does not close workspace tabs when local preflight already knows it is dirty', async () => {
     const repo = seedRepoState({
       id: REPO_ID,
@@ -182,6 +214,17 @@ describe('branch action dispatch', () => {
     expect(runBranchAction).not.toHaveBeenCalled()
   })
 })
+
+function emptyWorktreeSnapshot(): WorktreeTerminalSnapshot {
+  return {
+    worktreeTerminalKey: WORKTREE_KEY,
+    selectedDescriptor: null,
+    slots: [],
+    count: 0,
+    bellCount: 0,
+    pendingCreate: false,
+  }
+}
 
 function worktreeSnapshotWithTerminal(): WorktreeTerminalSnapshot {
   return {

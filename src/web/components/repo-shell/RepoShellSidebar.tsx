@@ -14,25 +14,41 @@ import { WINDOW_CHROME_HEIGHT_PX } from '#/shared/window-chrome.ts'
 import { WindowChromeDragRegion } from '#/web/components/window-chrome-region.tsx'
 
 const NOOP = () => {}
+const SIDEBAR_TOP_CLASS_NAME = 'flex shrink-0 items-center gap-1 bg-card text-sm'
+type RepoShellSidebarChromeRegion = 'drag' | 'none'
 
 interface RepoShellSidebarProps {
   repoId?: string
   compact: boolean
   branchContent?: ReactNode
+  chromeRegion?: RepoShellSidebarChromeRegion
   onOpenSettings?: () => void
 }
 
-export function RepoShellSidebar({ repoId, compact, branchContent, onOpenSettings }: RepoShellSidebarProps) {
+export function RepoShellSidebar({
+  repoId,
+  compact,
+  branchContent,
+  chromeRegion = 'drag',
+  onOpenSettings,
+}: RepoShellSidebarProps) {
   const t = useT()
   return (
     <aside className="flex min-h-0 min-w-0 flex-1 flex-col bg-card">
-      {!compact && (
-        <WindowChromeDragRegion
-          className="flex shrink-0 items-center gap-1 bg-card text-sm"
-          data-testid="repo-shell-sidebar-top"
-          style={{ height: WINDOW_CHROME_HEIGHT_PX }}
-        />
-      )}
+      {!compact &&
+        (chromeRegion === 'drag' ? (
+          <WindowChromeDragRegion
+            className={SIDEBAR_TOP_CLASS_NAME}
+            data-testid="repo-shell-sidebar-top"
+            style={{ height: WINDOW_CHROME_HEIGHT_PX }}
+          />
+        ) : (
+          <div
+            className={SIDEBAR_TOP_CLASS_NAME}
+            data-testid="repo-shell-sidebar-top"
+            style={{ height: WINDOW_CHROME_HEIGHT_PX }}
+          />
+        ))}
       <RepoShellPrimaryActions repoId={repoId} />
       {repoId ? (
         <>

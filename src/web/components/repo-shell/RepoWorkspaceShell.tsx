@@ -1,13 +1,7 @@
 import { type ReactNode } from 'react'
-import {
-  FocusModeSidebarReveal,
-  FocusModeSidebarRevealTrigger,
-  useFocusModeSidebarReveal,
-} from '#/web/components/repo-shell/FocusModeSidebarReveal.tsx'
+import { FocusModeSidebarChrome } from '#/web/components/repo-shell/FocusModeSidebarChrome.tsx'
 import { CompactRepoWorkspace, RepoWorkspace } from '#/web/components/Layout.tsx'
 import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
-import { WINDOW_CHROME_HEIGHT_PX } from '#/shared/window-chrome.ts'
-import { WindowChromeDragRegion } from '#/web/components/window-chrome-region.tsx'
 
 interface RepoWorkspaceShellProps {
   repoId?: string
@@ -44,7 +38,6 @@ export function RepoWorkspaceShell({
   })
   const sidebarPaneSize = 100 - workspacePaneSize
   const focusRevealEnabled = !compact && behavior.branchNavigatorCollapsed
-  const focusSidebar = useFocusModeSidebarReveal(focusRevealEnabled)
 
   const renderWorkspaceBody = (
     workspacePane: ReactNode,
@@ -78,28 +71,13 @@ export function RepoWorkspaceShell({
   return (
     <section className="relative flex min-w-0 flex-1 flex-col">
       {renderWorkspaceBody(branchWorkspacePane, branchNavigatorPane)}
-      {focusToggleEnabled && !compact ? (
-        <WindowChromeDragRegion
-          data-testid="focus-mode-toggle-overlay"
-          data-focus-reveal-surface={focusRevealEnabled ? '' : undefined}
-          className="pointer-events-none absolute left-0 top-0 z-40 flex items-center bg-transparent"
-          style={{ height: WINDOW_CHROME_HEIGHT_PX }}
-        >
-          <FocusModeSidebarRevealTrigger
-            revealEnabled={focusRevealEnabled}
-            onMouseEnter={focusSidebar.onTriggerEnter}
-            onMouseLeave={focusSidebar.onTriggerLeave}
-          />
-        </WindowChromeDragRegion>
-      ) : null}
-      {focusSidebar.rendered && !compact ? (
-        <FocusModeSidebarReveal
+      {!compact ? (
+        <FocusModeSidebarChrome
           repoId={repoId}
-          open={focusSidebar.open}
+          focusToggleEnabled={focusToggleEnabled}
+          revealEnabled={focusRevealEnabled}
           sidebarSize={sidebarPaneSize}
           onSidebarSizeChange={(nextSidebarSize) => onWorkspacePaneSizeChange(100 - nextSidebarSize)}
-          onSurfaceEnter={focusSidebar.onSurfaceEnter}
-          onSurfaceLeave={focusSidebar.onSurfaceLeave}
           onOpenSettings={onOpenSettings}
         />
       ) : null}

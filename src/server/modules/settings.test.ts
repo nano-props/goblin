@@ -6,12 +6,14 @@ const mocks = vi.hoisted(() => ({
   getServerSettingsPrefs: vi.fn(),
   getServerSessionState: vi.fn(),
   getServerRecentRepos: vi.fn(),
+  getServerRepoSettings: vi.fn(),
 }))
 
 vi.mock('#/server/modules/settings-source.ts', () => ({
   getServerSettingsPrefs: mocks.getServerSettingsPrefs,
   getServerSessionState: mocks.getServerSessionState,
   getServerRecentRepos: mocks.getServerRecentRepos,
+  getServerRepoSettings: mocks.getServerRepoSettings,
 }))
 
 describe('server settings snapshot runtime state', () => {
@@ -34,6 +36,7 @@ describe('server settings snapshot runtime state', () => {
     })
     mocks.getServerSessionState.mockResolvedValue(defaultSessionState())
     mocks.getServerRecentRepos.mockResolvedValue([])
+    mocks.getServerRepoSettings.mockResolvedValue([])
 
     const state = createServerSettingsState()
     state.globalShortcutRegistered = true

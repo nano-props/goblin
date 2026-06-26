@@ -1,6 +1,6 @@
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
-import { settingsLog } from '#/web/logger.ts'
 import type { GlobalShortcutState, SessionState } from '#/shared/api-types.ts'
+import { settingsLog } from '#/web/logger.ts'
 import {
   addRecentRepo,
   clearRecentRepos,

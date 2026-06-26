@@ -8,6 +8,7 @@ export type ClientEffectIntent =
   | { type: 'open-repo-path-requested' }
   | { type: 'open-remote-repo-requested' }
   | { type: 'clone-repo-requested' }
+  | { type: 'create-worktree-requested' }
   | { type: 'app-quitting' }
   | { type: 'terminal-new-tab-requested' }
   | { type: 'workspace-pane-close-tab-or-window-requested' }
@@ -35,6 +36,7 @@ export function isClientEffectIntent(event: unknown): event is ClientEffectInten
     case 'open-repo-path-requested':
     case 'open-remote-repo-requested':
     case 'clone-repo-requested':
+    case 'create-worktree-requested':
     case 'app-quitting':
     case 'terminal-new-tab-requested':
     case 'workspace-pane-close-tab-or-window-requested':

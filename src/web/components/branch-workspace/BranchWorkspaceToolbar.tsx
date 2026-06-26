@@ -34,11 +34,9 @@ import {
   terminalWorkspacePaneTabProvider,
   workspacePaneStaticTabProvider,
 } from '#/web/workspace-pane/workspace-pane-tab-providers.ts'
-import {
-  WorkspaceToolbar,
-  WorkspaceToolbarLeadingSpacer,
-} from '#/web/components/workspace-toolbar-chrome.tsx'
-import { WorkspaceExternalAppsMenu } from '#/web/components/branch-workspace/WorkspaceExternalAppsMenu.tsx'
+import { WorkspaceToolbar, WorkspaceToolbarLeadingSpacer } from '#/web/components/workspace-toolbar-chrome.tsx'
+import { WorkspaceOpenExternallyMenu } from '#/web/components/branch-workspace/WorkspaceOpenExternallyMenu.tsx'
+import type { BranchActions } from '#/web/hooks/useBranchActions.tsx'
 
 interface Props {
   repo: BranchWorkspaceRepo
@@ -46,6 +44,7 @@ interface Props {
   workspacePaneId: string
   workspacePaneTabModel: BranchWorkspacePaneTabModel
   trafficLightOffset?: boolean
+  branchActions?: BranchActions
 }
 
 export function BranchWorkspaceToolbar({
@@ -54,6 +53,7 @@ export function BranchWorkspaceToolbar({
   workspacePaneId,
   workspacePaneTabModel,
   trafficLightOffset = false,
+  branchActions,
 }: Props) {
   const t = useT()
   const navigation = useMainWindowNavigation()
@@ -270,9 +270,9 @@ export function BranchWorkspaceToolbar({
             />
           )}
         </div>
-        {!compact && detail.branch && (
+        {detail.branch && (
           <div className="flex h-full shrink-0 items-center" data-workspace-toolbar-trailing-actions="">
-            <WorkspaceExternalAppsMenu repo={repo} branch={detail.branch} />
+            <WorkspaceOpenExternallyMenu repo={repo} branch={detail.branch} branchActions={branchActions!} />
           </div>
         )}
       </div>

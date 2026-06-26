@@ -1,4 +1,5 @@
 import { runWithRepoBackend } from '#/server/modules/repo-backend.ts'
+import { isValidRepoLocator } from '#/shared/input-validation.ts'
 import {
   DEFAULT_REPOSITORY_LOG_COUNT,
   type ExecResult,
@@ -7,6 +8,7 @@ import {
   type WorktreeStatus,
 } from '#/shared/git-types.ts'
 import type { ProbeResult, PullRequestEntry, RepoSnapshot } from '#/shared/api-types.ts'
+import type { WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
 
 export async function probeRepository(cwd: string): Promise<ProbeResult> {
   return await runWithRepoBackend(cwd, async (backend) => await backend.probe())
@@ -64,6 +66,14 @@ export async function getRepositoryLog(
 
 export async function getRepositoryPatch(cwd: string, worktreePath: string, signal?: AbortSignal): Promise<ExecResult> {
   return await runWithRepoBackend(cwd, async (backend) => await backend.getPatch(worktreePath, signal))
+}
+
+export async function getRepositoryWorktreeBootstrapPreview(
+  cwd: string,
+  signal?: AbortSignal,
+): Promise<WorktreeBootstrapPreviewResult> {
+  if (!isValidRepoLocator(cwd)) return { ok: false, message: 'error.invalid-arguments' }
+  return await runWithRepoBackend(cwd, async (backend) => await backend.getWorktreeBootstrapPreview(signal))
 }
 
 export type CompositeInclude = 'snapshot' | 'status' | 'pullRequests'

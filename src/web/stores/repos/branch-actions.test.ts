@@ -3,7 +3,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { markRepoOperationTargets, nextRepoOperationId, repoOperation } from '#/web/stores/repos/runtime.ts'
 import { replaceRepo } from '#/web/stores/repos/helpers.ts'
 import { getBranchActionCapabilities } from '#/web/hooks/useBranchActions.tsx'
-import { branchBrowserRemoteProvider } from '#/web/hooks/useBranchActionItems.ts'
+import { branchBrowserRemoteProvider } from '#/web/hooks/useRemoteOpenAction.ts'
 import {
   createBranchSnapshot,
   createRepoBranch,
@@ -46,6 +46,17 @@ function setSelectionForTest(selectedBranch: string, branchViewMode: BranchViewM
   })
 }
 
+function createWorktreeAction(): Extract<RepoBranchAction, { kind: 'createWorktree' }> {
+  return {
+    kind: 'createWorktree',
+    input: {
+      worktreePath: '/tmp/gbl-branch-actions-test-worktree',
+      mode: { kind: 'newBranch', newBranch: 'feature/new', baseRef: 'feature/a' },
+    },
+    worktreeBootstrap: { kind: 'skip' },
+  }
+}
+
 function installSuccessfulCreateWorktreeBridge(options?: { onSnapshot?: () => void }) {
   const snapshot = {
     branches: [
@@ -70,9 +81,7 @@ function installSuccessfulCreateWorktreeBridge(options?: { onSnapshot?: () => vo
   })
 }
 
-function installSuccessfulCreateWorktreeBridgeWithExistingWorktree(
-  options?: { onSnapshot?: () => void },
-) {
+function installSuccessfulCreateWorktreeBridgeWithExistingWorktree(options?: { onSnapshot?: () => void }) {
   const snapshot = {
     branches: [
       createBranchSnapshot('feature/a', { worktree: { path: '/tmp/gbl-branch-actions-test-repo' } }),
@@ -553,13 +562,7 @@ describe('runBranchAction', () => {
   test.each([
     [
       'createWorktree',
-      {
-        kind: 'createWorktree',
-        input: {
-          worktreePath: '/tmp/gbl-branch-actions-test-worktree',
-          mode: { kind: 'newBranch', newBranch: 'feature/new', baseRef: 'feature/a' },
-        },
-      },
+      createWorktreeAction(),
       'repo.createWorktree',
     ],
     ['deleteBranch', { kind: 'deleteBranch', branch: 'feature/a' }, 'repo.deleteBranch'],
@@ -625,13 +628,7 @@ describe('runBranchAction', () => {
         }),
     })
 
-    const work = useReposStore.getState().runBranchAction(REPO_ID, {
-      kind: 'createWorktree',
-      input: {
-        worktreePath: '/tmp/gbl-branch-actions-test-worktree',
-        mode: { kind: 'newBranch', newBranch: 'feature/new', baseRef: 'feature/a' },
-      },
-    })
+    const work = useReposStore.getState().runBranchAction(REPO_ID, createWorktreeAction())
     const running = useReposStore.getState().repos[REPO_ID]
 
     expect(running?.operations.branchAction).toMatchObject({
@@ -666,13 +663,7 @@ describe('runBranchAction', () => {
       'repo.pullRequests': async () => [],
     })
 
-    useReposStore.getState().submitBranchAction(REPO_ID, {
-      kind: 'createWorktree',
-      input: {
-        worktreePath: '/tmp/gbl-branch-actions-test-worktree',
-        mode: { kind: 'newBranch', newBranch: 'feature/new', baseRef: 'feature/a' },
-      },
-    })
+    useReposStore.getState().submitBranchAction(REPO_ID, createWorktreeAction())
 
     expect(useReposStore.getState().repos[REPO_ID]?.operations.branchAction).toMatchObject({
       phase: 'running',
@@ -691,13 +682,7 @@ describe('runBranchAction', () => {
 
     await useReposStore.getState().runBranchAction(
       REPO_ID,
-      {
-        kind: 'createWorktree',
-        input: {
-          worktreePath: '/tmp/gbl-branch-actions-test-worktree',
-          mode: { kind: 'newBranch', newBranch: 'feature/new', baseRef: 'feature/a' },
-        },
-      },
+      createWorktreeAction(),
       { token: 1, refreshOnError: false },
     )
 
@@ -718,13 +703,7 @@ describe('runBranchAction', () => {
 
     await useReposStore.getState().runBranchAction(
       REPO_ID,
-      {
-        kind: 'createWorktree',
-        input: {
-          worktreePath: '/tmp/gbl-branch-actions-test-worktree',
-          mode: { kind: 'newBranch', newBranch: 'feature/new', baseRef: 'feature/a' },
-        },
-      },
+      createWorktreeAction(),
       { token: 1 },
     )
 
@@ -739,13 +718,7 @@ describe('runBranchAction', () => {
 
     await useReposStore.getState().runBranchAction(
       REPO_ID,
-      {
-        kind: 'createWorktree',
-        input: {
-          worktreePath: '/tmp/gbl-branch-actions-test-worktree',
-          mode: { kind: 'newBranch', newBranch: 'feature/new', baseRef: 'feature/a' },
-        },
-      },
+      createWorktreeAction(),
       { token: 1 },
     )
 
@@ -765,13 +738,7 @@ describe('runBranchAction', () => {
 
     await useReposStore.getState().runBranchAction(
       REPO_ID,
-      {
-        kind: 'createWorktree',
-        input: {
-          worktreePath: '/tmp/gbl-branch-actions-test-worktree',
-          mode: { kind: 'newBranch', newBranch: 'feature/new', baseRef: 'feature/a' },
-        },
-      },
+      createWorktreeAction(),
       { token: 1, refreshOnError: false },
     )
 
@@ -796,13 +763,7 @@ describe('runBranchAction', () => {
 
     await useReposStore.getState().runBranchAction(
       REPO_ID,
-      {
-        kind: 'createWorktree',
-        input: {
-          worktreePath: '/tmp/gbl-branch-actions-test-worktree',
-          mode: { kind: 'newBranch', newBranch: 'feature/new', baseRef: 'feature/a' },
-        },
-      },
+      createWorktreeAction(),
       { token: 1 },
     )
 

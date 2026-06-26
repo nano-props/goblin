@@ -8,6 +8,7 @@ import {
 import { emptyRepoOperations } from '#/web/stores/repos/operations.ts'
 import { emptyRepoResources } from '#/web/stores/repos/resources.ts'
 import { deriveConnectivityLog } from '#/web/logger.ts'
+import type { ExecResult } from '#/web/types.ts'
 import type { RepoEvent, RepoResultEventOptions, RepoState, ReposSet, ReposStore } from '#/web/stores/repos/types.ts'
 
 let nextInstanceToken = 1
@@ -133,7 +134,7 @@ export function isRepoUnavailable(repo: RepoState): boolean {
   return repo.availability.phase === 'unavailable'
 }
 
-export function resultEvent(result: { ok: boolean; message: string }, options?: RepoResultEventOptions): RepoEvent {
+export function resultEvent(result: ExecResult, options?: RepoResultEventOptions): RepoEvent {
   return { id: nextEventId++, kind: 'result', result, action: options?.action }
 }
 

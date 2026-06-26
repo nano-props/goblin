@@ -779,6 +779,10 @@ export class TerminalSlotRegistry {
     const terminalWorktreeKey = worktreeTerminalKey(base.repoRoot, base.worktreePath)
     await this.settlePendingCreateForWorktree(terminalWorktreeKey)
     const keys = this.sortedSlotsForWorktree(terminalWorktreeKey).map((session) => session.descriptor.key)
+    // When no terminal sessions exist there is nothing to release. Skip the
+    // durable-close wait so a stale pending close (e.g. from an earlier tab
+    // that already left the worktree) cannot block worktree removal.
+    if (keys.length === 0) return true
     const results = await Promise.all(keys.map((key) => this.closeTerminal(key)))
     const pendingClosesSettled = await this.waitForPendingClosesForWorktree(terminalWorktreeKey)
     return results.every(Boolean) && pendingClosesSettled

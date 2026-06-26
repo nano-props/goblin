@@ -4,6 +4,7 @@ Use these docs for app-level product and architecture decisions:
 
 - `ui-conventions.md`: UI and copy rules
 - `arch.md`: app shell and process control
+- `ssh-remote.md`: SSH remote repository backend design
 - `layering.md`: feature layering rules
 - `state-sync.md`: state control and sync model
 - `client-model.md`: client model
