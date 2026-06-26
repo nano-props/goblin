@@ -4,19 +4,12 @@ import type {
   BranchWorkspaceRepo,
   SelectedBranchWorkspacePresentation,
 } from '#/web/components/branch-workspace/model.ts'
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
-import {
-  useTerminalRepoSyncReady,
-  useWorktreeTerminalSnapshot,
-} from '#/web/components/terminal/terminal-slot-store.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
-import { workspacePaneTabOrderForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
-import {
-  createBranchWorkspacePaneTabModel,
-  type BranchWorkspacePaneTab,
-  type BranchWorkspacePaneSelection,
+import type {
+  BranchWorkspacePaneTabModel,
+  BranchWorkspacePaneTab,
+  BranchWorkspacePaneSelection,
 } from '#/web/components/branch-workspace/workspace-pane-tab-model.ts'
-import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import {
   terminalWorkspacePaneTabProvider,
   workspacePaneStaticTabProvider,
@@ -30,6 +23,7 @@ interface Props {
   }
   detail: SelectedBranchWorkspacePresentation
   workspacePaneId: string
+  workspacePaneTabModel: BranchWorkspacePaneTabModel
 }
 
 // Pure view: the workspace pane body is derived from the repos store's
@@ -37,26 +31,10 @@ interface Props {
 // never re-projects on snapshot refresh, branch switch, or session restore.
 // The tab model keeps the body render target separate from the active
 // materialized tab.
-export function BranchWorkspaceContent({ repo, detail, workspacePaneId }: Props) {
+export function BranchWorkspaceContent({ repo, detail, workspacePaneId, workspacePaneTabModel }: Props) {
   const t = useT()
   const compact = useIsCompactUi()
   const { branch } = detail
-  const terminalWorktreeKey = branch?.worktree?.path ? worktreeTerminalKey(repo.id, branch.worktree.path) : null
-  const worktreeSnapshot = useWorktreeTerminalSnapshot(terminalWorktreeKey)
-  const terminalSyncReady = useTerminalRepoSyncReady(repo.id)
-  const workspacePaneTabOrder = workspacePaneTabOrderForBranch(repo.ui, branch?.name)
-  const workspacePaneTabModel = createBranchWorkspacePaneTabModel({
-    repoId: repo.id,
-    branchName: branch?.name ?? null,
-    worktreePath: branch?.worktree?.path ?? null,
-    preferredView: preferredWorkspacePaneViewForBranch(repo.ui, branch?.name),
-    tabOrder: workspacePaneTabOrder,
-    runtimeTerminalViews: worktreeSnapshot.slots,
-    terminalSessionCount: worktreeSnapshot.count,
-    terminalCreatePending: worktreeSnapshot.pendingCreate,
-    terminalSyncReady,
-    lastClosedTabContext: branch ? (repo.ui.lastClosedTabContextByBranch[branch.name] ?? null) : null,
-  })
   const selection = workspacePaneTabModel.selection
   const renderedView = selection?.view ?? null
   const panelLabel = workspacePanePanelLabel({
@@ -65,8 +43,8 @@ export function BranchWorkspaceContent({ repo, detail, workspacePaneId }: Props)
     workspacePaneId,
     compact,
     t,
-    terminalSyncReady,
-    terminalCreatePending: worktreeSnapshot.pendingCreate,
+    terminalSyncReady: workspacePaneTabModel.terminalSyncReady,
+    terminalCreatePending: workspacePaneTabModel.terminalCreatePending,
   })
   const noBranchTitleKey = repo.data.branches.length === 0 ? 'branches.empty' : 'branches.filter-empty'
   if (!branch) return <EmptyState title={t(noBranchTitleKey)} />
@@ -88,7 +66,7 @@ export function BranchWorkspaceContent({ repo, detail, workspacePaneId }: Props)
             detail,
             workspacePaneId,
             panelLabel,
-            terminalSyncReady,
+            terminalSyncReady: workspacePaneTabModel.terminalSyncReady,
           })
         : null}
     </div>

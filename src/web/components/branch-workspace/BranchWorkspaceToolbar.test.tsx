@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 
-import { act } from 'react'
+import { act, type ComponentProps } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { BranchWorkspaceToolbar } from '#/web/components/branch-workspace/BranchWorkspaceToolbar.tsx'
 import { getSelectedBranchWorkspacePresentation } from '#/web/components/branch-workspace/model.ts'
+import { useBranchWorkspacePaneTabModel } from '#/web/components/branch-workspace/use-branch-workspace-pane-tab-model.ts'
 import { useBranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { TerminalSlotContext, TerminalSlotReadContext } from '#/web/components/terminal/terminal-slot-context.ts'
 import type {
@@ -103,6 +104,17 @@ let container: HTMLDivElement | null = null
 let root: Root | null = null
 let queryClient: QueryClient | null = null
 const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+
+type BranchWorkspaceToolbarHarnessProps = Omit<
+  ComponentProps<typeof BranchWorkspaceToolbar>,
+  'workspacePaneTabModel' | 'branchActions'
+>
+
+function BranchWorkspaceToolbarHarness(props: BranchWorkspaceToolbarHarnessProps) {
+  const workspacePaneTabModel = useBranchWorkspacePaneTabModel(props.repo, props.detail)
+  const branchActions = useBranchActions(props.repo, props.detail.branch!)
+  return <BranchWorkspaceToolbar {...props} workspacePaneTabModel={workspacePaneTabModel} branchActions={branchActions} />
+}
 
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
@@ -488,6 +500,7 @@ describe('BranchWorkspaceToolbar', () => {
     expect(useReposStore.getState().repos[REPO_ID]?.ui.lastClosedTabContextByBranch['feature/worktree']).toEqual({
       closingIdentity: 'status:status',
       previousTabIdentities: ['status:status', 'terminal:t1'],
+      wasActive: true,
     })
   })
 
@@ -924,6 +937,7 @@ describe('BranchWorkspaceToolbar', () => {
     expect(useReposStore.getState().repos[REPO_ID]?.ui.lastClosedTabContextByBranch['feature/worktree']).toEqual({
       closingIdentity: 'terminal:t1',
       previousTabIdentities: ['status:status', 'terminal:t1', 'changes:changes'],
+      wasActive: true,
     })
   })
 
@@ -1130,7 +1144,7 @@ function renderToolbar(options: {
         <MainWindowNavigationProvider value={options.navigation}>
           <TerminalSlotContext.Provider value={commandContext}>
             <TerminalSlotReadContext.Provider value={readContext}>
-              <ToolbarHost
+              <BranchWorkspaceToolbarHarness
                 repo={repo}
                 detail={detail}
                 workspacePaneId="workspace"
