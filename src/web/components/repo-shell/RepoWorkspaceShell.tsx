@@ -13,7 +13,7 @@ interface RepoWorkspaceShellProps {
   branchNavigatorPane: ReactNode
   branchWorkspacePane: ReactNode
   singlePaneActivePane?: 'navigator' | 'workspace'
-  focusToggleEnabled?: boolean
+  zenModeToggleEnabled?: boolean
   onOpenSettings?: () => void
 }
 
@@ -27,10 +27,10 @@ export function RepoWorkspaceShell({
   branchNavigatorPane,
   branchWorkspacePane,
   singlePaneActivePane = 'navigator',
-  focusToggleEnabled = true,
+  zenModeToggleEnabled = true,
   onOpenSettings,
 }: RepoWorkspaceShellProps) {
-  const effectiveZenMode = focusToggleEnabled && zenMode
+  const effectiveZenMode = zenModeToggleEnabled && zenMode
   const behavior = repoWorkspaceBehavior({
     compact,
     zenMode: effectiveZenMode,
@@ -74,7 +74,7 @@ export function RepoWorkspaceShell({
       {!compact ? (
         <ZenModeSidebarChrome
           repoId={repoId}
-          focusToggleEnabled={focusToggleEnabled}
+          zenModeToggleEnabled={zenModeToggleEnabled}
           revealEnabled={zenRevealEnabled}
           sidebarSize={sidebarPaneSize}
           onSidebarSizeChange={(nextSidebarSize) => onWorkspacePaneSizeChange(100 - nextSidebarSize)}

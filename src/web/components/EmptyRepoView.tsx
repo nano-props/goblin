@@ -25,7 +25,7 @@ export function EmptyRepoView({ onOpenSettings }: EmptyRepoViewProps) {
       branchWorkspaceActive={false}
       workspacePaneSize={workspacePaneSize}
       onWorkspacePaneSizeChange={setWorkspacePaneSize}
-      focusToggleEnabled={false}
+      zenModeToggleEnabled={false}
       branchNavigatorPane={
         <RepoWorkspacePane>
           <RepoShellSidebar compact={compact} onOpenSettings={onOpenSettings} />

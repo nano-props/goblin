@@ -54,7 +54,7 @@ interface ZenModeSidebarRevealTriggerProps {
 
 interface ZenModeSidebarChromeProps {
   repoId?: string
-  focusToggleEnabled: boolean
+  zenModeToggleEnabled: boolean
   revealEnabled: boolean
   sidebarSize: number
   onSidebarSizeChange: (sidebarSize: number) => void
@@ -127,14 +127,14 @@ function useZenModeSidebarReveal(enabled: boolean): ZenModeSidebarRevealState {
 
 export function ZenModeSidebarChrome({
   repoId,
-  focusToggleEnabled,
+  zenModeToggleEnabled,
   revealEnabled,
   sidebarSize,
   onSidebarSizeChange,
   onOpenSettings,
 }: ZenModeSidebarChromeProps) {
   const reveal = useZenModeSidebarReveal(revealEnabled)
-  if (!focusToggleEnabled && !reveal.rendered) return null
+  if (!zenModeToggleEnabled && !reveal.rendered) return null
 
   return (
     <>
@@ -150,7 +150,7 @@ export function ZenModeSidebarChrome({
           onOpenSettings={onOpenSettings}
         />
       ) : null}
-      {focusToggleEnabled ? (
+      {zenModeToggleEnabled ? (
         <ZenModeSidebarRevealTriggerLayer
           revealEnabled={revealEnabled}
           onMouseEnter={reveal.onTriggerEnter}
