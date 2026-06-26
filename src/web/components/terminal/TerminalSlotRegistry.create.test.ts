@@ -329,6 +329,16 @@ describe('TerminalSlotRegistry create flow', () => {
     expect(registry.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
   })
 
+  test('closeTerminalsForWorktree returns true when no terminal sessions exist', async () => {
+    expect(registry.worktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+
+    await expect(
+      registry.closeTerminalsForWorktree({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH }),
+    ).resolves.toBe(true)
+
+    expect(mocks.closeMock).not.toHaveBeenCalled()
+  })
+
   test('retries creating until host geometry becomes measurable', async () => {
     mocks.proposeTerminalGeometryMock.mockReturnValue(null)
 
