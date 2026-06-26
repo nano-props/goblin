@@ -16,7 +16,10 @@ import {
 } from '#/web/components/branch-navigator/branch-row-metrics.ts'
 import {
   WorkspaceToolbar,
+  WorkspaceToolbarActions,
+  WorkspaceToolbarContent,
   WorkspaceToolbarLeadingSpacer,
+  WorkspaceToolbarPrimary,
 } from '#/web/components/workspace-toolbar-chrome.tsx'
 
 interface BranchNavigatorSkeletonProps {
@@ -99,14 +102,14 @@ export function BranchWorkspaceSkeleton({
     <section data-testid="branch-workspace-skeleton" className="flex min-h-0 flex-1 flex-col bg-background">
       <WorkspaceToolbar draggable={toolbarDraggable} trafficLightOffset={toolbarTrafficLightOffset}>
         <WorkspaceToolbarLeadingSpacer reserve={toolbarTrafficLightOffset} />
-        <div className="flex min-w-0 flex-1 items-center gap-1">
-          <div className="flex shrink-0 gap-1">
+        <WorkspaceToolbarContent>
+          <WorkspaceToolbarPrimary>
             <Skeleton className="h-7 w-20" />
             <Skeleton className="h-7 w-24" />
             <Skeleton className="h-7 w-20" />
-          </div>
-        </div>
-        <div aria-hidden="true" className="min-w-2 flex-1 self-stretch" />
+          </WorkspaceToolbarPrimary>
+          <WorkspaceToolbarActions aria-hidden="true" />
+        </WorkspaceToolbarContent>
       </WorkspaceToolbar>
 
       <div className="flex min-h-0 flex-1 flex-col">

@@ -1,5 +1,9 @@
 export const WORKSPACE_EXTERNAL_APP_RECENT_STORAGE_KEY = 'goblin.workspace-external-app.recent'
 
+export function workspaceExternalAppRecentScope(repoId: string, worktreePath?: string | null): string {
+  return worktreePath ? `${repoId}:${worktreePath}` : repoId
+}
+
 function recentStorageKey(scope?: string): string {
   return scope ? `${WORKSPACE_EXTERNAL_APP_RECENT_STORAGE_KEY}:${scope}` : WORKSPACE_EXTERNAL_APP_RECENT_STORAGE_KEY
 }

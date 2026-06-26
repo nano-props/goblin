@@ -207,11 +207,50 @@ button,
 }
 
 .goblin-workspace-toolbar {
+  --goblin-workspace-toolbar-edge-inset: 0.375rem;
+  --goblin-workspace-toolbar-edge-inset-non-draggable: 0.5rem;
+  --goblin-workspace-toolbar-section-gap: 0.375rem;
+  --goblin-workspace-toolbar-control-gap: 0.25rem;
+  padding-left: var(--goblin-workspace-toolbar-edge-inset);
+  padding-right: var(--goblin-workspace-toolbar-edge-inset);
   transition:
     padding-left var(--goblin-workspace-pane-transition-duration, 240ms)
       var(--goblin-workspace-pane-transition-easing, cubic-bezier(0.2, 0, 0, 1)),
     padding-right var(--goblin-workspace-pane-transition-duration, 240ms)
       var(--goblin-workspace-pane-transition-easing, cubic-bezier(0.2, 0, 0, 1));
+}
+
+.goblin-workspace-toolbar--non-draggable {
+  padding-left: var(--goblin-workspace-toolbar-edge-inset-non-draggable);
+  padding-right: var(--goblin-workspace-toolbar-edge-inset-non-draggable);
+}
+
+.goblin-workspace-toolbar__content {
+  display: flex;
+  align-items: center;
+  gap: var(--goblin-workspace-toolbar-section-gap);
+  min-width: 0;
+  flex: 1 1 auto;
+  height: 100%;
+  overflow: hidden;
+}
+
+.goblin-workspace-toolbar__primary {
+  display: flex;
+  align-items: center;
+  gap: var(--goblin-workspace-toolbar-control-gap);
+  min-width: 0;
+  flex: 1 1 auto;
+  height: 100%;
+  overflow: hidden;
+}
+
+.goblin-workspace-toolbar__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--goblin-workspace-toolbar-control-gap);
+  flex: 0 0 auto;
+  height: 100%;
 }
 
 .goblin-workspace-toolbar__leading-spacer {
@@ -227,7 +266,7 @@ button,
 /* Traffic-light offset for the workspace toolbar. Applied when focus-mode
    collapses the sidebar and the workspace pane becomes the first visible
    pane under the macOS traffic-light buttons. Only left padding is
-   adjusted; right padding stays at the toolbar's standard px-1.5 so
+   adjusted; right padding stays at the toolbar's standard padding so
    trailing actions (e.g. open-external button group) don't shift. */
 .goblin-workspace-toolbar--traffic-offset {
   padding-left: var(--goblin-window-chrome-left);

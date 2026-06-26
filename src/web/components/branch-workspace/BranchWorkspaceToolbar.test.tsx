@@ -5,8 +5,9 @@ import { createRoot, type Root } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { BranchWorkspaceToolbar } from '#/web/components/branch-workspace/BranchWorkspaceToolbar.tsx'
+import { WorkspaceOpenExternallyMenu } from '#/web/components/branch-workspace/WorkspaceOpenExternallyMenu.tsx'
 import { getSelectedBranchWorkspacePresentation } from '#/web/components/branch-workspace/model.ts'
-import { useBranchActions } from '#/web/hooks/useBranchActions.tsx'
+import { useBranchActions, type BranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { TerminalSlotContext, TerminalSlotReadContext } from '#/web/components/terminal/terminal-slot-context.ts'
 import type {
   WorkspacePaneStaticViewType,
@@ -28,7 +29,10 @@ import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
-import { WORKSPACE_EXTERNAL_APP_RECENT_STORAGE_KEY } from '#/web/workspace-external-apps-recent.ts'
+import {
+  WORKSPACE_EXTERNAL_APP_RECENT_STORAGE_KEY,
+  workspaceExternalAppRecentScope,
+} from '#/web/workspace-external-apps-recent.ts'
 import {
   workspacePaneStaticViewsForBranch,
   workspacePaneTabOrderForBranch,
@@ -197,7 +201,7 @@ describe('BranchWorkspaceToolbar', () => {
 
     const toolbarClassName = c.querySelector('.goblin-workspace-toolbar')?.className ?? ''
     expect(toolbarClassName).not.toContain('window-chrome')
-    expect(toolbarClassName).not.toContain('px-2')
+    expect(toolbarClassName).not.toContain('goblin-workspace-toolbar--non-draggable')
     expect(toolbarClassName).toContain('gap-0')
     expect(c.querySelector('[data-testid="workspace-toolbar-leading-spacer"]')).not.toBeNull()
     expect(c.querySelector('[data-testid="workspace-toolbar-leading-spacer"]')?.className).not.toContain(
@@ -216,7 +220,9 @@ describe('BranchWorkspaceToolbar', () => {
 
     expect(c.querySelector('.goblin-workspace-toolbar')?.className).not.toContain('app-drag-region')
     expect(c.querySelector('.goblin-workspace-toolbar')?.className).not.toContain('window-chrome')
-    expect(c.querySelector('.goblin-workspace-toolbar')?.className).toContain('px-2')
+    expect(c.querySelector('.goblin-workspace-toolbar')?.className).toContain(
+      'goblin-workspace-toolbar--non-draggable',
+    )
   })
 
   test('renders status and terminal affordance without a default changes tab', () => {
@@ -336,7 +342,7 @@ describe('BranchWorkspaceToolbar', () => {
     expect(c.querySelector<HTMLButtonElement>('button[aria-label="settings.editor.vscode"]')).toBeNull()
   })
 
-  test('uses the global recent external app as the split-button primary action', async () => {
+  test('uses the scoped recent external app as the split-button primary action', async () => {
     const { container: c } = renderToolbar({
       terminalCount: 0,
       navigation: navigationWith({}),
@@ -361,7 +367,11 @@ describe('BranchWorkspaceToolbar', () => {
       await Promise.resolve()
     })
 
-    expect(window.localStorage.getItem(`${WORKSPACE_EXTERNAL_APP_RECENT_STORAGE_KEY}:${WORKTREE_PATH}`)).toBe('finder')
+    expect(
+      window.localStorage.getItem(
+        `${WORKSPACE_EXTERNAL_APP_RECENT_STORAGE_KEY}:${workspaceExternalAppRecentScope(REPO_ID, WORKTREE_PATH)}`,
+      ),
+    ).toBe('finder')
     expect(repoClientMocks.openRepositoryInFinder).toHaveBeenCalledWith(WORKTREE_PATH)
 
     const primary = c.querySelector<HTMLButtonElement>('button[aria-label="worktrees.reveal-title"]')
@@ -373,6 +383,53 @@ describe('BranchWorkspaceToolbar', () => {
     })
 
     expect(repoClientMocks.openRepositoryInFinder).toHaveBeenCalledTimes(2)
+  })
+
+  test('reloads the scoped recent external app when the worktree path changes', async () => {
+    const nextWorktreePath = '/tmp/gbl-branch-workspace-toolbar-worktree-next'
+    window.localStorage.setItem(
+      `${WORKSPACE_EXTERNAL_APP_RECENT_STORAGE_KEY}:${workspaceExternalAppRecentScope(REPO_ID, WORKTREE_PATH)}`,
+      'finder',
+    )
+    window.localStorage.setItem(
+      `${WORKSPACE_EXTERNAL_APP_RECENT_STORAGE_KEY}:${workspaceExternalAppRecentScope(REPO_ID, nextWorktreePath)}`,
+      'editor:vscode',
+    )
+    container = document.createElement('div')
+    document.body.appendChild(container)
+    root = createRoot(container)
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+    })
+    const branchActions = menuBranchActions()
+
+    await act(async () => {
+      root!.render(
+        <WorkspaceOpenExternallyMenu
+          repo={repo}
+          branch={createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })}
+          branchActions={branchActions}
+        />,
+      )
+      await Promise.resolve()
+    })
+
+    expect(container.querySelector<HTMLButtonElement>('button[aria-label="worktrees.reveal-title"]')).not.toBeNull()
+
+    await act(async () => {
+      root!.render(
+        <WorkspaceOpenExternallyMenu
+          repo={repo}
+          branch={createRepoBranch('feature/worktree', { worktree: { path: nextWorktreePath } })}
+          branchActions={branchActions}
+        />,
+      )
+      await Promise.resolve()
+    })
+
+    expect(container.querySelector<HTMLButtonElement>('button[aria-label="settings.editor.vscode"]')).not.toBeNull()
+    expect(container.querySelector<HTMLButtonElement>('button[aria-label="worktrees.reveal-title"]')).toBeNull()
   })
 
   test('keeps the external app launcher reachable in compact mode', () => {
@@ -412,7 +469,7 @@ describe('BranchWorkspaceToolbar', () => {
     expect(tabs.slice(0, 2)).toEqual(['terminal:t1', 'status:status'])
   })
 
-  test('lets the workspace tab strip reach the toolbar right edge', () => {
+  test('uses the workspace toolbar spacing primitives without generic toolbar gaps', () => {
     const { container: c } = renderToolbar({
       terminalCount: 3,
       navigation: navigationWith({}),
@@ -421,16 +478,22 @@ describe('BranchWorkspaceToolbar', () => {
     const toolbar = c.firstElementChild
     if (!(toolbar instanceof HTMLElement)) throw new Error('missing toolbar')
     const spacer = toolbar.firstElementChild
-    const stripHost = toolbar.children[1]
+    const content = toolbar.children[1]
     if (!(spacer instanceof HTMLElement)) throw new Error('missing leading spacer')
-    if (!(stripHost instanceof HTMLElement)) throw new Error('missing workspace tab strip host')
+    if (!(content instanceof HTMLElement)) throw new Error('missing workspace toolbar content')
+    const primary = content.firstElementChild
+    const actions = content.querySelector('[data-workspace-toolbar-trailing-actions]')
+    if (!(primary instanceof HTMLElement)) throw new Error('missing workspace toolbar primary group')
+    if (!(actions instanceof HTMLElement)) throw new Error('missing workspace toolbar actions group')
 
     expect(toolbar.children).toHaveLength(2)
     expect(toolbar.className).toContain('gap-0')
     expect(toolbar.className).not.toContain('gap-2')
     expect(spacer.className).toContain('goblin-workspace-toolbar__leading-spacer')
     expect(spacer.className).not.toContain('goblin-workspace-toolbar__leading-spacer--reserved')
-    expect(stripHost.className).toContain('flex-1')
+    expect(content.className).toContain('goblin-workspace-toolbar__content')
+    expect(primary.className).toContain('goblin-workspace-toolbar__primary')
+    expect(actions.className).toContain('goblin-workspace-toolbar__actions')
   })
 
   test('renders static tabs in saved workspace pane order without runtime materialization', async () => {
@@ -980,6 +1043,35 @@ describe('BranchWorkspaceToolbar', () => {
     expect(mocks.createTerminal).not.toHaveBeenCalled()
   })
 })
+
+function menuBranchActions(): BranchActions {
+  return {
+    blocked: false,
+    busyAction: null,
+    capabilities: {
+      canRemoveWorktree: false,
+      isRegularBranch: false,
+      canCopyPatch: false,
+      canPull: false,
+      canPush: false,
+      canOpenRemote: false,
+      canOpenTerminal: true,
+      canOpenEditor: true,
+      canOpenFinder: true,
+    },
+    actions: {
+      copyPatch: vi.fn(async () => false),
+      pull: vi.fn(),
+      push: vi.fn(),
+      openTerminal: vi.fn(async () => ({ ok: true, message: '' })),
+      openEditor: vi.fn(async () => ({ ok: true, message: '' })),
+      openFinder: vi.fn(async () => ({ ok: true, message: '' })),
+      openRemote: vi.fn(async () => ({ ok: true, message: '' })),
+      requestDeleteBranch: vi.fn(),
+      requestRemoveWorktree: vi.fn(),
+    },
+  }
+}
 
 function renderToolbar(options: {
   terminalCount: number
