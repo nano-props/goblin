@@ -1,6 +1,7 @@
 import type { CSSProperties, HTMLAttributes, ReactNode } from 'react'
 import { WINDOW_CHROME_HEIGHT_PX } from '#/shared/window-chrome.ts'
 import { cn } from '#/web/lib/cn.ts'
+import { WindowChromeDragRegion } from '#/web/components/window-chrome-region.tsx'
 
 const WORKSPACE_TOOLBAR_STYLE = { height: WINDOW_CHROME_HEIGHT_PX } satisfies CSSProperties
 const WORKSPACE_TOOLBAR_BASE_CLASS =
@@ -12,19 +13,12 @@ interface WorkspaceToolbarChromeOptions {
 }
 
 interface WorkspaceToolbarProps
-  extends Omit<HTMLAttributes<HTMLDivElement>, 'draggable'>,
-    WorkspaceToolbarChromeOptions {
+  extends Omit<HTMLAttributes<HTMLDivElement>, 'draggable'>, WorkspaceToolbarChromeOptions {
   children: ReactNode
 }
 
-function workspaceToolbarChromeClassName({
-  draggable = true,
-  trafficLightOffset = false,
-}: WorkspaceToolbarChromeOptions = {}) {
-  return cn(
-    WORKSPACE_TOOLBAR_BASE_CLASS,
-    draggable ? (trafficLightOffset ? 'window-chrome' : 'app-drag-region') : 'px-2',
-  )
+function workspaceToolbarChromeClassName({ draggable = true }: Pick<WorkspaceToolbarChromeOptions, 'draggable'> = {}) {
+  return cn(WORKSPACE_TOOLBAR_BASE_CLASS, !draggable && 'px-2')
 }
 
 export function WorkspaceToolbar({
@@ -35,14 +29,20 @@ export function WorkspaceToolbar({
   style,
   ...props
 }: WorkspaceToolbarProps) {
+  const toolbarProps = {
+    className: cn(workspaceToolbarChromeClassName({ draggable }), className),
+    style: { ...WORKSPACE_TOOLBAR_STYLE, ...style },
+    ...props,
+  }
+
+  if (!draggable) {
+    return <div {...toolbarProps}>{children}</div>
+  }
+
   return (
-    <div
-      className={cn(workspaceToolbarChromeClassName({ draggable, trafficLightOffset }), className)}
-      style={{ ...WORKSPACE_TOOLBAR_STYLE, ...style }}
-      {...props}
-    >
+    <WindowChromeDragRegion reserveWindowControls={trafficLightOffset} {...toolbarProps}>
       {children}
-    </div>
+    </WindowChromeDragRegion>
   )
 }
 
@@ -59,10 +59,7 @@ export function WorkspaceToolbarLeadingSpacer({ reserve }: { reserve: boolean })
   )
 }
 
-export function WorkspaceChrome({
-  draggable = true,
-  trafficLightOffset = false,
-}: WorkspaceToolbarChromeOptions) {
+export function WorkspaceChrome({ draggable = true, trafficLightOffset = false }: WorkspaceToolbarChromeOptions) {
   return (
     <WorkspaceToolbar draggable={draggable} trafficLightOffset={trafficLightOffset}>
       <WorkspaceToolbarLeadingSpacer reserve={trafficLightOffset} />

@@ -11,6 +11,7 @@ import { useT } from '#/web/stores/i18n.ts'
 import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
 import { SidebarRowButton } from '#/web/components/ui/sidebar-row-button.tsx'
 import { WINDOW_CHROME_HEIGHT_PX } from '#/shared/window-chrome.ts'
+import { WindowChromeDragRegion } from '#/web/components/window-chrome-region.tsx'
 
 const NOOP = () => {}
 
@@ -18,24 +19,16 @@ interface RepoShellSidebarProps {
   repoId?: string
   compact: boolean
   branchContent?: ReactNode
-  surface?: 'docked' | 'floating'
   onOpenSettings?: () => void
 }
 
-export function RepoShellSidebar({
-  repoId,
-  compact,
-  branchContent,
-  surface = 'docked',
-  onOpenSettings,
-}: RepoShellSidebarProps) {
+export function RepoShellSidebar({ repoId, compact, branchContent, onOpenSettings }: RepoShellSidebarProps) {
   const t = useT()
   return (
     <aside className="flex min-h-0 min-w-0 flex-1 flex-col bg-card">
       {!compact && (
-        <div
-          className="window-chrome flex shrink-0 items-center gap-1 bg-card text-sm"
-          data-interactive={surface === 'floating' ? true : undefined}
+        <WindowChromeDragRegion
+          className="flex shrink-0 items-center gap-1 bg-card text-sm"
           data-testid="repo-shell-sidebar-top"
           style={{ height: WINDOW_CHROME_HEIGHT_PX }}
         />

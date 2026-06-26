@@ -39,6 +39,7 @@ describe('WorkspaceToolbar', () => {
     const toolbar = workspaceToolbar()
     expect(toolbar).not.toBeNull()
     expect(toolbar?.className).toContain('goblin-workspace-toolbar')
+    expect(toolbar?.dataset.windowChromeRegion).toBe('drag')
     expect(toolbar?.className).toContain('app-drag-region')
     expect(toolbar?.className).toContain('gap-0')
     expect(toolbar?.className).toContain('px-1.5')
@@ -58,6 +59,7 @@ describe('WorkspaceToolbar', () => {
 
     const toolbar = workspaceToolbar()
     expect(toolbar?.className).toContain('px-2')
+    expect(toolbar?.dataset.windowChromeRegion).toBeUndefined()
     expect(toolbar?.className).not.toContain('app-drag-region')
     expect(toolbar?.className).not.toContain('window-chrome')
   })
@@ -68,6 +70,7 @@ describe('WorkspaceToolbar', () => {
     const toolbar = workspaceToolbar()
     const spacer = container?.querySelector('[data-testid="workspace-toolbar-leading-spacer"]')
     expect(toolbar?.className).toContain('window-chrome')
+    expect(toolbar?.dataset.windowChromeRegion).toBe('drag')
     expect(toolbar?.className).not.toContain('app-drag-region')
     expect(spacer?.className).toContain('goblin-workspace-toolbar__leading-spacer--reserved')
   })

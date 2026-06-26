@@ -227,7 +227,11 @@ describe('RepoView workspace navigation', () => {
       focusModeSidebarReveal()
         ?.querySelector('[data-testid="repo-shell-sidebar-top"]')
         ?.hasAttribute('data-interactive'),
-    ).toBe(true)
+    ).toBe(false)
+    expect(
+      focusModeSidebarReveal()?.querySelector<HTMLElement>('[data-testid="repo-shell-sidebar-top"]')?.dataset
+        .windowChromeRegion,
+    ).toBe('drag')
   })
 
   test('large-screen collapsed Focus Mode reveals the sidebar when the focus toggle is hovered', () => {
@@ -235,10 +239,12 @@ describe('RepoView workspace navigation', () => {
     useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
     render(<RepoView repoId={REPO_ID} />)
 
-    expect(focusModeToggleOverlay()?.hasAttribute('data-interactive')).toBe(true)
+    expect(focusModeToggleOverlay()?.hasAttribute('data-interactive')).toBe(false)
+    expect(focusModeToggleOverlay()?.dataset.windowChromeRegion).toBe('drag')
     expect(focusModeToggleOverlay()?.hasAttribute('data-focus-reveal-surface')).toBe(true)
-    expect(focusModeToggleOverlay()?.className).toContain('goblin-focus-reveal-trigger-layer')
-    expect(focusModeToggleOverlay()?.className).not.toContain('window-chrome')
+    expect(focusModeToggleOverlay()?.className).toContain('window-chrome')
+    expect(focusModeSidebarTrigger()?.hasAttribute('data-interactive')).toBe(true)
+    expect(focusModeSidebarTrigger()?.dataset.windowChromeRegion).toBe('interactive')
     expect(focusModeSidebarReveal()?.dataset.open).toBe('false')
 
     act(() => {

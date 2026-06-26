@@ -19,6 +19,7 @@ import { ResizeHandleLine, resizeHandleClassNames } from '#/web/components/ui/re
 import { useElementInlineSize } from '#/web/hooks/useElementInlineSize.ts'
 import { WINDOW_CHROME_HEIGHT_PX } from '#/shared/window-chrome.ts'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
+import { WindowChromeInteractiveRegion } from '#/web/components/window-chrome-region.tsx'
 
 const FOCUS_REVEAL_SURFACE_SELECTOR = '[data-floating-surface],[data-focus-reveal-surface]'
 const FOCUS_REVEAL_CLOSE_MS = 260
@@ -130,8 +131,7 @@ export function FocusModeSidebarRevealTrigger({
   onMouseLeave,
 }: FocusModeSidebarRevealTriggerProps) {
   return (
-    <div
-      data-interactive
+    <WindowChromeInteractiveRegion
       data-focus-reveal-surface={revealEnabled ? '' : undefined}
       data-testid="focus-mode-sidebar-trigger"
       className="pointer-events-auto"
@@ -139,7 +139,7 @@ export function FocusModeSidebarRevealTrigger({
       onMouseLeave={revealEnabled ? onMouseLeave : undefined}
     >
       <WorkspaceFocusToggle />
-    </div>
+    </WindowChromeInteractiveRegion>
   )
 }
 
@@ -339,9 +339,8 @@ export function FocusModeSidebarReveal({
         onMouseEnter={onSurfaceEnter}
         onMouseLeave={handleSurfaceLeave}
       >
-        <RepoShellSidebar repoId={repoId} compact={false} surface="floating" onOpenSettings={onOpenSettings} />
-        <div
-          data-interactive
+        <RepoShellSidebar repoId={repoId} compact={false} onOpenSettings={onOpenSettings} />
+        <WindowChromeInteractiveRegion
           data-testid="focus-mode-sidebar-resize-handle"
           data-separator={resizeRailState === 'idle' ? undefined : resizeRailState}
           role="separator"
@@ -356,7 +355,7 @@ export function FocusModeSidebarReveal({
           onMouseLeave={handleResizeRailMouseLeave}
         >
           <ResizeHandleLine />
-        </div>
+        </WindowChromeInteractiveRegion>
       </div>
     </div>
   )

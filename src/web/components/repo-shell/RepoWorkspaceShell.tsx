@@ -7,6 +7,7 @@ import {
 import { CompactRepoWorkspace, RepoWorkspace } from '#/web/components/Layout.tsx'
 import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
 import { WINDOW_CHROME_HEIGHT_PX } from '#/shared/window-chrome.ts'
+import { WindowChromeDragRegion } from '#/web/components/window-chrome-region.tsx'
 
 interface RepoWorkspaceShellProps {
   repoId?: string
@@ -78,11 +79,10 @@ export function RepoWorkspaceShell({
     <section className="relative flex min-w-0 flex-1 flex-col">
       {renderWorkspaceBody(branchWorkspacePane, branchNavigatorPane)}
       {focusToggleEnabled && !compact ? (
-        <div
+        <WindowChromeDragRegion
           data-testid="focus-mode-toggle-overlay"
-          data-interactive
           data-focus-reveal-surface={focusRevealEnabled ? '' : undefined}
-          className="goblin-focus-reveal-trigger-layer pointer-events-none absolute left-0 top-0 z-40 flex items-center bg-transparent"
+          className="pointer-events-none absolute left-0 top-0 z-40 flex items-center bg-transparent"
           style={{ height: WINDOW_CHROME_HEIGHT_PX }}
         >
           <FocusModeSidebarRevealTrigger
@@ -90,7 +90,7 @@ export function RepoWorkspaceShell({
             onMouseEnter={focusSidebar.onTriggerEnter}
             onMouseLeave={focusSidebar.onTriggerLeave}
           />
-        </div>
+        </WindowChromeDragRegion>
       ) : null}
       {focusSidebar.rendered && !compact ? (
         <FocusModeSidebarReveal
