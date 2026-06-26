@@ -67,6 +67,8 @@ export interface BranchWorkspacePaneTabModel {
   worktreePath: string | null
   worktreeTerminalKey: string | null
   terminalBase: TerminalSlotBase | null
+  terminalCreatePending: boolean
+  terminalSyncReady: boolean
   /** Single branch-scoped workspace pane tab strip order. */
   tabOrder: WorkspacePaneTabOrderEntry[]
   /** Open static workspace pane views derived from tabOrder. */
@@ -152,6 +154,8 @@ export function createBranchWorkspacePaneTabModel(
     worktreeTerminalKey: worktreeKey,
     terminalBase:
       input.branchName && worktreePath ? { repoRoot: input.repoId, branch: input.branchName, worktreePath } : null,
+    terminalCreatePending: input.terminalCreatePending ?? false,
+    terminalSyncReady: input.terminalSyncReady,
     tabOrder,
     staticViews,
     terminalViews,

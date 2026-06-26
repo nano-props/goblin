@@ -276,6 +276,7 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
         if (
           current &&
           current.closingIdentity === context.closingIdentity &&
+          current.wasActive === context.wasActive &&
           current.previousTabIdentities.length === context.previousTabIdentities.length &&
           current.previousTabIdentities.every((id, i) => id === context.previousTabIdentities[i])
         ) {

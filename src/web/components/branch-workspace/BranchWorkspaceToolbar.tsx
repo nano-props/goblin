@@ -3,8 +3,6 @@ import { ArrowLeft } from 'lucide-react'
 import { useT } from '#/web/stores/i18n.ts'
 import { Button } from '#/web/components/ui/button.tsx'
 import { Tip } from '#/web/components/Tip.tsx'
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
-import { useTerminalRepoSyncReady, useWorktreeTerminalSnapshot } from '#/web/components/terminal/terminal-slot-store.ts'
 import { useTerminalSlotContext } from '#/web/components/terminal/terminal-slot-context.ts'
 import {
   WorkspacePaneViewStrip,
@@ -24,7 +22,7 @@ import type {
   BranchWorkspaceRepo,
   SelectedBranchWorkspacePresentation,
 } from '#/web/components/branch-workspace/model.ts'
-import { useBranchWorkspacePaneTabModel } from '#/web/components/branch-workspace/use-branch-workspace-pane-tab-model.ts'
+import type { BranchWorkspacePaneTabModel } from '#/web/components/branch-workspace/workspace-pane-tab-model.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import { useIsInitialSyncInFlight } from '#/web/stores/repo-sync.ts'
@@ -46,10 +44,17 @@ interface Props {
   repo: BranchWorkspaceRepo
   detail: SelectedBranchWorkspacePresentation
   workspacePaneId: string
+  workspacePaneTabModel: BranchWorkspacePaneTabModel
   trafficLightOffset?: boolean
 }
 
-export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId, trafficLightOffset = false }: Props) {
+export function BranchWorkspaceToolbar({
+  repo,
+  detail,
+  workspacePaneId,
+  workspacePaneTabModel,
+  trafficLightOffset = false,
+}: Props) {
   const t = useT()
   const navigation = useMainWindowNavigation()
   const compact = useIsCompactUi()
@@ -59,18 +64,12 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId, trafficL
   // repo-sync store which the Provider updates via markReady() at the end
   // of every syncServerSlots.
   const isInitialSyncInFlight = useIsInitialSyncInFlight(repo.id)
-  const terminalWorktreeKey = detail.branch?.worktree?.path
-    ? worktreeTerminalKey(repo.id, detail.branch.worktree.path)
-    : null
   const branchName = detail.branch?.name ?? null
   const preferredWorkspacePaneView = preferredWorkspacePaneViewForBranch(repo.ui, branchName)
   const showBranchLevelTabs = !!detail.branch
 
   const { createTerminal, selectTerminal, scrollToBottom } = useTerminalSlotContext()
 
-  const worktreeSnapshot = useWorktreeTerminalSnapshot(terminalWorktreeKey)
-  const terminalSyncReady = useTerminalRepoSyncReady(repo.id)
-  const workspacePaneTabModel = useBranchWorkspacePaneTabModel(repo, detail)
   const workspacePaneTabFocusRegistry = useFocusRegistry<string, HTMLButtonElement>()
 
   const terminalBase = useMemo<TerminalSlotBase | null>(
@@ -151,8 +150,8 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId, trafficL
         if (tab.kind === 'pending') {
           const label = terminalWorkspacePaneTabProvider.pendingLabel({
             t,
-            terminalCreatePending: worktreeSnapshot.pendingCreate,
-            terminalSyncReady,
+            terminalCreatePending: workspacePaneTabModel.terminalCreatePending,
+            terminalSyncReady: workspacePaneTabModel.terminalSyncReady,
           })
           return createPendingWorkspacePaneTabItem({
             type: tab.type,
@@ -178,9 +177,9 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId, trafficL
     [
       branchName,
       detail.statusCount,
-      terminalSyncReady,
       t,
-      worktreeSnapshot.pendingCreate,
+      workspacePaneTabModel.terminalCreatePending,
+      workspacePaneTabModel.terminalSyncReady,
       workspacePaneTabModel.tabs,
       workspacePaneId,
     ],
@@ -250,7 +249,7 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId, trafficL
           {compact && branchWorkspaceBackAction}
           {showBranchLevelTabs && (
             <WorkspacePaneViewStrip
-              worktreeTerminalKey={terminalWorktreeKey}
+              worktreeTerminalKey={workspacePaneTabModel.worktreeTerminalKey}
               items={workspacePaneTabItems}
               workspacePaneId={workspacePaneId}
               activeTabIdentity={activeTabIdentity}
@@ -261,7 +260,7 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId, trafficL
               // While a real terminal create is in flight, the tab model
               // contributes a pending terminal tab. Additional creates stay
               // disabled through the New Terminal affordance.
-              newTerminalBusy={isInitialSyncInFlight || worktreeSnapshot.pendingCreate}
+              newTerminalBusy={isInitialSyncInFlight || workspacePaneTabModel.terminalCreatePending}
               onNew={handleNewTerminal}
               onSelect={handleSelectWorkspacePaneTabItem}
               onScrollToBottom={handleScrollToBottom}

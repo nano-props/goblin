@@ -3,7 +3,11 @@ import type {
   BranchWorkspaceRepo,
   SelectedBranchWorkspacePresentation,
 } from '#/web/components/branch-workspace/model.ts'
-import { createBranchWorkspacePaneTabModel } from '#/web/components/branch-workspace/workspace-pane-tab-model.ts'
+import {
+  createBranchWorkspacePaneTabModel,
+  type BranchWorkspacePaneTabModel,
+  type BranchWorkspacePaneTabModelInput,
+} from '#/web/components/branch-workspace/workspace-pane-tab-model.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
 import {
   useTerminalRepoSyncReady,
@@ -13,19 +17,30 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { workspacePaneTabOrderForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
 
-/**
- * Builds the workspace pane tab model and keeps the per-worktree terminal
- * selection in the repos store in sync with the model's resolved active tab.
- *
- * This makes the workspace pane tab model the single authority for which
- * workspace tab is active: the model reads `selectedTerminalByWorktree`,
- * resolves the active terminal tab, and writes the key back only when the
- * model resolves a different terminal than the one already recorded.
- */
+export interface BranchWorkspacePaneTabModelInputState {
+  input: BranchWorkspacePaneTabModelInput
+  selectedTerminalKey: string | undefined
+}
+
 export function useBranchWorkspacePaneTabModel(
   repo: Pick<BranchWorkspaceRepo, 'id' | 'ui'>,
   detail: SelectedBranchWorkspacePresentation,
 ) {
+  const { input, selectedTerminalKey } = useBranchWorkspacePaneTabModelInput(repo, detail)
+  const model = useMemo(() => createBranchWorkspacePaneTabModel(input), [input])
+  useSyncBranchWorkspacePaneTerminalSelection(model, selectedTerminalKey)
+  return model
+}
+
+/**
+ * Reads repo and terminal-runtime state and packages the pure tab-model input.
+ * No writes happen here; this is the data boundary into the workspace pane tab
+ * projection.
+ */
+export function useBranchWorkspacePaneTabModelInput(
+  repo: Pick<BranchWorkspaceRepo, 'id' | 'ui'>,
+  detail: SelectedBranchWorkspacePresentation,
+): BranchWorkspacePaneTabModelInputState {
   const { branch } = detail
   const branchName = branch?.name ?? null
   const worktreePath = branch?.worktree?.path ?? null
@@ -36,7 +51,6 @@ export function useBranchWorkspacePaneTabModel(
   const selectedTerminalKey = useReposStore((s) =>
     terminalWorktreeKey ? s.selectedTerminalByWorktree[terminalWorktreeKey] : undefined,
   )
-  const setSelectedTerminal = useReposStore((s) => s.setSelectedTerminal)
 
   const workspacePaneTabOrder = useMemo(
     () => workspacePaneTabOrderForBranch(repo.ui, branchName),
@@ -55,21 +69,20 @@ export function useBranchWorkspacePaneTabModel(
 
   const modelSelectedTerminalKey = terminalWorktreeKey ? (selectedTerminalKey ?? null) : null
 
-  const model = useMemo(
-    () =>
-      createBranchWorkspacePaneTabModel({
-        repoId: repo.id,
-        branchName,
-        worktreePath,
-        preferredView,
-        tabOrder: workspacePaneTabOrder,
-        runtimeTerminalViews: worktreeSnapshot.slots,
-        terminalSessionCount: worktreeSnapshot.count,
-        terminalCreatePending: worktreeSnapshot.pendingCreate,
-        terminalSyncReady,
-        lastClosedTabContext,
-        selectedTerminalKey: modelSelectedTerminalKey,
-      }),
+  const input = useMemo<BranchWorkspacePaneTabModelInput>(
+    () => ({
+      repoId: repo.id,
+      branchName,
+      worktreePath,
+      preferredView,
+      tabOrder: workspacePaneTabOrder,
+      runtimeTerminalViews: worktreeSnapshot.slots,
+      terminalSessionCount: worktreeSnapshot.count,
+      terminalCreatePending: worktreeSnapshot.pendingCreate,
+      terminalSyncReady,
+      lastClosedTabContext,
+      selectedTerminalKey: modelSelectedTerminalKey,
+    }),
     [
       repo.id,
       branchName,
@@ -85,13 +98,24 @@ export function useBranchWorkspacePaneTabModel(
     ],
   )
 
-  useEffect(() => {
-    if (!terminalWorktreeKey) return
-    const activeTab = model.activeTab
-    if (activeTab?.kind !== 'terminal') return
-    if (activeTab.key === selectedTerminalKey) return
-    setSelectedTerminal(terminalWorktreeKey, activeTab.key)
-  }, [terminalWorktreeKey, model.activeTab, selectedTerminalKey, setSelectedTerminal])
+  return useMemo(() => ({ input, selectedTerminalKey }), [input, selectedTerminalKey])
+}
 
-  return model
+/**
+ * Mirrors the model's resolved active terminal into the repos store. Keeping
+ * this separate from input collection makes the single write-side effect in
+ * the tab-model hook explicit.
+ */
+export function useSyncBranchWorkspacePaneTerminalSelection(
+  model: Pick<BranchWorkspacePaneTabModel, 'activeTab' | 'worktreeTerminalKey'>,
+  selectedTerminalKey: string | undefined,
+): void {
+  const setSelectedTerminal = useReposStore((s) => s.setSelectedTerminal)
+  const activeTerminalKey = model.activeTab?.kind === 'terminal' ? model.activeTab.key : null
+
+  useEffect(() => {
+    if (!model.worktreeTerminalKey || !activeTerminalKey) return
+    if (activeTerminalKey === selectedTerminalKey) return
+    setSelectedTerminal(model.worktreeTerminalKey, activeTerminalKey)
+  }, [activeTerminalKey, model.worktreeTerminalKey, selectedTerminalKey, setSelectedTerminal])
 }

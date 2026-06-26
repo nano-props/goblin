@@ -1,4 +1,4 @@
-import { useId, useMemo } from 'react'
+import { useId } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import {
@@ -8,6 +8,7 @@ import {
 } from '#/web/components/branch-workspace/model.ts'
 import { BranchWorkspaceToolbar } from '#/web/components/branch-workspace/BranchWorkspaceToolbar.tsx'
 import { BranchWorkspaceContent } from '#/web/components/branch-workspace/BranchWorkspaceContent.tsx'
+import { useBranchWorkspacePaneTabModel } from '#/web/components/branch-workspace/use-branch-workspace-pane-tab-model.ts'
 import { useBranchActionItems } from '#/web/hooks/useBranchActionItems.ts'
 import { useBranchActionShortcutRegistry } from '#/web/hooks/useBranchActionShortcutRegistry.ts'
 import { BranchActionSurfaceContext } from '#/web/components/branch-workspace/branch-action-surface-context.ts'
@@ -102,7 +103,7 @@ export function BranchWorkspace({
   )
   if (!repo) return null
 
-  const detail = useMemo(() => getSelectedBranchWorkspacePresentation(repo), [repo])
+  const detail = getSelectedBranchWorkspacePresentation(repo)
 
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-background">
@@ -117,17 +118,48 @@ export function BranchWorkspace({
           toolbarTrafficLightOffset={toolbarTrafficLightOffset}
         />
       ) : (
-        <>
-          <BranchWorkspaceToolbar
-            repo={repo}
-            detail={detail}
-            workspacePaneId={workspacePaneId}
-            trafficLightOffset={toolbarTrafficLightOffset}
-          />
-          <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId={workspacePaneId} />
-        </>
+        <BranchWorkspacePane
+          repo={repo}
+          detail={detail}
+          workspacePaneId={workspacePaneId}
+          toolbarTrafficLightOffset={toolbarTrafficLightOffset}
+        />
       )}
     </section>
+  )
+}
+
+interface BranchWorkspacePaneProps {
+  repo: BranchWorkspaceRepo
+  detail: SelectedBranchWorkspacePresentation
+  workspacePaneId: string
+  toolbarTrafficLightOffset?: boolean
+}
+
+function BranchWorkspacePane({
+  repo,
+  detail,
+  workspacePaneId,
+  toolbarTrafficLightOffset = false,
+}: BranchWorkspacePaneProps) {
+  const workspacePaneTabModel = useBranchWorkspacePaneTabModel(repo, detail)
+
+  return (
+    <>
+      <BranchWorkspaceToolbar
+        repo={repo}
+        detail={detail}
+        workspacePaneId={workspacePaneId}
+        trafficLightOffset={toolbarTrafficLightOffset}
+        workspacePaneTabModel={workspacePaneTabModel}
+      />
+      <BranchWorkspaceContent
+        repo={repo}
+        detail={detail}
+        workspacePaneId={workspacePaneId}
+        workspacePaneTabModel={workspacePaneTabModel}
+      />
+    </>
   )
 }
 
@@ -153,13 +185,12 @@ function BranchShortcutHandler({
 
   return (
     <BranchActionSurfaceContext.Provider value={actions}>
-      <BranchWorkspaceToolbar
+      <BranchWorkspacePane
         repo={repo}
         detail={detail}
         workspacePaneId={workspacePaneId}
-        trafficLightOffset={toolbarTrafficLightOffset}
+        toolbarTrafficLightOffset={toolbarTrafficLightOffset}
       />
-      <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId={workspacePaneId} />
     </BranchActionSurfaceContext.Provider>
   )
 }

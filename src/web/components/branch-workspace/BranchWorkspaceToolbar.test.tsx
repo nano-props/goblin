@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 
-import { act } from 'react'
+import { act, type ComponentProps } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { BranchWorkspaceToolbar } from '#/web/components/branch-workspace/BranchWorkspaceToolbar.tsx'
 import { getSelectedBranchWorkspacePresentation } from '#/web/components/branch-workspace/model.ts'
+import { useBranchWorkspacePaneTabModel } from '#/web/components/branch-workspace/use-branch-workspace-pane-tab-model.ts'
 import { TerminalSlotContext, TerminalSlotReadContext } from '#/web/components/terminal/terminal-slot-context.ts'
 import type {
   WorkspacePaneStaticViewType,
@@ -101,6 +102,16 @@ let container: HTMLDivElement | null = null
 let root: Root | null = null
 let queryClient: QueryClient | null = null
 const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+
+type BranchWorkspaceToolbarHarnessProps = Omit<
+  ComponentProps<typeof BranchWorkspaceToolbar>,
+  'workspacePaneTabModel'
+>
+
+function BranchWorkspaceToolbarHarness(props: BranchWorkspaceToolbarHarnessProps) {
+  const workspacePaneTabModel = useBranchWorkspacePaneTabModel(props.repo, props.detail)
+  return <BranchWorkspaceToolbar {...props} workspacePaneTabModel={workspacePaneTabModel} />
+}
 
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
@@ -1070,7 +1081,7 @@ function renderToolbar(options: {
         <MainWindowNavigationProvider value={options.navigation}>
           <TerminalSlotContext.Provider value={commandContext}>
             <TerminalSlotReadContext.Provider value={readContext}>
-              <BranchWorkspaceToolbar
+              <BranchWorkspaceToolbarHarness
                 repo={repo}
                 detail={detail}
                 workspacePaneId="workspace"
