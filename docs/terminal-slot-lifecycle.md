@@ -1,29 +1,14 @@
 # Terminal: session lifecycle correctness
 
-> **Status**: combined bug-fix and design note.
-> All four roots described here are implemented on `main` as of
-> `694c68c`. The type-level atomicity follow-up #1 (§Type-level
-> atomicity) and the takeover atomicity follow-up #5 (§Takeover
-> atomicity) landed on top. The document is retained as the
-> authoritative contract and as a record of why the implementation
-> is shaped the way it is.
->
-> - R0 first-frame atomicity — `d020cd5`, type-level tightening
->   in §Type-level atomicity.
-> - R1 durable close, R2 `slot-closed` broadcast, R3 empty-state
->   CTA — landed together in `fa67adb` (the "wip: snapshot
->   uncommitted tree" baseline; the commit name is from the
->   code-review prep step, the code itself is the stable fix set
->   this document describes).
->
-> Replaces the narrower `terminal-first-frame-fix.md` note, which only
-> described the first-frame atomicity slice of this same symptom family.
+> **Status**: design contract. The fixes described here are implemented.
+> This document is the authoritative spec for terminal session lifecycle
+> behavior; implementation details live in the source, not in these lines.
 
 ## Why this document exists
 
-The terminal feature has surfaced several bugs that look unrelated but
-share one underlying weakness: the `create` path does not own the
-created session's lifecycle end to end.
+The terminal feature surfaced several bugs that looked unrelated but shared
+one underlying weakness: the `create` path did not own the created session's
+lifecycle end to end.
 
 - The first frame depended on a race between `create`, realtime output,
   a follow-up snapshot, and session-list reconciliation. Result: blank
@@ -53,27 +38,26 @@ This document defines the contract that closes that gap.
 
 In scope:
 
-- `create` first-frame protocol (already implemented, summarized below
-  for completeness and to anchor the design rules).
+- `create` first-frame protocol.
 - Durable close on the client — every close must be tracked to server
   ack before a subsequent create in the same repo is allowed to race.
 - `slot-closed` per-session broadcast — multi-window consistency
   without a full repo list rescan.
 - Empty-state CTA on the terminal slot.
+- Takeover atomicity: the takeover response is the authoritative
+  handshake for the new controller's view.
 
 Out of scope:
 
-- Moving `TerminalSlotRegistry` to a client-level singleton
-  lifetime. Tracked as `terminal-roadmap.md` P1.7.
-- Transport-level reconnect / backoff design. Tracked as `terminal.md`
-  / `realtime.md`.
+- Transport-level reconnect / backoff design. Tracked in `docs/terminal.md`
+  and `docs/realtime.md`.
 - Server-side PTY health probes (separate operational concern).
 
 ---
 
 ## User-visible symptoms
 
-The combined symptom list across the three root causes:
+The combined symptom list across the root causes:
 
 - **First terminal opened blank** (R0).
 - **Torn / partially replayed first prompt**, including an isolated
@@ -93,37 +77,30 @@ The combined symptom list across the three root causes:
   knew the snapshot during `create`, but the public response did not
   treat it as the authoritative handshake. The client reconstructed
   the first frame from multiple asynchronous sources.
-- **R1 — Close is fire-and-forget and silent on failure.**
-  `ManagedTerminalSlot.dispose()` calls
-  `void terminalBridge.close(...).catch(() => {})`. A WebSocket
-  mid-request teardown or a race with `closeSocketIfIdle` can drop
-  the close before the server sees it. The PTY stays alive.
-- **R2 — The catalog reuses orphan sessions by key.**
-  `terminal-catalog.ts` returns `action: 'restored'` for any existing
-  session with a controller. Combined with `forceNew: false` in
-  `ensureSession`, the new client attaches to the orphan PTY. There
-  is no explicit per-session close broadcast, so other windows
-  cannot drop their local copy promptly.
-- **R3 — Empty-state slot had no UI affordance.** `TerminalSlot.tsx`
-  renders a bare `<div>` host when `!hasSessions && slotMode === 'opening'`.
+- **R1 — Close was fire-and-forget and silent on failure.**
+  `ManagedTerminalSlot.dispose()` called `terminalBridge.close(...)`
+  with a swallowed rejection. A WebSocket mid-request teardown or a
+  race with idle socket shutdown could drop the close before the
+  server saw it. The PTY stayed alive.
+- **R2 — The catalog reused orphan sessions by key.** The terminal
+  catalog returned `action: 'restored'` for any existing session with
+  a controller. Combined with `forceNew: false`, the new client
+  attached to the orphan PTY. There was no explicit per-session close
+  broadcast, so other windows could not drop their local copy
+  promptly.
+- **R3 — Empty-state slot had no UI affordance.** `TerminalSlot`
+  rendered a bare host when `!hasSessions && slotMode === 'opening'`.
   The `terminal.empty` i18n key was defined but never rendered.
 
 ---
 
 ## R0: First-frame atomicity (`create`)
 
-### Status
-
-Implemented in commit `d020cd5`. This section preserves the design
-rules so they can be cited from the protocol contract; the bug analysis
-is intentionally retained in summary form.
-
 ### Protocol changes
 
-1. `create` now returns the created session's first-frame hydration
+1. `create` returns the created session's first-frame hydration
    data directly. The success payload carries the same class of
-   information the client already relied on for `attach` /
-   `restart`:
+   information the client already relied on for `attach` / `restart`:
    - `ptySessionId`
    - `processName`
    - `canonicalTitle`
@@ -137,7 +114,7 @@ is intentionally retained in summary form.
 
    This makes `create` self-sufficient for the first visible frame.
 
-2. `create` now participates in the realtime pause boundary. The
+2. `create` participates in the realtime pause boundary. The
    server treats `create` like `attach` / `restart` for the purpose
    of buffering per-socket output while the snapshot-bearing
    response is being prepared. The snapshot-bearing response is
@@ -172,63 +149,41 @@ The client was doing an overly strict validation step:
 - required the returned `sessions` list to already include the
   created session.
 
-That extra requirement was removed. When the returned session list
-lags the created session, the client now:
+That extra requirement was removed. The client now trusts the
+authoritative `create` payload for first paint. `create.sessions`
+remains useful for tab-strip and count updates, but a lagging list
+no longer triggers the false-failure toast. If the server claims
+`action: 'created'` yet the catalog `sessions[]` does not echo that
+session, the create is rejected as a half-applied protocol mismatch
+rather than silently fabricating a synthetic entry.
 
-1. trusts the authoritative `create` payload for first paint,
-2. synthesizes temporary projection data if needed,
-3. lets later session-sync / reconciliation catch up normally.
+### Type-level atomicity
 
-### Type-level atomicity (follow-up #1)
+The shared protocol types require the first-frame fields at the type
+level, so a forgotten field surfaces as a compile error rather than a
+runtime crash.
 
-Follow-up #1 from §Suggested follow-ups landed: the shared protocol
-types now require the first-frame fields at the type level, so a
-forgotten field surfaces as a compile error rather than a runtime
-crash. Two changes:
-
-1. A new `TerminalFirstFrame` interface
-   (`src/shared/terminal-types.ts`) is the single source of truth for
+1. A `TerminalFirstFrame` interface is the single source of truth for
    the first-frame handshake. It lifts every field that R0 made
    required (`ptySessionId`, `processName`, `canonicalTitle`, `phase`,
    `message`, `snapshot`, `snapshotSeq`, `controller`, `canonicalCols`,
    `canonicalRows`).
-2. `TerminalAttachResult` no longer accepts `canonicalCols?` /
-   `canonicalRows?` — both are required. The internal server-side
-   `EnsureTerminalCatalogResult` shape was tightened to match.
+2. `TerminalAttachResult` no longer accepts optional `canonicalCols` /
+   `canonicalRows` — both are required.
 3. `TerminalCatalogMutationResult` intersects with `TerminalFirstFrame`
-   instead of `Partial<Extract<TerminalAttachResult, { ok: true }>>`,
-   so every `create` success carries the full first-frame payload at
-   the type level. The client's runtime "missing ptySessionId" check
-   is now redundant for the type-checked paths (and stays as a
-   belt-and-suspenders guard against `unknown`/JSON-blob shapes
-   arriving from the bridge layer).
-
-The client-side fabrication path in `performCreateTerminal` is
-removed: if the server claims `action: 'created'` but the catalog
-`sessions[]` does not echo that session, the create is rejected with
-`error.terminal-create-failed` instead of silently inventing a
-synthetic session entry. The first-frame payload is now the source
-of truth — fabrication was hiding real protocol mismatches
-(half-applied creates that committed the session row but skipped the
-catalog append).
+   instead of a partial attach result, so every `create` success carries
+   the full first-frame payload at the type level. The client's runtime
+   "missing ptySessionId" check stays as a belt-and-suspenders guard
+   against `unknown`/JSON-blob shapes arriving from the bridge layer.
 
 ---
 
 ## R1: Durable close
 
-### Status
-
-Implemented on `main` (landed via `fa67adb`). Registry state
-`pendingCloseBySessionId` (`TerminalSlotRegistry.ts:88`),
-`enqueueDurableClose` (488), `flushPendingClosesForRepo` (517),
-`destroy` rejection (149–160), and the `ManagedTerminalSlot.dispose`
-rewire (851). Coverage in
-`TerminalSlotRegistry.create.test.ts` (durable close describe
-block, lines 215 onward).
-
 ### Why
 
-`ManagedTerminalSlot.dispose()` today:
+`ManagedTerminalSlot.dispose()` used to close server-side sessions
+like this:
 
 ```ts
 for (const ptySessionId of sessionIds) {
@@ -239,74 +194,66 @@ for (const ptySessionId of sessionIds) {
 Two problems:
 
 - `.catch(() => {})` swallows rejections. A WebSocket mid-request
-  teardown (`client-terminal-bridge.ts:104
-rejectPendingSocketRequests`, called from `handleSocketDisconnection`)
-  or a race with `closeSocketIfIdle` can drop the close before the
-  server sees it.
+  teardown or a race with idle socket shutdown can drop the close
+  before the server sees it.
 - The dispose path is not awaited. A subsequent create in the same
   worktree can race ahead, the catalog can still see the orphan PTY
   in its directory, and the catalog returns `action: 'restored'`
   for the same key.
 
-The fix is not "retry with timeout" or "fire-and-forget with
-backoff". It is to make close a tracked operation with the same
-shape as the existing `pendingCreateByWorktree` registry pattern.
-
 ### Design
 
-Mirror the existing `pendingCreateByWorktree` triple
-(`enqueuePendingCreate` / `flushPendingCreate` / `destroy`) for closes.
+Mirror the existing pending-create queue (enqueue / flush /
+destroy) for closes.
 
-**New registry state** (`TerminalSlotRegistry.ts`):
+**New registry state**:
 
 ```ts
-private readonly pendingCloseBySessionId = new Map<
+private readonly pendingCloseByPtySessionId = new Map<
   string,
-  { promise: Promise<void>; resolve: () => void; reject: (err: unknown) => void }
+  {
+    worktreeTerminalKey: string
+    promise: Promise<void>
+    resolve: () => void
+    reject: (error: unknown) => void
+  }
 >()
 ```
 
 **New registry methods**:
 
-- `enqueueDurableClose({ ptySessionId, worktreeTerminalKey })` —
-  called from `ManagedTerminalSlot.dispose()`. Records a pending
-  entry, kicks off `terminalBridge.close` in the background, resolves
-  on server ack, rejects on socket error. The entry is removed from
-  the map on either outcome.
-- `flushPendingClosesForRepo(repoRoot)` — awaited at the top of
-  `performCreateTerminal` so a subsequent create in the same window
-  cannot race with a lost close. Drains all entries whose
-  `worktreeTerminalKey` belongs to the same repo before the create
-  is issued.
+- **Enqueue durable close** — called from `ManagedTerminalSlot` via
+  an injected callback. Records a pending entry, kicks off
+  `terminalBridge.close` in the background, resolves on server ack,
+  rejects on socket error. The entry is removed from the map on
+  either outcome. Concurrent calls for the same `ptySessionId` dedupe
+  to the same promise.
+- **Flush pending closes for the worktree** — awaited inside the
+  create flush for the same worktree so a subsequent create cannot
+  race with a lost close. Drains all entries whose worktree key
+  matches before the create is issued.
   - If the close succeeds, the orphan is gone and the catalog will
     create fresh.
-  - If the close fails (timeout / disconnect), log via
-    `terminalLog.warn` and proceed. The user can `pruneTerminals`
-    from the UI to clean up.
-- `destroy()` — reject and clear the new map, mirroring the
-  `pendingCreateByWorktree` rejection at `destroy()`.
+  - If the close fails (timeout / disconnect), log loudly and
+    proceed. The user can `pruneTerminals` from the UI to clean up.
+- `destroy()` — reject and clear the pending-close map, mirroring the
+  pending-create rejection at `destroy()`.
 
-**Caller change** (`ManagedTerminalSlot.ts`):
+**Caller change**:
 
-- Replace the fire-and-forget loop with
-  `registry.enqueueDurableClose({ ptySessionId, worktreeTerminalKey: this.descriptor.worktreeTerminalKey })`.
+- Replace the fire-and-forget loop with an injected durable-close
+  callback wired to the registry queue.
+- Provide both a synchronous `dispose()` (for backward-compatible
+  callers) and an async `disposeAndWait()` (for callers that need a
+  resource-release barrier).
 - Local view teardown stays synchronous — the next create rebuilds
   from a fresh server-side session.
-- Registry is injected via the constructor alongside `notify` and
-  `onBell`. No back-reference from the class to the registry; the
-  registry installs a callback on the descriptor's `notify` flow.
 
 **Logging**:
 
 - Replace `.catch(() => {})` with logging on both success and failure.
   This is intentionally noisy — the bug is silent today, and any
   future regression must be visible in logs.
-
-```ts
-registry.enqueueDurableClose({ ptySessionId, worktreeTerminalKey }).catch((err) => {
-  terminalLog.warn('durable close failed', { ptySessionId, err })
-})
-```
 
 ### Why this is the root cause, not a patch
 
@@ -315,29 +262,16 @@ registry.enqueueDurableClose({ ptySessionId, worktreeTerminalKey }).catch((err) 
   keeper.
 - The create path does not change; it only waits for the close path
   to settle before issuing. The catalog can still return `action:
-'restored'` — that is correct behavior when an orphan exists; the
+  'restored'` — that is correct behavior when an orphan exists; the
   bug is that the orphan exists when it should not.
 
 ---
 
 ## R2: `slot-closed` broadcast
 
-### Status
-
-Implemented on `main` (landed via `fa67adb`). Protocol variant in
-`src/shared/terminal-socket.ts:30-37`. Server emit in
-`terminal-runtime-actions.ts:144-156`. Client dispatcher branch
-in `client-terminal-bridge.ts:186`. Registry handler
-`handleSessionClosed` in
-`TerminalSlotRegistry.ts:210`. Coverage in
-`terminal-runtime-actions.test.ts` (emits both broadcasts on
-successful close; non-user close does not leak a phantom
-event) and `TerminalSlotRegistry.create.test.ts`
-(handleSessionClosed drops the matching local session).
-
 ### Why
 
-Today, the only way other windows learn a session is gone is the
+The only way other windows learned a session was gone was the
 `sessions-changed` broadcast. That is a full repo list rescan — too
 heavy for "window A just closed a terminal, drop it from window B's
 local view promptly".
@@ -346,7 +280,7 @@ A per-session broadcast is the targeted counterpart.
 
 ### Protocol change
 
-Add to `TerminalRealtimeMessage` in `src/shared/terminal-socket.ts`:
+Add to `TerminalRealtimeMessage`:
 
 ```ts
 | { type: 'slot-closed'; ptySessionId: string; repoRoot: string }
@@ -354,45 +288,41 @@ Add to `TerminalRealtimeMessage` in `src/shared/terminal-socket.ts`:
 
 ### Server emit
 
-In `terminal-runtime-actions.ts`, after `manager.closeSessionForUser(...)`
-returns `true`:
+After a user-initiated close succeeds:
 
 ```ts
 broker.broadcastToUser(userId, {
   type: 'slot-closed',
-  ptySessionId: input.ptySessionId,
+  ptySessionId,
   repoRoot,
 })
 ```
 
 The `repoRoot` is derived from the session's scope. The message is
 sent only to sockets for the same `userId`; other users never see
-the closed session id. The manager
-returns it on the close result, or we look it up via
-`manager.findSessionById(ptySessionId)` before closing.
+the closed session id. Internal/non-user closes (PTY exit, shutdown)
+do **not** emit `slot-closed`; those paths rely on the broader
+session-sync primitives.
 
 ### Client dispatcher
 
-`src/web/client-terminal-bridge.ts`:
-
-- Add `sessionClosedSubscribers: Set<(event) => void>` and include
-  it in `hasRealtimeSubscribers()`.
-- Add a dispatcher branch for `message.type === 'slot-closed'`
-  in the same switch that handles `output` / `title` / `exit` /
-  `identity` / `lifecycle` / `sessions-changed`.
-- Expose `onSessionClosed(cb)` on the returned bridge and add a
-  matching method to `ClientTerminalBridge` in
-  `src/web/client-bridge-types.ts`.
+The terminal bridge exposes `onSlotClosed(cb)` and dispatches the
+`slot-closed` variant in the same switch that handles `output`,
+`title`, `exit`, `identity`, `lifecycle`, and `sessions-changed`.
 
 ### Registry subscribes
 
-`TerminalSlotProvider.tsx`: mirror the `onExit` pattern. On
-`slot-closed`:
+The provider mirrors the `onExit` pattern. On `slot-closed`:
 
 ```ts
-const key = sessionKeyBySessionId.get(event.ptySessionId)
-if (key) registry.discardLocalSessionAndDismissDetailIfLast(key, descriptor)
+terminalBridge.onSlotClosed((event) => {
+  registry.handleSlotClosed(event.ptySessionId)
+})
 ```
+
+The registry drops the matching local session without issuing a
+second server close (the originating window already disposed the
+local entry, and the server has already killed the PTY).
 
 This handles the case where window A's close drops the socket
 mid-flight and window B's server-side close still emits the broadcast
@@ -410,46 +340,22 @@ a coherent event across the system, not just a local view teardown.
 
 ## R3: Empty-state CTA
 
-### Status
-
-Implemented on `main` (landed via `fa67adb`). `EmptyTerminalCta`
-component (`TerminalSlot.tsx:471-509`) renders the overlay with
-`terminal.empty` title and `terminal.new` button when
-`slotMode === 'opening' && !hasSessions`. The button's
-`creating` local state guards against double-click; on failure the
-slot toasts `error.terminal-create-failed`. i18n keys present in
-all four locales (`en` 331, `zh` 311, `ja` 326, `ko` 319 for
-`terminal.new`; `en` 335, `zh` 315, `ja` 330, `ko` 323 for
-`terminal.empty`). Coverage in `TerminalSlot.test.tsx` (success
-path renders the CTA + click triggers createTerminal; failure
-path toasts).
-
 ### Why
 
-`TerminalSlot.tsx` renders a bare `<div>` host when `!hasSessions &&
-slotMode === 'opening'`. The user has to guess where to click. The
-`terminal.empty` i18n key is defined but never wired. The dead
-branch at `TerminalSlot.tsx:419` shows the gate was planned but
-never built.
+`TerminalSlot` rendered a bare host when `!hasSessions &&
+slotMode === 'opening'`. The user had to guess where to click. The
+`terminal.empty` i18n key was defined but never rendered.
 
 ### Design
 
-When `!hasSessions && slotMode === 'opening'`, render an overlay
+When `slotMode === 'opening' && !hasSessions`, render an overlay
 with a "New terminal" button.
 
-- Reuse `terminal.new` (defined in `en.ts:331`, wired up in
-  `BranchWorkspaceToolbar.tsx`).
-- Reuse `terminal.empty` if already defined; add to locales that
-  lack it.
-- Compute `terminalBase` from the slot's `repoRoot` / `branch` /
-  `worktreePath` props (already on `TerminalSlotProps`).
-- The button calls `createTerminal(base)` from the slot's
-  `useTerminalSlotContext`.
-- On failure, toast via the existing `sonner` import in
-  `TerminalSlot.tsx`.
-
-Gate the existing dead branch at `TerminalSlot.tsx:419` on the new
-condition.
+- Reuse the existing `terminal.new` and `terminal.empty` i18n keys.
+- The button calls the slot's create handler with the worktree's
+  base (`repoRoot`, `branch`, `worktreePath`).
+- Guard against double-click with a local `creating` state.
+- On failure, toast via the existing terminal-create error path.
 
 ### Why this is part of the same fix family
 
@@ -461,42 +367,32 @@ report.
 
 ---
 
-## Takeover atomicity (follow-up #5)
+## Takeover atomicity
 
 ### Status
 
-Implemented on `main`. The `terminal.takeover` response is now
-the authoritative handshake for the new controller's view; the
-realtime `identity` event keeps the same shape (and the same
-authority role) for the _other_ control-change paths
-(controller crash, sibling auto-claim after disconnect, fresh
-attach). The client no longer waits for a follow-up
-`identity` event before painting the post-takeover frame.
+Implemented. The `terminal.takeover` response is now the
+authoritative handshake for the new controller's view; the realtime
+`identity` event keeps the same shape (and the same authority role)
+for the _other_ control-change paths (controller crash, sibling
+auto-claim after disconnect, fresh attach). The client no longer
+waits for a follow-up `identity` event before painting the
+post-takeover frame.
 
 ### The two-step handshake that was
 
 Before this change, `terminal.takeover` returned only
 `{ ok, ptySessionId, controller }`. The client treated the
 realtime `identity` event as the authority and used the bridge
-response only to "trigger the server-side handoff". The
-comment in `ManagedTerminalSlot.takeover()` was explicit:
-
-> "Identity changes are applied exclusively via authoritative
-> onIdentity realtime messages. The bridge response is only used
-> to trigger the server-side handoff."
+response only to "trigger the server-side handoff".
 
 The cost was a stale window between the response settling and the
 `onIdentity` event arriving:
 
-- `runtime.canResize()` returned `false` (the pre-PR gate, the
-  same `phase === 'open' && role === 'controller'` predicate
-  later renamed to `canSendInput()` by the identity/lifecycle
-  split), so any resize the user fired in that window was
-  short-circuited at `flushResize` and never reached the PTY.
-- User keystrokes typed in that window were dropped at the
-  input gate.
-- The takeover spinner cleared only after the realtime event
-  arrived (~50–100ms after the response).
+- Input gates returned `false` because the runtime still saw the old
+  role, so keystrokes and resizes fired in that window were dropped.
+- The takeover spinner cleared only after the realtime event arrived
+  (~50–100ms after the response).
 
 This violated the same "atomicity" R0 enforced for `create` /
 `attach` / `restart`: the client had to wait for a separate
@@ -505,40 +401,33 @@ response.
 
 ### What changed
 
-1. `TerminalTakeoverResult` now carries the full first-frame
-   payload on the success branch — `role`,
-   `controllerStatus`, `canonicalCols`, `canonicalRows`, `phase`,
-   alongside the existing `controller`. The shape mirrors
-   `TerminalFirstFrame` minus the snapshot fields
+1. `TerminalTakeoverResult` carries the full first-frame payload on
+   the success branch — `role`, `controllerStatus`, `canonicalCols`,
+   `canonicalRows`, `phase`, alongside the existing `controller`. The
+   shape mirrors `TerminalFirstFrame` minus the snapshot fields
    (`snapshot`, `snapshotSeq`) — takeover doesn't return a fresh
    snapshot because the new controller keeps whatever the viewer
-   was already showing (no need to re-fetch the buffer).
+   was already showing.
 2. `TerminalIdentityEvent` and the client-side
    `TerminalIdentityViewModel` keep the same role/geometry shape
-   as the takeover response. Both surfaces carry the same
-   fields, and the client can apply either without re-checking
-   what fields it has.
-3. The server-side `TerminalSlotManager.takeoverResult`
-   builder now reads `session.cols`, `session.rows`,
-   `session.phase` synchronously after the identity effect
-   runs and packs them into the response. The realtime
-   `emitIdentity` payload carries `canonicalCols` and
-   `canonicalRows` (no `phase`) for the non-takeover paths.
-4. `TerminalSlotState.applyIdentity` accepts role, status, and
-   canonical size, while `applyLifecycle` accepts phase and
-   message. The two are disjoint, so a transitional phase update
-   can never look like a role change at the apply boundary.
-5. `ManagedTerminalSlot.takeover()` now awaits the response
-   and calls `runtime.applyTakeover(result)`, a new method that
-   feeds the response into the identity + lifecycle apply
-   path. The previous `.catch(() => {})` becomes
-   `terminalLog.warn('takeover failed ...')` to mirror the
-   `terminal.ts:resize` rejection pattern.
-6. `ManagedTerminalSlot.handleIdentity` and the bridge
-   conversion in `client-terminal-bridge.ts` were aligned to
-   route the role / status / canonical-size fields through the
-   new identity channel, with `handleLifecycle` carrying phase
-   and message on a separate channel.
+   as the takeover response. Both surfaces carry the same fields,
+   and the client can apply either without re-checking what fields
+   it has.
+3. The server-side takeover builder reads session geometry and phase
+   synchronously after the identity effect runs and packs them into
+   the response. The realtime `identity` payload carries the same
+   role/status/canonical-size fields for the non-takeover paths.
+4. Identity and lifecycle application are split: identity carries
+   role/status/geometry; lifecycle carries phase/message. The two
+   are disjoint, so a transitional phase update can never look like
+   a role change at the apply boundary.
+5. The client awaits the takeover response and applies it through
+   `runtime.applyTakeover(result)`, which feeds the response into
+   the identity + lifecycle apply path in one shot. Takeover
+   failures are logged instead of swallowed.
+6. The bridge conversion and the runtime's identity handler are
+   aligned to route role/status/geometry through the identity
+   channel and phase/message through the lifecycle channel.
 
 ### What is _not_ changed
 
@@ -550,9 +439,9 @@ A subsequent realtime event for the _same_ ptySessionId after a
 successful takeover is treated as a benign re-apply with
 identical values (no-op).
 
-`TerminalSlot` and `BranchWorkspaceToolbar` UI are unchanged — they
-read `role` / `controllerStatus` from the runtime and simply see
-the new values arrive one round-trip sooner.
+The terminal slot and workspace-toolbar UI are unchanged — they
+read role / controller status from the runtime and simply see the
+new values arrive one round-trip sooner.
 
 ### Multi-window safety
 
@@ -567,90 +456,40 @@ arrive at the same final state.
 
 ### Verification
 
-- `bun run test` — all 1425 tests pass (added 2 takeover tests
-  asserting the new authoritative contract; flipped 2 existing
-  tests that asserted the old "wait for the realtime event"
-  behavior).
-- `bun run typecheck` — clean (the new fields propagate through
-  every typed surface; the inline `TerminalIdentityViewModel`
-  literal at `TerminalSlotRegistry.handleIdentity` and in
-  the test files were collapsed to the named type so future
-  field additions propagate automatically).
-- `terminal.test.ts` — wire-format identity message carries
-  role/status/canonical-size only, with phase on the separate
-  `lifecycle` channel.
-- `terminal-runtime.test.ts` — two takeover success assertions
-  updated to the new 7-field shape; the existing
-  `expect(identityMessage).toMatchObject({...})` for the
-  realtime emission already accepts the new fields as an
-  additive change.
+- Add or update tests asserting that the takeover response carries
+  role/status/geometry/phase and that the runtime applies them
+  without waiting for a realtime event.
+- Add or update tests asserting that the subsequent realtime
+  `identity` event is idempotent.
+- Add or update wire-format tests asserting that the realtime
+  identity message carries role/status/geometry and that phase lives
+  on the separate lifecycle channel.
 
 ### Out of scope
 
 - No restructuring of who-emits-when for the realtime event.
 - `TerminalFirstFrame` is unchanged — takeover borrows its shape
   but doesn't need to extend it.
-- Task #70 (P2 contract tests) — separate phase.
 
 ---
 
 ## Implementation history
 
-All four roots landed on `main`:
+All four roots landed historically. The code has since been
+refactored into `src/web/components/terminal/` and
+`src/server/terminal/`. The contract in this document is the
+stable part; file paths and internal method names are subject to
+further refactoring.
 
-- **R0** (first-frame atomicity) — `d020cd5`.
-- **R1, R2, R3** landed together in `fa67adb`. The commit name is
-  "wip: snapshot uncommitted tree"; that is a code-review prep
-  label (the commit message says "Captures everything in the
-  working tree at the start of the code-review pass so subsequent
-  fixes (#15-#23) can be reviewed as atomic commits against this
-  baseline"). The R1/R2/R3 code in `fa67adb` is the stable fix
-  set this document describes — it is not a draft. Treat those
-  three as implemented at `fa67adb` for any forward-looking
-  planning.
+Had the fix set been split into separate commits, the notional
+order would have been:
 
-Follow-up #5 from §Suggested follow-ups also landed: takeover's
-two-step handshake (response + realtime `identity` event) was
-collapsed into a single authoritative handshake, with the realtime
-event kept as the authority only on the non-takeover paths. See
-§Takeover atomicity (follow-up #5).
-
-For reference, the notional landing order _had_ this fix set been
-split into separate commits (it was not, due to the wip-snapshot
-baseline):
-
-### P1 — Client-only, lowest risk
-
-R3: empty-state CTA.
-
-- Client-only. No protocol change, no registry change.
-- i18n key already defined in all four locales.
-- No risk of regressing existing terminal flows.
-- Visible UX win on its own.
-
-### P2 — Protocol addition
-
-R2: `slot-closed` broadcast.
-
-- Adds a new `TerminalRealtimeMessage` variant. Additive — old
-  subscribers ignore the new variant.
-- Cross-window behavior change but no behavior regression.
-
-### P3 — Largest blast radius
-
-R1: durable close.
-
-- Required injecting the registry into `ManagedTerminalSlot`'s
-  constructor.
-- Changed `dispose()` semantics — every dispose path now goes
-  through the pending-close map. Existing dispose tests had to be
-  updated to await the pending close.
-- Added a sequencing step at the top of `performCreateTerminal`
-  (await `flushPendingClosesForRepo`). Existing registry tests that
-  raced close + create in the same worktree were reviewed in
-  lockstep.
-
-**Suggested (notional) order had it been split**: R3 → R2 → R1.
+1. **R3: empty-state CTA** — client-only, lowest risk, visible UX win.
+2. **R2: `slot-closed` broadcast** — additive protocol change, no
+   behavior regression.
+3. **R1: durable close** — largest blast radius, requires injecting
+   the durable-close queue into the slot disposal path and sequencing
+   close-before-create in the registry.
 
 ---
 
@@ -658,44 +497,18 @@ R1: durable close.
 
 ### Per fix — existing coverage
 
-**R0**:
-
-- `TerminalSlotProvider.test.tsx` test mocks supply the new
-  first-frame hydration fields on both `created` and `reused`
-  paths. Registry-side validation in
-  `TerminalSlotRegistry.create.test.ts` covers the
+- **R0**: provider tests supply the new first-frame hydration fields
+  on both `created` and `reused` paths; registry tests cover the
   `create.ptySessionId` + `snapshot` + `snapshotSeq` rule.
-
-**R1** — `TerminalSlotRegistry.create.test.ts`
-(`describe('durable close')`):
-
-- `awaits an in-flight close for the same worktree before creating`
-  (215).
-- `failures do not block the next create` (264).
-- `deduplicates concurrent enqueues for the same session` (289).
-- `destroys reject pending entries` (318).
-- `handleSessionClosed drops the matching local session` (336).
-
-**R2**:
-
-- `terminal-runtime-actions.test.ts`:
-  - `emits BOTH sessions-changed and session-closed on a successful
-close` (56).
-  - A non-user close does not leak a phantom `slot-closed`
-    event (84).
-  - A failed close path does not synthesize a `slot-closed`
-    with a fake repoRoot (100, 129).
-- `TerminalSlotProvider.test.tsx`: `slot-closed` mocks feed
-  the registry's `handleSessionClosed` path (already exercised by
-  the R1 durable-close test above).
-
-**R3** — `TerminalSlot.test.tsx`:
-
-- Renders the empty-state CTA when `!hasSessions` (success path
-  asserts aria-label, title text, and button text match the
-  i18n keys; click triggers `createTerminal` with the right args).
-- `empty-state CTA failure toasts error.terminal-create-failed`
-  (1361).
+- **R1**: registry durable-close tests cover awaiting an in-flight
+  close before creating, failures not blocking the next create,
+  deduplicating concurrent enqueues, destroying pending entries, and
+  dropping the local session on `slot-closed`.
+- **R2**: runtime-action tests cover emitting both broadcasts on
+  successful user close, non-user closes not leaking phantom events,
+  and failed closes not synthesizing fake broadcasts.
+- **R3**: slot tests cover rendering the CTA when the slot has no
+  sessions, click triggering create, and failure toasting.
 
 ### Manual smoke (still applicable as a regression check)
 
@@ -714,10 +527,8 @@ close` (56).
 
 ### Global
 
-- `bun run test` — all 1419 tests pass.
-- `bun run typecheck` — clean (architecture + no-html-injection +
-  all 3 tsconfig projects).
-- `bun run lint` (if present) — clean.
+- `bun run test` — passing.
+- `bun run typecheck` — clean.
 
 ---
 
@@ -735,8 +546,8 @@ any individual implementation:
    immediately see; they all owe the same atomic handshake.
 3. **Close is durable.** `dispose()` must not be fire-and-forget on
    the server side. The registry owns pending close state.
-4. **Close is a broadcast event.** When the server confirms a close,
-   other windows learn about it through `slot-closed`, not
+4. **Close is a broadcast event.** When the server confirms a user
+   close, other windows learn about it through `slot-closed`, not
    through a full reconcile.
 5. **A subsequent create in the same worktree must await in-flight
    closes in that worktree.** The catalog must never hand back an
@@ -746,48 +557,40 @@ any individual implementation:
    zero sessions must show the affordance to open one.
 7. **Treat React/provider lifetime concerns separately from terminal
    protocol correctness.** The first-frame fix and the singleton
-   lifetime cleanup (P1.7) are related but separate.
+   registry lifetime cleanup are related but separate.
+8. **Takeover is authoritative in its response.** The takeover
+   response carries the new controller's full identity/lifecycle
+   frame; the client applies it synchronously. The realtime
+   `identity` event remains authoritative only for the non-takeover
+   control-change paths.
 
 ---
 
 ## Suggested follow-ups
 
 1. **Done** — tighten the shared `TerminalCatalogMutationResult`
-   type so the first-frame fields are required at the type level,
-   not only by client-side validation. (See §Type-level atomicity.)
-2. **Done (rolled back via `282ea76`)** — Decide explicitly whether
-   the same-session snapshot reapply patch (broadened
-   `ManagedTerminalSlot.hydrate()`) should stay as a supported
-   repair path. The broadened hydrate was rolled back: it
-   re-painted xterm mid-session and caused terminal-emulator
-   protocol replies (OSC color queries) to leak into the PTY
-   stdin path as input pollution. The long-term rule now lives in
+   type so the first-frame fields are required at the type level.
+2. **Done** — decide explicitly that same-session snapshot reapply is
+   not a supported repair path. The long-term rule now lives in
    `docs/terminal.md`: replay side effects are local rendering
-   artifacts and must not be forwarded as user stdin. The first-frame
-   `applyOpenResult` path is the only re-apply route now; same-session
-   re-hydration is a no-op.
-3. **Done (P1.7)** — Decide explicitly whether the delayed
-   provider-destroy heuristic (one-macrotask delay on
-   `TerminalSlotProvider` cleanup) should remain until P1.7
-   lands. P1.7 (`ebb88ef`) supersedes it — the registry is now a
-   client-level singleton, so per-provider destroy debouncing is
-   not needed. The debounce was removed in `f19eba1`.
-4. **Done (P1.7)** — Move `TerminalSlotRegistry` to a client-
-   level singleton lifetime. (See `terminal-roadmap.md` P1.7.)
-5. **Done** — collapse the takeover two-step handshake (response +
-   realtime `identity` event) into a single authoritative
-   handshake, keeping the realtime event as authority only on the
-   non-takeover paths. (See §Takeover atomicity.)
-6. Add a contract-test pass over the terminal invariants listed in
-   `terminal-roadmap.md` P2.
+   artifacts and must not be forwarded as user stdin.
+3. **Done** — move `TerminalSlotRegistry` to a client-level singleton
+   lifetime. The registry is now created on first access and lives
+   for the client's entire lifetime; the provider is only a wiring
+   adapter.
+4. **Done** — collapse the takeover two-step handshake (response +
+   realtime `identity` event) into a single authoritative handshake,
+   keeping the realtime event as authority only on the non-takeover
+   paths.
+5. Add contract tests for the terminal invariants listed in
+   `docs/terminal-roadmap.md` P2.
 
 ---
 
 ## Related documents
 
 - `docs/terminal.md` — terminal system design
-- `docs/terminal-roadmap.md` — refactor roadmap (P1.7, P1.8, P2
-  contract tests)
+- `docs/terminal-roadmap.md` — refactor roadmap
 - `docs/terminal-target-model.md` — terminal target lifecycle and
   control model
 - `docs/realtime.md` — realtime channel discipline that R2's
