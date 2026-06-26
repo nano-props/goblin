@@ -45,6 +45,23 @@ export interface BranchActionCapabilities {
   canOpenFinder: boolean
 }
 
+export interface BranchActions {
+  blocked: boolean
+  busyAction: BranchUiActionOpId | BranchActionItemId | null
+  capabilities: BranchActionCapabilities
+  actions: {
+    copyPatch: () => Promise<boolean>
+    pull: () => void
+    push: () => void
+    openTerminal: (app: TerminalApp) => Promise<ExecResult | null> | undefined
+    openEditor: (app: EditorApp) => Promise<ExecResult | null> | undefined
+    openFinder: () => Promise<ExecResult | null> | undefined
+    openRemote: () => Promise<ExecResult | null>
+    requestDeleteBranch: () => void
+    requestRemoveWorktree: () => void
+  }
+}
+
 export function getBranchActionCapabilities(repo: BranchActionRepo, branch: RepoBranchState): BranchActionCapabilities {
   const isCurrent = branch.name === repo.data.currentBranch
   const isProtected = PROTECTED_BRANCHES.has(branch.name)
@@ -75,7 +92,7 @@ export function getBranchActionCapabilities(repo: BranchActionRepo, branch: Repo
  * workspace-level render point and `branchActionDispatch` for the
  * dispatch functions the dialog uses to commit a confirmed action.
  */
-export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState) {
+export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState): BranchActions {
   const setLastResult = useReposStore((s) => s.setLastResult)
   const runBranchAction = useReposStore((s) => s.runBranchAction)
   const branchActionBusy = isBranchActionBlocked(repo)

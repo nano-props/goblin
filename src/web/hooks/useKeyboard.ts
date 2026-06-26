@@ -207,8 +207,7 @@ export function useKeyboard({
           break
         }
         case 'pull':
-        case 'push':
-        case 'remote': {
+        case 'push': {
           if (overlayOpen || !repo || !repo.ui.selectedBranch) break
           e.preventDefault()
           runBranchActionShortcut(action)

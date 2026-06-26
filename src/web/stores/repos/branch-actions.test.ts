@@ -3,7 +3,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { markRepoOperationTargets, nextRepoOperationId, repoOperation } from '#/web/stores/repos/runtime.ts'
 import { replaceRepo } from '#/web/stores/repos/helpers.ts'
 import { getBranchActionCapabilities } from '#/web/hooks/useBranchActions.tsx'
-import { branchBrowserRemoteProvider } from '#/web/hooks/useBranchActionItems.ts'
+import { branchBrowserRemoteProvider } from '#/web/hooks/useRemoteOpenAction.ts'
 import {
   createBranchSnapshot,
   createRepoBranch,
@@ -70,9 +70,7 @@ function installSuccessfulCreateWorktreeBridge(options?: { onSnapshot?: () => vo
   })
 }
 
-function installSuccessfulCreateWorktreeBridgeWithExistingWorktree(
-  options?: { onSnapshot?: () => void },
-) {
+function installSuccessfulCreateWorktreeBridgeWithExistingWorktree(options?: { onSnapshot?: () => void }) {
   const snapshot = {
     branches: [
       createBranchSnapshot('feature/a', { worktree: { path: '/tmp/gbl-branch-actions-test-repo' } }),

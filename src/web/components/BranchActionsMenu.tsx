@@ -11,6 +11,7 @@ import {
   type BranchActionSurface,
 } from '#/web/hooks/useBranchActionItems.ts'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
+import { useBranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
 import { cn } from '#/web/lib/cn.ts'
 interface Props {
@@ -21,7 +22,8 @@ interface Props {
 }
 
 export function BranchActionsMenu({ repo, branch, open, onOpenChange }: Props) {
-  const { mainItems, destructiveItems } = useBranchActionItems(repo, branch)
+  const branchActions = useBranchActions(repo, branch)
+  const { mainItems, destructiveItems } = useBranchActionItems(repo, branch, branchActions)
 
   // Dialogs are no longer rendered here. The shared
   // `BranchActionDialogHost` is mounted once at the workspace level

@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { BranchWorkspaceToolbar } from '#/web/components/branch-workspace/BranchWorkspaceToolbar.tsx'
 import { getSelectedBranchWorkspacePresentation } from '#/web/components/branch-workspace/model.ts'
+import { useBranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { TerminalSlotContext, TerminalSlotReadContext } from '#/web/components/terminal/terminal-slot-context.ts'
 import type {
   WorkspacePaneStaticViewType,
@@ -26,6 +27,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
+import type { RepoState } from '#/web/stores/repos/types.ts'
 import { WORKSPACE_EXTERNAL_APP_RECENT_STORAGE_KEY } from '#/web/workspace-external-apps-recent.ts'
 import {
   workspacePaneStaticViewsForBranch,
@@ -241,7 +243,7 @@ describe('BranchWorkspaceToolbar', () => {
       navigation: navigationWith({}),
     })
 
-    const trigger = c.querySelector<HTMLButtonElement>('button[aria-label="workspace.external-apps.open"]')
+    const trigger = c.querySelector<HTMLButtonElement>('[data-testid="workspace-open-externally-menu-trigger"]')
     expect(trigger).not.toBeNull()
     const trailingActions = c.querySelector('[data-workspace-toolbar-trailing-actions]')
     expect(trailingActions).not.toBeNull()
@@ -266,6 +268,60 @@ describe('BranchWorkspaceToolbar', () => {
     expect(document.body.textContent).not.toContain('settings.editor.windsurf')
   })
 
+  test('renders the remote/PR item in the open-externally dropdown', async () => {
+    const { container: c } = renderToolbar({
+      terminalCount: 0,
+      navigation: navigationWith({}),
+      remote: { hasBrowserRemote: true, browserRemoteProvider: 'github' },
+    })
+
+    const trigger = c.querySelector<HTMLButtonElement>('[data-testid="workspace-open-externally-menu-trigger"]')
+    expect(trigger).not.toBeNull()
+
+    await act(async () => {
+      trigger?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+      trigger?.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
+      await Promise.resolve()
+    })
+
+    const menuItems = Array.from(document.body.querySelectorAll<HTMLButtonElement>('[role="listitem"] button')).map(
+      (button) => button.textContent,
+    )
+    expect(menuItems).toContain('workspace.open-externally.remote')
+    expect(document.body.textContent).toContain('workspace.open-externally.remote')
+  })
+
+  test('renders the open-externally menu for remote only when no local external apps are available', async () => {
+    useHostInfoStore.setState({
+      snapshot: { homeDir: '/Users/tester', platform: 'win32', hostname: 'test-host', pid: 1 },
+    })
+    runtimeExternalAppSettings.value = {
+      terminalAvailable: false,
+      terminalAppAvailability: { ghostty: false, terminal: false, windowsTerminal: false },
+      editorAvailable: false,
+      editorAppAvailability: { vscode: false, cursor: false, windsurf: false },
+    }
+    const { container: c } = renderToolbar({
+      terminalCount: 0,
+      navigation: navigationWith({}),
+      remote: { hasBrowserRemote: true, browserRemoteProvider: 'github' },
+    })
+
+    const trigger = c.querySelector<HTMLButtonElement>('[data-testid="workspace-open-externally-menu-trigger"]')
+    expect(trigger).not.toBeNull()
+
+    await act(async () => {
+      trigger?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+      trigger?.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
+      await Promise.resolve()
+    })
+
+    const menuItems = Array.from(document.body.querySelectorAll<HTMLButtonElement>('[role="listitem"] button')).map(
+      (button) => button.textContent,
+    )
+    expect(menuItems).toEqual(['workspace.open-externally.remote'])
+  })
+
   test('uses the first visible external app as the split-button primary action without recent state', () => {
     const { container: c } = renderToolbar({
       terminalCount: 0,
@@ -282,7 +338,7 @@ describe('BranchWorkspaceToolbar', () => {
       navigation: navigationWith({}),
     })
 
-    const trigger = c.querySelector<HTMLButtonElement>('button[aria-label="workspace.external-apps.open"]')
+    const trigger = c.querySelector<HTMLButtonElement>('[data-testid="workspace-open-externally-menu-trigger"]')
     expect(trigger).not.toBeNull()
 
     await act(async () => {
@@ -323,7 +379,7 @@ describe('BranchWorkspaceToolbar', () => {
       navigation: navigationWith({}),
     })
 
-    expect(c.querySelector('button[aria-label="workspace.external-apps.open"]')).toBeNull()
+    expect(c.querySelector('button[aria-label="workspace.open-externally.open"]')).toBeNull()
   })
 
   test('renders status and terminal views in one workspace tab strip with a separator', () => {
@@ -932,6 +988,7 @@ function renderToolbar(options: {
   collapsed?: boolean
   pendingCreate?: boolean
   trafficLightOffset?: boolean
+  remote?: Partial<RepoState['remote']>
   /**
    * When true, do NOT mark the repo ready before mounting. The toolbar
    * reads `isInitialSyncInFlight` from the store and renders the
@@ -984,6 +1041,7 @@ function renderToolbar(options: {
           ]
         : [],
     statusLoaded: true,
+    remote: options.remote,
   })
   const detail = getSelectedBranchWorkspacePresentation(repo)
   const sessions: TerminalSlotSummary[] = Array.from({ length: options.terminalCount }, (_, index) => ({
@@ -1068,7 +1126,7 @@ function renderToolbar(options: {
         <MainWindowNavigationProvider value={options.navigation}>
           <TerminalSlotContext.Provider value={commandContext}>
             <TerminalSlotReadContext.Provider value={readContext}>
-              <BranchWorkspaceToolbar
+              <ToolbarHost
                 repo={repo}
                 detail={detail}
                 workspacePaneId="workspace"
@@ -1100,6 +1158,11 @@ function renderToolbar(options: {
       showRepoWorkspacePaneView,
     },
   }
+}
+
+function ToolbarHost(props: Omit<Parameters<typeof BranchWorkspaceToolbar>[0], 'branchActions'>) {
+  const branchActions = useBranchActions(props.repo, props.detail.branch!)
+  return <BranchWorkspaceToolbar {...props} branchActions={branchActions} />
 }
 
 function navigationWith(overrides: Partial<MainWindowNavigationActions>): MainWindowNavigationActions {

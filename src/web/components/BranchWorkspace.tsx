@@ -10,6 +10,7 @@ import { BranchWorkspaceToolbar } from '#/web/components/branch-workspace/Branch
 import { BranchWorkspaceContent } from '#/web/components/branch-workspace/BranchWorkspaceContent.tsx'
 import { useBranchActionItems } from '#/web/hooks/useBranchActionItems.ts'
 import { useBranchActionShortcutRegistry } from '#/web/hooks/useBranchActionShortcutRegistry.ts'
+import { useBranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { BranchActionSurfaceContext } from '#/web/components/branch-workspace/branch-action-surface-context.ts'
 interface Props {
   repoId: string
@@ -148,7 +149,8 @@ function BranchShortcutHandler({
   shortcutsEnabled,
   toolbarTrafficLightOffset = false,
 }: BranchShortcutHandlerProps) {
-  const actions = useBranchActionItems(repo, branch)
+  const branchActions = useBranchActions(repo, branch)
+  const actions = useBranchActionItems(repo, branch, branchActions)
   useBranchActionShortcutRegistry(actions, shortcutsEnabled)
 
   return (
@@ -158,6 +160,7 @@ function BranchShortcutHandler({
         detail={detail}
         workspacePaneId={workspacePaneId}
         trafficLightOffset={toolbarTrafficLightOffset}
+        branchActions={branchActions}
       />
       <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId={workspacePaneId} />
     </BranchActionSurfaceContext.Provider>

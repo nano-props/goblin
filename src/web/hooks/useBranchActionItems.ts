@@ -1,17 +1,13 @@
-import { ArrowDown, ArrowUp, Diff, ExternalLink, GitBranch, GitPullRequest, History, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Diff, GitBranch, History, Trash2 } from 'lucide-react'
 import { createElement, type ReactNode } from 'react'
-import { GitHubOutlineIcon } from '#/web/components/GitHubOutlineIcon.tsx'
-import { GitLabLogoIcon } from '#/web/components/GitLabLogoIcon.tsx'
 import type { RepoBranchState } from '#/web/stores/repos/types.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import { useBranchActions, type BranchActionItemId } from '#/web/hooks/useBranchActions.tsx'
+import { type BranchActions, type BranchActionItemId } from '#/web/hooks/useBranchActions.tsx'
 import {
   branchActionDisplayPhase,
   type BranchActionRepo,
   type BranchCopyPatchAction,
 } from '#/web/hooks/branch-action-state.ts'
-import { branchPullRequestBelongsToBranch } from '#/shared/git-types.ts'
-import type { BrowserRemoteProvider } from '#/web/types.ts'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
 import type { WorkspacePaneBranchViewType, WorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
 import { openWorkspacePaneView } from '#/web/components/branch-workspace/open-workspace-pane-view.ts'
@@ -45,30 +41,14 @@ export function visibleBranchActionItems({
   return [...mainItems, ...destructiveItems].filter((item) => item.visible)
 }
 
-export function branchBrowserRemoteProvider(
+export function useBranchActionItems(
   repo: BranchActionRepo,
   branch: RepoBranchState,
-): BrowserRemoteProvider | undefined {
-  const providers = repo.remote.remoteProviders
-  if (branch.tracking && providers) {
-    const remoteName = Object.keys(providers)
-      .filter((remote) => branch.tracking === remote || branch.tracking!.startsWith(`${remote}/`))
-      .sort((a, b) => b.length - a.length)[0]
-    if (remoteName) return providers[remoteName]
-  }
-  return repo.remote.browserRemoteProvider
-}
-
-function browserRemoteIcon(provider: BrowserRemoteProvider | undefined) {
-  if (provider === 'github') return GitHubOutlineIcon
-  if (provider === 'gitlab') return GitLabLogoIcon
-  return ExternalLink
-}
-
-export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchState): BranchActionSurface {
+  branchActions: BranchActions,
+): BranchActionSurface {
   const t = useT()
   const navigation = useMainWindowNavigation()
-  const { blocked, busyAction, capabilities, actions } = useBranchActions(repo, branch)
+  const { blocked, busyAction, capabilities, actions } = branchActions
   const disabled = blocked
   const busy = (id: BranchActionItemId) => busyAction === id
   const phase = branchActionDisplayPhase(repo, branch.name)
@@ -82,9 +62,6 @@ export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchS
     if (phase === 'queued' && queuedKey) return t(queuedKey)
     return t(loadingKey)
   }
-  const pullRequest =
-    branch.pullRequest && branchPullRequestBelongsToBranch(branch, branch.pullRequest) ? branch.pullRequest : undefined
-  const remoteIcon = pullRequest ? GitPullRequest : browserRemoteIcon(branchBrowserRemoteProvider(repo, branch))
   const openStaticWorkspacePaneView = (type: WorkspacePaneBranchViewType | WorkspacePaneStaticViewType) => {
     void openWorkspacePaneView({
       repoId: repo.id,
@@ -148,18 +125,6 @@ export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchS
       visible: !!branch.worktree?.path,
       icon: createElement(Diff),
       onSelect: () => openStaticWorkspacePaneView('changes'),
-    },
-    {
-      id: 'remote',
-      label: pullRequest ? t('action.remote-pr', { n: pullRequest.number }) : t('action.remote'),
-      disabled,
-      busy: busy('remote'),
-      visible: capabilities.canOpenRemote,
-      shortcut: '⇧G',
-      icon: createElement(remoteIcon),
-      onSelect: () => {
-        void actions.openRemote()
-      },
     },
   ]
 

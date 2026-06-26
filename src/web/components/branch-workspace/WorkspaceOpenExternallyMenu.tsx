@@ -1,12 +1,13 @@
-import { ChevronDown, Loader2 } from 'lucide-react'
+import { ChevronDown, ExternalLink, Loader2 } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 import type { RepoBranchState } from '#/web/stores/repos/types.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { focusRing } from '#/web/components/ui/focus.ts'
 import { Popover, PopoverContent, PopoverTrigger } from '#/web/components/ui/popover.tsx'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
-import { useBranchActions } from '#/web/hooks/useBranchActions.tsx'
+import type { BranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
+import { useRemoteOpenAction } from '#/web/hooks/useRemoteOpenAction.ts'
 import { useRuntimeExternalAppSettings } from '#/web/runtime-settings-external-apps.ts'
 import { remoteRepoTarget } from '#/web/stores/repos/helpers.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
@@ -24,22 +25,24 @@ import { cn } from '#/web/lib/cn.ts'
 interface Props {
   repo: BranchActionRepo
   branch: RepoBranchState
+  branchActions: BranchActions
 }
 
-export function WorkspaceExternalAppsMenu({ repo, branch }: Props) {
+export function WorkspaceOpenExternallyMenu({ repo, branch, branchActions }: Props) {
   const t = useT()
   const worktreePath = branch.worktree?.path
   const [open, setOpen] = useState(false)
   const contentRef = useRef<HTMLDivElement>(null)
   const { pending, run } = useAsyncPending<string>()
-  const { blocked, capabilities, actions } = useBranchActions(repo, branch)
+  const { blocked, capabilities, actions } = branchActions
   const externalApps = useRuntimeExternalAppSettings()
   const hostPlatform = useHostInfoStore((state) => state.snapshot?.platform ?? 'web')
   const isRemoteRepo = remoteRepoTarget(repo.id, repo.remote.lifecycle) !== null
   const finderAvailable = capabilities.canOpenFinder && hostPlatform === 'darwin'
+  const remoteOpenAction = useRemoteOpenAction(repo, branch, branchActions)
   const [recentItemId, setRecentItemId] = useState<string | null>(() => readRecentWorkspaceExternalAppId())
 
-  const visibleItems = useMemo(
+  const localItems = useMemo(
     () =>
       WORKSPACE_EXTERNAL_APPS.filter((item) =>
         workspaceExternalAppItemVisible({
@@ -53,14 +56,15 @@ export function WorkspaceExternalAppsMenu({ repo, branch }: Props) {
     [capabilities, externalApps, finderAvailable, isRemoteRepo],
   )
   const primaryItem = useMemo(
-    () => selectPrimaryWorkspaceExternalApp(visibleItems, recentItemId),
-    [recentItemId, visibleItems],
+    () => selectPrimaryWorkspaceExternalApp(localItems, recentItemId),
+    [recentItemId, localItems],
   )
 
-  if (!worktreePath || !primaryItem || visibleItems.length === 0) return null
+  if (!worktreePath || (localItems.length === 0 && !remoteOpenAction.visible)) return null
 
   const busy = pending !== null || blocked
-  const menuLabel = t('workspace.external-apps.open')
+  const menuLabel = t('workspace.open-externally.open')
+  const hasPrimary = primaryItem !== null
 
   function runItem(item: WorkspaceExternalAppItem) {
     if (busy) return
@@ -74,8 +78,14 @@ export function WorkspaceExternalAppsMenu({ repo, branch }: Props) {
     })
   }
 
-  const PrimaryIcon = primaryItem.Icon
-  const primaryLabel = t(primaryItem.labelKey)
+  function runRemoteItem() {
+    if (busy || remoteOpenAction.disabled || remoteOpenAction.busy || !remoteOpenAction.visible) return
+    setOpen(false)
+    remoteOpenAction.onSelect()
+  }
+
+  const PrimaryIcon = primaryItem?.Icon ?? ExternalLink
+  const primaryLabel = primaryItem ? t(primaryItem.labelKey) : menuLabel
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -93,14 +103,15 @@ export function WorkspaceExternalAppsMenu({ repo, branch }: Props) {
           title={primaryLabel}
           aria-label={primaryLabel}
           aria-busy={busy ? true : undefined}
-          disabled={busy}
-          onClick={() => runItem(primaryItem)}
+          disabled={busy || !hasPrimary}
+          onClick={() => hasPrimary && runItem(primaryItem)}
         >
-          {pending === primaryItem.id ? <Loader2 className="animate-spin" /> : <PrimaryIcon />}
+          {primaryItem && pending === primaryItem.id ? <Loader2 className="animate-spin" /> : <PrimaryIcon />}
         </button>
         <PopoverTrigger asChild>
           <button
             type="button"
+            data-testid="workspace-open-externally-menu-trigger"
             className={cn(
               'flex h-full w-6 cursor-pointer items-center justify-center text-muted-foreground outline-none transition-colors duration-100 hover:bg-control-hover hover:text-foreground disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-3.5 [&_svg]:shrink-0',
               focusRing,
@@ -126,23 +137,28 @@ export function WorkspaceExternalAppsMenu({ repo, branch }: Props) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="space-y-0.5 p-1" role="list">
-          {visibleItems.map((item) => (
+          {localItems.map((item) => (
             <div key={item.id} role="listitem">
-              <WorkspaceExternalAppsItem
+              <WorkspaceOpenExternallyItem
                 item={item}
                 pending={pending}
-                selected={item.id === primaryItem.id}
+                selected={item.id === primaryItem?.id}
                 onSelect={() => runItem(item)}
               />
             </div>
           ))}
+          {remoteOpenAction.visible && (
+            <div key={remoteOpenAction.id} role="listitem">
+              <WorkspaceOpenExternallyRemoteItem action={remoteOpenAction} pending={pending} onSelect={runRemoteItem} />
+            </div>
+          )}
         </div>
       </PopoverContent>
     </Popover>
   )
 }
 
-function WorkspaceExternalAppsItem({
+function WorkspaceOpenExternallyItem({
   item,
   pending,
   selected,
@@ -174,6 +190,35 @@ function WorkspaceExternalAppsItem({
   )
 }
 
+function WorkspaceOpenExternallyRemoteItem({
+  action,
+  pending,
+  onSelect,
+}: {
+  action: ReturnType<typeof useRemoteOpenAction>
+  pending: string | null
+  onSelect: () => void
+}) {
+  return (
+    <button
+      type="button"
+      title={action.title}
+      aria-label={action.ariaLabel}
+      disabled={action.disabled}
+      onClick={onSelect}
+      className={cn(
+        'flex h-8 w-full cursor-pointer items-center gap-2 rounded-sm py-1 pl-2 pr-2 text-left text-sm outline-none transition-colors duration-100 hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50',
+        focusRing,
+      )}
+    >
+      <span className="flex size-4 shrink-0 items-center justify-center text-muted-foreground [&_svg]:size-4 [&_svg]:shrink-0">
+        {action.busy ? <Loader2 size={16} className="animate-spin" /> : action.icon}
+      </span>
+      <span className="min-w-0 flex-1 truncate">{action.label}</span>
+    </button>
+  )
+}
+
 function workspaceExternalAppItemVisible({
   item,
   capabilities,
@@ -182,7 +227,7 @@ function workspaceExternalAppItemVisible({
   isRemoteRepo,
 }: {
   item: WorkspaceExternalAppItem
-  capabilities: ReturnType<typeof useBranchActions>['capabilities']
+  capabilities: BranchActions['capabilities']
   externalApps: ReturnType<typeof useRuntimeExternalAppSettings>
   finderAvailable: boolean
   isRemoteRepo: boolean

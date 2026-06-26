@@ -11,7 +11,7 @@ describe('shortcut definitions', () => {
     expect(matchBranchActionShortcut({ code: 'KeyP', shiftKey: false })).toBe('pull')
     expect(matchBranchActionShortcut({ code: 'KeyP', shiftKey: true })).toBe('push')
     expect(matchBranchActionShortcut({ code: 'KeyG', shiftKey: false })).toBeNull()
-    expect(matchBranchActionShortcut({ code: 'KeyG', shiftKey: true })).toBe('remote')
+    expect(matchBranchActionShortcut({ code: 'KeyG', shiftKey: true })).toBeNull()
     expect(matchBranchActionShortcut({ code: 'KeyV', shiftKey: false })).toBeNull()
     expect(matchBranchActionShortcut({ code: 'KeyV', shiftKey: true })).toBeNull()
   })

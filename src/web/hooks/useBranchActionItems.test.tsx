@@ -79,16 +79,7 @@ describe('useBranchActionItems', () => {
       actionIds = visibleBranchActionItems(actions).map((item) => item.id)
     })
 
-    expect(actionIds).toEqual([
-      'pull',
-      'push',
-      'status',
-      'history',
-      'changes',
-      'remote',
-      'removeWorktree',
-      'deleteBranch',
-    ])
+    expect(actionIds).toEqual(['pull', 'push', 'status', 'history', 'changes', 'removeWorktree', 'deleteBranch'])
   })
 
   test('exposes copy patch as a changes-tab action instead of a menu item', async () => {
@@ -140,7 +131,8 @@ function HookHost({
   onReady: (actions: ReturnType<typeof useBranchActionItems>) => void
   branch?: RepoBranchState
 }) {
-  onReady(useBranchActionItems(repo(), inputBranch ?? branch()))
+  const branchActions = mocks.useBranchActions()
+  onReady(useBranchActionItems(repo(), inputBranch ?? branch(), branchActions))
   return null
 }
 
