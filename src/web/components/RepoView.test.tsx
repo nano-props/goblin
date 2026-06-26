@@ -66,10 +66,10 @@ vi.mock('#/web/components/repo-toolbar/RepoToolbarActions.tsx', () => ({
   RepoSyncAction: () => <div data-testid="repo-sync-action" />,
 }))
 
-vi.mock('#/web/components/WorkspaceFocusToggle.tsx', () => ({
-  WorkspaceFocusToggle: (props: React.ComponentProps<'button'>) => (
+vi.mock('#/web/components/WorkspaceZenModeToggle.tsx', () => ({
+  WorkspaceZenModeToggle: (props: React.ComponentProps<'button'>) => (
     <button type="button" {...props}>
-      focus
+      zen
     </button>
   ),
 }))
