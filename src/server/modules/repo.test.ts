@@ -517,6 +517,11 @@ describe('repo mutation invalidation publishing', () => {
   })
 
   test('removeRepositoryWorktree publishes snapshot invalidations for affected worktrees after removal success', async () => {
+    mocks.removeWorktree.mockResolvedValueOnce({
+      ok: true,
+      message: 'ok',
+      affectedWorktreePaths: ['/tmp/repo-worktree'],
+    })
     mocks.getWorktrees.mockResolvedValueOnce([
       { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true, isDirty: false },
       {

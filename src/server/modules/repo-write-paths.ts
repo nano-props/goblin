@@ -123,8 +123,8 @@ function publishRepoSnapshotInvalidations(cwd: string, affectedRepoIds: readonly
   }
 }
 
-function execResultOnly(result: RepoMutationResult): ExecResult {
-  const { affectedRepoIds: _affectedRepoIds, ...execResult } = result
+function execResultOnly(result: RepoMutationResult & { affectedWorktreePaths?: readonly string[] }): ExecResult {
+  const { affectedRepoIds: _affectedRepoIds, affectedWorktreePaths: _affectedWorktreePaths, ...execResult } = result
   return execResult
 }
 
