@@ -20,7 +20,15 @@ function asRepoBackend(backend: ReadBackend): RepoBackend {
 
 type ReadBackend = Pick<
   RepoBackend,
-  'id' | 'kind' | 'probe' | 'getSnapshot' | 'getStatus' | 'getPullRequests' | 'getLog' | 'fetch'
+  | 'id'
+  | 'kind'
+  | 'probe'
+  | 'getSnapshot'
+  | 'getStatus'
+  | 'getPullRequests'
+  | 'getLog'
+  | 'fetch'
+  | 'getWorktreeBootstrapPreview'
 >
 
 function makeBackend(overrides: Partial<ReadBackend> = {}): ReadBackend {
@@ -33,6 +41,19 @@ function makeBackend(overrides: Partial<ReadBackend> = {}): ReadBackend {
     getPullRequests: () => Promise.resolve<PullRequestEntry[] | null>(null),
     getLog: () => Promise.resolve<LogEntry[]>([]),
     fetch: () => Promise.resolve({ ok: true, message: '' }),
+    getWorktreeBootstrapPreview: () =>
+      Promise.resolve({
+        ok: true,
+        preview: {
+          hasConfig: false,
+          hasOperations: false,
+          configHash: null,
+          copyCount: 0,
+          symlinkCount: 0,
+          hardlinkCount: 0,
+          excludeCount: 0,
+        },
+      }),
   }
   return { ...base, ...overrides }
 }
@@ -80,6 +101,36 @@ describe('getRepositoryLog', () => {
 
     await expect(getRepositoryLog('/tmp/repo', 'feature/work')).resolves.toEqual([])
     expect(getLog).toHaveBeenCalledWith('feature/work', { count: 50, skip: 0, signal: undefined })
+  })
+})
+
+describe('getRepositoryWorktreeBootstrapPreview', () => {
+  test('reads bootstrap preview through the repo backend', async () => {
+    const getWorktreeBootstrapPreview = vi.fn(() =>
+      Promise.resolve({
+        ok: true as const,
+        preview: {
+          hasConfig: true,
+          hasOperations: true,
+          configHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          copyCount: 1,
+          symlinkCount: 0,
+          hardlinkCount: 0,
+          excludeCount: 0,
+        },
+      }),
+    )
+    mocks.runWithRepoBackend.mockImplementation((_cwd: string, task: BackendTask) =>
+      task(asRepoBackend(makeBackend({ getWorktreeBootstrapPreview }))),
+    )
+    const { getRepositoryWorktreeBootstrapPreview } = await import('#/server/modules/repo-read-paths.ts')
+    const signal = new AbortController().signal
+
+    await expect(getRepositoryWorktreeBootstrapPreview('/tmp/repo', signal)).resolves.toMatchObject({
+      ok: true,
+      preview: { hasOperations: true },
+    })
+    expect(getWorktreeBootstrapPreview).toHaveBeenCalledWith(signal)
   })
 })
 

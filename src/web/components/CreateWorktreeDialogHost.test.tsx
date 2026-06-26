@@ -15,7 +15,11 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { CreateWorktreeDialogHost } from '#/web/components/CreateWorktreeDialogHost.tsx'
+import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
+import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
+import { useReposStore } from '#/web/stores/repos/store.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
+import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 
 const REPO_ID = '/tmp/gbl-create-host-test'
 let container: HTMLDivElement | null = null
@@ -24,6 +28,8 @@ const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENV
 
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
+  mainWindowQueryClient.clear()
+  globalThis.localStorage?.clear()
   resetReposStore()
   seedRepoState({
     id: REPO_ID,
@@ -42,6 +48,10 @@ afterEach(() => {
   root = null
   container = null
   document.body.innerHTML = ''
+  mainWindowQueryClient.clear()
+  globalThis.localStorage?.clear()
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
@@ -59,8 +69,8 @@ describe('CreateWorktreeDialogHost', () => {
     // and the effect fired (because `open` changed), calling
     // `onOpenChange(false)`. The dialog was unopenable from the UI.
     //
-    // The fix removes `open` (and the unstable `onOpenChange`) from
-    // the dep array, so the effect only fires on `activeId` change.
+    // The fix only closes when the captured previous active repo differs
+    // from the current `activeId`.
     // In the real flow the host is mounted in Layout with `open=false`
     // initially; the parent flips to `true` when the user clicks the
     // create-worktree button. This test reproduces that flow.
@@ -71,10 +81,9 @@ describe('CreateWorktreeDialogHost', () => {
     expect(onOpenChange).not.toHaveBeenCalled()
 
     // (2) The user clicks the create-worktree button. Parent flips `open` to
-    // true. The host re-renders; only `open` changed, not
-    // `activeId`. The effect's deps are `[activeId]`, so the effect
-    // must NOT fire — pre-fix it did, and called `onOpenChange(false)`
-    // in the same render.
+    // true. The host re-renders; only `open` changed, not `activeId`.
+    // The guarded effect must NOT call `onOpenChange(false)` — pre-fix
+    // it did so in the same render.
     act(() => {
       root!.render(<CreateWorktreeDialogHost open={true} onOpenChange={onOpenChange} activeId={REPO_ID} />)
     })
@@ -109,4 +118,140 @@ describe('CreateWorktreeDialogHost', () => {
     })
     expect(container?.textContent ?? '').toBe('')
   })
+
+  test('prompts before running goblin.toml bootstrap and forwards the run decision', async () => {
+    const submitBranchAction = vi.spyOn(useReposStore.getState(), 'submitBranchAction').mockImplementation(() => {})
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { cwd?: string }
+      expect(body.cwd).toBe(REPO_ID)
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          preview: {
+            hasConfig: true,
+            hasOperations: true,
+            configHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+            copyCount: 1,
+            symlinkCount: 0,
+            hardlinkCount: 0,
+            excludeCount: 0,
+            setup: { command: 'bun install' },
+          },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      )
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderHost(true, vi.fn())
+    await flushReact()
+    setInputValue('cwt-branch', 'feature/bootstrap')
+    await clickButton('action.create-worktree-confirm')
+    await flushReact()
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(document.body.textContent).toContain('action.create-worktree-bootstrap-title')
+    expect(submitBranchAction).not.toHaveBeenCalled()
+
+    await clickButton('action.create-worktree-bootstrap-run')
+
+    expect(submitBranchAction).toHaveBeenCalledWith(
+      REPO_ID,
+      expect.objectContaining({
+        kind: 'createWorktree',
+        worktreeBootstrap: {
+          kind: 'run',
+          configHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        },
+      }),
+      expect.objectContaining({ refreshOnError: false }),
+    )
+  })
+
+  test('preflights then auto-runs a trusted goblin.toml config hash', async () => {
+    mainWindowQueryClient.setQueryData(
+      settingsSnapshotQueryKey(),
+      defaultSettingsSnapshot({
+        repoSettings: [
+          {
+            repoId: REPO_ID,
+            worktreeBootstrapTrust: {
+              configHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+              trustedAt: '2026-06-26T00:00:00.000Z',
+            },
+          },
+        ],
+      }),
+    )
+    const submitBranchAction = vi.spyOn(useReposStore.getState(), 'submitBranchAction').mockImplementation(() => {})
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { cwd?: string }
+      expect(body.cwd).toBe(REPO_ID)
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          preview: {
+            hasConfig: true,
+            hasOperations: true,
+            configHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+            copyCount: 1,
+            symlinkCount: 0,
+            hardlinkCount: 0,
+            excludeCount: 0,
+          },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      )
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderHost(true, vi.fn())
+    await flushReact()
+    setInputValue('cwt-branch', 'feature/trusted')
+    await clickButton('action.create-worktree-confirm')
+    await flushReact()
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(document.body.textContent).not.toContain('action.create-worktree-bootstrap-title')
+    expect(submitBranchAction).toHaveBeenCalledWith(
+      REPO_ID,
+      expect.objectContaining({
+        kind: 'createWorktree',
+        worktreeBootstrap: {
+          kind: 'run',
+          configHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        },
+      }),
+      expect.objectContaining({ refreshOnError: false }),
+    )
+  })
 })
+
+async function flushReact(): Promise<void> {
+  await act(async () => {
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+}
+
+function setInputValue(id: string, value: string): void {
+  const input = document.getElementById(id)
+  if (!(input instanceof HTMLInputElement)) throw new Error(`missing input ${id}`)
+  const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+  if (!valueSetter) throw new Error('missing input value setter')
+  act(() => {
+    valueSetter.call(input, value)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+  })
+}
+
+async function clickButton(text: string): Promise<void> {
+  const button = Array.from(document.querySelectorAll('button')).find((candidate) => candidate.textContent === text)
+  if (!(button instanceof HTMLButtonElement)) throw new Error(`missing button ${text}`)
+  await act(async () => {
+    button.click()
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+}

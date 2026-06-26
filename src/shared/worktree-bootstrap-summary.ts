@@ -15,6 +15,38 @@ export interface WorktreeBootstrapSummary {
   }
 }
 
+export type WorktreeBootstrapDecision =
+  | { kind: 'skip' }
+  | {
+      kind: 'run'
+      configHash: string
+    }
+
+export interface WorktreeBootstrapPreview {
+  hasConfig: boolean
+  hasOperations: boolean
+  configHash: string | null
+  copyCount: number
+  symlinkCount: number
+  hardlinkCount: number
+  excludeCount: number
+  setup?: {
+    command: string
+  }
+}
+
+export type WorktreeBootstrapPreviewResult =
+  | { ok: true; preview: WorktreeBootstrapPreview }
+  | { ok: false; message: string }
+
+interface WorktreeBootstrapConfigLike {
+  copy: readonly string[]
+  symlink: readonly string[]
+  hardlink: readonly string[]
+  exclude: readonly string[]
+  setup?: string
+}
+
 export const WORKTREE_BOOTSTRAP_SUMMARY_PATH_LIMIT = 8
 
 export function compactWorktreeBootstrapPaths(paths: readonly string[]): WorktreeBootstrapPathSummary {
@@ -33,6 +65,27 @@ export function hasWorktreeBootstrapSummaryDetails(summary: WorktreeBootstrapSum
     summary.skippedMissing.count > 0 ||
     !!summary.setup
   )
+}
+
+export function worktreeBootstrapPreviewFromConfig(
+  config: WorktreeBootstrapConfigLike | undefined,
+  configHash?: string,
+): WorktreeBootstrapPreview {
+  const copyCount = config?.copy.length ?? 0
+  const symlinkCount = config?.symlink.length ?? 0
+  const hardlinkCount = config?.hardlink.length ?? 0
+  const excludeCount = config?.exclude.length ?? 0
+  const setup = config?.setup
+  return {
+    hasConfig: !!config,
+    hasOperations: copyCount + symlinkCount + hardlinkCount > 0 || !!setup,
+    configHash: config ? (configHash ?? null) : null,
+    copyCount,
+    symlinkCount,
+    hardlinkCount,
+    excludeCount,
+    ...(setup ? { setup: { command: setup } } : {}),
+  }
 }
 
 export function formatWorktreeBootstrapSummary(summary: WorktreeBootstrapSummary | undefined): string {

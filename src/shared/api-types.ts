@@ -41,6 +41,8 @@ import type { RepoQueryInvalidationEvent } from '#/shared/repo-query-invalidatio
 import { type NativeShellProjection } from '#/shared/native-shell-projection.ts'
 import { RemoteAbsolutePathSchema } from '#/shared/remote-repo-schema.ts'
 import type { CreateWorktreeIpcInput } from '#/shared/worktree-create.ts'
+import type { WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
+import type { RepoSettingsEntry } from '#/shared/repo-settings.ts'
 
 export type { SettingsPage } from '#/shared/settings-pages.ts'
 export type {
@@ -60,6 +62,7 @@ export type {
   NativeSettingsProjectionState,
   NativeShellProjection,
 } from '#/shared/native-shell-projection.ts'
+export type { RepoSettingsEntry, WorktreeBootstrapTrust } from '#/shared/repo-settings.ts'
 
 export interface LanInfo {
   host: string
@@ -99,7 +102,11 @@ export interface RuntimeRecentReposState {
   recentRepos: RepoSessionEntry[]
 }
 
-export interface SettingsSnapshot extends RuntimeSettingsSnapshot, RuntimeRecentReposState {
+export interface RepoSettingsState {
+  repoSettings: RepoSettingsEntry[]
+}
+
+export interface SettingsSnapshot extends RuntimeSettingsSnapshot, RuntimeRecentReposState, RepoSettingsState {
   session: SessionState
 }
 
@@ -243,6 +250,7 @@ export interface AppIpcHandlers {
       alsoDeleteUpstream?: boolean
     }) => Promise<ExecResult>
     createWorktree: (input: CreateWorktreeIpcInput) => Promise<ExecResult>
+    worktreeBootstrapPreview: (input: { cwd: string }) => Promise<WorktreeBootstrapPreviewResult>
     remoteBranches: (input: { cwd: string }) => Promise<string[]>
     pull: (input: { cwd: string; branch: string; worktreePath?: string }) => Promise<ExecResult>
     push: (input: { cwd: string; branch: string }) => Promise<ExecResult>
@@ -272,6 +280,7 @@ export interface AppIpcHandlers {
     applyShellProjection: (input: NativeShellProjection) => Promise<void>
     addRecentRepo: (input: { repo: RepoSessionEntry }) => Promise<RepoSessionEntry[]>
     clearRecentRepos: () => Promise<void>
+    trustRepoWorktreeBootstrapConfig: (input: { repoId: string; configHash: string }) => Promise<RepoSettingsEntry[]>
   }
   externalApps: {
     get: () => Promise<ExternalAppsSnapshot>

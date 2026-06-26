@@ -13,6 +13,7 @@ import {
   setSettingsFetchInterval,
   setShortcutsDisabled,
   setTerminalNotificationsEnabled,
+  trustRepoWorktreeBootstrapConfig,
 } from '#/web/settings-client.ts'
 import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
 import {
@@ -21,6 +22,7 @@ import {
   updateExternalAppsCache,
   updateGitHubCliCache,
   updateRestorableSessionStateCache,
+  updateRepoSettingsStateCache,
   updateRuntimeRecentReposStateCache,
   updateRuntimeSettingsSnapshotCache,
 } from '#/web/settings-query-cache.ts'
@@ -38,6 +40,11 @@ export async function clearRecentRepoHistory(): Promise<void> {
 export async function persistSessionState(session: SessionState): Promise<void> {
   const savedSession = await saveSession(session)
   updateRestorableSessionStateCache(mainWindowQueryClient, savedSession)
+}
+
+export async function rememberRepoWorktreeBootstrapConfig(repoId: string, configHash: string): Promise<void> {
+  const result = await trustRepoWorktreeBootstrapConfig(repoId, configHash)
+  updateRepoSettingsStateCache(mainWindowQueryClient, { repoSettings: result.repoSettings })
 }
 
 export async function setFetchIntervalPreference(sec: number): Promise<number> {

@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { createHash } from 'node:crypto'
 import { constants as fsConstants, promises as fs } from 'node:fs'
 import { execa, ExecaError } from 'execa'
 import { parse } from 'smol-toml'
@@ -9,7 +10,9 @@ import {
   compactWorktreeBootstrapPaths,
   formatWorktreeBootstrapSummary,
   hasWorktreeBootstrapSummaryDetails,
+  worktreeBootstrapPreviewFromConfig,
   type WorktreeBootstrapSummary,
+  type WorktreeBootstrapPreviewResult,
 } from '#/shared/worktree-bootstrap-summary.ts'
 
 type MaterializationMode = 'copy' | 'symlink' | 'hardlink'
@@ -20,6 +23,28 @@ export interface WorktreeBootstrapConfig {
   hardlink: string[]
   exclude: string[]
   setup?: string
+}
+
+export async function getWorktreeBootstrapPreview(
+  sourceCwd: string,
+  options?: { signal?: AbortSignal },
+): Promise<WorktreeBootstrapPreviewResult> {
+  try {
+    if (options?.signal?.aborted) return { ok: false, message: 'cancelled' }
+    const sourceRepoRoot = await getRepoRoot(sourceCwd, { signal: options?.signal })
+    if (!sourceRepoRoot) return { ok: false, message: 'failed to resolve source repo root' }
+
+    const loaded = await loadBootstrapConfig(path.resolve(sourceRepoRoot))
+    if (loaded.kind === 'none') return { ok: true, preview: worktreeBootstrapPreviewFromConfig(undefined) }
+    if (loaded.kind === 'error') return { ok: false, message: loaded.message }
+
+    const valid = validateBootstrapConfigPaths(loaded.config)
+    if (!valid.ok) return { ok: false, message: valid.message }
+    return { ok: true, preview: worktreeBootstrapPreviewFromConfig(loaded.config, loaded.configHash) }
+  } catch (err) {
+    if (options?.signal?.aborted) return { ok: false, message: 'cancelled' }
+    return { ok: false, message: errorMessage(err) }
+  }
 }
 
 interface ConcreteSource {
@@ -43,7 +68,7 @@ const WINDOWS_ROOTED_PATH_RE = /^(?:[A-Za-z]:|[\\/])/
 export async function bootstrapWorktreeAfterCreate(
   sourceCwd: string,
   targetWorktreePath: string,
-  options?: { signal?: AbortSignal },
+  options?: { signal?: AbortSignal; expectedConfigHash?: string },
 ): Promise<ExecResult> {
   try {
     if (options?.signal?.aborted) return { ok: false, message: 'cancelled' }
@@ -53,8 +78,14 @@ export async function bootstrapWorktreeAfterCreate(
     const sourceRoot = path.resolve(sourceRepoRoot)
     const targetRoot = path.resolve(targetWorktreePath)
     const loaded = await loadBootstrapConfig(sourceRoot)
-    if (loaded.kind === 'none') return { ok: true, message: '' }
+    if (loaded.kind === 'none') {
+      if (options?.expectedConfigHash) return bootstrapFailure(`${CONFIG_FILE} changed after confirmation`)
+      return { ok: true, message: '' }
+    }
     if (loaded.kind === 'error') return bootstrapFailure(loaded.message)
+    if (options?.expectedConfigHash && loaded.configHash !== options.expectedConfigHash) {
+      return bootstrapFailure(`${CONFIG_FILE} changed after confirmation`)
+    }
 
     const planned = await planMaterializations(sourceRoot, targetRoot, loaded.config, options?.signal)
     if (!planned.ok) return bootstrapFailure(planned.message)
@@ -81,7 +112,11 @@ export async function bootstrapWorktreeAfterCreate(
 
 async function loadBootstrapConfig(
   sourceRoot: string,
-): Promise<{ kind: 'none' } | { kind: 'ready'; config: WorktreeBootstrapConfig } | { kind: 'error'; message: string }> {
+): Promise<
+  | { kind: 'none' }
+  | { kind: 'ready'; config: WorktreeBootstrapConfig; configHash: string }
+  | { kind: 'error'; message: string }
+> {
   let raw = ''
   try {
     raw = await fs.readFile(path.join(sourceRoot, CONFIG_FILE), 'utf8')
@@ -89,7 +124,12 @@ async function loadBootstrapConfig(
     if (isErrno(err, 'ENOENT')) return { kind: 'none' }
     return { kind: 'error', message: `failed to read ${CONFIG_FILE}: ${errorMessage(err)}` }
   }
-  return parseBootstrapConfig(raw)
+  const loaded = parseBootstrapConfig(raw)
+  return loaded.kind === 'ready' ? { ...loaded, configHash: worktreeBootstrapConfigHash(raw) } : loaded
+}
+
+export function worktreeBootstrapConfigHash(raw: string): string {
+  return `sha256:${createHash('sha256').update(raw, 'utf8').digest('hex')}`
 }
 
 export function parseBootstrapConfig(
@@ -129,6 +169,22 @@ export function parseBootstrapConfig(
       setup: setup.value,
     },
   }
+}
+
+export function validateBootstrapConfigPaths(
+  config: WorktreeBootstrapConfig,
+): { ok: true } | { ok: false; message: string } {
+  for (const mode of materializationModes()) {
+    for (const entry of config[mode]) {
+      const valid = validateConfigPath(entry)
+      if (!valid.ok) return valid
+    }
+  }
+  for (const entry of config.exclude) {
+    const valid = validateConfigPath(entry)
+    if (!valid.ok) return valid
+  }
+  return { ok: true }
 }
 
 function readStringList(

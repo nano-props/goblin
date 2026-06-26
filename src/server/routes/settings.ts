@@ -9,6 +9,7 @@ import {
   applyServerGlobalShortcutRegistrationWrite,
   applyServerRecentRepoAddWrite,
   applyServerRecentRepoClearWrite,
+  applyServerRepoWorktreeBootstrapTrustWrite,
   applyServerSessionWrite,
   applyServerSettingsPrefsWrite,
 } from '#/server/modules/settings-write-paths.ts'
@@ -70,5 +71,9 @@ export function createSettingsRoutes(settingsState: ServerSettingsState) {
     return c.json(await applyServerRecentRepoAddWrite({ repo }))
   })
   app.post('/recent-repos/clear', async (c) => c.json(await applyServerRecentRepoClearWrite()))
+  app.post('/repo-settings/worktree-bootstrap-trust', async (c) => {
+    const { repoId, configHash } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.repoWorktreeBootstrapTrust, c)
+    return c.json(await applyServerRepoWorktreeBootstrapTrustWrite({ repoId, configHash }))
+  })
   return app
 }

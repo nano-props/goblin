@@ -1,6 +1,8 @@
 import path from 'node:path'
 import {
   parseBootstrapConfig,
+  validateBootstrapConfigPaths,
+  worktreeBootstrapConfigHash,
   type WorktreeBootstrapConfig,
 } from '#/system/git/worktree-bootstrap.ts'
 import { parseBranches, parseLog, parseStatus, parseWorktrees } from '#/system/git/parsers.ts'
@@ -39,6 +41,14 @@ import {
   parseRemoteTrackingRefs,
   type CreateWorktreeInput,
 } from '#/shared/worktree-create.ts'
+import {
+  compactWorktreeBootstrapPaths,
+  formatWorktreeBootstrapSummary,
+  hasWorktreeBootstrapSummaryDetails,
+  worktreeBootstrapPreviewFromConfig,
+  type WorktreeBootstrapPreviewResult,
+  type WorktreeBootstrapSummary,
+} from '#/shared/worktree-bootstrap-summary.ts'
 
 type RemoteGitRunner = (
   command: RemoteCommandKind,
@@ -117,6 +127,7 @@ export async function getRemoteLog(
   skip?: number,
   options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
 ): Promise<LogEntry[]> {
+  if (!isSafeBranchName(branch)) return []
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
   const result = await run({ type: 'gitLog', path: target.remotePath, branch, count, skip }, target, {
     signal: options.signal,
@@ -293,38 +304,81 @@ export async function createRemoteWorktree(
 
 const REMOTE_BOOTSTRAP_TIMEOUT_MS = 10 * 60_000
 
-export async function bootstrapRemoteWorktreeAfterCreate(
-  target: RemoteRepoTarget,
-  worktreePath: string,
-  options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
-): Promise<ExecResult> {
-  const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
+interface RemoteBootstrapConfigLoad {
+  config?: WorktreeBootstrapConfig
+  configHash?: string
+  sourceRoot: string
+}
 
-  const readResult = await run(
-    { type: 'readRemoteFile', path: path.join(target.remotePath, 'goblin.toml') },
+async function loadRemoteBootstrapConfig(
+  target: RemoteRepoTarget,
+  options: { signal?: AbortSignal; run: RemoteGitRunner },
+): Promise<{ ok: true; value: RemoteBootstrapConfigLoad } | { ok: false; message: string }> {
+  const rootResult = await options.run({ type: 'revParseTopLevel', path: target.remotePath }, target, {
+    signal: options.signal,
+    timeoutMs: REMOTE_BRANCH_OP_TIMEOUT_MS,
+  })
+  if (rootResult.message === 'cancelled') return { ok: false, message: 'cancelled' }
+  if (!rootResult.ok) return { ok: false, message: rootResult.message || 'failed to resolve source repo root' }
+  const sourceRoot = rootResult.stdout || target.remotePath
+
+  const readResult = await options.run(
+    { type: 'readRemoteFile', path: path.posix.join(sourceRoot, 'goblin.toml') },
     target,
     { signal: options.signal, timeoutMs: REMOTE_BRANCH_OP_TIMEOUT_MS },
   )
   if (readResult.message === 'cancelled') return { ok: false, message: 'cancelled' }
-  if (!readResult.ok) return { ok: false, message: `Worktree bootstrap failed: ${readResult.message}` }
+  if (!readResult.ok) return { ok: false, message: readResult.message || 'failed to read goblin.toml' }
 
   const raw = readResult.stdout
-  if (!raw.trim()) return { ok: true, message: '' }
+  if (!raw.trim()) return { ok: true, value: { sourceRoot } }
 
   const loaded = parseBootstrapConfig(raw)
-  if (loaded.kind === 'error') return { ok: false, message: `Worktree bootstrap failed: ${loaded.message}` }
-  if (loaded.kind === 'none') return { ok: true, message: '' }
+  if (loaded.kind === 'error') return { ok: false, message: loaded.message }
+  if (loaded.kind === 'none') return { ok: true, value: { sourceRoot } }
+  const validPaths = validateBootstrapConfigPaths(loaded.config)
+  if (!validPaths.ok) return { ok: false, message: validPaths.message }
+  return { ok: true, value: { sourceRoot, config: loaded.config, configHash: worktreeBootstrapConfigHash(raw) } }
+}
+
+export async function getRemoteWorktreeBootstrapPreview(
+  target: RemoteRepoTarget,
+  options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
+): Promise<WorktreeBootstrapPreviewResult> {
+  const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
+  const loaded = await loadRemoteBootstrapConfig(target, { signal: options.signal, run })
+  if (!loaded.ok) return { ok: false, message: `Worktree bootstrap failed: ${loaded.message}` }
+  return { ok: true, preview: worktreeBootstrapPreviewFromConfig(loaded.value.config, loaded.value.configHash) }
+}
+
+export async function bootstrapRemoteWorktreeAfterCreate(
+  target: RemoteRepoTarget,
+  worktreePath: string,
+  options: { signal?: AbortSignal; run?: RemoteGitRunner; expectedConfigHash?: string } = {},
+): Promise<ExecResult> {
+  const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
+  const loaded = await loadRemoteBootstrapConfig(target, { signal: options.signal, run })
+  if (!loaded.ok) return { ok: false, message: `Worktree bootstrap failed: ${loaded.message}` }
+  if (!loaded.value.config) {
+    if (options.expectedConfigHash) {
+      return { ok: false, message: 'Worktree bootstrap failed: goblin.toml changed after confirmation' }
+    }
+    return { ok: true, message: '' }
+  }
+  if (options.expectedConfigHash && loaded.value.configHash !== options.expectedConfigHash) {
+    return { ok: false, message: 'Worktree bootstrap failed: goblin.toml changed after confirmation' }
+  }
 
   const bootstrapResult = await run(
     {
       type: 'bootstrapRemoteWorktree',
-      sourceRoot: target.remotePath,
+      sourceRoot: loaded.value.sourceRoot,
       targetRoot: worktreePath,
-      copy: loaded.config.copy,
-      symlink: loaded.config.symlink,
-      hardlink: loaded.config.hardlink,
-      exclude: loaded.config.exclude,
-      setup: loaded.config.setup,
+      copy: loaded.value.config.copy,
+      symlink: loaded.value.config.symlink,
+      hardlink: loaded.value.config.hardlink,
+      exclude: loaded.value.config.exclude,
+      setup: loaded.value.config.setup,
     },
     target,
     { signal: options.signal, timeoutMs: REMOTE_BOOTSTRAP_TIMEOUT_MS },
@@ -332,10 +386,15 @@ export async function bootstrapRemoteWorktreeAfterCreate(
   if (bootstrapResult.message === 'cancelled') return { ok: false, message: 'cancelled' }
   if (!bootstrapResult.ok) return { ok: false, message: `Worktree bootstrap failed: ${bootstrapResult.message}` }
 
-  return { ok: true, message: formatRemoteBootstrapOutput(bootstrapResult.stdout) }
+  const summary = remoteBootstrapSummaryFromOutput(bootstrapResult.stdout)
+  return {
+    ok: true,
+    message: formatWorktreeBootstrapSummary(summary),
+    ...(hasWorktreeBootstrapSummaryDetails(summary) ? { worktreeBootstrap: summary } : {}),
+  }
 }
 
-function formatRemoteBootstrapOutput(stdout: string): string {
+function remoteBootstrapSummaryFromOutput(stdout: string): WorktreeBootstrapSummary {
   const copy: string[] = []
   const symlink: string[] = []
   const hardlink: string[] = []
@@ -362,13 +421,13 @@ function formatRemoteBootstrapOutput(stdout: string): string {
         break
     }
   }
-  const parts: string[] = []
-  if (copy.length > 0) parts.push(`Copied ${copy.length} path${copy.length === 1 ? '' : 's'}`)
-  if (symlink.length > 0) parts.push(`Symlinked ${symlink.length} path${symlink.length === 1 ? '' : 's'}`)
-  if (hardlink.length > 0) parts.push(`Hardlinked ${hardlink.length} path${hardlink.length === 1 ? '' : 's'}`)
-  if (missing.length > 0) parts.push(`Skipped missing ${missing.length} path${missing.length === 1 ? '' : 's'}`)
-  if (setup) parts.push(`Ran setup: ${setup}`)
-  return parts.join('\n')
+  return {
+    copy: compactWorktreeBootstrapPaths(copy),
+    symlink: compactWorktreeBootstrapPaths(symlink),
+    hardlink: compactWorktreeBootstrapPaths(hardlink),
+    skippedMissing: compactWorktreeBootstrapPaths(missing),
+    ...(setup ? { setup: { command: setup } } : {}),
+  }
 }
 
 export async function getRemoteTrackingBranches(
@@ -391,6 +450,7 @@ export async function removeRemoteWorktree(
     run?: RemoteGitRunner
   },
 ): Promise<RemoteWorktreeMutationResult> {
+  if (!isSafeBranchName(input.branch)) return { ok: false, message: 'error.invalid-arguments' }
   const run: RemoteGitRunner = input.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
   const listResult = await run({ type: 'gitWorktreeList', path: target.remotePath }, target, { signal: input.signal })
   if (input.signal?.aborted) return { ok: false, message: 'cancelled' }
@@ -466,6 +526,7 @@ export async function deleteRemoteBranch(
   target: RemoteRepoTarget,
   input: { branch: string; force?: boolean; signal?: AbortSignal; run?: RemoteGitRunner },
 ): Promise<ExecResult> {
+  if (!isSafeBranchName(input.branch)) return { ok: false, message: 'error.invalid-arguments' }
   const run: RemoteGitRunner = input.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
   const snapshot = await getRemoteSnapshot(target, { signal: input.signal, run })
   if (input.signal?.aborted) return { ok: false, message: 'cancelled' }
@@ -502,6 +563,7 @@ export async function getRemoteBrowserUrl(
   branch?: string,
   options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
 ): Promise<string | null> {
+  if (branch && !isSafeBranchName(branch)) return null
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
   const [remoteInfo, upstream] = await Promise.all([
     getRemoteRepoInfo(target, { signal: options.signal, run }),
@@ -738,8 +800,9 @@ async function mapWithConcurrency<T, R>(
       if (index >= items.length) return
       try {
         results[index] = await fn(items[index]!)
-      } catch {
-        // ignore errors after abort
+      } catch (err) {
+        if (signal?.aborted) return
+        throw err
       }
     }
   }

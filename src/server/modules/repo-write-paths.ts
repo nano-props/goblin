@@ -14,6 +14,7 @@ import { isValidCwd, isValidRepoLocator } from '#/shared/input-validation.ts'
 import { type CloneRepoResult, type ProbeResult } from '#/shared/api-types.ts'
 import { normalizeCreateWorktreeInput, type CreateWorktreeInput } from '#/shared/worktree-create.ts'
 import { constants as fsConstants, promises as fs } from 'node:fs'
+import type { WorktreeBootstrapDecision } from '#/shared/worktree-bootstrap-summary.ts'
 
 type ProbeAvailability = { ok: true } | { ok: false; message: string }
 
@@ -263,6 +264,7 @@ export async function createRepositoryWorktree(
   input: CreateWorktreeInput,
   signal?: AbortSignal,
   sourceToken?: string,
+  options?: { worktreeBootstrap?: WorktreeBootstrapDecision },
 ): Promise<ExecResult> {
   if (!isValidRepoLocator(cwd)) return { ok: false, message: 'error.invalid-arguments' }
   const normalized = normalizeCreateWorktreeInput(input)
@@ -273,7 +275,9 @@ export async function createRepositoryWorktree(
   return await runWithRepoBackend(cwd, async (backend) => {
     return await publishSnapshotInvalidationAfterMutation(
       cwd,
-      await backend.createWorktree(normalized, signal),
+      await backend.createWorktree(normalized, signal, {
+        worktreeBootstrap: options?.worktreeBootstrap ?? { kind: 'skip' },
+      }),
       sourceToken,
     )
   })

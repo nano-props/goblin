@@ -13,6 +13,7 @@
 // should be a paired change with a detached-worktree row in the list.
 
 import { isSafeBranchName } from '#/shared/refnames.ts'
+import type { WorktreeBootstrapDecision } from '#/shared/worktree-bootstrap-summary.ts'
 
 export type CreateWorktreeMode =
   | { kind: 'newBranch'; newBranch: string; baseRef: string }
@@ -29,6 +30,7 @@ export interface CreateWorktreeInput {
 export interface CreateWorktreeIpcInput extends CreateWorktreeInput {
   cwd: string
   sourceToken?: string
+  worktreeBootstrap?: WorktreeBootstrapDecision
 }
 
 export function normalizeCreateWorktreeInput(input: unknown): CreateWorktreeInput | null {

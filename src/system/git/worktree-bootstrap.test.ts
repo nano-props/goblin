@@ -2,7 +2,11 @@ import os from 'node:os'
 import path from 'node:path'
 import { mkdir, mkdtemp, readFile, readlink, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { beforeEach, afterEach, describe, expect, test, vi } from 'vitest'
-import { bootstrapWorktreeAfterCreate } from '#/system/git/worktree-bootstrap.ts'
+import {
+  bootstrapWorktreeAfterCreate,
+  getWorktreeBootstrapPreview,
+  worktreeBootstrapConfigHash,
+} from '#/system/git/worktree-bootstrap.ts'
 
 const mocks = vi.hoisted(() => ({
   getRepoRoot: vi.fn(),
@@ -31,6 +35,54 @@ afterEach(async () => {
 })
 
 describe('worktree bootstrap', () => {
+  test('previews configured operations without materializing them', async () => {
+    await writeConfig(`
+[worktree]
+copy = [".env.local", "config/*"]
+symlink = ["linked.txt"]
+hardlink = ["cache.db"]
+exclude = ["config/*.log"]
+setup = "bun install"
+`)
+
+    const result = await getWorktreeBootstrapPreview(sourceRoot)
+
+    expect(result).toEqual({
+      ok: true,
+      preview: {
+        hasConfig: true,
+        hasOperations: true,
+        configHash: expect.stringMatching(/^sha256:[a-f0-9]{64}$/),
+        copyCount: 2,
+        symlinkCount: 1,
+        hardlinkCount: 1,
+        excludeCount: 1,
+        setup: { command: 'bun install' },
+      },
+    })
+    await expect(readFile(path.join(targetRoot, '.env.local'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  test('previews exclude-only configs as no executable operations', async () => {
+    await writeConfig(`
+[worktree]
+exclude = ["config/*.log"]
+`)
+
+    await expect(getWorktreeBootstrapPreview(sourceRoot)).resolves.toEqual({
+      ok: true,
+      preview: {
+        hasConfig: true,
+        hasOperations: false,
+        configHash: expect.stringMatching(/^sha256:[a-f0-9]{64}$/),
+        copyCount: 0,
+        symlinkCount: 0,
+        hardlinkCount: 0,
+        excludeCount: 1,
+      },
+    })
+  })
+
   test('does nothing when goblin.toml is absent', async () => {
     const result = await bootstrapWorktreeAfterCreate(sourceRoot, targetRoot)
 
@@ -83,6 +135,24 @@ setup = ${JSON.stringify(setupCommand)}
     const targetCache = await stat(path.join(targetRoot, 'cache.db'))
     expect(targetCache.ino).toBe(sourceCache.ino)
     await expect(readFile(path.join(targetRoot, 'setup.txt'), 'utf8')).resolves.toBe('done')
+  })
+
+  test('does not run when goblin.toml changed after confirmation', async () => {
+    const trustedConfig = '[worktree]\ncopy = [".env"]\n'
+    await writeConfig(trustedConfig)
+    const trustedHash = worktreeBootstrapConfigHash(trustedConfig)
+    await writeFile(path.join(sourceRoot, 'other.env'), 'changed\n')
+    await writeConfig('[worktree]\ncopy = ["other.env"]\n')
+
+    const result = await bootstrapWorktreeAfterCreate(sourceRoot, targetRoot, {
+      expectedConfigHash: trustedHash,
+    })
+
+    expect(result).toEqual({
+      ok: false,
+      message: 'Worktree bootstrap failed: goblin.toml changed after confirmation',
+    })
+    await expect(readFile(path.join(targetRoot, 'other.env'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
   test('reports missing literal sources without failing create', async () => {

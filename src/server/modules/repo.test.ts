@@ -30,6 +30,8 @@ const mocks = vi.hoisted(() => ({
   setBackgroundSyncRepos: vi.fn(),
   publishRepoQueryInvalidation: vi.fn(),
   bootstrapWorktreeAfterCreate: vi.fn(),
+  getWorktreeBootstrapPreview: vi.fn(),
+  getRemoteWorktreeBootstrapPreview: vi.fn(),
 }))
 
 vi.mock('#/system/git/branches.ts', () => ({
@@ -84,6 +86,7 @@ vi.mock('#/system/git/worktrees.ts', () => ({
 
 vi.mock('#/system/git/worktree-bootstrap.ts', () => ({
   bootstrapWorktreeAfterCreate: mocks.bootstrapWorktreeAfterCreate,
+  getWorktreeBootstrapPreview: mocks.getWorktreeBootstrapPreview,
 }))
 
 vi.mock('#/shared/input-validation.ts', () => ({
@@ -100,10 +103,20 @@ vi.mock('#/system/ssh/diagnostics.ts', () => ({
 }))
 
 vi.mock('#/system/ssh/git.ts', () => ({
+  bootstrapRemoteWorktreeAfterCreate: vi.fn(),
+  createRemoteWorktree: vi.fn(),
+  deleteRemoteBranch: vi.fn(),
   fetchRemoteRepository: vi.fn(),
+  getRemoteBrowserUrl: vi.fn(),
   getRemoteLog: vi.fn(),
+  getRemotePatch: vi.fn(),
   getRemoteSnapshot: vi.fn(),
   getRemoteStatus: vi.fn(),
+  getRemoteTrackingBranches: vi.fn(),
+  getRemoteWorktreeBootstrapPreview: mocks.getRemoteWorktreeBootstrapPreview,
+  pullRemoteBranch: vi.fn(),
+  pushRemoteBranch: vi.fn(),
+  removeRemoteWorktree: vi.fn(),
 }))
 
 vi.mock('#/system/git/pull-requests.ts', () => ({
@@ -136,6 +149,30 @@ beforeEach(() => {
   mocks.pushBranch.mockResolvedValue({ ok: true, message: 'ok' })
   mocks.createWorktree.mockResolvedValue({ ok: true, message: 'ok' })
   mocks.bootstrapWorktreeAfterCreate.mockResolvedValue({ ok: true, message: '' })
+  mocks.getWorktreeBootstrapPreview.mockResolvedValue({
+    ok: true,
+    preview: {
+      hasConfig: false,
+      hasOperations: false,
+      configHash: null,
+      copyCount: 0,
+      symlinkCount: 0,
+      hardlinkCount: 0,
+      excludeCount: 0,
+    },
+  })
+  mocks.getRemoteWorktreeBootstrapPreview.mockResolvedValue({
+    ok: true,
+    preview: {
+      hasConfig: false,
+      hasOperations: false,
+      configHash: null,
+      copyCount: 0,
+      symlinkCount: 0,
+      hardlinkCount: 0,
+      excludeCount: 0,
+    },
+  })
   mocks.deleteBranch.mockResolvedValue({ ok: true, message: 'ok' })
   mocks.deleteUpstreamBranch.mockResolvedValue({ ok: true, message: 'ok' })
   mocks.removeWorktree.mockResolvedValue({ ok: true, message: 'ok' })
@@ -366,6 +403,18 @@ describe('repo mutation invalidation publishing', () => {
     })
   })
 
+  test('createRepositoryWorktree skips bootstrap unless run is explicitly requested', async () => {
+    const { createRepositoryWorktree } = await import('#/server/modules/repo-write-paths.ts')
+
+    const result = await createRepositoryWorktree('/tmp/repo', {
+      worktreePath: '/tmp/repo-worktree',
+      mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
+    })
+
+    expect(result).toEqual({ ok: true, message: 'ok' })
+    expect(mocks.bootstrapWorktreeAfterCreate).not.toHaveBeenCalled()
+  })
+
   test.each([
     [
       'pullRepositoryBranch',
@@ -424,15 +473,30 @@ describe('repo mutation invalidation publishing', () => {
     })
     const { createRepositoryWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await createRepositoryWorktree('/tmp/repo', {
-      worktreePath: '/tmp/repo-worktree',
-      mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
-    })
+    const result = await createRepositoryWorktree(
+      '/tmp/repo',
+      {
+        worktreePath: '/tmp/repo-worktree',
+        mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
+      },
+      undefined,
+      undefined,
+      {
+        worktreeBootstrap: {
+          kind: 'run',
+          configHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        },
+      },
+    )
 
     expect(result).toEqual({
       ok: false,
       message: 'Worktree bootstrap failed: destination already exists: .env.local',
       repoChanged: true,
+    })
+    expect(mocks.bootstrapWorktreeAfterCreate).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-worktree', {
+      signal: undefined,
+      expectedConfigHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     })
     expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledWith({
       repoId: '/tmp/repo',
