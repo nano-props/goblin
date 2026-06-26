@@ -349,9 +349,9 @@ async function runSetupCommand(
   if (signal?.aborted) return { ok: false, message: 'cancelled' }
   try {
     await fs.access(targetRoot, fsConstants.R_OK | fsConstants.W_OK)
-    const result = await execa(setup, {
+    const invocation = buildSetupInvocation(setup)
+    const result = await execa(invocation.command, invocation.args, {
       cwd: targetRoot,
-      shell: true,
       timeout: SETUP_TIMEOUT_MS,
       cancelSignal: signal,
       forceKillAfterDelay: 500,
@@ -367,6 +367,15 @@ async function runSetupCommand(
     }
     return { ok: false, message: errorMessage(err) }
   }
+}
+
+function buildSetupInvocation(setup: string): { command: string; args: string[] } {
+  const shell = process.env.SHELL?.trim()
+  // An interactive login shell loads the user's normal terminal environment
+  // (e.g. ~/.zshrc / ~/.bashrc as well as ~/.zprofile / ~/.bash_profile),
+  // so tools like bun, nvm, and pnpm resolve without absolute paths.
+  if (shell) return { command: shell, args: ['-il', '-c', setup] }
+  return { command: '/bin/sh', args: ['-c', setup] }
 }
 
 function materializationModes(): MaterializationMode[] {
