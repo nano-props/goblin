@@ -10,6 +10,7 @@
 #   exclude = ["*.log", "*.tmp"]
 #   setup = "bun install"
 
+[worktree]
 copy = [".env"]
 setup = "bun install"
 
