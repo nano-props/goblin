@@ -14,6 +14,7 @@ import type { LogEntry, WorktreeStatus } from '#/web/types.ts'
 beforeEach(resetRefreshTest)
 
 type TestRepo = NonNullable<ReturnType<typeof useReposStore.getState>['repos'][string]>
+type TestCreateWorktreeAction = Parameters<ReturnType<typeof useReposStore.getState>['runBranchAction']>[1]
 
 function updateRepoForTest(mutator: (repo: TestRepo) => void) {
   useReposStore.setState((s) => {
@@ -32,6 +33,17 @@ function logEntry(index: number): LogEntry {
     message: `commit ${index}`,
     author: 'Alice',
     date: '2026-01-01T00:00:00+08:00',
+  }
+}
+
+function createWorktreeAction(): TestCreateWorktreeAction {
+  return {
+    kind: 'createWorktree',
+    input: {
+      worktreePath: '/tmp/worktrees/feature-a',
+      mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
+    },
+    worktreeBootstrap: { kind: 'skip' },
   }
 }
 
@@ -281,13 +293,7 @@ describe('remote fetch timestamps', () => {
 
     const result = await useReposStore.getState().runBranchAction(
       REPO_ID,
-      {
-        kind: 'createWorktree',
-        input: {
-          worktreePath: '/tmp/worktrees/feature-a',
-          mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
-        },
-      },
+      createWorktreeAction(),
       { token, refreshOnError: false },
     )
 
@@ -309,13 +315,7 @@ describe('remote fetch timestamps', () => {
 
     const result = await useReposStore.getState().runBranchAction(
       REPO_ID,
-      {
-        kind: 'createWorktree',
-        input: {
-          worktreePath: '/tmp/worktrees/feature-a',
-          mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
-        },
-      },
+      createWorktreeAction(),
       { token, refreshOnError: false },
     )
 
@@ -342,13 +342,7 @@ describe('remote fetch timestamps', () => {
 
     const result = await useReposStore.getState().runBranchAction(
       REPO_ID,
-      {
-        kind: 'createWorktree',
-        input: {
-          worktreePath: '/tmp/worktrees/feature-a',
-          mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
-        },
-      },
+      createWorktreeAction(),
       { token, refreshOnError: false },
     )
 

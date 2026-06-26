@@ -8,7 +8,6 @@ const mocks = vi.hoisted(() => ({
   clearServerRecentRepos: vi.fn(),
   setServerFetchIntervalSec: vi.fn(),
   setServerSessionState: vi.fn(),
-  trustServerRepoWorktreeBootstrapConfig: vi.fn(),
   updateServerSettingsPrefs: vi.fn(),
   settingsInvalidationScopesForPrefsPatch: vi.fn(),
 }))
@@ -22,7 +21,6 @@ vi.mock('#/server/modules/settings-source.ts', () => ({
   clearServerRecentRepos: mocks.clearServerRecentRepos,
   setServerFetchIntervalSec: mocks.setServerFetchIntervalSec,
   setServerSessionState: mocks.setServerSessionState,
-  trustServerRepoWorktreeBootstrapConfig: mocks.trustServerRepoWorktreeBootstrapConfig,
   updateServerSettingsPrefs: mocks.updateServerSettingsPrefs,
 }))
 
@@ -105,47 +103,10 @@ describe('settings write paths', () => {
     expect(mocks.publishSettingsInvalidation).toHaveBeenCalledWith(['settings-snapshot'])
   })
 
-  test('stores repo-level worktree bootstrap trust and publishes settings snapshot invalidation', async () => {
-    const repoSettings = [
-      {
-        repoId: '/tmp/repo-a',
-        worktreeBootstrapTrust: {
-          configHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-          trustedAt: '2026-06-26T00:00:00.000Z',
-        },
-      },
-    ]
-    mocks.trustServerRepoWorktreeBootstrapConfig.mockResolvedValue(repoSettings)
-    const { applyServerRepoWorktreeBootstrapTrustWrite } = await import('#/server/modules/settings-write-paths.ts')
-
-    await expect(
-      applyServerRepoWorktreeBootstrapTrustWrite({
-        repoId: '/tmp/repo-a',
-        configHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      }),
-    ).resolves.toEqual({ ok: true, repoSettings })
-    expect(mocks.trustServerRepoWorktreeBootstrapConfig).toHaveBeenCalledWith({
-      repoId: '/tmp/repo-a',
-      configHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-    })
-    expect(mocks.publishSettingsInvalidation).toHaveBeenCalledWith(['settings-snapshot'])
-  })
-
   test('schema rejects malformed fetch interval at the perimeter', async () => {
     const { SETTINGS_PROCEDURE_SCHEMAS } = await import('#/shared/procedure-schemas.ts')
     const { parseHttpInput } = await import('#/server/common/http-validate.ts')
     expect(() => parseHttpInput(SETTINGS_PROCEDURE_SCHEMAS.fetchInterval, { sec: '5m' })).toThrow()
-  })
-
-  test('schema rejects malformed repo worktree bootstrap trust hashes at the perimeter', async () => {
-    const { SETTINGS_PROCEDURE_SCHEMAS } = await import('#/shared/procedure-schemas.ts')
-    const { parseHttpInput } = await import('#/server/common/http-validate.ts')
-    expect(() =>
-      parseHttpInput(SETTINGS_PROCEDURE_SCHEMAS.repoWorktreeBootstrapTrust, {
-        repoId: '/tmp/repo',
-        configHash: 'not-a-hash',
-      }),
-    ).toThrow()
   })
 
   test('schema accepts well-formed session state via the perimeter', async () => {

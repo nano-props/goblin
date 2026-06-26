@@ -218,7 +218,7 @@ function runBranchActionIpc(
     case 'push':
       return pushRepositoryBranch(repoId, action.branch, signal, sourceToken)
     case 'createWorktree':
-      return createRepositoryWorktree(repoId, action.input, signal, sourceToken, action.worktreeBootstrap)
+      return createRepositoryWorktree(repoId, action.input, action.worktreeBootstrap, signal, sourceToken)
     case 'deleteBranch':
       return deleteRepositoryBranch(
         repoId,

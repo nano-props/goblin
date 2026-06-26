@@ -4,14 +4,12 @@ import {
   clearServerRecentRepos,
   setServerFetchIntervalSec,
   setServerSessionState,
-  trustServerRepoWorktreeBootstrapConfig,
   updateServerSettingsPrefs,
 } from '#/server/modules/settings-source.ts'
 import type { ServerSettingsState } from '#/server/modules/settings-state.ts'
 import { resolveI18nSnapshot } from '#/shared/i18n/snapshot.ts'
 import { toSafeSessionRepoEntry } from '#/shared/input-validation.ts'
 import type { SessionState, SettingsPrefsUpdateResponse } from '#/shared/api-types.ts'
-import type { RepoSettingsEntry } from '#/shared/repo-settings.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import { repoSessionEntryId } from '#/shared/remote-repo.ts'
 import { settingsInvalidationScopesForPrefsPatch } from '#/shared/server-invalidation.ts'
@@ -39,10 +37,6 @@ export interface ApplyServerSessionInput {
 }
 export interface ApplyServerRecentRepoAddInput {
   repo: RepoSessionEntry
-}
-export interface ApplyServerRepoWorktreeBootstrapTrustInput {
-  repoId: string
-  configHash: string
 }
 
 export async function applyServerFetchIntervalWrite(
@@ -103,12 +97,4 @@ export async function applyServerRecentRepoClearWrite(): Promise<{ ok: true }> {
   await clearServerRecentRepos()
   publishSettingsInvalidation(['settings-snapshot'])
   return { ok: true }
-}
-
-export async function applyServerRepoWorktreeBootstrapTrustWrite(
-  input: ApplyServerRepoWorktreeBootstrapTrustInput,
-): Promise<{ ok: true; repoSettings: RepoSettingsEntry[] }> {
-  const repoSettings = await trustServerRepoWorktreeBootstrapConfig(input)
-  publishSettingsInvalidation(['settings-snapshot'])
-  return { ok: true, repoSettings }
 }

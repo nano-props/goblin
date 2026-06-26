@@ -10,21 +10,17 @@ import {
   settingsSnapshotQueryKey,
 } from '#/web/settings-query-cache.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
-import type { RepoSettingsEntry } from '#/shared/repo-settings.ts'
 import type { GitHubCliState } from '#/shared/api-types.ts'
 
 type AddRecentRepoResult = {
   recentRepos: RepoSessionEntry[]
   addedRepo: RepoSessionEntry | null
 }
-type TrustRepoWorktreeBootstrapResult = {
-  ok: true
-  repoSettings: RepoSettingsEntry[]
-}
 
 const appDataClientMocks = vi.hoisted(() => ({
   addRecentRepo: vi.fn<() => Promise<AddRecentRepoResult>>(async () => ({ recentRepos: [], addedRepo: null })),
   clearRecentRepos: vi.fn(async () => {}),
+  getSettingsSnapshot: vi.fn(),
   refreshExternalAppsSnapshot: vi.fn(async () => ({
     terminal: {
       available: false,
@@ -50,15 +46,12 @@ const appDataClientMocks = vi.hoisted(() => ({
   setSettingsFetchInterval: vi.fn(async (sec) => sec),
   setShortcutsDisabled: vi.fn(async () => {}),
   setTerminalNotificationsEnabled: vi.fn(async () => {}),
-  trustRepoWorktreeBootstrapConfig: vi.fn<() => Promise<TrustRepoWorktreeBootstrapResult>>(async () => ({
-    ok: true,
-    repoSettings: [],
-  })),
 }))
 
 vi.mock('#/web/settings-client.ts', () => ({
   addRecentRepo: appDataClientMocks.addRecentRepo,
   clearRecentRepos: appDataClientMocks.clearRecentRepos,
+  getSettingsSnapshot: appDataClientMocks.getSettingsSnapshot,
   refreshExternalAppsSnapshot: appDataClientMocks.refreshExternalAppsSnapshot,
   refreshGitHubCliState: appDataClientMocks.refreshGitHubCliState,
   saveSession: appDataClientMocks.saveSession,
@@ -68,7 +61,6 @@ vi.mock('#/web/settings-client.ts', () => ({
   setSettingsFetchInterval: appDataClientMocks.setSettingsFetchInterval,
   setShortcutsDisabled: appDataClientMocks.setShortcutsDisabled,
   setTerminalNotificationsEnabled: appDataClientMocks.setTerminalNotificationsEnabled,
-  trustRepoWorktreeBootstrapConfig: appDataClientMocks.trustRepoWorktreeBootstrapConfig,
 }))
 
 describe('settings write paths', () => {
@@ -78,6 +70,8 @@ describe('settings write paths', () => {
     appDataClientMocks.addRecentRepo.mockResolvedValue({ recentRepos: [], addedRepo: null })
     appDataClientMocks.clearRecentRepos.mockReset()
     appDataClientMocks.clearRecentRepos.mockResolvedValue(undefined)
+    appDataClientMocks.getSettingsSnapshot.mockReset()
+    appDataClientMocks.getSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())
     appDataClientMocks.refreshExternalAppsSnapshot.mockReset()
     appDataClientMocks.refreshExternalAppsSnapshot.mockResolvedValue({
       terminal: {
@@ -112,8 +106,6 @@ describe('settings write paths', () => {
     appDataClientMocks.setShortcutsDisabled.mockResolvedValue(undefined)
     appDataClientMocks.setTerminalNotificationsEnabled.mockReset()
     appDataClientMocks.setTerminalNotificationsEnabled.mockResolvedValue(undefined)
-    appDataClientMocks.trustRepoWorktreeBootstrapConfig.mockReset()
-    appDataClientMocks.trustRepoWorktreeBootstrapConfig.mockResolvedValue({ ok: true, repoSettings: [] })
   })
 
   test('recordRecentRepo syncs recent repos into the settings snapshot cache', async () => {
@@ -160,32 +152,6 @@ describe('settings write paths', () => {
     expect(mainWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
       session,
     })
-  })
-
-  test('rememberRepoWorktreeBootstrapConfig syncs repo settings into the settings snapshot cache', async () => {
-    const repoSettings = [
-      {
-        repoId: '/tmp/repo-a',
-        worktreeBootstrapTrust: {
-          configHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-          trustedAt: '2026-06-26T00:00:00.000Z',
-        },
-      },
-    ]
-    mainWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
-    appDataClientMocks.trustRepoWorktreeBootstrapConfig.mockResolvedValue({ ok: true, repoSettings })
-    const { rememberRepoWorktreeBootstrapConfig } = await import('#/web/settings-write-paths.ts')
-
-    await rememberRepoWorktreeBootstrapConfig(
-      '/tmp/repo-a',
-      'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-    )
-
-    expect(appDataClientMocks.trustRepoWorktreeBootstrapConfig).toHaveBeenCalledWith(
-      '/tmp/repo-a',
-      'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-    )
-    expect(mainWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({ repoSettings })
   })
 
   test('refreshGitHubCliDetection writes refreshed state into the GitHub CLI cache', async () => {

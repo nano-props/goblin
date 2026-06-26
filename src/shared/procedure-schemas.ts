@@ -25,7 +25,7 @@ const EditorAppSchema = v.picklist(['vscode', 'cursor', 'windsurf'])
 const WorktreeBootstrapConfigHashSchema = v.pipe(v.string(), v.regex(WORKTREE_BOOTSTRAP_CONFIG_HASH_RE))
 const WorktreeBootstrapDecisionSchema = v.variant('kind', [
   v.object({ kind: v.literal('skip') }),
-  v.object({ kind: v.literal('run'), configHash: WorktreeBootstrapConfigHashSchema }),
+  v.object({ kind: v.literal('run'), configHash: WorktreeBootstrapConfigHashSchema, rememberTrust: v.boolean() }),
 ])
 
 const RemoteRepoRefSchema = v.object({
@@ -69,7 +69,7 @@ export const REPO_PROCEDURE_SCHEMAS = {
       v.object({ kind: v.literal('existingBranch'), branch: v.string() }),
       v.object({ kind: v.literal('trackRemoteBranch'), remoteRef: v.string(), localBranch: v.string() }),
     ]),
-    worktreeBootstrap: v.optional(WorktreeBootstrapDecisionSchema),
+    worktreeBootstrap: WorktreeBootstrapDecisionSchema,
     sourceToken: SourceToken,
   }),
   getRemoteBranches: CwdInput,
@@ -184,7 +184,6 @@ export const SETTINGS_PROCEDURE_SCHEMAS = {
   fetchInterval: v.object({ sec: v.number() }),
   globalShortcutState: v.object({ registered: v.boolean() }),
   recentReposAdd: v.object({ repo: RepoSessionEntrySchema }),
-  repoWorktreeBootstrapTrust: v.object({ repoId: v.string(), configHash: WorktreeBootstrapConfigHashSchema }),
   githubCli: GITHUB_CLI_REFRESH_SCHEMA,
 } as const
 

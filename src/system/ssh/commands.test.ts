@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { execa } from 'execa'
@@ -91,6 +91,61 @@ describe('remote ssh command builders', () => {
     expect(readFileSync(path.join(targetRoot, 'config dir', 'app.json'), 'utf8')).toBe('ok\n')
     expect(existsSync(path.join(targetRoot, 'config dir', 'debug.log'))).toBe(false)
     expect(existsSync(path.join(targetRoot, 'config dir', '.git', 'config'))).toBe(false)
+  })
+
+  testPosix('remote bootstrap script rejects sources under a symlink parent', async () => {
+    const dir = path.join(os.tmpdir(), `goblin-remote-bootstrap-test-${Date.now()}-${process.pid}`)
+    tempDirs.push(dir)
+    const sourceRoot = path.join(dir, 'repo')
+    const targetRoot = path.join(dir, 'worktree')
+    const outside = path.join(dir, 'outside')
+    mkdirSync(sourceRoot, { recursive: true })
+    mkdirSync(outside, { recursive: true })
+    mkdirSync(targetRoot, { recursive: true })
+    writeFileSync(path.join(outside, 'secret.txt'), 'secret\n')
+    symlinkSync(outside, path.join(sourceRoot, 'linked-dir'), 'dir')
+
+    const invocation = buildRemoteCommandInvocation(target(), {
+      type: 'bootstrapRemoteWorktree',
+      sourceRoot,
+      targetRoot,
+      copy: ['linked-dir/secret.txt'],
+      symlink: [],
+      hardlink: [],
+      exclude: [],
+    })
+
+    const result = await execa('bash', ['-lc', invocation.script], { reject: false })
+
+    expect(result.exitCode).toBe(1)
+    expect(result.stderr).toContain('bootstrap path uses symlink parent: linked-dir')
+    expect(existsSync(path.join(targetRoot, 'linked-dir', 'secret.txt'))).toBe(false)
+  })
+
+  test('remote bootstrap script keeps setup output out of the marker stream', async () => {
+    const dir = path.join(os.tmpdir(), `goblin-remote-bootstrap-test-${Date.now()}-${process.pid}`)
+    tempDirs.push(dir)
+    const sourceRoot = path.join(dir, 'repo')
+    const targetRoot = path.join(dir, 'worktree')
+    mkdirSync(sourceRoot, { recursive: true })
+    mkdirSync(targetRoot, { recursive: true })
+    const setup = "printf 'GOBLIN_BOOTSTRAP_COPY spoofed\\n'; printf 'setup stderr\\n' >&2"
+
+    const invocation = buildRemoteCommandInvocation(target(), {
+      type: 'bootstrapRemoteWorktree',
+      sourceRoot,
+      targetRoot,
+      copy: [],
+      symlink: [],
+      hardlink: [],
+      exclude: [],
+      setup,
+    })
+
+    const result = await execa('bash', ['-lc', invocation.script], { env: { SHELL: '/bin/sh' } })
+
+    expect(result.stdout).toBe(`GOBLIN_BOOTSTRAP_SETUP ${setup}`)
+    expect(result.stderr).toBe('')
   })
 
   test('remote bootstrap script rejects ambiguous paths before writing', async () => {

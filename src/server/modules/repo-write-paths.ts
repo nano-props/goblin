@@ -1,7 +1,8 @@
 import path from 'node:path'
 import { runServerCancellable, abortServerNetworkOp } from '#/server/common/network-ops.ts'
-import { publishRepoQueryInvalidation } from '#/server/modules/invalidation-broker.ts'
+import { publishRepoQueryInvalidation, publishSettingsInvalidation } from '#/server/modules/invalidation-broker.ts'
 import { resolveRepoBackend, runWithRepoBackend, type RepoMutationResult } from '#/server/modules/repo-backend.ts'
+import { getServerRepoSettings, trustServerRepoWorktreeBootstrapConfig } from '#/server/modules/settings-source.ts'
 import { cloneRepository as cloneGitRepository } from '#/system/git/clone.ts'
 import { openInPreferredEditor } from '#/system/editors.ts'
 import { openInPreferredTerminal } from '#/system/terminals.ts'
@@ -10,7 +11,8 @@ import { type ExecResult } from '#/shared/git-types.ts'
 import { type NetworkOpKind } from '#/shared/api-types.ts'
 import type { EditorApp, TerminalApp } from '#/shared/api-types.ts'
 import { checkGitAvailable } from '#/system/git/helper.ts'
-import { isValidCwd, isValidRepoLocator } from '#/shared/input-validation.ts'
+import { isValidCwd, isValidRepoLocator, toSafeRepoLocator } from '#/shared/input-validation.ts'
+import { isRepoWorktreeBootstrapConfigTrusted } from '#/shared/repo-settings.ts'
 import { type CloneRepoResult, type ProbeResult } from '#/shared/api-types.ts'
 import { normalizeCreateWorktreeInput, type CreateWorktreeInput } from '#/shared/worktree-create.ts'
 import { constants as fsConstants, promises as fs } from 'node:fs'
@@ -267,20 +269,44 @@ export async function createRepositoryWorktree(
   options?: { worktreeBootstrap?: WorktreeBootstrapDecision },
 ): Promise<ExecResult> {
   if (!isValidRepoLocator(cwd)) return { ok: false, message: 'error.invalid-arguments' }
+  const repoId = toSafeRepoLocator(cwd)
+  if (!repoId) return { ok: false, message: 'error.invalid-arguments' }
   const normalized = normalizeCreateWorktreeInput(input)
   if (!normalized) return { ok: false, message: 'error.invalid-arguments' }
   if (!path.isAbsolute(normalized.worktreePath) || /[\0-\x1f\x7f]/.test(normalized.worktreePath)) {
     return { ok: false, message: 'error.invalid-path' }
   }
+  const worktreeBootstrap = options?.worktreeBootstrap ?? { kind: 'skip' }
+  const prepared = await prepareWorktreeBootstrapRun(repoId, worktreeBootstrap)
+  if (!prepared.ok) return prepared
   return await runWithRepoBackend(cwd, async (backend) => {
     return await publishSnapshotInvalidationAfterMutation(
       cwd,
       await backend.createWorktree(normalized, signal, {
-        worktreeBootstrap: options?.worktreeBootstrap ?? { kind: 'skip' },
+        worktreeBootstrap,
       }),
       sourceToken,
     )
   })
+}
+
+async function prepareWorktreeBootstrapRun(
+  repoId: string,
+  decision: WorktreeBootstrapDecision,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  if (decision.kind !== 'run') return { ok: true }
+  const repoSettings = await getServerRepoSettings()
+  if (isRepoWorktreeBootstrapConfigTrusted(repoSettings, repoId, decision.configHash)) {
+    return { ok: true }
+  }
+  if (!decision.rememberTrust) return { ok: false, message: 'error.worktree-bootstrap-not-confirmed' }
+  try {
+    await trustServerRepoWorktreeBootstrapConfig({ repoId, configHash: decision.configHash })
+    publishSettingsInvalidation(['settings-snapshot'])
+    return { ok: true }
+  } catch {
+    return { ok: false, message: 'error.settings-write-title' }
+  }
 }
 
 export async function getRepositoryRemoteBranches(cwd: string, signal?: AbortSignal): Promise<string[]> {

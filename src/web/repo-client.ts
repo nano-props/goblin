@@ -96,9 +96,9 @@ export async function pushRepositoryBranch(
 export async function createRepositoryWorktree(
   cwd: string,
   input: CreateWorktreeInput,
+  worktreeBootstrap: WorktreeBootstrapDecision,
   signal?: AbortSignal,
   sourceToken?: string,
-  worktreeBootstrap?: WorktreeBootstrapDecision,
 ): Promise<ExecResult> {
   return await postServerJson(
     '/api/repo/create-worktree',

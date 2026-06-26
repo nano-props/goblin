@@ -280,7 +280,6 @@ export interface AppIpcHandlers {
     applyShellProjection: (input: NativeShellProjection) => Promise<void>
     addRecentRepo: (input: { repo: RepoSessionEntry }) => Promise<RepoSessionEntry[]>
     clearRecentRepos: () => Promise<void>
-    trustRepoWorktreeBootstrapConfig: (input: { repoId: string; configHash: string }) => Promise<RepoSettingsEntry[]>
   }
   externalApps: {
     get: () => Promise<ExternalAppsSnapshot>

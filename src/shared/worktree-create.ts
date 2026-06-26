@@ -30,7 +30,7 @@ export interface CreateWorktreeInput {
 export interface CreateWorktreeIpcInput extends CreateWorktreeInput {
   cwd: string
   sourceToken?: string
-  worktreeBootstrap?: WorktreeBootstrapDecision
+  worktreeBootstrap: WorktreeBootstrapDecision
 }
 
 export function normalizeCreateWorktreeInput(input: unknown): CreateWorktreeInput | null {

@@ -10,7 +10,6 @@ import type {
   LangPref,
   LanInfo,
   RuntimeRecentReposState,
-  RepoSettingsState,
   SessionState,
   SettingsPrefs,
   SettingsPrefsUpdateResponse,
@@ -26,7 +25,6 @@ import {
 import { runtimeSettingsSnapshotFromSettingsSnapshot } from '#/shared/settings-snapshot.ts'
 
 type RecentReposUpdateResponse = { ok: boolean; addedRepo?: RepoSessionEntry | null } & RuntimeRecentReposState
-type RepoSettingsUpdateResponse = { ok: boolean } & RepoSettingsState
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 
 export async function getSettingsSnapshot(): Promise<SettingsSnapshot> {
@@ -172,16 +170,6 @@ export async function clearRecentRepos(): Promise<void> {
       },
     )
   }
-}
-
-export async function trustRepoWorktreeBootstrapConfig(
-  repoId: string,
-  configHash: string,
-): Promise<RepoSettingsUpdateResponse> {
-  return await postServerJson<{ repoId: string; configHash: string }, RepoSettingsUpdateResponse>(
-    '/api/settings/repo-settings/worktree-bootstrap-trust',
-    { repoId, configHash },
-  )
 }
 
 export async function saveSession(session: SessionState): Promise<SessionState> {

@@ -10,7 +10,7 @@
 // git's responsibility.
 
 import { useEffect, useRef, useState } from 'react'
-import { GitBranch, GitBranchPlus, RadioTower, type LucideIcon } from 'lucide-react'
+import { GitBranch, GitBranchPlus, RadioTower, ShieldCheck, type LucideIcon } from 'lucide-react'
 import { DialogFooter } from '#/web/components/ui/dialog.tsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/web/components/ui/select.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
@@ -20,6 +20,7 @@ import { AnimateHeight } from '#/web/components/ui/animate-height.tsx'
 import { Input } from '#/web/components/ui/input.tsx'
 import { RemotePathSuggestions } from '#/web/components/ui/remote-path-suggestions.tsx'
 import { ToggleGroup, ToggleGroupItem } from '#/web/components/ui/toggle-group.tsx'
+import { ConfirmCheckbox } from '#/web/components/ConfirmCheckbox.tsx'
 import { useRemotePathSuggestions } from '#/web/hooks/useRemotePathSuggestions.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { remoteRepoTarget } from '#/web/stores/repos/helpers.ts'
@@ -32,6 +33,7 @@ import {
   type CreateWorktreeDialogMode,
   type CreateWorktreeRequest,
 } from '#/web/components/create-worktree-dialog/create-worktree-dialog.logic.ts'
+import type { WorktreeBootstrapPreview } from '#/shared/worktree-bootstrap-summary.ts'
 
 const MODE_OPTIONS = [
   { id: 'newBranch', labelKey: 'action.create-worktree-mode-new', icon: GitBranchPlus },
@@ -42,11 +44,20 @@ const MODE_OPTIONS = [
 interface Props {
   open: boolean
   repo: RepoState
+  worktreeBootstrap?: WorktreeBootstrapPromptState
   onClose: () => void
-  onCreate: (request: CreateWorktreeRequest) => void | Promise<void>
+  onCreate: (request: CreateWorktreeRequest) => boolean | void | Promise<boolean | void>
 }
 
-export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
+interface WorktreeBootstrapPromptState {
+  loading: boolean
+  preview: WorktreeBootstrapPreview | null
+  trusted: boolean
+  trust: boolean
+  onTrustChange: (checked: boolean) => void
+}
+
+export function CreateWorktreeDialog({ open, repo, worktreeBootstrap, onClose, onCreate }: Props) {
   const t = useT()
   const compact = useIsCompactUi()
 
@@ -59,6 +70,7 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
   const [worktreePath, setWorktreePath] = useState('')
   const [remoteBranches, setRemoteBranches] = useState<string[]>([])
   const [remoteBranchesLoading, setRemoteBranchesLoading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
 
   // Reset on the rising edge of `open` only. A guard ref prevents snapshot
   // refreshes (which change repo.data.branches / currentBranch) from wiping
@@ -79,6 +91,7 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
     setWorktreePath('')
     setRemoteBranches([])
     setRemoteBranchesLoading(false)
+    setSubmitting(false)
   }, [open, repo.data.branches, repo.data.currentBranch])
 
   // Lazy-load remote-tracking branches the first time the user switches
@@ -112,13 +125,21 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
   )
 
   const branchActionBusy = repo.operations.branchAction.phase !== 'idle'
-  const canSubmit = !!derived.input && derived.validPath && !branchActionBusy
+  const bootstrapBusy = worktreeBootstrap?.loading === true
+  const canSubmit = !!derived.input && derived.validPath && !branchActionBusy && !bootstrapBusy && !submitting
 
-  function handleSubmit() {
+  async function handleSubmit(): Promise<void> {
     const nextInput = derived.input
-    if (!nextInput || branchActionBusy) return
-    void onCreate({ input: nextInput })
-    onClose()
+    if (!nextInput || branchActionBusy || bootstrapBusy || submitting) return
+    setSubmitting(true)
+    let shouldClose = false
+    try {
+      const result = await onCreate({ input: nextInput })
+      shouldClose = result !== false
+    } finally {
+      setSubmitting(false)
+    }
+    if (shouldClose) onClose()
   }
 
   const remotePathSuggestions = useRemotePathSuggestions({
@@ -141,7 +162,7 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
         className="space-y-3"
         onSubmit={(e) => {
           e.preventDefault()
-          handleSubmit()
+          void handleSubmit()
         }}
       >
         <Field className="gap-2">
@@ -338,6 +359,9 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
             {derived.pathHintText}
           </FieldDescription>
         </Field>
+
+        <WorktreeBootstrapPrompt state={worktreeBootstrap} />
+
         <DialogFooter className="gap-2 pt-2">
           <Button type="button" variant="outline" className={cn(compact && 'w-full')} onClick={onClose}>
             {t('dialog.cancel')}
@@ -349,4 +373,73 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
       </form>
     </FormDialog>
   )
+}
+
+function WorktreeBootstrapPrompt({ state }: { state: WorktreeBootstrapPromptState | undefined }) {
+  const t = useT()
+  const preview = state?.preview ?? null
+  const showPrompt = state?.loading || (preview?.hasOperations && preview.configHash)
+  if (!state || !showPrompt) return null
+  const rows = preview ? bootstrapRows(preview, t) : []
+
+  return (
+    <div className="rounded-md border bg-muted/30 px-3 py-2.5 text-sm">
+      <div className="flex items-start gap-2">
+        <ShieldCheck aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="font-medium leading-none">{t('action.create-worktree-bootstrap-title')}</div>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            {state.loading ? t('action.create-worktree-bootstrap-loading') : t('action.create-worktree-bootstrap-body')}
+          </p>
+          {!state.loading && preview && (
+            <>
+              {rows.length > 0 && (
+                <dl className="grid gap-1.5 border-y py-2 text-xs">
+                  {rows.map((row) => (
+                    <div key={row.label} className="grid grid-cols-[1fr_auto] items-center gap-3">
+                      <dt className="text-muted-foreground">{row.label}</dt>
+                      <dd className="font-mono text-foreground tabular-nums">{row.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+              {preview.setup && (
+                <div className="space-y-1">
+                  <span className="block text-xs text-muted-foreground">
+                    {t('action.create-worktree-bootstrap-setup-label')}
+                  </span>
+                  <code className="block max-h-20 overflow-auto rounded-md bg-muted px-2 py-1.5 font-mono text-xs break-all text-foreground">
+                    {preview.setup.command}
+                  </code>
+                </div>
+              )}
+              {state.trusted ? (
+                <p className="text-xs text-muted-foreground">{t('action.create-worktree-bootstrap-trusted')}</p>
+              ) : (
+                <>
+                  <ConfirmCheckbox checked={state.trust} onCheckedChange={state.onTrustChange}>
+                    {t('action.create-worktree-bootstrap-remember')}
+                  </ConfirmCheckbox>
+                  <p className="text-xs text-muted-foreground">{t('action.create-worktree-bootstrap-note')}</p>
+                </>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function bootstrapRows(preview: WorktreeBootstrapPreview, t: (key: string) => string) {
+  const rows: Array<{ label: string; value: number }> = []
+  if (preview.copyCount > 0)
+    rows.push({ label: t('action.create-worktree-bootstrap-copy-label'), value: preview.copyCount })
+  if (preview.symlinkCount > 0)
+    rows.push({ label: t('action.create-worktree-bootstrap-symlink-label'), value: preview.symlinkCount })
+  if (preview.hardlinkCount > 0)
+    rows.push({ label: t('action.create-worktree-bootstrap-hardlink-label'), value: preview.hardlinkCount })
+  if (preview.excludeCount > 0)
+    rows.push({ label: t('action.create-worktree-bootstrap-exclude-label'), value: preview.excludeCount })
+  return rows
 }

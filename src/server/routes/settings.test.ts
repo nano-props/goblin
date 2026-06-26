@@ -10,7 +10,6 @@ const mocks = vi.hoisted(() => ({
   applyServerGlobalShortcutRegistrationWrite: vi.fn(),
   applyServerRecentRepoAddWrite: vi.fn(),
   applyServerRecentRepoClearWrite: vi.fn(),
-  applyServerRepoWorktreeBootstrapTrustWrite: vi.fn(),
   applyServerSessionWrite: vi.fn(),
   applyServerSettingsPrefsWrite: vi.fn(),
 }))
@@ -36,7 +35,6 @@ vi.mock('#/server/modules/settings-write-paths.ts', () => ({
   applyServerGlobalShortcutRegistrationWrite: mocks.applyServerGlobalShortcutRegistrationWrite,
   applyServerRecentRepoAddWrite: mocks.applyServerRecentRepoAddWrite,
   applyServerRecentRepoClearWrite: mocks.applyServerRecentRepoClearWrite,
-  applyServerRepoWorktreeBootstrapTrustWrite: mocks.applyServerRepoWorktreeBootstrapTrustWrite,
   applyServerSessionWrite: mocks.applyServerSessionWrite,
   applyServerSettingsPrefsWrite: mocks.applyServerSettingsPrefsWrite,
 }))
@@ -135,38 +133,6 @@ describe('settings routes', () => {
     )
     await expect(clearResponse.json()).resolves.toEqual({ ok: true })
     expect(mocks.applyServerRecentRepoClearWrite).toHaveBeenCalled()
-  })
-
-  test('delegates repo worktree bootstrap trust writes to the settings write-path application layer', async () => {
-    const repoSettings = [
-      {
-        repoId: '/tmp/repo-a',
-        worktreeBootstrapTrust: {
-          configHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-          trustedAt: '2026-06-26T00:00:00.000Z',
-        },
-      },
-    ]
-    mocks.applyServerRepoWorktreeBootstrapTrustWrite.mockResolvedValue({ ok: true, repoSettings })
-    const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
-    const app = createSettingsRoutes(createServerSettingsState())
-
-    const response = await app.request(
-      new Request('http://127.0.0.1:32100/repo-settings/worktree-bootstrap-trust', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          repoId: '/tmp/repo-a',
-          configHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-        }),
-      }),
-    )
-
-    await expect(response.json()).resolves.toEqual({ ok: true, repoSettings })
-    expect(mocks.applyServerRepoWorktreeBootstrapTrustWrite).toHaveBeenCalledWith({
-      repoId: '/tmp/repo-a',
-      configHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-    })
   })
 
   test('returns 400 BAD_REQUEST when the body is missing required fields', async () => {

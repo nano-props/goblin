@@ -4,7 +4,7 @@ import type { WorktreeBootstrapDecision } from '#/shared/worktree-bootstrap-summ
 export type RepoBranchAction =
   | { kind: 'pull'; branch: string; worktreePath?: string }
   | { kind: 'push'; branch: string }
-  | { kind: 'createWorktree'; input: CreateWorktreeInput; worktreeBootstrap?: WorktreeBootstrapDecision }
+  | { kind: 'createWorktree'; input: CreateWorktreeInput; worktreeBootstrap: WorktreeBootstrapDecision }
   | { kind: 'deleteBranch'; branch: string; force?: boolean; alsoDeleteUpstream?: boolean }
   | {
       kind: 'removeWorktree'

@@ -336,6 +336,12 @@ async function validateMaterializations(
   signal: AbortSignal | undefined,
 ): Promise<{ ok: true; operations: ReadyMaterialization[] } | { ok: false; message: string }> {
   const operations: ReadyMaterialization[] = []
+  let sourceRootReal = sourceRoot
+  try {
+    sourceRootReal = await fs.realpath(sourceRoot)
+  } catch (err) {
+    return { ok: false, message: `failed to inspect source repo root: ${errorMessage(err)}` }
+  }
   for (const item of planned) {
     if (signal?.aborted) return { ok: false, message: 'cancelled' }
 
@@ -354,6 +360,9 @@ async function validateMaterializations(
       return { ok: false, message: `hardlink source is not a file: ${item.rel}` }
     }
 
+    const safeSource = await validateSourcePathWithinRoot(sourceRoot, sourceRootReal, item.rel, item.abs, stat)
+    if (!safeSource.ok) return safeSource
+
     const destination = resolveDestinationPath(targetRoot, item.rel)
     if (!destination.ok) return destination
     if (await pathExists(destination.abs, { useLstat: true })) {
@@ -365,6 +374,45 @@ async function validateMaterializations(
     operations.push({ ...item, abs: source.abs, dest: destination.abs, stat })
   }
   return { ok: true, operations }
+}
+
+async function validateSourcePathWithinRoot(
+  sourceRoot: string,
+  sourceRootReal: string,
+  rel: string,
+  abs: string,
+  stat: Awaited<ReturnType<typeof fs.lstat>>,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const symlinkAncestor = await firstSymlinkAncestor(sourceRoot, rel)
+  if (symlinkAncestor) {
+    return { ok: false, message: `bootstrap path uses symlink parent: ${symlinkAncestor}` }
+  }
+  if (stat.isSymbolicLink()) return { ok: true }
+
+  let sourceReal = ''
+  try {
+    sourceReal = await fs.realpath(abs)
+  } catch (err) {
+    return { ok: false, message: `failed to inspect ${rel}: ${errorMessage(err)}` }
+  }
+  if (!isWithinRoot(sourceRootReal, sourceReal)) return { ok: false, message: `bootstrap path escapes repo root: ${rel}` }
+  return { ok: true }
+}
+
+async function firstSymlinkAncestor(sourceRoot: string, rel: string): Promise<string | null> {
+  const segments = rel.split('/').filter(Boolean)
+  let current = sourceRoot
+  for (let index = 0; index < segments.length - 1; index += 1) {
+    current = path.join(current, segments[index]!)
+    try {
+      const stat = await fs.lstat(current)
+      if (stat.isSymbolicLink()) return segments.slice(0, index + 1).join('/')
+    } catch (err) {
+      if (isErrno(err, 'ENOENT')) return null
+      throw err
+    }
+  }
+  return null
 }
 
 async function materializePlan(

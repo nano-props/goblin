@@ -20,6 +20,7 @@ export type WorktreeBootstrapDecision =
   | {
       kind: 'run'
       configHash: string
+      rememberTrust: boolean
     }
 
 export interface WorktreeBootstrapPreview {
