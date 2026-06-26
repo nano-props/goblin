@@ -1,12 +1,12 @@
 import { type ReactNode } from 'react'
-import { FocusModeSidebarChrome } from '#/web/components/repo-shell/FocusModeSidebarChrome.tsx'
+import { ZenModeSidebarChrome } from '#/web/components/repo-shell/ZenModeSidebarChrome.tsx'
 import { CompactRepoWorkspace, RepoWorkspace } from '#/web/components/Layout.tsx'
 import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
 
 interface RepoWorkspaceShellProps {
   repoId?: string
   compact: boolean
-  workspaceFocused: boolean
+  zenMode: boolean
   branchWorkspaceActive: boolean
   workspacePaneSize: number
   onWorkspacePaneSizeChange: (size: number) => void
@@ -20,7 +20,7 @@ interface RepoWorkspaceShellProps {
 export function RepoWorkspaceShell({
   repoId,
   compact,
-  workspaceFocused,
+  zenMode,
   branchWorkspaceActive,
   workspacePaneSize,
   onWorkspacePaneSizeChange,
@@ -30,10 +30,10 @@ export function RepoWorkspaceShell({
   focusToggleEnabled = true,
   onOpenSettings,
 }: RepoWorkspaceShellProps) {
-  const effectiveWorkspaceFocused = focusToggleEnabled && workspaceFocused
+  const effectiveWorkspaceFocused = focusToggleEnabled && zenMode
   const behavior = repoWorkspaceBehavior({
     compact,
-    workspaceFocused: effectiveWorkspaceFocused,
+    zenMode: effectiveWorkspaceFocused,
     branchWorkspaceActive,
   })
   const sidebarPaneSize = 100 - workspacePaneSize
@@ -72,7 +72,7 @@ export function RepoWorkspaceShell({
     <section className="relative flex min-w-0 flex-1 flex-col">
       {renderWorkspaceBody(branchWorkspacePane, branchNavigatorPane)}
       {!compact ? (
-        <FocusModeSidebarChrome
+        <ZenModeSidebarChrome
           repoId={repoId}
           focusToggleEnabled={focusToggleEnabled}
           revealEnabled={focusRevealEnabled}

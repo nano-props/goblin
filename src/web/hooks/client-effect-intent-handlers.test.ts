@@ -107,7 +107,7 @@ function deps(currentRepoId: string | null) {
     })),
     setSelectedTerminal: vi.fn(),
     resetLayout: vi.fn(),
-    toggleWorkspaceFocused: vi.fn(),
+    toggleZenMode: vi.fn(),
     t: (key: string) => key,
   }
 }

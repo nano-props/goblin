@@ -7,7 +7,7 @@ import type {
 
 export interface MainWindowWorkspaceState extends Pick<
   ReposStore,
-  'activeId' | 'order' | 'sessionReady' | 'workspaceFocused'
+  'activeId' | 'order' | 'sessionReady' | 'zenMode'
 > {}
 
 export interface MainWindowNavigationState extends Pick<ReposStore, 'activeId' | 'order'> {}
@@ -18,7 +18,7 @@ export interface KeyboardRuntimeState {
 
 export interface RestorableWorkspaceViewportState extends Pick<
   ReposStore,
-  'activeId' | 'order' | 'workspaceFocused'
+  'activeId' | 'order' | 'zenMode'
 > {}
 
 export interface RestorableWorkspaceNavigationState extends Pick<ReposStore, 'activeId' | 'order'> {}
@@ -36,7 +36,7 @@ export function restorableWorkspaceStateFromStore(
     ReposStore,
     | 'order'
     | 'activeId'
-    | 'workspaceFocused'
+    | 'zenMode'
     | 'workspacePaneSize'
     | 'selectedTerminalByWorktree'
   >,
@@ -44,19 +44,19 @@ export function restorableWorkspaceStateFromStore(
   return {
     order: state.order,
     activeId: state.activeId,
-    workspaceFocused: state.workspaceFocused,
+    zenMode: state.zenMode,
     workspacePaneSize: state.workspacePaneSize,
     selectedTerminalByWorktree: state.selectedTerminalByWorktree,
   }
 }
 
 function restorableWorkspaceViewportStateFromStore(
-  state: Pick<ReposStore, 'activeId' | 'order' | 'workspaceFocused'>,
+  state: Pick<ReposStore, 'activeId' | 'order' | 'zenMode'>,
 ): RestorableWorkspaceViewportState {
   return {
     activeId: state.activeId,
     order: state.order,
-    workspaceFocused: state.workspaceFocused,
+    zenMode: state.zenMode,
   }
 }
 
@@ -70,13 +70,13 @@ export function restorableWorkspaceNavigationStateFromStore(
 }
 
 export function mainWindowWorkspaceStateFromStore(
-  state: Pick<ReposStore, 'activeId' | 'order' | 'sessionReady' | 'workspaceFocused'>,
+  state: Pick<ReposStore, 'activeId' | 'order' | 'sessionReady' | 'zenMode'>,
 ): MainWindowWorkspaceState {
   const restorable = restorableWorkspaceViewportStateFromStore(state)
   return {
     activeId: restorable.activeId,
     order: restorable.order,
-    workspaceFocused: restorable.workspaceFocused,
+    zenMode: restorable.zenMode,
     sessionReady: state.sessionReady,
   }
 }
@@ -95,7 +95,7 @@ export function mainWindowWorkspaceStateEqual(a: MainWindowWorkspaceState, b: Ma
   return (
     a.activeId === b.activeId &&
     a.sessionReady === b.sessionReady &&
-    a.workspaceFocused === b.workspaceFocused &&
+    a.zenMode === b.zenMode &&
     arraysEqual(a.order, b.order)
   )
 }

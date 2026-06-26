@@ -20,7 +20,7 @@ type ClientWorkspaceIntent = Extract<
   | { type: 'repo-refresh-requested' }
   | { type: 'show-workspace-pane-view-requested' }
   | { type: 'terminal-primary-action-requested' }
-  | { type: 'workspace-focus-toggle-requested' }
+  | { type: 'workspace-zen-mode-toggle-requested' }
 >
 
 export type TerminalBellIntentPlan =
@@ -58,7 +58,7 @@ export type WorkspaceIntentPlan =
   | { kind: 'refresh-repo'; repoId: string; token: number }
   | { kind: 'show-workspace-pane-view'; repoId: string; tab: WorkspacePaneView }
   | { kind: 'terminal-primary-action'; repoId: string }
-  | { kind: 'toggle-workspace-focus' }
+  | { kind: 'toggle-zen-mode' }
 
 export type ExternalOpenDrainKickPlan = { kind: 'ignore' } | { kind: 'schedule-rerun' } | { kind: 'start-drain' }
 
@@ -156,10 +156,10 @@ export function createWorkspaceIntentPlan(
     case 'terminal-primary-action-requested':
       if (context.workspaceShortcutSuppressed || !context.currentRepoId) return { kind: 'noop' }
       return { kind: 'terminal-primary-action', repoId: context.currentRepoId }
-    case 'workspace-focus-toggle-requested':
+    case 'workspace-zen-mode-toggle-requested':
       if (context.workspaceShortcutSuppressed || context.terminalFocused || !context.currentRepoId)
         return { kind: 'noop' }
-      return { kind: 'toggle-workspace-focus' }
+      return { kind: 'toggle-zen-mode' }
   }
 }
 
@@ -186,6 +186,6 @@ function isClientWorkspaceIntent(event: ClientEffectIntent): event is ClientWork
     event.type === 'repo-refresh-requested' ||
     event.type === 'show-workspace-pane-view-requested' ||
     event.type === 'terminal-primary-action-requested' ||
-    event.type === 'workspace-focus-toggle-requested'
+    event.type === 'workspace-zen-mode-toggle-requested'
   )
 }

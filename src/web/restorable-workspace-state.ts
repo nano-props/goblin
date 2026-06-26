@@ -16,7 +16,7 @@ export function sessionStateFromRestorableWorkspaceState(input: {
   return {
     openRepos: persistedOpenWorkspaceEntries(restorableWorkspaceState.order, repos),
     activeRepo: persistedActiveRepoIdForSession(restorableWorkspaceState.activeId),
-    workspaceFocused: restorableWorkspaceState.workspaceFocused,
+    zenMode: restorableWorkspaceState.zenMode,
     workspacePaneSize: restorableWorkspaceState.workspacePaneSize,
     selectedTerminalByWorktree: persistedSelectedTerminalByWorktreeForSession(
       restorableWorkspaceState.selectedTerminalByWorktree,
@@ -39,7 +39,7 @@ export function sessionStateFromRestorableWorkspaceState(input: {
 interface RestoredWorkspaceStateFromSession
   extends Pick<
     RestorableWorkspaceState,
-    'activeId' | 'workspaceFocused' | 'workspacePaneSize' | 'selectedTerminalByWorktree'
+    'activeId' | 'zenMode' | 'workspacePaneSize' | 'selectedTerminalByWorktree'
   > {
   preferredWorkspacePaneViewByBranchByRepo: NonNullable<SessionState['preferredWorkspacePaneViewByBranchByRepo']>
   workspacePaneTabOrderByBranchByRepo: SessionState['workspacePaneTabOrderByBranchByRepo']
@@ -51,7 +51,7 @@ export function restoreRestorableWorkspaceStateFromSession(
 ): RestoredWorkspaceStateFromSession {
   return {
     activeId,
-    workspaceFocused: session.workspaceFocused,
+    zenMode: session.zenMode,
     workspacePaneSize: session.workspacePaneSize,
     selectedTerminalByWorktree: session.selectedTerminalByWorktree ?? {},
     preferredWorkspacePaneViewByBranchByRepo: session.preferredWorkspacePaneViewByBranchByRepo ?? {},

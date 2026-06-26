@@ -39,7 +39,7 @@
   --color-separator: var(--goblin-border-subtle);
   --color-border: var(--goblin-border-default);
   --color-input: var(--goblin-border-strong);
-  --color-ring: var(--goblin-focus-ring);
+  --color-ring: var(--goblin-zen-ring);
   --color-destructive: var(--goblin-action-danger);
   --color-destructive-foreground: var(--goblin-action-danger-foreground);
 

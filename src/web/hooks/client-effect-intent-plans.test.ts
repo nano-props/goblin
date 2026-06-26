@@ -104,9 +104,9 @@ describe('client effect intent plans', () => {
     expect(plan).toEqual({ kind: 'refresh-repo', repoId: '/tmp/repo', token: 7 })
   })
 
-  test('creates a focus mode toggle plan for the current workspace', () => {
+  test('creates a zen mode toggle plan for the current workspace', () => {
     const plan = createWorkspaceIntentPlan(
-      { type: 'workspace-focus-toggle-requested' },
+      { type: 'workspace-zen-mode-toggle-requested' },
       {
         overlayBlocked: false,
         workspaceShortcutSuppressed: false,
@@ -116,12 +116,12 @@ describe('client effect intent plans', () => {
       },
     )
 
-    expect(plan).toEqual({ kind: 'toggle-workspace-focus' })
+    expect(plan).toEqual({ kind: 'toggle-zen-mode' })
   })
 
-  test('suppresses focus mode toggle when workspace shortcuts are blocked', () => {
+  test('suppresses zen mode toggle when workspace shortcuts are blocked', () => {
     const plan = createWorkspaceIntentPlan(
-      { type: 'workspace-focus-toggle-requested' },
+      { type: 'workspace-zen-mode-toggle-requested' },
       {
         overlayBlocked: false,
         workspaceShortcutSuppressed: true,
@@ -134,9 +134,9 @@ describe('client effect intent plans', () => {
     expect(plan).toEqual({ kind: 'noop' })
   })
 
-  test('suppresses focus mode toggle while the terminal is focused', () => {
+  test('suppresses zen mode toggle while the terminal is focused', () => {
     const plan = createWorkspaceIntentPlan(
-      { type: 'workspace-focus-toggle-requested' },
+      { type: 'workspace-zen-mode-toggle-requested' },
       {
         overlayBlocked: false,
         workspaceShortcutSuppressed: false,

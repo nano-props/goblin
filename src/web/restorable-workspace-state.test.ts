@@ -22,7 +22,7 @@ describe('restorable-workspace-state', () => {
         restorableWorkspaceState: {
           order: [repo.id],
           activeId: repo.id,
-          workspaceFocused: false,
+          zenMode: false,
           workspacePaneSize: 55,
           selectedTerminalByWorktree: {
             '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0slot-2',
@@ -32,7 +32,7 @@ describe('restorable-workspace-state', () => {
     ).toEqual({
       openRepos: [localRepoSessionEntry('/tmp/repo')],
       activeRepo: '/tmp/repo',
-      workspaceFocused: false,
+      zenMode: false,
       workspacePaneSize: 55,
       selectedTerminalByWorktree: {
         '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0slot-2',
@@ -61,7 +61,7 @@ describe('restorable-workspace-state', () => {
         restorableWorkspaceState: {
           order: [repo.id],
           activeId: repo.id,
-          workspaceFocused: false,
+          zenMode: false,
           workspacePaneSize: 55,
           selectedTerminalByWorktree: {},
         },
@@ -93,7 +93,7 @@ describe('restorable-workspace-state', () => {
         restorableWorkspaceState: {
           order: [repo.id],
           activeId: repo.id,
-          workspaceFocused: false,
+          zenMode: false,
           workspacePaneSize: 55,
           selectedTerminalByWorktree: {},
         },
@@ -111,7 +111,7 @@ describe('restorable-workspace-state', () => {
       restoreRestorableWorkspaceStateFromSession({
         openRepos: [localRepoSessionEntry('/tmp/repo')],
         activeRepo: '/tmp/repo',
-        workspaceFocused: false,
+        zenMode: false,
         workspacePaneSize: 40,
         selectedTerminalByWorktree: {
           '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0slot-1',
@@ -124,7 +124,7 @@ describe('restorable-workspace-state', () => {
       }),
     ).toEqual({
       activeId: '/tmp/repo',
-      workspaceFocused: false,
+      zenMode: false,
       workspacePaneSize: 40,
       selectedTerminalByWorktree: {
         '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0slot-1',

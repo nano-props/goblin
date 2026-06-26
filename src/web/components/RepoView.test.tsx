@@ -179,8 +179,8 @@ describe('RepoView workspace navigation', () => {
     expect(branchWorkspace()).not.toBeNull()
   })
 
-  test('large-screen Focus Mode uses Branch Navigator until a branch opens a collapsed split workspace', () => {
-    useReposStore.getState().setWorkspaceFocused(true)
+  test('large-screen Zen Mode uses Branch Navigator until a branch opens a collapsed split workspace', () => {
+    useReposStore.getState().setZenMode(true)
     render(<RepoView repoId={REPO_ID} />)
 
     expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBeNull()
@@ -198,89 +198,89 @@ describe('RepoView workspace navigation', () => {
     expect(workspace()?.dataset.branchNavigatorCollapsed).toBe('true')
     expect(branchWorkspace()).not.toBeNull()
     expect(branchWorkspace()?.dataset.trafficLightOffset).toBe('true')
-    expect(focusModeSidebarTrigger()).not.toBeNull()
+    expect(zenModeSidebarTrigger()).not.toBeNull()
     const sidebarTops = [...(container?.querySelectorAll<HTMLElement>('[data-testid="repo-shell-sidebar-top"]') ?? [])]
     expect(sidebarTops.length).toBeGreaterThan(0)
-    const closedRevealTop = focusModeSidebarReveal()?.querySelector<HTMLElement>(
+    const closedRevealTop = zenModeSidebarReveal()?.querySelector<HTMLElement>(
       '[data-testid="repo-shell-sidebar-top"]',
     )
-    expect(focusModeSidebarReveal()?.dataset.open).toBe('false')
-    expect(focusModeSidebarReveal()?.dataset.interactive).toBe('false')
+    expect(zenModeSidebarReveal()?.dataset.open).toBe('false')
+    expect(zenModeSidebarReveal()?.dataset.interactive).toBe('false')
     expect(closedRevealTop?.dataset.windowChromeRegion).toBeUndefined()
     expect(closedRevealTop?.querySelector('[data-window-chrome-region="no-drag"]')).toBeNull()
   })
 
-  test('large-screen collapsed Focus Mode reveals the sidebar on left-edge hover', () => {
-    useReposStore.getState().setWorkspaceFocused(true)
+  test('large-screen collapsed Zen Mode reveals the sidebar on left-edge hover', () => {
+    useReposStore.getState().setZenMode(true)
     useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
     useReposStore.getState().setWorkspacePaneSize(55)
     render(<RepoView repoId={REPO_ID} />)
 
-    const reveal = focusModeSidebarReveal()
+    const reveal = zenModeSidebarReveal()
     expect(reveal).not.toBeNull()
     expect(reveal?.dataset.open).toBe('false')
     expect(reveal?.dataset.state).toBe('closed')
-    expect(focusModeSidebarLayer()?.className).toContain('right-0')
+    expect(zenModeSidebarLayer()?.className).toContain('right-0')
     expect(reveal?.className).not.toContain('border-r')
     expect(reveal?.getAttribute('aria-hidden')).toBe('true')
     expect(reveal?.hasAttribute('inert')).toBe(true)
 
     act(() => {
-      focusModeSidebarHitArea()?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+      zenModeSidebarHitArea()?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
     })
 
-    expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
-    expect(focusModeSidebarReveal()?.dataset.interactive).toBe('true')
-    expect(focusModeSidebarReveal()?.getAttribute('aria-hidden')).toBeNull()
-    expect(focusModeSidebarReveal()?.hasAttribute('inert')).toBe(false)
-    const floatingSidebarTop = focusModeSidebarReveal()?.querySelector<HTMLElement>(
+    expect(zenModeSidebarReveal()?.dataset.open).toBe('true')
+    expect(zenModeSidebarReveal()?.dataset.interactive).toBe('true')
+    expect(zenModeSidebarReveal()?.getAttribute('aria-hidden')).toBeNull()
+    expect(zenModeSidebarReveal()?.hasAttribute('inert')).toBe(false)
+    const floatingSidebarTop = zenModeSidebarReveal()?.querySelector<HTMLElement>(
       '[data-testid="repo-shell-sidebar-top"]',
     )
     expect(floatingSidebarTop?.hasAttribute('data-interactive')).toBe(false)
     expect(floatingSidebarTop?.dataset.windowChromeRegion).toBe('drag')
     expect(floatingSidebarTop?.querySelector('[data-window-chrome-region="no-drag"]')).toBeNull()
-    expect(focusModeSidebarTrigger()?.dataset.windowChromeRegion).toBe('interactive')
-    expect(focusModeSidebarTrigger()?.tagName).toBe('BUTTON')
+    expect(zenModeSidebarTrigger()?.dataset.windowChromeRegion).toBe('interactive')
+    expect(zenModeSidebarTrigger()?.tagName).toBe('BUTTON')
   })
 
-  test('large-screen collapsed Focus Mode reveals the sidebar when the focus toggle is hovered', () => {
-    useReposStore.getState().setWorkspaceFocused(true)
+  test('large-screen collapsed Zen Mode reveals the sidebar when the focus toggle is hovered', () => {
+    useReposStore.getState().setZenMode(true)
     useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
     render(<RepoView repoId={REPO_ID} />)
 
-    const revealLayer = focusModeSidebarLayer()
-    const toggleOverlay = focusModeToggleOverlay()
-    expect(focusModeToggleOverlay()?.hasAttribute('data-interactive')).toBe(false)
-    expect(focusModeToggleOverlay()?.dataset.windowChromeRegion).toBeUndefined()
-    expect(focusModeToggleOverlay()?.hasAttribute('data-focus-reveal-surface')).toBe(true)
-    expect(focusModeToggleOverlay()?.className).toContain('goblin-focus-reveal-trigger-layer')
-    expect(focusModeToggleOverlay()?.className).not.toContain('window-chrome')
-    expect(focusModeToggleOverlay()?.className).not.toContain('app-drag-region')
+    const revealLayer = zenModeSidebarLayer()
+    const toggleOverlay = zenModeToggleOverlay()
+    expect(zenModeToggleOverlay()?.hasAttribute('data-interactive')).toBe(false)
+    expect(zenModeToggleOverlay()?.dataset.windowChromeRegion).toBeUndefined()
+    expect(zenModeToggleOverlay()?.hasAttribute('data-zen-reveal-surface')).toBe(true)
+    expect(zenModeToggleOverlay()?.className).toContain('goblin-zen-reveal-trigger-layer')
+    expect(zenModeToggleOverlay()?.className).not.toContain('window-chrome')
+    expect(zenModeToggleOverlay()?.className).not.toContain('app-drag-region')
     expect(revealLayer).not.toBeNull()
     expect(toggleOverlay).not.toBeNull()
     expect(revealLayer!.compareDocumentPosition(toggleOverlay!) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     )
-    expect(focusModeSidebarTrigger()?.hasAttribute('data-interactive')).toBe(true)
-    expect(focusModeSidebarTrigger()?.dataset.windowChromeRegion).toBe('interactive')
-    expect(focusModeSidebarReveal()?.dataset.open).toBe('false')
+    expect(zenModeSidebarTrigger()?.hasAttribute('data-interactive')).toBe(true)
+    expect(zenModeSidebarTrigger()?.dataset.windowChromeRegion).toBe('interactive')
+    expect(zenModeSidebarReveal()?.dataset.open).toBe('false')
 
     act(() => {
-      focusModeSidebarTrigger()?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+      zenModeSidebarTrigger()?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
     })
 
-    expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
+    expect(zenModeSidebarReveal()?.dataset.open).toBe('true')
   })
 
-  test('large-screen collapsed Focus Mode keeps the sidebar open across the window-chrome reveal surface', () => {
-    useReposStore.getState().setWorkspaceFocused(true)
+  test('large-screen collapsed Zen Mode keeps the sidebar open across the window-chrome reveal surface', () => {
+    useReposStore.getState().setZenMode(true)
     useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
     render(<RepoView repoId={REPO_ID} />)
 
     act(() => {
-      focusModeSidebarTrigger()?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+      zenModeSidebarTrigger()?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
     })
-    expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
+    expect(zenModeSidebarReveal()?.dataset.open).toBe('true')
 
     mockFocusRevealLayout({
       panelLeft: -14,
@@ -288,148 +288,148 @@ describe('RepoView workspace navigation', () => {
     })
 
     act(() => {
-      focusModeSidebarReveal()?.dispatchEvent(
+      zenModeSidebarReveal()?.dispatchEvent(
         new MouseEvent('mouseout', {
           bubbles: true,
-          relatedTarget: focusModeToggleOverlay(),
+          relatedTarget: zenModeToggleOverlay(),
           clientX: 355,
           clientY: 24,
         }),
       )
-      focusModeToggleOverlay()?.dispatchEvent(
+      zenModeToggleOverlay()?.dispatchEvent(
         new PointerEvent('pointermove', { bubbles: true, clientX: 355, clientY: 24 }),
       )
     })
 
-    expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
+    expect(zenModeSidebarReveal()?.dataset.open).toBe('true')
   })
 
-  test('large-screen collapsed Focus Mode does not close from the trigger mouseout alone', () => {
-    useReposStore.getState().setWorkspaceFocused(true)
+  test('large-screen collapsed Zen Mode does not close from the trigger mouseout alone', () => {
+    useReposStore.getState().setZenMode(true)
     useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
     render(<RepoView repoId={REPO_ID} />)
 
-    const toggle = focusModeSidebarTrigger()
+    const toggle = zenModeSidebarTrigger()
     act(() => {
       toggle?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
     })
-    expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
+    expect(zenModeSidebarReveal()?.dataset.open).toBe('true')
 
     act(() => {
       toggle?.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body }))
     })
-    expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
+    expect(zenModeSidebarReveal()?.dataset.open).toBe('true')
 
     act(() => {
       document.body.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: 800, clientY: 24 }))
     })
-    expect(focusModeSidebarReveal()?.dataset.open).toBe('false')
+    expect(zenModeSidebarReveal()?.dataset.open).toBe('false')
   })
 
-  test('large-screen collapsed Focus Mode stays open while the pointer remains on the focus trigger', () => {
-    useReposStore.getState().setWorkspaceFocused(true)
+  test('large-screen collapsed Zen Mode stays open while the pointer remains on the focus trigger', () => {
+    useReposStore.getState().setZenMode(true)
     useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
     render(<RepoView repoId={REPO_ID} />)
 
-    const trigger = focusModeSidebarTrigger()
-    expect(trigger?.hasAttribute('data-focus-reveal-surface')).toBe(true)
+    const trigger = zenModeSidebarTrigger()
+    expect(trigger?.hasAttribute('data-zen-reveal-surface')).toBe(true)
 
     act(() => {
       trigger?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
       trigger?.dispatchEvent(new PointerEvent('pointermove', { bubbles: true }))
     })
 
-    expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
+    expect(zenModeSidebarReveal()?.dataset.open).toBe('true')
   })
 
-  test('large-screen collapsed Focus Mode opens reveal on first trigger hover', () => {
+  test('large-screen collapsed Zen Mode opens reveal on first trigger hover', () => {
     render(<RepoView repoId={REPO_ID} />)
 
     act(() => {
       useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
-      useReposStore.getState().setWorkspaceFocused(true)
+      useReposStore.getState().setZenMode(true)
     })
 
-    expect(focusModeSidebarReveal()?.dataset.open).toBe('false')
+    expect(zenModeSidebarReveal()?.dataset.open).toBe('false')
 
-    const trigger = focusModeSidebarTrigger()
+    const trigger = zenModeSidebarTrigger()
     act(() => {
       trigger?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
     })
-    expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
+    expect(zenModeSidebarReveal()?.dataset.open).toBe('true')
   })
 
-  test('large-screen collapsed Focus Mode stays open while moving from trigger into the revealed sidebar', () => {
-    useReposStore.getState().setWorkspaceFocused(true)
+  test('large-screen collapsed Zen Mode stays open while moving from trigger into the revealed sidebar', () => {
+    useReposStore.getState().setZenMode(true)
     useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
     render(<RepoView repoId={REPO_ID} />)
 
-    const toggle = focusModeSidebarTrigger()
+    const toggle = zenModeSidebarTrigger()
     act(() => {
       toggle?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
     })
-    expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
+    expect(zenModeSidebarReveal()?.dataset.open).toBe('true')
 
-    const reveal = focusModeSidebarReveal()
+    const reveal = zenModeSidebarReveal()
     act(() => {
       toggle?.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: reveal }))
       reveal?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
     })
 
-    expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
+    expect(zenModeSidebarReveal()?.dataset.open).toBe('true')
 
     act(() => {
-      focusModeSidebarReveal()?.dispatchEvent(
+      zenModeSidebarReveal()?.dispatchEvent(
         new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body }),
       )
     })
 
-    expect(focusModeSidebarReveal()?.dataset.open).toBe('false')
+    expect(zenModeSidebarReveal()?.dataset.open).toBe('false')
   })
 
-  test('large-screen collapsed Focus Mode stays open while pointer moves into a portal floating surface', () => {
+  test('large-screen collapsed Zen Mode stays open while pointer moves into a portal floating surface', () => {
     const floatingSurface = document.createElement('div')
     floatingSurface.setAttribute('data-floating-surface', '')
     document.body.appendChild(floatingSurface)
 
     try {
-      useReposStore.getState().setWorkspaceFocused(true)
+      useReposStore.getState().setZenMode(true)
       useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
       render(<RepoView repoId={REPO_ID} />)
 
       act(() => {
-        focusModeSidebarHitArea()?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+        zenModeSidebarHitArea()?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
       })
-      expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
+      expect(zenModeSidebarReveal()?.dataset.open).toBe('true')
 
       act(() => {
-        focusModeSidebarReveal()?.dispatchEvent(
+        zenModeSidebarReveal()?.dispatchEvent(
           new MouseEvent('mouseout', { bubbles: true, relatedTarget: floatingSurface }),
         )
         floatingSurface.dispatchEvent(new PointerEvent('pointermove', { bubbles: true }))
       })
 
-      expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
+      expect(zenModeSidebarReveal()?.dataset.open).toBe('true')
 
       act(() => {
         document.body.dispatchEvent(new PointerEvent('pointermove', { bubbles: true }))
       })
 
-      expect(focusModeSidebarReveal()?.dataset.open).toBe('false')
+      expect(zenModeSidebarReveal()?.dataset.open).toBe('false')
     } finally {
       floatingSurface.remove()
     }
   })
 
-  test('large-screen collapsed Focus Mode stays open when pointer coordinates remain inside the reveal', () => {
-    useReposStore.getState().setWorkspaceFocused(true)
+  test('large-screen collapsed Zen Mode stays open when pointer coordinates remain inside the reveal', () => {
+    useReposStore.getState().setZenMode(true)
     useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
     render(<RepoView repoId={REPO_ID} />)
 
     act(() => {
-      focusModeSidebarHitArea()?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+      zenModeSidebarHitArea()?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
     })
-    expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
+    expect(zenModeSidebarReveal()?.dataset.open).toBe('true')
 
     mockFocusRevealLayout({
       panelLeft: -14,
@@ -440,11 +440,11 @@ describe('RepoView workspace navigation', () => {
       document.body.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: 355, clientY: 24 }))
     })
 
-    expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
+    expect(zenModeSidebarReveal()?.dataset.open).toBe('true')
   })
 
-  test('large-screen collapsed Focus Mode resizes the same sidebar width state from the reveal edge', () => {
-    useReposStore.getState().setWorkspaceFocused(true)
+  test('large-screen collapsed Zen Mode resizes the same sidebar width state from the reveal edge', () => {
+    useReposStore.getState().setZenMode(true)
     useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
     useReposStore.getState().setWorkspacePaneSize(70)
     render(<RepoView repoId={REPO_ID} />)
@@ -455,28 +455,28 @@ describe('RepoView workspace navigation', () => {
     })
 
     act(() => {
-      focusModeSidebarHitArea()?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+      zenModeSidebarHitArea()?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
     })
 
     act(() => {
-      focusModeSidebarResizeHandle()?.dispatchEvent(
+      zenModeSidebarResizeHandle()?.dispatchEvent(
         new PointerEvent('pointerdown', { bubbles: true, clientX: 420, pointerId: 1 }),
       )
     })
 
-    expect(focusModeSidebarResizeHandle()?.dataset.separator).toBe('active')
+    expect(zenModeSidebarResizeHandle()?.dataset.separator).toBe('active')
 
     act(() => {
       window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, clientX: 420, pointerId: 1 }))
     })
 
     expect(useReposStore.getState().workspacePaneSize).toBe(58)
-    expect(focusModeSidebarResizeHandle()?.dataset.separator).toBeUndefined()
+    expect(zenModeSidebarResizeHandle()?.dataset.separator).toBeUndefined()
   })
 
-  test('large-screen collapsed Focus Mode cleans resize listeners if the reveal unmounts mid-drag', () => {
+  test('large-screen collapsed Zen Mode cleans resize listeners if the reveal unmounts mid-drag', () => {
     const removeEventListener = vi.spyOn(window, 'removeEventListener')
-    useReposStore.getState().setWorkspaceFocused(true)
+    useReposStore.getState().setZenMode(true)
     useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
     render(<RepoView repoId={REPO_ID} />)
 
@@ -486,16 +486,16 @@ describe('RepoView workspace navigation', () => {
     })
 
     act(() => {
-      focusModeSidebarHitArea()?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+      zenModeSidebarHitArea()?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
     })
 
     act(() => {
-      focusModeSidebarResizeHandle()?.dispatchEvent(
+      zenModeSidebarResizeHandle()?.dispatchEvent(
         new PointerEvent('pointerdown', { bubbles: true, clientX: 420, pointerId: 1 }),
       )
     })
 
-    expect(focusModeSidebarResizeHandle()?.dataset.separator).toBe('active')
+    expect(zenModeSidebarResizeHandle()?.dataset.separator).toBe('active')
 
     act(() => {
       root?.unmount()
@@ -507,28 +507,28 @@ describe('RepoView workspace navigation', () => {
     expect(removeEventListener).toHaveBeenCalledWith('pointercancel', expect.any(Function))
   })
 
-  test('large-screen collapsed Focus Mode keeps the open reveal mounted while focus mode exits', () => {
+  test('large-screen collapsed Zen Mode keeps the open reveal mounted while zen mode exits', () => {
     vi.useFakeTimers()
     try {
-      useReposStore.getState().setWorkspaceFocused(true)
+      useReposStore.getState().setZenMode(true)
       useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
       render(<RepoView repoId={REPO_ID} />)
 
       act(() => {
-        focusModeSidebarHitArea()?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+        zenModeSidebarHitArea()?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
       })
-      expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
+      expect(zenModeSidebarReveal()?.dataset.open).toBe('true')
 
       act(() => {
-        useReposStore.getState().setWorkspaceFocused(false)
+        useReposStore.getState().setZenMode(false)
       })
 
       expect(workspace()?.dataset.branchNavigatorCollapsed).toBe('false')
-      expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
-      expect(focusModeSidebarReveal()?.dataset.interactive).toBe('false')
-      expect(focusModeSidebarReveal()?.getAttribute('aria-hidden')).toBe('true')
-      expect(focusModeSidebarReveal()?.hasAttribute('inert')).toBe(true)
-      const retainedSidebarTop = focusModeSidebarReveal()?.querySelector<HTMLElement>(
+      expect(zenModeSidebarReveal()?.dataset.open).toBe('true')
+      expect(zenModeSidebarReveal()?.dataset.interactive).toBe('false')
+      expect(zenModeSidebarReveal()?.getAttribute('aria-hidden')).toBe('true')
+      expect(zenModeSidebarReveal()?.hasAttribute('inert')).toBe(true)
+      const retainedSidebarTop = zenModeSidebarReveal()?.querySelector<HTMLElement>(
         '[data-testid="repo-shell-sidebar-top"]',
       )
       expect(retainedSidebarTop?.dataset.windowChromeRegion).toBeUndefined()
@@ -538,45 +538,45 @@ describe('RepoView workspace navigation', () => {
         document.body.dispatchEvent(new PointerEvent('pointermove', { bubbles: true }))
         vi.advanceTimersByTime(WORKSPACE_PANE_TRANSITION_MS - 1)
       })
-      expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
+      expect(zenModeSidebarReveal()?.dataset.open).toBe('true')
 
       act(() => {
         vi.advanceTimersByTime(1)
       })
-      expect(focusModeSidebarReveal()).toBeNull()
+      expect(zenModeSidebarReveal()).toBeNull()
     } finally {
       vi.useRealTimers()
     }
   })
 
-  test('large-screen collapsed Focus Mode does not reopen the reveal while focus mode is exiting', () => {
+  test('large-screen collapsed Zen Mode does not reopen the reveal while zen mode is exiting', () => {
     vi.useFakeTimers()
     try {
-      useReposStore.getState().setWorkspaceFocused(true)
+      useReposStore.getState().setZenMode(true)
       useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
       render(<RepoView repoId={REPO_ID} />)
 
       act(() => {
-        focusModeSidebarHitArea()?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+        zenModeSidebarHitArea()?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
       })
-      expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
+      expect(zenModeSidebarReveal()?.dataset.open).toBe('true')
 
       mockFocusRevealLayout({ panelLeft: 0, panelWidth: 360 })
 
       act(() => {
-        useReposStore.getState().setWorkspaceFocused(false)
+        useReposStore.getState().setZenMode(false)
       })
 
-      expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
-      expect(focusModeSidebarReveal()?.dataset.interactive).toBe('false')
-      expect(focusModeSidebarHitArea()?.className).toContain('pointer-events-none')
+      expect(zenModeSidebarReveal()?.dataset.open).toBe('true')
+      expect(zenModeSidebarReveal()?.dataset.interactive).toBe('false')
+      expect(zenModeSidebarHitArea()?.className).toContain('pointer-events-none')
 
       act(() => {
         document.body.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: 120, clientY: 24 }))
         vi.advanceTimersByTime(WORKSPACE_PANE_TRANSITION_MS)
       })
 
-      expect(focusModeSidebarReveal()).toBeNull()
+      expect(zenModeSidebarReveal()).toBeNull()
     } finally {
       vi.useRealTimers()
     }
@@ -663,15 +663,15 @@ describe('RepoView workspace navigation', () => {
   })
 
   test('large-screen focused initial loading with selected branch keeps floating sidebar reveal available', () => {
-    useReposStore.getState().setWorkspaceFocused(true)
+    useReposStore.getState().setZenMode(true)
     useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
     setSnapshotLoading(REPO_ID)
 
     render(<RepoView repoId={REPO_ID} />)
 
     expect(workspace()?.dataset.branchNavigatorCollapsed).toBe('true')
-    expect(focusModeSidebarReveal()).not.toBeNull()
-    expect(focusModeSidebarReveal()?.dataset.open).toBe('false')
+    expect(zenModeSidebarReveal()).not.toBeNull()
+    expect(zenModeSidebarReveal()?.dataset.open).toBe('false')
   })
 
   test('large-screen unavailable repo keeps the repo shell chrome available', () => {
@@ -686,15 +686,15 @@ describe('RepoView workspace navigation', () => {
   })
 
   test('large-screen focused unavailable repo with selected branch keeps floating sidebar reveal available', () => {
-    useReposStore.getState().setWorkspaceFocused(true)
+    useReposStore.getState().setZenMode(true)
     useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
     setRepoUnavailable(REPO_ID)
 
     render(<RepoView repoId={REPO_ID} />)
 
     expect(workspace()?.dataset.branchNavigatorCollapsed).toBe('true')
-    expect(focusModeSidebarReveal()).not.toBeNull()
-    expect(focusModeSidebarReveal()?.dataset.open).toBe('false')
+    expect(zenModeSidebarReveal()).not.toBeNull()
+    expect(zenModeSidebarReveal()?.dataset.open).toBe('false')
   })
 
   test('compact initial loading shows the selected Branch Workspace skeleton as the single pane', () => {
@@ -763,28 +763,28 @@ function workspaceFocusToggle(): HTMLButtonElement | null {
   return container?.querySelector<HTMLButtonElement>('[data-testid="workspace-focus-toggle"]') ?? null
 }
 
-function focusModeSidebarHitArea(): HTMLElement | null {
-  return container?.querySelector<HTMLElement>('[data-testid="focus-mode-sidebar-hit-area"]') ?? null
+function zenModeSidebarHitArea(): HTMLElement | null {
+  return container?.querySelector<HTMLElement>('[data-testid="zen-mode-sidebar-hit-area"]') ?? null
 }
 
-function focusModeSidebarReveal(): HTMLElement | null {
-  return container?.querySelector<HTMLElement>('[data-testid="focus-mode-sidebar-reveal"]') ?? null
+function zenModeSidebarReveal(): HTMLElement | null {
+  return container?.querySelector<HTMLElement>('[data-testid="zen-mode-sidebar-reveal"]') ?? null
 }
 
-function focusModeSidebarLayer(): HTMLElement | null {
-  return container?.querySelector<HTMLElement>('[data-testid="focus-mode-sidebar-layer"]') ?? null
+function zenModeSidebarLayer(): HTMLElement | null {
+  return container?.querySelector<HTMLElement>('[data-testid="zen-mode-sidebar-layer"]') ?? null
 }
 
-function focusModeSidebarResizeHandle(): HTMLElement | null {
-  return container?.querySelector<HTMLElement>('[data-testid="focus-mode-sidebar-resize-handle"]') ?? null
+function zenModeSidebarResizeHandle(): HTMLElement | null {
+  return container?.querySelector<HTMLElement>('[data-testid="zen-mode-sidebar-resize-handle"]') ?? null
 }
 
-function focusModeSidebarTrigger(): HTMLElement | null {
-  return container?.querySelector<HTMLElement>('[data-testid="focus-mode-sidebar-trigger"]') ?? null
+function zenModeSidebarTrigger(): HTMLElement | null {
+  return container?.querySelector<HTMLElement>('[data-testid="zen-mode-sidebar-trigger"]') ?? null
 }
 
-function focusModeToggleOverlay(): HTMLElement | null {
-  return container?.querySelector<HTMLElement>('[data-testid="focus-mode-toggle-overlay"]') ?? null
+function zenModeToggleOverlay(): HTMLElement | null {
+  return container?.querySelector<HTMLElement>('[data-testid="zen-mode-toggle-overlay"]') ?? null
 }
 
 function mockFocusRevealLayout({
@@ -806,8 +806,8 @@ function mockFocusRevealLayout({
   hostWidth?: number
   hostHeight?: number
 }) {
-  const layer = focusModeSidebarLayer()
-  const reveal = focusModeSidebarReveal()
+  const layer = zenModeSidebarLayer()
+  const reveal = zenModeSidebarReveal()
   if (!layer || !reveal) throw new Error('missing focus reveal')
 
   Object.defineProperty(layer, 'getBoundingClientRect', {

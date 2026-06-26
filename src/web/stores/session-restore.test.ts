@@ -27,7 +27,7 @@ function installBridge(sessionOverrides: Record<string, unknown> = {}) {
             session: {
               openRepos: [],
               activeRepo: null,
-              workspaceFocused: true,
+              zenMode: true,
               workspacePaneSize: 0.5,
               selectedTerminalByWorktree: {},
               workspacePaneTabOrderByBranchByRepo: {},
@@ -82,7 +82,7 @@ describe('session restore store', () => {
     installBridge({
       openRepos: [{ kind: 'local', id: '/tmp/repo' }],
       activeRepo: '/tmp/repo',
-      workspaceFocused: false,
+      zenMode: false,
       workspacePaneSize: 0.4,
     })
 
@@ -91,14 +91,14 @@ describe('session restore store', () => {
     expect(useSessionRestoreStore.getState().consumeBootSessionSnapshot()).toMatchObject({
       openRepos: [{ kind: 'local', id: '/tmp/repo' }],
       activeRepo: '/tmp/repo',
-      workspaceFocused: false,
+      zenMode: false,
       workspacePaneSize: 0.4,
     })
     expect(useSessionRestoreStore.getState().bootSessionSnapshot).toBeNull()
     expect(useSessionRestoreStore.getState().consumeBootSessionSnapshot()).toMatchObject({
       openRepos: [],
       activeRepo: null,
-      workspaceFocused: false,
+      zenMode: false,
       workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
     })
   })

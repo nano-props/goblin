@@ -17,7 +17,7 @@ html[data-color-theme='mono'][data-theme='light'] {
   --goblin-border-subtle: rgb(9 9 11 / 0.1);
   --goblin-border-default: #e4e4e7;
   --goblin-border-strong: #d4d4d8;
-  --goblin-focus-ring: #a1a1aa;
+  --goblin-zen-ring: #a1a1aa;
   --goblin-action-primary: #18181b;
   --goblin-action-primary-foreground: #fafafa;
   --goblin-action-danger: #ef4444;
@@ -98,7 +98,7 @@ html[data-color-theme='mono'][data-theme='dark'] {
   --goblin-border-subtle: rgb(255 255 255 / 0.08);
   --goblin-border-default: rgb(255 255 255 / 0.1);
   --goblin-border-strong: rgb(255 255 255 / 0.16);
-  --goblin-focus-ring: #71717a;
+  --goblin-zen-ring: #71717a;
   --goblin-action-primary: #fafafa;
   --goblin-action-primary-foreground: #18181b;
   --goblin-action-danger: #f87171;

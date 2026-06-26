@@ -4,26 +4,26 @@ export interface RepoWorkspaceBehavior {
   mode: RepoWorkspaceMode
   singlePane: boolean
   compact: boolean
-  workspaceFocused: boolean
+  zenMode: boolean
   branchNavigatorCollapsed: boolean
 }
 
 export function repoWorkspaceBehavior({
   compact = false,
-  workspaceFocused = false,
+  zenMode = false,
   branchWorkspaceActive = false,
 }: {
   compact?: boolean
-  workspaceFocused?: boolean
+  zenMode?: boolean
   branchWorkspaceActive?: boolean
 }): RepoWorkspaceBehavior {
-  const branchNavigatorCollapsed = !compact && workspaceFocused && branchWorkspaceActive
-  const singlePane = compact || (workspaceFocused && !branchWorkspaceActive)
+  const branchNavigatorCollapsed = !compact && zenMode && branchWorkspaceActive
+  const singlePane = compact || (zenMode && !branchWorkspaceActive)
   return {
     mode: singlePane ? 'single-pane' : 'split',
     singlePane,
     compact,
-    workspaceFocused,
+    zenMode,
     branchNavigatorCollapsed,
   }
 }

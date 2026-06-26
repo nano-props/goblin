@@ -43,7 +43,7 @@ function defaultIpcResult(path: string, input?: unknown) {
       session: {
         openRepos: [],
         activeRepo: null,
-        workspaceFocused: true,
+        zenMode: true,
         workspacePaneSize: 50,
       },
       recentRepos: [],

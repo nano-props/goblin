@@ -9,7 +9,7 @@ const SESSION_SAVE_DEBOUNCE_MS = 200
 export function useSessionPersistence() {
   const activeId = useReposStore((s) => s.activeId)
   const order = useReposStore((s) => s.order)
-  const workspaceFocused = useReposStore((s) => s.workspaceFocused)
+  const zenMode = useReposStore((s) => s.zenMode)
   const workspacePaneSize = useReposStore((s) => s.workspacePaneSize)
   const selectedTerminalByWorktree = useReposStore((s) => s.selectedTerminalByWorktree)
   const sessionReady = useReposStore((s) => s.sessionReady)
@@ -27,7 +27,7 @@ export function useSessionPersistence() {
       restorableWorkspaceState: restorableWorkspaceStateFromStore({
         order,
         activeId,
-        workspaceFocused,
+        zenMode,
         workspacePaneSize,
         selectedTerminalByWorktree,
       }),
@@ -36,7 +36,7 @@ export function useSessionPersistence() {
     const immediateKey = JSON.stringify({
       openRepos: session.openRepos,
       activeRepo: session.activeRepo,
-      workspaceFocused: session.workspaceFocused,
+      zenMode: session.zenMode,
       workspacePaneSize: session.workspacePaneSize,
       selectedTerminalByWorktree: session.selectedTerminalByWorktree,
       preferredWorkspacePaneViewByBranchByRepo: session.preferredWorkspacePaneViewByBranchByRepo,
@@ -63,7 +63,7 @@ export function useSessionPersistence() {
     order,
     activeId,
     workspacePaneSize,
-    workspaceFocused,
+    zenMode,
     selectedTerminalByWorktree,
     repos,
   ])

@@ -3,7 +3,7 @@ import path from 'node:path'
 import { toSafeRepoLocator, toSafeSessionRepoEntry } from '#/shared/input-validation.ts'
 import { serverDataFile } from '#/shared/data-dir.ts'
 import type { LangPref, SessionState, SettingsPrefs, ThemePref } from '#/shared/api-types.ts'
-import { DEFAULT_WORKSPACE_FOCUSED, normalizeWorkspacePaneSize } from '#/shared/workspace-layout.ts'
+import { DEFAULT_ZEN_MODE, normalizeWorkspacePaneSize } from '#/shared/workspace-layout.ts'
 import { repoSessionEntryId, type RepoSessionEntry } from '#/shared/remote-repo.ts'
 import {
   isWorktreeBootstrapConfigHash,
@@ -218,8 +218,8 @@ function normalizeSession(value: unknown): SessionState {
   return {
     openRepos,
     activeRepo: activeRepo && openRepos.some((entry) => repoSessionEntryId(entry) === activeRepo) ? activeRepo : null,
-    workspaceFocused:
-      typeof partial.workspaceFocused === 'boolean' ? partial.workspaceFocused : DEFAULT_WORKSPACE_FOCUSED,
+    zenMode:
+      typeof partial.zenMode === 'boolean' ? partial.zenMode : DEFAULT_ZEN_MODE,
     workspacePaneSize: normalizeWorkspacePaneSize(partial.workspacePaneSize),
     selectedTerminalByWorktree: normalizeSelectedTerminalByWorktree(partial.selectedTerminalByWorktree),
     preferredWorkspacePaneViewByBranchByRepo: normalizePreferredWorkspacePaneViewByBranchByRepo(

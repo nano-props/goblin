@@ -4,7 +4,7 @@ import { act } from 'react'
 import type { ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
-import { WorkspaceFocusToggle } from '#/web/components/WorkspaceFocusToggle.tsx'
+import { WorkspaceZenModeToggle } from '#/web/components/WorkspaceZenModeToggle.tsx'
 import { resetReposStore } from '#/web/stores/repos/test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 
@@ -31,7 +31,7 @@ afterEach(() => {
 })
 
 describe('WorkspaceFocusToggle', () => {
-  test('keeps the same button node when focus mode changes', () => {
+  test('keeps the same button node when zen mode changes', () => {
     render(<WorkspaceFocusToggle />)
 
     const button = focusToggle()
@@ -39,23 +39,23 @@ describe('WorkspaceFocusToggle', () => {
     expect(button?.getAttribute('aria-pressed')).toBe('false')
 
     act(() => {
-      useReposStore.getState().setWorkspaceFocused(true)
+      useReposStore.getState().setZenMode(true)
     })
 
     expect(focusToggle()).toBe(button)
     expect(focusToggle()?.getAttribute('aria-pressed')).toBe('true')
   })
 
-  test('toggles focus mode when clicked', () => {
+  test('toggles zen mode when clicked', () => {
     render(<WorkspaceFocusToggle />)
 
-    expect(useReposStore.getState().workspaceFocused).toBe(false)
+    expect(useReposStore.getState().zenMode).toBe(false)
 
     act(() => {
       focusToggle()?.click()
     })
 
-    expect(useReposStore.getState().workspaceFocused).toBe(true)
+    expect(useReposStore.getState().zenMode).toBe(true)
     expect(focusToggle()?.getAttribute('aria-pressed')).toBe('true')
   })
 
@@ -80,5 +80,5 @@ function render(element: ReactNode) {
 }
 
 function focusToggle(): HTMLButtonElement | null {
-  return container?.querySelector<HTMLButtonElement>('button[aria-label="workspace.focus-toggle-label"]') ?? null
+  return container?.querySelector<HTMLButtonElement>('button[aria-label="workspace.zen-mode-toggle-label"]') ?? null
 }

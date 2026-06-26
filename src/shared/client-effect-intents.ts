@@ -17,7 +17,7 @@ export type ClientEffectIntent =
   | { type: 'repo-refresh-requested' }
   | { type: 'show-workspace-pane-view-requested'; tab: WorkspacePaneView }
   | { type: 'terminal-primary-action-requested' }
-  | { type: 'workspace-focus-toggle-requested' }
+  | { type: 'workspace-zen-mode-toggle-requested' }
   | { type: 'layout-reset-requested' }
   | { type: 'open-settings-requested'; page: SettingsPage }
   | { type: 'theme-pref-set-requested'; pref: ThemePref }
@@ -43,7 +43,7 @@ export function isClientEffectIntent(event: unknown): event is ClientEffectInten
     case 'close-repo-requested':
     case 'repo-refresh-requested':
     case 'terminal-primary-action-requested':
-    case 'workspace-focus-toggle-requested':
+    case 'workspace-zen-mode-toggle-requested':
     case 'layout-reset-requested':
     case 'clear-recent-repos-requested':
     case 'external-open-enqueued':

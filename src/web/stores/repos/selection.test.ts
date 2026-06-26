@@ -573,45 +573,45 @@ describe('setWorkspacePaneView', () => {
 describe('workspace pane layout state', () => {
   test('applies session pane state atomically with shared normalization rules', () => {
     useReposStore.getState().applySessionLayoutState({
-      workspaceFocused: true,
+      zenMode: true,
       workspacePaneSize: 45,
     })
 
     expect(useReposStore.getState()).toMatchObject({
-      workspaceFocused: true,
+      zenMode: true,
       workspacePaneSize: 45,
     })
   })
 })
 
-describe('setWorkspaceFocused', () => {
-  test('enables large-screen Focus Mode', () => {
-    useReposStore.getState().setWorkspaceFocused(true)
+describe('setZenMode', () => {
+  test('enables large-screen Zen Mode', () => {
+    useReposStore.getState().setZenMode(true)
 
-    expect(useReposStore.getState().workspaceFocused).toBe(true)
+    expect(useReposStore.getState().zenMode).toBe(true)
   })
 
-  test('can disable large-screen Focus Mode again', () => {
-    useReposStore.getState().setWorkspaceFocused(true)
-    useReposStore.getState().setWorkspaceFocused(false)
+  test('can disable large-screen Zen Mode again', () => {
+    useReposStore.getState().setZenMode(true)
+    useReposStore.getState().setZenMode(false)
 
-    expect(useReposStore.getState().workspaceFocused).toBe(false)
+    expect(useReposStore.getState().zenMode).toBe(false)
   })
 
-  test('toggles large-screen Focus Mode', () => {
-    useReposStore.getState().toggleWorkspaceFocused()
+  test('toggles large-screen Zen Mode', () => {
+    useReposStore.getState().toggleZenMode()
 
-    expect(useReposStore.getState().workspaceFocused).toBe(true)
+    expect(useReposStore.getState().zenMode).toBe(true)
   })
 
-  test('preserves large-screen Focus Mode when filtering leaves no selected branch', () => {
+  test('preserves large-screen Zen Mode when filtering leaves no selected branch', () => {
     seedRepo({ selectedBranch: 'main', branches: [branch('main')] })
-    useReposStore.getState().setWorkspaceFocused(true)
+    useReposStore.getState().setZenMode(true)
 
     useReposStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
 
     expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBeNull()
-    expect(useReposStore.getState().workspaceFocused).toBe(true)
+    expect(useReposStore.getState().zenMode).toBe(true)
   })
 })
 
@@ -630,15 +630,15 @@ describe('setWorkspacePaneSize', () => {
 })
 
 describe('resetLayout', () => {
-  test('restores the default pane size but leaves workspaceFocused untouched', () => {
+  test('restores the default pane size but leaves zenMode untouched', () => {
     useReposStore.setState({
-      workspaceFocused: true,
+      zenMode: true,
       workspacePaneSize: 70,
     })
 
     useReposStore.getState().resetLayout()
 
-    expect(useReposStore.getState().workspaceFocused).toBe(true)
+    expect(useReposStore.getState().zenMode).toBe(true)
     expect(useReposStore.getState().workspacePaneSize).toBe(DEFAULT_WORKSPACE_PANE_SIZE)
   })
 

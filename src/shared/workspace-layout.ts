@@ -1,4 +1,4 @@
-export const DEFAULT_WORKSPACE_FOCUSED = false
+export const DEFAULT_ZEN_MODE = false
 export const DEFAULT_WORKSPACE_PANE_SIZE = 70
 
 const MIN_WORKSPACE_PANE_SIZE = 10
@@ -10,14 +10,14 @@ export function normalizeWorkspacePaneSize(value: unknown): number {
 }
 
 export function normalizeWorkspaceSessionLayoutState(value: {
-  workspaceFocused?: unknown
+  zenMode?: unknown
   workspacePaneSize?: unknown
 }): {
-  workspaceFocused: boolean
+  zenMode: boolean
   workspacePaneSize: number
 } {
   return {
-    workspaceFocused: typeof value.workspaceFocused === 'boolean' ? value.workspaceFocused : DEFAULT_WORKSPACE_FOCUSED,
+    zenMode: typeof value.zenMode === 'boolean' ? value.zenMode : DEFAULT_ZEN_MODE,
     workspacePaneSize: normalizeWorkspacePaneSize(value.workspacePaneSize),
   }
 }

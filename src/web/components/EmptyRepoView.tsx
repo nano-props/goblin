@@ -21,7 +21,7 @@ export function EmptyRepoView({ onOpenSettings }: EmptyRepoViewProps) {
   return (
     <RepoWorkspaceShell
       compact={compact}
-      workspaceFocused={false}
+      zenMode={false}
       branchWorkspaceActive={false}
       workspacePaneSize={workspacePaneSize}
       onWorkspacePaneSizeChange={setWorkspacePaneSize}

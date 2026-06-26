@@ -49,10 +49,10 @@ describe('shortcut definitions', () => {
     expect(resolveClientMenuCommandAccelerator(command, {})).toBeUndefined()
   })
 
-  test('defines the focus mode toggle shortcut', () => {
-    const command = clientMenuCommandById('view-toggle-focus-mode')
-    expect(command.menuLabelKey).toBe('workspace.focus-toggle-label')
-    expect(command.intent).toEqual({ type: 'workspace-focus-toggle-requested' })
+  test('defines the zen mode toggle shortcut', () => {
+    const command = clientMenuCommandById('view-toggle-zen-mode')
+    expect(command.menuLabelKey).toBe('workspace.zen-mode-toggle-label')
+    expect(command.intent).toEqual({ type: 'workspace-zen-mode-toggle-requested' })
     expect(resolveClientMenuCommandAccelerator(command, {})).toBe('CmdOrCtrl+B')
   })
 })

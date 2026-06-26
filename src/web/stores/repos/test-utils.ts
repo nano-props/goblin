@@ -18,7 +18,7 @@ import type {
 import type { WorkspacePaneTabOrderEntry, WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import type { BranchSnapshotInfo, PullRequestInfo, WorktreeStatus } from '#/web/types.ts'
 import type { RepoBranchState, RepoState } from '#/web/stores/repos/types.ts'
-import { DEFAULT_WORKSPACE_FOCUSED, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
+import { DEFAULT_ZEN_MODE, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
 export type IpcTestHandler = (input: any) => unknown
 
 interface TerminalBridgeTestOutputs {
@@ -99,7 +99,7 @@ export function resetReposStore(): void {
     order: [],
     activeId: null,
     sessionReady: false,
-    workspaceFocused: DEFAULT_WORKSPACE_FOCUSED,
+    zenMode: DEFAULT_ZEN_MODE,
     workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
     selectedTerminalByWorktree: {},
   })
@@ -540,7 +540,7 @@ export function seedRepoState(options: {
     order: [options.id],
     activeId: options.id,
     sessionReady: true,
-    workspaceFocused: DEFAULT_WORKSPACE_FOCUSED,
+    zenMode: DEFAULT_ZEN_MODE,
     workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
   })
   return repo
