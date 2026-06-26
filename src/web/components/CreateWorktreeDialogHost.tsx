@@ -33,12 +33,14 @@ export function CreateWorktreeDialogHost({ open, onOpenChange, activeId }: Props
   const [bootstrapPreview, setBootstrapPreview] = useState<WorktreeBootstrapPreview | null>(null)
   const [bootstrapPreviewLoading, setBootstrapPreviewLoading] = useState(false)
   const [bootstrapChoice, setBootstrapChoice] = useState<WorktreeBootstrapChoice>('skip')
+  const [rememberBootstrapTrust, setRememberBootstrapTrust] = useState(false)
   const previousActiveIdRef = useRef(activeId)
 
   function resetBootstrapPreflightState(): void {
     setBootstrapPreview(null)
     setBootstrapPreviewLoading(false)
     setBootstrapChoice('skip')
+    setRememberBootstrapTrust(false)
   }
 
   // Force-close when the active repo changes. Without this a
@@ -67,6 +69,7 @@ export function CreateWorktreeDialogHost({ open, onOpenChange, activeId }: Props
     setBootstrapPreview(null)
     setBootstrapPreviewLoading(true)
     setBootstrapChoice('skip')
+    setRememberBootstrapTrust(false)
 
     void getRepositoryWorktreeBootstrapPreview(repoId, controller.signal)
       .then((result) => {
@@ -123,8 +126,7 @@ export function CreateWorktreeDialogHost({ open, onOpenChange, activeId }: Props
     const configHash = bootstrapPreview?.hasOperations ? bootstrapPreview.configHash : null
     if (!configHash) return { kind: 'skip' }
     if (isCurrentBootstrapConfigTrusted(repoId, configHash)) return { kind: 'run', configHash, rememberTrust: false }
-    if (bootstrapChoice === 'run') return { kind: 'run', configHash, rememberTrust: false }
-    if (bootstrapChoice === 'trust') return { kind: 'run', configHash, rememberTrust: true }
+    if (bootstrapChoice === 'run') return { kind: 'run', configHash, rememberTrust: rememberBootstrapTrust }
     return { kind: 'skip' }
   }
 
@@ -135,6 +137,11 @@ export function CreateWorktreeDialogHost({ open, onOpenChange, activeId }: Props
   const bootstrapConfigHash = bootstrapPreview?.configHash ?? null
   const bootstrapTrusted = isCurrentBootstrapConfigTrusted(repo.id, bootstrapConfigHash)
 
+  function handleBootstrapChoiceChange(next: WorktreeBootstrapChoice): void {
+    setBootstrapChoice(next)
+    if (next !== 'run') setRememberBootstrapTrust(false)
+  }
+
   return (
     <CreateWorktreeDialog
       open={open}
@@ -144,7 +151,9 @@ export function CreateWorktreeDialogHost({ open, onOpenChange, activeId }: Props
         preview: bootstrapPreview,
         trusted: bootstrapTrusted,
         choice: bootstrapChoice,
-        onChoiceChange: setBootstrapChoice,
+        rememberTrust: rememberBootstrapTrust,
+        onChoiceChange: handleBootstrapChoiceChange,
+        onRememberTrustChange: setRememberBootstrapTrust,
       }}
       onClose={() => onOpenChange(false)}
       onCreate={handleCreateWorktree}

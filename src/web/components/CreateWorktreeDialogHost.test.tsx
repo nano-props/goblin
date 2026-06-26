@@ -158,10 +158,12 @@ describe('CreateWorktreeDialogHost', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(document.body.textContent).toContain('action.create-worktree-bootstrap-title')
+    expect(document.body.textContent).toContain('action.create-worktree-bootstrap-remember')
     expect(submitBranchAction).not.toHaveBeenCalled()
 
     setInputValue('cwt-branch', 'feature/bootstrap')
-    await clickButton('action.create-worktree-bootstrap-trust-run')
+    await clickButton('action.create-worktree-bootstrap-run')
+    await clickLabel('action.create-worktree-bootstrap-remember')
     await clickButton('action.create-worktree-confirm')
     await flushReact()
 
@@ -440,6 +442,16 @@ async function clickButton(text: string): Promise<void> {
   if (!(button instanceof HTMLButtonElement)) throw new Error(`missing button ${text}`)
   await act(async () => {
     button.click()
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+}
+
+async function clickLabel(text: string): Promise<void> {
+  const label = Array.from(document.querySelectorAll('label')).find((candidate) => candidate.textContent === text)
+  if (!(label instanceof HTMLLabelElement)) throw new Error(`missing label ${text}`)
+  await act(async () => {
+    label.click()
     await Promise.resolve()
     await Promise.resolve()
   })
