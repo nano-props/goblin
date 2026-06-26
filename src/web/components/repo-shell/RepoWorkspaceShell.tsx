@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react'
-import { FocusModeSidebarChrome } from '#/web/components/repo-shell/FocusModeSidebarReveal.tsx'
+import { FocusModeSidebarChrome } from '#/web/components/repo-shell/FocusModeSidebarChrome.tsx'
 import { CompactRepoWorkspace, RepoWorkspace } from '#/web/components/Layout.tsx'
 import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
 
