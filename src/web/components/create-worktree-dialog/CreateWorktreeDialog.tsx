@@ -26,23 +26,18 @@ import { remoteRepoTarget } from '#/web/stores/repos/helpers.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { getRepositoryRemoteBranches } from '#/web/repo-client.ts'
-import { defaultWorktreePath, formatWorktreePath, tildify, untildify } from '#/web/lib/paths.ts'
 import { cn } from '#/web/lib/cn.ts'
-import { validateBranchName } from '#/shared/refnames.ts'
-import { isResolvableRemotePathInput } from '#/shared/remote-repo.ts'
-import { deriveLocalBranchFromRemoteRef, type CreateWorktreeInput } from '#/shared/worktree-create.ts'
-
-type CreateWorktreeDialogMode = CreateWorktreeInput['mode']['kind']
+import {
+  deriveCreateWorktreeForm,
+  type CreateWorktreeDialogMode,
+  type CreateWorktreeRequest,
+} from '#/web/components/create-worktree-dialog/create-worktree-dialog.logic.ts'
 
 const MODE_OPTIONS = [
   { id: 'newBranch', labelKey: 'action.create-worktree-mode-new', icon: GitBranchPlus },
   { id: 'existingBranch', labelKey: 'action.create-worktree-mode-existing', icon: GitBranch },
   { id: 'trackRemoteBranch', labelKey: 'action.create-worktree-mode-remote', icon: RadioTower },
 ] satisfies Array<{ id: CreateWorktreeDialogMode; labelKey: string; icon: LucideIcon }>
-
-export interface CreateWorktreeRequest {
-  input: CreateWorktreeInput
-}
 
 interface Props {
   open: boolean
@@ -65,14 +60,16 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
   const [remoteBranches, setRemoteBranches] = useState<string[]>([])
   const [remoteBranchesLoading, setRemoteBranchesLoading] = useState(false)
 
-  // Reset on the rising edge of `open` only. Listing repo.data.branches /
-  // repo.data.currentBranch in the deps would re-fire on every snapshot
-  // refresh (incl. background refreshes) and wipe user input.
-  const initialBaseRef = useRef('')
-  initialBaseRef.current = repo.data.currentBranch || repo.data.branches[0]?.name || ''
+  // Reset on the rising edge of `open` only. A guard ref prevents snapshot
+  // refreshes (which change repo.data.branches / currentBranch) from wiping
+  // user input while the dialog stays open. The ref starts false so the
+  // first render with open=true still triggers the reset.
+  const previousOpenRef = useRef(false)
   useEffect(() => {
-    if (!open) return
-    const initialBase = initialBaseRef.current
+    const wasClosed = !previousOpenRef.current && open
+    previousOpenRef.current = open
+    if (!wasClosed) return
+    const initialBase = repo.data.currentBranch || repo.data.branches[0]?.name || ''
     setMode('newBranch')
     setBase(initialBase)
     setBranch('')
@@ -82,7 +79,7 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
     setWorktreePath('')
     setRemoteBranches([])
     setRemoteBranchesLoading(false)
-  }, [open])
+  }, [open, repo.data.branches, repo.data.currentBranch])
 
   // Lazy-load remote-tracking branches the first time the user switches
   // to `trackRemoteBranch`. Re-fetching when `remoteBranches.length > 0`
@@ -107,108 +104,29 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
   }, [mode, open, remoteBranches.length, repo.id])
 
   const remoteTarget = remoteRepoTarget(repo.id, repo.remote.lifecycle)
-  const localBranchNames = repo.data.branches.map((b) => b.name)
-  const hasLocalBranch = (name: string) => localBranchNames.includes(name)
-  const branchWorktree = (name: string) => repo.data.branches.find((b) => b.name === name)?.worktree
-
-  const branchTrimmed = branch.trim()
-  const selectedRemoteRef = remoteRef || remoteBranches[0] || ''
-  const derivedLocalBranch = deriveLocalBranchFromRemoteRef(selectedRemoteRef) ?? ''
-  const trackLocalBranch = localBranch.trim() || derivedLocalBranch
-  const pathName = worktreePathName({ mode, branchTrimmed, existingBranch, trackLocalBranch })
-  const pathTrimmed = remoteTarget ? worktreePath.trim() : untildify(worktreePath.trim())
-  const defaultPath = remoteTarget
-    ? defaultRemoteWorktreePath(remoteTarget.remotePath, pathName)
-    : defaultWorktreePath(repo.id, pathName)
-  const effectivePath = pathTrimmed || defaultPath
-  const displayDefaultPath = remoteTarget ? formatWorktreePath(defaultPath, remoteTarget) : tildify(defaultPath)
-  const displayEffectivePath = remoteTarget ? formatWorktreePath(effectivePath, remoteTarget) : tildify(effectivePath)
-  const pathDisabledHint = t('action.create-worktree-path-disabled-hint')
-  const pathHintText = !pathName ? pathDisabledHint : effectivePath ? displayEffectivePath : ''
-
-  const remotePathSuggestions = useRemotePathSuggestions({
-    enabled: open && !!remoteTarget && pathName.length > 0,
-    alias: remoteTarget?.alias ?? '',
-    remotePath: remoteTarget?.remotePath ?? '/',
-    prefix: worktreePath,
-  })
-
-  const branchValidation = branchTrimmed ? validateBranchName(branchTrimmed) : { ok: true }
-  const localBranchValidation = trackLocalBranch ? validateBranchName(trackLocalBranch) : { ok: true }
-  const baseExists = base ? hasLocalBranch(base) : false
-  const existingBranchExists = existingBranch ? hasLocalBranch(existingBranch) : false
-  const branchExists = branchTrimmed ? hasLocalBranch(branchTrimmed) : false
-  const trackLocalBranchExists = trackLocalBranch ? hasLocalBranch(trackLocalBranch) : false
-
-  const existingBranchWorktree = existingBranch && existingBranchExists ? branchWorktree(existingBranch) : undefined
-  const branchExistingWorktree = branchTrimmed && branchExists ? branchWorktree(branchTrimmed) : undefined
-  const trackLocalBranchWorktree =
-    trackLocalBranch && trackLocalBranchExists ? branchWorktree(trackLocalBranch) : undefined
-
-  const baseError = mode === 'newBranch' && base && !baseExists ? t('action.create-worktree-base-missing') : ''
-  const branchError =
-    mode === 'newBranch' && branchTrimmed
-      ? !branchValidation.ok
-        ? t('action.create-worktree-branch-invalid')
-        : branchExists && branchExistingWorktree
-          ? t('action.create-worktree-has-worktree', { branch: branchTrimmed })
-          : branchExists
-            ? t('action.create-worktree-branch-exists')
-            : ''
-      : ''
-  const existingBranchError =
-    mode === 'existingBranch' && existingBranch
-      ? !existingBranchExists
-        ? t('action.create-worktree-existing-missing')
-        : existingBranchWorktree
-          ? t('action.create-worktree-has-worktree', { branch: existingBranch })
-          : ''
-      : ''
-  const localBranchError =
-    mode === 'trackRemoteBranch' && trackLocalBranch
-      ? !localBranchValidation.ok
-        ? t('action.create-worktree-branch-invalid')
-        : trackLocalBranchExists && trackLocalBranchWorktree
-          ? t('action.create-worktree-has-worktree', { branch: trackLocalBranch })
-          : trackLocalBranchExists
-            ? t('action.create-worktree-local-branch-exists')
-            : ''
-      : ''
+  const derived = deriveCreateWorktreeForm(
+    { mode, base, branch, existingBranch, remoteRef, localBranch, worktreePath, remoteBranches },
+    repo,
+    remoteTarget,
+    t,
+  )
 
   const branchActionBusy = repo.operations.branchAction.phase !== 'idle'
-  const validPath = remoteTarget ? isResolvableRemotePathInput(effectivePath) : effectivePath.length > 0
-  const input = buildInput()
-  const canSubmit = !!input && validPath && !branchActionBusy
-
-  function buildInput(): CreateWorktreeInput | null {
-    if (!validPath) return null
-    switch (mode) {
-      case 'newBranch':
-        return branchTrimmed && !branchError && baseExists
-          ? { worktreePath: effectivePath, mode: { kind: 'newBranch', newBranch: branchTrimmed, baseRef: base } }
-          : null
-      case 'existingBranch':
-        return existingBranch && existingBranchExists && !existingBranchError
-          ? { worktreePath: effectivePath, mode: { kind: 'existingBranch', branch: existingBranch } }
-          : null
-      case 'trackRemoteBranch':
-        return selectedRemoteRef && trackLocalBranch && !localBranchError
-          ? {
-              worktreePath: effectivePath,
-              mode: { kind: 'trackRemoteBranch', remoteRef: selectedRemoteRef, localBranch: trackLocalBranch },
-            }
-          : null
-    }
-    const exhaustive: never = mode
-    return exhaustive
-  }
+  const canSubmit = !!derived.input && derived.validPath && !branchActionBusy
 
   function handleSubmit() {
-    const nextInput = buildInput()
+    const nextInput = derived.input
     if (!nextInput || branchActionBusy) return
     void onCreate({ input: nextInput })
     onClose()
   }
+
+  const remotePathSuggestions = useRemotePathSuggestions({
+    enabled: open && !!remoteTarget && derived.pathName.length > 0,
+    alias: remoteTarget?.alias ?? '',
+    remotePath: remoteTarget?.remotePath ?? '/',
+    prefix: worktreePath,
+  })
 
   return (
     <FormDialog
@@ -241,15 +159,11 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
           >
             {MODE_OPTIONS.map((option) => {
               const Icon = option.icon
-              const selected = mode === option.id
               return (
                 <ToggleGroupItem
                   key={option.id}
                   value={option.id}
-                  className={cn(
-                    'flex min-h-8 flex-1 items-center justify-center gap-1 px-2 text-xs',
-                    selected && 'bg-selected text-selected-foreground',
-                  )}
+                  className="flex min-h-8 flex-1 items-center justify-center gap-1 px-2 text-xs"
                 >
                   <Icon size={14} />
                   <span className="truncate">{t(option.labelKey)}</span>
@@ -263,13 +177,13 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
           <div className="space-y-3">
             {mode === 'newBranch' && (
               <>
-                <Field className="gap-2" data-invalid={baseError ? true : undefined}>
+                <Field className="gap-2" data-invalid={derived.baseError ? true : undefined}>
                   <FieldLabel htmlFor="cwt-base">{t('action.create-worktree-base-label')}</FieldLabel>
                   <Select value={base} onValueChange={setBase}>
                     <SelectTrigger
                       id="cwt-base"
                       className="h-10 w-full text-sm"
-                      aria-invalid={!!baseError}
+                      aria-invalid={!!derived.baseError}
                       aria-describedby="cwt-base-error"
                     >
                       <SelectValue placeholder={t('action.create-worktree-base-placeholder')} />
@@ -288,11 +202,11 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
                     </SelectContent>
                   </Select>
                   <FieldError id="cwt-base-error" reserveHeight aria-live="polite" aria-atomic="true">
-                    {baseError}
+                    {derived.baseError}
                   </FieldError>
                 </Field>
 
-                <Field className="gap-2" data-invalid={branchError ? true : undefined}>
+                <Field className="gap-2" data-invalid={derived.branchError ? true : undefined}>
                   <FieldLabel htmlFor="cwt-branch">{t('action.create-worktree-branch-label')}</FieldLabel>
                   <Input
                     id="cwt-branch"
@@ -301,24 +215,24 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
                     value={branch}
                     onChange={(e) => setBranch(e.target.value)}
                     placeholder={t('action.create-worktree-branch-placeholder')}
-                    aria-invalid={!!branchError}
+                    aria-invalid={!!derived.branchError}
                     aria-describedby="cwt-branch-error"
                   />
                   <FieldError id="cwt-branch-error" reserveHeight aria-live="polite" aria-atomic="true">
-                    {branchError}
+                    {derived.branchError}
                   </FieldError>
                 </Field>
               </>
             )}
 
             {mode === 'existingBranch' && (
-              <Field className="gap-2" data-invalid={existingBranchError ? true : undefined}>
+              <Field className="gap-2" data-invalid={derived.existingBranchError ? true : undefined}>
                 <FieldLabel htmlFor="cwt-existing-branch">{t('action.create-worktree-existing-label')}</FieldLabel>
                 <Select value={existingBranch} onValueChange={setExistingBranch}>
                   <SelectTrigger
                     id="cwt-existing-branch"
                     className="h-10 w-full text-sm"
-                    aria-invalid={!!existingBranchError}
+                    aria-invalid={!!derived.existingBranchError}
                     aria-describedby="cwt-existing-branch-error"
                   >
                     <SelectValue placeholder={t('action.create-worktree-existing-placeholder')} />
@@ -332,7 +246,7 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
                   </SelectContent>
                 </Select>
                 <FieldError id="cwt-existing-branch-error" reserveHeight aria-live="polite" aria-atomic="true">
-                  {existingBranchError}
+                  {derived.existingBranchError}
                 </FieldError>
               </Field>
             )}
@@ -342,7 +256,7 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
                 <Field className="gap-2">
                   <FieldLabel htmlFor="cwt-remote-ref">{t('action.create-worktree-remote-label')}</FieldLabel>
                   <Select
-                    value={selectedRemoteRef}
+                    value={derived.selectedRemoteRef}
                     onValueChange={(next) => {
                       setRemoteRef(next)
                       setLocalBranch('')
@@ -369,19 +283,19 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
                   </FieldDescription>
                 </Field>
 
-                <Field className="gap-2" data-invalid={localBranchError ? true : undefined}>
+                <Field className="gap-2" data-invalid={derived.localBranchError ? true : undefined}>
                   <FieldLabel htmlFor="cwt-local-branch">{t('action.create-worktree-local-branch-label')}</FieldLabel>
                   <Input
                     id="cwt-local-branch"
                     className="h-10 text-sm"
                     value={localBranch}
                     onChange={(e) => setLocalBranch(e.target.value)}
-                    placeholder={derivedLocalBranch || t('action.create-worktree-local-branch-placeholder')}
-                    aria-invalid={!!localBranchError}
+                    placeholder={derived.derivedLocalBranch || t('action.create-worktree-local-branch-placeholder')}
+                    aria-invalid={!!derived.localBranchError}
                     aria-describedby="cwt-local-branch-error"
                   />
                   <FieldError id="cwt-local-branch-error" reserveHeight aria-live="polite" aria-atomic="true">
-                    {localBranchError}
+                    {derived.localBranchError}
                   </FieldError>
                 </Field>
               </>
@@ -395,22 +309,22 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
             <RemotePathSuggestions
               id="cwt-path"
               value={worktreePath}
-              disabled={!pathName}
+              disabled={!derived.pathName}
               onChange={setWorktreePath}
               suggestions={remotePathSuggestions.suggestions}
               isLoading={remotePathSuggestions.isLoading}
               hasFetched={remotePathSuggestions.hasFetched}
               emptyLabel={t('repo-picker.open-remote-path-no-matches')}
-              placeholder={displayDefaultPath}
+              placeholder={derived.displayDefaultPath}
               aria-describedby="cwt-path-hint"
             />
           ) : (
             <Input
               id="cwt-path"
               value={worktreePath}
-              disabled={!pathName}
+              disabled={!derived.pathName}
               onChange={(e) => setWorktreePath(e.target.value)}
-              placeholder={displayDefaultPath}
+              placeholder={derived.displayDefaultPath}
               aria-describedby="cwt-path-hint"
               className="h-10 font-mono text-sm"
             />
@@ -419,9 +333,9 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
             id="cwt-path-hint"
             reserveHeight
             className="truncate"
-            title={displayEffectivePath || undefined}
+            title={derived.displayEffectivePath || undefined}
           >
-            {pathHintText}
+            {derived.pathHintText}
           </FieldDescription>
         </Field>
         <DialogFooter className="gap-2 pt-2">
@@ -435,31 +349,4 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
       </form>
     </FormDialog>
   )
-}
-
-function worktreePathName(input: {
-  mode: CreateWorktreeDialogMode
-  branchTrimmed: string
-  existingBranch: string
-  trackLocalBranch: string
-}): string {
-  switch (input.mode) {
-    case 'newBranch':
-      return input.branchTrimmed
-    case 'existingBranch':
-      return input.existingBranch
-    case 'trackRemoteBranch':
-      return input.trackLocalBranch
-  }
-  const exhaustive: never = input.mode
-  return exhaustive
-}
-
-function defaultRemoteWorktreePath(repoPath: string, name: string): string {
-  const slug = name.trim().replaceAll('/', '-')
-  if (!slug) return ''
-  const normalized = repoPath.replace(/\/+$/, '')
-  const baseName = normalized.split('/').filter(Boolean).at(-1) ?? 'worktree'
-  const parent = normalized.slice(0, Math.max(0, normalized.lastIndexOf('/'))) || '/'
-  return `${parent === '/' ? '' : parent}/${baseName}-${slug}`
 }

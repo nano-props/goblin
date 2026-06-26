@@ -171,4 +171,4 @@ This improves readability and long-term maintainability, but it is less urgent t
 - Prefer explicit control transitions over heuristic control changes.
 - Prefer server truth over client inference.
 - Prefer geometry correctness over post-hoc rendering fixes.
-- Prefer contract tests over implementation-shaped tests for terminal behavior.
+- Apply `testing.md`'s contract-test guidance to terminal behavior.

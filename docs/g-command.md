@@ -32,7 +32,7 @@ Adding a `g <subcommand>` is one entry in a table:
 - an optional usage hint
 - a `run(ctx)` function
 
-The CLI is reduced to `find by name → call run`. Each `run` receives a context with args, env, I/O, and a transport. The transport abstracts HTTP, so tests inject a mock and never touch the wire.
+The CLI is reduced to `find by name → call run`. Each `run` receives a context with args, env, I/O, and a transport. The transport abstracts HTTP so command logic stays independent of the wire.
 
 This shape scales linearly: the first command and the tenth command cost the same to add. Adding a sub-domain of commands (e.g. a "branches" namespace) is one new file under `commands/` plus one registry entry — no central dispatch table needs editing.
 
@@ -40,7 +40,7 @@ This shape scales linearly: the first command and the tenth command cost the sam
 
 Most `g` commands are target-state, not actions. `g delta` means "the changes tab is the active tab", not "switch to the changes tab and increment a counter". Two `g delta` calls produce the same final state as one.
 
-This makes commands safe to retry, easy to test (no setup-then-act sequences), and lets the client treat each intent as a pure assignment rather than a stateful transition. The client's existing intent plan for view-switching is already a pure assignment — `g` leans on that rather than introducing a new model.
+This makes commands safe to retry and lets the client treat each intent as a pure assignment rather than a stateful transition. The client's existing intent plan for view-switching is already a pure assignment — `g` leans on that rather than introducing a new model.
 
 ## The error envelope
 
@@ -75,7 +75,7 @@ The pattern for adding a new `g` command:
 1. Decide which plane it uses. Reads and writes that target server state go through the HTTP transport. Commands that should reach the client go through the WS broker.
 2. For control-plane commands, add a route on the server that validates the request and calls the intent publisher. The client side needs no changes — the existing intent router picks the intent up.
 3. Implement the command as a registry entry. Use the existing factory pattern if the new command shares shape with an existing one; otherwise write the `run` function inline.
-4. Add tests covering happy path, server-side failure, transport-level failure, and (for commands with arguments) bad arguments.
+4. Add tests according to `testing.md`, covering the command's observable envelope and failure modes.
 
 When in doubt, look at an existing command — the view commands are the canonical example.
 

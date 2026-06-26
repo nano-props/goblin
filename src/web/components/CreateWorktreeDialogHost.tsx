@@ -10,7 +10,8 @@
 // close the dialog to match the previous per-repo trigger behaviour.
 
 import { useEffect, useRef } from 'react'
-import { CreateWorktreeDialog, type CreateWorktreeRequest } from '#/web/components/CreateWorktreeDialog.tsx'
+import { CreateWorktreeDialog } from '#/web/components/create-worktree-dialog/CreateWorktreeDialog.tsx'
+import type { CreateWorktreeRequest } from '#/web/components/create-worktree-dialog/create-worktree-dialog.logic.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 
 interface Props {
@@ -36,6 +37,9 @@ export function CreateWorktreeDialogHost({ open, onOpenChange, activeId }: Props
   if (!repo) return null
 
   function handleCreateWorktree(request: CreateWorktreeRequest): void {
+    // TypeScript narrows `repo` to non-null in the render body, but not inside
+    // a nested function. The early return is a no-op at runtime because the
+    // host already bails out above; it just satisfies the type checker.
     if (!repo) return
     if (repo.operations.branchAction.phase !== 'idle') return
     submitBranchAction(
