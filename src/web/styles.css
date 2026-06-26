@@ -71,8 +71,9 @@ html[data-host='electron'][data-chrome='overlay'] {
 }
 
 /* Window-chrome drag region — leaves room for macOS traffic lights on the left.
- * Used by the workspace toolbar and sidebar top spacer; child buttons opt out via
- * -webkit-app-region: no-drag (set on `button` and `[data-interactive]`). */
+ * Use this on empty chrome surfaces and structural chrome overlays. Only real
+ * controls should opt out via `button` or `[data-interactive]`; marking a
+ * layout host as interactive removes that whole rectangle from native dragging. */
 .window-chrome {
   -webkit-app-region: drag;
   padding-left: var(--goblin-window-chrome-left);
@@ -82,12 +83,6 @@ html[data-host='electron'][data-chrome='overlay'] {
 button,
 [data-interactive] {
   -webkit-app-region: no-drag;
-}
-
-.goblin-focus-reveal-trigger-layer {
-  -webkit-app-region: no-drag;
-  padding-left: var(--goblin-window-chrome-left);
-  padding-right: var(--goblin-window-chrome-right);
 }
 
 .app-drag-region {

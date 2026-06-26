@@ -1,5 +1,6 @@
 import type { ComponentPropsWithoutRef, ReactNode, Ref } from 'react'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
+import { WindowChromeDragRegion, WindowChromeInteractiveRegion } from '#/web/components/window-chrome-region.tsx'
 import { cn } from '#/web/lib/cn.ts'
 
 interface ToolbarTabStripProps {
@@ -11,23 +12,28 @@ interface ToolbarTabStripProps {
 
 // Shared toolbar tab-strip shell:
 // - compact mode keeps a single flex row in the toolbar height
-// - expanded mode owns the horizontal ScrollArea + compact scrollbar semantics
+// - expanded mode keeps the scrollable tab content no-drag, but leaves any
+//   unused toolbar width as native window chrome for dragging.
 export function ToolbarTabStrip({ compact, compactContent, scrollContent, viewportRef }: ToolbarTabStripProps) {
   if (compact) {
     return <div className="flex h-full min-w-0 flex-1 items-center">{compactContent}</div>
   }
 
   return (
-    <ScrollArea
-      orientation="horizontal"
-      scrollbarMode="compact"
-      data-interactive
-      className="h-full min-w-0 flex-1"
-      viewportClassName="[&>div]:h-full"
-      viewportRef={viewportRef}
-    >
-      {scrollContent}
-    </ScrollArea>
+    <div className="flex h-full min-w-0 flex-1 items-center">
+      <WindowChromeInteractiveRegion asChild>
+        <ScrollArea
+          orientation="horizontal"
+          scrollbarMode="compact"
+          className="h-full min-w-0 max-w-full flex-none w-fit"
+          viewportClassName="[&>div]:h-full"
+          viewportRef={viewportRef}
+        >
+          {scrollContent}
+        </ScrollArea>
+      </WindowChromeInteractiveRegion>
+      <WindowChromeDragRegion reserveWindowControls={false} className="min-w-0 flex-1 self-stretch" aria-hidden />
+    </div>
   )
 }
 

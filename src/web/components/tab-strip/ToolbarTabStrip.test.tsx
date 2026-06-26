@@ -49,9 +49,20 @@ describe('ToolbarTabStrip', () => {
       />,
     )
 
-    expect(container?.firstElementChild?.className).toContain('h-full')
-    expect(container?.firstElementChild?.className).toContain('flex-1')
-    expect(container?.firstElementChild?.hasAttribute('data-interactive')).toBe(true)
+    const host = container?.firstElementChild
+    const scrollRoot = host?.firstElementChild
+    const dragRemainder = host?.lastElementChild
+
+    expect(host?.className).toContain('h-full')
+    expect(host?.className).toContain('flex-1')
+    expect(host?.hasAttribute('data-interactive')).toBe(false)
+    expect(scrollRoot?.className).toContain('w-fit')
+    expect(scrollRoot?.className).toContain('max-w-full')
+    expect(scrollRoot?.hasAttribute('data-interactive')).toBe(true)
+    expect((scrollRoot as HTMLElement | null)?.dataset.windowChromeRegion).toBe('interactive')
+    expect(dragRemainder?.getAttribute('aria-hidden')).toBe('true')
+    expect((dragRemainder as HTMLElement | null)?.dataset.windowChromeRegion).toBe('drag')
+    expect(dragRemainder?.className).toContain('flex-1')
     expect(container?.querySelector('[data-testid="scroll-marker"]')).not.toBeNull()
     expect(container?.querySelector('[data-testid="compact-marker"]')).toBeNull()
   })
