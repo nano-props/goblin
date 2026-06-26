@@ -27,7 +27,7 @@ export type ClientMenuCommandId =
   | 'view-history'
   | 'view-changes'
   | 'view-terminal'
-  | 'view-toggle-focus-mode'
+  | 'view-toggle-zen-mode'
   | 'view-refresh'
   | 'window-next-repo'
   | 'window-prev-repo'
@@ -219,11 +219,11 @@ export const CLIENT_MENU_COMMANDS: ClientMenuCommandDefinition[] = [
     },
   ),
   clientMenuCommand(
-    'view-toggle-focus-mode',
-    'workspace.focus-toggle-label',
-    { type: 'workspace-focus-toggle-requested' },
+    'view-toggle-zen-mode',
+    'workspace.zen-mode-toggle-label',
+    { type: 'workspace-zen-mode-toggle-requested' },
     {
-      helpLabelKey: 'workspace.focus-toggle-label',
+      helpLabelKey: 'workspace.zen-mode-toggle-label',
       accelerator: 'CmdOrCtrl+B',
     },
   ),
@@ -272,7 +272,7 @@ export const WINDOW_REPO_SHORTCUTS: AcceleratorShortcutDefinition[] = clientMenu
 ])
 
 export const VIEW_SHORTCUTS: AcceleratorShortcutDefinition[] = clientMenuAcceleratorShortcuts([
-  'view-toggle-focus-mode',
+  'view-toggle-zen-mode',
 ])
 
 export const CLIENT_KEYBOARD_SHORTCUTS: ClientKeyboardShortcutDefinition[] = [

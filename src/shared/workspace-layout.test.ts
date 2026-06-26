@@ -1,19 +1,19 @@
 import { describe, expect, test } from 'vitest'
 import {
-  DEFAULT_WORKSPACE_FOCUSED,
+  DEFAULT_ZEN_MODE,
   DEFAULT_WORKSPACE_PANE_SIZE,
   normalizeWorkspaceSessionLayoutState,
 } from '#/shared/workspace-layout.ts'
 
 describe('normalizeWorkspaceSessionLayoutState', () => {
-  test('preserves Focus Mode and workspace pane size', () => {
+  test('preserves Zen Mode and workspace pane size', () => {
     expect(
       normalizeWorkspaceSessionLayoutState({
-        workspaceFocused: false,
+        zenMode: false,
         workspacePaneSize: 45,
       }),
     ).toEqual({
-      workspaceFocused: false,
+      zenMode: false,
       workspacePaneSize: 45,
     })
   })
@@ -21,11 +21,11 @@ describe('normalizeWorkspaceSessionLayoutState', () => {
   test('falls back to defaults for invalid input', () => {
     expect(
       normalizeWorkspaceSessionLayoutState({
-        workspaceFocused: 'bad',
+        zenMode: 'bad',
         workspacePaneSize: 'bad',
       }),
     ).toEqual({
-      workspaceFocused: DEFAULT_WORKSPACE_FOCUSED,
+      zenMode: DEFAULT_ZEN_MODE,
       workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
     })
   })

@@ -46,7 +46,7 @@ interface SharedClientIntentDeps {
   ensureWorkspaceOpen: (input: string | RepoSessionEntry) => Promise<OpenRepoResult>
   setSelectedTerminal: (worktreeKey: string, key: string) => void
   resetLayout: () => void
-  toggleWorkspaceFocused: () => void
+  toggleZenMode: () => void
   t: (key: string) => string
 }
 
@@ -189,8 +189,8 @@ export async function handleWorkspaceClientIntent(
         navigation: deps.navigation,
         t: deps.t,
       })
-    case 'toggle-workspace-focus':
-      deps.toggleWorkspaceFocused()
+    case 'toggle-zen-mode':
+      deps.toggleZenMode()
       return true
   }
 }

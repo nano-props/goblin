@@ -245,7 +245,7 @@ describe('useClientEffectIntentRouter', () => {
     expect(useReposStore.getState().repos[repo.id]).toBeUndefined()
   })
 
-  test('focus mode menu action toggles the workspace focus state', async () => {
+  test('zen mode menu action toggles the zen mode state', async () => {
     const repo = seedRepoState({
       id: '/tmp/repo',
       currentBranch: 'main',
@@ -256,13 +256,13 @@ describe('useClientEffectIntentRouter', () => {
 
     await renderHookHost()
 
-    expect(useReposStore.getState().workspaceFocused).toBe(false)
+    expect(useReposStore.getState().zenMode).toBe(false)
     await act(async () => {
-      for (const listener of intentListeners) listener({ type: 'workspace-focus-toggle-requested' })
+      for (const listener of intentListeners) listener({ type: 'workspace-zen-mode-toggle-requested' })
       await Promise.resolve()
     })
 
-    expect(useReposStore.getState().workspaceFocused).toBe(true)
+    expect(useReposStore.getState().zenMode).toBe(true)
   })
 
   test('current repo menu actions prefer the visible routed repo over store activeId', async () => {
@@ -344,7 +344,7 @@ describe('useClientEffectIntentRouter', () => {
       for (const listener of intentListeners) {
         listener({ type: 'show-workspace-pane-view-requested', tab: 'terminal' })
         listener({ type: 'terminal-primary-action-requested' })
-        listener({ type: 'workspace-focus-toggle-requested' })
+        listener({ type: 'workspace-zen-mode-toggle-requested' })
         listener({ type: 'close-repo-requested' })
       }
       await Promise.resolve()
@@ -352,7 +352,7 @@ describe('useClientEffectIntentRouter', () => {
 
     const state = useReposStore.getState()
     expect(preferredWorkspacePaneView(repo.id)).toBe('status')
-    expect(state.workspaceFocused).toBe(false)
+    expect(state.zenMode).toBe(false)
     expect(closeRepoSpy).not.toHaveBeenCalled()
   })
 

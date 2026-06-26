@@ -19,9 +19,9 @@ vi.mock('#/web/components/repo-shell/RepoWorkspaceShell.tsx', () => ({
     <div
       data-testid="repo-workspace-shell"
       data-compact={String(props.compact)}
-      data-workspace-focused={String(props.workspaceFocused)}
+      data-zen-mode={String(props.zenMode)}
       data-branch-workspace-active={String(props.branchWorkspaceActive)}
-      data-focus-toggle-enabled={String(props.focusToggleEnabled)}
+      data-zen-mode-toggle-enabled={String(props.zenModeToggleEnabled)}
       data-single-pane-active-pane={props.singlePaneActivePane}
     >
       {props.branchNavigatorPane}
@@ -67,13 +67,13 @@ function renderEmptyRepoView() {
 }
 
 describe('EmptyRepoView', () => {
-  test('disables focus toggle and pins the navigator pane in compact mode', () => {
+  test('disables zen toggle and pins the navigator pane in compact mode', () => {
     responsiveMocks.mode = 'compact'
     renderEmptyRepoView()
 
     const shell = container!.querySelector<HTMLElement>('[data-testid="repo-workspace-shell"]')
     expect(shell).not.toBeNull()
-    expect(shell?.dataset.focusToggleEnabled).toBe('false')
+    expect(shell?.dataset.zenModeToggleEnabled).toBe('false')
     expect(shell?.dataset.singlePaneActivePane).toBe('navigator')
     expect(shell?.dataset.compact).toBe('true')
   })
@@ -83,7 +83,7 @@ describe('EmptyRepoView', () => {
     renderEmptyRepoView()
 
     const shell = container!.querySelector<HTMLElement>('[data-testid="repo-workspace-shell"]')
-    expect(shell?.dataset.workspaceFocused).toBe('false')
+    expect(shell?.dataset.zenMode).toBe('false')
     expect(shell?.dataset.branchWorkspaceActive).toBe('false')
   })
 })

@@ -22,7 +22,7 @@ import { createRefreshActions } from '#/web/stores/repos/refresh.ts'
 import { createSelectionActions } from '#/web/stores/repos/selection.ts'
 import { reposLog } from '#/web/logger.ts'
 import { normalizeRestorableRepoCache } from '#/web/stores/repos/persistence.ts'
-import { DEFAULT_WORKSPACE_FOCUSED, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
+import { DEFAULT_ZEN_MODE, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
 import type { RestorableRepoSnapshot, ReposStore } from '#/web/stores/repos/types.ts'
 
 interface PersistedReposStore {
@@ -101,7 +101,7 @@ export const useReposStore = create<ReposStore>()(
       // Restorable workspace state.
       order: [],
       activeId: null,
-      workspaceFocused: DEFAULT_WORKSPACE_FOCUSED,
+      zenMode: DEFAULT_ZEN_MODE,
       workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
       selectedTerminalByWorktree: {},
 

@@ -1,5 +1,5 @@
 // Shared branch-list data layer for BranchNavigator. The persistent
-// sidebar and focus-mode reveal drawer both render that same pane, so
+// sidebar and zen-mode reveal drawer both render that same pane, so
 // branches, current/selected branch, view-mode, branch action state,
 // and remote metadata stay on one selector.
 

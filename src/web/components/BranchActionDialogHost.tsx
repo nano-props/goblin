@@ -6,12 +6,12 @@
 // it survives settings ⇄ workspace navigation. State lives in
 // `useBranchActionDialogsStore`, not in any React component local
 // state, so a confirmation requested from a temporary surface (e.g.
-// the focus-mode HoverCard popover) survives the surface unmounting.
+// the zen-mode HoverCard popover) survives the surface unmounting.
 //
 // Every confirmation is resolved against the **dialog payload's**
 // `(repoId, branchName)`, looked up in `useReposStore` via
 // `useBranchActionDialogDisplay`. The user can open a confirmation
-// for a non-selected branch row (e.g. a row in the focus-mode
+// for a non-selected branch row (e.g. a row in the zen-mode
 // HoverCard popover) and confirm against the right branch data, not
 // the workspace's selected branch. When the user switches active
 // repo or selected branch, the `closeStaleDialogs` effect below

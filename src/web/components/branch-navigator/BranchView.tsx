@@ -1,5 +1,5 @@
 // Single source of truth for the left-pane branch list. The persistent
-// sidebar and the focus-mode reveal drawer both render BranchNavigator,
+// sidebar and the zen-mode reveal drawer both render BranchNavigator,
 // so branch selection, filtering, action menus, and empty state stay
 // in one data path.
 

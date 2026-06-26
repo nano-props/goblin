@@ -335,7 +335,7 @@ describe('BranchActionDialogHost', () => {
   test('integration: clicking Confirm dispatches against the dialog payload, not the host\'s active workspace', async () => {
     // The headline contract of this refactor: the user can open a
     // dialog for a non-selected branch row (e.g. a row in the
-    // focus-mode HoverCard popover) and the Confirm click dispatches
+    // zen-mode HoverCard popover) and the Confirm click dispatches
     // against that branch's data, not the workspace's
     // `(activeRepoId, activeBranchName)`.
     const dispatch = await import('#/web/hooks/branchActionDispatch.ts')

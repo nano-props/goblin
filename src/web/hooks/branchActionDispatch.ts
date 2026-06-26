@@ -6,7 +6,7 @@
 // were in the same React subtree, but the layout-level `BranchActionDialogHost`
 // needs to dispatch a confirmation against the dialog payload's
 // `(repo, branch)` — not the host's `(repo, branch)` — so the user can
-// open a dialog for a non-selected branch (e.g. a row in the focus-mode
+// open a dialog for a non-selected branch (e.g. a row in the zen-mode
 // HoverCard popover).
 //
 // Each function takes the resolved `repo` and `branch` explicitly,

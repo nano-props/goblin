@@ -46,7 +46,7 @@ describe('repo selectors', () => {
       mainWindowWorkspaceStateFromStore({
         activeId: '/tmp/repo',
         order: ['/tmp/repo'],
-        workspaceFocused: true,
+        zenMode: true,
         sessionReady: true,
       }),
     ).toMatchObject({
@@ -59,7 +59,7 @@ describe('repo selectors', () => {
       restorableWorkspaceStateFromStore({
         order: ['/tmp/repo'],
         activeId: '/tmp/repo',
-        workspaceFocused: false,
+        zenMode: false,
         workspacePaneSize: 50,
         selectedTerminalByWorktree: {
           '/tmp/repo\0/tmp/repo': 'slot-1',
@@ -68,7 +68,7 @@ describe('repo selectors', () => {
     ).toEqual({
       order: ['/tmp/repo'],
       activeId: '/tmp/repo',
-      workspaceFocused: false,
+      zenMode: false,
       workspacePaneSize: 50,
       selectedTerminalByWorktree: {
         '/tmp/repo\0/tmp/repo': 'slot-1',
@@ -94,13 +94,13 @@ describe('repo selectors', () => {
         mainWindowWorkspaceStateFromStore({
           activeId: '/tmp/repo-a',
           order: ['/tmp/repo-a', '/tmp/repo-b'],
-          workspaceFocused: false,
+          zenMode: false,
           sessionReady: true,
         }),
         mainWindowWorkspaceStateFromStore({
           activeId: '/tmp/repo-a',
           order: ['/tmp/repo-a', '/tmp/repo-b'],
-          workspaceFocused: false,
+          zenMode: false,
           sessionReady: true,
         }),
       ),
@@ -152,23 +152,23 @@ describe('repo selectors', () => {
     })
     expect(
       restorableWorkspaceLayoutStoreActionsFromStore({
-        toggleWorkspaceFocused: fnA as never,
+        toggleZenMode: fnA as never,
         resetLayout: fnA as never,
         setSelectedTerminal: fnA as never,
       }),
     ).toEqual({
-      toggleWorkspaceFocused: fnA,
+      toggleZenMode: fnA,
       resetLayout: fnA,
       setSelectedTerminal: fnA,
     })
     expect(
       restorableWorkspaceLayoutPreferenceStoreActionsFromStore({
-        toggleWorkspaceFocused: fnA as never,
+        toggleZenMode: fnA as never,
         resetLayout: fnA as never,
         setSelectedTerminal: fnA as never,
       }),
     ).toEqual({
-      toggleWorkspaceFocused: fnA,
+      toggleZenMode: fnA,
       resetLayout: fnA,
       setSelectedTerminal: fnA,
     })
@@ -237,13 +237,13 @@ describe('repo selectors', () => {
           ensureWorkspaceOpen: fnA as never,
           setSelectedTerminal: fnA as never,
           resetLayout: fnA as never,
-          toggleWorkspaceFocused: fnA as never,
+          toggleZenMode: fnA as never,
         }),
         clientEffectIntentStoreActionsFromStore({
           ensureWorkspaceOpen: fnA as never,
           setSelectedTerminal: fnA as never,
           resetLayout: fnB as never,
-          toggleWorkspaceFocused: fnA as never,
+          toggleZenMode: fnA as never,
         }),
       ),
     ).toBe(false)

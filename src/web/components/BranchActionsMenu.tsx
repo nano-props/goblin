@@ -29,7 +29,7 @@ export function BranchActionsMenu({ repo, branch, open, onOpenChange }: Props) {
   // `BranchActionDialogHost` is mounted once at the workspace level
   // (`BranchWorkspace`), and its open/close state is held by
   // `useBranchActionDialogsStore` so that triggering a confirm from a
-  // temporary surface (e.g. the focus-mode HoverCard popover) does
+  // temporary surface (e.g. the zen-mode HoverCard popover) does
   // not get its dialog torn down when the surface unmounts.
   return (
     <BranchActionsPopover

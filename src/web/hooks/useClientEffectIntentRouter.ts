@@ -46,7 +46,7 @@ export function useClientEffectIntentRouter({
   // This hook is the single client-side subscription point for native effect
   // intents. Routing stays centralized here; intent-specific behavior lives in
   // the handler/plan helpers so components do not subscribe independently.
-  const { ensureWorkspaceOpen, setSelectedTerminal, resetLayout, toggleWorkspaceFocused } = useStoreWithEqualityFn(
+  const { ensureWorkspaceOpen, setSelectedTerminal, resetLayout, toggleZenMode } = useStoreWithEqualityFn(
     useReposStore,
     clientEffectIntentStoreActionsFromStore,
     clientEffectIntentStoreActionsEqual,
@@ -85,7 +85,7 @@ export function useClientEffectIntentRouter({
       ensureWorkspaceOpen: async (input: string | RepoSessionEntry) => await ensureWorkspaceOpenRef.current(input),
       setSelectedTerminal,
       resetLayout,
-      toggleWorkspaceFocused,
+      toggleZenMode,
       t: (key: string) => tRef.current(key),
     })
 
@@ -139,7 +139,7 @@ export function useClientEffectIntentRouter({
     openRepoPathDialog,
     resetLayout,
     setSelectedTerminal,
-    toggleWorkspaceFocused,
+    toggleZenMode,
     t,
   ])
 }

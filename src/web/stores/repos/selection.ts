@@ -35,8 +35,8 @@ type RestorableWorkspaceSelectionActions = Pick<
   | 'cycleActive'
   | 'applySessionLayoutState'
   | 'applySessionSelectedTerminalState'
-  | 'setWorkspaceFocused'
-  | 'toggleWorkspaceFocused'
+  | 'setZenMode'
+  | 'toggleZenMode'
   | 'setWorkspacePaneSize'
   | 'resetLayout'
   | 'setSelectedTerminal'
@@ -93,11 +93,11 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
       // edits are persisted later through useSessionPersistence.
       set((s) => {
         const next = normalizeWorkspaceSessionLayoutState(layoutState)
-        if (s.workspaceFocused === next.workspaceFocused && s.workspacePaneSize === next.workspacePaneSize) {
+        if (s.zenMode === next.zenMode && s.workspacePaneSize === next.workspacePaneSize) {
           return s
         }
         return {
-          workspaceFocused: next.workspaceFocused,
+          zenMode: next.zenMode,
           workspacePaneSize: next.workspacePaneSize,
         }
       })
@@ -120,12 +120,12 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
       })
     },
 
-    setWorkspaceFocused(enabled: boolean) {
-      set((s) => (s.workspaceFocused === enabled ? s : { workspaceFocused: enabled }))
+    setZenMode(enabled: boolean) {
+      set((s) => (s.zenMode === enabled ? s : { zenMode: enabled }))
     },
 
-    toggleWorkspaceFocused() {
-      set((s) => ({ workspaceFocused: !s.workspaceFocused }))
+    toggleZenMode() {
+      set((s) => ({ zenMode: !s.zenMode }))
     },
 
     setWorkspacePaneSize(size: number) {

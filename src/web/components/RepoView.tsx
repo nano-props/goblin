@@ -36,14 +36,14 @@ export function RepoView({ repoId, onOpenSettings }: Props) {
       return {
         exists: presentation.exists,
         initialLoading: presentation.initialLoading,
-        workspaceFocused: s.workspaceFocused,
+        zenMode: s.zenMode,
         workspacePaneSize: s.workspacePaneSize,
       }
     },
     (a, b) =>
       a.exists === b.exists &&
       a.initialLoading === b.initialLoading &&
-      a.workspaceFocused === b.workspaceFocused &&
+      a.zenMode === b.zenMode &&
       a.workspacePaneSize === b.workspacePaneSize,
   )
   const setWorkspacePaneSize = useReposStore((s) => s.setWorkspacePaneSize)
@@ -84,8 +84,8 @@ export function RepoView({ repoId, onOpenSettings }: Props) {
 
   if (!view.exists || !repo) return <div />
 
-  const focusModeCollapsed = !compact && view.workspaceFocused && branchWorkspaceActive
-  const workspaceTrafficLightOffset = focusModeCollapsed
+  const zenModeCollapsed = !compact && view.zenMode && branchWorkspaceActive
+  const workspaceTrafficLightOffset = zenModeCollapsed
 
   const renderBranchNavigatorPane = (branchContent?: ReactNode) => (
     <RepoWorkspacePane>
@@ -93,7 +93,7 @@ export function RepoView({ repoId, onOpenSettings }: Props) {
         repoId={repoId}
         compact={compact}
         branchContent={branchContent}
-        chromeRegion={focusModeCollapsed ? 'none' : 'drag'}
+        chromeRegion={zenModeCollapsed ? 'none' : 'drag'}
         onOpenSettings={onOpenSettings}
       />
     </RepoWorkspacePane>
@@ -104,7 +104,7 @@ export function RepoView({ repoId, onOpenSettings }: Props) {
       <RepoWorkspaceShell
         repoId={repoId}
         compact={compact}
-        workspaceFocused={view.workspaceFocused}
+        zenMode={view.zenMode}
         branchWorkspaceActive={branchWorkspaceActive}
         workspacePaneSize={view.workspacePaneSize}
         onWorkspacePaneSizeChange={setWorkspacePaneSize}
@@ -126,7 +126,7 @@ export function RepoView({ repoId, onOpenSettings }: Props) {
       <RepoWorkspaceShell
         repoId={repoId}
         compact={compact}
-        workspaceFocused={view.workspaceFocused}
+        zenMode={view.zenMode}
         branchWorkspaceActive={branchWorkspaceActive}
         workspacePaneSize={view.workspacePaneSize}
         onWorkspacePaneSizeChange={setWorkspacePaneSize}
@@ -158,7 +158,7 @@ export function RepoView({ repoId, onOpenSettings }: Props) {
     <RepoWorkspaceShell
       repoId={repoId}
       compact={compact}
-      workspaceFocused={view.workspaceFocused}
+      zenMode={view.zenMode}
       branchWorkspaceActive={branchWorkspaceActive}
       workspacePaneSize={view.workspacePaneSize}
       onWorkspacePaneSizeChange={setWorkspacePaneSize}

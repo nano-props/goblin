@@ -26,7 +26,7 @@
 // Size:
 //   • sm (default): vertical = h-4 (16px). Matches the tab-strip /
 //     leading-action chrome height (h-7 / h-8 wrappers) across
-//     RepoPicker, WorkspacePane, and the Focus Mode seam.
+//     RepoPicker, WorkspacePane, and the Zen Mode seam.
 //   • md: vertical = h-5 (20px). Reserved for any future 40px+
 //     toolbar that needs a chunkier seam — no current caller.
 //

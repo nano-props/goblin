@@ -158,7 +158,7 @@ const WorkspacePaneTerminalTabOrderEntrySchema = v.object({
 const SessionStateSchema = v.object({
   openRepos: v.array(RepoSessionEntrySchema),
   activeRepo: v.nullable(v.string()),
-  workspaceFocused: v.boolean(),
+  zenMode: v.boolean(),
   workspacePaneSize: v.number(),
   selectedTerminalByWorktree: v.optional(v.record(v.string(), v.string())),
   preferredWorkspacePaneViewByBranchByRepo: v.optional(

@@ -83,7 +83,7 @@ export interface SessionState {
   openRepos: RepoSessionEntry[]
   /** The active repository id — null when no repos were open. */
   activeRepo: string | null
-  workspaceFocused: boolean
+  zenMode: boolean
   workspacePaneSize: number
   selectedTerminalByWorktree?: Record<string, string>
   /** Per-repo, per-branch workspace pane view preference that session restore can make renderable. */

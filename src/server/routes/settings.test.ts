@@ -79,7 +79,7 @@ describe('settings routes', () => {
     const session = {
       openRepos: [],
       activeRepo: null,
-      workspaceFocused: true,
+      zenMode: true,
       workspacePaneSize: 50,
       selectedTerminalByWorktree: {},
       workspacePaneTabOrderByBranchByRepo: {},

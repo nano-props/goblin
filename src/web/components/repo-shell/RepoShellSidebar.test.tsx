@@ -82,7 +82,7 @@ describe('RepoShellSidebar', () => {
     expect(settings).not.toBeNull()
   })
 
-  test('renders focus reveal top chrome as draggable without owning focus-toggle geometry', () => {
+  test('renders zen reveal top chrome as draggable without owning zen-toggle geometry', () => {
     render(<RepoShellSidebar repoId={REPO_ID} compact={false} branchContent={<div data-testid="branch-content" />} />)
 
     const sidebarTop = document.body.querySelector<HTMLElement>('[data-testid="repo-shell-sidebar-top"]')

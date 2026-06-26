@@ -1,9 +1,9 @@
 // Branch action confirmation dialog state. Lifted out of component
 // local state so that a confirmation requested from a temporary
-// surface (e.g. the focus-mode HoverCard popover) survives the
+// surface (e.g. the zen-mode HoverCard popover) survives the
 // surface unmounting. Previously `useRetainedDialogState` was used
 // inside `useBranchActions` and the dialog state was destroyed as
-// soon as the row that hosted it was unmounted — see the focus-mode
+// soon as the row that hosted it was unmounted — see the zen-mode
 // "Delete worktree does nothing" bug.
 //
 // Follows docs/arch.md "Keep overlays centralized" — branch action

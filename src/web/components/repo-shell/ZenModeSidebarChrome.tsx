@@ -7,7 +7,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
-import { WorkspaceFocusToggle } from '#/web/components/WorkspaceFocusToggle.tsx'
+import { WorkspaceZenModeToggle } from '#/web/components/WorkspaceZenModeToggle.tsx'
 import { RepoShellSidebar } from '#/web/components/repo-shell/RepoShellSidebar.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import {
@@ -21,12 +21,12 @@ import { WINDOW_CHROME_HEIGHT_PX } from '#/shared/window-chrome.ts'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
 import { WindowChromeInteractiveRegion } from '#/web/components/window-chrome-region.tsx'
 
-const FOCUS_REVEAL_SURFACE_SELECTOR = '[data-floating-surface],[data-focus-reveal-surface]'
-const FOCUS_REVEAL_CLOSE_MS = 260
+const ZEN_REVEAL_SURFACE_SELECTOR = '[data-floating-surface],[data-zen-reveal-surface]'
+const ZEN_REVEAL_CLOSE_MS = 260
 type ResizeRailState = 'idle' | 'hover' | 'active'
 type RevealPanelState = 'closed' | 'opening' | 'open' | 'closing'
 
-interface FocusModeSidebarRevealState {
+interface ZenModeSidebarRevealState {
   open: boolean
   rendered: boolean
   onTriggerEnter: () => void
@@ -34,10 +34,10 @@ interface FocusModeSidebarRevealState {
   onSurfaceLeave: () => void
 }
 
-interface FocusModeSidebarRevealProps {
+interface ZenModeSidebarRevealProps {
   repoId?: string
   open: boolean
-  // The panel can stay visually mounted while focus mode exits; only an
+  // The panel can stay visually mounted while zen mode exits; only an
   // interactive panel may own pointer handlers or native drag regions.
   interactive: boolean
   sidebarSize: number
@@ -47,21 +47,21 @@ interface FocusModeSidebarRevealProps {
   onOpenSettings?: () => void
 }
 
-interface FocusModeSidebarRevealTriggerProps {
+interface ZenModeSidebarRevealTriggerProps {
   revealEnabled?: boolean
   onMouseEnter?: () => void
 }
 
-interface FocusModeSidebarChromeProps {
+interface ZenModeSidebarChromeProps {
   repoId?: string
-  focusToggleEnabled: boolean
+  zenModeToggleEnabled: boolean
   revealEnabled: boolean
   sidebarSize: number
   onSidebarSizeChange: (sidebarSize: number) => void
   onOpenSettings?: () => void
 }
 
-function useFocusModeSidebarReveal(enabled: boolean): FocusModeSidebarRevealState {
+function useZenModeSidebarReveal(enabled: boolean): ZenModeSidebarRevealState {
   const [open, setOpen] = useState(false)
   const previousEnabled = useRef(enabled)
   const exitRetainTimer = useRef<number | null>(null)
@@ -125,21 +125,21 @@ function useFocusModeSidebarReveal(enabled: boolean): FocusModeSidebarRevealStat
   }
 }
 
-export function FocusModeSidebarChrome({
+export function ZenModeSidebarChrome({
   repoId,
-  focusToggleEnabled,
+  zenModeToggleEnabled,
   revealEnabled,
   sidebarSize,
   onSidebarSizeChange,
   onOpenSettings,
-}: FocusModeSidebarChromeProps) {
-  const reveal = useFocusModeSidebarReveal(revealEnabled)
-  if (!focusToggleEnabled && !reveal.rendered) return null
+}: ZenModeSidebarChromeProps) {
+  const reveal = useZenModeSidebarReveal(revealEnabled)
+  if (!zenModeToggleEnabled && !reveal.rendered) return null
 
   return (
     <>
       {reveal.rendered ? (
-        <FocusModeSidebarReveal
+        <ZenModeSidebarReveal
           repoId={repoId}
           open={reveal.open}
           interactive={revealEnabled}
@@ -150,8 +150,8 @@ export function FocusModeSidebarChrome({
           onOpenSettings={onOpenSettings}
         />
       ) : null}
-      {focusToggleEnabled ? (
-        <FocusModeSidebarRevealTriggerLayer
+      {zenModeToggleEnabled ? (
+        <ZenModeSidebarRevealTriggerLayer
           revealEnabled={revealEnabled}
           onMouseEnter={reveal.onTriggerEnter}
         />
@@ -160,18 +160,18 @@ export function FocusModeSidebarChrome({
   )
 }
 
-function FocusModeSidebarRevealTriggerLayer({
+function ZenModeSidebarRevealTriggerLayer({
   revealEnabled = false,
   onMouseEnter,
-}: FocusModeSidebarRevealTriggerProps) {
+}: ZenModeSidebarRevealTriggerProps) {
   return (
     <div
-      data-testid="focus-mode-toggle-overlay"
-      data-focus-reveal-surface={revealEnabled ? '' : undefined}
-      className="goblin-focus-reveal-trigger-layer pointer-events-none absolute left-0 top-0 z-40 flex items-center bg-transparent"
+      data-testid="zen-mode-toggle-overlay"
+      data-zen-reveal-surface={revealEnabled ? '' : undefined}
+      className="goblin-zen-reveal-trigger-layer pointer-events-none absolute left-0 top-0 z-40 flex items-center bg-transparent"
       style={{ height: WINDOW_CHROME_HEIGHT_PX }}
     >
-      <FocusModeSidebarRevealTrigger
+      <ZenModeSidebarRevealTrigger
         revealEnabled={revealEnabled}
         onMouseEnter={onMouseEnter}
       />
@@ -179,15 +179,15 @@ function FocusModeSidebarRevealTriggerLayer({
   )
 }
 
-function FocusModeSidebarRevealTrigger({
+function ZenModeSidebarRevealTrigger({
   revealEnabled = false,
   onMouseEnter,
-}: FocusModeSidebarRevealTriggerProps) {
+}: ZenModeSidebarRevealTriggerProps) {
   return (
     <WindowChromeInteractiveRegion asChild>
-      <WorkspaceFocusToggle
-        data-focus-reveal-surface={revealEnabled ? '' : undefined}
-        data-testid="focus-mode-sidebar-trigger"
+      <WorkspaceZenModeToggle
+        data-zen-reveal-surface={revealEnabled ? '' : undefined}
+        data-testid="zen-mode-sidebar-trigger"
         className="pointer-events-auto"
         onMouseEnter={revealEnabled ? onMouseEnter : undefined}
       />
@@ -195,7 +195,7 @@ function FocusModeSidebarRevealTrigger({
   )
 }
 
-function FocusModeSidebarReveal({
+function ZenModeSidebarReveal({
   repoId,
   open,
   interactive,
@@ -204,7 +204,7 @@ function FocusModeSidebarReveal({
   onSurfaceEnter,
   onSurfaceLeave,
   onOpenSettings,
-}: FocusModeSidebarRevealProps) {
+}: ZenModeSidebarRevealProps) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const panelRef = useRef<HTMLDivElement | null>(null)
   const hitAreaRef = useRef<HTMLDivElement | null>(null)
@@ -248,7 +248,7 @@ function FocusModeSidebarReveal({
   const handleResizePointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
       if (!panelInteractive) return
-      const rect = focusRevealHostRect(hostRef.current)
+      const rect = zenRevealHostRect(hostRef.current)
       if (!rect || rect.width <= 0) return
 
       event.preventDefault()
@@ -327,13 +327,13 @@ function FocusModeSidebarReveal({
     closeAnimationTimerRef.current = window.setTimeout(() => {
       closeAnimationTimerRef.current = null
       setPanelVisualState('closed')
-    }, FOCUS_REVEAL_CLOSE_MS)
+    }, ZEN_REVEAL_CLOSE_MS)
   }, [clearCloseAnimationTimer, clearOpenAnimationFrame, open, setPanelVisualState])
   const handleSurfaceLeave = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
       if (resizingRef.current) return
       if (isPointerInsideRevealBounds(event, hostRef.current, panelRef.current)) return
-      if (isFocusRevealSurfaceTarget(event.relatedTarget, panelRef.current, hitAreaRef.current)) return
+      if (isZenRevealSurfaceTarget(event.relatedTarget, panelRef.current, hitAreaRef.current)) return
       onSurfaceLeave()
     },
     [onSurfaceLeave],
@@ -344,7 +344,7 @@ function FocusModeSidebarReveal({
     const handlePointerMove = (event: PointerEvent) => {
       if (resizingRef.current) return
       if (
-        isFocusRevealSurfaceTarget(event.target, panelRef.current, hitAreaRef.current) ||
+        isZenRevealSurfaceTarget(event.target, panelRef.current, hitAreaRef.current) ||
         isPointerInsideRevealBounds(event, hostRef.current, panelRef.current) ||
         isPointerInsideElement(event, hitAreaRef.current)
       ) {
@@ -368,13 +368,13 @@ function FocusModeSidebarReveal({
   return (
     <div
       ref={hostRef}
-      data-testid="focus-mode-sidebar-layer"
+      data-testid="zen-mode-sidebar-layer"
       className="pointer-events-none absolute inset-y-0 left-0 right-0 z-30"
     >
       <div
         ref={hitAreaRef}
-        data-focus-reveal-surface=""
-        data-testid="focus-mode-sidebar-hit-area"
+        data-zen-reveal-surface=""
+        data-testid="zen-mode-sidebar-hit-area"
         className={cn('absolute bottom-0 left-0 w-3', interactive ? 'pointer-events-auto' : 'pointer-events-none')}
         style={{ top: WINDOW_CHROME_HEIGHT_PX }}
         onMouseEnter={interactive ? onSurfaceEnter : undefined}
@@ -383,14 +383,14 @@ function FocusModeSidebarReveal({
       />
       <div
         ref={panelRef}
-        data-focus-reveal-surface={panelInteractive ? '' : undefined}
-        data-testid="focus-mode-sidebar-reveal"
+        data-zen-reveal-surface={panelInteractive ? '' : undefined}
+        data-testid="zen-mode-sidebar-reveal"
         data-open={open ? 'true' : 'false'}
         data-interactive={panelInteractive ? 'true' : 'false'}
         data-state={panelState}
         aria-hidden={panelInteractive ? undefined : true}
         inert={panelInteractive ? undefined : true}
-        className="goblin-focus-reveal-panel absolute inset-y-0 left-0 flex min-w-0 overflow-hidden bg-card"
+        className="goblin-zen-reveal-panel absolute inset-y-0 left-0 flex min-w-0 overflow-hidden bg-card"
         style={style}
         onMouseEnter={panelInteractive ? onSurfaceEnter : undefined}
         onMouseLeave={panelInteractive ? handleSurfaceLeave : undefined}
@@ -402,7 +402,7 @@ function FocusModeSidebarReveal({
           onOpenSettings={onOpenSettings}
         />
         <WindowChromeInteractiveRegion
-          data-testid="focus-mode-sidebar-resize-handle"
+          data-testid="zen-mode-sidebar-resize-handle"
           data-separator={resizeRailState === 'idle' ? undefined : resizeRailState}
           role="separator"
           aria-orientation="vertical"
@@ -422,7 +422,7 @@ function FocusModeSidebarReveal({
   )
 }
 
-function focusRevealHostRect(host: HTMLElement | null): DOMRect | null {
+function zenRevealHostRect(host: HTMLElement | null): DOMRect | null {
   const rect = host?.getBoundingClientRect()
   if (rect && rect.width > 0) return rect
   const parentRect = host?.parentElement?.getBoundingClientRect()
@@ -460,7 +460,7 @@ function isPointerInsideRevealBounds(
   )
 }
 
-function isFocusRevealSurfaceTarget(
+function isZenRevealSurfaceTarget(
   target: EventTarget | null,
   panel: HTMLElement | null,
   hitArea: HTMLElement | null,
@@ -469,7 +469,7 @@ function isFocusRevealSurfaceTarget(
   if (panel?.contains(target) || hitArea?.contains(target)) return true
 
   const targetElement = target instanceof Element ? target : target.parentElement
-  return !!targetElement?.closest(FOCUS_REVEAL_SURFACE_SELECTOR)
+  return !!targetElement?.closest(ZEN_REVEAL_SURFACE_SELECTOR)
 }
 
 function useRootFontSizePx(): number {

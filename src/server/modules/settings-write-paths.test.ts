@@ -73,7 +73,7 @@ describe('settings write paths', () => {
     const session: SessionState = {
       openRepos: [],
       activeRepo: null,
-      workspaceFocused: true,
+      zenMode: true,
       workspacePaneSize: 50,
       selectedTerminalByWorktree: {},
       workspacePaneTabOrderByBranchByRepo: {},
@@ -116,12 +116,12 @@ describe('settings write paths', () => {
       session: {
         openRepos: [],
         activeRepo: null,
-        workspaceFocused: true,
+        zenMode: true,
         workspacePaneSize: 42.5,
         workspacePaneTabOrderByBranchByRepo: {},
       },
     })
-    expect(parsed.session.workspaceFocused).toBe(true)
+    expect(parsed.session.zenMode).toBe(true)
     expect(parsed.session.workspacePaneSize).toBe(42.5)
   })
 
@@ -134,7 +134,7 @@ describe('settings write paths', () => {
         session: {
           openRepos: [{ kind: 'local', id: '/tmp/repo' }],
           activeRepo: '/tmp/repo',
-          workspaceFocused: true,
+          zenMode: true,
           workspacePaneSize: 42.5,
           preferredWorkspacePaneViewByBranchByRepo: {
             '/tmp/repo': {
@@ -158,7 +158,7 @@ describe('settings write paths', () => {
     const session = {
       openRepos: [{ kind: 'local', id: '/tmp/repo' }],
       activeRepo: '/tmp/repo',
-      workspaceFocused: true,
+      zenMode: true,
       workspacePaneSize: 42.5,
       workspacePaneTabOrderByBranchByRepo: {
         '/tmp/repo': {

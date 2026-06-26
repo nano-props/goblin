@@ -248,7 +248,7 @@ describe('useBranchActionDialogsStore', () => {
   })
 
   test('regression: dialog state survives any component lifecycle — store is the only owner', () => {
-    // This test encodes the invariant the focus-mode bug violated.
+    // This test encodes the invariant the zen-mode bug violated.
     // Before this refactor, dialog state lived in `useRetainedDialogState`
     // inside `useBranchActions`, which was itself called from inside
     // a HoverCard subtree. When the HoverCard unmounted, the dialog

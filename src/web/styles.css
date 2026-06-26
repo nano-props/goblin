@@ -91,10 +91,10 @@ button,
   -webkit-app-region: drag;
 }
 
-/* Focus-mode overlay is only a layout/hit-test surface. The underlying
+/* Zen-mode overlay is only a layout/hit-test surface. The underlying
  * workspace toolbar or revealed sidebar owns blank-space dragging; the child
  * trigger opts out through an interactive chrome region. */
-.goblin-focus-reveal-trigger-layer {
+.goblin-zen-reveal-trigger-layer {
   padding-left: var(--goblin-window-chrome-left);
   padding-right: var(--goblin-window-chrome-right);
 }
@@ -161,7 +161,7 @@ button,
 }
 
 /* Workspace split-pane collapse motion. Kept at the layout boundary so
- * Focus Mode changes the pane geometry without remounting the workspace. */
+ * Zen Mode changes the pane geometry without remounting the workspace. */
 .goblin-split-pane {
   container-type: inline-size;
 }
@@ -263,7 +263,7 @@ button,
   width: 2.5rem;
 }
 
-/* Traffic-light offset for the workspace toolbar. Applied when focus-mode
+/* Traffic-light offset for the workspace toolbar. Applied when zen-mode
    collapses the sidebar and the workspace pane becomes the first visible
    pane under the macOS traffic-light buttons. Only left padding is
    adjusted; right padding stays at the toolbar's standard padding so
@@ -272,7 +272,7 @@ button,
   padding-left: var(--goblin-window-chrome-left);
 }
 
-.goblin-focus-reveal-panel {
+.goblin-zen-reveal-panel {
   opacity: 0;
   pointer-events: none;
   transform: translateX(-100%);
@@ -283,31 +283,31 @@ button,
   box-shadow: none;
 }
 
-.goblin-focus-reveal-panel[data-state='open'] {
+.goblin-zen-reveal-panel[data-state='open'] {
   opacity: 1;
   transform: translateX(0);
   box-shadow: 8px 0 24px rgb(15 23 42 / 14%);
 }
 
-.goblin-focus-reveal-panel[data-state='open'][data-interactive='true'] {
+.goblin-zen-reveal-panel[data-state='open'][data-interactive='true'] {
   pointer-events: auto;
 }
 
-html[data-theme='dark'] .goblin-focus-reveal-panel[data-state='open'] {
+html[data-theme='dark'] .goblin-zen-reveal-panel[data-state='open'] {
   box-shadow: 8px 0 24px rgb(0 0 0 / 35%);
 }
 
-.goblin-focus-reveal-panel[data-state='opening'] {
+.goblin-zen-reveal-panel[data-state='opening'] {
   opacity: 0;
   transform: translateX(-14px);
   transition: none;
 }
 
-.goblin-focus-reveal-panel[data-state='opening'][data-interactive='true'] {
+.goblin-zen-reveal-panel[data-state='opening'][data-interactive='true'] {
   pointer-events: auto;
 }
 
-.goblin-focus-reveal-panel[data-state='closing'] {
+.goblin-zen-reveal-panel[data-state='closing'] {
   opacity: 0;
   pointer-events: none;
   transform: translateX(-14px);
@@ -315,11 +315,11 @@ html[data-theme='dark'] .goblin-focus-reveal-panel[data-state='open'] {
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.goblin-focus-reveal-panel[data-state='closed'] {
+.goblin-zen-reveal-panel[data-state='closed'] {
   transition: none;
 }
 
-/* Compact workspace page transition. Mirrors the split-pane Focus Mode
+/* Compact workspace page transition. Mirrors the split-pane Zen Mode
  * timing while keeping both panes mounted for a mobile-style push/pop. */
 .goblin-compact-workspace {
   contain: layout paint;

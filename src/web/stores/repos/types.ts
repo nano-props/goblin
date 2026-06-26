@@ -184,8 +184,8 @@ export interface RestorableWorkspaceState {
   order: string[]
   /** Active repository restored from SessionState.activeRepo. */
   activeId: string | null
-  /** Large-screen Focus Mode restored from SessionState. Compact UI is stronger and always shows one pane at a time. */
-  workspaceFocused: boolean
+  /** Large-screen Zen Mode restored from SessionState. Compact UI is stronger and always shows one pane at a time. */
+  zenMode: boolean
   workspacePaneSize: number
   /** Per worktree terminal selection restored from SessionState.selectedTerminalByWorktree. */
   selectedTerminalByWorktree: Record<string, string>
@@ -211,10 +211,10 @@ export interface LocalWorkspaceState {
 
 export interface RestorableWorkspaceActions {
   setActive: (id: string) => void
-  applySessionLayoutState: (layout: Pick<SessionState, 'workspaceFocused' | 'workspacePaneSize'>) => void
+  applySessionLayoutState: (layout: Pick<SessionState, 'zenMode' | 'workspacePaneSize'>) => void
   applySessionSelectedTerminalState: (selectedTerminalByWorktree: Record<string, string>) => void
-  setWorkspaceFocused: (enabled: boolean) => void
-  toggleWorkspaceFocused: () => void
+  setZenMode: (enabled: boolean) => void
+  toggleZenMode: () => void
   setWorkspacePaneSize: (size: number) => void
   resetLayout: () => void
   setSelectedTerminal: (worktreeTerminalKey: string, key: string | null) => void

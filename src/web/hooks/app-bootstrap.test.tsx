@@ -52,7 +52,7 @@ describe('app bootstrap hooks', () => {
     const hydrateSessionRestore = vi.spyOn(useSessionRestoreStore.getState(), 'hydrate').mockResolvedValue({
       openRepos: [{ kind: 'local', id: '/tmp/repo' }],
       activeRepo: '/tmp/repo',
-      workspaceFocused: true,
+      zenMode: true,
       workspacePaneSize: 50,
       selectedTerminalByWorktree: {},
       workspacePaneTabOrderByBranchByRepo: {},
@@ -73,7 +73,7 @@ describe('app bootstrap hooks', () => {
     const session = {
       openRepos: [{ kind: 'local' as const, id: '/tmp/repo' }],
       activeRepo: '/tmp/repo',
-      workspaceFocused: false,
+      zenMode: false,
       workspacePaneSize: 45,
       selectedTerminalByWorktree: { '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0slot-2' },
       workspacePaneTabOrderByBranchByRepo: {
@@ -92,7 +92,7 @@ describe('app bootstrap hooks', () => {
     await render(<Harness />)
 
     const state = useReposStore.getState()
-    expect(state.workspaceFocused).toBe(false)
+    expect(state.zenMode).toBe(false)
     expect(state.workspacePaneSize).toBe(45)
     expect(state.selectedTerminalByWorktree).toEqual({
       '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0slot-2',
@@ -115,7 +115,7 @@ describe('app bootstrap hooks', () => {
     const session = {
       openRepos: [{ kind: 'local' as const, id: '/tmp/repo' }],
       activeRepo: '/tmp/repo',
-      workspaceFocused: true,
+      zenMode: true,
       workspacePaneSize: 55,
       selectedTerminalByWorktree: {},
       workspacePaneTabOrderByBranchByRepo: {},

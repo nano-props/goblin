@@ -21,11 +21,11 @@ export function EmptyRepoView({ onOpenSettings }: EmptyRepoViewProps) {
   return (
     <RepoWorkspaceShell
       compact={compact}
-      workspaceFocused={false}
+      zenMode={false}
       branchWorkspaceActive={false}
       workspacePaneSize={workspacePaneSize}
       onWorkspacePaneSizeChange={setWorkspacePaneSize}
-      focusToggleEnabled={false}
+      zenModeToggleEnabled={false}
       branchNavigatorPane={
         <RepoWorkspacePane>
           <RepoShellSidebar compact={compact} onOpenSettings={onOpenSettings} />

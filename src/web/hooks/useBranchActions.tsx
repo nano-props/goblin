@@ -161,7 +161,7 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
     if (guardBusy()) return
     if (isPushProtected(branch.name)) {
       // Open the protected-branch confirm dialog through the central
-      // store. State outlives any temporary surface (e.g. focus-mode
+      // store. State outlives any temporary surface (e.g. zen-mode
       // HoverCard popover), so the dialog stays open even after the
       // trigger surface unmounts. The dialog's Confirm button calls
       // `dispatchPush` from `branchActionDispatch` to commit.

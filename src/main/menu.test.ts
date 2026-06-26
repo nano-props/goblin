@@ -264,7 +264,7 @@ describe('app menu actions', () => {
     const historyItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.history')
     const changesItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.changes')
     const terminalItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.terminal')
-    const focusModeItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'workspace.focus-toggle-label')
+    const zenModeItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'workspace.zen-mode-toggle-label')
     const firstNumberedItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.terminal 1')
     const lastNumberedItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.terminal 7')
     const oldPrimaryItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.terminal-primary-action')
@@ -273,7 +273,7 @@ describe('app menu actions', () => {
     expect(historyItem?.accelerator).toBeUndefined()
     expect(changesItem?.accelerator).toBeUndefined()
     expect(terminalItem?.accelerator).toBeUndefined()
-    expect(focusModeItem?.accelerator).toBe('CmdOrCtrl+B')
+    expect(zenModeItem?.accelerator).toBe('CmdOrCtrl+B')
     expect(firstNumberedItem).toBeUndefined()
     expect(lastNumberedItem).toBeUndefined()
     expect(oldPrimaryItem).toBeUndefined()
@@ -285,11 +285,11 @@ describe('app menu actions', () => {
       type: 'terminal-primary-action-requested',
     })
 
-    focusModeItem.click()
+    zenModeItem.click()
     await Promise.resolve()
 
     expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, {
-      type: 'workspace-focus-toggle-requested',
+      type: 'workspace-zen-mode-toggle-requested',
     })
   })
 

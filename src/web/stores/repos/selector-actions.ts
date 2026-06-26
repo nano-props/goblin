@@ -4,12 +4,12 @@ export interface RestorableWorkspaceViewportStoreActions extends Pick<ReposStore
 
 export interface RestorableWorkspaceLayoutStoreActions extends Pick<
   ReposStore,
-  'resetLayout' | 'setSelectedTerminal' | 'toggleWorkspaceFocused'
+  'resetLayout' | 'setSelectedTerminal' | 'toggleZenMode'
 > {}
 
 export interface RestorableWorkspaceLayoutPreferenceStoreActions extends Pick<
   ReposStore,
-  'resetLayout' | 'setSelectedTerminal' | 'toggleWorkspaceFocused'
+  'resetLayout' | 'setSelectedTerminal' | 'toggleZenMode'
 > {}
 
 export interface RuntimeCoherentRepoOpenStoreActions extends Pick<ReposStore, 'ensureWorkspaceOpen'> {}
@@ -33,7 +33,7 @@ export interface RepoPickerStoreActions extends Pick<ReposStore, 'ensureWorkspac
 
 export interface ClientEffectIntentStoreActions extends Pick<
   ReposStore,
-  'ensureWorkspaceOpen' | 'setSelectedTerminal' | 'resetLayout' | 'toggleWorkspaceFocused'
+  'ensureWorkspaceOpen' | 'setSelectedTerminal' | 'resetLayout' | 'toggleZenMode'
 > {}
 
 export function restorableWorkspaceViewportStoreActionsFromStore(
@@ -64,22 +64,22 @@ export function runtimeCoherentRepoNavigationStoreActionsFromStore(
 }
 
 export function restorableWorkspaceLayoutStoreActionsFromStore(
-  state: Pick<ReposStore, 'resetLayout' | 'setSelectedTerminal' | 'toggleWorkspaceFocused'>,
+  state: Pick<ReposStore, 'resetLayout' | 'setSelectedTerminal' | 'toggleZenMode'>,
 ): RestorableWorkspaceLayoutStoreActions {
   return {
     resetLayout: state.resetLayout,
     setSelectedTerminal: state.setSelectedTerminal,
-    toggleWorkspaceFocused: state.toggleWorkspaceFocused,
+    toggleZenMode: state.toggleZenMode,
   }
 }
 
 export function restorableWorkspaceLayoutPreferenceStoreActionsFromStore(
-  state: Pick<ReposStore, 'resetLayout' | 'setSelectedTerminal' | 'toggleWorkspaceFocused'>,
+  state: Pick<ReposStore, 'resetLayout' | 'setSelectedTerminal' | 'toggleZenMode'>,
 ): RestorableWorkspaceLayoutPreferenceStoreActions {
   return {
     resetLayout: state.resetLayout,
     setSelectedTerminal: state.setSelectedTerminal,
-    toggleWorkspaceFocused: state.toggleWorkspaceFocused,
+    toggleZenMode: state.toggleZenMode,
   }
 }
 
@@ -133,7 +133,7 @@ export function repoPickerStoreActionsFromStore(
 }
 
 export function clientEffectIntentStoreActionsFromStore(
-  state: Pick<ReposStore, 'ensureWorkspaceOpen' | 'setSelectedTerminal' | 'resetLayout' | 'toggleWorkspaceFocused'>,
+  state: Pick<ReposStore, 'ensureWorkspaceOpen' | 'setSelectedTerminal' | 'resetLayout' | 'toggleZenMode'>,
 ): ClientEffectIntentStoreActions {
   const runtimeCoherent = runtimeCoherentRepoOpenStoreActionsFromStore({
     ensureWorkspaceOpen: state.ensureWorkspaceOpen,
@@ -142,7 +142,7 @@ export function clientEffectIntentStoreActionsFromStore(
     ensureWorkspaceOpen: runtimeCoherent.ensureWorkspaceOpen,
     setSelectedTerminal: state.setSelectedTerminal,
     resetLayout: state.resetLayout,
-    toggleWorkspaceFocused: state.toggleWorkspaceFocused,
+    toggleZenMode: state.toggleZenMode,
   }
 }
 
@@ -171,6 +171,6 @@ export function clientEffectIntentStoreActionsEqual(
     a.ensureWorkspaceOpen === b.ensureWorkspaceOpen &&
     a.setSelectedTerminal === b.setSelectedTerminal &&
     a.resetLayout === b.resetLayout &&
-    a.toggleWorkspaceFocused === b.toggleWorkspaceFocused
+    a.toggleZenMode === b.toggleZenMode
   )
 }

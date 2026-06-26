@@ -21,11 +21,11 @@ interface AppProps {
 export function App({ routeSettingsPage = null, onRouteSettingsPageChange }: AppProps) {
   const activeId = useReposStore((s) => s.activeId)
   const sessionReady = useReposStore((s) => s.sessionReady)
-  const workspaceFocused = useReposStore((s) => s.workspaceFocused)
+  const zenMode = useReposStore((s) => s.zenMode)
   const uiMode = useResponsiveUiMode()
   const bootWorkspaceBehavior = repoWorkspaceBehavior({
     compact: uiMode === 'compact',
-    workspaceFocused,
+    zenMode,
   })
 
   if (routeSettingsPage) {

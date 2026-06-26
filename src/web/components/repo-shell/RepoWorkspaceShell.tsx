@@ -1,43 +1,43 @@
 import { type ReactNode } from 'react'
-import { FocusModeSidebarChrome } from '#/web/components/repo-shell/FocusModeSidebarChrome.tsx'
+import { ZenModeSidebarChrome } from '#/web/components/repo-shell/ZenModeSidebarChrome.tsx'
 import { CompactRepoWorkspace, RepoWorkspace } from '#/web/components/Layout.tsx'
 import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
 
 interface RepoWorkspaceShellProps {
   repoId?: string
   compact: boolean
-  workspaceFocused: boolean
+  zenMode: boolean
   branchWorkspaceActive: boolean
   workspacePaneSize: number
   onWorkspacePaneSizeChange: (size: number) => void
   branchNavigatorPane: ReactNode
   branchWorkspacePane: ReactNode
   singlePaneActivePane?: 'navigator' | 'workspace'
-  focusToggleEnabled?: boolean
+  zenModeToggleEnabled?: boolean
   onOpenSettings?: () => void
 }
 
 export function RepoWorkspaceShell({
   repoId,
   compact,
-  workspaceFocused,
+  zenMode,
   branchWorkspaceActive,
   workspacePaneSize,
   onWorkspacePaneSizeChange,
   branchNavigatorPane,
   branchWorkspacePane,
   singlePaneActivePane = 'navigator',
-  focusToggleEnabled = true,
+  zenModeToggleEnabled = true,
   onOpenSettings,
 }: RepoWorkspaceShellProps) {
-  const effectiveWorkspaceFocused = focusToggleEnabled && workspaceFocused
+  const effectiveZenMode = zenModeToggleEnabled && zenMode
   const behavior = repoWorkspaceBehavior({
     compact,
-    workspaceFocused: effectiveWorkspaceFocused,
+    zenMode: effectiveZenMode,
     branchWorkspaceActive,
   })
   const sidebarPaneSize = 100 - workspacePaneSize
-  const focusRevealEnabled = !compact && behavior.branchNavigatorCollapsed
+  const zenRevealEnabled = !compact && behavior.branchNavigatorCollapsed
 
   const renderWorkspaceBody = (
     workspacePane: ReactNode,
@@ -72,10 +72,10 @@ export function RepoWorkspaceShell({
     <section className="relative flex min-w-0 flex-1 flex-col">
       {renderWorkspaceBody(branchWorkspacePane, branchNavigatorPane)}
       {!compact ? (
-        <FocusModeSidebarChrome
+        <ZenModeSidebarChrome
           repoId={repoId}
-          focusToggleEnabled={focusToggleEnabled}
-          revealEnabled={focusRevealEnabled}
+          zenModeToggleEnabled={zenModeToggleEnabled}
+          revealEnabled={zenRevealEnabled}
           sidebarSize={sidebarPaneSize}
           onSidebarSizeChange={(nextSidebarSize) => onWorkspacePaneSizeChange(100 - nextSidebarSize)}
           onOpenSettings={onOpenSettings}
