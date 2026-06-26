@@ -245,7 +245,7 @@ describe('useClientEffectIntentRouter', () => {
     expect(useReposStore.getState().repos[repo.id]).toBeUndefined()
   })
 
-  test('zen mode menu action toggles the workspace focus state', async () => {
+  test('zen mode menu action toggles the zen mode state', async () => {
     const repo = seedRepoState({
       id: '/tmp/repo',
       currentBranch: 'main',
