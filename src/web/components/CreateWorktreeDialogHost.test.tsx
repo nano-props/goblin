@@ -120,7 +120,7 @@ describe('CreateWorktreeDialogHost', () => {
     expect(container?.textContent ?? '').toBe('')
   })
 
-  test('forwards a remember-trust bootstrap run decision from the create dialog', async () => {
+  test('forwards a trust-and-run bootstrap decision from the create dialog', async () => {
     const configHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
     mainWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
     const submitBranchAction = vi.spyOn(useReposStore.getState(), 'submitBranchAction').mockImplementation(() => {})
@@ -161,7 +161,7 @@ describe('CreateWorktreeDialogHost', () => {
     expect(submitBranchAction).not.toHaveBeenCalled()
 
     setInputValue('cwt-branch', 'feature/bootstrap')
-    await clickLabel('action.create-worktree-bootstrap-remember')
+    await clickButton('action.create-worktree-bootstrap-trust-run')
     await clickButton('action.create-worktree-confirm')
     await flushReact()
 
@@ -180,7 +180,52 @@ describe('CreateWorktreeDialogHost', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  test('skips goblin.toml bootstrap when the user leaves the trust checkbox off', async () => {
+  test('forwards a run-once bootstrap decision from the create dialog', async () => {
+    const configHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+    mainWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
+    const submitBranchAction = vi.spyOn(useReposStore.getState(), 'submitBranchAction').mockImplementation(() => {})
+    const fetchMock = vi.fn(async () => {
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          preview: {
+            hasConfig: true,
+            hasOperations: true,
+            configHash,
+            copyCount: 1,
+            symlinkCount: 0,
+            hardlinkCount: 0,
+            excludeCount: 0,
+          },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      )
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderHost(true, vi.fn())
+    await flushReact()
+    setInputValue('cwt-branch', 'feature/run-once')
+    await clickButton('action.create-worktree-bootstrap-run')
+    await clickButton('action.create-worktree-confirm')
+    await flushReact()
+
+    expect(submitBranchAction).toHaveBeenCalledWith(
+      REPO_ID,
+      expect.objectContaining({
+        kind: 'createWorktree',
+        worktreeBootstrap: {
+          kind: 'run',
+          configHash,
+          rememberTrust: false,
+        },
+      }),
+      expect.objectContaining({ refreshOnError: false }),
+    )
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  test('skips goblin.toml bootstrap by default for untrusted configs', async () => {
     const submitBranchAction = vi.spyOn(useReposStore.getState(), 'submitBranchAction').mockImplementation(() => {})
     const fetchMock = vi.fn(async () => {
       return new Response(
@@ -395,16 +440,6 @@ async function clickButton(text: string): Promise<void> {
   if (!(button instanceof HTMLButtonElement)) throw new Error(`missing button ${text}`)
   await act(async () => {
     button.click()
-    await Promise.resolve()
-    await Promise.resolve()
-  })
-}
-
-async function clickLabel(text: string): Promise<void> {
-  const label = Array.from(document.querySelectorAll('label')).find((candidate) => candidate.textContent === text)
-  if (!(label instanceof HTMLLabelElement)) throw new Error(`missing label ${text}`)
-  await act(async () => {
-    label.click()
     await Promise.resolve()
     await Promise.resolve()
   })

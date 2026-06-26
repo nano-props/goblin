@@ -427,7 +427,8 @@ describe('repo mutation invalidation publishing', () => {
     expect(mocks.bootstrapWorktreeAfterCreate).not.toHaveBeenCalled()
   })
 
-  test('createRepositoryWorktree rejects bootstrap run requests without trusted repo settings', async () => {
+  test('createRepositoryWorktree allows one-time bootstrap run requests without trusted repo settings', async () => {
+    const configHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
     const { createRepositoryWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
     const result = await createRepositoryWorktree(
@@ -441,15 +442,19 @@ describe('repo mutation invalidation publishing', () => {
       {
         worktreeBootstrap: {
           kind: 'run',
-          configHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          configHash,
           rememberTrust: false,
         },
       },
     )
 
-    expect(result).toEqual({ ok: false, message: 'error.worktree-bootstrap-not-confirmed' })
-    expect(mocks.createWorktree).not.toHaveBeenCalled()
-    expect(mocks.bootstrapWorktreeAfterCreate).not.toHaveBeenCalled()
+    expect(result).toEqual({ ok: true, message: 'ok' })
+    expect(mocks.createWorktree).toHaveBeenCalled()
+    expect(mocks.bootstrapWorktreeAfterCreate).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-worktree', {
+      signal: undefined,
+      expectedConfigHash: configHash,
+    })
+    expect(mocks.trustServerRepoWorktreeBootstrapConfig).not.toHaveBeenCalled()
   })
 
   test('createRepositoryWorktree allows bootstrap run requests for trusted repo config hashes', async () => {

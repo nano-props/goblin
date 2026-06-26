@@ -20,7 +20,6 @@ import { AnimateHeight } from '#/web/components/ui/animate-height.tsx'
 import { Input } from '#/web/components/ui/input.tsx'
 import { RemotePathSuggestions } from '#/web/components/ui/remote-path-suggestions.tsx'
 import { ToggleGroup, ToggleGroupItem } from '#/web/components/ui/toggle-group.tsx'
-import { ConfirmCheckbox } from '#/web/components/ConfirmCheckbox.tsx'
 import { useRemotePathSuggestions } from '#/web/hooks/useRemotePathSuggestions.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { remoteRepoTarget } from '#/web/stores/repos/helpers.ts'
@@ -41,6 +40,14 @@ const MODE_OPTIONS = [
   { id: 'trackRemoteBranch', labelKey: 'action.create-worktree-mode-remote', icon: RadioTower },
 ] satisfies Array<{ id: CreateWorktreeDialogMode; labelKey: string; icon: LucideIcon }>
 
+export type WorktreeBootstrapChoice = 'skip' | 'run' | 'trust'
+
+const BOOTSTRAP_CHOICE_OPTIONS = [
+  { id: 'skip', labelKey: 'action.create-worktree-bootstrap-skip' },
+  { id: 'run', labelKey: 'action.create-worktree-bootstrap-run' },
+  { id: 'trust', labelKey: 'action.create-worktree-bootstrap-trust-run' },
+] satisfies Array<{ id: WorktreeBootstrapChoice; labelKey: string }>
+
 interface Props {
   open: boolean
   repo: RepoState
@@ -53,8 +60,8 @@ interface WorktreeBootstrapPromptState {
   loading: boolean
   preview: WorktreeBootstrapPreview | null
   trusted: boolean
-  trust: boolean
-  onTrustChange: (checked: boolean) => void
+  choice: WorktreeBootstrapChoice
+  onChoiceChange: (choice: WorktreeBootstrapChoice) => void
 }
 
 export function CreateWorktreeDialog({ open, repo, worktreeBootstrap, onClose, onCreate }: Props) {
@@ -417,9 +424,23 @@ function WorktreeBootstrapPrompt({ state }: { state: WorktreeBootstrapPromptStat
                 <p className="text-xs text-muted-foreground">{t('action.create-worktree-bootstrap-trusted')}</p>
               ) : (
                 <>
-                  <ConfirmCheckbox checked={state.trust} onCheckedChange={state.onTrustChange}>
-                    {t('action.create-worktree-bootstrap-remember')}
-                  </ConfirmCheckbox>
+                  <ToggleGroup
+                    type="single"
+                    value={state.choice}
+                    onValueChange={(next) => {
+                      if (isWorktreeBootstrapChoice(next)) state.onChoiceChange(next)
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    aria-label={t('action.create-worktree-bootstrap-title')}
+                  >
+                    {BOOTSTRAP_CHOICE_OPTIONS.map((option) => (
+                      <ToggleGroupItem key={option.id} value={option.id} className="min-h-8 flex-1 px-2 text-xs">
+                        <span className="truncate">{t(option.labelKey)}</span>
+                      </ToggleGroupItem>
+                    ))}
+                  </ToggleGroup>
                   <p className="text-xs text-muted-foreground">{t('action.create-worktree-bootstrap-note')}</p>
                 </>
               )}
@@ -442,4 +463,8 @@ function bootstrapRows(preview: WorktreeBootstrapPreview, t: (key: string) => st
   if (preview.excludeCount > 0)
     rows.push({ label: t('action.create-worktree-bootstrap-exclude-label'), value: preview.excludeCount })
   return rows
+}
+
+function isWorktreeBootstrapChoice(value: string): value is WorktreeBootstrapChoice {
+  return value === 'skip' || value === 'run' || value === 'trust'
 }

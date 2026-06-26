@@ -299,7 +299,7 @@ async function prepareWorktreeBootstrapRun(
   if (isRepoWorktreeBootstrapConfigTrusted(repoSettings, repoId, decision.configHash)) {
     return { ok: true }
   }
-  if (!decision.rememberTrust) return { ok: false, message: 'error.worktree-bootstrap-not-confirmed' }
+  if (!decision.rememberTrust) return { ok: true }
   try {
     await trustServerRepoWorktreeBootstrapConfig({ repoId, configHash: decision.configHash })
     publishSettingsInvalidation(['settings-snapshot'])
