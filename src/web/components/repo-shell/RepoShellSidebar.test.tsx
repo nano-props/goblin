@@ -82,23 +82,14 @@ describe('RepoShellSidebar', () => {
     expect(settings).not.toBeNull()
   })
 
-  test('renders focus reveal top chrome as draggable with a focus-toggle no-drag carve-out', () => {
-    render(
-      <RepoShellSidebar
-        repoId={REPO_ID}
-        compact={false}
-        chromeNoDragExclusion="focus-toggle"
-        branchContent={<div data-testid="branch-content" />}
-      />,
-    )
+  test('renders focus reveal top chrome as draggable without owning focus-toggle geometry', () => {
+    render(<RepoShellSidebar repoId={REPO_ID} compact={false} branchContent={<div data-testid="branch-content" />} />)
 
     const sidebarTop = document.body.querySelector<HTMLElement>('[data-testid="repo-shell-sidebar-top"]')
-    const noDrag = document.body.querySelector<HTMLElement>('[data-testid="repo-shell-sidebar-focus-toggle-no-drag"]')
     expect(sidebarTop?.dataset.windowChromeRegion).toBe('drag')
     expect(sidebarTop?.className).toContain('window-chrome')
-    expect(sidebarTop?.className).toContain('relative')
-    expect(noDrag?.dataset.windowChromeRegion).toBe('no-drag')
-    expect(noDrag?.style.left).toBe('var(--goblin-window-chrome-left)')
+    expect(sidebarTop?.className).not.toContain('relative')
+    expect(sidebarTop?.querySelector('[data-window-chrome-region="no-drag"]')).toBeNull()
     expect(sidebarTop?.hasAttribute('data-interactive')).toBe(false)
   })
 

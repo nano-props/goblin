@@ -134,14 +134,14 @@ export function FocusModeSidebarRevealTrigger({
   onMouseLeave,
 }: FocusModeSidebarRevealTriggerProps) {
   return (
-    <WindowChromeInteractiveRegion
-      data-focus-reveal-surface={revealEnabled ? '' : undefined}
-      data-testid="focus-mode-sidebar-trigger"
-      className="pointer-events-auto"
-      onMouseEnter={revealEnabled ? onMouseEnter : undefined}
-      onMouseLeave={revealEnabled ? onMouseLeave : undefined}
-    >
-      <WorkspaceFocusToggle />
+    <WindowChromeInteractiveRegion asChild>
+      <WorkspaceFocusToggle
+        data-focus-reveal-surface={revealEnabled ? '' : undefined}
+        data-testid="focus-mode-sidebar-trigger"
+        className="pointer-events-auto"
+        onMouseEnter={revealEnabled ? onMouseEnter : undefined}
+        onMouseLeave={revealEnabled ? onMouseLeave : undefined}
+      />
     </WindowChromeInteractiveRegion>
   )
 }
@@ -350,7 +350,6 @@ export function FocusModeSidebarReveal({
           repoId={repoId}
           compact={false}
           chromeRegion={panelInteractive ? 'drag' : 'none'}
-          chromeNoDragExclusion={panelInteractive ? 'focus-toggle' : undefined}
           onOpenSettings={onOpenSettings}
         />
         <WindowChromeInteractiveRegion

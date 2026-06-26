@@ -77,6 +77,19 @@ export function RepoWorkspaceShell({
   return (
     <section className="relative flex min-w-0 flex-1 flex-col">
       {renderWorkspaceBody(branchWorkspacePane, branchNavigatorPane)}
+      {focusSidebar.rendered && !compact ? (
+        <FocusModeSidebarReveal
+          repoId={repoId}
+          open={focusSidebar.open}
+          interactive={focusRevealEnabled}
+          sidebarSize={sidebarPaneSize}
+          onSidebarSizeChange={(nextSidebarSize) => onWorkspacePaneSizeChange(100 - nextSidebarSize)}
+          onSurfaceEnter={focusSidebar.onSurfaceEnter}
+          onSurfaceLeave={focusSidebar.onSurfaceLeave}
+          onOpenSettings={onOpenSettings}
+        />
+      ) : null}
+      {/* Electron folds app-region entries in DOM order; keep the button no-drag after reveal drag. */}
       {focusToggleEnabled && !compact ? (
         <div
           data-testid="focus-mode-toggle-overlay"
@@ -90,18 +103,6 @@ export function RepoWorkspaceShell({
             onMouseLeave={focusSidebar.onTriggerLeave}
           />
         </div>
-      ) : null}
-      {focusSidebar.rendered && !compact ? (
-        <FocusModeSidebarReveal
-          repoId={repoId}
-          open={focusSidebar.open}
-          interactive={focusRevealEnabled}
-          sidebarSize={sidebarPaneSize}
-          onSidebarSizeChange={(nextSidebarSize) => onWorkspacePaneSizeChange(100 - nextSidebarSize)}
-          onSurfaceEnter={focusSidebar.onSurfaceEnter}
-          onSurfaceLeave={focusSidebar.onSurfaceLeave}
-          onOpenSettings={onOpenSettings}
-        />
       ) : null}
     </section>
   )

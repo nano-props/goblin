@@ -67,8 +67,8 @@ vi.mock('#/web/components/repo-toolbar/RepoToolbarActions.tsx', () => ({
 }))
 
 vi.mock('#/web/components/WorkspaceFocusToggle.tsx', () => ({
-  WorkspaceFocusToggle: () => (
-    <button type="button" data-testid="workspace-focus-toggle">
+  WorkspaceFocusToggle: (props: React.ComponentProps<'button'>) => (
+    <button type="button" {...props}>
       focus
     </button>
   ),
@@ -207,7 +207,7 @@ describe('RepoView workspace navigation', () => {
     expect(focusModeSidebarReveal()?.dataset.open).toBe('false')
     expect(focusModeSidebarReveal()?.dataset.interactive).toBe('false')
     expect(closedRevealTop?.dataset.windowChromeRegion).toBeUndefined()
-    expect(closedRevealTop?.querySelector('[data-testid="repo-shell-sidebar-focus-toggle-no-drag"]')).toBeNull()
+    expect(closedRevealTop?.querySelector('[data-window-chrome-region="no-drag"]')).toBeNull()
   })
 
   test('large-screen collapsed Focus Mode reveals the sidebar on left-edge hover', () => {
@@ -238,10 +238,9 @@ describe('RepoView workspace navigation', () => {
     )
     expect(floatingSidebarTop?.hasAttribute('data-interactive')).toBe(false)
     expect(floatingSidebarTop?.dataset.windowChromeRegion).toBe('drag')
-    expect(
-      floatingSidebarTop?.querySelector<HTMLElement>('[data-testid="repo-shell-sidebar-focus-toggle-no-drag"]')?.dataset
-        .windowChromeRegion,
-    ).toBe('no-drag')
+    expect(floatingSidebarTop?.querySelector('[data-window-chrome-region="no-drag"]')).toBeNull()
+    expect(focusModeSidebarTrigger()?.dataset.windowChromeRegion).toBe('interactive')
+    expect(focusModeSidebarTrigger()?.tagName).toBe('BUTTON')
   })
 
   test('large-screen collapsed Focus Mode reveals the sidebar when the focus toggle is hovered', () => {
@@ -249,20 +248,25 @@ describe('RepoView workspace navigation', () => {
     useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
     render(<RepoView repoId={REPO_ID} />)
 
+    const revealLayer = focusModeSidebarLayer()
+    const toggleOverlay = focusModeToggleOverlay()
     expect(focusModeToggleOverlay()?.hasAttribute('data-interactive')).toBe(false)
     expect(focusModeToggleOverlay()?.dataset.windowChromeRegion).toBeUndefined()
     expect(focusModeToggleOverlay()?.hasAttribute('data-focus-reveal-surface')).toBe(true)
     expect(focusModeToggleOverlay()?.className).toContain('goblin-focus-reveal-trigger-layer')
     expect(focusModeToggleOverlay()?.className).not.toContain('window-chrome')
     expect(focusModeToggleOverlay()?.className).not.toContain('app-drag-region')
+    expect(revealLayer).not.toBeNull()
+    expect(toggleOverlay).not.toBeNull()
+    expect(revealLayer!.compareDocumentPosition(toggleOverlay!) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
     expect(focusModeSidebarTrigger()?.hasAttribute('data-interactive')).toBe(true)
     expect(focusModeSidebarTrigger()?.dataset.windowChromeRegion).toBe('interactive')
     expect(focusModeSidebarReveal()?.dataset.open).toBe('false')
 
     act(() => {
-      focusModeSidebarTrigger()
-        ?.querySelector('[data-testid="workspace-focus-toggle"]')
-        ?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+      focusModeSidebarTrigger()?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
     })
 
     expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
@@ -274,9 +278,7 @@ describe('RepoView workspace navigation', () => {
     render(<RepoView repoId={REPO_ID} />)
 
     act(() => {
-      focusModeSidebarTrigger()
-        ?.querySelector('[data-testid="workspace-focus-toggle"]')
-        ?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+      focusModeSidebarTrigger()?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
     })
     expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
 
@@ -307,7 +309,7 @@ describe('RepoView workspace navigation', () => {
     useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
     render(<RepoView repoId={REPO_ID} />)
 
-    const toggle = focusModeSidebarTrigger()?.querySelector('[data-testid="workspace-focus-toggle"]')
+    const toggle = focusModeSidebarTrigger()
     act(() => {
       toggle?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
     })
@@ -371,7 +373,7 @@ describe('RepoView workspace navigation', () => {
     useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
     render(<RepoView repoId={REPO_ID} />)
 
-    const toggle = focusModeSidebarTrigger()?.querySelector('[data-testid="workspace-focus-toggle"]')
+    const toggle = focusModeSidebarTrigger()
     act(() => {
       toggle?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
     })
@@ -539,7 +541,7 @@ describe('RepoView workspace navigation', () => {
         '[data-testid="repo-shell-sidebar-top"]',
       )
       expect(retainedSidebarTop?.dataset.windowChromeRegion).toBeUndefined()
-      expect(retainedSidebarTop?.querySelector('[data-testid="repo-shell-sidebar-focus-toggle-no-drag"]')).toBeNull()
+      expect(retainedSidebarTop?.querySelector('[data-window-chrome-region="no-drag"]')).toBeNull()
 
       act(() => {
         document.body.dispatchEvent(new PointerEvent('pointermove', { bubbles: true }))
