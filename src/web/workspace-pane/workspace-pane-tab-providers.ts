@@ -1,4 +1,4 @@
-import { FileText, GitBranch, History, Terminal, type LucideIcon } from 'lucide-react'
+import { Diff, GitBranch, History, Terminal, type LucideIcon } from 'lucide-react'
 import type {
   WorkspacePaneStaticViewType,
   WorkspacePaneTabOrderEntry,
@@ -147,7 +147,7 @@ class ChangesWorkspacePaneTabProvider extends WorkspacePaneStaticTabProvider<'ch
   readonly refreshOnOpen = true
 
   constructor() {
-    super({ type: 'changes', icon: FileText })
+    super({ type: 'changes', icon: Diff })
   }
 
   label(input: WorkspacePaneStaticTabMetadataInput): string {
