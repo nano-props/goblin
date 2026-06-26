@@ -9,7 +9,8 @@ describe('helpShortcutSections', () => {
     const app = sections[3]?.rows
     expect(nav?.find((row) => row.labelKey === 'help.row.next-repo')?.combos).toEqual([['⌘', ']']])
     expect(view?.find((row) => row.labelKey === 'help.row.select-workspace-tab')?.combos[0]).toEqual(['⌘', '1'])
-    expect(app?.find((row) => row.labelKey === 'help.row.new-terminal')?.combos).toEqual([['⌘', 'N']])
+    expect(app?.find((row) => row.labelKey === 'help.row.new-terminal')?.combos).toEqual([['⌘', 'T']])
+    expect(app?.find((row) => row.labelKey === 'help.row.create-worktree')?.combos).toEqual([['⌘', 'N']])
     expect(view?.find((row) => row.labelKey === 'workspace.focus-toggle-label')?.combos).toEqual([['⌘', 'B']])
     expect(app?.find((row) => row.labelKey === 'help.row.settings')?.combos).toEqual([['⌘', ',']])
   })

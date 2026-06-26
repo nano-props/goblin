@@ -4,6 +4,7 @@ import type { RepoBranchState } from '#/web/stores/repos/types.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { Button } from '#/web/components/ui/button.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '#/web/components/ui/popover.tsx'
+import { InlineShortcut } from '#/web/components/InlineShortcut.tsx'
 import {
   useBranchActionItems,
   type BranchActionItem,
@@ -146,11 +147,7 @@ function BranchActionPopoverItem({
         {busy === item.id || item.busy ? <Loader2 size={16} className="animate-spin" /> : item.icon}
       </span>
       <span className="min-w-0 flex-1 truncate">{item.label}</span>
-      {item.shortcut && (
-        <span className="ml-auto min-w-6 pl-8 text-right text-xs tracking-widest text-muted-foreground">
-          {item.shortcut}
-        </span>
-      )}
+      {item.shortcut && <InlineShortcut shortcut={item.shortcut} />}
     </button>
   )
 }

@@ -1,7 +1,15 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { toast } from 'sonner'
 import { handleWorkspaceClientIntent } from '#/web/hooks/client-effect-intent-handlers.ts'
+
+vi.mock('sonner', () => ({
+  toast: {
+    error: vi.fn(),
+    success: vi.fn(),
+  },
+}))
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
@@ -33,6 +41,53 @@ describe('client effect intent handlers', () => {
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo ? preferredWorkspacePaneViewForBranch(repo.ui, repo.ui.selectedBranch) : null).toBe('status')
   })
+
+  test('create-worktree-requested opens create-worktree for the current repo', async () => {
+    seedRepoState({ id: REPO_ID, branches: [createRepoBranch('main')] })
+    const d = deps(REPO_ID)
+
+    await expect(handleWorkspaceClientIntent({ type: 'create-worktree-requested' }, d)).resolves.toBe(true)
+    expect(d.openCreateWorktree).toHaveBeenCalledOnce()
+    expect(toast.error).not.toHaveBeenCalled()
+  })
+
+  test('create-worktree-requested is a no-op when no repo is active', async () => {
+    const d = deps(null)
+
+    await expect(handleWorkspaceClientIntent({ type: 'create-worktree-requested' }, d)).resolves.toBe(true)
+    expect(d.openCreateWorktree).not.toHaveBeenCalled()
+    expect(toast.error).not.toHaveBeenCalled()
+  })
+
+  test('create-worktree-requested shows a busy toast while a branch action is running', async () => {
+    seedRepoState({ id: REPO_ID, branches: [createRepoBranch('main')] })
+    useReposStore.setState((state) => {
+      const repo = state.repos[REPO_ID]
+      if (!repo) return state
+      return {
+        repos: {
+          ...state.repos,
+          [REPO_ID]: {
+            ...repo,
+            operations: {
+              ...repo.operations,
+              branchAction: {
+                ...repo.operations.branchAction,
+                phase: 'running',
+                reason: 'branch:pull',
+                target: 'main',
+              },
+            },
+          },
+        },
+      }
+    })
+    const d = deps(REPO_ID)
+
+    await expect(handleWorkspaceClientIntent({ type: 'create-worktree-requested' }, d)).resolves.toBe(true)
+    expect(d.openCreateWorktree).not.toHaveBeenCalled()
+    expect(toast.error).toHaveBeenCalledWith('action.create-worktree-busy')
+  })
 })
 
 function deps(currentRepoId: string | null) {
@@ -43,6 +98,7 @@ function deps(currentRepoId: string | null) {
     openRepoPathDialog: vi.fn(),
     openCloneRepo: vi.fn(),
     openRemoteRepo: vi.fn(),
+    openCreateWorktree: vi.fn(),
     isOverlayOpen: () => false,
     isWorkspaceShortcutSuppressed: () => false,
     ensureWorkspaceOpen: vi.fn(async (input: string | { id: string }) => ({

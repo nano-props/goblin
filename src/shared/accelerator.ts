@@ -13,6 +13,8 @@ const RESERVED_GLOBAL_SHORTCUTS = new Set<string>([
   'Control+Shift+R',
   'Command+N',
   'Control+N',
+  'Command+T',
+  'Control+T',
   'Command+1',
   'Control+1',
   'Command+2',
@@ -144,9 +146,18 @@ export function formatAccelerator(accelerator: string): string {
 }
 
 export function acceleratorToKeyLabels(accelerator: string): string[] {
-  const parsed = parseGlobalShortcut(accelerator)
+  const normalized = normalizeCmdOrCtrl(accelerator)
+  const parsed = parseGlobalShortcut(normalized)
   if (!parsed) return [accelerator]
   return parsed.split('+').map((token) => MODIFIER_LABELS[token as (typeof MODIFIERS)[number]] ?? token)
+}
+
+function normalizeCmdOrCtrl(accelerator: string): string {
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform)
+  return accelerator
+    .split('+')
+    .map((token) => (token === 'CmdOrCtrl' ? (isMac ? 'Command' : 'Control') : token))
+    .join('+')
 }
 
 function isAllowedShortcutKey(token: string): boolean {

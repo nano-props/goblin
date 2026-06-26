@@ -137,6 +137,7 @@ function createFileMenu(state: AppMenuState): MenuItemConstructorOptions {
     label: t('menu.file'),
     submenu: [
       createClientCommandMenuItem(state, 'file-new-terminal-tab'),
+      createClientCommandMenuItem(state, 'file-create-worktree'),
       separator(),
       createClientCommandMenuItem(state, 'file-open-local-repo'),
       createClientCommandMenuItem(state, 'file-open-local-repo-path'),
