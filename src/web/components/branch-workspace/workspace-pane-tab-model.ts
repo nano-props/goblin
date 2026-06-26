@@ -266,10 +266,10 @@ function workspacePaneSelection(
   if (activeTab) return { kind: 'materialized-tab', view: activeTab.type, tab: activeTab }
   // Terminal-host is reserved for the "actively waiting" states — the user
   // wants the terminal view but no terminal session exists yet, so we keep
-  // the new-terminal affordance reachable. Skip when a user-initiated close
-  // just happened: the adjacency fallback below will land them on the
-  // spatial neighbor instead.
-  if (renderableView === 'terminal' && !lastClosedTabContext) {
+  // the new-terminal affordance reachable. A retained close context is only
+  // useful once the preferred view is unrenderable; it must not hide the host
+  // that pending terminal creation needs for geometry.
+  if (renderableView === 'terminal') {
     return { kind: 'terminal-host', view: 'terminal', tab: null }
   }
   // User-initiated close: when the user just closed a tab AND the preferred

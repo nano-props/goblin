@@ -254,6 +254,33 @@ describe('branch workspace pane tab model', () => {
     expect(model.activeTab).toBeNull()
   })
 
+  test('keeps terminal-host while create is pending after the last tab was closed', () => {
+    // Regression: closing every workspace tab leaves a close context behind.
+    // Creating a terminal from that empty strip must still mount the
+    // terminal host; otherwise the registry waits for host geometry until it
+    // times out with error.terminal-host-not-measurable.
+    const model = createBranchWorkspacePaneTabModel({
+      repoId: REPO_ID,
+      branchName: 'feature/model',
+      worktreePath: WORKTREE_PATH,
+      preferredView: 'terminal',
+      tabOrder: [],
+      runtimeTerminalViews: [],
+      terminalSessionCount: 0,
+      terminalCreatePending: true,
+      terminalSyncReady: true,
+      lastClosedTabContext: {
+        closingIdentity: 'status:status',
+        previousTabIdentities: ['status:status'],
+      },
+    })
+
+    expect(model.selection).toEqual({ kind: 'terminal-host', view: 'terminal', tab: null })
+    expect(model.renderedView).toBe('terminal')
+    expect(model.activeTab).toBeNull()
+    expect(model.tabs.map((tab) => [tab.identity, tab.kind])).toEqual([['terminal:pending', 'pending']])
+  })
+
   test('keeps the terminal-host view while the initial terminal sync is unresolved', () => {
     // Same as above: the user wants terminal and the worktree has no
     // terminal session yet, but sync is not done. We preserve the
