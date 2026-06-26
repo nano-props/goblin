@@ -30,7 +30,11 @@ export function WorkspaceToolbar({
   ...props
 }: WorkspaceToolbarProps) {
   const toolbarProps = {
-    className: cn(workspaceToolbarChromeClassName({ draggable }), className),
+    className: cn(
+      workspaceToolbarChromeClassName({ draggable }),
+      trafficLightOffset && 'goblin-workspace-toolbar--traffic-offset',
+      className,
+    ),
     style: { ...WORKSPACE_TOOLBAR_STYLE, ...style },
     ...props,
   }
@@ -40,7 +44,7 @@ export function WorkspaceToolbar({
   }
 
   return (
-    <WindowChromeDragRegion reserveWindowControls={trafficLightOffset} {...toolbarProps}>
+    <WindowChromeDragRegion reserveWindowControls={false} {...toolbarProps}>
       {children}
     </WindowChromeDragRegion>
   )

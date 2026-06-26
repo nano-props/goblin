@@ -224,6 +224,15 @@ button,
   width: 2.5rem;
 }
 
+/* Traffic-light offset for the workspace toolbar. Applied when focus-mode
+   collapses the sidebar and the workspace pane becomes the first visible
+   pane under the macOS traffic-light buttons. Only left padding is
+   adjusted; right padding stays at the toolbar's standard px-1.5 so
+   trailing actions (e.g. open-external button group) don't shift. */
+.goblin-workspace-toolbar--traffic-offset {
+  padding-left: var(--goblin-window-chrome-left);
+}
+
 .goblin-focus-reveal-panel {
   opacity: 0;
   pointer-events: none;

@@ -177,7 +177,7 @@ describe('BranchWorkspaceToolbar', () => {
     })
 
     const toolbarClassName = c.querySelector('.goblin-workspace-toolbar')?.className ?? ''
-    expect(toolbarClassName).toContain('window-chrome')
+    expect(toolbarClassName).toContain('goblin-workspace-toolbar--traffic-offset')
     expect(toolbarClassName).toContain('gap-0')
     expect(c.querySelector('[data-testid="workspace-toolbar-leading-spacer"]')?.className).toContain(
       'goblin-workspace-toolbar__leading-spacer--reserved',
@@ -361,7 +361,7 @@ describe('BranchWorkspaceToolbar', () => {
       await Promise.resolve()
     })
 
-    expect(window.localStorage.getItem(WORKSPACE_EXTERNAL_APP_RECENT_STORAGE_KEY)).toBe('finder')
+    expect(window.localStorage.getItem(`${WORKSPACE_EXTERNAL_APP_RECENT_STORAGE_KEY}:${WORKTREE_PATH}`)).toBe('finder')
     expect(repoClientMocks.openRepositoryInFinder).toHaveBeenCalledWith(WORKTREE_PATH)
 
     const primary = c.querySelector<HTMLButtonElement>('button[aria-label="worktrees.reveal-title"]')
