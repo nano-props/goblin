@@ -54,7 +54,16 @@ interface FocusModeSidebarRevealTriggerProps {
   onMouseLeave?: () => void
 }
 
-export function useFocusModeSidebarReveal(enabled: boolean): FocusModeSidebarRevealState {
+interface FocusModeSidebarChromeProps {
+  repoId?: string
+  focusToggleEnabled: boolean
+  revealEnabled: boolean
+  sidebarSize: number
+  onSidebarSizeChange: (sidebarSize: number) => void
+  onOpenSettings?: () => void
+}
+
+function useFocusModeSidebarReveal(enabled: boolean): FocusModeSidebarRevealState {
   const [open, setOpen] = useState(false)
   const [triggerArmed, setTriggerArmed] = useState(true)
   const previousEnabled = useRef(enabled)
@@ -128,7 +137,64 @@ export function useFocusModeSidebarReveal(enabled: boolean): FocusModeSidebarRev
   }
 }
 
-export function FocusModeSidebarRevealTrigger({
+export function FocusModeSidebarChrome({
+  repoId,
+  focusToggleEnabled,
+  revealEnabled,
+  sidebarSize,
+  onSidebarSizeChange,
+  onOpenSettings,
+}: FocusModeSidebarChromeProps) {
+  const reveal = useFocusModeSidebarReveal(revealEnabled)
+  if (!focusToggleEnabled && !reveal.rendered) return null
+
+  return (
+    <>
+      {reveal.rendered ? (
+        <FocusModeSidebarReveal
+          repoId={repoId}
+          open={reveal.open}
+          interactive={revealEnabled}
+          sidebarSize={sidebarSize}
+          onSidebarSizeChange={onSidebarSizeChange}
+          onSurfaceEnter={reveal.onSurfaceEnter}
+          onSurfaceLeave={reveal.onSurfaceLeave}
+          onOpenSettings={onOpenSettings}
+        />
+      ) : null}
+      {focusToggleEnabled ? (
+        <FocusModeSidebarRevealTriggerLayer
+          revealEnabled={revealEnabled}
+          onMouseEnter={reveal.onTriggerEnter}
+          onMouseLeave={reveal.onTriggerLeave}
+        />
+      ) : null}
+    </>
+  )
+}
+
+function FocusModeSidebarRevealTriggerLayer({
+  revealEnabled = false,
+  onMouseEnter,
+  onMouseLeave,
+}: FocusModeSidebarRevealTriggerProps) {
+  return (
+    <div
+      data-testid="focus-mode-toggle-overlay"
+      data-focus-reveal-surface={revealEnabled ? '' : undefined}
+      className="goblin-focus-reveal-trigger-layer pointer-events-none absolute left-0 top-0 z-40 flex items-center bg-transparent"
+      style={{ height: WINDOW_CHROME_HEIGHT_PX }}
+    >
+      <FocusModeSidebarRevealTrigger
+        revealEnabled={revealEnabled}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
+      />
+    </div>
+  )
+}
+
+function FocusModeSidebarRevealTrigger({
   revealEnabled = false,
   onMouseEnter,
   onMouseLeave,
@@ -146,7 +212,7 @@ export function FocusModeSidebarRevealTrigger({
   )
 }
 
-export function FocusModeSidebarReveal({
+function FocusModeSidebarReveal({
   repoId,
   open,
   interactive,
