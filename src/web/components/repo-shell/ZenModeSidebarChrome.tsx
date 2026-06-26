@@ -21,8 +21,8 @@ import { WINDOW_CHROME_HEIGHT_PX } from '#/shared/window-chrome.ts'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
 import { WindowChromeInteractiveRegion } from '#/web/components/window-chrome-region.tsx'
 
-const FOCUS_REVEAL_SURFACE_SELECTOR = '[data-floating-surface],[data-zen-reveal-surface]'
-const FOCUS_REVEAL_CLOSE_MS = 260
+const ZEN_REVEAL_SURFACE_SELECTOR = '[data-floating-surface],[data-zen-reveal-surface]'
+const ZEN_REVEAL_CLOSE_MS = 260
 type ResizeRailState = 'idle' | 'hover' | 'active'
 type RevealPanelState = 'closed' | 'opening' | 'open' | 'closing'
 
@@ -248,7 +248,7 @@ function ZenModeSidebarReveal({
   const handleResizePointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
       if (!panelInteractive) return
-      const rect = focusRevealHostRect(hostRef.current)
+      const rect = zenRevealHostRect(hostRef.current)
       if (!rect || rect.width <= 0) return
 
       event.preventDefault()
@@ -327,13 +327,13 @@ function ZenModeSidebarReveal({
     closeAnimationTimerRef.current = window.setTimeout(() => {
       closeAnimationTimerRef.current = null
       setPanelVisualState('closed')
-    }, FOCUS_REVEAL_CLOSE_MS)
+    }, ZEN_REVEAL_CLOSE_MS)
   }, [clearCloseAnimationTimer, clearOpenAnimationFrame, open, setPanelVisualState])
   const handleSurfaceLeave = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
       if (resizingRef.current) return
       if (isPointerInsideRevealBounds(event, hostRef.current, panelRef.current)) return
-      if (isFocusRevealSurfaceTarget(event.relatedTarget, panelRef.current, hitAreaRef.current)) return
+      if (isZenRevealSurfaceTarget(event.relatedTarget, panelRef.current, hitAreaRef.current)) return
       onSurfaceLeave()
     },
     [onSurfaceLeave],
@@ -344,7 +344,7 @@ function ZenModeSidebarReveal({
     const handlePointerMove = (event: PointerEvent) => {
       if (resizingRef.current) return
       if (
-        isFocusRevealSurfaceTarget(event.target, panelRef.current, hitAreaRef.current) ||
+        isZenRevealSurfaceTarget(event.target, panelRef.current, hitAreaRef.current) ||
         isPointerInsideRevealBounds(event, hostRef.current, panelRef.current) ||
         isPointerInsideElement(event, hitAreaRef.current)
       ) {
@@ -422,7 +422,7 @@ function ZenModeSidebarReveal({
   )
 }
 
-function focusRevealHostRect(host: HTMLElement | null): DOMRect | null {
+function zenRevealHostRect(host: HTMLElement | null): DOMRect | null {
   const rect = host?.getBoundingClientRect()
   if (rect && rect.width > 0) return rect
   const parentRect = host?.parentElement?.getBoundingClientRect()
@@ -460,7 +460,7 @@ function isPointerInsideRevealBounds(
   )
 }
 
-function isFocusRevealSurfaceTarget(
+function isZenRevealSurfaceTarget(
   target: EventTarget | null,
   panel: HTMLElement | null,
   hitArea: HTMLElement | null,
@@ -469,7 +469,7 @@ function isFocusRevealSurfaceTarget(
   if (panel?.contains(target) || hitArea?.contains(target)) return true
 
   const targetElement = target instanceof Element ? target : target.parentElement
-  return !!targetElement?.closest(FOCUS_REVEAL_SURFACE_SELECTOR)
+  return !!targetElement?.closest(ZEN_REVEAL_SURFACE_SELECTOR)
 }
 
 function useRootFontSizePx(): number {

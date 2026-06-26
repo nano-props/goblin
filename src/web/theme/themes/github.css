@@ -17,7 +17,7 @@ html[data-color-theme='github'][data-theme='light'] {
   --goblin-border-subtle: #dadfe6;
   --goblin-border-default: #d0d7de;
   --goblin-border-strong: #afb8c1;
-  --goblin-zen-ring: #0969da;
+  --goblin-focus-ring: #0969da;
   --goblin-action-primary: #0969da;
   --goblin-action-primary-foreground: #ffffff;
   --goblin-action-danger: #cf222e;
@@ -98,7 +98,7 @@ html[data-color-theme='github'][data-theme='dark'] {
   --goblin-border-subtle: #21262d;
   --goblin-border-default: #30363d;
   --goblin-border-strong: #484f58;
-  --goblin-zen-ring: #1f6feb;
+  --goblin-focus-ring: #1f6feb;
   --goblin-action-primary: #2f81f7;
   --goblin-action-primary-foreground: #ffffff;
   --goblin-action-danger: #f85149;
