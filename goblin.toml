@@ -1,7 +1,15 @@
 # Configure worktree bootstrap for this repo.
-# Uncomment entries under [worktree] as needed.
+# Add [worktree] with copy, symlink, hardlink, exclude, and setup when needed.
 # Paths are repo-relative.
+#
+# Example:
+#   [worktree]
+#   copy = [".env.local"]
+#   symlink = ["config/*.json"]
+#   hardlink = ["build/cache.db"]
+#   exclude = ["*.log", "*.tmp"]
+#   setup = "bun install"
 
-[worktree]
 copy = [".env"]
 setup = "bun install"
+

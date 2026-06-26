@@ -104,7 +104,7 @@ describe('g command cli', () => {
     expect(postJson).toHaveBeenCalledWith('/api/repo/view', { tab: 'history' })
   })
 
-  test('g init creates a commented worktree bootstrap config in the current directory', async () => {
+  test('g init creates an empty commented goblin.toml in the current directory', async () => {
     const { io } = makeIo()
     const { transport, postJson } = makeTransport()
     const tmp = await mkdtemp(path.join(os.tmpdir(), 'g-command-init-test-'))
@@ -119,10 +119,11 @@ describe('g command cli', () => {
       expect(postJson).not.toHaveBeenCalled()
       const config = await readFile(path.join(tmp, 'goblin.toml'), 'utf8')
       expect(config.startsWith('# Configure worktree bootstrap')).toBe(true)
-      expect(config).toContain('Uncomment entries under [worktree]')
+      expect(config).toContain('Add [worktree]')
       expect(config).toContain('Paths are repo-relative.')
-      expect(config).toContain('\n[worktree]\n')
-      expect(config).toContain('# setup = "bun install"')
+      expect(config).toContain('# Example:')
+      expect(config).toContain('#   setup = "bun install"')
+      expect(config).not.toContain('\n[worktree]')
     } finally {
       process.chdir(previousCwd)
       await rm(tmp, { recursive: true, force: true })
