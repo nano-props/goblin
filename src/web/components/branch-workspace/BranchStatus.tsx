@@ -2,7 +2,7 @@ import {
   ArrowDown,
   ArrowUp,
   Check,
-  FileEdit,
+  Diff,
   FolderTree,
   GitBranch,
   GitCommitHorizontal,
@@ -213,7 +213,7 @@ export function BranchStatus({ detail }: Props) {
       />
       {hasWorktreeChanges && (
         <StatusRow
-          icon={<FileEdit size={14} />}
+          icon={<Diff size={14} />}
           label={t('branch-status.signal.changes')}
           value={
             <StatusChip tone="attention">

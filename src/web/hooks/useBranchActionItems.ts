@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, ExternalLink, FileText, GitBranch, GitPullRequest, History, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Diff, ExternalLink, GitBranch, GitPullRequest, History, Trash2 } from 'lucide-react'
 import { createElement, type ReactNode } from 'react'
 import { GitHubOutlineIcon } from '#/web/components/GitHubOutlineIcon.tsx'
 import { GitLabLogoIcon } from '#/web/components/GitLabLogoIcon.tsx'
@@ -146,7 +146,7 @@ export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchS
       label: t('tab.changes'),
       disabled,
       visible: !!branch.worktree?.path,
-      icon: createElement(FileText),
+      icon: createElement(Diff),
       onSelect: () => openStaticWorkspacePaneView('changes'),
     },
     {
