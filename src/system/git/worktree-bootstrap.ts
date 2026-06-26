@@ -175,8 +175,10 @@ async function planMaterializations(
 
   const excludes = await expandExcludes(sourceRoot, config.exclude, signal)
   if (!excludes.ok) return excludes
-  for (const rel of excludes.paths) {
-    for (const mode of materializationModes()) expanded[mode].delete(rel)
+  for (const mode of materializationModes()) {
+    for (const rel of expanded[mode].keys()) {
+      if (isExcludedPath(rel, excludes.paths)) expanded[mode].delete(rel)
+    }
   }
 
   const ambiguous = findAmbiguousSource(expanded)

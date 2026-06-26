@@ -133,6 +133,27 @@ exclude = ["config/*.log", "config/nested"]
     })
   })
 
+  test('removes operations nested under excluded parent paths', async () => {
+    await mkdir(path.join(sourceRoot, 'config'), { recursive: true })
+    await writeFile(path.join(sourceRoot, 'config', 'app.json'), '{"ok":true}\n')
+    await writeFile(path.join(sourceRoot, 'config', 'debug.log'), 'skip\n')
+    await writeConfig(`
+[worktree]
+copy = ["config/*"]
+exclude = ["config"]
+`)
+
+    const result = await bootstrapWorktreeAfterCreate(sourceRoot, targetRoot)
+
+    expect(result).toEqual({ ok: true, message: '' })
+    await expect(readFile(path.join(targetRoot, 'config', 'app.json'), 'utf8')).rejects.toMatchObject({
+      code: 'ENOENT',
+    })
+    await expect(readFile(path.join(targetRoot, 'config', 'debug.log'), 'utf8')).rejects.toMatchObject({
+      code: 'ENOENT',
+    })
+  })
+
   test('does not copy git metadata from copied directory trees', async () => {
     await mkdir(path.join(sourceRoot, 'config', '.git'), { recursive: true })
     await writeFile(path.join(sourceRoot, 'config', '.git', 'config'), 'skip\n')
