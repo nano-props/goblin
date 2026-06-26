@@ -587,7 +587,7 @@ describe('RepoView workspace navigation', () => {
     render(<RepoView repoId={REPO_ID} />)
 
     expect(container?.querySelector('[data-testid="repo-shell-sidebar-top"]')).toBeNull()
-    expect(workspaceFocusToggle()).toBeNull()
+    expect(zenModeSidebarTrigger()).toBeNull()
     expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBeNull()
     expect(compactWorkspace()?.dataset.activePane).toBe('navigator')
     expect(compactPane('navigator')?.getAttribute('aria-hidden')).toBeNull()
@@ -757,10 +757,6 @@ function compactWorkspace(): HTMLElement | null {
 
 function compactPane(pane: 'navigator' | 'workspace'): HTMLElement | null {
   return container?.querySelector<HTMLElement>(`[data-compact-workspace-pane="${pane}"]`) ?? null
-}
-
-function workspaceFocusToggle(): HTMLButtonElement | null {
-  return container?.querySelector<HTMLButtonElement>('[data-testid="workspace-focus-toggle"]') ?? null
 }
 
 function zenModeSidebarHitArea(): HTMLElement | null {
