@@ -11,27 +11,58 @@ import { useT } from '#/web/stores/i18n.ts'
 import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
 import { SidebarRowButton } from '#/web/components/ui/sidebar-row-button.tsx'
 import { WINDOW_CHROME_HEIGHT_PX } from '#/shared/window-chrome.ts'
-import { WindowChromeDragRegion } from '#/web/components/window-chrome-region.tsx'
+import { WindowChromeDragRegion, WindowChromeNoDragRegion } from '#/web/components/window-chrome-region.tsx'
+import { cn } from '#/web/lib/cn.ts'
 
 const NOOP = () => {}
+const SIDEBAR_TOP_CLASS_NAME = 'flex shrink-0 items-center gap-1 bg-card text-sm'
+type RepoShellSidebarChromeRegion = 'drag' | 'none'
+type RepoShellSidebarChromeNoDragExclusion = 'focus-toggle'
 
 interface RepoShellSidebarProps {
   repoId?: string
   compact: boolean
   branchContent?: ReactNode
+  chromeRegion?: RepoShellSidebarChromeRegion
+  chromeNoDragExclusion?: RepoShellSidebarChromeNoDragExclusion
   onOpenSettings?: () => void
 }
 
-export function RepoShellSidebar({ repoId, compact, branchContent, onOpenSettings }: RepoShellSidebarProps) {
+export function RepoShellSidebar({
+  repoId,
+  compact,
+  branchContent,
+  chromeRegion = 'drag',
+  chromeNoDragExclusion,
+  onOpenSettings,
+}: RepoShellSidebarProps) {
   const t = useT()
+  const hasFocusToggleChromeExclusion = chromeRegion === 'drag' && chromeNoDragExclusion === 'focus-toggle'
   return (
     <aside className="flex min-h-0 min-w-0 flex-1 flex-col bg-card">
       {!compact && (
-        <WindowChromeDragRegion
-          className="flex shrink-0 items-center gap-1 bg-card text-sm"
-          data-testid="repo-shell-sidebar-top"
-          style={{ height: WINDOW_CHROME_HEIGHT_PX }}
-        />
+        chromeRegion === 'drag' ? (
+          <WindowChromeDragRegion
+            className={cn(SIDEBAR_TOP_CLASS_NAME, hasFocusToggleChromeExclusion && 'relative')}
+            data-testid="repo-shell-sidebar-top"
+            style={{ height: WINDOW_CHROME_HEIGHT_PX }}
+          >
+            {hasFocusToggleChromeExclusion ? (
+              <WindowChromeNoDragRegion
+                aria-hidden
+                data-testid="repo-shell-sidebar-focus-toggle-no-drag"
+                className="absolute top-1/2 size-8 -translate-y-1/2"
+                style={{ left: 'var(--goblin-window-chrome-left)' }}
+              />
+            ) : null}
+          </WindowChromeDragRegion>
+        ) : (
+          <div
+            className={SIDEBAR_TOP_CLASS_NAME}
+            data-testid="repo-shell-sidebar-top"
+            style={{ height: WINDOW_CHROME_HEIGHT_PX }}
+          />
+        )
       )}
       <RepoShellPrimaryActions repoId={repoId} />
       {repoId ? (

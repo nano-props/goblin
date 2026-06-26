@@ -43,6 +43,10 @@ describe('RepoShellSidebar', () => {
   test('renders sidebar actions before the branch content without growing action rows', () => {
     render(<RepoShellSidebar repoId={REPO_ID} compact={false} branchContent={<div data-testid="branch-content" />} />)
 
+    const sidebarTop = document.body.querySelector<HTMLElement>('[data-testid="repo-shell-sidebar-top"]')
+    expect(sidebarTop?.dataset.windowChromeRegion).toBe('drag')
+    expect(sidebarTop?.querySelector('[data-window-chrome-region="no-drag"]')).toBeNull()
+
     const repoPicker = document.body.querySelector('[data-testid="repo-picker-host"]')
     expect(repoPicker).not.toBeNull()
 
@@ -76,6 +80,42 @@ describe('RepoShellSidebar', () => {
 
     const settings = document.body.querySelector('button[aria-label="app-chrome.settings"]')
     expect(settings).not.toBeNull()
+  })
+
+  test('renders focus reveal top chrome as draggable with a focus-toggle no-drag carve-out', () => {
+    render(
+      <RepoShellSidebar
+        repoId={REPO_ID}
+        compact={false}
+        chromeNoDragExclusion="focus-toggle"
+        branchContent={<div data-testid="branch-content" />}
+      />,
+    )
+
+    const sidebarTop = document.body.querySelector<HTMLElement>('[data-testid="repo-shell-sidebar-top"]')
+    const noDrag = document.body.querySelector<HTMLElement>('[data-testid="repo-shell-sidebar-focus-toggle-no-drag"]')
+    expect(sidebarTop?.dataset.windowChromeRegion).toBe('drag')
+    expect(sidebarTop?.className).toContain('window-chrome')
+    expect(sidebarTop?.className).toContain('relative')
+    expect(noDrag?.dataset.windowChromeRegion).toBe('no-drag')
+    expect(noDrag?.style.left).toBe('var(--goblin-window-chrome-left)')
+    expect(sidebarTop?.hasAttribute('data-interactive')).toBe(false)
+  })
+
+  test('can render the top chrome as neutral when the docked sidebar is collapsed', () => {
+    render(
+      <RepoShellSidebar
+        repoId={REPO_ID}
+        compact={false}
+        chromeRegion="none"
+        branchContent={<div data-testid="branch-content" />}
+      />,
+    )
+
+    const sidebarTop = document.body.querySelector<HTMLElement>('[data-testid="repo-shell-sidebar-top"]')
+    expect(sidebarTop?.dataset.windowChromeRegion).toBeUndefined()
+    expect(sidebarTop?.querySelector('[data-window-chrome-region="no-drag"]')).toBeNull()
+    expect(sidebarTop?.hasAttribute('data-interactive')).toBe(false)
   })
 })
 

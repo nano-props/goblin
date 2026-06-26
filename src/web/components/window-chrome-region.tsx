@@ -29,3 +29,14 @@ export const WindowChromeInteractiveRegion = forwardRef<HTMLDivElement, WindowCh
     return <Comp ref={ref} {...props} data-interactive data-window-chrome-region="interactive" />
   },
 )
+
+interface WindowChromeNoDragRegionProps extends ComponentPropsWithoutRef<'div'> {
+  asChild?: boolean
+}
+
+export const WindowChromeNoDragRegion = forwardRef<HTMLDivElement, WindowChromeNoDragRegionProps>(
+  function WindowChromeNoDragRegion({ asChild = false, ...props }, ref) {
+    const Comp = asChild ? Slot.Root : 'div'
+    return <Comp ref={ref} {...props} data-window-chrome-region="no-drag" />
+  },
+)
