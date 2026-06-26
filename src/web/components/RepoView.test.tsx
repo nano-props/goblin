@@ -243,7 +243,7 @@ describe('RepoView workspace navigation', () => {
     expect(zenModeSidebarTrigger()?.tagName).toBe('BUTTON')
   })
 
-  test('large-screen collapsed Zen Mode reveals the sidebar when the focus toggle is hovered', () => {
+  test('large-screen collapsed Zen Mode reveals the sidebar when the zen toggle is hovered', () => {
     useReposStore.getState().setZenMode(true)
     useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
     render(<RepoView repoId={REPO_ID} />)
@@ -282,7 +282,7 @@ describe('RepoView workspace navigation', () => {
     })
     expect(zenModeSidebarReveal()?.dataset.open).toBe('true')
 
-    mockFocusRevealLayout({
+    mockZenRevealLayout({
       panelLeft: -14,
       panelWidth: 360,
     })
@@ -326,7 +326,7 @@ describe('RepoView workspace navigation', () => {
     expect(zenModeSidebarReveal()?.dataset.open).toBe('false')
   })
 
-  test('large-screen collapsed Zen Mode stays open while the pointer remains on the focus trigger', () => {
+  test('large-screen collapsed Zen Mode stays open while the pointer remains on the zen trigger', () => {
     useReposStore.getState().setZenMode(true)
     useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
     render(<RepoView repoId={REPO_ID} />)
@@ -431,7 +431,7 @@ describe('RepoView workspace navigation', () => {
     })
     expect(zenModeSidebarReveal()?.dataset.open).toBe('true')
 
-    mockFocusRevealLayout({
+    mockZenRevealLayout({
       panelLeft: -14,
       panelWidth: 360,
     })
@@ -561,7 +561,7 @@ describe('RepoView workspace navigation', () => {
       })
       expect(zenModeSidebarReveal()?.dataset.open).toBe('true')
 
-      mockFocusRevealLayout({ panelLeft: 0, panelWidth: 360 })
+      mockZenRevealLayout({ panelLeft: 0, panelWidth: 360 })
 
       act(() => {
         useReposStore.getState().setZenMode(false)
@@ -783,7 +783,7 @@ function zenModeToggleOverlay(): HTMLElement | null {
   return container?.querySelector<HTMLElement>('[data-testid="zen-mode-toggle-overlay"]') ?? null
 }
 
-function mockFocusRevealLayout({
+function mockZenRevealLayout({
   panelLeft = 0,
   panelWidth = 360,
   panelTop = 0,
@@ -804,7 +804,7 @@ function mockFocusRevealLayout({
 }) {
   const layer = zenModeSidebarLayer()
   const reveal = zenModeSidebarReveal()
-  if (!layer || !reveal) throw new Error('missing focus reveal')
+  if (!layer || !reveal) throw new Error('missing zen reveal')
 
   Object.defineProperty(layer, 'getBoundingClientRect', {
     configurable: true,

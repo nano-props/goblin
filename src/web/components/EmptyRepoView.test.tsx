@@ -67,7 +67,7 @@ function renderEmptyRepoView() {
 }
 
 describe('EmptyRepoView', () => {
-  test('disables focus toggle and pins the navigator pane in compact mode', () => {
+  test('disables zen toggle and pins the navigator pane in compact mode', () => {
     responsiveMocks.mode = 'compact'
     renderEmptyRepoView()
 
