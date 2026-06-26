@@ -1,4 +1,4 @@
-import { useId } from 'react'
+import { useId, useMemo } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import {
@@ -102,7 +102,7 @@ export function BranchWorkspace({
   )
   if (!repo) return null
 
-  const detail = getSelectedBranchWorkspacePresentation(repo)
+  const detail = useMemo(() => getSelectedBranchWorkspacePresentation(repo), [repo])
 
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-background">

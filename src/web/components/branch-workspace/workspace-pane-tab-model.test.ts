@@ -27,6 +27,7 @@ describe('branch workspace pane tab model', () => {
       runtimeTerminalViews: [terminalView('slot-1', 1, true)],
       terminalSessionCount: 1,
       terminalSyncReady: true,
+      selectedTerminalKey: null,
       lastClosedTabContext: null,
     })
 
@@ -42,16 +43,17 @@ describe('branch workspace pane tab model', () => {
     expect(model.activeTab?.identity).toBe('status:status')
   })
 
-  test('uses the selected terminal as the active terminal tab', () => {
+  test('uses the selected terminal from the store as the active terminal tab', () => {
     const model = createBranchWorkspacePaneTabModel({
       repoId: REPO_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredView: 'terminal',
       tabOrder: [staticEntry('status')],
-      runtimeTerminalViews: [terminalView('slot-1', 1, false), terminalView('slot-2', 2, true)],
+      runtimeTerminalViews: [terminalView('slot-1', 1, false), terminalView('slot-2', 2, false)],
       terminalSessionCount: 2,
       terminalSyncReady: true,
+      selectedTerminalKey: 'slot-2',
       lastClosedTabContext: null,
     })
 
@@ -72,6 +74,7 @@ describe('branch workspace pane tab model', () => {
       terminalSessionCount: 0,
       terminalCreatePending: true,
       terminalSyncReady: true,
+      selectedTerminalKey: null,
       lastClosedTabContext: null,
     })
 
@@ -95,6 +98,7 @@ describe('branch workspace pane tab model', () => {
       terminalSessionCount: 0,
       terminalCreatePending: false,
       terminalSyncReady: false,
+      selectedTerminalKey: null,
       lastClosedTabContext: null,
     })
 
@@ -114,6 +118,7 @@ describe('branch workspace pane tab model', () => {
       runtimeTerminalViews: [],
       terminalSessionCount: 0,
       terminalSyncReady: true,
+      selectedTerminalKey: null,
       lastClosedTabContext: null,
     })
 
@@ -141,6 +146,7 @@ describe('branch workspace pane tab model', () => {
       runtimeTerminalViews: [terminalView('slot-1', 1, true)],
       terminalSessionCount: 1,
       terminalSyncReady: true,
+      selectedTerminalKey: null,
       lastClosedTabContext: null,
     })
 
@@ -167,6 +173,7 @@ describe('branch workspace pane tab model', () => {
       runtimeTerminalViews: [terminalView('ignored', 1, true)],
       terminalSessionCount: 1,
       terminalSyncReady: true,
+      selectedTerminalKey: null,
       lastClosedTabContext: null,
     })
 
@@ -191,6 +198,7 @@ describe('branch workspace pane tab model', () => {
       runtimeTerminalViews: [],
       terminalSessionCount: 0,
       terminalSyncReady: true,
+      selectedTerminalKey: null,
       lastClosedTabContext: null,
     })
 
@@ -206,7 +214,7 @@ describe('branch workspace pane tab model', () => {
   test('lands on the remaining terminal when the active terminal is closed among many', () => {
     // The user has [status, slot-1, slot-2] with slot-1 selected.
     // The user closes slot-1 (X click) — slot-1 is removed from
-    // tabOrder, slot-2 stays selected in the registry. The model
+    // tabOrder, slot-2 stays selected in the store. The model
     // re-resolves: preferred=terminal, count=1, slot-2 is selected.
     // This is the "natural" case: no fallback needed, the new active
     // terminal is slot-2.
@@ -219,6 +227,7 @@ describe('branch workspace pane tab model', () => {
       runtimeTerminalViews: [terminalView('slot-2', 2, true)],
       terminalSessionCount: 1,
       terminalSyncReady: true,
+      selectedTerminalKey: 'slot-2',
       lastClosedTabContext: null,
     })
 
@@ -246,6 +255,7 @@ describe('branch workspace pane tab model', () => {
       terminalSessionCount: 0,
       terminalCreatePending: true,
       terminalSyncReady: true,
+      selectedTerminalKey: null,
       lastClosedTabContext: null,
     })
 
@@ -269,6 +279,7 @@ describe('branch workspace pane tab model', () => {
       terminalSessionCount: 0,
       terminalCreatePending: true,
       terminalSyncReady: true,
+      selectedTerminalKey: null,
       lastClosedTabContext: {
         closingIdentity: 'status:status',
         previousTabIdentities: ['status:status'],
@@ -296,6 +307,7 @@ describe('branch workspace pane tab model', () => {
       terminalSessionCount: 0,
       terminalCreatePending: false,
       terminalSyncReady: false,
+      selectedTerminalKey: null,
       lastClosedTabContext: null,
     })
 
@@ -314,6 +326,7 @@ describe('branch workspace pane tab model', () => {
       runtimeTerminalViews: [],
       terminalSessionCount: 0,
       terminalSyncReady: true,
+      selectedTerminalKey: null,
       lastClosedTabContext: null,
     })
 
@@ -339,6 +352,7 @@ describe('branch workspace pane tab model', () => {
       runtimeTerminalViews: [],
       terminalSessionCount: 0,
       terminalSyncReady: true,
+      selectedTerminalKey: null,
       lastClosedTabContext: {
         closingIdentity: 'terminal:slot-1',
         previousTabIdentities: ['status:status', 'terminal:slot-1', 'changes:changes'],
@@ -368,6 +382,7 @@ describe('branch workspace pane tab model', () => {
       runtimeTerminalViews: [],
       terminalSessionCount: 0,
       terminalSyncReady: true,
+      selectedTerminalKey: null,
       lastClosedTabContext: {
         closingIdentity: 'status:status',
         previousTabIdentities: ['status:status'],
@@ -391,6 +406,7 @@ describe('branch workspace pane tab model', () => {
       runtimeTerminalViews: [],
       terminalSessionCount: 0,
       terminalSyncReady: true,
+      selectedTerminalKey: null,
       lastClosedTabContext: {
         closingIdentity: 'changes:changes',
         previousTabIdentities: ['status:status', 'changes:changes'],
@@ -417,6 +433,7 @@ describe('branch workspace pane tab model', () => {
       runtimeTerminalViews: [],
       terminalSessionCount: 0,
       terminalSyncReady: true,
+      selectedTerminalKey: null,
       lastClosedTabContext: null,
     })
 
@@ -437,6 +454,7 @@ describe('branch workspace pane tab model', () => {
       runtimeTerminalViews: [terminalView('slot-1', 1, true)],
       terminalSessionCount: 1,
       terminalSyncReady: true,
+      selectedTerminalKey: 'slot-1',
       lastClosedTabContext: null,
     })
 
@@ -456,6 +474,7 @@ describe('branch workspace pane tab model', () => {
       terminalSessionCount: 0,
       terminalCreatePending: true,
       terminalSyncReady: true,
+      selectedTerminalKey: null,
       lastClosedTabContext: null,
     })
 
@@ -474,9 +493,10 @@ describe('branch workspace pane tab model', () => {
         terminalEntry('slot-2'),
         staticEntry('changes'),
       ],
-      runtimeTerminalViews: [terminalView('slot-1', 1, false), terminalView('slot-2', 2, true)],
+      runtimeTerminalViews: [terminalView('slot-1', 1, false), terminalView('slot-2', 2, false)],
       terminalSessionCount: 2,
       terminalSyncReady: true,
+      selectedTerminalKey: 'slot-2',
       lastClosedTabContext: null,
     })
 
@@ -486,6 +506,61 @@ describe('branch workspace pane tab model', () => {
     )
     expect(adjacentBranchWorkspacePaneTab(model.tabs, null, -1)).toBeNull()
     expect(adjacentBranchWorkspacePaneTab(model.tabs, 'missing:missing', 1)).toBeNull()
+  })
+
+  test('prefers the spatial neighbor when the active terminal is closed and another terminal remains', () => {
+    // Regression: with preferred=terminal and a mixed strip, closing the active
+    // rightmost terminal must land on the adjacent tab in strip order (the
+    // static tab in the middle), not jump to the leftmost remaining terminal
+    // just because the terminal view is still renderable.
+    const model = createBranchWorkspacePaneTabModel({
+      repoId: REPO_ID,
+      branchName: 'feature/model',
+      worktreePath: WORKTREE_PATH,
+      preferredView: 'terminal',
+      tabOrder: [terminalEntry('slot-1'), staticEntry('status'), terminalEntry('slot-2')],
+      runtimeTerminalViews: [terminalView('slot-1', 1, false), terminalView('slot-2', 2, false)],
+      terminalSessionCount: 2,
+      terminalSyncReady: true,
+      selectedTerminalKey: 'slot-2',
+      lastClosedTabContext: {
+        closingIdentity: 'terminal:slot-2',
+        previousTabIdentities: ['terminal:slot-1', 'status:status', 'terminal:slot-2'],
+        wasActive: true,
+      },
+    })
+
+    expect(model.selection).toEqual({
+      kind: 'materialized-tab',
+      view: 'status',
+      tab: { identity: 'status:status', kind: 'static', type: 'status', view: null },
+    })
+    expect(model.renderedView).toBe('status')
+    expect(model.activeTab?.identity).toBe('status:status')
+  })
+
+  test('keeps the current terminal selection when a background terminal is closed', () => {
+    // Closing a non-active terminal must not hijack the active selection via
+    // the spatial neighbor logic.
+    const model = createBranchWorkspacePaneTabModel({
+      repoId: REPO_ID,
+      branchName: 'feature/model',
+      worktreePath: WORKTREE_PATH,
+      preferredView: 'terminal',
+      tabOrder: [terminalEntry('slot-1'), staticEntry('status'), terminalEntry('slot-2')],
+      runtimeTerminalViews: [terminalView('slot-1', 1, false), terminalView('slot-2', 2, false)],
+      terminalSessionCount: 2,
+      terminalSyncReady: true,
+      selectedTerminalKey: 'slot-2',
+      lastClosedTabContext: {
+        closingIdentity: 'terminal:slot-1',
+        previousTabIdentities: ['terminal:slot-1', 'status:status', 'terminal:slot-2'],
+        wasActive: false,
+      },
+    })
+
+    expect(model.selection).toMatchObject({ kind: 'materialized-tab', view: 'terminal' })
+    expect(model.activeTab?.identity).toBe('terminal:slot-2')
   })
 })
 

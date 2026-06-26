@@ -10,13 +10,11 @@ import {
   useWorktreeTerminalSnapshot,
 } from '#/web/components/terminal/terminal-slot-store.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
-import { workspacePaneTabOrderForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
-import {
-  createBranchWorkspacePaneTabModel,
-  type BranchWorkspacePaneTab,
-  type BranchWorkspacePaneSelection,
+import { useBranchWorkspacePaneTabModel } from '#/web/components/branch-workspace/use-branch-workspace-pane-tab-model.ts'
+import type {
+  BranchWorkspacePaneTab,
+  BranchWorkspacePaneSelection,
 } from '#/web/components/branch-workspace/workspace-pane-tab-model.ts'
-import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import {
   terminalWorkspacePaneTabProvider,
   workspacePaneStaticTabProvider,
@@ -44,19 +42,7 @@ export function BranchWorkspaceContent({ repo, detail, workspacePaneId }: Props)
   const terminalWorktreeKey = branch?.worktree?.path ? worktreeTerminalKey(repo.id, branch.worktree.path) : null
   const worktreeSnapshot = useWorktreeTerminalSnapshot(terminalWorktreeKey)
   const terminalSyncReady = useTerminalRepoSyncReady(repo.id)
-  const workspacePaneTabOrder = workspacePaneTabOrderForBranch(repo.ui, branch?.name)
-  const workspacePaneTabModel = createBranchWorkspacePaneTabModel({
-    repoId: repo.id,
-    branchName: branch?.name ?? null,
-    worktreePath: branch?.worktree?.path ?? null,
-    preferredView: preferredWorkspacePaneViewForBranch(repo.ui, branch?.name),
-    tabOrder: workspacePaneTabOrder,
-    runtimeTerminalViews: worktreeSnapshot.slots,
-    terminalSessionCount: worktreeSnapshot.count,
-    terminalCreatePending: worktreeSnapshot.pendingCreate,
-    terminalSyncReady,
-    lastClosedTabContext: branch ? (repo.ui.lastClosedTabContextByBranch[branch.name] ?? null) : null,
-  })
+  const workspacePaneTabModel = useBranchWorkspacePaneTabModel(repo, detail)
   const selection = workspacePaneTabModel.selection
   const renderedView = selection?.view ?? null
   const panelLabel = workspacePanePanelLabel({

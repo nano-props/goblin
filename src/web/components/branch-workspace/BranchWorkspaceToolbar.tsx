@@ -24,14 +24,13 @@ import type {
   BranchWorkspaceRepo,
   SelectedBranchWorkspacePresentation,
 } from '#/web/components/branch-workspace/model.ts'
+import { useBranchWorkspacePaneTabModel } from '#/web/components/branch-workspace/use-branch-workspace-pane-tab-model.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import { useIsInitialSyncInFlight } from '#/web/stores/repo-sync.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { workspacePaneTabOrderForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
 import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
-import { createBranchWorkspacePaneTabModel } from '#/web/components/branch-workspace/workspace-pane-tab-model.ts'
 import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
 import {
   terminalWorkspacePaneTabProvider,
@@ -64,7 +63,6 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId, trafficL
     ? worktreeTerminalKey(repo.id, detail.branch.worktree.path)
     : null
   const branchName = detail.branch?.name ?? null
-  const worktreePath = detail.branch?.worktree?.path ?? null
   const preferredWorkspacePaneView = preferredWorkspacePaneViewForBranch(repo.ui, branchName)
   const showBranchLevelTabs = !!detail.branch
 
@@ -72,37 +70,7 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId, trafficL
 
   const worktreeSnapshot = useWorktreeTerminalSnapshot(terminalWorktreeKey)
   const terminalSyncReady = useTerminalRepoSyncReady(repo.id)
-  const workspacePaneTabOrder = useMemo(
-    () => workspacePaneTabOrderForBranch(repo.ui, branchName),
-    [branchName, repo.ui.workspacePaneTabOrderByBranch],
-  )
-  const workspacePaneTabModel = useMemo(
-    () =>
-      createBranchWorkspacePaneTabModel({
-        repoId: repo.id,
-        branchName,
-        worktreePath,
-        preferredView: preferredWorkspacePaneView,
-        tabOrder: workspacePaneTabOrder,
-        runtimeTerminalViews: worktreeSnapshot.slots,
-        terminalSessionCount: worktreeSnapshot.count,
-        terminalCreatePending: worktreeSnapshot.pendingCreate,
-        terminalSyncReady,
-        lastClosedTabContext: branchName ? (repo.ui.lastClosedTabContextByBranch[branchName] ?? null) : null,
-      }),
-    [
-      branchName,
-      workspacePaneTabOrder,
-      repo.id,
-      preferredWorkspacePaneView,
-      terminalSyncReady,
-      worktreePath,
-      worktreeSnapshot.count,
-      worktreeSnapshot.pendingCreate,
-      worktreeSnapshot.slots,
-      repo.ui.lastClosedTabContextByBranch,
-    ],
-  )
+  const workspacePaneTabModel = useBranchWorkspacePaneTabModel(repo, detail)
   const workspacePaneTabFocusRegistry = useFocusRegistry<string, HTMLButtonElement>()
 
   const terminalBase = useMemo<TerminalSlotBase | null>(

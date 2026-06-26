@@ -428,6 +428,7 @@ describe('BranchWorkspaceToolbar', () => {
     expect(useReposStore.getState().repos[REPO_ID]?.ui.lastClosedTabContextByBranch['feature/worktree']).toEqual({
       closingIdentity: 'status:status',
       previousTabIdentities: ['status:status', 'terminal:t1'],
+      wasActive: true,
     })
   })
 
@@ -864,6 +865,7 @@ describe('BranchWorkspaceToolbar', () => {
     expect(useReposStore.getState().repos[REPO_ID]?.ui.lastClosedTabContextByBranch['feature/worktree']).toEqual({
       closingIdentity: 'terminal:t1',
       previousTabIdentities: ['status:status', 'terminal:t1', 'changes:changes'],
+      wasActive: true,
     })
   })
 
