@@ -5,7 +5,7 @@ import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import { WINDOW_TOPBAR_HEIGHT_PX } from '#/shared/window-chrome.ts'
+import { WINDOW_CHROME_HEIGHT_PX } from '#/shared/window-chrome.ts'
 import { SidebarRowButton } from '#/web/components/ui/sidebar-row-button.tsx'
 
 export interface SettingsSidebarItem<TPage extends string> {
@@ -37,7 +37,7 @@ export function SettingsSidebar<TPage extends string>({
   const uiMode = useResponsiveUiMode()
   const compact = uiMode === 'compact'
   const selectedPageButtonRef = useRef<HTMLButtonElement | null>(null)
-  const chromeHeight = topInset > 0 ? topInset : WINDOW_TOPBAR_HEIGHT_PX
+  const chromeHeight = topInset > 0 ? topInset : WINDOW_CHROME_HEIGHT_PX
 
   useEffect(() => {
     if (!autoFocusSelected) return

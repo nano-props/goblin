@@ -10,12 +10,12 @@ import {
 import { useT } from '#/web/stores/i18n.ts'
 import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
 import { SidebarRowButton } from '#/web/components/ui/sidebar-row-button.tsx'
-import { WINDOW_TOPBAR_HEIGHT_PX } from '#/shared/window-chrome.ts'
+import { WINDOW_CHROME_HEIGHT_PX } from '#/shared/window-chrome.ts'
 
 const NOOP = () => {}
 
 interface RepoShellSidebarProps {
-  repoId: string
+  repoId?: string
   compact: boolean
   branchContent?: ReactNode
   surface?: 'docked' | 'floating'
@@ -34,39 +34,43 @@ export function RepoShellSidebar({
     <aside className="flex min-h-0 min-w-0 flex-1 flex-col bg-card">
       {!compact && (
         <div
-          className="topbar flex shrink-0 items-center gap-1 bg-card text-sm"
+          className="window-chrome flex shrink-0 items-center gap-1 bg-card text-sm"
           data-interactive={surface === 'floating' ? true : undefined}
           data-testid="repo-shell-sidebar-top"
-          style={{ height: WINDOW_TOPBAR_HEIGHT_PX }}
+          style={{ height: WINDOW_CHROME_HEIGHT_PX }}
         />
       )}
       <RepoShellPrimaryActions repoId={repoId} />
-      <RepoShellBranchHeader repoId={repoId} title={t('tab.branches')} />
-      <div className="flex min-h-0 flex-1 bg-card">
-        {branchContent ?? <BranchNavigator repoId={repoId} />}
-      </div>
+      {repoId ? (
+        <>
+          <RepoShellBranchHeader repoId={repoId} title={t('tab.branches')} />
+          <div className="flex min-h-0 flex-1 bg-card">{branchContent ?? <BranchNavigator repoId={repoId} />}</div>
+        </>
+      ) : (
+        <div className="flex min-h-0 flex-1 bg-card" />
+      )}
       <SidebarSettingsButton onOpenSettings={onOpenSettings} />
     </aside>
   )
 }
 
-function RepoShellPrimaryActions({ repoId }: { repoId: string }) {
+function RepoShellPrimaryActions({ repoId }: { repoId?: string }) {
   return (
     <div className="shrink-0 px-3 pt-4">
       <div className="flex min-w-0 flex-col gap-0">
         <RepoPickerRow repoId={repoId} />
-        <CreateWorktreeRowAction repoId={repoId} />
+        {repoId ? <CreateWorktreeRowAction repoId={repoId} /> : null}
       </div>
     </div>
   )
 }
 
-function RepoPickerRow({ repoId }: { repoId: string }) {
+function RepoPickerRow({ repoId }: { repoId?: string }) {
   const overlayActions = useContext(LayoutOverlayActions)
   return (
     <div className="flex h-8 min-w-0 shrink-0 items-center">
       <RepoPickerHost
-        currentRepoId={repoId}
+        currentRepoId={repoId ?? null}
         onOpenRepoPathDialog={overlayActions?.openRepoPathDialog ?? NOOP}
         onOpenRemote={overlayActions?.openRemoteRepo ?? NOOP}
         onClone={overlayActions?.openCloneRepo ?? NOOP}
@@ -92,16 +96,12 @@ function SidebarSettingsButton({ onOpenSettings }: { onOpenSettings?: () => void
   const t = useT()
   const button = (
     <SidebarRowButton
-      aria-label={t('topbar.settings')}
+      aria-label={t('app-chrome.settings')}
       onClick={() => onOpenSettings?.()}
       leading={<Settings size={16} />}
     >
-      {t('topbar.settings-tooltip')}
+      {t('app-chrome.settings-tooltip')}
     </SidebarRowButton>
   )
-  return (
-    <div className="relative z-10 shrink-0 bg-card p-2">
-      {button}
-    </div>
-  )
+  return <div className="relative z-10 shrink-0 bg-card p-2">{button}</div>
 }

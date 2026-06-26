@@ -1,11 +1,12 @@
 import { type ReactNode, useCallback, useRef, useState } from 'react'
-import { Check, Download, FolderGit2, FolderOpen, Plus, Server, X } from 'lucide-react'
+import { Check, ChevronDown, Download, FolderGit2, FolderOpen, Plus, Server, X } from 'lucide-react'
 import { Button } from '#/web/components/ui/button.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { Tip } from '#/web/components/Tip.tsx'
 import { ToolbarTabList, ToolbarTabStripBody } from '#/web/components/tab-strip/ToolbarTabStrip.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '#/web/components/ui/popover.tsx'
 import { MenuRowButton } from '#/web/components/ui/menu-row-button.tsx'
+import { SidebarRowButton } from '#/web/components/ui/sidebar-row-button.tsx'
 import { CurrentRepoSidebarButton, CurrentRepoToolbarButton } from '#/web/components/repo-picker/CurrentRepoButton.tsx'
 import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import type { RepoPickerLabels, RepoPickerRepo, RepoPickerSurface } from '#/web/components/repo-picker/types.ts'
@@ -242,31 +243,46 @@ export function RepoPicker({
   return (
     <nav className="flex h-full min-w-0 flex-1 items-center" aria-label={labels.repositories}>
       <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-        {currentRepo && surface === 'sidebar' ? (
+        {currentRepo ? (
+          surface === 'sidebar' ? (
+            <PopoverTrigger asChild>
+              <CurrentRepoSidebarButton
+                repo={currentRepo}
+                focusRegistry={focusRegistry}
+                onKeyboardNavigate={handleKeyboardNavigate}
+                unavailableLabel={labels.unavailable}
+                fill
+              />
+            </PopoverTrigger>
+          ) : (
+            <PopoverTrigger asChild>
+              <ToolbarTabStripBody className="flex-1">
+                <ToolbarTabList role="tablist" aria-orientation="horizontal" data-current-repo-group className="flex-1">
+                  <CurrentRepoToolbarButton
+                    repo={currentRepo}
+                    isCurrent={currentRepo.id === activeId}
+                    focusRegistry={focusRegistry}
+                    onActivate={onActivate}
+                    onKeyboardNavigate={handleKeyboardNavigate}
+                    unavailableLabel={labels.unavailable}
+                    fill
+                  />
+                </ToolbarTabList>
+              </ToolbarTabStripBody>
+            </PopoverTrigger>
+          )
+        ) : surface === 'sidebar' ? (
           <PopoverTrigger asChild>
-            <CurrentRepoSidebarButton
-              repo={currentRepo}
-              focusRegistry={focusRegistry}
-              onKeyboardNavigate={handleKeyboardNavigate}
-              unavailableLabel={labels.unavailable}
+            <SidebarRowButton
+              data-testid="repo-picker-placeholder"
+              aria-label={labels.placeholder}
+              size="dense"
               fill
-            />
-          </PopoverTrigger>
-        ) : currentRepo ? (
-          <PopoverTrigger asChild>
-            <ToolbarTabStripBody className="flex-1">
-              <ToolbarTabList role="tablist" aria-orientation="horizontal" data-current-repo-group className="flex-1">
-                <CurrentRepoToolbarButton
-                  repo={currentRepo}
-                  isCurrent={currentRepo.id === activeId}
-                  focusRegistry={focusRegistry}
-                  onActivate={onActivate}
-                  onKeyboardNavigate={handleKeyboardNavigate}
-                  unavailableLabel={labels.unavailable}
-                  fill
-                />
-              </ToolbarTabList>
-            </ToolbarTabStripBody>
+              leading={<FolderOpen size={16} />}
+              trailing={<ChevronDown size={14} aria-hidden />}
+            >
+              {labels.placeholder}
+            </SidebarRowButton>
           </PopoverTrigger>
         ) : (
           <Tip label={labels.open}>

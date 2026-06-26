@@ -65,17 +65,18 @@ export const ko: Record<DictKey, string> = {
 
   'menu.help.shortcuts': '키보드 단축키',
 
-  // ---- Topbar ------------------------------------------------------------
-  'topbar.open': '열기',
-  'topbar.menu': '메뉴',
-  'topbar.settings': '설정 (⌘,)',
-  'topbar.settings-tooltip': '설정',
+  // ---- 앱 상단 바 ------------------------------------------------------------
+  'app-chrome.open': '열기',
+  'app-chrome.menu': '메뉴',
+  'app-chrome.settings': '설정 (⌘,)',
+  'app-chrome.settings-tooltip': '설정',
 
   // ---- Dependencies ------------------------------------------------------
 
   // ---- Repository picker ---------------------------------------------------
   'repo-picker.repos': '리포지토리',
   'repo-picker.close-named': '{name} 닫기',
+  'repo-picker.placeholder': '저장소 선택',
   'repo-picker.open-local': '로컬 리포지토리 열기…',
   'repo-picker.open-remote': '원격 리포지토리 열기…',
   'repo-picker.open-title': '로컬 리포지토리 열기',
@@ -184,8 +185,7 @@ export const ko: Record<DictKey, string> = {
 
   // ---- Empty state -------------------------------------------------------
   'empty.title': '열린 리포지토리가 없습니다',
-  'empty.body':
-    '상단 도구 모음의 <open>열기</open> 를 눌러 Git 리포지토리를 추가하거나, 리포지토리 폴더를 이 창으로 드롭하세요.',
+  'empty.body': '사이드바에서 저장소를 선택하거나 Git 폴더를 이 창으로 드래그하세요.',
 
   // ---- Drag and drop -----------------------------------------------------
   'drop.title': '놓아서 로컬 리포지토리 열기',

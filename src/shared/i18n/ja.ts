@@ -72,17 +72,18 @@ export const ja: Record<DictKey, string> = {
   // ---- Menu — Help -------------------------------------------------------
   'menu.help.shortcuts': 'キーボードショートカット',
 
-  // ---- Topbar ------------------------------------------------------------
-  'topbar.open': '開く',
-  'topbar.menu': 'メニュー',
-  'topbar.settings': '設定 (⌘,)',
-  'topbar.settings-tooltip': '設定',
+  // ---- アプリトップバー ------------------------------------------------------------
+  'app-chrome.open': '開く',
+  'app-chrome.menu': 'メニュー',
+  'app-chrome.settings': '設定 (⌘,)',
+  'app-chrome.settings-tooltip': '設定',
 
   // ---- Dependencies ------------------------------------------------------
 
   // ---- Repository picker ---------------------------------------------------
   'repo-picker.repos': 'リポジトリ',
   'repo-picker.close-named': '{name} を閉じる',
+  'repo-picker.placeholder': 'リポジトリを選択',
   'repo-picker.open-local': 'ローカルリポジトリを開く…',
   'repo-picker.open-remote': 'リモートリポジトリを開く…',
   'repo-picker.open-title': 'ローカルリポジトリを開く',
@@ -191,8 +192,7 @@ export const ja: Record<DictKey, string> = {
 
   // ---- Empty state -------------------------------------------------------
   'empty.title': 'リポジトリが開かれていません',
-  'empty.body':
-    '上部ツールバーの <open>開く</open> から Git リポジトリを追加するか、リポジトリフォルダをこのウィンドウにドロップします。',
+  'empty.body': 'サイドバーからリポジトリを選択するか、Git フォルダをドラッグしてください。',
 
   // ---- Drag and drop -----------------------------------------------------
   'drop.title': 'ドロップしてローカルリポジトリを開く',

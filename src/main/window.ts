@@ -27,7 +27,7 @@ import {
 } from '#/main/window-shell.ts'
 import { getTheme } from '#/main/theme.ts'
 import { clientNodeLog, windowNodeLog } from '#/node/logger.ts'
-import { WINDOW_TOPBAR_HEIGHT_PX } from '#/shared/window-chrome.ts'
+import { WINDOW_CHROME_HEIGHT_PX } from '#/shared/window-chrome.ts'
 
 const DEFAULT_BOUNDS: WindowBounds = { width: 1100, height: 720 }
 const MAIN_WINDOW_SURFACE = {
@@ -109,8 +109,8 @@ async function createMainWindow(): Promise<BrowserWindow> {
     minHeight: 480,
     backgroundColor,
     titleBarStyle: defaultTitleBarStyle(),
-    titleBarOverlay: titleBarOverlayForTheme(resolved, colorTheme, WINDOW_TOPBAR_HEIGHT_PX),
-    trafficLightPosition: macTrafficLightPosition(WINDOW_TOPBAR_HEIGHT_PX),
+    titleBarOverlay: titleBarOverlayForTheme(resolved, colorTheme, WINDOW_CHROME_HEIGHT_PX),
+    trafficLightPosition: macTrafficLightPosition(WINDOW_CHROME_HEIGHT_PX),
     autoHideMenuBar: process.platform !== 'darwin',
     webPreferences: await createClientWindowWebPreferences(),
   })
@@ -174,7 +174,7 @@ export function applyMainWindowChromeTheme(theme: 'light' | 'dark'): void {
   if (!supportsTitleBarOverlay()) return
   const win = getMainWindow()
   if (!win || win.isDestroyed()) return
-  const overlay = titleBarOverlayForTheme(theme, getTheme().colorTheme, WINDOW_TOPBAR_HEIGHT_PX)
+  const overlay = titleBarOverlayForTheme(theme, getTheme().colorTheme, WINDOW_CHROME_HEIGHT_PX)
   if (!overlay) return
   try {
     win.setTitleBarOverlay(overlay)

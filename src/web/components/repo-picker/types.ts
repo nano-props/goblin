@@ -23,6 +23,7 @@ export interface RepoPickerLabels {
   repositories: string
   closeWithName: (name: string) => string
   open: string
+  placeholder: string
   openLocal: string
   openLocalShortcut: string | null
   openRemote: string

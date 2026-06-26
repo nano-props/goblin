@@ -1,8 +1,8 @@
 import type { CSSProperties, HTMLAttributes, ReactNode } from 'react'
-import { WINDOW_TOPBAR_HEIGHT_PX } from '#/shared/window-chrome.ts'
+import { WINDOW_CHROME_HEIGHT_PX } from '#/shared/window-chrome.ts'
 import { cn } from '#/web/lib/cn.ts'
 
-const WORKSPACE_TOOLBAR_STYLE = { height: WINDOW_TOPBAR_HEIGHT_PX } satisfies CSSProperties
+const WORKSPACE_TOOLBAR_STYLE = { height: WINDOW_CHROME_HEIGHT_PX } satisfies CSSProperties
 const WORKSPACE_TOOLBAR_BASE_CLASS =
   'goblin-workspace-toolbar flex min-w-0 shrink-0 items-center justify-between gap-0 border-b border-border/60 bg-card px-1.5'
 
@@ -23,7 +23,7 @@ function workspaceToolbarChromeClassName({
 }: WorkspaceToolbarChromeOptions = {}) {
   return cn(
     WORKSPACE_TOOLBAR_BASE_CLASS,
-    draggable ? (trafficLightOffset ? 'topbar' : 'app-drag-region') : 'px-2',
+    draggable ? (trafficLightOffset ? 'window-chrome' : 'app-drag-region') : 'px-2',
   )
 }
 

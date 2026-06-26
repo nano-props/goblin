@@ -1,0 +1,50 @@
+import { FolderGit2 } from 'lucide-react'
+import { RepoShellSidebar } from '#/web/components/repo-shell/RepoShellSidebar.tsx'
+import { RepoWorkspaceShell } from '#/web/components/repo-shell/RepoWorkspaceShell.tsx'
+import { RepoWorkspacePane } from '#/web/components/Layout.tsx'
+import { WorkspaceChrome } from '#/web/components/workspace-toolbar-chrome.tsx'
+import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
+import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useT } from '#/web/stores/i18n.ts'
+
+interface EmptyRepoViewProps {
+  onOpenSettings?: () => void
+}
+
+export function EmptyRepoView({ onOpenSettings }: EmptyRepoViewProps) {
+  const t = useT()
+  const uiMode = useResponsiveUiMode()
+  const compact = uiMode === 'compact'
+  const workspacePaneSize = useReposStore((s) => s.workspacePaneSize)
+  const setWorkspacePaneSize = useReposStore((s) => s.setWorkspacePaneSize)
+
+  return (
+    <RepoWorkspaceShell
+      compact={compact}
+      workspaceFocused={false}
+      branchWorkspaceActive={false}
+      workspacePaneSize={workspacePaneSize}
+      onWorkspacePaneSizeChange={setWorkspacePaneSize}
+      focusToggleEnabled={false}
+      branchNavigatorPane={
+        <RepoWorkspacePane>
+          <RepoShellSidebar compact={compact} onOpenSettings={onOpenSettings} />
+        </RepoWorkspacePane>
+      }
+      branchWorkspacePane={
+        <RepoWorkspacePane>
+          <WorkspaceChrome />
+          <div className="flex flex-1 items-center justify-center">
+            <div className="max-w-sm text-center">
+              <FolderGit2 className="mx-auto mb-3 h-10 w-10 text-muted-foreground/50" strokeWidth={1.5} aria-hidden />
+              <div className="mb-1 text-sm font-medium text-foreground">{t('empty.title')}</div>
+              <div className="text-xs leading-relaxed text-muted-foreground">{t('empty.body')}</div>
+            </div>
+          </div>
+        </RepoWorkspacePane>
+      }
+      singlePaneActivePane="navigator"
+      onOpenSettings={onOpenSettings}
+    />
+  )
+}

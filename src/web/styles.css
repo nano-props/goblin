@@ -70,10 +70,10 @@ html[data-host='electron'][data-chrome='overlay'] {
   --goblin-window-chrome-right: 150px;
 }
 
-/* Topbar — leaves room for macOS traffic lights on the left.
- * Acts as the Electron drag region; child buttons opt out via
+/* Window-chrome drag region — leaves room for macOS traffic lights on the left.
+ * Used by the workspace toolbar and sidebar top spacer; child buttons opt out via
  * -webkit-app-region: no-drag (set on `button` and `[data-interactive]`). */
-.topbar {
+.window-chrome {
   -webkit-app-region: drag;
   padding-left: var(--goblin-window-chrome-left);
   padding-right: var(--goblin-window-chrome-right);
@@ -161,9 +161,7 @@ button,
   container-type: inline-size;
 }
 
-.goblin-split-pane[data-collapse-transition]
-  > [data-slot='resizable-panel-group']
-  > [data-slot='resizable-panel'] {
+.goblin-split-pane[data-collapse-transition] > [data-slot='resizable-panel-group'] > [data-slot='resizable-panel'] {
   transition:
     flex-basis var(--goblin-workspace-pane-transition-duration) var(--goblin-workspace-pane-transition-easing),
     flex-grow var(--goblin-workspace-pane-transition-duration) var(--goblin-workspace-pane-transition-easing),

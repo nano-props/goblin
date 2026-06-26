@@ -175,7 +175,7 @@ describe('BranchWorkspaceToolbar', () => {
     })
 
     const toolbarClassName = c.querySelector('.goblin-workspace-toolbar')?.className ?? ''
-    expect(toolbarClassName).toContain('topbar')
+    expect(toolbarClassName).toContain('window-chrome')
     expect(toolbarClassName).toContain('gap-0')
     expect(c.querySelector('[data-testid="workspace-toolbar-leading-spacer"]')?.className).toContain(
       'goblin-workspace-toolbar__leading-spacer--reserved',
@@ -191,7 +191,7 @@ describe('BranchWorkspaceToolbar', () => {
     })
 
     const toolbarClassName = c.querySelector('.goblin-workspace-toolbar')?.className ?? ''
-    expect(toolbarClassName).not.toContain('topbar')
+    expect(toolbarClassName).not.toContain('window-chrome')
     expect(toolbarClassName).not.toContain('px-2')
     expect(toolbarClassName).toContain('gap-0')
     expect(c.querySelector('[data-testid="workspace-toolbar-leading-spacer"]')).not.toBeNull()
@@ -209,7 +209,7 @@ describe('BranchWorkspaceToolbar', () => {
     })
 
     expect(c.querySelector('.goblin-workspace-toolbar')?.className).not.toContain('app-drag-region')
-    expect(c.querySelector('.goblin-workspace-toolbar')?.className).not.toContain('topbar')
+    expect(c.querySelector('.goblin-workspace-toolbar')?.className).not.toContain('window-chrome')
     expect(c.querySelector('.goblin-workspace-toolbar')?.className).toContain('px-2')
   })
 
