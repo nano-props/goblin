@@ -285,7 +285,7 @@ export async function pushRemoteBranch(
 export async function createRemoteWorktree(
   target: RemoteRepoTarget,
   input: CreateWorktreeInput & { signal?: AbortSignal; run?: RemoteGitRunner },
-): Promise<ExecResult> {
+): Promise<RemoteWorktreeMutationResult> {
   const normalized = normalizeCreateWorktreeInput(input)
   if (!normalized) return { ok: false, message: 'error.invalid-arguments' }
   if (!isValidRemotePath(normalized.worktreePath)) return { ok: false, message: 'error.invalid-path' }
@@ -299,7 +299,8 @@ export async function createRemoteWorktree(
     target,
     { signal: input.signal, timeoutMs: REMOTE_BRANCH_OP_TIMEOUT_MS },
   )
-  return remoteExecResult(result)
+  const execResult = remoteExecResult(result)
+  return execResult.ok ? withAffectedWorktreePaths(execResult, [normalized.worktreePath]) : execResult
 }
 
 const REMOTE_BOOTSTRAP_TIMEOUT_MS = 10 * 60_000

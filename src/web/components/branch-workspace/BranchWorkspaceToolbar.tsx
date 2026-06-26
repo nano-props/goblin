@@ -308,7 +308,7 @@ export function BranchWorkspaceToolbar({
             />
           )}
         </div>
-        {!compact && detail.branch && (
+        {detail.branch && (
           <div className="flex h-full shrink-0 items-center" data-workspace-toolbar-trailing-actions="">
             <WorkspaceOpenExternallyMenu repo={repo} branch={detail.branch} branchActions={branchActions!} />
           </div>

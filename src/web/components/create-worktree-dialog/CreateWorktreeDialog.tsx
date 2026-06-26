@@ -59,6 +59,7 @@ interface Props {
 interface WorktreeBootstrapPromptState {
   loading: boolean
   preview: WorktreeBootstrapPreview | null
+  error: boolean
   trusted: boolean
   choice: WorktreeBootstrapChoice
   rememberTrust: boolean
@@ -387,7 +388,7 @@ export function CreateWorktreeDialog({ open, repo, worktreeBootstrap, onClose, o
 function WorktreeBootstrapPrompt({ state }: { state: WorktreeBootstrapPromptState | undefined }) {
   const t = useT()
   const preview = state?.preview ?? null
-  const showPrompt = state?.loading || (preview?.hasOperations && preview.configHash)
+  const showPrompt = state?.loading || state?.error || (preview?.hasOperations && preview.configHash)
   if (!state || !showPrompt) return null
   const rows = preview ? bootstrapRows(preview, t) : []
 
@@ -398,9 +399,13 @@ function WorktreeBootstrapPrompt({ state }: { state: WorktreeBootstrapPromptStat
         <div className="min-w-0 flex-1 space-y-2">
           <div className="font-medium leading-none">{t('action.create-worktree-bootstrap-title')}</div>
           <p className="text-xs leading-relaxed text-muted-foreground">
-            {state.loading ? t('action.create-worktree-bootstrap-loading') : t('action.create-worktree-bootstrap-body')}
+            {state.loading
+              ? t('action.create-worktree-bootstrap-loading')
+              : state.error
+                ? t('action.create-worktree-bootstrap-error')
+                : t('action.create-worktree-bootstrap-body')}
           </p>
-          {!state.loading && preview && (
+          {!state.loading && !state.error && preview && (
             <>
               {rows.length > 0 && (
                 <dl className="grid gap-1.5 border-y py-2 text-xs">

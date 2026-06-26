@@ -122,6 +122,51 @@ describe('remote ssh command builders', () => {
     expect(existsSync(path.join(targetRoot, 'linked-dir', 'secret.txt'))).toBe(false)
   })
 
+  testPosix('remote bootstrap script rejects targets under a symlink parent', async () => {
+    const dir = path.join(os.tmpdir(), `goblin-remote-bootstrap-test-${Date.now()}-${process.pid}`)
+    tempDirs.push(dir)
+    const sourceRoot = path.join(dir, 'repo')
+    const targetRoot = path.join(dir, 'worktree')
+    const outside = path.join(dir, 'outside')
+    mkdirSync(path.join(sourceRoot, 'linked-dir'), { recursive: true })
+    mkdirSync(targetRoot, { recursive: true })
+    mkdirSync(outside, { recursive: true })
+    writeFileSync(path.join(sourceRoot, 'linked-dir', 'secret.txt'), 'secret\n')
+    symlinkSync(outside, path.join(targetRoot, 'linked-dir'), 'dir')
+
+    const invocation = buildRemoteCommandInvocation(target(), {
+      type: 'bootstrapRemoteWorktree',
+      sourceRoot,
+      targetRoot,
+      copy: ['linked-dir/secret.txt'],
+      symlink: [],
+      hardlink: [],
+      exclude: [],
+    })
+
+    const result = await execa('bash', ['-lc', invocation.script], { reject: false })
+
+    expect(result.exitCode).toBe(1)
+    expect(result.stderr).toContain('bootstrap target path uses symlink parent: linked-dir')
+    expect(existsSync(path.join(outside, 'secret.txt'))).toBe(false)
+  })
+
+  testPosix('readRemoteFile fails when the path is not a regular file', async () => {
+    const dir = path.join(os.tmpdir(), `goblin-remote-read-test-${Date.now()}-${process.pid}`)
+    tempDirs.push(dir)
+    mkdirSync(dir, { recursive: true })
+
+    const invocation = buildRemoteCommandInvocation(target(), {
+      type: 'readRemoteFile',
+      path: dir,
+    })
+
+    const result = await execa('bash', ['-lc', invocation.script], { reject: false })
+
+    expect(result.exitCode).toBe(1)
+    expect(result.stderr).toContain(`error: remote file is not readable: ${dir}`)
+  })
+
   test('remote bootstrap script keeps setup output out of the marker stream', async () => {
     const dir = path.join(os.tmpdir(), `goblin-remote-bootstrap-test-${Date.now()}-${process.pid}`)
     tempDirs.push(dir)

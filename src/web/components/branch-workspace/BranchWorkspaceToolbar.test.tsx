@@ -371,7 +371,7 @@ describe('BranchWorkspaceToolbar', () => {
     expect(repoClientMocks.openRepositoryInFinder).toHaveBeenCalledTimes(2)
   })
 
-  test('hides the external app launcher in compact mode', () => {
+  test('keeps the external app launcher reachable in compact mode', () => {
     compactUi = true
     const { container: c } = renderToolbar({
       terminalCount: 1,
@@ -379,7 +379,7 @@ describe('BranchWorkspaceToolbar', () => {
       navigation: navigationWith({}),
     })
 
-    expect(c.querySelector('button[aria-label="workspace.open-externally.open"]')).toBeNull()
+    expect(c.querySelector('button[aria-label="workspace.open-externally.open"]')).not.toBeNull()
   })
 
   test('renders status and terminal views in one workspace tab strip with a separator', () => {

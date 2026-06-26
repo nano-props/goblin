@@ -277,35 +277,33 @@ export async function createRepositoryWorktree(
     return { ok: false, message: 'error.invalid-path' }
   }
   const worktreeBootstrap = options?.worktreeBootstrap ?? { kind: 'skip' }
-  const prepared = await prepareWorktreeBootstrapRun(repoId, worktreeBootstrap)
-  if (!prepared.ok) return prepared
   return await runWithRepoBackend(cwd, async (backend) => {
+    const result = await backend.createWorktree(normalized, signal, {
+      worktreeBootstrap,
+    })
+    const trustedResult = await trustWorktreeBootstrapAfterSuccessfulRun(repoId, worktreeBootstrap, result)
     return await publishSnapshotInvalidationAfterMutation(
       cwd,
-      await backend.createWorktree(normalized, signal, {
-        worktreeBootstrap,
-      }),
+      trustedResult,
       sourceToken,
     )
   })
 }
 
-async function prepareWorktreeBootstrapRun(
+async function trustWorktreeBootstrapAfterSuccessfulRun(
   repoId: string,
   decision: WorktreeBootstrapDecision,
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  if (decision.kind !== 'run') return { ok: true }
-  const repoSettings = await getServerRepoSettings()
-  if (isRepoWorktreeBootstrapConfigTrusted(repoSettings, repoId, decision.configHash)) {
-    return { ok: true }
-  }
-  if (!decision.rememberTrust) return { ok: true }
+  result: RepoMutationResult,
+): Promise<RepoMutationResult> {
+  if (!result.ok || decision.kind !== 'run' || !decision.rememberTrust) return result
   try {
+    const repoSettings = await getServerRepoSettings()
+    if (isRepoWorktreeBootstrapConfigTrusted(repoSettings, repoId, decision.configHash)) return result
     await trustServerRepoWorktreeBootstrapConfig({ repoId, configHash: decision.configHash })
     publishSettingsInvalidation(['settings-snapshot'])
-    return { ok: true }
+    return result
   } catch {
-    return { ok: false, message: 'error.settings-write-title' }
+    return { ...result, ok: false, message: 'error.settings-write-title', repoChanged: true }
   }
 }
 

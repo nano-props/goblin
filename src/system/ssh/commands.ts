@@ -298,7 +298,13 @@ function scriptForCommand(command: RemoteCommandKind): string {
     case 'gitRemoteVerbose':
       return `git -C ${shellQuote(command.path)} remote -v`
     case 'readRemoteFile':
-      return `cat ${shellQuote(command.path)} 2>/dev/null || true`
+      return [
+        `if [ ! -e ${shellQuote(command.path)} ] && [ ! -L ${shellQuote(command.path)} ]; then exit 0; fi`,
+        `if [ ! -f ${shellQuote(command.path)} ]; then printf '%s\\n' ${shellQuote(
+          `error: remote file is not readable: ${command.path}`,
+        )} >&2; exit 1; fi`,
+        `cat -- ${shellQuote(command.path)}`,
+      ].join('\n')
     case 'bootstrapRemoteWorktree':
       return remoteBootstrapScript(command)
   }
@@ -427,6 +433,24 @@ function remoteBootstrapInnerScript(command: Extract<RemoteCommandKind, { type: 
     '',
     'source_parent_has_symlink() {',
     '  local rel="$1" current="$SOURCE_ROOT" segment parent_rel i j',
+    '  local -a parts',
+    '  IFS=/ read -r -a parts <<< "$rel"',
+    '  for ((i = 0; i < ${#parts[@]} - 1; i += 1)); do',
+    '    segment="${parts[$i]}"',
+    '    [ -n "$segment" ] || continue',
+    '    current="$current/$segment"',
+    '    if [ -L "$current" ]; then',
+    '      parent_rel="${parts[0]}"',
+    '      for ((j = 1; j <= i; j += 1)); do parent_rel="$parent_rel/${parts[$j]}"; done',
+    '      SYMLINK_PARENT="$parent_rel"',
+    '      return 0',
+    '    fi',
+    '  done',
+    '  return 1',
+    '}',
+    '',
+    'target_parent_has_symlink() {',
+    '  local rel="$1" current="$TARGET_ROOT" segment parent_rel i j',
     '  local -a parts',
     '  IFS=/ read -r -a parts <<< "$rel"',
     '  for ((i = 0; i < ${#parts[@]} - 1; i += 1)); do',
@@ -587,6 +611,7 @@ function remoteBootstrapInnerScript(command: Extract<RemoteCommandKind, { type: 
     '    target_path_for_rel "$rel"; dst="$DST"',
     '    if ! path_exists "$src"; then append_missing "$rel"; continue; fi',
     '    if source_parent_has_symlink "$rel"; then die "bootstrap path uses symlink parent: $SYMLINK_PARENT"; fi',
+    '    if target_parent_has_symlink "$rel"; then die "bootstrap target path uses symlink parent: $SYMLINK_PARENT"; fi',
     '    if [ "$mode" = "hardlink" ] && { [ -L "$src" ] || [ ! -f "$src" ]; }; then',
     '      die "hardlink source is not a file: $rel"',
     '    fi',
@@ -616,6 +641,7 @@ function remoteBootstrapInnerScript(command: Extract<RemoteCommandKind, { type: 
     '  target_path_for_rel "$rel"; dst="$DST"',
     '  if ! path_exists "$src"; then die "failed to copy $rel: source is missing"; fi',
     '  if source_parent_has_symlink "$rel"; then die "bootstrap path uses symlink parent: $SYMLINK_PARENT"; fi',
+    '  if target_parent_has_symlink "$rel"; then die "bootstrap target path uses symlink parent: $SYMLINK_PARENT"; fi',
     '  if path_exists "$dst"; then die "destination already exists: $rel"; fi',
     '  if [ -d "$src" ] && [ ! -L "$src" ]; then',
     '    mkdir -p -- "$dst" || die "failed to copy $rel"',
@@ -627,6 +653,7 @@ function remoteBootstrapInnerScript(command: Extract<RemoteCommandKind, { type: 
     '    return',
     '  fi',
     '  mkdir -p -- "$(dirname "$dst")" || die "failed to copy $rel"',
+    '  if target_parent_has_symlink "$rel"; then die "bootstrap target path uses symlink parent: $SYMLINK_PARENT"; fi',
     '  cp -P -- "$src" "$dst" || die "failed to copy $rel"',
     '}',
     '',
@@ -642,8 +669,10 @@ function remoteBootstrapInnerScript(command: Extract<RemoteCommandKind, { type: 
     '  target_path_for_rel "$rel"; dst="$DST"',
     '  if ! path_exists "$src"; then die "failed to symlink $rel: source is missing"; fi',
     '  if source_parent_has_symlink "$rel"; then die "bootstrap path uses symlink parent: $SYMLINK_PARENT"; fi',
+    '  if target_parent_has_symlink "$rel"; then die "bootstrap target path uses symlink parent: $SYMLINK_PARENT"; fi',
     '  if path_exists "$dst"; then die "destination already exists: $rel"; fi',
     '  mkdir -p -- "$(dirname "$dst")" || die "failed to symlink $rel"',
+    '  if target_parent_has_symlink "$rel"; then die "bootstrap target path uses symlink parent: $SYMLINK_PARENT"; fi',
     '  ln -s -- "$src" "$dst" || die "failed to symlink $rel"',
     '  printf \'GOBLIN_BOOTSTRAP_SYMLINK %s\\n\' "$rel"',
     '}',
@@ -654,9 +683,11 @@ function remoteBootstrapInnerScript(command: Extract<RemoteCommandKind, { type: 
     '  target_path_for_rel "$rel"; dst="$DST"',
     '  if ! path_exists "$src"; then die "failed to hardlink $rel: source is missing"; fi',
     '  if source_parent_has_symlink "$rel"; then die "bootstrap path uses symlink parent: $SYMLINK_PARENT"; fi',
+    '  if target_parent_has_symlink "$rel"; then die "bootstrap target path uses symlink parent: $SYMLINK_PARENT"; fi',
     '  if [ -L "$src" ] || [ ! -f "$src" ]; then die "hardlink source is not a file: $rel"; fi',
     '  if path_exists "$dst"; then die "destination already exists: $rel"; fi',
     '  mkdir -p -- "$(dirname "$dst")" || die "failed to hardlink $rel"',
+    '  if target_parent_has_symlink "$rel"; then die "bootstrap target path uses symlink parent: $SYMLINK_PARENT"; fi',
     '  ln -- "$src" "$dst" || die "failed to hardlink $rel"',
     '  printf \'GOBLIN_BOOTSTRAP_HARDLINK %s\\n\' "$rel"',
     '}',

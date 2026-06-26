@@ -442,6 +442,7 @@ export const ko: Record<DictKey, string> = {
   'action.create-worktree-bootstrap-body':
     '파일 복사/링크 또는 setup 실행이 포함된 bootstrap 규칙을 찾았습니다.',
   'action.create-worktree-bootstrap-loading': 'goblin.toml bootstrap 규칙을 확인하는 중입니다.',
+  'action.create-worktree-bootstrap-error': 'bootstrap 규칙을 미리 볼 수 없습니다. 실행은 건너뜁니다.',
   'action.create-worktree-bootstrap-note': '신뢰하지 않으면 이번에만 실행됩니다. 신뢰한 구성은 다음부터 자동 실행됩니다.',
   'action.create-worktree-bootstrap-trusted': '신뢰됨 상태입니다. 생성 후 자동 실행됩니다.',
   'action.create-worktree-bootstrap-copy-label': '복사 항목',

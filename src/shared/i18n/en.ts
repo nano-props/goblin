@@ -454,6 +454,7 @@ export const en = {
   'action.create-worktree-bootstrap-body':
     'Detected bootstrap rules that may copy or link files and run setup.',
   'action.create-worktree-bootstrap-loading': 'Checking goblin.toml bootstrap rules.',
+  'action.create-worktree-bootstrap-error': 'Could not preview bootstrap rules. Bootstrap will be skipped.',
   'action.create-worktree-bootstrap-note': 'Untrusted runs apply once. Trusted configs run automatically next time.',
   'action.create-worktree-bootstrap-trusted': 'Trusted. Bootstrap will run after creation.',
   'action.create-worktree-bootstrap-copy-label': 'Copy entries',

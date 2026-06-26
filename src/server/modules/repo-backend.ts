@@ -445,18 +445,19 @@ async function createRemoteRepoBackend(repoId: string): Promise<RepoBackend> {
     },
     async createWorktree(input, signal, options) {
       const created = await createRemoteWorktree(target, { ...input, signal })
-      if (!created.ok) return created
-      if (options?.worktreeBootstrap?.kind !== 'run') return created
+      const affectedRepoIds = remoteWorktreeRepoIds(target, created.affectedWorktreePaths)
+      if (!created.ok) return withAffectedRepoIds(created, affectedRepoIds)
+      if (options?.worktreeBootstrap?.kind !== 'run') return withAffectedRepoIds(created, affectedRepoIds)
       const bootstrapped = await bootstrapRemoteWorktreeAfterCreate(target, input.worktreePath, {
         signal,
         expectedConfigHash: options.worktreeBootstrap.configHash,
       })
-      if (!bootstrapped.ok) return { ...bootstrapped, repoChanged: true }
-      return {
+      if (!bootstrapped.ok) return withAffectedRepoIds({ ...bootstrapped, repoChanged: true }, affectedRepoIds)
+      return withAffectedRepoIds({
         ok: true,
         message: [created.message, bootstrapped.message].filter(Boolean).join('\n'),
         ...(bootstrapped.worktreeBootstrap ? { worktreeBootstrap: bootstrapped.worktreeBootstrap } : {}),
-      }
+      }, affectedRepoIds)
     },
     async deleteBranch(branch, options, signal) {
       return await deleteRemoteBranch(target, { branch, force: options?.force, signal })

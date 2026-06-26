@@ -430,6 +430,7 @@ export const zh: Record<DictKey, string> = {
   'action.create-worktree-bootstrap-body':
     '检测到初始化规则，可能复制/链接文件或运行 setup。',
   'action.create-worktree-bootstrap-loading': '正在检查 goblin.toml 初始化规则。',
+  'action.create-worktree-bootstrap-error': '无法预览初始化规则，将跳过执行。',
   'action.create-worktree-bootstrap-note': '未信任仅本次执行；信任后下次自动执行。',
   'action.create-worktree-bootstrap-trusted': '已信任，创建后自动执行。',
   'action.create-worktree-bootstrap-copy-label': '复制条目',

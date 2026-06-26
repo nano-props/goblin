@@ -324,6 +324,88 @@ describe('CreateWorktreeDialogHost', () => {
     )
   })
 
+  test('keeps trusted bootstrap state in sync when settings cache updates after preview', async () => {
+    const configHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+    mainWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
+    const submitBranchAction = vi.spyOn(useReposStore.getState(), 'submitBranchAction').mockImplementation(() => {})
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => previewResponse({ hasOperations: true, configHash })),
+    )
+
+    renderHost(true, vi.fn())
+    await flushReact()
+
+    expect(document.body.textContent).toContain('action.create-worktree-bootstrap-title')
+    expect(document.body.textContent).not.toContain('action.create-worktree-bootstrap-trusted')
+
+    act(() => {
+      mainWindowQueryClient.setQueryData(
+        settingsSnapshotQueryKey(),
+        defaultSettingsSnapshot({
+          repoSettings: [
+            {
+              repoId: REPO_ID,
+              worktreeBootstrapTrust: {
+                configHash,
+                trustedAt: '2026-06-26T00:00:00.000Z',
+              },
+            },
+          ],
+        }),
+      )
+    })
+    await flushReact()
+
+    expect(document.body.textContent).toContain('action.create-worktree-bootstrap-trusted')
+
+    setInputValue('cwt-branch', 'feature/trusted-after-preview')
+    await clickButton('action.create-worktree-confirm')
+    await flushReact()
+
+    expect(submitBranchAction).toHaveBeenCalledWith(
+      REPO_ID,
+      expect.objectContaining({
+        kind: 'createWorktree',
+        worktreeBootstrap: { kind: 'run', configHash, rememberTrust: false },
+      }),
+      expect.objectContaining({ refreshOnError: false }),
+    )
+  })
+
+  test('shows preview errors and skips bootstrap when creating anyway', async () => {
+    mainWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
+    const submitBranchAction = vi.spyOn(useReposStore.getState(), 'submitBranchAction').mockImplementation(() => {})
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        return new Response(JSON.stringify({ ok: false, message: 'invalid goblin.toml' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      }),
+    )
+
+    renderHost(true, vi.fn())
+    await flushReact()
+
+    expect(document.body.textContent).toContain('action.create-worktree-bootstrap-error')
+    expect(document.body.textContent).not.toContain('action.create-worktree-bootstrap-run')
+
+    setInputValue('cwt-branch', 'feature/preview-error')
+    await clickButton('action.create-worktree-confirm')
+    await flushReact()
+
+    expect(submitBranchAction).toHaveBeenCalledWith(
+      REPO_ID,
+      expect.objectContaining({
+        kind: 'createWorktree',
+        worktreeBootstrap: { kind: 'skip' },
+      }),
+      expect.objectContaining({ refreshOnError: false }),
+    )
+  })
+
   test('ignores a stale bootstrap preview after reopening the create dialog', async () => {
     const configHash = 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
     mainWindowQueryClient.setQueryData(

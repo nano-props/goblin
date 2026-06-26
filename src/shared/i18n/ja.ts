@@ -450,6 +450,7 @@ export const ja: Record<DictKey, string> = {
   'action.create-worktree-bootstrap-body':
     'ファイルのコピー/リンクや setup 実行を含む bootstrap ルールが見つかりました。',
   'action.create-worktree-bootstrap-loading': 'goblin.toml bootstrap ルールを確認しています。',
+  'action.create-worktree-bootstrap-error': 'bootstrap ルールをプレビューできません。実行はスキップされます。',
   'action.create-worktree-bootstrap-note': '未信頼の場合は今回のみ実行します。信頼済み設定は次回から自動実行されます。',
   'action.create-worktree-bootstrap-trusted': '信頼済みです。作成後に自動実行します。',
   'action.create-worktree-bootstrap-copy-label': 'コピー項目',

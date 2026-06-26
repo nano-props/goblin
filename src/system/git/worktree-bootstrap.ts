@@ -90,7 +90,13 @@ export async function bootstrapWorktreeAfterCreate(
     const planned = await planMaterializations(sourceRoot, targetRoot, loaded.config, options?.signal)
     if (!planned.ok) return bootstrapFailure(planned.message)
 
-    const materialized = await materializePlan(sourceRoot, planned.operations, planned.excludedPaths, options?.signal)
+    const materialized = await materializePlan(
+      sourceRoot,
+      targetRoot,
+      planned.operations,
+      planned.excludedPaths,
+      options?.signal,
+    )
     if (!materialized.ok) return bootstrapFailure(materialized.message)
 
     if (loaded.config.setup) {
@@ -365,6 +371,8 @@ async function validateMaterializations(
 
     const destination = resolveDestinationPath(targetRoot, item.rel)
     if (!destination.ok) return destination
+    const safeDestination = await validateDestinationPathWithinRoot(targetRoot, item.rel)
+    if (!safeDestination.ok) return safeDestination
     if (await pathExists(destination.abs, { useLstat: true })) {
       return { ok: false, message: `destination already exists: ${item.rel}` }
     }
@@ -374,6 +382,17 @@ async function validateMaterializations(
     operations.push({ ...item, abs: source.abs, dest: destination.abs, stat })
   }
   return { ok: true, operations }
+}
+
+async function validateDestinationPathWithinRoot(
+  targetRoot: string,
+  rel: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const symlinkAncestor = await firstSymlinkAncestor(targetRoot, rel)
+  if (symlinkAncestor) {
+    return { ok: false, message: `bootstrap target path uses symlink parent: ${symlinkAncestor}` }
+  }
+  return { ok: true }
 }
 
 async function validateSourcePathWithinRoot(
@@ -417,6 +436,7 @@ async function firstSymlinkAncestor(sourceRoot: string, rel: string): Promise<st
 
 async function materializePlan(
   sourceRoot: string,
+  targetRoot: string,
   operations: ReadyMaterialization[],
   excludedPaths: Set<string>,
   signal: AbortSignal | undefined,
@@ -425,6 +445,8 @@ async function materializePlan(
     if (signal?.aborted) return { ok: false, message: 'cancelled' }
     try {
       await fs.mkdir(path.dirname(item.dest), { recursive: true })
+      const safeDestination = await validateDestinationPathWithinRoot(targetRoot, item.rel)
+      if (!safeDestination.ok) return safeDestination
       switch (item.mode) {
         case 'copy':
           await fs.cp(item.abs, item.dest, {
