@@ -34,7 +34,13 @@ import {
   terminalWorkspacePaneTabProvider,
   workspacePaneStaticTabProvider,
 } from '#/web/workspace-pane/workspace-pane-tab-providers.ts'
-import { WorkspaceToolbar, WorkspaceToolbarLeadingSpacer } from '#/web/components/workspace-toolbar-chrome.tsx'
+import {
+  WorkspaceToolbar,
+  WorkspaceToolbarActions,
+  WorkspaceToolbarContent,
+  WorkspaceToolbarLeadingSpacer,
+  WorkspaceToolbarPrimary,
+} from '#/web/components/workspace-toolbar-chrome.tsx'
 import { WorkspaceOpenExternallyMenu } from '#/web/components/branch-workspace/WorkspaceOpenExternallyMenu.tsx'
 import type { BranchActions } from '#/web/hooks/useBranchActions.tsx'
 
@@ -215,7 +221,7 @@ export function BranchWorkspaceToolbar({
     return (
       <WorkspaceToolbar draggable={!compact} trafficLightOffset={trafficLightOffset}>
         <WorkspaceToolbarLeadingSpacer reserve={trafficLightOffset} />
-        <div className="min-w-0 flex-1" />
+        <WorkspaceToolbarPrimary />
       </WorkspaceToolbar>
     )
   }
@@ -240,8 +246,8 @@ export function BranchWorkspaceToolbar({
   return (
     <WorkspaceToolbar draggable={!compact} trafficLightOffset={trafficLightOffset}>
       <WorkspaceToolbarLeadingSpacer reserve={trafficLightOffset} />
-      <div className="flex h-full min-w-0 flex-1 items-center gap-1 overflow-hidden">
-        <div className="flex h-full min-w-0 flex-1 items-center gap-1 overflow-hidden">
+      <WorkspaceToolbarContent>
+        <WorkspaceToolbarPrimary>
           {/* Compact UI only: back-to-branch-navigator is the user's escape hatch
               from the branch workspace. It must stay visible even when the tab
               strip below is empty, so it lives at the toolbar level rather than
@@ -269,13 +275,13 @@ export function BranchWorkspaceToolbar({
               activateKeyboardNavigationSelection
             />
           )}
-        </div>
+        </WorkspaceToolbarPrimary>
         {detail.branch && (
-          <div className="flex h-full shrink-0 items-center" data-workspace-toolbar-trailing-actions="">
+          <WorkspaceToolbarActions data-workspace-toolbar-trailing-actions="">
             <WorkspaceOpenExternallyMenu repo={repo} branch={detail.branch} branchActions={branchActions!} />
-          </div>
+          </WorkspaceToolbarActions>
         )}
-      </div>
+      </WorkspaceToolbarContent>
     </WorkspaceToolbar>
   )
 }

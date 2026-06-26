@@ -1,5 +1,5 @@
 import { ChevronDown, ExternalLink, Loader2 } from 'lucide-react'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { RepoBranchState } from '#/web/stores/repos/types.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { focusRing } from '#/web/components/ui/focus.ts'
@@ -18,6 +18,7 @@ import {
 } from '#/web/external-workspace-apps.tsx'
 import {
   readRecentWorkspaceExternalAppId,
+  workspaceExternalAppRecentScope,
   writeRecentWorkspaceExternalAppId,
 } from '#/web/workspace-external-apps-recent.ts'
 import { cn } from '#/web/lib/cn.ts'
@@ -39,7 +40,12 @@ export function WorkspaceOpenExternallyMenu({ repo, branch, branchActions }: Pro
   const isRemoteRepo = remoteRepoTarget(repo.id, repo.remote.lifecycle) !== null
   const finderAvailable = capabilities.canOpenFinder && hostPlatform === 'darwin'
   const remoteOpenAction = useRemoteOpenAction(repo, branch, branchActions)
-  const [recentItemId, setRecentItemId] = useState<string | null>(() => readRecentWorkspaceExternalAppId())
+  const recentScope = workspaceExternalAppRecentScope(repo.id, branch.worktree?.path)
+  const [recentItemId, setRecentItemId] = useState<string | null>(() => readRecentWorkspaceExternalAppId(recentScope))
+
+  useEffect(() => {
+    setRecentItemId(readRecentWorkspaceExternalAppId(recentScope))
+  }, [recentScope])
 
   const localItems = useMemo(
     () =>
@@ -69,7 +75,7 @@ export function WorkspaceOpenExternallyMenu({ repo, branch, branchActions }: Pro
     if (busy) return
     setOpen(false)
     setRecentItemId(item.id)
-    writeRecentWorkspaceExternalAppId(item.id)
+    writeRecentWorkspaceExternalAppId(item.id, recentScope)
     void run(item.id, () => {
       if (item.kind === 'terminal') return actions.openTerminal(item.app)
       if (item.kind === 'editor') return actions.openEditor(item.app)

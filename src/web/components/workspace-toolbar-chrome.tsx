@@ -5,7 +5,7 @@ import { WindowChromeDragRegion, WindowChromeNoDragRegion } from '#/web/componen
 
 const WORKSPACE_TOOLBAR_STYLE = { height: WINDOW_CHROME_HEIGHT_PX } satisfies CSSProperties
 const WORKSPACE_TOOLBAR_BASE_CLASS =
-  'goblin-workspace-toolbar flex min-w-0 shrink-0 items-center justify-between gap-0 border-b border-border/60 bg-card px-1.5'
+  'goblin-workspace-toolbar flex min-w-0 shrink-0 items-center justify-between gap-0 border-b border-border/60 bg-card'
 
 interface WorkspaceToolbarChromeOptions {
   draggable?: boolean
@@ -17,8 +17,10 @@ interface WorkspaceToolbarProps
   children: ReactNode
 }
 
+type WorkspaceToolbarLayoutProps = HTMLAttributes<HTMLDivElement>
+
 function workspaceToolbarChromeClassName({ draggable = true }: Pick<WorkspaceToolbarChromeOptions, 'draggable'> = {}) {
-  return cn(WORKSPACE_TOOLBAR_BASE_CLASS, !draggable && 'px-2')
+  return cn(WORKSPACE_TOOLBAR_BASE_CLASS, !draggable && 'goblin-workspace-toolbar--non-draggable')
 }
 
 export function WorkspaceToolbar({
@@ -30,7 +32,11 @@ export function WorkspaceToolbar({
   ...props
 }: WorkspaceToolbarProps) {
   const toolbarProps = {
-    className: cn(workspaceToolbarChromeClassName({ draggable }), className),
+    className: cn(
+      workspaceToolbarChromeClassName({ draggable }),
+      trafficLightOffset && 'goblin-workspace-toolbar--traffic-offset',
+      className,
+    ),
     style: { ...WORKSPACE_TOOLBAR_STYLE, ...style },
     ...props,
   }
@@ -40,10 +46,22 @@ export function WorkspaceToolbar({
   }
 
   return (
-    <WindowChromeDragRegion reserveWindowControls={trafficLightOffset} {...toolbarProps}>
+    <WindowChromeDragRegion reserveWindowControls={false} {...toolbarProps}>
       {children}
     </WindowChromeDragRegion>
   )
+}
+
+export function WorkspaceToolbarContent({ className, ...props }: WorkspaceToolbarLayoutProps) {
+  return <div className={cn('goblin-workspace-toolbar__content', className)} {...props} />
+}
+
+export function WorkspaceToolbarPrimary({ className, ...props }: WorkspaceToolbarLayoutProps) {
+  return <div className={cn('goblin-workspace-toolbar__primary', className)} {...props} />
+}
+
+export function WorkspaceToolbarActions({ className, ...props }: WorkspaceToolbarLayoutProps) {
+  return <div className={cn('goblin-workspace-toolbar__actions', className)} {...props} />
 }
 
 export function WorkspaceToolbarLeadingSpacer({
@@ -77,7 +95,7 @@ export function WorkspaceChrome({ draggable = true, trafficLightOffset = false }
   return (
     <WorkspaceToolbar draggable={draggable} trafficLightOffset={trafficLightOffset}>
       <WorkspaceToolbarLeadingSpacer reserve={trafficLightOffset} />
-      <div className="min-w-0 flex-1" />
+      <WorkspaceToolbarPrimary />
     </WorkspaceToolbar>
   )
 }
