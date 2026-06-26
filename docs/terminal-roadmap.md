@@ -105,13 +105,28 @@ This is manageable now, but it will become a maintenance bottleneck as the featu
 - terminal mutation handlers / write paths
 - realtime request dispatch adapter
 
-## P1.7: Decouple terminal runtime lifetime from React provider lifetime
+## P1.7: Decouple terminal runtime lifetime from React provider lifetime (completed)
 
-Keep `TerminalSlotRegistry` / shared terminal runtime state on a client-level lifetime rather than a provider-owned lifetime. This remains the preferred next-stage cleanup, but it should not block the current first-frame protocol fix. See `docs/terminal-slot-lifecycle.md` for the bug analysis and why this work is related but separate.
+**Status: completed.** `TerminalSlotRegistry` is now a client-level
+singleton: one instance per client process, created on first access,
+living until process teardown. The `TerminalSlotProvider` is only a
+wiring adapter that forwards bridge events into the singleton and
+exposes its API via React context. A StrictMode re-mount no longer
+recreates the registry, so the previous provider-owned lifetime and
+its destroy debounce have been removed. See
+`docs/terminal-slot-lifecycle.md` for the bug analysis and why this
+work is related but separate.
 
-## P1.8: Make create deliver an atomic first frame
+## P1.8: Make create deliver an atomic first frame (completed)
 
-`create` should follow the same first-frame contract shape as `attach` / `restart`: return snapshot hydration data directly, and let the client treat that payload as the authoritative first-frame handshake. `create.sessions` should remain projection data only. See `docs/terminal-slot-lifecycle.md` for the detailed bug write-up and contract rules.
+**Status: completed.** `create` now returns the full first-frame
+payload (`ptySessionId`, `snapshot`, `snapshotSeq`, process metadata,
+geometry, and controller info) directly. `TerminalCatalogMutationResult`
+intersects with `TerminalFirstFrame` at the type level, and the client
+hydrates from the response without a follow-up snapshot fetch.
+`create.sessions` remains projection data only. See
+`docs/terminal-slot-lifecycle.md` for the detailed bug write-up and
+contract rules.
 
 ## P2: Further tighten client projection boundaries
 
