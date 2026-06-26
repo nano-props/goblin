@@ -520,7 +520,6 @@ describe('repo mutation invalidation publishing', () => {
     mocks.removeWorktree.mockResolvedValueOnce({
       ok: true,
       message: 'ok',
-      affectedWorktreePaths: ['/tmp/repo-worktree'],
     })
     mocks.getWorktrees.mockResolvedValueOnce([
       { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true, isDirty: false },

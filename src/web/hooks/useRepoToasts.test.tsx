@@ -11,9 +11,27 @@ const toastMocks = vi.hoisted(() => ({
   success: vi.fn(),
   error: vi.fn(),
 }))
+const i18nMocks = vi.hoisted(() => ({
+  dict: {
+    'action.create-worktree-created-title': 'Created worktree',
+    'worktree-bootstrap.summary.copy-one': 'Copied {count} path: {paths}{moreSuffix}',
+    'worktree-bootstrap.summary.copy-other': 'Copied {count} paths: {paths}{moreSuffix}',
+    'worktree-bootstrap.summary.skipped-missing-one': 'Skipped missing {count} path: {paths}{moreSuffix}',
+    'worktree-bootstrap.summary.skipped-missing-other': 'Skipped missing {count} paths: {paths}{moreSuffix}',
+    'worktree-bootstrap.summary.setup': 'Ran setup: {command}',
+  } as Record<string, string>,
+  interpolate(template: string, params?: Record<string, string | number>): string {
+    return template.replace(/\{(\w+)\}/g, (match, key) => String(params?.[key] ?? match))
+  },
+}))
 
 vi.mock('sonner', () => ({
   toast: toastMocks,
+}))
+
+vi.mock('#/web/stores/i18n.ts', () => ({
+  useT: () => (key: string, params?: Record<string, string | number>) =>
+    i18nMocks.interpolate(i18nMocks.dict[key] ?? key, params),
 }))
 
 const REPO_ID = '/tmp/repo-toasts-test'

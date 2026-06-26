@@ -13,6 +13,8 @@ Use this doc for repo-configured file materialization and post-create setup when
 
 Use `goblin.toml` at the repo root.
 
+Run `g init` from the repo root to create a commented empty file.
+
 ```toml
 [worktree]
 copy = [
@@ -41,6 +43,7 @@ setup = "bun install"
 
 - Read `goblin.toml` from the repo root of the worktree that initiated create.
 - Resolve all paths and globs relative to that same repo root.
+- Run bootstrap for local worktree creation only.
 - After `git worktree add`, expand `copy` / `symlink` / `hardlink`, then subtract `exclude`, then materialize into the new worktree.
 - After materialization, run `setup` once in the new worktree root if it is defined.
 
@@ -59,6 +62,7 @@ setup = "bun install"
 - Never overwrite an existing destination path.
 - Missing source paths are skipped and reported.
 - If one concrete path matches more than one of `copy`, `symlink`, or `hardlink`, fail the bootstrap as a config error.
+- Bootstrap failure does not roll back files already created in the new worktree.
 - `setup` runs an arbitrary command on the user's machine; treat `goblin.toml` as trusted input only.
 
 ## v1 bias

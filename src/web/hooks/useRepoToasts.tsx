@@ -5,8 +5,40 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import type { RepoEvent } from '#/web/stores/repos/types.ts'
 import { repoEventActionSuccessLabel } from '#/web/stores/repos/action-labels.ts'
-import { formatWorktreeBootstrapSummary } from '#/shared/worktree-bootstrap-summary.ts'
+import {
+  hasWorktreeBootstrapSummaryDetails,
+  type WorktreeBootstrapPathSummary,
+  type WorktreeBootstrapSummary,
+} from '#/shared/worktree-bootstrap-summary.ts'
 const EMPTY_EVENTS: RepoEvent[] = []
+
+type Translator = ReturnType<typeof useT>
+type WorktreeBootstrapSummaryPathKind = 'copy' | 'symlink' | 'hardlink' | 'skippedMissing'
+type WorktreeBootstrapSummaryCountKind = 'one' | 'other'
+
+const WORKTREE_BOOTSTRAP_PATH_SUMMARY_KEYS: Record<
+  WorktreeBootstrapSummaryPathKind,
+  Record<WorktreeBootstrapSummaryCountKind, string>
+> = {
+  copy: {
+    one: 'worktree-bootstrap.summary.copy-one',
+    other: 'worktree-bootstrap.summary.copy-other',
+  },
+  symlink: {
+    one: 'worktree-bootstrap.summary.symlink-one',
+    other: 'worktree-bootstrap.summary.symlink-other',
+  },
+  hardlink: {
+    one: 'worktree-bootstrap.summary.hardlink-one',
+    other: 'worktree-bootstrap.summary.hardlink-other',
+  },
+  skippedMissing: {
+    one: 'worktree-bootstrap.summary.skipped-missing-one',
+    other: 'worktree-bootstrap.summary.skipped-missing-other',
+  },
+}
+const WORKTREE_BOOTSTRAP_MORE_SUFFIX_KEY = 'worktree-bootstrap.summary.more-suffix'
+const WORKTREE_BOOTSTRAP_SETUP_KEY = 'worktree-bootstrap.summary.setup'
 
 export function useRepoToasts(repoId: string) {
   const t = useT()
@@ -29,7 +61,7 @@ export function useRepoToasts(repoId: string) {
         const hasMessage = !!result.message
         const actionLabel = repoEventActionSuccessLabel(event.action)
         const resultMessageKey = result.message || 'error.unknown'
-        const bootstrapSummary = formatWorktreeBootstrapSummary(result.worktreeBootstrap)
+        const bootstrapSummary = formatTranslatedWorktreeBootstrapSummary(result.worktreeBootstrap, tRef.current)
         const descriptionText = bootstrapSummary || tRef.current(resultMessageKey)
         const description =
           (!result.ok || (hasMessage && (!actionLabel || !!bootstrapSummary))) && descriptionText ? (
@@ -74,4 +106,37 @@ function ToastDescription({ children }: { children: React.ReactNode }) {
       </pre>
     </ScrollArea>
   )
+}
+
+function formatTranslatedWorktreeBootstrapSummary(
+  summary: WorktreeBootstrapSummary | undefined,
+  t: Translator,
+): string {
+  if (!summary || !hasWorktreeBootstrapSummaryDetails(summary)) return ''
+  return [
+    formatTranslatedPathSummary('copy', summary.copy, t),
+    formatTranslatedPathSummary('symlink', summary.symlink, t),
+    formatTranslatedPathSummary('hardlink', summary.hardlink, t),
+    formatTranslatedPathSummary('skippedMissing', summary.skippedMissing, t),
+    summary.setup ? t(WORKTREE_BOOTSTRAP_SETUP_KEY, { command: summary.setup.command }) : '',
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
+function formatTranslatedPathSummary(
+  kind: WorktreeBootstrapSummaryPathKind,
+  summary: WorktreeBootstrapPathSummary,
+  t: Translator,
+): string {
+  if (summary.count === 0) return ''
+  const countKind: WorktreeBootstrapSummaryCountKind = summary.count === 1 ? 'one' : 'other'
+  const summaryKey = WORKTREE_BOOTSTRAP_PATH_SUMMARY_KEYS[kind][countKind]
+  const extraCount = summary.count - summary.paths.length
+  const moreSuffix = extraCount > 0 ? t(WORKTREE_BOOTSTRAP_MORE_SUFFIX_KEY, { count: extraCount }) : ''
+  return t(summaryKey, {
+    count: summary.count,
+    paths: summary.paths.join(', '),
+    moreSuffix,
+  })
 }

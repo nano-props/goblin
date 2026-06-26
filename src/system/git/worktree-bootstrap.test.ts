@@ -176,6 +176,9 @@ copy = ["config"]
     ['path escape', '../secret.env', 'escapes repo root'],
     ['git metadata', '.git/config', 'must not target .git'],
     ['repo root', '.', 'must not target repo root'],
+    ['windows drive-relative path', 'C:secret.env', 'must be relative'],
+    ['windows drive-absolute path', String.raw`C:\secret.env`, 'must be relative'],
+    ['windows rooted path', String.raw`\secret.env`, 'must be relative'],
   ])('rejects unsafe %s entries', async (_name, entry, message) => {
     await writeConfig(`
 [worktree]

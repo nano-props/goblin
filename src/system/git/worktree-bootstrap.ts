@@ -38,6 +38,7 @@ interface ReadyMaterialization extends PlannedMaterialization {
 
 const CONFIG_FILE = 'goblin.toml'
 const SETUP_TIMEOUT_MS = 10 * 60_000
+const WINDOWS_ROOTED_PATH_RE = /^(?:[A-Za-z]:|[\\/])/
 
 export async function bootstrapWorktreeAfterCreate(
   sourceCwd: string,
@@ -376,7 +377,8 @@ function validateConfigPath(entry: string): { ok: true } | { ok: false; message:
   if (entry.length === 0) return { ok: false, message: 'bootstrap path must not be empty' }
   if (/[\0-\x1f\x7f]/.test(entry)) return { ok: false, message: `bootstrap path contains control characters: ${entry}` }
   if (entry.startsWith('!')) return { ok: false, message: `negative glob patterns are not supported: ${entry}` }
-  if (path.isAbsolute(entry)) return { ok: false, message: `bootstrap path must be relative: ${entry}` }
+  if (path.isAbsolute(entry) || WINDOWS_ROOTED_PATH_RE.test(entry))
+    return { ok: false, message: `bootstrap path must be relative: ${entry}` }
   if (normalizeRelativePath(entry) === '.')
     return { ok: false, message: `bootstrap path must not target repo root: ${entry}` }
 
