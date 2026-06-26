@@ -121,6 +121,8 @@ describe('g command cli', () => {
       expect(config.startsWith('# Configure worktree bootstrap')).toBe(true)
       expect(config).toContain('Add [worktree]')
       expect(config).toContain('Paths are repo-relative.')
+      expect(config).toContain('# Example:')
+      expect(config).toContain('#   setup = "bun install"')
       expect(config).not.toContain('\n[worktree]')
     } finally {
       process.chdir(previousCwd)
