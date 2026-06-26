@@ -30,7 +30,6 @@ interface FocusModeSidebarRevealState {
   open: boolean
   rendered: boolean
   onTriggerEnter: () => void
-  onTriggerLeave: () => void
   onSurfaceEnter: () => void
   onSurfaceLeave: () => void
 }
@@ -51,7 +50,6 @@ interface FocusModeSidebarRevealProps {
 interface FocusModeSidebarRevealTriggerProps {
   revealEnabled?: boolean
   onMouseEnter?: () => void
-  onMouseLeave?: () => void
 }
 
 interface FocusModeSidebarChromeProps {
@@ -65,7 +63,6 @@ interface FocusModeSidebarChromeProps {
 
 function useFocusModeSidebarReveal(enabled: boolean): FocusModeSidebarRevealState {
   const [open, setOpen] = useState(false)
-  const [triggerArmed, setTriggerArmed] = useState(true)
   const previousEnabled = useRef(enabled)
   const exitRetainTimer = useRef<number | null>(null)
   const exitRetaining = useRef(false)
@@ -81,7 +78,6 @@ function useFocusModeSidebarReveal(enabled: boolean): FocusModeSidebarRevealStat
   const openSidebar = useCallback(() => {
     if (!enabled) return
     clearExitRetain()
-    setTriggerArmed(true)
     setOpen(true)
   }, [clearExitRetain, enabled])
 
@@ -98,11 +94,9 @@ function useFocusModeSidebarReveal(enabled: boolean): FocusModeSidebarRevealStat
     clearExitRetain()
     if (enabled) {
       setOpen(false)
-      setTriggerArmed(false)
       return
     }
 
-    setTriggerArmed(true)
     if (!open) {
       setOpen(false)
       return
@@ -119,19 +113,13 @@ function useFocusModeSidebarReveal(enabled: boolean): FocusModeSidebarRevealStat
   useEffect(() => clearExitRetain, [clearExitRetain])
 
   const onTriggerEnter = useCallback(() => {
-    if (!triggerArmed) return
     openSidebar()
-  }, [openSidebar, triggerArmed])
-
-  const onTriggerLeave = useCallback(() => {
-    setTriggerArmed(true)
-  }, [])
+  }, [openSidebar])
 
   return {
     open,
     rendered: enabled || open,
     onTriggerEnter,
-    onTriggerLeave,
     onSurfaceEnter: openSidebar,
     onSurfaceLeave: closeSidebar,
   }
@@ -166,7 +154,6 @@ export function FocusModeSidebarChrome({
         <FocusModeSidebarRevealTriggerLayer
           revealEnabled={revealEnabled}
           onMouseEnter={reveal.onTriggerEnter}
-          onMouseLeave={reveal.onTriggerLeave}
         />
       ) : null}
     </>
@@ -176,7 +163,6 @@ export function FocusModeSidebarChrome({
 function FocusModeSidebarRevealTriggerLayer({
   revealEnabled = false,
   onMouseEnter,
-  onMouseLeave,
 }: FocusModeSidebarRevealTriggerProps) {
   return (
     <div
@@ -188,7 +174,6 @@ function FocusModeSidebarRevealTriggerLayer({
       <FocusModeSidebarRevealTrigger
         revealEnabled={revealEnabled}
         onMouseEnter={onMouseEnter}
-        onMouseLeave={onMouseLeave}
       />
     </div>
   )
@@ -197,7 +182,6 @@ function FocusModeSidebarRevealTriggerLayer({
 function FocusModeSidebarRevealTrigger({
   revealEnabled = false,
   onMouseEnter,
-  onMouseLeave,
 }: FocusModeSidebarRevealTriggerProps) {
   return (
     <WindowChromeInteractiveRegion asChild>
@@ -206,7 +190,6 @@ function FocusModeSidebarRevealTrigger({
         data-testid="focus-mode-sidebar-trigger"
         className="pointer-events-auto"
         onMouseEnter={revealEnabled ? onMouseEnter : undefined}
-        onMouseLeave={revealEnabled ? onMouseLeave : undefined}
       />
     </WindowChromeInteractiveRegion>
   )

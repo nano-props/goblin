@@ -342,7 +342,7 @@ describe('RepoView workspace navigation', () => {
     expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
   })
 
-  test('large-screen collapsed Focus Mode arms trigger hover only after the pointer leaves once', () => {
+  test('large-screen collapsed Focus Mode opens reveal on first trigger hover', () => {
     render(<RepoView repoId={REPO_ID} />)
 
     act(() => {
@@ -353,15 +353,6 @@ describe('RepoView workspace navigation', () => {
     expect(focusModeSidebarReveal()?.dataset.open).toBe('false')
 
     const trigger = focusModeSidebarTrigger()
-    act(() => {
-      trigger?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
-    })
-    expect(focusModeSidebarReveal()?.dataset.open).toBe('false')
-
-    act(() => {
-      trigger?.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body }))
-    })
-
     act(() => {
       trigger?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
     })
