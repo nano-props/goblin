@@ -40,12 +40,16 @@ describe('ToolbarTabStrip', () => {
     expect(container?.querySelector('[data-testid="scroll-marker"]')).toBeNull()
   })
 
-  test('renders the scroll shell with the shared horizontal scroll-area contract', () => {
+  test('renders the scroll shell without taking over blank-space dragging', () => {
     render(
       <ToolbarTabStrip
         compact={false}
         compactContent={<div data-testid="compact-marker" />}
-        scrollContent={<div data-testid="scroll-marker" />}
+        scrollContent={
+          <div data-testid="scroll-marker">
+            <button type="button">Tab</button>
+          </div>
+        }
       />,
     )
 
@@ -58,12 +62,13 @@ describe('ToolbarTabStrip', () => {
     expect(host?.hasAttribute('data-interactive')).toBe(false)
     expect(scrollRoot?.className).toContain('w-fit')
     expect(scrollRoot?.className).toContain('max-w-full')
-    expect(scrollRoot?.hasAttribute('data-interactive')).toBe(true)
-    expect((scrollRoot as HTMLElement | null)?.dataset.windowChromeRegion).toBe('interactive')
+    expect(scrollRoot?.hasAttribute('data-interactive')).toBe(false)
+    expect((scrollRoot as HTMLElement | null)?.dataset.windowChromeRegion).toBeUndefined()
     expect(dragRemainder?.getAttribute('aria-hidden')).toBe('true')
     expect((dragRemainder as HTMLElement | null)?.dataset.windowChromeRegion).toBe('drag')
     expect(dragRemainder?.className).toContain('flex-1')
     expect(container?.querySelector('[data-testid="scroll-marker"]')).not.toBeNull()
+    expect(container?.querySelector('button')?.textContent).toBe('Tab')
     expect(container?.querySelector('[data-testid="compact-marker"]')).toBeNull()
   })
 })

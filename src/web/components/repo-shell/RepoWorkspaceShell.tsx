@@ -7,7 +7,6 @@ import {
 import { CompactRepoWorkspace, RepoWorkspace } from '#/web/components/Layout.tsx'
 import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
 import { WINDOW_CHROME_HEIGHT_PX } from '#/shared/window-chrome.ts'
-import { WindowChromeDragRegion } from '#/web/components/window-chrome-region.tsx'
 
 interface RepoWorkspaceShellProps {
   repoId?: string
@@ -79,10 +78,10 @@ export function RepoWorkspaceShell({
     <section className="relative flex min-w-0 flex-1 flex-col">
       {renderWorkspaceBody(branchWorkspacePane, branchNavigatorPane)}
       {focusToggleEnabled && !compact ? (
-        <WindowChromeDragRegion
+        <div
           data-testid="focus-mode-toggle-overlay"
           data-focus-reveal-surface={focusRevealEnabled ? '' : undefined}
-          className="pointer-events-none absolute left-0 top-0 z-40 flex items-center bg-transparent"
+          className="goblin-focus-reveal-trigger-layer pointer-events-none absolute left-0 top-0 z-40 flex items-center bg-transparent"
           style={{ height: WINDOW_CHROME_HEIGHT_PX }}
         >
           <FocusModeSidebarRevealTrigger
@@ -90,12 +89,13 @@ export function RepoWorkspaceShell({
             onMouseEnter={focusSidebar.onTriggerEnter}
             onMouseLeave={focusSidebar.onTriggerLeave}
           />
-        </WindowChromeDragRegion>
+        </div>
       ) : null}
       {focusSidebar.rendered && !compact ? (
         <FocusModeSidebarReveal
           repoId={repoId}
           open={focusSidebar.open}
+          interactive={focusRevealEnabled}
           sidebarSize={sidebarPaneSize}
           onSidebarSizeChange={(nextSidebarSize) => onWorkspacePaneSizeChange(100 - nextSidebarSize)}
           onSurfaceEnter={focusSidebar.onSurfaceEnter}

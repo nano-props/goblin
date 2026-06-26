@@ -1,6 +1,6 @@
 import type { ComponentPropsWithoutRef, ReactNode, Ref } from 'react'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
-import { WindowChromeDragRegion, WindowChromeInteractiveRegion } from '#/web/components/window-chrome-region.tsx'
+import { WindowChromeDragRegion } from '#/web/components/window-chrome-region.tsx'
 import { cn } from '#/web/lib/cn.ts'
 
 interface ToolbarTabStripProps {
@@ -12,8 +12,8 @@ interface ToolbarTabStripProps {
 
 // Shared toolbar tab-strip shell:
 // - compact mode keeps a single flex row in the toolbar height
-// - expanded mode keeps the scrollable tab content no-drag, but leaves any
-//   unused toolbar width as native window chrome for dragging.
+// - expanded mode leaves only actual controls as no-drag; gaps inside the
+//   scroll shell and the unused toolbar width stay native window chrome.
 export function ToolbarTabStrip({ compact, compactContent, scrollContent, viewportRef }: ToolbarTabStripProps) {
   if (compact) {
     return <div className="flex h-full min-w-0 flex-1 items-center">{compactContent}</div>
@@ -21,17 +21,15 @@ export function ToolbarTabStrip({ compact, compactContent, scrollContent, viewpo
 
   return (
     <div className="flex h-full min-w-0 flex-1 items-center">
-      <WindowChromeInteractiveRegion asChild>
-        <ScrollArea
-          orientation="horizontal"
-          scrollbarMode="compact"
-          className="h-full min-w-0 max-w-full flex-none w-fit"
-          viewportClassName="[&>div]:h-full"
-          viewportRef={viewportRef}
-        >
-          {scrollContent}
-        </ScrollArea>
-      </WindowChromeInteractiveRegion>
+      <ScrollArea
+        orientation="horizontal"
+        scrollbarMode="compact"
+        className="h-full min-w-0 max-w-full flex-none w-fit"
+        viewportClassName="[&>div]:h-full"
+        viewportRef={viewportRef}
+      >
+        {scrollContent}
+      </ScrollArea>
       <WindowChromeDragRegion reserveWindowControls={false} className="min-w-0 flex-1 self-stretch" aria-hidden />
     </div>
   )

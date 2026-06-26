@@ -1,7 +1,7 @@
 import type { CSSProperties, HTMLAttributes, ReactNode } from 'react'
 import { WINDOW_CHROME_HEIGHT_PX } from '#/shared/window-chrome.ts'
 import { cn } from '#/web/lib/cn.ts'
-import { WindowChromeDragRegion } from '#/web/components/window-chrome-region.tsx'
+import { WindowChromeDragRegion, WindowChromeNoDragRegion } from '#/web/components/window-chrome-region.tsx'
 
 const WORKSPACE_TOOLBAR_STYLE = { height: WINDOW_CHROME_HEIGHT_PX } satisfies CSSProperties
 const WORKSPACE_TOOLBAR_BASE_CLASS =
@@ -46,16 +46,30 @@ export function WorkspaceToolbar({
   )
 }
 
-export function WorkspaceToolbarLeadingSpacer({ reserve }: { reserve: boolean }) {
+export function WorkspaceToolbarLeadingSpacer({
+  reserve,
+  noDrag = reserve,
+}: {
+  reserve: boolean
+  noDrag?: boolean
+}) {
   return (
     <div
       data-testid="workspace-toolbar-leading-spacer"
       className={cn(
         'goblin-workspace-toolbar__leading-spacer h-full shrink-0',
         reserve && 'goblin-workspace-toolbar__leading-spacer--reserved',
+        noDrag && 'relative',
       )}
       aria-hidden
-    />
+    >
+      {noDrag ? (
+        <WindowChromeNoDragRegion
+          data-testid="workspace-toolbar-leading-no-drag"
+          className="absolute left-0 top-1/2 size-8 -translate-y-1/2"
+        />
+      ) : null}
+    </div>
   )
 }
 

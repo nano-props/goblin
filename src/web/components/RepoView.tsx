@@ -84,7 +84,8 @@ export function RepoView({ repoId, onOpenSettings }: Props) {
 
   if (!view.exists || !repo) return <div />
 
-  const workspaceTrafficLightOffset = !compact && view.workspaceFocused && branchWorkspaceActive
+  const focusModeCollapsed = !compact && view.workspaceFocused && branchWorkspaceActive
+  const workspaceTrafficLightOffset = focusModeCollapsed
 
   const renderBranchNavigatorPane = (branchContent?: ReactNode) => (
     <RepoWorkspacePane>
@@ -92,6 +93,7 @@ export function RepoView({ repoId, onOpenSettings }: Props) {
         repoId={repoId}
         compact={compact}
         branchContent={branchContent}
+        chromeRegion={focusModeCollapsed ? 'none' : 'drag'}
         onOpenSettings={onOpenSettings}
       />
     </RepoWorkspacePane>

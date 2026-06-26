@@ -12,6 +12,7 @@ let root: Root | null = null
 let keyboardSensorToken: object
 let pointerSensorToken: object
 let sortableOnKeyDown: ReturnType<typeof vi.fn>
+let sortableOnPointerDown: ReturnType<typeof vi.fn>
 let useSensorMock: ReturnType<typeof vi.fn>
 let sortableDragging = false
 const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -22,6 +23,7 @@ beforeEach(() => {
   keyboardSensorToken = {}
   pointerSensorToken = {}
   sortableOnKeyDown = vi.fn()
+  sortableOnPointerDown = vi.fn()
   sortableDragging = false
   useSensorMock = vi.fn((sensor, options) => ({ sensor, options }))
 
@@ -39,7 +41,7 @@ beforeEach(() => {
     sortableKeyboardCoordinates: vi.fn(),
     useSortable: () => ({
       attributes: {},
-      listeners: { onKeyDown: sortableOnKeyDown },
+      listeners: { onKeyDown: sortableOnKeyDown, onPointerDown: sortableOnPointerDown },
       setNodeRef: vi.fn(),
       setActivatorNodeRef: vi.fn(),
       transform: null,
@@ -131,12 +133,22 @@ describe('WorkspacePaneViewStrip keyboard dnd wiring', () => {
 
     const tab = document.body.querySelector('#workspace-workspace-pane-view')
     if (!(tab instanceof HTMLButtonElement)) throw new Error('missing terminal view')
+    const tabChrome = document.body.querySelector('[data-workspace-pane-view-tooltip-id="terminal:t1"]')
+    if (!(tabChrome instanceof HTMLDivElement)) throw new Error('missing terminal chrome')
+
+    expect(tabChrome.dataset.windowChromeRegion).toBe('interactive')
 
     act(() => {
       tab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', code: 'ArrowRight', bubbles: true }))
     })
 
     expect(sortableOnKeyDown).toHaveBeenCalledTimes(1)
+
+    act(() => {
+      tabChrome.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    })
+
+    expect(sortableOnPointerDown).toHaveBeenCalledTimes(1)
   })
 })
 

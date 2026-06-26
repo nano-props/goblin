@@ -182,6 +182,9 @@ describe('BranchWorkspaceToolbar', () => {
     expect(c.querySelector('[data-testid="workspace-toolbar-leading-spacer"]')?.className).toContain(
       'goblin-workspace-toolbar__leading-spacer--reserved',
     )
+    expect(
+      c.querySelector<HTMLElement>('[data-testid="workspace-toolbar-leading-no-drag"]')?.dataset.windowChromeRegion,
+    ).toBe('no-drag')
   })
 
   test('keeps the leading spacer mounted when the focus offset is inactive', () => {
@@ -200,6 +203,7 @@ describe('BranchWorkspaceToolbar', () => {
     expect(c.querySelector('[data-testid="workspace-toolbar-leading-spacer"]')?.className).not.toContain(
       'goblin-workspace-toolbar__leading-spacer--reserved',
     )
+    expect(c.querySelector('[data-testid="workspace-toolbar-leading-no-drag"]')).toBeNull()
   })
 
   test('does not opt compact toolbar chrome into window dragging', () => {

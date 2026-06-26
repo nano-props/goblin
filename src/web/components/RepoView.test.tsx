@@ -199,6 +199,15 @@ describe('RepoView workspace navigation', () => {
     expect(branchWorkspace()).not.toBeNull()
     expect(branchWorkspace()?.dataset.trafficLightOffset).toBe('true')
     expect(focusModeSidebarTrigger()).not.toBeNull()
+    const sidebarTops = [...(container?.querySelectorAll<HTMLElement>('[data-testid="repo-shell-sidebar-top"]') ?? [])]
+    expect(sidebarTops.length).toBeGreaterThan(0)
+    const closedRevealTop = focusModeSidebarReveal()?.querySelector<HTMLElement>(
+      '[data-testid="repo-shell-sidebar-top"]',
+    )
+    expect(focusModeSidebarReveal()?.dataset.open).toBe('false')
+    expect(focusModeSidebarReveal()?.dataset.interactive).toBe('false')
+    expect(closedRevealTop?.dataset.windowChromeRegion).toBeUndefined()
+    expect(closedRevealTop?.querySelector('[data-testid="repo-shell-sidebar-focus-toggle-no-drag"]')).toBeNull()
   })
 
   test('large-screen collapsed Focus Mode reveals the sidebar on left-edge hover', () => {
@@ -221,17 +230,18 @@ describe('RepoView workspace navigation', () => {
     })
 
     expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
+    expect(focusModeSidebarReveal()?.dataset.interactive).toBe('true')
     expect(focusModeSidebarReveal()?.getAttribute('aria-hidden')).toBeNull()
     expect(focusModeSidebarReveal()?.hasAttribute('inert')).toBe(false)
+    const floatingSidebarTop = focusModeSidebarReveal()?.querySelector<HTMLElement>(
+      '[data-testid="repo-shell-sidebar-top"]',
+    )
+    expect(floatingSidebarTop?.hasAttribute('data-interactive')).toBe(false)
+    expect(floatingSidebarTop?.dataset.windowChromeRegion).toBe('drag')
     expect(
-      focusModeSidebarReveal()
-        ?.querySelector('[data-testid="repo-shell-sidebar-top"]')
-        ?.hasAttribute('data-interactive'),
-    ).toBe(false)
-    expect(
-      focusModeSidebarReveal()?.querySelector<HTMLElement>('[data-testid="repo-shell-sidebar-top"]')?.dataset
+      floatingSidebarTop?.querySelector<HTMLElement>('[data-testid="repo-shell-sidebar-focus-toggle-no-drag"]')?.dataset
         .windowChromeRegion,
-    ).toBe('drag')
+    ).toBe('no-drag')
   })
 
   test('large-screen collapsed Focus Mode reveals the sidebar when the focus toggle is hovered', () => {
@@ -240,9 +250,11 @@ describe('RepoView workspace navigation', () => {
     render(<RepoView repoId={REPO_ID} />)
 
     expect(focusModeToggleOverlay()?.hasAttribute('data-interactive')).toBe(false)
-    expect(focusModeToggleOverlay()?.dataset.windowChromeRegion).toBe('drag')
+    expect(focusModeToggleOverlay()?.dataset.windowChromeRegion).toBeUndefined()
     expect(focusModeToggleOverlay()?.hasAttribute('data-focus-reveal-surface')).toBe(true)
-    expect(focusModeToggleOverlay()?.className).toContain('window-chrome')
+    expect(focusModeToggleOverlay()?.className).toContain('goblin-focus-reveal-trigger-layer')
+    expect(focusModeToggleOverlay()?.className).not.toContain('window-chrome')
+    expect(focusModeToggleOverlay()?.className).not.toContain('app-drag-region')
     expect(focusModeSidebarTrigger()?.hasAttribute('data-interactive')).toBe(true)
     expect(focusModeSidebarTrigger()?.dataset.windowChromeRegion).toBe('interactive')
     expect(focusModeSidebarReveal()?.dataset.open).toBe('false')
@@ -482,6 +494,9 @@ describe('RepoView workspace navigation', () => {
 
     act(() => {
       focusModeSidebarHitArea()?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+    })
+
+    act(() => {
       focusModeSidebarResizeHandle()?.dispatchEvent(
         new PointerEvent('pointerdown', { bubbles: true, clientX: 420, pointerId: 1 }),
       )
@@ -517,6 +532,14 @@ describe('RepoView workspace navigation', () => {
 
       expect(workspace()?.dataset.branchNavigatorCollapsed).toBe('false')
       expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
+      expect(focusModeSidebarReveal()?.dataset.interactive).toBe('false')
+      expect(focusModeSidebarReveal()?.getAttribute('aria-hidden')).toBe('true')
+      expect(focusModeSidebarReveal()?.hasAttribute('inert')).toBe(true)
+      const retainedSidebarTop = focusModeSidebarReveal()?.querySelector<HTMLElement>(
+        '[data-testid="repo-shell-sidebar-top"]',
+      )
+      expect(retainedSidebarTop?.dataset.windowChromeRegion).toBeUndefined()
+      expect(retainedSidebarTop?.querySelector('[data-testid="repo-shell-sidebar-focus-toggle-no-drag"]')).toBeNull()
 
       act(() => {
         document.body.dispatchEvent(new PointerEvent('pointermove', { bubbles: true }))
@@ -552,6 +575,8 @@ describe('RepoView workspace navigation', () => {
       })
 
       expect(focusModeSidebarReveal()?.dataset.open).toBe('true')
+      expect(focusModeSidebarReveal()?.dataset.interactive).toBe('false')
+      expect(focusModeSidebarHitArea()?.className).toContain('pointer-events-none')
 
       act(() => {
         document.body.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: 120, clientY: 24 }))

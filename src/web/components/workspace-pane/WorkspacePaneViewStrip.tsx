@@ -749,6 +749,7 @@ interface WorkspacePaneViewChromeProps {
   isDragging?: boolean
   tabId: string
   buttonRef: ((node: HTMLButtonElement | null) => void) | undefined
+  containerProps?: ComponentPropsWithoutRef<'div'>
   buttonProps?: ComponentPropsWithoutRef<'button'>
   onSelect: (identity: string) => void
   onClose: (event: React.MouseEvent, identity: string) => void
@@ -769,6 +770,7 @@ function WorkspacePaneViewChrome({
   isDragging = false,
   tabId,
   buttonRef,
+  containerProps,
   buttonProps,
   onSelect,
   onClose,
@@ -801,10 +803,17 @@ function WorkspacePaneViewChrome({
   return (
     <ToolbarClosableTab
       containerProps={{
+        ...containerProps,
         'data-workspace-pane-view-tooltip-id': item.identity,
         'data-workspace-pane-pending-view': isPendingWorkspacePaneTabItem(item) ? item.type : undefined,
-        onPointerEnter: () => onHoverChange?.(item.identity),
-        onPointerLeave: () => onHoverChange?.(null),
+        onPointerEnter: (event) => {
+          containerProps?.onPointerEnter?.(event)
+          onHoverChange?.(item.identity)
+        },
+        onPointerLeave: (event) => {
+          containerProps?.onPointerLeave?.(event)
+          onHoverChange?.(null)
+        },
       }}
       containerClassName={toolbarTabChromeClassName({
         variant: 'workspace',
@@ -925,7 +934,8 @@ function SortableWorkspacePaneView({
         isDragging={sortable.isDragging}
         tabId={tabId}
         buttonRef={sortable.setButtonRef}
-        buttonProps={{ ...sortable.attributes, ...sortable.sortableListeners }}
+        containerProps={sortable.sortableListeners}
+        buttonProps={sortable.attributes}
         onSelect={onSelect}
         onClose={onClose}
         onKeyDown={(e) => {

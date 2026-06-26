@@ -71,9 +71,9 @@ html[data-host='electron'][data-chrome='overlay'] {
 }
 
 /* Window-chrome drag region — leaves room for macOS traffic lights on the left.
- * Use this on empty chrome surfaces and structural chrome overlays. Only real
- * controls should opt out via `button` or `[data-interactive]`; marking a
- * layout host as interactive removes that whole rectangle from native dragging. */
+ * Use this on empty chrome surfaces and structural chrome overlays. Controls
+ * opt out through the interactive/no-drag chrome regions; marking a layout host
+ * as interactive removes that whole rectangle from native dragging. */
 .window-chrome {
   -webkit-app-region: drag;
   padding-left: var(--goblin-window-chrome-left);
@@ -81,12 +81,22 @@ html[data-host='electron'][data-chrome='overlay'] {
 }
 
 button,
-[data-interactive] {
+[data-window-chrome-region='interactive'],
+[data-interactive],
+[data-window-chrome-region='no-drag'] {
   -webkit-app-region: no-drag;
 }
 
 .app-drag-region {
   -webkit-app-region: drag;
+}
+
+/* Focus-mode overlay is only a layout/hit-test surface. The underlying
+ * workspace toolbar or revealed sidebar owns blank-space dragging; the child
+ * trigger opts out through an interactive chrome region. */
+.goblin-focus-reveal-trigger-layer {
+  padding-left: var(--goblin-window-chrome-left);
+  padding-right: var(--goblin-window-chrome-right);
 }
 
 /* Visible focus ring for keyboard users. Tailwind v4 preflight removes
@@ -227,9 +237,12 @@ button,
 
 .goblin-focus-reveal-panel[data-state='open'] {
   opacity: 1;
-  pointer-events: auto;
   transform: translateX(0);
   box-shadow: 8px 0 24px rgb(15 23 42 / 14%);
+}
+
+.goblin-focus-reveal-panel[data-state='open'][data-interactive='true'] {
+  pointer-events: auto;
 }
 
 html[data-theme='dark'] .goblin-focus-reveal-panel[data-state='open'] {
@@ -238,9 +251,12 @@ html[data-theme='dark'] .goblin-focus-reveal-panel[data-state='open'] {
 
 .goblin-focus-reveal-panel[data-state='opening'] {
   opacity: 0;
-  pointer-events: auto;
   transform: translateX(-14px);
   transition: none;
+}
+
+.goblin-focus-reveal-panel[data-state='opening'][data-interactive='true'] {
+  pointer-events: auto;
 }
 
 .goblin-focus-reveal-panel[data-state='closing'] {
