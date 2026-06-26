@@ -116,19 +116,16 @@ async function publishSnapshotInvalidationAfterMutation(
   return execResultOnly(result)
 }
 
-function publishRepoSnapshotInvalidations(
-  cwd: string,
-  affectedRepoIds: readonly string[],
-  sourceToken?: string,
-): void {
+function publishRepoSnapshotInvalidations(cwd: string, affectedRepoIds: readonly string[], sourceToken?: string): void {
   const uniqueRepoIds = Array.from(new Set([cwd, ...affectedRepoIds].filter((repoId) => repoId.length > 0)))
   for (const repoId of uniqueRepoIds) {
     publishRepoSnapshotInvalidation(repoId, repoId === cwd ? sourceToken : undefined)
   }
 }
 
-function execResultOnly(result: ExecResult): ExecResult {
-  return { ok: result.ok, message: result.message }
+function execResultOnly(result: RepoMutationResult): ExecResult {
+  const { affectedRepoIds: _affectedRepoIds, ...execResult } = result
+  return execResult
 }
 
 async function withMergedAbortSignal<T>(

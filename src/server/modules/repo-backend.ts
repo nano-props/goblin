@@ -25,6 +25,7 @@ import {
 import { getRemoteTrackingBranches as getLocalRemoteTrackingBranches } from '#/system/git/remote-refs.ts'
 import { getWorkingStatus } from '#/system/git/status.ts'
 import { createWorktree, getWorktrees, removeWorktree } from '#/system/git/worktrees.ts'
+import { bootstrapWorktreeAfterCreate } from '#/system/git/worktree-bootstrap.ts'
 import { getWorktreePatch } from '#/system/git/patch.ts'
 import {
   type ExecResult,
@@ -92,7 +93,7 @@ export interface RepoBackend {
   fetch(signal: AbortSignal): Promise<{ ok: boolean; message: string }>
   pull(branch: string, worktreePath?: string, signal?: AbortSignal): Promise<ExecResult>
   push(branch: string, signal?: AbortSignal): Promise<ExecResult>
-  createWorktree(input: CreateWorktreeInput, signal?: AbortSignal): Promise<ExecResult>
+  createWorktree(input: CreateWorktreeInput, signal?: AbortSignal): Promise<RepoMutationResult>
   deleteBranch(
     branch: string,
     options?: { force?: boolean; alsoDeleteUpstream?: boolean },
@@ -304,7 +305,17 @@ function createLocalRepoBackend(repoId: string): RepoBackend {
     },
     async createWorktree(input, signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
-      return await createWorktree(repoId, input, signal)
+      const created = await createWorktree(repoId, input, signal)
+      if (!created.ok) return created
+      const bootstrapped = await bootstrapWorktreeAfterCreate(repoId, input.worktreePath, { signal })
+      const result = bootstrapped.ok
+        ? {
+            ok: true,
+            message: [created.message, bootstrapped.message].filter(Boolean).join('\n'),
+            ...(bootstrapped.worktreeBootstrap ? { worktreeBootstrap: bootstrapped.worktreeBootstrap } : {}),
+          }
+        : { ...bootstrapped, repoChanged: true }
+      return withAffectedRepoIds(result, [input.worktreePath])
     },
     async deleteBranch(branch, options, signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }

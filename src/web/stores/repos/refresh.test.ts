@@ -323,6 +323,44 @@ describe('remote fetch timestamps', () => {
     expect(snapshotCount).toBe(0)
   })
 
+  test('create worktree partial failure refreshes when the repository already changed', async () => {
+    const token = seedRepo([branch('main')])
+    let snapshotCount = 0
+    ipcHandlers['repo.createWorktree'] = async () => ({
+      ok: false,
+      message: 'Worktree bootstrap failed: setup failed',
+      repoChanged: true,
+    })
+    ipcHandlers['repo.composite'] = async () => {
+      snapshotCount += 1
+      return {
+        snapshot: { branches: [branch('main'), branch('feature/a')], current: 'main' },
+        status: [],
+        pullRequests: null,
+      }
+    }
+
+    const result = await useReposStore.getState().runBranchAction(
+      REPO_ID,
+      {
+        kind: 'createWorktree',
+        input: {
+          worktreePath: '/tmp/worktrees/feature-a',
+          mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
+        },
+      },
+      { token, refreshOnError: false },
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      message: 'Worktree bootstrap failed: setup failed',
+      repoChanged: true,
+    })
+    expect(snapshotCount).toBe(1)
+    expect(useReposStore.getState().repos[REPO_ID]?.data.branches.map((b) => b.name)).toEqual(['main', 'feature/a'])
+  })
+
   test('deferred branch action results skip toast and refresh until caller confirms follow-up', async () => {
     const token = seedRepo([branch('feature/a')])
     let snapshotCount = 0

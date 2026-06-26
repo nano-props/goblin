@@ -29,6 +29,7 @@ const mocks = vi.hoisted(() => ({
   runServerCancellable: vi.fn(),
   setBackgroundSyncRepos: vi.fn(),
   publishRepoQueryInvalidation: vi.fn(),
+  bootstrapWorktreeAfterCreate: vi.fn(),
 }))
 
 vi.mock('#/system/git/branches.ts', () => ({
@@ -81,6 +82,10 @@ vi.mock('#/system/git/worktrees.ts', () => ({
   removeWorktree: mocks.removeWorktree,
 }))
 
+vi.mock('#/system/git/worktree-bootstrap.ts', () => ({
+  bootstrapWorktreeAfterCreate: mocks.bootstrapWorktreeAfterCreate,
+}))
+
 vi.mock('#/shared/input-validation.ts', () => ({
   isValidCwd: () => true,
   isValidRepoLocator: () => true,
@@ -130,6 +135,7 @@ beforeEach(() => {
   mocks.pullBranch.mockResolvedValue({ ok: true, message: 'ok' })
   mocks.pushBranch.mockResolvedValue({ ok: true, message: 'ok' })
   mocks.createWorktree.mockResolvedValue({ ok: true, message: 'ok' })
+  mocks.bootstrapWorktreeAfterCreate.mockResolvedValue({ ok: true, message: '' })
   mocks.deleteBranch.mockResolvedValue({ ok: true, message: 'ok' })
   mocks.deleteUpstreamBranch.mockResolvedValue({ ok: true, message: 'ok' })
   mocks.removeWorktree.mockResolvedValue({ ok: true, message: 'ok' })
@@ -409,6 +415,33 @@ describe('repo mutation invalidation publishing', () => {
     await run(repo)
 
     expect(mocks.publishRepoQueryInvalidation).not.toHaveBeenCalled()
+  })
+
+  test('createRepositoryWorktree publishes invalidation when bootstrap fails after git created the worktree', async () => {
+    mocks.bootstrapWorktreeAfterCreate.mockResolvedValueOnce({
+      ok: false,
+      message: 'Worktree bootstrap failed: destination already exists: .env.local',
+    })
+    const { createRepositoryWorktree } = await import('#/server/modules/repo-write-paths.ts')
+
+    const result = await createRepositoryWorktree('/tmp/repo', {
+      worktreePath: '/tmp/repo-worktree',
+      mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
+    })
+
+    expect(result).toEqual({
+      ok: false,
+      message: 'Worktree bootstrap failed: destination already exists: .env.local',
+      repoChanged: true,
+    })
+    expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledWith({
+      repoId: '/tmp/repo',
+      query: 'repo-snapshot',
+    })
+    expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledWith({
+      repoId: '/tmp/repo-worktree',
+      query: 'repo-snapshot',
+    })
   })
 
   test('createRepositoryWorktree rejects non-absolute paths before calling git', async () => {

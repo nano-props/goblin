@@ -177,6 +177,7 @@ function shouldSuppressBranchActionResultMessage(result: ExecResult, options?: R
 }
 
 function shouldSkipBranchActionRefresh(result: ExecResult, options?: RunBranchActionOptions): boolean {
+  if (!result.ok && result.repoChanged) return false
   if (shouldSuppressBranchActionResultMessage(result, options)) return true
   if (!result.ok && result.message === 'error.network-op-in-progress') return true
   if (!result.ok && result.message === BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE) return true
@@ -297,7 +298,7 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
           get().setLastResult(id, result, token, { action: branchActionEventAction(action) })
         }
         if (shouldSkipBranchActionRefresh(result, options)) return
-        if (result.ok || options?.refreshOnError !== false) {
+        if (result.ok || result.repoChanged || options?.refreshOnError !== false) {
           const repo = get().repos[id]
           if (repo?.instanceToken === token) {
             await runRepoRefreshIntent(get, { kind: 'core-data-changed', reason: 'branch-action', id, token })

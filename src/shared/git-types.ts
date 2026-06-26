@@ -3,6 +3,8 @@
 // main/client bundles independent — neither side has to import the
 // other's module graph just to know what a `BranchSnapshotInfo` looks like.
 
+import type { WorktreeBootstrapSummary } from '#/shared/worktree-bootstrap-summary.ts'
+
 export interface BranchSnapshotInfo {
   name: string
   isCurrent: boolean
@@ -130,6 +132,13 @@ export const GIT_HASH_RE = /^[0-9a-fA-F]{7,64}$/
 export interface ExecResult {
   ok: boolean
   message: string
+  /**
+   * True when an operation returned a failure after it had already changed
+   * repository state. Clients should refresh even if they usually skip
+   * refresh-on-error for the action.
+   */
+  repoChanged?: boolean
+  worktreeBootstrap?: WorktreeBootstrapSummary
 }
 
 /** Branch names we treat as protected — direct push/delete/etc. require
