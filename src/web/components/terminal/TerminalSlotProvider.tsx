@@ -37,8 +37,6 @@ export function TerminalSlotProvider({ children }: TerminalSlotProviderProps) {
   const selectedTerminalByWorktree = useReposStore((s) => s.selectedTerminalByWorktree)
   const setSelectedTerminal = useReposStore((s) => s.setSelectedTerminal)
   const parkingRootRef = useRef<HTMLDivElement | null>(null)
-  const currentRepoIdRef = useRef(currentRepoId)
-  currentRepoIdRef.current = currentRepoId
   const repoIndexRef = useRef(repoIndex)
   repoIndexRef.current = repoIndex
 
@@ -72,7 +70,6 @@ export function TerminalSlotProvider({ children }: TerminalSlotProviderProps) {
   const registryRef = useRef<TerminalSlotRegistry | null>(null)
   if (!registryRef.current) {
     registryRef.current = getTerminalSlotRegistry({
-      getCurrentRepoId: () => currentRepoIdRef.current,
       onSelectedWorktreeChange: setSelectedTerminal,
       // Terminal-session lifetime owns terminal tab lifetime. User closes,
       // server exits, and reconcile removals all converge through this hook.
@@ -232,13 +229,14 @@ export function TerminalSlotProvider({ children }: TerminalSlotProviderProps) {
   // Server sync (initial + focus + external session changes)
   useEffect(() => {
     if (!currentRepoId) return
-    void syncServerSlots(currentRepoId)
+    const repoRoot = currentRepoId
+    void syncServerSlots(repoRoot)
 
     const handleFocus = () => {
-      if (!currentRepoIdRef.current) return
-      const repoRoot = currentRepoIdRef.current
-      if (!useRepoSyncStore.getState().shouldSync(repoRoot)) return
-      void syncServerSlots(repoRoot)
+      const focusedRepoRoot = useReposStore.getState().activeId
+      if (!focusedRepoRoot) return
+      if (!useRepoSyncStore.getState().shouldSync(focusedRepoRoot)) return
+      void syncServerSlots(focusedRepoRoot)
     }
     window.addEventListener('focus', handleFocus)
 
