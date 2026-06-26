@@ -1,4 +1,8 @@
 import path from 'node:path'
+import {
+  parseBootstrapConfig,
+  type WorktreeBootstrapConfig,
+} from '#/system/git/worktree-bootstrap.ts'
 import { parseBranches, parseLog, parseStatus, parseWorktrees } from '#/system/git/parsers.ts'
 import { markDefaultBranch, prioritizeDefaultBranch } from '#/system/git/branches.ts'
 import {
@@ -285,6 +289,86 @@ export async function createRemoteWorktree(
     { signal: input.signal, timeoutMs: REMOTE_BRANCH_OP_TIMEOUT_MS },
   )
   return remoteExecResult(result)
+}
+
+const REMOTE_BOOTSTRAP_TIMEOUT_MS = 10 * 60_000
+
+export async function bootstrapRemoteWorktreeAfterCreate(
+  target: RemoteRepoTarget,
+  worktreePath: string,
+  options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
+): Promise<ExecResult> {
+  const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
+
+  const readResult = await run(
+    { type: 'readRemoteFile', path: path.join(target.remotePath, 'goblin.toml') },
+    target,
+    { signal: options.signal, timeoutMs: REMOTE_BRANCH_OP_TIMEOUT_MS },
+  )
+  if (readResult.message === 'cancelled') return { ok: false, message: 'cancelled' }
+  if (!readResult.ok) return { ok: false, message: `Worktree bootstrap failed: ${readResult.message}` }
+
+  const raw = readResult.stdout
+  if (!raw.trim()) return { ok: true, message: '' }
+
+  const loaded = parseBootstrapConfig(raw)
+  if (loaded.kind === 'error') return { ok: false, message: `Worktree bootstrap failed: ${loaded.message}` }
+  if (loaded.kind === 'none') return { ok: true, message: '' }
+
+  const bootstrapResult = await run(
+    {
+      type: 'bootstrapRemoteWorktree',
+      sourceRoot: target.remotePath,
+      targetRoot: worktreePath,
+      copy: loaded.config.copy,
+      symlink: loaded.config.symlink,
+      hardlink: loaded.config.hardlink,
+      exclude: loaded.config.exclude,
+      setup: loaded.config.setup,
+    },
+    target,
+    { signal: options.signal, timeoutMs: REMOTE_BOOTSTRAP_TIMEOUT_MS },
+  )
+  if (bootstrapResult.message === 'cancelled') return { ok: false, message: 'cancelled' }
+  if (!bootstrapResult.ok) return { ok: false, message: `Worktree bootstrap failed: ${bootstrapResult.message}` }
+
+  return { ok: true, message: formatRemoteBootstrapOutput(bootstrapResult.stdout) }
+}
+
+function formatRemoteBootstrapOutput(stdout: string): string {
+  const copy: string[] = []
+  const symlink: string[] = []
+  const hardlink: string[] = []
+  const missing: string[] = []
+  let setup: string | undefined
+  for (const line of stdout.split('\n')) {
+    const [marker, ...rest] = line.split(' ')
+    const value = rest.join(' ')
+    switch (marker) {
+      case 'GOBLIN_BOOTSTRAP_COPY':
+        copy.push(value)
+        break
+      case 'GOBLIN_BOOTSTRAP_SYMLINK':
+        symlink.push(value)
+        break
+      case 'GOBLIN_BOOTSTRAP_HARDLINK':
+        hardlink.push(value)
+        break
+      case 'GOBLIN_BOOTSTRAP_MISSING':
+        missing.push(value)
+        break
+      case 'GOBLIN_BOOTSTRAP_SETUP':
+        setup = value
+        break
+    }
+  }
+  const parts: string[] = []
+  if (copy.length > 0) parts.push(`Copied ${copy.length} path${copy.length === 1 ? '' : 's'}`)
+  if (symlink.length > 0) parts.push(`Symlinked ${symlink.length} path${symlink.length === 1 ? '' : 's'}`)
+  if (hardlink.length > 0) parts.push(`Hardlinked ${hardlink.length} path${hardlink.length === 1 ? '' : 's'}`)
+  if (missing.length > 0) parts.push(`Skipped missing ${missing.length} path${missing.length === 1 ? '' : 's'}`)
+  if (setup) parts.push(`Ran setup: ${setup}`)
+  return parts.join('\n')
 }
 
 export async function getRemoteTrackingBranches(

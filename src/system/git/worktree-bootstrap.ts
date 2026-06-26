@@ -14,7 +14,7 @@ import {
 
 type MaterializationMode = 'copy' | 'symlink' | 'hardlink'
 
-interface WorktreeBootstrapConfig {
+export interface WorktreeBootstrapConfig {
   copy: string[]
   symlink: string[]
   hardlink: string[]
@@ -89,7 +89,12 @@ async function loadBootstrapConfig(
     if (isErrno(err, 'ENOENT')) return { kind: 'none' }
     return { kind: 'error', message: `failed to read ${CONFIG_FILE}: ${errorMessage(err)}` }
   }
+  return parseBootstrapConfig(raw)
+}
 
+export function parseBootstrapConfig(
+  raw: string,
+): { kind: 'none' } | { kind: 'ready'; config: WorktreeBootstrapConfig } | { kind: 'error'; message: string } {
   let parsed: unknown
   try {
     parsed = parse(raw)

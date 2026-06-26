@@ -43,6 +43,7 @@ import { resolveRemoteTarget as resolveSshRemoteTarget } from '#/system/ssh/conf
 import { testRemoteRepository } from '#/system/ssh/diagnostics.ts'
 import { SSH_BOOT_PROBE_TIMEOUT_MS } from '#/system/ssh/commands.ts'
 import {
+  bootstrapRemoteWorktreeAfterCreate,
   createRemoteWorktree,
   deleteRemoteBranch,
   fetchRemoteRepository,
@@ -422,7 +423,14 @@ async function createRemoteRepoBackend(repoId: string): Promise<RepoBackend> {
       return await pushRemoteBranch(target, branch, { signal })
     },
     async createWorktree(input, signal) {
-      return await createRemoteWorktree(target, { ...input, signal })
+      const created = await createRemoteWorktree(target, { ...input, signal })
+      if (!created.ok) return created
+      const bootstrapped = await bootstrapRemoteWorktreeAfterCreate(target, input.worktreePath, { signal })
+      if (!bootstrapped.ok) return { ...bootstrapped, repoChanged: true }
+      return {
+        ok: true,
+        message: [created.message, bootstrapped.message].filter(Boolean).join('\n'),
+      }
     },
     async deleteBranch(branch, options, signal) {
       return await deleteRemoteBranch(target, { branch, force: options?.force, signal })

@@ -75,6 +75,17 @@ export type RemoteCommandKind =
   | { type: 'gitIsAncestor'; path: string; ancestor: string; descendant: string }
   | { type: 'gitRemoteVerbose'; path: string }
   | { type: 'gitRemoteGetUrl'; path: string }
+  | { type: 'readRemoteFile'; path: string }
+  | {
+      type: 'bootstrapRemoteWorktree'
+      sourceRoot: string
+      targetRoot: string
+      copy: string[]
+      symlink: string[]
+      hardlink: string[]
+      exclude: string[]
+      setup?: string
+    }
 
 export interface RemoteCommandResult {
   ok: boolean
@@ -181,9 +192,9 @@ export async function runRemoteCommand(
 function scriptForCommand(command: RemoteCommandKind): string {
   switch (command.type) {
     case 'printHome':
-      return `printf '%s\\n' "$HOME"`
+      return `printf '%s\n' "$HOME"`
     case 'checkShell':
-      return `printf '%s\\n' ok`
+      return `printf '%s\n' ok`
     case 'checkGit':
       return 'command -v git'
     case 'testDirectory':
@@ -208,11 +219,11 @@ function scriptForCommand(command: RemoteCommandKind): string {
         '%(upstream:track)',
       ].join(FIELD_SEP)
       return [
-        `printf '%s\\n' ${shellQuote(REMOTE_SNAPSHOT_CURRENT_MARKER)}`,
+        `printf '%s\n' ${shellQuote(REMOTE_SNAPSHOT_CURRENT_MARKER)}`,
         `git -C ${repo} symbolic-ref --short HEAD 2>/dev/null || true`,
-        `printf '%s\\n' ${shellQuote(REMOTE_SNAPSHOT_DEFAULT_MARKER)}`,
+        `printf '%s\n' ${shellQuote(REMOTE_SNAPSHOT_DEFAULT_MARKER)}`,
         `git -C ${repo} symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##'`,
-        `printf '%s\\n' ${shellQuote(REMOTE_SNAPSHOT_BRANCHES_MARKER)}`,
+        `printf '%s\n' ${shellQuote(REMOTE_SNAPSHOT_BRANCHES_MARKER)}`,
         `git -C ${repo} for-each-ref --format=${shellQuote(branchFormat)} refs/heads/`,
       ].join('\n')
     }
@@ -282,6 +293,10 @@ function scriptForCommand(command: RemoteCommandKind): string {
       return `git -C ${shellQuote(command.path)} remote get-url origin`
     case 'gitRemoteVerbose':
       return `git -C ${shellQuote(command.path)} remote -v`
+    case 'readRemoteFile':
+      return `cat ${shellQuote(command.path)} 2>/dev/null || true`
+    case 'bootstrapRemoteWorktree':
+      return remoteBootstrapScript(command)
   }
   const exhaustive: never = command
   return exhaustive
@@ -311,6 +326,140 @@ function remoteWorktreeAddArgs(input: CreateWorktreeInput): string {
   }
   const exhaustive: never = input.mode
   return exhaustive
+}
+
+function remoteBootstrapScript(command: Extract<RemoteCommandKind, { type: 'bootstrapRemoteWorktree' }>): string {
+  const inner = remoteBootstrapInnerScript(command)
+  const quoted = shellQuote(inner)
+  return [
+    'command -v bash >/dev/null 2>&1 || { printf "%s\\n" "error: bash is required for worktree bootstrap" >&2; exit 1; }',
+    `exec bash -c ${quoted}`,
+  ].join('\n')
+}
+
+function remoteBootstrapInnerScript(
+  command: Extract<RemoteCommandKind, { type: 'bootstrapRemoteWorktree' }>,
+): string {
+  const quote = shellQuote
+  const copy = command.copy.map(quote).join(' ')
+  const symlink = command.symlink.map(quote).join(' ')
+  const hardlink = command.hardlink.map(quote).join(' ')
+  const exclude = command.exclude.map(quote).join(' ')
+  const setup = command.setup ? quote(command.setup) : "''"
+  const sourceRoot = quote(command.sourceRoot)
+  const targetRoot = quote(command.targetRoot)
+
+  const lines: string[] = [
+    'set -o pipefail',
+    'shopt -s nullglob dotglob',
+    'shopt -s globstar 2>/dev/null || true',
+    "GLOBIGNORE='.git:.git/**'",
+    '',
+    'SOURCE_ROOT=' + sourceRoot,
+    'TARGET_ROOT=' + targetRoot,
+    '',
+    'COPY_PATTERNS=(' + copy + ')',
+    'SYMLINK_PATTERNS=(' + symlink + ')',
+    'HARDLINK_PATTERNS=(' + hardlink + ')',
+    'EXCLUDE_PATTERNS=(' + exclude + ')',
+    'SETUP=' + setup,
+    '',
+    'has_git_segment() {',
+    '  case "/$1/" in */.git/*|*/.git) return 0;; esac',
+    '  return 1',
+    '}',
+    '',
+    'is_excluded() {',
+    '  local rel="$1"',
+    '  local ex',
+    '  for ex in "${EXCLUDED_PATHS[@]}"; do',
+    '    if [ "$rel" = "$ex" ] || [[ "$rel" = "$ex/"* ]]; then return 0; fi',
+    '  done',
+    '  return 1',
+    '}',
+    '',
+    'copy_item() {',
+    '  local rel="$1" src="$SOURCE_ROOT/$1" dst="$TARGET_ROOT/$1"',
+    '  if is_excluded "$rel"; then return; fi',
+    '  if has_git_segment "$rel"; then return; fi',
+    "  if [ ! -e \"$src\" ]; then printf 'GOBLIN_BOOTSTRAP_MISSING %s\\\\n' \"$rel\"; return; fi",
+    "  if [ -e \"$dst\" ]; then printf 'error: destination already exists: %s\\\\n' \"$rel\" >&2; exit 1; fi",
+    '  mkdir -p "$(dirname "$dst")"',
+    '  cp -R -P -- "$src" "$dst"',
+    "  printf 'GOBLIN_BOOTSTRAP_COPY %s\\\\n' \"$rel\"",
+    '}',
+    '',
+    'symlink_item() {',
+    '  local rel="$1" src="$SOURCE_ROOT/$1" dst="$TARGET_ROOT/$1"',
+    '  if is_excluded "$rel"; then return; fi',
+    '  if has_git_segment "$rel"; then return; fi',
+    "  if [ ! -e \"$src\" ]; then printf 'GOBLIN_BOOTSTRAP_MISSING %s\\\\n' \"$rel\"; return; fi",
+    "  if [ -e \"$dst\" ]; then printf 'error: destination already exists: %s\\\\n' \"$rel\" >&2; exit 1; fi",
+    '  mkdir -p "$(dirname "$dst")"',
+    '  ln -s -- "$src" "$dst"',
+    "  printf 'GOBLIN_BOOTSTRAP_SYMLINK %s\\\\n' \"$rel\"",
+    '}',
+    '',
+    'hardlink_item() {',
+    '  local rel="$1" src="$SOURCE_ROOT/$1" dst="$TARGET_ROOT/$1"',
+    '  if is_excluded "$rel"; then return; fi',
+    '  if has_git_segment "$rel"; then return; fi',
+    "  if [ ! -e \"$src\" ]; then printf 'GOBLIN_BOOTSTRAP_MISSING %s\\\\n' \"$rel\"; return; fi",
+    "  if [ ! -f \"$src\" ]; then printf 'error: hardlink source is not a file: %s\\\\n' \"$rel\" >&2; exit 1; fi",
+    "  if [ -e \"$dst\" ]; then printf 'error: destination already exists: %s\\\\n' \"$rel\" >&2; exit 1; fi",
+    '  mkdir -p "$(dirname "$dst")"',
+    '  ln -- "$src" "$dst"',
+    "  printf 'GOBLIN_BOOTSTRAP_HARDLINK %s\\\\n' \"$rel\"",
+    '}',
+    '',
+    'EXCLUDED_PATHS=()',
+    'for pattern in "${EXCLUDE_PATTERNS[@]}"; do',
+    '  [ -z "$pattern" ] && continue',
+    '  matches=($SOURCE_ROOT/$pattern)',
+    '  for match in "${matches[@]}"; do',
+    '    [ -e "$match" ] || continue',
+    '    rel="${match#$SOURCE_ROOT/}"',
+    '    if has_git_segment "$rel"; then continue; fi',
+    '    EXCLUDED_PATHS+=("$rel")',
+    '  done',
+    'done',
+    '',
+    'process_patterns() {',
+    '  local mode="$1"',
+    '  shift',
+    '  local patterns=("$@")',
+    '  local pattern match rel is_dynamic matches',
+    '  for pattern in "${patterns[@]}"; do',
+    '    [ -z "$pattern" ] && continue',
+    '    case "$pattern" in *[*\\?\\[\\{]*) is_dynamic=1 ;; *) is_dynamic=0 ;; esac',
+    '    matches=($SOURCE_ROOT/$pattern)',
+    '    for match in "${matches[@]}"; do',
+    '      if [ "$is_dynamic" -eq 0 ] && [ ! -e "$match" ]; then',
+    '        rel="${match#$SOURCE_ROOT/}"',
+    "        printf 'GOBLIN_BOOTSTRAP_MISSING %s\\\\n' \"$rel\"",
+    '        continue',
+    '      fi',
+    '      [ -e "$match" ] || continue',
+    '      rel="${match#$SOURCE_ROOT/}"',
+    '      if has_git_segment "$rel"; then continue; fi',
+    '      "${mode}_item" "$rel"',
+    '    done',
+    '  done',
+    '}',
+    '',
+    'process_patterns copy "${COPY_PATTERNS[@]}"',
+    'process_patterns symlink "${SYMLINK_PATTERNS[@]}"',
+    'process_patterns hardlink "${HARDLINK_PATTERNS[@]}"',
+    '',
+    'if [ -n "$SETUP" ]; then',
+    '  if ! (cd "$TARGET_ROOT" && "${SHELL:-/bin/sh}" -ilc "$SETUP"); then',
+    "    printf 'error: setup failed: %s\\\\n' \"$SETUP\" >&2",
+    '    exit 1',
+    '  fi',
+    "  printf 'GOBLIN_BOOTSTRAP_SETUP %s\\\\n' \"$SETUP\"",
+    'fi',
+  ]
+  return lines.join('\n')
 }
 
 function findExecutableOnPath(name: string): string | null {
