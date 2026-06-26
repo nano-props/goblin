@@ -206,7 +206,7 @@ describe('useKeyboard', () => {
     expect(toast.error).not.toHaveBeenCalled()
   })
 
-  test('primary modifier plus n shows a busy toast when there is no active repo', async () => {
+  test('primary modifier plus n no-ops when there is no active repo', async () => {
     Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
     const openCreateWorktree = vi.fn()
     await renderHookHost({ currentRepoId: null, openCreateWorktree })
@@ -217,7 +217,7 @@ describe('useKeyboard', () => {
     })
 
     expect(openCreateWorktree).not.toHaveBeenCalled()
-    expect(toast.error).toHaveBeenCalledWith('action.create-worktree-busy')
+    expect(toast.error).not.toHaveBeenCalled()
   })
 
   test('primary modifier plus n does not open create worktree while workspace shortcuts are suppressed', async () => {

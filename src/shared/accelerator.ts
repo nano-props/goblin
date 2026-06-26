@@ -13,6 +13,8 @@ const RESERVED_GLOBAL_SHORTCUTS = new Set<string>([
   'Control+Shift+R',
   'Command+N',
   'Control+N',
+  'Command+T',
+  'Control+T',
   'Command+1',
   'Control+1',
   'Command+2',

@@ -158,7 +158,8 @@ export function useKeyboard({
         if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyN') {
           e.preventDefault()
           const repo = repoId ? useReposStore.getState().repos[repoId] : null
-          if (repo && repo.operations.branchAction.phase === 'idle') {
+          if (!repo) return
+          if (repo.operations.branchAction.phase === 'idle') {
             openCreateWorktreeRef.current()
           } else {
             toast.error(translate('action.create-worktree-busy'))
