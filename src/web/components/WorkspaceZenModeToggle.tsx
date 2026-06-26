@@ -4,13 +4,13 @@ import { Button } from '#/web/components/ui/button.tsx'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 
-type WorkspaceFocusToggleProps = Omit<
+type WorkspaceZenModeToggleProps = Omit<
   ComponentPropsWithoutRef<typeof Button>,
   'aria-label' | 'aria-pressed' | 'children' | 'onClick' | 'size' | 'title' | 'type' | 'variant'
 >
 
-export const WorkspaceFocusToggle = forwardRef<HTMLButtonElement, WorkspaceFocusToggleProps>(
-  function WorkspaceFocusToggle({ className, ...props }, ref) {
+export const WorkspaceZenModeToggle = forwardRef<HTMLButtonElement, WorkspaceZenModeToggleProps>(
+  function WorkspaceZenModeToggle({ className, ...props }, ref) {
     const t = useT()
     const zenMode = useReposStore((s) => s.zenMode)
     const toggleZenMode = useReposStore((s) => s.toggleZenMode)

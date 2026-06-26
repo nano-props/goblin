@@ -185,7 +185,7 @@ function ZenModeSidebarRevealTrigger({
 }: ZenModeSidebarRevealTriggerProps) {
   return (
     <WindowChromeInteractiveRegion asChild>
-      <WorkspaceFocusToggle
+      <WorkspaceZenModeToggle
         data-zen-reveal-surface={revealEnabled ? '' : undefined}
         data-testid="zen-mode-sidebar-trigger"
         className="pointer-events-auto"

@@ -19,7 +19,7 @@ vi.mock('#/web/components/repo-shell/RepoWorkspaceShell.tsx', () => ({
     <div
       data-testid="repo-workspace-shell"
       data-compact={String(props.compact)}
-      data-workspace-focused={String(props.zenMode)}
+      data-zen-mode={String(props.zenMode)}
       data-branch-workspace-active={String(props.branchWorkspaceActive)}
       data-focus-toggle-enabled={String(props.focusToggleEnabled)}
       data-single-pane-active-pane={props.singlePaneActivePane}
