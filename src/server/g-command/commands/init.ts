@@ -5,16 +5,15 @@ import type { GoblinCommand, GoblinCommandContext } from '#/server/g-command/con
 const CONFIG_FILE = 'goblin.toml'
 
 const INITIAL_CONFIG = `# Configure worktree bootstrap for this repo.
-# Add [worktree] with copy, symlink, hardlink, exclude, and setup when needed.
+# Uncomment entries under [worktree] as needed.
 # Paths are repo-relative.
-#
-# Example:
-#   [worktree]
-#   copy = [".env.local"]
-#   symlink = ["config/*.json"]
-#   hardlink = ["build/cache.db"]
-#   exclude = ["*.log", "*.tmp"]
-#   setup = "bun install"
+
+[worktree]
+# copy = [".env.local"]
+# symlink = ["config/*.json"]
+# hardlink = ["build/cache.db"]
+# exclude = ["*.log", "*.tmp"]
+# setup = "bun install"
 `
 
 export const INIT_COMMAND: GoblinCommand = {
