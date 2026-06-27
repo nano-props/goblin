@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { createHttpClipboardBackend } from '#/web/clipboard/http-backend.ts'
+import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
 describe('createHttpClipboardBackend', () => {
   beforeEach(() => {
@@ -7,19 +8,17 @@ describe('createHttpClipboardBackend', () => {
   })
 
   test('returns [] without fetching when no files are given', async () => {
-    const fetchMock = vi.fn()
-    vi.stubGlobal('fetch', fetchMock)
+    const fetchMock = mockFetch()
     const backend = createHttpClipboardBackend({ url: 'http://server/', accessToken: 'sec' })
     expect(await backend.saveClipboardFiles([])).toEqual([])
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
   test('posts multipart to /api/clipboard/files with the secret header', async () => {
-    const fetchMock = vi.fn(async (_url: string | URL, _init?: RequestInit) => ({
+    const fetchMock = mockFetch(async (_url: RequestInfo | URL, _init?: RequestInit) => ({
       ok: true,
       json: async () => ({ paths: ['/tmp/a.png', '/tmp/b.png'] }),
     }))
-    vi.stubGlobal('fetch', fetchMock)
     const backend = createHttpClipboardBackend({ url: 'http://server/', accessToken: 'sec-123' })
     const a = new File([new Uint8Array([1])], 'a.png')
     const b = new File([new Uint8Array([2])], 'b.png')
@@ -41,11 +40,10 @@ describe('createHttpClipboardBackend', () => {
   })
 
   test('falls back to "clipboard.bin" when file.name is empty', async () => {
-    const fetchMock = vi.fn(async (_url: string | URL, _init?: RequestInit) => ({
+    const fetchMock = mockFetch(async (_url: RequestInfo | URL, _init?: RequestInit) => ({
       ok: true,
       json: async () => ({ paths: ['/x'] }),
     }))
-    vi.stubGlobal('fetch', fetchMock)
     const backend = createHttpClipboardBackend({ url: 'http://server/', accessToken: 'sec' })
     const blob = new File([new Uint8Array([1])], '')
     await backend.saveClipboardFiles([blob])

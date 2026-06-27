@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
 // Regression test for the create-worktree dialog host. The original
 // implementation mounted inside the per-repo action subtree and
@@ -127,7 +128,7 @@ describe('CreateWorktreeDialogHost', () => {
     const configHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
     primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
     const submitBranchAction = vi.spyOn(useReposStore.getState(), 'submitBranchAction').mockImplementation(() => {})
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const fetchMock = mockFetch(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = new URL(String(input))
       const body = JSON.parse(String(init?.body ?? '{}')) as { cwd?: string }
       if (url.pathname === '/api/repo/worktree-bootstrap-preview') {
@@ -154,7 +155,6 @@ describe('CreateWorktreeDialogHost', () => {
         headers: { 'content-type': 'application/json' },
       })
     })
-    vi.stubGlobal('fetch', fetchMock)
 
     renderHost(true, vi.fn())
     await flushReact()
@@ -187,7 +187,7 @@ describe('CreateWorktreeDialogHost', () => {
     const configHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
     primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
     const submitBranchAction = vi.spyOn(useReposStore.getState(), 'submitBranchAction').mockImplementation(() => {})
-    const fetchMock = vi.fn(async () => {
+    const fetchMock = mockFetch(async () => {
       return new Response(
         JSON.stringify({
           ok: true,
@@ -204,7 +204,6 @@ describe('CreateWorktreeDialogHost', () => {
         { status: 200, headers: { 'content-type': 'application/json' } },
       )
     })
-    vi.stubGlobal('fetch', fetchMock)
 
     renderHost(true, vi.fn())
     await flushReact()
@@ -229,7 +228,7 @@ describe('CreateWorktreeDialogHost', () => {
 
   test('runs goblin.toml bootstrap once by default for untrusted configs', async () => {
     const submitBranchAction = vi.spyOn(useReposStore.getState(), 'submitBranchAction').mockImplementation(() => {})
-    const fetchMock = vi.fn(async () => {
+    const fetchMock = mockFetch(async () => {
       return new Response(
         JSON.stringify({
           ok: true,
@@ -246,7 +245,6 @@ describe('CreateWorktreeDialogHost', () => {
         { status: 200, headers: { 'content-type': 'application/json' } },
       )
     })
-    vi.stubGlobal('fetch', fetchMock)
 
     renderHost(true, vi.fn())
     await flushReact()
@@ -285,7 +283,7 @@ describe('CreateWorktreeDialogHost', () => {
       }),
     )
     const submitBranchAction = vi.spyOn(useReposStore.getState(), 'submitBranchAction').mockImplementation(() => {})
-    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+    const fetchMock = mockFetch(async (_input: RequestInfo | URL, init?: RequestInit) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as { cwd?: string }
       expect(body.cwd).toBe(REPO_ID)
       return new Response(
@@ -304,7 +302,6 @@ describe('CreateWorktreeDialogHost', () => {
         { status: 200, headers: { 'content-type': 'application/json' } },
       )
     })
-    vi.stubGlobal('fetch', fetchMock)
 
     renderHost(true, vi.fn())
     await flushReact()
@@ -430,7 +427,7 @@ describe('CreateWorktreeDialogHost', () => {
     const firstPreview = deferred<Response>()
     const secondPreview = deferred<Response>()
     const previewResponses = [firstPreview, secondPreview]
-    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+    const fetchMock = mockFetch((input: RequestInfo | URL) => {
       const url = new URL(String(input))
       if (url.pathname !== '/api/repo/worktree-bootstrap-preview') {
         throw new Error(`unexpected request ${url.pathname}`)
@@ -439,7 +436,6 @@ describe('CreateWorktreeDialogHost', () => {
       if (!next) throw new Error('unexpected preview request')
       return next.promise
     })
-    vi.stubGlobal('fetch', fetchMock)
 
     renderHost(true, vi.fn())
     await flushReact()

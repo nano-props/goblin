@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
 import { act } from 'react'
 import type { ReactNode } from 'react'
@@ -15,7 +16,7 @@ let root: Root | null = null
 let ipcCalls: Array<{ path: string; input?: unknown }> = []
 const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 const testWindow = window as unknown as { goblinNative?: unknown; __GOBLIN_BOOTSTRAP__?: unknown }
-const fetchMock = vi.fn(async () => ({
+const fetchMock = mockFetch(async () => ({
   ok: true,
   json: async () => true,
 }))
@@ -25,7 +26,6 @@ beforeEach(() => {
   ipcCalls = []
   setClientBridgeForTests(null)
   fetchMock.mockClear()
-  vi.stubGlobal('fetch', fetchMock)
   testWindow.__GOBLIN_BOOTSTRAP__ = {
     runtime: {
       kind: 'electron',

@@ -3,6 +3,7 @@ import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import type { ClientBridge } from '#/web/client-bridge-types.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
+import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
 function webBootstrap(overrides: Partial<ClientBootstrapSnapshot> = {}): ClientBootstrapSnapshot {
   return {
@@ -101,7 +102,7 @@ describe('settings-client', () => {
 
   test('returns authoritative theme state directly from the settings write response', async () => {
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
-    const fetchMock = vi.fn(async () => ({
+    const fetchMock = mockFetch(async () => ({
       ok: true,
       json: async () => ({
         ok: true,
@@ -118,8 +119,6 @@ describe('settings-client', () => {
         },
       }),
     }))
-    vi.stubGlobal('fetch', fetchMock)
-
     const { setThemePref } = await import('#/web/settings-client.ts')
     await expect(setThemePref('dark')).resolves.toEqual({ pref: 'dark', resolved: 'dark', colorTheme: 'github' })
     expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -127,12 +126,10 @@ describe('settings-client', () => {
 
   test('fetches i18n payload from embedded server when no Electron bridge exists', async () => {
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
-    const fetchMock = vi.fn(async () => ({
+    const fetchMock = mockFetch(async () => ({
       ok: true,
       json: async () => ({ lang: 'ko', pref: 'auto', dict: { hello: '안녕' } }),
     }))
-    vi.stubGlobal('fetch', fetchMock)
-
     const { getI18nSnapshot } = await import('#/web/settings-client.ts')
     await expect(getI18nSnapshot()).resolves.toEqual({ lang: 'ko', pref: 'auto', dict: { hello: '안녕' } })
     expect(fetchMock).toHaveBeenCalledWith(
@@ -145,11 +142,10 @@ describe('settings-client', () => {
 
   test('passes abort signal through when fetching i18n payload', async () => {
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
-    const fetchMock = vi.fn(async () => ({
+    const fetchMock = mockFetch(async () => ({
       ok: true,
       json: async () => ({ lang: 'en', pref: 'auto', dict: { hello: 'hello' } }),
     }))
-    vi.stubGlobal('fetch', fetchMock)
     const controller = new AbortController()
 
     const { getI18nSnapshot } = await import('#/web/settings-client.ts')
@@ -193,9 +189,7 @@ describe('settings-client', () => {
         matchMedia: vi.fn(() => ({ matches: true })),
       },
     })
-    const fetchMock = vi.fn()
-    vi.stubGlobal('fetch', fetchMock)
-
+    const fetchMock = mockFetch()
     const { setGlobalShortcut } = await import('#/web/settings-client.ts')
     await expect(setGlobalShortcut('CommandOrControl+Shift+K')).resolves.toEqual({
       accelerator: 'CommandOrControl+Shift+K',
@@ -237,7 +231,7 @@ describe('settings-client', () => {
         matchMedia: vi.fn(() => ({ matches: true })),
       },
     })
-    const fetchMock = vi.fn().mockResolvedValueOnce({
+    const fetchMock = mockFetch().mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         ok: true,
@@ -255,8 +249,6 @@ describe('settings-client', () => {
         i18n: { lang: 'ja', pref: 'ja', dict: { hello: 'こんにちは' } },
       }),
     })
-    vi.stubGlobal('fetch', fetchMock)
-
     const { setI18nPref } = await import('#/web/settings-client.ts')
     await expect(setI18nPref('ja')).resolves.toEqual({ lang: 'ja', pref: 'ja', dict: { hello: 'こんにちは' } })
     expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -307,7 +299,7 @@ describe('settings-client', () => {
         matchMedia: vi.fn(() => ({ matches: true })),
       },
     })
-    const fetchMock = vi.fn(async () => ({
+    const fetchMock = mockFetch(async () => ({
       ok: true,
       json: async () => ({
         ok: true,
@@ -315,8 +307,6 @@ describe('settings-client', () => {
         addedRepo: { kind: 'local', id: '/tmp/repo' },
       }),
     }))
-    vi.stubGlobal('fetch', fetchMock)
-
     const { addRecentRepo } = await import('#/web/settings-client.ts')
     await expect(addRecentRepo({ kind: 'local', id: '/tmp/../tmp/repo' })).resolves.toMatchObject({
       recentRepos: [{ kind: 'local', id: '/tmp/repo' }],
@@ -370,12 +360,10 @@ describe('settings-client', () => {
         matchMedia: vi.fn(() => ({ matches: true })),
       },
     })
-    const fetchMock = vi.fn(async () => ({
+    const fetchMock = mockFetch(async () => ({
       ok: true,
       json: async () => ({ ok: true }),
     }))
-    vi.stubGlobal('fetch', fetchMock)
-
     const { clearRecentRepos } = await import('#/web/settings-client.ts')
     await expect(clearRecentRepos()).resolves.toBeUndefined()
     expect(fetchMock).toHaveBeenCalledWith(
@@ -421,7 +409,7 @@ describe('settings-client', () => {
         matchMedia: vi.fn(() => ({ matches: true })),
       },
     })
-    const fetchMock = vi.fn(async () => ({
+    const fetchMock = mockFetch(async () => ({
       ok: true,
       json: async () => ({
         ok: true,
@@ -429,8 +417,6 @@ describe('settings-client', () => {
         addedRepo: null,
       }),
     }))
-    vi.stubGlobal('fetch', fetchMock)
-
     const { addRecentRepo } = await import('#/web/settings-client.ts')
     await expect(
       addRecentRepo({ kind: 'local', id: '/bad\0repo' } as unknown as { kind: 'local'; id: string }),
@@ -485,7 +471,7 @@ describe('settings-client', () => {
         matchMedia: vi.fn(() => ({ matches: true })),
       },
     })
-    const fetchMock = vi.fn(async () => ({
+    const fetchMock = mockFetch(async () => ({
       ok: true,
       json: async () => ({
         ok: true,
@@ -497,8 +483,6 @@ describe('settings-client', () => {
         },
       }),
     }))
-    vi.stubGlobal('fetch', fetchMock)
-
     const { setThemePref } = await import('#/web/settings-client.ts')
     await expect(setThemePref('dark')).resolves.toMatchObject({ pref: 'dark' })
     expect(invokeIpc).toHaveBeenCalledTimes(1)
@@ -534,7 +518,7 @@ describe('settings-client', () => {
         matchMedia: vi.fn(() => ({ matches: true })),
       },
     })
-    const fetchMock = vi.fn(async () => ({
+    const fetchMock = mockFetch(async () => ({
       ok: true,
       json: async () => ({
         ok: true,
@@ -542,8 +526,6 @@ describe('settings-client', () => {
         addedRepo: { kind: 'local', id: '/persisted' },
       }),
     }))
-    vi.stubGlobal('fetch', fetchMock)
-
     const { addRecentRepo } = await import('#/web/settings-client.ts')
     await expect(addRecentRepo({ kind: 'local', id: '/persisted' })).resolves.toMatchObject({
       recentRepos: [{ kind: 'local', id: '/persisted' }],
@@ -580,9 +562,7 @@ describe('settings-client', () => {
         matchMedia: vi.fn(() => ({ matches: true })),
       },
     })
-    const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({ ok: true }) }))
-    vi.stubGlobal('fetch', fetchMock)
-
+    const fetchMock = mockFetch(async () => ({ ok: true, json: async () => ({ ok: true }) }))
     const { clearRecentRepos } = await import('#/web/settings-client.ts')
     await expect(clearRecentRepos()).resolves.toBeUndefined()
     expect(fetchMock).toHaveBeenCalledTimes(1)

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
 import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
+import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
 class FakeWebSocket {
   static instances: FakeWebSocket[] = []
@@ -206,12 +207,10 @@ describe('web invalidation sync', () => {
 
   test('unknown settings invalidation scopes are ignored', async () => {
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
-    const fetchMock = vi.fn(async () => ({
+    const fetchMock = mockFetch(async () => ({
       ok: true,
       json: async () => settingsSnapshotResponse(),
     }))
-    vi.stubGlobal('fetch', fetchMock)
-
     const { useSessionRestoreStore } = await import('#/web/stores/session-restore.ts')
     const { useThemeStore } = await import('#/web/stores/theme.ts')
     await useSessionRestoreStore.getState().hydrate()

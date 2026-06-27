@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
 import { act } from 'react'
 import type { ReactNode } from 'react'
@@ -18,7 +19,7 @@ let container: HTMLDivElement | null = null
 let root: Root | null = null
 const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 const testWindow = window as unknown as { goblinNative?: unknown; __GOBLIN_BOOTSTRAP__?: unknown }
-const fetchMock = vi.fn(async (input: string | URL) => {
+const fetchMock = mockFetch(async (input: RequestInfo | URL) => {
   const url = new URL(typeof input === 'string' ? input : input.toString())
   if (url.pathname === '/api/repo/clone') {
     return {
@@ -34,7 +35,6 @@ beforeEach(() => {
   resetReposStore()
   setClientBridgeForTests(null)
   fetchMock.mockClear()
-  vi.stubGlobal('fetch', fetchMock)
   testWindow.__GOBLIN_BOOTSTRAP__ = {
     runtime: {
       kind: 'electron',

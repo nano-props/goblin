@@ -2,13 +2,13 @@
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
+import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
-const fetchMock = vi.fn()
+const fetchMock = mockFetch()
 
 describe('useHostInfoStore', () => {
   beforeEach(() => {
     fetchMock.mockReset()
-    vi.stubGlobal('fetch', fetchMock)
     useHostInfoStore.setState({ snapshot: null, hydrated: false })
   })
 

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
 import { act } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -79,7 +80,7 @@ const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENV
 const testWindow = window as unknown as { goblinNative?: unknown; __GOBLIN_BOOTSTRAP__?: unknown }
 const sendTestNotification = vi.fn(async () => true)
 const invokeIpc = vi.fn(async ({ path, input }: { path: string; input?: unknown }) => defaultIpcResult(path, input))
-const fetchMock = vi.fn(async (input: string | URL, init?: RequestInit) => {
+const fetchMock = mockFetch(async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = new URL(typeof input === 'string' ? input : input.toString())
   const rawBody = typeof init?.body === 'string' && init.body.length > 0 ? init.body : ''
   const body = rawBody ? (JSON.parse(rawBody) as Record<string, unknown>) : {}
@@ -107,7 +108,6 @@ beforeEach(() => {
     defaultIpcResult(path, input),
   )
   fetchMock.mockClear()
-  vi.stubGlobal('fetch', fetchMock)
   // Host info used to live in the bootstrap payload; it now lives
   // on the public `/api/host` endpoint and the client-side
   // `useHostInfoStore`. Seed the store directly so tests don't

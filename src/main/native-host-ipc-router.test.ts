@@ -13,6 +13,7 @@ import { registerTrustedAppUrl, registerTrustedWebContents } from '#/main/ipc/tr
 import { wireNativeHostIpc } from '#/main/native-host-ipc-router.ts'
 import { getUserSettings } from '#/main/settings-server-client.ts'
 import type { IpcResponse, UserSettings } from '#/shared/api-types.ts'
+import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
 const ipcHandlers = new Map<string, (_event: unknown, input: any) => Promise<unknown>>()
 const browserWindowFromWebContents = vi.hoisted(() => vi.fn(() => null))
@@ -326,12 +327,10 @@ describe('main repo ipc cancellation', () => {
       url: 'http://127.0.0.1:32100',
       accessToken: 'secret',
     })
-    const fetchMock = vi.fn(async () => ({
+    const fetchMock = mockFetch(async () => ({
       ok: true,
       json: async () => [{ path: 'file.txt', staged: false, status: 'M' }],
     }))
-    vi.stubGlobal('fetch', fetchMock)
-
     const result = await invokeIpc('repo.status', { cwd: '/repo' })
 
     expect(result).toEqual({
@@ -347,7 +346,7 @@ describe('main repo ipc cancellation', () => {
       url: 'http://127.0.0.1:32100',
       accessToken: 'secret',
     })
-    const fetchMock = vi.fn(async () => ({
+    const fetchMock = mockFetch(async () => ({
       ok: true,
       json: async () => ({
         target: {
@@ -361,8 +360,6 @@ describe('main repo ipc cancellation', () => {
         },
       }),
     }))
-    vi.stubGlobal('fetch', fetchMock)
-
     const result = await invokeIpc('remote.resolveTarget', { alias: 'prod', remotePath: '/repo' })
 
     expect(result).toEqual({
@@ -388,8 +385,8 @@ describe('main repo ipc cancellation', () => {
       accessToken: 'secret',
     })
     let observedSignal: AbortSignal | undefined
-    const fetchMock = vi.fn(
-      (_url: string, init?: RequestInit) =>
+    const fetchMock = mockFetch(
+      (_url: RequestInfo | URL, init?: RequestInit) =>
         new Promise<Response>((resolve) => {
           observedSignal = init?.signal ?? undefined
           init?.signal?.addEventListener(
@@ -403,8 +400,6 @@ describe('main repo ipc cancellation', () => {
           )
         }),
     )
-    vi.stubGlobal('fetch', fetchMock)
-
     const aborted = await invokeAbortIpc({ requestId: 'ipc-read-status' }, trustedEvent)
 
     expect(fetchMock).not.toHaveBeenCalled()
