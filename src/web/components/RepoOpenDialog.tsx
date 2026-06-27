@@ -1,5 +1,5 @@
 import { OpenRepositoryDialog } from '#/web/components/OpenRepositoryDialog.tsx'
-import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
+import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 interface RepoOpenDialogProps {
   open: boolean
@@ -8,7 +8,7 @@ interface RepoOpenDialogProps {
 
 export function RepoOpenDialog({ open, onOpenChange }: RepoOpenDialogProps) {
   const ensureWorkspaceOpen = useReposStore((s) => s.ensureWorkspaceOpen)
-  const navigation = useMainWindowNavigation()
+  const navigation = usePrimaryWindowNavigation()
 
   return (
     <OpenRepositoryDialog

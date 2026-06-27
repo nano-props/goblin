@@ -4,8 +4,8 @@ import { Button } from '#/web/components/ui/button.tsx'
 import { EmptyState } from '#/web/components/Layout.tsx'
 import { PanelInset } from '#/web/components/ui/panel.tsx'
 import { formatRepoLocator } from '#/web/lib/paths.ts'
-import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
-import { formatTranslatableReason, shouldOfferSshSettings, unavailableBodyKey } from '#/web/lib/remote-support.ts'
+import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
+import { formatTranslatableReason, shouldOfferSshSettings, unavailableBodyKey } from '#/web/lib/remote-diagnostics.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
 import { isRepoUnavailable, remoteRepoTarget } from '#/web/stores/repos/repo-guards.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -17,7 +17,7 @@ interface Props {
 
 export function UnavailableRepoView({ repo }: Props) {
   const t = useT()
-  const navigation = useMainWindowNavigation()
+  const navigation = usePrimaryWindowNavigation()
   // Phase 4 invariant: the `availability.phase` mirror is a
   // legacy hint for the refresh-pipeline guards, NOT the
   // authoritative source. The lifecycle union is. Gate on

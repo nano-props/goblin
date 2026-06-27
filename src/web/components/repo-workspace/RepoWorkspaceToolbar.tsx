@@ -15,7 +15,7 @@ import {
   isTerminalWorkspacePaneTabItem,
   type WorkspacePaneTabItem,
 } from '#/web/components/workspace-pane/WorkspacePaneTabStrip.tsx'
-import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
+import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import type { WorkspacePaneStaticTabType, WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
 import type { TerminalSessionBase } from '#/web/components/terminal/types.ts'
 import type { RepoWorkspaceRepo, SelectedRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
@@ -59,7 +59,7 @@ export function RepoWorkspaceToolbar({
   branchActions,
 }: Props) {
   const t = useT()
-  const navigation = useMainWindowNavigation()
+  const navigation = usePrimaryWindowNavigation()
   const compact = useIsCompactUi()
   const clearSelectedBranch = useReposStore((s) => s.clearSelectedBranch)
   // While the first server-side session list for this repo is in flight,

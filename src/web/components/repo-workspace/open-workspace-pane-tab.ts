@@ -1,4 +1,4 @@
-import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
+import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { requestVisibleRepoStatusRefresh } from '#/web/stores/repos/refresh-coordinator.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
@@ -9,7 +9,7 @@ export async function openWorkspacePaneTab(input: {
   branchName?: string
   worktreePath: string | null | undefined
   type: WorkspacePaneStaticTabType
-  navigation: Pick<MainWindowNavigationActions, 'showRepoBranchWorkspacePaneTab' | 'showRepoWorkspacePaneTab'>
+  navigation: Pick<PrimaryWindowNavigationActions, 'showRepoBranchWorkspacePaneTab' | 'showRepoWorkspacePaneTab'>
 }): Promise<boolean> {
   const provider = workspacePaneStaticTabProvider(input.type)
   if (!provider.canOpen({ hasWorktree: !!input.worktreePath })) return false
@@ -23,7 +23,7 @@ function showWorkspacePaneTab(input: {
   repoId: string
   branchName?: string
   type: WorkspacePaneStaticTabType
-  navigation: Pick<MainWindowNavigationActions, 'showRepoBranchWorkspacePaneTab' | 'showRepoWorkspacePaneTab'>
+  navigation: Pick<PrimaryWindowNavigationActions, 'showRepoBranchWorkspacePaneTab' | 'showRepoWorkspacePaneTab'>
 }): void {
   if (input.branchName) {
     input.navigation.showRepoBranchWorkspacePaneTab(input.repoId, input.branchName, input.type)

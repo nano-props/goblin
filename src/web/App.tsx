@@ -10,7 +10,7 @@ import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
 
 // NOTE: App-level lifecycle hooks (bootstrap, session persistence,
 // keyboard, event routing, overlays, file drop) live in the <Layout>
-// route in main-router.tsx so they survive settings ⇄ workspace
+// route in primary-window-router.tsx so they survive settings ⇄ workspace
 // round-trips. This file handles rendering only.
 
 interface AppProps {

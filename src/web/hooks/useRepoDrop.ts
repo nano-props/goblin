@@ -5,7 +5,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { isShortcutBlockingLayerOpen } from '#/web/lib/layers.ts'
 import { openRepoPaths } from '#/web/lib/open-repo-paths.ts'
-import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
+import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 interface Options {
   /** True when an overlay (Settings/Help) is up. While blocked, the
    *  drop overlay stays hidden and drops are ignored — otherwise the
@@ -25,7 +25,7 @@ function isDropBlocked(blocked: boolean): boolean {
 
 export function useRepoDrop({ blocked }: Options) {
   const ensureWorkspaceOpen = useReposStore((s) => s.ensureWorkspaceOpen)
-  const navigation = useMainWindowNavigation()
+  const navigation = usePrimaryWindowNavigation()
   const t = useT()
   const tRef = useRef(t)
   tRef.current = t

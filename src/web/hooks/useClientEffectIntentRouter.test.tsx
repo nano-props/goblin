@@ -4,7 +4,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { useClientEffectIntentRouter } from '#/web/hooks/useClientEffectIntentRouter.ts'
-import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
+import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -34,7 +34,7 @@ const closeAllOverlays = vi.fn()
 let overlayOpen = false
 let workspaceShortcutSuppressed = false
 let currentRepoId: string | null = null
-let navigation!: MainWindowNavigationActions
+let navigation!: PrimaryWindowNavigationActions
 const activateRepoSpy = vi.fn()
 const closeRepoSpy = vi.fn()
 const showRepoBranchWorkspacePaneTabSpy = vi.fn()

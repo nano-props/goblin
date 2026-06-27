@@ -9,7 +9,7 @@ import { visibleBranches } from '#/web/stores/repos/branch-view-mode.ts'
 import { BranchList } from '#/web/components/branch-navigator/BranchList.tsx'
 import { useBranchListRepo } from '#/web/components/branch-navigator/use-branch-list-data.ts'
 import { EmptyState } from '#/web/components/Layout.tsx'
-import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
+import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { openWorkspacePaneTab } from '#/web/components/repo-workspace/open-workspace-pane-tab.ts'
 
 interface Props {
@@ -23,7 +23,7 @@ interface Props {
 
 export function BranchView({ repoId, onAfterSelect, onAfterOpenStatus }: Props) {
   const t = useT()
-  const navigation = useMainWindowNavigation()
+  const navigation = usePrimaryWindowNavigation()
   const repo = useBranchListRepo(repoId)
 
   const branches = useMemo(

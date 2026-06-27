@@ -5,7 +5,10 @@ import type { ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { RepoCloneDialog } from '#/web/components/RepoCloneDialog.tsx'
-import { MainWindowNavigationProvider, type MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
+import {
+  PrimaryWindowNavigationProvider,
+  type PrimaryWindowNavigationActions,
+} from '#/web/primary-window-navigation.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -77,9 +80,9 @@ describe('RepoCloneDialog', () => {
     const onOpenChange = vi.fn()
 
     render(
-      <MainWindowNavigationProvider value={navigationWith({ activateRepo })}>
+      <PrimaryWindowNavigationProvider value={navigationWith({ activateRepo })}>
         <RepoCloneDialog open onOpenChange={onOpenChange} />
-      </MainWindowNavigationProvider>,
+      </PrimaryWindowNavigationProvider>,
     )
 
     setInputValue('#clone-url', 'https://example.com/repo.git')
@@ -93,7 +96,7 @@ describe('RepoCloneDialog', () => {
   })
 })
 
-function navigationWith(overrides: Partial<MainWindowNavigationActions>): MainWindowNavigationActions {
+function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): PrimaryWindowNavigationActions {
   return {
     activateRepo: () => {},
     closeRepo: () => {},

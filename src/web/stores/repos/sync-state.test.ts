@@ -6,7 +6,7 @@ import {
   nextRepoOperationId,
 } from '#/web/stores/repos/repo-operation-scheduler.ts'
 import { canStartRemoteFetch } from '#/web/stores/repos/sync-state.ts'
-import type { RepoRuntimeOperationTarget } from '#/web/stores/repos/repo-operation-scheduler.ts'
+import type { RepoOperationTarget } from '#/web/stores/repos/repo-operation-scheduler.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 type CoreRemoteFetchBlockerKey = 'fetch' | 'branchAction' | 'snapshot' | 'status'
 
@@ -63,7 +63,7 @@ describe('canStartRemoteFetch', () => {
     (key) => {
       const r = repo()
       const operationId = nextRepoOperationId(r.id)
-      const target: RepoRuntimeOperationTarget = { key, reason: key === 'branchAction' ? 'branch:pull' : key }
+      const target: RepoOperationTarget = { key, reason: key === 'branchAction' ? 'branch:pull' : key }
 
       markRepoOperationTargets(r.id, operationId, [target], 'running')
 

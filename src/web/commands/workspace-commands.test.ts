@@ -19,7 +19,7 @@ import {
   workspacePaneTabOrderForBranch,
 } from '#/web/stores/repos/workspace-pane-tabs.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
-import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
+import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { WorktreeTerminalSnapshot } from '#/web/components/terminal/types.ts'
 import type { WorkspacePaneStaticTabType, WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
@@ -942,7 +942,7 @@ function terminalEntry(id: string) {
   return { type: 'terminal' as const, id }
 }
 
-function navigationWith(overrides: Partial<MainWindowNavigationActions> = {}): MainWindowNavigationActions {
+function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {}): PrimaryWindowNavigationActions {
   return {
     activateRepo: (repoId) => useReposStore.getState().setActive(repoId),
     closeRepo: () => {},

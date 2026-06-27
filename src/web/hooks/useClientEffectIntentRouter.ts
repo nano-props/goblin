@@ -12,7 +12,7 @@ import {
   handleTerminalBellClickIntent,
   handleWorkspaceClientIntent,
 } from '#/web/hooks/client-effect-intent-handlers.ts'
-import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
+import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import {
@@ -21,7 +21,7 @@ import {
 } from '#/web/stores/repos/selector-actions.ts'
 
 interface ClientEffectIntentRouterOptions {
-  navigation: MainWindowNavigationActions
+  navigation: PrimaryWindowNavigationActions
   currentRepoId: string | null
   closeAllOverlays: () => void
   openRepoPathDialog: () => void

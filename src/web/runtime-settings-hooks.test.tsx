@@ -6,7 +6,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { DEFAULT_COLOR_THEME } from '#/shared/color-theme.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
-import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { externalAppsQueryKey, settingsSnapshotQueryKey } from '#/web/settings-queries.ts'
 import { useExternalAppSettings } from '#/web/runtime-settings-external-apps.ts'
 import { useFetchSettings } from '#/web/runtime-settings-fetch.ts'
@@ -22,7 +22,7 @@ const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENV
 
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
-  mainWindowQueryClient.clear()
+  primaryWindowQueryClient.clear()
   useThemeStore.setState({
     pref: 'auto',
     resolved: 'light',
@@ -47,13 +47,13 @@ afterEach(() => {
   container?.remove()
   root = null
   container = null
-  mainWindowQueryClient.clear()
+  primaryWindowQueryClient.clear()
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
 describe('runtime settings hooks', () => {
   test('reads fetch, shortcut, and lan settings from the runtime settings snapshot', async () => {
-    mainWindowQueryClient.setQueryData(
+    primaryWindowQueryClient.setQueryData(
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({
         fetchIntervalSec: 300,
@@ -82,7 +82,7 @@ describe('runtime settings hooks', () => {
       return null
     }
 
-    await renderWithMainWindowQueryClient(<HookHost />)
+    await renderWithPrimaryWindowQueryClient(<HookHost />)
 
     expect(result).toMatchObject({
       fetch: {
@@ -102,7 +102,7 @@ describe('runtime settings hooks', () => {
   })
 
   test('reads external app runtime settings from the runtime external apps snapshot', async () => {
-    mainWindowQueryClient.setQueryData(externalAppsQueryKey(), {
+    primaryWindowQueryClient.setQueryData(externalAppsQueryKey(), {
       terminal: {
         available: true,
         appAvailability: { ghostty: true, terminal: false, windowsTerminal: false },
@@ -121,7 +121,7 @@ describe('runtime settings hooks', () => {
       return null
     }
 
-    await renderWithMainWindowQueryClient(<HookHost />)
+    await renderWithPrimaryWindowQueryClient(<HookHost />)
 
     expect(result).toMatchObject({
       terminalAvailable: true,
@@ -130,7 +130,7 @@ describe('runtime settings hooks', () => {
   })
 
   test('reads recent repos from the runtime recent repos state', async () => {
-    mainWindowQueryClient.setQueryData(
+    primaryWindowQueryClient.setQueryData(
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({
         recentRepos: [
@@ -146,7 +146,7 @@ describe('runtime settings hooks', () => {
       return null
     }
 
-    await renderWithMainWindowQueryClient(<HookHost />)
+    await renderWithPrimaryWindowQueryClient(<HookHost />)
 
     expect(result).toEqual([
       { kind: 'local', id: '/tmp/repo-a' },
@@ -155,12 +155,12 @@ describe('runtime settings hooks', () => {
   })
 })
 
-async function renderWithMainWindowQueryClient(element: React.ReactElement) {
+async function renderWithPrimaryWindowQueryClient(element: React.ReactElement) {
   container = document.createElement('div')
   document.body.append(container)
   root = createRoot(container)
   await act(async () => {
-    root!.render(<QueryClientProvider client={mainWindowQueryClient}>{element}</QueryClientProvider>)
+    root!.render(<QueryClientProvider client={primaryWindowQueryClient}>{element}</QueryClientProvider>)
     await Promise.resolve()
   })
 }

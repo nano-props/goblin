@@ -20,7 +20,7 @@ import { isShortcutBlockingLayerOpen } from '#/web/lib/layers.ts'
 import { runBranchActionShortcut } from '#/web/keyboard/branch-action-shortcuts.ts'
 import { matchClientKeyboardShortcut } from '#/shared/shortcut-definitions.ts'
 import { isTerminalFocused } from '#/web/terminal-focus.ts'
-import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
+import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import { getRuntimeShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
 import { keyboardRuntimeStateFromStore } from '#/web/stores/repos/selector-state.ts'
@@ -39,7 +39,7 @@ const INTERACTIVE_SHORTCUT_TARGET_SELECTOR =
   'button,a,input,textarea,select,[role="button"],[role="tab"],[role="menuitem"],[data-interactive]'
 
 interface Options {
-  navigation: MainWindowNavigationActions
+  navigation: PrimaryWindowNavigationActions
   currentRepoId: string | null
   onShowHelp: () => void
   /** Returns true when workspace shortcuts should not affect the repo view. */
@@ -92,7 +92,7 @@ function moveBranchSelection(
     selectBranch: (repoId: string, branch: string) => void
   },
   direction: MoveDirection,
-  navigation: MainWindowNavigationActions,
+  navigation: PrimaryWindowNavigationActions,
 ): boolean {
   const branches = visibleBranches({
     branches: input.repo.data.branches,

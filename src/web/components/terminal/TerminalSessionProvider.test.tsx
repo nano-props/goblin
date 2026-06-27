@@ -15,7 +15,7 @@ import {
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
-import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-queries.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -417,8 +417,8 @@ beforeEach(() => {
   resetReposStore()
   useRepoSyncStore.setState(useRepoSyncStore.getInitialState())
   window.sessionStorage.setItem('goblin:terminal-client-id', 'client_local')
-  mainWindowQueryClient.clear()
-  mainWindowQueryClient.setQueryData(
+  primaryWindowQueryClient.clear()
+  primaryWindowQueryClient.setQueryData(
     settingsSnapshotQueryKey(),
     defaultSettingsSnapshot({ terminalNotificationsEnabled: false }),
   )
@@ -698,7 +698,7 @@ describe('TerminalSessionProvider', () => {
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
     })
-    mainWindowQueryClient.setQueryData(
+    primaryWindowQueryClient.setQueryData(
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({ terminalNotificationsEnabled: true }),
     )
@@ -831,7 +831,7 @@ describe('TerminalSessionProvider', () => {
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
     })
-    mainWindowQueryClient.setQueryData(
+    primaryWindowQueryClient.setQueryData(
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({ terminalNotificationsEnabled: true }),
     )

@@ -1,5 +1,5 @@
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { disposeAllRepoOperationSchedulers } from '#/web/stores/repos/repo-operation-scheduler.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
@@ -92,7 +92,7 @@ export function createPullRequest(number: number, options: Partial<PullRequestIn
 
 export function resetReposStore(): void {
   disposeAllRepoOperationSchedulers()
-  mainWindowQueryClient.clear()
+  primaryWindowQueryClient.clear()
   useReposStore.setState({
     repos: {},
     repoSnapshotCache: {},

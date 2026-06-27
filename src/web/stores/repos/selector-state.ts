@@ -5,9 +5,12 @@ import type {
   RuntimeCoherentRepoProjectionState,
 } from '#/web/stores/repos/types.ts'
 
-export interface MainWindowWorkspaceState extends Pick<ReposStore, 'activeId' | 'order' | 'sessionReady' | 'zenMode'> {}
+export interface PrimaryWindowWorkspaceState extends Pick<
+  ReposStore,
+  'activeId' | 'order' | 'sessionReady' | 'zenMode'
+> {}
 
-export interface MainWindowNavigationState extends Pick<ReposStore, 'activeId' | 'order'> {}
+export interface PrimaryWindowNavigationState extends Pick<ReposStore, 'activeId' | 'order'> {}
 
 export interface KeyboardRuntimeState {
   repo: RepoState | null
@@ -56,9 +59,9 @@ export function restorableWorkspaceNavigationStateFromStore(
   }
 }
 
-export function mainWindowWorkspaceStateFromStore(
+export function primaryWindowWorkspaceStateFromStore(
   state: Pick<ReposStore, 'activeId' | 'order' | 'sessionReady' | 'zenMode'>,
-): MainWindowWorkspaceState {
+): PrimaryWindowWorkspaceState {
   const restorable = restorableWorkspaceViewportStateFromStore(state)
   return {
     activeId: restorable.activeId,
@@ -70,7 +73,7 @@ export function mainWindowWorkspaceStateFromStore(
 
 export function navigationWorkspaceStateFromStore(
   state: Pick<ReposStore, 'activeId' | 'order'>,
-): MainWindowNavigationState {
+): PrimaryWindowNavigationState {
   const restorable = restorableWorkspaceNavigationStateFromStore(state)
   return {
     activeId: restorable.activeId,
@@ -78,7 +81,10 @@ export function navigationWorkspaceStateFromStore(
   }
 }
 
-export function mainWindowWorkspaceStateEqual(a: MainWindowWorkspaceState, b: MainWindowWorkspaceState): boolean {
+export function primaryWindowWorkspaceStateEqual(
+  a: PrimaryWindowWorkspaceState,
+  b: PrimaryWindowWorkspaceState,
+): boolean {
   return (
     a.activeId === b.activeId &&
     a.sessionReady === b.sessionReady &&
@@ -87,7 +93,10 @@ export function mainWindowWorkspaceStateEqual(a: MainWindowWorkspaceState, b: Ma
   )
 }
 
-export function navigationWorkspaceStateEqual(a: MainWindowNavigationState, b: MainWindowNavigationState): boolean {
+export function navigationWorkspaceStateEqual(
+  a: PrimaryWindowNavigationState,
+  b: PrimaryWindowNavigationState,
+): boolean {
   return a.activeId === b.activeId && arraysEqual(a.order, b.order)
 }
 

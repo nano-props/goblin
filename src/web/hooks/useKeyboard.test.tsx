@@ -14,7 +14,7 @@ vi.mock('sonner', () => ({
 }))
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
+import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import type { WorktreeTerminalSnapshot } from '#/web/components/terminal/types.ts'
 import { workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
@@ -33,7 +33,7 @@ interface HookHostOptions {
   isSettingsOpen: () => boolean
   onExitSettings: () => void
   openCreateWorktree: () => void
-  navigation: MainWindowNavigationActions
+  navigation: PrimaryWindowNavigationActions
 }
 
 beforeEach(() => {
@@ -364,7 +364,7 @@ function HookHost(overrides: Partial<HookHostOptions>) {
   return null
 }
 
-function navigationWith(overrides: Partial<MainWindowNavigationActions> = {}): MainWindowNavigationActions {
+function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {}): PrimaryWindowNavigationActions {
   return {
     activateRepo: () => {},
     closeRepo: () => {},

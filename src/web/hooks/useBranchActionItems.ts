@@ -8,7 +8,7 @@ import {
   type BranchActionRepo,
   type BranchCopyPatchAction,
 } from '#/web/hooks/branch-action-state.ts'
-import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
+import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import type { WorkspacePaneBranchTabType, WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import { openWorkspacePaneTab } from '#/web/components/repo-workspace/open-workspace-pane-tab.ts'
 export interface BranchActionItem {
@@ -47,7 +47,7 @@ export function useBranchActionItems(
   branchActions: BranchActions,
 ): BranchActionSurface {
   const t = useT()
-  const navigation = useMainWindowNavigation()
+  const navigation = usePrimaryWindowNavigation()
   const { blocked, busyAction, capabilities, actions } = branchActions
   const disabled = blocked
   const busy = (id: BranchActionItemId) => busyAction === id

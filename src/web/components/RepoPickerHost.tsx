@@ -6,7 +6,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { RepoPicker } from '#/web/components/repo-picker/RepoPicker.tsx'
 import { repoPickerReposEqual } from '#/web/components/repo-picker/summary-equality.ts'
-import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
+import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import type { RepoPickerRepo, RepoPickerSurface } from '#/web/components/repo-picker/types.ts'
 import { openRepoFromDialog } from '#/web/lib/open-repo-dialog.ts'
 import { useShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
@@ -55,7 +55,7 @@ export function RepoPickerHost({
         .filter((x): x is RepoPickerRepo => x !== null),
     repoPickerReposEqual,
   )
-  const navigation = useMainWindowNavigation()
+  const navigation = usePrimaryWindowNavigation()
   const { ensureWorkspaceOpen } = useStoreWithEqualityFn(
     useReposStore,
     repoPickerStoreActionsFromStore,

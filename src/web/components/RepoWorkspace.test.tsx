@@ -13,7 +13,10 @@ import type {
   TerminalSessionReadContextValue,
   WorktreeTerminalSnapshot,
 } from '#/web/components/terminal/types.ts'
-import { MainWindowNavigationProvider, type MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
+import {
+  PrimaryWindowNavigationProvider,
+  type PrimaryWindowNavigationActions,
+} from '#/web/primary-window-navigation.tsx'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import { resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 
@@ -56,7 +59,7 @@ const terminalCommandContext: TerminalSessionContextValue = {
   serialize: vi.fn(() => ''),
 }
 
-const navigation: MainWindowNavigationActions = {
+const navigation: PrimaryWindowNavigationActions = {
   activateRepo: vi.fn(),
   closeRepo: vi.fn(),
   cycleRepo: vi.fn(),
@@ -79,13 +82,13 @@ afterEach(() => {
 describe('RepoWorkspace', () => {
   test('can render after the repo appears without changing hook order', () => {
     render(
-      <MainWindowNavigationProvider value={navigation}>
+      <PrimaryWindowNavigationProvider value={navigation}>
         <TerminalSessionContext.Provider value={terminalCommandContext}>
           <TerminalSessionReadContext.Provider value={terminalReadContext}>
             <RepoWorkspace repoId={REPO_ID} />
           </TerminalSessionReadContext.Provider>
         </TerminalSessionContext.Provider>
-      </MainWindowNavigationProvider>,
+      </PrimaryWindowNavigationProvider>,
     )
 
     expect(() => {

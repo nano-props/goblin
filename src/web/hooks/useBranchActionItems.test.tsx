@@ -18,8 +18,8 @@ vi.mock('#/web/hooks/useBranchActions.tsx', () => ({
   useBranchActions: mocks.useBranchActions,
 }))
 
-vi.mock('#/web/main-window-navigation.tsx', () => ({
-  useMainWindowNavigation: () => ({
+vi.mock('#/web/primary-window-navigation.tsx', () => ({
+  usePrimaryWindowNavigation: () => ({
     showRepoBranchWorkspacePaneTab: vi.fn(),
   }),
 }))

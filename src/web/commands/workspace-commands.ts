@@ -2,7 +2,7 @@ import { worktreeTerminalKey } from '#/web/components/terminal/terminal-workspac
 import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { openWorkspacePaneTab } from '#/web/components/repo-workspace/open-workspace-pane-tab.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
+import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import type { TerminalSessionBase } from '#/web/components/terminal/types.ts'
 import {
@@ -24,24 +24,24 @@ import {
 interface ShowWorkspacePaneTabCommandOptions {
   repoId: string | null
   tab: WorkspacePaneTabType
-  navigation: MainWindowNavigationActions
+  navigation: PrimaryWindowNavigationActions
 }
 
 interface TerminalPrimaryActionCommandOptions {
   repoId: string | null
-  navigation: MainWindowNavigationActions
+  navigation: PrimaryWindowNavigationActions
   t?: TerminalCreateTranslator
 }
 
 interface NewTerminalTabCommandOptions {
   repoId: string | null
-  navigation: MainWindowNavigationActions
+  navigation: PrimaryWindowNavigationActions
   t?: TerminalCreateTranslator
 }
 
 interface CloseWorkspacePaneTabCommandOptions {
   repoId: string | null
-  navigation: MainWindowNavigationActions
+  navigation: PrimaryWindowNavigationActions
   targetIdentity?: string
 }
 
@@ -52,13 +52,13 @@ interface CloseWorkspacePaneTabOrWindowCommandOptions extends CloseWorkspacePane
 interface SelectWorkspacePaneTabByIndexCommandOptions {
   repoId: string | null
   tabIndex: number
-  navigation: MainWindowNavigationActions
+  navigation: PrimaryWindowNavigationActions
 }
 
 interface MoveWorkspacePaneTabCommandOptions {
   repoId: string | null
   direction: 1 | -1
-  navigation: MainWindowNavigationActions
+  navigation: PrimaryWindowNavigationActions
 }
 
 export async function runShowWorkspacePaneTabCommand({
@@ -228,7 +228,7 @@ function selectedRepoWorkspaceTarget(repoId: string): { branchName: string; work
 function showWorkspacePaneCommandTab(
   target: RepoWorkspaceTabModel,
   tab: RepoWorkspaceTab,
-  navigation: MainWindowNavigationActions,
+  navigation: PrimaryWindowNavigationActions,
 ): void {
   navigation.showRepoWorkspacePaneTab(target.repoId, tab.type)
   if (tab.kind === 'terminal' && target.worktreeTerminalKey) {

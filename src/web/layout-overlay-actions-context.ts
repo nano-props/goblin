@@ -6,7 +6,7 @@ export interface LayoutOverlayActionsValue {
   openRemoteRepo: () => void
   /**
    * Open the create-worktree dialog for the currently active repo. The
-   * dialog itself is mounted in `Layout.MainWindowOverlays` so it
+   * dialog itself is mounted in `Layout.PrimaryWindowOverlays` so it
    * survives settings ⇄ workspace navigation — half-typed branch
    * names and ref selections are not lost when the user navigates
    * away and back.

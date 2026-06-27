@@ -10,7 +10,7 @@ vi.mock('sonner', () => ({
     success: vi.fn(),
   },
 }))
-import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
+import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -112,7 +112,7 @@ function deps(currentRepoId: string | null) {
   }
 }
 
-function navigationWithStoreActions(): MainWindowNavigationActions {
+function navigationWithStoreActions(): PrimaryWindowNavigationActions {
   return {
     activateRepo: (repoId) => useReposStore.getState().setActive(repoId),
     closeRepo: (repoId) => useReposStore.getState().closeRepo(repoId),

@@ -4,7 +4,7 @@
 // implementation mounted inside the per-repo action subtree and
 // lost its form state every time the user navigated to Settings
 // because that subtree unmounted. The fix moved the
-// host to `Layout.MainWindowOverlays` (outside `<Outlet />`), so the
+// host to `Layout.PrimaryWindowOverlays` (outside `<Outlet />`), so the
 // dialog survives settings ⇄ workspace navigation.
 //
 // The subtle regression this protects against is closing the dialog
@@ -15,7 +15,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { CreateWorktreeDialogHost } from '#/web/components/CreateWorktreeDialogHost.tsx'
-import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
@@ -28,7 +28,7 @@ const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENV
 
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
-  mainWindowQueryClient.clear()
+  primaryWindowQueryClient.clear()
   globalThis.localStorage?.clear()
   resetReposStore()
   seedRepoState({
@@ -52,7 +52,7 @@ afterEach(() => {
   root = null
   container = null
   document.body.innerHTML = ''
-  mainWindowQueryClient.clear()
+  primaryWindowQueryClient.clear()
   globalThis.localStorage?.clear()
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
@@ -125,7 +125,7 @@ describe('CreateWorktreeDialogHost', () => {
 
   test('forwards a remembered bootstrap decision from the create dialog checkbox', async () => {
     const configHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-    mainWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
+    primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
     const submitBranchAction = vi.spyOn(useReposStore.getState(), 'submitBranchAction').mockImplementation(() => {})
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = new URL(String(input))
@@ -185,7 +185,7 @@ describe('CreateWorktreeDialogHost', () => {
 
   test('forwards a run-once bootstrap decision from the create dialog without checking trust', async () => {
     const configHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-    mainWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
+    primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
     const submitBranchAction = vi.spyOn(useReposStore.getState(), 'submitBranchAction').mockImplementation(() => {})
     const fetchMock = vi.fn(async () => {
       return new Response(
@@ -270,7 +270,7 @@ describe('CreateWorktreeDialogHost', () => {
   })
 
   test('preflights then auto-runs a trusted goblin.toml config hash', async () => {
-    mainWindowQueryClient.setQueryData(
+    primaryWindowQueryClient.setQueryData(
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({
         repoSettings: [
@@ -330,7 +330,7 @@ describe('CreateWorktreeDialogHost', () => {
 
   test('keeps trusted bootstrap state in sync when settings cache updates after preview', async () => {
     const configHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-    mainWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
+    primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
     const submitBranchAction = vi.spyOn(useReposStore.getState(), 'submitBranchAction').mockImplementation(() => {})
     vi.stubGlobal(
       'fetch',
@@ -343,7 +343,7 @@ describe('CreateWorktreeDialogHost', () => {
     expect(document.body.textContent).toContain('action.create-worktree-bootstrap-remember')
 
     act(() => {
-      mainWindowQueryClient.setQueryData(
+      primaryWindowQueryClient.setQueryData(
         settingsSnapshotQueryKey(),
         defaultSettingsSnapshot({
           repoSettings: [
@@ -377,7 +377,7 @@ describe('CreateWorktreeDialogHost', () => {
   })
 
   test('shows preview errors and skips bootstrap when creating anyway', async () => {
-    mainWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
+    primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
     const submitBranchAction = vi.spyOn(useReposStore.getState(), 'submitBranchAction').mockImplementation(() => {})
     vi.stubGlobal(
       'fetch',
@@ -412,7 +412,7 @@ describe('CreateWorktreeDialogHost', () => {
 
   test('ignores a stale bootstrap preview after reopening the create dialog', async () => {
     const configHash = 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
-    mainWindowQueryClient.setQueryData(
+    primaryWindowQueryClient.setQueryData(
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({
         repoSettings: [

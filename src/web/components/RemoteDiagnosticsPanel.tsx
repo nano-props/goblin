@@ -1,6 +1,6 @@
 import { toast } from 'sonner'
 import { DialogStatusRow } from '#/web/components/ui/dialog-status-row.tsx'
-import { failedDiagnosticsCategory } from '#/web/lib/remote-support.ts'
+import { failedDiagnosticsCategory } from '#/web/lib/remote-diagnostics.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import type { RemoteDiagnosticCategory, RemoteDiagnosticsResult } from '#/shared/remote-repo.ts'
 

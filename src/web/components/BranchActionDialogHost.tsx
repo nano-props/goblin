@@ -2,7 +2,7 @@
 // (push / delete branch / force-delete / remove worktree / force-
 // remove worktree).
 //
-// Mounted once in `Layout.MainWindowOverlays`, outside `<Outlet />`, so
+// Mounted once in `Layout.PrimaryWindowOverlays`, outside `<Outlet />`, so
 // it survives settings ⇄ workspace navigation. State lives in
 // `useBranchActionDialogsStore`, not in any React component local
 // state, so a confirmation requested from a temporary surface (e.g.

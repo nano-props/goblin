@@ -1,7 +1,7 @@
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 
-export interface MainWindowNavigationActions {
+export interface PrimaryWindowNavigationActions {
   activateRepo: (repoId: string) => void
   closeRepo: (repoId: string) => void
   cycleRepo: (direction: 1 | -1) => void
@@ -11,7 +11,7 @@ export interface MainWindowNavigationActions {
   openSettings: (page: SettingsPage) => void
 }
 
-interface CreateMainWindowNavigationActionsOptions {
+interface CreatePrimaryWindowNavigationActionsOptions {
   activeId: string | null
   order: string[]
   setActive: (repoId: string) => void
@@ -22,7 +22,7 @@ interface CreateMainWindowNavigationActionsOptions {
   onOpenSettings?: (page: SettingsPage) => void
 }
 
-export function createMainWindowNavigationActions({
+export function createPrimaryWindowNavigationActions({
   activeId,
   order,
   setActive,
@@ -31,7 +31,7 @@ export function createMainWindowNavigationActions({
   selectBranch,
   setWorkspacePaneTab,
   onOpenSettings,
-}: CreateMainWindowNavigationActionsOptions): MainWindowNavigationActions {
+}: CreatePrimaryWindowNavigationActionsOptions): PrimaryWindowNavigationActions {
   return {
     activateRepo(repoId) {
       setActive(repoId)

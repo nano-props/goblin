@@ -23,18 +23,18 @@ import {
   createWorkspaceIntentPlan,
 } from '#/web/hooks/client-effect-intent-plans.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
-import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
+import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { OpenRepoResult } from '#/web/stores/repos/types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 
 interface TerminalBellIntentDeps {
-  navigation: MainWindowNavigationActions
+  navigation: PrimaryWindowNavigationActions
   closeAllOverlays: () => void
   setSelectedTerminal: (worktreeKey: string, key: string) => void
 }
 
 interface SharedClientIntentDeps {
-  navigation: MainWindowNavigationActions
+  navigation: PrimaryWindowNavigationActions
   currentRepoId: string | null
   closeAllOverlays: () => void
   openRepoPathDialog: () => void

@@ -5,9 +5,9 @@ import {
   remoteSshCommand,
   shouldOfferSshSettings,
   unavailableBodyKey,
-} from '#/web/lib/remote-support.ts'
+} from '#/web/lib/remote-diagnostics.ts'
 
-describe('remote support helpers', () => {
+describe('remote diagnostics helpers', () => {
   test('formats translated and untranslated reasons safely', () => {
     const t = (key: string) => (key === 'error.ssh-config-changed' ? 'SSH config changed' : key)
     expect(formatTranslatableReason(t, 'error.ssh-config-changed')).toBe('SSH config changed')

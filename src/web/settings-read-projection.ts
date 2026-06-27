@@ -1,4 +1,4 @@
-import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { externalAppsQueryKey, settingsSnapshotQueryKey, useSettingsSnapshotQuery } from '#/web/settings-queries.ts'
 import type {
   ExternalAppsSnapshot,
@@ -12,7 +12,7 @@ import {
 } from '#/shared/settings-snapshot.ts'
 
 export function currentSettingsSnapshot(): SettingsSnapshot | undefined {
-  return mainWindowQueryClient.getQueryData<SettingsSnapshot>(settingsSnapshotQueryKey())
+  return primaryWindowQueryClient.getQueryData<SettingsSnapshot>(settingsSnapshotQueryKey())
 }
 
 export function runtimeSettingsSnapshotOrUndefined(
@@ -46,7 +46,7 @@ export function useRuntimeRecentReposState(): RuntimeRecentReposState | undefine
 }
 
 export function currentExternalAppsSnapshot(): ExternalAppsSnapshot | undefined {
-  return mainWindowQueryClient.getQueryData<ExternalAppsSnapshot>(externalAppsQueryKey())
+  return primaryWindowQueryClient.getQueryData<ExternalAppsSnapshot>(externalAppsQueryKey())
 }
 
 export function readRuntimeShortcutSettings(data: RuntimeSettingsSnapshot | undefined) {

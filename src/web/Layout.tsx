@@ -25,13 +25,13 @@ import { useRepoStoreInvalidationRefresh } from '#/web/hooks/useRepoStoreInvalid
 import { useSessionPersistence } from '#/web/hooks/useSessionPersistence.ts'
 import { useSettingsWriteErrorToast } from '#/web/hooks/useSettingsWriteErrorToast.ts'
 import { useSettingsQueryInvalidationSync } from '#/web/settings-queries.ts'
-import { createMainWindowNavigationActions } from '#/web/main-window-navigation-actions.ts'
-import { MainWindowNavigationProvider } from '#/web/main-window-navigation.tsx'
+import { createPrimaryWindowNavigationActions } from '#/web/primary-window-navigation-actions.ts'
+import { PrimaryWindowNavigationProvider } from '#/web/primary-window-navigation.tsx'
 import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import {
-  mainWindowNavigationStoreActionsEqual,
-  mainWindowNavigationStoreActionsFromStore,
+  primaryWindowNavigationStoreActionsEqual,
+  primaryWindowNavigationStoreActionsFromStore,
 } from '#/web/stores/repos/selector-actions.ts'
 
 export function Layout() {
@@ -50,12 +50,12 @@ export function Layout() {
   const order = useReposStore((s) => s.order)
   const { setActive, closeRepo, cycleActive, selectBranch, setWorkspacePaneTab } = useStoreWithEqualityFn(
     useReposStore,
-    mainWindowNavigationStoreActionsFromStore,
-    mainWindowNavigationStoreActionsEqual,
+    primaryWindowNavigationStoreActionsFromStore,
+    primaryWindowNavigationStoreActionsEqual,
   )
   const navigation = useMemo(
     () =>
-      createMainWindowNavigationActions({
+      createPrimaryWindowNavigationActions({
         activeId,
         order,
         setActive,
@@ -98,7 +98,7 @@ export function Layout() {
     <ErrorBoundary>
       <TokenGate>
         <AuthenticatedSideEffects />
-        <MainWindowNavigationProvider value={navigation}>
+        <PrimaryWindowNavigationProvider value={navigation}>
           <LayoutOverlayActions.Provider
             value={{
               openRepoPathDialog: overlays.openRepoPathDialog,
@@ -116,7 +116,7 @@ export function Layout() {
                 onDrop={repoDrop.onDrop}
               >
                 <Outlet />
-                <MainWindowOverlays
+                <PrimaryWindowOverlays
                   overlays={overlays}
                   repoDrop={repoDrop}
                   activeId={activeId}
@@ -125,21 +125,21 @@ export function Layout() {
               </div>
             </TerminalSessionProvider>
           </LayoutOverlayActions.Provider>
-        </MainWindowNavigationProvider>
+        </PrimaryWindowNavigationProvider>
         {import.meta.env.DEV ? <TanStackRouterDevtools /> : null}
       </TokenGate>
     </ErrorBoundary>
   )
 }
 
-interface MainWindowOverlaysProps {
+interface PrimaryWindowOverlaysProps {
   overlays: ReturnType<typeof useAppOverlays>
   repoDrop: ReturnType<typeof useRepoDrop>
   activeId: string | null
   activeBranchName: string | null
 }
 
-function MainWindowOverlays({ overlays, repoDrop, activeId, activeBranchName }: MainWindowOverlaysProps) {
+function PrimaryWindowOverlays({ overlays, repoDrop, activeId, activeBranchName }: PrimaryWindowOverlaysProps) {
   return (
     <>
       <RepoOpenDialog open={overlays.state.openRepo.open} onOpenChange={overlays.setOpenRepoOpen} />

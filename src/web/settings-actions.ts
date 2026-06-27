@@ -14,7 +14,7 @@ import {
   setShortcutsDisabled as setSettingsShortcutsDisabled,
   setTerminalNotificationsEnabled as setSettingsTerminalNotificationsEnabled,
 } from '#/web/settings-client.ts'
-import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import {
   externalAppsQueryKey,
   lanInfoQueryKey,
@@ -27,28 +27,28 @@ import {
 
 export async function recordRecentRepo(repo: RepoSessionEntry): Promise<void> {
   const result = await addRecentRepo(repo)
-  updateRuntimeRecentReposStateCache(mainWindowQueryClient, { recentRepos: result.recentRepos })
+  updateRuntimeRecentReposStateCache(primaryWindowQueryClient, { recentRepos: result.recentRepos })
 }
 
 export async function clearRecentRepoHistory(): Promise<void> {
   await clearRecentRepos()
-  updateRuntimeRecentReposStateCache(mainWindowQueryClient, { recentRepos: [] })
+  updateRuntimeRecentReposStateCache(primaryWindowQueryClient, { recentRepos: [] })
 }
 
 export async function persistSessionState(session: WorkspaceSessionState): Promise<void> {
   const savedSession = await saveSession(session)
-  updateRestorableSessionStateCache(mainWindowQueryClient, savedSession)
+  updateRestorableSessionStateCache(primaryWindowQueryClient, savedSession)
 }
 
 export async function setFetchInterval(sec: number): Promise<number> {
   const fetchIntervalSec = await setSettingsFetchInterval(sec)
-  updateRuntimeSettingsSnapshotCache(mainWindowQueryClient, (current) => ({ ...current, fetchIntervalSec }))
+  updateRuntimeSettingsSnapshotCache(primaryWindowQueryClient, (current) => ({ ...current, fetchIntervalSec }))
   return fetchIntervalSec
 }
 
 export async function setTerminalNotificationsEnabled(enabled: boolean): Promise<void> {
   await setSettingsTerminalNotificationsEnabled(enabled)
-  updateRuntimeSettingsSnapshotCache(mainWindowQueryClient, (current) => ({
+  updateRuntimeSettingsSnapshotCache(primaryWindowQueryClient, (current) => ({
     ...current,
     terminalNotificationsEnabled: enabled,
   }))
@@ -56,12 +56,15 @@ export async function setTerminalNotificationsEnabled(enabled: boolean): Promise
 
 export async function setShortcutsDisabled(disabled: boolean): Promise<void> {
   await setSettingsShortcutsDisabled(disabled)
-  updateRuntimeSettingsSnapshotCache(mainWindowQueryClient, (current) => ({ ...current, shortcutsDisabled: disabled }))
+  updateRuntimeSettingsSnapshotCache(primaryWindowQueryClient, (current) => ({
+    ...current,
+    shortcutsDisabled: disabled,
+  }))
 }
 
 export async function setGlobalShortcutDisabled(disabled: boolean): Promise<void> {
   await setSettingsGlobalShortcutDisabled(disabled)
-  updateRuntimeSettingsSnapshotCache(mainWindowQueryClient, (current) => ({
+  updateRuntimeSettingsSnapshotCache(primaryWindowQueryClient, (current) => ({
     ...current,
     globalShortcutDisabled: disabled,
   }))
@@ -69,7 +72,7 @@ export async function setGlobalShortcutDisabled(disabled: boolean): Promise<void
 
 export async function setGlobalShortcut(accelerator: string): Promise<GlobalShortcutState> {
   const state = await setSettingsGlobalShortcut(accelerator)
-  updateRuntimeSettingsSnapshotCache(mainWindowQueryClient, (current) => ({
+  updateRuntimeSettingsSnapshotCache(primaryWindowQueryClient, (current) => ({
     ...current,
     globalShortcut: state.accelerator,
     globalShortcutRegistered: state.registered,
@@ -79,18 +82,18 @@ export async function setGlobalShortcut(accelerator: string): Promise<GlobalShor
 
 export async function refreshExternalAppsDetection(): Promise<void> {
   const state = await refreshExternalAppsSnapshot()
-  mainWindowQueryClient.setQueryData(externalAppsQueryKey(), state)
+  primaryWindowQueryClient.setQueryData(externalAppsQueryKey(), state)
 }
 
 export async function refreshGitHubCliDetection(hosts?: string[]): Promise<void> {
   const state = await refreshGitHubCliState(hosts)
-  updateGitHubCliCache(mainWindowQueryClient, hosts, state)
+  updateGitHubCliCache(primaryWindowQueryClient, hosts, state)
 }
 
 export async function setLanEnabled(enabled: boolean): Promise<void> {
   await setSettingsLanEnabled(enabled)
-  updateRuntimeSettingsSnapshotCache(mainWindowQueryClient, (current) => ({ ...current, lanEnabled: enabled }))
-  void mainWindowQueryClient.invalidateQueries({ queryKey: lanInfoQueryKey() })
+  updateRuntimeSettingsSnapshotCache(primaryWindowQueryClient, (current) => ({ ...current, lanEnabled: enabled }))
+  void primaryWindowQueryClient.invalidateQueries({ queryKey: lanInfoQueryKey() })
 }
 
 export async function runSettingsAction<T>(label: string, task: () => Promise<T>): Promise<T | null> {

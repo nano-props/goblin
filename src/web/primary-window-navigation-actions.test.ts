@@ -1,12 +1,12 @@
 import { describe, expect, test, vi } from 'vitest'
-import { createMainWindowNavigationActions } from '#/web/main-window-navigation-actions.ts'
+import { createPrimaryWindowNavigationActions } from '#/web/primary-window-navigation-actions.ts'
 
-describe('createMainWindowNavigationActions', () => {
+describe('createPrimaryWindowNavigationActions', () => {
   test('mutates store directly for repo branch workspace navigation', () => {
     const setActive = vi.fn()
     const selectBranch = vi.fn()
     const setWorkspacePaneTab = vi.fn()
-    const actions = createMainWindowNavigationActions({
+    const actions = createPrimaryWindowNavigationActions({
       activeId: '/tmp/repo-a',
       order: ['/tmp/repo-a', '/tmp/repo-b'],
       setActive,
@@ -26,7 +26,7 @@ describe('createMainWindowNavigationActions', () => {
 
   test('workspace pane navigation updates the preferred workspace pane view', () => {
     const setWorkspacePaneTab = vi.fn()
-    const actions = createMainWindowNavigationActions({
+    const actions = createPrimaryWindowNavigationActions({
       activeId: '/tmp/repo-a',
       order: ['/tmp/repo-a'],
       setActive: vi.fn(),
@@ -43,7 +43,7 @@ describe('createMainWindowNavigationActions', () => {
 
   test('cycles repos through the store action', () => {
     const cycleActive = vi.fn()
-    const actions = createMainWindowNavigationActions({
+    const actions = createPrimaryWindowNavigationActions({
       activeId: '/tmp/repo-a',
       order: ['/tmp/repo-a', '/tmp/repo-b', '/tmp/repo-c'],
       setActive: vi.fn(),
@@ -60,7 +60,7 @@ describe('createMainWindowNavigationActions', () => {
 
   test('closes the repo through the store action', () => {
     const closeRepo = vi.fn()
-    const actions = createMainWindowNavigationActions({
+    const actions = createPrimaryWindowNavigationActions({
       activeId: '/tmp/repo-b',
       order: ['/tmp/repo-a', '/tmp/repo-b', '/tmp/repo-c'],
       setActive: vi.fn(),

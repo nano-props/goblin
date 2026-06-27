@@ -79,15 +79,15 @@ function SettingsRoute() {
   )
 }
 
-const mainRouteTree = rootRoute.addChildren([
+const primaryWindowRouteTree = rootRoute.addChildren([
   layoutRoute.addChildren([indexRoute, appRoute, settingsIndexRoute, settingsRoute]),
 ])
 
-export const mainRouter = createRouter({
-  routeTree: mainRouteTree,
+export const primaryWindowRouter = createRouter({
+  routeTree: primaryWindowRouteTree,
   history: createBrowserHistory(),
 })
 
-export function MainWindowRouterProvider() {
-  return <RouterProvider router={mainRouter} />
+export function PrimaryWindowRouterProvider() {
+  return <RouterProvider router={primaryWindowRouter} />
 }

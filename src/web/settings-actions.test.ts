@@ -2,7 +2,7 @@
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { defaultSettingsSnapshot, defaultSessionState } from '#/shared/settings-defaults.ts'
-import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import {
   externalAppsQueryKey,
   githubCliQueryKey,
@@ -65,7 +65,7 @@ vi.mock('#/web/settings-client.ts', () => ({
 
 describe('settings actions', () => {
   beforeEach(() => {
-    mainWindowQueryClient.clear()
+    primaryWindowQueryClient.clear()
     appDataClientMocks.addRecentRepo.mockReset()
     appDataClientMocks.addRecentRepo.mockResolvedValue({ recentRepos: [], addedRepo: null })
     appDataClientMocks.clearRecentRepos.mockReset()
@@ -109,7 +109,7 @@ describe('settings actions', () => {
   })
 
   test('recordRecentRepo syncs recent repos into the settings snapshot cache', async () => {
-    mainWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
+    primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
     appDataClientMocks.addRecentRepo.mockResolvedValue({
       recentRepos: [{ kind: 'local', id: '/tmp/repo-a' }],
       addedRepo: { kind: 'local', id: '/tmp/repo-a' },
@@ -118,13 +118,13 @@ describe('settings actions', () => {
 
     await recordRecentRepo({ kind: 'local', id: '/tmp/repo-a' })
 
-    expect(mainWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
+    expect(primaryWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
       recentRepos: [{ kind: 'local', id: '/tmp/repo-a' }],
     })
   })
 
   test('clearRecentRepoHistory clears recent repos from the settings snapshot cache', async () => {
-    mainWindowQueryClient.setQueryData(
+    primaryWindowQueryClient.setQueryData(
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({ recentRepos: [{ kind: 'local', id: '/tmp/repo-a' }] }),
     )
@@ -132,13 +132,13 @@ describe('settings actions', () => {
 
     await clearRecentRepoHistory()
 
-    expect(mainWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
+    expect(primaryWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
       recentRepos: [],
     })
   })
 
   test('persistSessionState syncs the saved session into the settings snapshot cache', async () => {
-    mainWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
+    primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
     const session = {
       ...defaultSessionState(),
       openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo-a' }],
@@ -149,7 +149,7 @@ describe('settings actions', () => {
 
     await persistSessionState(session)
 
-    expect(mainWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
+    expect(primaryWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
       session,
     })
   })
@@ -173,20 +173,20 @@ describe('settings actions', () => {
 
     await refreshGitHubCliDetection()
 
-    expect(mainWindowQueryClient.getQueryData(githubCliQueryKey())).toMatchObject({
+    expect(primaryWindowQueryClient.getQueryData(githubCliQueryKey())).toMatchObject({
       available: true,
       version: '2.70.0',
     })
   })
 
   test('setLanEnabled updates runtime settings cache and invalidates LAN info', async () => {
-    const invalidateSpy = vi.spyOn(mainWindowQueryClient, 'invalidateQueries')
-    mainWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
+    const invalidateSpy = vi.spyOn(primaryWindowQueryClient, 'invalidateQueries')
+    primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
     const { setLanEnabled } = await import('#/web/settings-actions.ts')
 
     await setLanEnabled(true)
 
-    expect(mainWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({ lanEnabled: true })
+    expect(primaryWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({ lanEnabled: true })
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: lanInfoQueryKey() })
     invalidateSpy.mockRestore()
   })

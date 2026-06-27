@@ -24,7 +24,7 @@ export interface RuntimeCoherentRepoProjectionStoreActions extends Pick<
   'ensureWorkspaceOpen' | 'closeRepo' | 'selectBranch' | 'setWorkspacePaneTab'
 > {}
 
-export interface MainWindowNavigationStoreActions extends Pick<
+export interface PrimaryWindowNavigationStoreActions extends Pick<
   ReposStore,
   'setActive' | 'closeRepo' | 'cycleActive' | 'selectBranch' | 'setWorkspacePaneTab'
 > {}
@@ -100,9 +100,9 @@ export function runtimeCoherentRepoProjectionStoreActionsFromStore(
   }
 }
 
-export function mainWindowNavigationStoreActionsFromStore(
+export function primaryWindowNavigationStoreActionsFromStore(
   state: Pick<ReposStore, 'setActive' | 'cycleActive' | 'closeRepo' | 'selectBranch' | 'setWorkspacePaneTab'>,
-): MainWindowNavigationStoreActions {
+): PrimaryWindowNavigationStoreActions {
   const restorable = restorableWorkspaceViewportStoreActionsFromStore({
     setActive: state.setActive,
     cycleActive: state.cycleActive,
@@ -146,9 +146,9 @@ export function clientEffectIntentStoreActionsFromStore(
   }
 }
 
-export function mainWindowNavigationStoreActionsEqual(
-  a: MainWindowNavigationStoreActions,
-  b: MainWindowNavigationStoreActions,
+export function primaryWindowNavigationStoreActionsEqual(
+  a: PrimaryWindowNavigationStoreActions,
+  b: PrimaryWindowNavigationStoreActions,
 ): boolean {
   return (
     a.setActive === b.setActive &&

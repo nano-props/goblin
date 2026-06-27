@@ -26,7 +26,10 @@ import type {
   TerminalDescriptor,
   WorktreeTerminalSnapshot,
 } from '#/web/components/terminal/types.ts'
-import { MainWindowNavigationProvider, type MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
+import {
+  PrimaryWindowNavigationProvider,
+  type PrimaryWindowNavigationActions,
+} from '#/web/primary-window-navigation.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
@@ -1091,7 +1094,7 @@ function menuBranchActions(): BranchActions {
 function renderToolbar(options: {
   terminalCount: number
   changeCount?: number
-  navigation: MainWindowNavigationActions
+  navigation: PrimaryWindowNavigationActions
   preferredWorkspacePaneTab?: WorkspacePaneTabType
   workspacePaneStaticTabs?: WorkspacePaneStaticTabType[]
   workspacePaneTabOrder?: WorkspacePaneTabOrderEntry[]
@@ -1234,7 +1237,7 @@ function renderToolbar(options: {
   act(() => {
     root!.render(
       <QueryClientProvider client={queryClient!}>
-        <MainWindowNavigationProvider value={options.navigation}>
+        <PrimaryWindowNavigationProvider value={options.navigation}>
           <TerminalSessionContext.Provider value={commandContext}>
             <TerminalSessionReadContext.Provider value={readContext}>
               <RepoWorkspaceToolbarHarness
@@ -1245,7 +1248,7 @@ function renderToolbar(options: {
               />
             </TerminalSessionReadContext.Provider>
           </TerminalSessionContext.Provider>
-        </MainWindowNavigationProvider>
+        </PrimaryWindowNavigationProvider>
       </QueryClientProvider>,
     )
   })
@@ -1276,7 +1279,7 @@ function ToolbarHost(props: Omit<Parameters<typeof RepoWorkspaceToolbar>[0], 'br
   return <RepoWorkspaceToolbar {...props} branchActions={branchActions} />
 }
 
-function navigationWith(overrides: Partial<MainWindowNavigationActions>): MainWindowNavigationActions {
+function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): PrimaryWindowNavigationActions {
   return {
     activateRepo: () => {},
     closeRepo: () => {},

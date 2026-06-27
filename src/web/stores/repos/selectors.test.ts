@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'vitest'
 import {
   keyboardRuntimeStateFromStore,
-  mainWindowWorkspaceStateEqual,
-  mainWindowWorkspaceStateFromStore,
+  primaryWindowWorkspaceStateEqual,
+  primaryWindowWorkspaceStateFromStore,
   navigationWorkspaceStateEqual,
   navigationWorkspaceStateFromStore,
   activeRepoFromStore,
@@ -11,8 +11,8 @@ import {
   runtimeCoherentRepoProjectionStateFromStore,
 } from '#/web/stores/repos/selector-state.ts'
 import {
-  mainWindowNavigationStoreActionsEqual,
-  mainWindowNavigationStoreActionsFromStore,
+  primaryWindowNavigationStoreActionsEqual,
+  primaryWindowNavigationStoreActionsFromStore,
   clientEffectIntentStoreActionsEqual,
   clientEffectIntentStoreActionsFromStore,
   repoPickerStoreActionsEqual,
@@ -43,7 +43,7 @@ describe('repo selectors', () => {
       },
     })
     expect(
-      mainWindowWorkspaceStateFromStore({
+      primaryWindowWorkspaceStateFromStore({
         activeId: '/tmp/repo',
         order: ['/tmp/repo'],
         zenMode: true,
@@ -88,16 +88,16 @@ describe('repo selectors', () => {
     })
   })
 
-  test('compares main window workspace slices structurally', () => {
+  test('compares primary window workspace slices structurally', () => {
     expect(
-      mainWindowWorkspaceStateEqual(
-        mainWindowWorkspaceStateFromStore({
+      primaryWindowWorkspaceStateEqual(
+        primaryWindowWorkspaceStateFromStore({
           activeId: '/tmp/repo-a',
           order: ['/tmp/repo-a', '/tmp/repo-b'],
           zenMode: false,
           sessionReady: true,
         }),
-        mainWindowWorkspaceStateFromStore({
+        primaryWindowWorkspaceStateFromStore({
           activeId: '/tmp/repo-a',
           order: ['/tmp/repo-a', '/tmp/repo-b'],
           zenMode: false,
@@ -204,15 +204,15 @@ describe('repo selectors', () => {
       setWorkspacePaneTab: fnA,
     })
     expect(
-      mainWindowNavigationStoreActionsEqual(
-        mainWindowNavigationStoreActionsFromStore({
+      primaryWindowNavigationStoreActionsEqual(
+        primaryWindowNavigationStoreActionsFromStore({
           setActive: fnA,
           closeRepo: fnA,
           cycleActive: fnA,
           selectBranch: fnA,
           setWorkspacePaneTab: fnA,
         }),
-        mainWindowNavigationStoreActionsFromStore({
+        primaryWindowNavigationStoreActionsFromStore({
           setActive: fnA,
           closeRepo: fnA,
           cycleActive: fnA,
