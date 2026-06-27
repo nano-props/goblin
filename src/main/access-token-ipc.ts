@@ -2,9 +2,9 @@ import { unlink } from 'node:fs/promises'
 import { app, ipcMain } from 'electron'
 import { ROTATE_ACCESS_TOKEN_CHANNEL } from '#/shared/ipc-channels.ts'
 import { accessTokenFilePath, readOrCreateAccessToken } from '#/shared/access-token-file.ts'
-import { startEmbeddedServer, stopEmbeddedServer, getEmbeddedServerRuntime } from '#/main/server-manager.ts'
-import { getMainWindow } from '#/main/window.ts'
-import { createClientEntryUrl } from '#/main/window-shell.ts'
+import { startEmbeddedServer, stopEmbeddedServer, getEmbeddedServerRuntime } from '#/main/embedded-server-lifecycle.ts'
+import { getPrimaryWindow } from '#/main/window.ts'
+import { createBrowserEntryUrl } from '#/main/window-security.ts'
 import { replantEmbedAuthCookieForRotation } from '#/main/cookie-bootstrap.ts'
 import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
 import { accessTokenNodeLog } from '#/node/logger.ts'
@@ -85,32 +85,35 @@ async function doRotate(): Promise<{ accessToken: string }> {
 }
 
 /**
- * Replant the auth cookie on the main window's session. Best-effort:
+ * Replant the auth cookie on the primary window's session. Best-effort:
  * a missing runtime, missing window, or cookies.set failure must
  * never propagate up to the rotation IPC handler — the caller (the
  * settings UI) needs the new access token regardless.
  */
 async function tryReplantEmbedAuthCookie(accessToken: string): Promise<void> {
   const runtime = getEmbeddedServerRuntime()
-  const main = getMainWindow()
-  if (!main || runtime?.accessToken !== accessToken) return
+  const primary = getPrimaryWindow()
+  if (!primary || runtime?.accessToken !== accessToken) return
   try {
-    const { url } = createClientEntryUrl({ routePath: '/' })
+    const { url } = createBrowserEntryUrl({ routePath: '/' })
     await replantEmbedAuthCookieForRotation({
       accessToken,
       url: url.toString(),
-      webContents: main.webContents,
+      webContents: primary.webContents,
     })
   } catch (err) {
-    accessTokenNodeLog.warn({ err }, 'failed to replant embed auth cookie after rotation; client will fall back to URL-token path')
+    accessTokenNodeLog.warn(
+      { err },
+      'failed to replant embed auth cookie after rotation; client will fall back to URL-token path',
+    )
   }
 }
 
-export function wireAccessTokenBridgeIpc(): void {
+export function wireAccessTokenIpc(): void {
   // Token rotation: deletes the on-disk token, restarts the
   // server, replants the new cookie. The gating matters here
   // because rotation is a destructive operation: a popup could
-  // otherwise spin-restart the server, briefly denying the main
+  // otherwise spin-restart the server, briefly denying the primary
   // window service, or race the user into losing their
   // session-resume state.
   //

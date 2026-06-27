@@ -2,8 +2,8 @@
 //
 // Boundary:
 // - This module owns client-surface identity and capability lookup.
-// - It does NOT own window shell policy (navigation/open-handler), which
-//   lives in window-shell.ts.
+// - It does NOT own BrowserWindow security policy (navigation/open-handler),
+//   which lives in window-security.ts.
 
 import { BrowserWindow, type BrowserWindow as BrowserWindowType } from 'electron'
 import { windowRegistryNodeLog } from '#/node/logger.ts'
@@ -30,7 +30,7 @@ export interface RegisteredClientSurfaceHandle extends RegisteredClientSurface {
   window: BrowserWindowType
 }
 
-let mainWindow: BrowserWindowType | null = null
+let primaryWindow: BrowserWindowType | null = null
 const surfacesByWebContentsId = new Map<number, RegisteredClientSurface>()
 
 function defaultCapabilities(): RegisteredClientSurfaceCapabilities {
@@ -57,22 +57,22 @@ function unregisterSurface(win?: BrowserWindowType | null): void {
   } catch {}
 }
 
-export function unregisterMainWindow(win?: BrowserWindowType): void {
-  if (win && mainWindow !== win) return
-  unregisterSurface(mainWindow ?? win)
-  mainWindow = null
+export function unregisterPrimaryWindow(win?: BrowserWindowType): void {
+  if (win && primaryWindow !== win) return
+  unregisterSurface(primaryWindow ?? win)
+  primaryWindow = null
 }
 
-export function getMainWindow(): BrowserWindowType | null {
-  if (mainWindow && !mainWindow.isDestroyed()) return mainWindow
-  unregisterSurface(mainWindow)
-  mainWindow = null
+export function getPrimaryWindow(): BrowserWindowType | null {
+  if (primaryWindow && !primaryWindow.isDestroyed()) return primaryWindow
+  unregisterSurface(primaryWindow)
+  primaryWindow = null
   return null
 }
 
 function allRegisteredWindows(): BrowserWindowType[] {
-  const main = getMainWindow()
-  return main ? [main] : []
+  const primary = getPrimaryWindow()
+  return primary ? [primary] : []
 }
 
 function allRegisteredSurfaces(): RegisteredClientSurfaceHandle[] {
@@ -96,8 +96,8 @@ export function isRegisteredClientSurfaceId(webContentsId: number): boolean {
 }
 
 function registeredWindowByWebContentsId(webContentsId: number): BrowserWindowType | null {
-  const main = getMainWindow()
-  if (main?.webContents.id === webContentsId) return main
+  const primary = getPrimaryWindow()
+  if (primary?.webContents.id === webContentsId) return primary
   return null
 }
 
@@ -125,7 +125,7 @@ export function focusedRegisteredSurface(): RegisteredClientSurfaceHandle | null
 export function getFocusedRegisteredWindow(): BrowserWindowType | null {
   const focused = BrowserWindow.getFocusedWindow()
   if (!focused || focused.isDestroyed()) return null
-  return focused === getMainWindow() ? focused : null
+  return focused === getPrimaryWindow() ? focused : null
 }
 
 export function sendToRegisteredWindow(
@@ -191,7 +191,7 @@ export function broadcastToSurfaceCapability(
 }
 
 export function registerClientWindowSurface(win: BrowserWindowType, surface: ClientSurfaceSpec): void {
-  mainWindow = win
+  primaryWindow = win
   registerSurface(win, {
     windowKey: surface.windowKey,
     capabilities: resolveCapabilities(surface.capabilities),
@@ -199,5 +199,5 @@ export function registerClientWindowSurface(win: BrowserWindowType, surface: Cli
 }
 
 export function unregisterClientWindowSurface(_surface: ClientSurfaceSpec, win?: BrowserWindowType): void {
-  unregisterMainWindow(win)
+  unregisterPrimaryWindow(win)
 }

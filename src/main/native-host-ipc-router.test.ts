@@ -1,6 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
 import { app, ipcMain } from 'electron'
-import { IPC_ABORT_CHANNEL, IPC_CHANNEL } from '#/shared/ipc-channels.ts'
+import { HOST_IPC_ABORT_CHANNEL, HOST_IPC_CALL_CHANNEL } from '#/shared/ipc-channels.ts'
 import { getDefaultBranch, isAncestor, getCurrentBranch, getUpstream, isGitRepo } from '#/system/git/branches.ts'
 import { createWorktree, getWorktrees } from '#/system/git/worktrees.ts'
 import { getWorkingStatus } from '#/system/git/status.ts'
@@ -10,9 +10,9 @@ import { getBrowserRemoteUrl, pullBranch } from '#/system/git/remote.ts'
 import { getBranchPullRequest, getBranchPullRequests } from '#/system/git/pull-requests.ts'
 import { openHttpsExternal } from '#/main/external-url.ts'
 import { registerTrustedAppUrl, registerTrustedWebContents } from '#/main/ipc/trusted-webcontents.ts'
-import { wireIpc } from '#/main/ipc.ts'
+import { wireIpc } from '#/main/native-host-ipc-router.ts'
 import { getSettingsPrefs } from '#/main/settings-server-client.ts'
-import type { IpcResponse, SettingsPrefs } from '#/shared/api-types.ts'
+import type { IpcResponse, UserSettings } from '#/shared/api-types.ts'
 
 const ipcHandlers = new Map<string, (_event: unknown, input: any) => Promise<unknown>>()
 const browserWindowFromWebContents = vi.hoisted(() => vi.fn(() => null))
@@ -24,7 +24,7 @@ const getEmbeddedServerRuntimeMock = vi.hoisted(() =>
   vi.fn<() => { url: string; accessToken: string } | null>(() => null),
 )
 
-function settingsPrefs(overrides: Partial<SettingsPrefs> = {}): SettingsPrefs {
+function settingsPrefs(overrides: Partial<UserSettings> = {}): UserSettings {
   return {
     lang: 'auto',
     theme: 'auto',
@@ -116,11 +116,11 @@ vi.mock('#/system/git/pull-requests.ts', () => ({
 }))
 
 vi.mock('#/main/window.ts', () => ({
-  activateMainWindow: vi.fn(() => Promise.resolve({ webContents: { send: vi.fn() } })),
-  getMainWindow: vi.fn(() => null),
+  activatePrimaryWindow: vi.fn(() => Promise.resolve({ webContents: { send: vi.fn() } })),
+  getPrimaryWindow: vi.fn(() => null),
 }))
 
-vi.mock('#/main/window-registry.ts', () => ({
+vi.mock('#/main/client-surface-registry.ts', () => ({
   focusedRegisteredSurface: vi.fn(() => null),
   allRegisteredSurfacesWithCapability: vi.fn(() => []),
   isRegisteredClientSurfaceId: vi.fn(() => false),
@@ -215,7 +215,7 @@ vi.mock('#/system/ssh/commands.ts', () => ({
   runRemoteCommand: runRemoteCommandMock,
 }))
 
-vi.mock('#/main/server-manager.ts', () => ({
+vi.mock('#/main/embedded-server-lifecycle.ts', () => ({
   getEmbeddedServerRuntime: getEmbeddedServerRuntimeMock,
 }))
 
@@ -231,13 +231,13 @@ async function invokeIpc(
   event: unknown = trustedEvent,
   requestId?: string,
 ): Promise<IpcResponse> {
-  const handler = ipcHandlers.get(IPC_CHANNEL)
+  const handler = ipcHandlers.get(HOST_IPC_CALL_CHANNEL)
   if (!handler) throw new Error('IPC handler not wired')
   return handler(event, { path, input, requestId }) as Promise<IpcResponse>
 }
 
 async function invokeAbortIpc(input: unknown, event: unknown = trustedEvent): Promise<unknown> {
-  const handler = ipcHandlers.get(IPC_ABORT_CHANNEL)
+  const handler = ipcHandlers.get(HOST_IPC_ABORT_CHANNEL)
   if (!handler) throw new Error('IPC abort handler not wired')
   return handler(event, input)
 }
@@ -412,7 +412,7 @@ describe('main repo ipc cancellation', () => {
     expect(aborted).toBe(false)
   })
 
-  test('projects recent repos into native shell state, syncing both menu and Dock recents', async () => {
+  test('projects recent repos into native host state, syncing both menu and Dock recents', async () => {
     const repo = { kind: 'local' as const, id: '/repo' }
 
     const result = await invokeIpc('settings.applyShellProjection', { recentRepos: { recentRepos: [repo] } })
@@ -440,7 +440,7 @@ describe('main repo ipc cancellation', () => {
     expect(app.addRecentDocument).toHaveBeenCalledWith('/repo')
   })
 
-  test('projects server-owned prefs into native shell state when the client updates them', async () => {
+  test('projects server-owned prefs into native host state when the client updates them', async () => {
     const result = await invokeIpc('settings.applyShellProjection', {
       prefs: {
         patch: {
@@ -476,7 +476,7 @@ describe('main repo ipc cancellation', () => {
     expect((await import('#/main/menu.ts')).buildAppMenu).toHaveBeenCalled()
   })
 
-  test('rejects an empty native shell projection payload', async () => {
+  test('rejects an empty native host projection payload', async () => {
     const result = await invokeIpc('settings.applyShellProjection', {})
 
     expect(result).toEqual({

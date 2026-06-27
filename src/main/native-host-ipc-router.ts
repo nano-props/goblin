@@ -3,18 +3,18 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import {
   IpcError,
   createAppRouter,
-  type NativeIpcHandlers,
+  type NativeHostIpcHandlers,
   type IpcRequest,
   type IpcResponse,
 } from '#/shared/api-types.ts'
-import { NATIVE_IPC_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
-import { applyMainWindowChromeTheme } from '#/main/window.ts'
-import { allRegisteredSurfacesWithCapability } from '#/main/window-registry.ts'
+import { NATIVE_HOST_IPC_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
+import { applyPrimaryWindowTitleBarTheme } from '#/main/window.ts'
+import { allRegisteredSurfacesWithCapability } from '#/main/client-surface-registry.ts'
 import { subscribeTheme } from '#/main/theme.ts'
 import { buildAppMenu } from '#/main/menu.ts'
 import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
 import { WINDOW_BACKGROUND_BY_COLOR_THEME } from '#/shared/theme-tokens.ts'
-import { IPC_ABORT_CHANNEL, IPC_CHANNEL } from '#/shared/ipc-channels.ts'
+import { HOST_IPC_ABORT_CHANNEL, HOST_IPC_CALL_CHANNEL } from '#/shared/ipc-channels.ts'
 import { createNativeHostIpcHandlers } from '#/main/native-host-ipc-handlers.ts'
 
 const MAX_IPC_PROCEDURE_PATH_LENGTH = 128
@@ -31,9 +31,9 @@ export function wireIpc(): void {
   if (wired) return
   wired = true
 
-  const router = createAppRouter(createNativeIpcHandlers(), NATIVE_IPC_PROCEDURE_SCHEMAS)
+  const router = createAppRouter(createNativeHostIpcHandlers(), NATIVE_HOST_IPC_PROCEDURE_SCHEMAS)
 
-  ipcMain.handle(IPC_ABORT_CHANNEL, async (event, input: unknown): Promise<boolean> => {
+  ipcMain.handle(HOST_IPC_ABORT_CHANNEL, async (event, input: unknown): Promise<boolean> => {
     try {
       return isTrustedIpcEvent(event) ? abortIpcRequest(input) : false
     } catch {
@@ -41,7 +41,7 @@ export function wireIpc(): void {
     }
   })
 
-  ipcMain.handle(IPC_CHANNEL, async (event, request: IpcRequest): Promise<IpcResponse> => {
+  ipcMain.handle(HOST_IPC_CALL_CHANNEL, async (event, request: IpcRequest): Promise<IpcResponse> => {
     try {
       if (!isTrustedIpcEvent(event)) {
         throw new IpcError({ code: 'FORBIDDEN', message: 'Untrusted IPC sender' })
@@ -73,7 +73,7 @@ export function wireIpc(): void {
     for (const { window: win } of allRegisteredSurfacesWithCapability('themeSync')) {
       if (!win.isDestroyed()) win.setBackgroundColor(WINDOW_BACKGROUND_BY_COLOR_THEME[state.colorTheme][state.resolved])
     }
-    applyMainWindowChromeTheme(state.resolved)
+    applyPrimaryWindowTitleBarTheme(state.resolved)
     buildAppMenu()
   })
 }
@@ -119,8 +119,4 @@ function toIpcError(err: unknown): Extract<IpcResponse, { ok: false }>['error'] 
   if (err instanceof IpcError) return { name: err.name, code: err.code, message: err.message }
   if (err instanceof Error) return { name: err.name, message: err.message }
   return { message: String(err) }
-}
-
-function createNativeIpcHandlers(): NativeIpcHandlers {
-  return createNativeHostIpcHandlers()
 }

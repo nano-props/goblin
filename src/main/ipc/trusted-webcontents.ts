@@ -1,5 +1,5 @@
 import type { IpcMainInvokeEvent, WebContents } from 'electron'
-import { isRegisteredClientSurfaceId } from '#/main/window-registry.ts'
+import { isRegisteredClientSurfaceId } from '#/main/client-surface-registry.ts'
 
 const explicitlyTrustedWebContentsIds = new Set<number>()
 const trustedAppUrls = new Set<string>()

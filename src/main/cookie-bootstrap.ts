@@ -72,11 +72,7 @@ export interface EmbedAuthCookieOptions {
  * by the time the caller is ready, but in dev mode the proxy
  * round-trip is fast enough that this matters in practice.
  */
-export async function plantEmbedAuthCookie({
-  accessToken,
-  url,
-  webContents,
-}: EmbedAuthCookieOptions): Promise<void> {
+export async function plantEmbedAuthCookie({ accessToken, url, webContents }: EmbedAuthCookieOptions): Promise<void> {
   // Pass the URL's origin (protocol + host + port) through,
   // dropping any query string. Chromium scopes the cookie to
   // host *and* port, so a port-stripped URL (`http://127.0.0.1`)
@@ -117,7 +113,7 @@ export interface ReplantEmbedAuthCookieForRotationOptions {
  * Replant the auth cookie after the embedded server restarts with a
  * new access token. Thin wrapper over `plantEmbedAuthCookie` that
  * uses a narrower `webContents` type so the rotation flow in
- * `access-token-bridge.ts` can inject a `Pick<WebContents, 'session'>`
+ * `access-token-ipc.ts` can inject a `Pick<WebContents, 'session'>`
  * without depending on the full Electron surface.
  *
  * Without this replant, a rotation leaves the client's

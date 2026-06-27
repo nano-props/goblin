@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { IPC_EVENT_CHANNEL } from '#/shared/ipc-channels.ts'
+import { HOST_IPC_EVENT_CHANNEL } from '#/shared/ipc-channels.ts'
 
 const mocks = vi.hoisted(() => ({
   getFocusedWindow: vi.fn(() => null),
@@ -22,22 +22,22 @@ function makeWindow() {
   } as any
 }
 
-describe('window registry', () => {
+describe('client surface registry', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()
     nextWebContentsId = 1
   })
 
-  test('tracks the main window surface and resolves the focused registered window', async () => {
-    const registry = await import('#/main/window-registry.ts')
-    const main = makeWindow()
+  test('tracks the primary window surface and resolves the focused registered window', async () => {
+    const registry = await import('#/main/client-surface-registry.ts')
+    const primary = makeWindow()
 
-    registry.registerClientWindowSurface(main, { windowKey: 'main' })
+    registry.registerClientWindowSurface(primary, { windowKey: 'main' })
 
-    expect(registry.getMainWindow()).toBe(main)
-    expect(registry.isRegisteredClientSurfaceId(main.webContents.id)).toBe(true)
-    expect(registry.registeredClientSurfaceByWebContentsId(main.webContents.id)).toEqual({
+    expect(registry.getPrimaryWindow()).toBe(primary)
+    expect(registry.isRegisteredClientSurfaceId(primary.webContents.id)).toBe(true)
+    expect(registry.registeredClientSurfaceByWebContentsId(primary.webContents.id)).toEqual({
       windowKey: 'main',
       capabilities: {
         ipcBroadcast: true,
@@ -45,34 +45,34 @@ describe('window registry', () => {
       },
     })
 
-    mocks.getFocusedWindow.mockReturnValue(main)
-    expect(registry.getFocusedRegisteredWindow()).toBe(main)
+    mocks.getFocusedWindow.mockReturnValue(primary)
+    expect(registry.getFocusedRegisteredWindow()).toBe(primary)
     expect(registry.focusedRegisteredSurface()).toEqual({
       windowKey: 'main',
       capabilities: {
         ipcBroadcast: true,
         themeSync: true,
       },
-      webContentsId: main.webContents.id,
-      window: main,
+      webContentsId: primary.webContents.id,
+      window: primary,
     })
   })
 
   test('broadcasts to matching surfaces by capability', async () => {
-    const registry = await import('#/main/window-registry.ts')
-    const main = makeWindow()
+    const registry = await import('#/main/client-surface-registry.ts')
+    const primary = makeWindow()
 
-    registry.registerClientWindowSurface(main, { windowKey: 'main', capabilities: { ipcBroadcast: true } })
-    registry.broadcastToSurfaceCapability('ipcBroadcast', IPC_EVENT_CHANNEL, [{ type: 'settings-write-error' }])
+    registry.registerClientWindowSurface(primary, { windowKey: 'main', capabilities: { ipcBroadcast: true } })
+    registry.broadcastToSurfaceCapability('ipcBroadcast', HOST_IPC_EVENT_CHANNEL, [{ type: 'settings-write-error' }])
 
-    expect(main.webContents.send).toHaveBeenCalledWith(IPC_EVENT_CHANNEL, { type: 'settings-write-error' })
+    expect(primary.webContents.send).toHaveBeenCalledWith(HOST_IPC_EVENT_CHANNEL, { type: 'settings-write-error' })
   })
 
   test('filters surfaces by capability', async () => {
-    const registry = await import('#/main/window-registry.ts')
-    const main = makeWindow()
+    const registry = await import('#/main/client-surface-registry.ts')
+    const primary = makeWindow()
 
-    registry.registerClientWindowSurface(main, { windowKey: 'main', capabilities: { themeSync: true } })
+    registry.registerClientWindowSurface(primary, { windowKey: 'main', capabilities: { themeSync: true } })
 
     expect(registry.allRegisteredSurfacesWithCapability('themeSync')).toEqual([
       {
@@ -81,8 +81,8 @@ describe('window registry', () => {
           ipcBroadcast: true,
           themeSync: true,
         },
-        webContentsId: main.webContents.id,
-        window: main,
+        webContentsId: primary.webContents.id,
+        window: primary,
       },
     ])
   })

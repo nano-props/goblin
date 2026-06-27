@@ -27,7 +27,7 @@ beforeEach(async () => {
   vi.clearAllMocks()
   isTrustedIpcEventMock.mockReturnValue(true)
   // Per-test tmpdir keeps sweep tests isolated from anything else under /tmp.
-  testTmpdir = path.join(realTmpdir(), `clipboard-bridge-test-${process.pid}-${Math.random().toString(36).slice(2)}`)
+  testTmpdir = path.join(realTmpdir(), `clipboard-ipc-test-${process.pid}-${Math.random().toString(36).slice(2)}`)
   await mkdir(testTmpdir, { recursive: true })
   vi.spyOn(os, 'tmpdir').mockReturnValue(testTmpdir)
 })
@@ -39,7 +39,7 @@ afterEach(async () => {
 
 describe('saveClipboardBinaryFiles', () => {
   test('writes blobs to the per-process temp dir with timestamped names', async () => {
-    const { saveClipboardBinaryFiles } = await import('#/main/clipboard-bridge.ts')
+    const { saveClipboardBinaryFiles } = await import('#/main/clipboard-ipc.ts')
     const paths = await saveClipboardBinaryFiles([
       { name: 'shot.png', bytes: new TextEncoder().encode('alpha').buffer as ArrayBuffer },
       { name: 'doc.pdf', bytes: new TextEncoder().encode('beta').buffer as ArrayBuffer },
@@ -68,7 +68,7 @@ describe('saveClipboardBinaryFiles', () => {
     // new format inserts a process-level counter between index
     // and name; this test pins that the counter is part of the
     // filename and is unique per call.
-    const { saveClipboardBinaryFiles } = await import('#/main/clipboard-bridge.ts')
+    const { saveClipboardBinaryFiles } = await import('#/main/clipboard-ipc.ts')
     const a = await saveClipboardBinaryFiles([{ name: 'first.bin', bytes: new ArrayBuffer(1) }])
     const b = await saveClipboardBinaryFiles([{ name: 'first.bin', bytes: new ArrayBuffer(1) }])
     expect(a[0]).not.toBe(b[0])
@@ -80,7 +80,7 @@ describe('saveClipboardBinaryFiles', () => {
   })
 
   test('returns empty array for empty input without creating the temp dir', async () => {
-    const { saveClipboardBinaryFiles } = await import('#/main/clipboard-bridge.ts')
+    const { saveClipboardBinaryFiles } = await import('#/main/clipboard-ipc.ts')
     const paths = await saveClipboardBinaryFiles([])
     expect(paths).toEqual([])
     const entries = await readdir(testTmpdir)
@@ -88,13 +88,13 @@ describe('saveClipboardBinaryFiles', () => {
   })
 
   test('rejects payloads exceeding PASTE_FILE_MAX_BYTES', async () => {
-    const { saveClipboardBinaryFiles } = await import('#/main/clipboard-bridge.ts')
+    const { saveClipboardBinaryFiles } = await import('#/main/clipboard-ipc.ts')
     const oversized = new ArrayBuffer(PASTE_FILE_MAX_BYTES + 1)
     await expect(saveClipboardBinaryFiles([{ name: 'big.bin', bytes: oversized }])).rejects.toThrow(/exceeds/)
   })
 
   test('sanitises path-separator characters in the supplied name', async () => {
-    const { saveClipboardBinaryFiles } = await import('#/main/clipboard-bridge.ts')
+    const { saveClipboardBinaryFiles } = await import('#/main/clipboard-ipc.ts')
     const paths = await saveClipboardBinaryFiles([{ name: '../escape/attempt.png', bytes: new ArrayBuffer(4) }])
     expect(paths[0]).not.toContain('../')
     // Anchor the literal `.png` extension — see comment above on why
@@ -116,7 +116,7 @@ describe('saveClipboardBinaryFiles', () => {
     // out-of-band character in the C1 range to lock the contract
     // — if a future refactor narrows the character class to
     // \x00-\x1F, this re-fails loudly.
-    const { saveClipboardBinaryFiles } = await import('#/main/clipboard-bridge.ts')
+    const { saveClipboardBinaryFiles } = await import('#/main/clipboard-ipc.ts')
     const c1Char = String.fromCharCode(0x90) // U+0090, control char
     const name = `name${c1Char}tail.bin`
     const paths = await saveClipboardBinaryFiles([{ name, bytes: new ArrayBuffer(1) }])
@@ -126,7 +126,7 @@ describe('saveClipboardBinaryFiles', () => {
   })
 
   test('prefixes Windows reserved file stems after sanitising', async () => {
-    const { saveClipboardBinaryFiles } = await import('#/main/clipboard-bridge.ts')
+    const { saveClipboardBinaryFiles } = await import('#/main/clipboard-ipc.ts')
     const paths = await saveClipboardBinaryFiles([
       { name: 'CON.png', bytes: new ArrayBuffer(1) },
       { name: 'lpt9.txt', bytes: new ArrayBuffer(1) },
@@ -138,7 +138,7 @@ describe('saveClipboardBinaryFiles', () => {
 
 describe('pruneStaleClipboardTempDirs', () => {
   test('removes goblin-clipboard-* dirs left by previous runs but preserves the current one', async () => {
-    const { pruneStaleClipboardTempDirs, saveClipboardBinaryFiles } = await import('#/main/clipboard-bridge.ts')
+    const { pruneStaleClipboardTempDirs, saveClipboardBinaryFiles } = await import('#/main/clipboard-ipc.ts')
     // Stale leftovers
     const stale = path.join(testTmpdir, 'goblin-clipboard-99999')
     await mkdir(stale, { recursive: true })
@@ -153,7 +153,7 @@ describe('pruneStaleClipboardTempDirs', () => {
   })
 
   test('ignores unrelated entries in the temp dir', async () => {
-    const { pruneStaleClipboardTempDirs } = await import('#/main/clipboard-bridge.ts')
+    const { pruneStaleClipboardTempDirs } = await import('#/main/clipboard-ipc.ts')
     await mkdir(path.join(testTmpdir, 'someone-else'), { recursive: true })
     await pruneStaleClipboardTempDirs()
     const entries = await readdir(testTmpdir)
@@ -163,7 +163,7 @@ describe('pruneStaleClipboardTempDirs', () => {
 
 describe('pruneExpiredClipboardTempFiles', () => {
   test('removes expired files from the current process temp dir but preserves fresh files', async () => {
-    const { pruneExpiredClipboardTempFiles } = await import('#/main/clipboard-bridge.ts')
+    const { pruneExpiredClipboardTempFiles } = await import('#/main/clipboard-ipc.ts')
     const currentDir = path.join(testTmpdir, `goblin-clipboard-${process.pid}`)
     await mkdir(currentDir, { recursive: true })
     const oldFile = path.join(currentDir, 'old.bin')
@@ -184,12 +184,12 @@ describe('pruneExpiredClipboardTempFiles', () => {
   })
 
   test('does not throw when the current temp dir is missing', async () => {
-    const { pruneExpiredClipboardTempFiles } = await import('#/main/clipboard-bridge.ts')
+    const { pruneExpiredClipboardTempFiles } = await import('#/main/clipboard-ipc.ts')
     await expect(pruneExpiredClipboardTempFiles()).resolves.toBeUndefined()
   })
 
   test('handles empty dirs, subdirs, and stat failures without throwing', async () => {
-    const { pruneExpiredClipboardTempFiles } = await import('#/main/clipboard-bridge.ts')
+    const { pruneExpiredClipboardTempFiles } = await import('#/main/clipboard-ipc.ts')
     const currentDir = path.join(testTmpdir, `goblin-clipboard-${process.pid}`)
     await mkdir(currentDir, { recursive: true })
     await expect(pruneExpiredClipboardTempFiles(Date.now(), 0)).resolves.toBeUndefined()
@@ -204,12 +204,12 @@ describe('pruneExpiredClipboardTempFiles', () => {
   })
 })
 
-describe('wireClipboardBridgeIpc', () => {
+describe('wireClipboardIpc', () => {
   test('registers the handler and triggers a startup prune', async () => {
     const stale = path.join(testTmpdir, 'goblin-clipboard-99999')
     await mkdir(stale, { recursive: true })
-    const { wireClipboardBridgeIpc } = await import('#/main/clipboard-bridge.ts')
-    wireClipboardBridgeIpc()
+    const { wireClipboardIpc } = await import('#/main/clipboard-ipc.ts')
+    wireClipboardIpc()
     // pruneStaleClipboardTempDirs is fire-and-forget; await a microtask flush
     await new Promise((r) => setTimeout(r, 10))
     const entries = await readdir(testTmpdir)
@@ -219,16 +219,16 @@ describe('wireClipboardBridgeIpc', () => {
 
   test('handler rejects untrusted senders by returning []', async () => {
     isTrustedIpcEventMock.mockReturnValue(false)
-    const { wireClipboardBridgeIpc } = await import('#/main/clipboard-bridge.ts')
-    wireClipboardBridgeIpc()
+    const { wireClipboardIpc } = await import('#/main/clipboard-ipc.ts')
+    wireClipboardIpc()
     const handler = ipcHandlers.get('goblin:clipboard-save-files')!
     const result = await handler({}, [{ name: 'a.txt', bytes: new ArrayBuffer(1) }])
     expect(result).toEqual([])
   })
 
   test('handler returns [] on malformed payload shape', async () => {
-    const { wireClipboardBridgeIpc } = await import('#/main/clipboard-bridge.ts')
-    wireClipboardBridgeIpc()
+    const { wireClipboardIpc } = await import('#/main/clipboard-ipc.ts')
+    wireClipboardIpc()
     const handler = ipcHandlers.get('goblin:clipboard-save-files')!
     expect(await handler({}, 'not an array')).toEqual([])
     expect(await handler({}, [{ name: 5, bytes: new ArrayBuffer(1) }])).toEqual([])
@@ -236,8 +236,8 @@ describe('wireClipboardBridgeIpc', () => {
   })
 
   test('handler returns absolute paths for a well-formed payload', async () => {
-    const { wireClipboardBridgeIpc } = await import('#/main/clipboard-bridge.ts')
-    wireClipboardBridgeIpc()
+    const { wireClipboardIpc } = await import('#/main/clipboard-ipc.ts')
+    wireClipboardIpc()
     const handler = ipcHandlers.get('goblin:clipboard-save-files')!
     const result = await handler({}, [{ name: 'a.txt', bytes: new TextEncoder().encode('hi').buffer as ArrayBuffer }])
     expect(Array.isArray(result)).toBe(true)
@@ -245,8 +245,8 @@ describe('wireClipboardBridgeIpc', () => {
   })
 
   test('handler swallows write errors to []', async () => {
-    const { wireClipboardBridgeIpc } = await import('#/main/clipboard-bridge.ts')
-    wireClipboardBridgeIpc()
+    const { wireClipboardIpc } = await import('#/main/clipboard-ipc.ts')
+    wireClipboardIpc()
     const handler = ipcHandlers.get('goblin:clipboard-save-files')!
     const oversized = new ArrayBuffer(PASTE_FILE_MAX_BYTES + 1)
     const result = await handler({}, [{ name: 'big.bin', bytes: oversized }])
@@ -256,17 +256,17 @@ describe('wireClipboardBridgeIpc', () => {
   test('clears any prior periodic-prune interval on re-entry', async () => {
     // Regression for the previous implementation that called
     // `setInterval` unconditionally on every wire-up. The test
-    // harness re-enters `wireClipboardBridgeIpc` (each test that
+    // harness re-enters `wireClipboardIpc` (each test that
     // touches the handler calls it again), and without the
     // clearInterval guard each call stacked a 1 h timer that no one
     // ever cleared. We assert that the second call invokes
     // `clearInterval` exactly once with a non-zero handle, leaving
     // the most recent timer in place.
     const clearIntervalSpy = vi.spyOn(globalThis, 'clearInterval')
-    const { wireClipboardBridgeIpc } = await import('#/main/clipboard-bridge.ts')
-    wireClipboardBridgeIpc()
+    const { wireClipboardIpc } = await import('#/main/clipboard-ipc.ts')
+    wireClipboardIpc()
     const firstCallCount = clearIntervalSpy.mock.calls.length
-    wireClipboardBridgeIpc()
+    wireClipboardIpc()
     const newCalls = clearIntervalSpy.mock.calls.slice(firstCallCount)
     expect(newCalls).toHaveLength(1)
     const cleared = newCalls[0]?.[0]

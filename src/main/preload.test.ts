@@ -30,13 +30,13 @@ function extractIpcChannelLiterals(source: string): string[] {
 }
 import {
   CLIENT_EFFECT_INTENT_CHANNEL,
-  IPC_ABORT_CHANNEL,
-  IPC_CHANNEL,
-  IPC_EVENT_CHANNEL,
-  SHELL_CONSUME_EXTERNAL_OPEN_PATHS_CHANNEL,
-  SHELL_OPEN_DIRECTORY_DIALOG_CHANNEL,
-  SHELL_OPEN_EXTERNAL_URL_CHANNEL,
-  SHELL_OPEN_SETTINGS_WINDOW_CHANNEL,
+  HOST_IPC_ABORT_CHANNEL,
+  HOST_IPC_CALL_CHANNEL,
+  HOST_IPC_EVENT_CHANNEL,
+  HOST_CONSUME_EXTERNAL_OPEN_PATHS_CHANNEL,
+  HOST_OPEN_DIRECTORY_DIALOG_CHANNEL,
+  HOST_OPEN_EXTERNAL_URL_CHANNEL,
+  HOST_OPEN_SETTINGS_WINDOW_CHANNEL,
   TERMINAL_NOTIFY_BELL_CHANNEL,
   TERMINAL_SEND_TEST_NOTIFICATION_CHANNEL,
   TERMINAL_SET_BADGE_CHANNEL,
@@ -123,7 +123,7 @@ describe('preload goblinNative bridge', () => {
     expect(goblinNative).toHaveProperty('invokeIpc')
     expect(goblinNative).toHaveProperty('abortIpc')
     expect(goblinNative).toHaveProperty('pathForFile')
-    expect(goblinNative).toHaveProperty('shell')
+    expect(goblinNative).toHaveProperty('host')
     expect(goblinNative).toHaveProperty('terminal')
     expect(goblinNative).toHaveProperty('saveClipboardFiles')
     expect(goblinNative).toHaveProperty('onEvent')
@@ -136,7 +136,7 @@ describe('preload goblinNative bridge', () => {
     await goblinNative.invokeIpc({ path: 'repo.status', input: { cwd: '/repo' }, requestId: 'ipc_test_1' })
 
     expect(invocations[0]).toEqual({
-      channel: IPC_CHANNEL,
+      channel: HOST_IPC_CALL_CHANNEL,
       args: [{ path: 'repo.status', input: { cwd: '/repo' }, requestId: 'ipc_test_1' }],
     })
   })
@@ -147,24 +147,24 @@ describe('preload goblinNative bridge', () => {
     await goblinNative.abortIpc('ipc_test_1')
 
     expect(invocations[0]).toEqual({
-      channel: IPC_ABORT_CHANNEL,
+      channel: HOST_IPC_ABORT_CHANNEL,
       args: [{ requestId: 'ipc_test_1' }],
     })
   })
 
-  test('forwards shell bridge calls to their IPC channels', async () => {
+  test('forwards host shell calls to their IPC channels', async () => {
     const { goblinNative, invocations } = loadPreload()
 
-    await goblinNative.shell.openSettingsWindow({ page: 'about' })
-    await goblinNative.shell.openExternalUrl({ url: 'https://example.com', allowHttp: false })
-    await goblinNative.shell.openDirectoryDialog({ title: 'Open Git Repository' })
-    await goblinNative.shell.consumeExternalOpenPaths()
+    await goblinNative.host.openSettingsWindow({ page: 'about' })
+    await goblinNative.host.openExternalUrl({ url: 'https://example.com', allowHttp: false })
+    await goblinNative.host.openDirectoryDialog({ title: 'Open Git Repository' })
+    await goblinNative.host.consumeExternalOpenPaths()
 
     expect(invocations.map((entry) => entry.channel)).toEqual([
-      SHELL_OPEN_SETTINGS_WINDOW_CHANNEL,
-      SHELL_OPEN_EXTERNAL_URL_CHANNEL,
-      SHELL_OPEN_DIRECTORY_DIALOG_CHANNEL,
-      SHELL_CONSUME_EXTERNAL_OPEN_PATHS_CHANNEL,
+      HOST_OPEN_SETTINGS_WINDOW_CHANNEL,
+      HOST_OPEN_EXTERNAL_URL_CHANNEL,
+      HOST_OPEN_DIRECTORY_DIALOG_CHANNEL,
+      HOST_CONSUME_EXTERNAL_OPEN_PATHS_CHANNEL,
     ])
   })
 
@@ -208,7 +208,7 @@ describe('preload goblinNative bridge', () => {
     const off2 = goblinNative.onEvent(cb2)
 
     expect(ipcRenderer.on).toHaveBeenCalledTimes(1)
-    expect(ipcRenderer.on).toHaveBeenCalledWith(IPC_EVENT_CHANNEL, expect.any(Function))
+    expect(ipcRenderer.on).toHaveBeenCalledWith(HOST_IPC_EVENT_CHANNEL, expect.any(Function))
 
     const listener = ipcRenderer.on.mock.calls[0]?.[1] as ((event: unknown, payload: unknown) => void) | undefined
     listener?.(null, { type: 'settings-write-error', message: 'failed' })
@@ -220,7 +220,7 @@ describe('preload goblinNative bridge', () => {
 
     off2()
     expect(ipcRenderer.off).toHaveBeenCalledTimes(1)
-    expect(ipcRenderer.off).toHaveBeenCalledWith(IPC_EVENT_CHANNEL, listener)
+    expect(ipcRenderer.off).toHaveBeenCalledWith(HOST_IPC_EVENT_CHANNEL, listener)
   })
 
   test('continues delivering goblin:event when one subscriber throws', () => {
@@ -310,16 +310,16 @@ describe('preload goblinNative bridge', () => {
     // explain why the server can't host the capability before the
     // channel can land. That justification is the contract.
     const BROWSER_MISSING_CHANNELS: Record<string, string> = {
-      [IPC_CHANNEL]:
+      [HOST_IPC_CALL_CHANNEL]:
         'native-only RPC dispatch — currently used for global-shortcut registration, native menu rebuilds, and workspace-layout menu gating',
-      [IPC_ABORT_CHANNEL]: 'paired with IPC_CHANNEL for cancellation',
-      [IPC_EVENT_CHANNEL]: 'main → client event broadcast (Electron-only transport)',
+      [HOST_IPC_ABORT_CHANNEL]: 'paired with HOST_IPC_CALL_CHANNEL for cancellation',
+      [HOST_IPC_EVENT_CHANNEL]: 'main → client event broadcast (Electron-only transport)',
       [CLIENT_EFFECT_INTENT_CHANNEL]: 'client effect intent dispatch (paired with the IPC dispatch channel)',
-      [SHELL_OPEN_SETTINGS_WINDOW_CHANNEL]: 'BrowserWindow management — open the settings window as its own OS window',
-      [SHELL_OPEN_EXTERNAL_URL_CHANNEL]:
+      [HOST_OPEN_SETTINGS_WINDOW_CHANNEL]: 'BrowserWindow management — open the settings window as its own OS window',
+      [HOST_OPEN_EXTERNAL_URL_CHANNEL]:
         'Electron shell.openExternal — protocol-handler restrictions the browser API cannot enforce',
-      [SHELL_OPEN_DIRECTORY_DIALOG_CHANNEL]: 'native OS directory picker dialog (no browser equivalent)',
-      [SHELL_CONSUME_EXTERNAL_OPEN_PATHS_CHANNEL]:
+      [HOST_OPEN_DIRECTORY_DIALOG_CHANNEL]: 'native OS directory picker dialog (no browser equivalent)',
+      [HOST_CONSUME_EXTERNAL_OPEN_PATHS_CHANNEL]:
         'OS file-association handoff (Finder/Explorer "open with Goblin") — Electron-only queue',
       [TERMINAL_NOTIFY_BELL_CHANNEL]:
         'Electron Notification API — desktop-attached notifications with per-app identity',

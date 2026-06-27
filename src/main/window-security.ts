@@ -1,11 +1,11 @@
-// Shared shell policy for trusted client windows.
+// BrowserWindow security policy for trusted client surfaces.
 //
 // Boundary:
-// - This module owns BrowserWindow shell concerns: preload, security
+// - This module owns BrowserWindow security concerns: preload, security
 //   options, trusted entry URL normalization, navigation blocking, and
 //   external link handling.
 // - It does NOT own surface identity/capabilities; that lives in
-//   window-registry.ts / client-surface.ts.
+//   client-surface-registry.ts / client-surface.ts.
 
 import { app, type BrowserWindow, type BrowserWindowConstructorOptions } from 'electron'
 import { createHash } from 'node:crypto'
@@ -19,7 +19,7 @@ import {
   registerTrustedAppUrl,
 } from '#/main/ipc/trusted-webcontents.ts'
 import { getTheme } from '#/main/theme.ts'
-import { getEmbeddedServerRuntime } from '#/main/server-manager.ts'
+import { getEmbeddedServerRuntime } from '#/main/embedded-server-lifecycle.ts'
 import { WINDOW_BACKGROUND_BY_COLOR_THEME } from '#/shared/theme-tokens.ts'
 import { DEFAULT_COLOR_THEME } from '#/shared/settings-defaults.ts'
 
@@ -34,7 +34,7 @@ export function windowCanvasBackground(): string {
   return WINDOW_BACKGROUND_BY_COLOR_THEME[colorTheme][resolved]
 }
 
-export async function createClientWindowWebPreferences(): Promise<BrowserWindowConstructorOptions['webPreferences']> {
+export async function createBrowserWindowWebPreferences(): Promise<BrowserWindowConstructorOptions['webPreferences']> {
   return {
     preload: resolvePreloadPath(),
     contextIsolation: true,
@@ -65,7 +65,7 @@ function resolveClientBuildCacheKey(): string | null {
   }
 }
 
-interface ClientEntryUrlOptions {
+interface BrowserEntryUrlOptions {
   entryHtml?: string
   routePath?: string
 }
@@ -80,7 +80,7 @@ export function getEmbeddedServerUrl(): string | null {
   return runtime?.url || null
 }
 
-export function createClientEntryUrl({ entryHtml = 'index.html', routePath = '/' }: ClientEntryUrlOptions): {
+export function createBrowserEntryUrl({ entryHtml = 'index.html', routePath = '/' }: BrowserEntryUrlOptions): {
   url: URL
 } {
   const baseUrl = getClientBaseUrl()
@@ -104,15 +104,15 @@ export function createClientEntryUrl({ entryHtml = 'index.html', routePath = '/'
   return { url }
 }
 
-export function configureTrustedClientWindow(win: BrowserWindow, logLabel: string): void {
+export function configureTrustedBrowserWindow(win: BrowserWindow, logLabel: string): void {
   win.webContents.on('will-navigate', (event, nextUrl) => {
-    // Client windows are expected to stay on their bootstrap entry and
+    // Browser windows are expected to stay on their bootstrap entry and
     // route internally via app state / browser-history updates, not
     // arbitrary full-frame navigations. We still allow the exact entry URL
-    // that main explicitly bound to this webContents so dev/prod reloads and
-    // same-entry refresh remain possible. With the embedded app server +
-    // history routing we now trust the app origin, not individual entry
-    // files.
+    // that the native host explicitly bound to this webContents so dev/prod
+    // reloads and same-entry refresh remain possible. With the embedded app
+    // server + history routing we now trust the app origin, not individual
+    // entry files.
     if (!isTrustedAppUrlForWebContents(win.webContents.id, nextUrl)) event.preventDefault()
   })
   win.webContents.setWindowOpenHandler(({ url: nextUrl }) => {
@@ -127,7 +127,7 @@ export function configureTrustedClientWindow(win: BrowserWindow, logLabel: strin
   })
 }
 
-export function allowClientWindowEntryUrl(win: BrowserWindow, value: string): void {
+export function allowBrowserWindowEntryUrl(win: BrowserWindow, value: string): void {
   // Scope trust per BrowserWindow, not just per app origin. Once Goblin has
   // multiple client surfaces, a globally-trusted URL set is too broad.
   allowTrustedAppUrlForWebContents(win.webContents, value)

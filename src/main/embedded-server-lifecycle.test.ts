@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { createServer } from 'node:net'
 
-// server-manager.ts imports `app` from `electron` at module load. In a plain
-// Node test environment, importing the `electron` package triggers a download
-// of the Electron binary, which dominates this test's runtime. The functions
-// exercised here (parseServerPort, reserveEmbeddedServerPort) do not touch
-// `app`, so a minimal stub is enough to keep the import cheap.
+// embedded-server-lifecycle.ts imports `app` from `electron` at module load. In a
+// plain Node test environment, importing the `electron` package triggers a
+// download of the Electron binary, which dominates this test's runtime. The
+// functions exercised here (parseServerPort, reserveEmbeddedServerPort) do not
+// touch `app`, so a minimal stub is enough to keep the import cheap.
 vi.mock('electron', () => ({
   app: {
     getAppPath: () => '/tmp',
@@ -15,7 +15,7 @@ vi.mock('electron', () => ({
 }))
 
 const { DEFAULT_EMBEDDED_SERVER_PORT, parseServerPort, reserveEmbeddedServerPort } =
-  await import('#/main/server-manager.ts')
+  await import('#/main/embedded-server-lifecycle.ts')
 
 const openServers: Array<ReturnType<typeof createServer>> = []
 

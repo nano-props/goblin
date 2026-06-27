@@ -29,7 +29,7 @@ const IPC = {
     event: 'goblin:event',
     effectIntent: 'goblin:client-effect-intent',
   },
-  shell: {
+  host: {
     openSettingsWindow: 'goblin:shell-open-settings-window',
     openExternalUrl: 'goblin:shell-open-external-url',
     openDirectoryDialog: 'goblin:shell-open-directory-dialog',
@@ -146,11 +146,11 @@ contextBridge.exposeInMainWorld('goblinNative', {
       return ''
     }
   },
-  shell: {
-    openSettingsWindow: (input) => safeInvoke(IPC.shell.openSettingsWindow, input),
-    openExternalUrl: (input) => safeInvoke(IPC.shell.openExternalUrl, input),
-    openDirectoryDialog: (input) => safeInvoke(IPC.shell.openDirectoryDialog, input),
-    consumeExternalOpenPaths: () => safeInvoke(IPC.shell.consumeExternalOpenPaths),
+  host: {
+    openSettingsWindow: (input) => safeInvoke(IPC.host.openSettingsWindow, input),
+    openExternalUrl: (input) => safeInvoke(IPC.host.openExternalUrl, input),
+    openDirectoryDialog: (input) => safeInvoke(IPC.host.openDirectoryDialog, input),
+    consumeExternalOpenPaths: () => safeInvoke(IPC.host.consumeExternalOpenPaths),
   },
   terminal: {
     notifyBell: (input) => safeInvoke(IPC.terminal.notifyBell, input),
@@ -175,7 +175,7 @@ contextBridge.exposeInMainWorld('goblinNative', {
           // Mirrors the web HTTP backend: the empty-name fallback
           // (CLIPBOARD_FALLBACK_FILE_NAME) is the literal duplicated
           // there as well, and the server-side `sanitizeBaseName`
-          // preserves it. Keeping the names identical across runtimes
+          // preserves it. Keeping the names identical across repoOperationSchedulers
           // avoids a class of debugging where Electron and web leave
           // different temp filenames for the same paste payload.
           name: typeof file?.name === 'string' && file.name.length > 0 ? file.name : CLIPBOARD_FALLBACK_FILE_NAME,

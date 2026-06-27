@@ -18,7 +18,7 @@ const mocks = vi.hoisted(() => {
     exit: vi.fn(),
     quit: vi.fn(),
     whenReady: vi.fn(() => whenReadyPromise),
-    activateMainWindow: vi.fn(() => Promise.resolve({})),
+    activatePrimaryWindow: vi.fn(() => Promise.resolve({})),
     assertDictionaryParity: vi.fn(),
     buildAppMenu: vi.fn(),
     flushWindowState: vi.fn(() => Promise.resolve(true)),
@@ -33,8 +33,10 @@ const mocks = vi.hoisted(() => {
     unregisterAppShortcuts: vi.fn(),
     wireIpc: vi.fn(),
     broadcastClientEffectIntent: vi.fn(),
-    wireShellBridgeIpc: vi.fn(),
+    wireShellIpc: vi.fn(),
     wireTerminalIpc: vi.fn(),
+    wireClipboardIpc: vi.fn(),
+    wireAccessTokenIpc: vi.fn(),
     resetReady() {
       whenReadyPromise = new Promise<void>((resolve) => {
         resolveReady = resolve
@@ -73,7 +75,7 @@ vi.mock('electron', () => ({
 }))
 
 vi.mock('#/main/window.ts', () => ({
-  activateMainWindow: mocks.activateMainWindow,
+  activatePrimaryWindow: mocks.activatePrimaryWindow,
 }))
 
 vi.mock('#/main/theme.ts', () => ({
@@ -103,7 +105,7 @@ vi.mock('#/main/i18n/index.ts', () => ({
   setCurrentLang: mocks.setCurrentLang,
 }))
 
-vi.mock('#/main/ipc', () => ({
+vi.mock('#/main/native-host-ipc-router.ts', () => ({
   wireIpc: mocks.wireIpc,
 }))
 
@@ -111,8 +113,8 @@ vi.mock('#/main/client-surface-events.ts', () => ({
   broadcastClientEffectIntent: mocks.broadcastClientEffectIntent,
 }))
 
-vi.mock('#/main/shell-bridge.ts', () => ({
-  wireShellBridgeIpc: mocks.wireShellBridgeIpc,
+vi.mock('#/main/shell-ipc.ts', () => ({
+  wireShellIpc: mocks.wireShellIpc,
 }))
 
 vi.mock('#/main/terminal.ts', () => ({
@@ -124,9 +126,17 @@ vi.mock('#/main/settings-server-client.ts', () => ({
   setSettingsGlobalShortcutState: mocks.setSettingsGlobalShortcutState,
 }))
 
-vi.mock('#/main/server-manager.ts', () => ({
+vi.mock('#/main/embedded-server-lifecycle.ts', () => ({
   startEmbeddedServer: vi.fn(() => Promise.resolve()),
   stopEmbeddedServer: vi.fn(() => Promise.resolve()),
+}))
+
+vi.mock('#/main/clipboard-ipc.ts', () => ({
+  wireClipboardIpc: mocks.wireClipboardIpc,
+}))
+
+vi.mock('#/main/access-token-ipc.ts', () => ({
+  wireAccessTokenIpc: mocks.wireAccessTokenIpc,
 }))
 
 vi.mock('#/main/shortcuts.ts', () => ({
@@ -169,12 +179,12 @@ describe('main process startup lifecycle', () => {
 
     await emit('second-instance')
     await Promise.resolve()
-    expect(mocks.activateMainWindow).not.toHaveBeenCalled()
+    expect(mocks.activatePrimaryWindow).not.toHaveBeenCalled()
 
     mocks.resolveReady()
     await vi.waitFor(() => {
       expect(mocks.buildAppMenu).toHaveBeenCalled()
-      expect(mocks.activateMainWindow).toHaveBeenCalled()
+      expect(mocks.activatePrimaryWindow).toHaveBeenCalled()
     })
   })
 
@@ -190,7 +200,7 @@ describe('main process startup lifecycle', () => {
       expect(mocks.exit).toHaveBeenCalledWith(0)
     })
 
-    expect(mocks.activateMainWindow).not.toHaveBeenCalled()
+    expect(mocks.activatePrimaryWindow).not.toHaveBeenCalled()
     expect(mocks.handlers.get('activate')).toBeUndefined()
   })
 
@@ -234,11 +244,11 @@ describe('main process startup lifecycle', () => {
 
     expect(event.preventDefault).toHaveBeenCalledTimes(1)
     expect(mocks.enqueueExternalOpenPath).toHaveBeenCalledWith('/tmp/repo')
-    expect(mocks.activateMainWindow).not.toHaveBeenCalled()
+    expect(mocks.activatePrimaryWindow).not.toHaveBeenCalled()
 
     mocks.resolveReady()
     await vi.waitFor(() => {
-      expect(mocks.activateMainWindow).toHaveBeenCalled()
+      expect(mocks.activatePrimaryWindow).toHaveBeenCalled()
     })
   })
 })

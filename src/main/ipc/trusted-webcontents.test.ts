@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest'
-import { registerClientWindowSurface } from '#/main/window-registry.ts'
+import { registerClientWindowSurface } from '#/main/client-surface-registry.ts'
 import {
   allowTrustedAppUrlForWebContents,
   isTrustedAppUrl,

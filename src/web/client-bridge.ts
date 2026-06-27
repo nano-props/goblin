@@ -1,7 +1,7 @@
 import type { ClientBootstrapSnapshot, ClientNativeCapability } from '#/shared/bootstrap.ts'
 import type { IpcEvent, IpcRequest } from '#/shared/api-types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
-import type { ClientShellBridge, ClientBridge, ClientTerminalBridge } from '#/web/client-bridge-types.ts'
+import type { ClientHostBridge, ClientBridge, ClientTerminalBridge } from '#/web/client-bridge-types.ts'
 import { readNativeBridge } from '#/web/native-bridge.ts'
 import { createHttpClipboardBackend } from '#/web/clipboard/http-backend.ts'
 import {
@@ -31,10 +31,10 @@ import {
 function capabilitiesFromBridge(bridge: NonNullable<Window['goblinNative']>): ReadonlySet<ClientNativeCapability> {
   const caps = new Set<ClientNativeCapability>()
   if (typeof bridge.invokeIpc === 'function') caps.add('settings-ipc')
-  if (bridge.shell?.openSettingsWindow) caps.add('open-settings-window')
-  if (bridge.shell?.openExternalUrl) caps.add('open-external-url')
-  if (bridge.shell?.openDirectoryDialog) caps.add('open-directory-dialog')
-  if (bridge.shell?.consumeExternalOpenPaths) caps.add('consume-external-open-paths')
+  if (bridge.host?.openSettingsWindow) caps.add('open-settings-window')
+  if (bridge.host?.openExternalUrl) caps.add('open-external-url')
+  if (bridge.host?.openDirectoryDialog) caps.add('open-directory-dialog')
+  if (bridge.host?.consumeExternalOpenPaths) caps.add('consume-external-open-paths')
   // `terminal` is typed as required on `GoblinNativeBridge` but a
   // test or older preload may omit it; the `?.` keeps the runtime
   // safe without forcing every mock to declare a stub.
@@ -133,7 +133,7 @@ function getOrCreateTerminalBridge(): ClientTerminalBridge {
  *
  * Why this is the right shape:
  *
- *  - The bootstrap is identical across runtimes now (host info and
+ *  - The bootstrap is identical across repoOperationSchedulers now (host info and
  *    auth both live on dedicated `/api/*` endpoints). The only
  *    runtime-specific surface is the IPC bridge the Electron
  *    preload exposes under `window.goblinNative` — and that surface
@@ -219,8 +219,8 @@ function createClientBridge(): ClientBridge {
       }
       return await bridge.rotateAccessToken()
     },
-    shell(): ClientShellBridge | null {
-      return readNativeBridge()?.shell ?? null
+    host(): ClientHostBridge | null {
+      return readNativeBridge()?.host ?? null
     },
     terminal() {
       return terminalBridge

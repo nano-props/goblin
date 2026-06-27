@@ -11,26 +11,26 @@ import { BrowserWindow, app, screen } from 'electron'
 import { loadWindowState, setWindowBounds, type WindowBounds } from '#/main/window-state.ts'
 import { attachClientSurfaceWindow, detachClientSurfaceWindow } from '#/main/client-surface.ts'
 import { plantEmbedAuthCookie } from '#/main/cookie-bootstrap.ts'
-import { getEmbeddedServerRuntime } from '#/main/server-manager.ts'
+import { getEmbeddedServerRuntime } from '#/main/embedded-server-lifecycle.ts'
 import {
   defaultTitleBarStyle,
   macTrafficLightPosition,
   supportsTitleBarOverlay,
   titleBarOverlayForTheme,
-} from '#/main/window-chrome.ts'
-import { getMainWindow as getRegisteredMainWindow } from '#/main/window-registry.ts'
+} from '#/main/title-bar-chrome.ts'
+import { getPrimaryWindow as getRegisteredPrimaryWindow } from '#/main/client-surface-registry.ts'
 import {
-  allowClientWindowEntryUrl,
-  createClientEntryUrl,
-  createClientWindowWebPreferences,
+  allowBrowserWindowEntryUrl,
+  createBrowserEntryUrl,
+  createBrowserWindowWebPreferences,
   windowCanvasBackground,
-} from '#/main/window-shell.ts'
+} from '#/main/window-security.ts'
 import { getTheme } from '#/main/theme.ts'
 import { clientNodeLog, windowNodeLog } from '#/node/logger.ts'
 import { WINDOW_CHROME_HEIGHT_PX } from '#/shared/window-chrome.ts'
 
 const DEFAULT_BOUNDS: WindowBounds = { width: 1100, height: 720 }
-const MAIN_WINDOW_SURFACE = {
+const PRIMARY_WINDOW_SURFACE = {
   windowKey: 'main',
   capabilities: {
     ipcBroadcast: true,
@@ -38,24 +38,24 @@ const MAIN_WINDOW_SURFACE = {
   },
 } as const
 
-let mainWindowCreation: Promise<BrowserWindow> | null = null
+let primaryWindowCreation: Promise<BrowserWindow> | null = null
 
-export function getMainWindow(): BrowserWindow | null {
-  return getRegisteredMainWindow()
+export function getPrimaryWindow(): BrowserWindow | null {
+  return getRegisteredPrimaryWindow()
 }
 
-export function getOrCreateMainWindow(): Promise<BrowserWindow> {
-  const existing = getMainWindow()
+export function getOrCreatePrimaryWindow(): Promise<BrowserWindow> {
+  const existing = getPrimaryWindow()
   if (existing) return Promise.resolve(existing)
-  mainWindowCreation ??= createMainWindow().finally(() => {
-    mainWindowCreation = null
+  primaryWindowCreation ??= createPrimaryWindow().finally(() => {
+    primaryWindowCreation = null
   })
-  return mainWindowCreation
+  return primaryWindowCreation
 }
 
-export async function activateMainWindow(): Promise<BrowserWindow> {
+export async function activatePrimaryWindow(): Promise<BrowserWindow> {
   await app.whenReady()
-  const win = await getOrCreateMainWindow()
+  const win = await getOrCreatePrimaryWindow()
   if (win.isMinimized()) win.restore()
   if (!win.isVisible()) win.show()
   if (process.platform === 'darwin') {
@@ -92,7 +92,7 @@ function clampToDisplay(bounds: WindowBounds): WindowBounds {
   return { x: bounds.x, y: bounds.y, width, height }
 }
 
-async function createMainWindow(): Promise<BrowserWindow> {
+async function createPrimaryWindow(): Promise<BrowserWindow> {
   const backgroundColor = windowCanvasBackground()
   const { resolved, colorTheme } = getTheme()
 
@@ -112,7 +112,7 @@ async function createMainWindow(): Promise<BrowserWindow> {
     titleBarOverlay: titleBarOverlayForTheme(resolved, colorTheme, WINDOW_CHROME_HEIGHT_PX),
     trafficLightPosition: macTrafficLightPosition(WINDOW_CHROME_HEIGHT_PX),
     autoHideMenuBar: process.platform !== 'darwin',
-    webPreferences: await createClientWindowWebPreferences(),
+    webPreferences: await createBrowserWindowWebPreferences(),
   })
   win.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
     clientNodeLog.error({ validatedURL, errorCode, errorDescription }, 'failed to load')
@@ -120,9 +120,9 @@ async function createMainWindow(): Promise<BrowserWindow> {
   win.webContents.on('render-process-gone', (_event, details) => {
     clientNodeLog.error({ details }, 'process gone')
   })
-  attachClientSurfaceWindow(win, { logLabel: 'window', surface: MAIN_WINDOW_SURFACE })
-  const { url } = createClientEntryUrl({ routePath: '/' })
-  allowClientWindowEntryUrl(win, url.toString())
+  attachClientSurfaceWindow(win, { logLabel: 'window', surface: PRIMARY_WINDOW_SURFACE })
+  const { url } = createBrowserEntryUrl({ routePath: '/' })
+  allowBrowserWindowEntryUrl(win, url.toString())
   // Plant the auth cookie on the client's session BEFORE
   // `loadURL` so authenticated client requests are ready as
   // soon as the app mounts. The first boot request is public
@@ -159,7 +159,7 @@ async function createMainWindow(): Promise<BrowserWindow> {
   win.on('move', persistBounds)
 
   win.on('closed', () => {
-    detachClientSurfaceWindow(win, MAIN_WINDOW_SURFACE)
+    detachClientSurfaceWindow(win, PRIMARY_WINDOW_SURFACE)
   })
 
   try {
@@ -170,9 +170,9 @@ async function createMainWindow(): Promise<BrowserWindow> {
   return win
 }
 
-export function applyMainWindowChromeTheme(theme: 'light' | 'dark'): void {
+export function applyPrimaryWindowTitleBarTheme(theme: 'light' | 'dark'): void {
   if (!supportsTitleBarOverlay()) return
-  const win = getMainWindow()
+  const win = getPrimaryWindow()
   if (!win || win.isDestroyed()) return
   const overlay = titleBarOverlayForTheme(theme, getTheme().colorTheme, WINDOW_CHROME_HEIGHT_PX)
   if (!overlay) return
@@ -181,7 +181,7 @@ export function applyMainWindowChromeTheme(theme: 'light' | 'dark'): void {
   } catch {}
 }
 
-/** Restore the main window to its default size, centered on the display
+/** Restore the primary window to its default size, centered on the display
  *  it currently lives on. On macOS, exiting fullscreen is an async system
  *  animation — `setBounds` called against a still-transitioning window
  *  is dropped, so we defer the resize to the `leave-full-screen` event
@@ -190,8 +190,8 @@ export function applyMainWindowChromeTheme(theme: 'light' | 'dark'): void {
  *  existing resize/move listeners persist the new bounds. Wired to the
  *  Window > Reset Window menu item so users have a one-click escape from
  *  an awkward drag-resize. */
-export function resetMainWindowToDefault(): void {
-  const win = getMainWindow()
+export function resetPrimaryWindow(): void {
+  const win = getPrimaryWindow()
   if (!win || win.isDestroyed()) return
   const applyDefault = () => {
     if (win.isDestroyed()) return

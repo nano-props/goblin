@@ -70,7 +70,7 @@ function timestampedFileName(index: number, name: string): string {
   return `${timestamp}-${index}-${filenameCounter}-${sanitizeBaseName(name)}`
 }
 
-// Module-level handle to the periodic prune interval. `wireClipboardBridgeIpc`
+// Module-level handle to the periodic prune interval. `wireClipboardIpc`
 // can be called more than once in the test harness (and could be in a
 // future hot-reload), and `setInterval` itself has no idea about that —
 // without this handle, each call would schedule an additional 1 h timer
@@ -179,7 +179,7 @@ function coerceBinaryClipboardFiles(input: unknown): BinaryClipboardFile[] | nul
   return out
 }
 
-export function wireClipboardBridgeIpc(): void {
+export function wireClipboardIpc(): void {
   ipcMain.handle(CLIPBOARD_SAVE_FILES_CHANNEL, async (event, payload: unknown): Promise<string[]> => {
     if (!isTrustedIpcEvent(event)) return []
     const files = coerceBinaryClipboardFiles(payload)
@@ -189,18 +189,18 @@ export function wireClipboardBridgeIpc(): void {
     } catch (err) {
       // We collapse to `[]` so the resolver can count a backend-transfer
       // failure, but the client can't tell *why*
-      // this bridge call failed. Log here so ops can diagnose (an oversized
+      // this IPC call failed. Log here so ops can diagnose (an oversized
       // payload routed through a misbehaving preload, a temp-dir
       // permission failure, etc.). Uses raw console.warn because
       // pino/consola isn't available in this module's import graph;
       // the client-side `web/logger.ts` will already be emitting
       // its own record of the toast.
-      console.warn(`[clipboard-bridge] ${CLIPBOARD_SAVE_FILES_CHANNEL} failed`, err)
+      console.warn(`[clipboard-ipc] ${CLIPBOARD_SAVE_FILES_CHANNEL} failed`, err)
       return []
     }
   })
   // Startup prune removes leftovers from previous PIDs. Periodic
-  // prune handles the long-running main process: the temp dir at
+  // prune handles the long-running native host: the temp dir at
   // `<os.tmpdir>/goblin-clipboard-<pid>/` only grows on writes
   // (no per-write cleanup), so a 24/7 desktop install that pastes
   // files hundreds of times a day would otherwise accumulate
@@ -209,7 +209,7 @@ export function wireClipboardBridgeIpc(): void {
   // housekeeping measure, not a security control.
   void pruneStaleClipboardTempDirs()
   void pruneExpiredClipboardTempFiles()
-  // Clear any previous interval — `wireClipboardBridgeIpc` may be
+  // Clear any previous interval — `wireClipboardIpc` may be
   // re-entered (test harness, future hot-reload), and `setInterval`
   // itself doesn't know about re-entry. Without this guard each call
   // would stack another timer that no one ever clears.
@@ -220,7 +220,7 @@ export function wireClipboardBridgeIpc(): void {
   periodicPrune = setInterval(
     () => {
       void Promise.all([pruneStaleClipboardTempDirs(), pruneExpiredClipboardTempFiles()]).catch((err) =>
-        console.warn('[clipboard-bridge] periodic prune failed', err),
+        console.warn('[clipboard-ipc] periodic prune failed', err),
       )
     },
     60 * 60 * 1000,

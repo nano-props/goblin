@@ -1,26 +1,21 @@
 import { beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
 import { registerTrustedAppUrl, registerTrustedWebContents } from '#/main/ipc/trusted-webcontents.ts'
-import { wireShellBridgeIpc } from '#/main/shell-bridge.ts'
+import { wireShellIpc } from '#/main/shell-ipc.ts'
 import {
-  SHELL_CONSUME_EXTERNAL_OPEN_PATHS_CHANNEL,
-  SHELL_OPEN_DIRECTORY_DIALOG_CHANNEL,
-  SHELL_OPEN_EXTERNAL_URL_CHANNEL,
-  SHELL_OPEN_SETTINGS_WINDOW_CHANNEL,
+  HOST_CONSUME_EXTERNAL_OPEN_PATHS_CHANNEL,
+  HOST_OPEN_DIRECTORY_DIALOG_CHANNEL,
+  HOST_OPEN_EXTERNAL_URL_CHANNEL,
+  HOST_OPEN_SETTINGS_WINDOW_CHANNEL,
 } from '#/shared/ipc-channels.ts'
 
-const {
-  ipcHandlers,
-  browserWindowFromWebContents,
-  showOpenDialog,
-  sendClientEffectIntent,
-  activateMainWindow,
-} = vi.hoisted(() => ({
-  ipcHandlers: new Map<string, (_event: unknown, input: any) => unknown>(),
-  browserWindowFromWebContents: vi.fn(),
-  showOpenDialog: vi.fn(),
-  sendClientEffectIntent: vi.fn(),
-  activateMainWindow: vi.fn(),
-}))
+const { ipcHandlers, browserWindowFromWebContents, showOpenDialog, sendClientEffectIntent, activatePrimaryWindow } =
+  vi.hoisted(() => ({
+    ipcHandlers: new Map<string, (_event: unknown, input: any) => unknown>(),
+    browserWindowFromWebContents: vi.fn(),
+    showOpenDialog: vi.fn(),
+    sendClientEffectIntent: vi.fn(),
+    activatePrimaryWindow: vi.fn(),
+  }))
 
 vi.mock('electron', () => ({
   ipcMain: {
@@ -33,8 +28,8 @@ vi.mock('electron', () => ({
 }))
 
 vi.mock('#/main/window.ts', () => ({
-  activateMainWindow,
-  getMainWindow: vi.fn(() => null),
+  activatePrimaryWindow,
+  getPrimaryWindow: vi.fn(() => null),
 }))
 
 vi.mock('#/main/client-surface-events.ts', () => ({
@@ -47,22 +42,22 @@ const trustedEvent = {
   senderFrame: { url: 'http://127.0.0.1:5173/' },
 } as any
 
-describe('shell bridge IPC', () => {
+describe('shell IPC', () => {
   beforeAll(() => {
     registerTrustedAppUrl('http://127.0.0.1:5173/')
     registerTrustedWebContents(trustedSender as any)
-    wireShellBridgeIpc()
+    wireShellIpc()
   })
 
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  test('wires shell bridge handlers', () => {
-    expect(ipcHandlers.has(SHELL_OPEN_SETTINGS_WINDOW_CHANNEL)).toBe(true)
-    expect(ipcHandlers.has(SHELL_OPEN_EXTERNAL_URL_CHANNEL)).toBe(true)
-    expect(ipcHandlers.has(SHELL_OPEN_DIRECTORY_DIALOG_CHANNEL)).toBe(true)
-    expect(ipcHandlers.has(SHELL_CONSUME_EXTERNAL_OPEN_PATHS_CHANNEL)).toBe(true)
+  test('wires shell IPC handlers', () => {
+    expect(ipcHandlers.has(HOST_OPEN_SETTINGS_WINDOW_CHANNEL)).toBe(true)
+    expect(ipcHandlers.has(HOST_OPEN_EXTERNAL_URL_CHANNEL)).toBe(true)
+    expect(ipcHandlers.has(HOST_OPEN_DIRECTORY_DIALOG_CHANNEL)).toBe(true)
+    expect(ipcHandlers.has(HOST_CONSUME_EXTERNAL_OPEN_PATHS_CHANNEL)).toBe(true)
   })
 
   test('parents directory dialogs to the sender window', async () => {
@@ -70,7 +65,7 @@ describe('shell bridge IPC', () => {
     browserWindowFromWebContents.mockReturnValue(senderWindow)
     showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: ['/repo'] })
 
-    const result = await invoke(SHELL_OPEN_DIRECTORY_DIALOG_CHANNEL, { title: 'Open Git Repository' })
+    const result = await invoke(HOST_OPEN_DIRECTORY_DIALOG_CHANNEL, { title: 'Open Git Repository' })
 
     expect(result).toBe('/repo')
     expect(browserWindowFromWebContents).toHaveBeenCalledWith(trustedSender)
@@ -80,21 +75,21 @@ describe('shell bridge IPC', () => {
     })
   })
 
-  test('opens settings through an effect intent on the activated main window', async () => {
-    const mainWindow = {} as any
-    activateMainWindow.mockResolvedValue(mainWindow)
+  test('opens settings through an effect intent on the activated primary window', async () => {
+    const primaryWindow = {} as any
+    activatePrimaryWindow.mockResolvedValue(primaryWindow)
 
-    const result = await invoke(SHELL_OPEN_SETTINGS_WINDOW_CHANNEL, { page: 'about' })
+    const result = await invoke(HOST_OPEN_SETTINGS_WINDOW_CHANNEL, { page: 'about' })
 
     expect(result).toBe(true)
-    expect(sendClientEffectIntent).toHaveBeenCalledWith(mainWindow, {
+    expect(sendClientEffectIntent).toHaveBeenCalledWith(primaryWindow, {
       type: 'open-settings-requested',
       page: 'about',
     })
   })
 
-  test('rejects untrusted shell bridge senders', async () => {
-    const result = await invokeWithEvent(SHELL_OPEN_DIRECTORY_DIALOG_CHANNEL, { title: 'Open Git Repository' }, {
+  test('rejects untrusted shell IPC senders', async () => {
+    const result = await invokeWithEvent(HOST_OPEN_DIRECTORY_DIALOG_CHANNEL, { title: 'Open Git Repository' }, {
       sender: { id: 99, once: vi.fn() },
       senderFrame: { url: 'https://example.com/' },
     } as any)

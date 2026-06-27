@@ -6,7 +6,7 @@ import { setSettingsGlobalShortcutState } from '#/main/settings-server-client.ts
 import { syncGlobalShortcuts } from '#/main/shortcuts.ts'
 import { applyThemeSettingsProjection } from '#/main/theme.ts'
 import type {
-  NativeShellProjection,
+  NativeHostProjection,
   NativeSettingsProjectionPatch,
   NativeSettingsProjectionState,
 } from '#/shared/api-types.ts'
@@ -82,7 +82,7 @@ export async function applyNativeHostSettingsPrefsProjection(input: {
   if (shouldRebuildMenu) buildAppMenu()
 }
 
-export async function applyNativeHostShellProjection(input: NativeShellProjection): Promise<void> {
+export async function applyNativeHostShellProjection(input: NativeHostProjection): Promise<void> {
   if (input.prefs) {
     await applyNativeHostSettingsPrefsProjection({
       patch: input.prefs.patch,

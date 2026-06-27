@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
   postEmbeddedServerJson: vi.fn(),
 }))
 
-vi.mock('#/main/server-manager.ts', () => ({
+vi.mock('#/main/embedded-server-lifecycle.ts', () => ({
   getEmbeddedServerRuntime: mocks.getEmbeddedServerRuntime,
 }))
 
@@ -64,7 +64,7 @@ describe('main settings server client', () => {
     expect(mocks.postEmbeddedServerJson).toHaveBeenCalledWith(
       { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
       '/api/settings/prefs',
-      { settings: { theme: 'dark' } },
+      { prefs: { theme: 'dark' } },
     )
   })
 

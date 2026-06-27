@@ -95,10 +95,10 @@ describe('replantEmbedAuthCookieForRotation', () => {
 
   test('propagates a cookies.set failure so the rotation handler logs it', async () => {
     // The wrapper intentionally does NOT swallow rejections —
-    // the rotation handler in `access-token-bridge.ts` is the
+    // the rotation handler in `access-token-ipc.ts` is the
     // seam that decides "best-effort, log and continue" vs
     // "fatal, propagate to the IPC caller". Tests for that
-    // decision live in the bridge suite.
+    // decision live in the IPC handler suite.
     cookieSetMock.mockRejectedValueOnce(new Error('cookies.set failed'))
     const { replantEmbedAuthCookieForRotation } = await import('#/main/cookie-bootstrap.ts')
     await expect(

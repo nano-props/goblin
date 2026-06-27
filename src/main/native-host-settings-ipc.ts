@@ -1,4 +1,4 @@
-import type { NativeIpcHandlers } from '#/shared/api-types.ts'
+import type { NativeHostIpcHandlers } from '#/shared/api-types.ts'
 import { isReservedGlobalShortcut, parseGlobalShortcut } from '#/shared/accelerator.ts'
 import { getSettingsPrefs, setSettingsGlobalShortcutState, updateSettingsPrefs } from '#/main/settings-server-client.ts'
 import { applyNativeHostShellProjection } from '#/main/native-host-settings-effects.ts'
@@ -14,7 +14,7 @@ async function getRuntimeServerSettingsPrefs() {
   return await getSettingsPrefs()
 }
 
-export function createNativeHostSettingsIpcHandlers(): Pick<NativeIpcHandlers, 'settings'> {
+export function createNativeHostSettingsIpcHandlers(): Pick<NativeHostIpcHandlers, 'settings'> {
   return {
     settings: {
       applyShellProjection: async (input) => await applyNativeHostShellProjection(input),

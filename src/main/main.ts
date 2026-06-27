@@ -1,32 +1,32 @@
 import { app, dialog } from 'electron'
 import type { SettingsSnapshot } from '#/shared/api-types.ts'
-import { activateMainWindow } from '#/main/window.ts'
+import { activatePrimaryWindow } from '#/main/window.ts'
 import { initTheme } from '#/main/theme.ts'
 import { flushWindowState } from '#/main/window-state.ts'
 import { buildAppMenu } from '#/main/menu.ts'
 import { initializeMenuRuntimeState } from '#/main/menu-state.ts'
 import { syncRecentRepos } from '#/main/recent-repos.ts'
 import { assertDictionaryParity, resolveLang, setCurrentLang } from '#/main/i18n/index.ts'
-import { wireIpc } from '#/main/ipc.ts'
-import { wireShellBridgeIpc } from '#/main/shell-bridge.ts'
-import { wireClipboardBridgeIpc } from '#/main/clipboard-bridge.ts'
-import { wireAccessTokenBridgeIpc } from '#/main/access-token-bridge.ts'
+import { wireIpc } from '#/main/native-host-ipc-router.ts'
+import { wireShellIpc } from '#/main/shell-ipc.ts'
+import { wireClipboardIpc } from '#/main/clipboard-ipc.ts'
+import { wireAccessTokenIpc } from '#/main/access-token-ipc.ts'
 import { windowNodeLog, windowStateNodeLog, serverNodeLog } from '#/node/logger.ts'
 import { wireTerminalIpc } from '#/main/terminal.ts'
 import { syncGlobalShortcuts, unregisterAppShortcuts } from '#/main/shortcuts.ts'
 import { enqueueExternalOpenPath } from '#/main/external-open.ts'
 import { broadcastClientEffectIntent } from '#/main/client-surface-events.ts'
 import { getSettingsSnapshot, setSettingsGlobalShortcutState } from '#/main/settings-server-client.ts'
-import { startEmbeddedServer, stopEmbeddedServer } from '#/main/server-manager.ts'
+import { startEmbeddedServer, stopEmbeddedServer } from '#/main/embedded-server-lifecycle.ts'
 
-function activateMainWindowFromEvent(): void {
+function activatePrimaryWindowFromEvent(): void {
   void activationBarrier
     .then(() => {
       if (isQuitting) return null
-      return activateMainWindow()
+      return activatePrimaryWindow()
     })
     .catch((err) => {
-      windowNodeLog.error({ err }, 'failed to activate main window')
+      windowNodeLog.error({ err }, 'failed to activate primary window')
     })
 }
 
@@ -36,7 +36,7 @@ let isQuitting = false
 app.on('open-file', (event, path) => {
   event.preventDefault()
   if (!enqueueExternalOpenPath(path)) return
-  activateMainWindowFromEvent()
+  activatePrimaryWindowFromEvent()
 })
 
 async function main(): Promise<void> {
@@ -45,10 +45,10 @@ async function main(): Promise<void> {
     return
   }
 
-  activationBarrier = initializeMainProcess()
+  activationBarrier = initializeNativeHost()
 
   app.on('second-instance', () => {
-    activateMainWindowFromEvent()
+    activatePrimaryWindowFromEvent()
   })
 
   app.on('window-all-closed', () => {
@@ -68,17 +68,17 @@ async function main(): Promise<void> {
     if (isQuitting) return
     event.preventDefault()
     isQuitting = true
-    await finalizeMainProcessExit()
+    await finalizeNativeHostExit()
   })
 
   await activationBarrier
   if (isQuitting) return
-  await activateMainWindow()
+  await activatePrimaryWindow()
   if (isQuitting) return
-  app.on('activate', activateMainWindowFromEvent)
+  app.on('activate', activatePrimaryWindowFromEvent)
 }
 
-async function finalizeMainProcessExit(): Promise<void> {
+async function finalizeNativeHostExit(): Promise<void> {
   try {
     broadcastClientEffectIntent({ type: 'app-quitting' })
     const windowStateFlushed = await flushWindowState()
@@ -90,17 +90,17 @@ async function finalizeMainProcessExit(): Promise<void> {
   }
 }
 
-async function initializeMainProcess(): Promise<void> {
+async function initializeNativeHost(): Promise<void> {
   await app.whenReady()
-  await startEmbeddedServerForMainProcess()
+  await startEmbeddedServerForNativeHost()
   const settingsSnapshot = await getSettingsSnapshot()
   await initTheme({ theme: settingsSnapshot.theme, colorTheme: settingsSnapshot.colorTheme })
   await initializeRuntimeState(settingsSnapshot)
-  wireMainProcessIpc()
+  wireNativeHostIpc()
   await syncInitialGlobalShortcutState(settingsSnapshot)
 }
 
-async function startEmbeddedServerForMainProcess(): Promise<void> {
+async function startEmbeddedServerForNativeHost(): Promise<void> {
   try {
     await startEmbeddedServer()
   } catch (err) {
@@ -125,12 +125,12 @@ async function initializeRuntimeState(settingsSnapshot: SettingsSnapshot): Promi
   buildAppMenu()
 }
 
-function wireMainProcessIpc(): void {
+function wireNativeHostIpc(): void {
   wireIpc()
-  wireShellBridgeIpc()
+  wireShellIpc()
   wireTerminalIpc()
-  wireClipboardBridgeIpc()
-  wireAccessTokenBridgeIpc()
+  wireClipboardIpc()
+  wireAccessTokenIpc()
 }
 
 async function syncInitialGlobalShortcutState(settingsSnapshot: SettingsSnapshot): Promise<void> {

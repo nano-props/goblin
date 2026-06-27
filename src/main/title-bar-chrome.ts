@@ -8,9 +8,9 @@ export function defaultTitleBarStyle(): 'hiddenInset' | 'hidden' {
 
 export function standaloneTitleBarStyle(): 'hiddenInset' | 'hidden' {
   // Kept separate from defaultTitleBarStyle() even though they currently
-  // match. Main and auxiliary windows have already diverged in other chrome
-  // concerns (menu bar policy, page routing, close lifecycle), and keeping
-  // distinct entry points makes future platform-specific tweaks local.
+  // match. Primary and auxiliary windows have already diverged in other
+  // chrome concerns (menu bar policy, page routing, close lifecycle), and
+  // keeping distinct entry points makes future platform-specific tweaks local.
   return process.platform === 'darwin' ? 'hiddenInset' : 'hidden'
 }
 
