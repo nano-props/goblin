@@ -49,11 +49,11 @@ export async function getRemotePathSuggestions(
   return await postServerJson('/api/remote/path-suggestions', input, { signal })
 }
 
-export async function testRemoteRepositoryConnection(
+export async function testRemoteRepoConnection(
   target: RemoteRepoTarget,
   signal?: AbortSignal,
 ): Promise<RemoteDiagnosticsResult> {
-  return await postServerJson('/api/remote/test-repository', { target }, { signal })
+  return await postServerJson('/api/remote/test-repo', { target }, { signal })
 }
 
 export async function openRemoteRepositoryEditor(

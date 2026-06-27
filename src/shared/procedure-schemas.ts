@@ -136,7 +136,7 @@ export const REMOTE_PROCEDURE_SCHEMAS = {
   // 'connecting' — that's a client projection.
   remoteLifecycle: v.object({ repoId: v.string() }),
   pathSuggestions: RemotePathSuggestionsInputSchema,
-  testRepository: v.object({ target: RemoteTargetSchema }),
+  testRepo: v.object({ target: RemoteTargetSchema }),
   openEditor: v.object({ repoId: v.string(), worktreePath: v.string(), app: EditorAppSchema }),
   openTerminal: v.object({ repoId: v.string(), worktreePath: v.string(), app: TerminalAppSchema }),
 } as const

@@ -9,11 +9,7 @@ import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/web/components/ui/select.tsx'
 import { useRemotePathSuggestions } from '#/web/hooks/useRemotePathSuggestions.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
-import {
-  getRemoteSshHosts,
-  resolveRemoteRepositoryTarget,
-  testRemoteRepositoryConnection,
-} from '#/web/remote-client.ts'
+import { getRemoteSshHosts, resolveRemoteRepositoryTarget, testRemoteRepoConnection } from '#/web/remote-client.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { RemoteDiagnosticsPanel } from '#/web/components/RemoteDiagnosticsPanel.tsx'
@@ -106,7 +102,7 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
     try {
       const nextTarget = await resolveCurrentTarget()
       if (!nextTarget) return
-      const result = await testRemoteRepositoryConnection(nextTarget)
+      const result = await testRemoteRepoConnection(nextTarget)
       setDiagnostics(result)
     } catch (err) {
       setActionError(formatRemoteDialogError(t, err))
@@ -131,7 +127,7 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
       }
       const needsTest = !diagnostics?.ok || diagnostics.target.id !== nextTarget.id
       if (needsTest) {
-        const result = await testRemoteRepositoryConnection(nextTarget)
+        const result = await testRemoteRepoConnection(nextTarget)
         if (!result.ok) {
           setDiagnostics(result)
           setLoading(false)

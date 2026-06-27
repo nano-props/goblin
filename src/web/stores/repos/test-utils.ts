@@ -415,7 +415,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         if (url.pathname === '/api/remote/resolve-target') return call('remote.resolveTarget', body)
         if (url.pathname === '/api/remote/lifecycle') return call('remote.lifecycle', body)
         if (url.pathname === '/api/remote/path-suggestions') return call('remote.listPathSuggestions', body)
-        if (url.pathname === '/api/remote/test-repository') return call('remote.testRepository', body)
+        if (url.pathname === '/api/remote/test-repo') return call('remote.testRepo', body)
         if (url.pathname === '/api/repo/probe') return call('repo.probe', body)
         if (url.pathname === '/api/repo/snapshot') return call('repo.snapshot', body)
         if (url.pathname === '/api/repo/status') return call('repo.status', body)

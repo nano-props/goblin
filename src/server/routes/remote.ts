@@ -29,8 +29,8 @@ export function createRemoteRoutes() {
     const { alias, remotePath, prefix } = await parseHttpBody(REMOTE_PROCEDURE_SCHEMAS.pathSuggestions, c)
     return c.json(await getServerRemotePathSuggestions({ alias, remotePath, prefix }, c.req.raw.signal))
   })
-  app.post('/test-repository', async (c) => {
-    const { target } = await parseHttpBody(REMOTE_PROCEDURE_SCHEMAS.testRepository, c)
+  app.post('/test-repo', async (c) => {
+    const { target } = await parseHttpBody(REMOTE_PROCEDURE_SCHEMAS.testRepo, c)
     return c.json(await testServerRemoteRepo(target, c.req.raw.signal))
   })
   app.post('/open-editor', async (c) => {

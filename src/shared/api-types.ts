@@ -262,7 +262,7 @@ export interface AppIpcHandlers {
     listSshHosts: () => Promise<SshConfigHostsResult>
     resolveTarget: (input: RemoteConnectionInput) => Promise<ResolvedRemoteTarget>
     listPathSuggestions: (input: RemotePathSuggestionsInput) => Promise<string[]>
-    testRepository: (input: { target: RemoteRepoTarget }) => Promise<RemoteDiagnosticsResult>
+    testRepo: (input: { target: RemoteRepoTarget }) => Promise<RemoteDiagnosticsResult>
   }
   theme: {
     get: () => ThemeState

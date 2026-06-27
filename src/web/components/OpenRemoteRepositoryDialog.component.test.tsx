@@ -48,7 +48,7 @@ beforeEach(() => {
           json: async () => ({ target: { ...target, alias: body.alias, remotePath: body.remotePath } }),
         }
       }
-      if (url.pathname === '/api/remote/test-repository') {
+      if (url.pathname === '/api/remote/test-repo') {
         return { ok: true, json: async () => ({ ok: true, target: body.target, stages: [] }) }
       }
       if (url.pathname === '/api/remote/path-suggestions') {
@@ -154,7 +154,7 @@ describe('OpenRemoteRepositoryDialog', () => {
             }),
           }
         }
-        if (url.pathname === '/api/remote/test-repository') {
+        if (url.pathname === '/api/remote/test-repo') {
           return { ok: true, json: async () => ({ ok: true, target: body.target, stages: [] }) }
         }
         if (url.pathname === '/api/remote/path-suggestions') {
@@ -196,7 +196,7 @@ describe('OpenRemoteRepositoryDialog', () => {
             json: async () => ({ target: { ...target, alias: body.alias, remotePath: body.remotePath } }),
           }
         }
-        if (url.pathname === '/api/remote/test-repository') {
+        if (url.pathname === '/api/remote/test-repo') {
           return {
             ok: true,
             json: () =>
@@ -246,7 +246,7 @@ describe('OpenRemoteRepositoryDialog', () => {
             json: async () => ({ target: { ...target, alias: body.alias, remotePath: body.remotePath } }),
           }
         }
-        if (url.pathname === '/api/remote/test-repository') {
+        if (url.pathname === '/api/remote/test-repo') {
           return {
             ok: true,
             json: async () => ({
@@ -303,7 +303,7 @@ describe('OpenRemoteRepositoryDialog', () => {
             json: async () => ({ target: { ...target, alias: body.alias, remotePath: body.remotePath } }),
           }
         }
-        if (url.pathname === '/api/remote/test-repository') {
+        if (url.pathname === '/api/remote/test-repo') {
           return { ok: true, json: async () => ({ ok: true, target: body.target, stages: [] }) }
         }
         if (url.pathname === '/api/remote/path-suggestions') {
@@ -371,7 +371,7 @@ describe('OpenRemoteRepositoryDialog', () => {
             json: async () => ({ target: { ...target, alias: body.alias, remotePath: body.remotePath } }),
           }
         }
-        if (url.pathname === '/api/remote/test-repository') {
+        if (url.pathname === '/api/remote/test-repo') {
           return { ok: true, json: async () => ({ ok: true, target: body.target, stages: [] }) }
         }
         if (url.pathname === '/api/remote/path-suggestions') {
@@ -439,7 +439,7 @@ describe('OpenRemoteRepositoryDialog', () => {
             json: async () => ({ target: { ...target, alias: body.alias, remotePath: body.remotePath } }),
           }
         }
-        if (url.pathname === '/api/remote/test-repository') {
+        if (url.pathname === '/api/remote/test-repo') {
           throw new Error('Permission denied')
         }
         if (url.pathname === '/api/remote/path-suggestions') {
