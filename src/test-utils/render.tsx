@@ -75,4 +75,3 @@ export async function flushMicrotasks(ticks = 3): Promise<void> {
     await Promise.resolve()
   }
 }
-

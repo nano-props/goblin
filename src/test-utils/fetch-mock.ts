@@ -29,9 +29,7 @@ import { vi } from 'vitest'
 
 export type FetchMock = ReturnType<typeof vi.fn>
 
-export function mockFetch(
-  impl?: (...args: Parameters<typeof fetch>) => ReturnType<typeof fetch> | unknown,
-): FetchMock {
+export function mockFetch(impl?: (...args: Parameters<typeof fetch>) => ReturnType<typeof fetch> | unknown): FetchMock {
   const fetchMock = vi.fn(impl as (...args: unknown[]) => unknown)
   vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch)
   return fetchMock

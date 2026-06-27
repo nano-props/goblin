@@ -76,10 +76,7 @@ export default defineConfig({
           // `src/test-utils/` and `src/web/test-utils/` live in the
           // `node` project so we don't run them twice.
           include: ['src/web/**/*.test.ts', 'src/web/**/*.test.tsx'],
-          exclude: [
-            'src/web/test-utils/**',
-            'src/test-utils/**',
-          ],
+          exclude: ['src/web/test-utils/**', 'src/test-utils/**'],
         },
       },
     ],

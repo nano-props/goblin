@@ -14,14 +14,7 @@
 import { afterEach, vi } from 'vitest'
 
 const FAKE_TIMER_OPTIONS: Parameters<typeof vi.useFakeTimers>[0] = {
-  toFake: [
-    'setTimeout',
-    'setInterval',
-    'requestAnimationFrame',
-    'cancelAnimationFrame',
-    'Date',
-    'performance',
-  ],
+  toFake: ['setTimeout', 'setInterval', 'requestAnimationFrame', 'cancelAnimationFrame', 'Date', 'performance'],
 }
 
 let registered = false

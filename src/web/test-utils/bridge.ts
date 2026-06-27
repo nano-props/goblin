@@ -23,10 +23,7 @@
 //     in `beforeEach`.
 
 import type { RepoState, RepoBranchState } from '#/web/stores/repos/types.ts'
-import {
-  stripBranchWorktreeMetadata,
-  worktreeStatesFromBranches,
-} from '#/web/stores/repos/worktree-state.ts'
+import { stripBranchWorktreeMetadata, worktreeStatesFromBranches } from '#/web/stores/repos/worktree-state.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { disposeAllRepoOperationSchedulers } from '#/web/stores/repos/repo-operation-scheduler.ts'
@@ -296,7 +293,10 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
   // across `src/web/test-utils/`, instead of a second inline copy.
   const socketMock = installWebSocketMock({ autoOpen: true })
   const OriginalSend = socketMock.MockWebSocket.prototype.send
-  socketMock.MockWebSocket.prototype.send = function patchedSend(this: InstanceType<typeof socketMock.MockWebSocket>, data: string) {
+  socketMock.MockWebSocket.prototype.send = function patchedSend(
+    this: InstanceType<typeof socketMock.MockWebSocket>,
+    data: string,
+  ) {
     OriginalSend.call(this, data)
     let parsed: { type?: string; requestId?: string; action?: string; input?: unknown } | null = null
     try {
