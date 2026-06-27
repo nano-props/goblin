@@ -10,11 +10,11 @@ has to decide, at every moment, **which window is allowed to type**.
 The answer to that question is what this document is about.
 
 This is a principles-level document. It does not describe fields,
-methods, timers, or flags. It describes the *shape* of the answer
-and the *constraints* the answer has to respect. Implementation
+methods, timers, or flags. It describes the _shape_ of the answer
+and the _constraints_ the answer has to respect. Implementation
 lives in `src/server/terminal/terminal-controller.ts`,
 `src/web/components/terminal/authority-gate.ts`, and the
-`ManagedTerminalSlot` glue.
+`TerminalSession` glue.
 
 ## The product premise
 
@@ -36,8 +36,8 @@ intent to win**, without ceremony.
 ## What "control" means
 
 A terminal session in Goblin has one writer at a time. Exactly one
-window is *the controller* — the one whose keystrokes reach the
-shell. All other windows are *viewers*: they see the same screen,
+window is _the controller_ — the one whose keystrokes reach the
+shell. All other windows are _viewers_: they see the same screen,
 they read the same output, but their input is dropped at the
 boundary.
 
@@ -59,15 +59,15 @@ following all mean the same thing:
 - I just opened this terminal on another device.
 - I just clicked 接管 because the cursor was stuck elsewhere.
 
-Each of those is a clear signal that the user wants *this window*
+Each of those is a clear signal that the user wants _this window_
 to be the one in control. The system must honor that signal
 without requiring the user to first close the previous window.
 
 Crucially, the system has no business distinguishing "another
 device of mine" from "another tab of mine" from "another Electron
 window of mine". They're all the same user. The boundary that
-matters is *write intent just happened*, not *what kind of
-attachment produced that intent*.
+matters is _write intent just happened_, not _what kind of
+attachment produced that intent_.
 
 ## The button, demoted
 
@@ -84,7 +84,7 @@ The main path is:
    touched the session before and grants control.
 3. Window is now the controller.
 4. User types. Keystrokes flow through the local gate.
-5. If the window is a *viewer* (some sibling window is currently
+5. If the window is a _viewer_ (some sibling window is currently
    the controller), the gate promotes it before the keystroke
    reaches the server. The user sees no interruption — they
    typed, the keystroke arrived.
@@ -137,7 +137,7 @@ survives a socket-level reconnect within the same window**, and
 The two-tier identity means the model can tell "same window, brief
 network issue" apart from "different window, deliberate switch".
 
-## When the original controller is *not* the next to arrive
+## When the original controller is _not_ the next to arrive
 
 The same-window reconnect is the friendly case. The less-friendly
 case is a small but real race:
@@ -282,7 +282,7 @@ protects the user's mental model, not their secrets.
   they take over via the button).
 - If a design decision is "should the user see a 'takeover
   required' modal", the answer is: only when the takeover button
-  is the *only* way to make progress. In normal use it is not.
+  is the _only_ way to make progress. In normal use it is not.
 - If a design decision is "does this distinguish between user
   devices", the answer is no. Two devices of the same user are
   one user.

@@ -67,7 +67,7 @@ Representative examples:
 
 Notes:
 
-- `RestorableWorkspaceState` names the workspace fields that serialize into `SessionState`.
+- `RestorableWorkspaceState` names the workspace fields that serialize into `WorkspaceSessionState`.
 - `RestorableRepoCacheState` names the warm-start repo cache slice.
 - `RestorableRepoSnapshot` is the stored snapshot shape inside that cache.
 - Restorable helpers should focus on boot restore and persistence boundaries, not on live runtime convergence.

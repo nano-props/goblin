@@ -59,7 +59,7 @@ Routing is split between `src/shared/clipboard-paste.ts` and `src/web/clipboard/
 - `looksLikeAbsolutePathList(text)` — multi-line absolute paths (POSIX `/…`, Windows drive letter `C:\…`, UNC `\\…`). Non-file URIs deliberately excluded.
 - `isAbsolutePathLike(line)` — single-line primitive used by both the multi-line predicate and the single-line + files branch.
 
-The router itself is `previewPaste({ text, files }) → PastePreview` in `src/web/clipboard/process.ts` — synchronous, side-effect free. When it returns `'files'`, `TerminalSlot` then calls `resolvePastedFiles(files)` asynchronously. The slot uses this split so it can call `event.preventDefault()` / `event.stopPropagation()` before the event reaches xterm.js's descendant textarea listener.
+The router itself is `previewPaste({ text, files }) → PastePreview` in `src/web/clipboard/process.ts` — synchronous, side-effect free. When it returns `'files'`, `TerminalSessionView` then calls `resolvePastedFiles(files)` asynchronously. The view uses this split so it can call `event.preventDefault()` / `event.stopPropagation()` before the event reaches xterm.js's descendant textarea listener.
 
 **Don't preventDefault on the text branch.** xterm.js's native paste handler reads `text/plain` itself and wraps with `\x1b[200~…\x1b[201~` when the shell has enabled bracketed-paste mode. Letting it run is what gives the user correct bracketed-paste semantics for free.
 

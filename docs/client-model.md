@@ -2,7 +2,7 @@
 
 Use this doc for the server-first client model.
 
-> *We use "client" to mean a browser-side UI host — this includes both BrowserWindow-hosted Electron pages and plain web browser tabs. The code directory remains `src/web/` because it contains browser-side UI code; the architecture term is still "client".*
+> _We use "client" to mean a browser-side UI host — this includes both BrowserWindow-hosted Electron pages and plain web browser tabs. The code directory remains `src/web/` because it contains browser-side UI code; the architecture term is still "client"._
 
 - Treat the backend as the primary runtime.
 - Design client behavior around the server contract first.
