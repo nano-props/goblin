@@ -31,7 +31,7 @@ export async function getSettingsSnapshot(): Promise<SettingsSnapshot> {
   return await fetchServerJson<SettingsSnapshot>('/api/settings')
 }
 
-function resolveThemeStateFromPrefs(settings: Pick<UserSettings, 'theme' | 'colorTheme'>): ThemeState {
+function resolveThemeStateFromUserSettings(settings: Pick<UserSettings, 'theme' | 'colorTheme'>): ThemeState {
   const resolved =
     settings.theme === 'auto'
       ? window.matchMedia?.('(prefers-color-scheme: dark)').matches
@@ -42,7 +42,7 @@ function resolveThemeStateFromPrefs(settings: Pick<UserSettings, 'theme' | 'colo
 }
 
 export function resolveThemeStateFromSettings(settings: Pick<UserSettings, 'theme' | 'colorTheme'>): ThemeState {
-  return resolveThemeStateFromPrefs(settings)
+  return resolveThemeStateFromUserSettings(settings)
 }
 
 export async function getThemeState(): Promise<ThemeState> {
@@ -83,11 +83,11 @@ async function updateUserSettingsPatch(settings: Record<string, unknown>): Promi
 }
 
 export async function setThemePref(pref: ThemePref): Promise<ThemeState> {
-  return resolveThemeStateFromPrefs((await updateUserSettingsPatch({ theme: pref })).settings)
+  return resolveThemeStateFromUserSettings((await updateUserSettingsPatch({ theme: pref })).settings)
 }
 
 export async function setThemeColorTheme(colorTheme: ColorTheme): Promise<ThemeState> {
-  return resolveThemeStateFromPrefs((await updateUserSettingsPatch({ colorTheme })).settings)
+  return resolveThemeStateFromUserSettings((await updateUserSettingsPatch({ colorTheme })).settings)
 }
 
 export async function getI18nSnapshot(options?: { signal?: AbortSignal }): Promise<I18nSnapshot> {

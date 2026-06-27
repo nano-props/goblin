@@ -11,7 +11,7 @@ export function persistedActiveRepoIdForSession(activeId: string | null): string
   return activeId
 }
 
-export function persistedPreferredWorkspacePaneViewByBranchByRepoForSession(
+export function persistedPreferredWorkspacePaneTabByBranchByRepoForSession(
   repos: Record<
     string,
     | {

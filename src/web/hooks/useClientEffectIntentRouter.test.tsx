@@ -37,7 +37,7 @@ let currentRepoId: string | null = null
 let navigation!: MainWindowNavigationActions
 const activateRepoSpy = vi.fn()
 const closeRepoSpy = vi.fn()
-const showRepoBranchWorkspacePaneViewSpy = vi.fn()
+const showRepoBranchWorkspacePaneTabSpy = vi.fn()
 const consumeExternalOpenPathsSpy = vi.fn<() => Promise<string[]>>(async () => [])
 
 beforeEach(() => {
@@ -47,7 +47,7 @@ beforeEach(() => {
   closeAllOverlays.mockClear()
   activateRepoSpy.mockClear()
   closeRepoSpy.mockClear()
-  showRepoBranchWorkspacePaneViewSpy.mockClear()
+  showRepoBranchWorkspacePaneTabSpy.mockClear()
   appDataClientMocks.clearRecentRepoHistory.mockClear()
   consumeExternalOpenPathsSpy.mockReset()
   consumeExternalOpenPathsSpy.mockResolvedValue([])
@@ -75,7 +75,7 @@ beforeEach(() => {
       state.setWorkspacePaneTab(repoId, tab)
     },
     showRepoBranchWorkspacePaneTab: (repoId, branch, tab) => {
-      showRepoBranchWorkspacePaneViewSpy(repoId, branch, tab)
+      showRepoBranchWorkspacePaneTabSpy(repoId, branch, tab)
       const state = useReposStore.getState()
       state.setActive(repoId)
       state.selectBranch(repoId, branch)
@@ -184,7 +184,7 @@ describe('useClientEffectIntentRouter', () => {
     })
 
     const state = useReposStore.getState()
-    expect(showRepoBranchWorkspacePaneViewSpy).toHaveBeenCalledWith(repo.id, 'feature/test', 'terminal')
+    expect(showRepoBranchWorkspacePaneTabSpy).toHaveBeenCalledWith(repo.id, 'feature/test', 'terminal')
     expect(state.repos[repo.id]?.ui.selectedBranch).toBe('feature/test')
     expect(preferredWorkspacePaneTab(repo.id)).toBe('terminal')
     expect(state.selectedTerminalSessionByWorktree).toMatchObject({

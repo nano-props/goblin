@@ -5,7 +5,7 @@ import {
   persistedActiveRepoIdForSession,
   persistedWorkspacePaneTabOrderByBranchByRepoForSession,
   persistedSelectedTerminalByWorktreeForSession,
-  persistedPreferredWorkspacePaneViewByBranchByRepoForSession,
+  persistedPreferredWorkspacePaneTabByBranchByRepoForSession,
 } from '#/web/session-persistence-state.ts'
 
 export function sessionStateFromRestorableWorkspaceState(input: {
@@ -22,7 +22,7 @@ export function sessionStateFromRestorableWorkspaceState(input: {
       restorableWorkspaceState.selectedTerminalSessionByWorktree,
       repos,
     ),
-    preferredWorkspacePaneTabByBranchByRepo: persistedPreferredWorkspacePaneViewByBranchByRepoForSession(
+    preferredWorkspacePaneTabByBranchByRepo: persistedPreferredWorkspacePaneTabByBranchByRepoForSession(
       repos,
       restorableWorkspaceState.order,
     ),

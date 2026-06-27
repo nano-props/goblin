@@ -136,7 +136,7 @@ export async function resolveRemoteRepoTarget(repoId: string): Promise<RemoteRep
 
 export async function runWithRepoSource<T>(
   cwd: string,
-  task: (backend: Awaited<ReturnType<typeof resolveRepoSource>>) => Promise<T>,
+  task: (source: Awaited<ReturnType<typeof resolveRepoSource>>) => Promise<T>,
 ): Promise<T> {
   return await task(await resolveRepoSource(cwd))
 }

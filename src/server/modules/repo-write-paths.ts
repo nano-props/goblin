@@ -218,7 +218,7 @@ export async function fetchRepo(
     return result
   }
   async function executeFetch(): Promise<{ ok: boolean; message: string }> {
-    return await runWithRepoSource(cwd, async (backend) => await runFetch((signal) => backend.fetch(signal)))
+    return await runWithRepoSource(cwd, async (source) => await runFetch((signal) => source.fetch(signal)))
   }
 
   if (kind === 'user') {
@@ -243,9 +243,9 @@ export async function pullRepoBranch(
   signal?: AbortSignal,
   sourceToken?: string,
 ): Promise<ExecResult> {
-  const backend = await resolveRepoSource(cwd)
+  const source = await resolveRepoSource(cwd)
   return await runUserNetworkMutation(cwd, signal, sourceToken, async (mergedSignal) => {
-    return await backend.pull(branch, worktreePath, mergedSignal)
+    return await source.pull(branch, worktreePath, mergedSignal)
   })
 }
 
@@ -255,9 +255,9 @@ export async function pushRepoBranch(
   signal?: AbortSignal,
   sourceToken?: string,
 ): Promise<ExecResult> {
-  const backend = await resolveRepoSource(cwd)
+  const source = await resolveRepoSource(cwd)
   return await runUserNetworkMutation(cwd, signal, sourceToken, async (mergedSignal) => {
-    return await backend.push(branch, mergedSignal)
+    return await source.push(branch, mergedSignal)
   })
 }
 
@@ -277,8 +277,8 @@ export async function createRepoWorktree(
     return { ok: false, message: 'error.invalid-path' }
   }
   const worktreeBootstrap = options?.worktreeBootstrap ?? { kind: 'skip' }
-  return await runWithRepoSource(cwd, async (backend) => {
-    const result = await backend.createWorktree(normalized, signal, {
+  return await runWithRepoSource(cwd, async (source) => {
+    const result = await source.createWorktree(normalized, signal, {
       worktreeBootstrap,
     })
     const trustedResult = await trustWorktreeBootstrapAfterSuccessfulRun(repoId, worktreeBootstrap, result)
@@ -305,7 +305,7 @@ async function trustWorktreeBootstrapAfterSuccessfulRun(
 
 export async function getRepoRemoteBranches(cwd: string, signal?: AbortSignal): Promise<string[]> {
   if (!isValidRepoLocator(cwd)) return []
-  return await runWithRepoSource(cwd, async (backend) => await backend.getRemoteBranches(signal))
+  return await runWithRepoSource(cwd, async (source) => await source.getRemoteBranches(signal))
 }
 
 export async function deleteRepoBranch(
@@ -315,10 +315,10 @@ export async function deleteRepoBranch(
   signal?: AbortSignal,
   sourceToken?: string,
 ): Promise<ExecResult> {
-  return await runWithRepoSource(cwd, async (backend) => {
+  return await runWithRepoSource(cwd, async (source) => {
     return await publishSnapshotInvalidationAfterMutation(
       cwd,
-      await backend.deleteBranch(branch, options, signal),
+      await source.deleteBranch(branch, options, signal),
       sourceToken,
     )
   })
@@ -336,13 +336,13 @@ export async function removeRepoWorktree(
   signal?: AbortSignal,
   sourceToken?: string,
 ): Promise<ExecResult> {
-  return await runWithRepoSource(cwd, async (backend) => {
-    return await publishSnapshotInvalidationAfterMutation(cwd, await backend.removeWorktree(input, signal), sourceToken)
+  return await runWithRepoSource(cwd, async (source) => {
+    return await publishSnapshotInvalidationAfterMutation(cwd, await source.removeWorktree(input, signal), sourceToken)
   })
 }
 
 export async function openRepoRemote(cwd: string, branch?: string, signal?: AbortSignal): Promise<ExecResult> {
-  const url = await runWithRepoSource(cwd, async (backend) => await backend.getBrowserRemoteUrl(branch, signal))
+  const url = await runWithRepoSource(cwd, async (source) => await source.getBrowserRemoteUrl(branch, signal))
   return url ? { ok: true, message: url } : { ok: false, message: 'error.no-remote-url' }
 }
 

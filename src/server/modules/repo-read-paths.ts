@@ -11,15 +11,15 @@ import type { ProbeResult, PullRequestEntry, RepoSnapshot } from '#/shared/api-t
 import type { WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
 
 export async function probeRepo(cwd: string): Promise<ProbeResult> {
-  return await runWithRepoSource(cwd, async (backend) => await backend.probe())
+  return await runWithRepoSource(cwd, async (source) => await source.probe())
 }
 
 export async function getRepoSnapshot(cwd: string, signal?: AbortSignal): Promise<RepoSnapshot | null> {
-  return signal?.aborted ? null : await runWithRepoSource(cwd, async (backend) => await backend.getSnapshot(signal))
+  return signal?.aborted ? null : await runWithRepoSource(cwd, async (source) => await source.getSnapshot(signal))
 }
 
 export async function getRepoStatus(cwd: string, signal?: AbortSignal): Promise<WorktreeStatus[]> {
-  return signal?.aborted ? [] : await runWithRepoSource(cwd, async (backend) => await backend.getStatus(signal))
+  return signal?.aborted ? [] : await runWithRepoSource(cwd, async (source) => await source.getStatus(signal))
 }
 
 export async function getRepoPullRequests(
@@ -41,7 +41,7 @@ export async function getRepoPullRequests(
   const branchNames = branchSet ? Array.from(branchSet) : undefined
   const prs = await runWithRepoSource(
     cwd,
-    async (backend) => await backend.getPullRequests(branchNames, { mode, signal: options?.signal }),
+    async (source) => await source.getPullRequests(branchNames, { mode, signal: options?.signal }),
   )
   if (!prs) return null
   return prs
@@ -55,8 +55,8 @@ export async function getRepoLog(
   if (typeof branch !== 'string' || branch.length === 0) return []
   return await runWithRepoSource(
     cwd,
-    async (backend) =>
-      await backend.getLog(branch, {
+    async (source) =>
+      await source.getLog(branch, {
         count: options?.count ?? DEFAULT_REPOSITORY_LOG_COUNT,
         skip: options?.skip ?? 0,
         signal: options?.signal,
@@ -65,7 +65,7 @@ export async function getRepoLog(
 }
 
 export async function getRepoPatch(cwd: string, worktreePath: string, signal?: AbortSignal): Promise<ExecResult> {
-  return await runWithRepoSource(cwd, async (backend) => await backend.getPatch(worktreePath, signal))
+  return await runWithRepoSource(cwd, async (source) => await source.getPatch(worktreePath, signal))
 }
 
 export async function getRepoWorktreeBootstrapPreview(
@@ -73,7 +73,7 @@ export async function getRepoWorktreeBootstrapPreview(
   signal?: AbortSignal,
 ): Promise<WorktreeBootstrapPreviewResult> {
   if (!isValidRepoLocator(cwd)) return { ok: false, message: 'error.invalid-arguments' }
-  return await runWithRepoSource(cwd, async (backend) => await backend.getWorktreeBootstrapPreview(signal))
+  return await runWithRepoSource(cwd, async (source) => await source.getWorktreeBootstrapPreview(signal))
 }
 
 export type RepoBulkReadSection = 'snapshot' | 'status' | 'pullRequests'
@@ -104,7 +104,7 @@ export interface RepoBulkReadOptions {
 /**
  * Build a per-section `AbortSignal` that fires when either the
  * caller's signal or the timeout fires. The timeout is a hard cap
- * independent of any backend-specific backoff; its job is to bound
+ * independent of any source-specific backoff; its job is to bound
  * how long the composite endpoint can block the request worker.
  */
 function composeSectionSignal(

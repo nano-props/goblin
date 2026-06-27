@@ -48,9 +48,9 @@ import {
   workspacePaneTabProvider,
 } from '#/web/components/workspace-pane/tab-providers.ts'
 
-type TerminalWorkspacePaneViewSummary = Extract<WorkspacePaneTabSummary, { type: 'terminal' }>
+type TerminalWorkspacePaneTabSummary = Extract<WorkspacePaneTabSummary, { type: 'terminal' }>
 
-interface WorkspacePaneViewStripProps {
+interface WorkspacePaneTabStripProps {
   worktreeTerminalKey: string | null
   items: WorkspacePaneTabItem[]
   workspacePaneId: string
@@ -96,7 +96,7 @@ export interface WorkspacePaneStaticTabItem extends WorkspacePaneSortableTabItem
 
 export interface WorkspacePaneTerminalTabItem extends WorkspacePaneSortableTabItemBase {
   kind: 'terminal'
-  view: TerminalWorkspacePaneViewSummary
+  view: TerminalWorkspacePaneTabSummary
   closeLabel: string
   orderEntry: Extract<WorkspacePaneTabOrderEntry, { type: 'terminal' }>
 }
@@ -135,7 +135,7 @@ export function createStaticWorkspacePaneTabItem(input: {
 }
 
 export function createTerminalWorkspacePaneTabItem(input: {
-  view: TerminalWorkspacePaneViewSummary
+  view: TerminalWorkspacePaneTabSummary
   label: string
   tooltip: string
   closeLabel: string
@@ -184,7 +184,7 @@ const WORKSPACE_PANE_VIEW_TOOLTIP_SELECTOR = '[data-workspace-pane-tab-tooltip-i
 const WORKSPACE_PANE_COMPACT_TRAILING_ACTION_ID = '__workspace-pane-compact-trailing-action__'
 const WORKSPACE_PANE_NEW_ACTION_ID = '__workspace-pane-new-action__'
 
-function shouldShowWorkspacePaneViewSeparator({
+function shouldShowWorkspacePaneTabSeparator({
   leftId,
   rightId,
   activeId,
@@ -198,7 +198,7 @@ function shouldShowWorkspacePaneViewSeparator({
   return !!rightId && leftId !== activeId && rightId !== activeId && leftId !== hoveredId && rightId !== hoveredId
 }
 
-interface WorkspacePaneViewSwitcherPopoverProps {
+interface WorkspacePaneTabSwitcherPopoverProps {
   items: WorkspacePaneTabItem[]
   activeTabIdentity: string | null
   label: string
@@ -210,7 +210,7 @@ interface WorkspacePaneViewSwitcherPopoverProps {
   t: (key: string, params?: Record<string, string | number>) => string
 }
 
-function WorkspacePaneViewSwitcherPopover({
+function WorkspacePaneTabSwitcherPopover({
   items,
   activeTabIdentity,
   label,
@@ -220,7 +220,7 @@ function WorkspacePaneViewSwitcherPopover({
   onSelect,
   onClose,
   t,
-}: WorkspacePaneViewSwitcherPopoverProps) {
+}: WorkspacePaneTabSwitcherPopoverProps) {
   const [open, setOpen] = useState(false)
   const contentRef = useRef<HTMLDivElement>(null)
 
@@ -278,7 +278,7 @@ function WorkspacePaneViewSwitcherPopover({
                       ) : selected ? (
                         <Check size={13} aria-hidden />
                       ) : (
-                        <WorkspacePaneViewIcon item={item} active={false} />
+                        <WorkspacePaneTabIcon item={item} active={false} />
                       )}
                     </span>
                     <span className="min-w-0 flex-1 truncate">{item.label || item.tooltip}</span>
@@ -344,7 +344,7 @@ export function WorkspacePaneTabStrip({
   onReorder,
   onNavigateOut,
   activateKeyboardNavigationSelection = false,
-}: WorkspacePaneViewStripProps) {
+}: WorkspacePaneTabStripProps) {
   const t = useT()
   const terminalItems = useMemo(() => items.filter(isTerminalWorkspacePaneTabItem), [items])
   const sortableItems = useMemo(() => items.filter(isSortableWorkspacePaneTabItem), [items])
@@ -575,7 +575,7 @@ export function WorkspacePaneTabStrip({
 
     return (
       <ToolbarTabStripBody className="flex-1">
-        <WorkspacePaneViewTooltipLayer
+        <WorkspacePaneTabTooltipLayer
           items={items}
           role="tablist"
           aria-label={t('workspace-pane-tabs.tabs')}
@@ -598,7 +598,7 @@ export function WorkspacePaneTabStrip({
               onKeyDown={handleTabKeyDown}
               t={t}
               compact={collapseToSelectedTab}
-              showSeparator={shouldShowWorkspacePaneViewSeparator({
+              showSeparator={shouldShowWorkspacePaneTabSeparator({
                 leftId: compactItem.identity,
                 rightId: WORKSPACE_PANE_COMPACT_TRAILING_ACTION_ID,
                 activeId: compactActiveVisualIdentity,
@@ -607,8 +607,8 @@ export function WorkspacePaneTabStrip({
               onHoverChange={setHoveredTabIdentity}
             />
           ) : null}
-        </WorkspacePaneViewTooltipLayer>
-        <WorkspacePaneViewSwitcherPopover
+        </WorkspacePaneTabTooltipLayer>
+        <WorkspacePaneTabSwitcherPopover
           items={items}
           activeTabIdentity={activeTabIdentity}
           label={t('workspace-pane-tabs.tabs')}
@@ -635,7 +635,7 @@ export function WorkspacePaneTabStrip({
       >
         <ToolbarTabStripBody scroll>
           <SortableContext items={sortableIds} strategy={horizontalListSortingStrategy}>
-            <WorkspacePaneViewTooltipLayer items={items} role="tablist" aria-label={t('workspace-pane-tabs.tabs')}>
+            <WorkspacePaneTabTooltipLayer items={items} role="tablist" aria-label={t('workspace-pane-tabs.tabs')}>
               {items.map((item, index) => {
                 const nextItem = items[index + 1]
                 const rightId = nextItem ? nextItem.identity : WORKSPACE_PANE_NEW_ACTION_ID
@@ -648,7 +648,7 @@ export function WorkspacePaneTabStrip({
                   total: items.length,
                   tabId: tabIdForItem(item),
                   focusRegistry,
-                  showSeparator: shouldShowWorkspacePaneViewSeparator({
+                  showSeparator: shouldShowWorkspacePaneTabSeparator({
                     leftId: item.identity,
                     rightId,
                     activeId: activeVisualIdentity,
@@ -665,10 +665,10 @@ export function WorkspacePaneTabStrip({
                   return <WorkspacePaneTabType key={item.identity} {...commonProps} />
                 }
                 return (
-                  <SortableWorkspacePaneView key={item.identity} {...commonProps} sortableIdentity={item.sortableId} />
+                  <SortableWorkspacePaneTab key={item.identity} {...commonProps} sortableIdentity={item.sortableId} />
                 )
               })}
-            </WorkspacePaneViewTooltipLayer>
+            </WorkspacePaneTabTooltipLayer>
           </SortableContext>
           {canCreateNew ? (
             <WorkspacePaneNewButton
@@ -694,7 +694,7 @@ export function WorkspacePaneTabStrip({
   )
 }
 
-interface WorkspacePaneViewProps {
+interface WorkspacePaneTabProps {
   item: WorkspacePaneTabItem
   isActive: boolean
   isSelected: boolean
@@ -744,7 +744,7 @@ const WorkspacePaneNewButton = forwardRef<
   )
 })
 
-interface WorkspacePaneViewChromeProps {
+interface WorkspacePaneTabChromeProps {
   item: WorkspacePaneTabItem
   isActive: boolean
   isSelected: boolean
@@ -765,7 +765,7 @@ interface WorkspacePaneViewChromeProps {
   onHoverChange?: (identity: string | null) => void
 }
 
-function WorkspacePaneViewChrome({
+function WorkspacePaneTabChrome({
   item,
   isActive,
   isSelected,
@@ -784,7 +784,7 @@ function WorkspacePaneViewChrome({
   compact = false,
   showSeparator = false,
   onHoverChange,
-}: WorkspacePaneViewChromeProps) {
+}: WorkspacePaneTabChromeProps) {
   const bellUnreadLabel = t('terminal.bell-unread')
   const accessibleLabel = item.label || item.tooltip
   const ariaLabel =
@@ -851,7 +851,7 @@ function WorkspacePaneViewChrome({
       {isPendingWorkspacePaneTabItem(item) && item.busy ? (
         <Loader2 size={13} className="shrink-0 animate-spin text-muted-foreground" />
       ) : (
-        <WorkspacePaneViewIcon item={item} active={isActive} compact={compact} />
+        <WorkspacePaneTabIcon item={item} active={isActive} compact={compact} />
       )}
       {isPendingWorkspacePaneTabItem(item) && item.busy ? null : item.label ? (
         <span className="truncate">{item.label}</span>
@@ -885,9 +885,9 @@ function WorkspacePaneTabType({
   compact,
   showSeparator,
   onHoverChange,
-}: WorkspacePaneViewProps) {
+}: WorkspacePaneTabProps) {
   return (
-    <WorkspacePaneViewChrome
+    <WorkspacePaneTabChrome
       item={item}
       isActive={isActive}
       isSelected={isSelected}
@@ -907,7 +907,7 @@ function WorkspacePaneTabType({
   )
 }
 
-function SortableWorkspacePaneView({
+function SortableWorkspacePaneTab({
   sortableIdentity,
   item,
   isActive,
@@ -924,12 +924,12 @@ function SortableWorkspacePaneView({
   compact,
   showSeparator,
   onHoverChange,
-}: WorkspacePaneViewProps & { sortableIdentity: string }) {
+}: WorkspacePaneTabProps & { sortableIdentity: string }) {
   const sortable = useSortableTab(sortableIdentity, { onButtonRef: focusRegistry.setRef(item.identity) })
 
   return (
     <div ref={sortable.setContainerRef} style={sortable.style} className="touch-none select-none">
-      <WorkspacePaneViewChrome
+      <WorkspacePaneTabChrome
         item={item}
         isActive={isActive}
         isSelected={isSelected}
@@ -957,11 +957,11 @@ function SortableWorkspacePaneView({
   )
 }
 
-interface WorkspacePaneViewTooltipLayerProps extends ComponentPropsWithoutRef<'div'> {
+interface WorkspacePaneTabTooltipLayerProps extends ComponentPropsWithoutRef<'div'> {
   items: WorkspacePaneTabItem[]
 }
 
-function WorkspacePaneViewTooltipLayer({ items, children, ...props }: WorkspacePaneViewTooltipLayerProps) {
+function WorkspacePaneTabTooltipLayer({ items, children, ...props }: WorkspacePaneTabTooltipLayerProps) {
   return (
     <DelegatedTooltipLayer
       items={items}
@@ -981,7 +981,7 @@ function WorkspacePaneViewTooltipLayer({ items, children, ...props }: WorkspaceP
   )
 }
 
-function WorkspacePaneViewIcon({
+function WorkspacePaneTabIcon({
   item,
   active,
   compact = false,

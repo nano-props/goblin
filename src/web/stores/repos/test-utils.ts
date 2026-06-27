@@ -106,11 +106,10 @@ export function resetReposStore(): void {
 }
 
 export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>): void {
-  const shellOpenExternalUrl = handlers['shell.openExternalUrl'] ?? handlers['app.openExternalUrl']
-  const shellOpenDirectoryDialog = handlers['shell.openDirectoryDialog'] ?? handlers['repo.openDialog']
-  const shellConsumeExternalOpenPaths =
-    handlers['shell.consumeExternalOpenPaths'] ?? handlers['repo.consumeExternalOpenPaths']
-  const shellOpenSettingsWindow = handlers['shell.openSettingsWindow'] ?? handlers['app.openSettingsWindow']
+  const hostOpenExternalUrl = handlers['app.openExternalUrl']
+  const hostOpenDirectoryDialog = handlers['repo.openDialog']
+  const hostConsumeExternalOpenPaths = handlers['repo.consumeExternalOpenPaths']
+  const hostOpenSettingsWindow = handlers['app.openSettingsWindow']
   Object.defineProperty(globalThis, 'window', {
     configurable: true,
     value: {
@@ -133,21 +132,21 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         pathForFile: () => '',
         host: {
           openSettingsWindow: (input: unknown) =>
-            shellOpenSettingsWindow ? Promise.resolve(shellOpenSettingsWindow(input)) : Promise.resolve(false),
+            hostOpenSettingsWindow ? Promise.resolve(hostOpenSettingsWindow(input)) : Promise.resolve(false),
           openExternalUrl: (input: unknown) =>
-            shellOpenExternalUrl
-              ? Promise.resolve(shellOpenExternalUrl(input))
+            hostOpenExternalUrl
+              ? Promise.resolve(hostOpenExternalUrl(input))
               : Promise.resolve({ ok: false, message: 'error.invalid-url' }),
           openDirectoryDialog: (input: { title?: string }) => {
             const handler =
               input?.title === 'Choose Clone Destination' && handlers['repo.cloneParentDialog']
                 ? handlers['repo.cloneParentDialog']
-                : shellOpenDirectoryDialog
+                : hostOpenDirectoryDialog
             return handler ? Promise.resolve(handler(input)) : Promise.resolve(null)
           },
           consumeExternalOpenPaths: () =>
-            shellConsumeExternalOpenPaths
-              ? Promise.resolve(shellConsumeExternalOpenPaths(undefined))
+            hostConsumeExternalOpenPaths
+              ? Promise.resolve(hostConsumeExternalOpenPaths(undefined))
               : Promise.resolve([]),
         },
         terminal: {
@@ -411,7 +410,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         if (url.pathname === '/api/settings/recent-repos/add') return call('settings.addRecentRepo', body)
         if (url.pathname === '/api/settings/session') return call('settings.saveSession', body)
         if (url.pathname === '/api/settings/fetch-interval') return call('settings.setFetchInterval', body)
-        if (url.pathname === '/api/settings/prefs') return call('settings.updatePrefs', body)
+        if (url.pathname === '/api/settings/prefs') return call('settings.updateUserSettings', body)
         if (url.pathname === '/api/remote/ssh-hosts') return call('remote.listSshHosts', undefined)
         if (url.pathname === '/api/remote/resolve-target') return call('remote.resolveTarget', body)
         if (url.pathname === '/api/remote/lifecycle') return call('remote.lifecycle', body)

@@ -177,7 +177,7 @@ export async function handleWorkspaceClientIntent(
         token: plan.token,
       })
       return true
-    case 'show-workspace-pane-view':
+    case 'show-workspace-pane-tab':
       return await runShowWorkspacePaneTabCommand({
         repoId: plan.repoId,
         tab: plan.tab,

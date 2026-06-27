@@ -38,25 +38,25 @@ export function useRepoStatusRefresh() {
     activeRepoStatusSnapshotEqual,
   )
   const previousActiveRepoId = useRef<string | null>(null)
-  const previousPreferredWorkspacePaneView = useRef<WorkspacePaneTabType | null>(null)
+  const previousPreferredWorkspacePaneTab = useRef<WorkspacePaneTabType | null>(null)
   const previousStatusViewOpen = useRef<boolean>(false)
 
   useEffect(() => {
     const lastActiveRepoId = previousActiveRepoId.current
-    const lastPreferredWorkspacePaneView = previousPreferredWorkspacePaneView.current
+    const lastPreferredWorkspacePaneTab = previousPreferredWorkspacePaneTab.current
     const lastStatusViewOpen = previousStatusViewOpen.current
     const nextActiveRepoId = activeRepoId?.id ?? null
-    const nextPreferredWorkspacePaneView = activeRepoId?.preferredWorkspacePaneTab ?? null
+    const nextPreferredWorkspacePaneTab = activeRepoId?.preferredWorkspacePaneTab ?? null
     const nextStatusViewOpen = activeRepoId?.statusViewOpen ?? false
     const activeRepoChanged = nextActiveRepoId !== lastActiveRepoId
     const openedStatusLikeTab =
       !activeRepoChanged &&
       nextActiveRepoId !== null &&
-      ((nextPreferredWorkspacePaneView === 'status' && nextStatusViewOpen && !lastStatusViewOpen) ||
-        ((nextPreferredWorkspacePaneView === 'status' || nextPreferredWorkspacePaneView === 'changes') &&
-          nextPreferredWorkspacePaneView !== lastPreferredWorkspacePaneView))
+      ((nextPreferredWorkspacePaneTab === 'status' && nextStatusViewOpen && !lastStatusViewOpen) ||
+        ((nextPreferredWorkspacePaneTab === 'status' || nextPreferredWorkspacePaneTab === 'changes') &&
+          nextPreferredWorkspacePaneTab !== lastPreferredWorkspacePaneTab))
     previousActiveRepoId.current = nextActiveRepoId
-    previousPreferredWorkspacePaneView.current = nextPreferredWorkspacePaneView
+    previousPreferredWorkspacePaneTab.current = nextPreferredWorkspacePaneTab
     previousStatusViewOpen.current = nextStatusViewOpen
     if (!activeRepoId || (!activeRepoChanged && !openedStatusLikeTab)) return
     void runRepoRefreshIntent(useReposStore.getState, {

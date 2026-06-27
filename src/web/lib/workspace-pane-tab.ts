@@ -4,8 +4,8 @@ import {
   type WorkspacePaneBranchTabType,
   type WorkspacePaneTabType,
   type WorkspacePaneTabScope,
-  workspacePaneTabRequiresWorktree as sharedWorkspacePaneViewRequiresWorktree,
-  workspacePaneTabScope as sharedWorkspacePaneViewScope,
+  workspacePaneTabRequiresWorktree as sharedWorkspacePaneTabRequiresWorktree,
+  workspacePaneTabScope as sharedWorkspacePaneTabScope,
 } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabProvider } from '#/web/components/workspace-pane/tab-providers.ts'
 
@@ -16,20 +16,20 @@ export function isWorkspacePaneTab(value: string | null | undefined): value is W
   return isWorkspacePaneTabType(value)
 }
 
-export function workspacePaneTabScope(view: WorkspacePaneTabType): WorkspacePaneTabScope {
-  return sharedWorkspacePaneViewScope(view)
+export function workspacePaneTabScope(tab: WorkspacePaneTabType): WorkspacePaneTabScope {
+  return sharedWorkspacePaneTabScope(tab)
 }
 
-export function isBranchLevelWorkspacePaneTab(view: WorkspacePaneTabType): view is BranchLevelWorkspacePaneTab {
-  return isWorkspacePaneBranchTabType(view)
+export function isBranchLevelWorkspacePaneTab(tab: WorkspacePaneTabType): tab is BranchLevelWorkspacePaneTab {
+  return isWorkspacePaneBranchTabType(tab)
 }
 
-export function isWorktreeLevelWorkspacePaneTab(view: WorkspacePaneTabType): view is WorktreeLevelWorkspacePaneTab {
-  return workspacePaneTabScope(view) === 'worktree'
+export function isWorktreeLevelWorkspacePaneTab(tab: WorkspacePaneTabType): tab is WorktreeLevelWorkspacePaneTab {
+  return workspacePaneTabScope(tab) === 'worktree'
 }
 
-export function workspacePaneTabRequiresWorktree(view: WorkspacePaneTabType): boolean {
-  return sharedWorkspacePaneViewRequiresWorktree(view)
+export function workspacePaneTabRequiresWorktree(tab: WorkspacePaneTabType): boolean {
+  return sharedWorkspacePaneTabRequiresWorktree(tab)
 }
 
 /**

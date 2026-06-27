@@ -59,7 +59,7 @@ export type WorkspaceIntentPlan =
   | { kind: 'close-window' }
   | { kind: 'cycle-repo'; direction: 1 | -1 }
   | { kind: 'refresh-repo'; repoId: string; token: number }
-  | { kind: 'show-workspace-pane-view'; repoId: string; tab: WorkspacePaneTabType }
+  | { kind: 'show-workspace-pane-tab'; repoId: string; tab: WorkspacePaneTabType }
   | { kind: 'terminal-primary-action'; repoId: string }
   | { kind: 'toggle-zen-mode' }
 
@@ -155,7 +155,7 @@ export function createWorkspaceIntentPlan(
       return { kind: 'refresh-repo', repoId: context.currentRepo.id, token: context.currentRepo.instanceToken }
     case 'show-workspace-pane-tab-requested':
       if (context.workspaceShortcutSuppressed || !context.currentRepoId) return { kind: 'noop' }
-      return { kind: 'show-workspace-pane-view', repoId: context.currentRepoId, tab: event.tab }
+      return { kind: 'show-workspace-pane-tab', repoId: context.currentRepoId, tab: event.tab }
     case 'terminal-primary-action-requested':
       if (context.workspaceShortcutSuppressed || !context.currentRepoId) return { kind: 'noop' }
       return { kind: 'terminal-primary-action', repoId: context.currentRepoId }

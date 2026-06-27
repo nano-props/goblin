@@ -7,8 +7,8 @@ import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import { workspacePaneStaticViewsForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
 import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 
-const REPO_ID = '/tmp/workspace-pane-view-repo'
-const WORKTREE_PATH = '/tmp/workspace-pane-view-worktree'
+const REPO_ID = '/tmp/workspace-pane-tab-repo'
+const WORKTREE_PATH = '/tmp/workspace-pane-tab-worktree'
 const originalRefreshStatus = useReposStore.getState().refreshStatus
 
 beforeEach(() => {

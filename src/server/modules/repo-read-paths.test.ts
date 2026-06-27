@@ -13,12 +13,12 @@ vi.mock('#/server/modules/repo-source.ts', () => ({
 
 // Tests only need the read surface; cast to the full interface at the
 // boundary so individual stub objects stay focused.
-type BackendTask = (backend: RepoSource) => Promise<unknown>
-function asRepoSource(backend: ReadBackend): RepoSource {
-  return backend as unknown as RepoSource
+type SourceTask = (source: RepoSource) => Promise<unknown>
+function asRepoSource(source: ReadSource): RepoSource {
+  return source as unknown as RepoSource
 }
 
-type ReadBackend = Pick<
+type ReadSource = Pick<
   RepoSource,
   | 'id'
   | 'kind'
@@ -31,8 +31,8 @@ type ReadBackend = Pick<
   | 'getWorktreeBootstrapPreview'
 >
 
-function makeBackend(overrides: Partial<ReadBackend> = {}): ReadBackend {
-  const base: ReadBackend = {
+function makeSource(overrides: Partial<ReadSource> = {}): ReadSource {
+  const base: ReadSource = {
     id: '/tmp/repo',
     kind: 'local',
     probe: () => Promise.resolve({ ok: true }),
@@ -60,7 +60,7 @@ function makeBackend(overrides: Partial<ReadBackend> = {}): ReadBackend {
 
 beforeEach(() => {
   mocks.runWithRepoSource.mockReset()
-  mocks.runWithRepoSource.mockImplementation((_cwd: string, task: BackendTask) => task(asRepoSource(makeBackend())))
+  mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) => task(asRepoSource(makeSource())))
 })
 
 afterEach(() => {
@@ -68,7 +68,7 @@ afterEach(() => {
 })
 
 describe('getRepoLog', () => {
-  test('reads branch history through the repo backend', async () => {
+  test('reads branch history through the repo source', async () => {
     const entries: LogEntry[] = [
       {
         hash: '78c150a000000000000000000000000000000000',
@@ -80,8 +80,8 @@ describe('getRepoLog', () => {
       },
     ]
     const getLog = vi.fn(() => Promise.resolve(entries))
-    mocks.runWithRepoSource.mockImplementation((_cwd: string, task: BackendTask) =>
-      task(asRepoSource(makeBackend({ getLog }))),
+    mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
+      task(asRepoSource(makeSource({ getLog }))),
     )
     const { getRepoLog } = await import('#/server/modules/repo-read-paths.ts')
     const signal = new AbortController().signal
@@ -92,8 +92,8 @@ describe('getRepoLog', () => {
 
   test('uses the shared default branch history count', async () => {
     const getLog = vi.fn(() => Promise.resolve<LogEntry[]>([]))
-    mocks.runWithRepoSource.mockImplementation((_cwd: string, task: BackendTask) =>
-      task(asRepoSource(makeBackend({ getLog }))),
+    mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
+      task(asRepoSource(makeSource({ getLog }))),
     )
     const { getRepoLog } = await import('#/server/modules/repo-read-paths.ts')
 
@@ -103,7 +103,7 @@ describe('getRepoLog', () => {
 })
 
 describe('getRepoWorktreeBootstrapPreview', () => {
-  test('reads bootstrap preview through the repo backend', async () => {
+  test('reads bootstrap preview through the repo source', async () => {
     const getWorktreeBootstrapPreview = vi.fn(() =>
       Promise.resolve({
         ok: true as const,
@@ -118,8 +118,8 @@ describe('getRepoWorktreeBootstrapPreview', () => {
         },
       }),
     )
-    mocks.runWithRepoSource.mockImplementation((_cwd: string, task: BackendTask) =>
-      task(asRepoSource(makeBackend({ getWorktreeBootstrapPreview }))),
+    mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
+      task(asRepoSource(makeSource({ getWorktreeBootstrapPreview }))),
     )
     const { getRepoWorktreeBootstrapPreview } = await import('#/server/modules/repo-read-paths.ts')
     const signal = new AbortController().signal
@@ -139,10 +139,10 @@ describe('readRepoBulk timeout', () => {
       current: 'main',
     }
     const status: WorktreeStatus[] = []
-    mocks.runWithRepoSource.mockImplementation((_cwd: string, task: BackendTask) =>
+    mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
       task(
         asRepoSource(
-          makeBackend({
+          makeSource({
             getSnapshot: () => Promise.resolve(snapshot),
             getStatus: () => Promise.resolve(status),
             getPullRequests: () => Promise.resolve(null),
@@ -161,10 +161,10 @@ describe('readRepoBulk timeout', () => {
     vi.useFakeTimers()
     // Snapshot returns immediately; status hangs until aborted; PRs
     // returns null after a short delay.
-    mocks.runWithRepoSource.mockImplementation((_cwd: string, task: BackendTask) =>
+    mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
       task(
         asRepoSource(
-          makeBackend({
+          makeSource({
             getSnapshot: () =>
               Promise.resolve<RepoSnapshot | null>({
                 branches: [],
@@ -194,10 +194,10 @@ describe('readRepoBulk timeout', () => {
 
   test('disables the per-section timeout when timeoutMs is 0', async () => {
     let observedSignal: AbortSignal | undefined
-    mocks.runWithRepoSource.mockImplementation((_cwd: string, task: BackendTask) =>
+    mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
       task(
         asRepoSource(
-          makeBackend({
+          makeSource({
             getStatus: (signal?: AbortSignal) => {
               observedSignal = signal
               return new Promise<WorktreeStatus[]>((resolve) => {
@@ -213,7 +213,7 @@ describe('readRepoBulk timeout', () => {
     // Give the microtask queue a chance to wire up.
     await Promise.resolve()
     // A fresh, never-aborting signal is still wired through to the
-    // backend (so the backend code path is uniform) — just one
+    // source (so the source code path is uniform) — just one
     // that will never fire on its own.
     expect(observedSignal).toBeDefined()
     expect(observedSignal?.aborted).toBe(false)
@@ -230,10 +230,10 @@ describe('readRepoBulk timeout', () => {
     let snapshotSignal: AbortSignal | undefined
     let statusSignal: AbortSignal | undefined
     let prsSignal: AbortSignal | undefined
-    mocks.runWithRepoSource.mockImplementation((_cwd: string, task: BackendTask) =>
+    mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
       task(
         asRepoSource(
-          makeBackend({
+          makeSource({
             getSnapshot: (signal?: AbortSignal) => {
               snapshotSignal = signal
               return new Promise<RepoSnapshot | null>((_resolve, reject) => {

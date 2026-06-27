@@ -62,7 +62,7 @@ export function useBranchActionItems(
     if (phase === 'queued' && queuedKey) return t(queuedKey)
     return t(loadingKey)
   }
-  const openStaticWorkspacePaneView = (type: WorkspacePaneBranchTabType | WorkspacePaneStaticTabType) => {
+  const openStaticWorkspacePaneTab = (type: WorkspacePaneBranchTabType | WorkspacePaneStaticTabType) => {
     void openWorkspacePaneTab({
       repoId: repo.id,
       branchName: branch.name,
@@ -108,15 +108,7 @@ export function useBranchActionItems(
       disabled,
       visible: true,
       icon: createElement(GitBranch),
-      onSelect: () => openStaticWorkspacePaneView('status'),
-    },
-    {
-      id: 'changes',
-      label: t('tab.changes'),
-      disabled,
-      visible: !!branch.worktree?.path,
-      icon: createElement(Diff),
-      onSelect: () => openStaticWorkspacePaneView('changes'),
+      onSelect: () => openStaticWorkspacePaneTab('status'),
     },
     {
       id: 'history',
@@ -124,7 +116,15 @@ export function useBranchActionItems(
       disabled,
       visible: true,
       icon: createElement(History),
-      onSelect: () => openStaticWorkspacePaneView('history'),
+      onSelect: () => openStaticWorkspacePaneTab('history'),
+    },
+    {
+      id: 'changes',
+      label: t('tab.changes'),
+      disabled,
+      visible: !!branch.worktree?.path,
+      icon: createElement(Diff),
+      onSelect: () => openStaticWorkspacePaneTab('changes'),
     },
   ]
 

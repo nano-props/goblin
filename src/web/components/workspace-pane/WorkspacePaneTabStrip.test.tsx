@@ -60,7 +60,7 @@ afterEach(() => {
 describe('WorkspacePaneTabStrip', () => {
   test('shows terminal tooltip content with only the original title', async () => {
     render(
-      <TestWorkspacePaneViewStrip
+      <TestWorkspacePaneTabStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         panelActive
@@ -107,7 +107,7 @@ describe('WorkspacePaneTabStrip', () => {
 
   test('keeps the selected terminal in the collapsed popover list and still offers new terminal', async () => {
     render(
-      <TestWorkspacePaneViewStrip
+      <TestWorkspacePaneTabStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         responsiveCompact
@@ -148,7 +148,7 @@ describe('WorkspacePaneTabStrip', () => {
   test('collapsed terminal view only navigates out on arrow keys', () => {
     const onNavigateOut = vi.fn()
     render(
-      <TestWorkspacePaneViewStrip
+      <TestWorkspacePaneTabStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         responsiveCompact
@@ -184,7 +184,7 @@ describe('WorkspacePaneTabStrip', () => {
 
   test('keeps all terminal views visible in a horizontal scroll area when not in compact mode', () => {
     render(
-      <TestWorkspacePaneViewStrip
+      <TestWorkspacePaneTabStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
@@ -220,7 +220,7 @@ describe('WorkspacePaneTabStrip', () => {
 
   test('uses the last tab separator for the new terminal boundary while hovering new terminal', () => {
     render(
-      <TestWorkspacePaneViewStrip
+      <TestWorkspacePaneTabStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         panelActive
@@ -249,7 +249,7 @@ describe('WorkspacePaneTabStrip', () => {
 
   test('uses the full terminal title and unread state in the tab aria-label', () => {
     render(
-      <TestWorkspacePaneViewStrip
+      <TestWorkspacePaneTabStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         panelActive
@@ -284,7 +284,7 @@ describe('WorkspacePaneTabStrip', () => {
     const onNavigateOut = vi.fn()
 
     render(
-      <TestWorkspacePaneViewStrip
+      <TestWorkspacePaneTabStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
@@ -340,7 +340,7 @@ describe('WorkspacePaneTabStrip', () => {
 
   test('keeps the selected terminal view semantically selected even when the panel is inactive', () => {
     render(
-      <TestWorkspacePaneViewStrip
+      <TestWorkspacePaneTabStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
@@ -369,7 +369,7 @@ describe('WorkspacePaneTabStrip', () => {
 
   test('scrolls the view strip to the far right when a new terminal session is added', () => {
     render(
-      <TestWorkspacePaneViewStrip
+      <TestWorkspacePaneTabStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[session({ key: 't1', title: 'term-1' }), session({ key: 't2', title: 'term-2', selected: false })]}
@@ -388,7 +388,7 @@ describe('WorkspacePaneTabStrip', () => {
     Object.defineProperty(viewport, 'scrollLeft', { value: 0, writable: true, configurable: true })
 
     rerender(
-      <TestWorkspacePaneViewStrip
+      <TestWorkspacePaneTabStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
@@ -409,7 +409,7 @@ describe('WorkspacePaneTabStrip', () => {
 
   test('does not scroll on initial mount', () => {
     render(
-      <TestWorkspacePaneViewStrip
+      <TestWorkspacePaneTabStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
@@ -433,7 +433,7 @@ describe('WorkspacePaneTabStrip', () => {
 
     // Trigger a re-render with the same sessions to confirm the effect does not scroll.
     rerender(
-      <TestWorkspacePaneViewStrip
+      <TestWorkspacePaneTabStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
@@ -454,7 +454,7 @@ describe('WorkspacePaneTabStrip', () => {
 
   test('does not scroll when the view strip does not overflow horizontally', () => {
     render(
-      <TestWorkspacePaneViewStrip
+      <TestWorkspacePaneTabStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[session({ key: 't1', title: 'term-1' }), session({ key: 't2', title: 'term-2', selected: false })]}
@@ -475,7 +475,7 @@ describe('WorkspacePaneTabStrip', () => {
     Object.defineProperty(viewport, 'scrollLeft', { value: 0, writable: true, configurable: true })
 
     rerender(
-      <TestWorkspacePaneViewStrip
+      <TestWorkspacePaneTabStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
@@ -501,7 +501,7 @@ describe('WorkspacePaneTabStrip', () => {
     })
 
     render(
-      <TestWorkspacePaneViewStrip
+      <TestWorkspacePaneTabStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[session({ key: 't1', title: 'term-1' }), session({ key: 't2', title: 'term-2', selected: false })]}
@@ -521,7 +521,7 @@ describe('WorkspacePaneTabStrip', () => {
     Object.defineProperty(viewport, 'scrollLeft', { value: 0, writable: true, configurable: true })
 
     rerender(
-      <TestWorkspacePaneViewStrip
+      <TestWorkspacePaneTabStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
@@ -545,7 +545,7 @@ describe('WorkspacePaneTabStrip', () => {
 
   test('does not scroll when a terminal session is removed', () => {
     render(
-      <TestWorkspacePaneViewStrip
+      <TestWorkspacePaneTabStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
@@ -568,7 +568,7 @@ describe('WorkspacePaneTabStrip', () => {
     Object.defineProperty(viewport, 'scrollLeft', { value: 500, writable: true, configurable: true })
 
     rerender(
-      <TestWorkspacePaneViewStrip
+      <TestWorkspacePaneTabStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[session({ key: 't1', title: 'term-1' }), session({ key: 't2', title: 'term-2', selected: false })]}
@@ -585,7 +585,7 @@ describe('WorkspacePaneTabStrip', () => {
 
   test('restores the full view strip after leaving compact mode', () => {
     rerender(
-      <TestWorkspacePaneViewStrip
+      <TestWorkspacePaneTabStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         responsiveCompact
@@ -619,7 +619,7 @@ describe('WorkspacePaneTabStrip', () => {
     expect(document.body.querySelector('button[aria-label="workspace-pane-tabs.tabs"]')).not.toBeNull()
 
     rerender(
-      <TestWorkspacePaneViewStrip
+      <TestWorkspacePaneTabStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[session({ key: 't1', title: 'term-1' }), session({ key: 't2', title: 'term-2', selected: false })]}
@@ -637,7 +637,7 @@ describe('WorkspacePaneTabStrip', () => {
 
   test('keeps the compact tab visually unselected even when its panel is active', () => {
     render(
-      <TestWorkspacePaneViewStrip
+      <TestWorkspacePaneTabStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         responsiveCompact
@@ -668,7 +668,7 @@ describe('WorkspacePaneTabStrip', () => {
       ])
 
       return (
-        <TestWorkspacePaneViewStrip
+        <TestWorkspacePaneTabStrip
           worktreeTerminalKey="/repo\0/repo/worktree"
           workspacePaneId="workspace"
           responsiveCompact
@@ -707,7 +707,7 @@ describe('WorkspacePaneTabStrip', () => {
 
   test('compact mode renders an empty tab area but keeps the popover switcher reachable when no tab is active', () => {
     render(
-      <TestWorkspacePaneViewStrip
+      <TestWorkspacePaneTabStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         responsiveCompact
@@ -744,7 +744,7 @@ describe('WorkspacePaneTabStrip', () => {
 
   test('renders a compact pending item across the available tab row', () => {
     render(
-      <TestWorkspacePaneViewStrip
+      <TestWorkspacePaneTabStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         responsiveCompact
@@ -777,7 +777,7 @@ describe('WorkspacePaneTabStrip', () => {
 
   test('renders the same pending item as a busy tab in expanded mode', () => {
     render(
-      <TestWorkspacePaneViewStrip
+      <TestWorkspacePaneTabStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         panelActive
@@ -839,7 +839,7 @@ describe('WorkspacePaneTabStrip', () => {
   })
 })
 
-function TestWorkspacePaneViewStrip(props: {
+function TestWorkspacePaneTabStrip(props: {
   worktreeTerminalKey: string
   sessions: TerminalSessionSummary[]
   workspacePaneId: string
