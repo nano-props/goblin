@@ -19,6 +19,8 @@ export function createTerminalBellController(
   const unreadKeys = new Set<string>()
   const lastNotificationAt = new Map<string, number>()
 
+  onBadgeChange(unreadKeys.size)
+
   function notifyAndBadge(key?: string) {
     notify(key)
     onBadgeChange(unreadKeys.size)

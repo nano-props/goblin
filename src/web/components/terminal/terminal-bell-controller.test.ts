@@ -46,6 +46,14 @@ beforeEach(() => {
 })
 
 describe('terminal bell controller', () => {
+  test('publishes the initial unread count from the source of truth', () => {
+    const onBadgeChange = vi.fn()
+
+    createTerminalBellController(vi.fn(), onBadgeChange)
+
+    expect(onBadgeChange).toHaveBeenCalledWith(0)
+  })
+
   test('marks background bells unread and requests a system notification when enabled', async () => {
     const notify = vi.fn()
     const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false)

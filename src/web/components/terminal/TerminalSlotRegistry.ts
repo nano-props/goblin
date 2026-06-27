@@ -159,6 +159,7 @@ export class TerminalSlotRegistry {
 
   setRepoIndex(repoIndex: TerminalRepoIndex): void {
     this.repoIndex = repoIndex
+    this.pruneSessionsMissingFromRepoIndex()
     this.syncDescriptorsFromRepoIndex()
   }
 
@@ -1009,6 +1010,13 @@ export class TerminalSlotRegistry {
       changedWorktrees.add(session.descriptor.worktreeTerminalKey)
     }
     for (const worktreeTerminalKey of changedWorktrees) this.notifyWorktree(worktreeTerminalKey)
+  }
+
+  private pruneSessionsMissingFromRepoIndex(): void {
+    const keysToRemove = Array.from(this.sessions.entries())
+      .filter(([, session]) => !this.repoIndex[session.descriptor.repoRoot])
+      .map(([key]) => key)
+    for (const key of keysToRemove) this.removeSession(key, { dispose: true, closeSlot: false })
   }
 
   private ensureSlot(descriptor: TerminalDescriptor): ManagedTerminalSlot {
