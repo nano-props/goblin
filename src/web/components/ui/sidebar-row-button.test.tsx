@@ -1,36 +1,16 @@
 // @vitest-environment jsdom
 
-import { createRoot, type Root } from 'react-dom/client'
-import { act, type ReactNode } from 'react'
-import { afterEach, beforeEach, describe, expect, test } from 'vitest'
+import { describe, expect, test } from 'vitest'
 import { SidebarRowButton } from '#/web/components/ui/sidebar-row-button.tsx'
-
-let container: HTMLDivElement | null = null
-let root: Root | null = null
-const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
-
-beforeEach(() => {
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
-  container = document.createElement('div')
-  document.body.appendChild(container)
-  root = createRoot(container)
-})
-
-afterEach(() => {
-  act(() => {
-    root?.unmount()
-  })
-  container?.remove()
-  root = null
-  container = null
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
-})
+import { renderInJsdom } from '#/test-utils/render.tsx'
 
 describe('SidebarRowButton', () => {
   test('uses compact full-width chrome without growing in a vertical flex stack', () => {
-    render(<SidebarRowButton aria-label="Sidebar row">Sidebar row</SidebarRowButton>)
+    const { container } = renderInJsdom(
+      <SidebarRowButton aria-label="Sidebar row">Sidebar row</SidebarRowButton>,
+    )
 
-    const button = document.body.querySelector('button[aria-label="Sidebar row"]')
+    const button = container.querySelector('button[aria-label="Sidebar row"]')
     if (!(button instanceof HTMLButtonElement)) throw new Error('missing sidebar row button')
 
     expect(button.className).toContain('w-full')
@@ -40,7 +20,7 @@ describe('SidebarRowButton', () => {
   })
 
   test('owns compact and icon row sizes without caller class overrides', () => {
-    render(
+    const { container } = renderInJsdom(
       <div>
         <SidebarRowButton aria-label="Compact row" size="compact">
           Compact row
@@ -54,9 +34,9 @@ describe('SidebarRowButton', () => {
       </div>,
     )
 
-    const compact = document.body.querySelector('button[aria-label="Compact row"]')
-    const dense = document.body.querySelector('button[aria-label="Dense row"]')
-    const icon = document.body.querySelector('button[aria-label="Icon row"]')
+    const compact = container.querySelector('button[aria-label="Compact row"]')
+    const dense = container.querySelector('button[aria-label="Dense row"]')
+    const icon = container.querySelector('button[aria-label="Icon row"]')
     if (
       !(compact instanceof HTMLButtonElement) ||
       !(dense instanceof HTMLButtonElement) ||
@@ -78,9 +58,3 @@ describe('SidebarRowButton', () => {
     expect(icon.className).not.toContain('w-full')
   })
 })
-
-function render(node: ReactNode) {
-  act(() => {
-    root?.render(node)
-  })
-}

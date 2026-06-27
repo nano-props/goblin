@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
-import { act, type ReactNode } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import { act } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 import { RepoActivityControl } from '#/web/components/repo-activity/RepoActivityControl.tsx'
 import { resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -11,12 +11,7 @@ import { markRepoOperationTargets, nextRepoOperationId } from '#/web/stores/repo
 
 const REPO_ID = '/tmp/repo-activity-control-component'
 
-let container: HTMLDivElement | null = null
-let root: Root | null = null
-const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
-
 beforeEach(() => {
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   vi.useFakeTimers()
   resetReposStore()
   // Empty dict so `t('key')` returns the key itself — lets the test
@@ -32,14 +27,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  act(() => {
-    root?.unmount()
-  })
-  container?.remove()
-  root = null
-  container = null
   vi.useRealTimers()
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
 describe('RepoActivityControl component', () => {
@@ -47,10 +35,10 @@ describe('RepoActivityControl component', () => {
     seedRepoState({ id: REPO_ID, remote: { hasRemotes: true } })
     markRepoOperationTargets(REPO_ID, nextRepoOperationId(REPO_ID), [{ key: 'status', reason: 'status' }], 'running')
 
-    render(<RepoActivityControl repoId={REPO_ID} />)
+    const { container } = renderInJsdom(<RepoActivityControl repoId={REPO_ID} />)
 
-    expect(button().disabled).toBe(false)
-    expect(button().getAttribute('aria-busy')).toBeNull()
+    expect(button(container).disabled).toBe(false)
+    expect(button(container).getAttribute('aria-busy')).toBeNull()
   })
 
   test('disables the primary refresh button during manual refreshes', () => {
@@ -62,19 +50,19 @@ describe('RepoActivityControl component', () => {
       'running',
     )
 
-    render(<RepoActivityControl repoId={REPO_ID} />)
+    const { container } = renderInJsdom(<RepoActivityControl repoId={REPO_ID} />)
 
-    expect(button().disabled).toBe(true)
-    expect(button().getAttribute('aria-busy')).toBe('true')
+    expect(button(container).disabled).toBe(true)
+    expect(button(container).getAttribute('aria-busy')).toBe('true')
   })
 
   test('renders the primary refresh button for local-only repositories without the local-only label', () => {
     seedRepoState({ id: REPO_ID, remote: { hasRemotes: false } })
 
-    render(<RepoActivityControl repoId={REPO_ID} />)
+    const { container } = renderInJsdom(<RepoActivityControl repoId={REPO_ID} />)
 
-    expect(button().disabled).toBe(false)
-    expect(document.body.textContent).not.toContain('tab.local-only')
+    expect(button(container).disabled).toBe(false)
+    expect(container.textContent).not.toContain('tab.local-only')
   })
 
   test('shows the last-sync time in the refresh button tooltip when fetch has loaded', async () => {
@@ -97,9 +85,9 @@ describe('RepoActivityControl component', () => {
       },
     }))
 
-    render(<RepoActivityControl repoId={REPO_ID} />)
+    const { container } = renderInJsdom(<RepoActivityControl repoId={REPO_ID} />)
 
-    const tooltip = await openTooltip(button())
+    const tooltip = await openTooltip(button(container))
     // The tooltip should be a single line (no separator), starting
     // with the "Last synced" label, and the relative time should be
     // present (date-fns renders "5 seconds ago" in en).
@@ -110,9 +98,9 @@ describe('RepoActivityControl component', () => {
   test('falls back to the fetch action title in the refresh button tooltip before the first sync', async () => {
     seedRepoState({ id: REPO_ID, remote: { hasRemotes: true } })
 
-    render(<RepoActivityControl repoId={REPO_ID} />)
+    const { container } = renderInJsdom(<RepoActivityControl repoId={REPO_ID} />)
 
-    const tooltip = await openTooltip(button())
+    const tooltip = await openTooltip(button(container))
     // No sync time has been recorded, so the tooltip shows the
     // generic fetch title — not the "Last synced" line.
     expect(tooltip.textContent).toContain('action.fetch-title')
@@ -120,17 +108,8 @@ describe('RepoActivityControl component', () => {
   })
 })
 
-function render(element: ReactNode) {
-  container = document.createElement('div')
-  document.body.append(container)
-  root = createRoot(container)
-  act(() => {
-    root!.render(element)
-  })
-}
-
-function button(): HTMLButtonElement {
-  const element = document.body.querySelector('button')
+function button(container: HTMLElement): HTMLButtonElement {
+  const element = container.querySelector('button')
   if (!(element instanceof HTMLButtonElement)) throw new Error('Missing refresh button')
   return element
 }

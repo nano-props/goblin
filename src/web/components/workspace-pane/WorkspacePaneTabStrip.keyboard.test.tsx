@@ -1,24 +1,20 @@
 // @vitest-environment jsdom
 
 import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { terminalWorkspacePaneTabProvider } from '#/web/components/workspace-pane/tab-providers.ts'
 import type { WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
 import type { TerminalSessionSummary } from '#/web/components/terminal/types.ts'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 
-let container: HTMLDivElement | null = null
-let root: Root | null = null
 let keyboardSensorToken: object
 let pointerSensorToken: object
 let sortableOnKeyDown: ReturnType<typeof vi.fn>
 let sortableOnPointerDown: ReturnType<typeof vi.fn>
 let useSensorMock: ReturnType<typeof vi.fn>
 let sortableDragging = false
-const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 
 beforeEach(() => {
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   vi.resetModules()
   keyboardSensorToken = {}
   pointerSensorToken = {}
@@ -56,14 +52,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  act(() => {
-    root?.unmount()
-  })
-  container?.remove()
-  root = null
-  container = null
   delete (HTMLElement.prototype as { scrollIntoView?: unknown }).scrollIntoView
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
   vi.doUnmock('@dnd-kit/core')
   vi.doUnmock('@dnd-kit/sortable')
 })
@@ -74,24 +63,19 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
     const workspacePaneTabStripModule = await import('#/web/components/workspace-pane/WorkspacePaneTabStrip.tsx')
     const TestWorkspacePaneTabStrip = makeWorkspacePaneTabStrip(workspacePaneTabStripModule)
 
-    container = document.createElement('div')
-    document.body.append(container)
-    root = createRoot(container)
-    act(() => {
-      root!.render(
-        <TestWorkspacePaneTabStrip
-          worktreeTerminalKey="/repo\0/repo/worktree"
-          workspacePaneId="workspace"
-          panelActive
-          sessions={[session({ key: 't1', selected: true })]}
-          onNew={() => {}}
-          onSelect={() => {}}
-          onScrollToBottom={() => {}}
-          onClose={() => {}}
-          onReorder={() => {}}
-        />,
-      )
-    })
+    renderInJsdom(
+      <TestWorkspacePaneTabStrip
+        worktreeTerminalKey="/repo\0/repo/worktree"
+        workspacePaneId="workspace"
+        panelActive
+        sessions={[session({ key: 't1', selected: true })]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    )
 
     const tabChrome = document.body.querySelector('[data-workspace-pane-tab-tooltip-id="terminal:t1"]')
     if (!(tabChrome instanceof HTMLDivElement)) throw new Error('missing terminal tab')
@@ -104,26 +88,21 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
     const workspacePaneTabStripModule = await import('#/web/components/workspace-pane/WorkspacePaneTabStrip.tsx')
     const TestWorkspacePaneTabStrip = makeWorkspacePaneTabStrip(workspacePaneTabStripModule)
 
-    container = document.createElement('div')
-    document.body.append(container)
-    root = createRoot(container)
-    act(() => {
-      root!.render(
-        <TestWorkspacePaneTabStrip
-          worktreeTerminalKey="/repo\0/repo/worktree"
-          workspacePaneId="workspace"
-          sessions={[
-            session({ key: 't1', selected: true }),
-            session({ key: 't2', selected: false, sessionId: 'session-2', index: 2 }),
-          ]}
-          onNew={() => {}}
-          onSelect={() => {}}
-          onScrollToBottom={() => {}}
-          onClose={() => {}}
-          onReorder={() => {}}
-        />,
-      )
-    })
+    renderInJsdom(
+      <TestWorkspacePaneTabStrip
+        worktreeTerminalKey="/repo\0/repo/worktree"
+        workspacePaneId="workspace"
+        sessions={[
+          session({ key: 't1', selected: true }),
+          session({ key: 't2', selected: false, sessionId: 'session-2', index: 2 }),
+        ]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    )
 
     expect(useSensorMock).toHaveBeenCalledWith(pointerSensorToken, { activationConstraint: { distance: 6 } })
     expect(useSensorMock).toHaveBeenCalledWith(

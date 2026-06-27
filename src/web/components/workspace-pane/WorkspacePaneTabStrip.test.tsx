@@ -2,8 +2,8 @@
 
 import { act, useState } from 'react'
 import type { ReactNode } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import type { RenderResult } from '@testing-library/react'
 import {
   WorkspacePaneTabStrip,
   createPendingWorkspacePaneTabItem,
@@ -14,17 +14,14 @@ import {
 import { terminalWorkspacePaneTabProvider } from '#/web/components/workspace-pane/tab-providers.ts'
 import type { WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
 import type { TerminalSessionSummary } from '#/web/components/terminal/types.ts'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 
-let container: HTMLDivElement | null = null
-let root: Root | null = null
 const reactActEnvironment = globalThis as typeof globalThis & {
-  IS_REACT_ACT_ENVIRONMENT?: boolean
   goblinNative?: unknown
   __GOBLIN_BOOTSTRAP__?: unknown
 }
 
 beforeEach(() => {
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   vi.useFakeTimers()
   Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
     configurable: true,
@@ -43,18 +40,15 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  act(() => {
-    root?.unmount()
-  })
-  container?.remove()
-  root = null
-  container = null
-  document.body.innerHTML = ''
   delete reactActEnvironment.goblinNative
   delete reactActEnvironment.__GOBLIN_BOOTSTRAP__
   delete (HTMLElement.prototype as Partial<HTMLElement>).scrollIntoView
   vi.useRealTimers()
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
+  // Reset our module-level render handle so the next test that only
+  // calls `rerender(...)` (e.g. "restores the full tab strip after
+  // leaving compact mode") falls through to `render(...)` instead of
+  // trying to rerender a root that `cleanup()` already unmounted.
+  lastRender = null
 })
 
 describe('WorkspacePaneTabStrip', () => {
@@ -891,23 +885,17 @@ function TestWorkspacePaneTabStrip(props: {
   )
 }
 
-function render(element: ReactNode) {
-  container = document.createElement('div')
-  document.body.append(container)
-  root = createRoot(container)
-  act(() => {
-    root!.render(element)
-  })
+let lastRender: RenderResult | null = null
+
+function render(element: ReactNode): RenderResult {
+  lastRender = renderInJsdom(element)
+  return lastRender
 }
 
-function rerender(element: ReactNode) {
-  if (!container || !root) {
-    render(element)
-    return
-  }
-  act(() => {
-    root!.render(element)
-  })
+function rerender(element: ReactNode): RenderResult {
+  if (!lastRender) return render(element)
+  lastRender.rerender(element)
+  return lastRender
 }
 
 function session(overrides: Partial<TerminalSessionSummary> = {}): TerminalSessionSummary {

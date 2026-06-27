@@ -4,20 +4,14 @@ import { describe, expect, test, vi } from 'vitest'
 import { advanceTimersAndFlush, flushMicrotasks, renderInJsdom } from '#/test-utils/index.ts'
 import { useFakeTimers } from '#/test-utils/timers.ts'
 
-declare global {
-  // eslint-disable-next-line no-var
-  var IS_REACT_ACT_ENVIRONMENT: boolean | undefined
-}
-
 describe('renderInJsdom', () => {
-  test('renders React elements and enables the act environment', () => {
+  test('renders React elements and returns the standard RTL query API', () => {
     const { getByTestId } = renderInJsdom(
       <div>
         <span data-testid="target">hello</span>
       </div>,
     )
     expect(getByTestId('target').textContent).toBe('hello')
-    expect(globalThis.IS_REACT_ACT_ENVIRONMENT).toBe(true)
   })
 
   test('flushAnimationFrames awaits the requested number of frames', async () => {

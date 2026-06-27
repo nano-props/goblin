@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
 
-import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 import { FilePathText } from '#/web/components/FilePathText.tsx'
 import { ellipsizeLeftPathByWidth } from '#/web/lib/display-path.ts'
 
@@ -27,8 +26,6 @@ describe('FilePathText', () => {
   const originalGetBoundingClientRect = HTMLElement.prototype.getBoundingClientRect
 
   beforeEach(() => {
-    ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-    document.body.innerHTML = ''
     window.ResizeObserver = MockResizeObserver
     Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
       configurable: true,
@@ -54,7 +51,6 @@ describe('FilePathText', () => {
   })
 
   afterEach(() => {
-    document.body.innerHTML = ''
     vi.restoreAllMocks()
     window.ResizeObserver = originalResizeObserver
     HTMLElement.prototype.getBoundingClientRect = originalGetBoundingClientRect
@@ -65,7 +61,7 @@ describe('FilePathText', () => {
     Reflect.deleteProperty(HTMLElement.prototype, 'clientWidth')
   })
 
-  test('measures actual rendered width instead of estimating by character count', async () => {
+  test('measures actual rendered width instead of estimating by character count', () => {
     vi.spyOn(window, 'getComputedStyle').mockImplementation(
       () =>
         ({
@@ -84,29 +80,18 @@ describe('FilePathText', () => {
     } as unknown as CanvasRenderingContext2D)
 
     const path = 'src/example/WideWide/iiiiiiii.ts'
-    const container = document.createElement('div')
-    document.body.appendChild(container)
-    const root: Root = createRoot(container)
+    const { container } = renderInJsdom(<FilePathText path={path} />)
 
-    await act(async () => {
-      root.render(<FilePathText path={path} />)
-    })
-
-    try {
-      const span = container.querySelector('span')
-      expect(span).not.toBeNull()
-      expect(span?.textContent).toBe(
-        ellipsizeLeftPathByWidth(path, 112, (text) => measureTextWidth(text) + Math.max(0, text.length - 1)),
-      )
-      expect(span?.className).not.toContain('truncate')
-      expect(span?.getAttribute('title')).toBe(path)
-    } finally {
-      await act(async () => root.unmount())
-      container.remove()
-    }
+    const span = container.querySelector('span')
+    expect(span).not.toBeNull()
+    expect(span?.textContent).toBe(
+      ellipsizeLeftPathByWidth(path, 112, (text) => measureTextWidth(text) + Math.max(0, text.length - 1)),
+    )
+    expect(span?.className).not.toContain('truncate')
+    expect(span?.getAttribute('title')).toBe(path)
   })
 
-  test('recomputes when typography changes without a width change', async () => {
+  test('recomputes when typography changes without a width change', () => {
     vi.spyOn(window, 'getComputedStyle').mockImplementation((element) => {
       const isTight = (element as HTMLElement).className.includes('tight')
       return {
@@ -125,29 +110,16 @@ describe('FilePathText', () => {
     } as unknown as CanvasRenderingContext2D)
 
     const path = 'src/example/deeply/nested/file.ts'
-    const container = document.createElement('div')
-    document.body.appendChild(container)
-    const root: Root = createRoot(container)
+    const { container, rerender } = renderInJsdom(<FilePathText path={path} className="wide" />)
 
-    await act(async () => {
-      root.render(<FilePathText path={path} className="wide" />)
-    })
+    const before = container.querySelector('span')?.textContent
+    expect(before).toBe('/file.ts')
 
-    try {
-      const before = container.querySelector('span')?.textContent
-      expect(before).toBe('/file.ts')
+    rerender(<FilePathText path={path} className="tight" />)
 
-      await act(async () => {
-        root.render(<FilePathText path={path} className="tight" />)
-      })
-
-      const after = container.querySelector('span')?.textContent
-      expect(after).toBe(ellipsizeLeftPathByWidth(path, 112, (text) => text.length * 10))
-      expect(after).toBe('…/file.ts')
-    } finally {
-      await act(async () => root.unmount())
-      container.remove()
-    }
+    const after = container.querySelector('span')?.textContent
+    expect(after).toBe(ellipsizeLeftPathByWidth(path, 112, (text) => text.length * 10))
+    expect(after).toBe('…/file.ts')
   })
 })
 

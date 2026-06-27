@@ -7,31 +7,9 @@
 // reads from `*Display`, not from the raw slot). This test covers
 // the underlying retention mechanism directly.
 
-import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, test } from 'vitest'
+import { describe, expect, test } from 'vitest'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useLastNonNull } from '#/web/hooks/useLastNonNull.ts'
-
-let container: HTMLDivElement | null = null
-let root: Root | null = null
-const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
-
-beforeEach(() => {
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
-  container = document.createElement('div')
-  document.body.append(container)
-  root = createRoot(container)
-})
-
-afterEach(() => {
-  act(() => {
-    root?.unmount()
-  })
-  container?.remove()
-  root = null
-  container = null
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
-})
 
 interface HarnessHandle<T> {
   current: T | null
@@ -47,13 +25,9 @@ function mountHarness<T>(initial: T | null): HarnessHandle<T> {
     handle.current = useLastNonNull(value)
     return null
   }
-  act(() => {
-    root!.render(<Harness value={initial} />)
-  })
+  const result = renderInJsdom(<Harness value={initial} />)
   handle.setProps = (next) => {
-    act(() => {
-      root!.render(<Harness value={next.value} />)
-    })
+    result.rerender(<Harness value={next.value} />)
   }
   return handle
 }

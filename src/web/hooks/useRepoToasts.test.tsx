@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
 
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useRepoToasts } from '#/web/hooks/useRepoToasts.tsx'
 import { resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -36,25 +35,10 @@ vi.mock('#/web/stores/i18n.ts', () => ({
 
 const REPO_ID = '/tmp/repo-toasts-test'
 
-let host: HTMLDivElement
-let root: Root
-
 beforeEach(() => {
   resetReposStore()
   toastMocks.success.mockClear()
   toastMocks.error.mockClear()
-  host = document.createElement('div')
-  document.body.appendChild(host)
-  root = createRoot(host)
-})
-
-afterEach(() => {
-  if (root) {
-    act(() => {
-      root.unmount()
-    })
-  }
-  host?.remove()
 })
 
 describe('useRepoToasts', () => {
@@ -77,9 +61,7 @@ describe('useRepoToasts', () => {
       { action: { kind: 'createWorktree', branch: 'feature/a', worktreePath: '/tmp/worktrees/feature-a' } },
     )
 
-    await act(async () => {
-      root.render(<Harness repoId={REPO_ID} />)
-    })
+    renderInJsdom(<Harness repoId={REPO_ID} />)
 
     expect(toastMocks.success).toHaveBeenCalledTimes(1)
     const [, options] = toastMocks.success.mock.calls[0]!

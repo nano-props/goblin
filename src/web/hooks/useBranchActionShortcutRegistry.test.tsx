@@ -1,35 +1,17 @@
 // @vitest-environment jsdom
 
 import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 import type { BranchActionSurface } from '#/web/hooks/useBranchActionItems.ts'
 import { useBranchActionShortcutRegistry } from '#/web/hooks/useBranchActionShortcutRegistry.ts'
 import { runBranchActionShortcut } from '#/web/keyboard/branch-action-shortcuts.ts'
-
-let container: HTMLDivElement | null = null
-let root: Root | null = null
-const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
-
-beforeEach(() => {
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
-})
-
-afterEach(() => {
-  act(() => {
-    root?.unmount()
-  })
-  container?.remove()
-  root = null
-  container = null
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
-})
 
 describe('useBranchActionShortcutRegistry', () => {
   test('runs the visible branch action handler', async () => {
     const onPull = vi.fn()
 
-    await renderHookHost({
+    renderHookHost({
       mainItems: [
         {
           id: 'pull',
@@ -54,7 +36,7 @@ describe('useBranchActionShortcutRegistry', () => {
     const hiddenPull = vi.fn()
     const disabledPush = vi.fn()
 
-    await renderHookHost({
+    renderHookHost({
       mainItems: [
         {
           id: 'pull',
@@ -89,23 +71,15 @@ describe('useBranchActionShortcutRegistry', () => {
     const firstPull = vi.fn()
     const secondPull = vi.fn()
 
-    container = document.createElement('div')
-    document.body.append(container)
-    root = createRoot(container)
-
-    await act(async () => {
-      root!.render(<HookHost actions={actionsWith(firstPull)} />)
-      await Promise.resolve()
-    })
+    const { rerender } = renderInJsdom(<HookHost actions={actionsWith(firstPull)} />)
+    await Promise.resolve()
 
     act(() => {
       runBranchActionShortcut('pull')
     })
 
-    await act(async () => {
-      root!.render(<HookHost actions={actionsWith(secondPull)} />)
-      await Promise.resolve()
-    })
+    rerender(<HookHost actions={actionsWith(secondPull)} />)
+    await Promise.resolve()
 
     act(() => {
       runBranchActionShortcut('pull')
@@ -118,19 +92,11 @@ describe('useBranchActionShortcutRegistry', () => {
   test('clears the shortcut handler while disabled', async () => {
     const onPull = vi.fn()
 
-    container = document.createElement('div')
-    document.body.append(container)
-    root = createRoot(container)
+    const { rerender } = renderInJsdom(<HookHost actions={actionsWith(onPull)} />)
+    await Promise.resolve()
 
-    await act(async () => {
-      root!.render(<HookHost actions={actionsWith(onPull)} />)
-      await Promise.resolve()
-    })
-
-    await act(async () => {
-      root!.render(<HookHost actions={actionsWith(onPull)} enabled={false} />)
-      await Promise.resolve()
-    })
+    rerender(<HookHost actions={actionsWith(onPull)} enabled={false} />)
+    await Promise.resolve()
 
     act(() => {
       runBranchActionShortcut('pull')
@@ -142,14 +108,8 @@ describe('useBranchActionShortcutRegistry', () => {
 
 type ShortcutActionItems = Pick<BranchActionSurface, 'mainItems' | 'destructiveItems'>
 
-async function renderHookHost(actions: ShortcutActionItems) {
-  container = document.createElement('div')
-  document.body.append(container)
-  root = createRoot(container)
-  await act(async () => {
-    root!.render(<HookHost actions={actions} />)
-    await Promise.resolve()
-  })
+function renderHookHost(actions: ShortcutActionItems) {
+  renderInJsdom(<HookHost actions={actions} />)
 }
 
 function HookHost({ actions, enabled = true }: { actions: ShortcutActionItems; enabled?: boolean }) {

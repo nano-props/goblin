@@ -1,9 +1,8 @@
 // @vitest-environment jsdom
 
 import { act, type ComponentProps } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
-import { cleanup, render, screen } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { screen } from '@testing-library/react'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { RepoWorkspaceContent } from '#/web/components/repo-workspace/RepoWorkspaceContent.tsx'
 import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
 import { getSelectedRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
@@ -24,6 +23,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import { workspacePaneStaticTabOrderEntry, workspacePaneTerminalTabOrderEntry } from '#/shared/workspace-pane.ts'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 
 const repoClientMocks = vi.hoisted(() => ({
   getRepoLog: vi.fn(),
@@ -35,10 +35,6 @@ vi.mock('#/web/repo-client.ts', () => ({
 
 const REPO_ID = '/tmp/gbl-repo-workspace-content-repo'
 
-let container: HTMLDivElement | null = null
-let root: Root | null = null
-const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
-
 type RepoWorkspaceContentHarnessProps = Omit<ComponentProps<typeof RepoWorkspaceContent>, 'workspacePaneTabModel'>
 
 function RepoWorkspaceContentHarness(props: RepoWorkspaceContentHarnessProps) {
@@ -47,25 +43,9 @@ function RepoWorkspaceContentHarness(props: RepoWorkspaceContentHarnessProps) {
 }
 
 beforeEach(() => {
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   resetReposStore()
   useRepoSyncStore.setState({ ready: new Map(), timestamps: new Map() })
   repoClientMocks.getRepoLog.mockResolvedValue([])
-  container = document.createElement('div')
-  document.body.append(container)
-  root = createRoot(container)
-})
-
-afterEach(() => {
-  act(() => {
-    root?.unmount()
-  })
-  cleanup()
-  container?.remove()
-  root = null
-  container = null
-  repoClientMocks.getRepoLog.mockReset()
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
 describe('RepoWorkspaceContent', () => {
@@ -127,29 +107,27 @@ describe('RepoWorkspaceContent', () => {
     })
     const detail = getSelectedRepoWorkspacePresentation(repo)
 
-    act(() => {
-      root!.render(
-        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
-          <BranchActionSurfaceContext.Provider
-            value={branchActionSurfaceWithCopyPatch({
-              label: 'status.copy-patch',
-              title: 'status.copy-patch-title',
-              disabled: false,
-              visible: true,
-              onSelect: onCopyPatch,
-            })}
-          >
-            <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-          </BranchActionSurfaceContext.Provider>
-        </TerminalSessionReadContext.Provider>,
-      )
-    })
+    const { container } = renderInJsdom(
+      <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
+        <BranchActionSurfaceContext.Provider
+          value={branchActionSurfaceWithCopyPatch({
+            label: 'status.copy-patch',
+            title: 'status.copy-patch-title',
+            disabled: false,
+            visible: true,
+            onSelect: onCopyPatch,
+          })}
+        >
+          <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+        </BranchActionSurfaceContext.Provider>
+      </TerminalSessionReadContext.Provider>,
+    )
 
-    expect(container?.querySelector('#workspace-status-panel')).not.toBeNull()
-    expect(container?.textContent).toContain('branch-status.changes-count')
-    expect(container?.textContent).toContain('branch-status.signal.changes')
+    expect(container.querySelector('#workspace-status-panel')).not.toBeNull()
+    expect(container.textContent).toContain('branch-status.changes-count')
+    expect(container.textContent).toContain('branch-status.signal.changes')
 
-    const copyButton = container?.querySelector<HTMLButtonElement>('button[aria-label="status.copy-patch-title"]')
+    const copyButton = container.querySelector<HTMLButtonElement>('button[aria-label="status.copy-patch-title"]')
     expect(copyButton).not.toBeNull()
     // The button is now icon-only (no visible text), mirroring CopyButton.
     expect(copyButton!.textContent?.trim()).toBe('')
@@ -187,25 +165,23 @@ describe('RepoWorkspaceContent', () => {
     const detail = getSelectedRepoWorkspacePresentation(repo)
     const onCopyPatch = vi.fn().mockResolvedValue(true)
 
-    act(() => {
-      root!.render(
-        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
-          <BranchActionSurfaceContext.Provider
-            value={branchActionSurfaceWithCopyPatch({
-              label: 'status.copy-patch',
-              title: 'status.copy-patch-title',
-              disabled: false,
-              visible: true,
-              onSelect: onCopyPatch,
-            })}
-          >
-            <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-          </BranchActionSurfaceContext.Provider>
-        </TerminalSessionReadContext.Provider>,
-      )
-    })
+    const { container } = renderInJsdom(
+      <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
+        <BranchActionSurfaceContext.Provider
+          value={branchActionSurfaceWithCopyPatch({
+            label: 'status.copy-patch',
+            title: 'status.copy-patch-title',
+            disabled: false,
+            visible: true,
+            onSelect: onCopyPatch,
+          })}
+        >
+          <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+        </BranchActionSurfaceContext.Provider>
+      </TerminalSessionReadContext.Provider>,
+    )
 
-    const copyButton = container?.querySelector<HTMLButtonElement>('button[aria-label="status.copy-patch-title"]')!
+    const copyButton = container.querySelector<HTMLButtonElement>('button[aria-label="status.copy-patch-title"]')!
     expect(copyButton).not.toBeNull()
 
     await act(async () => {
@@ -245,28 +221,26 @@ describe('RepoWorkspaceContent', () => {
     })
     const detail = getSelectedRepoWorkspacePresentation(repo)
 
-    act(() => {
-      root!.render(
-        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
-          <BranchActionSurfaceContext.Provider
-            value={branchActionSurfaceWithCopyPatch({
-              label: 'status.copy-patch',
-              title: 'status.copy-patch-title',
-              disabled: false,
-              visible: true,
-              onSelect: vi.fn(),
-            })}
-          >
-            <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-          </BranchActionSurfaceContext.Provider>
-        </TerminalSessionReadContext.Provider>,
-      )
-    })
+    const { container } = renderInJsdom(
+      <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
+        <BranchActionSurfaceContext.Provider
+          value={branchActionSurfaceWithCopyPatch({
+            label: 'status.copy-patch',
+            title: 'status.copy-patch-title',
+            disabled: false,
+            visible: true,
+            onSelect: vi.fn(),
+          })}
+        >
+          <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+        </BranchActionSurfaceContext.Provider>
+      </TerminalSessionReadContext.Provider>,
+    )
 
-    expect(container?.querySelector('#workspace-status-panel')).not.toBeNull()
-    expect(container?.textContent).not.toContain('branch-status.changes-count')
-    expect(container?.textContent).not.toContain('branch-status.signal.changes')
-    expect(container?.querySelector('button[aria-label="status.copy-patch-title"]')).toBeNull()
+    expect(container.querySelector('#workspace-status-panel')).not.toBeNull()
+    expect(container.textContent).not.toContain('branch-status.changes-count')
+    expect(container.textContent).not.toContain('branch-status.signal.changes')
+    expect(container.querySelector('button[aria-label="status.copy-patch-title"]')).toBeNull()
   })
 
   test('hides the copy patch button on the changes row when copyPatchAction.visible is false', () => {
@@ -295,26 +269,24 @@ describe('RepoWorkspaceContent', () => {
     })
     const detail = getSelectedRepoWorkspacePresentation(repo)
 
-    act(() => {
-      root!.render(
-        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
-          <BranchActionSurfaceContext.Provider
-            value={branchActionSurfaceWithCopyPatch({
-              label: 'status.copy-patch',
-              title: 'status.copy-patch-title',
-              disabled: false,
-              visible: false,
-              onSelect: vi.fn(),
-            })}
-          >
-            <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-          </BranchActionSurfaceContext.Provider>
-        </TerminalSessionReadContext.Provider>,
-      )
-    })
+    const { container } = renderInJsdom(
+      <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
+        <BranchActionSurfaceContext.Provider
+          value={branchActionSurfaceWithCopyPatch({
+            label: 'status.copy-patch',
+            title: 'status.copy-patch-title',
+            disabled: false,
+            visible: false,
+            onSelect: vi.fn(),
+          })}
+        >
+          <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+        </BranchActionSurfaceContext.Provider>
+      </TerminalSessionReadContext.Provider>,
+    )
 
-    expect(container?.textContent).toContain('branch-status.changes-count')
-    expect(container?.querySelector('button[aria-label="status.copy-patch-title"]')).toBeNull()
+    expect(container.textContent).toContain('branch-status.changes-count')
+    expect(container.querySelector('button[aria-label="status.copy-patch-title"]')).toBeNull()
   })
 
   test('renders the changes panel with status entries and tab labelling', () => {
@@ -346,17 +318,15 @@ describe('RepoWorkspaceContent', () => {
     })
     const detail = getSelectedRepoWorkspacePresentation(repo)
 
-    act(() => {
-      root!.render(
-        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
-          <BranchActionSurfaceContext.Provider value={defaultBranchActionSurface()}>
-            <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-          </BranchActionSurfaceContext.Provider>
-        </TerminalSessionReadContext.Provider>,
-      )
-    })
+    const { container } = renderInJsdom(
+      <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
+        <BranchActionSurfaceContext.Provider value={defaultBranchActionSurface()}>
+          <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+        </BranchActionSurfaceContext.Provider>
+      </TerminalSessionReadContext.Provider>,
+    )
 
-    const panel = container?.querySelector('#workspace-changes-panel')
+    const panel = container.querySelector('#workspace-changes-panel')
     expect(panel).not.toBeNull()
     expect(panel?.getAttribute('role')).toBe('tabpanel')
     expect(panel?.getAttribute('aria-labelledby')).toBe('workspace-changes-tab')
@@ -383,20 +353,18 @@ describe('RepoWorkspaceContent', () => {
     })
     const detail = getSelectedRepoWorkspacePresentation(repo)
 
-    act(() => {
-      root!.render(
-        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
-          <BranchActionSurfaceContext.Provider value={defaultBranchActionSurface()}>
-            <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-          </BranchActionSurfaceContext.Provider>
-        </TerminalSessionReadContext.Provider>,
-      )
-    })
+    const { container } = renderInJsdom(
+      <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
+        <BranchActionSurfaceContext.Provider value={defaultBranchActionSurface()}>
+          <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+        </BranchActionSurfaceContext.Provider>
+      </TerminalSessionReadContext.Provider>,
+    )
 
-    expect(container?.querySelector('#workspace-status-panel')).not.toBeNull()
-    expect(container?.textContent).toContain('feature/no-worktree')
-    expect(container?.textContent).toContain('branch-status.worktree.none')
-    expect(container?.textContent).not.toContain('workspace-pane-tabs.empty')
+    expect(container.querySelector('#workspace-status-panel')).not.toBeNull()
+    expect(container.textContent).toContain('feature/no-worktree')
+    expect(container.textContent).toContain('branch-status.worktree.none')
+    expect(container.textContent).not.toContain('workspace-pane-tabs.empty')
   })
 
   test('shows the workspace empty state when the status tab is closed', () => {
@@ -417,16 +385,14 @@ describe('RepoWorkspaceContent', () => {
     })
     const detail = getSelectedRepoWorkspacePresentation(repo)
 
-    act(() => {
-      root!.render(
-        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
-          <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-        </TerminalSessionReadContext.Provider>,
-      )
-    })
+    const { container } = renderInJsdom(
+      <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
+        <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+      </TerminalSessionReadContext.Provider>,
+    )
 
-    expect(container?.querySelector('#workspace-status-panel')).toBeNull()
-    expect(container?.textContent).toContain('workspace-pane-tabs.empty')
+    expect(container.querySelector('#workspace-status-panel')).toBeNull()
+    expect(container.textContent).toContain('workspace-pane-tabs.empty')
   })
 
   test('falls back to status when a worktree-scoped preference is unrenderable on a branch without a worktree', () => {
@@ -439,22 +405,20 @@ describe('RepoWorkspaceContent', () => {
     })
     const detail = getSelectedRepoWorkspacePresentation(repo)
 
-    act(() => {
-      root!.render(
-        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
-          <BranchActionSurfaceContext.Provider value={defaultBranchActionSurface()}>
-            <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-          </BranchActionSurfaceContext.Provider>
-        </TerminalSessionReadContext.Provider>,
-      )
-    })
+    const { container } = renderInJsdom(
+      <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
+        <BranchActionSurfaceContext.Provider value={defaultBranchActionSurface()}>
+          <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+        </BranchActionSurfaceContext.Provider>
+      </TerminalSessionReadContext.Provider>,
+    )
 
     // The user's preferred tab (terminal) is unrenderable without a
     // worktree. The model falls back to the first materialized tab (status)
     // so the user lands on a real tab instead of the empty pane.
-    expect(container?.querySelector('#workspace-status-panel')).not.toBeNull()
-    expect(container?.querySelector('#workspace-terminal-panel')).toBeNull()
-    expect(container?.textContent).not.toContain('workspace-pane-tabs.empty')
+    expect(container.querySelector('#workspace-status-panel')).not.toBeNull()
+    expect(container.querySelector('#workspace-terminal-panel')).toBeNull()
+    expect(container.textContent).not.toContain('workspace-pane-tabs.empty')
   })
 
   test('falls back to status when terminal is preferred but sync confirms no terminal tabs', () => {
@@ -469,23 +433,21 @@ describe('RepoWorkspaceContent', () => {
     useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceToken)
     const detail = getSelectedRepoWorkspacePresentation(repo)
 
-    act(() => {
-      root!.render(
-        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
-          <BranchActionSurfaceContext.Provider value={defaultBranchActionSurface()}>
-            <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-          </BranchActionSurfaceContext.Provider>
-        </TerminalSessionReadContext.Provider>,
-      )
-    })
+    const { container } = renderInJsdom(
+      <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
+        <BranchActionSurfaceContext.Provider value={defaultBranchActionSurface()}>
+          <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+        </BranchActionSurfaceContext.Provider>
+      </TerminalSessionReadContext.Provider>,
+    )
 
     // Sync is ready, the worktree has no terminal sessions, and the user
     // preferred terminal — the preferred tab is unrenderable. The model
     // falls back to the first materialized tab (status) at read time so
     // the user does not land on the empty pane.
-    expect(container?.querySelector('#workspace-status-panel')).not.toBeNull()
-    expect(container?.querySelector('#workspace-terminal-panel')).toBeNull()
-    expect(container?.textContent).not.toContain('workspace-pane-tabs.empty')
+    expect(container.querySelector('#workspace-status-panel')).not.toBeNull()
+    expect(container.querySelector('#workspace-terminal-panel')).toBeNull()
+    expect(container.textContent).not.toContain('workspace-pane-tabs.empty')
   })
 
   test('mounts the terminal session while terminal creation is pending with no sessions', () => {
@@ -511,23 +473,21 @@ describe('RepoWorkspaceContent', () => {
       worktreeSnapshot: () => worktreeSnapshot,
     }
 
-    act(() => {
-      root!.render(
-        <TerminalSessionContext.Provider value={terminalCommandContextWith({ registerHost })}>
-          <TerminalSessionReadContext.Provider value={readContext}>
-            <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-          </TerminalSessionReadContext.Provider>
-        </TerminalSessionContext.Provider>,
-      )
-    })
+    const { container } = renderInJsdom(
+      <TerminalSessionContext.Provider value={terminalCommandContextWith({ registerHost })}>
+        <TerminalSessionReadContext.Provider value={readContext}>
+          <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+        </TerminalSessionReadContext.Provider>
+      </TerminalSessionContext.Provider>,
+    )
 
-    const panel = container?.querySelector('#workspace-terminal-panel')
+    const panel = container.querySelector('#workspace-terminal-panel')
     expect(panel).not.toBeNull()
     expect(panel?.getAttribute('aria-labelledby')).toBe('workspace-terminal-pending-tab')
     expect(panel?.hasAttribute('aria-label')).toBe(false)
-    expect(container?.querySelector('.goblin-terminal-session__host')).not.toBeNull()
-    expect(container?.textContent).toContain('terminal.opening')
-    expect(container?.textContent).not.toContain('workspace-pane-tabs.empty')
+    expect(container.querySelector('.goblin-terminal-session__host')).not.toBeNull()
+    expect(container.textContent).toContain('terminal.opening')
+    expect(container.textContent).not.toContain('workspace-pane-tabs.empty')
     expect(registerHost).toHaveBeenCalledWith(worktreeKey, expect.any(HTMLDivElement))
   })
 
@@ -560,7 +520,7 @@ describe('RepoWorkspaceContent', () => {
       worktreeSnapshot: () => worktreeSnapshot,
     }
 
-    render(
+    renderInJsdom(
       <TerminalSessionContext.Provider value={terminalCommandContextWith({ registerHost })}>
         <TerminalSessionReadContext.Provider value={readContext}>
           <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
@@ -596,23 +556,21 @@ describe('RepoWorkspaceContent', () => {
       worktreeSnapshot: () => worktreeSnapshot,
     }
 
-    act(() => {
-      root!.render(
-        <TerminalSessionContext.Provider value={terminalCommandContextWith({ createTerminal, registerHost })}>
-          <TerminalSessionReadContext.Provider value={readContext}>
-            <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-          </TerminalSessionReadContext.Provider>
-        </TerminalSessionContext.Provider>,
-      )
-    })
+    const { container } = renderInJsdom(
+      <TerminalSessionContext.Provider value={terminalCommandContextWith({ createTerminal, registerHost })}>
+        <TerminalSessionReadContext.Provider value={readContext}>
+          <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+        </TerminalSessionReadContext.Provider>
+      </TerminalSessionContext.Provider>,
+    )
 
-    const panel = container?.querySelector('#workspace-terminal-panel')
+    const panel = container.querySelector('#workspace-terminal-panel')
     expect(panel).not.toBeNull()
     expect(panel?.getAttribute('aria-label')).toBe('terminal.loading')
     expect(panel?.hasAttribute('aria-labelledby')).toBe(false)
-    expect(container?.textContent).toContain('terminal.loading')
-    expect(container?.textContent).not.toContain('terminal.new')
-    expect(container?.querySelector('.goblin-terminal-session__empty-cta')).toBeNull()
+    expect(container.textContent).toContain('terminal.loading')
+    expect(container.textContent).not.toContain('terminal.new')
+    expect(container.querySelector('.goblin-terminal-session__empty-cta')).toBeNull()
     expect(createTerminal).not.toHaveBeenCalled()
     expect(registerHost).toHaveBeenCalledWith(worktreeKey, expect.any(HTMLDivElement))
   })
@@ -643,17 +601,15 @@ describe('RepoWorkspaceContent', () => {
       worktreeSnapshot: () => worktreeSnapshot,
     }
 
-    act(() => {
-      root!.render(
-        <TerminalSessionContext.Provider value={terminalCommandContextWith({ registerHost })}>
-          <TerminalSessionReadContext.Provider value={readContext}>
-            <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-          </TerminalSessionReadContext.Provider>
-        </TerminalSessionContext.Provider>,
-      )
-    })
+    const { container } = renderInJsdom(
+      <TerminalSessionContext.Provider value={terminalCommandContextWith({ registerHost })}>
+        <TerminalSessionReadContext.Provider value={readContext}>
+          <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+        </TerminalSessionReadContext.Provider>
+      </TerminalSessionContext.Provider>,
+    )
 
-    expect(container?.querySelector('#workspace-terminal-panel')?.getAttribute('aria-labelledby')).toBe(
+    expect(container.querySelector('#workspace-terminal-panel')?.getAttribute('aria-labelledby')).toBe(
       'workspace-workspace-pane-tab',
     )
     expect(registerHost).toHaveBeenCalledWith(worktreeKey, expect.any(HTMLDivElement))
@@ -671,15 +627,13 @@ describe('RepoWorkspaceContent', () => {
     })
     const detail = getSelectedRepoWorkspacePresentation(repo)
 
-    act(() => {
-      root!.render(
-        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
-          <BranchActionSurfaceContext.Provider value={defaultBranchActionSurface()}>
-            <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-          </BranchActionSurfaceContext.Provider>
-        </TerminalSessionReadContext.Provider>,
-      )
-    })
+    const { container } = renderInJsdom(
+      <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
+        <BranchActionSurfaceContext.Provider value={defaultBranchActionSurface()}>
+          <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+        </BranchActionSurfaceContext.Provider>
+      </TerminalSessionReadContext.Provider>,
+    )
     await flushAsyncWork()
 
     // The selected branch (feature/b) has no explicit tab order, so it
@@ -688,9 +642,9 @@ describe('RepoWorkspaceContent', () => {
     // back to the first materialized tab (status) so the user does not
     // land on the empty pane. The store keeps the original preferred
     // tab (history) so opening history later returns to it.
-    expect(container?.querySelector('#workspace-status-panel')).not.toBeNull()
-    expect(container?.querySelector('#workspace-history-panel')).toBeNull()
-    expect(container?.textContent).not.toContain('workspace-pane-tabs.empty')
+    expect(container.querySelector('#workspace-status-panel')).not.toBeNull()
+    expect(container.querySelector('#workspace-history-panel')).toBeNull()
+    expect(container.textContent).not.toContain('workspace-pane-tabs.empty')
     expect(repoClientMocks.getRepoLog).not.toHaveBeenCalled()
   })
 
@@ -714,13 +668,11 @@ describe('RepoWorkspaceContent', () => {
     })
     const detail = getSelectedRepoWorkspacePresentation(repo)
 
-    act(() => {
-      root!.render(
-        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
-          <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-        </TerminalSessionReadContext.Provider>,
-      )
-    })
+    const { container } = renderInJsdom(
+      <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
+        <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+      </TerminalSessionReadContext.Provider>,
+    )
     await flushAsyncWork()
 
     expect(repoClientMocks.getRepoLog).toHaveBeenCalledWith(
@@ -728,7 +680,7 @@ describe('RepoWorkspaceContent', () => {
       'feature/history',
       expect.objectContaining({ count: 50 }),
     )
-    const row = container?.querySelector(
+    const row = container.querySelector(
       'li[title="78c150a (HEAD -> fix/w-tab, origin/main, origin/fix/w-tab, origin/HEAD, main) Fix branch navigator name truncation"]',
     )
     expect(row).not.toBeNull()
@@ -768,16 +720,14 @@ describe('RepoWorkspaceContent', () => {
     })
     const detail = getSelectedRepoWorkspacePresentation(repo)
 
-    act(() => {
-      root!.render(
-        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
-          <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-        </TerminalSessionReadContext.Provider>,
-      )
-    })
+    const { container } = renderInJsdom(
+      <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
+        <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+      </TerminalSessionReadContext.Provider>,
+    )
     await flushAsyncWork()
 
-    expect(container?.querySelector('#workspace-history-panel')?.getAttribute('aria-labelledby')).toBe(
+    expect(container.querySelector('#workspace-history-panel')?.getAttribute('aria-labelledby')).toBe(
       'workspace-history-tab',
     )
   })
@@ -793,17 +743,15 @@ describe('RepoWorkspaceContent', () => {
     })
     const detail = getSelectedRepoWorkspacePresentation(repo)
 
-    act(() => {
-      root!.render(
-        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
-          <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-        </TerminalSessionReadContext.Provider>,
-      )
-    })
+    const { container } = renderInJsdom(
+      <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
+        <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+      </TerminalSessionReadContext.Provider>,
+    )
     await flushAsyncWork()
 
-    expect(container?.textContent).toContain('error.failed-read-repo')
-    expect(container?.textContent).not.toContain('log.empty-for-branch')
+    expect(container.textContent).toContain('error.failed-read-repo')
+    expect(container.textContent).not.toContain('log.empty-for-branch')
   })
 })
 

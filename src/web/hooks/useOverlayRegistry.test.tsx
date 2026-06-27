@@ -1,13 +1,9 @@
 // @vitest-environment jsdom
 
 import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, test } from 'vitest'
+import { describe, expect, test } from 'vitest'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useOverlayRegistry } from '#/web/hooks/useOverlayRegistry.ts'
-
-let container: HTMLDivElement | null = null
-let root: Root | null = null
-const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 
 function Harness() {
   const overlays = useOverlayRegistry(['settings', 'clone', 'openRepo'] as const)
@@ -34,59 +30,39 @@ function Harness() {
   )
 }
 
-beforeEach(() => {
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
-})
-
-afterEach(() => {
-  act(() => {
-    root?.unmount()
-  })
-  container?.remove()
-  root = null
-  container = null
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
-})
-
 describe('useOverlayRegistry', () => {
   test('opens, closes, and closes all overlays generically', () => {
-    container = document.createElement('div')
-    document.body.append(container)
-    root = createRoot(container)
+    const { container } = renderInJsdom(<Harness />)
 
-    act(() => {
-      root!.render(<Harness />)
-    })
+    click(container, '#open-settings')
+    click(container, '#set-clone-open')
+    expect(text(container, '#settings-open')).toBe('open')
+    expect(text(container, '#clone-open')).toBe('open')
+    expect(text(container, '#open-repo-open')).toBe('closed')
+    expect(text(container, '#any-open')).toBe('open')
 
-    click('#open-settings')
-    click('#set-clone-open')
-    expect(text('#settings-open')).toBe('open')
-    expect(text('#clone-open')).toBe('open')
-    expect(text('#open-repo-open')).toBe('closed')
-    expect(text('#any-open')).toBe('open')
+    click(container, '#close-settings')
+    expect(text(container, '#settings-open')).toBe('closed')
+    expect(text(container, '#clone-open')).toBe('open')
 
-    click('#close-settings')
-    expect(text('#settings-open')).toBe('closed')
-    expect(text('#clone-open')).toBe('open')
-
-    click('#close-all')
-    expect(text('#settings-open')).toBe('closed')
-    expect(text('#clone-open')).toBe('closed')
-    expect(text('#open-repo-open')).toBe('closed')
-    expect(text('#any-open')).toBe('closed')
+    click(container, '#close-all')
+    expect(text(container, '#settings-open')).toBe('closed')
+    expect(text(container, '#clone-open')).toBe('closed')
+    expect(text(container, '#open-repo-open')).toBe('closed')
+    expect(text(container, '#any-open')).toBe('closed')
   })
 })
 
-function click(selector: string) {
-  const element = container?.querySelector(selector)
+function click(container: HTMLElement, selector: string) {
+  const element = container.querySelector(selector)
   if (!(element instanceof HTMLButtonElement)) throw new Error(`Missing button: ${selector}`)
   act(() => {
     element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
   })
 }
 
-function text(selector: string): string {
-  const element = container?.querySelector(selector)
+function text(container: HTMLElement, selector: string): string {
+  const element = container.querySelector(selector)
   if (!(element instanceof HTMLOutputElement)) throw new Error(`Missing output: ${selector}`)
   return element.textContent ?? ''
 }

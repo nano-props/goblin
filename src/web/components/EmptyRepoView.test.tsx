@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
 
-import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, describe, expect, test, vi } from 'vitest'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 import { EmptyRepoView } from '#/web/components/EmptyRepoView.tsx'
 
 const responsiveMocks = vi.hoisted(() => ({
@@ -38,40 +37,20 @@ vi.mock('#/web/components/workspace-toolbar-chrome.tsx', () => ({
   WorkspaceChrome: () => <div data-testid="workspace-chrome" />,
 }))
 
-let container: HTMLDivElement | null = null
-let root: Root | null = null
-const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
-
-beforeEach(() => {
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
-  container = document.createElement('div')
-  document.body.appendChild(container)
-  root = createRoot(container)
-})
-
 afterEach(() => {
-  act(() => {
-    root?.unmount()
-  })
-  container?.remove()
-  root = null
-  container = null
   responsiveMocks.mode = 'default'
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
 function renderEmptyRepoView() {
-  act(() => {
-    root!.render(<EmptyRepoView onOpenSettings={() => {}} />)
-  })
+  return renderInJsdom(<EmptyRepoView onOpenSettings={() => {}} />)
 }
 
 describe('EmptyRepoView', () => {
   test('disables zen toggle and pins the navigator pane in compact mode', () => {
     responsiveMocks.mode = 'compact'
-    renderEmptyRepoView()
+    const { container } = renderEmptyRepoView()
 
-    const shell = container!.querySelector<HTMLElement>('[data-testid="repo-workspace-shell"]')
+    const shell = container.querySelector<HTMLElement>('[data-testid="repo-workspace-shell"]')
     expect(shell).not.toBeNull()
     expect(shell?.dataset.zenModeToggleEnabled).toBe('false')
     expect(shell?.dataset.singlePaneActivePane).toBe('navigator')
@@ -80,9 +59,9 @@ describe('EmptyRepoView', () => {
 
   test('keeps workspace inactive by default even outside compact mode', () => {
     responsiveMocks.mode = 'default'
-    renderEmptyRepoView()
+    const { container } = renderEmptyRepoView()
 
-    const shell = container!.querySelector<HTMLElement>('[data-testid="repo-workspace-shell"]')
+    const shell = container.querySelector<HTMLElement>('[data-testid="repo-workspace-shell"]')
     expect(shell?.dataset.zenMode).toBe('false')
     expect(shell?.dataset.repoWorkspaceActive).toBe('false')
   })

@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 
 import { act, type ComponentProps } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { RepoWorkspaceToolbar } from '#/web/components/repo-workspace/RepoWorkspaceToolbar.tsx'
@@ -45,6 +44,7 @@ import {
   workspacePaneTabOrderForBranch,
 } from '#/web/stores/repos/workspace-pane-tabs.ts'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 
 let compactUi = false
 const runtimeExternalAppSettings = vi.hoisted(() => ({
@@ -110,11 +110,6 @@ function defaultRuntimeExternalAppSettings() {
   }
 }
 
-let container: HTMLDivElement | null = null
-let root: Root | null = null
-let queryClient: QueryClient | null = null
-const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
-
 type RepoWorkspaceToolbarHarnessProps = Omit<
   ComponentProps<typeof RepoWorkspaceToolbar>,
   'workspacePaneTabModel' | 'branchActions'
@@ -127,7 +122,6 @@ function RepoWorkspaceToolbarHarness(props: RepoWorkspaceToolbarHarnessProps) {
 }
 
 beforeEach(() => {
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   compactUi = false
   runtimeExternalAppSettings.value = defaultRuntimeExternalAppSettings()
   appShellMocks.openExternalUrl.mockReset()
@@ -148,13 +142,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  act(() => {
-    root?.unmount()
-  })
-  container?.remove()
-  root = null
-  container = null
-  queryClient = null
   toastMocks.error.mockClear()
   appShellMocks.openExternalUrl.mockReset()
   repoClientMocks.openRepoInFinder.mockReset()
@@ -162,7 +149,6 @@ afterEach(() => {
   window.localStorage.clear()
   setClientBridgeForTests(null)
   setTerminalSessionCommandBridge(null)
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
 describe('RepoWorkspaceToolbar', () => {
@@ -421,38 +407,29 @@ describe('RepoWorkspaceToolbar', () => {
       `${WORKSPACE_EXTERNAL_APP_RECENT_STORAGE_KEY}:${workspaceExternalAppRecentScope(REPO_ID, nextWorktreePath)}`,
       'editor:vscode',
     )
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
     const repo = seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
     })
     const branchActions = menuBranchActions()
 
-    await act(async () => {
-      root!.render(
-        <WorkspaceOpenExternallyMenu
-          repo={repo}
-          branch={createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })}
-          branchActions={branchActions}
-        />,
-      )
-      await Promise.resolve()
-    })
+    const { container, rerender } = renderInJsdom(
+      <WorkspaceOpenExternallyMenu
+        repo={repo}
+        branch={createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })}
+        branchActions={branchActions}
+      />,
+    )
 
     expect(container.querySelector<HTMLButtonElement>('button[aria-label="worktrees.reveal-title"]')).not.toBeNull()
 
-    await act(async () => {
-      root!.render(
-        <WorkspaceOpenExternallyMenu
-          repo={repo}
-          branch={createRepoBranch('feature/worktree', { worktree: { path: nextWorktreePath } })}
-          branchActions={branchActions}
-        />,
-      )
-      await Promise.resolve()
-    })
+    rerender(
+      <WorkspaceOpenExternallyMenu
+        repo={repo}
+        branch={createRepoBranch('feature/worktree', { worktree: { path: nextWorktreePath } })}
+        branchActions={branchActions}
+      />,
+    )
 
     expect(container.querySelector<HTMLButtonElement>('button[aria-label="settings.editor.vscode"]')).not.toBeNull()
     expect(container.querySelector<HTMLButtonElement>('button[aria-label="worktrees.reveal-title"]')).toBeNull()
@@ -1120,8 +1097,9 @@ function renderToolbar(options: {
    */
   loading?: boolean
 }): {
-  container: HTMLDivElement
+  container: HTMLElement
   terminalTab: HTMLButtonElement
+  rerender: ReturnType<typeof renderInJsdom>['rerender']
   mocks: {
     createTerminal: ReturnType<typeof vi.fn>
     selectTerminal: ReturnType<typeof vi.fn>
@@ -1240,28 +1218,23 @@ function renderToolbar(options: {
     closeTerminalByDescriptor,
   })
 
-  container = document.createElement('div')
-  document.body.appendChild(container)
-  root = createRoot(container)
-  queryClient = new QueryClient()
-  act(() => {
-    root!.render(
-      <QueryClientProvider client={queryClient!}>
-        <PrimaryWindowNavigationProvider value={options.navigation}>
-          <TerminalSessionContext.Provider value={commandContext}>
-            <TerminalSessionReadContext.Provider value={readContext}>
-              <RepoWorkspaceToolbarHarness
-                repo={repo}
-                detail={detail}
-                workspacePaneId="workspace"
-                trafficLightOffset={options.trafficLightOffset}
-              />
-            </TerminalSessionReadContext.Provider>
-          </TerminalSessionContext.Provider>
-        </PrimaryWindowNavigationProvider>
-      </QueryClientProvider>,
-    )
-  })
+  const queryClient = new QueryClient()
+  const { container, rerender } = renderInJsdom(
+    <QueryClientProvider client={queryClient}>
+      <PrimaryWindowNavigationProvider value={options.navigation}>
+        <TerminalSessionContext.Provider value={commandContext}>
+          <TerminalSessionReadContext.Provider value={readContext}>
+            <RepoWorkspaceToolbarHarness
+              repo={repo}
+              detail={detail}
+              workspacePaneId="workspace"
+              trafficLightOffset={options.trafficLightOffset}
+            />
+          </TerminalSessionReadContext.Provider>
+        </TerminalSessionContext.Provider>
+      </PrimaryWindowNavigationProvider>
+    </QueryClientProvider>,
+  )
 
   const tabSelector =
     options.worktree === false
@@ -1274,6 +1247,7 @@ function renderToolbar(options: {
   return {
     container,
     terminalTab: tab as HTMLButtonElement,
+    rerender,
     mocks: {
       createTerminal,
       selectTerminal,

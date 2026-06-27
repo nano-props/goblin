@@ -29,6 +29,22 @@
 //      observer on every TooltipContent. A no-op shim is enough — those
 //      components only use the observation to anchor the portal, which is
 //      irrelevant in tests.
+//
+// Notes on React 18/19 act warnings:
+//   Earlier revisions of this file installed a `console.error` patch to
+//   swallow the "An update to <Component> inside a test was not wrapped
+//   in act(...)" warnings that came from fire-and-forget `useEffect`
+//   chains in `useRepoStatusRefresh`, `useClientEffectIntentRouter`,
+//   `RepoWorkspaceToolbar`'s `useTerminalSessions`, and the Radix
+//   portal components. The root cause turned out to be
+//   `src/test-utils/render.tsx` permanently setting
+//   `globalThis.IS_REACT_ACT_ENVIRONMENT = true`, which left the
+//   worker in the "act environment is on but no act is running" state
+//   that React 19's `warnIfUpdatesNotWrappedWithActDEV` flags on
+//   every post-mount commit. With `renderInJsdom` no longer
+//   permanently flipping that flag, React's check short-circuits to
+//   "not configured for act" and never warns, so the patch is no
+//   longer needed.
 
 const originalEmit = process.emit.bind(process)
 process.emit = function patchedEmit(event, payload, ...rest) {

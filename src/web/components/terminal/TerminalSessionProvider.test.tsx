@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
 import { act, useEffect, useRef } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { TerminalSessionProvider } from '#/web/components/terminal/TerminalSessionProvider.tsx'
 import { setTerminalSessionProjectionForTests } from '#/web/components/terminal/TerminalSessionProjection.ts'
@@ -315,7 +315,6 @@ function attachResult(): TerminalAttachResult {
 }
 
 beforeEach(() => {
-  ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   exitHandler = null
   outputHandler = null
   titleHandler = null
@@ -1746,21 +1745,17 @@ describe('TerminalSessionProvider', () => {
     // registration path (no RegisterHost, no probes) so the only
     // preloadTerminalFont call comes from the new useEffect in
     // TerminalSessionProvider itself.
-    const container = document.createElement('div')
-    document.body.appendChild(container)
-    const root = createRoot(container)
+    const result = renderInJsdom(
+      <TerminalSessionProvider>
+        <span>probe</span>
+      </TerminalSessionProvider>,
+    )
     try {
-      await act(async () => {
-        root.render(
-          <TerminalSessionProvider>
-            <span>probe</span>
-          </TerminalSessionProvider>,
-        )
-      })
       expect(geometryMocks.preloadTerminalFont).toHaveBeenCalledTimes(1)
     } finally {
-      await act(async () => root.unmount())
-      container.remove()
+      await act(async () => {
+        result.unmount()
+      })
     }
   })
 
@@ -1830,18 +1825,12 @@ describe('TerminalSessionProvider', () => {
       }),
     })
 
-    const container = document.createElement('div')
-    document.body.appendChild(container)
-    const root = createRoot(container)
+    const result = renderInJsdom(
+      <TerminalSessionProvider>
+        <span>probe</span>
+      </TerminalSessionProvider>,
+    )
     try {
-      await act(async () => {
-        root.render(
-          <TerminalSessionProvider>
-            <span>probe</span>
-          </TerminalSessionProvider>,
-        )
-      })
-
       // No active repo yet → effect's guard skips the prewarm.
       expect(prewarm).not.toHaveBeenCalled()
 
@@ -1859,8 +1848,9 @@ describe('TerminalSessionProvider', () => {
       expect(prewarm).toHaveBeenCalledTimes(1)
       expect(prewarm).toHaveBeenCalledWith()
     } finally {
-      await act(async () => root.unmount())
-      container.remove()
+      await act(async () => {
+        result.unmount()
+      })
     }
   })
 
@@ -1930,18 +1920,12 @@ describe('TerminalSessionProvider', () => {
       }),
     })
 
-    const container = document.createElement('div')
-    document.body.appendChild(container)
-    const root = createRoot(container)
+    const result = renderInJsdom(
+      <TerminalSessionProvider>
+        <span>probe</span>
+      </TerminalSessionProvider>,
+    )
     try {
-      await act(async () => {
-        root.render(
-          <TerminalSessionProvider>
-            <span>probe</span>
-          </TerminalSessionProvider>,
-        )
-      })
-
       // visibilitychange:visible → kick
       kickReconnect.mockClear()
       await act(async () => {
@@ -1972,8 +1956,9 @@ describe('TerminalSessionProvider', () => {
       })
       expect(kickReconnect).not.toHaveBeenCalled()
     } finally {
-      await act(async () => root.unmount())
-      container.remove()
+      await act(async () => {
+        result.unmount()
+      })
       // Reset visibilityState to the jsdom default so other tests
       // aren't affected by our defineProperty.
       Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' })
@@ -2079,19 +2064,13 @@ async function renderProviderWithHost(): Promise<{
   getContext: () => TerminalSessionContextValue
   unmount: () => Promise<void>
 }> {
-  const container = document.createElement('div')
-  document.body.appendChild(container)
-  const root: Root = createRoot(container)
   let context: TerminalSessionContextValue | null = null
-
-  await act(async () => {
-    root.render(
-      <TerminalSessionProvider>
-        <CaptureContext onContext={(value) => (context = value)} />
-        <RegisterHost worktreeTerminalKey={worktreeTerminalKey(REPO_ID, WORKTREE_PATH)} />
-      </TerminalSessionProvider>,
-    )
-  })
+  const result = renderInJsdom(
+    <TerminalSessionProvider>
+      <CaptureContext onContext={(value) => (context = value)} />
+      <RegisterHost worktreeTerminalKey={worktreeTerminalKey(REPO_ID, WORKTREE_PATH)} />
+    </TerminalSessionProvider>,
+  )
 
   return {
     getContext: () => {
@@ -2099,8 +2078,9 @@ async function renderProviderWithHost(): Promise<{
       return context
     },
     unmount: async () => {
-      await act(async () => root.unmount())
-      container.remove()
+      await act(async () => {
+        result.unmount()
+      })
     },
   }
 }
@@ -2121,9 +2101,6 @@ async function renderProviderWithProbe(worktreeTerminalKey: string): Promise<{
   }
   unmount: () => Promise<void>
 }> {
-  const container = document.createElement('div')
-  document.body.appendChild(container)
-  const root: Root = createRoot(container)
   let context: TerminalSessionContextValue | null = null
   let probe: {
     count: number
@@ -2137,16 +2114,13 @@ async function renderProviderWithProbe(worktreeTerminalKey: string): Promise<{
       phase: string
     }>
   } | null = null
-
-  await act(async () => {
-    root.render(
-      <TerminalSessionProvider>
-        <CaptureContext onContext={(value) => (context = value)} />
-        <RegisterHost worktreeTerminalKey={worktreeTerminalKey} />
-        <CaptureGroupProbe worktreeTerminalKey={worktreeTerminalKey} onProbe={(value) => (probe = value)} />
-      </TerminalSessionProvider>,
-    )
-  })
+  const result = renderInJsdom(
+    <TerminalSessionProvider>
+      <CaptureContext onContext={(value) => (context = value)} />
+      <RegisterHost worktreeTerminalKey={worktreeTerminalKey} />
+      <CaptureGroupProbe worktreeTerminalKey={worktreeTerminalKey} onProbe={(value) => (probe = value)} />
+    </TerminalSessionProvider>,
+  )
 
   return {
     getContext: () => {
@@ -2158,8 +2132,9 @@ async function renderProviderWithProbe(worktreeTerminalKey: string): Promise<{
       return probe
     },
     unmount: async () => {
-      await act(async () => root.unmount())
-      container.remove()
+      await act(async () => {
+        result.unmount()
+      })
     },
   }
 }

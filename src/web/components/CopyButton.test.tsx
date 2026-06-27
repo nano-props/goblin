@@ -1,19 +1,14 @@
 // @vitest-environment jsdom
 
 import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { CopyButton } from '#/web/components/CopyButton.tsx'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 
 describe('CopyButton', () => {
-  let container: HTMLDivElement
-  let root: Root
   let writeText: ReturnType<typeof vi.fn>
 
   beforeEach(() => {
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
     writeText = vi.fn()
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
@@ -22,18 +17,8 @@ describe('CopyButton', () => {
   })
 
   afterEach(() => {
-    act(() => {
-      root.unmount()
-    })
-    container.remove()
     vi.restoreAllMocks()
   })
-
-  function render(value: string) {
-    act(() => {
-      root.render(<CopyButton value={value} copyLabel="Copy" copiedLabel="Copied" />)
-    })
-  }
 
   test('does not show copied feedback for a stale clipboard write after value changes', async () => {
     let resolveFirst!: () => void
@@ -43,10 +28,14 @@ describe('CopyButton', () => {
       }),
     )
 
-    render('first')
-    container.querySelector<HTMLButtonElement>('button[aria-label="Copy"]')!.click()
+    const { container, rerender } = renderInJsdom(
+      <CopyButton value="first" copyLabel="Copy" copiedLabel="Copied" />,
+    )
+    act(() => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Copy"]')!.click()
+    })
 
-    render('second')
+    rerender(<CopyButton value="second" copyLabel="Copy" copiedLabel="Copied" />)
 
     await act(async () => {
       resolveFirst()

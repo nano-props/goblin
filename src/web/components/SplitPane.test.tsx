@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 
 import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import type { ReactNode } from 'react'
+import type { RenderResult } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { SplitPane } from '#/web/components/SplitPane.tsx'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 
 const resizableMocks = vi.hoisted(() => ({
   setLayout: vi.fn<(layout: Record<string, number>) => void>(),
@@ -66,9 +68,6 @@ vi.mock('#/web/components/ui/resizable.tsx', () => ({
   ),
 }))
 
-let container: HTMLDivElement | null = null
-let root: Root | null = null
-const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 const originalResizeObserver = globalThis.ResizeObserver
 const resizeObserverRecords: ResizeObserverRecord[] = []
 
@@ -78,7 +77,6 @@ interface ResizeObserverRecord {
 }
 
 beforeEach(() => {
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   resizableMocks.setLayout.mockClear()
   resizableMocks.onLayoutChanged = null
   resizableMocks.groupDisabled = null
@@ -104,26 +102,22 @@ beforeEach(() => {
       this.record.elements.clear()
     }
   }
-  container = document.createElement('div')
-  document.body.appendChild(container)
-  root = createRoot(container)
 })
 
 afterEach(() => {
-  act(() => {
-    root?.unmount()
-  })
-  container?.remove()
-  root = null
-  container = null
   globalThis.ResizeObserver = originalResizeObserver
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
+  // Reset our module-level render handle so the next test that only
+  // calls `rerender(...)` (e.g. "keeps panel transition active when
+  // collapse is reversed before the timeout settles") falls through to
+  // `render(...)` instead of trying to rerender a root that
+  // `cleanup()` already unmounted.
+  lastRender = null
 })
 
 describe('SplitPane', () => {
   test('persists user layout changes while expanded', () => {
     const onAfterSizeChange = vi.fn()
-    render(<SplitPane before={<div />} after={<div />} afterSize={62} onAfterSizeChange={onAfterSizeChange} />)
+    const { container } = render(<SplitPane before={<div />} after={<div />} afterSize={62} onAfterSizeChange={onAfterSizeChange} />)
 
     expect(resizableMocks.setLayout).toHaveBeenLastCalledWith({ before: 38, after: 62 })
 
@@ -136,7 +130,7 @@ describe('SplitPane', () => {
 
   test('collapses the before pane without persisting the collapsed layout', () => {
     const onAfterSizeChange = vi.fn()
-    render(
+    const { container } = render(
       <SplitPane
         before={<button type="button">before</button>}
         after={<div />}
@@ -152,17 +146,17 @@ describe('SplitPane', () => {
     expect(resizableMocks.setLayout).toHaveBeenLastCalledWith({ before: 0, after: 100 })
     expect(resizableMocks.groupDisabled).toBe(true)
     expect(resizableMocks.beforePanelMinSize).toBe(0)
-    expect(beforePanel()?.getAttribute('aria-hidden')).toBe('true')
-    expect(beforeClip()).not.toBeNull()
-    expect(beforeContent()?.style.getPropertyValue('--goblin-split-pane-before-open-size')).toBe('38cqw')
-    expect(beforeContent()?.style.getPropertyValue('--goblin-split-pane-before-min-size')).toBe('14rem')
-    expect(beforeContent()?.style.getPropertyValue('--goblin-split-pane-after-min-size')).toBe('22rem')
-    expect(splitPane()?.style.getPropertyValue('--goblin-workspace-pane-transition-duration')).toBe(
+    expect(beforePanel(container)?.getAttribute('aria-hidden')).toBe('true')
+    expect(beforeClip(container)).not.toBeNull()
+    expect(beforeContent(container)?.style.getPropertyValue('--goblin-split-pane-before-open-size')).toBe('38cqw')
+    expect(beforeContent(container)?.style.getPropertyValue('--goblin-split-pane-before-min-size')).toBe('14rem')
+    expect(beforeContent(container)?.style.getPropertyValue('--goblin-split-pane-after-min-size')).toBe('22rem')
+    expect(splitPane(container)?.style.getPropertyValue('--goblin-workspace-pane-transition-duration')).toBe(
       `${WORKSPACE_PANE_TRANSITION_MS}ms`,
     )
-    expect(beforeContent()?.className).toContain('shrink-0')
-    expect(beforeContent()?.className).not.toContain('flex-1')
-    expect(resizeHandle()?.disabled).toBe(true)
+    expect(beforeContent(container)?.className).toContain('shrink-0')
+    expect(beforeContent(container)?.className).not.toContain('flex-1')
+    expect(resizeHandle(container)?.disabled).toBe(true)
 
     act(() => {
       resizableMocks.onLayoutChanged?.({ before: 0, after: 100 })
@@ -172,7 +166,7 @@ describe('SplitPane', () => {
   })
 
   test('uses measured before panel width when available', async () => {
-    render(
+    const { container } = render(
       <SplitPane
         before={<div />}
         after={<div />}
@@ -183,15 +177,15 @@ describe('SplitPane', () => {
       />,
     )
 
-    emitElementResize(splitPane(), 800)
-    emitElementResize(beforeClip(), 320)
+    emitElementResize(splitPane(container), 800)
+    emitElementResize(beforeClip(container), 320)
     await flushEffects()
 
-    expect(beforeContent()?.style.getPropertyValue('--goblin-split-pane-before-measured-size')).toBe('320px')
+    expect(beforeContent(container)?.style.getPropertyValue('--goblin-split-pane-before-measured-size')).toBe('320px')
   })
 
   test('does not animate the initially collapsed pane', () => {
-    render(
+    const { container } = render(
       <SplitPane
         before={<div />}
         after={<div />}
@@ -203,7 +197,7 @@ describe('SplitPane', () => {
       />,
     )
 
-    expect(splitPane()?.dataset.collapseTransition).toBeUndefined()
+    expect(splitPane(container)?.dataset.collapseTransition).toBeUndefined()
   })
 
   test('keeps panel transition active when collapse is reversed before the timeout settles', async () => {
@@ -221,43 +215,50 @@ describe('SplitPane', () => {
         />
       )
 
-      render(splitPaneElement(false))
-      expect(splitPane()?.dataset.collapseTransition).toBeUndefined()
+      const { container } = render(splitPaneElement(false))
+      expect(splitPane(container)?.dataset.collapseTransition).toBeUndefined()
 
-      render(splitPaneElement(true))
+      rerender(splitPaneElement(true))
       await flushEffects()
-      expect(splitPane()?.dataset.collapseTransition).toBe('collapsing')
+      expect(splitPane(container)?.dataset.collapseTransition).toBe('collapsing')
 
       act(() => {
         vi.advanceTimersByTime(120)
       })
-      expect(splitPane()?.dataset.collapseTransition).toBe('collapsing')
+      expect(splitPane(container)?.dataset.collapseTransition).toBe('collapsing')
 
-      render(splitPaneElement(false))
+      rerender(splitPaneElement(false))
       await flushEffects()
-      expect(splitPane()?.dataset.collapseTransition).toBe('expanding')
+      expect(splitPane(container)?.dataset.collapseTransition).toBe('expanding')
       expect(resizableMocks.setLayout).toHaveBeenLastCalledWith({ before: 38, after: 62 })
 
       act(() => {
         vi.advanceTimersByTime(239)
       })
-      expect(splitPane()?.dataset.collapseTransition).toBe('expanding')
+      expect(splitPane(container)?.dataset.collapseTransition).toBe('expanding')
 
       act(() => {
         vi.advanceTimersByTime(1)
       })
       await flushEffects()
-      expect(splitPane()?.dataset.collapseTransition).toBeUndefined()
+      expect(splitPane(container)?.dataset.collapseTransition).toBeUndefined()
     } finally {
       vi.useRealTimers()
     }
   })
 })
 
-function render(element: React.ReactNode) {
-  act(() => {
-    root!.render(element)
-  })
+let lastRender: RenderResult | null = null
+
+function render(element: ReactNode): RenderResult {
+  lastRender = renderInJsdom(element)
+  return lastRender
+}
+
+function rerender(element: ReactNode): RenderResult {
+  if (!lastRender) return render(element)
+  lastRender.rerender(element)
+  return lastRender
 }
 
 async function flushEffects() {
@@ -266,24 +267,24 @@ async function flushEffects() {
   })
 }
 
-function splitPane(): HTMLElement | null {
-  return container?.querySelector<HTMLElement>('.goblin-split-pane') ?? null
+function splitPane(container: HTMLElement): HTMLElement | null {
+  return container.querySelector<HTMLElement>('.goblin-split-pane') ?? null
 }
 
-function beforePanel(): HTMLElement | null {
-  return container?.querySelector<HTMLElement>('section[id="before"]') ?? null
+function beforePanel(container: HTMLElement): HTMLElement | null {
+  return container.querySelector<HTMLElement>('section[id="before"]') ?? null
 }
 
-function beforeClip(): HTMLElement | null {
-  return container?.querySelector<HTMLElement>('.goblin-split-pane__before-clip') ?? null
+function beforeClip(container: HTMLElement): HTMLElement | null {
+  return container.querySelector<HTMLElement>('.goblin-split-pane__before-clip') ?? null
 }
 
-function beforeContent(): HTMLElement | null {
-  return container?.querySelector<HTMLElement>('.goblin-split-pane__before-content') ?? null
+function beforeContent(container: HTMLElement): HTMLElement | null {
+  return container.querySelector<HTMLElement>('.goblin-split-pane__before-content') ?? null
 }
 
-function resizeHandle(): HTMLButtonElement | null {
-  return container?.querySelector<HTMLButtonElement>('[data-testid="resize-handle"]') ?? null
+function resizeHandle(container: HTMLElement): HTMLButtonElement | null {
+  return container.querySelector<HTMLButtonElement>('[data-testid="resize-handle"]') ?? null
 }
 
 function emitElementResize(element: Element | null, width: number) {

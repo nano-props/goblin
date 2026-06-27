@@ -1,17 +1,12 @@
 // @vitest-environment jsdom
 
 import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { RepoPicker } from '#/web/components/repo-picker/RepoPicker.tsx'
 import type { RepoPickerRepo } from '#/web/components/repo-picker/types.ts'
-
-let container: HTMLDivElement | null = null
-let root: Root | null = null
-const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+import { renderInJsdom } from '#/test-utils/render.tsx'
 
 beforeEach(() => {
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   vi.stubGlobal('matchMedia', createMatchMedia(false))
   vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb: FrameRequestCallback) => {
     cb(0)
@@ -19,39 +14,22 @@ beforeEach(() => {
   })
 })
 
-afterEach(() => {
-  act(() => {
-    root?.unmount()
-  })
-  container?.remove()
-  root = null
-  container = null
-  vi.unstubAllGlobals()
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
-  vi.restoreAllMocks()
-})
-
 describe('RepoPicker keyboard navigation', () => {
   test('moves between repos from the current repo button', () => {
     const onActivate = vi.fn()
 
-    container = document.createElement('div')
-    document.body.append(container)
-    root = createRoot(container)
-    act(() => {
-      root!.render(
-        <RepoPicker
-          repos={[repo('repo-a', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
-          activeId="/tmp/repo-a"
-          labels={labels}
-          onActivate={onActivate}
-          onClose={() => {}}
-          onOpenLocal={() => {}}
-          onOpenRemote={() => {}}
-          onClone={() => {}}
-        />,
-      )
-    })
+    renderInJsdom(
+      <RepoPicker
+        repos={[repo('repo-a', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
+        activeId="/tmp/repo-a"
+        labels={labels}
+        onActivate={onActivate}
+        onClose={() => {}}
+        onOpenLocal={() => {}}
+        onOpenRemote={() => {}}
+        onClone={() => {}}
+      />,
+    )
 
     const currentRepoButton = document.body.querySelector('[data-current-repo-id="/tmp/repo-a"]')
     if (!(currentRepoButton instanceof HTMLButtonElement)) throw new Error('missing current repo button')
@@ -68,24 +46,19 @@ describe('RepoPicker keyboard navigation', () => {
   test('moves between repos from the sidebar current repo button', () => {
     const onActivate = vi.fn()
 
-    container = document.createElement('div')
-    document.body.append(container)
-    root = createRoot(container)
-    act(() => {
-      root!.render(
-        <RepoPicker
-          repos={[repo('repo-a', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
-          activeId="/tmp/repo-a"
-          labels={labels}
-          onActivate={onActivate}
-          onClose={() => {}}
-          onOpenLocal={() => {}}
-          onOpenRemote={() => {}}
-          onClone={() => {}}
-          surface="sidebar"
-        />,
-      )
-    })
+    renderInJsdom(
+      <RepoPicker
+        repos={[repo('repo-a', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
+        activeId="/tmp/repo-a"
+        labels={labels}
+        onActivate={onActivate}
+        onClose={() => {}}
+        onOpenLocal={() => {}}
+        onOpenRemote={() => {}}
+        onClone={() => {}}
+        surface="sidebar"
+      />,
+    )
 
     const currentRepoButton = document.body.querySelector('[data-current-repo-id="/tmp/repo-a"]')
     if (!(currentRepoButton instanceof HTMLButtonElement)) throw new Error('missing current repo button')

@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
 
-import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useSessionPersistence } from '#/web/hooks/useSessionPersistence.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -14,27 +13,13 @@ vi.mock('#/web/settings-actions.ts', () => ({
   persistWorkspaceSessionState: (session: unknown) => persistWorkspaceSessionStateMock(session),
 }))
 
-let container: HTMLDivElement | null = null
-let root: Root | null = null
-
 beforeEach(() => {
-  ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   resetReposStore()
   persistWorkspaceSessionStateMock.mockReset()
 })
 
-afterEach(() => {
-  act(() => {
-    root?.unmount()
-  })
-  container?.remove()
-  root = null
-  container = null
-  ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = false
-})
-
 describe('useSessionPersistence', () => {
-  test('persists the active terminal map into settings session state', async () => {
+  test('persists the active terminal map into settings session state', () => {
     const repo = seedRepoState({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
@@ -51,7 +36,7 @@ describe('useSessionPersistence', () => {
       },
     })
 
-    await render(<Harness />)
+    renderInJsdom(<Harness />)
 
     expect(persistWorkspaceSessionStateMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -69,7 +54,7 @@ describe('useSessionPersistence', () => {
     )
   })
 
-  test('persists explicitly closed workspace pane tabs as empty arrays', async () => {
+  test('persists explicitly closed workspace pane tabs as empty arrays', () => {
     const repo = seedRepoState({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
@@ -78,7 +63,7 @@ describe('useSessionPersistence', () => {
     })
     useReposStore.getState().closeWorkspacePaneStaticTab(repo.id, 'status', 'feature/worktree')
 
-    await render(<Harness />)
+    renderInJsdom(<Harness />)
 
     expect(persistWorkspaceSessionStateMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -95,15 +80,4 @@ describe('useSessionPersistence', () => {
 function Harness() {
   useSessionPersistence()
   return null
-}
-
-async function render(element: React.ReactNode) {
-  container = document.createElement('div')
-  document.body.append(container)
-  root = createRoot(container)
-  await act(async () => {
-    root!.render(element)
-    await Promise.resolve()
-    await Promise.resolve()
-  })
 }

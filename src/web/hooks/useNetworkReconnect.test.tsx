@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 
 import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { cleanup } from '@testing-library/react'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 import { normalizeRemoteTarget, type RemoteRepoConnectionLifecycle } from '#/shared/remote-repo.ts'
 import { useNetworkReconnect } from '#/web/hooks/useNetworkReconnect.ts'
 import { resetLifecycleTest } from '#/web/stores/repos/repo-session-test-utils.ts'
@@ -64,12 +65,7 @@ vi.mock('#/web/stores/repos/remote-repo-connection-orchestrator.ts', () => ({
   }),
 }))
 
-let container: HTMLDivElement | null = null
-let root: Root | null = null
-const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
-
 beforeEach(() => {
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   // NOTE: this hook test intentionally does NOT call
   // `installGoblin({})` — the test-utils' fake `window` is
   // a plain object without `addEventListener`/`removeEventListener`,
@@ -81,28 +77,12 @@ beforeEach(() => {
   resetLifecycleTest()
 })
 
-afterEach(() => {
-  act(() => {
-    root?.unmount()
-  })
-  container?.remove()
-  root = null
-  container = null
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
-})
-
 function fireOnline(): void {
   window.dispatchEvent(new Event('online'))
 }
 
-async function mountHook(): Promise<void> {
-  container = document.createElement('div')
-  document.body.append(container)
-  root = createRoot(container)
-  await act(async () => {
-    root!.render(<HookHost />)
-    await Promise.resolve()
-  })
+function mountHook() {
+  return renderInJsdom(<HookHost />)
 }
 
 function HookHost(): null {
@@ -228,7 +208,7 @@ describe('useNetworkReconnect', () => {
   test('re-probes a `failed` remote repo on `online`', async () => {
     const target = remoteTargetFixture()
     seedRepo(target.id, { kind: 'failed', reason: 'unreachable' })
-    await mountHook()
+    mountHook()
 
     fireOnline()
     // The orchestrator's task is async; let it settle.
@@ -241,7 +221,7 @@ describe('useNetworkReconnect', () => {
   test('skips a `ready` remote repo (no re-probe on online)', async () => {
     const target = remoteTargetFixture()
     seedRepo(target.id, { kind: 'ready', target })
-    await mountHook()
+    mountHook()
 
     fireOnline()
     for (let i = 0; i < 5; i += 1) await Promise.resolve()
@@ -254,7 +234,7 @@ describe('useNetworkReconnect', () => {
   test('re-probes a `connecting` remote repo on `online` (orchestrator aborts stale run)', async () => {
     const target = remoteTargetFixture()
     seedRepo(target.id, { kind: 'connecting' })
-    await mountHook()
+    mountHook()
 
     fireOnline()
     for (let i = 0; i < 10; i += 1) await Promise.resolve()
@@ -269,7 +249,7 @@ describe('useNetworkReconnect', () => {
 
   test('skips local repos entirely', async () => {
     seedRepo('/tmp/local-repo', null)
-    await mountHook()
+    mountHook()
 
     fireOnline()
     for (let i = 0; i < 5; i += 1) await Promise.resolve()
@@ -284,14 +264,13 @@ describe('useNetworkReconnect', () => {
   test('cleans up the window listener on unmount', async () => {
     const target = remoteTargetFixture()
     seedRepo(target.id, { kind: 'failed', reason: 'unreachable' })
-    await mountHook()
+    const result = mountHook()
 
     // Unmount the hook host. After unmount, a second `online`
     // event should NOT trigger a re-probe.
     act(() => {
-      root?.unmount()
+      cleanup()
     })
-    root = null
 
     fireOnline()
     for (let i = 0; i < 10; i += 1) await Promise.resolve()
@@ -307,7 +286,7 @@ describe('useNetworkReconnect', () => {
     // re-probed on the next `online` event. This pins the
     // "store is the source of truth" invariant.
     const target = remoteTargetFixture()
-    await mountHook()
+    mountHook()
     seedRepo(target.id, { kind: 'failed', reason: 'unreachable' })
 
     fireOnline()

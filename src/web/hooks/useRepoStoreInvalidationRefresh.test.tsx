@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 import { resetRepoRefreshCoordinatorState } from '#/web/stores/repos/refresh-coordinator.ts'
 import { beginRepoInvalidationSource, settleRepoInvalidationSource } from '#/web/stores/repos/invalidation-sources.ts'
 import { useRepoStoreInvalidationRefresh } from '#/web/hooks/useRepoStoreInvalidationRefresh.ts'
@@ -41,16 +41,10 @@ function Harness() {
 }
 
 describe('useRepoStoreInvalidationRefresh', () => {
-  let container: HTMLDivElement
-  let root: Root
-
   beforeEach(() => {
-    ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
+    listeners.clear()
     resetRepoRefreshCoordinatorState()
     storeState.refreshCoreData.mockReset()
     storeState.repos['/tmp/repo'] = {
@@ -65,18 +59,13 @@ describe('useRepoStoreInvalidationRefresh', () => {
   })
 
   afterEach(() => {
-    act(() => root.unmount())
-    container.remove()
     listeners.clear()
     resetRepoRefreshCoordinatorState()
     vi.useRealTimers()
-    ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = false
   })
 
   test('refreshes snapshot and status when a repo-snapshot invalidation arrives', async () => {
-    await act(async () => {
-      root.render(<Harness />)
-    })
+    renderInJsdom(<Harness />)
 
     await act(async () => {
       for (const listener of listeners)
@@ -89,9 +78,7 @@ describe('useRepoStoreInvalidationRefresh', () => {
   test('skips duplicate invalidation refreshes from an active local source token', async () => {
     beginRepoInvalidationSource('repo_branch_1')
 
-    await act(async () => {
-      root.render(<Harness />)
-    })
+    renderInJsdom(<Harness />)
 
     await act(async () => {
       for (const listener of listeners)
@@ -110,9 +97,7 @@ describe('useRepoStoreInvalidationRefresh', () => {
     beginRepoInvalidationSource('repo_manual_1')
     settleRepoInvalidationSource('repo_manual_1')
 
-    await act(async () => {
-      root.render(<Harness />)
-    })
+    renderInJsdom(<Harness />)
 
     await act(async () => {
       for (const listener of listeners)
@@ -130,9 +115,7 @@ describe('useRepoStoreInvalidationRefresh', () => {
   test('refreshes when invalidation source token does not match a local action', async () => {
     beginRepoInvalidationSource('repo_manual_2')
 
-    await act(async () => {
-      root.render(<Harness />)
-    })
+    renderInJsdom(<Harness />)
 
     await act(async () => {
       for (const listener of listeners)

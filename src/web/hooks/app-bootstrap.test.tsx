@@ -1,9 +1,8 @@
 // @vitest-environment jsdom
 
-import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
+import { flushMicrotasks, renderInJsdom } from '#/test-utils/render.tsx'
 import { useAuthenticatedAppBootstrap } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
 import { usePublicAppBootstrap } from '#/web/hooks/usePublicAppBootstrap.ts'
 import { getSettingsSnapshot } from '#/web/settings-client.ts'
@@ -22,28 +21,14 @@ vi.mock('#/web/settings-client.ts', async (importOriginal) => {
   }
 })
 
-let container: HTMLDivElement | null = null
-let root: Root | null = null
-const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 const mockedGetSettingsSnapshot = vi.mocked(getSettingsSnapshot)
 
 beforeEach(() => {
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   resetReposStore()
   vi.restoreAllMocks()
   mockedGetSettingsSnapshot.mockReset()
   mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())
   useSessionRestoreStore.setState({ bootSessionSnapshot: null })
-})
-
-afterEach(() => {
-  act(() => {
-    root?.unmount()
-  })
-  container?.remove()
-  root = null
-  container = null
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
 describe('app bootstrap hooks', () => {
@@ -60,7 +45,8 @@ describe('app bootstrap hooks', () => {
     const hydrateI18n = vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
     const hydrateHostInfo = vi.spyOn(useHostInfoStore.getState(), 'hydrate').mockResolvedValue(undefined)
 
-    await render(<PublicHarness />)
+    renderInJsdom(<PublicHarness />)
+    await flushMicrotasks(3)
 
     expect(hydrateI18n).not.toHaveBeenCalled()
     expect(hydrateHostInfo).toHaveBeenCalled()
@@ -89,7 +75,8 @@ describe('app bootstrap hooks', () => {
     vi.spyOn(useHostInfoStore.getState(), 'hydrate').mockResolvedValue(undefined)
     const hydrateRepoSession = vi.spyOn(useReposStore.getState(), 'hydrateRepoSession').mockResolvedValue(undefined)
 
-    await render(<Harness />)
+    renderInJsdom(<Harness />)
+    await flushMicrotasks(3)
 
     const state = useReposStore.getState()
     expect(state.zenMode).toBe(false)
@@ -126,7 +113,8 @@ describe('app bootstrap hooks', () => {
     vi.spyOn(useHostInfoStore.getState(), 'hydrate').mockRejectedValue(new Error('host unavailable'))
     const hydrateRepoSession = vi.spyOn(useReposStore.getState(), 'hydrateRepoSession').mockResolvedValue(undefined)
 
-    await render(<Harness />)
+    renderInJsdom(<Harness />)
+    await flushMicrotasks(3)
 
     expect(hydrateRepoSession).toHaveBeenCalledWith([{ kind: 'local', id: '/tmp/repo' }], '/tmp/repo', {
       workspacePaneRestoreState: {
@@ -147,16 +135,4 @@ function Harness() {
 function PublicHarness() {
   usePublicAppBootstrap()
   return null
-}
-
-async function render(element: React.ReactNode) {
-  container = document.createElement('div')
-  document.body.append(container)
-  root = createRoot(container)
-  await act(async () => {
-    root!.render(element)
-    await Promise.resolve()
-    await Promise.resolve()
-    await Promise.resolve()
-  })
 }
