@@ -243,6 +243,7 @@ export interface RuntimeCoherentRepoProjectionActions {
   openWorkspacePaneStaticView: (id: string, tab: WorkspacePaneStaticViewType, branchName?: string) => void
   closeWorkspacePaneStaticView: (id: string, tab: WorkspacePaneStaticViewType, branchName?: string) => void
   addWorkspacePaneTerminalTab: (id: string, terminalKey: string, branchName?: string) => void
+  addAndFocusWorkspacePaneTerminalTab: (id: string, terminalKey: string, branchName?: string) => void
   removeWorkspacePaneTerminalTab: (id: string, terminalKey: string, branchName?: string) => void
   reorderWorkspacePaneTabs: (id: string, orderedTabs: WorkspacePaneTabOrderEntry[], branchName?: string) => void
   /** Records the most recent user-initiated close on a branch so the

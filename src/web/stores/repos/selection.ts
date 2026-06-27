@@ -13,6 +13,7 @@ import {
   type WorkspacePaneTabOrderEntry,
   type WorkspacePaneView,
 } from '#/shared/workspace-pane.ts'
+import { formatWorktreeKey } from '#/shared/terminal-slot-key.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
 import {
   normalizeWorkspacePaneTabOrder,
@@ -49,6 +50,7 @@ type RuntimeCoherentSelectionActions = Pick<
   | 'openWorkspacePaneStaticView'
   | 'closeWorkspacePaneStaticView'
   | 'addWorkspacePaneTerminalTab'
+  | 'addAndFocusWorkspacePaneTerminalTab'
   | 'removeWorkspacePaneTerminalTab'
   | 'reorderWorkspacePaneTabs'
   | 'setLastClosedTabContext'
@@ -223,6 +225,61 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
         })
       })
       clearLastClosedTabContextForBranch(set, get, id, branchName)
+    },
+
+    addAndFocusWorkspacePaneTerminalTab(id: string, terminalKey: string, branchName?: string) {
+      let token: number | undefined
+      let viewChanged = false
+      set((s) => {
+        const repo = s.repos[id]
+        const branch = branchName ?? repo?.ui.selectedBranch
+        if (!repo || !branch) return s
+        const branchState = repo.data.branches.find((candidate) => candidate.name === branch)
+        const worktreePath = branchState?.worktree?.path
+        if (!worktreePath) return s
+        const currentOrder = workspacePaneTabOrderForBranch(repo.ui, branch)
+        const nextOrder = workspacePaneTabOrderWithTerminal(currentOrder, terminalKey)
+        const currentView = preferredWorkspacePaneViewForBranch(repo.ui, branch)
+        const wtKey = formatWorktreeKey(id, worktreePath)
+        const currentSelected = s.selectedTerminalByWorktree[wtKey]
+        const orderChanged = !workspacePaneTabOrdersEqual(currentOrder, nextOrder)
+        viewChanged = currentView !== 'terminal'
+        const selectionChanged = currentSelected !== terminalKey
+        if (!orderChanged && !viewChanged && !selectionChanged) return s
+        token = repo.instanceToken
+        const repoPatch = replaceRepoState(s, repo, (r) => {
+          if (orderChanged) {
+            r.ui.workspacePaneTabOrderByBranch = workspacePaneTabOrderRecordWith(r.ui, branch, nextOrder)
+          }
+          if (viewChanged) {
+            r.ui.preferredWorkspacePaneViewByBranch = preferredWorkspacePaneViewByBranchRecordWith(
+              r.ui,
+              branch,
+              'terminal',
+            )
+          }
+          if (r.ui.lastClosedTabContextByBranch[branch]) {
+            delete r.ui.lastClosedTabContextByBranch[branch]
+          }
+        })
+        if (!selectionChanged) return repoPatch
+        return {
+          ...repoPatch,
+          selectedTerminalByWorktree: { ...s.selectedTerminalByWorktree, [wtKey]: terminalKey },
+        }
+      })
+      if (!viewChanged || token === undefined) return
+      const repo = get().repos[id]
+      persistRestorableRepoSnapshot(set, repo, token)
+      void runRepoRefreshIntent(get, {
+        kind: 'visible-pull-request-changed',
+        id,
+        token,
+        branch:
+          repo && preferredWorkspacePaneViewForBranch(repo.ui, repo.ui.selectedBranch) === 'status'
+            ? repo.ui.selectedBranch
+            : null,
+      })
     },
 
     removeWorkspacePaneTerminalTab(id: string, terminalKey: string, branchName?: string) {

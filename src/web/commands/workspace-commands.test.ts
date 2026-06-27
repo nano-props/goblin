@@ -386,6 +386,43 @@ describe('workspace commands', () => {
     expect(tabOrderFor('feature/worktree')).toEqual([staticEntry('status')])
   })
 
+  test('new terminal tab command switches back to terminal view if user changed view during create', async () => {
+    seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      selectedBranch: 'feature/worktree',
+      preferredWorkspacePaneView: 'status',
+      workspacePaneTabOrderByBranch: {
+        'feature/worktree': [staticEntry('status'), terminalEntry('slot-1')],
+      },
+    })
+    const { promise, resolve } = Promise.withResolvers<string>()
+    const createTerminal = vi.fn(() => promise)
+    setTerminalSlotCommandBridge({
+      worktreeSnapshot: () => worktreeSnapshotWithTerminal(),
+      createTerminal,
+      selectTerminal: vi.fn(),
+    })
+
+    const command = runNewTerminalTabCommand({ repoId: REPO_ID, navigation: navigationWith() })
+    await vi.waitFor(() => expect(createTerminal).toHaveBeenCalledTimes(1))
+
+    // Simulate the user clicking a different tab while the create is in flight.
+    useReposStore.getState().setWorkspacePaneView(REPO_ID, 'status')
+    expect(preferredWorkspacePaneView()).toBe('status')
+
+    resolve('slot-2')
+    await command
+
+    expect(tabOrderFor('feature/worktree')).toEqual([
+      staticEntry('status'),
+      terminalEntry('slot-1'),
+      terminalEntry('slot-2'),
+    ])
+    expect(preferredWorkspacePaneView()).toBe('terminal')
+    expect(useReposStore.getState().selectedTerminalByWorktree[WORKTREE_KEY]).toBe('slot-2')
+  })
+
   test('close workspace tab command closes the selected terminal when terminal is active', async () => {
     seedRepoState({
       id: REPO_ID,
