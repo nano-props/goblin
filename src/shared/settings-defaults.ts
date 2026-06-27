@@ -12,7 +12,7 @@ export const DEFAULT_SHORTCUTS_DISABLED = false
 export const DEFAULT_GLOBAL_SHORTCUT_DISABLED = false
 export const DEFAULT_LAN_ENABLED = false
 
-export function defaultSessionState(): WorkspaceSessionState {
+export function defaultWorkspaceSessionState(): WorkspaceSessionState {
   return {
     openRepoEntries: [],
     activeRepoId: null,
@@ -42,7 +42,7 @@ export function defaultSettingsSnapshot(overrides: Partial<SettingsSnapshot> = {
   return {
     ...prefs,
     globalShortcutRegistered: overrides.globalShortcutRegistered ?? false,
-    session: overrides.session ?? defaultSessionState(),
+    session: overrides.session ?? defaultWorkspaceSessionState(),
     recentRepos: overrides.recentRepos ?? [],
     repoSettings: overrides.repoSettings ?? [],
   }

@@ -30,7 +30,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   const repoIndex = useStoreWithEqualityFn(useReposStore, (s) => repoIndexFromRepos(s.repos), repoIndexEqual)
   // The provider lives at the router root (above the per-route App), so it
   // reads the active repo directly from the repos store rather than via a
-  // prop. This keeps the terminal session registry, parking root, and
+  // prop. This keeps the terminal session projection, parking root, and
   // xterm views alive across settings → workspace round-trips.
   const currentRepoId = useReposStore((s) => s.activeId)
   const currentRepoInstanceToken = currentRepoId ? (repoIndex[currentRepoId]?.instanceToken ?? null) : null
@@ -62,14 +62,14 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     void terminalBridge.prewarm()
   }, [currentRepoId])
 
-  // The registry is a client-level singleton (terminal-roadmap.md P1.7).
+  // The projection is a client-level singleton (terminal-roadmap.md P1.7).
   // The first Provider mount constructs it via `getTerminalSessionProjection`;
   // subsequent mounts (StrictMode re-mount, route round-trip) reuse the
   // same instance. The ref is kept only so the rest of this component can
   // reach the singleton without re-calling the getter on every render.
-  const registryRef = useRef<TerminalSessionProjection | null>(null)
-  if (!registryRef.current) {
-    registryRef.current = getTerminalSessionProjection({
+  const projectionRef = useRef<TerminalSessionProjection | null>(null)
+  if (!projectionRef.current) {
+    projectionRef.current = getTerminalSessionProjection({
       onSelectedWorktreeChange: setSelectedTerminal,
       // Terminal-session lifetime owns terminal tab lifetime. User closes,
       // server exits, and reconcile removals all converge through this hook.
@@ -82,10 +82,10 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       },
     })
   }
-  const registry = registryRef.current
+  const projection = projectionRef.current
 
   const loadMissingSnapshots = useCallback(
-    async (serverSlots: TerminalSessionSummary[]): Promise<Map<string, TerminalSessionSnapshot>> => {
+    async (serverSessions: TerminalSessionSummary[]): Promise<Map<string, TerminalSessionSnapshot>> => {
       // allSettled (not all) so a single rejected snapshot fetch does not
       // cancel the rest of the reconciliation. Each request is bounded by
       // the bridge's per-request timeout, so the worst case here is that
@@ -94,11 +94,11 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       // Rejections are surfaced via `result.reason` so they remain visible
       // in logs without poisoning the reconciliation.
       const settled = await Promise.allSettled(
-        serverSlots.map((session) => terminalBridge.getSessionSnapshot({ ptySessionId: session.ptySessionId })),
+        serverSessions.map((session) => terminalBridge.getSessionSnapshot({ ptySessionId: session.ptySessionId })),
       )
       const entries: Array<readonly [string, TerminalSessionSnapshot]> = []
       settled.forEach((result, index) => {
-        const session = serverSlots[index]
+        const session = serverSessions[index]
         if (!session) return
         if (result.status === 'fulfilled') {
           const snapshot = result.value
@@ -112,7 +112,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       })
       return new Map(entries)
     },
-    [registry],
+    [projection],
   )
 
   const syncServerSlots = useCallback(
@@ -120,10 +120,10 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       if (!repoRoot || !repoIndexRef.current[repoRoot]) return
       try {
         const clientId = readOrCreateWebTerminalClientId()
-        const serverSlots = await loadTerminalSessions(repoRoot)
-        const snapshotsByPtySessionId = await loadMissingSnapshots(serverSlots)
+        const serverSessions = await loadTerminalSessions(repoRoot)
+        const snapshotsByPtySessionId = await loadMissingSnapshots(serverSessions)
         if (!repoIndexRef.current[repoRoot]) return
-        registry.reconcileServerSessions(repoRoot, serverSlots, clientId, snapshotsByPtySessionId)
+        projection.reconcileServerSessions(repoRoot, serverSessions, clientId, snapshotsByPtySessionId)
       } catch (err) {
         terminalSessionProviderLog.debug('failed to sync server sessions', { err })
       } finally {
@@ -133,18 +133,18 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
         }
       }
     },
-    [loadMissingSnapshots, registry],
+    [loadMissingSnapshots, projection],
   )
 
-  // Registry state sync
+  // Projection state sync
   useEffect(() => {
-    registry.setRepoIndex(repoIndex)
-    registry.setPreferredSelectedTerminalKeys(selectedTerminalSessionByWorktree)
-  }, [registry, repoIndex, selectedTerminalSessionByWorktree])
+    projection.setRepoIndex(repoIndex)
+    projection.setPreferredSelectedTerminalKeys(selectedTerminalSessionByWorktree)
+  }, [projection, repoIndex, selectedTerminalSessionByWorktree])
 
   // Parking DOM
   useEffect(() => {
-    registry.setParkingRoot(parkingRootRef.current)
+    projection.setParkingRoot(parkingRootRef.current)
   })
 
   // T5.1: visibility recovery hook. On `visibilitychange:visible` and
@@ -177,26 +177,26 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     }
   }, [])
 
-  // Registry event wiring (singleton lifecycle, see terminal-roadmap.md P1.7).
-  // The registry is client-level; we only subscribe / unsubscribe bridge
-  // events on mount/unmount. We do NOT destroy the registry — the singleton
+  // Projection event wiring (singleton lifecycle, see terminal-roadmap.md P1.7).
+  // The projection is client-level; we only subscribe / unsubscribe bridge
+  // events on mount/unmount. We do NOT destroy the projection — the singleton
   // outlives the Provider. StrictMode re-mounts simply re-register the same
   // listeners against the same instance.
   useEffect(() => {
     const offOutput = terminalBridge.onOutput((event) => {
-      registry.handleOutput(event)
+      projection.handleOutput(event)
     })
     const offTitle = terminalBridge.onTitle((event) => {
-      registry.handleServerTitle(event)
+      projection.handleServerTitle(event)
     })
     const offExit = terminalBridge.onExit((event) => {
-      registry.handleExit(event)
+      projection.handleExit(event)
     })
     const offIdentity = terminalBridge.onIdentity((event) => {
-      registry.handleIdentity(event)
+      projection.handleIdentity(event)
     })
     const offLifecycle = terminalBridge.onLifecycle((event) => {
-      registry.handleLifecycle(event)
+      projection.handleLifecycle(event)
     })
     // Per-session close broadcast. When the server confirms a close,
     // drop the matching local entry immediately so a sibling window
@@ -204,16 +204,16 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     // window) doesn't reattach to the orphan. The originating window
     // already disposed the local entry, so the handler is a no-op
     // there — the broadcast is multi-window safe by construction.
-    const offSlotClosed = terminalBridge.onSessionClosed((event) => {
-      registry.handleSlotClosed(event.ptySessionId)
+    const offSessionClosed = terminalBridge.onSessionClosed((event) => {
+      projection.handleSessionClosed(event.ptySessionId)
     })
 
     setTerminalSessionCommandBridge({
-      worktreeSnapshot: registry.worktreeSnapshot,
-      createTerminal: registry.createTerminal,
-      selectTerminal: registry.selectTerminal,
-      closeTerminalByDescriptor: registry.closeTerminalByDescriptor,
-      closeTerminalsForWorktree: registry.closeTerminalsForWorktree,
+      worktreeSnapshot: projection.worktreeSnapshot,
+      createTerminal: projection.createTerminal,
+      selectTerminal: projection.selectTerminal,
+      closeTerminalByDescriptor: projection.closeTerminalByDescriptor,
+      closeTerminalsForWorktree: projection.closeTerminalsForWorktree,
     })
 
     return () => {
@@ -222,9 +222,9 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       offExit()
       offIdentity()
       offLifecycle()
-      offSlotClosed()
+      offSessionClosed()
     }
-  }, [registry])
+  }, [projection])
 
   // Server sync (initial + focus + external session changes)
   useEffect(() => {
@@ -266,35 +266,35 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
 
   const commandValue = useMemo<TerminalSessionContextValue>(
     () => ({
-      createTerminal: registry.createTerminal,
-      registerHost: registry.registerHost,
-      unregisterHost: registry.unregisterHost,
-      selectTerminal: registry.selectTerminal,
-      scrollToBottom: registry.scrollToBottom,
-      scrollLines: registry.scrollLines,
-      clearBell: registry.clearBell,
-      closeTerminalByDescriptor: registry.closeTerminalByDescriptor,
-      attach: registry.attach,
-      detach: registry.detach,
-      restart: registry.restart,
-      isTerminalFocusTarget: registry.isTerminalFocusTarget,
-      findNext: registry.findNext,
-      findPrevious: registry.findPrevious,
-      clearSearch: registry.clearSearch,
-      writeInput: registry.writeInput,
-      takeover: registry.takeover,
-      serialize: registry.serialize,
+      createTerminal: projection.createTerminal,
+      registerHost: projection.registerHost,
+      unregisterHost: projection.unregisterHost,
+      selectTerminal: projection.selectTerminal,
+      scrollToBottom: projection.scrollToBottom,
+      scrollLines: projection.scrollLines,
+      clearBell: projection.clearBell,
+      closeTerminalByDescriptor: projection.closeTerminalByDescriptor,
+      attach: projection.attach,
+      detach: projection.detach,
+      restart: projection.restart,
+      isTerminalFocusTarget: projection.isTerminalFocusTarget,
+      findNext: projection.findNext,
+      findPrevious: projection.findPrevious,
+      clearSearch: projection.clearSearch,
+      writeInput: projection.writeInput,
+      takeover: projection.takeover,
+      serialize: projection.serialize,
     }),
-    [registry],
+    [projection],
   )
   const readValue = useMemo<TerminalSessionReadContextValue>(
     () => ({
-      worktreeSnapshot: registry.worktreeSnapshot,
-      subscribeWorktree: registry.subscribeWorktree,
-      snapshot: registry.snapshot,
-      subscribeSnapshot: registry.subscribeSnapshot,
+      worktreeSnapshot: projection.worktreeSnapshot,
+      subscribeWorktree: projection.subscribeWorktree,
+      snapshot: projection.snapshot,
+      subscribeSnapshot: projection.subscribeSnapshot,
     }),
-    [registry],
+    [projection],
   )
 
   return (

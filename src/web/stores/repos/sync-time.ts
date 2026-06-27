@@ -4,8 +4,8 @@
 // without importing each other.
 import type { RepoState } from '#/web/stores/repos/types.ts'
 
-export function latestRepoSyncTime(repo: Pick<RepoState, 'projection' | 'resources'>): number | null {
-  const snapshotLoadedAt = repo.projection.source === 'fresh' ? repo.resources.snapshot.loadedAt : null
-  const times = [repo.resources.fetch.loadedAt, snapshotLoadedAt].filter((time): time is number => time !== null)
+export function latestRepoSyncTime(repo: Pick<RepoState, 'projection' | 'dataLoads'>): number | null {
+  const snapshotLoadedAt = repo.projection.source === 'fresh' ? repo.dataLoads.snapshot.loadedAt : null
+  const times = [repo.dataLoads.fetch.loadedAt, snapshotLoadedAt].filter((time): time is number => time !== null)
   return times.length === 0 ? null : Math.max(...times)
 }

@@ -8,7 +8,7 @@ import {
   persistedPreferredWorkspacePaneTabByBranchByRepoForSession,
 } from '#/web/session-persistence-state.ts'
 
-export function sessionStateFromRestorableWorkspaceState(input: {
+export function workspaceSessionStateFromRestorableWorkspaceState(input: {
   repos: ReposStore['repos']
   restorableWorkspaceState: RestorableWorkspaceState
 }): WorkspaceSessionState {

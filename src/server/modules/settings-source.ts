@@ -31,8 +31,8 @@ import {
   DEFAULT_TERMINAL_NOTIFICATIONS_ENABLED,
   DEFAULT_THEME_PREF,
   MAX_RECENT_REPOS,
-  defaultSessionState,
   defaultUserSettings,
+  defaultWorkspaceSessionState,
 } from '#/shared/settings-defaults.ts'
 
 type FetchIntervalListener = (sec: number) => void
@@ -112,7 +112,7 @@ function dedupeRepoEntries(entries: RepoSessionEntry[]): RepoSessionEntry[] {
 }
 
 function defaultSession(): WorkspaceSessionState {
-  return defaultSessionState()
+  return defaultWorkspaceSessionState()
 }
 
 function normalizeSelectedTerminalSessionByWorktree(value: unknown): Record<string, string> {

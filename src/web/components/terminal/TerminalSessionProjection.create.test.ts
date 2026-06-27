@@ -309,7 +309,7 @@ describe('TerminalSessionProjection create flow', () => {
     // Attach the rejection handler before destroy() so the rejected
     // promise is not flagged as unhandled between the synchronous
     // `destroy()` call and the later `expect(...).rejects` chain.
-    const expectation = expect(pending).rejects.toThrow('terminal registry destroyed')
+    const expectation = expect(pending).rejects.toThrow('terminal session projection destroyed')
     registry.destroy()
     await expectation
     expect((registry as any).hostWaitersByWorktree.size).toBe(0)
@@ -501,14 +501,14 @@ describe('TerminalSessionProjection create flow', () => {
 
     expect((registry as any).pendingCloseByPtySessionId.size).toBe(1)
     registry.destroy()
-    await expect(closePromise).rejects.toThrow('terminal registry destroyed')
+    await expect(closePromise).rejects.toThrow('terminal session projection destroyed')
     expect((registry as any).pendingCloseByPtySessionId.size).toBe(0)
   })
 
-  test('durable close: handleSlotClosed drops the matching local session', async () => {
+  test('durable close: handleSessionClosed drops the matching local session', async () => {
     // The server emits a session-closed broadcast when window A
     // closes a session. Sibling windows route the event into
-    // handleSlotClosed to drop the local entry without a
+    // handleSessionClosed to drop the local entry without a
     // full reconcile.
     const host = document.createElement('div')
     document.body.appendChild(host)
@@ -517,7 +517,7 @@ describe('TerminalSessionProjection create flow', () => {
 
     expect(registry.worktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
 
-    registry.handleSlotClosed('pty_session_1_aaaaaaaaa')
+    registry.handleSessionClosed('pty_session_1_aaaaaaaaa')
 
     // The local session is gone; the worktree snapshot is empty.
     expect(registry.worktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(0)

@@ -40,7 +40,7 @@ export function repoStatusRefreshSnapshot(repo: RepoState): RepoStatusRefreshSna
     preferredWorkspacePaneTab: preferredWorkspacePaneTabForBranch(repo.ui, repo.ui.selectedBranch),
     statusViewOpen: workspacePaneStaticTabsForBranch(repo.ui, repo.ui.selectedBranch).includes('status'),
     unavailable: isRepoUnavailable(repo),
-    statusPhase: repo.resources.status.phase,
+    statusPhase: repo.dataLoads.status.phase,
   }
 }
 

@@ -47,7 +47,7 @@ export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntim
           : createInProcessPtySupervisor(),
         gCommand: gCommandEntry
           ? {
-              serverUrl: localServerUrl(serverHost, serverPort),
+              serverUrl: embeddedServerUrl(serverHost, serverPort),
               accessToken: appOptions.accessToken,
               entryPath: gCommandEntry,
               binDir: gCommandBinDir,
@@ -76,7 +76,7 @@ export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntim
   }
 }
 
-function localServerUrl(host: string, port: number): string {
+function embeddedServerUrl(host: string, port: number): string {
   let accessHost = host
   if (accessHost === '0.0.0.0') accessHost = '127.0.0.1'
   else if (accessHost === '::') accessHost = '[::1]'

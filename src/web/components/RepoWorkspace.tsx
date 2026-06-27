@@ -37,8 +37,8 @@ function repoWorkspaceRepoEqual(a: RepoWorkspaceRepo | undefined, b: RepoWorkspa
       a.ui.preferredWorkspacePaneTabByBranch === b.ui.preferredWorkspacePaneTabByBranch &&
       a.ui.workspacePaneTabOrderByBranch === b.ui.workspacePaneTabOrderByBranch &&
       a.ui.lastClosedTabContextByBranch === b.ui.lastClosedTabContextByBranch &&
-      a.resources.status === b.resources.status &&
-      a.resources.pullRequests === b.resources.pullRequests &&
+      a.dataLoads.status === b.dataLoads.status &&
+      a.dataLoads.pullRequests === b.dataLoads.pullRequests &&
       a.operations.branchAction === b.operations.branchAction &&
       a.remote.lifecycle === b.remote.lifecycle &&
       a.remote.hasRemotes === b.remote.hasRemotes &&
@@ -82,9 +82,9 @@ export function RepoWorkspace({
               workspacePaneTabOrderByBranch: repo.ui.workspacePaneTabOrderByBranch,
               lastClosedTabContextByBranch: repo.ui.lastClosedTabContextByBranch,
             },
-            resources: {
-              status: repo.resources.status,
-              pullRequests: repo.resources.pullRequests,
+            dataLoads: {
+              status: repo.dataLoads.status,
+              pullRequests: repo.dataLoads.pullRequests,
             },
             operations: {
               branchAction: repo.operations.branchAction,

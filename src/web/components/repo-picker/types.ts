@@ -6,7 +6,7 @@ export interface RepoPickerRepo {
   remoteDetails: GitRemoteInfo[]
   /**
    * Last time this client refreshed repo data after a sync/invalidation.
-   * Null until snapshot/fetch resources have completed at least once.
+   * Null until snapshot/fetch data loads have completed at least once.
    */
   lastSyncedAt: number | null
   /**

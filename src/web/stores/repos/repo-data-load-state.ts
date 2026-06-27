@@ -52,71 +52,71 @@ export function emptyRepoDataLoadBundle(): RepoDataLoadBundle {
   }
 }
 
-export function dataLoadBusy(resource: RepoDataLoadState): boolean {
-  return resource.phase !== 'idle'
+export function dataLoadBusy(dataLoad: RepoDataLoadState): boolean {
+  return dataLoad.phase !== 'idle'
 }
 
-export function dataLoadInitialLoading(resource: RepoDataLoadState): boolean {
-  return resource.phase === 'loading'
+export function dataLoadInitialLoading(dataLoad: RepoDataLoadState): boolean {
+  return dataLoad.phase === 'loading'
 }
 
-export function startDataLoad(resource: RepoDataLoadState, options?: { hasData?: boolean }): void {
-  resource.phase = resource.loadedAt !== null || options?.hasData ? 'refreshing' : 'loading'
-  resource.error = null
+export function startDataLoad(dataLoad: RepoDataLoadState, options?: { hasData?: boolean }): void {
+  dataLoad.phase = dataLoad.loadedAt !== null || options?.hasData ? 'refreshing' : 'loading'
+  dataLoad.error = null
 }
 
-export function finishDataLoadSuccess(resource: RepoDataLoadState, loadedAt: number = Date.now()): void {
-  resource.phase = 'idle'
-  resource.loadedAt = loadedAt
-  resource.error = null
-  resource.stale = false
+export function finishDataLoadSuccess(dataLoad: RepoDataLoadState, loadedAt: number = Date.now()): void {
+  dataLoad.phase = 'idle'
+  dataLoad.loadedAt = loadedAt
+  dataLoad.error = null
+  dataLoad.stale = false
 }
 
-export function finishDataLoadError(resource: RepoDataLoadState, error: string): void {
-  const stale = resource.loadedAt !== null || resource.phase === 'refreshing'
-  resource.phase = 'idle'
-  resource.error = error
-  resource.stale = stale
+export function finishDataLoadError(dataLoad: RepoDataLoadState, error: string): void {
+  const stale = dataLoad.loadedAt !== null || dataLoad.phase === 'refreshing'
+  dataLoad.phase = 'idle'
+  dataLoad.error = error
+  dataLoad.stale = stale
 }
 
-export function finishDataLoadUnavailable(resource: RepoDataLoadState): void {
-  const stale = resource.loadedAt !== null || resource.phase === 'refreshing'
-  resource.phase = 'idle'
-  resource.error = null
-  resource.stale = stale
+export function finishDataLoadUnavailable(dataLoad: RepoDataLoadState): void {
+  const stale = dataLoad.loadedAt !== null || dataLoad.phase === 'refreshing'
+  dataLoad.phase = 'idle'
+  dataLoad.error = null
+  dataLoad.stale = stale
 }
 
-export function cancelDataLoad(resource: RepoDataLoadState): void {
-  resource.phase = 'idle'
+export function cancelDataLoad(dataLoad: RepoDataLoadState): void {
+  dataLoad.phase = 'idle'
 }
 
 export function startPullRequestDataLoad(
-  resource: RepoPullRequestDataLoadState,
+  dataLoad: RepoPullRequestDataLoadState,
   mode: PullRequestFetchMode,
   options?: { hasData?: boolean },
 ): void {
-  startDataLoad(resource, options)
-  resource.mode = mode
+  startDataLoad(dataLoad, options)
+  dataLoad.mode = mode
 }
 
 export function finishPullRequestDataLoadSuccess(
-  resource: RepoPullRequestDataLoadState,
+  dataLoad: RepoPullRequestDataLoadState,
   mode: PullRequestFetchMode,
   loadedAt: number = Date.now(),
 ): void {
-  finishDataLoadSuccess(resource, loadedAt)
-  resource.mode = mode
+  finishDataLoadSuccess(dataLoad, loadedAt)
+  dataLoad.mode = mode
 }
 
 export function finishPullRequestDataLoadUnavailable(
-  resource: RepoPullRequestDataLoadState,
+  dataLoad: RepoPullRequestDataLoadState,
   mode: PullRequestFetchMode,
 ): void {
-  finishDataLoadUnavailable(resource)
-  resource.mode = mode
+  finishDataLoadUnavailable(dataLoad)
+  dataLoad.mode = mode
 }
 
-export function finishPullRequestDataLoadError(resource: RepoPullRequestDataLoadState, error: string): void {
-  finishDataLoadError(resource, error)
-  resource.mode = null
+export function finishPullRequestDataLoadError(dataLoad: RepoPullRequestDataLoadState, error: string): void {
+  finishDataLoadError(dataLoad, error)
+  dataLoad.mode = null
 }

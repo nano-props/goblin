@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { defaultSettingsSnapshot, defaultSessionState } from '#/shared/settings-defaults.ts'
+import { defaultSettingsSnapshot, defaultWorkspaceSessionState } from '#/shared/settings-defaults.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import {
   externalAppsQueryKey,
@@ -137,17 +137,17 @@ describe('settings actions', () => {
     })
   })
 
-  test('persistSessionState syncs the saved session into the settings snapshot cache', async () => {
+  test('persistWorkspaceSessionState syncs the saved session into the settings snapshot cache', async () => {
     primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
     const session = {
-      ...defaultSessionState(),
+      ...defaultWorkspaceSessionState(),
       openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo-a' }],
       activeRepoId: '/tmp/repo-a',
     }
     appDataClientMocks.saveSession.mockResolvedValue(session)
-    const { persistSessionState } = await import('#/web/settings-actions.ts')
+    const { persistWorkspaceSessionState } = await import('#/web/settings-actions.ts')
 
-    await persistSessionState(session)
+    await persistWorkspaceSessionState(session)
 
     expect(primaryWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
       session,

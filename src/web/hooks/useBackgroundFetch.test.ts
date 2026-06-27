@@ -3,14 +3,14 @@ import { backgroundSyncRepoIdsFromStore } from '#/web/hooks/useBackgroundFetch.t
 import type { RepoState, ReposStore } from '#/web/stores/repos/types.ts'
 
 describe('backgroundSyncRepoIdsFromStore', () => {
-  test('keeps the active remotely backed repo registered while local refresh resources are busy', () => {
+  test('keeps the active remotely backed repo registered while local refresh data loads are busy', () => {
     const repo = createRepo({
       id: '/repo',
       remote: { hasRemotes: true, hasGitHubRemote: true },
       availability: { phase: 'available' },
     })
-    repo.resources.snapshot.phase = 'refreshing'
-    repo.resources.status.phase = 'refreshing'
+    repo.dataLoads.snapshot.phase = 'refreshing'
+    repo.dataLoads.status.phase = 'refreshing'
     repo.operations.snapshot.phase = 'running'
     repo.operations.status.phase = 'running'
 
@@ -60,7 +60,7 @@ function createRepo(input: {
       statusLoaded: false,
       worktreesByPath: {},
     },
-    resources: {
+    dataLoads: {
       fetch: { phase: 'idle', loadedAt: null, stale: false, error: null },
       snapshot: { phase: 'idle', loadedAt: null, stale: false, error: null },
       status: { phase: 'idle', loadedAt: null, stale: false, error: null },

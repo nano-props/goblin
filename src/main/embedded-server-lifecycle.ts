@@ -79,7 +79,7 @@ function parseServerPort(value: string | undefined): number {
 }
 
 async function reserveEmbeddedServerPort(host: string, preferredPort: number): Promise<number> {
-  return await reserveAvailablePort(host, preferredPort, 'Failed to allocate local server port')
+  return await reserveAvailablePort(host, preferredPort, 'Failed to allocate embedded server port')
 }
 
 async function waitForServer(url: string, timeoutMs: number): Promise<void> {

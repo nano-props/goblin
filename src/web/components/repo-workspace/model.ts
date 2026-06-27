@@ -19,10 +19,10 @@ export function getRepoWorkspacePresentation(repo: RepoState | undefined): RepoW
   // available the projection already shows stale branches and we drop
   // the skeleton.
   const remoteConnecting = deriveConnectivity(repo) === 'connecting'
-  const hasLoadedSnapshot = repo.resources.snapshot.loadedAt !== null
+  const hasLoadedSnapshot = repo.dataLoads.snapshot.loadedAt !== null
   return {
     exists: true,
-    initialLoading: dataLoadInitialLoading(repo.resources.snapshot) || (remoteConnecting && !hasLoadedSnapshot),
+    initialLoading: dataLoadInitialLoading(repo.dataLoads.snapshot) || (remoteConnecting && !hasLoadedSnapshot),
   }
 }
 
@@ -38,7 +38,7 @@ export interface RepoWorkspaceRepo extends BranchActionRepo {
     | 'workspacePaneTabOrderByBranch'
     | 'lastClosedTabContextByBranch'
   >
-  resources: Pick<RepoState['resources'], 'status' | 'pullRequests'>
+  dataLoads: Pick<RepoState['dataLoads'], 'status' | 'pullRequests'>
   remote: BranchActionRepo['remote'] & Pick<RepoState['remote'], 'lifecycle'>
 }
 
@@ -60,19 +60,19 @@ export function getSelectedRepoWorkspace(repo: RepoWorkspaceRepo) {
 
 export function getSelectedRepoWorkspacePresentation(repo: RepoWorkspaceRepo) {
   const detail = getSelectedRepoWorkspace(repo)
-  const statusLoading = dataLoadBusy(repo.resources.status)
+  const statusLoading = dataLoadBusy(repo.dataLoads.status)
 
   return {
     ...detail,
     loading: {
       status: statusLoading,
-      pullRequests: dataLoadBusy(repo.resources.pullRequests),
+      pullRequests: dataLoadBusy(repo.dataLoads.pullRequests),
     },
     errors: {
-      status: repo.resources.status.error,
+      status: repo.dataLoads.status.error,
     },
     stale: {
-      status: repo.resources.status.stale,
+      status: repo.dataLoads.status.stale,
     },
   }
 }

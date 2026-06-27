@@ -48,7 +48,7 @@ function createRepo(
     options.preferredWorkspacePaneTab ?? 'status',
   )
   if (options.unavailable) repo.availability = { phase: 'unavailable', reason: 'error.failed-read-repo', checkedAt: 0 }
-  repo.resources.status.phase = options.statusPhase ?? 'idle'
+  repo.dataLoads.status.phase = options.statusPhase ?? 'idle'
   return repo
 }
 

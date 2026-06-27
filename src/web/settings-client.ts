@@ -68,7 +68,7 @@ async function updateUserSettingsPatch(settings: Record<string, unknown>): Promi
     await invokeNativeIpcPath<void>('settings.applyNativeHostProjection', {
       prefs: {
         patch,
-        settings: nativeSettingsProjectionStateFromSettings(result.settings),
+        settings: nativeSettingsProjectionStateFromSettings(result.prefs),
       },
     })
   } catch (err) {
@@ -83,11 +83,11 @@ async function updateUserSettingsPatch(settings: Record<string, unknown>): Promi
 }
 
 export async function setThemePref(pref: ThemePref): Promise<ThemeState> {
-  return resolveThemeStateFromUserSettings((await updateUserSettingsPatch({ theme: pref })).settings)
+  return resolveThemeStateFromUserSettings((await updateUserSettingsPatch({ theme: pref })).prefs)
 }
 
 export async function setThemeColorTheme(colorTheme: ColorTheme): Promise<ThemeState> {
-  return resolveThemeStateFromUserSettings((await updateUserSettingsPatch({ colorTheme })).settings)
+  return resolveThemeStateFromUserSettings((await updateUserSettingsPatch({ colorTheme })).prefs)
 }
 
 export async function getI18nSnapshot(options?: { signal?: AbortSignal }): Promise<I18nSnapshot> {

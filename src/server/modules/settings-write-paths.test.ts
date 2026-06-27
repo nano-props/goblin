@@ -63,7 +63,7 @@ describe('settings command handlers', () => {
       ),
     ).resolves.toEqual({
       ok: true,
-      settings: updatedSettings,
+      prefs: updatedSettings,
       i18n: i18nSnapshot,
     })
     expect(mocks.publishSettingsInvalidation).toHaveBeenCalledWith(['i18n'])

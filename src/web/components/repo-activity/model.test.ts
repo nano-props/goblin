@@ -18,8 +18,8 @@ describe('repo activity model', () => {
     useReposStore.setState((state) => {
       const repo = state.repos[REPO_ID]
       if (!repo) return state
-      repo.resources.pullRequests.phase = 'refreshing'
-      repo.resources.pullRequests.mode = 'summary'
+      repo.dataLoads.pullRequests.phase = 'refreshing'
+      repo.dataLoads.pullRequests.mode = 'summary'
       return { repos: { ...state.repos, [REPO_ID]: { ...repo } } }
     })
 
@@ -34,8 +34,8 @@ describe('repo activity model', () => {
     useReposStore.setState((state) => {
       const repo = state.repos[REPO_ID]
       if (!repo) return state
-      repo.resources.pullRequests.phase = 'refreshing'
-      repo.resources.pullRequests.mode = 'full'
+      repo.dataLoads.pullRequests.phase = 'refreshing'
+      repo.dataLoads.pullRequests.mode = 'full'
       return { repos: { ...state.repos, [REPO_ID]: { ...repo } } }
     })
 

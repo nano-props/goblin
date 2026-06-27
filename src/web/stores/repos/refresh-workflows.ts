@@ -19,7 +19,7 @@ function repoFresh(get: ReposGet, id: string, token: number): boolean {
 
 function pullRequestRefreshFailed(get: ReposGet, id: string, token: number): boolean {
   const repo = get().repos[id]
-  return !!repo && repo.instanceToken === token && repo.resources.pullRequests.error !== null
+  return !!repo && repo.instanceToken === token && repo.dataLoads.pullRequests.error !== null
 }
 
 function visibleDetailPullRequestPending(get: ReposGet, id: string, token: number): boolean {

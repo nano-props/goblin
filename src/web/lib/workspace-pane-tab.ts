@@ -45,7 +45,7 @@ export interface WorkspacePaneRenderabilityContext {
   terminalSessionCount: number
   /** Whether a new terminal is queued and waiting for mount geometry. */
   terminalCreatePending?: boolean
-  /** Whether the terminal session registry has finished its first sync. */
+  /** Whether the terminal session projection has finished its first sync. */
   terminalSyncReady: boolean
 }
 

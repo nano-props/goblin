@@ -20,7 +20,7 @@ import {
   lanInfoQueryKey,
   updateExternalAppsCache,
   updateGitHubCliCache,
-  updateRestorableSessionStateCache,
+  updateRestorableWorkspaceSessionStateCache,
   updateRuntimeRecentReposStateCache,
   updateRuntimeSettingsSnapshotCache,
 } from '#/web/settings-query-cache.ts'
@@ -35,9 +35,9 @@ export async function clearRecentRepoHistory(): Promise<void> {
   updateRuntimeRecentReposStateCache(primaryWindowQueryClient, { recentRepos: [] })
 }
 
-export async function persistSessionState(session: WorkspaceSessionState): Promise<void> {
+export async function persistWorkspaceSessionState(session: WorkspaceSessionState): Promise<void> {
   const savedSession = await saveSession(session)
-  updateRestorableSessionStateCache(primaryWindowQueryClient, savedSession)
+  updateRestorableWorkspaceSessionStateCache(primaryWindowQueryClient, savedSession)
 }
 
 export async function setFetchInterval(sec: number): Promise<number> {

@@ -295,7 +295,7 @@ export function insertPlaceholderRepo(
       // (dataLoadInitialLoading would hide them).
       const cached = s.repoSnapshotCache[entry.id]
       if (cached && cached.data.branches.length > 0) {
-        repo.resources.snapshot = { ...repo.resources.snapshot, phase: 'refreshing', error: null, stale: true }
+        repo.dataLoads.snapshot = { ...repo.dataLoads.snapshot, phase: 'refreshing', error: null, stale: true }
       }
       return repo
     },

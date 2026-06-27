@@ -5,7 +5,7 @@ import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 import { isRepoUnavailableReason, markRepoUnavailable } from '#/web/stores/repos/availability.ts'
 import { runExclusiveOperation, runLatestOperation } from '#/web/stores/repos/operation-runner.ts'
 import { persistRepoSnapshotCacheEntry } from '#/web/stores/repos/persistence.ts'
-import { runLatestResourceOperation } from '#/web/stores/repos/resource-runner.ts'
+import { runLatestDataLoadOperation } from '#/web/stores/repos/data-load-runner.ts'
 import { applyStatusToWorktreeStates } from '#/web/stores/repos/worktree-state.ts'
 import { pruneRepoBranchPullRequestOperations } from '#/web/stores/repos/repo-operation-scheduler.ts'
 import { runCoreDataRefreshWorkflow, runSnapshotSuccessWorkflow } from '#/web/stores/repos/refresh-workflows.ts'
@@ -16,7 +16,7 @@ import {
   applyPullRequestRefreshUnavailableState,
   applySnapshotToRepoProjection,
   resolveActionToken,
-  startPullRequestRefreshResources,
+  startPullRequestRefreshDataLoads,
 } from '#/web/stores/repos/refresh-state.ts'
 import { createRefreshSyncHelpers } from '#/web/stores/repos/refresh-sync.ts'
 import { runWithRepoInvalidationSource } from '#/web/stores/repos/invalidation-sources.ts'
@@ -155,7 +155,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       if (!resolved) return
       const { token } = resolved
       updateIfFresh(set, id, token, (r) => {
-        startDataLoad(r.resources.snapshot, { hasData: r.data.branches.length > 0 })
+        startDataLoad(r.dataLoads.snapshot, { hasData: r.data.branches.length > 0 })
       })
       await runLatestOperation({
         set,
@@ -171,7 +171,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
         onResult: async (snap, ctx) => {
           if (!snap) {
             updateIfFresh(set, id, token, (r) => {
-              finishDataLoadError(r.resources.snapshot, 'error.failed-read-repo')
+              finishDataLoadError(r.dataLoads.snapshot, 'error.failed-read-repo')
               r.events = appendRepoEvent(r.events, errorEvent('error.failed-read-repo'))
             })
             return
@@ -181,7 +181,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
         onError: (message) => {
           updateIfFresh(set, id, token, (r) => {
             if (isRepoUnavailableReason(message)) markRepoUnavailable(r, message)
-            finishDataLoadError(r.resources.snapshot, message)
+            finishDataLoadError(r.dataLoads.snapshot, message)
             r.events = appendRepoEvent(r.events, errorEvent(message))
           })
         },
@@ -204,7 +204,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       if (!request) return
       const { branchNames, requested, mode, clearMissing } = request
       updateIfFresh(set, id, token, (r) => {
-        startPullRequestRefreshResources(r, branchNames, requested, mode)
+        startPullRequestRefreshDataLoads(r, branchNames, requested, mode)
       })
       await runLatestOperation({
         set,
@@ -240,7 +240,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       const resolved = resolveActionToken(get, id, options?.token)
       if (!resolved) return
       const { token } = resolved
-      await runLatestResourceOperation({
+      await runLatestDataLoadOperation({
         set,
         get,
         id,
@@ -249,7 +249,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
         operationKey: 'status',
         priority: 40,
         target: { key: 'status', reason: 'status' },
-        selectResource: (r) => r.resources.status,
+        selectDataLoad: (r) => r.dataLoads.status,
         start: (r) => ({ hasData: r.data.statusLoaded || r.data.status.length > 0 }),
         task: (signal) => getRepoStatus(id, signal),
         applyResult: (r, status) => {
@@ -289,8 +289,8 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       if (!resolved) return
       const { token } = resolved
       updateIfFresh(set, id, token, (r) => {
-        startDataLoad(r.resources.snapshot, { hasData: r.data.branches.length > 0 })
-        startDataLoad(r.resources.status, { hasData: r.data.statusLoaded || r.data.status.length > 0 })
+        startDataLoad(r.dataLoads.snapshot, { hasData: r.data.branches.length > 0 })
+        startDataLoad(r.dataLoads.status, { hasData: r.data.statusLoaded || r.data.status.length > 0 })
       })
       await runLatestOperation({
         set,
@@ -316,20 +316,20 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
             r.data.status = result.status
             r.data.statusLoaded = true
             r.data.worktreesByPath = applyStatusToWorktreeStates(r.data.worktreesByPath, result.status)
-            // The composite started the status resource above but, unlike
+            // The composite started the status data load above but, unlike
             // snapshot which has a dedicated success flow that calls
             // finishDataLoadSuccess, status has no follow-up path. Without
-            // this reset, the resource stays in 'loading'/'refreshing'
+            // this reset, the data load stays in 'loading'/'refreshing'
             // forever, blocking useRepoStatusRefresh's gate from firing
             // on the next status/changes tab open.
-            finishDataLoadSuccess(r.resources.status)
+            finishDataLoadSuccess(r.dataLoads.status)
           })
           if (result.status.length > 0 && ctx.isCurrent()) {
             persistRepoSnapshotCacheEntry(set, get().repos[id], token)
           }
           if (result.snapshot === null) {
             updateIfFresh(set, id, token, (r) => {
-              finishDataLoadError(r.resources.snapshot, 'error.failed-read-repo')
+              finishDataLoadError(r.dataLoads.snapshot, 'error.failed-read-repo')
               r.events = appendRepoEvent(r.events, errorEvent('error.failed-read-repo'))
             })
             return
@@ -341,8 +341,8 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
         onError: (message) => {
           updateIfFresh(set, id, token, (r) => {
             if (isRepoUnavailableReason(message)) markRepoUnavailable(r, message)
-            finishDataLoadError(r.resources.snapshot, message)
-            finishDataLoadError(r.resources.status, message)
+            finishDataLoadError(r.dataLoads.snapshot, message)
+            finishDataLoadError(r.dataLoads.status, message)
             r.events = appendRepoEvent(r.events, errorEvent(message))
           })
         },

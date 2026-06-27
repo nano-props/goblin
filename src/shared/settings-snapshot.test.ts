@@ -3,7 +3,7 @@ import {
   buildRuntimeRecentReposState,
   buildRuntimeSettingsSnapshot,
   buildSettingsSnapshot,
-  restorableSessionStateFromSettingsSnapshot,
+  restorableWorkspaceSessionStateFromSettingsSnapshot,
   runtimeRecentReposStateFromSettingsSnapshot,
   runtimeSettingsSnapshotFromSettingsSnapshot,
 } from '#/shared/settings-snapshot.ts'
@@ -93,7 +93,7 @@ describe('settings snapshot partitions', () => {
     expect(runtimeRecentReposStateFromSettingsSnapshot(snapshot)).toEqual({
       recentRepos: [{ kind: 'local', id: '/tmp/repo-b' }],
     })
-    expect(restorableSessionStateFromSettingsSnapshot(snapshot)).toEqual({
+    expect(restorableWorkspaceSessionStateFromSettingsSnapshot(snapshot)).toEqual({
       openRepoEntries: [{ kind: 'local', id: '/tmp/repo-b' }],
       activeRepoId: '/tmp/repo-b',
       zenMode: false,

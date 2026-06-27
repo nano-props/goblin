@@ -36,13 +36,13 @@ export async function getSettingsSnapshot(): Promise<SettingsSnapshot> {
 
 export async function updateUserSettings(settings: UserSettingsPatch): Promise<UserSettings> {
   const runtime = requireEmbeddedServerRuntime()
-  const json = await postEmbeddedServerJson<{ settings?: UserSettings }>(runtime, '/api/settings/prefs', {
+  const json = await postEmbeddedServerJson<{ prefs?: UserSettings }>(runtime, '/api/settings/prefs', {
     prefs: settings,
   }).catch((error) => {
     throw new Error(`Embedded server rejected settings update${error instanceof Error ? `: ${error.message}` : ''}`)
   })
-  if (!json?.settings) throw new Error('Embedded server returned an invalid settings payload')
-  return json.settings
+  if (!json?.prefs) throw new Error('Embedded server returned an invalid settings payload')
+  return json.prefs
 }
 
 export async function getUserSettings(): Promise<UserSettings> {

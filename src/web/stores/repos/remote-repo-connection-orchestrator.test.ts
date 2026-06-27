@@ -80,7 +80,7 @@ describe('runRemoteRepoConnection', () => {
         name: 'example:repo',
         instanceToken: 1,
         data: { branches: [], currentBranch: '', status: [], statusLoaded: false, worktreesByPath: {} },
-        resources: {
+        dataLoads: {
           fetch: { phase: 'idle', loadedAt: null, stale: false, error: null },
           snapshot: { phase: 'idle', loadedAt: null, stale: false, error: null },
           status: { phase: 'idle', loadedAt: null, stale: false, error: null },
@@ -142,7 +142,7 @@ describe('runRemoteRepoConnection', () => {
         name: 'example:repo',
         instanceToken: 1,
         data: { branches: [], currentBranch: '', status: [], statusLoaded: false, worktreesByPath: {} },
-        resources: emptyResources(),
+        dataLoads: emptyDataLoads(),
         operations: emptyOperations(),
         ui: {
           selectedBranch: null,
@@ -190,7 +190,7 @@ describe('runRemoteRepoConnection', () => {
         name: 'example:repo',
         instanceToken: 1,
         data: { branches: [], currentBranch: '', status: [], statusLoaded: false, worktreesByPath: {} },
-        resources: emptyResources(),
+        dataLoads: emptyDataLoads(),
         operations: emptyOperations(),
         ui: {
           selectedBranch: null,
@@ -238,7 +238,7 @@ describe('runRemoteRepoConnection', () => {
         name: 'example:repo',
         instanceToken: 1,
         data: { branches: [], currentBranch: '', status: [], statusLoaded: false, worktreesByPath: {} },
-        resources: emptyResources(),
+        dataLoads: emptyDataLoads(),
         operations: emptyOperations(),
         ui: {
           selectedBranch: null,
@@ -319,7 +319,7 @@ describe('runRemoteRepoConnection', () => {
         name: 'example:repo',
         instanceToken: 1,
         data: { branches: [], currentBranch: '', status: [], statusLoaded: false, worktreesByPath: {} },
-        resources: emptyResources(),
+        dataLoads: emptyDataLoads(),
         operations: emptyOperations(),
         ui: {
           selectedBranch: null,
@@ -387,7 +387,7 @@ describe('runRemoteRepoConnection', () => {
           name: 'example:repo',
           instanceToken: 1,
           data: { branches: [], currentBranch: '', status: [], statusLoaded: false, worktreesByPath: {} },
-          resources: emptyResources(),
+          dataLoads: emptyDataLoads(),
           operations: emptyOperations(),
           ui: {
             selectedBranch: null,
@@ -452,7 +452,7 @@ function idleDataLoad() {
   }
 }
 
-function emptyResources() {
+function emptyDataLoads() {
   return {
     fetch: idleDataLoad(),
     snapshot: idleDataLoad(),

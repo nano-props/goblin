@@ -148,7 +148,7 @@ function throwIfStale(get: ReposGet, id: string, token: number): void {
   if (get().repos[id]?.instanceToken !== token) throw new Error('cancelled')
 }
 
-function syncNetworkFetchResourceState(
+function syncNetworkFetchDataLoadState(
   set: ReposSet,
   id: string,
   token: number,
@@ -158,11 +158,11 @@ function syncNetworkFetchResourceState(
   if (!network) return
   updateIfFresh(set, id, token, (r) => {
     if (result.message === 'cancelled') {
-      cancelDataLoad(r.resources.fetch)
+      cancelDataLoad(r.dataLoads.fetch)
       return
     }
-    if (result.ok) finishDataLoadSuccess(r.resources.fetch)
-    else finishDataLoadError(r.resources.fetch, result.message)
+    if (result.ok) finishDataLoadSuccess(r.dataLoads.fetch)
+    else finishDataLoadError(r.dataLoads.fetch, result.message)
   })
 }
 
@@ -294,10 +294,10 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
         return result
       }
       updateIfFresh(set, id, token, (r) => {
-        if (network) startDataLoad(r.resources.fetch, { hasData: r.resources.fetch.loadedAt !== null })
+        if (network) startDataLoad(r.dataLoads.fetch, { hasData: r.dataLoads.fetch.loadedAt !== null })
       })
       const handleResult = async (result: ExecResult) => {
-        syncNetworkFetchResourceState(set, id, token, network, result)
+        syncNetworkFetchDataLoadState(set, id, token, network, result)
         if (!shouldSuppressBranchActionResultMessage(result, options)) {
           get().setLastResult(id, result, token, { action: branchActionEventAction(action) })
         }
@@ -311,7 +311,7 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
         if (result.ok && network) get().clearFetchFailed(id, token)
       }
       const handleError = (message: string) => {
-        syncNetworkFetchResourceState(set, id, token, network, { ok: false, message })
+        syncNetworkFetchDataLoadState(set, id, token, network, { ok: false, message })
         if (message === 'cancelled') return
         get().setLastResult(id, { ok: false, message }, token, { action: branchActionEventAction(action) })
       }

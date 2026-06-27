@@ -57,7 +57,7 @@ describe('main settings server client', () => {
 
   test('persists settings prefs patches through the embedded server runtime', async () => {
     const prefs = defaultUserSettings({ theme: 'dark', colorTheme: 'github', globalShortcut: 'Alt+K' })
-    mocks.postEmbeddedServerJson.mockResolvedValueOnce({ settings: prefs })
+    mocks.postEmbeddedServerJson.mockResolvedValueOnce({ prefs })
 
     const mod = await import('#/main/settings-server-client.ts')
     await expect(mod.updateUserSettings({ theme: 'dark' })).resolves.toBe(prefs)

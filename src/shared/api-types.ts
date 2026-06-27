@@ -155,7 +155,7 @@ export interface I18nSnapshot {
 
 export interface UserSettingsUpdateResponse {
   ok: true
-  settings: UserSettings
+  prefs: UserSettings
   i18n?: I18nSnapshot
   externalApps?: ExternalAppsSnapshot
 }

@@ -9,7 +9,7 @@
 // Scope normalization (`terminalSessionScope`) lives in
 // `server/terminal/terminal-slot-scope.ts` because it depends on
 // `node:path`. This file stays pure so the client can import the
-// format/parse helpers via `web/components/terminal/terminal-slot-keys.ts`
+// format/parse helpers via `web/components/terminal/terminal-workspace-slot-keys.ts`
 // without dragging Node built-ins into the bundle.
 
 const SLOT_KEY_SEGMENT = 3
@@ -23,13 +23,13 @@ export function formatWorktreeKey(repoRoot: string, worktreePath: string): strin
   return `${repoRoot}\0${worktreePath}`
 }
 
-export interface ParsedTerminalSlotKey {
+export interface ParsedTerminalWorkspaceSlotKey {
   repoRoot: string
   worktreePath: string
   slotId: string
 }
 
-export function parseTerminalWorkspaceSlotKey(key: string): ParsedTerminalSlotKey | null {
+export function parseTerminalWorkspaceSlotKey(key: string): ParsedTerminalWorkspaceSlotKey | null {
   const parts = key.split('\0')
   if (parts.length !== SLOT_KEY_SEGMENT) return null
   const [repoRoot, worktreePath, slotId] = parts

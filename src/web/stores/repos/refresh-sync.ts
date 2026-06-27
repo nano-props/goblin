@@ -1,8 +1,8 @@
 import { isRepoUnavailable, updateIfFresh } from '#/web/stores/repos/repo-guards.ts'
 import { runExclusiveOperation } from '#/web/stores/repos/operation-runner.ts'
 import {
-  applyFetchResourceError,
-  applyFetchResourceResult,
+  applyFetchDataLoadError,
+  applyFetchDataLoadResult,
   canRunRemoteFetchNow,
   repoIfFresh,
   resolveActionToken,
@@ -27,7 +27,7 @@ export function createRefreshSyncHelpers(set: ReposSet, get: ReposGet) {
     const { repo: repoBefore, token } = resolved
     if (!canRunRemoteFetchNow(repoBefore)) return { ok: false, message: 'error.network-op-in-progress' }
     updateIfFresh(set, id, token, (r) => {
-      startDataLoad(r.resources.fetch, { hasData: r.resources.fetch.loadedAt !== null })
+      startDataLoad(r.dataLoads.fetch, { hasData: r.dataLoads.fetch.loadedAt !== null })
     })
     return runExclusiveOperation({
       set,
@@ -43,12 +43,12 @@ export function createRefreshSyncHelpers(set: ReposSet, get: ReposGet) {
       errorFromResult: (result) => (!result.ok && result.message !== 'cancelled' ? result.message : null),
       onResult: (result) => {
         updateIfFresh(set, id, token, (r) => {
-          applyFetchResourceResult(r, result)
+          applyFetchDataLoadResult(r, result)
         })
       },
       onError: (message) => {
         updateIfFresh(set, id, token, (r) => {
-          applyFetchResourceError(r, message)
+          applyFetchDataLoadError(r, message)
         })
       },
       rethrow: true,

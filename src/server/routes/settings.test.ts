@@ -47,7 +47,7 @@ describe('settings routes', () => {
   test('delegates prefs writes to the settings command handler layer', async () => {
     mocks.handleUpdateUserSettings.mockResolvedValue({
       ok: true,
-      settings: { lang: 'ja' },
+      prefs: { lang: 'ja' },
       i18n: { lang: 'ja', pref: 'ja', dict: {} },
     })
 
@@ -66,7 +66,7 @@ describe('settings routes', () => {
 
     await expect(response.json()).resolves.toEqual({
       ok: true,
-      settings: { lang: 'ja' },
+      prefs: { lang: 'ja' },
       i18n: { lang: 'ja', pref: 'ja', dict: {} },
     })
     expect(mocks.handleUpdateUserSettings).toHaveBeenCalledWith(

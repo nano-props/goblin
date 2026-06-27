@@ -105,7 +105,7 @@ describe('settings-client', () => {
       ok: true,
       json: async () => ({
         ok: true,
-        settings: {
+        prefs: {
           lang: 'auto',
           theme: 'dark',
           colorTheme: 'github',
@@ -241,7 +241,7 @@ describe('settings-client', () => {
       ok: true,
       json: async () => ({
         ok: true,
-        settings: {
+        prefs: {
           lang: 'ja',
           theme: 'auto',
           colorTheme: 'macos',
@@ -489,7 +489,7 @@ describe('settings-client', () => {
       ok: true,
       json: async () => ({
         ok: true,
-        settings: {
+        prefs: {
           theme: 'dark',
           colorTheme: 'macos',
           shortcutsDisabled: false,

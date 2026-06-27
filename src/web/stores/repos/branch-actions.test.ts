@@ -301,7 +301,7 @@ describe('branch action capabilities', () => {
 })
 
 describe('runBranchAction', () => {
-  test('blocks local branch actions while remote fetch resource is busy', async () => {
+  test('blocks local branch actions while remote fetch data load is busy', async () => {
     let deleteCalls = 0
     installGoblinTestBridge({
       'repo.deleteBranch': async () => {

@@ -87,7 +87,7 @@ export function runtimeRecentReposStateFromSettingsSnapshot(
   }
 }
 
-export function restorableSessionStateFromSettingsSnapshot(
+export function restorableWorkspaceSessionStateFromSettingsSnapshot(
   snapshot: Pick<SettingsSnapshot, 'session'>,
 ): WorkspaceSessionState {
   return snapshot.session

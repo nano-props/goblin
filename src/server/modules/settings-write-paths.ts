@@ -56,7 +56,7 @@ export async function handleUpdateUserSettings(
   publishSettingsInvalidation(settingsInvalidationScopesForPrefsPatch(patch))
   return {
     ok: true,
-    settings,
+    prefs: settings,
     ...('lang' in patch ? { i18n: resolveI18nSnapshot(settings.lang, options.acceptLanguage) } : {}),
   }
 }

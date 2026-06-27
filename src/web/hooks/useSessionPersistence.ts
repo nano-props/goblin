@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react'
-import { persistSessionState } from '#/web/settings-actions.ts'
+import { persistWorkspaceSessionState } from '#/web/settings-actions.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { restorableWorkspaceStateFromStore } from '#/web/stores/repos/selector-state.ts'
-import { sessionStateFromRestorableWorkspaceState } from '#/web/restorable-workspace-state.ts'
+import { workspaceSessionStateFromRestorableWorkspaceState } from '#/web/restorable-workspace-state.ts'
 import { sessionLog } from '#/web/logger.ts'
 const SESSION_SAVE_DEBOUNCE_MS = 200
 
@@ -22,7 +22,7 @@ export function useSessionPersistence() {
     // sessionReady gates this effect so we never overwrite restorable session
     // state with an empty pre-bootstrap workspace.
     if (!sessionReady) return
-    const session = sessionStateFromRestorableWorkspaceState({
+    const session = workspaceSessionStateFromRestorableWorkspaceState({
       repos,
       restorableWorkspaceState: restorableWorkspaceStateFromStore({
         order,
@@ -47,7 +47,7 @@ export function useSessionPersistence() {
     if (lastSavedRef.current === serialized) return
     const save = () => {
       lastSavedRef.current = serialized
-      void persistSessionState(session).catch((err) => {
+      void persistWorkspaceSessionState(session).catch((err) => {
         lastSavedRef.current = null
         sessionLog.warn('save failed', { err })
       })

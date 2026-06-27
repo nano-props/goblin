@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { localRepoSessionEntry } from '#/shared/remote-repo.ts'
 import {
   restoreRestorableWorkspaceStateFromSession,
-  sessionStateFromRestorableWorkspaceState,
+  workspaceSessionStateFromRestorableWorkspaceState,
 } from '#/web/restorable-workspace-state.ts'
 import { createRepoBranch, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
@@ -17,7 +17,7 @@ describe('restorable-workspace-state', () => {
     })
 
     expect(
-      sessionStateFromRestorableWorkspaceState({
+      workspaceSessionStateFromRestorableWorkspaceState({
         repos: { [repo.id]: repo },
         restorableWorkspaceState: {
           order: [repo.id],
@@ -56,7 +56,7 @@ describe('restorable-workspace-state', () => {
     })
 
     expect(
-      sessionStateFromRestorableWorkspaceState({
+      workspaceSessionStateFromRestorableWorkspaceState({
         repos: { [repo.id]: repo },
         restorableWorkspaceState: {
           order: [repo.id],
@@ -88,7 +88,7 @@ describe('restorable-workspace-state', () => {
     })
 
     expect(
-      sessionStateFromRestorableWorkspaceState({
+      workspaceSessionStateFromRestorableWorkspaceState({
         repos: { [repo.id]: repo },
         restorableWorkspaceState: {
           order: [repo.id],

@@ -55,14 +55,14 @@ const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = {
  * Provider-independent: `TerminalSessionProvider` is just a wiring
  * adapter that forwards bridge events into the singleton and exposes
  * its API via React context. A dev-mode React StrictMode re-mount of
- * the Provider must NOT recreate the registry — see
+ * the Provider must NOT recreate the projection — see
  * `terminal-roadmap.md` P1.7.
  *
  * **Why singleton**: the terminal feature owns cross-cutting state
  * (parking root, per-worktree session lists, bell controller, geometry
  * cache, snapshot caches, pending create/close queues) that has no
  * natural React tree boundary. The previous Provider-owned lifetime
- * required a `pendingRegistryDestroyRef + setTimeout(0)` debounce to
+ * required a `pendingProjectionDestroyRef + setTimeout(0)` debounce to
  * survive StrictMode; the singleton removes that dance entirely.
  */
 export class TerminalSessionProjection {
@@ -170,10 +170,10 @@ export class TerminalSessionProjection {
   /**
    * Test-only / explicit-teardown path.
    *
-   * Production code does NOT call this. The registry is a client-
+   * Production code does NOT call this. The projection is a client-
    * level singleton and is meant to live for the client's entire
    * lifetime. The Provider never invokes `destroy()` on unmount; the
-   * `pendingRegistryDestroyRef + setTimeout` debounce that used to
+   * `pendingProjectionDestroyRef + setTimeout` debounce that used to
    * gate a Provider-unmount destroy has been removed.
    *
    * Tests use `destroy()` on a per-test local instance to drain
@@ -189,11 +189,11 @@ export class TerminalSessionProjection {
   destroy(): void {
     setTerminalFocused(false)
     for (const pending of this.pendingCreateByWorktree.values()) {
-      pending.geometryAbortController?.abort(new Error('terminal registry destroyed'))
-      pending.reject(new Error('terminal registry destroyed'))
+      pending.geometryAbortController?.abort(new Error('terminal session projection destroyed'))
+      pending.reject(new Error('terminal session projection destroyed'))
     }
     for (const pending of this.pendingCloseByPtySessionId.values())
-      pending.reject(new Error('terminal registry destroyed'))
+      pending.reject(new Error('terminal session projection destroyed'))
     for (const session of this.sessions.values()) session.dispose({ closeSession: false })
     this.sessions.clear()
     this.slotKeyByPtySessionId.clear()
@@ -211,7 +211,7 @@ export class TerminalSessionProjection {
     this.worktreeListeners.clear()
     this.snapshotListeners.clear()
     this.bellController.reset()
-    if (registryInstance === this) registryInstance = null
+    if (projectionInstance === this) projectionInstance = null
   }
 
   handleOutput(event: { ptySessionId: string; data: string; seq: number; processName: string }): void {
@@ -265,7 +265,7 @@ export class TerminalSessionProjection {
   // `closeTerminal`) because the server has already killed the PTY
   // — calling `close` again would no-op the `closeSessionForUser` check
   // on the server and add a useless WS roundtrip.
-  handleSlotClosed(ptySessionId: string): void {
+  handleSessionClosed(ptySessionId: string): void {
     const directKey = this.slotKeyByPtySessionId.get(ptySessionId)
     if (!directKey) return
     const session = this.sessions.get(directKey)
@@ -291,7 +291,7 @@ export class TerminalSessionProjection {
 
   reconcileServerSessions(
     repoRoot: string,
-    serverSlots: ServerTerminalSessionSummary[],
+    serverSessions: ServerTerminalSessionSummary[],
     clientId: string,
     snapshotsByPtySessionId: ReadonlyMap<string, TerminalSessionSnapshot>,
   ): void {
@@ -302,9 +302,9 @@ export class TerminalSessionProjection {
       .map(([key]) => key)
 
     const { controllerKeyByWorktree, touchedWorktrees, displayOrderChangedWorktrees, missingLocalCount } =
-      this.materializeServerSessions(repoRoot, serverSlots, clientId, snapshotsByPtySessionId)
+      this.materializeServerSessions(repoRoot, serverSessions, clientId, snapshotsByPtySessionId)
 
-    const serverKeys = new Set(serverSlots.map((s) => s.key))
+    const serverKeys = new Set(serverSessions.map((s) => s.key))
     const orphanedLocalCount = this.evictOrphanedLocalSessions(repoRoot, serverKeys)
 
     this.resolveSelectedKeysForTouchedWorktrees(touchedWorktrees, controllerKeyByWorktree)
@@ -319,7 +319,7 @@ export class TerminalSessionProjection {
   // session.hydrate, displayOrderByKey, syncPtySessionIdIndex.
   private materializeServerSessions(
     repoRoot: string,
-    serverSlots: ServerTerminalSessionSummary[],
+    serverSessions: ServerTerminalSessionSummary[],
     clientId: string,
     snapshotsByPtySessionId: ReadonlyMap<string, TerminalSessionSnapshot>,
   ): {
@@ -333,7 +333,7 @@ export class TerminalSessionProjection {
     const displayOrderChangedWorktrees = new Set<string>()
     let missingLocalCount = 0
 
-    for (const serverSession of serverSlots) {
+    for (const serverSession of serverSessions) {
       const projected = projectServerTerminalSession({
         repoIndex: this.repoIndex,
         repoRoot,
@@ -454,17 +454,17 @@ export class TerminalSessionProjection {
     // hide a real protocol mismatch (e.g., a half-applied create that
     // committed the session row but skipped the catalog append). Reject
     // and let the operator restart the create.
-    const createdSlot = result.sessions.find(
+    const createdSession = result.sessions.find(
       (session) => session.key === result.key && session.ptySessionId === snapshotPtySessionId,
     )
-    if (!createdSlot) {
+    if (!createdSession) {
       throw new Error('error.terminal-create-failed')
     }
-    const serverSlots = result.sessions
+    const serverSessions = result.sessions
     this.setPreferredSelectedTerminalKey(terminalWorktreeKey, result.key)
     this.reconcileServerSessions(
       base.repoRoot,
-      serverSlots,
+      serverSessions,
       clientId,
       new Map<string, TerminalSessionSnapshot>([[snapshotPtySessionId, result as TerminalSessionSnapshot]]),
     )
@@ -1085,10 +1085,10 @@ export interface TerminalSessionProjectionDeps {
   onTerminalSessionRemoved?: (key: string, base: TerminalSessionBase) => void
 }
 
-let registryInstance: TerminalSessionProjection | null = null
+let projectionInstance: TerminalSessionProjection | null = null
 
 /**
- * Lazy getter for the client-level terminal session registry.
+ * Lazy getter for the client-level terminal session projection.
  *
  * First call constructs the singleton with `deps` (only the first
  * call's deps are honored — subsequent calls return the existing
@@ -1100,10 +1100,10 @@ let registryInstance: TerminalSessionProjection | null = null
  * `src/web/client-bridge.ts`.
  */
 export function getTerminalSessionProjection(deps: TerminalSessionProjectionDeps): TerminalSessionProjection {
-  if (!registryInstance) {
-    registryInstance = new TerminalSessionProjection(deps.onSelectedWorktreeChange, deps.onTerminalSessionRemoved)
+  if (!projectionInstance) {
+    projectionInstance = new TerminalSessionProjection(deps.onSelectedWorktreeChange, deps.onTerminalSessionRemoved)
   }
-  return registryInstance
+  return projectionInstance
 }
 
 /**
@@ -1113,12 +1113,12 @@ export function getTerminalSessionProjection(deps: TerminalSessionProjectionDeps
  *    install it with `setTerminalSessionProjectionForTests(instance)`.
  * 2. In `afterEach`: call `setTerminalSessionProjectionForTests(null)`.
  *    If the per-test instance needs to drain pending promises or
- *    clear listener maps, call `registry.destroy()` on the local
+ *    clear listener maps, call `projection.destroy()` on the local
  *    reference before clearing the session.
  *
  * Production code never calls this. Mirrors
  * `setClientBridgeForTests()` at `src/web/client-bridge.ts`.
  */
 export function setTerminalSessionProjectionForTests(instance: TerminalSessionProjection | null): void {
-  registryInstance = instance
+  projectionInstance = instance
 }

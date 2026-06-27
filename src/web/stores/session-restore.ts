@@ -5,7 +5,7 @@
 
 import { create, type StoreApi } from 'zustand'
 import type { WorkspaceSessionState, SettingsSnapshot } from '#/shared/api-types.ts'
-import { restorableSessionStateFromSettingsSnapshot } from '#/shared/settings-snapshot.ts'
+import { restorableWorkspaceSessionStateFromSettingsSnapshot } from '#/shared/settings-snapshot.ts'
 import { getSettingsSnapshot } from '#/web/settings-client.ts'
 import { DEFAULT_ZEN_MODE, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
 
@@ -43,7 +43,7 @@ function commitBootSessionSnapshot(
   version: number,
   snapshot: Pick<SettingsSnapshot, 'session'>,
 ): WorkspaceSessionState {
-  const session = restorableSessionStateFromSettingsSnapshot(snapshot)
+  const session = restorableWorkspaceSessionStateFromSettingsSnapshot(snapshot)
   if (version === hydrateVersion) set({ bootSessionSnapshot: session })
   return session
 }

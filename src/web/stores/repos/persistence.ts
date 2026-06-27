@@ -54,11 +54,11 @@ function restoreProjectionFromSnapshot(repo: RepoState, snapshot: RepoSnapshotCa
     selectedBranch: snapshot.ui.selectedBranch,
     viewMode: snapshot.ui.branchViewMode,
   })
-  const resources = {
-    ...repo.resources,
-    snapshot: { ...repo.resources.snapshot },
+  const dataLoads = {
+    ...repo.dataLoads,
+    snapshot: { ...repo.dataLoads.snapshot },
   }
-  if (snapshot.data.branches.length > 0) finishDataLoadSuccess(resources.snapshot, snapshot.savedAt)
+  if (snapshot.data.branches.length > 0) finishDataLoadSuccess(dataLoads.snapshot, snapshot.savedAt)
   const branches = cachedBranches(snapshot.data.branches)
   const branchNames = branches.map((branch) => branch.name)
   return {
@@ -69,7 +69,7 @@ function restoreProjectionFromSnapshot(repo: RepoState, snapshot: RepoSnapshotCa
       branches,
       currentBranch: snapshot.data.currentBranch,
     },
-    resources,
+    dataLoads,
     ui: {
       ...repo.ui,
       selectedBranch,

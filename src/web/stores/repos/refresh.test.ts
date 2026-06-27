@@ -71,7 +71,7 @@ describe('remote fetch timestamps', () => {
     // Composite folds snapshot + status into one round trip, but for
     // assertions each side still counts as 1 (semantic: it was
     // refreshed). Standalone handlers are kept for tests that exercise
-    // the post-write single-resource path.
+    // the post-write single-data-load path.
     ipcHandlers['repo.composite'] = async () => {
       snapshotCount += 1
       statusCount += 1
@@ -95,7 +95,7 @@ describe('remote fetch timestamps', () => {
 
     await useReposStore.getState().syncAndRefresh(REPO_ID, { token })
 
-    expect(useReposStore.getState().repos[REPO_ID]?.resources.fetch.loadedAt).toBeGreaterThanOrEqual(before)
+    expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.fetch.loadedAt).toBeGreaterThanOrEqual(before)
   })
 
   test('manual sync ignores stale fetch results after repo reopen', async () => {
@@ -118,7 +118,7 @@ describe('remote fetch timestamps', () => {
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.instanceToken).toBe(2)
     expect(repo?.events).toEqual([])
-    expect(repo?.resources.fetch.loadedAt).toBeNull()
+    expect(repo?.dataLoads.fetch.loadedAt).toBeNull()
   })
 
   test('network operations expose repo-level fetch busy state', async () => {
@@ -132,13 +132,13 @@ describe('remote fetch timestamps', () => {
     const work = useReposStore.getState().syncAndRefresh(REPO_ID, { token })
 
     const runningRepo = useReposStore.getState().repos[REPO_ID]
-    expect(runningRepo?.resources.fetch.phase).toBe('loading')
+    expect(runningRepo?.dataLoads.fetch.phase).toBe('loading')
     expect(canStartRemoteFetch(runningRepo)).toBe(false)
 
     resolveNetwork({ ok: true, message: 'ok' })
     await work
 
-    expect(useReposStore.getState().repos[REPO_ID]?.resources.fetch.phase).toBe('idle')
+    expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.fetch.phase).toBe('idle')
   })
 
   test('manual sync records failed fetch results and still refreshes local state', async () => {
@@ -212,7 +212,7 @@ describe('remote fetch timestamps', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.events.at(-1)).toMatchObject({ kind: 'result', result: { ok: false, message: 'network down' } })
-    expect(repo?.resources.fetch.phase).toBe('idle')
+    expect(repo?.dataLoads.fetch.phase).toBe('idle')
   })
 
   test('branch network actions expose branch and fetch operation state', async () => {
@@ -227,7 +227,7 @@ describe('remote fetch timestamps', () => {
 
     const runningRepo = useReposStore.getState().repos[REPO_ID]
     expect(runningRepo?.operations.branchAction.phase).toBe('running')
-    expect(runningRepo?.resources.fetch.phase).toBe('loading')
+    expect(runningRepo?.dataLoads.fetch.phase).toBe('loading')
     expect(canStartRemoteFetch(runningRepo)).toBe(false)
 
     resolvePull({ ok: true, message: 'ok' })
@@ -235,7 +235,7 @@ describe('remote fetch timestamps', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.operations.branchAction.phase).toBe('idle')
-    expect(repo?.resources.fetch.phase).toBe('idle')
+    expect(repo?.dataLoads.fetch.phase).toBe('idle')
   })
 
   test('branch write actions run through branch operation state and refresh after completion', async () => {
@@ -418,7 +418,7 @@ describe('remote fetch timestamps', () => {
       error: 'fatal: rejected',
       target: null,
     })
-    expect(useReposStore.getState().repos[REPO_ID]?.resources.fetch).toMatchObject({
+    expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.fetch).toMatchObject({
       phase: 'idle',
       error: 'fatal: rejected',
     })
@@ -494,7 +494,7 @@ describe('core refresh request ordering', () => {
     expect(compositeCalls).toBe(1)
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.availability).toMatchObject({ phase: 'unavailable', reason: 'error.not-git-repo' })
-    expect(repo?.resources.snapshot.error).toBe('error.not-git-repo')
+    expect(repo?.dataLoads.snapshot.error).toBe('error.not-git-repo')
   })
 
   test('refreshSnapshot restores an unavailable repo when the path is a git repo again', async () => {
@@ -509,7 +509,7 @@ describe('core refresh request ordering', () => {
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.availability).toEqual({ phase: 'available' })
     expect(repo?.data.branches.map((b) => b.name)).toEqual(['main'])
-    expect(repo?.resources.snapshot.error).toBeNull()
+    expect(repo?.dataLoads.snapshot.error).toBeNull()
   })
 
   test('refreshCoreData drops status when the repo is reopened before the composite settles', async () => {
@@ -683,7 +683,7 @@ describe('core refresh request ordering', () => {
     })
   })
 
-  test('refreshStatus records resource loading, success, and stale error state', async () => {
+  test('refreshStatus records data-load loading, success, and stale error state', async () => {
     const token = seedRepo([branch('feature/a')])
     let resolveStatus!: (value: WorktreeStatus[]) => void
     const status: WorktreeStatus[] = [{ path: '/tmp/gbl-test-repo', branch: 'feature/a', isMain: true, entries: [] }]
@@ -694,7 +694,7 @@ describe('core refresh request ordering', () => {
 
     const work = useReposStore.getState().refreshStatus(REPO_ID, { token })
 
-    expect(useReposStore.getState().repos[REPO_ID]?.resources.status).toMatchObject({
+    expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.status).toMatchObject({
       phase: 'loading',
       loadedAt: null,
       error: null,
@@ -704,9 +704,9 @@ describe('core refresh request ordering', () => {
     resolveStatus(status)
     await work
 
-    const loadedAt = useReposStore.getState().repos[REPO_ID]?.resources.status.loadedAt
+    const loadedAt = useReposStore.getState().repos[REPO_ID]?.dataLoads.status.loadedAt
     expect(loadedAt).toEqual(expect.any(Number))
-    expect(useReposStore.getState().repos[REPO_ID]?.resources.status).toMatchObject({
+    expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.status).toMatchObject({
       phase: 'idle',
       error: null,
       stale: false,
@@ -718,7 +718,7 @@ describe('core refresh request ordering', () => {
 
     await useReposStore.getState().refreshStatus(REPO_ID, { token })
 
-    expect(useReposStore.getState().repos[REPO_ID]?.resources.status).toMatchObject({
+    expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.status).toMatchObject({
       phase: 'idle',
       loadedAt,
       error: 'status failed',

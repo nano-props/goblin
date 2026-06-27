@@ -130,7 +130,7 @@ export interface RepoRemoteState {
   remoteProviders?: Record<string, BrowserRemoteProvider>
   hasGitHubRemote?: boolean
   /** Sticky connectivity badge for background fetch failures. Unlike
-   *  `resources.fetch.error`, this persists after the operation settles and
+   *  `dataLoads.fetch.error`, this persists after the operation settles and
    *  is cleared by the next successful network operation. */
   fetchFailed: boolean
   /** Last fetch failure message — populated when fetchFailed flips
@@ -157,7 +157,7 @@ export interface RepoState {
   instanceToken: number
   /** Client-local projection of runtime-coherent repo truth. */
   data: RepoDataState
-  resources: RepoDataLoadBundle
+  dataLoads: RepoDataLoadBundle
   operations: RepoOperationsState
   ui: RepoUiState
   projection: RepoProjectionMeta

@@ -2,7 +2,7 @@ import { afterEach, expect, test, vi } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { defaultSessionState } from '#/shared/settings-defaults.ts'
+import { defaultWorkspaceSessionState } from '#/shared/settings-defaults.ts'
 
 let tmp: string | null = null
 let previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
@@ -69,7 +69,7 @@ test('persists updates and notifies subscribers from the server settings store',
     lanEnabled: false,
   })
   await mod.setServerSessionState({
-    ...defaultSessionState(),
+    ...defaultWorkspaceSessionState(),
     openRepoEntries: [{ kind: 'local', id: '/repo-b' }],
     activeRepoId: '/repo-b',
     selectedTerminalSessionByWorktree: { '/repo-b\0/worktree': '/repo-b\0/worktree\0slot-2' },
@@ -162,7 +162,7 @@ test('normalizes branch-scoped workspace pane view preferences in server session
 
   const mod = await import('#/server/modules/settings-source.ts')
   await mod.setServerSessionState({
-    ...defaultSessionState(),
+    ...defaultWorkspaceSessionState(),
     openRepoEntries: [
       { kind: 'local', id: '/repo-b' },
       { kind: 'local', id: '/repo-array' },
@@ -207,7 +207,7 @@ test('normalizes workspace pane tab order in server sessions', async () => {
 
   const mod = await import('#/server/modules/settings-source.ts')
   await mod.setServerSessionState({
-    ...defaultSessionState(),
+    ...defaultWorkspaceSessionState(),
     openRepoEntries: [
       { kind: 'local', id: '/repo-b' },
       { kind: 'local', id: '/repo-array' },

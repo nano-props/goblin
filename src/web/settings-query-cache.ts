@@ -52,7 +52,10 @@ export function updateRuntimeRecentReposStateCache(queryClient: QueryClient, nex
   }))
 }
 
-export function updateRestorableSessionStateCache(queryClient: QueryClient, session: WorkspaceSessionState): void {
+export function updateRestorableWorkspaceSessionStateCache(
+  queryClient: QueryClient,
+  session: WorkspaceSessionState,
+): void {
   updateSettingsSnapshotCache(queryClient, (current) => ({
     ...current,
     session,

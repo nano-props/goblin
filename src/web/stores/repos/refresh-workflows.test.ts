@@ -29,7 +29,7 @@ describe('repo refresh workflows', () => {
               preferredWorkspacePaneTabByBranch: {},
               lastClosedTabContextByBranch: {},
             },
-            resources: { pullRequests: { error: null } },
+            dataLoads: { pullRequests: { error: null } },
           },
         },
         refreshPullRequests: (
@@ -89,7 +89,7 @@ describe('repo refresh workflows', () => {
               preferredWorkspacePaneTabByBranch: {},
               lastClosedTabContextByBranch: {},
             },
-            resources: { pullRequests: { error: null } },
+            dataLoads: { pullRequests: { error: null } },
           },
         },
         refreshPullRequests: (

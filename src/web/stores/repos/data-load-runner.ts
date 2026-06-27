@@ -13,7 +13,7 @@ import type { RepoState, ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 import type { RepoOperationLane } from '#/web/stores/repos/repo-operation-scheduler.ts'
 type RepoDraft = Draft<RepoState>
 
-export interface RunLatestResourceOperationOptions<T> {
+export interface RunLatestDataLoadOperationOptions<T> {
   set: ReposSet
   get: ReposGet
   id: string
@@ -22,7 +22,7 @@ export interface RunLatestResourceOperationOptions<T> {
   operationKey: string
   priority: number
   target: RepoOperationTarget
-  selectResource: (repo: RepoDraft) => RepoDataLoadState
+  selectDataLoad: (repo: RepoDraft) => RepoDataLoadState
   start?: (repo: RepoDraft) => { hasData?: boolean } | void
   task: (signal: AbortSignal) => Promise<T>
   applyResult: (repo: RepoDraft, result: T) => boolean | void
@@ -38,10 +38,10 @@ export interface RunLatestResourceOperationOptions<T> {
   onErrorLog?: (message: string) => void
 }
 
-export async function runLatestResourceOperation<T>(options: RunLatestResourceOperationOptions<T>): Promise<void> {
+export async function runLatestDataLoadOperation<T>(options: RunLatestDataLoadOperationOptions<T>): Promise<void> {
   updateIfFresh(options.set, options.id, options.token, (repo) => {
     const startOptions = options.start?.(repo)
-    startDataLoad(options.selectResource(repo), startOptions ?? undefined)
+    startDataLoad(options.selectDataLoad(repo), startOptions ?? undefined)
   })
   await runLatestOperation({
     set: options.set,
@@ -57,14 +57,14 @@ export async function runLatestResourceOperation<T>(options: RunLatestResourceOp
       updateIfFresh(options.set, options.id, options.token, (repo) => {
         const shouldFinish = options.applyResult(repo, result)
         if (shouldFinish === false) return
-        finishDataLoadSuccess(options.selectResource(repo))
+        finishDataLoadSuccess(options.selectDataLoad(repo))
       })
       await options.onSuccess?.(result, ctx)
     },
     onError: (message) => {
       options.onErrorLog?.(message)
       updateIfFresh(options.set, options.id, options.token, (repo) => {
-        finishDataLoadError(options.selectResource(repo), message)
+        finishDataLoadError(options.selectDataLoad(repo), message)
         options.onError?.(message, repo)
         repo.events = appendRepoEvent(repo.events, errorEvent(message))
       })

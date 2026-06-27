@@ -8,10 +8,10 @@ import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/r
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
 
-const persistSessionStateMock = vi.fn(async (_session: unknown) => {})
+const persistWorkspaceSessionStateMock = vi.fn(async (_session: unknown) => {})
 
 vi.mock('#/web/settings-actions.ts', () => ({
-  persistSessionState: (session: unknown) => persistSessionStateMock(session),
+  persistWorkspaceSessionState: (session: unknown) => persistWorkspaceSessionStateMock(session),
 }))
 
 let container: HTMLDivElement | null = null
@@ -20,7 +20,7 @@ let root: Root | null = null
 beforeEach(() => {
   ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   resetReposStore()
-  persistSessionStateMock.mockReset()
+  persistWorkspaceSessionStateMock.mockReset()
 })
 
 afterEach(() => {
@@ -53,7 +53,7 @@ describe('useSessionPersistence', () => {
 
     await render(<Harness />)
 
-    expect(persistSessionStateMock).toHaveBeenCalledWith(
+    expect(persistWorkspaceSessionStateMock).toHaveBeenCalledWith(
       expect.objectContaining({
         openRepoEntries: [{ kind: 'local', id: '/tmp/repo' }],
         activeRepoId: '/tmp/repo',
@@ -80,7 +80,7 @@ describe('useSessionPersistence', () => {
 
     await render(<Harness />)
 
-    expect(persistSessionStateMock).toHaveBeenCalledWith(
+    expect(persistWorkspaceSessionStateMock).toHaveBeenCalledWith(
       expect.objectContaining({
         workspacePaneTabOrderByBranchByRepo: {
           '/tmp/repo': {

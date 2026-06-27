@@ -251,7 +251,7 @@ describe('useBranchActions', () => {
     expect(mocks.openRepoEditor).not.toHaveBeenCalled()
   })
 
-  test('openTerminal uses the local server route for non-remote repos', async () => {
+  test('openTerminal uses the embedded server route for non-remote repos', async () => {
     const branch = createRepoBranch('feature/local', { worktree: { path: '/tmp/local-feature' } })
     const repo = seedRepoState({
       id: REPO_ID,
@@ -295,7 +295,7 @@ describe('useBranchActions', () => {
     expect(mocks.openRemoteRepositoryEditor).not.toHaveBeenCalled()
   })
 
-  test('openFinder uses the local server route for non-remote repos', async () => {
+  test('openFinder uses the embedded server route for non-remote repos', async () => {
     const branch = createRepoBranch('feature/local', { worktree: { path: '/tmp/local-feature' } })
     const repo = seedRepoState({
       id: REPO_ID,

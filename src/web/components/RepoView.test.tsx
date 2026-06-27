@@ -837,10 +837,10 @@ function setSnapshotLoading(repoId: string) {
     repos: {
       [repoId]: {
         ...repo,
-        resources: {
-          ...repo.resources,
+        dataLoads: {
+          ...repo.dataLoads,
           snapshot: {
-            ...repo.resources.snapshot,
+            ...repo.dataLoads.snapshot,
             phase: 'loading' as const,
             loadedAt: null,
             error: null,

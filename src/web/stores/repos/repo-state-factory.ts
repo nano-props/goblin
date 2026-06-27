@@ -24,7 +24,7 @@ export function emptyRepo(id: string, name: string): RepoState {
       statusLoaded: false,
       worktreesByPath: {},
     },
-    resources: emptyRepoDataLoadBundle(),
+    dataLoads: emptyRepoDataLoadBundle(),
     operations: emptyRepoOperations(),
     ui: {
       selectedBranch: null,
