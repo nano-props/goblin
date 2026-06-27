@@ -33,10 +33,10 @@ export type TerminalRealtimeMessage =
   | { type: 'identity'; event: TerminalIdentityEvent }
   | { type: 'lifecycle'; event: TerminalLifecycleEvent }
   | { type: 'sessions-changed'; repoRoot: string }
-  // Targeted per-slot close. Emitted by the server after a
+  // Targeted per-session close. Emitted by the server after a
   // successful `close` request, alongside the existing
   // `sessions-changed` global broadcast. Multi-window clients use
-  // this to drop the local slot immediately, without waiting for
+  // this to drop the local session immediately, without waiting for
   // a full list-rescan. The `repoRoot` is included so the client
   // can route the event to the right worktree without a manager
   // lookup.

@@ -45,7 +45,7 @@ An attachment represents one client attachment to a session.
 
 It owns:
 
-- attachment identity
+- attachment identity (`clientId` in the current wire model)
 - connection state
 - last reported geometry
 - recency information needed for reconnect and release policy
@@ -76,7 +76,7 @@ At a high level, the server-side session model should evolve toward:
 - canonical geometry
 - PTY binding information
 - attachment map
-- controller attachment id
+- controller `clientId`
 - render state for replay and snapshots
 
 The important change is that the server should hold **multiple attachments per session**, not only the latest attachment state.
@@ -113,7 +113,7 @@ That leads to ambiguity during restart failure, reconnect races, and delayed cle
 
 ## Target attachment model
 
-The target model should store attachments as a set or map keyed by attachment id.
+The target model should store attachments as a set or map keyed by `clientId`.
 
 Each attachment should track:
 

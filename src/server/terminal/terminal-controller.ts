@@ -181,7 +181,7 @@ export function restartTerminalClientControl(state: TerminalControllerState, cli
  * Connection-state transition for a single attachment.
  *
  * Disconnect is immediate: the previous design kept the controller
- * slot in a 'grace' sub-state for 30 seconds so a transient network
+ * role in a 'grace' sub-state for 30 seconds so a transient network
  * blip wouldn't strand the controller. With user-scoped auto-claim
  * + sticky `userSticky`, that protection is no longer needed —
  * when the controller's attachment disconnects the controller role clears,

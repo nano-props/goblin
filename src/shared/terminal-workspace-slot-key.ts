@@ -1,4 +1,6 @@
 // Canonical workspace-pane slot key / worktree key encoding for the terminal subsystem.
+// "Slot" here means the workspace-pane tab identity only; the trailing
+// `sessionId` segment names the terminal session rendered in that tab.
 // The format is `${scope}\0${worktreePath}\0${sessionId}` for
 // workspace-pane slot keys and `${repoRoot}\0${worktreePath}` for worktree keys. Both
 // segments are non-empty strings in normal use. The format is

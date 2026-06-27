@@ -1,204 +1,200 @@
-# Terminology
+# Terminology Spec
 
-Use this doc as the canonical naming reference for Goblin's architecture, subsystems, and implementation vocabulary.
+Use this document as the naming spec for Goblin code and docs.
 
-> This is a prescriptive document: code should move toward the names listed here. When a name appears in the "Canonical" column, use it in new code and refactors. Names in the "Deprecated" column are being retired.
+> This is a normative document. New code should follow these names. When old code is touched, move it toward this spec unless there is a stronger local constraint.
 
-## Why this document exists
+## Purpose
 
-Goblin has grown enough subsystems that the same English words started meaning different things in different files:
+Goblin has several places where the same English word can plausibly mean different things. This spec prevents that drift by assigning one canonical name to each architectural concept and by defining how names should be chosen when new code is introduced.
 
-- `slot` meant both a workspace-pane tab identity and a terminal session.
-- `main` meant the Electron main process, the entry `main()` function, and the primary app window.
-- `shell` meant BrowserWindow security policy, OS-level host actions, and the server-to-native settings projection.
-- `Repository*` appeared in server modules while `Repo*` appeared everywhere else.
-- `runtime`, `manager`, `registry`, `helpers`, and `service` became catch-all suffixes that hid real responsibilities.
+The main collisions this spec resolves are:
 
-This doc removes that ambiguity by giving each concept one canonical name and explaining why it was chosen.
+- `slot` as both a workspace-pane UI identity and a terminal business object
+- `main` as both Electron's main process and "the primary thing"
+- `shell` as both an OS shell and a BrowserWindow / native-host concern
+- `Repository*` vs `Repo*`
+- vague suffixes like `manager`, `service`, `registry`, and `helpers`
 
-## Naming principles
+## Core rules
 
-1. **Feature first, layer second.** A file name should start with the feature it belongs to, then the layer role if needed. Prefer `repo-source.ts` over `repo-service.ts`.
-2. **No vague catch-all suffixes.** Avoid `manager`, `service`, `controller`, `registry`, `helpers`, `utils`, or `support` unless that term is the actual stable boundary of the file. If a file mixes unrelated concerns, split it.
-3. **One word per concept.** Do not reuse a domain word for two different things. `slot` is reserved for workspace-pane tabs; terminal sessions are `session`.
-4. **Client/server vocabulary must align.** If the client calls it `RepoSnapshot`, the server function that produces it is `getRepoSnapshot`, not `getRepositorySnapshot`.
-5. **Reserve `runtime-` for runtime facades.** Per `docs/layering.md`, a runtime facade combines read + write for a feature. Do not slap `runtime` on every async scheduler.
-6. **Brand consistently.** The local server that the Electron main process spawns is the `embedded server`, not the `local server`.
-7. **State class names are explicit.** Local, runtime-coherent, and restorable state each have their own suffix conventions (see "State classes" below).
+1. One concept, one word.
+   If two things are materially different in the product model, do not give them the same noun.
+2. Prefer product meaning over implementation accidents.
+   Name the business object, not the mechanism currently used to implement it.
+3. Feature first, layer second.
+   Start names with the feature, then the role: `repo-source.ts`, not `source-repo.ts`.
+4. Client and server must share the same nouns.
+   If the client says `RepoSnapshot`, the server should say `getRepoSnapshot`.
+5. Use explicit layer words.
+   Prefer `source`, `snapshot`, `projection`, `write-paths`, `queries`, `runtime` when they accurately describe the boundary.
+6. Treat catch-all suffixes as suspicious.
+   Avoid `manager`, `service`, `registry`, `helpers`, `utils`, and `support` unless that word is the real stable abstraction.
+7. Keep state class visible when it matters.
+   Distinguish local state, runtime-coherent state, and restorable state in names.
 
-## Cross-cutting terms
+## Decision order
 
-| Concept                                    | Canonical name         | Notes                                                                                                                           |
-| ------------------------------------------ | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| Browser/Electron UI side                   | `client`               | The code lives in `src/web/`, but the architecture term is `client`.                                                            |
-| Electron main process side                 | `native host`          | Replaces overloaded `main`. Directory stays `src/main/` for alias stability; use `native-host` in new type/function/file names. |
-| The server spawned by the native host      | `embedded server`      | Unifies prior `embedded` / `local` mix. User-data filenames are not changed.                                                    |
-| Server-side aggregate runtime object       | `runtime`              | Only for things like `createServerRuntime` that wire the whole server app.                                                      |
-| Authoritative persistence/IO layer         | `source`               | Matches `docs/layering.md`. `repo-source.ts`, not `repo-backend.ts`.                                                            |
-| Intent/action envelope from outside the UI | `client effect intent` | Already used in `docs/g-command.md` and `src/shared/client-effect-intents.ts`.                                                  |
+When naming a new type, file, or module, make the decision in this order:
+
+1. What product concept is this?
+2. Which layer owns it?
+3. Is the state local, runtime-coherent, or restorable?
+4. Is there already a canonical noun for this concept elsewhere in the codebase?
+5. Is the proposed suffix a real boundary, or just a vague bucket?
+
+If a name fails any step above, rename it before adding more code around it.
+
+## Canonical cross-cutting terms
+
+| Concept | Canonical | Rule |
+| --- | --- | --- |
+| Browser/Electron UI side | `client` | Use `client` as the architecture term even though code lives in `src/web/`. |
+| Electron main-process side | `native host` | Use `native host` in names and docs; keep `src/main/` only for alias stability. |
+| Server spawned by the native host | `embedded server` | Do not introduce `local server` as a competing term. |
+| Aggregate runtime object | `runtime` | Reserve for a facade that wires a feature or app runtime together. |
+| Authoritative persistence / IO layer | `source` | Prefer `repo-source.ts` over `repo-backend.ts`. |
+| Outside-UI intent envelope | `client effect intent` | Use the existing term consistently. |
 
 ## State classes
 
-Goblin uses three state classes. Keep them visible in names.
+Goblin uses three state classes:
 
-| Class                | When to use                                                                              | Typical suffixes                                                              |
-| -------------------- | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| **Local**            | Short-lived interaction state that never leaves the component or window.                 | plain React state, `*Query` for local filters, `pending`/`open` flags         |
-| **Runtime-coherent** | State that should converge across windows during the current run; server owns the truth. | `Runtime*`, `*Projection`, `*Snapshot` when read-only                         |
-| **Restorable**       | State that survives relaunch but does not need live sync.                                | `Restorable*`, `SessionState` (workspace session, not HTTP session), `*Cache` |
+| Class | Meaning | Typical names |
+| --- | --- | --- |
+| Local | State that never needs to converge across windows | React state, `*Query`, `open`, `pending` |
+| Runtime-coherent | State that should converge during the current run and is server-owned | `*Projection`, `*Snapshot`, `Runtime*` |
+| Restorable | State that survives relaunch without live sync | `*Cache`, `Restorable*`, `WorkspaceSessionState` |
 
 Rules:
 
-- `SessionState` specifically means the persisted workspace session (open repos, active repo, pane layout). It does **not** mean an HTTP session or auth session.
-- `Snapshot` means a read-model projection of server truth at a point in time. `RepoSnapshot`, `SettingsSnapshot`, and `I18nSnapshot` are all snapshots, but they are not interchangeable.
+- `SessionState` refers to the persisted workspace session domain, not HTTP or auth session state.
+- `Snapshot` means a read-model projection of server truth at a point in time.
 
-## Layer file naming
+## Layer naming
 
-Inside a feature, use the layer role as the second half of the name.
+Within a feature, use these layer names when they fit:
 
-| Layer                     | Typical files                                                                                           |
-| ------------------------- | ------------------------------------------------------------------------------------------------------- |
-| Boundary                  | `src/server/routes/<feature>.ts`, `src/web/<feature>-client.ts`                                         |
-| Read                      | `src/web/<feature>-queries.ts`, `src/web/<feature>-snapshot.ts`, `src/server/modules/<feature>-read.ts` |
-| Write                     | `src/server/modules/<feature>-write-paths.ts`, `src/web/<feature>-write-paths.ts`                       |
-| Source                    | `src/server/modules/<feature>-source.ts`                                                                |
-| Runtime facade (optional) | `src/web/runtime-<feature>*.ts` only when read + write are both exposed                                 |
+| Layer | Typical forms |
+| --- | --- |
+| Boundary | `src/server/routes/<feature>.ts`, `src/web/<feature>-client.ts` |
+| Read | `src/web/<feature>-queries.ts`, `src/web/<feature>-snapshot.ts`, `src/server/modules/<feature>-read.ts` |
+| Write | `src/server/modules/<feature>-write-paths.ts`, `src/web/<feature>-write-paths.ts` |
+| Source | `src/server/modules/<feature>-source.ts` |
+| Runtime | `runtime-<feature>*` only when the file truly exposes a read+write facade |
 
-Do not create a runtime facade that only reads or only writes. Do not create a `service` or `controller` file that mixes layers.
+Do not use `runtime` for a queue or scheduler that is not actually a runtime facade.
 
-## Subsystem glossaries
+## Canonical subsystem rules
 
 ### Terminal
 
-The terminal subsystem is server-backed and reconnectable. Its core entities are documented in `docs/terminal.md` and `docs/terminal-target-model.md`.
+Terminal terminology has one hard boundary:
 
-| Concept                                      | Canonical                     | Deprecated                 | Rationale                                                                                       |
-| -------------------------------------------- | ----------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------- |
-| Server-side long-lived shell business object | `TerminalSession`             | `TerminalSlot`             | `slot` is a workspace-pane concept. Docs call this a session.                                   |
-| Server session manager                       | `TerminalSessionManager`      | `TerminalSlotManager`      | Same as above.                                                                                  |
-| Session lifecycle phase                      | `TerminalSessionPhase`        | `TerminalSlotPhase`        | Same as above.                                                                                  |
-| Per-user detached TTL timer                  | `TerminalDetachedUserTimer`   | `TerminalConnectionState`  | It schedules cleanup after the last socket disconnect; it does not track live connection state. |
-| Per-worktree session display order           | `TerminalSessionOrderRuntime` | `TerminalViewOrderRuntime` | The server tracks session order for the tab strip, not "views".                                 |
-| Client singleton projection/orchestrator     | `TerminalSessionProjection`   | `TerminalSlotRegistry`     | "Registry" was vague; "Slot" overloaded workspace-pane tabs.                                    |
-| Client per-session wrapper                   | `TerminalSession`             | `ManagedTerminalSlot`      | Removes both the vague `Managed` prefix and the `Slot` overload.                                |
-| Client per-session runtime                   | `TerminalSessionRuntime`      | `TerminalSlotRuntime`      | Same as above.                                                                                  |
-| Client per-session state                     | `TerminalSessionState`        | `TerminalSlotState`        | Same as above.                                                                                  |
-| Client per-session view                      | `TerminalSessionView`         | `TerminalSlotView`         | Same as above.                                                                                  |
-| Workspace-pane tab slot key for terminals    | `TerminalWorkspaceSlotKey`    | `TerminalSlotKey`          | Keeps `slot` only where it really means a workspace-pane tab slot.                              |
-| Session closed realtime event                | `session-closed`              | `slot-closed`              | The event means a terminal session closed.                                                      |
-| Session id validation helper                 | `isValidTerminalSessionId`    | `isValidSlotId`            | Same as above.                                                                                  |
+- `slot` is reserved for workspace-pane UI identity.
+- `session` is the terminal business object.
+- control ownership is described as `controller`, `viewer`, `unowned`, or `controller role`.
+
+Canonical terminal terms:
+
+| Concept | Canonical | Deprecated |
+| --- | --- | --- |
+| Server-side business object | `TerminalSession` | `TerminalSlot` |
+| Server state owner | `TerminalSessionManager` | `TerminalSlotManager` |
+| Client singleton projection | `TerminalSessionProjection` | `TerminalSlotRegistry` |
+| Per-session client view | `TerminalSessionView` | `TerminalSlotView` |
+| Per-session client state | `TerminalSessionState` | `TerminalSlotState` |
+| Per-session client runtime | `TerminalSessionRuntime` | `TerminalSlotRuntime` |
+| Per-worktree ordering runtime | `TerminalSessionOrderRuntime` | `TerminalViewOrderRuntime` |
+| Workspace-pane slot key | `TerminalWorkspaceSlotKey` | `TerminalSlotKey` |
+| Session lifecycle event | `session-closed` | `slot-closed` |
+| Session id validator | `isValidTerminalSessionId` | `isValidSlotId` |
+
+Naming consequences:
+
+- Do not use `slot` for a terminal business object.
+- Do not use `session` to mean controller ownership.
+- If you mean the UI tab identity, say `workspace-pane slot` or `TerminalWorkspaceSlotKey`.
 
 ### Repo / workspace
 
-| Concept                                 | Canonical                                                | Deprecated                                       | Rationale                                                                              |
-| --------------------------------------- | -------------------------------------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------- |
-| Server-side authoritative repo accessor | `RepoSource` / `repo-source.ts`                          | `RepoBackend` / `repo-backend.ts`                | Matches the documented `source` layer.                                                 |
-| Server read: snapshot                   | `getRepoSnapshot`                                        | `getRepositorySnapshot`                          | Aligns client/server vocabulary.                                                       |
-| Server read: status                     | `getRepoStatus`                                          | `getRepositoryStatus`                            | Aligns client/server vocabulary.                                                       |
-| Server read: log                        | `getRepoLog`                                             | `getRepositoryLog`                               | Aligns client/server vocabulary.                                                       |
-| Bulk composite read endpoint            | `RepoBulkReadResult` / `readRepoBulk`                    | `RepositoryComposite` / `getRepositoryComposite` | "Composite" is jargon; "bulk read" describes the operation.                            |
-| Server write: create worktree           | `createRepoWorktree`                                     | `createRepositoryWorktree`                       | Aligns client/server vocabulary.                                                       |
-| Server write: delete branch             | `deleteRepoBranch`                                       | `deleteRepositoryBranch`                         | Aligns client/server vocabulary.                                                       |
-| Server write: pull branch               | `pullRepoBranch`                                         | `pullRepositoryBranch`                           | Aligns client/server vocabulary.                                                       |
-| Client async task scheduler             | `RepoOperationScheduler` / `repo-operation-scheduler.ts` | `RepoRuntime` / `runtime.ts`                     | It schedules operations, not a generic runtime.                                        |
-| Operation lane                          | `RepoOperationLane`                                      | `RepoTaskLane` / `RepoLane`                      | Consistent with `OperationScheduler`.                                                  |
-| UI-facing data load state               | `RepoDataLoadState` / `repo-data-load-state.ts`          | `RepoResourcesState` / `resources.ts`            | "Resources" collided with operations; the file comment already called this load state. |
-| Branch detail surface (right pane)      | `RepoWorkspace` / `repo-workspace/`                      | `branch-workspace/`                              | A workspace scoped to one repo/branch.                                                 |
-| Branch detail tab model                 | `repo-workspace-tab-model.ts`                            | `workspace-pane-tab-model.ts`                    | Located inside `repo-workspace/`; no redundant prefix.                                 |
-| Workspace pane tab type                 | `WorkspacePaneTabType`                                   | `WorkspacePaneView`                              | The UI renders tabs, not abstract views.                                               |
-| Workspace pane static tab type          | `WorkspacePaneStaticTabType`                             | `WorkspacePaneStaticViewType`                    | Same as above.                                                                         |
-| Workspace pane tab scope                | `WorkspacePaneTabScope`                                  | `WorkspacePaneViewScope`                         | Same as above.                                                                         |
-| SSH remote connection lifecycle         | `RemoteRepoConnectionLifecycle`                          | `RemoteRepoLifecycle`                            | Distinguishes remote connection from repo open/close lifecycle.                        |
-| Repo open/close/hydration lifecycle     | `RepoSession` / `repo-session.ts`                        | `lifecycle.ts`                                   | Distinguishes from remote connection lifecycle.                                        |
+Repo naming rules:
+
+- Use `Repo*`, not `Repository*`, unless required by an external API.
+- Use `WorkspacePaneTab*`, not `WorkspacePaneView*`, for tab concepts.
+- Use `RepoSession` only for repo open/close/hydration lifecycle, not for terminal sessions or auth sessions.
+
+Canonical examples:
+
+| Concept | Canonical | Deprecated |
+| --- | --- | --- |
+| Authoritative repo accessor | `RepoSource` / `repo-source.ts` | `RepoBackend` / `repo-backend.ts` |
+| Snapshot read | `getRepoSnapshot` | `getRepositorySnapshot` |
+| Status read | `getRepoStatus` | `getRepositoryStatus` |
+| Log read | `getRepoLog` | `getRepositoryLog` |
+| Bulk read | `RepoBulkReadResult` / `readRepoBulk` | `RepositoryComposite` / `getRepositoryComposite` |
+| Operation scheduler | `RepoOperationScheduler` | `RepoRuntime` |
+| Operation lane | `RepoOperationLane` | `RepoTaskLane`, `RepoLane` |
+| Data load state | `RepoDataLoadState` | `RepoResourcesState` |
+| Right-pane surface | `RepoWorkspace` | `branch-workspace/` |
+| Workspace-pane tab type | `WorkspacePaneTabType` | `WorkspacePaneView` |
 
 ### Settings / server
 
-| Concept                                    | Canonical                                                             | Deprecated                                               | Rationale                                                                              |
-| ------------------------------------------ | --------------------------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| User-configurable preferences              | `UserSettings`                                                        | `SettingsPrefs`                                          | `Prefs` is abbreviated and the PATCH body used `settings` while the type said `prefs`. |
-| PATCH body key for prefs                   | `prefs`                                                               | `settings`                                               | Aligns the request contract with the concept.                                          |
-| Native shortcut registration runtime state | `NativeShortcutRegistrationState` / `native-shortcut-registration.ts` | `ServerSettingsState` / `settings-state.ts`              | It only tracks whether the global shortcut is registered with the OS.                  |
-| Persisted workspace session data           | `WorkspaceSessionState`                                               | `SessionState`                                           | Avoids confusion with HTTP/auth session.                                               |
-| Server command handler                     | `handleSetFetchInterval`                                              | `applyServerFetchIntervalWrite`                          | `handle` is clearer for a command handler; removes redundant `apply`/`Write`.          |
-| Client settings actions                    | `settings-actions.ts` / `setFetchInterval`                            | `settings-write-paths.ts` / `setFetchIntervalPreference` | Simpler, consistent with action vocabulary.                                            |
-| Runtime settings facade                    | `runtime-settings-*.ts`                                               | same                                                     | Keep the file prefix, but export hooks with consistent `use*Settings` naming.          |
+Canonical rules:
 
-### Native host (Electron main process)
+- Use `UserSettings` for user-configurable preferences.
+- Use `WorkspaceSessionState` for persisted workspace session data.
+- Use `handle*` for command handlers when the module is handling a command, not just mutating state.
 
-Directory `src/main/` is kept for alias stability. New file/type/function names use `native-host`.
+Selected mappings:
 
-| Concept                                 | Canonical                                              | Deprecated                                             | Rationale                                                                              |
-| --------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------ | -------------------------------------------------------------------------------------- |
-| Primary BrowserWindow                   | `primaryWindow` / `activatePrimaryWindow`              | `mainWindow` / `activateMainWindow`                    | `main` is overloaded with the main process.                                            |
-| Primary window surface constant         | `PRIMARY_WINDOW_SURFACE`                               | `MAIN_WINDOW_SURFACE`                                  | Same as above.                                                                         |
-| Client surface registry                 | `client-surface-registry.ts` / `ClientSurfaceRegistry` | `window-registry.ts`                                   | Matches the existing `ClientSurface*` abstraction.                                     |
-| BrowserWindow security / preload policy | `window-security.ts`                                   | `window-shell.ts`                                      | `shell` collided with OS shell and native-shell projection.                            |
-| BrowserWindow web preferences factory   | `createBrowserWindowWebPreferences`                    | `createClientWindowWebPreferences`                     | `BrowserWindow` is the Electron type; `client` was ambiguous.                          |
-| Browser entry URL factory               | `createBrowserEntryUrl`                                | `createClientEntryUrl`                                 | Same as above.                                                                         |
-| Trusted BrowserWindow config            | `configureTrustedBrowserWindow`                        | `configureTrustedClientWindow`                         | Same as above.                                                                         |
-| Title-bar / traffic-light chrome        | `title-bar-chrome.ts` / `TITLE_BAR_HEIGHT_PX`          | `window-chrome.ts` / `WINDOW_CHROME_HEIGHT_PX`         | `chrome` is easily confused with the browser; this is specifically title-bar geometry. |
-| Embedded server lifecycle controller    | `embedded-server-lifecycle.ts`                         | `server-manager.ts`                                    | `manager` is vague; this spawns and kills the embedded server process.                 |
-| Native host IPC router                  | `native-host-ipc-router.ts` / `NativeHostIpcHandlers`  | `ipc.ts` / `NativeIpcHandlers`                         | Clarifies which IPC and which host.                                                    |
-| Native host IPC procedure schemas       | `NATIVE_HOST_IPC_PROCEDURE_SCHEMAS`                    | `NATIVE_IPC_PROCEDURE_SCHEMAS`                         | Same as above.                                                                         |
-| OS shell action IPC handler             | `shell-ipc.ts` / `wireShellIpc`                        | `shell-bridge.ts` / `wireShellBridgeIpc`               | These are simple IPC handlers, not the cross-runtime bridge abstraction.               |
-| Clipboard IPC handler                   | `clipboard-ipc.ts` / `wireClipboardIpc`                | `clipboard-bridge.ts` / `wireClipboardBridgeIpc`       | Same as above.                                                                         |
-| Access token IPC handler                | `access-token-ipc.ts` / `wireAccessTokenIpc`           | `access-token-bridge.ts` / `wireAccessTokenBridgeIpc`  | Same as above.                                                                         |
-| Server-to-native projection             | `native-host-projection.ts` / `NativeHostProjection`   | `native-shell-projection.ts` / `NativeShellProjection` | Removes `shell` overlap; the projection is from server to native host.                 |
+| Concept | Canonical | Deprecated |
+| --- | --- | --- |
+| User-configurable preferences | `UserSettings` | `SettingsPrefs` |
+| Prefs PATCH body key | `prefs` | `settings` |
+| Persisted workspace session | `WorkspaceSessionState` | `SessionState` |
+| Native shortcut registration state | `NativeShortcutRegistrationState` | `ServerSettingsState` |
 
-## Anti-patterns
+### Native host
 
-Avoid these naming patterns in new code and remove them when touching old code:
+Canonical rules:
 
-- `Repository*` in server modules when the rest of the codebase uses `Repo*`.
-- `TerminalSlot*` for server-side terminal business objects.
-- `Manager`, `Service`, `Controller`, `Registry`, `Helpers`, `Utils`, `Support` as file names unless the term is the real boundary.
-- `mainWindow`, `mainProcess`, `main()` all in the same conversation without qualification.
-- `shell` for anything other than an OS shell command or the product shell concept documented here.
-- `runtime` for a file that is just a scheduler or queue.
-- `SessionState` for an HTTP or auth session.
+- Use `native host` for the Electron main-process side.
+- Use `primaryWindow`, not `mainWindow`, for the principal BrowserWindow.
+- Use `*-ipc` for plain IPC handlers.
+- Use `embedded server` for the server process the native host spawns.
 
-## Migration mapping (quick reference)
+Selected mappings:
 
-| Old                              | New                               |
-| -------------------------------- | --------------------------------- |
-| `TerminalSlot`                   | `TerminalSession`                 |
-| `TerminalSlotManager`            | `TerminalSessionManager`          |
-| `TerminalSlotRegistry`           | `TerminalSessionProjection`       |
-| `ManagedTerminalSlot`            | `TerminalSession`                 |
-| `TerminalConnectionState`        | `TerminalDetachedUserTimer`       |
-| `TerminalViewOrderRuntime`       | `TerminalSessionOrderRuntime`     |
-| `slot-closed`                    | `session-closed`                  |
-| `RepoBackend`                    | `RepoSource`                      |
-| `getRepositorySnapshot`          | `getRepoSnapshot`                 |
-| `RepositoryComposite`            | `RepoBulkReadResult`              |
-| `RepoRuntime`                    | `RepoOperationScheduler`          |
-| `RepoTaskLane` / `RepoLane`      | `RepoOperationLane`               |
-| `RepoResourcesState`             | `RepoDataLoadState`               |
-| `branch-workspace/`              | `repo-workspace/`                 |
-| `WorkspacePaneView`              | `WorkspacePaneTabType`            |
-| `RemoteRepoLifecycle`            | `RemoteRepoConnectionLifecycle`   |
-| `lifecycle.ts` (repo open/close) | `repo-session.ts`                 |
-| `SettingsPrefs`                  | `UserSettings`                    |
-| `{ settings: ... }` prefs patch  | `{ prefs: ... }`                  |
-| `ServerSettingsState`            | `NativeShortcutRegistrationState` |
-| `SessionState`                   | `WorkspaceSessionState`           |
-| `mainWindow`                     | `primaryWindow`                   |
-| `activateMainWindow`             | `activatePrimaryWindow`           |
-| `window-registry.ts`             | `client-surface-registry.ts`      |
-| `window-shell.ts`                | `window-security.ts`              |
-| `window-chrome.ts`               | `title-bar-chrome.ts`             |
-| `server-manager.ts`              | `embedded-server-lifecycle.ts`    |
-| `ipc.ts` (main IPC router)       | `native-host-ipc-router.ts`       |
-| `shell-bridge.ts`                | `shell-ipc.ts`                    |
-| `clipboard-bridge.ts`            | `clipboard-ipc.ts`                |
-| `access-token-bridge.ts`         | `access-token-ipc.ts`             |
-| `native-shell-projection.ts`     | `native-host-projection.ts`       |
+| Concept | Canonical | Deprecated |
+| --- | --- | --- |
+| Primary window | `primaryWindow` / `activatePrimaryWindow` | `mainWindow` / `activateMainWindow` |
+| Client surface registry | `client-surface-registry.ts` | `window-registry.ts` |
+| Window security policy | `window-security.ts` | `window-shell.ts` |
+| Embedded server lifecycle | `embedded-server-lifecycle.ts` | `server-manager.ts` |
+| Native host IPC router | `native-host-ipc-router.ts` | `ipc.ts` |
+| Clipboard IPC handler | `clipboard-ipc.ts` | `clipboard-bridge.ts` |
+| Access-token IPC handler | `access-token-ipc.ts` | `access-token-bridge.ts` |
+| Server-to-native projection | `native-host-projection.ts` | `native-shell-projection.ts` |
+
+## Review checklist
+
+Reject or rename changes that:
+
+- introduce a second noun for an existing product concept
+- use `slot` for a terminal business object
+- use `session` for controller ownership
+- add `Repository*` names to internal repo code
+- introduce `main*` names that really mean `native host` or `primaryWindow`
+- use `runtime`, `manager`, `service`, or `registry` as a vague bucket instead of a real boundary
+- use `SessionState` for anything other than persisted workspace session state
 
 ## See also
 
-- `docs/arch.md` — app shell and process control
-- `docs/layering.md` — feature and concern layering
-- `docs/state-sync.md` — local, runtime-coherent, and restorable state
-- `docs/client-model.md` — client/server model boundaries
-- `docs/terminal.md` and `docs/terminal-target-model.md` — terminal concepts
-- `docs/g-command.md` — `g` shell command two-plane model
+- `docs/arch.md`
+- `docs/layering.md`
+- `docs/state-sync.md`
+- `docs/client-model.md`
+- `docs/terminal.md`
+- `docs/terminal-target-model.md`

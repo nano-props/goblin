@@ -79,7 +79,6 @@ describe('WorkspacePaneTabStrip', () => {
       />,
     )
 
-    console.log('debug body:', document.body.innerHTML.substring(0, 2000))
     const tab = document.body.querySelector('[data-workspace-pane-tab-tooltip-id="terminal:t1"]')
     if (!(tab instanceof HTMLElement)) throw new Error('missing terminal tab')
     tab.getBoundingClientRect = () =>

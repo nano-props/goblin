@@ -204,7 +204,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       // lets it fall through to `registerTerminalClient`'s own
       // fallback (which resolves to the existing session's stored
       // value, defaulting to `false` if unknown). For a brand-new
-      // slot there is no existing value to consult, so the `?? true`
+      // session there is no existing value to consult, so the `?? true`
       // here reflects "no prior liveness info; treat as live" — the
       // same optimistic default the broker uses for the first
       // `registerSocket`. The asymmetry is intentional, not a bug.
@@ -212,7 +212,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       // Mirror the existing-session path: route the `attach` through
       // `applyIdentityEffect` so the returned `emitIdentity` flag
       // (true for the auto-claim case where the new clientId picks
-      // up an unowned session) actually broadcasts the realtime
+      // up a session with no controller) actually broadcasts the realtime
       // `identity` event to siblings. Without this the session's
       // controller and `userSticky` flags are set correctly but
       // sibling windows only learn about the new controller via the

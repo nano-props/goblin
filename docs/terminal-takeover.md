@@ -224,8 +224,8 @@ the microtask queue rather than the round-trip.
 If the user types **during** the `unowned` window, the gate's
 `authorize('write')` returns `{ kind: 'denied', reason:
 'session-closed' }` — the gate deliberately distinguishes `unowned`
-from `viewer` so it does not auto-promote a write against a slot
-the server has just cleared. The keystroke is dropped at the
+from `viewer` so it does not auto-promote a write against a session
+whose controller role the server has just cleared. The keystroke is dropped at the
 gate. (Pre-PR, the gate collapsed `unowned` to `viewer` and
 auto-promoted, which caused the spurious takeover round-trip
 this PR's identity/lifecycle split fixes.) Once the second

@@ -114,12 +114,12 @@ class TerminalCatalog {
     // to scope user-scoped session lists — see the comment on
     // `terminalSessionScope` in server/terminal/terminal-session-scope.ts
     // for the normalization rationale.
-    const targetSlotKey = formatTerminalWorkspaceSlotKey(
+    const targetWorkspaceSlotKey = formatTerminalWorkspaceSlotKey(
       sessionScope,
       isRemoteRepoId(input.repoRoot) ? input.worktreePath : path.resolve(input.worktreePath),
       sessionId,
     )
-    const existingSession = existingSessions.find((session) => session.key === targetSlotKey)
+    const existingSession = existingSessions.find((session) => session.key === targetWorkspaceSlotKey)
     const action: TerminalCatalogAction = existingSession
       ? existingSession.controller
         ? 'restored'
@@ -127,9 +127,9 @@ class TerminalCatalog {
       : 'created'
 
     if (isRemoteRepoId(input.repoRoot)) {
-      return await this.ensureRemote(userId, input, { sessionId, cols, rows, targetSlotKey, action })
+      return await this.ensureRemote(userId, input, { sessionId, cols, rows, targetSlotKey: targetWorkspaceSlotKey, action })
     }
-    return await this.ensureLocal(userId, input, { cols, rows, targetSlotKey, action })
+    return await this.ensureLocal(userId, input, { cols, rows, targetSlotKey: targetWorkspaceSlotKey, action })
   }
 
   async create(clientId: string, userId: string, input: TerminalCreateInput): Promise<TerminalCatalogMutationResult> {

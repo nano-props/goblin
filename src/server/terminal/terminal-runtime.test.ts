@@ -1031,7 +1031,7 @@ describe('server terminal runtime', () => {
     const ptySessionId = created.sessions[0]?.ptySessionId
     if (!ptySessionId) throw new Error('expected session id')
 
-    // A disconnects; B attaches and claims the now-empty session.
+    // A disconnects; B attaches and claims the now-empty controller role.
     host.unregisterSocket('client_a', USER_1, socketA)
     host.registerSocket('client_b', USER_1, socketB)
     const bAttach = await host.attach('client_a', USER_1, {
@@ -1045,7 +1045,7 @@ describe('server terminal runtime', () => {
       controller: { clientId: 'client_b', status: 'connected' },
     })
 
-    // A reconnects later. The session is held by B; A's attach must
+    // A reconnects later. B still holds the controller role; A's attach must
     // NOT preempt B — A becomes a viewer.
     host.registerSocket('client_a', USER_1, socketAReconnect)
     const aReattach = await host.attach('client_a', USER_1, {
