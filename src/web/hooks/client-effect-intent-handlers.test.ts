@@ -12,7 +12,7 @@ vi.mock('sonner', () => ({
 }))
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
-import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
+import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 
 const REPO_ID = '/tmp/gbl-client-intent-handlers-repo'

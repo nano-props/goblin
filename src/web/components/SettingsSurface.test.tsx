@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { SettingsSurface } from '#/web/components/SettingsSurface.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
-import { resetReposStore } from '#/web/stores/repos/test-utils.ts'
+import { resetReposStore } from '#/web/test-utils/bridge.ts'
 
 const toastMocks = vi.hoisted(() => ({
   success: vi.fn(),

@@ -11,7 +11,7 @@ import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useSessionRestoreStore } from '#/web/stores/session-restore.ts'
-import { resetReposStore } from '#/web/stores/repos/test-utils.ts'
+import { resetReposStore } from '#/web/test-utils/bridge.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
 
 vi.mock('#/web/settings-client.ts', async (importOriginal) => {

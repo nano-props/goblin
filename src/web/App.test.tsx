@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { App } from '#/web/App.tsx'
 import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
+import { resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 
 const responsiveMocks = vi.hoisted(() => ({
   mode: 'default' as 'default' | 'compact',

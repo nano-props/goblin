@@ -10,7 +10,7 @@ import {
   createRepoBranch,
   resetReposStore,
   seedRepoState,
-} from '#/web/stores/repos/test-utils.ts'
+} from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { RepoSnapshotCacheEntry } from '#/web/stores/repos/types.ts'
 function cachedRepo(savedAt: number): RepoSnapshotCacheEntry {

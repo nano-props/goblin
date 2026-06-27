@@ -14,7 +14,7 @@ import {
   installGoblinTestBridge,
   resetReposStore,
   seedRepoState,
-} from '#/web/stores/repos/test-utils.ts'
+} from '#/web/test-utils/bridge.ts'
 import type { RepoBranchAction } from '#/web/stores/repos/branch-action-types.ts'
 import type { BranchViewMode } from '#/web/stores/repos/types.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'

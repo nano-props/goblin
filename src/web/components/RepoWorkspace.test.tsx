@@ -18,7 +18,7 @@ import {
   type PrimaryWindowNavigationActions,
 } from '#/web/primary-window-navigation.tsx'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
-import { resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
+import { resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 
 const REPO_ID = '/tmp/repo-workspace-container-repo'
 

@@ -24,7 +24,7 @@ import {
   createRepoBranch,
   resetReposStore,
   seedRepoState,
-} from '#/web/stores/repos/test-utils.ts'
+} from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'

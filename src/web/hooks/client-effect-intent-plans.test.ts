@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { createBranchSnapshot, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
+import { createBranchSnapshot, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import {
   createAppLevelIntentPlan,
   createExternalOpenDrainKickPlan,

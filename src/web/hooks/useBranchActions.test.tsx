@@ -7,7 +7,7 @@ import { act } from 'react'
 import { useBranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { openBranchExternalTarget } from '#/web/hooks/openBranchExternalTarget.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
-import { createPullRequest, createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
+import { createPullRequest, createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 
 const mocks = vi.hoisted(() => ({
   openExternalUrl: vi.fn(),
