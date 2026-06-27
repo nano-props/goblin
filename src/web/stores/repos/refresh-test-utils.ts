@@ -6,7 +6,7 @@ import {
   resetReposStore,
   seedRepoState,
   type IpcTestHandler,
-} from '#/web/stores/repos/test-utils.ts'
+} from '#/web/test-utils/bridge.ts'
 export const REPO_ID = '/tmp/gbl-test-repo'
 export const ipcHandlers: Record<string, IpcTestHandler> = {}
 export const pullRequest = createPullRequest

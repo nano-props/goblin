@@ -1,142 +1,32 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
-
-class MockWebSocket {
-  static readonly CONNECTING = 0
-  static readonly OPEN = 1
-  static readonly CLOSING = 2
-  static readonly CLOSED = 3
-  static instances: MockWebSocket[] = []
-  readonly url: string
-  readyState = MockWebSocket.CONNECTING
-  sent: string[] = []
-  private readonly listeners = new Map<string, Set<(event: any) => void>>()
-
-  constructor(url: string) {
-    this.url = url
-    MockWebSocket.instances.push(this)
-  }
-
-  addEventListener(type: string, cb: (event: any) => void) {
-    let listeners = this.listeners.get(type)
-    if (!listeners) {
-      listeners = new Set()
-      this.listeners.set(type, listeners)
-    }
-    listeners.add(cb)
-  }
-
-  removeEventListener(type: string, cb: (event: any) => void) {
-    this.listeners.get(type)?.delete(cb)
-  }
-
-  send(data: string) {
-    this.sent.push(data)
-  }
-
-  close() {
-    this.readyState = MockWebSocket.CLOSED
-    this.emit('close', {})
-  }
-
-  emitOpen() {
-    this.readyState = MockWebSocket.OPEN
-    this.emit('open', {})
-  }
-
-  emitMessage(data: unknown) {
-    this.emit('message', { data })
-  }
-
-  emitError() {
-    this.emit('error', {})
-  }
-
-  private emit(type: string, event: any) {
-    for (const listener of this.listeners.get(type) ?? []) listener(event)
-  }
-}
-
-const mockNotifications: Array<{ onclick: (() => void) | null }> = []
-
-class MockNotification {
-  static permission: NotificationPermission = 'granted'
-  static async requestPermission(): Promise<NotificationPermission> {
-    return 'granted'
-  }
-
-  onclick: (() => void) | null = null
-
-  constructor(_title: string, _options?: NotificationOptions) {
-    mockNotifications.push(this)
-  }
-
-  close() {}
-}
-
+import { installWebSocketMock, type WebSocketMockHandle } from '#/web/test-utils/websocket-mock.ts'
+import { installHostBootstrap } from '#/web/test-utils/host-bootstrap.ts'
+import { mockFetch } from '#/test-utils/fetch-mock.ts'
+let wsMock: WebSocketMockHandle
 describe('terminal web host bridge', () => {
   beforeEach(() => {
-    const createStorage = () => {
-      const store: Record<string, string> = {}
-      return {
-        getItem: (k: string) => store[k] ?? null,
-        setItem: (k: string, v: string) => {
-          store[k] = v
-        },
-        removeItem: (k: string) => {
-          delete store[k]
-        },
-        clear: () => {
-          for (const k of Object.keys(store)) delete store[k]
-        },
-        key: (i: number) => Object.keys(store)[i] ?? null,
-        get length() {
-          return Object.keys(store).length
-        },
-      }
-    }
-    Object.defineProperty(window, 'localStorage', { value: createStorage(), configurable: true })
-    Object.defineProperty(window, 'sessionStorage', { value: createStorage(), configurable: true })
+    wsMock = installWebSocketMock({ autoOpen: false })
+    installHostBootstrap({
+      runtime: 'web',
+      initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
+    })
     vi.restoreAllMocks()
     vi.resetModules()
     setClientBridgeForTests(null)
-    MockWebSocket.instances.length = 0
-    mockNotifications.length = 0
+    wsMock.reset()
     window.localStorage.clear()
     window.sessionStorage.clear()
-    Object.defineProperty(window, 'goblinNative', {
-      configurable: true,
-      value: undefined,
-    })
-    Object.defineProperty(globalThis, 'WebSocket', { configurable: true, value: MockWebSocket })
-    Object.defineProperty(globalThis, 'Notification', { configurable: true, value: MockNotification })
-    Object.defineProperty(window, '__GOBLIN_BOOTSTRAP__', {
-      configurable: true,
-      value: {
-        runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
-        initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
-      },
-    })
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: {
-        href: 'http://127.0.0.1:32100/',
-        origin: 'http://127.0.0.1:32100',
-        search: '',
-      },
-    })
   })
 
   test('attaches terminals through terminal websocket request-response in web host mode', async () => {
-    const fetchMock = vi.fn()
-    vi.stubGlobal('fetch', fetchMock)
+    const fetchMock = mockFetch()
     const { terminalBridge } = await import('#/web/terminal.ts')
 
     const dispose = terminalBridge.onOutput(() => {})
-    const socket = MockWebSocket.instances[0]
+    const socket = wsMock.instances[0]
     expect(socket?.url).toMatch(/^ws:\/\/127\.0\.0\.1:32100\/ws\/terminal\?t=secret&clientId=client_sharedterminal$/)
     const attachPromise = terminalBridge.attach({
       ptySessionId: 'pty_1234567890123456',
@@ -186,7 +76,7 @@ describe('terminal web host bridge', () => {
     window.localStorage.setItem('goblin:terminal-client-id', 'web_oldpersistedclient')
     const { terminalBridge } = await import('#/web/terminal.ts')
     const dispose = terminalBridge.onOutput(() => {})
-    const socket = MockWebSocket.instances[0]
+    const socket = wsMock.instances[0]
     const attachPromise = terminalBridge.attach({
       ptySessionId: 'pty_1234567890123456',
       cols: 100,
@@ -224,11 +114,10 @@ describe('terminal web host bridge', () => {
   })
 
   test('does not fall back to http when attach websocket cannot open', async () => {
-    const fetchMock = vi.fn()
-    vi.stubGlobal('fetch', fetchMock)
+    const fetchMock = mockFetch()
     const { terminalBridge } = await import('#/web/terminal.ts')
     const dispose = terminalBridge.onOutput(() => {})
-    const socket = MockWebSocket.instances[0]
+    const socket = wsMock.instances[0]
     const attachPromise = terminalBridge.attach({
       ptySessionId: 'pty_1234567890123456',
       cols: 100,
@@ -243,11 +132,10 @@ describe('terminal web host bridge', () => {
   })
 
   test('does not fall back to http when write websocket is unavailable', async () => {
-    const fetchMock = vi.fn()
-    vi.stubGlobal('fetch', fetchMock)
+    const fetchMock = mockFetch()
     const { terminalBridge } = await import('#/web/terminal.ts')
     const dispose = terminalBridge.onOutput(() => {})
-    const socket = MockWebSocket.instances[0]
+    const socket = wsMock.instances[0]
     const writePromise = terminalBridge.write({
       ptySessionId: 'pty_1234567890123456',
       data: 'pwd',
@@ -261,11 +149,10 @@ describe('terminal web host bridge', () => {
   })
 
   test('includes the current attachment id when creating a terminal in web host mode', async () => {
-    const fetchMock = vi.fn()
-    vi.stubGlobal('fetch', fetchMock)
+    const fetchMock = mockFetch()
     const { terminalBridge } = await import('#/web/terminal.ts')
     const dispose = terminalBridge.onOutput(() => {})
-    const socket = MockWebSocket.instances[0]
+    const socket = wsMock.instances[0]
 
     const createPromise = terminalBridge.create({
       repoRoot: '/tmp/repo',
@@ -311,11 +198,10 @@ describe('terminal web host bridge', () => {
   })
 
   test('loads terminal session lists through websocket request-response and validates payloads', async () => {
-    const fetchMock = vi.fn()
-    vi.stubGlobal('fetch', fetchMock)
+    const fetchMock = mockFetch()
     const { terminalBridge } = await import('#/web/terminal.ts')
     const dispose = terminalBridge.onOutput(() => {})
-    const socket = MockWebSocket.instances[0]
+    const socket = wsMock.instances[0]
 
     const listPromise = terminalBridge.listSessions({ repoRoot: '/tmp/repo' })
     socket?.emitOpen()
@@ -346,11 +232,10 @@ describe('terminal web host bridge', () => {
   })
 
   test('loads terminal snapshots through websocket request-response and validates payloads', async () => {
-    const fetchMock = vi.fn()
-    vi.stubGlobal('fetch', fetchMock)
+    const fetchMock = mockFetch()
     const { terminalBridge } = await import('#/web/terminal.ts')
     const dispose = terminalBridge.onOutput(() => {})
-    const socket = MockWebSocket.instances[0]
+    const socket = wsMock.instances[0]
 
     const snapshotPromise = terminalBridge.getSessionSnapshot({ ptySessionId: 'pty_1234567890123456' })
     socket?.emitOpen()
@@ -381,11 +266,10 @@ describe('terminal web host bridge', () => {
   })
 
   test('does not fall back to http when create websocket cannot open', async () => {
-    const fetchMock = vi.fn()
-    vi.stubGlobal('fetch', fetchMock)
+    const fetchMock = mockFetch()
     const { terminalBridge } = await import('#/web/terminal.ts')
     const dispose = terminalBridge.onOutput(() => {})
-    const socket = MockWebSocket.instances[0]
+    const socket = wsMock.instances[0]
     const createPromise = terminalBridge.create({
       repoRoot: '/tmp/repo',
       branch: 'feature',
@@ -401,8 +285,7 @@ describe('terminal web host bridge', () => {
   })
 
   test('rejects create when websocket errors before opening', async () => {
-    const fetchMock = vi.fn()
-    vi.stubGlobal('fetch', fetchMock)
+    const fetchMock = mockFetch()
     const { terminalBridge } = await import('#/web/terminal.ts')
     const createPromise = terminalBridge.create({
       repoRoot: '/tmp/repo',
@@ -410,7 +293,7 @@ describe('terminal web host bridge', () => {
       worktreePath: '/tmp/repo',
       kind: 'primary',
     })
-    const socket = MockWebSocket.instances[0]
+    const socket = wsMock.instances[0]
     if (!socket) throw new Error('missing web terminal socket')
     const expectation = expect(createPromise).rejects.toThrow('Terminal socket error before open')
 
@@ -423,8 +306,7 @@ describe('terminal web host bridge', () => {
   test('times out create when websocket stays connecting', async () => {
     vi.useFakeTimers()
     try {
-      const fetchMock = vi.fn()
-      vi.stubGlobal('fetch', fetchMock)
+      const fetchMock = mockFetch()
       const { terminalBridge } = await import('#/web/terminal.ts')
       const createPromise = terminalBridge.create({
         repoRoot: '/tmp/repo',
@@ -432,7 +314,7 @@ describe('terminal web host bridge', () => {
         worktreePath: '/tmp/repo',
         kind: 'primary',
       })
-      const socket = MockWebSocket.instances[0]
+      const socket = wsMock.instances[0]
       if (!socket) throw new Error('missing web terminal socket')
       const expectation = expect(createPromise).rejects.toThrow('Terminal socket open timed out')
 
@@ -440,7 +322,7 @@ describe('terminal web host bridge', () => {
 
       await expectation
       expect(fetchMock).not.toHaveBeenCalled()
-      expect(socket.readyState).toBe(MockWebSocket.CLOSED)
+      expect(socket.readyState).toBe(wsMock.CLOSED)
     } finally {
       vi.useRealTimers()
     }
@@ -449,11 +331,10 @@ describe('terminal web host bridge', () => {
   test('times out session list loading when websocket stays connecting', async () => {
     vi.useFakeTimers()
     try {
-      const fetchMock = vi.fn()
-      vi.stubGlobal('fetch', fetchMock)
+      const fetchMock = mockFetch()
       const { terminalBridge } = await import('#/web/terminal.ts')
       const listPromise = terminalBridge.listSessions({ repoRoot: '/tmp/repo' })
-      const socket = MockWebSocket.instances[0]
+      const socket = wsMock.instances[0]
       if (!socket) throw new Error('missing web terminal socket')
       const expectation = expect(listPromise).rejects.toThrow('Terminal socket open timed out')
 
@@ -461,18 +342,17 @@ describe('terminal web host bridge', () => {
 
       await expectation
       expect(fetchMock).not.toHaveBeenCalled()
-      expect(socket.readyState).toBe(MockWebSocket.CLOSED)
+      expect(socket.readyState).toBe(wsMock.CLOSED)
     } finally {
       vi.useRealTimers()
     }
   })
 
   test('does not fall back to http when list websocket cannot open', async () => {
-    const fetchMock = vi.fn()
-    vi.stubGlobal('fetch', fetchMock)
+    const fetchMock = mockFetch()
     const { terminalBridge } = await import('#/web/terminal.ts')
     const dispose = terminalBridge.onOutput(() => {})
-    const socket = MockWebSocket.instances[0]
+    const socket = wsMock.instances[0]
     const listPromise = terminalBridge.listSessions({ repoRoot: '/tmp/repo' })
 
     socket?.close()
@@ -483,11 +363,10 @@ describe('terminal web host bridge', () => {
   })
 
   test('does not fall back to http when snapshot websocket cannot open', async () => {
-    const fetchMock = vi.fn()
-    vi.stubGlobal('fetch', fetchMock)
+    const fetchMock = mockFetch()
     const { terminalBridge } = await import('#/web/terminal.ts')
     const dispose = terminalBridge.onOutput(() => {})
-    const socket = MockWebSocket.instances[0]
+    const socket = wsMock.instances[0]
     const snapshotPromise = terminalBridge.getSessionSnapshot({ ptySessionId: 'pty_1234567890123456' })
 
     socket?.close()
@@ -498,11 +377,10 @@ describe('terminal web host bridge', () => {
   })
 
   test('does not fall back to http when prune websocket cannot open', async () => {
-    const fetchMock = vi.fn()
-    vi.stubGlobal('fetch', fetchMock)
+    const fetchMock = mockFetch()
     const { terminalBridge } = await import('#/web/terminal.ts')
     const dispose = terminalBridge.onOutput(() => {})
-    const socket = MockWebSocket.instances[0]
+    const socket = wsMock.instances[0]
     const prunePromise = terminalBridge.pruneTerminals('/tmp/repo')
 
     socket?.close()
@@ -513,11 +391,10 @@ describe('terminal web host bridge', () => {
   })
 
   test('does not fall back to http when prune uses websocket request-response', async () => {
-    const fetchMock = vi.fn()
-    vi.stubGlobal('fetch', fetchMock)
+    const fetchMock = mockFetch()
     const { terminalBridge } = await import('#/web/terminal.ts')
     const dispose = terminalBridge.onOutput(() => {})
-    const socket = MockWebSocket.instances[0]
+    const socket = wsMock.instances[0]
     const prunePromise = terminalBridge.pruneTerminals('/tmp/repo')
     socket?.emitOpen()
     await Promise.resolve()
@@ -545,7 +422,7 @@ describe('terminal web host bridge', () => {
   test('closes an idle terminal socket after a one-shot websocket request resolves without subscribers', async () => {
     const { terminalBridge } = await import('#/web/terminal.ts')
     const prunePromise = terminalBridge.pruneTerminals('/tmp/repo')
-    const socket = MockWebSocket.instances[0]
+    const socket = wsMock.instances[0]
     if (!socket) throw new Error('missing web terminal socket')
 
     socket.emitOpen()
@@ -562,7 +439,7 @@ describe('terminal web host bridge', () => {
     )
 
     await expect(prunePromise).resolves.toEqual({ pruned: 1, remaining: 0 })
-    expect(socket.readyState).toBe(MockWebSocket.CLOSED)
+    expect(socket.readyState).toBe(wsMock.CLOSED)
   })
 
   test('closes an idle terminal socket after a one-shot websocket request times out without subscribers', async () => {
@@ -570,7 +447,7 @@ describe('terminal web host bridge', () => {
     try {
       const { terminalBridge } = await import('#/web/terminal.ts')
       const prunePromise = terminalBridge.pruneTerminals('/tmp/repo')
-      const socket = MockWebSocket.instances[0]
+      const socket = wsMock.instances[0]
       if (!socket) throw new Error('missing web terminal socket')
 
       socket.emitOpen()
@@ -582,18 +459,17 @@ describe('terminal web host bridge', () => {
       await vi.advanceTimersByTimeAsync(30_000)
 
       await expectation
-      expect(socket.readyState).toBe(MockWebSocket.CLOSED)
+      expect(socket.readyState).toBe(wsMock.CLOSED)
     } finally {
       vi.useRealTimers()
     }
   })
 
   test('does not fall back to http when create/list/snapshot/prune websocket payloads resolve successfully', async () => {
-    const fetchMock = vi.fn()
-    vi.stubGlobal('fetch', fetchMock)
+    const fetchMock = mockFetch()
     const { terminalBridge } = await import('#/web/terminal.ts')
     const dispose = terminalBridge.onOutput(() => {})
-    const socket = MockWebSocket.instances[0]
+    const socket = wsMock.instances[0]
     const createPromise = terminalBridge.create({
       repoRoot: '/tmp/repo',
       branch: 'feature',
@@ -634,7 +510,7 @@ describe('terminal web host bridge', () => {
     const disposeIdentity = terminalBridge.onIdentity(onIdentity)
     const disposeLifecycle = terminalBridge.onLifecycle(onLifecycle)
     const disposeSessionsChanged = terminalBridge.onSessionsChanged(onSessionsChanged)
-    const socket = MockWebSocket.instances[0]
+    const socket = wsMock.instances[0]
     if (!socket) throw new Error('missing web terminal socket')
 
     socket.emitMessage(
@@ -703,13 +579,13 @@ describe('terminal web host bridge', () => {
   test('reuses a connecting terminal socket when subscribers briefly drop to zero', async () => {
     const { terminalBridge } = await import('#/web/terminal.ts')
     const firstDispose = terminalBridge.onOutput(() => {})
-    expect(MockWebSocket.instances).toHaveLength(1)
+    expect(wsMock.instances).toHaveLength(1)
 
     firstDispose()
     const secondDispose = terminalBridge.onOutput(() => {})
-    expect(MockWebSocket.instances).toHaveLength(1)
+    expect(wsMock.instances).toHaveLength(1)
 
-    const socket = MockWebSocket.instances[0]
+    const socket = wsMock.instances[0]
     if (!socket) throw new Error('missing web terminal socket')
     const onOutput = vi.fn()
     const disposeMessage = terminalBridge.onOutput(onOutput)
@@ -729,8 +605,8 @@ describe('terminal web host bridge', () => {
   test('keeps a connecting terminal socket open when a one-shot request arrives after subscribers drop', async () => {
     const { terminalBridge } = await import('#/web/terminal.ts')
     const dispose = terminalBridge.onOutput(() => {})
-    expect(MockWebSocket.instances).toHaveLength(1)
-    const socket = MockWebSocket.instances[0]
+    expect(wsMock.instances).toHaveLength(1)
+    const socket = wsMock.instances[0]
     if (!socket) throw new Error('missing web terminal socket')
 
     dispose()
@@ -743,7 +619,7 @@ describe('terminal web host bridge', () => {
     socket.emitOpen()
     await Promise.resolve()
 
-    expect(socket.readyState).toBe(MockWebSocket.OPEN)
+    expect(socket.readyState).toBe(wsMock.OPEN)
     const request = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'create')
     expect(request).toMatchObject({ type: 'request', action: 'create' })
     socket.emitMessage(
@@ -757,7 +633,7 @@ describe('terminal web host bridge', () => {
     )
 
     await expect(createPromise).resolves.toMatchObject({ ok: true, key: 'key_1' })
-    expect(socket.readyState).toBe(MockWebSocket.CLOSED)
+    expect(socket.readyState).toBe(wsMock.CLOSED)
   })
 
   test('ignores stale terminal socket events after reconnect creates a newer socket', async () => {
@@ -765,13 +641,13 @@ describe('terminal web host bridge', () => {
     const { terminalBridge } = await import('#/web/terminal.ts')
     const onOutput = vi.fn()
     const dispose = terminalBridge.onOutput(onOutput)
-    const firstSocket = MockWebSocket.instances[0]
+    const firstSocket = wsMock.instances[0]
     if (!firstSocket) throw new Error('missing initial terminal socket')
 
     firstSocket.close()
     await vi.advanceTimersByTimeAsync(300)
 
-    const secondSocket = MockWebSocket.instances[1]
+    const secondSocket = wsMock.instances[1]
     if (!secondSocket) throw new Error('missing reconnected terminal socket')
 
     firstSocket.emitMessage(
@@ -798,14 +674,14 @@ describe('terminal web host bridge', () => {
     const { markAppQuitting } = await import('#/web/app-lifecycle.ts')
     const { terminalBridge } = await import('#/web/terminal.ts')
     const dispose = terminalBridge.onOutput(() => {})
-    const socket = MockWebSocket.instances[0]
+    const socket = wsMock.instances[0]
     if (!socket) throw new Error('missing initial terminal socket')
 
     markAppQuitting()
     await vi.advanceTimersByTimeAsync(300)
 
-    expect(socket.readyState).toBe(MockWebSocket.CLOSED)
-    expect(MockWebSocket.instances).toHaveLength(1)
+    expect(socket.readyState).toBe(wsMock.CLOSED)
+    expect(wsMock.instances).toHaveLength(1)
     dispose()
     vi.useRealTimers()
   })
@@ -820,7 +696,7 @@ describe('terminal web host bridge', () => {
     await expect(
       terminalBridge.notifyBell({ title: 'repo', body: 'feature/test\\nzsh', key, repoRoot: '/tmp/repo' }),
     ).resolves.toBe(true)
-    mockNotifications[0]?.onclick?.()
+    wsMock.notificationInstances[0]?.onclick?.()
 
     expect(bellClick).toHaveBeenCalledWith({ type: 'terminal-bell-click', repoRoot: '/tmp/repo', key })
     dispose()
