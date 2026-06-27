@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   createMock: vi.fn(),
   closeMock: vi.fn(),
+  setBadgeMock: vi.fn(),
   proposeTerminalGeometryMock: vi.fn<() => { cols: number; rows: number } | null>(() => ({
     cols: 101,
     rows: 31,
@@ -17,7 +18,7 @@ vi.mock('#/web/terminal.ts', () => ({
   terminalBridge: {
     create: mocks.createMock,
     close: mocks.closeMock,
-    setBadge: vi.fn(),
+    setBadge: mocks.setBadgeMock,
   },
 }))
 
@@ -186,6 +187,7 @@ describe('TerminalSlotRegistry create flow', () => {
     mocks.createMock.mockResolvedValue(makeCreateResult())
     mocks.closeMock.mockReset()
     mocks.closeMock.mockResolvedValue(true)
+    mocks.setBadgeMock.mockReset()
     mocks.proposeTerminalGeometryMock.mockClear()
     mocks.preloadTerminalFontMock.mockClear()
     mocks.clientIdMock.mockClear()
@@ -233,6 +235,10 @@ describe('TerminalSlotRegistry create flow', () => {
       rows: 31,
       clientId: 'client_local',
     })
+  })
+
+  test('clears the native badge when the registry starts', () => {
+    expect(mocks.setBadgeMock).toHaveBeenCalledWith(0)
   })
 
   test('keeps the worktree pending while create is in flight with registered host geometry', async () => {
@@ -515,6 +521,49 @@ describe('TerminalSlotRegistry create flow', () => {
 
     // The local session is gone; the worktree snapshot is empty.
     expect(registry.worktreeSnapshot(WORKTREE_KEY).slots.length).toBe(0)
+  })
+
+  test('prunes sessions missing from the repo index and clears their bell badge', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    registry.registerHost(WORKTREE_KEY, host)
+    const key = await registry.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
+    mocks.setBadgeMock.mockClear()
+
+    ;(registry as any).bellController.handleBell(
+      {
+        key,
+        worktreeTerminalKey: WORKTREE_KEY,
+        slotId: 'slot-1',
+        index: 1,
+        repoRoot: REPO_ROOT,
+        branch: BRANCH,
+        worktreePath: WORKTREE_PATH,
+      },
+      { processName: 'zsh', visible: false },
+    )
+    expect(mocks.setBadgeMock).toHaveBeenLastCalledWith(1)
+
+    registry.setRepoIndex({})
+
+    expect(registry.worktreeSnapshot(WORKTREE_KEY).slots.length).toBe(0)
+    expect(mocks.setBadgeMock).toHaveBeenLastCalledWith(0)
+  })
+
+  test('does not prune sessions when the repo still exists but branch metadata is temporarily missing', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    registry.registerHost(WORKTREE_KEY, host)
+    await registry.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
+
+    registry.setRepoIndex({
+      [REPO_ROOT]: {
+        instanceToken: 2,
+        branchByWorktreePath: {},
+      },
+    })
+
+    expect(registry.worktreeSnapshot(WORKTREE_KEY).slots.length).toBe(1)
   })
 
 })
