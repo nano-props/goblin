@@ -1,5 +1,5 @@
 import { selectedBranchForViewMode } from '#/web/stores/repos/branch-view-mode.ts'
-import { replaceRepoState } from '#/web/stores/repos/helpers.ts'
+import { replaceRepoState } from '#/web/stores/repos/repo-state-factory.ts'
 import { persistRestorableRepoSnapshot } from '#/web/stores/repos/persistence.ts'
 import {
   DEFAULT_WORKSPACE_PANE_SIZE,
@@ -8,10 +8,10 @@ import {
 } from '#/shared/workspace-layout.ts'
 import type { BranchViewMode, RepoState, ReposGet, ReposSet, ReposStore } from '#/web/stores/repos/types.ts'
 import {
-  WORKSPACE_PANE_WORKTREE_STATIC_VIEW_TYPES,
-  type WorkspacePaneStaticViewType,
+  WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES,
+  type WorkspacePaneStaticTabType,
   type WorkspacePaneTabOrderEntry,
-  type WorkspacePaneView,
+  type WorkspacePaneTabType,
 } from '#/shared/workspace-pane.ts'
 import { formatWorktreeKey } from '#/shared/terminal-slot-key.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
@@ -46,7 +46,7 @@ type RestorableWorkspaceSelectionActions = Pick<
 type RuntimeCoherentSelectionActions = Pick<
   ReposStore,
   | 'setBranchViewMode'
-  | 'setWorkspacePaneView'
+  | 'setWorkspacePaneTab'
   | 'openWorkspacePaneStaticView'
   | 'closeWorkspacePaneStaticView'
   | 'addWorkspacePaneTerminalTab'
@@ -58,12 +58,7 @@ type RuntimeCoherentSelectionActions = Pick<
   | 'clearSelectedBranch'
 >
 
-function clearLastClosedTabContextForBranch(
-  set: ReposSet,
-  get: ReposGet,
-  id: string,
-  branchName?: string,
-): void {
+function clearLastClosedTabContextForBranch(set: ReposSet, get: ReposGet, id: string, branchName?: string): void {
   const branch = branchName ?? get().repos[id]?.ui.selectedBranch
   if (!branch) return
   set((s) => {
@@ -182,7 +177,7 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
   }
 
   return {
-    openWorkspacePaneStaticView(id: string, tab: WorkspacePaneStaticViewType, branchName?: string) {
+    openWorkspacePaneStaticView(id: string, tab: WorkspacePaneStaticTabType, branchName?: string) {
       set((s) => {
         const repo = s.repos[id]
         const branch = branchName ?? repo?.ui.selectedBranch
@@ -197,7 +192,7 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
       clearLastClosedTabContextForBranch(set, get, id, branchName)
     },
 
-    closeWorkspacePaneStaticView(id: string, tab: WorkspacePaneStaticViewType, branchName?: string) {
+    closeWorkspacePaneStaticView(id: string, tab: WorkspacePaneStaticTabType, branchName?: string) {
       set((s) => {
         const repo = s.repos[id]
         const branch = branchName ?? repo?.ui.selectedBranch
@@ -369,7 +364,7 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
       if (changed && token !== undefined) afterSelectionChange(id, token, selectedForPullRequest)
     },
 
-    setWorkspacePaneView(id: string, tab: WorkspacePaneView) {
+    setWorkspacePaneTab(id: string, tab: WorkspacePaneTabType) {
       // Persists the user's branch-scoped preferred view type verbatim.
       // Opening/closing branch tabs is owned by explicit open/close actions;
       // this action only changes selection intent.
@@ -453,16 +448,16 @@ function workspacePaneTabOrdersEqual(
   return a.length === b.length && b.every((entry, index) => entry.type === a[index]?.type && entry.id === a[index]?.id)
 }
 
-function hiddenWorkspacePaneStaticViews(repo: RepoState, branchName: string): ReadonlySet<WorkspacePaneStaticViewType> {
+function hiddenWorkspacePaneStaticViews(repo: RepoState, branchName: string): ReadonlySet<WorkspacePaneStaticTabType> {
   const branch = repo.data.branches.find((candidate) => candidate.name === branchName)
   if (branch?.worktree?.path) return new Set()
-  return new Set(WORKSPACE_PANE_WORKTREE_STATIC_VIEW_TYPES)
+  return new Set(WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES)
 }
 
 function mergeHiddenWorkspacePaneStaticTabs(
   current: readonly WorkspacePaneTabOrderEntry[],
   visibleOrder: readonly WorkspacePaneTabOrderEntry[],
-  hiddenStaticViews: ReadonlySet<WorkspacePaneStaticViewType>,
+  hiddenStaticViews: ReadonlySet<WorkspacePaneStaticTabType>,
 ): WorkspacePaneTabOrderEntry[] {
   if (hiddenStaticViews.size === 0) return [...visibleOrder]
   const visible = [...visibleOrder]

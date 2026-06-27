@@ -70,7 +70,7 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
   // AFTER the override pass so it can dynamically read the
   // (possibly-overridden) `remote.resolveTarget` and
   // `repo.probe` handlers. The mock composes them into a
-  // converged `RemoteRepoLifecycleResult` (ready or failed,
+  // converged `RemoteRepoConnectionResult` (ready or failed,
   // never connecting) — same shape the real server returns.
   handlers['remote.lifecycle'] = ({ repoId }: { repoId: string }) => {
     // Step 1: server-side resolveTarget. The mock's resolveTarget

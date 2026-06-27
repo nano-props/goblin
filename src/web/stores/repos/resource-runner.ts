@@ -1,15 +1,16 @@
 import type { Draft } from 'immer'
-import { appendRepoEvent, errorEvent, updateIfFresh } from '#/web/stores/repos/helpers.ts'
+import { appendRepoEvent, errorEvent } from '#/web/stores/repos/repo-state-factory.ts'
+import { updateIfFresh } from '#/web/stores/repos/repo-guards.ts'
 import { runLatestOperation } from '#/web/stores/repos/operation-runner.ts'
 import {
-  finishResourceError,
-  finishResourceSuccess,
-  startResource,
-  type RepoResourceState,
-} from '#/web/stores/repos/resources.ts'
+  finishDataLoadError,
+  finishDataLoadSuccess,
+  startDataLoad,
+  type RepoDataLoadState,
+} from '#/web/stores/repos/repo-data-load-state.ts'
 import type { RepoOperationTarget } from '#/web/stores/repos/operation-runner.ts'
 import type { RepoState, ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
-import type { RepoTaskLane } from '#/web/stores/repos/runtime.ts'
+import type { RepoOperationLane } from '#/web/stores/repos/repo-operation-scheduler.ts'
 type RepoDraft = Draft<RepoState>
 
 export interface RunLatestResourceOperationOptions<T> {
@@ -17,11 +18,11 @@ export interface RunLatestResourceOperationOptions<T> {
   get: ReposGet
   id: string
   token: number
-  lane: RepoTaskLane
+  lane: RepoOperationLane
   operationKey: string
   priority: number
   target: RepoOperationTarget
-  selectResource: (repo: RepoDraft) => RepoResourceState
+  selectResource: (repo: RepoDraft) => RepoDataLoadState
   start?: (repo: RepoDraft) => { hasData?: boolean } | void
   task: (signal: AbortSignal) => Promise<T>
   applyResult: (repo: RepoDraft, result: T) => boolean | void
@@ -40,7 +41,7 @@ export interface RunLatestResourceOperationOptions<T> {
 export async function runLatestResourceOperation<T>(options: RunLatestResourceOperationOptions<T>): Promise<void> {
   updateIfFresh(options.set, options.id, options.token, (repo) => {
     const startOptions = options.start?.(repo)
-    startResource(options.selectResource(repo), startOptions ?? undefined)
+    startDataLoad(options.selectResource(repo), startOptions ?? undefined)
   })
   await runLatestOperation({
     set: options.set,
@@ -56,14 +57,14 @@ export async function runLatestResourceOperation<T>(options: RunLatestResourceOp
       updateIfFresh(options.set, options.id, options.token, (repo) => {
         const shouldFinish = options.applyResult(repo, result)
         if (shouldFinish === false) return
-        finishResourceSuccess(options.selectResource(repo))
+        finishDataLoadSuccess(options.selectResource(repo))
       })
       await options.onSuccess?.(result, ctx)
     },
     onError: (message) => {
       options.onErrorLog?.(message)
       updateIfFresh(options.set, options.id, options.token, (repo) => {
-        finishResourceError(options.selectResource(repo), message)
+        finishDataLoadError(options.selectResource(repo), message)
         options.onError?.(message, repo)
         repo.events = appendRepoEvent(repo.events, errorEvent(message))
       })

@@ -3,9 +3,9 @@ import {
   shouldSuppressRepoInvalidationSource,
   resetRepoInvalidationSourceState,
 } from '#/web/stores/repos/invalidation-sources.ts'
-import { isRepoUnavailable } from '#/web/stores/repos/helpers.ts'
+import { isRepoUnavailable } from '#/web/stores/repos/repo-guards.ts'
 import type { RepoState, ReposGet } from '#/web/stores/repos/types.ts'
-import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { workspacePaneStaticViewsForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
 import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 
@@ -27,7 +27,7 @@ type RepoInvalidationRefreshDisposition = 'refresh' | 'suppress'
 export interface RepoStatusRefreshSnapshot {
   id: string
   token: number
-  preferredWorkspacePaneView: WorkspacePaneView
+  preferredWorkspacePaneView: WorkspacePaneTabType
   statusViewOpen: boolean
   unavailable: boolean
   statusPhase: 'idle' | 'loading' | 'refreshing'

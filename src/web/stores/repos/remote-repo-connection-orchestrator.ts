@@ -4,7 +4,7 @@
  * Per docs/goblin-remote-repo-refactor-plan.md §6: every path that
  * starts, retries, or re-probes a remote repo's lifecycle must go
  * through this function. The previous design had three independent
- * entry points (hydrateSession, ensureWorkspaceOpen, ad-hoc retry)
+ * entry points (hydrateRepoSession, ensureWorkspaceOpen, ad-hoc retry)
  * that each composed resolveTarget + probe + classification
  * themselves; the client ended up owning the entire lifecycle
  * state machine. Phase 3 lifts the resolveTarget + probe +
@@ -16,7 +16,7 @@
  *   1. Mark the repo as `connecting` (preserving last-known target
  *      so the UI keeps showing the remote locator during re-probe).
  *   2. Call the server lifecycle boundary
- *      (`resolveRemoteRepoLifecycle` — see §5).
+ *      (`resolveRemoteRepoConnection` — see §5).
  *   3. Settle the lifecycle to `ready` or `failed`.
  *   4. On `ready`, trigger the initial repo data refresh.
  *   5. Guarantee no `connecting` ever stays in the store without
@@ -31,21 +31,21 @@
 import {
   isRemoteRepoId,
   type RemoteRepoFailureReason,
-  type RemoteRepoLifecycleResult,
+  type RemoteRepoConnectionResult,
   type RemoteRepoTarget,
 } from '#/shared/remote-repo.ts'
 import {
   addResolvedRepo,
   addUnavailableRepo,
   type InitialRepoRefresh,
-} from '#/web/stores/repos/lifecycle-write-paths.ts'
+} from '#/web/stores/repos/repo-session-write-paths.ts'
 import { markRemoteLifecycleConnecting } from '#/web/stores/repos/availability.ts'
 import { runLatestOperation } from '#/web/stores/repos/operation-runner.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
 import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
-import { resolveRemoteRepoLifecycle } from '#/web/remote-client.ts'
+import { resolveRemoteRepoConnection } from '#/web/remote-client.ts'
 
-export interface RemoteLifecycleOutcome {
+export interface RemoteRepoConnectionOutcome {
   kind: 'ready' | 'failed'
   reason?: RemoteRepoFailureReason
   repoId: string
@@ -57,7 +57,7 @@ export interface RemoteLifecycleOutcome {
  *  internal outcome shape. The two are nearly identical — the only
  *  difference is the orchestrator's optional `target` (server
  *  guarantees it on `ready`, optional on `failed`). */
-function toOutcome(result: RemoteRepoLifecycleResult): RemoteLifecycleOutcome {
+function toOutcome(result: RemoteRepoConnectionResult): RemoteRepoConnectionOutcome {
   if (result.kind === 'ready') {
     return {
       kind: 'ready',
@@ -87,12 +87,12 @@ function toOutcome(result: RemoteRepoLifecycleResult): RemoteLifecycleOutcome {
  * caller wins, but the user-facing outcome is delivered to
  * whichever call started the run.
  */
-export async function runRemoteRepoLifecycle(
+export async function runRemoteRepoConnection(
   set: ReposSet,
   get: ReposGet,
   repoId: string,
   options: { token?: number; signal?: AbortSignal } = {},
-): Promise<RemoteLifecycleOutcome | null> {
+): Promise<RemoteRepoConnectionOutcome | null> {
   if (!isRemoteRepoId(repoId)) return null
   const token = options.token ?? get().repos[repoId]?.instanceToken
   if (!token) return null
@@ -109,7 +109,7 @@ export async function runRemoteRepoLifecycle(
     return { ...s, repos: { ...s.repos, [repoId]: next } }
   })
 
-  const result = await runLatestOperation<RemoteLifecycleOutcome>({
+  const result = await runLatestOperation<RemoteRepoConnectionOutcome>({
     set,
     get,
     id: repoId,
@@ -119,7 +119,7 @@ export async function runRemoteRepoLifecycle(
     targets: [{ key: 'lifecycle', reason: 'manual-refresh' as const }],
     task: async (signal) => {
       const composed = options.signal ? AbortSignal.any([signal, options.signal]) : signal
-      const result = await resolveRemoteRepoLifecycle({ repoId }, composed)
+      const result = await resolveRemoteRepoConnection({ repoId }, composed)
       return toOutcome(result)
     },
     onResult: (outcome, ctx) => {

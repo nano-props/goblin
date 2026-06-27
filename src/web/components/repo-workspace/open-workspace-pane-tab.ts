@@ -1,14 +1,14 @@
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import { requestVisibleRepoStatusRefresh } from '#/web/stores/repos/refresh-coordinator.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import type { WorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
-import { workspacePaneStaticTabProvider } from '#/web/workspace-pane/workspace-pane-tab-providers.ts'
+import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
+import { workspacePaneStaticTabProvider } from '#/web/components/workspace-pane/tab-providers.ts'
 
-export async function openWorkspacePaneView(input: {
+export async function openWorkspacePaneTab(input: {
   repoId: string
   branchName?: string
   worktreePath: string | null | undefined
-  type: WorkspacePaneStaticViewType
+  type: WorkspacePaneStaticTabType
   navigation: Pick<MainWindowNavigationActions, 'showRepoBranchWorkspacePaneView' | 'showRepoWorkspacePaneView'>
 }): Promise<boolean> {
   const provider = workspacePaneStaticTabProvider(input.type)
@@ -22,7 +22,7 @@ export async function openWorkspacePaneView(input: {
 function showWorkspacePaneView(input: {
   repoId: string
   branchName?: string
-  type: WorkspacePaneStaticViewType
+  type: WorkspacePaneStaticTabType
   navigation: Pick<MainWindowNavigationActions, 'showRepoBranchWorkspacePaneView' | 'showRepoWorkspacePaneView'>
 }): void {
   if (input.branchName) {

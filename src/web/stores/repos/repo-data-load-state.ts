@@ -1,29 +1,29 @@
-// Resources state tracks UI-facing load phases (idle/loading/refreshing).
+// Data-load state tracks UI-facing load phases (idle/loading/refreshing).
 // Executability decisions use the operations system (operations.ts) instead;
 // keeping the two separate eliminates the risk of drift.
 import type { PullRequestFetchMode } from '#/web/types.ts'
-export type RepoResourcePhase = 'idle' | 'loading' | 'refreshing'
+export type RepoDataLoadPhase = 'idle' | 'loading' | 'refreshing'
 
-export interface RepoResourceState {
-  phase: RepoResourcePhase
+export interface RepoDataLoadState {
+  phase: RepoDataLoadPhase
   loadedAt: number | null
   error: string | null
   stale: boolean
 }
 
-export interface RepoPullRequestResourceState extends RepoResourceState {
+export interface RepoPullRequestDataLoadState extends RepoDataLoadState {
   mode: PullRequestFetchMode | null
 }
 
-export interface RepoResourcesState {
-  snapshot: RepoResourceState
-  status: RepoResourceState
-  fetch: RepoResourceState
-  pullRequests: RepoPullRequestResourceState
-  pullRequestsByBranch: Record<string, RepoPullRequestResourceState>
+export interface RepoDataLoadBundle {
+  snapshot: RepoDataLoadState
+  status: RepoDataLoadState
+  fetch: RepoDataLoadState
+  pullRequests: RepoPullRequestDataLoadState
+  pullRequestsByBranch: Record<string, RepoPullRequestDataLoadState>
 }
 
-export function idleResource(loadedAt: number | null = null): RepoResourceState {
+export function idleDataLoad(loadedAt: number | null = null): RepoDataLoadState {
   return {
     phase: 'idle',
     loadedAt,
@@ -32,91 +32,91 @@ export function idleResource(loadedAt: number | null = null): RepoResourceState 
   }
 }
 
-export function idlePullRequestResource(
+export function idlePullRequestDataLoad(
   loadedAt: number | null = null,
   mode: PullRequestFetchMode | null = null,
-): RepoPullRequestResourceState {
+): RepoPullRequestDataLoadState {
   return {
-    ...idleResource(loadedAt),
+    ...idleDataLoad(loadedAt),
     mode,
   }
 }
 
-export function emptyRepoResources(): RepoResourcesState {
+export function emptyRepoDataLoadBundle(): RepoDataLoadBundle {
   return {
-    snapshot: idleResource(),
-    status: idleResource(),
-    fetch: idleResource(),
-    pullRequests: idlePullRequestResource(),
+    snapshot: idleDataLoad(),
+    status: idleDataLoad(),
+    fetch: idleDataLoad(),
+    pullRequests: idlePullRequestDataLoad(),
     pullRequestsByBranch: {},
   }
 }
 
-export function resourceBusy(resource: RepoResourceState): boolean {
+export function dataLoadBusy(resource: RepoDataLoadState): boolean {
   return resource.phase !== 'idle'
 }
 
-export function resourceInitialLoading(resource: RepoResourceState): boolean {
+export function dataLoadInitialLoading(resource: RepoDataLoadState): boolean {
   return resource.phase === 'loading'
 }
 
-export function startResource(resource: RepoResourceState, options?: { hasData?: boolean }): void {
+export function startDataLoad(resource: RepoDataLoadState, options?: { hasData?: boolean }): void {
   resource.phase = resource.loadedAt !== null || options?.hasData ? 'refreshing' : 'loading'
   resource.error = null
 }
 
-export function finishResourceSuccess(resource: RepoResourceState, loadedAt: number = Date.now()): void {
+export function finishDataLoadSuccess(resource: RepoDataLoadState, loadedAt: number = Date.now()): void {
   resource.phase = 'idle'
   resource.loadedAt = loadedAt
   resource.error = null
   resource.stale = false
 }
 
-export function finishResourceError(resource: RepoResourceState, error: string): void {
+export function finishDataLoadError(resource: RepoDataLoadState, error: string): void {
   const stale = resource.loadedAt !== null || resource.phase === 'refreshing'
   resource.phase = 'idle'
   resource.error = error
   resource.stale = stale
 }
 
-export function finishResourceUnavailable(resource: RepoResourceState): void {
+export function finishDataLoadUnavailable(resource: RepoDataLoadState): void {
   const stale = resource.loadedAt !== null || resource.phase === 'refreshing'
   resource.phase = 'idle'
   resource.error = null
   resource.stale = stale
 }
 
-export function cancelResource(resource: RepoResourceState): void {
+export function cancelDataLoad(resource: RepoDataLoadState): void {
   resource.phase = 'idle'
 }
 
-export function startPullRequestResource(
-  resource: RepoPullRequestResourceState,
+export function startPullRequestDataLoad(
+  resource: RepoPullRequestDataLoadState,
   mode: PullRequestFetchMode,
   options?: { hasData?: boolean },
 ): void {
-  startResource(resource, options)
+  startDataLoad(resource, options)
   resource.mode = mode
 }
 
-export function finishPullRequestResourceSuccess(
-  resource: RepoPullRequestResourceState,
+export function finishPullRequestDataLoadSuccess(
+  resource: RepoPullRequestDataLoadState,
   mode: PullRequestFetchMode,
   loadedAt: number = Date.now(),
 ): void {
-  finishResourceSuccess(resource, loadedAt)
+  finishDataLoadSuccess(resource, loadedAt)
   resource.mode = mode
 }
 
-export function finishPullRequestResourceUnavailable(
-  resource: RepoPullRequestResourceState,
+export function finishPullRequestDataLoadUnavailable(
+  resource: RepoPullRequestDataLoadState,
   mode: PullRequestFetchMode,
 ): void {
-  finishResourceUnavailable(resource)
+  finishDataLoadUnavailable(resource)
   resource.mode = mode
 }
 
-export function finishPullRequestResourceError(resource: RepoPullRequestResourceState, error: string): void {
-  finishResourceError(resource, error)
+export function finishPullRequestDataLoadError(resource: RepoPullRequestDataLoadState, error: string): void {
+  finishDataLoadError(resource, error)
   resource.mode = null
 }

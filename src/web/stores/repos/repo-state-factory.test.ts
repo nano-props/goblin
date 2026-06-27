@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
-import { deriveConnectivity, emptyRepo } from '#/web/stores/repos/helpers.ts'
+import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
+import { deriveConnectivity } from '#/web/stores/repos/repo-guards.ts'
 
 const REMOTE_ID = 'ssh-config://example/srv/repo'
 

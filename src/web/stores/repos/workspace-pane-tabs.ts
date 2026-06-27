@@ -1,5 +1,5 @@
 import type { RepoUiState } from '#/web/stores/repos/types.ts'
-import type { WorkspacePaneStaticViewType, WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneStaticTabType, WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
 import {
   isWorkspacePaneTabOrderEntry,
   workspacePaneStaticTabOrderEntry,
@@ -22,7 +22,7 @@ export function workspacePaneTabOrderForBranch(
 export function workspacePaneStaticViewsForBranch(
   ui: Pick<RepoUiState, 'workspacePaneTabOrderByBranch'>,
   branch: string | null | undefined,
-): WorkspacePaneStaticViewType[] {
+): WorkspacePaneStaticTabType[] {
   return workspacePaneTabOrderForBranch(ui, branch).flatMap((entry) => (entry.type === 'terminal' ? [] : [entry.type]))
 }
 
@@ -39,7 +39,7 @@ export function workspacePaneTabOrderRecordWith(
 
 export function workspacePaneTabOrderWithStaticView(
   current: readonly WorkspacePaneTabOrderEntry[],
-  view: WorkspacePaneStaticViewType,
+  view: WorkspacePaneStaticTabType,
 ): WorkspacePaneTabOrderEntry[] {
   if (current.some((entry) => entry.type === view)) return normalizeWorkspacePaneTabOrder(current)
   return normalizeWorkspacePaneTabOrder([...current, workspacePaneStaticTabOrderEntry(view)])
@@ -47,7 +47,7 @@ export function workspacePaneTabOrderWithStaticView(
 
 export function workspacePaneTabOrderWithoutStaticView(
   current: readonly WorkspacePaneTabOrderEntry[],
-  view: WorkspacePaneStaticViewType,
+  view: WorkspacePaneStaticTabType,
 ): WorkspacePaneTabOrderEntry[] {
   return normalizeWorkspacePaneTabOrder(current.filter((entry) => entry.type !== view))
 }
@@ -65,7 +65,9 @@ export function workspacePaneTabOrderWithoutTerminal(
   current: readonly WorkspacePaneTabOrderEntry[],
   terminalKey: string,
 ): WorkspacePaneTabOrderEntry[] {
-  return normalizeWorkspacePaneTabOrder(current.filter((entry) => entry.type !== 'terminal' || entry.id !== terminalKey))
+  return normalizeWorkspacePaneTabOrder(
+    current.filter((entry) => entry.type !== 'terminal' || entry.id !== terminalKey),
+  )
 }
 
 export function normalizeWorkspacePaneTabOrderRecord(
@@ -89,9 +91,7 @@ export function normalizeWorkspacePaneTabOrder(
   for (const raw of order) {
     if (!isWorkspacePaneTabOrderEntry(raw)) continue
     const entry =
-      raw.type === 'terminal'
-        ? workspacePaneTerminalTabOrderEntry(raw.id)
-        : workspacePaneStaticTabOrderEntry(raw.type)
+      raw.type === 'terminal' ? workspacePaneTerminalTabOrderEntry(raw.id) : workspacePaneStaticTabOrderEntry(raw.type)
     const identity = workspacePaneTabOrderEntryIdentity(entry)
     if (seen.has(identity)) continue
     seen.add(identity)

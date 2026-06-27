@@ -84,7 +84,7 @@ export interface RepoMutationResult extends ExecResult {
   affectedRepoIds?: readonly string[]
 }
 
-export interface RepoBackend {
+export interface RepoSource {
   id: string
   kind: 'local' | 'remote'
   probe(): Promise<ProbeResult>
@@ -124,7 +124,7 @@ export interface RepoBackend {
   getBrowserRemoteUrl(branch?: string, signal?: AbortSignal): Promise<string | null>
 }
 
-interface RepoBackendCapabilities {
+interface RepoSourceCapabilities {
   pullRequests: 'cwd-github' | 'derived-github-repo'
 }
 
@@ -134,15 +134,15 @@ export async function resolveRemoteRepoTarget(repoId: string): Promise<RemoteRep
   return (await resolveSshRemoteTarget(parsed)).target
 }
 
-export async function runWithRepoBackend<T>(
+export async function runWithRepoSource<T>(
   cwd: string,
-  task: (backend: Awaited<ReturnType<typeof resolveRepoBackend>>) => Promise<T>,
+  task: (backend: Awaited<ReturnType<typeof resolveRepoSource>>) => Promise<T>,
 ): Promise<T> {
-  return await task(await resolveRepoBackend(cwd))
+  return await task(await resolveRepoSource(cwd))
 }
 
-export async function resolveRepoBackend(repoId: string): Promise<RepoBackend> {
-  return isRemoteRepoId(repoId) ? await createRemoteRepoBackend(repoId) : createLocalRepoBackend(repoId)
+export async function resolveRepoSource(repoId: string): Promise<RepoSource> {
+  return isRemoteRepoId(repoId) ? await createRemoteRepoSource(repoId) : createLocalRepoSource(repoId)
 }
 
 function withAffectedRepoIds(result: ExecResult, affectedRepoIds: readonly string[]): RepoMutationResult {
@@ -190,8 +190,8 @@ async function probeGitRepository(cwd: string): Promise<ProbeAvailability> {
   return { ok: false, message: 'error.not-git-repo' }
 }
 
-function createLocalRepoBackend(repoId: string): RepoBackend {
-  const capabilities: RepoBackendCapabilities = { pullRequests: 'cwd-github' }
+function createLocalRepoSource(repoId: string): RepoSource {
+  const capabilities: RepoSourceCapabilities = { pullRequests: 'cwd-github' }
 
   async function validateBranchDeletion(
     branch: string,
@@ -393,9 +393,9 @@ function createLocalRepoBackend(repoId: string): RepoBackend {
   }
 }
 
-async function createRemoteRepoBackend(repoId: string): Promise<RepoBackend> {
+async function createRemoteRepoSource(repoId: string): Promise<RepoSource> {
   const target = await resolveRemoteRepoTarget(repoId)
-  const capabilities: RepoBackendCapabilities = { pullRequests: 'derived-github-repo' }
+  const capabilities: RepoSourceCapabilities = { pullRequests: 'derived-github-repo' }
   return {
     id: repoId,
     kind: 'remote',
@@ -453,11 +453,14 @@ async function createRemoteRepoBackend(repoId: string): Promise<RepoBackend> {
         expectedConfigHash: options.worktreeBootstrap.configHash,
       })
       if (!bootstrapped.ok) return withAffectedRepoIds({ ...bootstrapped, repoChanged: true }, affectedRepoIds)
-      return withAffectedRepoIds({
-        ok: true,
-        message: [created.message, bootstrapped.message].filter(Boolean).join('\n'),
-        ...(bootstrapped.worktreeBootstrap ? { worktreeBootstrap: bootstrapped.worktreeBootstrap } : {}),
-      }, affectedRepoIds)
+      return withAffectedRepoIds(
+        {
+          ok: true,
+          message: [created.message, bootstrapped.message].filter(Boolean).join('\n'),
+          ...(bootstrapped.worktreeBootstrap ? { worktreeBootstrap: bootstrapped.worktreeBootstrap } : {}),
+        },
+        affectedRepoIds,
+      )
     },
     async deleteBranch(branch, options, signal) {
       return await deleteRemoteBranch(target, { branch, force: options?.force, signal })

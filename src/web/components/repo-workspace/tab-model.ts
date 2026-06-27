@@ -1,30 +1,34 @@
-import type { WorkspacePaneStaticViewType, WorkspacePaneTabOrderEntry, WorkspacePaneView } from '#/shared/workspace-pane.ts'
-import { resolveRenderableWorkspacePaneView } from '#/web/lib/workspace-pane-view.ts'
-import type { TerminalSlotBase, WorkspacePaneViewSummary } from '#/web/components/terminal/types.ts'
+import type {
+  WorkspacePaneStaticTabType,
+  WorkspacePaneTabOrderEntry,
+  WorkspacePaneTabType,
+} from '#/shared/workspace-pane.ts'
+import { resolveRenderableWorkspacePaneTab } from '#/web/lib/workspace-pane-tab.ts'
+import type { TerminalSessionBase, WorkspacePaneTabSummary } from '#/web/components/terminal/types.ts'
 import {
   PENDING_TERMINAL_WORKSPACE_PANE_VIEW_IDENTITY,
   isTerminalWorkspacePaneView,
-} from '#/web/components/workspace-pane/workspace-pane-view-model.ts'
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
+} from '#/web/components/workspace-pane/workspace-pane-tab-summary.ts'
+import { worktreeTerminalKey } from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
 import { normalizeWorkspacePaneTabOrder } from '#/web/stores/repos/workspace-pane-tabs.ts'
 import {
   terminalWorkspacePaneTabProvider,
   workspacePaneStaticTabProvider,
   workspacePaneTabProvider,
-} from '#/web/workspace-pane/workspace-pane-tab-providers.ts'
+} from '#/web/components/workspace-pane/tab-providers.ts'
 
 export type BranchWorkspacePaneTabKind = 'static' | 'terminal' | 'pending'
 
-type TerminalWorkspacePaneTabView = Extract<WorkspacePaneViewSummary, { type: 'terminal' }>
+type TerminalWorkspacePaneTabView = Extract<WorkspacePaneTabSummary, { type: 'terminal' }>
 
 interface BranchWorkspacePaneTabBase {
   identity: string
-  type: WorkspacePaneView
+  type: WorkspacePaneTabType
   kind: BranchWorkspacePaneTabKind
 }
 
 export interface BranchWorkspacePaneStaticTab extends BranchWorkspacePaneTabBase {
-  type: WorkspacePaneStaticViewType
+  type: WorkspacePaneStaticTabType
   kind: 'static'
   view: null
 }
@@ -51,7 +55,7 @@ export type BranchWorkspacePaneTab = BranchWorkspacePaneMaterializedTab | Branch
 export type BranchWorkspacePaneSelection =
   | {
       kind: 'materialized-tab'
-      view: WorkspacePaneView
+      view: WorkspacePaneTabType
       tab: BranchWorkspacePaneMaterializedTab
     }
   | {
@@ -61,25 +65,25 @@ export type BranchWorkspacePaneSelection =
       tab: null
     }
 
-export interface BranchWorkspacePaneTabModel {
+export interface RepoWorkspaceTabModel {
   repoId: string
   branchName: string | null
   worktreePath: string | null
   worktreeTerminalKey: string | null
-  terminalBase: TerminalSlotBase | null
+  terminalBase: TerminalSessionBase | null
   terminalCreatePending: boolean
   terminalSyncReady: boolean
   /** Single branch-scoped workspace pane tab strip order. */
   tabOrder: WorkspacePaneTabOrderEntry[]
   /** Open static workspace pane views derived from tabOrder. */
-  staticViews: WorkspacePaneStaticViewType[]
+  staticViews: WorkspacePaneStaticTabType[]
   /** Live terminal views owned by the terminal runtime. */
-  terminalViews: WorkspacePaneViewSummary[]
+  terminalViews: WorkspacePaneTabSummary[]
   tabs: BranchWorkspacePaneTab[]
   /** The render target for the workspace pane body. */
   selection: BranchWorkspacePaneSelection | null
   /** The selected view, when a body can be rendered. */
-  renderedView: WorkspacePaneView | null
+  renderedView: WorkspacePaneTabType | null
   /** The selected materialized tab, when one exists in the tab strip. */
   activeTab: BranchWorkspacePaneMaterializedTab | null
 }
@@ -88,9 +92,9 @@ export interface BranchWorkspacePaneTabModelInput {
   repoId: string
   branchName: string | null
   worktreePath: string | null
-  preferredView: WorkspacePaneView
+  preferredView: WorkspacePaneTabType
   tabOrder: readonly WorkspacePaneTabOrderEntry[]
-  runtimeTerminalViews: readonly WorkspacePaneViewSummary[]
+  runtimeTerminalViews: readonly WorkspacePaneTabSummary[]
   terminalSessionCount: number
   terminalCreatePending?: boolean
   terminalSyncReady: boolean
@@ -119,16 +123,14 @@ export interface BranchWorkspacePaneTabModelInput {
   selectedTerminalKey: string | null
 }
 
-export function createBranchWorkspacePaneTabModel(
-  input: BranchWorkspacePaneTabModelInput,
-): BranchWorkspacePaneTabModel {
+export function createRepoWorkspaceTabModel(input: BranchWorkspacePaneTabModelInput): RepoWorkspaceTabModel {
   const tabOrder = input.branchName ? normalizeWorkspacePaneTabOrder(input.tabOrder) : []
   const worktreePath = input.branchName ? input.worktreePath : null
   const worktreeKey = worktreePath ? worktreeTerminalKey(input.repoId, worktreePath) : null
   const terminalViews = worktreeKey ? input.runtimeTerminalViews.filter(isTerminalWorkspacePaneView) : []
   const materializedTabs = materializedWorkspacePaneTabs({ tabOrder, terminalViews, hasWorktree: !!worktreeKey })
   const staticViews = materializedTabs.flatMap((tab) => (tab.kind === 'static' ? [tab.type] : []))
-  const candidateView = resolveRenderableWorkspacePaneView(input.preferredView, {
+  const candidateView = resolveRenderableWorkspacePaneTab(input.preferredView, {
     hasWorktree: !!worktreeKey,
     terminalSessionCount: input.terminalSessionCount,
     terminalCreatePending: input.terminalCreatePending,
@@ -192,7 +194,7 @@ export function adjacentBranchWorkspacePaneTab(
   return null
 }
 
-function staticWorkspacePaneTab(type: WorkspacePaneStaticViewType): BranchWorkspacePaneStaticTab {
+function staticWorkspacePaneTab(type: WorkspacePaneStaticTabType): BranchWorkspacePaneStaticTab {
   const provider = workspacePaneStaticTabProvider(type)
   return {
     identity: provider.identity(),
@@ -271,10 +273,14 @@ function materializedWorkspacePaneTabs(input: {
 }
 
 function workspacePaneSelection(
-  renderableView: WorkspacePaneView | null,
+  renderableView: WorkspacePaneTabType | null,
   activeTab: BranchWorkspacePaneMaterializedTab | null,
   materializedTabs: readonly BranchWorkspacePaneMaterializedTab[],
-  lastClosedTabContext: { closingIdentity: string; previousTabIdentities: readonly string[]; wasActive?: boolean } | null,
+  lastClosedTabContext: {
+    closingIdentity: string
+    previousTabIdentities: readonly string[]
+    wasActive?: boolean
+  } | null,
 ): BranchWorkspacePaneSelection | null {
   // User-initiated close of the active tab: prefer the spatial neighbor in the
   // tab strip even if the user's preferred view is still renderable through
@@ -323,10 +329,7 @@ function workspacePaneSelection(
   return null
 }
 
-function adjacentIdentityAfterClose(
-  identities: readonly string[],
-  closingIdentity: string,
-): string | null {
+function adjacentIdentityAfterClose(identities: readonly string[], closingIdentity: string): string | null {
   const closingIndex = identities.indexOf(closingIdentity)
   if (closingIndex === -1) return null
   for (let offset = 1; offset < identities.length; offset += 1) {
@@ -340,7 +343,7 @@ function adjacentIdentityAfterClose(
 
 function activeBranchWorkspacePaneTab(
   tabs: readonly BranchWorkspacePaneMaterializedTab[],
-  renderableView: WorkspacePaneView,
+  renderableView: WorkspacePaneTabType,
   selectedTerminalKey: string | null,
 ): BranchWorkspacePaneMaterializedTab | null {
   if (renderableView === 'terminal') {

@@ -25,7 +25,7 @@ interface RepoShellSidebarProps {
   onOpenSettings?: () => void
 }
 
-export function RepoShellSidebar({
+export function RepoLayoutSidebar({
   repoId,
   compact,
   branchContent,

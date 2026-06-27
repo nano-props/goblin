@@ -9,7 +9,7 @@ import {
   REPO_A,
   REPO_B,
   resetLifecycleTest,
-} from '#/web/stores/repos/lifecycle-test-utils.ts'
+} from '#/web/stores/repos/repo-session-test-utils.ts'
 
 beforeEach(resetLifecycleTest)
 
@@ -79,7 +79,7 @@ describe('repo lifecycle', () => {
     if (second.ok) useReposStore.getState().setActive(second.id)
     // Opening REPO_A again is a focus action: the repo is already
     // resolved and its data is coherent, so we skip the snapshot/status
-    // pipeline. (hydrateSession still always refreshes on boot — see
+    // pipeline. (hydrateRepoSession still always refreshes on boot — see
     // the lifecycle-hydrate test for the cached-then-fresh contract.)
     const third = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
     if (third.ok) useReposStore.getState().setActive(third.id)

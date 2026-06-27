@@ -3,9 +3,9 @@ import { ArrowLeft } from 'lucide-react'
 import { useT } from '#/web/stores/i18n.ts'
 import { Button } from '#/web/components/ui/button.tsx'
 import { Tip } from '#/web/components/Tip.tsx'
-import { useTerminalSlotContext } from '#/web/components/terminal/terminal-slot-context.ts'
+import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import {
-  WorkspacePaneViewStrip,
+  WorkspacePaneTabStrip,
   EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY,
   createPendingWorkspacePaneTabItem,
   createStaticWorkspacePaneTabItem,
@@ -14,15 +14,12 @@ import {
   isStaticWorkspacePaneTabItem,
   isTerminalWorkspacePaneTabItem,
   type WorkspacePaneTabItem,
-} from '#/web/components/workspace-pane/WorkspacePaneViewStrip.tsx'
+} from '#/web/components/workspace-pane/WorkspacePaneTabStrip.tsx'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
-import type { WorkspacePaneStaticViewType, WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
-import type { TerminalSlotBase } from '#/web/components/terminal/types.ts'
-import type {
-  BranchWorkspaceRepo,
-  SelectedBranchWorkspacePresentation,
-} from '#/web/components/branch-workspace/model.ts'
-import type { BranchWorkspacePaneTabModel } from '#/web/components/branch-workspace/workspace-pane-tab-model.ts'
+import type { WorkspacePaneStaticTabType, WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
+import type { TerminalSessionBase } from '#/web/components/terminal/types.ts'
+import type { RepoWorkspaceRepo, SelectedRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
+import type { RepoWorkspaceTabModel } from '#/web/components/repo-workspace/tab-model.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import { useIsInitialSyncInFlight } from '#/web/stores/repo-sync.ts'
@@ -33,7 +30,7 @@ import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-comm
 import {
   terminalWorkspacePaneTabProvider,
   workspacePaneStaticTabProvider,
-} from '#/web/workspace-pane/workspace-pane-tab-providers.ts'
+} from '#/web/components/workspace-pane/tab-providers.ts'
 import {
   WorkspaceToolbar,
   WorkspaceToolbarActions,
@@ -41,19 +38,19 @@ import {
   WorkspaceToolbarLeadingSpacer,
   WorkspaceToolbarPrimary,
 } from '#/web/components/workspace-toolbar-chrome.tsx'
-import { WorkspaceOpenExternallyMenu } from '#/web/components/branch-workspace/WorkspaceOpenExternallyMenu.tsx'
+import { WorkspaceOpenExternallyMenu } from '#/web/components/repo-workspace/WorkspaceOpenExternallyMenu.tsx'
 import type { BranchActions } from '#/web/hooks/useBranchActions.tsx'
 
 interface Props {
-  repo: BranchWorkspaceRepo
-  detail: SelectedBranchWorkspacePresentation
+  repo: RepoWorkspaceRepo
+  detail: SelectedRepoWorkspacePresentation
   workspacePaneId: string
-  workspacePaneTabModel: BranchWorkspacePaneTabModel
+  workspacePaneTabModel: RepoWorkspaceTabModel
   trafficLightOffset?: boolean
   branchActions?: BranchActions
 }
 
-export function BranchWorkspaceToolbar({
+export function RepoWorkspaceToolbar({
   repo,
   detail,
   workspacePaneId,
@@ -74,11 +71,11 @@ export function BranchWorkspaceToolbar({
   const preferredWorkspacePaneView = preferredWorkspacePaneViewForBranch(repo.ui, branchName)
   const showBranchLevelTabs = !!detail.branch
 
-  const { createTerminal, selectTerminal, scrollToBottom } = useTerminalSlotContext()
+  const { createTerminal, selectTerminal, scrollToBottom } = useTerminalSessionContext()
 
   const workspacePaneTabFocusRegistry = useFocusRegistry<string, HTMLButtonElement>()
 
-  const terminalBase = useMemo<TerminalSlotBase | null>(
+  const terminalBase = useMemo<TerminalSessionBase | null>(
     () =>
       detail.branch?.worktree?.path
         ? { repoRoot: repo.id, branch: detail.branch.name, worktreePath: detail.branch.worktree.path }
@@ -143,7 +140,7 @@ export function BranchWorkspaceToolbar({
       workspacePaneTabModel.tabs.map((tab) => {
         if (tab.kind === 'static') {
           const metadata = { t, branchName: branchName ?? '', statusCount: detail.statusCount }
-          const type = tab.type as WorkspacePaneStaticViewType
+          const type = tab.type as WorkspacePaneStaticTabType
           const provider = workspacePaneStaticTabProvider(type)
           return createStaticWorkspacePaneTabItem({
             type,
@@ -251,10 +248,10 @@ export function BranchWorkspaceToolbar({
           {/* Compact UI only: back-to-branch-navigator is the user's escape hatch
               from the branch workspace. It must stay visible even when the tab
               strip below is empty, so it lives at the toolbar level rather than
-              inside WorkspacePaneViewStrip's tab chrome. */}
+              inside WorkspacePaneTabStrip's tab chrome. */}
           {compact && branchWorkspaceBackAction}
           {showBranchLevelTabs && (
-            <WorkspacePaneViewStrip
+            <WorkspacePaneTabStrip
               worktreeTerminalKey={workspacePaneTabModel.worktreeTerminalKey}
               items={workspacePaneTabItems}
               workspacePaneId={workspacePaneId}

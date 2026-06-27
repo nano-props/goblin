@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { replaceRepo } from '#/web/stores/repos/helpers.ts'
+import { replaceRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { terminalLog } from '#/web/logger.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { markRepoOperationTargets, repoOperation } from '#/web/stores/repos/runtime.ts'
+import { markRepoOperationTargets, repoOperation } from '#/web/stores/repos/repo-operation-scheduler.ts'
 import { branch, REPO_ID, resetRefreshTest, ipcHandlers, seedRepo } from '#/web/stores/repos/refresh-test-utils.ts'
 import { seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { canStartRemoteFetch } from '#/web/stores/repos/sync-state.ts'
@@ -291,11 +291,9 @@ describe('remote fetch timestamps', () => {
       }
     }
 
-    const result = await useReposStore.getState().runBranchAction(
-      REPO_ID,
-      createWorktreeAction(),
-      { token, refreshOnError: false },
-    )
+    const result = await useReposStore
+      .getState()
+      .runBranchAction(REPO_ID, createWorktreeAction(), { token, refreshOnError: false })
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(result).toEqual({ ok: true, message: 'ok' })
@@ -313,11 +311,9 @@ describe('remote fetch timestamps', () => {
       return { branches: [branch('main'), branch('feature/a')], current: 'main' }
     }
 
-    const result = await useReposStore.getState().runBranchAction(
-      REPO_ID,
-      createWorktreeAction(),
-      { token, refreshOnError: false },
-    )
+    const result = await useReposStore
+      .getState()
+      .runBranchAction(REPO_ID, createWorktreeAction(), { token, refreshOnError: false })
 
     expect(result).toEqual({ ok: false, message: 'error.invalid-path' })
     expect(snapshotCount).toBe(0)
@@ -340,11 +336,9 @@ describe('remote fetch timestamps', () => {
       }
     }
 
-    const result = await useReposStore.getState().runBranchAction(
-      REPO_ID,
-      createWorktreeAction(),
-      { token, refreshOnError: false },
-    )
+    const result = await useReposStore
+      .getState()
+      .runBranchAction(REPO_ID, createWorktreeAction(), { token, refreshOnError: false })
 
     expect(result).toEqual({
       ok: false,

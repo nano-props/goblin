@@ -4,29 +4,26 @@ import { useT } from '#/web/stores/i18n.ts'
 import { EmptyState, ScrollPane } from '#/web/components/Layout.tsx'
 import { StatusListSkeleton } from '#/web/components/Skeleton.tsx'
 import { StatusList } from '#/web/components/StatusList.tsx'
-import { getRepositoryLog } from '#/web/repo-client.ts'
+import { getRepoLog } from '#/web/repo-client.ts'
 import type { LogEntry } from '#/web/types.ts'
-import { BranchStatus } from '#/web/components/branch-workspace/BranchStatus.tsx'
-import { TerminalSlot } from '#/web/components/terminal/TerminalSlot.tsx'
-import type { TerminalSlotBase } from '#/web/components/terminal/types.ts'
-import type {
-  BranchWorkspaceRepo,
-  SelectedBranchWorkspacePresentation,
-} from '#/web/components/branch-workspace/model.ts'
+import { BranchStatus } from '#/web/components/repo-workspace/BranchStatus.tsx'
+import { TerminalSessionView } from '#/web/components/terminal/TerminalSessionView.tsx'
+import type { TerminalSessionBase } from '#/web/components/terminal/types.ts'
+import type { RepoWorkspaceRepo, SelectedRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
-import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
-import { useTerminalSlotContext } from '#/web/components/terminal/terminal-slot-context.ts'
+import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
+import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
-import type { WorkspacePanePanelLabel } from '#/web/workspace-pane/workspace-pane-tab-providers.ts'
+import type { WorkspacePanePanelLabel } from '#/web/components/workspace-pane/tab-providers.ts'
 
 const DEFAULT_BRANCH_HISTORY_ERROR_KEY = 'error.failed-read-repo'
 
 export interface WorkspacePanePanelRenderInput {
-  type: WorkspacePaneView
-  repo: Pick<BranchWorkspaceRepo, 'id' | 'data' | 'ui'> & {
-    data: BranchWorkspaceRepo['data'] & Pick<BranchWorkspaceRepo['data'], 'statusLoaded'>
+  type: WorkspacePaneTabType
+  repo: Pick<RepoWorkspaceRepo, 'id' | 'data' | 'ui'> & {
+    data: RepoWorkspaceRepo['data'] & Pick<RepoWorkspaceRepo['data'], 'statusLoaded'>
   }
-  detail: SelectedBranchWorkspacePresentation
+  detail: SelectedRepoWorkspacePresentation
   workspacePaneId: string
   panelLabel: WorkspacePanePanelLabel
   terminalSyncReady: boolean
@@ -42,7 +39,7 @@ interface TabPanelProps {
   children: ReactNode
 }
 
-type BranchWorkspaceBranch = NonNullable<SelectedBranchWorkspacePresentation['branch']>
+type BranchWorkspaceBranch = NonNullable<SelectedRepoWorkspacePresentation['branch']>
 type WorkspacePanePanelComponent = (props: WorkspacePanePanelProps) => ReactNode
 
 const BRANCH_WORKSPACE_PANE_PANEL_BY_TYPE = {
@@ -50,7 +47,7 @@ const BRANCH_WORKSPACE_PANE_PANEL_BY_TYPE = {
   changes: ChangesWorkspacePanePanel,
   history: HistoryWorkspacePanePanel,
   terminal: TerminalWorkspacePanePanel,
-} satisfies Record<WorkspacePaneView, WorkspacePanePanelComponent>
+} satisfies Record<WorkspacePaneTabType, WorkspacePanePanelComponent>
 
 export function renderBranchWorkspacePanePanel(input: WorkspacePanePanelRenderInput): ReactNode {
   const Panel = BRANCH_WORKSPACE_PANE_PANEL_BY_TYPE[input.type]
@@ -157,7 +154,7 @@ function BranchHistoryTab({
   useEffect(() => {
     const ctrl = new AbortController()
     setState({ phase: 'loading', entries: [], error: null })
-    void getRepositoryLog(repoId, branchName, { count: DEFAULT_REPOSITORY_LOG_COUNT, signal: ctrl.signal })
+    void getRepoLog(repoId, branchName, { count: DEFAULT_REPOSITORY_LOG_COUNT, signal: ctrl.signal })
       .then((entries) => {
         if (!ctrl.signal.aborted) setState({ phase: 'loaded', entries, error: null })
       })
@@ -175,11 +172,7 @@ function BranchHistoryTab({
   const errorTitleKey = state.error ?? DEFAULT_BRANCH_HISTORY_ERROR_KEY
 
   return (
-    <BranchTabPanel
-      id={`${workspacePaneId}-history-panel`}
-      {...panelLabel}
-      busy={state.phase === 'loading'}
-    >
+    <BranchTabPanel id={`${workspacePaneId}-history-panel`} {...panelLabel} busy={state.phase === 'loading'}>
       {state.phase === 'loading' ? (
         <StatusListSkeleton rows={8} />
       ) : state.phase === 'error' ? (
@@ -278,10 +271,10 @@ function BranchTerminalTab({
   terminalSyncReady: boolean
   branch: BranchWorkspaceBranch
 }) {
-  const { createTerminal } = useTerminalSlotContext()
+  const { createTerminal } = useTerminalSessionContext()
   const t = useT()
   const createTerminalForSlot = useCallback(
-    async (base: TerminalSlotBase) => {
+    async (base: TerminalSessionBase) => {
       await runCreateTerminalTabCommand({
         base,
         createTerminal,
@@ -294,7 +287,7 @@ function BranchTerminalTab({
   if (!branch.worktree?.path) return null
   return (
     <BranchTabPanel id={`${workspacePaneId}-terminal-panel`} {...panelLabel}>
-      <TerminalSlot
+      <TerminalSessionView
         repoRoot={repoId}
         branch={branch.name}
         worktreePath={branch.worktree?.path}
@@ -319,7 +312,7 @@ function BranchChangesTab({
   panelLabel: WorkspacePanePanelLabel
   repo: WorkspacePanePanelRenderInput['repo']
   branch: BranchWorkspaceBranch
-  selectedStatus: SelectedBranchWorkspacePresentation['selectedStatus']
+  selectedStatus: SelectedRepoWorkspacePresentation['selectedStatus']
   statusLoading: boolean
   statusError: string | null
   statusStale: boolean
@@ -360,7 +353,10 @@ function StaleStatusNotice({ message }: { message: string }) {
   return (
     <div className="border-b border-warning-border bg-warning-surface px-4 py-2 text-xs text-warning">
       <span className="font-medium">{t('status.stale-title')}</span>
-      <span className="text-muted-foreground">{' \u2014 '}{t(message)}</span>
+      <span className="text-muted-foreground">
+        {' \u2014 '}
+        {t(message)}
+      </span>
     </div>
   )
 }

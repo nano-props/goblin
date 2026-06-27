@@ -12,11 +12,11 @@ import {
 } from 'lucide-react'
 import { useI18nStore, useT } from '#/web/stores/i18n.ts'
 import { EmptyState } from '#/web/components/Layout.tsx'
-import { PullRequestStatusRow } from '#/web/components/branch-workspace/PullRequestStatusRow.tsx'
+import { PullRequestStatusRow } from '#/web/components/repo-workspace/PullRequestStatusRow.tsx'
 import { IconCopyButton } from '#/web/components/IconCopyButton.tsx'
 import type { BranchCopyPatchAction } from '#/web/hooks/branch-action-state.ts'
 import { useActionFeedback } from '#/web/hooks/useActionFeedback.ts'
-import { useBranchActionSurface } from '#/web/components/branch-workspace/branch-action-surface-context.ts'
+import { useBranchActionSurface } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
 import {
   CopyableValue,
   MonoValue,
@@ -24,16 +24,16 @@ import {
   StatusRow,
   StatusRows,
   type Tone,
-} from '#/web/components/branch-workspace/status-ui.tsx'
+} from '#/web/components/repo-workspace/status-ui.tsx'
 import { formatRelativeTimeOrNull } from '#/web/lib/dates.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { formatWorktreePath } from '#/web/lib/paths.ts'
-import { remoteRepoTarget } from '#/web/stores/repos/helpers.ts'
+import { remoteRepoTarget } from '#/web/stores/repos/repo-guards.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { PROTECTED_BRANCHES, branchPullRequestBelongsToBranch } from '#/shared/git-types.ts'
-import type { SelectedBranchWorkspace } from '#/web/components/branch-workspace/model.ts'
+import type { SelectedRepoWorkspace } from '#/web/components/repo-workspace/model.ts'
 interface Props {
-  detail: SelectedBranchWorkspace
+  detail: SelectedRepoWorkspace
 }
 
 function SyncValue({
@@ -88,7 +88,7 @@ function StatusCopyPatchButton({ action }: { action: BranchCopyPatchAction }) {
   // `status.copy-patch-label`) so screen-reader users and sighted users
   // hovering the button learn it copies a git-apply patch specifically.
   const showCheck = succeeded && !busy
-  const label = showCheck ? t('status.copy-patch-success') : action.title ?? t('status.copy-patch-label')
+  const label = showCheck ? t('status.copy-patch-success') : (action.title ?? t('status.copy-patch-label'))
 
   const handleClick = () => {
     if (action.busy || action.disabled) return
@@ -150,11 +150,7 @@ export function BranchStatus({ detail }: Props) {
   const worktreeLocked = detail.worktreeState?.isLocked ?? false
   // The "dirty worktree" signal moved to its own row below; the worktree
   // row only needs to surface lock state on its own.
-  const worktreeTone: Tone = worktreeLocked
-    ? 'attention'
-    : branch.worktree?.path
-      ? 'brand'
-      : 'neutral'
+  const worktreeTone: Tone = worktreeLocked ? 'attention' : branch.worktree?.path ? 'brand' : 'neutral'
   const worktreeValue = branch.worktree?.path ? (
     <CopyableValue
       value={worktreePath}
@@ -216,9 +212,7 @@ export function BranchStatus({ detail }: Props) {
           icon={<Diff size={14} />}
           label={t('branch-status.signal.changes')}
           value={
-            <StatusChip tone="attention">
-              {t('branch-status.changes-count', { n: worktreeChangeCount })}
-            </StatusChip>
+            <StatusChip tone="attention">{t('branch-status.changes-count', { n: worktreeChangeCount })}</StatusChip>
           }
           after={copyPatchAction.visible ? <StatusCopyPatchButton action={copyPatchAction} /> : undefined}
           valueLayout="inline"

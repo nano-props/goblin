@@ -4,11 +4,11 @@ import {
   insertPlaceholderRepo,
   addResolvedRepo,
   addUnavailableRepo,
-  createRuntimeRepoLifecycleActions,
+  createRuntimeRepoSessionActions,
   refreshInitialRepoState,
   resolveRepoPath,
-} from '#/web/stores/repos/lifecycle-write-paths.ts'
-import { runRemoteRepoLifecycle } from '#/web/stores/repos/remote-lifecycle-orchestrator.ts'
+} from '#/web/stores/repos/repo-session-write-paths.ts'
+import { runRemoteRepoConnection } from '#/web/stores/repos/remote-repo-connection-orchestrator.ts'
 import { activeRepoIdAfterWorkspaceHydration } from '#/web/open-workspace-state.ts'
 import { isRemoteRepoId, type RepoSessionEntry } from '#/shared/remote-repo.ts'
 import { restoreSessionWorkspacePaneStateInRepos } from '#/web/stores/repos/workspace-pane-session-restore.ts'
@@ -18,20 +18,20 @@ interface InitialRepoRefresh {
   token: number
 }
 
-type RestorableWorkspaceLifecycleActions = Pick<ReposStore, 'hydrateSession'>
+type RestorableWorkspaceLifecycleActions = Pick<ReposStore, 'hydrateRepoSession'>
 
 const SESSION_PROBE_CONCURRENCY = 4
 
 function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet): RestorableWorkspaceLifecycleActions {
   return {
-    async hydrateSession(
+    async hydrateRepoSession(
       openRepos: RepoSessionEntry[],
       activeRepo: string | null,
       options?: RepoSessionHydrationOptions,
     ) {
       const { signal, workspacePaneRestoreState } = options ?? {}
       // Boot/session restore of workspace membership and active repository. This
-      // reopens what SessionState described, but does not subscribe the repos
+      // reopens what WorkspaceSessionState described, but does not subscribe the repos
       // store to future session writes from persistence.
       //
       // The flow is split into two phases so the repo picker never sits
@@ -121,7 +121,7 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
               // → initial refresh. Local probes stay on the
               // legacy path below since they have no remote
               // lifecycle to converge.
-              const outcome = await runRemoteRepoLifecycle(set, get, entry.id, { signal })
+              const outcome = await runRemoteRepoConnection(set, get, entry.id, { signal })
               if (signal?.aborted) return
               // Hydration must keep the user-selected active repo
               // in sync with the orchestrator's writes. The
@@ -205,9 +205,9 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
   }
 }
 
-export function createLifecycleActions(set: ReposSet, get: ReposGet) {
+export function createRepoSessionActions(set: ReposSet, get: ReposGet) {
   return {
-    ...createRuntimeRepoLifecycleActions(set, get),
+    ...createRuntimeRepoSessionActions(set, get),
     ...createRestorableWorkspaceLifecycleActions(set, get),
   }
 }

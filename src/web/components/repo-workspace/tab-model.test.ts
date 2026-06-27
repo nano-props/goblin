@@ -1,11 +1,11 @@
 import { describe, expect, test } from 'vitest'
 import {
   adjacentBranchWorkspacePaneTab,
-  createBranchWorkspacePaneTabModel,
+  createRepoWorkspaceTabModel,
   nextBranchWorkspacePaneTabAfterClose,
-} from '#/web/components/branch-workspace/workspace-pane-tab-model.ts'
-import type { WorkspacePaneViewSummary } from '#/web/components/terminal/types.ts'
-import type { WorkspacePaneStaticViewType, WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
+} from '#/web/components/repo-workspace/tab-model.ts'
+import type { WorkspacePaneTabSummary } from '#/web/components/terminal/types.ts'
+import type { WorkspacePaneStaticTabType, WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
 
 const REPO_ID = '/tmp/gbl-workspace-pane-tab-model-repo'
 const WORKTREE_PATH = '/tmp/gbl-workspace-pane-tab-model-worktree'
@@ -13,17 +13,12 @@ const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
 
 describe('branch workspace pane tab model', () => {
   test('projects a single tab order across static and terminal tabs', () => {
-    const model = createBranchWorkspacePaneTabModel({
+    const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredView: 'status',
-      tabOrder: [
-        terminalEntry('slot-1'),
-        staticEntry('status'),
-        staticEntry('changes'),
-        staticEntry('history'),
-      ],
+      tabOrder: [terminalEntry('slot-1'), staticEntry('status'), staticEntry('changes'), staticEntry('history')],
       runtimeTerminalViews: [terminalView('slot-1', 1, true)],
       terminalSessionCount: 1,
       terminalSyncReady: true,
@@ -44,7 +39,7 @@ describe('branch workspace pane tab model', () => {
   })
 
   test('uses the selected terminal from the store as the active terminal tab', () => {
-    const model = createBranchWorkspacePaneTabModel({
+    const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
@@ -64,7 +59,7 @@ describe('branch workspace pane tab model', () => {
   })
 
   test('keeps terminal selected without a runtime tab while creation is pending', () => {
-    const model = createBranchWorkspacePaneTabModel({
+    const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
@@ -88,7 +83,7 @@ describe('branch workspace pane tab model', () => {
   })
 
   test('does not add a pending terminal tab during initial terminal sync', () => {
-    const model = createBranchWorkspacePaneTabModel({
+    const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
@@ -109,7 +104,7 @@ describe('branch workspace pane tab model', () => {
   })
 
   test('falls back to the first materialized tab when the preferred worktree static view is not open', () => {
-    const model = createBranchWorkspacePaneTabModel({
+    const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
@@ -137,7 +132,7 @@ describe('branch workspace pane tab model', () => {
   })
 
   test('falls back to the first materialized tab when a branch preference names a closed tab', () => {
-    const model = createBranchWorkspacePaneTabModel({
+    const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
@@ -164,7 +159,7 @@ describe('branch workspace pane tab model', () => {
   })
 
   test('returns branch-scope tabs when the selected branch has no worktree', () => {
-    const model = createBranchWorkspacePaneTabModel({
+    const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
       branchName: 'feature/model',
       worktreePath: null,
@@ -189,7 +184,7 @@ describe('branch workspace pane tab model', () => {
     // falls back to status (the first materialized tab) so the user does
     // not land on the empty pane. The store keeps preferred=terminal so
     // opening a new terminal returns the user to the terminal view.
-    const model = createBranchWorkspacePaneTabModel({
+    const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
@@ -218,7 +213,7 @@ describe('branch workspace pane tab model', () => {
     // re-resolves: preferred=terminal, count=1, slot-2 is selected.
     // This is the "natural" case: no fallback needed, the new active
     // terminal is slot-2.
-    const model = createBranchWorkspacePaneTabModel({
+    const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
@@ -245,7 +240,7 @@ describe('branch workspace pane tab model', () => {
     // the terminal-host view so the new-terminal affordance remains
     // reachable. preferred=terminal, no materialized terminal, but
     // pendingCreate=true, so the terminal-host is preserved.
-    const model = createBranchWorkspacePaneTabModel({
+    const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
@@ -269,7 +264,7 @@ describe('branch workspace pane tab model', () => {
     // Creating a terminal from that empty strip must still mount the
     // terminal host; otherwise the registry waits for host geometry until it
     // times out with error.terminal-host-not-measurable.
-    const model = createBranchWorkspacePaneTabModel({
+    const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
@@ -297,7 +292,7 @@ describe('branch workspace pane tab model', () => {
     // terminal session yet, but sync is not done. We preserve the
     // terminal-host view rather than falling back to status, because the
     // terminal session might appear after sync lands.
-    const model = createBranchWorkspacePaneTabModel({
+    const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
@@ -317,7 +312,7 @@ describe('branch workspace pane tab model', () => {
   })
 
   test('returns no selection when there is no branch at all', () => {
-    const model = createBranchWorkspacePaneTabModel({
+    const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
       branchName: null,
       worktreePath: null,
@@ -343,7 +338,7 @@ describe('branch workspace pane tab model', () => {
     // the last terminal exits. The store records closingIdentity=slot-1
     // with the pre-close tab identities; the model uses it to surface changes
     // (the spatial neighbor of slot-1) instead of status (tabs[0]).
-    const model = createBranchWorkspacePaneTabModel({
+    const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
@@ -373,7 +368,7 @@ describe('branch workspace pane tab model', () => {
     // so there is no neighbor to surface. The model falls back to its
     // generic tabs[0] lookup, which is also null here, and returns no
     // selection.
-    const model = createBranchWorkspacePaneTabModel({
+    const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
@@ -397,7 +392,7 @@ describe('branch workspace pane tab model', () => {
     // If the user closes a tab but their preferred view is still open, the
     // model picks the preferred view directly — lastClosedTabContext only
     // applies when the preferred view became unrenderable.
-    const model = createBranchWorkspacePaneTabModel({
+    const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
@@ -421,10 +416,10 @@ describe('branch workspace pane tab model', () => {
   })
 
   test('falls back to tabs[0] for server-side exits with no lastClosedTabContext', () => {
-    // The last terminal exits externally (registry onTerminalSlotRemoved),
+    // The last terminal exits externally (registry onTerminalSessionRemoved),
     // no user-initiated close recorded. The model has no adjacency hint, so
     // it uses the generic tabs[0] fallback.
-    const model = createBranchWorkspacePaneTabModel({
+    const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
@@ -445,7 +440,7 @@ describe('branch workspace pane tab model', () => {
   })
 
   test('resolves the adjacent tab after close from the shared tab list', () => {
-    const model = createBranchWorkspacePaneTabModel({
+    const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
@@ -464,7 +459,7 @@ describe('branch workspace pane tab model', () => {
   })
 
   test('skips pending terminal tabs when resolving the next tab after close', () => {
-    const model = createBranchWorkspacePaneTabModel({
+    const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
@@ -482,17 +477,12 @@ describe('branch workspace pane tab model', () => {
   })
 
   test('moves through the shared tab list from the active tab identity', () => {
-    const model = createBranchWorkspacePaneTabModel({
+    const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredView: 'terminal',
-      tabOrder: [
-        staticEntry('status'),
-        terminalEntry('slot-1'),
-        terminalEntry('slot-2'),
-        staticEntry('changes'),
-      ],
+      tabOrder: [staticEntry('status'), terminalEntry('slot-1'), terminalEntry('slot-2'), staticEntry('changes')],
       runtimeTerminalViews: [terminalView('slot-1', 1, false), terminalView('slot-2', 2, false)],
       terminalSessionCount: 2,
       terminalSyncReady: true,
@@ -501,9 +491,7 @@ describe('branch workspace pane tab model', () => {
     })
 
     expect(adjacentBranchWorkspacePaneTab(model.tabs, model.activeTab?.identity, 1)?.identity).toBe('changes:changes')
-    expect(adjacentBranchWorkspacePaneTab(model.tabs, model.activeTab?.identity, -1)?.identity).toBe(
-      'terminal:slot-1',
-    )
+    expect(adjacentBranchWorkspacePaneTab(model.tabs, model.activeTab?.identity, -1)?.identity).toBe('terminal:slot-1')
     expect(adjacentBranchWorkspacePaneTab(model.tabs, null, -1)).toBeNull()
     expect(adjacentBranchWorkspacePaneTab(model.tabs, 'missing:missing', 1)).toBeNull()
   })
@@ -513,7 +501,7 @@ describe('branch workspace pane tab model', () => {
     // rightmost terminal must land on the adjacent tab in strip order (the
     // static tab in the middle), not jump to the leftmost remaining terminal
     // just because the terminal view is still renderable.
-    const model = createBranchWorkspacePaneTabModel({
+    const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
@@ -542,7 +530,7 @@ describe('branch workspace pane tab model', () => {
   test('keeps the current terminal selection when a background terminal is closed', () => {
     // Closing a non-active terminal must not hijack the active selection via
     // the spatial neighbor logic.
-    const model = createBranchWorkspacePaneTabModel({
+    const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
@@ -564,7 +552,7 @@ describe('branch workspace pane tab model', () => {
   })
 })
 
-function staticEntry(type: WorkspacePaneStaticViewType): WorkspacePaneTabOrderEntry {
+function staticEntry(type: WorkspacePaneStaticTabType): WorkspacePaneTabOrderEntry {
   return { type, id: type }
 }
 
@@ -572,7 +560,7 @@ function terminalEntry(id: string): WorkspacePaneTabOrderEntry {
   return { type: 'terminal', id }
 }
 
-function terminalView(key: string, displayOrder: number, selected: boolean): WorkspacePaneViewSummary {
+function terminalView(key: string, displayOrder: number, selected: boolean): WorkspacePaneTabSummary {
   return {
     type: 'terminal',
     id: key,

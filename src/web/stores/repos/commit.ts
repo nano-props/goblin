@@ -1,4 +1,4 @@
-import { appendRepoEvent, replaceRepoState, resultEvent } from '#/web/stores/repos/helpers.ts'
+import { appendRepoEvent, replaceRepoState, resultEvent } from '#/web/stores/repos/repo-state-factory.ts'
 import type { ExecResult } from '#/web/types.ts'
 import type { RepoResultEventOptions, ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 export function createCommitActions(set: ReposSet, get: ReposGet) {

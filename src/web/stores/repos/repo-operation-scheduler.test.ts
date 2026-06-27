@@ -1,26 +1,26 @@
 import { beforeEach, describe, expect, test } from 'vitest'
 import {
-  disposeAllRepoRuntimes,
-  disposeRepoRuntime,
+  disposeAllRepoOperationSchedulers,
+  disposeRepoOperationScheduler,
   markRepoOperationTargets,
   pruneRepoBranchLogOperations,
   pruneRepoBranchPullRequestOperations,
   repoOperation,
   repoOperationBusy,
-  scheduleRepoTask,
+  scheduleRepoOperation,
   settleRepoOperationTargets,
-} from '#/web/stores/repos/runtime.ts'
+} from '#/web/stores/repos/repo-operation-scheduler.ts'
 const REPO_ID = '/tmp/gbl-runtime-test-repo'
 
 beforeEach(() => {
-  disposeAllRepoRuntimes()
+  disposeAllRepoOperationSchedulers()
 })
 
 describe('repo runtime task scheduling', () => {
   test('runs queued tasks by priority within a lane', async () => {
     const starts: string[] = []
     let releaseFirst!: () => void
-    const first = scheduleRepoTask(
+    const first = scheduleRepoOperation(
       REPO_ID,
       'network',
       () =>
@@ -29,7 +29,7 @@ describe('repo runtime task scheduling', () => {
           releaseFirst = () => resolve('first')
         }),
     )
-    const low = scheduleRepoTask(
+    const low = scheduleRepoOperation(
       REPO_ID,
       'network',
       async () => {
@@ -38,7 +38,7 @@ describe('repo runtime task scheduling', () => {
       },
       { priority: 1 },
     )
-    const high = scheduleRepoTask(
+    const high = scheduleRepoOperation(
       REPO_ID,
       'network',
       async () => {
@@ -58,7 +58,7 @@ describe('repo runtime task scheduling', () => {
   test('replaces older queued tasks with the same key', async () => {
     const starts: string[] = []
     let releaseFirst!: () => void
-    const first = scheduleRepoTask(
+    const first = scheduleRepoOperation(
       REPO_ID,
       'network',
       () =>
@@ -67,8 +67,8 @@ describe('repo runtime task scheduling', () => {
           releaseFirst = () => resolve('first')
         }),
     )
-    const replaced = scheduleRepoTask(REPO_ID, 'network', async () => 'replaced', { replaceQueuedKey: 'status' })
-    const latest = scheduleRepoTask(
+    const replaced = scheduleRepoOperation(REPO_ID, 'network', async () => 'replaced', { replaceQueuedKey: 'status' })
+    const latest = scheduleRepoOperation(
       REPO_ID,
       'network',
       async () => {
@@ -87,7 +87,7 @@ describe('repo runtime task scheduling', () => {
 
   test('rejects queued tasks after their queue timeout', async () => {
     let releaseFirst!: () => void
-    const first = scheduleRepoTask(
+    const first = scheduleRepoOperation(
       REPO_ID,
       'network',
       () =>
@@ -95,7 +95,7 @@ describe('repo runtime task scheduling', () => {
           releaseFirst = () => resolve('first')
         }),
     )
-    const queued = scheduleRepoTask(REPO_ID, 'network', async () => 'queued', {
+    const queued = scheduleRepoOperation(REPO_ID, 'network', async () => 'queued', {
       queuedTimeoutMs: 1,
       queuedTimeoutMessage: 'queued timeout',
     })
@@ -108,7 +108,7 @@ describe('repo runtime task scheduling', () => {
 
   test('dispose aborts active tasks and rejects queued tasks', async () => {
     let activeAborted = false
-    const active = scheduleRepoTask(
+    const active = scheduleRepoOperation(
       REPO_ID,
       'network',
       (signal) =>
@@ -119,10 +119,10 @@ describe('repo runtime task scheduling', () => {
           })
         }),
     )
-    const queued = scheduleRepoTask(REPO_ID, 'network', async () => 'queued')
+    const queued = scheduleRepoOperation(REPO_ID, 'network', async () => 'queued')
     const queuedRejected = expect(queued).rejects.toThrow('cancelled')
 
-    disposeRepoRuntime(REPO_ID)
+    disposeRepoOperationScheduler(REPO_ID)
 
     await expect(active).rejects.toThrow('active cancelled')
     await queuedRejected
@@ -134,7 +134,7 @@ describe('repo runtime task scheduling', () => {
 
     expect(repoOperationBusy(REPO_ID, 'fetch')).toBe(true)
 
-    disposeRepoRuntime(REPO_ID)
+    disposeRepoOperationScheduler(REPO_ID)
     settleRepoOperationTargets(REPO_ID, 1, [{ key: 'fetch', reason: 'fetch' }], null)
 
     expect(repoOperationBusy(REPO_ID, 'fetch')).toBe(false)

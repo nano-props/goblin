@@ -7,17 +7,17 @@ import type {
   PullRequestFetchMode,
   WorktreeStatus,
 } from '#/web/types.ts'
-import type { RemoteRepoLifecycle, RepoSessionEntry } from '#/shared/remote-repo.ts'
-import type { SessionState } from '#/shared/api-types.ts'
+import type { RemoteRepoConnectionLifecycle, RepoSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionState } from '#/shared/api-types.ts'
 import type {
-  WorkspacePaneSessionView,
-  WorkspacePaneStaticViewType,
+  WorkspacePaneSessionTabType,
+  WorkspacePaneStaticTabType,
   WorkspacePaneTabOrderEntry,
-  WorkspacePaneView,
+  WorkspacePaneTabType,
 } from '#/shared/workspace-pane.ts'
 import type { RepoBranchAction, RunBranchActionOptions } from '#/web/stores/repos/branch-action-types.ts'
 import type { RepoOperationsState } from '#/web/stores/repos/operations.ts'
-import type { RepoResourcesState } from '#/web/stores/repos/resources.ts'
+import type { RepoDataLoadBundle, RepoDataLoadState } from '#/web/stores/repos/repo-data-load-state.ts'
 export type BranchViewMode = 'all' | 'worktrees'
 export type RepoDataSource = 'cache' | 'fresh'
 // Client branches keep only the worktree reference; metadata lives in worktreesByPath.
@@ -74,18 +74,18 @@ export interface RepoUiState {
   workspacePaneTabOrderByBranch: Record<string, WorkspacePaneTabOrderEntry[]>
   /** Branch-scoped selected workspace pane view. Branch switches read this
    *  first so selecting a tab on one branch does not select it on another. */
-  preferredWorkspacePaneViewByBranch: Record<string, WorkspacePaneView>
+  preferredWorkspacePaneViewByBranch: Record<string, WorkspacePaneTabType>
   /**
    * Per-branch hint about the most recent user-initiated workspace pane tab
    * close. Set by `setLastClosedTabContext` after `runCloseWorkspacePaneTabCommand`
-   * commits. Read by `createBranchWorkspacePaneTabModel` to prefer the spatial
+   * commits. Read by `createRepoWorkspaceTabModel` to prefer the spatial
    * neighbor of the closed tab over the generic tabs[0] fallback when the
    * preferred view becomes unrenderable, and also when the closed tab was the
    * active tab so the workspace pane does not jump to a different remaining
    * terminal instead of the adjacent tab. Overwritten by the next close on the
    * same branch.
    *
-   * Runtime-coherent only: not persisted to SessionState and not restored on
+   * Runtime-coherent only: not persisted to WorkspaceSessionState and not restored on
    * relaunch. A fresh session starts with an empty record; the first user
    * close populates it for that branch. Context is cleared by explicit
    * selection/tab-order changes so a stale close hint cannot override later
@@ -121,7 +121,7 @@ export interface RepoRemoteState {
    * from `web/stores/repos/helpers.ts` instead of reaching into
    * `repo.remote.target`.
    */
-  lifecycle: RemoteRepoLifecycle | null
+  lifecycle: RemoteRepoConnectionLifecycle | null
   remotes?: string[]
   remoteDetails?: GitRemoteInfo[]
   hasRemotes?: boolean
@@ -157,7 +157,7 @@ export interface RepoState {
   instanceToken: number
   /** Client-local projection of runtime-coherent repo truth. */
   data: RepoDataState
-  resources: RepoResourcesState
+  resources: RepoDataLoadBundle
   operations: RepoOperationsState
   ui: RepoUiState
   projection: RepoProjectionMeta
@@ -177,23 +177,23 @@ export interface RestorableRepoCacheState {
 }
 
 export interface RestorableWorkspaceState {
-  /** Client workspace UI state that is serialized into SessionState for
+  /** Client workspace UI state that is serialized into WorkspaceSessionState for
    *  next-launch restore. This is restorable state, not runtime-coherent
    *  shared state. */
-  /** Open repository order restored from SessionState.openRepos. */
+  /** Open repository order restored from WorkspaceSessionState.openRepos. */
   order: string[]
-  /** Active repository restored from SessionState.activeRepo. */
+  /** Active repository restored from WorkspaceSessionState.activeRepo. */
   activeId: string | null
-  /** Large-screen Zen Mode restored from SessionState. Compact UI is stronger and always shows one pane at a time. */
+  /** Large-screen Zen Mode restored from WorkspaceSessionState. Compact UI is stronger and always shows one pane at a time. */
   zenMode: boolean
   workspacePaneSize: number
-  /** Per worktree terminal selection restored from SessionState.selectedTerminalByWorktree. */
+  /** Per worktree terminal selection restored from WorkspaceSessionState.selectedTerminalByWorktree. */
   selectedTerminalByWorktree: Record<string, string>
 }
 
 export interface SessionWorkspacePaneRestoreState {
   workspacePaneTabOrderByBranchByRepo: Record<string, Record<string, WorkspacePaneTabOrderEntry[]>>
-  preferredWorkspacePaneViewByBranchByRepo: Record<string, Record<string, WorkspacePaneSessionView>>
+  preferredWorkspacePaneViewByBranchByRepo: Record<string, Record<string, WorkspacePaneSessionTabType>>
 }
 
 export interface RepoSessionHydrationOptions {
@@ -203,7 +203,7 @@ export interface RepoSessionHydrationOptions {
 
 export interface LocalWorkspaceState {
   /** Client-only workspace UI state that should never be serialized into
-   *  SessionState or treated as restorable workspace state. */
+   *  WorkspaceSessionState or treated as restorable workspace state. */
   /** Hydration flag — true once boot session is restored, so we don't
    *  overwrite the saved session with an empty one before restore. */
   sessionReady: boolean
@@ -211,7 +211,7 @@ export interface LocalWorkspaceState {
 
 export interface RestorableWorkspaceActions {
   setActive: (id: string) => void
-  applySessionLayoutState: (layout: Pick<SessionState, 'zenMode' | 'workspacePaneSize'>) => void
+  applySessionLayoutState: (layout: Pick<WorkspaceSessionState, 'zenMode' | 'workspacePaneSize'>) => void
   applySessionSelectedTerminalState: (selectedTerminalByWorktree: Record<string, string>) => void
   setZenMode: (enabled: boolean) => void
   toggleZenMode: () => void
@@ -234,14 +234,14 @@ export interface RuntimeCoherentRepoProjectionActions {
    * phase — the orchestrator flips to `connecting` and re-runs.
    * Returns the new outcome, or `null` for non-remote ids.
    */
-  retryRemoteRepoLifecycle: (id: string) => Promise<{ ok: boolean; reason?: string } | null>
+  retryRemoteRepoConnection: (id: string) => Promise<{ ok: boolean; reason?: string } | null>
   /** Updates the selected branch's workspace pane view type. The store does not project
    *  against terminal session count, worktree presence, or opened workspace pane views;
    *  the UI resolves the active pane at read time so session restore preserves
    *  branch-scoped user intent. */
-  setWorkspacePaneView: (id: string, tab: WorkspacePaneView) => void
-  openWorkspacePaneStaticView: (id: string, tab: WorkspacePaneStaticViewType, branchName?: string) => void
-  closeWorkspacePaneStaticView: (id: string, tab: WorkspacePaneStaticViewType, branchName?: string) => void
+  setWorkspacePaneTab: (id: string, tab: WorkspacePaneTabType) => void
+  openWorkspacePaneStaticView: (id: string, tab: WorkspacePaneStaticTabType, branchName?: string) => void
+  closeWorkspacePaneStaticView: (id: string, tab: WorkspacePaneStaticTabType, branchName?: string) => void
   addWorkspacePaneTerminalTab: (id: string, terminalKey: string, branchName?: string) => void
   addAndFocusWorkspacePaneTerminalTab: (id: string, terminalKey: string, branchName?: string) => void
   removeWorkspacePaneTerminalTab: (id: string, terminalKey: string, branchName?: string) => void
@@ -276,7 +276,7 @@ export interface RuntimeCoherentRepoProjectionActions {
   syncAndRefresh: (id: string, options?: { token?: number }) => Promise<void>
   setLastResult: (id: string, result: ExecResult, token: number, options?: RepoResultEventOptions) => void
   clearEvents: (id: string, eventIds: number[]) => void
-  hydrateSession: (
+  hydrateRepoSession: (
     openRepos: RepoSessionEntry[],
     activeRepo: string | null,
     options?: RepoSessionHydrationOptions,

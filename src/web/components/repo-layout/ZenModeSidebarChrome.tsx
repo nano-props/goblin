@@ -8,13 +8,13 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react'
 import { WorkspaceZenModeToggle } from '#/web/components/WorkspaceZenModeToggle.tsx'
-import { RepoShellSidebar } from '#/web/components/repo-shell/RepoShellSidebar.tsx'
+import { RepoLayoutSidebar } from '#/web/components/repo-layout/RepoLayoutSidebar.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import {
   clampRepoSidebarSizePercent,
   repoSidebarWidthExpression,
   repoSidebarWidthPx,
-} from '#/web/components/repo-shell/sidebar-sizing.ts'
+} from '#/web/components/repo-layout/sidebar-sizing.ts'
 import { ResizeHandleLine, resizeHandleClassNames } from '#/web/components/ui/resizable.tsx'
 import { useElementInlineSize } from '#/web/hooks/useElementInlineSize.ts'
 import { WINDOW_CHROME_HEIGHT_PX } from '#/shared/window-chrome.ts'
@@ -151,19 +151,13 @@ export function ZenModeSidebarChrome({
         />
       ) : null}
       {zenModeToggleEnabled ? (
-        <ZenModeSidebarRevealTriggerLayer
-          revealEnabled={revealEnabled}
-          onMouseEnter={reveal.onTriggerEnter}
-        />
+        <ZenModeSidebarRevealTriggerLayer revealEnabled={revealEnabled} onMouseEnter={reveal.onTriggerEnter} />
       ) : null}
     </>
   )
 }
 
-function ZenModeSidebarRevealTriggerLayer({
-  revealEnabled = false,
-  onMouseEnter,
-}: ZenModeSidebarRevealTriggerProps) {
+function ZenModeSidebarRevealTriggerLayer({ revealEnabled = false, onMouseEnter }: ZenModeSidebarRevealTriggerProps) {
   return (
     <div
       data-testid="zen-mode-toggle-overlay"
@@ -171,18 +165,12 @@ function ZenModeSidebarRevealTriggerLayer({
       className="goblin-zen-reveal-trigger-layer pointer-events-none absolute left-0 top-0 z-40 flex items-center bg-transparent"
       style={{ height: WINDOW_CHROME_HEIGHT_PX }}
     >
-      <ZenModeSidebarRevealTrigger
-        revealEnabled={revealEnabled}
-        onMouseEnter={onMouseEnter}
-      />
+      <ZenModeSidebarRevealTrigger revealEnabled={revealEnabled} onMouseEnter={onMouseEnter} />
     </div>
   )
 }
 
-function ZenModeSidebarRevealTrigger({
-  revealEnabled = false,
-  onMouseEnter,
-}: ZenModeSidebarRevealTriggerProps) {
+function ZenModeSidebarRevealTrigger({ revealEnabled = false, onMouseEnter }: ZenModeSidebarRevealTriggerProps) {
   return (
     <WindowChromeInteractiveRegion asChild>
       <WorkspaceZenModeToggle
@@ -395,7 +383,7 @@ function ZenModeSidebarReveal({
         onMouseEnter={panelInteractive ? onSurfaceEnter : undefined}
         onMouseLeave={panelInteractive ? handleSurfaceLeave : undefined}
       >
-        <RepoShellSidebar
+        <RepoLayoutSidebar
           repoId={repoId}
           compact={false}
           chromeRegion={panelInteractive ? 'drag' : 'none'}

@@ -107,9 +107,7 @@ interface BranchActionDialogsActions {
    * confirm) — only the previous code reset `deleteAlsoUpstream: false`
    * here, which was a regression from pre-PR behaviour.
    */
-  openForceRemoveWorktreeConfirm: (
-    entry: BranchActionDialogEntry<RemoveWorktreeDialogPayload>,
-  ) => void
+  openForceRemoveWorktreeConfirm: (entry: BranchActionDialogEntry<RemoveWorktreeDialogPayload>) => void
   closeDialog: (key: BranchActionDialogKey) => void
   /**
    * Close any dialog whose (repoId, branchName) does not match
@@ -148,7 +146,10 @@ function updateCheckbox(
  * action to enforce the single-dialog-at-a-time invariant without each
  * call site having to remember to null the others.
  */
-function closeOtherSlots(state: BranchActionDialogsState, except: BranchActionDialogKey): Partial<BranchActionDialogsState> {
+function closeOtherSlots(
+  state: BranchActionDialogsState,
+  except: BranchActionDialogKey,
+): Partial<BranchActionDialogsState> {
   const next: Partial<Record<BranchActionDialogKey, null>> = {}
   for (const key of DIALOG_KEYS) {
     if (key !== except) {

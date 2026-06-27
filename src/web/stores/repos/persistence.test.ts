@@ -4,7 +4,7 @@ import {
   normalizeRestorableRepoCache,
   persistRestorableRepoSnapshot,
 } from '#/web/stores/repos/persistence.ts'
-import { emptyRepo } from '#/web/stores/repos/helpers.ts'
+import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import {
   createBranchSnapshot,
   createRepoBranch,

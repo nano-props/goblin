@@ -8,8 +8,8 @@ import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import type { BranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
 import { useRemoteOpenAction } from '#/web/hooks/useRemoteOpenAction.ts'
-import { useRuntimeExternalAppSettings } from '#/web/runtime-settings-external-apps.ts'
-import { remoteRepoTarget } from '#/web/stores/repos/helpers.ts'
+import { useExternalAppSettings } from '#/web/runtime-settings-external-apps.ts'
+import { remoteRepoTarget } from '#/web/stores/repos/repo-guards.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import {
   WORKSPACE_EXTERNAL_APPS,
@@ -35,7 +35,7 @@ export function WorkspaceOpenExternallyMenu({ repo, branch, branchActions }: Pro
   const contentRef = useRef<HTMLDivElement>(null)
   const { pending, run } = useAsyncPending<string>()
   const { blocked, capabilities, actions } = branchActions
-  const externalApps = useRuntimeExternalAppSettings()
+  const externalApps = useExternalAppSettings()
   const hostPlatform = useHostInfoStore((state) => state.snapshot?.platform ?? 'web')
   const isRemoteRepo = remoteRepoTarget(repo.id, repo.remote.lifecycle) !== null
   const finderAvailable = capabilities.canOpenFinder && hostPlatform === 'darwin'
@@ -233,7 +233,7 @@ function workspaceExternalAppItemVisible({
 }: {
   item: WorkspaceExternalAppItem
   capabilities: BranchActions['capabilities']
-  externalApps: ReturnType<typeof useRuntimeExternalAppSettings>
+  externalApps: ReturnType<typeof useExternalAppSettings>
   finderAvailable: boolean
   isRemoteRepo: boolean
 }): boolean {

@@ -3,7 +3,7 @@ import * as v from 'valibot'
 import type { ReposSet } from '#/web/stores/repos/types.ts'
 import { selectedBranchForBranchSet } from '#/web/stores/repos/branch-view-mode.ts'
 import type { RestorableRepoSnapshot, RepoState } from '#/web/stores/repos/types.ts'
-import { finishResourceSuccess } from '#/web/stores/repos/resources.ts'
+import { finishDataLoadSuccess } from '#/web/stores/repos/repo-data-load-state.ts'
 import { stripBranchWorktreeMetadata } from '#/web/stores/repos/worktree-state.ts'
 import { normalizeWorkspacePaneTabOrderRecord } from '#/web/stores/repos/workspace-pane-tabs.ts'
 const MAX_CACHE_AGE_MS = 14 * 24 * 60 * 60 * 1000
@@ -58,7 +58,7 @@ function restoreProjectionFromSnapshot(repo: RepoState, snapshot: RestorableRepo
     ...repo.resources,
     snapshot: { ...repo.resources.snapshot },
   }
-  if (snapshot.data.branches.length > 0) finishResourceSuccess(resources.snapshot, snapshot.savedAt)
+  if (snapshot.data.branches.length > 0) finishDataLoadSuccess(resources.snapshot, snapshot.savedAt)
   const branches = cachedBranches(snapshot.data.branches)
   const branchNames = branches.map((branch) => branch.name)
   return {

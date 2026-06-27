@@ -1,4 +1,4 @@
-import { isRepoUnavailable, updateIfFresh } from '#/web/stores/repos/helpers.ts'
+import { isRepoUnavailable, updateIfFresh } from '#/web/stores/repos/repo-guards.ts'
 import { runExclusiveOperation } from '#/web/stores/repos/operation-runner.ts'
 import {
   applyFetchResourceError,
@@ -8,10 +8,10 @@ import {
   resolveActionToken,
   shouldAttemptFetch,
 } from '#/web/stores/repos/refresh-state.ts'
-import { startResource } from '#/web/stores/repos/resources.ts'
+import { startDataLoad } from '#/web/stores/repos/repo-data-load-state.ts'
 import { canStartRemoteFetch } from '#/web/stores/repos/sync-state.ts'
-import { waitForRepoOperationsIdle } from '#/web/stores/repos/runtime.ts'
-import { fetchRepository } from '#/web/repo-client.ts'
+import { waitForRepoOperationsIdle } from '#/web/stores/repos/repo-operation-scheduler.ts'
+import { fetchRepo } from '#/web/repo-client.ts'
 import type { RepoOperationReason } from '#/web/stores/repos/operations.ts'
 import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 import type { ExecResult } from '#/web/types.ts'
@@ -27,7 +27,7 @@ export function createRefreshSyncHelpers(set: ReposSet, get: ReposGet) {
     const { repo: repoBefore, token } = resolved
     if (!canRunRemoteFetchNow(repoBefore)) return { ok: false, message: 'error.network-op-in-progress' }
     updateIfFresh(set, id, token, (r) => {
-      startResource(r.resources.fetch, { hasData: r.resources.fetch.loadedAt !== null })
+      startDataLoad(r.resources.fetch, { hasData: r.resources.fetch.loadedAt !== null })
     })
     return runExclusiveOperation({
       set,
@@ -69,7 +69,7 @@ export function createRefreshSyncHelpers(set: ReposSet, get: ReposGet) {
       if (!canStartRemoteFetch(repo)) return null
     }
     try {
-      return await runNetworkTask(id, (signal) => fetchRepository(id, 'user', signal, sourceToken), {
+      return await runNetworkTask(id, (signal) => fetchRepo(id, 'user', signal, sourceToken), {
         token,
         reason: 'user-fetch',
         priority: 100,

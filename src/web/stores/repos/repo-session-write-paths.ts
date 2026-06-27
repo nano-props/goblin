@@ -1,12 +1,12 @@
 import { lastPathSegment } from '#/web/lib/paths.ts'
-import { emptyRepo } from '#/web/stores/repos/helpers.ts'
+import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { restoreRepoProjectionFromSnapshot } from '#/web/stores/repos/persistence.ts'
-import { disposeRepoRuntime } from '#/web/stores/repos/runtime.ts'
+import { disposeRepoOperationScheduler } from '#/web/stores/repos/repo-operation-scheduler.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
-import { abortRepositoryOperation, probeRepository } from '#/web/repo-client.ts'
+import { abortRepoOperation, probeRepo } from '#/web/repo-client.ts'
 import { resolveRemoteRepositoryTarget } from '#/web/remote-client.ts'
-import { recordRecentRepo } from '#/web/settings-write-paths.ts'
-import { runRemoteRepoLifecycle } from '#/web/stores/repos/remote-lifecycle-orchestrator.ts'
+import { recordRecentRepo } from '#/web/settings-actions.ts'
+import { runRemoteRepoConnection } from '#/web/stores/repos/remote-repo-connection-orchestrator.ts'
 import {
   markRemoteLifecycleConnecting,
   markRemoteLifecycleFailed,
@@ -19,7 +19,7 @@ import {
   localRepoSessionEntry,
   normalizeRemoteRepoRef,
   parseRemoteRepoId,
-  remoteRepoLifecycleTarget,
+  remoteRepoConnectionTarget,
   remoteRepoSessionEntry,
   type RemoteRepoTarget,
   type RepoSessionEntry,
@@ -60,7 +60,7 @@ export async function resolveRepoPath(
   try {
     let target: RemoteRepoTarget | undefined
     if (entry.kind === 'remote') target = await resolveRemoteRepositoryTarget(entry.ref)
-    const probe = await probeRepository(entry.id)
+    const probe = await probeRepo(entry.id)
     if (!probe?.ok || !probe.root) {
       return {
         input: entry.id,
@@ -192,7 +192,7 @@ export function addResolvedRepo(
       if (!resolvedRepo.target) return null
       const lifecycleReady = existing.remote.lifecycle?.kind === 'ready'
       const targetChanged = !remoteTargetsEqual(
-        remoteRepoLifecycleTarget(existing.remote.lifecycle),
+        remoteRepoConnectionTarget(existing.remote.lifecycle),
         resolvedRepo.target,
       )
       if (!nameChanged && lifecycleReady && !targetChanged) return null
@@ -247,7 +247,7 @@ export function addUnavailableRepo(
       // be a fresh object — zustand's middleware freezes the
       // state tree, and markRemoteLifecycleFailed mutates the
       // passed repo's remote.
-      const retainedTarget = target ?? remoteRepoLifecycleTarget(existing.remote.lifecycle) ?? undefined
+      const retainedTarget = target ?? remoteRepoConnectionTarget(existing.remote.lifecycle) ?? undefined
       const next: RepoState = {
         ...existing,
         remote: { ...existing.remote },
@@ -292,7 +292,7 @@ export function insertPlaceholderRepo(
       // addUnavailableRepo replaces it.
       if (entry.kind === 'remote') markRemoteLifecycleConnecting(repo)
       // 'refreshing' so the cached branches render with a stale indicator
-      // (resourceInitialLoading would hide them).
+      // (dataLoadInitialLoading would hide them).
       const cached = s.restorableRepoCache[entry.id]
       if (cached && cached.data.branches.length > 0) {
         repo.resources.snapshot = { ...repo.resources.snapshot, phase: 'refreshing', error: null, stale: true }
@@ -313,10 +313,10 @@ export function refreshInitialRepoState(get: ReposGet, refresh: InitialRepoRefre
   })
 }
 
-export function createRuntimeRepoLifecycleActions(
+export function createRuntimeRepoSessionActions(
   set: ReposSet,
   get: ReposGet,
-): Pick<ReposStore, 'ensureWorkspaceOpen' | 'closeRepo' | 'retryRemoteRepoLifecycle'> {
+): Pick<ReposStore, 'ensureWorkspaceOpen' | 'closeRepo' | 'retryRemoteRepoConnection'> {
   return {
     async ensureWorkspaceOpen(pathOrEntry: string | RepoSessionEntry): Promise<OpenRepoResult> {
       const entry = sessionEntryFromInput(pathOrEntry)
@@ -339,7 +339,7 @@ export function createRuntimeRepoLifecycleActions(
             return { ...s, repos: result.repos, order: result.order }
           })
         }
-        const outcome = await runRemoteRepoLifecycle(set, get, entry.id)
+        const outcome = await runRemoteRepoConnection(set, get, entry.id)
         if (!outcome) return { ok: false, message: 'error.not-git-repo' }
         if (outcome.kind === 'ready' && outcome.target) {
           const recentEntry = remoteRepoSessionEntry(outcome.target)
@@ -378,12 +378,12 @@ export function createRuntimeRepoLifecycleActions(
     },
 
     closeRepo(id: string) {
-      disposeRepoRuntime(id)
+      disposeRepoOperationScheduler(id)
       // Tell main to abort any cancellable network op for this repo —
       // otherwise a `git push` started right before the user closed the
       // repo keeps running for up to the network timeout, charged to a
       // repo that no longer exists. Fire-and-forget; failure is fine.
-      void abortRepositoryOperation(id).catch(() => {
+      void abortRepoOperation(id).catch(() => {
         /* main may have nothing to abort — ignore */
       })
       set((s) => {
@@ -405,9 +405,9 @@ export function createRuntimeRepoLifecycleActions(
       })
     },
 
-    async retryRemoteRepoLifecycle(id: string) {
+    async retryRemoteRepoConnection(id: string) {
       if (!isRemoteRepoId(id)) return null
-      const outcome = await runRemoteRepoLifecycle(set, get, id)
+      const outcome = await runRemoteRepoConnection(set, get, id)
       if (!outcome) return null
       if (outcome.kind === 'ready') return { ok: true }
       return { ok: false, reason: outcome.reason ?? 'unknown' }

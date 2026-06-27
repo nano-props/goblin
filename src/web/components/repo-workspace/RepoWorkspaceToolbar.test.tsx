@@ -4,22 +4,25 @@ import { act, type ComponentProps } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { BranchWorkspaceToolbar } from '#/web/components/branch-workspace/BranchWorkspaceToolbar.tsx'
-import { WorkspaceOpenExternallyMenu } from '#/web/components/branch-workspace/WorkspaceOpenExternallyMenu.tsx'
-import { getSelectedBranchWorkspacePresentation } from '#/web/components/branch-workspace/model.ts'
-import { useBranchWorkspacePaneTabModel } from '#/web/components/branch-workspace/use-branch-workspace-pane-tab-model.ts'
+import { RepoWorkspaceToolbar } from '#/web/components/repo-workspace/RepoWorkspaceToolbar.tsx'
+import { WorkspaceOpenExternallyMenu } from '#/web/components/repo-workspace/WorkspaceOpenExternallyMenu.tsx'
+import { getSelectedRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
+import { useRepoWorkspaceTabModel } from '#/web/components/repo-workspace/use-repo-workspace-tab-model.ts'
 import { useBranchActions, type BranchActions } from '#/web/hooks/useBranchActions.tsx'
-import { TerminalSlotContext, TerminalSlotReadContext } from '#/web/components/terminal/terminal-slot-context.ts'
+import {
+  TerminalSessionContext,
+  TerminalSessionReadContext,
+} from '#/web/components/terminal/terminal-session-context.ts'
 import type {
-  WorkspacePaneStaticViewType,
+  WorkspacePaneStaticTabType,
   WorkspacePaneTabOrderEntry,
-  WorkspacePaneView,
+  WorkspacePaneTabType,
 } from '#/shared/workspace-pane.ts'
 import { workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
 import type {
-  TerminalSlotContextValue,
-  TerminalSlotReadContextValue,
-  TerminalSlotSummary,
+  TerminalSessionContextValue,
+  TerminalSessionReadContextValue,
+  TerminalSessionSummary,
   TerminalDescriptor,
   WorktreeTerminalSnapshot,
 } from '#/web/components/terminal/types.ts'
@@ -38,7 +41,7 @@ import {
   workspacePaneStaticViewsForBranch,
   workspacePaneTabOrderForBranch,
 } from '#/web/stores/repos/workspace-pane-tabs.ts'
-import { setTerminalSlotCommandBridge } from '#/web/components/terminal/terminal-slot-command-bridge.ts'
+import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 
 let compactUi = false
 const runtimeExternalAppSettings = vi.hoisted(() => ({
@@ -53,7 +56,7 @@ const appShellMocks = vi.hoisted(() => ({
   openExternalUrl: vi.fn(),
 }))
 const repoClientMocks = vi.hoisted(() => ({
-  openRepositoryInFinder: vi.fn(async (path: string) => ({ ok: true, message: path })),
+  openRepoInFinder: vi.fn(async (path: string) => ({ ok: true, message: path })),
 }))
 
 vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
@@ -61,7 +64,7 @@ vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
 }))
 
 vi.mock('#/web/runtime-settings-external-apps.ts', () => ({
-  useRuntimeExternalAppSettings: () => runtimeExternalAppSettings.value,
+  useExternalAppSettings: () => runtimeExternalAppSettings.value,
 }))
 
 vi.mock('#/web/app-shell-client.ts', () => ({
@@ -72,7 +75,7 @@ vi.mock('#/web/repo-client.ts', async () => {
   const actual = (await vi.importActual('#/web/repo-client.ts')) as typeof import('#/web/repo-client.ts')
   return {
     ...actual,
-    openRepositoryInFinder: repoClientMocks.openRepositoryInFinder,
+    openRepoInFinder: repoClientMocks.openRepoInFinder,
   }
 })
 
@@ -110,14 +113,14 @@ let queryClient: QueryClient | null = null
 const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 
 type BranchWorkspaceToolbarHarnessProps = Omit<
-  ComponentProps<typeof BranchWorkspaceToolbar>,
+  ComponentProps<typeof RepoWorkspaceToolbar>,
   'workspacePaneTabModel' | 'branchActions'
 >
 
 function BranchWorkspaceToolbarHarness(props: BranchWorkspaceToolbarHarnessProps) {
-  const workspacePaneTabModel = useBranchWorkspacePaneTabModel(props.repo, props.detail)
+  const workspacePaneTabModel = useRepoWorkspaceTabModel(props.repo, props.detail)
   const branchActions = useBranchActions(props.repo, props.detail.branch!)
-  return <BranchWorkspaceToolbar {...props} workspacePaneTabModel={workspacePaneTabModel} branchActions={branchActions} />
+  return <RepoWorkspaceToolbar {...props} workspacePaneTabModel={workspacePaneTabModel} branchActions={branchActions} />
 }
 
 beforeEach(() => {
@@ -125,8 +128,8 @@ beforeEach(() => {
   compactUi = false
   runtimeExternalAppSettings.value = defaultRuntimeExternalAppSettings()
   appShellMocks.openExternalUrl.mockReset()
-  repoClientMocks.openRepositoryInFinder.mockReset()
-  repoClientMocks.openRepositoryInFinder.mockImplementation(async (path: string) => ({ ok: true, message: path }))
+  repoClientMocks.openRepoInFinder.mockReset()
+  repoClientMocks.openRepoInFinder.mockImplementation(async (path: string) => ({ ok: true, message: path }))
   useHostInfoStore.setState({
     snapshot: { homeDir: '/Users/tester', platform: 'darwin', hostname: 'test-host', pid: 1 },
     hydrated: true,
@@ -151,15 +154,15 @@ afterEach(() => {
   queryClient = null
   toastMocks.error.mockClear()
   appShellMocks.openExternalUrl.mockReset()
-  repoClientMocks.openRepositoryInFinder.mockReset()
+  repoClientMocks.openRepoInFinder.mockReset()
   useHostInfoStore.setState({ snapshot: null, hydrated: false })
   window.localStorage.clear()
   setClientBridgeForTests(null)
-  setTerminalSlotCommandBridge(null)
+  setTerminalSessionCommandBridge(null)
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
-describe('BranchWorkspaceToolbar', () => {
+describe('RepoWorkspaceToolbar', () => {
   test('renders a status tab for a selected branch without a worktree', async () => {
     const showRepoWorkspacePaneView = vi.fn()
     const { container: c, terminalTab } = renderToolbar({
@@ -232,9 +235,7 @@ describe('BranchWorkspaceToolbar', () => {
 
     expect(c.querySelector('.goblin-workspace-toolbar')?.className).not.toContain('app-drag-region')
     expect(c.querySelector('.goblin-workspace-toolbar')?.className).not.toContain('window-chrome')
-    expect(c.querySelector('.goblin-workspace-toolbar')?.className).toContain(
-      'goblin-workspace-toolbar--non-draggable',
-    )
+    expect(c.querySelector('.goblin-workspace-toolbar')?.className).toContain('goblin-workspace-toolbar--non-draggable')
   })
 
   test('renders status and terminal affordance without a default changes tab', () => {
@@ -384,7 +385,7 @@ describe('BranchWorkspaceToolbar', () => {
         `${WORKSPACE_EXTERNAL_APP_RECENT_STORAGE_KEY}:${workspaceExternalAppRecentScope(REPO_ID, WORKTREE_PATH)}`,
       ),
     ).toBe('finder')
-    expect(repoClientMocks.openRepositoryInFinder).toHaveBeenCalledWith(WORKTREE_PATH)
+    expect(repoClientMocks.openRepoInFinder).toHaveBeenCalledWith(WORKTREE_PATH)
 
     const primary = c.querySelector<HTMLButtonElement>('button[aria-label="worktrees.reveal-title"]')
     expect(primary).not.toBeNull()
@@ -394,7 +395,7 @@ describe('BranchWorkspaceToolbar', () => {
       await Promise.resolve()
     })
 
-    expect(repoClientMocks.openRepositoryInFinder).toHaveBeenCalledTimes(2)
+    expect(repoClientMocks.openRepoInFinder).toHaveBeenCalledTimes(2)
   })
 
   test('reloads the scoped recent external app when the worktree path changes', async () => {
@@ -1091,8 +1092,8 @@ function renderToolbar(options: {
   terminalCount: number
   changeCount?: number
   navigation: MainWindowNavigationActions
-  preferredWorkspacePaneView?: WorkspacePaneView
-  workspacePaneStaticViews?: WorkspacePaneStaticViewType[]
+  preferredWorkspacePaneView?: WorkspacePaneTabType
+  workspacePaneStaticViews?: WorkspacePaneStaticTabType[]
   workspacePaneTabOrder?: WorkspacePaneTabOrderEntry[]
   worktree?: boolean
   collapsed?: boolean
@@ -1153,8 +1154,8 @@ function renderToolbar(options: {
     statusLoaded: true,
     remote: options.remote,
   })
-  const detail = getSelectedBranchWorkspacePresentation(repo)
-  const sessions: TerminalSlotSummary[] = Array.from({ length: options.terminalCount }, (_, index) => ({
+  const detail = getSelectedRepoWorkspacePresentation(repo)
+  const sessions: TerminalSessionSummary[] = Array.from({ length: options.terminalCount }, (_, index) => ({
     type: 'terminal',
     id: `t${index + 1}`,
     key: `t${index + 1}`,
@@ -1182,13 +1183,13 @@ function renderToolbar(options: {
   const worktreeSnapshot: WorktreeTerminalSnapshot = {
     worktreeTerminalKey: `${REPO_ID}\0${WORKTREE_PATH}`,
     selectedDescriptor,
-    slots: sessions,
+    sessions,
     count: options.terminalCount,
     bellCount: sessions.filter((session) => session.hasBell).length,
     pendingCreate: options.pendingCreate ?? false,
   }
   const terminalSnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
-  const readContext: TerminalSlotReadContextValue = {
+  const readContext: TerminalSessionReadContextValue = {
     worktreeSnapshot: () => worktreeSnapshot,
     subscribeWorktree: () => () => {},
     snapshot: () => terminalSnapshot,
@@ -1199,7 +1200,7 @@ function renderToolbar(options: {
   const scrollToBottom = vi.fn()
   const closeTerminalByDescriptor = vi.fn(async () => true)
   const showRepoWorkspacePaneView = vi.fn(options.navigation.showRepoWorkspacePaneView)
-  const commandContext: TerminalSlotContextValue = {
+  const commandContext: TerminalSessionContextValue = {
     createTerminal,
     registerHost: vi.fn(),
     unregisterHost: vi.fn(),
@@ -1219,7 +1220,7 @@ function renderToolbar(options: {
     takeover: vi.fn(),
     serialize: vi.fn(() => ''),
   }
-  setTerminalSlotCommandBridge({
+  setTerminalSessionCommandBridge({
     worktreeSnapshot: readContext.worktreeSnapshot,
     createTerminal,
     selectTerminal,
@@ -1234,16 +1235,16 @@ function renderToolbar(options: {
     root!.render(
       <QueryClientProvider client={queryClient!}>
         <MainWindowNavigationProvider value={options.navigation}>
-          <TerminalSlotContext.Provider value={commandContext}>
-            <TerminalSlotReadContext.Provider value={readContext}>
+          <TerminalSessionContext.Provider value={commandContext}>
+            <TerminalSessionReadContext.Provider value={readContext}>
               <BranchWorkspaceToolbarHarness
                 repo={repo}
                 detail={detail}
                 workspacePaneId="workspace"
                 trafficLightOffset={options.trafficLightOffset}
               />
-            </TerminalSlotReadContext.Provider>
-          </TerminalSlotContext.Provider>
+            </TerminalSessionReadContext.Provider>
+          </TerminalSessionContext.Provider>
         </MainWindowNavigationProvider>
       </QueryClientProvider>,
     )
@@ -1270,9 +1271,9 @@ function renderToolbar(options: {
   }
 }
 
-function ToolbarHost(props: Omit<Parameters<typeof BranchWorkspaceToolbar>[0], 'branchActions'>) {
+function ToolbarHost(props: Omit<Parameters<typeof RepoWorkspaceToolbar>[0], 'branchActions'>) {
   const branchActions = useBranchActions(props.repo, props.detail.branch!)
-  return <BranchWorkspaceToolbar {...props} branchActions={branchActions} />
+  return <RepoWorkspaceToolbar {...props} branchActions={branchActions} />
 }
 
 function navigationWith(overrides: Partial<MainWindowNavigationActions>): MainWindowNavigationActions {
@@ -1302,7 +1303,7 @@ function closeButtonFor(container: HTMLElement, identity: string): HTMLButtonEle
   )
 }
 
-function openViewsFor(branchName: string): WorkspacePaneStaticViewType[] {
+function openViewsFor(branchName: string): WorkspacePaneStaticTabType[] {
   const repo = useReposStore.getState().repos[REPO_ID]
   return repo ? workspacePaneStaticViewsForBranch(repo.ui, branchName) : []
 }
@@ -1312,7 +1313,7 @@ function tabOrderFor(branchName: string): WorkspacePaneTabOrderEntry[] {
   return repo ? workspacePaneTabOrderForBranch(repo.ui, branchName) : []
 }
 
-function staticEntry(type: WorkspacePaneStaticViewType): WorkspacePaneTabOrderEntry {
+function staticEntry(type: WorkspacePaneStaticTabType): WorkspacePaneTabOrderEntry {
   return workspacePaneStaticTabOrderEntry(type)
 }
 

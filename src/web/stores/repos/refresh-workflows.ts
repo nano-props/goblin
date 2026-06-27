@@ -1,4 +1,5 @@
-import { appendRepoEvent, errorEvent, isRepoUnavailable, updateIfFresh } from '#/web/stores/repos/helpers.ts'
+import { appendRepoEvent, errorEvent } from '#/web/stores/repos/repo-state-factory.ts'
+import { isRepoUnavailable, updateIfFresh } from '#/web/stores/repos/repo-guards.ts'
 import { persistRestorableRepoSnapshot } from '#/web/stores/repos/persistence.ts'
 import { refreshPullRequestsLog, terminalLog } from '#/web/logger.ts'
 import { terminalBridge } from '#/web/terminal.ts'

@@ -1,29 +1,26 @@
 import { useT } from '#/web/stores/i18n.ts'
 import { EmptyState } from '#/web/components/Layout.tsx'
-import type {
-  BranchWorkspaceRepo,
-  SelectedBranchWorkspacePresentation,
-} from '#/web/components/branch-workspace/model.ts'
+import type { RepoWorkspaceRepo, SelectedRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import type {
-  BranchWorkspacePaneTabModel,
+  RepoWorkspaceTabModel,
   BranchWorkspacePaneTab,
   BranchWorkspacePaneSelection,
-} from '#/web/components/branch-workspace/workspace-pane-tab-model.ts'
+} from '#/web/components/repo-workspace/tab-model.ts'
 import {
   terminalWorkspacePaneTabProvider,
   workspacePaneStaticTabProvider,
   type WorkspacePanePanelLabel,
-} from '#/web/workspace-pane/workspace-pane-tab-providers.ts'
-import { renderBranchWorkspacePanePanel } from '#/web/components/branch-workspace/workspace-pane-panels.tsx'
+} from '#/web/components/workspace-pane/tab-providers.ts'
+import { renderBranchWorkspacePanePanel } from '#/web/components/repo-workspace/panels.tsx'
 
 interface Props {
-  repo: Pick<BranchWorkspaceRepo, 'id' | 'data' | 'ui'> & {
-    data: BranchWorkspaceRepo['data'] & Pick<BranchWorkspaceRepo['data'], 'statusLoaded'>
+  repo: Pick<RepoWorkspaceRepo, 'id' | 'data' | 'ui'> & {
+    data: RepoWorkspaceRepo['data'] & Pick<RepoWorkspaceRepo['data'], 'statusLoaded'>
   }
-  detail: SelectedBranchWorkspacePresentation
+  detail: SelectedRepoWorkspacePresentation
   workspacePaneId: string
-  workspacePaneTabModel: BranchWorkspacePaneTabModel
+  workspacePaneTabModel: RepoWorkspaceTabModel
 }
 
 // Pure view: the workspace pane body is derived from the repos store's
@@ -31,7 +28,7 @@ interface Props {
 // never re-projects on snapshot refresh, branch switch, or session restore.
 // The tab model keeps the body render target separate from the active
 // materialized tab.
-export function BranchWorkspaceContent({ repo, detail, workspacePaneId, workspacePaneTabModel }: Props) {
+export function RepoWorkspaceContent({ repo, detail, workspacePaneId, workspacePaneTabModel }: Props) {
   const t = useT()
   const compact = useIsCompactUi()
   const { branch } = detail

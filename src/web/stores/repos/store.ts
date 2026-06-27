@@ -17,7 +17,7 @@ import { create } from 'zustand'
 import { persist, type PersistStorage, type StorageValue } from 'zustand/middleware'
 import { createBranchActions } from '#/web/stores/repos/branch-actions.ts'
 import { createCommitActions } from '#/web/stores/repos/commit.ts'
-import { createLifecycleActions } from '#/web/stores/repos/lifecycle.ts'
+import { createRepoSessionActions } from '#/web/stores/repos/repo-session.ts'
 import { createRefreshActions } from '#/web/stores/repos/refresh.ts'
 import { createSelectionActions } from '#/web/stores/repos/selection.ts'
 import { reposLog } from '#/web/logger.ts'
@@ -108,7 +108,7 @@ export const useReposStore = create<ReposStore>()(
       // Local client-only state.
       sessionReady: false,
 
-      ...createLifecycleActions(set, get),
+      ...createRepoSessionActions(set, get),
       ...createSelectionActions(set, get),
       ...createRefreshActions(set, get),
       ...createBranchActions(set, get),

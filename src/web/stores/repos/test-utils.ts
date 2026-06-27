@@ -1,7 +1,7 @@
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
-import { emptyRepo } from '#/web/stores/repos/helpers.ts'
-import { disposeAllRepoRuntimes } from '#/web/stores/repos/runtime.ts'
+import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
+import { disposeAllRepoOperationSchedulers } from '#/web/stores/repos/repo-operation-scheduler.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { vi } from 'vitest'
@@ -11,11 +11,11 @@ import type {
   TerminalAttachResult,
   TerminalCatalogMutationResult,
   TerminalMutationResult,
-  TerminalSlotSnapshot,
-  TerminalSlotSummary,
+  TerminalSessionSnapshot,
+  TerminalSessionSummary,
   TerminalTakeoverResult,
 } from '#/shared/terminal-types.ts'
-import type { WorkspacePaneTabOrderEntry, WorkspacePaneView } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabOrderEntry, WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import type { BranchSnapshotInfo, PullRequestInfo, WorktreeStatus } from '#/web/types.ts'
 import type { RepoBranchState, RepoState } from '#/web/stores/repos/types.ts'
 import { DEFAULT_ZEN_MODE, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
@@ -30,8 +30,8 @@ interface TerminalBridgeTestOutputs {
   'terminal.close': TerminalMutationResult
   'terminal.create': TerminalCatalogMutationResult
   'terminal.prune': { pruned: number; remaining: number }
-  'terminal.listSessions': TerminalSlotSummary[]
-  'terminal.getSlotSnapshot': TerminalSlotSnapshot | null
+  'terminal.listSessions': TerminalSessionSummary[]
+  'terminal.getSessionSnapshot': TerminalSessionSnapshot | null
   'terminal.notifyBell': TerminalMutationResult
 }
 
@@ -55,8 +55,8 @@ function terminalHandlerNameForSocketAction(action: string): keyof TerminalBridg
       return 'terminal.prune'
     case 'list-sessions':
       return 'terminal.listSessions'
-    case 'slot-snapshot':
-      return 'terminal.getSlotSnapshot'
+    case 'session-snapshot':
+      return 'terminal.getSessionSnapshot'
     default:
       return null
   }
@@ -91,7 +91,7 @@ export function createPullRequest(number: number, options: Partial<PullRequestIn
 }
 
 export function resetReposStore(): void {
-  disposeAllRepoRuntimes()
+  disposeAllRepoOperationSchedulers()
   mainWindowQueryClient.clear()
   useReposStore.setState({
     repos: {},
@@ -131,7 +131,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         abortIpc: () => Promise.resolve(false),
         onEvent: () => () => {},
         pathForFile: () => '',
-        shell: {
+        host: {
           openSettingsWindow: (input: unknown) =>
             shellOpenSettingsWindow ? Promise.resolve(shellOpenSettingsWindow(input)) : Promise.resolve(false),
           openExternalUrl: (input: unknown) =>
@@ -194,9 +194,9 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
     payload: unknown,
   ): TerminalBridgeTestOutputs['terminal.listSessions']
   function callTerminalHandler(
-    name: 'terminal.getSlotSnapshot',
+    name: 'terminal.getSessionSnapshot',
     payload: unknown,
-  ): TerminalBridgeTestOutputs['terminal.getSlotSnapshot']
+  ): TerminalBridgeTestOutputs['terminal.getSessionSnapshot']
   function callTerminalHandler(
     name: 'terminal.notifyBell',
     payload: unknown,
@@ -235,7 +235,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           return { pruned: 0, remaining: 0 }
         case 'terminal.listSessions':
           return []
-        case 'terminal.getSlotSnapshot':
+        case 'terminal.getSessionSnapshot':
           return null
         case 'terminal.create': {
           const terminalKind = (payload as { kind?: string } | undefined)?.kind
@@ -361,7 +361,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
     onEffectIntent: () => () => {},
     pathForFile: () => '',
     saveClipboardFiles: () => Promise.resolve([]),
-    shell: () => window.goblinNative.shell ?? null,
+    host: () => window.goblinNative.host ?? null,
     terminal: () => ({
       attach: async (input) => callTerminalHandler('terminal.attach', input),
       restart: async (input) => callTerminalHandler('terminal.restart', input),
@@ -374,7 +374,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       listSessions: async (input) => callTerminalHandler('terminal.listSessions', input),
       prewarm: async () => {},
       kickReconnect: () => {},
-      getSlotSnapshot: async (input) => callTerminalHandler('terminal.getSlotSnapshot', input),
+      getSessionSnapshot: async (input) => callTerminalHandler('terminal.getSessionSnapshot', input),
       notifyBell: async (input) => callTerminalHandler('terminal.notifyBell', input),
       sendTestNotification: async () => true,
       setBadge: () => {},
@@ -384,7 +384,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       onIdentity: () => () => {},
       onLifecycle: () => () => {},
       onSessionsChanged: () => () => {},
-      onSlotClosed: () => () => {},
+      onSessionClosed: () => () => {},
     }),
   })
   vi.stubGlobal(
@@ -485,8 +485,8 @@ export function seedRepoState(options: {
   branchSnapshots?: BranchSnapshotInfo[]
   currentBranch?: string
   selectedBranch?: string | null
-  preferredWorkspacePaneView?: WorkspacePaneView
-  preferredWorkspacePaneViewByBranch?: Record<string, WorkspacePaneView>
+  preferredWorkspacePaneView?: WorkspacePaneTabType
+  preferredWorkspacePaneViewByBranch?: Record<string, WorkspacePaneTabType>
   workspacePaneTabOrderByBranch?: Record<string, WorkspacePaneTabOrderEntry[]>
   instanceToken?: number
   status?: WorktreeStatus[]

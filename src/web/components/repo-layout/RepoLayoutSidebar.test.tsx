@@ -3,7 +3,7 @@
 import { act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { RepoShellSidebar } from '#/web/components/repo-shell/RepoShellSidebar.tsx'
+import { RepoLayoutSidebar } from '#/web/components/repo-layout/RepoLayoutSidebar.tsx'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 
 vi.mock('#/web/components/RepoPickerHost.tsx', () => ({
@@ -39,9 +39,9 @@ afterEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
-describe('RepoShellSidebar', () => {
+describe('RepoLayoutSidebar', () => {
   test('renders sidebar actions before the branch content without growing action rows', () => {
-    render(<RepoShellSidebar repoId={REPO_ID} compact={false} branchContent={<div data-testid="branch-content" />} />)
+    render(<RepoLayoutSidebar repoId={REPO_ID} compact={false} branchContent={<div data-testid="branch-content" />} />)
 
     const sidebarTop = document.body.querySelector<HTMLElement>('[data-testid="repo-shell-sidebar-top"]')
     expect(sidebarTop?.dataset.windowChromeRegion).toBe('drag')
@@ -66,7 +66,7 @@ describe('RepoShellSidebar', () => {
   })
 
   test('renders placeholder state when no repo is open', () => {
-    render(<RepoShellSidebar compact={false} />)
+    render(<RepoLayoutSidebar compact={false} />)
 
     expect(document.body.querySelector('[data-testid="repo-picker-host"]')).not.toBeNull()
 
@@ -83,7 +83,7 @@ describe('RepoShellSidebar', () => {
   })
 
   test('renders zen reveal top chrome as draggable without owning zen-toggle geometry', () => {
-    render(<RepoShellSidebar repoId={REPO_ID} compact={false} branchContent={<div data-testid="branch-content" />} />)
+    render(<RepoLayoutSidebar repoId={REPO_ID} compact={false} branchContent={<div data-testid="branch-content" />} />)
 
     const sidebarTop = document.body.querySelector<HTMLElement>('[data-testid="repo-shell-sidebar-top"]')
     expect(sidebarTop?.dataset.windowChromeRegion).toBe('drag')
@@ -95,7 +95,7 @@ describe('RepoShellSidebar', () => {
 
   test('can render the top chrome as neutral when the docked sidebar is collapsed', () => {
     render(
-      <RepoShellSidebar
+      <RepoLayoutSidebar
         repoId={REPO_ID}
         compact={false}
         chromeRegion="none"

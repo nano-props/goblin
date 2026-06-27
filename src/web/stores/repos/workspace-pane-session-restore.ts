@@ -1,6 +1,6 @@
-import { isWorkspacePaneSessionViewType, isWorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
-import type { WorkspacePaneStaticViewType, WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
-import { replaceRepo } from '#/web/stores/repos/helpers.ts'
+import { isWorkspacePaneSessionTabType, isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneStaticTabType, WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
+import { replaceRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { normalizeWorkspacePaneTabOrderRecord } from '#/web/stores/repos/workspace-pane-tabs.ts'
 import {
   preferredWorkspacePaneViewForBranch,
@@ -73,8 +73,8 @@ function restoredPreferredWorkspacePaneViews(
   let next = repo.ui.preferredWorkspacePaneViewByBranch
   for (const [branch, view] of Object.entries(preferredViewByBranch)) {
     if (!isRestorableBranchName(branch)) continue
-    if (!isWorkspacePaneSessionViewType(view)) continue
-    if (isWorkspacePaneStaticViewType(view) && !workspacePaneStaticViews(tabOrderByBranch[branch] ?? []).includes(view))
+    if (!isWorkspacePaneSessionTabType(view)) continue
+    if (isWorkspacePaneStaticTabType(view) && !workspacePaneStaticViews(tabOrderByBranch[branch] ?? []).includes(view))
       continue
     const current =
       next === repo.ui.preferredWorkspacePaneViewByBranch
@@ -123,6 +123,6 @@ function workspacePaneTabOrderRecordsEqual(
   })
 }
 
-function workspacePaneStaticViews(order: readonly WorkspacePaneTabOrderEntry[]): WorkspacePaneStaticViewType[] {
+function workspacePaneStaticViews(order: readonly WorkspacePaneTabOrderEntry[]): WorkspacePaneStaticTabType[] {
   return order.flatMap((entry) => (entry.type === 'terminal' ? [] : [entry.type]))
 }

@@ -183,25 +183,25 @@ describe('repo selectors', () => {
       runtimeCoherentRepoNavigationStoreActionsFromStore({
         closeRepo: fnA as never,
         selectBranch: fnA as never,
-        setWorkspacePaneView: fnA as never,
+        setWorkspacePaneTab: fnA as never,
       }),
     ).toEqual({
       closeRepo: fnA,
       selectBranch: fnA,
-      setWorkspacePaneView: fnA,
+      setWorkspacePaneTab: fnA,
     })
     expect(
       runtimeCoherentRepoProjectionStoreActionsFromStore({
         ensureWorkspaceOpen: fnA as never,
         closeRepo: fnA as never,
         selectBranch: fnA as never,
-        setWorkspacePaneView: fnA as never,
+        setWorkspacePaneTab: fnA as never,
       }),
     ).toEqual({
       ensureWorkspaceOpen: fnA,
       closeRepo: fnA,
       selectBranch: fnA,
-      setWorkspacePaneView: fnA,
+      setWorkspacePaneTab: fnA,
     })
     expect(
       mainWindowNavigationStoreActionsEqual(
@@ -210,14 +210,14 @@ describe('repo selectors', () => {
           closeRepo: fnA,
           cycleActive: fnA,
           selectBranch: fnA,
-          setWorkspacePaneView: fnA,
+          setWorkspacePaneTab: fnA,
         }),
         mainWindowNavigationStoreActionsFromStore({
           setActive: fnA,
           closeRepo: fnA,
           cycleActive: fnA,
           selectBranch: fnA,
-          setWorkspacePaneView: fnA,
+          setWorkspacePaneTab: fnA,
         }),
       ),
     ).toBe(true)

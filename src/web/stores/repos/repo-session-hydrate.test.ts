@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { localRepoSessionEntry, normalizeRemoteTarget, remoteRepoSessionEntry } from '#/shared/remote-repo.ts'
-import { deriveConnectivity } from '#/web/stores/repos/helpers.ts'
+import { deriveConnectivity } from '#/web/stores/repos/repo-guards.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { BranchSnapshotInfo } from '#/web/types.ts'
 import {
@@ -10,17 +10,17 @@ import {
   REPO_A,
   REPO_B,
   resetLifecycleTest,
-} from '#/web/stores/repos/lifecycle-test-utils.ts'
+} from '#/web/stores/repos/repo-session-test-utils.ts'
 
 beforeEach(resetLifecycleTest)
 
 describe('repo session hydration', () => {
-  test('hydrateSession restores repositories through the same initial local refresh path without recent-repo side effects', async () => {
+  test('hydrateRepoSession restores repositories through the same initial local refresh path without recent-repo side effects', async () => {
     const calls = installGoblin()
 
     await useReposStore
       .getState()
-      .hydrateSession([localRepoSessionEntry(REPO_A), localRepoSessionEntry(REPO_B)], REPO_B)
+      .hydrateRepoSession([localRepoSessionEntry(REPO_A), localRepoSessionEntry(REPO_B)], REPO_B)
 
     expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
     expect(useReposStore.getState().activeId).toBe(REPO_B)
@@ -31,7 +31,7 @@ describe('repo session hydration', () => {
     })
   })
 
-  test('hydrateSession uses cached repo data while the initial refresh runs', async () => {
+  test('hydrateRepoSession uses cached repo data while the initial refresh runs', async () => {
     const savedAt = Date.now()
     useReposStore.setState({
       restorableRepoCache: {
@@ -67,7 +67,7 @@ describe('repo session hydration', () => {
         }),
     })
 
-    await useReposStore.getState().hydrateSession([localRepoSessionEntry(REPO_A)], REPO_A)
+    await useReposStore.getState().hydrateRepoSession([localRepoSessionEntry(REPO_A)], REPO_A)
 
     const cachedRepo = useReposStore.getState().repos[REPO_A]
     expect(cachedRepo?.name).toBe('cached-a')
@@ -89,7 +89,7 @@ describe('repo session hydration', () => {
     })
   })
 
-  test('hydrateSession exposes resolved cached repos before slower probes finish', async () => {
+  test('hydrateRepoSession exposes resolved cached repos before slower probes finish', async () => {
     const savedAt = Date.now()
     useReposStore.setState({
       restorableRepoCache: {
@@ -127,7 +127,7 @@ describe('repo session hydration', () => {
 
     const work = useReposStore
       .getState()
-      .hydrateSession([localRepoSessionEntry(REPO_A), localRepoSessionEntry(REPO_B)], REPO_A)
+      .hydrateRepoSession([localRepoSessionEntry(REPO_A), localRepoSessionEntry(REPO_B)], REPO_A)
     // Placeholder repos are inserted synchronously before any probe runs,
     // so REPO_A's cached projection is visible immediately.
     await vi.waitFor(() => {
@@ -162,7 +162,7 @@ describe('repo session hydration', () => {
     expect(useReposStore.getState().sessionReady).toBe(true)
   })
 
-  test('hydrateSession applies restored branch tab open-sets before cached placeholders become ready', async () => {
+  test('hydrateRepoSession applies restored branch tab open-sets before cached placeholders become ready', async () => {
     const savedAt = Date.now()
     useReposStore.setState({
       restorableRepoCache: {
@@ -194,7 +194,7 @@ describe('repo session hydration', () => {
         }>(() => {}),
     })
 
-    const work = useReposStore.getState().hydrateSession([localRepoSessionEntry(REPO_A)], REPO_A, {
+    const work = useReposStore.getState().hydrateRepoSession([localRepoSessionEntry(REPO_A)], REPO_A, {
       workspacePaneRestoreState: {
         workspacePaneTabOrderByBranchByRepo: { [REPO_A]: { main: [] } },
         preferredWorkspacePaneViewByBranchByRepo: { [REPO_A]: { main: 'status' } },
@@ -212,31 +212,31 @@ describe('repo session hydration', () => {
     await work
   })
 
-  test('hydrateSession keeps a user-selected active repo when boot probing settles later', async () => {
+  test('hydrateRepoSession keeps a user-selected active repo when boot probing settles later', async () => {
     installGoblin()
     const result = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
     if (result.ok) useReposStore.getState().setActive(result.id)
 
-    await useReposStore.getState().hydrateSession([localRepoSessionEntry(REPO_B)], REPO_B)
+    await useReposStore.getState().hydrateRepoSession([localRepoSessionEntry(REPO_B)], REPO_B)
 
     expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
     expect(useReposStore.getState().activeId).toBe(REPO_A)
   })
 
-  test('hydrateSession flips sessionReady even when openRepos is empty', async () => {
+  test('hydrateRepoSession flips sessionReady even when openRepos is empty', async () => {
     // Regression: a session with zero open repos used to leave the boot
     // skeleton up forever because sessionReady only flipped on the first
     // placeholder landing, and Phase 1 with no entries is a no-op.
     installGoblin()
 
-    await useReposStore.getState().hydrateSession([], null)
+    await useReposStore.getState().hydrateRepoSession([], null)
 
     expect(useReposStore.getState().order).toEqual([])
     expect(useReposStore.getState().activeId).toBeNull()
     expect(useReposStore.getState().sessionReady).toBe(true)
   })
 
-  test('hydrateSession promotes a remote repo to connected once the probe resolves', async () => {
+  test('hydrateRepoSession promotes a remote repo to connected once the probe resolves', async () => {
     const target = normalizeRemoteTarget({
       alias: 'example',
       host: 'example.com',
@@ -249,7 +249,7 @@ describe('repo session hydration', () => {
       probe: (path: string) => ({ ok: true, root: path, name: 'repo' }),
     })
 
-    await useReposStore.getState().hydrateSession([remoteRepoSessionEntry(target!)], target!.id)
+    await useReposStore.getState().hydrateRepoSession([remoteRepoSessionEntry(target!)], target!.id)
 
     // The derived connectivity naturally reads as 'connected' once
     // the lifecycle lands on `ready`. addResolvedRepo is the only
@@ -260,12 +260,12 @@ describe('repo session hydration', () => {
     expect(deriveConnectivity(repo!)).toBe('connected')
   })
 
-  test('hydrateSession restores unavailable repos as workspace entries', async () => {
+  test('hydrateRepoSession restores unavailable repos as workspace entries', async () => {
     installGoblin()
 
     await useReposStore
       .getState()
-      .hydrateSession([localRepoSessionEntry(REPO_A), localRepoSessionEntry('/missing')], '/missing')
+      .hydrateRepoSession([localRepoSessionEntry(REPO_A), localRepoSessionEntry('/missing')], '/missing')
 
     expect(useReposStore.getState().order).toEqual([REPO_A, '/missing'])
     expect(useReposStore.getState().activeId).toBe('/missing')
@@ -276,7 +276,7 @@ describe('repo session hydration', () => {
     })
   })
 
-  test('hydrateSession limits concurrent repo probes', async () => {
+  test('hydrateRepoSession limits concurrent repo probes', async () => {
     let active = 0
     let maxActive = 0
     const resolvers: Array<() => void> = []
@@ -293,7 +293,7 @@ describe('repo session hydration', () => {
       },
     })
 
-    const work = useReposStore.getState().hydrateSession(repos.map(localRepoSessionEntry), null)
+    const work = useReposStore.getState().hydrateRepoSession(repos.map(localRepoSessionEntry), null)
     for (let i = 0; i < 5 && resolvers.length < 4; i += 1) await Promise.resolve()
 
     expect(maxActive).toBe(4)
@@ -307,7 +307,7 @@ describe('repo session hydration', () => {
     expect(useReposStore.getState().order).toEqual(repos)
   })
 
-  test('hydrateSession restores remote target metadata for remote repos', async () => {
+  test('hydrateRepoSession restores remote target metadata for remote repos', async () => {
     const target = normalizeRemoteTarget({
       alias: 'example',
       host: 'example.com',
@@ -320,13 +320,13 @@ describe('repo session hydration', () => {
       probe: (path: string) => ({ ok: true, root: path, name: 'repo' }),
     })
 
-    await useReposStore.getState().hydrateSession([remoteRepoSessionEntry(target!)], target!.id)
+    await useReposStore.getState().hydrateRepoSession([remoteRepoSessionEntry(target!)], target!.id)
 
     expect(useReposStore.getState().repos[target!.id]?.remote.lifecycle).toEqual({ kind: 'ready', target })
     expect(useReposStore.getState().activeId).toBe(target!.id)
   })
 
-  test('hydrateSession keeps resolved remote target metadata when remote probe reports a missing path', async () => {
+  test('hydrateRepoSession keeps resolved remote target metadata when remote probe reports a missing path', async () => {
     const target = normalizeRemoteTarget({
       alias: 'example',
       host: 'example.com',
@@ -339,7 +339,7 @@ describe('repo session hydration', () => {
       probe: () => ({ ok: false, message: 'path-missing' }),
     })
 
-    await useReposStore.getState().hydrateSession([remoteRepoSessionEntry(target!)], target!.id)
+    await useReposStore.getState().hydrateRepoSession([remoteRepoSessionEntry(target!)], target!.id)
 
     // Phase 4: the lifecycle union owns the failure signal.
     // The `availability` mirror field is kept for the refresh
@@ -354,7 +354,7 @@ describe('repo session hydration', () => {
     })
   })
 
-  test('hydrateSession does not resolve a failed remote target twice', async () => {
+  test('hydrateRepoSession does not resolve a failed remote target twice', async () => {
     const target = normalizeRemoteTarget({
       alias: 'example',
       host: 'example.com',
@@ -367,12 +367,12 @@ describe('repo session hydration', () => {
       probe: () => ({ ok: false, message: 'unreachable' }),
     })
 
-    await useReposStore.getState().hydrateSession([remoteRepoSessionEntry(target!)], target!.id)
+    await useReposStore.getState().hydrateRepoSession([remoteRepoSessionEntry(target!)], target!.id)
 
     expect(calls.resolveTarget).toEqual([{ alias: 'example', remotePath: '/srv/repo' }])
   })
 
-  test('hydrateSession stops processing probes when the signal is already aborted', async () => {
+  test('hydrateRepoSession stops processing probes when the signal is already aborted', async () => {
     let probeCalls = 0
     const pending: Array<() => void> = []
     installGoblin({
@@ -388,7 +388,7 @@ describe('repo session hydration', () => {
 
     await useReposStore
       .getState()
-      .hydrateSession([localRepoSessionEntry(REPO_A), localRepoSessionEntry(REPO_B)], REPO_A, {
+      .hydrateRepoSession([localRepoSessionEntry(REPO_A), localRepoSessionEntry(REPO_B)], REPO_A, {
         signal: controller.signal,
       })
 
@@ -401,7 +401,7 @@ describe('repo session hydration', () => {
     expect(probeCalls).toBe(0)
 
     // The still-pending probe should not affect the store when it
-    // eventually resolves — hydrateSession already returned, so the
+    // eventually resolves — hydrateRepoSession already returned, so the
     // resolved target should not be applied.
     pending.splice(0).forEach((resolve) => resolve())
     await flushIpc()

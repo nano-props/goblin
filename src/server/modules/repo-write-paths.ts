@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { runServerCancellable, abortServerNetworkOp } from '#/server/common/network-ops.ts'
 import { publishRepoQueryInvalidation, publishSettingsInvalidation } from '#/server/modules/invalidation-broker.ts'
-import { resolveRepoBackend, runWithRepoBackend, type RepoMutationResult } from '#/server/modules/repo-backend.ts'
+import { resolveRepoSource, runWithRepoSource, type RepoMutationResult } from '#/server/modules/repo-source.ts'
 import { getServerRepoSettings, trustServerRepoWorktreeBootstrapConfig } from '#/server/modules/settings-source.ts'
 import { cloneRepository as cloneGitRepository } from '#/system/git/clone.ts'
 import { openInPreferredEditor } from '#/system/editors.ts'
@@ -207,7 +207,7 @@ export function abortCloneOperation(operationId: string): boolean {
   return true
 }
 
-export async function fetchRepository(
+export async function fetchRepo(
   cwd: string,
   kind: NetworkOpKind = 'user',
   sourceToken?: string,
@@ -218,7 +218,7 @@ export async function fetchRepository(
     return result
   }
   async function executeFetch(): Promise<{ ok: boolean; message: string }> {
-    return await runWithRepoBackend(cwd, async (backend) => await runFetch((signal) => backend.fetch(signal)))
+    return await runWithRepoSource(cwd, async (backend) => await runFetch((signal) => backend.fetch(signal)))
   }
 
   if (kind === 'user') {
@@ -236,32 +236,32 @@ export async function fetchRepository(
   return await backgroundFetch
 }
 
-export async function pullRepositoryBranch(
+export async function pullRepoBranch(
   cwd: string,
   branch: string,
   worktreePath?: string,
   signal?: AbortSignal,
   sourceToken?: string,
 ): Promise<ExecResult> {
-  const backend = await resolveRepoBackend(cwd)
+  const backend = await resolveRepoSource(cwd)
   return await runUserNetworkMutation(cwd, signal, sourceToken, async (mergedSignal) => {
     return await backend.pull(branch, worktreePath, mergedSignal)
   })
 }
 
-export async function pushRepositoryBranch(
+export async function pushRepoBranch(
   cwd: string,
   branch: string,
   signal?: AbortSignal,
   sourceToken?: string,
 ): Promise<ExecResult> {
-  const backend = await resolveRepoBackend(cwd)
+  const backend = await resolveRepoSource(cwd)
   return await runUserNetworkMutation(cwd, signal, sourceToken, async (mergedSignal) => {
     return await backend.push(branch, mergedSignal)
   })
 }
 
-export async function createRepositoryWorktree(
+export async function createRepoWorktree(
   cwd: string,
   input: CreateWorktreeInput,
   signal?: AbortSignal,
@@ -277,16 +277,12 @@ export async function createRepositoryWorktree(
     return { ok: false, message: 'error.invalid-path' }
   }
   const worktreeBootstrap = options?.worktreeBootstrap ?? { kind: 'skip' }
-  return await runWithRepoBackend(cwd, async (backend) => {
+  return await runWithRepoSource(cwd, async (backend) => {
     const result = await backend.createWorktree(normalized, signal, {
       worktreeBootstrap,
     })
     const trustedResult = await trustWorktreeBootstrapAfterSuccessfulRun(repoId, worktreeBootstrap, result)
-    return await publishSnapshotInvalidationAfterMutation(
-      cwd,
-      trustedResult,
-      sourceToken,
-    )
+    return await publishSnapshotInvalidationAfterMutation(cwd, trustedResult, sourceToken)
   })
 }
 
@@ -307,19 +303,19 @@ async function trustWorktreeBootstrapAfterSuccessfulRun(
   }
 }
 
-export async function getRepositoryRemoteBranches(cwd: string, signal?: AbortSignal): Promise<string[]> {
+export async function getRepoRemoteBranches(cwd: string, signal?: AbortSignal): Promise<string[]> {
   if (!isValidRepoLocator(cwd)) return []
-  return await runWithRepoBackend(cwd, async (backend) => await backend.getRemoteBranches(signal))
+  return await runWithRepoSource(cwd, async (backend) => await backend.getRemoteBranches(signal))
 }
 
-export async function deleteRepositoryBranch(
+export async function deleteRepoBranch(
   cwd: string,
   branch: string,
   options?: { force?: boolean; alsoDeleteUpstream?: boolean },
   signal?: AbortSignal,
   sourceToken?: string,
 ): Promise<ExecResult> {
-  return await runWithRepoBackend(cwd, async (backend) => {
+  return await runWithRepoSource(cwd, async (backend) => {
     return await publishSnapshotInvalidationAfterMutation(
       cwd,
       await backend.deleteBranch(branch, options, signal),
@@ -328,7 +324,7 @@ export async function deleteRepositoryBranch(
   })
 }
 
-export async function removeRepositoryWorktree(
+export async function removeRepoWorktree(
   cwd: string,
   input: {
     branch: string
@@ -340,29 +336,29 @@ export async function removeRepositoryWorktree(
   signal?: AbortSignal,
   sourceToken?: string,
 ): Promise<ExecResult> {
-  return await runWithRepoBackend(cwd, async (backend) => {
+  return await runWithRepoSource(cwd, async (backend) => {
     return await publishSnapshotInvalidationAfterMutation(cwd, await backend.removeWorktree(input, signal), sourceToken)
   })
 }
 
-export async function openRepositoryRemote(cwd: string, branch?: string, signal?: AbortSignal): Promise<ExecResult> {
-  const url = await runWithRepoBackend(cwd, async (backend) => await backend.getBrowserRemoteUrl(branch, signal))
+export async function openRepoRemote(cwd: string, branch?: string, signal?: AbortSignal): Promise<ExecResult> {
+  const url = await runWithRepoSource(cwd, async (backend) => await backend.getBrowserRemoteUrl(branch, signal))
   return url ? { ok: true, message: url } : { ok: false, message: 'error.no-remote-url' }
 }
 
-export async function openRepositoryTerminal(path: string, app: TerminalApp): Promise<ExecResult> {
+export async function openRepoTerminal(path: string, app: TerminalApp): Promise<ExecResult> {
   return await openInPreferredTerminal(path, app)
 }
 
-export async function openRepositoryEditor(path: string, app: EditorApp): Promise<ExecResult> {
+export async function openRepoEditor(path: string, app: EditorApp): Promise<ExecResult> {
   return await openInPreferredEditor(path, app)
 }
 
-export async function openRepositoryInFinder(path: string): Promise<ExecResult> {
+export async function openRepoInFinder(path: string): Promise<ExecResult> {
   return await openInFinder(path)
 }
 
-export function abortRepositoryOperation(cwd: string): boolean {
+export function abortRepoOperation(cwd: string): boolean {
   if (!isValidRepoLocator(cwd)) return false
   return abortServerNetworkOp(cwd)
 }

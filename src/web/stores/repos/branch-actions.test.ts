@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, test } from 'vitest'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { markRepoOperationTargets, nextRepoOperationId, repoOperation } from '#/web/stores/repos/runtime.ts'
-import { replaceRepo } from '#/web/stores/repos/helpers.ts'
+import {
+  markRepoOperationTargets,
+  nextRepoOperationId,
+  repoOperation,
+} from '#/web/stores/repos/repo-operation-scheduler.ts'
+import { replaceRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { getBranchActionCapabilities } from '#/web/hooks/useBranchActions.tsx'
 import { branchBrowserRemoteProvider } from '#/web/hooks/useRemoteOpenAction.ts'
 import {
@@ -560,11 +564,7 @@ describe('runBranchAction', () => {
   })
 
   test.each([
-    [
-      'createWorktree',
-      createWorktreeAction(),
-      'repo.createWorktree',
-    ],
+    ['createWorktree', createWorktreeAction(), 'repo.createWorktree'],
     ['deleteBranch', { kind: 'deleteBranch', branch: 'feature/a' }, 'repo.deleteBranch'],
     [
       'removeWorktree',
@@ -680,11 +680,7 @@ describe('runBranchAction', () => {
       'repo.createWorktree': async () => ({ ok: false, message: 'error.invalid-path' }),
     })
 
-    await useReposStore.getState().runBranchAction(
-      REPO_ID,
-      createWorktreeAction(),
-      { token: 1, refreshOnError: false },
-    )
+    await useReposStore.getState().runBranchAction(REPO_ID, createWorktreeAction(), { token: 1, refreshOnError: false })
 
     expect(useReposStore.getState().repos[REPO_ID]?.events.at(-1)).toMatchObject({
       kind: 'result',
@@ -701,11 +697,7 @@ describe('runBranchAction', () => {
     setSelectionForTest('feature/a', 'all')
     installSuccessfulCreateWorktreeBridge()
 
-    await useReposStore.getState().runBranchAction(
-      REPO_ID,
-      createWorktreeAction(),
-      { token: 1 },
-    )
+    await useReposStore.getState().runBranchAction(REPO_ID, createWorktreeAction(), { token: 1 })
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.ui.branchViewMode).toBe('all')
@@ -716,11 +708,7 @@ describe('runBranchAction', () => {
     setSelectionForTest('feature/a', 'worktrees')
     installSuccessfulCreateWorktreeBridgeWithExistingWorktree()
 
-    await useReposStore.getState().runBranchAction(
-      REPO_ID,
-      createWorktreeAction(),
-      { token: 1 },
-    )
+    await useReposStore.getState().runBranchAction(REPO_ID, createWorktreeAction(), { token: 1 })
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.ui.branchViewMode).toBe('worktrees')
@@ -736,11 +724,7 @@ describe('runBranchAction', () => {
       'repo.createWorktree': async () => result,
     })
 
-    await useReposStore.getState().runBranchAction(
-      REPO_ID,
-      createWorktreeAction(),
-      { token: 1, refreshOnError: false },
-    )
+    await useReposStore.getState().runBranchAction(REPO_ID, createWorktreeAction(), { token: 1, refreshOnError: false })
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.ui.branchViewMode).toBe('worktrees')
@@ -761,11 +745,7 @@ describe('runBranchAction', () => {
       },
     })
 
-    await useReposStore.getState().runBranchAction(
-      REPO_ID,
-      createWorktreeAction(),
-      { token: 1 },
-    )
+    await useReposStore.getState().runBranchAction(REPO_ID, createWorktreeAction(), { token: 1 })
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.instanceToken).toBe(2)

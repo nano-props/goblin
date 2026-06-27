@@ -1,4 +1,4 @@
-import { runWithRepoBackend } from '#/server/modules/repo-backend.ts'
+import { runWithRepoSource } from '#/server/modules/repo-source.ts'
 import { isValidRepoLocator } from '#/shared/input-validation.ts'
 import {
   DEFAULT_REPOSITORY_LOG_COUNT,
@@ -10,19 +10,19 @@ import {
 import type { ProbeResult, PullRequestEntry, RepoSnapshot } from '#/shared/api-types.ts'
 import type { WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
 
-export async function probeRepository(cwd: string): Promise<ProbeResult> {
-  return await runWithRepoBackend(cwd, async (backend) => await backend.probe())
+export async function probeRepo(cwd: string): Promise<ProbeResult> {
+  return await runWithRepoSource(cwd, async (backend) => await backend.probe())
 }
 
-export async function getRepositorySnapshot(cwd: string, signal?: AbortSignal): Promise<RepoSnapshot | null> {
-  return signal?.aborted ? null : await runWithRepoBackend(cwd, async (backend) => await backend.getSnapshot(signal))
+export async function getRepoSnapshot(cwd: string, signal?: AbortSignal): Promise<RepoSnapshot | null> {
+  return signal?.aborted ? null : await runWithRepoSource(cwd, async (backend) => await backend.getSnapshot(signal))
 }
 
-export async function getRepositoryStatus(cwd: string, signal?: AbortSignal): Promise<WorktreeStatus[]> {
-  return signal?.aborted ? [] : await runWithRepoBackend(cwd, async (backend) => await backend.getStatus(signal))
+export async function getRepoStatus(cwd: string, signal?: AbortSignal): Promise<WorktreeStatus[]> {
+  return signal?.aborted ? [] : await runWithRepoSource(cwd, async (backend) => await backend.getStatus(signal))
 }
 
-export async function getRepositoryPullRequests(
+export async function getRepoPullRequests(
   cwd: string,
   branches?: string[],
   options?: { mode?: PullRequestFetchMode; signal?: AbortSignal },
@@ -39,7 +39,7 @@ export async function getRepositoryPullRequests(
         )
   if (branchSet?.size === 0) return []
   const branchNames = branchSet ? Array.from(branchSet) : undefined
-  const prs = await runWithRepoBackend(
+  const prs = await runWithRepoSource(
     cwd,
     async (backend) => await backend.getPullRequests(branchNames, { mode, signal: options?.signal }),
   )
@@ -47,13 +47,13 @@ export async function getRepositoryPullRequests(
   return prs
 }
 
-export async function getRepositoryLog(
+export async function getRepoLog(
   cwd: string,
   branch: string,
   options?: { count?: number; skip?: number; signal?: AbortSignal },
 ): Promise<LogEntry[]> {
   if (typeof branch !== 'string' || branch.length === 0) return []
-  return await runWithRepoBackend(
+  return await runWithRepoSource(
     cwd,
     async (backend) =>
       await backend.getLog(branch, {
@@ -64,21 +64,21 @@ export async function getRepositoryLog(
   )
 }
 
-export async function getRepositoryPatch(cwd: string, worktreePath: string, signal?: AbortSignal): Promise<ExecResult> {
-  return await runWithRepoBackend(cwd, async (backend) => await backend.getPatch(worktreePath, signal))
+export async function getRepoPatch(cwd: string, worktreePath: string, signal?: AbortSignal): Promise<ExecResult> {
+  return await runWithRepoSource(cwd, async (backend) => await backend.getPatch(worktreePath, signal))
 }
 
-export async function getRepositoryWorktreeBootstrapPreview(
+export async function getRepoWorktreeBootstrapPreview(
   cwd: string,
   signal?: AbortSignal,
 ): Promise<WorktreeBootstrapPreviewResult> {
   if (!isValidRepoLocator(cwd)) return { ok: false, message: 'error.invalid-arguments' }
-  return await runWithRepoBackend(cwd, async (backend) => await backend.getWorktreeBootstrapPreview(signal))
+  return await runWithRepoSource(cwd, async (backend) => await backend.getWorktreeBootstrapPreview(signal))
 }
 
-export type CompositeInclude = 'snapshot' | 'status' | 'pullRequests'
+export type RepoBulkReadSection = 'snapshot' | 'status' | 'pullRequests'
 
-export interface RepositoryComposite {
+export interface RepoBulkReadResult {
   snapshot: RepoSnapshot | null
   status: WorktreeStatus[]
   pullRequests: PullRequestEntry[] | null
@@ -91,9 +91,9 @@ export interface RepositoryComposite {
  * the underlying git / network operation would have done. Set to
  * `0` to disable the timeout.
  */
-export const DEFAULT_COMPOSITE_TIMEOUT_MS = 15_000
+export const DEFAULT_BULK_READ_TIMEOUT_MS = 15_000
 
-export interface RepositoryCompositeOptions {
+export interface RepoBulkReadOptions {
   branches?: string[]
   mode?: PullRequestFetchMode
   signal?: AbortSignal
@@ -148,13 +148,13 @@ function composeSectionSignal(
  * `timeoutMs` deadline so a slow git / network operation cannot pin
  * the request worker.
  */
-export async function getRepositoryComposite(
+export async function readRepoBulk(
   cwd: string,
-  includes: ReadonlyArray<CompositeInclude>,
-  options: RepositoryCompositeOptions = {},
-): Promise<RepositoryComposite> {
-  const { branches, mode, signal, timeoutMs = DEFAULT_COMPOSITE_TIMEOUT_MS } = options
-  const want = (name: CompositeInclude) => includes.includes(name)
+  includes: ReadonlyArray<RepoBulkReadSection>,
+  options: RepoBulkReadOptions = {},
+): Promise<RepoBulkReadResult> {
+  const { branches, mode, signal, timeoutMs = DEFAULT_BULK_READ_TIMEOUT_MS } = options
+  const want = (name: RepoBulkReadSection) => includes.includes(name)
 
   // One signal per section so the slow leg can be cancelled
   // independently — the others keep going. We materialise the
@@ -167,13 +167,13 @@ export async function getRepositoryComposite(
   try {
     const settled = await Promise.allSettled([
       snapshotCtl
-        ? getRepositorySnapshot(cwd, snapshotCtl.signal).finally(() => snapshotCtl.cancel())
+        ? getRepoSnapshot(cwd, snapshotCtl.signal).finally(() => snapshotCtl.cancel())
         : Promise.resolve(null as RepoSnapshot | null),
       statusCtl
-        ? getRepositoryStatus(cwd, statusCtl.signal).finally(() => statusCtl.cancel())
+        ? getRepoStatus(cwd, statusCtl.signal).finally(() => statusCtl.cancel())
         : Promise.resolve([] as WorktreeStatus[]),
       prsCtl
-        ? getRepositoryPullRequests(cwd, branches, { mode, signal: prsCtl.signal }).finally(() => prsCtl.cancel())
+        ? getRepoPullRequests(cwd, branches, { mode, signal: prsCtl.signal }).finally(() => prsCtl.cancel())
         : Promise.resolve(null as PullRequestEntry[] | null),
     ])
     return {

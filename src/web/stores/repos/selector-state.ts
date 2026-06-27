@@ -5,10 +5,7 @@ import type {
   RuntimeCoherentRepoProjectionState,
 } from '#/web/stores/repos/types.ts'
 
-export interface MainWindowWorkspaceState extends Pick<
-  ReposStore,
-  'activeId' | 'order' | 'sessionReady' | 'zenMode'
-> {}
+export interface MainWindowWorkspaceState extends Pick<ReposStore, 'activeId' | 'order' | 'sessionReady' | 'zenMode'> {}
 
 export interface MainWindowNavigationState extends Pick<ReposStore, 'activeId' | 'order'> {}
 
@@ -16,10 +13,7 @@ export interface KeyboardRuntimeState {
   repo: RepoState | null
 }
 
-export interface RestorableWorkspaceViewportState extends Pick<
-  ReposStore,
-  'activeId' | 'order' | 'zenMode'
-> {}
+export interface RestorableWorkspaceViewportState extends Pick<ReposStore, 'activeId' | 'order' | 'zenMode'> {}
 
 export interface RestorableWorkspaceNavigationState extends Pick<ReposStore, 'activeId' | 'order'> {}
 
@@ -32,14 +26,7 @@ export function runtimeCoherentRepoProjectionStateFromStore(
 }
 
 export function restorableWorkspaceStateFromStore(
-  state: Pick<
-    ReposStore,
-    | 'order'
-    | 'activeId'
-    | 'zenMode'
-    | 'workspacePaneSize'
-    | 'selectedTerminalByWorktree'
-  >,
+  state: Pick<ReposStore, 'order' | 'activeId' | 'zenMode' | 'workspacePaneSize' | 'selectedTerminalByWorktree'>,
 ): RestorableWorkspaceState {
   return {
     order: state.order,

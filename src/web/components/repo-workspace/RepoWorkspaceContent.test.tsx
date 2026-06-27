@@ -4,19 +4,19 @@ import { act, type ComponentProps } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { BranchWorkspaceContent } from '#/web/components/branch-workspace/BranchWorkspaceContent.tsx'
-import { BranchActionSurfaceContext } from '#/web/components/branch-workspace/branch-action-surface-context.ts'
-import { getSelectedBranchWorkspacePresentation } from '#/web/components/branch-workspace/model.ts'
-import { useBranchWorkspacePaneTabModel } from '#/web/components/branch-workspace/use-branch-workspace-pane-tab-model.ts'
+import { RepoWorkspaceContent } from '#/web/components/repo-workspace/RepoWorkspaceContent.tsx'
+import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
+import { getSelectedRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
+import { useRepoWorkspaceTabModel } from '#/web/components/repo-workspace/use-repo-workspace-tab-model.ts'
 import type { BranchCopyPatchAction } from '#/web/hooks/branch-action-state.ts'
 import {
-  TerminalSlotContext,
-  TerminalSlotReadContext,
-} from '#/web/components/terminal/terminal-slot-context.ts'
+  TerminalSessionContext,
+  TerminalSessionReadContext,
+} from '#/web/components/terminal/terminal-session-context.ts'
 import type {
-  TerminalSlotContextValue,
-  TerminalSlotSummary,
-  TerminalSlotReadContextValue,
+  TerminalSessionContextValue,
+  TerminalSessionSummary,
+  TerminalSessionReadContextValue,
   WorktreeTerminalSnapshot,
 } from '#/web/components/terminal/types.ts'
 import {
@@ -27,15 +27,15 @@ import {
 } from '#/web/stores/repos/test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
-import type { WorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import { workspacePaneStaticTabOrderEntry, workspacePaneTerminalTabOrderEntry } from '#/shared/workspace-pane.ts'
 
 const repoClientMocks = vi.hoisted(() => ({
-  getRepositoryLog: vi.fn(),
+  getRepoLog: vi.fn(),
 }))
 
 vi.mock('#/web/repo-client.ts', () => ({
-  getRepositoryLog: repoClientMocks.getRepositoryLog,
+  getRepoLog: repoClientMocks.getRepoLog,
 }))
 
 const REPO_ID = '/tmp/gbl-branch-workspace-content-repo'
@@ -44,21 +44,18 @@ let container: HTMLDivElement | null = null
 let root: Root | null = null
 const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 
-type BranchWorkspaceContentHarnessProps = Omit<
-  ComponentProps<typeof BranchWorkspaceContent>,
-  'workspacePaneTabModel'
->
+type BranchWorkspaceContentHarnessProps = Omit<ComponentProps<typeof RepoWorkspaceContent>, 'workspacePaneTabModel'>
 
 function BranchWorkspaceContentHarness(props: BranchWorkspaceContentHarnessProps) {
-  const workspacePaneTabModel = useBranchWorkspacePaneTabModel(props.repo, props.detail)
-  return <BranchWorkspaceContent {...props} workspacePaneTabModel={workspacePaneTabModel} />
+  const workspacePaneTabModel = useRepoWorkspaceTabModel(props.repo, props.detail)
+  return <RepoWorkspaceContent {...props} workspacePaneTabModel={workspacePaneTabModel} />
 }
 
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   resetReposStore()
   useRepoSyncStore.setState({ ready: new Map(), timestamps: new Map() })
-  repoClientMocks.getRepositoryLog.mockResolvedValue([])
+  repoClientMocks.getRepoLog.mockResolvedValue([])
   container = document.createElement('div')
   document.body.append(container)
   root = createRoot(container)
@@ -72,11 +69,11 @@ afterEach(() => {
   container?.remove()
   root = null
   container = null
-  repoClientMocks.getRepositoryLog.mockReset()
+  repoClientMocks.getRepoLog.mockReset()
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
-describe('BranchWorkspaceContent', () => {
+describe('RepoWorkspaceContent', () => {
   // The status tab pulls `copyPatchAction` from the action surface
   // context. Surface it directly so the test can drive it without
   // mounting the whole `useBranchActionItems` machinery.
@@ -133,11 +130,11 @@ describe('BranchWorkspaceContent', () => {
         },
       ],
     })
-    const detail = getSelectedBranchWorkspacePresentation(repo)
+    const detail = getSelectedRepoWorkspacePresentation(repo)
 
     act(() => {
       root!.render(
-        <TerminalSlotReadContext.Provider value={emptyTerminalReadContext}>
+        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
           <BranchActionSurfaceContext.Provider
             value={branchActionSurfaceWithCopyPatch({
               label: 'status.copy-patch',
@@ -149,7 +146,7 @@ describe('BranchWorkspaceContent', () => {
           >
             <BranchWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
           </BranchActionSurfaceContext.Provider>
-        </TerminalSlotReadContext.Provider>,
+        </TerminalSessionReadContext.Provider>,
       )
     })
 
@@ -192,12 +189,12 @@ describe('BranchWorkspaceContent', () => {
         },
       ],
     })
-    const detail = getSelectedBranchWorkspacePresentation(repo)
+    const detail = getSelectedRepoWorkspacePresentation(repo)
     const onCopyPatch = vi.fn().mockResolvedValue(true)
 
     act(() => {
       root!.render(
-        <TerminalSlotReadContext.Provider value={emptyTerminalReadContext}>
+        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
           <BranchActionSurfaceContext.Provider
             value={branchActionSurfaceWithCopyPatch({
               label: 'status.copy-patch',
@@ -209,7 +206,7 @@ describe('BranchWorkspaceContent', () => {
           >
             <BranchWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
           </BranchActionSurfaceContext.Provider>
-        </TerminalSlotReadContext.Provider>,
+        </TerminalSessionReadContext.Provider>,
       )
     })
 
@@ -251,11 +248,11 @@ describe('BranchWorkspaceContent', () => {
       statusLoaded: true,
       status: [{ path: worktreePath, branch: 'feature/clean', isMain: false, entries: [] }],
     })
-    const detail = getSelectedBranchWorkspacePresentation(repo)
+    const detail = getSelectedRepoWorkspacePresentation(repo)
 
     act(() => {
       root!.render(
-        <TerminalSlotReadContext.Provider value={emptyTerminalReadContext}>
+        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
           <BranchActionSurfaceContext.Provider
             value={branchActionSurfaceWithCopyPatch({
               label: 'status.copy-patch',
@@ -267,7 +264,7 @@ describe('BranchWorkspaceContent', () => {
           >
             <BranchWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
           </BranchActionSurfaceContext.Provider>
-        </TerminalSlotReadContext.Provider>,
+        </TerminalSessionReadContext.Provider>,
       )
     })
 
@@ -301,11 +298,11 @@ describe('BranchWorkspaceContent', () => {
         },
       ],
     })
-    const detail = getSelectedBranchWorkspacePresentation(repo)
+    const detail = getSelectedRepoWorkspacePresentation(repo)
 
     act(() => {
       root!.render(
-        <TerminalSlotReadContext.Provider value={emptyTerminalReadContext}>
+        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
           <BranchActionSurfaceContext.Provider
             value={branchActionSurfaceWithCopyPatch({
               label: 'status.copy-patch',
@@ -317,7 +314,7 @@ describe('BranchWorkspaceContent', () => {
           >
             <BranchWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
           </BranchActionSurfaceContext.Provider>
-        </TerminalSlotReadContext.Provider>,
+        </TerminalSessionReadContext.Provider>,
       )
     })
 
@@ -352,15 +349,15 @@ describe('BranchWorkspaceContent', () => {
         },
       ],
     })
-    const detail = getSelectedBranchWorkspacePresentation(repo)
+    const detail = getSelectedRepoWorkspacePresentation(repo)
 
     act(() => {
       root!.render(
-        <TerminalSlotReadContext.Provider value={emptyTerminalReadContext}>
+        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
           <BranchActionSurfaceContext.Provider value={defaultBranchActionSurface()}>
             <BranchWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
           </BranchActionSurfaceContext.Provider>
-        </TerminalSlotReadContext.Provider>,
+        </TerminalSessionReadContext.Provider>,
       )
     })
 
@@ -389,15 +386,15 @@ describe('BranchWorkspaceContent', () => {
       selectedBranch: 'feature/no-worktree',
       preferredWorkspacePaneView: 'status',
     })
-    const detail = getSelectedBranchWorkspacePresentation(repo)
+    const detail = getSelectedRepoWorkspacePresentation(repo)
 
     act(() => {
       root!.render(
-        <TerminalSlotReadContext.Provider value={emptyTerminalReadContext}>
+        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
           <BranchActionSurfaceContext.Provider value={defaultBranchActionSurface()}>
             <BranchWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
           </BranchActionSurfaceContext.Provider>
-        </TerminalSlotReadContext.Provider>,
+        </TerminalSessionReadContext.Provider>,
       )
     })
 
@@ -423,13 +420,13 @@ describe('BranchWorkspaceContent', () => {
       preferredWorkspacePaneView: 'status',
       workspacePaneTabOrderByBranch: { 'feature/no-worktree': [] },
     })
-    const detail = getSelectedBranchWorkspacePresentation(repo)
+    const detail = getSelectedRepoWorkspacePresentation(repo)
 
     act(() => {
       root!.render(
-        <TerminalSlotReadContext.Provider value={emptyTerminalReadContext}>
+        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
           <BranchWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-        </TerminalSlotReadContext.Provider>,
+        </TerminalSessionReadContext.Provider>,
       )
     })
 
@@ -445,15 +442,15 @@ describe('BranchWorkspaceContent', () => {
       preferredWorkspacePaneView: 'terminal',
       workspacePaneTabOrderByBranch: { 'feature/no-worktree': [staticEntry('status')] },
     })
-    const detail = getSelectedBranchWorkspacePresentation(repo)
+    const detail = getSelectedRepoWorkspacePresentation(repo)
 
     act(() => {
       root!.render(
-        <TerminalSlotReadContext.Provider value={emptyTerminalReadContext}>
+        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
           <BranchActionSurfaceContext.Provider value={defaultBranchActionSurface()}>
             <BranchWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
           </BranchActionSurfaceContext.Provider>
-        </TerminalSlotReadContext.Provider>,
+        </TerminalSessionReadContext.Provider>,
       )
     })
 
@@ -475,15 +472,15 @@ describe('BranchWorkspaceContent', () => {
       workspacePaneTabOrderByBranch: { 'feature/terminal-empty': [staticEntry('status')] },
     })
     useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceToken)
-    const detail = getSelectedBranchWorkspacePresentation(repo)
+    const detail = getSelectedRepoWorkspacePresentation(repo)
 
     act(() => {
       root!.render(
-        <TerminalSlotReadContext.Provider value={emptyTerminalReadContext}>
+        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
           <BranchActionSurfaceContext.Provider value={defaultBranchActionSurface()}>
             <BranchWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
           </BranchActionSurfaceContext.Provider>
-        </TerminalSlotReadContext.Provider>,
+        </TerminalSessionReadContext.Provider>,
       )
     })
 
@@ -507,25 +504,25 @@ describe('BranchWorkspaceContent', () => {
       workspacePaneTabOrderByBranch: { 'feature/terminal-pending': [staticEntry('status')] },
     })
     useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceToken)
-    const detail = getSelectedBranchWorkspacePresentation(repo)
+    const detail = getSelectedRepoWorkspacePresentation(repo)
     const registerHost = vi.fn()
     const worktreeSnapshot: WorktreeTerminalSnapshot = {
       ...emptyWorktreeSnapshot,
       worktreeTerminalKey: worktreeKey,
       pendingCreate: true,
     }
-    const readContext: TerminalSlotReadContextValue = {
+    const readContext: TerminalSessionReadContextValue = {
       ...emptyTerminalReadContext,
       worktreeSnapshot: () => worktreeSnapshot,
     }
 
     act(() => {
       root!.render(
-        <TerminalSlotContext.Provider value={terminalCommandContextWith({ registerHost })}>
-          <TerminalSlotReadContext.Provider value={readContext}>
+        <TerminalSessionContext.Provider value={terminalCommandContextWith({ registerHost })}>
+          <TerminalSessionReadContext.Provider value={readContext}>
             <BranchWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-          </TerminalSlotReadContext.Provider>
-        </TerminalSlotContext.Provider>,
+          </TerminalSessionReadContext.Provider>
+        </TerminalSessionContext.Provider>,
       )
     })
 
@@ -533,7 +530,7 @@ describe('BranchWorkspaceContent', () => {
     expect(panel).not.toBeNull()
     expect(panel?.getAttribute('aria-labelledby')).toBe('workspace-terminal-pending-tab')
     expect(panel?.hasAttribute('aria-label')).toBe(false)
-    expect(container?.querySelector('.goblin-terminal-slot__host')).not.toBeNull()
+    expect(container?.querySelector('.goblin-terminal-session__host')).not.toBeNull()
     expect(container?.textContent).toContain('terminal.opening')
     expect(container?.textContent).not.toContain('workspace-pane-views.empty')
     expect(registerHost).toHaveBeenCalledWith(worktreeKey, expect.any(HTMLDivElement))
@@ -556,24 +553,24 @@ describe('BranchWorkspaceContent', () => {
       previousTabIdentities: ['status:status'],
     })
     const repo = useReposStore.getState().repos[REPO_ID]!
-    const detail = getSelectedBranchWorkspacePresentation(repo)
+    const detail = getSelectedRepoWorkspacePresentation(repo)
     const registerHost = vi.fn()
     const worktreeSnapshot: WorktreeTerminalSnapshot = {
       ...emptyWorktreeSnapshot,
       worktreeTerminalKey: worktreeKey,
       pendingCreate: true,
     }
-    const readContext: TerminalSlotReadContextValue = {
+    const readContext: TerminalSessionReadContextValue = {
       ...emptyTerminalReadContext,
       worktreeSnapshot: () => worktreeSnapshot,
     }
 
     render(
-      <TerminalSlotContext.Provider value={terminalCommandContextWith({ registerHost })}>
-        <TerminalSlotReadContext.Provider value={readContext}>
+      <TerminalSessionContext.Provider value={terminalCommandContextWith({ registerHost })}>
+        <TerminalSessionReadContext.Provider value={readContext}>
           <BranchWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-        </TerminalSlotReadContext.Provider>
-      </TerminalSlotContext.Provider>,
+        </TerminalSessionReadContext.Provider>
+      </TerminalSessionContext.Provider>,
     )
 
     expect(screen.getByRole('tabpanel').id).toBe('workspace-terminal-panel')
@@ -591,7 +588,7 @@ describe('BranchWorkspaceContent', () => {
       preferredWorkspacePaneView: 'terminal',
       workspacePaneTabOrderByBranch: { 'feature/terminal-loading': [staticEntry('status')] },
     })
-    const detail = getSelectedBranchWorkspacePresentation(repo)
+    const detail = getSelectedRepoWorkspacePresentation(repo)
     const createTerminal = vi.fn(async () => 'slot-1')
     const registerHost = vi.fn()
     const worktreeSnapshot: WorktreeTerminalSnapshot = {
@@ -599,18 +596,18 @@ describe('BranchWorkspaceContent', () => {
       worktreeTerminalKey: worktreeKey,
       pendingCreate: false,
     }
-    const readContext: TerminalSlotReadContextValue = {
+    const readContext: TerminalSessionReadContextValue = {
       ...emptyTerminalReadContext,
       worktreeSnapshot: () => worktreeSnapshot,
     }
 
     act(() => {
       root!.render(
-        <TerminalSlotContext.Provider value={terminalCommandContextWith({ createTerminal, registerHost })}>
-          <TerminalSlotReadContext.Provider value={readContext}>
+        <TerminalSessionContext.Provider value={terminalCommandContextWith({ createTerminal, registerHost })}>
+          <TerminalSessionReadContext.Provider value={readContext}>
             <BranchWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-          </TerminalSlotReadContext.Provider>
-        </TerminalSlotContext.Provider>,
+          </TerminalSessionReadContext.Provider>
+        </TerminalSessionContext.Provider>,
       )
     })
 
@@ -620,7 +617,7 @@ describe('BranchWorkspaceContent', () => {
     expect(panel?.hasAttribute('aria-labelledby')).toBe(false)
     expect(container?.textContent).toContain('terminal.loading')
     expect(container?.textContent).not.toContain('terminal.new')
-    expect(container?.querySelector('.goblin-terminal-slot__empty-cta')).toBeNull()
+    expect(container?.querySelector('.goblin-terminal-session__empty-cta')).toBeNull()
     expect(createTerminal).not.toHaveBeenCalled()
     expect(registerHost).toHaveBeenCalledWith(worktreeKey, expect.any(HTMLDivElement))
   })
@@ -638,26 +635,26 @@ describe('BranchWorkspaceContent', () => {
       },
     })
     useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceToken)
-    const detail = getSelectedBranchWorkspacePresentation(repo)
+    const detail = getSelectedRepoWorkspacePresentation(repo)
     const registerHost = vi.fn()
     const worktreeSnapshot: WorktreeTerminalSnapshot = {
       ...emptyWorktreeSnapshot,
       worktreeTerminalKey: worktreeKey,
-      slots: [terminalSession('t1', 1, false, worktreeKey), terminalSession('t2', 2, true, worktreeKey)],
+      sessions: [terminalSession('t1', 1, false, worktreeKey), terminalSession('t2', 2, true, worktreeKey)],
       count: 2,
     }
-    const readContext: TerminalSlotReadContextValue = {
+    const readContext: TerminalSessionReadContextValue = {
       ...emptyTerminalReadContext,
       worktreeSnapshot: () => worktreeSnapshot,
     }
 
     act(() => {
       root!.render(
-        <TerminalSlotContext.Provider value={terminalCommandContextWith({ registerHost })}>
-          <TerminalSlotReadContext.Provider value={readContext}>
+        <TerminalSessionContext.Provider value={terminalCommandContextWith({ registerHost })}>
+          <TerminalSessionReadContext.Provider value={readContext}>
             <BranchWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-          </TerminalSlotReadContext.Provider>
-        </TerminalSlotContext.Provider>,
+          </TerminalSessionReadContext.Provider>
+        </TerminalSessionContext.Provider>,
       )
     })
 
@@ -677,15 +674,15 @@ describe('BranchWorkspaceContent', () => {
         'feature/a': [staticEntry('status'), staticEntry('history')],
       },
     })
-    const detail = getSelectedBranchWorkspacePresentation(repo)
+    const detail = getSelectedRepoWorkspacePresentation(repo)
 
     act(() => {
       root!.render(
-        <TerminalSlotReadContext.Provider value={emptyTerminalReadContext}>
+        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
           <BranchActionSurfaceContext.Provider value={defaultBranchActionSurface()}>
             <BranchWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
           </BranchActionSurfaceContext.Provider>
-        </TerminalSlotReadContext.Provider>,
+        </TerminalSessionReadContext.Provider>,
       )
     })
     await flushAsyncWork()
@@ -699,11 +696,11 @@ describe('BranchWorkspaceContent', () => {
     expect(container?.querySelector('#workspace-status-panel')).not.toBeNull()
     expect(container?.querySelector('#workspace-history-panel')).toBeNull()
     expect(container?.textContent).not.toContain('workspace-pane-views.empty')
-    expect(repoClientMocks.getRepositoryLog).not.toHaveBeenCalled()
+    expect(repoClientMocks.getRepoLog).not.toHaveBeenCalled()
   })
 
   test('renders branch history as one-line short-hash log entries', async () => {
-    repoClientMocks.getRepositoryLog.mockResolvedValue([
+    repoClientMocks.getRepoLog.mockResolvedValue([
       {
         hash: '78c150a000000000000000000000000000000000',
         shortHash: '78c150a',
@@ -720,18 +717,18 @@ describe('BranchWorkspaceContent', () => {
       preferredWorkspacePaneView: 'history',
       workspacePaneTabOrderByBranch: { 'feature/history': [staticEntry('status'), staticEntry('history')] },
     })
-    const detail = getSelectedBranchWorkspacePresentation(repo)
+    const detail = getSelectedRepoWorkspacePresentation(repo)
 
     act(() => {
       root!.render(
-        <TerminalSlotReadContext.Provider value={emptyTerminalReadContext}>
+        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
           <BranchWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-        </TerminalSlotReadContext.Provider>,
+        </TerminalSessionReadContext.Provider>,
       )
     })
     await flushAsyncWork()
 
-    expect(repoClientMocks.getRepositoryLog).toHaveBeenCalledWith(
+    expect(repoClientMocks.getRepoLog).toHaveBeenCalledWith(
       REPO_ID,
       'feature/history',
       expect.objectContaining({ count: 50 }),
@@ -774,13 +771,13 @@ describe('BranchWorkspaceContent', () => {
       preferredWorkspacePaneView: 'history',
       workspacePaneTabOrderByBranch: { 'feature/history': [staticEntry('status'), staticEntry('history')] },
     })
-    const detail = getSelectedBranchWorkspacePresentation(repo)
+    const detail = getSelectedRepoWorkspacePresentation(repo)
 
     act(() => {
       root!.render(
-        <TerminalSlotReadContext.Provider value={emptyTerminalReadContext}>
+        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
           <BranchWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-        </TerminalSlotReadContext.Provider>,
+        </TerminalSessionReadContext.Provider>,
       )
     })
     await flushAsyncWork()
@@ -791,7 +788,7 @@ describe('BranchWorkspaceContent', () => {
   })
 
   test('shows an error state when branch history cannot be read', async () => {
-    repoClientMocks.getRepositoryLog.mockRejectedValue(new Error('error.failed-read-repo'))
+    repoClientMocks.getRepoLog.mockRejectedValue(new Error('error.failed-read-repo'))
     const repo = seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/history')],
@@ -799,13 +796,13 @@ describe('BranchWorkspaceContent', () => {
       preferredWorkspacePaneView: 'history',
       workspacePaneTabOrderByBranch: { 'feature/history': [staticEntry('history')] },
     })
-    const detail = getSelectedBranchWorkspacePresentation(repo)
+    const detail = getSelectedRepoWorkspacePresentation(repo)
 
     act(() => {
       root!.render(
-        <TerminalSlotReadContext.Provider value={emptyTerminalReadContext}>
+        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
           <BranchWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-        </TerminalSlotReadContext.Provider>,
+        </TerminalSessionReadContext.Provider>,
       )
     })
     await flushAsyncWork()
@@ -818,20 +815,20 @@ describe('BranchWorkspaceContent', () => {
 const emptyWorktreeSnapshot: WorktreeTerminalSnapshot = {
   worktreeTerminalKey: '',
   selectedDescriptor: null,
-  slots: [],
+  sessions: [],
   count: 0,
   bellCount: 0,
   pendingCreate: false,
 }
 
-const emptyTerminalReadContext: TerminalSlotReadContextValue = {
+const emptyTerminalReadContext: TerminalSessionReadContextValue = {
   worktreeSnapshot: () => emptyWorktreeSnapshot,
   subscribeWorktree: () => () => {},
   snapshot: () => ({ phase: 'opening', message: null, processName: 'terminal' }),
   subscribeSnapshot: () => () => {},
 }
 
-function terminalCommandContextWith(overrides: Partial<TerminalSlotContextValue> = {}): TerminalSlotContextValue {
+function terminalCommandContextWith(overrides: Partial<TerminalSessionContextValue> = {}): TerminalSessionContextValue {
   return {
     createTerminal: vi.fn(async () => 'slot-1'),
     registerHost: vi.fn(),
@@ -861,7 +858,7 @@ async function flushAsyncWork() {
   })
 }
 
-function staticEntry(type: WorkspacePaneStaticViewType) {
+function staticEntry(type: WorkspacePaneStaticTabType) {
   return workspacePaneStaticTabOrderEntry(type)
 }
 
@@ -874,7 +871,7 @@ function terminalSession(
   index: number,
   selected: boolean,
   worktreeTerminalKey: string,
-): TerminalSlotSummary {
+): TerminalSessionSummary {
   return {
     type: 'terminal',
     id: key,

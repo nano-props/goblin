@@ -1,6 +1,6 @@
 /**
  * Lifecycle / orchestrator coverage for the unified
- * runRemoteRepoLifecycle entry point.
+ * runRemoteRepoConnection entry point.
  *
  * Mirrors docs/goblin-remote-repo-refactor-plan.md §10.1:
  *   1. remote open success -> connecting -> ready
@@ -14,7 +14,7 @@
  */
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
-// Mock `resolveRemoteRepoLifecycle` to a controllable stub.
+// Mock `resolveRemoteRepoConnection` to a controllable stub.
 // By default the stub delegates to the real implementation
 // (via `importActual`) so the existing happy-path tests
 // still hit the IPC bridge. The abort-without-successor
@@ -28,19 +28,19 @@ vi.mock('#/web/remote-client.ts', async (importActual) => {
   const actual = await importActual<typeof import('#/web/remote-client.ts')>()
   return {
     ...actual,
-    resolveRemoteRepoLifecycle: vi.fn(async (input, signal) => {
+    resolveRemoteRepoConnection: vi.fn(async (input, signal) => {
       if (shouldThrowResolveLifecycle) {
         throw new Error('aborted')
       }
-      return actual.resolveRemoteRepoLifecycle(input, signal)
+      return actual.resolveRemoteRepoConnection(input, signal)
     }),
   }
 })
 
 import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
-import { runRemoteRepoLifecycle } from '#/web/stores/repos/remote-lifecycle-orchestrator.ts'
-import { emptyRepo } from '#/web/stores/repos/helpers.ts'
-import { installGoblin, resetLifecycleTest } from '#/web/stores/repos/lifecycle-test-utils.ts'
+import { runRemoteRepoConnection } from '#/web/stores/repos/remote-repo-connection-orchestrator.ts'
+import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
+import { installGoblin, resetLifecycleTest } from '#/web/stores/repos/repo-session-test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 
@@ -58,7 +58,7 @@ function remoteTargetFixture() {
   return target!
 }
 
-describe('runRemoteRepoLifecycle', () => {
+describe('runRemoteRepoConnection', () => {
   beforeEach(() => {
     resetLifecycleTest()
   })
@@ -122,7 +122,7 @@ describe('runRemoteRepoLifecycle', () => {
       return { ...s, repos: { ...s.repos, [REMOTE_ID]: repo }, order: [REMOTE_ID] }
     })
 
-    const outcome = await runRemoteRepoLifecycle(useReposStore.setState, useReposStore.getState, REMOTE_ID)
+    const outcome = await runRemoteRepoConnection(useReposStore.setState, useReposStore.getState, REMOTE_ID)
     expect(outcome?.kind).toBe('ready')
 
     const final = useReposStore.getState().repos[REMOTE_ID]
@@ -170,7 +170,7 @@ describe('runRemoteRepoLifecycle', () => {
       return { ...s, repos: { ...s.repos, [REMOTE_ID]: repo }, order: [REMOTE_ID] }
     })
 
-    const outcome = await runRemoteRepoLifecycle(useReposStore.setState, useReposStore.getState, REMOTE_ID)
+    const outcome = await runRemoteRepoConnection(useReposStore.setState, useReposStore.getState, REMOTE_ID)
     expect(outcome?.kind).toBe('failed')
     expect(outcome?.reason).toBe('config-changed')
     expect(useReposStore.getState().repos[REMOTE_ID]?.remote.lifecycle).toEqual({
@@ -218,7 +218,7 @@ describe('runRemoteRepoLifecycle', () => {
       return { ...s, repos: { ...s.repos, [REMOTE_ID]: repo }, order: [REMOTE_ID] }
     })
 
-    const outcome = await runRemoteRepoLifecycle(useReposStore.setState, useReposStore.getState, REMOTE_ID)
+    const outcome = await runRemoteRepoConnection(useReposStore.setState, useReposStore.getState, REMOTE_ID)
     expect(outcome?.kind).toBe('failed')
     expect(outcome?.reason).toBe('path-missing')
   })
@@ -267,11 +267,11 @@ describe('runRemoteRepoLifecycle', () => {
     })
 
     // First call: settle to failed.
-    await runRemoteRepoLifecycle(useReposStore.setState, useReposStore.getState, REMOTE_ID)
+    await runRemoteRepoConnection(useReposStore.setState, useReposStore.getState, REMOTE_ID)
     expect(useReposStore.getState().repos[REMOTE_ID]?.remote.lifecycle?.kind).toBe('failed')
 
     // Retry: the orchestrator flips to connecting and re-runs.
-    const second = await runRemoteRepoLifecycle(useReposStore.setState, useReposStore.getState, REMOTE_ID)
+    const second = await runRemoteRepoConnection(useReposStore.setState, useReposStore.getState, REMOTE_ID)
     expect(second?.kind).toBe('ready')
     expect(useReposStore.getState().repos[REMOTE_ID]?.remote.lifecycle?.kind).toBe('ready')
   })
@@ -286,7 +286,7 @@ describe('runRemoteRepoLifecycle', () => {
       return { ...s, repos: { ...s.repos, [REMOTE_ID]: repo }, order: [REMOTE_ID] }
     })
 
-    const outcome = await runRemoteRepoLifecycle(useReposStore.setState, useReposStore.getState, REMOTE_ID)
+    const outcome = await runRemoteRepoConnection(useReposStore.setState, useReposStore.getState, REMOTE_ID)
 
     expect(outcome?.kind).toBe('ready')
     const final = useReposStore.getState().repos[REMOTE_ID]
@@ -347,7 +347,7 @@ describe('runRemoteRepoLifecycle', () => {
       return { ...s, repos: { ...s.repos, [REMOTE_ID]: repo }, order: [REMOTE_ID] }
     })
 
-    const first = await runRemoteRepoLifecycle(useReposStore.setState, useReposStore.getState, REMOTE_ID)
+    const first = await runRemoteRepoConnection(useReposStore.setState, useReposStore.getState, REMOTE_ID)
     expect(first?.kind).toBe('failed')
     expect(useReposStore.getState().repos[REMOTE_ID]?.remote.lifecycle?.kind).toBe('failed')
 
@@ -357,19 +357,19 @@ describe('runRemoteRepoLifecycle', () => {
     // The first run's onError (which already settled to
     // `addUnavailableRepo`) MUST NOT run again on the second
     // run's behalf, and the second run's onResult writes `ready`.
-    const second = await runRemoteRepoLifecycle(useReposStore.setState, useReposStore.getState, REMOTE_ID)
+    const second = await runRemoteRepoConnection(useReposStore.setState, useReposStore.getState, REMOTE_ID)
     expect(second?.kind).toBe('ready')
     expect(useReposStore.getState().repos[REMOTE_ID]?.remote.lifecycle?.kind).toBe('ready')
   })
 
   test("the orchestrator's onError path lands `failed` for an aborted run", async () => {
-    // Driving the full lane-level abort (disposeRepoRuntime)
+    // Driving the full lane-level abort (disposeRepoOperationScheduler)
     // requires a signal-aware fetch stub that the IPC shim
     // doesn't surface (the shim's repo.probe handler doesn't
     // receive a signal). Instead we drive the orchestrator's
     // onError path directly by injecting a task body that throws
     // — this exercises the same `onError → addUnavailableRepo`
-    // write path that `disposeRepoRuntime` would trigger in
+    // write path that `disposeRepoOperationScheduler` would trigger in
     // production. The onError path is the contract for "no
     // orphaned connecting" (per docs/.../plan §6.5).
     installGoblin({})
@@ -414,7 +414,7 @@ describe('runRemoteRepoLifecycle', () => {
         }
         return { ...s, repos: { ...s.repos, [REMOTE_ID]: repo }, order: [REMOTE_ID] }
       })
-      const outcome = await runRemoteRepoLifecycle(useReposStore.setState, useReposStore.getState, REMOTE_ID)
+      const outcome = await runRemoteRepoConnection(useReposStore.setState, useReposStore.getState, REMOTE_ID)
       // The mock throws inside the task body; runLatestOperation
       // translates that to `outcome.kind === 'error'`, runs
       // onError (which writes `failed` via addUnavailableRepo),
@@ -443,7 +443,7 @@ function idle() {
   }
 }
 
-function idleResource() {
+function idleDataLoad() {
   return {
     phase: 'idle' as const,
     loadedAt: null,
@@ -454,10 +454,10 @@ function idleResource() {
 
 function emptyResources() {
   return {
-    fetch: idleResource(),
-    snapshot: idleResource(),
-    status: idleResource(),
-    pullRequests: { ...idleResource(), mode: null },
+    fetch: idleDataLoad(),
+    snapshot: idleDataLoad(),
+    status: idleDataLoad(),
+    pullRequests: { ...idleDataLoad(), mode: null },
     pullRequestsByBranch: {},
   }
 }
