@@ -29,17 +29,16 @@ import { vi } from 'vitest'
 
 export type FetchMock = ReturnType<typeof vi.fn>
 
-export function mockFetch(impl?: (...args: Parameters<typeof fetch>) => ReturnType<typeof fetch> | unknown): FetchMock {
+/**
+ * Install a `vi.fn()` as the global `fetch` and return it. Tests configure
+ * responses via the standard vi.fn API (`fetchMock.mockResolvedValueOnce(...)`).
+ *
+ * The `impl` return type accepts `Response` for real fetch-shaped returns and
+ * `unknown` for the common test shorthand of returning a plain `{ ok, json }`
+ * object.
+ */
+export function mockFetch(impl?: (...args: Parameters<typeof fetch>) => Response | unknown): FetchMock {
   const fetchMock = vi.fn(impl as (...args: unknown[]) => unknown)
   vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch)
   return fetchMock
-}
-
-/**
- * Remove the `fetch` stub installed by `mockFetch`. Call from `afterEach`
- * if the test suite does not already call `vi.restoreAllMocks()` or
- * `vi.unstubAllGlobals()` between tests.
- */
-export function restoreFetch(): void {
-  vi.unstubAllGlobals()
 }

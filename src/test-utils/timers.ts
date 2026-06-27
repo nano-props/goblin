@@ -12,6 +12,7 @@
 //     debounce / reconnect code paths.
 
 import { afterEach, vi } from 'vitest'
+import { flushMicrotasks } from './render.tsx'
 
 const FAKE_TIMER_OPTIONS: Parameters<typeof vi.useFakeTimers>[0] = {
   toFake: ['setTimeout', 'setInterval', 'requestAnimationFrame', 'cancelAnimationFrame', 'Date', 'performance'],
@@ -45,4 +46,5 @@ export function useFakeTimers(): typeof vi {
  */
 export async function advanceTimersAndFlush(ms: number): Promise<void> {
   await vi.advanceTimersByTimeAsync(ms)
+  await flushMicrotasks()
 }
