@@ -529,7 +529,6 @@ describe('TerminalSessionProjection create flow', () => {
     registry.registerHost(WORKTREE_KEY, host)
     const key = await registry.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
     mocks.setBadgeMock.mockClear()
-
     ;(registry as any).bellController.handleBell(
       {
         key,

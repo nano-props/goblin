@@ -1012,6 +1012,13 @@ export class TerminalSessionProjection {
     for (const worktreeTerminalKey of changedWorktrees) this.notifyWorktree(worktreeTerminalKey)
   }
 
+  private pruneSessionsMissingFromRepoIndex(): void {
+    const keysToRemove = Array.from(this.sessions.entries())
+      .filter(([, session]) => !this.repoIndex[session.descriptor.repoRoot])
+      .map(([key]) => key)
+    for (const key of keysToRemove) this.removeSession(key, { dispose: true, closeSession: false })
+  }
+
   private ensureSession(descriptor: TerminalDescriptor): TerminalSession {
     const current = this.sessions.get(descriptor.key)
     if (current) {
