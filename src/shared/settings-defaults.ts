@@ -1,6 +1,6 @@
 import { DEFAULT_GLOBAL_SHORTCUT } from '#/shared/accelerator.ts'
 import { DEFAULT_COLOR_THEME, type ColorTheme } from '#/shared/color-theme.ts'
-import type { LangPref, SessionState, SettingsPrefs, SettingsSnapshot, ThemePref } from '#/shared/api-types.ts'
+import type { LangPref, WorkspaceSessionState, UserSettings, SettingsSnapshot, ThemePref } from '#/shared/api-types.ts'
 import { DEFAULT_ZEN_MODE, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
 
 export const DEFAULT_FETCH_INTERVAL_SEC = 120
@@ -12,7 +12,7 @@ export const DEFAULT_SHORTCUTS_DISABLED = false
 export const DEFAULT_GLOBAL_SHORTCUT_DISABLED = false
 export const DEFAULT_LAN_ENABLED = false
 
-export function defaultSessionState(): SessionState {
+export function defaultSessionState(): WorkspaceSessionState {
   return {
     openRepos: [],
     activeRepo: null,
@@ -23,7 +23,7 @@ export function defaultSessionState(): SessionState {
   }
 }
 
-export function defaultSettingsPrefs(overrides: Partial<SettingsPrefs> = {}): SettingsPrefs {
+export function defaultSettingsPrefs(overrides: Partial<UserSettings> = {}): UserSettings {
   return {
     lang: overrides.lang ?? DEFAULT_LANG_PREF,
     theme: overrides.theme ?? DEFAULT_THEME_PREF,

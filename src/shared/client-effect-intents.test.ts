@@ -26,11 +26,12 @@ describe('isClientEffectIntent', () => {
   })
 
   test('accepts only valid recent repo entries', () => {
-    expect(isClientEffectIntent({ type: 'open-recent-repo-requested', entry: { kind: 'local', id: '/tmp/repo' } })).toBe(
-      true,
-    )
+    expect(
+      isClientEffectIntent({ type: 'open-recent-repo-requested', entry: { kind: 'local', id: '/tmp/repo' } }),
+    ).toBe(true)
     expect(isClientEffectIntent({ type: 'open-recent-repo-requested', entry: { kind: 'local', id: '' } })).toBe(false)
-    expect(isClientEffectIntent({ type: 'open-recent-repo-requested', entry: { kind: 'remote', id: 'remote:repo' } }))
-      .toBe(false)
+    expect(
+      isClientEffectIntent({ type: 'open-recent-repo-requested', entry: { kind: 'remote', id: 'remote:repo' } }),
+    ).toBe(false)
   })
 })

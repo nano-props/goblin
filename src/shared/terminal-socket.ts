@@ -10,10 +10,10 @@ import type {
   TerminalOutputEvent,
   TerminalResizeInput,
   TerminalRestartInput,
-  TerminalSlotInput,
-  TerminalSlotSnapshot,
-  TerminalSlotSnapshotInput,
-  TerminalSlotSummary,
+  TerminalSessionInput,
+  TerminalSessionSnapshot,
+  TerminalSessionSnapshotInput,
+  TerminalSessionSummary,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
   TerminalTitleEvent,
@@ -40,7 +40,7 @@ export type TerminalRealtimeMessage =
   // a full list-rescan. The `repoRoot` is included so the client
   // can route the event to the right worktree without a manager
   // lookup.
-  | { type: 'slot-closed'; ptySessionId: string; repoRoot: string }
+  | { type: 'session-closed'; ptySessionId: string; repoRoot: string }
 
 export interface TerminalSocketRequestInputs {
   attach: TerminalAttachInput
@@ -48,11 +48,11 @@ export interface TerminalSocketRequestInputs {
   write: TerminalWriteInput
   resize: TerminalResizeInput
   takeover: TerminalTakeoverInput
-  close: TerminalSlotInput
+  close: TerminalSessionInput
   'list-sessions': TerminalListSessionsInput
   create: TerminalCreateInput
   prune: { repoRoot: string }
-  'slot-snapshot': TerminalSlotSnapshotInput
+  'session-snapshot': TerminalSessionSnapshotInput
 }
 
 export interface TerminalSocketResponseOutputs {
@@ -62,10 +62,10 @@ export interface TerminalSocketResponseOutputs {
   resize: TerminalMutationResult
   takeover: TerminalTakeoverResult
   close: TerminalMutationResult
-  'list-sessions': TerminalSlotSummary[]
+  'list-sessions': TerminalSessionSummary[]
   create: TerminalCatalogMutationResult
   prune: { pruned: number; remaining: number }
-  'slot-snapshot': TerminalSlotSnapshot | null
+  'session-snapshot': TerminalSessionSnapshot | null
 }
 
 export type TerminalSocketRequestAction = keyof TerminalSocketRequestInputs

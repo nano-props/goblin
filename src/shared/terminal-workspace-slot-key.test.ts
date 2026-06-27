@@ -1,17 +1,17 @@
 import { describe, expect, test } from 'vitest'
 import {
-  formatTerminalSlotKey,
+  formatTerminalWorkspaceSlotKey,
   formatWorktreeKey,
-  parseTerminalSlotKey,
+  parseTerminalWorkspaceSlotKey,
   parseWorktreeKey,
   terminalPruneKeyFromSlotKey,
-} from '#/shared/terminal-slot-key.ts'
+} from '#/shared/terminal-workspace-slot-key.ts'
 
 describe('terminal slot key helpers', () => {
   test('formats and parses terminal slot keys round-trip', () => {
-    const key = formatTerminalSlotKey('/repo', '/repo/worktree', 'slot-2')
+    const key = formatTerminalWorkspaceSlotKey('/repo', '/repo/worktree', 'slot-2')
     expect(key).toBe('/repo\0/repo/worktree\0slot-2')
-    expect(parseTerminalSlotKey(key)).toEqual({
+    expect(parseTerminalWorkspaceSlotKey(key)).toEqual({
       repoRoot: '/repo',
       worktreePath: '/repo/worktree',
       slotId: 'slot-2',
@@ -19,11 +19,11 @@ describe('terminal slot key helpers', () => {
   })
 
   test('rejects malformed terminal slot keys', () => {
-    expect(parseTerminalSlotKey('')).toBeNull()
-    expect(parseTerminalSlotKey('/repo')).toBeNull()
-    expect(parseTerminalSlotKey('/repo\0/worktree')).toBeNull()
-    expect(parseTerminalSlotKey('/repo\0/worktree\0')).toBeNull()
-    expect(parseTerminalSlotKey('\0/worktree\0slot-1')).toBeNull()
+    expect(parseTerminalWorkspaceSlotKey('')).toBeNull()
+    expect(parseTerminalWorkspaceSlotKey('/repo')).toBeNull()
+    expect(parseTerminalWorkspaceSlotKey('/repo\0/worktree')).toBeNull()
+    expect(parseTerminalWorkspaceSlotKey('/repo\0/worktree\0')).toBeNull()
+    expect(parseTerminalWorkspaceSlotKey('\0/worktree\0slot-1')).toBeNull()
   })
 
   test('formats and parses worktree terminal keys round-trip', () => {

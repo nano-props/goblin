@@ -9,10 +9,7 @@ export function normalizeWorkspacePaneSize(value: unknown): number {
   return Math.max(MIN_WORKSPACE_PANE_SIZE, Math.min(MAX_WORKSPACE_PANE_SIZE, Math.round(value * 10) / 10))
 }
 
-export function normalizeWorkspaceSessionLayoutState(value: {
-  zenMode?: unknown
-  workspacePaneSize?: unknown
-}): {
+export function normalizeWorkspaceSessionLayoutState(value: { zenMode?: unknown; workspacePaneSize?: unknown }): {
   zenMode: boolean
   workspacePaneSize: number
 } {

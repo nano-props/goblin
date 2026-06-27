@@ -332,7 +332,7 @@ export const en = {
     'Could not take over the terminal. It may have closed or the connection may not be ready; try again.',
   'terminal.takeover-failed-generic': 'Failed to take over the terminal.',
   'terminal.takeover-session-gone': 'Terminal is no longer available.',
-  // AuthorityGate denial feedback. `slot-closed` is intentionally
+  // AuthorityGate denial feedback. `session-closed` is intentionally
   // silent (the session vanished, no need to nag) and has no key
   // here; the rest maps 1:1 to `AuthorizationDenialReason`.
   'terminal.write-blocked-reconnecting': 'Reconnecting — try again in a moment.',

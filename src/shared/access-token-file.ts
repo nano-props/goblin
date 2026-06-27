@@ -29,7 +29,9 @@ export function generateAccessToken(): string {
   // subsequent reads and force a re-generation on every server boot.
   // Pad to a fixed width so the on-disk token is always exactly 25 chars.
   const bytes = randomBytes(16)
-  return BigInt(`0x${bytes.toString('hex')}`).toString(36).padStart(25, '0')
+  return BigInt(`0x${bytes.toString('hex')}`)
+    .toString(36)
+    .padStart(25, '0')
 }
 
 /**

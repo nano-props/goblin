@@ -1,9 +1,6 @@
 import type { TerminalClientRole, TerminalController, TerminalResolvedController } from '#/shared/terminal-types.ts'
 
-export function resolveTerminalClientRole(
-  controller: TerminalController | null,
-  clientId: string,
-): TerminalClientRole {
+export function resolveTerminalClientRole(controller: TerminalController | null, clientId: string): TerminalClientRole {
   if (!controller) return 'unowned'
   return controller.clientId === clientId ? 'controller' : 'viewer'
 }

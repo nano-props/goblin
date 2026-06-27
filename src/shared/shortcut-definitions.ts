@@ -271,9 +271,7 @@ export const WINDOW_REPO_SHORTCUTS: AcceleratorShortcutDefinition[] = clientMenu
   'window-prev-repo',
 ])
 
-export const VIEW_SHORTCUTS: AcceleratorShortcutDefinition[] = clientMenuAcceleratorShortcuts([
-  'view-toggle-zen-mode',
-])
+export const VIEW_SHORTCUTS: AcceleratorShortcutDefinition[] = clientMenuAcceleratorShortcuts(['view-toggle-zen-mode'])
 
 export const CLIENT_KEYBOARD_SHORTCUTS: ClientKeyboardShortcutDefinition[] = [
   ...CLIENT_NAVIGATION_SHORTCUTS,

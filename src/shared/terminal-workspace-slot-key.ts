@@ -6,7 +6,7 @@
 // `\0` (validated upstream) and a NUL split makes the key
 // human-readable in logs.
 //
-// Scope normalization (`terminalSlotScope`) lives in
+// Scope normalization (`terminalSessionScope`) lives in
 // `server/terminal/terminal-slot-scope.ts` because it depends on
 // `node:path`. This file stays pure so the client can import the
 // format/parse helpers via `web/components/terminal/terminal-slot-keys.ts`
@@ -15,7 +15,7 @@
 const SLOT_KEY_SEGMENT = 3
 const WORKTREE_SEGMENT = 2
 
-export function formatTerminalSlotKey(repoRoot: string, worktreePath: string, slotId: string): string {
+export function formatTerminalWorkspaceSlotKey(repoRoot: string, worktreePath: string, slotId: string): string {
   return `${repoRoot}\0${worktreePath}\0${slotId}`
 }
 
@@ -29,7 +29,7 @@ export interface ParsedTerminalSlotKey {
   slotId: string
 }
 
-export function parseTerminalSlotKey(key: string): ParsedTerminalSlotKey | null {
+export function parseTerminalWorkspaceSlotKey(key: string): ParsedTerminalSlotKey | null {
   const parts = key.split('\0')
   if (parts.length !== SLOT_KEY_SEGMENT) return null
   const [repoRoot, worktreePath, slotId] = parts
@@ -53,7 +53,7 @@ export function parseWorktreeKey(key: string): ParsedWorktreeKey | null {
 /** Build a `${scope}\0${worktreePath}` key from a slot key (drops the
  *  trailing slotId segment). Used by catalog prune logic. */
 export function terminalPruneKeyFromSlotKey(slotKey: string): string | null {
-  const parsed = parseTerminalSlotKey(slotKey)
+  const parsed = parseTerminalWorkspaceSlotKey(slotKey)
   if (!parsed) return null
   return `${parsed.repoRoot}\0${parsed.worktreePath}`
 }

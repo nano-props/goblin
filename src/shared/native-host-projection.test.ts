@@ -1,12 +1,12 @@
 import * as v from 'valibot'
 import { describe, expect, test } from 'vitest'
 import {
-  NativeShellProjectionSchema,
+  NativeHostProjectionSchema,
   nativeSettingsProjectionStateFromSettings,
   pickNativeSettingsProjectionPatch,
-} from '#/shared/native-shell-projection.ts'
+} from '#/shared/native-host-projection.ts'
 
-describe('native shell projection helpers', () => {
+describe('native host projection helpers', () => {
   test('picks only settings that affect native projection', () => {
     expect(
       pickNativeSettingsProjectionPatch({
@@ -52,6 +52,6 @@ describe('native shell projection helpers', () => {
   })
 
   test('rejects an empty shell projection payload', () => {
-    expect(v.safeParse(NativeShellProjectionSchema, {}).success).toBe(false)
+    expect(v.safeParse(NativeHostProjectionSchema, {}).success).toBe(false)
   })
 })

@@ -13,7 +13,7 @@ import type {
   RepoRemoteInfo,
   WorktreeStatus,
 } from '#/shared/git-types.ts'
-import type { WorkspacePaneSessionView, WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneSessionTabType, WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import type {
@@ -22,7 +22,7 @@ import type {
   Lang,
   LangPref,
   ResolvedTheme,
-  SettingsPrefs,
+  UserSettings,
   TerminalApp,
   TerminalAppAvailability,
   ThemePref,
@@ -38,7 +38,7 @@ import type {
   SshConfigHostsResult,
 } from '#/shared/remote-repo.ts'
 import type { RepoQueryInvalidationEvent } from '#/shared/repo-query-invalidation.ts'
-import { type NativeShellProjection } from '#/shared/native-shell-projection.ts'
+import { type NativeHostProjection } from '#/shared/native-host-projection.ts'
 import { RemoteAbsolutePathSchema } from '#/shared/remote-repo-schema.ts'
 import type { CreateWorktreeIpcInput } from '#/shared/worktree-create.ts'
 import type { WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
@@ -51,7 +51,7 @@ export type {
   Lang,
   LangPref,
   ResolvedTheme,
-  SettingsPrefs,
+  UserSettings,
   TerminalApp,
   TerminalAppAvailability,
   ThemePref,
@@ -60,8 +60,8 @@ export type {
   NativeRecentReposProjection,
   NativeSettingsProjectionPatch,
   NativeSettingsProjectionState,
-  NativeShellProjection,
-} from '#/shared/native-shell-projection.ts'
+  NativeHostProjection,
+} from '#/shared/native-host-projection.ts'
 export type { RepoSettingsEntry, WorktreeBootstrapTrust } from '#/shared/repo-settings.ts'
 
 export interface LanInfo {
@@ -78,7 +78,7 @@ export interface ThemeState {
   colorTheme: ColorTheme
 }
 
-export interface SessionState {
+export interface WorkspaceSessionState {
   /** Repo entries that were open, in switcher order. */
   openRepos: RepoSessionEntry[]
   /** The active repository id — null when no repos were open. */
@@ -87,12 +87,12 @@ export interface SessionState {
   workspacePaneSize: number
   selectedTerminalByWorktree?: Record<string, string>
   /** Per-repo, per-branch workspace pane view preference that session restore can make renderable. */
-  preferredWorkspacePaneViewByBranchByRepo?: Record<string, Record<string, WorkspacePaneSessionView>>
+  preferredWorkspacePaneViewByBranchByRepo?: Record<string, Record<string, WorkspacePaneSessionTabType>>
   /** Per-repo, per-branch workspace pane tab strip order. Empty arrays are meaningful. */
   workspacePaneTabOrderByBranchByRepo: Record<string, Record<string, WorkspacePaneTabOrderEntry[]>>
 }
 
-export interface RuntimeSettingsSnapshot extends SettingsPrefs {
+export interface RuntimeSettingsSnapshot extends UserSettings {
   globalShortcutRegistered: boolean
 }
 
@@ -107,7 +107,7 @@ export interface RepoSettingsState {
 }
 
 export interface SettingsSnapshot extends RuntimeSettingsSnapshot, RuntimeRecentReposState, RepoSettingsState {
-  session: SessionState
+  session: WorkspaceSessionState
 }
 
 export interface GlobalShortcutState {
@@ -153,9 +153,9 @@ export interface I18nSnapshot {
   dict: Record<string, string>
 }
 
-export interface SettingsPrefsUpdateResponse {
+export interface UserSettingsUpdateResponse {
   ok: true
-  settings: SettingsPrefs
+  settings: UserSettings
   i18n?: I18nSnapshot
   externalApps?: ExternalAppsSnapshot
 }
@@ -276,8 +276,8 @@ export interface AppIpcHandlers {
     setShortcutsDisabled: (input: { disabled: boolean }) => Promise<void>
     setGlobalShortcutDisabled: (input: { disabled: boolean }) => Promise<void>
     setGlobalShortcut: (input: { accelerator: string }) => Promise<GlobalShortcutState>
-    saveSession: (input: { session: SessionState }) => Promise<void>
-    applyShellProjection: (input: NativeShellProjection) => Promise<void>
+    saveSession: (input: { session: WorkspaceSessionState }) => Promise<void>
+    applyShellProjection: (input: NativeHostProjection) => Promise<void>
     addRecentRepo: (input: { repo: RepoSessionEntry }) => Promise<RepoSessionEntry[]>
     clearRecentRepos: () => Promise<void>
   }
@@ -295,16 +295,16 @@ export interface AppIpcHandlers {
   }
 }
 
-export interface NativeIpcHandlers {
+export interface NativeHostIpcHandlers {
   settings: {
     setGlobalShortcut: (input: { accelerator: string }) => Promise<GlobalShortcutState>
-    applyShellProjection: (input: NativeShellProjection) => Promise<void>
+    applyShellProjection: (input: NativeHostProjection) => Promise<void>
   }
 }
 
-export type NativeIpcPath = {
-  [NS in keyof NativeIpcHandlers]: `${Extract<NS, string>}.${Extract<keyof NativeIpcHandlers[NS], string>}`
-}[keyof NativeIpcHandlers]
+export type NativeHostIpcPath = {
+  [NS in keyof NativeHostIpcHandlers]: `${Extract<NS, string>}.${Extract<keyof NativeHostIpcHandlers[NS], string>}`
+}[keyof NativeHostIpcHandlers]
 
 const EmptyInput = v.optional(v.void())
 const FiniteNumber = v.pipe(v.number(), v.finite())
@@ -386,18 +386,18 @@ function createValidatedNamespace<THandlers extends Record<string, (...args: nev
 export interface AppRouter {
   createCaller: () => {
     settings: {
-      [K in keyof NativeIpcHandlers['settings']]: (
+      [K in keyof NativeHostIpcHandlers['settings']]: (
         input: unknown,
-      ) => Promise<Awaited<ReturnType<NativeIpcHandlers['settings'][K]>>>
+      ) => Promise<Awaited<ReturnType<NativeHostIpcHandlers['settings'][K]>>>
     }
   }
 }
 
-type NativeIpcProcedureSchemas = {
-  [NS in keyof NativeIpcHandlers]: { [Proc in keyof NativeIpcHandlers[NS]]: ValibotSchema }
+type NativeHostIpcProcedureSchemas = {
+  [NS in keyof NativeHostIpcHandlers]: { [Proc in keyof NativeHostIpcHandlers[NS]]: ValibotSchema }
 }
 
-export function createAppRouter(handlers: NativeIpcHandlers, schemas: NativeIpcProcedureSchemas): AppRouter {
+export function createAppRouter(handlers: NativeHostIpcHandlers, schemas: NativeHostIpcProcedureSchemas): AppRouter {
   return {
     createCaller: () => ({
       settings: createValidatedNamespace(handlers.settings, schemas.settings),
