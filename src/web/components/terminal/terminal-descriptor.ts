@@ -5,14 +5,14 @@ import {
   worktreeTerminalKey,
 } from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
 
-export function terminalDescriptor(base: TerminalSessionBase, slotId: string, index: number): TerminalDescriptor {
+export function terminalDescriptor(base: TerminalSessionBase, sessionId: string, index: number): TerminalDescriptor {
   const terminalWorktreeKey = worktreeTerminalKey(base.repoRoot, base.worktreePath)
   return {
     ...base,
     worktreeTerminalKey: terminalWorktreeKey,
-    slotId,
+    sessionId,
     index,
-    key: formatTerminalWorkspaceSlotKey(base.repoRoot, base.worktreePath, slotId),
+    key: formatTerminalWorkspaceSlotKey(base.repoRoot, base.worktreePath, sessionId),
   }
 }
 

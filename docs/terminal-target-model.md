@@ -59,7 +59,7 @@ The controller is the attachment that currently owns write and resize authority.
 Controller state should be derived from:
 
 - which attachment currently controls the session
-- whether that attachment is connected (a disconnected controller clears the slot immediately; the model carries no "grace" sub-state)
+- whether that attachment is connected (a disconnected controller clears the controller role immediately; the model carries no "grace" sub-state)
 
 ### View
 
@@ -127,7 +127,7 @@ This allows the server to reason about:
 - viewer attachments
 - reconnect of the same attachment
 - takeover by a different attachment
-- release on disconnect (the controller slot clears immediately; control survives via the per-session `userSticky` flag, not via a per-attachment grace timer)
+- release on disconnect (the controller role clears immediately; control survives via the per-session `userSticky` flag, not via a per-attachment grace timer)
 
 ## Control roles as client projection
 
@@ -158,7 +158,7 @@ That keeps the UI simple while keeping the business model accurate.
 
 ### Disconnect behavior
 
-- disconnect should clear the controller slot immediately, not preserve it
+- disconnect should clear the controller role immediately, not preserve it
 - a subsequent attach from the same user (any attachment) auto-claims when no controller is present, because `userSticky` is sticky per session
 - releasing control should not require the client to guess what happened
 

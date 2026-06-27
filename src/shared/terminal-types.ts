@@ -79,7 +79,7 @@ export type TerminalTakeoverResult =
 /**
  * Successful attach/restart result.
  *
- * `snapshot`/`snapshotSeq` are the slot's server-side serialized
+ * `snapshot`/`snapshotSeq` are the session's server-side serialized
  * xterm screen and the last PTY output sequence included in that screen.
  * The client hydrates from these and re-replays any post-snapshot
  * events the runtime captures.

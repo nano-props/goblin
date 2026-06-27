@@ -1,5 +1,5 @@
 // Canonical slot/worktree key encoding for the terminal subsystem.
-// The format is `${scope}\0${worktreePath}\0${slotId}` for slot
+// The format is `${scope}\0${worktreePath}\0${sessionId}` for slot
 // keys and `${repoRoot}\0${worktreePath}` for worktree keys. Both
 // segments are non-empty strings in normal use. The format is
 // deliberately NUL-delimited because neither segment can contain
@@ -15,8 +15,8 @@
 const SLOT_KEY_SEGMENT = 3
 const WORKTREE_SEGMENT = 2
 
-export function formatTerminalWorkspaceSlotKey(repoRoot: string, worktreePath: string, slotId: string): string {
-  return `${repoRoot}\0${worktreePath}\0${slotId}`
+export function formatTerminalWorkspaceSlotKey(repoRoot: string, worktreePath: string, sessionId: string): string {
+  return `${repoRoot}\0${worktreePath}\0${sessionId}`
 }
 
 export function formatWorktreeKey(repoRoot: string, worktreePath: string): string {
@@ -26,15 +26,15 @@ export function formatWorktreeKey(repoRoot: string, worktreePath: string): strin
 export interface ParsedTerminalWorkspaceSlotKey {
   repoRoot: string
   worktreePath: string
-  slotId: string
+  sessionId: string
 }
 
 export function parseTerminalWorkspaceSlotKey(key: string): ParsedTerminalWorkspaceSlotKey | null {
   const parts = key.split('\0')
   if (parts.length !== SLOT_KEY_SEGMENT) return null
-  const [repoRoot, worktreePath, slotId] = parts
-  if (!repoRoot || !worktreePath || !slotId) return null
-  return { repoRoot, worktreePath, slotId }
+  const [repoRoot, worktreePath, sessionId] = parts
+  if (!repoRoot || !worktreePath || !sessionId) return null
+  return { repoRoot, worktreePath, sessionId }
 }
 
 export interface ParsedWorktreeKey {
@@ -51,7 +51,7 @@ export function parseWorktreeKey(key: string): ParsedWorktreeKey | null {
 }
 
 /** Build a `${scope}\0${worktreePath}` key from a slot key (drops the
- *  trailing slotId segment). Used by catalog prune logic. */
+ *  trailing sessionId segment). Used by catalog prune logic. */
 export function terminalPruneKeyFromSlotKey(slotKey: string): string | null {
   const parsed = parseTerminalWorkspaceSlotKey(slotKey)
   if (!parsed) return null

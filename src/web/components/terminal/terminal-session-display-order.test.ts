@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import {
-  restoreSlotDisplayOrder,
-  slotSnapshotDisplayOrder,
+  restoreSessionDisplayOrder,
+  sessionSnapshotDisplayOrder,
   terminalSessionDisplayOrder,
 } from '#/web/components/terminal/terminal-session-display-order.ts'
 
@@ -13,7 +13,7 @@ describe('terminal session display order helpers', () => {
         {
           key: 'session-2',
           worktreeTerminalKey: 'repo\0wt',
-          slotId: 'session-2',
+          sessionId: 'session-2',
           index: 2,
           repoRoot: '/repo',
           branch: 'main',
@@ -27,7 +27,7 @@ describe('terminal session display order helpers', () => {
         {
           key: 'session-3',
           worktreeTerminalKey: 'repo\0wt',
-          slotId: 'session-3',
+          sessionId: 'session-3',
           index: 3,
           repoRoot: '/repo',
           branch: 'main',
@@ -43,7 +43,7 @@ describe('terminal session display order helpers', () => {
       ['session-1', 1],
       ['session-2', 0],
     ])
-    const previous = slotSnapshotDisplayOrder(['session-1', 'session-2', 'session-3'], orders)
+    const previous = sessionSnapshotDisplayOrder(['session-1', 'session-2', 'session-3'], orders)
     orders.set('session-3', 0)
     orders.set('session-1', 1)
     orders.set('session-2', 2)
@@ -52,7 +52,7 @@ describe('terminal session display order helpers', () => {
       ['session-2', 2],
       ['session-3', 0],
     ])
-    restoreSlotDisplayOrder(orders, previous)
+    restoreSessionDisplayOrder(orders, previous)
     expect(Array.from(orders.entries())).toEqual([
       ['session-1', 1],
       ['session-2', 0],

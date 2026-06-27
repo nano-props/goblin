@@ -47,7 +47,7 @@ describe('useSessionPersistence', () => {
       activeId: repo.id,
       sessionReady: true,
       selectedTerminalSessionByWorktree: {
-        '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0slot-2',
+        '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0session-2',
       },
     })
 
@@ -58,7 +58,7 @@ describe('useSessionPersistence', () => {
         openRepoEntries: [{ kind: 'local', id: '/tmp/repo' }],
         activeRepoId: '/tmp/repo',
         selectedTerminalSessionByWorktree: {
-          '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0slot-2',
+          '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0session-2',
         },
         workspacePaneTabOrderByBranchByRepo: {
           '/tmp/repo': {

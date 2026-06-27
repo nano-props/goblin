@@ -34,7 +34,7 @@ let startPromise: Promise<EmbeddedServerRuntime | null> | null = null
 
 function embeddedServerEnabled(): boolean {
   if (typeof app.getAppPath !== 'function') return false
-  const raw = process.env.GOBLIN_ENABLE_LOCAL_SERVER?.trim()?.toLowerCase()
+  const raw = process.env.GOBLIN_ENABLE_EMBEDDED_SERVER?.trim()?.toLowerCase()
   if (raw === '0' || raw === 'false') return false
   if (raw === '1' || raw === 'true') return true
   return true

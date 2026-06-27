@@ -62,7 +62,7 @@ describe('repo selectors', () => {
         zenMode: false,
         workspacePaneSize: 50,
         selectedTerminalSessionByWorktree: {
-          '/tmp/repo\0/tmp/repo': 'slot-1',
+          '/tmp/repo\0/tmp/repo': 'session-1',
         },
       }),
     ).toEqual({
@@ -71,7 +71,7 @@ describe('repo selectors', () => {
       zenMode: false,
       workspacePaneSize: 50,
       selectedTerminalSessionByWorktree: {
-        '/tmp/repo\0/tmp/repo': 'slot-1',
+        '/tmp/repo\0/tmp/repo': 'session-1',
       },
     })
   })

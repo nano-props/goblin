@@ -295,7 +295,7 @@ describe('terminal web host bridge', () => {
         payload: {
           ok: true,
           action: 'created',
-          key: '/tmp/repo\u0000/tmp/repo\u0000slot-1',
+          key: '/tmp/repo\u0000/tmp/repo\u0000session-1',
           sessions: [],
         },
       }),
@@ -815,7 +815,7 @@ describe('terminal web host bridge', () => {
     const { onClientLocalEventType, resetClientLocalEventsForTests } = await import('#/web/local-events.ts')
     const bellClick = vi.fn()
     const dispose = onClientLocalEventType('terminal-bell-click', bellClick)
-    const key = '/tmp/repo\0/tmp/repo\0slot-2'
+    const key = '/tmp/repo\0/tmp/repo\0session-2'
 
     await expect(
       terminalBridge.notifyBell({ title: 'repo', body: 'feature/test\\nzsh', key, repoRoot: '/tmp/repo' }),

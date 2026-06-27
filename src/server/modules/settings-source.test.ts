@@ -72,7 +72,7 @@ test('persists updates and notifies subscribers from the server settings store',
     ...defaultWorkspaceSessionState(),
     openRepoEntries: [{ kind: 'local', id: '/repo-b' }],
     activeRepoId: '/repo-b',
-    selectedTerminalSessionByWorktree: { '/repo-b\0/worktree': '/repo-b\0/worktree\0slot-2' },
+    selectedTerminalSessionByWorktree: { '/repo-b\0/worktree': '/repo-b\0/worktree\0session-2' },
     workspacePaneTabOrderByBranchByRepo: {
       '/repo-b': {
         main: [],
@@ -105,7 +105,7 @@ test('persists updates and notifies subscribers from the server settings store',
   expect(await reloaded.getServerSessionState()).toMatchObject({
     openRepoEntries: [{ kind: 'local', id: '/repo-b' }],
     activeRepoId: '/repo-b',
-    selectedTerminalSessionByWorktree: { '/repo-b\0/worktree': '/repo-b\0/worktree\0slot-2' },
+    selectedTerminalSessionByWorktree: { '/repo-b\0/worktree': '/repo-b\0/worktree\0session-2' },
     workspacePaneTabOrderByBranchByRepo: {
       '/repo-b': {
         main: [],
@@ -217,7 +217,7 @@ test('normalizes workspace pane tab order in server sessions', async () => {
       '/repo-b': {
         main: [
           { type: 'status', id: 'status' },
-          { type: 'terminal', id: 'slot-1' },
+          { type: 'terminal', id: 'session-1' },
           { type: 'history', id: 'history' },
           { type: 'status', id: 'status' },
           { type: 'changes', id: 'changes' },
@@ -238,7 +238,7 @@ test('normalizes workspace pane tab order in server sessions', async () => {
       '/repo-b': {
         main: [
           { type: 'status', id: 'status' },
-          { type: 'terminal', id: 'slot-1' },
+          { type: 'terminal', id: 'session-1' },
           { type: 'history', id: 'history' },
           { type: 'changes', id: 'changes' },
         ],

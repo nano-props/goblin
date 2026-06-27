@@ -19,11 +19,11 @@ const WORKTREE_PATH = '/repo'
 const BRANCH = 'main'
 const WORKTREE_KEY = worktreeTerminalKey(REPO_ROOT, WORKTREE_PATH)
 
-function makeDescriptor(slotId: string, index: number): TerminalDescriptor {
+function makeDescriptor(sessionId: string, index: number): TerminalDescriptor {
   return {
-    key: `${REPO_ROOT}\0${WORKTREE_PATH}\0${slotId}`,
+    key: `${REPO_ROOT}\0${WORKTREE_PATH}\0${sessionId}`,
     worktreeTerminalKey: WORKTREE_KEY,
-    slotId,
+    sessionId,
     index,
     repoRoot: REPO_ROOT,
     branch: BRANCH,
@@ -42,7 +42,7 @@ function makeRepoIndex(): TerminalRepoIndex {
 
 function makeServerSession(
   ptySessionId: string,
-  slotId: string,
+  sessionId: string,
   overrides: Partial<{
     controller: { clientId: string; status: 'connected' }
     processName: string
@@ -54,7 +54,7 @@ function makeServerSession(
     displayOrder: number
   }> = {},
 ): TerminalSessionSummary {
-  const key = `${REPO_ROOT}\0${WORKTREE_PATH}\0${slotId}`
+  const key = `${REPO_ROOT}\0${WORKTREE_PATH}\0${sessionId}`
   return {
     ptySessionId,
     key,
@@ -310,7 +310,7 @@ describe('TerminalSessionProjection', () => {
 
       const snapshot = projection.worktreeSnapshot(WORKTREE_KEY)
       expect(snapshot.count).toBe(1)
-      expect(snapshot.sessions[0]!.slotId).toBe('session-1')
+      expect(snapshot.sessions[0]!.sessionId).toBe('session-1')
       expect(selectedChanges).toContainEqual({ worktreeTerminalKey: WORKTREE_KEY, key: snapshot.sessions[0]!.key })
     })
 
@@ -491,7 +491,7 @@ describe('TerminalSessionProjection', () => {
         'client_local',
         new Map(),
       )
-      expect(projection.worktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.slotId).toBe('session-1')
+      expect(projection.worktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.sessionId).toBe('session-1')
 
       // Second reconcile: session-1 removed, session-2 is controller
       projection.reconcileServerSessions(
@@ -504,7 +504,7 @@ describe('TerminalSessionProjection', () => {
         'client_local',
         new Map(),
       )
-      expect(projection.worktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.slotId).toBe('session-2')
+      expect(projection.worktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.sessionId).toBe('session-2')
     })
 
     test('closing the active terminal selects the adjacent tab in display order', () => {
@@ -522,13 +522,13 @@ describe('TerminalSessionProjection', () => {
       )
 
       const snapshot = projection.worktreeSnapshot(WORKTREE_KEY)
-      const activeKey = snapshot.sessions.find((session) => session.slotId === 'session-2')?.key
+      const activeKey = snapshot.sessions.find((session) => session.sessionId === 'session-2')?.key
       if (!activeKey) throw new Error('missing session-2')
 
       projection.selectTerminal(WORKTREE_KEY, activeKey)
       ;(projection as any).removeSession(activeKey, { dispose: false, closeSession: false })
 
-      expect(projection.worktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.slotId).toBe('session-1')
+      expect(projection.worktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.sessionId).toBe('session-1')
     })
 
     test('invalidates cached worktree snapshot when server display order changes', () => {
@@ -544,7 +544,7 @@ describe('TerminalSessionProjection', () => {
       )
 
       const firstSnapshot = projection.worktreeSnapshot(WORKTREE_KEY)
-      expect(firstSnapshot.sessions.map((session) => session.slotId)).toEqual(['session-1', 'session-2'])
+      expect(firstSnapshot.sessions.map((session) => session.sessionId)).toEqual(['session-1', 'session-2'])
 
       projection.reconcileServerSessions(
         REPO_ROOT,
@@ -557,7 +557,7 @@ describe('TerminalSessionProjection', () => {
       )
 
       const secondSnapshot = projection.worktreeSnapshot(WORKTREE_KEY)
-      expect(secondSnapshot.sessions.map((session) => session.slotId)).toEqual(['session-2', 'session-1'])
+      expect(secondSnapshot.sessions.map((session) => session.sessionId)).toEqual(['session-2', 'session-1'])
     })
   })
 
@@ -667,7 +667,7 @@ describe('TerminalSessionProjection', () => {
       // The session we injected is still in the projection's map —
       // i.e. the state survived the synthetic remount.
       const stored = (after as any).sessions.get(descriptor.key) as { descriptor: TerminalDescriptor } | undefined
-      expect(stored?.descriptor.slotId).toBe('session-1')
+      expect(stored?.descriptor.sessionId).toBe('session-1')
     })
   })
 })

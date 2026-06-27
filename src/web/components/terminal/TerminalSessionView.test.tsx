@@ -58,7 +58,7 @@ function completeWorktreeSnapshot(snapshot: TestWorktreeSnapshot): WorktreeTermi
   }
 }
 
-async function renderControllerSlot() {
+async function renderTerminalSession() {
   ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   const container = document.createElement('div')
   document.body.appendChild(container)
@@ -67,7 +67,7 @@ async function renderControllerSlot() {
   const descriptor = {
     key: 'session-1',
     worktreeTerminalKey: '/repo\0/worktree',
-    slotId: 'session-1',
+    sessionId: 'session-1',
     index: 1,
     repoRoot: '/repo',
     branch: 'feature',
@@ -80,7 +80,7 @@ async function renderControllerSlot() {
       {
         key: 'session-1',
         worktreeTerminalKey: '/repo\0/worktree',
-        slotId: 'session-1',
+        sessionId: 'session-1',
         index: 1,
         title: 'zsh',
         phase: 'open' as const,
@@ -143,7 +143,7 @@ async function renderControllerSlot() {
   })
 
   return {
-    slotRoot: container.querySelector('.goblin-terminal-session') as HTMLElement,
+    sessionRoot: container.querySelector('.goblin-terminal-session') as HTMLElement,
     writeInput,
     async cleanup() {
       await act(async () => root.unmount())
@@ -181,11 +181,11 @@ function clipboardDataWithTextAndFiles(text: string, files: File[]): DataTransfe
   return base
 }
 
-async function dispatchPaste(slotRoot: HTMLElement, files: File[]): Promise<void> {
+async function dispatchPaste(sessionRoot: HTMLElement, files: File[]): Promise<void> {
   const pasteEvent = new Event('paste', { bubbles: true, cancelable: true })
   Object.defineProperty(pasteEvent, 'clipboardData', { value: clipboardDataWithFiles(files) })
   await act(async () => {
-    slotRoot.dispatchEvent(pasteEvent)
+    sessionRoot.dispatchEvent(pasteEvent)
     await new Promise((r) => setTimeout(r, 0))
   })
 }
@@ -194,13 +194,13 @@ async function dispatchPaste(slotRoot: HTMLElement, files: File[]): Promise<void
  * Variant of `dispatchPaste` that also fakes `clipboardData.getData('text/plain')`
  * and returns the event so tests can assert on `defaultPrevented`.
  */
-async function dispatchPasteWithText(slotRoot: HTMLElement, text: string, files: File[] = []): Promise<Event> {
+async function dispatchPasteWithText(sessionRoot: HTMLElement, text: string, files: File[] = []): Promise<Event> {
   const pasteEvent = new Event('paste', { bubbles: true, cancelable: true })
   Object.defineProperty(pasteEvent, 'clipboardData', {
     value: clipboardDataWithTextAndFiles(text, files),
   })
   await act(async () => {
-    slotRoot.dispatchEvent(pasteEvent)
+    sessionRoot.dispatchEvent(pasteEvent)
     await new Promise((r) => setTimeout(r, 0))
   })
   return pasteEvent
@@ -217,7 +217,7 @@ describe('TerminalSessionView', () => {
       {
         key: 'session-1',
         worktreeTerminalKey: '/repo\0/worktree',
-        slotId: 'session-1',
+        sessionId: 'session-1',
         index: 1,
         title: 'zsh',
         phase: 'open' as const,
@@ -228,7 +228,7 @@ describe('TerminalSessionView', () => {
     const descriptor = {
       key: 'session-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      slotId: 'session-1',
+      sessionId: 'session-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -394,7 +394,7 @@ describe('TerminalSessionView', () => {
     const descriptor = {
       key: 'session-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      slotId: 'session-1',
+      sessionId: 'session-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -407,7 +407,7 @@ describe('TerminalSessionView', () => {
         {
           key: 'session-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          slotId: 'session-1',
+          sessionId: 'session-1',
           index: 1,
           title: 'zsh',
           phase: 'error' as const,
@@ -510,7 +510,7 @@ describe('TerminalSessionView', () => {
     const descriptor = {
       key: 'session-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      slotId: 'session-1',
+      sessionId: 'session-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -523,7 +523,7 @@ describe('TerminalSessionView', () => {
         {
           key: 'session-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          slotId: 'session-1',
+          sessionId: 'session-1',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -588,8 +588,8 @@ describe('TerminalSessionView', () => {
     })
 
     try {
-      const slotRoot = container.querySelector('.goblin-terminal-session') as HTMLElement
-      expect(slotRoot).toBeTruthy()
+      const sessionRoot = container.querySelector('.goblin-terminal-session') as HTMLElement
+      expect(sessionRoot).toBeTruthy()
       // Synthesize a Drop event with one file. jsdom's DataTransfer
       // doesn't accept programmatic `files` assignment cleanly, so we
       // build a minimal proxy that satisfies the handler.
@@ -602,7 +602,7 @@ describe('TerminalSessionView', () => {
       const dropEvent = new Event('drop', { bubbles: true, cancelable: true })
       Object.defineProperty(dropEvent, 'dataTransfer', { value: dataTransfer })
       await act(async () => {
-        slotRoot.dispatchEvent(dropEvent)
+        sessionRoot.dispatchEvent(dropEvent)
         // give the resolver microtask chain a tick — even though we
         // expect it never to run.
         await Promise.resolve()
@@ -631,7 +631,7 @@ describe('TerminalSessionView', () => {
     const descriptor = {
       key: 'session-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      slotId: 'session-1',
+      sessionId: 'session-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -644,7 +644,7 @@ describe('TerminalSessionView', () => {
         {
           key: 'session-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          slotId: 'session-1',
+          sessionId: 'session-1',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -718,8 +718,8 @@ describe('TerminalSessionView', () => {
         )
       })
 
-      const slotRoot = container.querySelector('.goblin-terminal-session') as HTMLElement
-      expect(slotRoot).toBeTruthy()
+      const sessionRoot = container.querySelector('.goblin-terminal-session') as HTMLElement
+      expect(sessionRoot).toBeTruthy()
       const file = new File([new Uint8Array([1, 2, 3])], 'shot with space.png', { type: 'image/png' })
       const dataTransfer = {
         types: ['Files'],
@@ -730,7 +730,7 @@ describe('TerminalSessionView', () => {
       Object.defineProperty(dropEvent, 'dataTransfer', { value: dataTransfer })
 
       await act(async () => {
-        slotRoot.dispatchEvent(dropEvent)
+        sessionRoot.dispatchEvent(dropEvent)
         // processDrop -> resolvePastedFiles -> setTimeout-free, but
         // the handler awaits a Promise chain. Let it drain.
         await new Promise((r) => setTimeout(r, 0))
@@ -771,7 +771,7 @@ describe('TerminalSessionView', () => {
     const descriptor = {
       key: 'session-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      slotId: 'session-1',
+      sessionId: 'session-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -784,7 +784,7 @@ describe('TerminalSessionView', () => {
         {
           key: 'session-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          slotId: 'session-1',
+          sessionId: 'session-1',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -846,7 +846,7 @@ describe('TerminalSessionView', () => {
           </TerminalSessionContext.Provider>,
         )
       })
-      const slotRoot = container.querySelector('.goblin-terminal-session') as HTMLElement
+      const sessionRoot = container.querySelector('.goblin-terminal-session') as HTMLElement
       const file = new File([new Uint8Array([1, 2, 3])], 'shot.png')
       const clipboardData = {
         files: {
@@ -859,7 +859,7 @@ describe('TerminalSessionView', () => {
       const pasteEvent = new Event('paste', { bubbles: true, cancelable: true })
       Object.defineProperty(pasteEvent, 'clipboardData', { value: clipboardData })
       await act(async () => {
-        slotRoot.dispatchEvent(pasteEvent)
+        sessionRoot.dispatchEvent(pasteEvent)
         await new Promise((r) => setTimeout(r, 0))
       })
       expect(writeInput).not.toHaveBeenCalled()
@@ -882,7 +882,7 @@ describe('TerminalSessionView', () => {
     const descriptor = {
       key: 'session-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      slotId: 'session-1',
+      sessionId: 'session-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -895,7 +895,7 @@ describe('TerminalSessionView', () => {
         {
           key: 'session-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          slotId: 'session-1',
+          sessionId: 'session-1',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -962,7 +962,7 @@ describe('TerminalSessionView', () => {
         )
       })
 
-      const slotRoot = container.querySelector('.goblin-terminal-session') as HTMLElement
+      const sessionRoot = container.querySelector('.goblin-terminal-session') as HTMLElement
       const file = new File([new Uint8Array([1, 2, 3])], 'weird name & space.png')
       const clipboardData = {
         files: {
@@ -976,7 +976,7 @@ describe('TerminalSessionView', () => {
       Object.defineProperty(pasteEvent, 'clipboardData', { value: clipboardData })
 
       await act(async () => {
-        slotRoot.dispatchEvent(pasteEvent)
+        sessionRoot.dispatchEvent(pasteEvent)
         await new Promise((r) => setTimeout(r, 0))
       })
 
@@ -1006,7 +1006,7 @@ describe('TerminalSessionView', () => {
     const descriptor = {
       key: 'session-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      slotId: 'session-1',
+      sessionId: 'session-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -1019,7 +1019,7 @@ describe('TerminalSessionView', () => {
         {
           key: 'session-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          slotId: 'session-1',
+          sessionId: 'session-1',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -1089,7 +1089,7 @@ describe('TerminalSessionView', () => {
         )
       })
 
-      const slotRoot = container.querySelector('.goblin-terminal-session') as HTMLElement
+      const sessionRoot = container.querySelector('.goblin-terminal-session') as HTMLElement
       const clipboardData = {
         files: {
           length: 1,
@@ -1101,7 +1101,7 @@ describe('TerminalSessionView', () => {
       const pasteEvent = new Event('paste', { bubbles: true, cancelable: true })
       Object.defineProperty(pasteEvent, 'clipboardData', { value: clipboardData })
       await act(async () => {
-        slotRoot.dispatchEvent(pasteEvent)
+        sessionRoot.dispatchEvent(pasteEvent)
         await new Promise((r) => setTimeout(r, 0))
       })
       // The synchronous size check called preventDefault() before
@@ -1122,10 +1122,10 @@ describe('TerminalSessionView', () => {
     vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
     const { toast } = await import('sonner')
     vi.mocked(toast.error).mockClear()
-    const rendered = await renderControllerSlot()
+    const rendered = await renderTerminalSession()
 
     try {
-      await dispatchPaste(rendered.slotRoot, [new File([new Uint8Array([1])], 'a.png')])
+      await dispatchPaste(rendered.sessionRoot, [new File([new Uint8Array([1])], 'a.png')])
 
       expect(rendered.writeInput).not.toHaveBeenCalled()
       expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-failed')
@@ -1141,10 +1141,10 @@ describe('TerminalSessionView', () => {
     vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue(['/tmp/safe-name.png'])
     const { toast } = await import('sonner')
     vi.mocked(toast.error).mockClear()
-    const rendered = await renderControllerSlot()
+    const rendered = await renderTerminalSession()
 
     try {
-      await dispatchPaste(rendered.slotRoot, [new File([new Uint8Array([1])], 'bad.png')])
+      await dispatchPaste(rendered.sessionRoot, [new File([new Uint8Array([1])], 'bad.png')])
 
       expect(rendered.writeInput).toHaveBeenCalledWith('session-1', "'/tmp/safe-name.png'", 'paste')
       expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('terminal.paste-file-unsafe')
@@ -1160,10 +1160,10 @@ describe('TerminalSessionView', () => {
     vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
     const { toast } = await import('sonner')
     vi.mocked(toast.error).mockClear()
-    const rendered = await renderControllerSlot()
+    const rendered = await renderTerminalSession()
 
     try {
-      await dispatchPaste(rendered.slotRoot, [new File([new Uint8Array([1])], 'bad.png')])
+      await dispatchPaste(rendered.sessionRoot, [new File([new Uint8Array([1])], 'bad.png')])
 
       expect(rendered.writeInput).not.toHaveBeenCalled()
       expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-failed')
@@ -1183,10 +1183,10 @@ describe('TerminalSessionView', () => {
     vi.mocked(shellClient.saveClipboardFiles).mockRejectedValue(new Error('network down'))
     const { toast } = await import('sonner')
     vi.mocked(toast.error).mockClear()
-    const rendered = await renderControllerSlot()
+    const rendered = await renderTerminalSession()
 
     try {
-      await dispatchPaste(rendered.slotRoot, [new File([new Uint8Array([1])], 'foo.png')])
+      await dispatchPaste(rendered.sessionRoot, [new File([new Uint8Array([1])], 'foo.png')])
 
       expect(rendered.writeInput).not.toHaveBeenCalled()
       expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-failed')
@@ -1202,11 +1202,11 @@ describe('TerminalSessionView', () => {
     vi.mocked(shellClient.saveClipboardFiles).mockRejectedValue(new Error('network down'))
     const { toast } = await import('sonner')
     vi.mocked(toast.error).mockClear()
-    const rendered = await renderControllerSlot()
+    const rendered = await renderTerminalSession()
     const file = new File([new Uint8Array([1])], 'foo.png')
 
     try {
-      const slotRoot = rendered.slotRoot
+      const sessionRoot = rendered.sessionRoot
       const dataTransfer = {
         types: ['Files'],
         files: [file] as unknown as FileList,
@@ -1215,7 +1215,7 @@ describe('TerminalSessionView', () => {
       const dropEvent = new Event('drop', { bubbles: true, cancelable: true })
       Object.defineProperty(dropEvent, 'dataTransfer', { value: dataTransfer })
       await act(async () => {
-        slotRoot.dispatchEvent(dropEvent)
+        sessionRoot.dispatchEvent(dropEvent)
         await new Promise((r) => setTimeout(r, 0))
       })
 
@@ -1232,10 +1232,10 @@ describe('TerminalSessionView', () => {
     vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
     const { toast } = await import('sonner')
     vi.mocked(toast.error).mockClear()
-    const rendered = await renderControllerSlot()
+    const rendered = await renderTerminalSession()
 
     try {
-      await dispatchPaste(rendered.slotRoot, [new File([new Uint8Array([1])], 'huge-path.png')])
+      await dispatchPaste(rendered.sessionRoot, [new File([new Uint8Array([1])], 'huge-path.png')])
 
       expect(rendered.writeInput).not.toHaveBeenCalled()
       expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-overflow')
@@ -1252,10 +1252,10 @@ describe('TerminalSessionView', () => {
     vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue(['/tmp/b.png'])
     const { toast } = await import('sonner')
     vi.mocked(toast.error).mockClear()
-    const rendered = await renderControllerSlot()
+    const rendered = await renderTerminalSession()
 
     try {
-      await dispatchPaste(rendered.slotRoot, [
+      await dispatchPaste(rendered.sessionRoot, [
         new File([new Uint8Array([1])], 'a.png'),
         new File([new Uint8Array([1])], 'b.png'),
         new File([new Uint8Array([1])], 'c.png'),
@@ -1286,7 +1286,7 @@ describe('TerminalSessionView', () => {
     const descriptor = {
       key: 'session-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      slotId: 'session-1',
+      sessionId: 'session-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -1299,7 +1299,7 @@ describe('TerminalSessionView', () => {
         {
           key: 'session-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          slotId: 'session-1',
+          sessionId: 'session-1',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -1373,7 +1373,7 @@ describe('TerminalSessionView', () => {
       })
       vi.mocked(toast.error).mockClear()
 
-      const slotRoot = container.querySelector('.goblin-terminal-session') as HTMLElement
+      const sessionRoot = container.querySelector('.goblin-terminal-session') as HTMLElement
       const files = [
         new File([new Uint8Array([1])], 'a.png'),
         new File([new Uint8Array([1])], 'b.png'),
@@ -1387,7 +1387,7 @@ describe('TerminalSessionView', () => {
       const dropEvent = new Event('drop', { bubbles: true, cancelable: true })
       Object.defineProperty(dropEvent, 'dataTransfer', { value: dataTransfer })
       await act(async () => {
-        slotRoot.dispatchEvent(dropEvent)
+        sessionRoot.dispatchEvent(dropEvent)
         await new Promise((r) => setTimeout(r, 0))
       })
 
@@ -1423,7 +1423,7 @@ describe('TerminalSessionView', () => {
     const descriptorA = {
       key: 'session-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      slotId: 'session-1',
+      sessionId: 'session-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -1432,7 +1432,7 @@ describe('TerminalSessionView', () => {
     const descriptorB = {
       key: 'session-2',
       worktreeTerminalKey: '/repo\0/worktree-other',
-      slotId: 'session-2',
+      sessionId: 'session-2',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -1445,7 +1445,7 @@ describe('TerminalSessionView', () => {
         {
           key: 'session-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          slotId: 'session-1',
+          sessionId: 'session-1',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -1463,7 +1463,7 @@ describe('TerminalSessionView', () => {
         {
           key: 'session-2',
           worktreeTerminalKey: '/repo\0/worktree-other',
-          slotId: 'session-2',
+          sessionId: 'session-2',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -1541,7 +1541,7 @@ describe('TerminalSessionView', () => {
         )
       })
 
-      const slotRoot = container.querySelector('.goblin-terminal-session') as HTMLElement
+      const sessionRoot = container.querySelector('.goblin-terminal-session') as HTMLElement
       const file = new File([new Uint8Array([1])], 'a.png')
       const dataTransfer = {
         types: ['Files'],
@@ -1552,7 +1552,7 @@ describe('TerminalSessionView', () => {
       Object.defineProperty(dropEvent, 'dataTransfer', { value: dataTransfer })
 
       await act(async () => {
-        slotRoot.dispatchEvent(dropEvent)
+        sessionRoot.dispatchEvent(dropEvent)
         // Yield to let the resolver start awaiting the (still-pending)
         // saveClipboardFiles Promise.
         await Promise.resolve()
@@ -1769,12 +1769,12 @@ describe('TerminalSessionView', () => {
     vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
     vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
 
-    const rendered = await renderControllerSlot()
+    const rendered = await renderTerminalSession()
     const thumbnail = new File([new Uint8Array([1, 2, 3])], 'thumbnail.png', { type: 'image/png' })
     const tsv = 'Header1\tHeader2\tHeader3\nValue1\tValue2\tValue3'
 
     try {
-      const event = await dispatchPasteWithText(rendered.slotRoot, tsv, [thumbnail])
+      const event = await dispatchPasteWithText(rendered.sessionRoot, tsv, [thumbnail])
 
       // We deliberately do NOT preventDefault here — xterm.js gets
       // the event and writes the TSV to PTY itself. We must also
@@ -1799,11 +1799,11 @@ describe('TerminalSessionView', () => {
     vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('/home/user/foo.png')
     vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
 
-    const rendered = await renderControllerSlot()
+    const rendered = await renderTerminalSession()
     const file = new File([new Uint8Array([1])], 'foo.png')
 
     try {
-      const event = await dispatchPasteWithText(rendered.slotRoot, 'file:///home/user/foo.png', [file])
+      const event = await dispatchPasteWithText(rendered.sessionRoot, 'file:///home/user/foo.png', [file])
 
       expect(event.defaultPrevented).toBe(true)
       expect(rendered.writeInput).toHaveBeenCalledWith('session-1', "'/home/user/foo.png'", 'paste')
@@ -1821,11 +1821,11 @@ describe('TerminalSessionView', () => {
     vi.mocked(shellClient.pathForDroppedFile).mockImplementation((file: File) => `C:\\Users\\me\\${file.name}`)
     vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
 
-    const rendered = await renderControllerSlot()
+    const rendered = await renderTerminalSession()
     const file = new File([new Uint8Array([1])], 'bar.png')
 
     try {
-      const event = await dispatchPasteWithText(rendered.slotRoot, 'C:\\Users\\me\\bar.png', [file])
+      const event = await dispatchPasteWithText(rendered.sessionRoot, 'C:\\Users\\me\\bar.png', [file])
 
       expect(event.defaultPrevented).toBe(true)
       expect(rendered.writeInput).toHaveBeenCalledWith('session-1', "'C:\\Users\\me\\bar.png'", 'paste')
@@ -1845,11 +1845,11 @@ describe('TerminalSessionView', () => {
     vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
     vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
 
-    const rendered = await renderControllerSlot()
+    const rendered = await renderTerminalSession()
     const thumbnail = new File([new Uint8Array([1, 2, 3])], 'thumbnail.png', { type: 'image/png' })
 
     try {
-      const event = await dispatchPasteWithText(rendered.slotRoot, '42', [thumbnail])
+      const event = await dispatchPasteWithText(rendered.sessionRoot, '42', [thumbnail])
       expect(event.defaultPrevented).toBe(false)
       expect(rendered.writeInput).not.toHaveBeenCalled()
       expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
@@ -1866,11 +1866,11 @@ describe('TerminalSessionView', () => {
     vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
     vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
 
-    const rendered = await renderControllerSlot()
+    const rendered = await renderTerminalSession()
     const image = new File([new Uint8Array([1, 2, 3])], 'image.png', { type: 'image/png' })
 
     try {
-      const event = await dispatchPasteWithText(rendered.slotRoot, 'https://example.com/foo', [image])
+      const event = await dispatchPasteWithText(rendered.sessionRoot, 'https://example.com/foo', [image])
       expect(event.defaultPrevented).toBe(false)
       expect(rendered.writeInput).not.toHaveBeenCalled()
       expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
@@ -1888,12 +1888,12 @@ describe('TerminalSessionView', () => {
     vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
     vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
 
-    const rendered = await renderControllerSlot()
+    const rendered = await renderTerminalSession()
     const thumbnail = new File([new Uint8Array([1, 2, 3])], 'thumbnail.png', { type: 'image/png' })
     const tsv = 'Alice\t30\tNYC'
 
     try {
-      const event = await dispatchPasteWithText(rendered.slotRoot, tsv, [thumbnail])
+      const event = await dispatchPasteWithText(rendered.sessionRoot, tsv, [thumbnail])
       expect(event.defaultPrevented).toBe(false)
       expect(rendered.writeInput).not.toHaveBeenCalled()
       expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
@@ -1911,10 +1911,10 @@ describe('TerminalSessionView', () => {
     vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
     vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
 
-    const rendered = await renderControllerSlot()
+    const rendered = await renderTerminalSession()
 
     try {
-      const event = await dispatchPasteWithText(rendered.slotRoot, 'echo hello', [])
+      const event = await dispatchPasteWithText(rendered.sessionRoot, 'echo hello', [])
       expect(event.defaultPrevented).toBe(false)
       expect(rendered.writeInput).not.toHaveBeenCalled()
       expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
@@ -1928,10 +1928,10 @@ describe('TerminalSessionView', () => {
     vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
     vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
 
-    const rendered = await renderControllerSlot()
+    const rendered = await renderTerminalSession()
 
     try {
-      const event = await dispatchPasteWithText(rendered.slotRoot, '', [])
+      const event = await dispatchPasteWithText(rendered.sessionRoot, '', [])
       expect(event.defaultPrevented).toBe(false)
       expect(rendered.writeInput).not.toHaveBeenCalled()
     } finally {

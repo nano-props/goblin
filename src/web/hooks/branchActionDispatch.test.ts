@@ -29,7 +29,7 @@ describe('branch action dispatch', () => {
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabOrderByBranch: {
-        'feature/worktree': [workspacePaneStaticTabOrderEntry('status'), { type: 'terminal', id: 'slot-1' }],
+        'feature/worktree': [workspacePaneStaticTabOrderEntry('status'), { type: 'terminal', id: 'session-1' }],
       },
     })
     const calls: string[] = []
@@ -48,7 +48,7 @@ describe('branch action dispatch', () => {
     )
     setTerminalSessionCommandBridge({
       worktreeSnapshot: () => worktreeSnapshotWithTerminal(),
-      createTerminal: vi.fn(async () => 'slot-2'),
+      createTerminal: vi.fn(async () => 'session-2'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor: vi.fn(async () => true),
       closeTerminalsForWorktree,
@@ -94,14 +94,14 @@ describe('branch action dispatch', () => {
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabOrderByBranch: {
-        'feature/worktree': [workspacePaneStaticTabOrderEntry('status'), { type: 'terminal', id: 'slot-1' }],
+        'feature/worktree': [workspacePaneStaticTabOrderEntry('status'), { type: 'terminal', id: 'session-1' }],
       },
     })
     const runBranchAction = vi.fn(async () => ({ ok: true, message: 'ok' }))
     useReposStore.setState({ runBranchAction })
     setTerminalSessionCommandBridge({
       worktreeSnapshot: () => worktreeSnapshotWithTerminal(),
-      createTerminal: vi.fn(async () => 'slot-2'),
+      createTerminal: vi.fn(async () => 'session-2'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor: vi.fn(async () => true),
       closeTerminalsForWorktree: vi.fn(async () => false),
@@ -143,7 +143,7 @@ describe('branch action dispatch', () => {
     const closeTerminalsForWorktree = vi.fn(async () => true)
     setTerminalSessionCommandBridge({
       worktreeSnapshot: () => emptyWorktreeSnapshot(),
-      createTerminal: vi.fn(async () => 'slot-2'),
+      createTerminal: vi.fn(async () => 'session-2'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor: vi.fn(async () => true),
       closeTerminalsForWorktree,
@@ -169,7 +169,7 @@ describe('branch action dispatch', () => {
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabOrderByBranch: {
-        'feature/worktree': [workspacePaneStaticTabOrderEntry('status'), { type: 'terminal', id: 'slot-1' }],
+        'feature/worktree': [workspacePaneStaticTabOrderEntry('status'), { type: 'terminal', id: 'session-1' }],
       },
       worktreesByPath: {
         [WORKTREE_PATH]: {
@@ -185,7 +185,7 @@ describe('branch action dispatch', () => {
     useReposStore.setState({ runBranchAction })
     setTerminalSessionCommandBridge({
       worktreeSnapshot: () => worktreeSnapshotWithTerminal(),
-      createTerminal: vi.fn(async () => 'slot-2'),
+      createTerminal: vi.fn(async () => 'session-2'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor: vi.fn(async () => true),
       closeTerminalsForWorktree,
@@ -221,9 +221,9 @@ function worktreeSnapshotWithTerminal(): WorktreeTerminalSnapshot {
   return {
     worktreeTerminalKey: WORKTREE_KEY,
     selectedDescriptor: {
-      key: 'slot-1',
+      key: 'session-1',
       worktreeTerminalKey: WORKTREE_KEY,
-      slotId: 'slot-1',
+      sessionId: 'session-1',
       index: 1,
       repoRoot: REPO_ID,
       branch: 'feature/worktree',
@@ -232,10 +232,10 @@ function worktreeSnapshotWithTerminal(): WorktreeTerminalSnapshot {
     sessions: [
       {
         type: 'terminal',
-        id: 'slot-1',
-        key: 'slot-1',
+        id: 'session-1',
+        key: 'session-1',
         worktreeTerminalKey: WORKTREE_KEY,
-        slotId: 'slot-1',
+        sessionId: 'session-1',
         index: 1,
         displayOrder: 1,
         title: 'terminal 1',

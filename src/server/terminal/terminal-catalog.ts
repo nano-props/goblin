@@ -14,7 +14,7 @@ import {
   type TerminalSessionPhase,
   type TerminalSessionSummary,
 } from '#/shared/terminal-types.ts'
-import { formatSlotId, parseSlotIdIndex } from '#/shared/slot-ids.ts'
+import { formatTerminalSessionId, parseTerminalSessionIdIndex } from '#/shared/terminal-session-id-format.ts'
 import { isValidTerminalClientId, isValidTerminalSize } from '#/shared/terminal-validators.ts'
 import { formatTerminalWorkspaceSlotKey, parseTerminalWorkspaceSlotKey } from '#/shared/terminal-workspace-slot-key.ts'
 import { terminalSessionScope } from '#/server/terminal/terminal-session-scope.ts'
@@ -27,7 +27,7 @@ interface EnsureTerminalCatalogInput {
   repoRoot: string
   branch: string
   worktreePath: string
-  slotId?: string
+  sessionId?: string
   cols?: number
   rows?: number
   clientId?: string
@@ -102,28 +102,32 @@ class TerminalCatalog {
     if (!isValidBranch(input.branch)) return { ok: false, message: 'error.invalid-arguments' }
     if (!isValidCwd(input.worktreePath)) return { ok: false, message: 'error.invalid-arguments' }
 
-    const slotId = input.slotId ?? formatSlotId(1)
+    const sessionId = input.sessionId ?? formatTerminalSessionId(1)
     const cols = input.cols ?? 80
     const rows = input.rows ?? 24
-    if (!this.options.isValidTerminalSessionId(slotId)) return { ok: false, message: 'error.invalid-arguments' }
+    if (!this.options.isValidTerminalSessionId(sessionId)) return { ok: false, message: 'error.invalid-arguments' }
     if (!isValidTerminalSize(cols, rows)) return { ok: false, message: 'error.invalid-arguments' }
 
-    const slotScope = terminalSessionScope(input.repoRoot)
-    const existingSessions = await this.options.manager.listSessionsForUser(userId, slotScope)
+    const sessionScope = terminalSessionScope(input.repoRoot)
+    const existingSessions = await this.options.manager.listSessionsForUser(userId, sessionScope)
     // Build the target session key from the same form the manager uses
     // to scope user-scoped session lists — see the comment on
     // `terminalSessionScope` in server/terminal/terminal-session-scope.ts
     // for the normalization rationale.
     const targetSlotKey = formatTerminalWorkspaceSlotKey(
-      slotScope,
+      sessionScope,
       isRemoteRepoId(input.repoRoot) ? input.worktreePath : path.resolve(input.worktreePath),
-      slotId,
+      sessionId,
     )
-    const existingSlot = existingSessions.find((session) => session.key === targetSlotKey)
-    const action: TerminalCatalogAction = existingSlot ? (existingSlot.controller ? 'restored' : 'reused') : 'created'
+    const existingSession = existingSessions.find((session) => session.key === targetSlotKey)
+    const action: TerminalCatalogAction = existingSession
+      ? existingSession.controller
+        ? 'restored'
+        : 'reused'
+      : 'created'
 
     if (isRemoteRepoId(input.repoRoot)) {
-      return await this.ensureRemote(userId, input, { slotId, cols, rows, targetSlotKey, action })
+      return await this.ensureRemote(userId, input, { sessionId, cols, rows, targetSlotKey, action })
     }
     return await this.ensureLocal(userId, input, { cols, rows, targetSlotKey, action })
   }
@@ -131,13 +135,14 @@ class TerminalCatalog {
   async create(clientId: string, userId: string, input: TerminalCreateInput): Promise<TerminalCatalogMutationResult> {
     if (!this.options.isValidClientId(clientId)) return { ok: false, message: 'error.invalid-arguments' }
     if (!isValidRepoLocator(input.repoRoot)) return { ok: false, message: 'error.invalid-arguments' }
-    const slotClientId = input.clientId ?? clientId
-    if (!isValidTerminalClientId(slotClientId)) return { ok: false, message: 'error.invalid-arguments' }
+    const terminalClientId = input.clientId ?? clientId
+    if (!isValidTerminalClientId(terminalClientId)) return { ok: false, message: 'error.invalid-arguments' }
 
     const createResult = await this.ensureOrRestore(clientId, userId, {
       ...input,
-      clientId: slotClientId,
-      slotId: input.kind === 'primary' ? 'slot-1' : await this.nextSlotId(userId, input.repoRoot, input.worktreePath),
+      clientId: terminalClientId,
+      sessionId:
+        input.kind === 'primary' ? 'session-1' : await this.nextSessionId(userId, input.repoRoot, input.worktreePath),
     })
     if (!createResult.ok) return { ok: false, message: createResult.message }
     return {
@@ -167,8 +172,8 @@ class TerminalCatalog {
     if (!this.options.isValidClientId(clientId)) return { pruned: 0, remaining: 0 }
     if (!isValidRepoLocator(repoRoot)) return { pruned: 0, remaining: 0 }
 
-    const slotScope = terminalSessionScope(repoRoot)
-    const allSessions = await this.options.manager.listSessionsForUser(userId, slotScope)
+    const sessionScope = terminalSessionScope(repoRoot)
+    const allSessions = await this.options.manager.listSessionsForUser(userId, sessionScope)
     if (isRemoteRepoId(repoRoot)) return { pruned: 0, remaining: allSessions.length }
 
     const worktrees = await getWorktrees(repoRoot, { includeStatus: false })
@@ -184,12 +189,12 @@ class TerminalCatalog {
     }
     if (pruned > 0) this.options.broadcastSessionsChanged(userId, repoRoot)
     const remaining = await this.options.manager
-      .listSessionsForUser(userId, slotScope)
+      .listSessionsForUser(userId, sessionScope)
       .then((sessions) => sessions.length)
     return { pruned, remaining }
   }
 
-  async nextSlotId(userId: string, repoRoot: string, worktreePath: string): Promise<string> {
+  async nextSessionId(userId: string, repoRoot: string, worktreePath: string): Promise<string> {
     // Compare against the canonical form so a forward-slash Windows path
     // matches the resolved back-slash form used as the session key prefix.
     const scopedRepoRoot = terminalSessionScope(repoRoot)
@@ -199,18 +204,18 @@ class TerminalCatalog {
     for (const session of sessions) {
       const parsed = parseTerminalWorkspaceSlotKey(session.key)
       if (!parsed || parsed.repoRoot !== scopedRepoRoot || parsed.worktreePath !== scopedWorktreePath) continue
-      const index = parseSlotIdIndex(parsed.slotId)
+      const index = parseTerminalSessionIdIndex(parsed.sessionId)
       if (index === null) continue
       if (index > maxIndex) maxIndex = index
     }
-    return formatSlotId(maxIndex + 1)
+    return formatTerminalSessionId(maxIndex + 1)
   }
 
   private async ensureRemote(
     userId: string,
     input: EnsureTerminalCatalogInput,
     context: {
-      slotId: string
+      sessionId: string
       cols: number
       rows: number
       targetSlotKey: string

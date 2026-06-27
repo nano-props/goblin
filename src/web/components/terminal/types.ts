@@ -10,7 +10,7 @@ import type { TerminalInput, TerminalUserInputSource } from '#/web/components/te
 export interface TerminalDescriptor {
   key: string
   worktreeTerminalKey: string
-  slotId: string
+  sessionId: string
   index: number
   repoRoot: string
   branch: string
@@ -115,7 +115,7 @@ export interface TerminalSessionSummary {
   id: string
   key: string
   worktreeTerminalKey: string
-  slotId: string
+  sessionId: string
   index: number
   displayOrder: number
   title: string

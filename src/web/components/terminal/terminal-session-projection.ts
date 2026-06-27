@@ -1,5 +1,5 @@
 import { resolveTerminalController } from '#/shared/terminal-controller.ts'
-import { parseSlotIdIndex } from '#/shared/slot-ids.ts'
+import { parseTerminalSessionIdIndex } from '#/shared/terminal-session-id-format.ts'
 import { parseTerminalWorkspaceSlotKey } from '#/shared/terminal-workspace-slot-key.ts'
 import type {
   TerminalAttachResult,
@@ -59,8 +59,8 @@ export function projectServerTerminalSession(input: {
   if (!branch) return null
   const descriptor = terminalDescriptor(
     { repoRoot: parsed.repoRoot, branch, worktreePath: parsed.worktreePath },
-    parsed.slotId,
-    parseSlotIdIndex(parsed.slotId) ?? 1,
+    parsed.sessionId,
+    parseTerminalSessionIdIndex(parsed.sessionId) ?? 1,
   )
   const terminalWorktree = worktreeTerminalKey(parsed.repoRoot, parsed.worktreePath)
   const controller = resolveTerminalController(input.serverSession.controller, input.clientId)

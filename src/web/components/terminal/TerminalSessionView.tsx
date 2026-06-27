@@ -207,7 +207,7 @@ export function TerminalSessionView({
   const [dragOver, setDragOver] = useState(false)
   const progress = snapshot.progress
   const attachment = snapshot.attachment
-  // Slot mode is a small state machine. The previous two-flag design
+  // Session mode is a small state machine. The previous two-flag design
   // (`isController` / `isReadonly`, both gated on `phase === 'open'`)
   // silently broke error-phase rendering: a viewer in error phase
   // would see neither the viewer overlay (open-gated) nor the

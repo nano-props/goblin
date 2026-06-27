@@ -18,8 +18,8 @@ describe('repo workspace pane tab model', () => {
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'status',
-      tabOrder: [terminalEntry('slot-1'), staticEntry('status'), staticEntry('changes'), staticEntry('history')],
-      runtimeTerminalViews: [terminalView('slot-1', 1, true)],
+      tabOrder: [terminalEntry('session-1'), staticEntry('status'), staticEntry('changes'), staticEntry('history')],
+      runtimeTerminalViews: [terminalView('session-1', 1, true)],
       terminalSessionCount: 1,
       terminalSyncReady: true,
       selectedTerminalKey: null,
@@ -30,7 +30,7 @@ describe('repo workspace pane tab model', () => {
     expect(model.terminalViews.map((view) => view.type)).toEqual(['terminal'])
     expect(model.staticTabs).toEqual(['status', 'changes', 'history'])
     expect(model.tabs.map((tab) => [tab.identity, tab.kind])).toEqual([
-      ['terminal:slot-1', 'terminal'],
+      ['terminal:session-1', 'terminal'],
       ['status:status', 'static'],
       ['changes:changes', 'static'],
       ['history:history', 'static'],
@@ -45,17 +45,17 @@ describe('repo workspace pane tab model', () => {
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
       tabOrder: [staticEntry('status')],
-      runtimeTerminalViews: [terminalView('slot-1', 1, false), terminalView('slot-2', 2, false)],
+      runtimeTerminalViews: [terminalView('session-1', 1, false), terminalView('session-2', 2, false)],
       terminalSessionCount: 2,
       terminalSyncReady: true,
-      selectedTerminalKey: 'slot-2',
+      selectedTerminalKey: 'session-2',
       lastClosedTabContext: null,
     })
 
     expect(model.renderedTab).toBe('terminal')
     expect(model.selection).toMatchObject({ kind: 'materialized-tab', tab: 'terminal' })
-    expect(model.activeTab?.identity).toBe('terminal:slot-2')
-    expect(model.activeTab?.kind === 'terminal' ? model.activeTab.key : null).toBe('slot-2')
+    expect(model.activeTab?.identity).toBe('terminal:session-2')
+    expect(model.activeTab?.kind === 'terminal' ? model.activeTab.key : null).toBe('session-2')
   })
 
   test('keeps terminal selected without a runtime tab while creation is pending', () => {
@@ -137,8 +137,8 @@ describe('repo workspace pane tab model', () => {
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'history',
-      tabOrder: [staticEntry('status'), terminalEntry('slot-1')],
-      runtimeTerminalViews: [terminalView('slot-1', 1, true)],
+      tabOrder: [staticEntry('status'), terminalEntry('session-1')],
+      runtimeTerminalViews: [terminalView('session-1', 1, true)],
       terminalSessionCount: 1,
       terminalSyncReady: true,
       selectedTerminalKey: null,
@@ -178,7 +178,7 @@ describe('repo workspace pane tab model', () => {
   })
 
   test('falls back to the first materialized tab when the last terminal exits a [status, terminal] strip', () => {
-    // The user is on a [status, slot-1] strip with preferred=terminal.
+    // The user is on a [status, session-1] strip with preferred=terminal.
     // The terminal exits, the runtime snapshot is empty, sync is ready, no
     // pending create. Old behavior: empty pane. New behavior: the model
     // falls back to status (the first materialized tab) so the user does
@@ -207,22 +207,22 @@ describe('repo workspace pane tab model', () => {
   })
 
   test('lands on the remaining terminal when the active terminal is closed among many', () => {
-    // The user has [status, slot-1, slot-2] with slot-1 selected.
-    // The user closes slot-1 (X click) — slot-1 is removed from
-    // tabOrder, slot-2 stays selected in the store. The model
-    // re-resolves: preferred=terminal, count=1, slot-2 is selected.
+    // The user has [status, session-1, session-2] with session-1 selected.
+    // The user closes session-1 (X click) — session-1 is removed from
+    // tabOrder, session-2 stays selected in the store. The model
+    // re-resolves: preferred=terminal, count=1, session-2 is selected.
     // This is the "natural" case: no fallback needed, the new active
-    // terminal is slot-2.
+    // terminal is session-2.
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
-      tabOrder: [staticEntry('status'), terminalEntry('slot-2')],
-      runtimeTerminalViews: [terminalView('slot-2', 2, true)],
+      tabOrder: [staticEntry('status'), terminalEntry('session-2')],
+      runtimeTerminalViews: [terminalView('session-2', 2, true)],
       terminalSessionCount: 1,
       terminalSyncReady: true,
-      selectedTerminalKey: 'slot-2',
+      selectedTerminalKey: 'session-2',
       lastClosedTabContext: null,
     })
 
@@ -231,7 +231,7 @@ describe('repo workspace pane tab model', () => {
       tab: 'terminal',
     })
     expect(model.renderedTab).toBe('terminal')
-    expect(model.activeTab?.kind === 'terminal' ? model.activeTab.key : null).toBe('slot-2')
+    expect(model.activeTab?.kind === 'terminal' ? model.activeTab.key : null).toBe('session-2')
   })
 
   test('keeps the terminal-host view while a terminal create is pending', () => {
@@ -334,10 +334,10 @@ describe('repo workspace pane tab model', () => {
   })
 
   test('lands on the spatial neighbor via lastClosedTabContext when the only terminal in a mixed strip is closed', () => {
-    // Regression: preferred=terminal + tabOrder=[status, slot-1, changes] +
-    // the last terminal exits. The store records closingIdentity=slot-1
+    // Regression: preferred=terminal + tabOrder=[status, session-1, changes] +
+    // the last terminal exits. The store records closingIdentity=session-1
     // with the pre-close tab identities; the model uses it to surface changes
-    // (the spatial neighbor of slot-1) instead of status (tabs[0]).
+    // (the spatial neighbor of session-1) instead of status (tabs[0]).
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
       branchName: 'feature/model',
@@ -349,8 +349,8 @@ describe('repo workspace pane tab model', () => {
       terminalSyncReady: true,
       selectedTerminalKey: null,
       lastClosedTabContext: {
-        closingIdentity: 'terminal:slot-1',
-        previousTabIdentities: ['status:status', 'terminal:slot-1', 'changes:changes'],
+        closingIdentity: 'terminal:session-1',
+        previousTabIdentities: ['status:status', 'terminal:session-1', 'changes:changes'],
       },
     })
 
@@ -445,16 +445,16 @@ describe('repo workspace pane tab model', () => {
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'status',
-      tabOrder: [staticEntry('status'), terminalEntry('slot-1'), staticEntry('changes')],
-      runtimeTerminalViews: [terminalView('slot-1', 1, true)],
+      tabOrder: [staticEntry('status'), terminalEntry('session-1'), staticEntry('changes')],
+      runtimeTerminalViews: [terminalView('session-1', 1, true)],
       terminalSessionCount: 1,
       terminalSyncReady: true,
-      selectedTerminalKey: 'slot-1',
+      selectedTerminalKey: 'session-1',
       lastClosedTabContext: null,
     })
 
-    expect(nextRepoWorkspaceTabAfterClose(model.tabs, 'status:status')?.identity).toBe('terminal:slot-1')
-    expect(nextRepoWorkspaceTabAfterClose(model.tabs, 'changes:changes')?.identity).toBe('terminal:slot-1')
+    expect(nextRepoWorkspaceTabAfterClose(model.tabs, 'status:status')?.identity).toBe('terminal:session-1')
+    expect(nextRepoWorkspaceTabAfterClose(model.tabs, 'changes:changes')?.identity).toBe('terminal:session-1')
     expect(nextRepoWorkspaceTabAfterClose(model.tabs, 'missing:missing')).toBeNull()
   })
 
@@ -482,16 +482,16 @@ describe('repo workspace pane tab model', () => {
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
-      tabOrder: [staticEntry('status'), terminalEntry('slot-1'), terminalEntry('slot-2'), staticEntry('changes')],
-      runtimeTerminalViews: [terminalView('slot-1', 1, false), terminalView('slot-2', 2, false)],
+      tabOrder: [staticEntry('status'), terminalEntry('session-1'), terminalEntry('session-2'), staticEntry('changes')],
+      runtimeTerminalViews: [terminalView('session-1', 1, false), terminalView('session-2', 2, false)],
       terminalSessionCount: 2,
       terminalSyncReady: true,
-      selectedTerminalKey: 'slot-2',
+      selectedTerminalKey: 'session-2',
       lastClosedTabContext: null,
     })
 
     expect(adjacentRepoWorkspaceTab(model.tabs, model.activeTab?.identity, 1)?.identity).toBe('changes:changes')
-    expect(adjacentRepoWorkspaceTab(model.tabs, model.activeTab?.identity, -1)?.identity).toBe('terminal:slot-1')
+    expect(adjacentRepoWorkspaceTab(model.tabs, model.activeTab?.identity, -1)?.identity).toBe('terminal:session-1')
     expect(adjacentRepoWorkspaceTab(model.tabs, null, -1)).toBeNull()
     expect(adjacentRepoWorkspaceTab(model.tabs, 'missing:missing', 1)).toBeNull()
   })
@@ -506,14 +506,14 @@ describe('repo workspace pane tab model', () => {
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
-      tabOrder: [terminalEntry('slot-1'), staticEntry('status'), terminalEntry('slot-2')],
-      runtimeTerminalViews: [terminalView('slot-1', 1, false), terminalView('slot-2', 2, false)],
+      tabOrder: [terminalEntry('session-1'), staticEntry('status'), terminalEntry('session-2')],
+      runtimeTerminalViews: [terminalView('session-1', 1, false), terminalView('session-2', 2, false)],
       terminalSessionCount: 2,
       terminalSyncReady: true,
-      selectedTerminalKey: 'slot-2',
+      selectedTerminalKey: 'session-2',
       lastClosedTabContext: {
-        closingIdentity: 'terminal:slot-2',
-        previousTabIdentities: ['terminal:slot-1', 'status:status', 'terminal:slot-2'],
+        closingIdentity: 'terminal:session-2',
+        previousTabIdentities: ['terminal:session-1', 'status:status', 'terminal:session-2'],
         wasActive: true,
       },
     })
@@ -535,20 +535,20 @@ describe('repo workspace pane tab model', () => {
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
-      tabOrder: [terminalEntry('slot-1'), staticEntry('status'), terminalEntry('slot-2')],
-      runtimeTerminalViews: [terminalView('slot-1', 1, false), terminalView('slot-2', 2, false)],
+      tabOrder: [terminalEntry('session-1'), staticEntry('status'), terminalEntry('session-2')],
+      runtimeTerminalViews: [terminalView('session-1', 1, false), terminalView('session-2', 2, false)],
       terminalSessionCount: 2,
       terminalSyncReady: true,
-      selectedTerminalKey: 'slot-2',
+      selectedTerminalKey: 'session-2',
       lastClosedTabContext: {
-        closingIdentity: 'terminal:slot-1',
-        previousTabIdentities: ['terminal:slot-1', 'status:status', 'terminal:slot-2'],
+        closingIdentity: 'terminal:session-1',
+        previousTabIdentities: ['terminal:session-1', 'status:status', 'terminal:session-2'],
         wasActive: false,
       },
     })
 
     expect(model.selection).toMatchObject({ kind: 'materialized-tab', tab: 'terminal' })
-    expect(model.activeTab?.identity).toBe('terminal:slot-2')
+    expect(model.activeTab?.identity).toBe('terminal:session-2')
   })
 })
 
@@ -566,7 +566,7 @@ function terminalView(key: string, displayOrder: number, selected: boolean): Wor
     id: key,
     key,
     worktreeTerminalKey: WORKTREE_KEY,
-    slotId: key,
+    sessionId: key,
     index: displayOrder,
     displayOrder,
     title: key,

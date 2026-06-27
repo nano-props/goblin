@@ -174,7 +174,7 @@ describe('useClientEffectIntentRouter', () => {
       ],
     })
     currentRepoId = repo.id
-    const key = '/tmp/repo\0/tmp/repo-feature\0slot-2'
+    const key = '/tmp/repo\0/tmp/repo-feature\0session-2'
 
     await renderHookHost()
 
@@ -213,7 +213,7 @@ describe('useClientEffectIntentRouter', () => {
       },
     }
     currentRepoId = repo.id
-    const key = '/tmp/repo\0/tmp/repo-feature\0slot-2'
+    const key = '/tmp/repo\0/tmp/repo-feature\0session-2'
 
     await renderHookHost()
 

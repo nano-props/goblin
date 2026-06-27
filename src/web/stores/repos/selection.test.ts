@@ -398,7 +398,7 @@ describe('setWorkspacePaneTab', () => {
       preferredWorkspacePaneTab: 'history',
       workspacePaneTabOrder: [
         workspacePaneStaticTabOrderEntry('status'),
-        terminalEntry('slot-1'),
+        terminalEntry('session-1'),
         workspacePaneStaticTabOrderEntry('history'),
       ],
     })
@@ -407,14 +407,14 @@ describe('setWorkspacePaneTab', () => {
       .getState()
       .reorderWorkspacePaneTabs(REPO_ID, [
         workspacePaneStaticTabOrderEntry('history'),
-        terminalEntry('slot-1'),
+        terminalEntry('session-1'),
         workspacePaneStaticTabOrderEntry('status'),
       ])
 
     expect(openTabsFor('main')).toEqual(['history', 'status'])
     expect(tabOrderFor('main')).toEqual([
       workspacePaneStaticTabOrderEntry('history'),
-      terminalEntry('slot-1'),
+      terminalEntry('session-1'),
       workspacePaneStaticTabOrderEntry('status'),
     ])
 
@@ -432,26 +432,26 @@ describe('setWorkspacePaneTab', () => {
   test('adds a terminal tab at the end even when a stale entry already exists', () => {
     seedRepo({
       selectedBranch: 'main',
-      workspacePaneTabOrder: [terminalEntry('slot-1'), workspacePaneStaticTabOrderEntry('status')],
+      workspacePaneTabOrder: [terminalEntry('session-1'), workspacePaneStaticTabOrderEntry('status')],
     })
 
-    useReposStore.getState().addWorkspacePaneTerminalTab(REPO_ID, 'slot-1')
+    useReposStore.getState().addWorkspacePaneTerminalTab(REPO_ID, 'session-1')
 
-    expect(tabOrderFor('main')).toEqual([workspacePaneStaticTabOrderEntry('status'), terminalEntry('slot-1')])
+    expect(tabOrderFor('main')).toEqual([workspacePaneStaticTabOrderEntry('status'), terminalEntry('session-1')])
   })
 
   test('addAndFocus adds the tab, switches to terminal view, and selects the new terminal', () => {
     seedRepo({ selectedBranch: 'feature/worktree', preferredWorkspacePaneTab: 'status' })
 
-    useReposStore.getState().addAndFocusWorkspacePaneTerminalTab(REPO_ID, 'slot-1')
+    useReposStore.getState().addAndFocusWorkspacePaneTerminalTab(REPO_ID, 'session-1')
 
     expect(tabOrderFor('feature/worktree')).toEqual([
       workspacePaneStaticTabOrderEntry('status'),
-      terminalEntry('slot-1'),
+      terminalEntry('session-1'),
     ])
     expect(preferredTabFor('feature/worktree')).toBe('terminal')
     expect(useReposStore.getState().selectedTerminalSessionByWorktree[`${REPO_ID}\0/tmp/feature-worktree`]).toBe(
-      'slot-1',
+      'session-1',
     )
   })
 
@@ -459,14 +459,14 @@ describe('setWorkspacePaneTab', () => {
     seedRepo({
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
-      workspacePaneTabOrder: [terminalEntry('slot-1')],
+      workspacePaneTabOrder: [terminalEntry('session-1')],
     })
     useReposStore.setState({
-      selectedTerminalSessionByWorktree: { [`${REPO_ID}\0/tmp/feature-worktree`]: 'slot-1' },
+      selectedTerminalSessionByWorktree: { [`${REPO_ID}\0/tmp/feature-worktree`]: 'session-1' },
     })
 
     const before = useReposStore.getState().repos[REPO_ID]
-    useReposStore.getState().addAndFocusWorkspacePaneTerminalTab(REPO_ID, 'slot-1')
+    useReposStore.getState().addAndFocusWorkspacePaneTerminalTab(REPO_ID, 'session-1')
 
     expect(useReposStore.getState().repos[REPO_ID]).toBe(before)
   })
@@ -475,7 +475,7 @@ describe('setWorkspacePaneTab', () => {
     seedRepo({ selectedBranch: 'feature/plain', preferredWorkspacePaneTab: 'status' })
 
     const before = useReposStore.getState().repos[REPO_ID]
-    useReposStore.getState().addAndFocusWorkspacePaneTerminalTab(REPO_ID, 'slot-1')
+    useReposStore.getState().addAndFocusWorkspacePaneTerminalTab(REPO_ID, 'session-1')
 
     expect(useReposStore.getState().repos[REPO_ID]).toBe(before)
     expect(preferredTabFor('feature/plain')).toBe('status')
@@ -486,12 +486,12 @@ describe('setWorkspacePaneTab', () => {
       selectedBranch: 'main',
       workspacePaneTabOrder: [
         workspacePaneStaticTabOrderEntry('status'),
-        terminalEntry('slot-1'),
+        terminalEntry('session-1'),
         workspacePaneStaticTabOrderEntry('history'),
       ],
     })
 
-    useReposStore.getState().removeWorkspacePaneTerminalTab(REPO_ID, 'slot-1')
+    useReposStore.getState().removeWorkspacePaneTerminalTab(REPO_ID, 'session-1')
 
     expect(tabOrderFor('main')).toEqual([
       workspacePaneStaticTabOrderEntry('status'),

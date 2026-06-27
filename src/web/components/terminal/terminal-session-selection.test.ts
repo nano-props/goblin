@@ -6,7 +6,7 @@ function descriptor(key: string): TerminalDescriptor {
   return {
     key,
     worktreeTerminalKey: 'repo\0wt',
-    slotId: key,
+    sessionId: key,
     index: 1,
     repoRoot: '/repo',
     branch: 'main',

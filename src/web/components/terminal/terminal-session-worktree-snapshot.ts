@@ -47,7 +47,7 @@ function buildTerminalSessionSummaries(input: {
       id: session.descriptor.key,
       key: session.descriptor.key,
       worktreeTerminalKey: input.worktreeTerminalKey,
-      slotId: session.descriptor.slotId,
+      sessionId: session.descriptor.sessionId,
       index: session.descriptor.index,
       displayOrder: input.getDisplayOrder(session),
       title: summarizeTerminalTitle(snapshot, session.descriptor.index),

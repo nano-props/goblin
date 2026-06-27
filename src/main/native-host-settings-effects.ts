@@ -69,7 +69,7 @@ async function applyGlobalShortcutDisabledProjectionPatch(input: {
   await persistNativeHostGlobalShortcutState(registered)
 }
 
-async function applyNativeHostUserSettingsProjection(input: {
+async function applyNativeHostSettingsProjection(input: {
   patch: NativeSettingsProjectionPatch
   settings: NativeSettingsProjectionState
 }): Promise<void> {
@@ -84,7 +84,7 @@ async function applyNativeHostUserSettingsProjection(input: {
 
 export async function applyNativeHostProjection(input: NativeHostProjection): Promise<void> {
   if (input.prefs) {
-    await applyNativeHostUserSettingsProjection({
+    await applyNativeHostSettingsProjection({
       patch: input.prefs.patch,
       settings: input.prefs.settings,
     })

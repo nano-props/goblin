@@ -2,11 +2,11 @@ import { describe, expect, test, vi } from 'vitest'
 import { buildWorktreeTerminalSnapshot } from '#/web/components/terminal/terminal-session-worktree-snapshot.ts'
 import type { TerminalSessionLike, TerminalDescriptor, TerminalSnapshot } from '#/web/components/terminal/types.ts'
 
-function makeDescriptor(slotId: string, index: number): TerminalDescriptor {
+function makeDescriptor(sessionId: string, index: number): TerminalDescriptor {
   return {
-    key: `/repo\0/repo\0${slotId}`,
+    key: `/repo\0/repo\0${sessionId}`,
     worktreeTerminalKey: '/repo\0/repo',
-    slotId,
+    sessionId,
     index,
     repoRoot: '/repo',
     branch: 'main',
@@ -77,7 +77,7 @@ describe('terminal session worktree snapshot helper', () => {
           type: 'terminal',
           id: descriptor.key,
           key: descriptor.key,
-          slotId: 'session-1',
+          sessionId: 'session-1',
           selected: true,
           hasBell: true,
           phase: 'open',

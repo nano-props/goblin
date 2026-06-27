@@ -21,7 +21,7 @@ describe('isClientEffectIntent', () => {
     expect(isClientEffectIntent({ type: 'theme-pref-set-requested', pref: 'sepia' })).toBe(false)
     expect(isClientEffectIntent({ type: 'lang-pref-set-requested', pref: 'zh' })).toBe(true)
     expect(isClientEffectIntent({ type: 'lang-pref-set-requested', pref: 'fr' })).toBe(false)
-    expect(isClientEffectIntent({ type: 'terminal-bell-click', repoRoot: '/tmp/repo', key: 'slot-1' })).toBe(true)
+    expect(isClientEffectIntent({ type: 'terminal-bell-click', repoRoot: '/tmp/repo', key: 'session-1' })).toBe(true)
     expect(isClientEffectIntent({ type: 'terminal-bell-click', repoRoot: '/tmp/repo', key: 1 })).toBe(false)
   })
 

@@ -98,7 +98,7 @@ The server remembers, for the lifetime of a session, that **this
 user has touched this session**. That single bit of sticky
 memory is what makes the roam scenarios work:
 
-- User closes the controller window. The controller slot is
+- User closes the controller window. The controller role is
   cleared at once.
 - User opens a new window elsewhere, attached to the same session.
 - The server sees: "user has been here before, no live
@@ -126,7 +126,7 @@ impose a richer contract than the OS provides.
 
 When a window's network briefly drops and comes back to the same
 attachment, the user perceives no interruption: the new attach is
-recognized as a continuation of the same window, the slot is
+recognized as a continuation of the same window, the controller role is
 cleared on disconnect, and the reattach re-claims through the
 user-sticky path. Because the reconnect and the reclaim happen
 back-to-back, the user sees their next keystroke flow as expected.
@@ -143,13 +143,13 @@ The same-window reconnect is the friendly case. The less-friendly
 case is a small but real race:
 
 1. Window A is the controller.
-2. A's network drops. The server clears the controller slot on
+2. A's network drops. The server clears the controller role on
    the same event (no grace period).
 3. Window B — a sibling tab, an Electron window on another
    machine, anything the user opened while A was away — attaches
-   first. B auto-claims because the slot is empty and the user
+   first. B auto-claims because no controller is present and the user
    has touched this session before.
-4. A's network comes back. A reconnects, but the slot is held by
+4. A's network comes back. A reconnects, but the controller role is held by
    B. A is now a viewer.
 
 This is intentional. The "most recent write intent wins" rule
@@ -174,7 +174,7 @@ A controller's process can die (laptop sleep, OS kill, NIC
 stuck) while the OS keeps the underlying TCP socket in
 `ESTABLISHED` for minutes or hours. Without intervention the
 server would still believe that `(userId, clientId)` is
-connected, the slot's controller would stay pinned to the
+connected, the controller role's controller would stay pinned to the
 dead client, and every sibling viewer would be stranded in
 viewer mode with no path to auto-claim.
 
@@ -189,7 +189,7 @@ A per-`clientId` heartbeat closes this gap:
   every `HEARTBEAT_INTERVAL_MS`. A `(userId, clientId)` whose
   last beat is older than `HEARTBEAT_DEADLINE_MS` (90 s, i.e.
   3 missed beats) gets a synthetic `onClientDisconnected`,
-  which clears the slot's controller slot and emits
+  which clears the controller role's controller role and emits
   `controller: null` to every sibling.
 - The next `attach` from any sibling (or from a freshly
   reconnected A) takes the auto-claim path — same as the
@@ -205,7 +205,7 @@ broker cannot drift out of sync.
 ## Known behavior: self-reconnect mid-flight
 
 The friendly reconnect case has one observable wrinkle. When A's
-socket drops, the server clears the slot and emits a
+socket drops, the server clears the controller role and emits a
 `controller: null` event. When A's socket comes back, the
 server re-emits `controller: A` after the auto-claim. Between
 those two events — typically a few milliseconds — A's client

@@ -121,7 +121,7 @@ export interface TerminalEventSink<TUser extends string | number> {
 
 export class TerminalSessionManager<TUser extends string | number> {
   private readonly sessionsByPtySessionId = new Map<string, TerminalSessionView<TUser>>()
-  private readonly ptySessionIdByUserSlotKey = new Map<string, string>()
+  private readonly ptySessionIdByUserSessionKey = new Map<string, string>()
   private readonly sink: TerminalEventSink<TUser>
   private readonly ptySupervisor: PtySupervisor
   private readonly terminalSessionOrder: TerminalSessionOrderRuntimeLike<TUser>
@@ -143,9 +143,9 @@ export class TerminalSessionManager<TUser extends string | number> {
     const cwd = path.resolve(input.cwd)
     const userId = input.userId
     if (!this.isValidUserId(userId)) return { ok: false, message: 'error.invalid-arguments' }
-    const userKey = this.userSlotKey(userId, input.key)
+    const userKey = this.userSessionKey(userId, input.key)
     if (input.forceNew) this.closeUserKey(userId, input.key)
-    const existingId = this.ptySessionIdByUserSlotKey.get(userKey)
+    const existingId = this.ptySessionIdByUserSessionKey.get(userKey)
     const existing = existingId ? this.sessionsByPtySessionId.get(existingId) : undefined
     if (existing) {
       this.terminalSessionOrder.registerTerminalSessionOrder({
@@ -191,7 +191,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       inputFlushScheduled: false,
     }
     this.sessionsByPtySessionId.set(id, session)
-    this.ptySessionIdByUserSlotKey.set(userKey, id)
+    this.ptySessionIdByUserSessionKey.set(userKey, id)
     this.terminalSessionOrder.registerTerminalSessionOrder({
       userId,
       scope: input.scope,
@@ -361,8 +361,9 @@ export class TerminalSessionManager<TUser extends string | number> {
     if (!session) return
     if (markTerminalSessionClosed(session)) this.emitLifecycle(session)
     this.sessionsByPtySessionId.delete(ptySessionId)
-    const userKey = this.userSlotKey(session.userId, session.key)
-    if (this.ptySessionIdByUserSlotKey.get(userKey) === ptySessionId) this.ptySessionIdByUserSlotKey.delete(userKey)
+    const userKey = this.userSessionKey(session.userId, session.key)
+    if (this.ptySessionIdByUserSessionKey.get(userKey) === ptySessionId)
+      this.ptySessionIdByUserSessionKey.delete(userKey)
     this.terminalSessionOrder.unregisterTerminalSessionOrder({
       userId: session.userId,
       scope: session.scope,
@@ -452,7 +453,7 @@ export class TerminalSessionManager<TUser extends string | number> {
   }
 
   private closeUserKey(userId: TUser, key: string): void {
-    const id = this.ptySessionIdByUserSlotKey.get(this.userSlotKey(userId, key))
+    const id = this.ptySessionIdByUserSessionKey.get(this.userSessionKey(userId, key))
     if (id) this.closeSession(id)
   }
 
@@ -527,7 +528,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     }
   }
 
-  private userSlotKey(userId: TUser, key: string): string {
+  private userSessionKey(userId: TUser, key: string): string {
     return `${String(userId)}\0${key}`
   }
 
@@ -541,7 +542,7 @@ export class TerminalSessionManager<TUser extends string | number> {
   }
 
   // Lifecycle emits a single, identity-free event whenever the
-  // slot's phase, message, or takeover-pending flag changes. A
+  // session's phase, message, or takeover-pending flag changes. A
   // controller→viewer teardown decision in the client must not
   // subscribe to this channel; the wire keeps the two concerns on
   // separate paths so the type-level separation in the client

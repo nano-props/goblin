@@ -50,14 +50,14 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       ) {
         return { ok: false, message: 'error.invalid-arguments' }
       }
-      const slotClientId = input.clientId ?? clientId
+      const terminalClientId = input.clientId ?? clientId
       const result = await manager.attachSession(
         userId,
         input.ptySessionId,
         input.cols,
         input.rows,
-        slotClientId,
-        resolveClientConnected(userId, slotClientId),
+        terminalClientId,
+        resolveClientConnected(userId, terminalClientId),
       )
       return result
     },
@@ -71,14 +71,14 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       ) {
         return { ok: false, message: 'error.invalid-arguments' }
       }
-      const slotClientId = input.clientId ?? clientId
+      const terminalClientId = input.clientId ?? clientId
       const result = await manager.restartSession(
         userId,
         input.ptySessionId,
         input.cols,
         input.rows,
-        slotClientId,
-        resolveClientConnected(userId, slotClientId),
+        terminalClientId,
+        resolveClientConnected(userId, terminalClientId),
       )
       if (repoRoot) broadcastRepoSessionsChanged(userId, repoRoot)
       return result
@@ -97,8 +97,8 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       if (!isValidTerminalPtySessionId(input?.ptySessionId) || !isValidTerminalWriteData(input?.data)) {
         return false
       }
-      const slotClientId = input.clientId ?? clientId
-      return manager.writeSession(userId, input.ptySessionId, input.data, slotClientId)
+      const terminalClientId = input.clientId ?? clientId
+      return manager.writeSession(userId, input.ptySessionId, input.data, terminalClientId)
     },
 
     resize(clientId: string, userId: string, input: TerminalResizeInput): TerminalMutationResult {
@@ -106,14 +106,14 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       if (!isValidTerminalPtySessionId(input?.ptySessionId) || !isValidTerminalSize(input?.cols, input?.rows)) {
         return false
       }
-      const slotClientId = input.clientId ?? clientId
+      const terminalClientId = input.clientId ?? clientId
       return manager.resizeSession(
         userId,
         input.ptySessionId,
         input.cols,
         input.rows,
-        slotClientId,
-        resolveClientConnected(userId, slotClientId),
+        terminalClientId,
+        resolveClientConnected(userId, terminalClientId),
       )
     },
 
@@ -151,14 +151,14 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       if (!isValidTerminalPtySessionId(input?.ptySessionId) || !isValidTerminalSize(input?.cols, input?.rows)) {
         return { ok: false, message: 'error.invalid-arguments' }
       }
-      const slotClientId = input.clientId ?? clientId
+      const terminalClientId = input.clientId ?? clientId
       return manager.takeoverSession(
         userId,
         input.ptySessionId,
         input.cols,
         input.rows,
-        slotClientId,
-        resolveClientConnected(userId, slotClientId),
+        terminalClientId,
+        resolveClientConnected(userId, terminalClientId),
       )
     },
 

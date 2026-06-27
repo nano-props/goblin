@@ -482,7 +482,7 @@ const mockFonts = new MockFontFaceSet()
 const descriptor = {
   key: '/repo\0/worktree',
   worktreeTerminalKey: '/repo\0/worktree',
-  slotId: 'session-1',
+  sessionId: 'session-1',
   index: 1,
   repoRoot: '/repo',
   branch: 'feature',
@@ -622,14 +622,14 @@ beforeEach(() => {
         input?.kind === 'primary'
           ? {
               action: 'reused' as const,
-              key: 'repo\0worktree\0slot-1',
+              key: 'repo\0worktree\0session-1',
               sessions: [],
               ...createFirstFrame('session-1'),
               ok: true as const,
             }
           : {
               action: 'created' as const,
-              key: 'repo\0worktree\0slot-2',
+              key: 'repo\0worktree\0session-2',
               sessions: [],
               ...createFirstFrame('session-2'),
               ok: true as const,

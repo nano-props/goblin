@@ -114,7 +114,7 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
           workspacePaneId="workspace"
           sessions={[
             session({ key: 't1', selected: true }),
-            session({ key: 't2', selected: false, slotId: 'slot-2', index: 2 }),
+            session({ key: 't2', selected: false, sessionId: 'session-2', index: 2 }),
           ]}
           onNew={() => {}}
           onSelect={() => {}}
@@ -202,7 +202,7 @@ function session(overrides: Partial<TerminalSessionSummary> = {}): TerminalSessi
     id: overrides.id ?? key,
     key,
     worktreeTerminalKey: overrides.worktreeTerminalKey ?? '/repo\0/repo/worktree',
-    slotId: overrides.slotId ?? 'slot-1',
+    sessionId: overrides.sessionId ?? 'session-1',
     index: overrides.index ?? 1,
     displayOrder: overrides.displayOrder ?? 1,
     title,

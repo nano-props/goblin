@@ -7,7 +7,7 @@ export function terminalSessionDisplayOrder(
   return displayOrderByKey.get(descriptor.key) ?? descriptor.index - 1
 }
 
-export function slotSnapshotDisplayOrder(
+export function sessionSnapshotDisplayOrder(
   orderedKeys: string[],
   displayOrderByKey: ReadonlyMap<string, number>,
 ): Map<string, number | undefined> {
@@ -16,7 +16,7 @@ export function slotSnapshotDisplayOrder(
   return previousOrder
 }
 
-export function restoreSlotDisplayOrder(
+export function restoreSessionDisplayOrder(
   displayOrderByKey: Map<string, number>,
   previousOrder: ReadonlyMap<string, number | undefined>,
 ): void {

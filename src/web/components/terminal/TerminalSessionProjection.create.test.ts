@@ -149,7 +149,7 @@ function makeCreateResult(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     ok: true as const,
     action: 'created' as const,
-    key: `${REPO_ROOT}\0${WORKTREE_PATH}\0slot-1`,
+    key: `${REPO_ROOT}\0${WORKTREE_PATH}\0session-1`,
     ptySessionId: 'pty_session_1_aaaaaaaaa',
     processName: 'zsh',
     canonicalTitle: null,
@@ -163,7 +163,7 @@ function makeCreateResult(overrides: Partial<Record<string, unknown>> = {}) {
     sessions: [
       {
         ptySessionId: 'pty_session_1_aaaaaaaaa',
-        key: `${REPO_ROOT}\0${WORKTREE_PATH}\0slot-1`,
+        key: `${REPO_ROOT}\0${WORKTREE_PATH}\0session-1`,
         cwd: WORKTREE_PATH,
         controller: { clientId: 'client_local', status: 'connected' as const },
         processName: 'zsh',
@@ -255,7 +255,7 @@ describe('TerminalSessionProjection create flow', () => {
     expect(projection.worktreeSnapshot(WORKTREE_KEY).count).toBe(0)
 
     resolve(makeCreateResult())
-    await expect(pending).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0slot-1`)
+    await expect(pending).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0session-1`)
     expect(projection.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
     expect(projection.worktreeSnapshot(WORKTREE_KEY).count).toBe(1)
   })
@@ -283,7 +283,7 @@ describe('TerminalSessionProjection create flow', () => {
     document.body.appendChild(host)
     projection.registerHost(WORKTREE_KEY, host)
 
-    await expect(pending).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0slot-1`)
+    await expect(pending).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0session-1`)
     expect(mocks.createMock).toHaveBeenCalledTimes(1)
     expect(mocks.createMock).toHaveBeenCalledWith({
       repoRoot: REPO_ROOT,
@@ -364,7 +364,7 @@ describe('TerminalSessionProjection create flow', () => {
 
     await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
     expect(projection.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
-    await expect(pending).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0slot-1`)
+    await expect(pending).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0session-1`)
   })
 
   test('fails create when terminal host is permanently unmeasurable', async () => {
@@ -422,7 +422,7 @@ describe('TerminalSessionProjection create flow', () => {
 
     // Both promises settle eventually.
     await expect(closePromise).resolves.toBeUndefined()
-    await expect(createPromise).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0slot-1`)
+    await expect(createPromise).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0session-1`)
 
     // Close is awaited before create. Without the durable-close
     // guard, create would resolve first because the close promise
@@ -454,7 +454,7 @@ describe('TerminalSessionProjection create flow', () => {
     // The next create proceeds normally.
     await expect(
       projection.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH }),
-    ).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0slot-1`)
+    ).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0session-1`)
     expect(mocks.createMock).toHaveBeenCalledTimes(1)
   })
 
@@ -533,7 +533,7 @@ describe('TerminalSessionProjection create flow', () => {
       {
         key,
         worktreeTerminalKey: WORKTREE_KEY,
-        slotId: 'slot-1',
+        sessionId: 'session-1',
         index: 1,
         repoRoot: REPO_ROOT,
         branch: BRANCH,

@@ -233,7 +233,7 @@ export function createServerTerminalBridge(options: {
     // broker (`src/server/terminal/terminal-realtime-broker.ts`).
     // The 90 s deadline (3 missed beats) is what fires a synthetic
     // `onClientDisconnected`, which in turn lets the next `attach`
-    // auto-claim the slot under the new user-sticky model.
+    // auto-claim control under the new user-sticky model.
     // Use `globalThis.setInterval` (not `window.setInterval`) so the
     // node-env test suite — which mocks `WebSocket` but does not
     // install `window` — does not crash on this line when the

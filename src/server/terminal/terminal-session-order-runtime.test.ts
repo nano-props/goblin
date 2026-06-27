@@ -9,17 +9,17 @@ describe('terminal session order runtime', () => {
       userId: 'user-a',
       scope: '/repo',
       worktreePath: '/repo-linked',
-      id: 'slot-1',
+      id: 'session-1',
     })
     runtime.registerTerminalSessionOrder({
       userId: 'user-a',
       scope: '/repo',
       worktreePath: '/repo-linked',
-      id: 'slot-2',
+      id: 'session-2',
     })
 
-    expect(runtime.sessionDisplayOrder(view('slot-1'))).toBe(0)
-    expect(runtime.sessionDisplayOrder(view('slot-2'))).toBe(1)
+    expect(runtime.sessionDisplayOrder(view('session-1'))).toBe(0)
+    expect(runtime.sessionDisplayOrder(view('session-2'))).toBe(1)
   })
 
   test('isolates identical terminal identities by user', () => {
@@ -29,17 +29,17 @@ describe('terminal session order runtime', () => {
       userId: 'user-a',
       scope: '/repo',
       worktreePath: '/repo-linked',
-      id: 'slot-1',
+      id: 'session-1',
     })
     runtime.registerTerminalSessionOrder({
       userId: 'user-b',
       scope: '/repo',
       worktreePath: '/repo-linked',
-      id: 'slot-1',
+      id: 'session-1',
     })
 
-    expect(runtime.sessionDisplayOrder(view('slot-1'))).toBe(0)
-    expect(runtime.sessionDisplayOrder({ ...view('slot-1'), userId: 'user-b' })).toBe(0)
+    expect(runtime.sessionDisplayOrder(view('session-1'))).toBe(0)
+    expect(runtime.sessionDisplayOrder({ ...view('session-1'), userId: 'user-b' })).toBe(0)
   })
 
   test('removes terminal views by user', () => {
@@ -49,19 +49,19 @@ describe('terminal session order runtime', () => {
       userId: 'user-a',
       scope: '/repo',
       worktreePath: '/repo-linked',
-      id: 'slot-1',
+      id: 'session-1',
     })
     runtime.registerTerminalSessionOrder({
       userId: 'user-b',
       scope: '/repo',
       worktreePath: '/repo-linked',
-      id: 'slot-1',
+      id: 'session-1',
     })
 
     runtime.closeSessionsForUser('user-a')
 
-    expect(runtime.sessionDisplayOrder(view('slot-1'))).toBeNull()
-    expect(runtime.sessionDisplayOrder({ ...view('slot-1'), userId: 'user-b' })).toBe(0)
+    expect(runtime.sessionDisplayOrder(view('session-1'))).toBeNull()
+    expect(runtime.sessionDisplayOrder({ ...view('session-1'), userId: 'user-b' })).toBe(0)
   })
 })
 

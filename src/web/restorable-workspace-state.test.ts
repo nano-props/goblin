@@ -25,7 +25,7 @@ describe('restorable-workspace-state', () => {
           zenMode: false,
           workspacePaneSize: 55,
           selectedTerminalSessionByWorktree: {
-            '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0slot-2',
+            '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0session-2',
           },
         },
       }),
@@ -35,7 +35,7 @@ describe('restorable-workspace-state', () => {
       zenMode: false,
       workspacePaneSize: 55,
       selectedTerminalSessionByWorktree: {
-        '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0slot-2',
+        '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0session-2',
       },
       preferredWorkspacePaneTabByBranchByRepo: { '/tmp/repo': { 'feature/worktree': 'terminal' } },
       workspacePaneTabOrderByBranchByRepo: {
@@ -114,7 +114,7 @@ describe('restorable-workspace-state', () => {
         zenMode: false,
         workspacePaneSize: 40,
         selectedTerminalSessionByWorktree: {
-          '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0slot-1',
+          '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0session-1',
         },
         workspacePaneTabOrderByBranchByRepo: {
           '/tmp/repo': {
@@ -127,7 +127,7 @@ describe('restorable-workspace-state', () => {
       zenMode: false,
       workspacePaneSize: 40,
       selectedTerminalSessionByWorktree: {
-        '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0slot-1',
+        '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0session-1',
       },
       preferredWorkspacePaneTabByBranchByRepo: {},
       workspacePaneTabOrderByBranchByRepo: {

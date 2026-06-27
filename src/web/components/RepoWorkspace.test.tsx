@@ -39,7 +39,7 @@ const terminalReadContext: TerminalSessionReadContextValue = {
 }
 
 const terminalCommandContext: TerminalSessionContextValue = {
-  createTerminal: vi.fn(async () => 'slot-1'),
+  createTerminal: vi.fn(async () => 'session-1'),
   registerHost: vi.fn(),
   unregisterHost: vi.fn(),
   selectTerminal: vi.fn(),

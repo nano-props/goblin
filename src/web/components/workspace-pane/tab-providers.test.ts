@@ -22,10 +22,10 @@ const t = (key: string, params?: Record<string, string | number>) => (params ? `
 
 const terminalView: WorkspacePaneTabSummary = {
   type: 'terminal',
-  id: 'slot-1',
-  key: 'slot-1',
+  id: 'session-1',
+  key: 'session-1',
   worktreeTerminalKey: 'repo\0worktree',
-  slotId: 'slot-1',
+  sessionId: 'session-1',
   index: 1,
   displayOrder: 1,
   title: 'Terminal 1',
@@ -110,10 +110,10 @@ describe('workspace pane tab providers', () => {
     expect(workspacePaneStaticTabProvider('status').buttonId('workspace-pane')).toBe('workspace-pane-status-tab')
     expect(workspacePaneStaticTabProvider('status').panelId('workspace-pane')).toBe('workspace-pane-status-panel')
     expect(workspacePaneStaticTabProvider('changes').orderEntry()).toEqual({ type: 'changes', id: 'changes' })
-    expect(terminalWorkspacePaneTabProvider.identity('slot-1')).toBe('terminal:slot-1')
+    expect(terminalWorkspacePaneTabProvider.identity('session-1')).toBe('terminal:session-1')
     expect(terminalWorkspacePaneTabProvider.buttonId('workspace-pane', 0)).toBe('workspace-pane-workspace-pane-tab')
     expect(terminalWorkspacePaneTabProvider.buttonId('workspace-pane', 2)).toBe('workspace-pane-workspace-pane-tab-2')
-    expect(terminalWorkspacePaneTabProvider.orderEntry('slot-1')).toEqual({ type: 'terminal', id: 'slot-1' })
+    expect(terminalWorkspacePaneTabProvider.orderEntry('session-1')).toEqual({ type: 'terminal', id: 'session-1' })
     expect(changesWorkspacePaneTabProvider.label({ t, branchName: 'main', statusCount: 3 })).toBe(
       'tab.changes-with-count:{"count":3}',
     )
@@ -187,13 +187,13 @@ describe('workspace pane tab providers', () => {
       terminalWorkspacePaneTabProvider.close({
         repoId: '/repo',
         branchName: 'main',
-        terminalKey: 'slot-1',
+        terminalKey: 'session-1',
         terminalBase,
         closeTerminalByDescriptor,
       }),
     ).resolves.toBe(true)
 
-    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('slot-1', terminalBase)
+    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('session-1', terminalBase)
   })
 
   test('closes terminal worktree resources through the worktree lifecycle callback', async () => {

@@ -1163,7 +1163,7 @@ function renderToolbar(options: {
     id: `t${index + 1}`,
     key: `t${index + 1}`,
     worktreeTerminalKey: `${REPO_ID}\0${WORKTREE_PATH}`,
-    slotId: `t${index + 1}`,
+    sessionId: `t${index + 1}`,
     index: index + 1,
     displayOrder: index + 1,
     title: `term-${index + 1}`,
@@ -1176,7 +1176,7 @@ function renderToolbar(options: {
     ? {
         key: sessions[0].key,
         worktreeTerminalKey: sessions[0].worktreeTerminalKey,
-        slotId: sessions[0].slotId,
+        sessionId: sessions[0].sessionId,
         index: sessions[0].index,
         repoRoot: REPO_ID,
         branch: branchName,

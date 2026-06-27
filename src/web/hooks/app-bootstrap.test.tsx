@@ -75,7 +75,7 @@ describe('app bootstrap hooks', () => {
       activeRepoId: '/tmp/repo',
       zenMode: false,
       workspacePaneSize: 45,
-      selectedTerminalSessionByWorktree: { '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0slot-2' },
+      selectedTerminalSessionByWorktree: { '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0session-2' },
       workspacePaneTabOrderByBranchByRepo: {
         '/tmp/repo': {
           main: [],
@@ -95,7 +95,7 @@ describe('app bootstrap hooks', () => {
     expect(state.zenMode).toBe(false)
     expect(state.workspacePaneSize).toBe(45)
     expect(state.selectedTerminalSessionByWorktree).toEqual({
-      '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0slot-2',
+      '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0session-2',
     })
     expect(hydrateRepoSession).toHaveBeenCalledWith([{ kind: 'local', id: '/tmp/repo' }], '/tmp/repo', {
       workspacePaneRestoreState: {

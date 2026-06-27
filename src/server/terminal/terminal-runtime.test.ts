@@ -397,7 +397,7 @@ describe('server terminal runtime', () => {
     expect(resolveRemoteTarget).toHaveBeenCalledWith({ alias: 'prod', remotePath: '/srv/repo' })
     expect(result.sessions).toEqual([
       expect.objectContaining({
-        key: 'ssh-config://prod/srv/repo\0/srv/repo\0slot-1',
+        key: 'ssh-config://prod/srv/repo\0/srv/repo\0session-1',
       }),
     ])
 
