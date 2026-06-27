@@ -94,7 +94,7 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
     })
 
     const tabChrome = document.body.querySelector('[data-workspace-pane-tab-tooltip-id="terminal:t1"]')
-    if (!(tabChrome instanceof HTMLDivElement)) throw new Error('missing terminal view')
+    if (!(tabChrome instanceof HTMLDivElement)) throw new Error('missing terminal tab')
     expect(tabChrome.className).toContain('bg-selected')
     expect(tabChrome.className).toContain('cursor-grabbing')
     expect(tabChrome.className).not.toContain('bg-card')
@@ -132,7 +132,7 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
     )
 
     const tab = document.body.querySelector('#workspace-workspace-pane-tab')
-    if (!(tab instanceof HTMLButtonElement)) throw new Error('missing terminal view')
+    if (!(tab instanceof HTMLButtonElement)) throw new Error('missing terminal tab')
     const tabChrome = document.body.querySelector('[data-workspace-pane-tab-tooltip-id="terminal:t1"]')
     if (!(tabChrome instanceof HTMLDivElement)) throw new Error('missing terminal chrome')
 

@@ -76,7 +76,7 @@ describe('useSessionPersistence', () => {
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'status',
     })
-    useReposStore.getState().closeWorkspacePaneStaticView(repo.id, 'status', 'feature/worktree')
+    useReposStore.getState().closeWorkspacePaneStaticTab(repo.id, 'status', 'feature/worktree')
 
     await render(<Harness />)
 

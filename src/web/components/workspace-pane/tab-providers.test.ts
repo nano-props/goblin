@@ -52,18 +52,18 @@ describe('workspace pane tab providers', () => {
     }
   })
 
-  test('registers one provider per workspace pane view type', () => {
+  test('registers one provider per workspace pane tab type', () => {
     expect(workspacePaneTabProviders.map((provider) => provider.type)).toEqual([...WORKSPACE_PANE_TAB_TYPES])
   })
 
   test('derives shared static scope lists from the static scope map', () => {
-    const branchViews = WORKSPACE_PANE_STATIC_TAB_TYPES.filter((type) => workspacePaneStaticTabScope(type) === 'branch')
-    const worktreeViews = WORKSPACE_PANE_STATIC_TAB_TYPES.filter(
+    const branchTabs = WORKSPACE_PANE_STATIC_TAB_TYPES.filter((type) => workspacePaneStaticTabScope(type) === 'branch')
+    const worktreeTabs = WORKSPACE_PANE_STATIC_TAB_TYPES.filter(
       (type) => workspacePaneStaticTabScope(type) === 'worktree',
     )
 
-    expect(WORKSPACE_PANE_BRANCH_TAB_TYPES).toEqual(branchViews)
-    expect(WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES).toEqual(worktreeViews)
+    expect(WORKSPACE_PANE_BRANCH_TAB_TYPES).toEqual(branchTabs)
+    expect(WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES).toEqual(worktreeTabs)
   })
 
   test('resolves worktree availability through providers', () => {
@@ -151,32 +151,32 @@ describe('workspace pane tab providers', () => {
     expect(terminalWorkspacePaneTabProvider.closeLabel(input)).toBe('terminal.close-named:{"name":"terminal.opening"}')
   })
 
-  test('closes static tabs through the static view lifecycle callback', async () => {
-    const closeStaticView = vi.fn()
+  test('closes static tabs through the static tab lifecycle callback', async () => {
+    const closeStaticTab = vi.fn()
 
     await expect(
       statusWorkspacePaneTabProvider.close({
         repoId: '/repo',
         branchName: 'main',
-        closeStaticView,
+        closeStaticTab,
       }),
     ).resolves.toBe(true)
 
-    expect(closeStaticView).toHaveBeenCalledWith('/repo', 'status', 'main')
+    expect(closeStaticTab).toHaveBeenCalledWith('/repo', 'status', 'main')
   })
 
   test('rejects static tab close without a branch owner', async () => {
-    const closeStaticView = vi.fn()
+    const closeStaticTab = vi.fn()
 
     await expect(
       statusWorkspacePaneTabProvider.close({
         repoId: '/repo',
         branchName: null,
-        closeStaticView,
+        closeStaticTab,
       }),
     ).resolves.toBe(false)
 
-    expect(closeStaticView).not.toHaveBeenCalled()
+    expect(closeStaticTab).not.toHaveBeenCalled()
   })
 
   test('closes terminal tabs through the terminal lifecycle callback', async () => {

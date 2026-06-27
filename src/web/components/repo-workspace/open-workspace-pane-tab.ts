@@ -13,7 +13,7 @@ export async function openWorkspacePaneTab(input: {
 }): Promise<boolean> {
   const provider = workspacePaneStaticTabProvider(input.type)
   if (!provider.canOpen({ hasWorktree: !!input.worktreePath })) return false
-  useReposStore.getState().openWorkspacePaneStaticView(input.repoId, input.type, input.branchName)
+  useReposStore.getState().openWorkspacePaneStaticTab(input.repoId, input.type, input.branchName)
   showWorkspacePaneTab(input)
   if (provider.refreshOnOpen) requestVisibleRepoStatusRefresh(useReposStore.getState, input.repoId)
   return true

@@ -30,7 +30,7 @@ export async function closeWorkspacePaneTab(target: RepoWorkspaceTabModel, tab: 
     branchName: target.branchName,
     terminalKey: tab.kind === 'terminal' ? tab.key : undefined,
     terminalBase: target.terminalBase,
-    closeStaticView: useReposStore.getState().closeWorkspacePaneStaticView,
+    closeStaticTab: useReposStore.getState().closeWorkspacePaneStaticTab,
     closeTerminalByDescriptor: bridge?.closeTerminalByDescriptor,
     closeTerminalsForWorktree: bridge?.closeTerminalsForWorktree,
   })
@@ -56,7 +56,7 @@ export async function closeWorkspacePaneTabsForWorktree({
     repoId,
     branchName,
     terminalBase,
-    closeStaticView: useReposStore.getState().closeWorkspacePaneStaticView,
+    closeStaticTab: useReposStore.getState().closeWorkspacePaneStaticTab,
     closeTerminalByDescriptor: bridge?.closeTerminalByDescriptor,
     closeTerminalsForWorktree: bridge?.closeTerminalsForWorktree,
   }
@@ -88,7 +88,7 @@ export function workspacePaneTabTargetForBranch(repoId: string, branchName: stri
     repoId,
     branchName,
     worktreePath: worktreePath ?? null,
-    preferredView: preferredWorkspacePaneTabForBranch(repo.ui, branchName),
+    preferredTab: preferredWorkspacePaneTabForBranch(repo.ui, branchName),
     tabOrder: workspacePaneTabOrderForBranch(repo.ui, branchName),
     runtimeTerminalViews: snapshot?.sessions ?? [],
     terminalSessionCount: snapshot?.count ?? 0,

@@ -6,7 +6,7 @@ import { Tip } from '#/web/components/Tip.tsx'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import {
   WorkspacePaneTabStrip,
-  EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY,
+  EMPTY_WORKSPACE_PANE_TAB_FOCUS_KEY,
   createPendingWorkspacePaneTabItem,
   createStaticWorkspacePaneTabItem,
   createTerminalWorkspacePaneTabItem,
@@ -108,7 +108,7 @@ export function RepoWorkspaceToolbar({
   const showWorkspacePaneTabItem = useCallback(
     (item: WorkspacePaneTabItem) => {
       if (isStaticWorkspacePaneTabItem(item)) {
-        navigation.showRepoWorkspacePaneTab(repo.id, item.staticViewType)
+        navigation.showRepoWorkspacePaneTab(repo.id, item.staticTabType)
         return
       }
       if (isTerminalWorkspacePaneTabItem(item)) {
@@ -259,7 +259,7 @@ export function RepoWorkspaceToolbar({
               responsiveCompact={compact}
               panelActive
               focusRegistry={workspacePaneTabFocusRegistry}
-              emptyFocusKey={EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY}
+              emptyFocusKey={EMPTY_WORKSPACE_PANE_TAB_FOCUS_KEY}
               // While a real terminal create is in flight, the tab model
               // contributes a pending terminal tab. Additional creates stay
               // disabled through the New Terminal affordance.

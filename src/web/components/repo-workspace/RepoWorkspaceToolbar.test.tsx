@@ -38,7 +38,7 @@ import {
   workspaceExternalAppRecentScope,
 } from '#/web/workspace-external-apps-recent.ts'
 import {
-  workspacePaneStaticViewsForBranch,
+  workspacePaneStaticTabsForBranch,
   workspacePaneTabOrderForBranch,
 } from '#/web/stores/repos/workspace-pane-tabs.ts'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
@@ -456,7 +456,7 @@ describe('RepoWorkspaceToolbar', () => {
     expect(c.querySelector('button[aria-label="workspace.open-externally.open"]')).not.toBeNull()
   })
 
-  test('renders status and terminal views in one workspace tab strip with a separator', () => {
+  test('renders status and terminal tabs in one workspace tab strip with a separator', () => {
     const { container: c } = renderToolbar({
       terminalCount: 1,
       navigation: navigationWith({}),
@@ -513,7 +513,7 @@ describe('RepoWorkspaceToolbar', () => {
     const { container: c } = renderToolbar({
       terminalCount: 0,
       preferredWorkspacePaneTab: 'history',
-      workspacePaneStaticViews: ['history', 'status'],
+      workspacePaneStaticTabs: ['history', 'status'],
       navigation: navigationWith({}),
     })
     await flush()
@@ -538,7 +538,7 @@ describe('RepoWorkspaceToolbar', () => {
     })
     await flush()
 
-    expect(openViewsFor('feature/worktree')).toEqual([])
+    expect(openTabsFor('feature/worktree')).toEqual([])
   })
 
   test('records the closing context for spatial adjacency after closing the active status tab', async () => {
@@ -556,7 +556,7 @@ describe('RepoWorkspaceToolbar', () => {
     })
     await flush()
 
-    expect(openViewsFor('feature/worktree')).toEqual([])
+    expect(openTabsFor('feature/worktree')).toEqual([])
     // The X-click records the closing context for the workspace pane tab
     // model. The model itself decides where to land — the close command does
     // not imperatively navigate, so navigation is untouched here.
@@ -572,7 +572,7 @@ describe('RepoWorkspaceToolbar', () => {
     const { container: c, mocks } = renderToolbar({
       terminalCount: 0,
       preferredWorkspacePaneTab: 'history',
-      workspacePaneStaticViews: ['history', 'status'],
+      workspacePaneStaticTabs: ['history', 'status'],
       navigation: navigationWith({}),
     })
 
@@ -584,10 +584,10 @@ describe('RepoWorkspaceToolbar', () => {
     })
     await flush()
 
-    expect(openViewsFor('feature/worktree')).toEqual(['status'])
+    expect(openTabsFor('feature/worktree')).toEqual(['status'])
   })
 
-  test('compact workspace view popover merges status and terminal views', async () => {
+  test('compact workspace tab popover merges status and terminal tabs', async () => {
     compactUi = true
     const { container: c } = renderToolbar({
       terminalCount: 1,
@@ -599,7 +599,7 @@ describe('RepoWorkspaceToolbar', () => {
     expect(c.querySelector('#workspace-status-tab')).toBeNull()
 
     const trigger = c.querySelector<HTMLButtonElement>('button[aria-label="workspace-pane-tabs.tabs"]')
-    if (!trigger) throw new Error('missing workspace view popover trigger')
+    if (!trigger) throw new Error('missing workspace tab popover trigger')
 
     await act(async () => {
       trigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
@@ -635,8 +635,8 @@ describe('RepoWorkspaceToolbar', () => {
     // The next sibling of the back button hosts the tablist — this nails down
     // the architectural contract that the strip lives beside (not inside) the
     // back button, so a future refactor can't silently re-couple them.
-    const viewStripHost = back?.nextElementSibling
-    expect(viewStripHost?.querySelector('[role="tablist"]')).toBe(tablist)
+    const tabStripHost = back?.nextElementSibling
+    expect(tabStripHost?.querySelector('[role="tablist"]')).toBe(tablist)
 
     act(() => {
       back?.click()
@@ -649,7 +649,7 @@ describe('RepoWorkspaceToolbar', () => {
     compactUi = true
     const { container: c } = renderToolbar({
       terminalCount: 0,
-      workspacePaneStaticViews: [],
+      workspacePaneStaticTabs: [],
       workspacePaneTabOrder: [],
       navigation: navigationWith({}),
     })
@@ -677,7 +677,7 @@ describe('RepoWorkspaceToolbar', () => {
     expect(c.querySelectorAll('[role="tab"]').length).toBeGreaterThan(0)
   })
 
-  test('compact workspace view keeps the tab switcher available during terminal sync loading', () => {
+  test('compact workspace tab strip keeps the tab switcher available during terminal sync loading', () => {
     compactUi = true
     const { container: c } = renderToolbar({
       terminalCount: 0,
@@ -691,7 +691,7 @@ describe('RepoWorkspaceToolbar', () => {
     expect(c.querySelector('button[aria-label="workspace-pane-tabs.tabs"]')).not.toBeNull()
   })
 
-  test('compact workspace view keeps the popover switcher reachable while the terminal view is loading', () => {
+  test('compact workspace tab strip keeps the popover switcher reachable while the terminal tab is loading', () => {
     // Regression: when the user is viewing the terminal panel while the
     // terminal registry is still hydrating (`preferredWorkspacePaneTab =
     // 'terminal'`, no materialized terminal tabs), the toolbar's
@@ -720,13 +720,13 @@ describe('RepoWorkspaceToolbar', () => {
     expect(tabs).toHaveLength(0)
     // The scrollable-layout affordances (the busy `+ New` button) must
     // stay out of the compact strip — the chevron-driven tab switcher is
-    // the only way to reach the workspace pane views in compact mode.
+    // the only way to reach the workspace pane tabs in compact mode.
     expect(c.querySelector('button[aria-label="terminal.new"]')).toBeNull()
     expect(c.querySelector('button[aria-label="terminal.loading"]')).toBeNull()
     expect(c.querySelector('button[aria-label="workspace-pane-tabs.tabs"]')).not.toBeNull()
   })
 
-  test('compact workspace view shows terminal creation as a full-width pending tab', () => {
+  test('compact workspace tab strip shows terminal creation as a full-width pending tab', () => {
     compactUi = true
     const { container: c } = renderToolbar({
       terminalCount: 0,
@@ -735,7 +735,7 @@ describe('RepoWorkspaceToolbar', () => {
       pendingCreate: true,
     })
 
-    const pendingView = c.querySelector('[data-workspace-pane-pending-view="terminal"]')
+    const pendingView = c.querySelector('[data-workspace-pane-pending-tab="terminal"]')
     const tab = c.querySelector('[role="tab"][aria-label="terminal.opening"]')
 
     expect(pendingView).not.toBeNull()
@@ -746,7 +746,7 @@ describe('RepoWorkspaceToolbar', () => {
     expect(c.querySelector('button[aria-label="workspace-pane-tabs.tabs"]')).not.toBeNull()
   })
 
-  test('expanded workspace view uses the same pending terminal tab during creation', () => {
+  test('expanded workspace tab strip uses the same pending terminal tab during creation', () => {
     const { container: c } = renderToolbar({
       terminalCount: 0,
       preferredWorkspacePaneTab: 'terminal',
@@ -754,7 +754,7 @@ describe('RepoWorkspaceToolbar', () => {
       pendingCreate: true,
     })
 
-    const pendingView = c.querySelector('[data-workspace-pane-pending-view="terminal"]')
+    const pendingView = c.querySelector('[data-workspace-pane-pending-tab="terminal"]')
     const tabs = Array.from(c.querySelectorAll('[role="tab"]'))
 
     expect(pendingView).not.toBeNull()
@@ -881,7 +881,7 @@ describe('RepoWorkspaceToolbar', () => {
     expect(c.querySelector('[data-testid="repo-workspace-toolbar-divider"]')).toBeNull()
   })
 
-  test('keeps terminal focus when pressing End on the compact terminal view', async () => {
+  test('keeps terminal focus when pressing End on the compact terminal tab', async () => {
     compactUi = true
     const showRepoWorkspacePaneTab = vi.fn()
     const { container: c } = renderToolbar({
@@ -902,19 +902,19 @@ describe('RepoWorkspaceToolbar', () => {
     expect(document.activeElement?.id).toBe('workspace-workspace-pane-tab')
   })
 
-  test('moves focus across opened status, changes, and terminal views with keyboard navigation', async () => {
+  test('moves focus across opened status, changes, and terminal tabs with keyboard navigation', async () => {
     const showRepoWorkspacePaneTab = vi.fn()
     const { container: c } = renderToolbar({
       terminalCount: 2,
       changeCount: 1,
-      workspacePaneStaticViews: ['status', 'changes'],
+      workspacePaneStaticTabs: ['status', 'changes'],
       navigation: navigationWith({ showRepoWorkspacePaneTab }),
     })
 
     const statusTab = c.querySelector<HTMLButtonElement>('#workspace-status-tab')
     const changesTab = c.querySelector<HTMLButtonElement>('#workspace-changes-tab')
     const terminalTab = c.querySelector<HTMLButtonElement>('#workspace-workspace-pane-tab')
-    if (!statusTab || !changesTab || !terminalTab) throw new Error('missing branch workspace pane views')
+    if (!statusTab || !changesTab || !terminalTab) throw new Error('missing branch workspace pane tabs')
 
     act(() => {
       statusTab.focus()
@@ -951,7 +951,7 @@ describe('RepoWorkspaceToolbar', () => {
     expect(c.querySelector('[data-workspace-pane-tab-tooltip-id="changes:changes"]')).toBeNull()
     const statusTab = c.querySelector<HTMLButtonElement>('#workspace-status-tab')
     const terminalTab = c.querySelector<HTMLButtonElement>('#workspace-workspace-pane-tab')
-    if (!statusTab || !terminalTab) throw new Error('missing branch workspace pane views')
+    if (!statusTab || !terminalTab) throw new Error('missing branch workspace pane tabs')
 
     act(() => {
       statusTab.focus()
@@ -972,7 +972,7 @@ describe('RepoWorkspaceToolbar', () => {
     expect(document.activeElement).toBe(statusTab)
   })
 
-  test('records the closing context for spatial adjacency after closing the active terminal view', async () => {
+  test('records the closing context for spatial adjacency after closing the active terminal tab', async () => {
     const showRepoWorkspacePaneTab = vi.fn()
     const { container: c, mocks } = renderToolbar({
       terminalCount: 1,
@@ -1093,7 +1093,7 @@ function renderToolbar(options: {
   changeCount?: number
   navigation: MainWindowNavigationActions
   preferredWorkspacePaneTab?: WorkspacePaneTabType
-  workspacePaneStaticViews?: WorkspacePaneStaticTabType[]
+  workspacePaneStaticTabs?: WorkspacePaneStaticTabType[]
   workspacePaneTabOrder?: WorkspacePaneTabOrderEntry[]
   worktree?: boolean
   collapsed?: boolean
@@ -1130,10 +1130,10 @@ function renderToolbar(options: {
     selectedBranch: branchName,
     preferredWorkspacePaneTab: options.preferredWorkspacePaneTab ?? 'status',
     workspacePaneTabOrderByBranch:
-      options.workspacePaneTabOrder || options.workspacePaneStaticViews
+      options.workspacePaneTabOrder || options.workspacePaneStaticTabs
         ? {
             [branchName]:
-              options.workspacePaneTabOrder ?? options.workspacePaneStaticViews?.map((type) => staticEntry(type)) ?? [],
+              options.workspacePaneTabOrder ?? options.workspacePaneStaticTabs?.map((type) => staticEntry(type)) ?? [],
           }
         : undefined,
     status:
@@ -1257,7 +1257,7 @@ function renderToolbar(options: {
         ? '[data-workspace-pane-tab-tooltip-id="terminal:t1"] button[role="tab"]'
         : 'button[aria-label="terminal.new"]'
   const tab = container.querySelector<HTMLButtonElement>(tabSelector)
-  if (!tab && !options.loading && !options.pendingCreate) throw new Error('missing terminal view')
+  if (!tab && !options.loading && !options.pendingCreate) throw new Error('missing terminal tab')
   return {
     container,
     terminalTab: tab as HTMLButtonElement,
@@ -1303,9 +1303,9 @@ function closeButtonFor(container: HTMLElement, identity: string): HTMLButtonEle
   )
 }
 
-function openViewsFor(branchName: string): WorkspacePaneStaticTabType[] {
+function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
   const repo = useReposStore.getState().repos[REPO_ID]
-  return repo ? workspacePaneStaticViewsForBranch(repo.ui, branchName) : []
+  return repo ? workspacePaneStaticTabsForBranch(repo.ui, branchName) : []
 }
 
 function tabOrderFor(branchName: string): WorkspacePaneTabOrderEntry[] {

@@ -59,7 +59,7 @@ export function useRepoWorkspaceTabModelInput(
     [branchName, repo.ui.lastClosedTabContextByBranch],
   )
 
-  const preferredView = useMemo(
+  const preferredTab = useMemo(
     () => preferredWorkspacePaneTabForBranch(repo.ui, branchName),
     [repo.ui.preferredWorkspacePaneTabByBranch, branchName],
   )
@@ -71,7 +71,7 @@ export function useRepoWorkspaceTabModelInput(
       repoId: repo.id,
       branchName,
       worktreePath,
-      preferredView,
+      preferredTab,
       tabOrder: workspacePaneTabOrder,
       runtimeTerminalViews: worktreeSnapshot.sessions,
       terminalSessionCount: worktreeSnapshot.count,
@@ -84,7 +84,7 @@ export function useRepoWorkspaceTabModelInput(
       repo.id,
       branchName,
       worktreePath,
-      preferredView,
+      preferredTab,
       workspacePaneTabOrder,
       worktreeSnapshot.sessions,
       worktreeSnapshot.count,

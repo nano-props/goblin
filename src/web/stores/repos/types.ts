@@ -240,8 +240,8 @@ export interface RuntimeCoherentRepoProjectionActions {
    *  the UI resolves the active pane at read time so session restore preserves
    *  branch-scoped user intent. */
   setWorkspacePaneTab: (id: string, tab: WorkspacePaneTabType) => void
-  openWorkspacePaneStaticView: (id: string, tab: WorkspacePaneStaticTabType, branchName?: string) => void
-  closeWorkspacePaneStaticView: (id: string, tab: WorkspacePaneStaticTabType, branchName?: string) => void
+  openWorkspacePaneStaticTab: (id: string, tab: WorkspacePaneStaticTabType, branchName?: string) => void
+  closeWorkspacePaneStaticTab: (id: string, tab: WorkspacePaneStaticTabType, branchName?: string) => void
   addWorkspacePaneTerminalTab: (id: string, terminalKey: string, branchName?: string) => void
   addAndFocusWorkspacePaneTerminalTab: (id: string, terminalKey: string, branchName?: string) => void
   removeWorkspacePaneTerminalTab: (id: string, terminalKey: string, branchName?: string) => void

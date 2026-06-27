@@ -41,7 +41,7 @@ import {
 } from '#/web/components/tab-strip/tab-variants.ts'
 import { useFocusRegistry, type FocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import { useSortableTab } from '#/web/components/tab-strip/useSortableTab.ts'
-import { PENDING_TERMINAL_WORKSPACE_PANE_VIEW_IDENTITY } from '#/web/components/workspace-pane/workspace-pane-tab-summary.ts'
+import { PENDING_TERMINAL_WORKSPACE_PANE_TAB_IDENTITY } from '#/web/components/workspace-pane/workspace-pane-tab-summary.ts'
 import {
   terminalWorkspacePaneTabProvider,
   workspacePaneStaticTabProvider,
@@ -90,7 +90,7 @@ interface WorkspacePaneSortableTabItemBase extends WorkspacePaneTabItemBase {
 
 export interface WorkspacePaneStaticTabItem extends WorkspacePaneSortableTabItemBase {
   kind: 'static'
-  staticViewType: WorkspacePaneStaticTabType
+  staticTabType: WorkspacePaneStaticTabType
   orderEntry: Extract<WorkspacePaneTabOrderEntry, { type: WorkspacePaneStaticTabType }>
 }
 
@@ -123,7 +123,7 @@ export function createStaticWorkspacePaneTabItem(input: {
     identity: provider.identity(),
     type: input.type,
     kind: 'static',
-    staticViewType: input.type,
+    staticTabType: input.type,
     label: input.label,
     tooltip: input.tooltip,
     closeLabel: input.closeLabel,
@@ -162,7 +162,7 @@ export function createPendingWorkspacePaneTabItem(input: {
   tooltip: string
   panelId?: string
 }): WorkspacePanePendingTabItem {
-  const identity = input.type === 'terminal' ? PENDING_TERMINAL_WORKSPACE_PANE_VIEW_IDENTITY : `${input.type}:pending`
+  const identity = input.type === 'terminal' ? PENDING_TERMINAL_WORKSPACE_PANE_TAB_IDENTITY : `${input.type}:pending`
   return {
     identity,
     type: input.type,
@@ -175,9 +175,9 @@ export function createPendingWorkspacePaneTabItem(input: {
   }
 }
 
-export const EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY = '__workspace-pane-empty__'
+export const EMPTY_WORKSPACE_PANE_TAB_FOCUS_KEY = '__workspace-pane-empty__'
 
-const WORKSPACE_PANE_VIEW_TOOLTIP_SELECTOR = '[data-workspace-pane-tab-tooltip-id]'
+const WORKSPACE_PANE_TAB_TOOLTIP_SELECTOR = '[data-workspace-pane-tab-tooltip-id]'
 // Virtual right-edge for the compact tab's separator computation. The popover
 // trigger that follows the tab is the only real DOM node on that side, but it
 // doesn't report hover state, so we use this sentinel identity instead.
@@ -335,7 +335,7 @@ export function WorkspacePaneTabStrip({
   responsiveCompact,
   panelActive,
   focusRegistry: externalFocusRegistry,
-  emptyFocusKey = EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY,
+  emptyFocusKey = EMPTY_WORKSPACE_PANE_TAB_FOCUS_KEY,
   newTerminalBusy = false,
   onNew,
   onSelect,
@@ -463,7 +463,7 @@ export function WorkspacePaneTabStrip({
   const tabIdForItem = useCallback(
     (item: WorkspacePaneTabItem) => {
       if (isStaticWorkspacePaneTabItem(item)) {
-        return workspacePaneStaticTabProvider(item.staticViewType).buttonId(workspacePaneId)
+        return workspacePaneStaticTabProvider(item.staticTabType).buttonId(workspacePaneId)
       }
       if (isPendingWorkspacePaneTabItem(item)) return `${workspacePaneId}-${item.type}-pending-tab`
       const index = terminalItems.findIndex((candidate) => candidate.identity === item.identity)
@@ -810,7 +810,7 @@ function WorkspacePaneTabChrome({
       containerProps={{
         ...containerProps,
         'data-workspace-pane-tab-tooltip-id': item.identity,
-        'data-workspace-pane-pending-view': isPendingWorkspacePaneTabItem(item) ? item.type : undefined,
+        'data-workspace-pane-pending-tab': isPendingWorkspacePaneTabItem(item) ? item.type : undefined,
         onPointerEnter: (event) => {
           containerProps?.onPointerEnter?.(event)
           onHoverChange?.(item.identity)
@@ -965,7 +965,7 @@ function WorkspacePaneTabTooltipLayer({ items, children, ...props }: WorkspacePa
   return (
     <DelegatedTooltipLayer
       items={items}
-      selector={WORKSPACE_PANE_VIEW_TOOLTIP_SELECTOR}
+      selector={WORKSPACE_PANE_TAB_TOOLTIP_SELECTOR}
       attributeName="data-workspace-pane-tab-tooltip-id"
       getItemId={(item) => item.identity}
       renderTooltip={(item) => <div className="truncate text-xs font-semibold text-foreground">{item.tooltip}</div>}

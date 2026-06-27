@@ -19,7 +19,7 @@ export function workspacePaneTabOrderForBranch(
   return [...(ui.workspacePaneTabOrderByBranch[branch] ?? DEFAULT_WORKSPACE_PANE_TAB_ORDER)]
 }
 
-export function workspacePaneStaticViewsForBranch(
+export function workspacePaneStaticTabsForBranch(
   ui: Pick<RepoUiState, 'workspacePaneTabOrderByBranch'>,
   branch: string | null | undefined,
 ): WorkspacePaneStaticTabType[] {
@@ -37,19 +37,19 @@ export function workspacePaneTabOrderRecordWith(
   }
 }
 
-export function workspacePaneTabOrderWithStaticView(
+export function workspacePaneTabOrderWithStaticTab(
   current: readonly WorkspacePaneTabOrderEntry[],
-  view: WorkspacePaneStaticTabType,
+  tab: WorkspacePaneStaticTabType,
 ): WorkspacePaneTabOrderEntry[] {
-  if (current.some((entry) => entry.type === view)) return normalizeWorkspacePaneTabOrder(current)
-  return normalizeWorkspacePaneTabOrder([...current, workspacePaneStaticTabOrderEntry(view)])
+  if (current.some((entry) => entry.type === tab)) return normalizeWorkspacePaneTabOrder(current)
+  return normalizeWorkspacePaneTabOrder([...current, workspacePaneStaticTabOrderEntry(tab)])
 }
 
-export function workspacePaneTabOrderWithoutStaticView(
+export function workspacePaneTabOrderWithoutStaticTab(
   current: readonly WorkspacePaneTabOrderEntry[],
-  view: WorkspacePaneStaticTabType,
+  tab: WorkspacePaneStaticTabType,
 ): WorkspacePaneTabOrderEntry[] {
-  return normalizeWorkspacePaneTabOrder(current.filter((entry) => entry.type !== view))
+  return normalizeWorkspacePaneTabOrder(current.filter((entry) => entry.type !== tab))
 }
 
 export function workspacePaneTabOrderWithTerminal(

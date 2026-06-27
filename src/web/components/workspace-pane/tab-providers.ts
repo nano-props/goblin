@@ -52,7 +52,7 @@ export interface WorkspacePaneTabCloseInput {
   branchName: string | null
   terminalKey?: string
   terminalBase?: TerminalSessionBase | null
-  closeStaticView?: (repoId: string, type: WorkspacePaneStaticTabType, branchName: string) => void
+  closeStaticTab?: (repoId: string, type: WorkspacePaneStaticTabType, branchName: string) => void
   closeTerminalByDescriptor?: (key: string, base: TerminalSessionBase) => Promise<boolean>
   closeTerminalsForWorktree?: (base: TerminalSessionBase) => Promise<boolean>
 }
@@ -120,8 +120,8 @@ export abstract class WorkspacePaneStaticTabProvider<
   }
 
   close(input: WorkspacePaneTabCloseInput): Promise<boolean> {
-    if (!input.branchName || !input.closeStaticView) return Promise.resolve(false)
-    input.closeStaticView(input.repoId, this.type, input.branchName)
+    if (!input.branchName || !input.closeStaticTab) return Promise.resolve(false)
+    input.closeStaticTab(input.repoId, this.type, input.branchName)
     return Promise.resolve(true)
   }
 }

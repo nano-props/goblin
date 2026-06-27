@@ -15,7 +15,7 @@ import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/r
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import {
-  workspacePaneStaticViewsForBranch,
+  workspacePaneStaticTabsForBranch,
   workspacePaneTabOrderForBranch,
 } from '#/web/stores/repos/workspace-pane-tabs.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
@@ -49,7 +49,7 @@ afterEach(() => {
 })
 
 describe('workspace commands', () => {
-  test('show workspace pane view command opens status as a branch static view when a worktree exists', async () => {
+  test('show workspace pane tab command opens status as a branch static tab when a worktree exists', async () => {
     seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -73,10 +73,10 @@ describe('workspace commands', () => {
 
     await expect(runShowWorkspacePaneTabCommand({ repoId: REPO_ID, tab: 'status', navigation })).resolves.toBe(true)
     expect(preferredWorkspacePaneTab()).toBe('status')
-    expect(openViewsFor('feature/worktree')).toEqual(['status'])
+    expect(openTabsFor('feature/worktree')).toEqual(['status'])
   })
 
-  test('show workspace pane view command opens history without routing through status', async () => {
+  test('show workspace pane tab command opens history without routing through status', async () => {
     seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -100,10 +100,10 @@ describe('workspace commands', () => {
 
     await expect(runShowWorkspacePaneTabCommand({ repoId: REPO_ID, tab: 'history', navigation })).resolves.toBe(true)
     expect(preferredWorkspacePaneTab()).toBe('history')
-    expect(openViewsFor('feature/worktree')).toEqual(['status', 'history'])
+    expect(openTabsFor('feature/worktree')).toEqual(['status', 'history'])
   })
 
-  test('show workspace pane view command opens changes as a workspace static tab', async () => {
+  test('show workspace pane tab command opens changes as a workspace static tab', async () => {
     seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -127,11 +127,11 @@ describe('workspace commands', () => {
 
     await expect(runShowWorkspacePaneTabCommand({ repoId: REPO_ID, tab: 'changes', navigation })).resolves.toBe(true)
     expect(preferredWorkspacePaneTab()).toBe('changes')
-    expect(openViewsFor('feature/worktree')).toEqual(['changes'])
+    expect(openTabsFor('feature/worktree')).toEqual(['changes'])
   })
 
   test.each(['status', 'changes'] as const)(
-    'show workspace pane view command refreshes status when opening %s',
+    'show workspace pane tab command refreshes status when opening %s',
     async (tab) => {
       seedRepoState({
         id: REPO_ID,
@@ -166,7 +166,7 @@ describe('workspace commands', () => {
     },
   )
 
-  test('show workspace pane view command keeps the previous view when changes has no worktree', async () => {
+  test('show workspace pane tab command keeps the previous tab when changes has no worktree', async () => {
     seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/no-worktree')],
@@ -189,10 +189,10 @@ describe('workspace commands', () => {
 
     await expect(runShowWorkspacePaneTabCommand({ repoId: REPO_ID, tab: 'changes', navigation })).resolves.toBe(false)
     expect(preferredWorkspacePaneTab()).toBe('terminal')
-    expect(openViewsFor('feature/no-worktree')).toEqual(['status'])
+    expect(openTabsFor('feature/no-worktree')).toEqual(['status'])
   })
 
-  test('show workspace pane view command opens status for a selected branch without a worktree', async () => {
+  test('show workspace pane tab command opens status for a selected branch without a worktree', async () => {
     seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/no-worktree')],
@@ -217,7 +217,7 @@ describe('workspace commands', () => {
     expect(preferredWorkspacePaneTab()).toBe('status')
   })
 
-  test('terminal primary action opens the terminal view and creates the first terminal when missing', async () => {
+  test('terminal primary action opens the terminal tab and creates the first terminal when missing', async () => {
     seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -566,7 +566,7 @@ describe('workspace commands', () => {
         closeWindow,
       }),
     ).toBe(true)
-    expect(openViewsFor('feature/worktree')).toEqual([])
+    expect(openTabsFor('feature/worktree')).toEqual([])
     // The close command no longer imperatively re-selects the adjacent tab;
     // it records the closing context in the store so the workspace pane tab
     // model can derive the spatial neighbor at read time. Navigation is
@@ -606,10 +606,10 @@ describe('workspace commands', () => {
         closeWindow,
       }),
     ).toBe(true)
-    expect(openViewsFor('feature/worktree')).toEqual(['status'])
+    expect(openTabsFor('feature/worktree')).toEqual(['status'])
     // The close command records what was closed (and the pre-close tab order)
     // so the model can derive the spatial neighbor at read time. Preferred
-    // view is unchanged — the model flips it to the neighbor via the same
+    // tab is unchanged — the model flips it to the neighbor via the same
     // derivation.
     expect(showRepoWorkspacePaneTab).not.toHaveBeenCalled()
     expect(preferredWorkspacePaneTab()).toBe('changes')
@@ -714,7 +714,7 @@ describe('workspace commands', () => {
 
     expect(closeWindow).not.toHaveBeenCalled()
     expect(preferredWorkspacePaneTab()).toBe('terminal')
-    expect(openViewsFor('feature/worktree')).toEqual(['status'])
+    expect(openTabsFor('feature/worktree')).toEqual(['status'])
   })
 
   test('close workspace tab command does not close the window while terminal sync is unresolved', async () => {
@@ -739,7 +739,7 @@ describe('workspace commands', () => {
 
     expect(closeWindow).not.toHaveBeenCalled()
     expect(preferredWorkspacePaneTab()).toBe('terminal')
-    expect(openViewsFor('feature/worktree')).toEqual(['status'])
+    expect(openTabsFor('feature/worktree')).toEqual(['status'])
   })
 
   test('close workspace tabs for worktree closes worktree-scoped tabs only', async () => {
@@ -779,7 +779,7 @@ describe('workspace commands', () => {
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     })
-    expect(openViewsFor('feature/worktree')).toEqual(['status', 'history'])
+    expect(openTabsFor('feature/worktree')).toEqual(['status', 'history'])
   })
 
   test('close workspace tabs for worktree releases pending terminal resources even without a terminal tab', async () => {
@@ -814,7 +814,7 @@ describe('workspace commands', () => {
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     })
-    expect(openViewsFor('feature/worktree')).toEqual(['status'])
+    expect(openTabsFor('feature/worktree')).toEqual(['status'])
   })
 
   test('select workspace pane tab by index follows the mixed tab strip order', () => {
@@ -924,9 +924,9 @@ function preferredWorkspacePaneTab() {
   return repo ? preferredWorkspacePaneTabForBranch(repo.ui, repo.ui.selectedBranch) : null
 }
 
-function openViewsFor(branch: string) {
+function openTabsFor(branch: string) {
   const repo = useReposStore.getState().repos[REPO_ID]
-  return repo ? workspacePaneStaticViewsForBranch(repo.ui, branch) : []
+  return repo ? workspacePaneStaticTabsForBranch(repo.ui, branch) : []
 }
 
 function tabOrderFor(branch: string): WorkspacePaneTabOrderEntry[] {

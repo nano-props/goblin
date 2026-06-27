@@ -152,7 +152,7 @@ function normalizePreferredWorkspacePaneTabByBranchByRepo(
       if (typeof paneView !== 'string' || !isWorkspacePaneSessionTabType(paneView)) continue
       if (
         isWorkspacePaneStaticTabType(paneView) &&
-        !workspacePaneStaticViews(tabOrderByRepo[safeRepoId]?.[branchName] ?? []).includes(paneView)
+        !workspacePaneStaticTabs(tabOrderByRepo[safeRepoId]?.[branchName] ?? []).includes(paneView)
       )
         continue
       byBranch[branchName] = paneView
@@ -235,7 +235,7 @@ function normalizeSession(value: unknown): WorkspaceSessionState {
   }
 }
 
-function workspacePaneStaticViews(order: readonly WorkspacePaneTabOrderEntry[]): WorkspacePaneStaticTabType[] {
+function workspacePaneStaticTabs(order: readonly WorkspacePaneTabOrderEntry[]): WorkspacePaneStaticTabType[] {
   return order.flatMap((entry) => (entry.type === 'terminal' ? [] : [entry.type]))
 }
 

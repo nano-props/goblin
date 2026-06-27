@@ -74,7 +74,7 @@ function restoredPreferredWorkspacePaneTabs(
   for (const [branch, tab] of Object.entries(preferredTabByBranch)) {
     if (!isRestorableBranchName(branch)) continue
     if (!isWorkspacePaneSessionTabType(tab)) continue
-    if (isWorkspacePaneStaticTabType(tab) && !workspacePaneStaticViews(tabOrderByBranch[branch] ?? []).includes(tab))
+    if (isWorkspacePaneStaticTabType(tab) && !workspacePaneStaticTabs(tabOrderByBranch[branch] ?? []).includes(tab))
       continue
     const current =
       next === repo.ui.preferredWorkspacePaneTabByBranch
@@ -123,6 +123,6 @@ function workspacePaneTabOrderRecordsEqual(
   })
 }
 
-function workspacePaneStaticViews(order: readonly WorkspacePaneTabOrderEntry[]): WorkspacePaneStaticTabType[] {
+function workspacePaneStaticTabs(order: readonly WorkspacePaneTabOrderEntry[]): WorkspacePaneStaticTabType[] {
   return order.flatMap((entry) => (entry.type === 'terminal' ? [] : [entry.type]))
 }

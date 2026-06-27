@@ -33,7 +33,7 @@ export function RepoWorkspaceContent({ repo, detail, workspacePaneId, workspaceP
   const compact = useIsCompactUi()
   const { branch } = detail
   const selection = workspacePaneTabModel.selection
-  const renderedView = selection?.view ?? null
+  const renderedTab = selection?.tab ?? null
   const panelLabel = workspacePanePanelLabel({
     selection,
     tabs: workspacePaneTabModel.tabs,
@@ -56,9 +56,9 @@ export function RepoWorkspaceContent({ repo, detail, workspacePaneId, workspaceP
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {renderedView
+      {renderedTab
         ? renderRepoWorkspacePanePanel({
-            type: renderedView,
+            type: renderedTab,
             repo,
             detail,
             workspacePaneId,
@@ -79,7 +79,7 @@ function workspacePanePanelLabel(input: {
   terminalSyncReady: boolean
   terminalCreatePending: boolean
 }): WorkspacePanePanelLabel {
-  const tab = input.selection?.kind === 'materialized-tab' ? input.selection.tab : null
+  const tab = input.selection?.kind === 'materialized-tab' ? input.selection.materializedTab : null
   if (tab?.kind === 'terminal') {
     const terminalTabs = input.tabs.filter((candidate) => candidate.kind === 'terminal')
     const index = terminalTabs.findIndex((candidate) => candidate.identity === tab.identity)

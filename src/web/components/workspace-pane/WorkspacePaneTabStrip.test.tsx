@@ -80,7 +80,7 @@ describe('WorkspacePaneTabStrip', () => {
     )
 
     const tab = document.body.querySelector('[data-workspace-pane-tab-tooltip-id="terminal:t1"]')
-    if (!(tab instanceof HTMLElement)) throw new Error('missing terminal view')
+    if (!(tab instanceof HTMLElement)) throw new Error('missing terminal tab')
     tab.getBoundingClientRect = () =>
       ({
         left: 12,
@@ -145,7 +145,7 @@ describe('WorkspacePaneTabStrip', () => {
     expect(closeButton?.className).not.toContain('group-hover:opacity-100')
   })
 
-  test('collapsed terminal view only navigates out on arrow keys', () => {
+  test('collapsed terminal tab only navigates out on arrow keys', () => {
     const onNavigateOut = vi.fn()
     render(
       <TestWorkspacePaneTabStrip
@@ -166,7 +166,7 @@ describe('WorkspacePaneTabStrip', () => {
     )
 
     const tab = document.body.querySelector('#workspace-workspace-pane-tab')
-    if (!(tab instanceof HTMLButtonElement)) throw new Error('missing collapsed terminal view')
+    if (!(tab instanceof HTMLButtonElement)) throw new Error('missing collapsed terminal tab')
 
     act(() => {
       tab.focus()
@@ -182,7 +182,7 @@ describe('WorkspacePaneTabStrip', () => {
     expect(tab.getAttribute('aria-setsize')).toBeNull()
   })
 
-  test('keeps all terminal views visible in a horizontal scroll area when not in compact mode', () => {
+  test('keeps all terminal tabs visible in a horizontal scroll area when not in compact mode', () => {
     render(
       <TestWorkspacePaneTabStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
@@ -235,7 +235,7 @@ describe('WorkspacePaneTabStrip', () => {
 
     const terminalTwo = document.body.querySelector('[data-workspace-pane-tab-tooltip-id="terminal:t2"]')
     const newButton = document.body.querySelector('button[aria-label="terminal.new"]')
-    if (!(terminalTwo instanceof HTMLElement)) throw new Error('missing terminal view')
+    if (!(terminalTwo instanceof HTMLElement)) throw new Error('missing terminal tab')
     if (!(newButton instanceof HTMLButtonElement)) throw new Error('missing new terminal button')
 
     expect(terminalTwo.querySelector(':scope > [data-slot="separator"][data-orientation="vertical"]')).not.toBeNull()
@@ -276,7 +276,7 @@ describe('WorkspacePaneTabStrip', () => {
     expect(tab?.querySelector('.bg-attention')).toBeNull()
   })
 
-  test('moves focus across the full terminal view strip and only navigates out at arrow-key edges', () => {
+  test('moves focus across the full terminal tab strip and only navigates out at arrow-key edges', () => {
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb: FrameRequestCallback) => {
       cb(0)
       return 0
@@ -309,7 +309,7 @@ describe('WorkspacePaneTabStrip', () => {
       !(tab2 instanceof HTMLButtonElement) ||
       !(tab3 instanceof HTMLButtonElement)
     ) {
-      throw new Error('missing terminal views')
+      throw new Error('missing terminal tabs')
     }
 
     act(() => {
@@ -338,7 +338,7 @@ describe('WorkspacePaneTabStrip', () => {
     expect(document.activeElement).toBe(tab3)
   })
 
-  test('keeps the selected terminal view semantically selected even when the panel is inactive', () => {
+  test('keeps the selected terminal tab semantically selected even when the panel is inactive', () => {
     render(
       <TestWorkspacePaneTabStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
@@ -358,7 +358,7 @@ describe('WorkspacePaneTabStrip', () => {
     const tab1 = document.body.querySelector('#workspace-workspace-pane-tab')
     const tab2 = document.body.querySelector('#workspace-workspace-pane-tab-1')
     if (!(tab1 instanceof HTMLButtonElement) || !(tab2 instanceof HTMLButtonElement)) {
-      throw new Error('missing terminal views')
+      throw new Error('missing terminal tabs')
     }
 
     expect(tab1.getAttribute('aria-selected')).toBe('true')
@@ -367,7 +367,7 @@ describe('WorkspacePaneTabStrip', () => {
     expect(tab2.tabIndex).toBe(-1)
   })
 
-  test('scrolls the view strip to the far right when a new terminal session is added', () => {
+  test('scrolls the tab strip to the far right when a new terminal session is added', () => {
     render(
       <TestWorkspacePaneTabStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
@@ -452,7 +452,7 @@ describe('WorkspacePaneTabStrip', () => {
     expect(viewport.scrollLeft).toBe(0)
   })
 
-  test('does not scroll when the view strip does not overflow horizontally', () => {
+  test('does not scroll when the tab strip does not overflow horizontally', () => {
     render(
       <TestWorkspacePaneTabStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
@@ -583,7 +583,7 @@ describe('WorkspacePaneTabStrip', () => {
     expect(viewport.scrollLeft).toBe(500)
   })
 
-  test('restores the full view strip after leaving compact mode', () => {
+  test('restores the full tab strip after leaving compact mode', () => {
     rerender(
       <TestWorkspacePaneTabStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
@@ -760,7 +760,7 @@ describe('WorkspacePaneTabStrip', () => {
       />,
     )
 
-    const pendingView = document.body.querySelector('[data-workspace-pane-pending-view="terminal"]')
+    const pendingView = document.body.querySelector('[data-workspace-pane-pending-tab="terminal"]')
     const tablist = document.body.querySelector('[role="tablist"][aria-label="workspace-pane-tabs.tabs"]')
     const tab = document.body.querySelector('[role="tab"][aria-label="terminal.opening"]')
 
@@ -792,7 +792,7 @@ describe('WorkspacePaneTabStrip', () => {
       />,
     )
 
-    const pendingView = document.body.querySelector('[data-workspace-pane-pending-view="terminal"]')
+    const pendingView = document.body.querySelector('[data-workspace-pane-pending-tab="terminal"]')
     const tabs = Array.from(document.body.querySelectorAll('[role="tab"]'))
 
     expect(pendingView).not.toBeNull()

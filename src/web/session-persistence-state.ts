@@ -37,7 +37,7 @@ export function persistedPreferredWorkspacePaneTabByBranchByRepoForSession(
       if (!isWorkspacePaneSessionTabType(tab)) continue
       if (
         isWorkspacePaneStaticTabType(tab) &&
-        !workspacePaneStaticViewsFromOrder(repo.ui.workspacePaneTabOrderByBranch[branchName] ?? []).includes(tab)
+        !workspacePaneStaticTabsFromOrder(repo.ui.workspacePaneTabOrderByBranch[branchName] ?? []).includes(tab)
       )
         continue
       byBranch[branchName] = tab
@@ -91,8 +91,6 @@ export function persistedSelectedTerminalByWorktreeForSession(
   return persisted
 }
 
-function workspacePaneStaticViewsFromOrder(
-  order: readonly WorkspacePaneTabOrderEntry[],
-): WorkspacePaneSessionTabType[] {
+function workspacePaneStaticTabsFromOrder(order: readonly WorkspacePaneTabOrderEntry[]): WorkspacePaneSessionTabType[] {
   return normalizeWorkspacePaneTabOrder(order).flatMap((entry) => (entry.type === 'terminal' ? [] : [entry.type]))
 }

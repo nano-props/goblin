@@ -6,7 +6,7 @@ import type {
 import { resolveRenderableWorkspacePaneTab } from '#/web/lib/workspace-pane-tab.ts'
 import type { TerminalSessionBase, WorkspacePaneTabSummary } from '#/web/components/terminal/types.ts'
 import {
-  PENDING_TERMINAL_WORKSPACE_PANE_VIEW_IDENTITY,
+  PENDING_TERMINAL_WORKSPACE_PANE_TAB_IDENTITY,
   isTerminalWorkspacePaneTab,
 } from '#/web/components/workspace-pane/workspace-pane-tab-summary.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
@@ -41,7 +41,7 @@ export interface RepoWorkspaceTerminalTab extends RepoWorkspaceTabBase {
 }
 
 export interface RepoWorkspacePendingTab extends RepoWorkspaceTabBase {
-  identity: typeof PENDING_TERMINAL_WORKSPACE_PANE_VIEW_IDENTITY
+  identity: typeof PENDING_TERMINAL_WORKSPACE_PANE_TAB_IDENTITY
   type: 'terminal'
   kind: 'pending'
   view: null
@@ -55,14 +55,14 @@ export type RepoWorkspaceTab = RepoWorkspaceMaterializedTab | RepoWorkspacePendi
 export type RepoWorkspaceSelection =
   | {
       kind: 'materialized-tab'
-      view: WorkspacePaneTabType
-      tab: RepoWorkspaceMaterializedTab
+      tab: WorkspacePaneTabType
+      materializedTab: RepoWorkspaceMaterializedTab
     }
   | {
       /** Render the terminal host even though no terminal tab exists yet. */
       kind: 'terminal-host'
-      view: 'terminal'
-      tab: null
+      tab: 'terminal'
+      materializedTab: null
     }
 
 export interface RepoWorkspaceTabModel {
@@ -75,15 +75,15 @@ export interface RepoWorkspaceTabModel {
   terminalSyncReady: boolean
   /** Single branch-scoped workspace pane tab strip order. */
   tabOrder: WorkspacePaneTabOrderEntry[]
-  /** Open static workspace pane views derived from tabOrder. */
-  staticViews: WorkspacePaneStaticTabType[]
+  /** Open static workspace pane tabs derived from tabOrder. */
+  staticTabs: WorkspacePaneStaticTabType[]
   /** Live terminal views owned by the terminal runtime. */
   terminalViews: WorkspacePaneTabSummary[]
   tabs: RepoWorkspaceTab[]
   /** The render target for the workspace pane body. */
   selection: RepoWorkspaceSelection | null
-  /** The selected view, when a body can be rendered. */
-  renderedView: WorkspacePaneTabType | null
+  /** The selected tab, when a body can be rendered. */
+  renderedTab: WorkspacePaneTabType | null
   /** The selected materialized tab, when one exists in the tab strip. */
   activeTab: RepoWorkspaceMaterializedTab | null
 }
@@ -92,7 +92,7 @@ export interface RepoWorkspaceTabModelInput {
   repoId: string
   branchName: string | null
   worktreePath: string | null
-  preferredView: WorkspacePaneTabType
+  preferredTab: WorkspacePaneTabType
   tabOrder: readonly WorkspacePaneTabOrderEntry[]
   runtimeTerminalViews: readonly WorkspacePaneTabSummary[]
   terminalSessionCount: number
@@ -129,18 +129,18 @@ export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): 
   const worktreeKey = worktreePath ? worktreeTerminalKey(input.repoId, worktreePath) : null
   const terminalViews = worktreeKey ? input.runtimeTerminalViews.filter(isTerminalWorkspacePaneTab) : []
   const materializedTabs = materializedWorkspacePaneTabs({ tabOrder, terminalViews, hasWorktree: !!worktreeKey })
-  const staticViews = materializedTabs.flatMap((tab) => (tab.kind === 'static' ? [tab.type] : []))
-  const candidateView = resolveRenderableWorkspacePaneTab(input.preferredView, {
+  const staticTabs = materializedTabs.flatMap((tab) => (tab.kind === 'static' ? [tab.type] : []))
+  const candidateTab = resolveRenderableWorkspacePaneTab(input.preferredTab, {
     hasWorktree: !!worktreeKey,
     terminalSessionCount: input.terminalSessionCount,
     terminalCreatePending: input.terminalCreatePending,
     terminalSyncReady: input.terminalSyncReady,
   })
-  const materializedActiveTab = candidateView
-    ? activeRepoWorkspaceTab(materializedTabs, candidateView, input.selectedTerminalKey)
+  const materializedActiveTab = candidateTab
+    ? activeRepoWorkspaceTab(materializedTabs, candidateTab, input.selectedTerminalKey)
     : null
   const selection = workspacePaneSelection(
-    candidateView,
+    candidateTab,
     materializedActiveTab,
     materializedTabs,
     input.lastClosedTabContext,
@@ -159,12 +159,12 @@ export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): 
     terminalCreatePending: input.terminalCreatePending ?? false,
     terminalSyncReady: input.terminalSyncReady,
     tabOrder,
-    staticViews,
+    staticTabs,
     terminalViews,
     tabs,
     selection,
-    renderedView: selection?.view ?? null,
-    activeTab: selection?.kind === 'materialized-tab' ? selection.tab : null,
+    renderedTab: selection?.tab ?? null,
+    activeTab: selection?.kind === 'materialized-tab' ? selection.materializedTab : null,
   }
 }
 
@@ -216,7 +216,7 @@ function terminalWorkspacePaneTab(view: TerminalWorkspacePaneTabView): RepoWorks
 
 function pendingTerminalWorkspacePaneTab(): RepoWorkspacePendingTab {
   return {
-    identity: PENDING_TERMINAL_WORKSPACE_PANE_VIEW_IDENTITY,
+    identity: PENDING_TERMINAL_WORKSPACE_PANE_TAB_IDENTITY,
     type: 'terminal',
     kind: 'pending',
     view: null,
@@ -273,7 +273,7 @@ function materializedWorkspacePaneTabs(input: {
 }
 
 function workspacePaneSelection(
-  renderableView: WorkspacePaneTabType | null,
+  renderableTab: WorkspacePaneTabType | null,
   activeTab: RepoWorkspaceMaterializedTab | null,
   materializedTabs: readonly RepoWorkspaceMaterializedTab[],
   lastClosedTabContext: {
@@ -283,7 +283,7 @@ function workspacePaneSelection(
   } | null,
 ): RepoWorkspaceSelection | null {
   // User-initiated close of the active tab: prefer the spatial neighbor in the
-  // tab strip even if the user's preferred view is still renderable through
+  // tab strip even if the user's preferred tab is still renderable through
   // another tab. Without this, closing the rightmost terminal when another
   // terminal exists would let the terminal runtime's selection jump over
   // intervening static tabs to a different terminal.
@@ -294,19 +294,19 @@ function workspacePaneSelection(
     )
     if (neighborIdentity) {
       const neighbor = materializedTabs.find((tab) => tab.identity === neighborIdentity)
-      if (neighbor) return { kind: 'materialized-tab', view: neighbor.type, tab: neighbor }
+      if (neighbor) return { kind: 'materialized-tab', tab: neighbor.type, materializedTab: neighbor }
     }
   }
-  if (activeTab) return { kind: 'materialized-tab', view: activeTab.type, tab: activeTab }
+  if (activeTab) return { kind: 'materialized-tab', tab: activeTab.type, materializedTab: activeTab }
   // Terminal-host is reserved for the "actively waiting" states — the user
-  // wants the terminal view but no terminal session exists yet, so we keep
+  // wants the terminal tab but no terminal session exists yet, so we keep
   // the new-terminal affordance reachable. A retained close context is only
-  // useful once the preferred view is unrenderable; it must not hide the host
+  // useful once the preferred tab is unrenderable; it must not hide the host
   // that pending terminal creation needs for geometry.
-  if (renderableView === 'terminal') {
-    return { kind: 'terminal-host', view: 'terminal', tab: null }
+  if (renderableTab === 'terminal') {
+    return { kind: 'terminal-host', tab: 'terminal', materializedTab: null }
   }
-  // User-initiated close of a background tab, or the preferred view became
+  // User-initiated close of a background tab, or the preferred tab became
   // unrenderable as a result of the close: prefer the spatial neighbor from
   // the pre-close tab order. Falls back to the generic tabs[0] lookup below
   // if no neighbor exists or the neighbor was removed by a subsequent action.
@@ -317,15 +317,15 @@ function workspacePaneSelection(
     )
     if (neighborIdentity) {
       const neighbor = materializedTabs.find((tab) => tab.identity === neighborIdentity)
-      if (neighbor) return { kind: 'materialized-tab', view: neighbor.type, tab: neighbor }
+      if (neighbor) return { kind: 'materialized-tab', tab: neighbor.type, materializedTab: neighbor }
     }
   }
-  // Generic fallback: the preferred view is unrenderable (no backing tab)
+  // Generic fallback: the preferred tab is unrenderable (no backing tab)
   // and either no user-initiated close was recorded, or the neighbor lookup
   // failed. Surface the first materialized tab so the user does not land on
   // the empty pane.
   const firstTab = materializedTabs[0]
-  if (firstTab) return { kind: 'materialized-tab', view: firstTab.type, tab: firstTab }
+  if (firstTab) return { kind: 'materialized-tab', tab: firstTab.type, materializedTab: firstTab }
   return null
 }
 
@@ -343,15 +343,15 @@ function adjacentIdentityAfterClose(identities: readonly string[], closingIdenti
 
 function activeRepoWorkspaceTab(
   tabs: readonly RepoWorkspaceMaterializedTab[],
-  renderableView: WorkspacePaneTabType,
+  renderableTab: WorkspacePaneTabType,
   selectedTerminalKey: string | null,
 ): RepoWorkspaceMaterializedTab | null {
-  if (renderableView === 'terminal') {
+  if (renderableTab === 'terminal') {
     if (selectedTerminalKey) {
       const selected = tabs.find((tab) => tab.kind === 'terminal' && tab.key === selectedTerminalKey)
       if (selected) return selected
     }
     return tabs.find((tab) => tab.kind === 'terminal') ?? null
   }
-  return tabs.find((tab) => tab.type === renderableView) ?? null
+  return tabs.find((tab) => tab.type === renderableTab) ?? null
 }

@@ -58,8 +58,8 @@ export function isWorkspacePaneWorktreeStaticTabType(
   return typeof value === 'string' && (WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES as readonly string[]).includes(value)
 }
 
-export function workspacePaneStaticTabScope(view: WorkspacePaneStaticTabType): WorkspacePaneTabScope {
-  return WORKSPACE_PANE_STATIC_TAB_SCOPES[view]
+export function workspacePaneStaticTabScope(tab: WorkspacePaneStaticTabType): WorkspacePaneTabScope {
+  return WORKSPACE_PANE_STATIC_TAB_SCOPES[tab]
 }
 
 export function workspacePaneTabScope(view: WorkspacePaneTabType): WorkspacePaneTabScope {

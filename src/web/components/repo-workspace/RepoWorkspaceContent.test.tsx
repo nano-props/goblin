@@ -454,9 +454,9 @@ describe('RepoWorkspaceContent', () => {
       )
     })
 
-    // The user's preferred view (terminal) is unrenderable without a
+    // The user's preferred tab (terminal) is unrenderable without a
     // worktree. The model falls back to the first materialized tab (status)
-    // so the user lands on a real view instead of the empty pane.
+    // so the user lands on a real tab instead of the empty pane.
     expect(container?.querySelector('#workspace-status-panel')).not.toBeNull()
     expect(container?.querySelector('#workspace-terminal-panel')).toBeNull()
     expect(container?.textContent).not.toContain('workspace-pane-tabs.empty')
@@ -485,7 +485,7 @@ describe('RepoWorkspaceContent', () => {
     })
 
     // Sync is ready, the worktree has no terminal sessions, and the user
-    // preferred terminal — the preferred view is unrenderable. The model
+    // preferred terminal — the preferred tab is unrenderable. The model
     // falls back to the first materialized tab (status) at read time so
     // the user does not land on the empty pane.
     expect(container?.querySelector('#workspace-status-panel')).not.toBeNull()
@@ -688,11 +688,11 @@ describe('RepoWorkspaceContent', () => {
     await flushAsyncWork()
 
     // The selected branch (feature/b) has no explicit tab order, so it
-    // falls back to the default [status]. The user's preferred view
+    // falls back to the default [status]. The user's preferred tab
     // (history) is not in the materialized tab list. The model falls
     // back to the first materialized tab (status) so the user does not
     // land on the empty pane. The store keeps the original preferred
-    // view (history) so opening history later returns to it.
+    // tab (history) so opening history later returns to it.
     expect(container?.querySelector('#workspace-status-panel')).not.toBeNull()
     expect(container?.querySelector('#workspace-history-panel')).toBeNull()
     expect(container?.textContent).not.toContain('workspace-pane-tabs.empty')
