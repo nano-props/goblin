@@ -51,7 +51,7 @@ function testBridge(overrides: Partial<ClientBridge> = {}): ClientBridge {
     onEffectIntent: () => () => {},
     pathForFile: () => '',
     saveClipboardFiles: () => Promise.resolve([]),
-    shell: () => null,
+    host: () => null,
     terminal: (() => {
       throw new Error('unused terminal bridge')
     }) as never,

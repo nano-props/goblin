@@ -8,11 +8,11 @@ import { DEFAULT_COLOR_THEME } from '#/shared/color-theme.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
 import { externalAppsQueryKey, settingsSnapshotQueryKey } from '#/web/settings-queries.ts'
-import { useRuntimeExternalAppSettings } from '#/web/runtime-settings-external-apps.ts'
-import { useRuntimeFetchSettings } from '#/web/runtime-settings-fetch.ts'
-import { useRuntimeLanSettings } from '#/web/runtime-settings-lan.ts'
+import { useExternalAppSettings } from '#/web/runtime-settings-external-apps.ts'
+import { useFetchSettings } from '#/web/runtime-settings-fetch.ts'
+import { useLanSettings } from '#/web/runtime-settings-lan.ts'
 import { useRuntimeRecentRepos } from '#/web/settings-read-projection.ts'
-import { useRuntimeShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
+import { useShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
 
@@ -67,17 +67,17 @@ describe('runtime settings hooks', () => {
     )
     let result:
       | {
-          fetch: ReturnType<typeof useRuntimeFetchSettings>
-          shortcuts: ReturnType<typeof useRuntimeShortcutSettings>
-          lan: ReturnType<typeof useRuntimeLanSettings>
+          fetch: ReturnType<typeof useFetchSettings>
+          shortcuts: ReturnType<typeof useShortcutSettings>
+          lan: ReturnType<typeof useLanSettings>
         }
       | undefined
 
     function HookHost() {
       result = {
-        fetch: useRuntimeFetchSettings(),
-        shortcuts: useRuntimeShortcutSettings(),
-        lan: useRuntimeLanSettings(),
+        fetch: useFetchSettings(),
+        shortcuts: useShortcutSettings(),
+        lan: useLanSettings(),
       }
       return null
     }
@@ -114,10 +114,10 @@ describe('runtime settings hooks', () => {
         detectedAt: 1,
       },
     })
-    let result: ReturnType<typeof useRuntimeExternalAppSettings> | undefined
+    let result: ReturnType<typeof useExternalAppSettings> | undefined
 
     function HookHost() {
-      result = useRuntimeExternalAppSettings()
+      result = useExternalAppSettings()
       return null
     }
 

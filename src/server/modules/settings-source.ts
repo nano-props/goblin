@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { toSafeRepoLocator, toSafeSessionRepoEntry } from '#/shared/input-validation.ts'
 import { serverDataFile } from '#/shared/data-dir.ts'
-import type { LangPref, SessionState, SettingsPrefs, ThemePref } from '#/shared/api-types.ts'
+import type { LangPref, WorkspaceSessionState, UserSettings, ThemePref } from '#/shared/api-types.ts'
 import { DEFAULT_ZEN_MODE, normalizeWorkspacePaneSize } from '#/shared/workspace-layout.ts'
 import { repoSessionEntryId, type RepoSessionEntry } from '#/shared/remote-repo.ts'
 import {
@@ -11,11 +11,11 @@ import {
   type WorktreeBootstrapTrust,
 } from '#/shared/repo-settings.ts'
 import {
-  isWorkspacePaneSessionViewType,
-  isWorkspacePaneStaticViewType,
+  isWorkspacePaneSessionTabType,
+  isWorkspacePaneStaticTabType,
   isWorkspacePaneTabOrderEntry,
-  type WorkspacePaneSessionView,
-  type WorkspacePaneStaticViewType,
+  type WorkspacePaneSessionTabType,
+  type WorkspacePaneStaticTabType,
   type WorkspacePaneTabOrderEntry,
   workspacePaneStaticTabOrderEntry,
 } from '#/shared/workspace-pane.ts'
@@ -46,12 +46,12 @@ interface ServerSettingsData {
   globalShortcutDisabled: boolean
   globalShortcut: string
   lanEnabled: boolean
-  session: SessionState
+  session: WorkspaceSessionState
   recentRepos: RepoSessionEntry[]
   repoSettings: RepoSettingsEntry[]
 }
 
-export type ServerSettingsPrefsPatch = Partial<SettingsPrefs>
+export type UserSettingsPatch = Partial<UserSettings>
 
 let cachedFetchIntervalSec = DEFAULT_FETCH_INTERVAL_SEC
 let settingsPromise: Promise<ServerSettingsData> | null = null
@@ -85,7 +85,7 @@ function normalizeLanEnabled(value: unknown): boolean {
   return value === true
 }
 
-function settingsPrefsFromData(data: ServerSettingsData): SettingsPrefs {
+function settingsPrefsFromData(data: ServerSettingsData): UserSettings {
   return {
     lang: data.lang,
     theme: data.theme,
@@ -111,7 +111,7 @@ function dedupeRepoEntries(entries: RepoSessionEntry[]): RepoSessionEntry[] {
   return normalized
 }
 
-function defaultSession(): SessionState {
+function defaultSession(): WorkspaceSessionState {
   return defaultSessionState()
 }
 
@@ -132,10 +132,10 @@ function normalizePreferredWorkspacePaneViewByBranchByRepo(
   value: unknown,
   openRepos: RepoSessionEntry[],
   tabOrderByRepo: Record<string, Record<string, WorkspacePaneTabOrderEntry[]>>,
-): Record<string, Record<string, WorkspacePaneSessionView>> {
+): Record<string, Record<string, WorkspacePaneSessionTabType>> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
   const openRepoIds = new Set(openRepos.map(repoSessionEntryId))
-  const normalized: Record<string, Record<string, WorkspacePaneSessionView>> = {}
+  const normalized: Record<string, Record<string, WorkspacePaneSessionTabType>> = {}
   for (const [repoId, rawByBranch] of Object.entries(value)) {
     const safeRepoId = toSafeRepoLocator(repoId)
     if (
@@ -146,12 +146,12 @@ function normalizePreferredWorkspacePaneViewByBranchByRepo(
       Array.isArray(rawByBranch)
     )
       continue
-    const byBranch: Record<string, WorkspacePaneSessionView> = {}
+    const byBranch: Record<string, WorkspacePaneSessionTabType> = {}
     for (const [branchName, paneView] of Object.entries(rawByBranch)) {
       if (!branchName || branchName.includes('\0')) continue
-      if (typeof paneView !== 'string' || !isWorkspacePaneSessionViewType(paneView)) continue
+      if (typeof paneView !== 'string' || !isWorkspacePaneSessionTabType(paneView)) continue
       if (
-        isWorkspacePaneStaticViewType(paneView) &&
+        isWorkspacePaneStaticTabType(paneView) &&
         !workspacePaneStaticViews(tabOrderByRepo[safeRepoId]?.[branchName] ?? []).includes(paneView)
       )
         continue
@@ -202,9 +202,9 @@ function normalizeWorkspacePaneTabOrderByBranchByRepo(
   return normalized
 }
 
-function normalizeSession(value: unknown): SessionState {
+function normalizeSession(value: unknown): WorkspaceSessionState {
   if (!value || typeof value !== 'object') return defaultSession()
-  const partial = value as Partial<SessionState>
+  const partial = value as Partial<WorkspaceSessionState>
   const openRepos = Array.isArray(partial.openRepos)
     ? dedupeRepoEntries(
         partial.openRepos.map(toSafeSessionRepoEntry).filter((entry): entry is RepoSessionEntry => entry !== null),
@@ -218,8 +218,7 @@ function normalizeSession(value: unknown): SessionState {
   return {
     openRepos,
     activeRepo: activeRepo && openRepos.some((entry) => repoSessionEntryId(entry) === activeRepo) ? activeRepo : null,
-    zenMode:
-      typeof partial.zenMode === 'boolean' ? partial.zenMode : DEFAULT_ZEN_MODE,
+    zenMode: typeof partial.zenMode === 'boolean' ? partial.zenMode : DEFAULT_ZEN_MODE,
     workspacePaneSize: normalizeWorkspacePaneSize(partial.workspacePaneSize),
     selectedTerminalByWorktree: normalizeSelectedTerminalByWorktree(partial.selectedTerminalByWorktree),
     preferredWorkspacePaneViewByBranchByRepo: normalizePreferredWorkspacePaneViewByBranchByRepo(
@@ -231,7 +230,7 @@ function normalizeSession(value: unknown): SessionState {
   }
 }
 
-function workspacePaneStaticViews(order: readonly WorkspacePaneTabOrderEntry[]): WorkspacePaneStaticViewType[] {
+function workspacePaneStaticViews(order: readonly WorkspacePaneTabOrderEntry[]): WorkspacePaneStaticTabType[] {
   return order.flatMap((entry) => (entry.type === 'terminal' ? [] : [entry.type]))
 }
 
@@ -335,7 +334,7 @@ export async function getServerFetchIntervalSec(): Promise<number> {
   return cachedFetchIntervalSec
 }
 
-export async function getServerSettingsPrefs(): Promise<SettingsPrefs> {
+export async function getServerSettingsPrefs(): Promise<UserSettings> {
   return settingsPrefsFromData(await loadServerSettings())
 }
 
@@ -358,7 +357,7 @@ export async function setServerFetchIntervalSec(sec: number): Promise<number> {
   return next
 }
 
-export async function updateServerSettingsPrefs(patch: ServerSettingsPrefsPatch): Promise<SettingsPrefs> {
+export async function updateServerSettingsPrefs(patch: UserSettingsPatch): Promise<UserSettings> {
   const data = await loadServerSettings()
   const nextLang = patch.lang === undefined ? data.lang : normalizeLangPref(patch.lang)
   const nextTheme = patch.theme === undefined ? data.theme : normalizeThemePref(patch.theme)
@@ -403,11 +402,11 @@ export async function updateServerSettingsPrefs(patch: ServerSettingsPrefsPatch)
   return settingsPrefsFromData(data)
 }
 
-export async function getServerSessionState(): Promise<SessionState> {
+export async function getServerSessionState(): Promise<WorkspaceSessionState> {
   return (await loadServerSettings()).session
 }
 
-export async function setServerSessionState(session: SessionState): Promise<SessionState> {
+export async function setServerSessionState(session: WorkspaceSessionState): Promise<WorkspaceSessionState> {
   const data = await loadServerSettings()
   const next = normalizeSession(session)
   data.session = next

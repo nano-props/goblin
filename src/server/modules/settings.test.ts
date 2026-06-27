@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { defaultSessionState } from '#/shared/settings-defaults.ts'
-import { createServerSettingsState } from '#/server/modules/settings-state.ts'
+import { createNativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
 
 const mocks = vi.hoisted(() => ({
   getServerSettingsPrefs: vi.fn(),
@@ -38,7 +38,7 @@ describe('server settings snapshot runtime state', () => {
     mocks.getServerRecentRepos.mockResolvedValue([])
     mocks.getServerRepoSettings.mockResolvedValue([])
 
-    const state = createServerSettingsState()
+    const state = createNativeShortcutRegistrationState()
     state.globalShortcutRegistered = true
 
     const snapshotMod = await import('#/server/modules/settings-snapshot.ts')

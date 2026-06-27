@@ -10,9 +10,9 @@ import type {
   LangPref,
   LanInfo,
   RuntimeRecentReposState,
-  SessionState,
-  SettingsPrefs,
-  SettingsPrefsUpdateResponse,
+  WorkspaceSessionState,
+  UserSettings,
+  UserSettingsUpdateResponse,
   SettingsSnapshot,
   ThemePref,
   ThemeState,
@@ -21,7 +21,7 @@ import type { ColorTheme } from '#/shared/color-theme.ts'
 import {
   nativeSettingsProjectionStateFromSettings,
   pickNativeSettingsProjectionPatch,
-} from '#/shared/native-shell-projection.ts'
+} from '#/shared/native-host-projection.ts'
 import { runtimeSettingsSnapshotFromSettingsSnapshot } from '#/shared/settings-snapshot.ts'
 
 type RecentReposUpdateResponse = { ok: boolean; addedRepo?: RepoSessionEntry | null } & RuntimeRecentReposState
@@ -31,7 +31,7 @@ export async function getSettingsSnapshot(): Promise<SettingsSnapshot> {
   return await fetchServerJson<SettingsSnapshot>('/api/settings')
 }
 
-function resolveThemeStateFromPrefs(settings: Pick<SettingsPrefs, 'theme' | 'colorTheme'>): ThemeState {
+function resolveThemeStateFromPrefs(settings: Pick<UserSettings, 'theme' | 'colorTheme'>): ThemeState {
   const resolved =
     settings.theme === 'auto'
       ? window.matchMedia?.('(prefers-color-scheme: dark)').matches
@@ -41,7 +41,7 @@ function resolveThemeStateFromPrefs(settings: Pick<SettingsPrefs, 'theme' | 'col
   return { pref: settings.theme, resolved, colorTheme: settings.colorTheme }
 }
 
-export function resolveThemeStateFromSettings(settings: Pick<SettingsPrefs, 'theme' | 'colorTheme'>): ThemeState {
+export function resolveThemeStateFromSettings(settings: Pick<UserSettings, 'theme' | 'colorTheme'>): ThemeState {
   return resolveThemeStateFromPrefs(settings)
 }
 
@@ -49,12 +49,12 @@ export async function getThemeState(): Promise<ThemeState> {
   return resolveThemeStateFromSettings(runtimeSettingsSnapshotFromSettingsSnapshot(await getSettingsSnapshot()))
 }
 
-async function updateSettingsPrefsPatch(settings: Record<string, unknown>): Promise<SettingsPrefsUpdateResponse> {
-  const result = await postServerJson<{ settings: Record<string, unknown> }, SettingsPrefsUpdateResponse>(
+async function updateSettingsPrefsPatch(settings: Record<string, unknown>): Promise<UserSettingsUpdateResponse> {
+  const result = await postServerJson<{ prefs: Record<string, unknown> }, UserSettingsUpdateResponse>(
     '/api/settings/prefs',
-    { settings },
+    { prefs: settings },
   )
-  const patch = pickNativeSettingsProjectionPatch(settings as Partial<SettingsPrefs>)
+  const patch = pickNativeSettingsProjectionPatch(settings as Partial<UserSettings>)
   if (!patch || !canUseNativeIpcBridge()) return result
   // The embedded server is the authority for settings — the
   // client just mirrors them to the native menu. A projection
@@ -172,11 +172,11 @@ export async function clearRecentRepos(): Promise<void> {
   }
 }
 
-export async function saveSession(session: SessionState): Promise<SessionState> {
-  const result = await postServerJson<{ session: SessionState }, { ok: boolean; session: SessionState }>(
-    '/api/settings/session',
-    { session },
-  )
+export async function saveSession(session: WorkspaceSessionState): Promise<WorkspaceSessionState> {
+  const result = await postServerJson<
+    { session: WorkspaceSessionState },
+    { ok: boolean; session: WorkspaceSessionState }
+  >('/api/settings/session', { session })
   return result.session
 }
 

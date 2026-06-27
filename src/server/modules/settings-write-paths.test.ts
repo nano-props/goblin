@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import type { SessionState } from '#/shared/api-types.ts'
+import type { WorkspaceSessionState } from '#/shared/api-types.ts'
 import { resolveI18nSnapshot } from '#/shared/i18n/snapshot.ts'
 
 const mocks = vi.hoisted(() => ({
@@ -34,7 +34,7 @@ vi.mock('#/shared/server-invalidation.ts', async () => {
   }
 })
 
-describe('settings write paths', () => {
+describe('settings command handlers', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
@@ -54,11 +54,11 @@ describe('settings write paths', () => {
     const i18nSnapshot = resolveI18nSnapshot('ja', 'ja-JP,ja;q=0.9,en;q=0.8')
     mocks.updateServerSettingsPrefs.mockResolvedValue(updatedSettings)
     mocks.settingsInvalidationScopesForPrefsPatch.mockReturnValue(['i18n'])
-    const { applyServerSettingsPrefsWrite } = await import('#/server/modules/settings-write-paths.ts')
+    const { handleUpdateUserSettings } = await import('#/server/modules/settings-write-paths.ts')
 
     await expect(
-      applyServerSettingsPrefsWrite(
-        { settings: { lang: 'ja' } },
+      handleUpdateUserSettings(
+        { prefs: { lang: 'ja' } },
         { acceptLanguage: 'ja-JP,ja;q=0.9,en;q=0.8', signal: new AbortController().signal },
       ),
     ).resolves.toEqual({
@@ -70,7 +70,7 @@ describe('settings write paths', () => {
   })
 
   test('persists session state without publishing settings invalidation', async () => {
-    const session: SessionState = {
+    const session: WorkspaceSessionState = {
       openRepos: [],
       activeRepo: null,
       zenMode: true,
@@ -79,10 +79,10 @@ describe('settings write paths', () => {
       workspacePaneTabOrderByBranchByRepo: {},
     }
     mocks.setServerSessionState.mockResolvedValue(session)
-    mocks.setServerSessionState.mockResolvedValue(session as SessionState)
-    const { applyServerSessionWrite } = await import('#/server/modules/settings-write-paths.ts')
+    mocks.setServerSessionState.mockResolvedValue(session as WorkspaceSessionState)
+    const { handleSetSession } = await import('#/server/modules/settings-write-paths.ts')
 
-    await expect(applyServerSessionWrite({ session })).resolves.toEqual({
+    await expect(handleSetSession({ session })).resolves.toEqual({
       ok: true,
       session,
     })
@@ -93,9 +93,9 @@ describe('settings write paths', () => {
   test('adds recent repos and publishes settings snapshot invalidation', async () => {
     const repo = { kind: 'local', id: '/tmp/repo-a' } as const
     mocks.addServerRecentRepo.mockResolvedValue([repo])
-    const { applyServerRecentRepoAddWrite } = await import('#/server/modules/settings-write-paths.ts')
+    const { handleAddRecentRepo } = await import('#/server/modules/settings-write-paths.ts')
 
-    await expect(applyServerRecentRepoAddWrite({ repo })).resolves.toEqual({
+    await expect(handleAddRecentRepo({ repo })).resolves.toEqual({
       ok: true,
       recentRepos: [repo],
       addedRepo: repo,

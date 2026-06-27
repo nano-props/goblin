@@ -3,39 +3,36 @@ import {
   readRuntimeShortcutSettings,
   useRuntimeSettingsSnapshot,
 } from '#/web/settings-read-projection.ts'
-import { runSettingsControllerAction } from '#/web/settings-write-paths.ts'
 import {
-  setGlobalShortcutDisabledPreference,
-  setGlobalShortcutPreference,
-  setShortcutsDisabledPreference,
-} from '#/web/settings-write-paths.ts'
+  runSettingsAction,
+  setGlobalShortcut,
+  setGlobalShortcutDisabled,
+  setShortcutsDisabled,
+} from '#/web/settings-actions.ts'
 import type { GlobalShortcutState } from '#/shared/api-types.ts'
 
 export function getRuntimeShortcutSettings() {
   return readRuntimeShortcutSettings(currentRuntimeSettingsSnapshot())
 }
 
-export function useRuntimeShortcutSettings() {
+export function useShortcutSettings() {
   return readRuntimeShortcutSettings(useRuntimeSettingsSnapshot())
 }
 
 export function useShortcutSettingsController() {
   return {
     async setShortcutsDisabled(disabled: boolean): Promise<void> {
-      await runSettingsControllerAction('shortcuts update', async () => {
-        await setShortcutsDisabledPreference(disabled)
+      await runSettingsAction('shortcuts update', async () => {
+        await setShortcutsDisabled(disabled)
       })
     },
     async setGlobalShortcutDisabled(disabled: boolean): Promise<void> {
-      await runSettingsControllerAction('global shortcut disabled update', async () => {
-        await setGlobalShortcutDisabledPreference(disabled)
+      await runSettingsAction('global shortcut disabled update', async () => {
+        await setGlobalShortcutDisabled(disabled)
       })
     },
     async setGlobalShortcut(accelerator: string): Promise<GlobalShortcutState | null> {
-      return await runSettingsControllerAction(
-        'global shortcut update',
-        async () => await setGlobalShortcutPreference(accelerator),
-      )
+      return await runSettingsAction('global shortcut update', async () => await setGlobalShortcut(accelerator))
     },
   }
 }

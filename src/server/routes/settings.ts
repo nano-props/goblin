@@ -3,14 +3,14 @@ import { getServerGitHubCliState } from '#/server/modules/github-cli.ts'
 import { getServerI18nSnapshot } from '#/server/modules/i18n.ts'
 import { getSettingsSnapshot } from '#/server/modules/settings-snapshot.ts'
 import { getServerSettingsPrefs } from '#/server/modules/settings-source.ts'
-import type { ServerSettingsState } from '#/server/modules/settings-state.ts'
+import type { NativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
 import {
-  applyServerFetchIntervalWrite,
-  applyServerGlobalShortcutRegistrationWrite,
-  applyServerRecentRepoAddWrite,
-  applyServerRecentRepoClearWrite,
-  applyServerSessionWrite,
-  applyServerSettingsPrefsWrite,
+  handleSetFetchInterval,
+  handleSetGlobalShortcutRegistered,
+  handleAddRecentRepo,
+  handleClearRecentRepos,
+  handleSetSession,
+  handleUpdateUserSettings,
 } from '#/server/modules/settings-write-paths.ts'
 import { getLanUrls, isLanAddress } from '#/shared/lan-addresses.ts'
 import type { LanInfo } from '#/shared/api-types.ts'
@@ -21,7 +21,7 @@ import {
   SETTINGS_PROCEDURE_SCHEMAS,
 } from '#/shared/procedure-schemas.ts'
 
-export function createSettingsRoutes(settingsState: ServerSettingsState) {
+export function createSettingsRoutes(settingsState: NativeShortcutRegistrationState) {
   const app = createRouteApp()
   app.get('/', async (c) => c.json(await getSettingsSnapshot(settingsState)))
   app.post('/github-cli', async (c) => {
@@ -43,13 +43,13 @@ export function createSettingsRoutes(settingsState: ServerSettingsState) {
   })
   app.post('/fetch-interval', async (c) => {
     const { sec } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.fetchInterval, c)
-    return c.json(await applyServerFetchIntervalWrite({ sec }))
+    return c.json(await handleSetFetchInterval({ sec }))
   })
   app.post('/prefs', async (c) => {
-    const { settings } = await parseHttpBody(SETTINGS_PATCH_SCHEMAS.prefs, c)
+    const { prefs } = await parseHttpBody(SETTINGS_PATCH_SCHEMAS.prefs, c)
     return c.json(
-      await applyServerSettingsPrefsWrite(
-        { settings },
+      await handleUpdateUserSettings(
+        { prefs },
         {
           acceptLanguage: c.req.header('accept-language'),
           signal: c.req.raw.signal,
@@ -59,16 +59,16 @@ export function createSettingsRoutes(settingsState: ServerSettingsState) {
   })
   app.post('/global-shortcut-state', async (c) => {
     const { registered } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.globalShortcutState, c)
-    return c.json(applyServerGlobalShortcutRegistrationWrite({ registered }, settingsState))
+    return c.json(handleSetGlobalShortcutRegistered({ registered }, settingsState))
   })
   app.post('/session', async (c) => {
     const { session } = await parseHttpBody(SETTINGS_PATCH_SCHEMAS.session, c)
-    return c.json(await applyServerSessionWrite({ session }))
+    return c.json(await handleSetSession({ session }))
   })
   app.post('/recent-repos/add', async (c) => {
     const { repo } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.recentReposAdd, c)
-    return c.json(await applyServerRecentRepoAddWrite({ repo }))
+    return c.json(await handleAddRecentRepo({ repo }))
   })
-  app.post('/recent-repos/clear', async (c) => c.json(await applyServerRecentRepoClearWrite()))
+  app.post('/recent-repos/clear', async (c) => c.json(await handleClearRecentRepos()))
   return app
 }
