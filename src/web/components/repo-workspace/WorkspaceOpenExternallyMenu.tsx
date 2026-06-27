@@ -1,4 +1,4 @@
-import { ChevronDown, ExternalLink, Loader2 } from 'lucide-react'
+import { ChevronDown, Loader2 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { RepoBranchState } from '#/web/stores/repos/types.ts'
 import { useT } from '#/web/stores/i18n.ts'
@@ -7,7 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '#/web/components/ui/pop
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import type { BranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
-import { useRemoteOpenAction } from '#/web/hooks/useRemoteOpenAction.ts'
+import { useRemoteOpenAction, type RemoteOpenActionItem } from '#/web/hooks/useRemoteOpenAction.ts'
 import { useExternalAppSettings } from '#/web/runtime-settings-external-apps.ts'
 import { remoteRepoTarget } from '#/web/stores/repos/repo-guards.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
@@ -69,9 +69,8 @@ export function WorkspaceOpenExternallyMenu({ repo, branch, branchActions }: Pro
 
   const busy = pending !== null || blocked
   const menuLabel = t('workspace.open-externally.open')
-  const hasPrimary = primaryItem !== null
 
-  function runItem(item: WorkspaceExternalAppItem) {
+  function runLocalItem(item: WorkspaceExternalAppItem) {
     if (busy) return
     setOpen(false)
     setRecentItemId(item.id)
@@ -89,8 +88,23 @@ export function WorkspaceOpenExternallyMenu({ repo, branch, branchActions }: Pro
     remoteOpenAction.onSelect()
   }
 
-  const PrimaryIcon = primaryItem?.Icon ?? ExternalLink
-  const primaryLabel = primaryItem ? t(primaryItem.labelKey) : menuLabel
+  const primaryAction = primaryItem
+    ? {
+        title: t(primaryItem.labelKey),
+        ariaLabel: t(primaryItem.labelKey),
+        busy: pending === primaryItem.id,
+        disabled: busy,
+        icon: <primaryItem.Icon />,
+        onSelect: () => runLocalItem(primaryItem),
+      }
+    : {
+        title: remoteOpenAction.title,
+        ariaLabel: remoteOpenAction.ariaLabel,
+        busy: remoteOpenAction.busy,
+        disabled: busy || remoteOpenAction.busy || remoteOpenAction.disabled,
+        icon: remoteOpenAction.icon,
+        onSelect: runRemoteItem,
+      }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -99,20 +113,7 @@ export function WorkspaceOpenExternallyMenu({ repo, branch, branchActions }: Pro
         onClick={(e) => e.stopPropagation()}
         onDoubleClick={(e) => e.stopPropagation()}
       >
-        <button
-          type="button"
-          className={cn(
-            'flex h-full w-8 cursor-pointer items-center justify-center outline-none transition-colors duration-100 hover:bg-control-hover disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0',
-            focusRing,
-          )}
-          title={primaryLabel}
-          aria-label={primaryLabel}
-          aria-busy={busy ? true : undefined}
-          disabled={busy || !hasPrimary}
-          onClick={() => hasPrimary && runItem(primaryItem)}
-        >
-          {primaryItem && pending === primaryItem.id ? <Loader2 className="animate-spin" /> : <PrimaryIcon />}
-        </button>
+        <PrimaryButton action={primaryAction} />
         <PopoverTrigger asChild>
           <button
             type="button"
@@ -141,25 +142,65 @@ export function WorkspaceOpenExternallyMenu({ repo, branch, branchActions }: Pro
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="space-y-0.5 p-1" role="list">
-          {localItems.map((item) => (
-            <div key={item.id} role="listitem">
-              <WorkspaceOpenExternallyItem
-                item={item}
-                pending={pending}
-                selected={item.id === primaryItem?.id}
-                onSelect={() => runItem(item)}
-              />
+        <div role="list">
+          {localItems.length > 0 && (
+            <div className="space-y-0.5 p-1">
+              {localItems.map((item) => (
+                <div key={item.id} role="listitem">
+                  <WorkspaceOpenExternallyItem
+                    item={item}
+                    pending={pending}
+                    selected={item.id === primaryItem?.id}
+                    onSelect={() => runLocalItem(item)}
+                  />
+                </div>
+              ))}
             </div>
-          ))}
+          )}
+          {remoteOpenAction.visible && localItems.length > 0 && (
+            <div aria-hidden="true" className="border-t border-separator" />
+          )}
           {remoteOpenAction.visible && (
-            <div key={remoteOpenAction.id} role="listitem">
-              <WorkspaceOpenExternallyRemoteItem action={remoteOpenAction} pending={pending} onSelect={runRemoteItem} />
+            <div className="space-y-0.5 p-1" key={remoteOpenAction.id}>
+              <div role="listitem">
+                <WorkspaceOpenExternallyRemoteItem action={remoteOpenAction} pending={pending} onSelect={runRemoteItem} />
+              </div>
             </div>
           )}
         </div>
       </PopoverContent>
     </Popover>
+  )
+}
+
+function PrimaryButton({
+  action,
+}: {
+  action: {
+    title: string
+    ariaLabel: string
+    busy: boolean
+    disabled: boolean
+    icon: React.ReactNode
+    onSelect: () => void
+  }
+}) {
+  return (
+    <button
+      type="button"
+      data-testid="workspace-open-externally-menu-primary"
+      className={cn(
+        'flex h-full w-8 cursor-pointer items-center justify-center outline-none transition-colors duration-100 hover:bg-control-hover disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0',
+        focusRing,
+      )}
+      title={action.title}
+      aria-label={action.ariaLabel}
+      aria-busy={action.busy ? true : undefined}
+      disabled={action.disabled}
+      onClick={action.onSelect}
+    >
+      {action.busy ? <Loader2 className="animate-spin" /> : action.icon}
+    </button>
   )
 }
 
@@ -200,7 +241,7 @@ function WorkspaceOpenExternallyRemoteItem({
   pending,
   onSelect,
 }: {
-  action: ReturnType<typeof useRemoteOpenAction>
+  action: RemoteOpenActionItem
   pending: string | null
   onSelect: () => void
 }) {

@@ -333,6 +333,16 @@ describe('RepoWorkspaceToolbar', () => {
       remote: { hasBrowserRemote: true, browserRemoteProvider: 'github' },
     })
 
+    // The split-button primary now falls back to the remote action when no
+    // local app is reachable, so the left button is enabled and labelled as
+    // the remote item rather than disabled.
+    const primary = c.querySelector<HTMLButtonElement>('[data-testid="workspace-open-externally-menu-primary"]')
+    expect(primary).not.toBeNull()
+    expect(primary?.disabled).toBe(false)
+    expect(primary?.getAttribute('aria-label')).toBe('workspace.open-externally.remote')
+    expect(primary?.getAttribute('aria-busy')).toBeNull()
+    // The right-hand chevron trigger stays the same so the user can still
+    // open the dropdown.
     const trigger = c.querySelector<HTMLButtonElement>('[data-testid="workspace-open-externally-menu-trigger"]')
     expect(trigger).not.toBeNull()
 
