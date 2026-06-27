@@ -13,8 +13,8 @@ import {
   type WorkspacePaneTabOrderEntry,
   type WorkspacePaneView,
 } from '#/shared/workspace-pane.ts'
+import { formatWorktreeKey } from '#/shared/terminal-slot-key.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
 import {
   normalizeWorkspacePaneTabOrder,
   workspacePaneStaticViewsForBranch,
@@ -240,7 +240,7 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
         const currentOrder = workspacePaneTabOrderForBranch(repo.ui, branch)
         const nextOrder = workspacePaneTabOrderWithTerminal(currentOrder, terminalKey)
         const currentView = preferredWorkspacePaneViewForBranch(repo.ui, branch)
-        const wtKey = worktreeTerminalKey(id, worktreePath)
+        const wtKey = formatWorktreeKey(id, worktreePath)
         const currentSelected = s.selectedTerminalByWorktree[wtKey]
         const orderChanged = !workspacePaneTabOrdersEqual(currentOrder, nextOrder)
         viewChanged = currentView !== 'terminal'
