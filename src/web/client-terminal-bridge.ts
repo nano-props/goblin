@@ -45,7 +45,7 @@ export interface ClientServerTerminalConfig {
   clientId: string
 }
 
-const WEB_TERMINAL_CLIENT_ID_STORAGE_KEY = 'goblin:web-terminal-client-id'
+const WEB_TERMINAL_CLIENT_ID_STORAGE_KEY = 'goblin:terminal-client-id'
 const TERMINAL_SOCKET_OPEN_TIMEOUT_MS = 10_000
 const TERMINAL_REQUEST_TIMEOUT_MS = 30_000
 

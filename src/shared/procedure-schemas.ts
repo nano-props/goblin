@@ -156,12 +156,12 @@ const WorkspacePaneTerminalTabOrderEntrySchema = v.object({
   id: v.pipe(v.string(), v.minLength(1)),
 })
 const WorkspaceSessionStateSchema = v.object({
-  openRepos: v.array(RepoSessionEntrySchema),
-  activeRepo: v.nullable(v.string()),
+  openRepoEntries: v.array(RepoSessionEntrySchema),
+  activeRepoId: v.nullable(v.string()),
   zenMode: v.boolean(),
   workspacePaneSize: v.number(),
-  selectedTerminalByWorktree: v.optional(v.record(v.string(), v.string())),
-  preferredWorkspacePaneViewByBranchByRepo: v.optional(
+  selectedTerminalSessionByWorktree: v.optional(v.record(v.string(), v.string())),
+  preferredWorkspacePaneTabByBranchByRepo: v.optional(
     v.record(v.string(), v.record(v.string(), v.picklist(['status', 'changes', 'history', 'terminal']))),
   ),
   workspacePaneTabOrderByBranchByRepo: v.record(

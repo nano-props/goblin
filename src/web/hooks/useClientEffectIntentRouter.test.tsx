@@ -187,7 +187,7 @@ describe('useClientEffectIntentRouter', () => {
     expect(showRepoBranchWorkspacePaneViewSpy).toHaveBeenCalledWith(repo.id, 'feature/test', 'terminal')
     expect(state.repos[repo.id]?.ui.selectedBranch).toBe('feature/test')
     expect(preferredWorkspacePaneView(repo.id)).toBe('terminal')
-    expect(state.selectedTerminalByWorktree).toMatchObject({
+    expect(state.selectedTerminalSessionByWorktree).toMatchObject({
       [worktreeTerminalKey(repo.id, '/tmp/repo-feature')]: key,
     })
   })
@@ -266,7 +266,7 @@ describe('useClientEffectIntentRouter', () => {
   })
 
   test('current repo menu actions prefer the visible routed repo over store activeId', async () => {
-    const activeRepo = seedRepoState({
+    const activeRepoId = seedRepoState({
       id: '/tmp/active-repo',
       currentBranch: 'main',
       selectedBranch: 'main',
@@ -285,11 +285,11 @@ describe('useClientEffectIntentRouter', () => {
     useReposStore.setState((state) => ({
       ...state,
       repos: {
-        [activeRepo.id]: activeRepo,
+        [activeRepoId.id]: activeRepoId,
         [visibleRepo.id]: visibleRepo,
       },
-      order: [activeRepo.id, visibleRepo.id],
-      activeId: activeRepo.id,
+      order: [activeRepoId.id, visibleRepo.id],
+      activeId: activeRepoId.id,
       sessionReady: true,
     }))
     currentRepoId = visibleRepo.id
@@ -303,7 +303,7 @@ describe('useClientEffectIntentRouter', () => {
 
     expect(closeRepoSpy).toHaveBeenCalledWith(visibleRepo.id)
     expect(useReposStore.getState().repos[visibleRepo.id]).toBeUndefined()
-    expect(useReposStore.getState().repos[activeRepo.id]).toBeDefined()
+    expect(useReposStore.getState().repos[activeRepoId.id]).toBeDefined()
   })
 
   test('open-recent-repo opens without store activation and then delegates activation to navigation', async () => {

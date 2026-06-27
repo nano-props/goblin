@@ -55,11 +55,11 @@ async function restoreBootSession(settingsSnapshot: Promise<SettingsSnapshot>): 
     // persisted session with a partially hydrated one.
     const restoredWorkspaceState = restoreRestorableWorkspaceStateFromSession(session)
     applySessionLayoutState(normalizedLayout)
-    applySessionSelectedTerminalState(restoredWorkspaceState.selectedTerminalByWorktree)
-    await hydrateRepoSession(session.openRepos, session.activeRepo, {
+    applySessionSelectedTerminalState(restoredWorkspaceState.selectedTerminalSessionByWorktree)
+    await hydrateRepoSession(session.openRepoEntries, session.activeRepoId, {
       workspacePaneRestoreState: {
         workspacePaneTabOrderByBranchByRepo: restoredWorkspaceState.workspacePaneTabOrderByBranchByRepo,
-        preferredWorkspacePaneViewByBranchByRepo: restoredWorkspaceState.preferredWorkspacePaneViewByBranchByRepo,
+        preferredWorkspacePaneTabByBranchByRepo: restoredWorkspaceState.preferredWorkspacePaneTabByBranchByRepo,
       },
     })
   } catch (err) {

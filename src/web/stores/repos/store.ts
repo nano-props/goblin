@@ -21,19 +21,19 @@ import { createRepoSessionActions } from '#/web/stores/repos/repo-session.ts'
 import { createRefreshActions } from '#/web/stores/repos/refresh.ts'
 import { createSelectionActions } from '#/web/stores/repos/selection.ts'
 import { reposLog } from '#/web/logger.ts'
-import { normalizeRestorableRepoCache } from '#/web/stores/repos/persistence.ts'
+import { normalizeRepoSnapshotCache } from '#/web/stores/repos/persistence.ts'
 import { DEFAULT_ZEN_MODE, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
-import type { RestorableRepoSnapshot, ReposStore } from '#/web/stores/repos/types.ts'
+import type { RepoSnapshotCacheEntry, ReposStore } from '#/web/stores/repos/types.ts'
 
 interface PersistedReposStore {
-  restorableRepoCache: Record<string, RestorableRepoSnapshot>
+  repoSnapshotCache: Record<string, RepoSnapshotCacheEntry>
 }
 
 interface RawPersistedReposStore {
-  restorableRepoCache?: unknown
+  repoSnapshotCache?: unknown
 }
 
-let lastStoredRepoCacheRef: Record<string, RestorableRepoSnapshot> | undefined
+let lastStoredRepoCacheRef: Record<string, RepoSnapshotCacheEntry> | undefined
 let lastStoredReposJson: string | undefined
 
 const repoStorage: PersistStorage<PersistedReposStore, void> = {
@@ -46,9 +46,9 @@ const repoStorage: PersistStorage<PersistedReposStore, void> = {
         return null
       }
       const parsed = JSON.parse(raw) as StorageValue<RawPersistedReposStore>
-      const restorableRepoCache = normalizeRestorableRepoCache(parsed.state?.restorableRepoCache)
-      const value = { state: { restorableRepoCache }, version: parsed.version }
-      lastStoredRepoCacheRef = restorableRepoCache
+      const repoSnapshotCache = normalizeRepoSnapshotCache(parsed.state?.repoSnapshotCache)
+      const value = { state: { repoSnapshotCache }, version: parsed.version }
+      lastStoredRepoCacheRef = repoSnapshotCache
       lastStoredReposJson = JSON.stringify(value)
       return value
     } catch (err) {
@@ -59,18 +59,18 @@ const repoStorage: PersistStorage<PersistedReposStore, void> = {
     }
   },
   setItem: (name, value) => {
-    const restorableRepoCache = value.state.restorableRepoCache
-    if (lastStoredReposJson !== undefined && restorableRepoCache === lastStoredRepoCacheRef) return
+    const repoSnapshotCache = value.state.repoSnapshotCache
+    if (lastStoredReposJson !== undefined && repoSnapshotCache === lastStoredRepoCacheRef) return
     const serialized = JSON.stringify(value)
     if (serialized === lastStoredReposJson) {
-      lastStoredRepoCacheRef = restorableRepoCache
+      lastStoredRepoCacheRef = repoSnapshotCache
       return
     }
     const storage = getStorage()
     if (!storage) return
     try {
       storage.setItem(name, serialized)
-      lastStoredRepoCacheRef = restorableRepoCache
+      lastStoredRepoCacheRef = repoSnapshotCache
       lastStoredReposJson = serialized
     } catch (err) {
       reposLog.warn(`failed to persist store ${name}`, { err })
@@ -96,14 +96,14 @@ export const useReposStore = create<ReposStore>()(
       repos: {},
 
       // Restorable warm-start cache.
-      restorableRepoCache: {},
+      repoSnapshotCache: {},
 
       // Restorable workspace state.
       order: [],
       activeId: null,
       zenMode: DEFAULT_ZEN_MODE,
       workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
-      selectedTerminalByWorktree: {},
+      selectedTerminalSessionByWorktree: {},
 
       // Local client-only state.
       sessionReady: false,
@@ -115,14 +115,12 @@ export const useReposStore = create<ReposStore>()(
       ...createCommitActions(set, get),
     }),
     {
-      name: 'goblin.repo-store',
+      name: 'goblin.repos-store',
       storage: repoStorage,
-      partialize: (state): PersistedReposStore => ({ restorableRepoCache: state.restorableRepoCache }),
+      partialize: (state): PersistedReposStore => ({ repoSnapshotCache: state.repoSnapshotCache }),
       merge: (persisted, current) => ({
         ...current,
-        restorableRepoCache: normalizeRestorableRepoCache(
-          (persisted as RawPersistedReposStore | null)?.restorableRepoCache,
-        ),
+        repoSnapshotCache: normalizeRepoSnapshotCache((persisted as RawPersistedReposStore | null)?.repoSnapshotCache),
       }),
     },
   ),

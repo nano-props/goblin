@@ -28,7 +28,7 @@ function activeRepoStatusSnapshotEqual(
 }
 
 export function useRepoStatusRefresh() {
-  const activeRepo = useStoreWithEqualityFn(
+  const activeRepoId = useStoreWithEqualityFn(
     useReposStore,
     (state): RepoStatusRefreshSnapshot | null => {
       const id = state.activeId
@@ -45,9 +45,9 @@ export function useRepoStatusRefresh() {
     const lastActiveRepoId = previousActiveRepoId.current
     const lastPreferredWorkspacePaneView = previousPreferredWorkspacePaneView.current
     const lastStatusViewOpen = previousStatusViewOpen.current
-    const nextActiveRepoId = activeRepo?.id ?? null
-    const nextPreferredWorkspacePaneView = activeRepo?.preferredWorkspacePaneView ?? null
-    const nextStatusViewOpen = activeRepo?.statusViewOpen ?? false
+    const nextActiveRepoId = activeRepoId?.id ?? null
+    const nextPreferredWorkspacePaneView = activeRepoId?.preferredWorkspacePaneView ?? null
+    const nextStatusViewOpen = activeRepoId?.statusViewOpen ?? false
     const activeRepoChanged = nextActiveRepoId !== lastActiveRepoId
     const openedStatusLikeTab =
       !activeRepoChanged &&
@@ -58,11 +58,11 @@ export function useRepoStatusRefresh() {
     previousActiveRepoId.current = nextActiveRepoId
     previousPreferredWorkspacePaneView.current = nextPreferredWorkspacePaneView
     previousStatusViewOpen.current = nextStatusViewOpen
-    if (!activeRepo || (!activeRepoChanged && !openedStatusLikeTab)) return
+    if (!activeRepoId || (!activeRepoChanged && !openedStatusLikeTab)) return
     void runRepoRefreshIntent(useReposStore.getState, {
       kind: 'visible-status-like-view-opened',
-      id: activeRepo.id,
-      token: activeRepo.token,
+      id: activeRepoId.id,
+      token: activeRepoId.token,
     })
-  }, [activeRepo])
+  }, [activeRepoId])
 }

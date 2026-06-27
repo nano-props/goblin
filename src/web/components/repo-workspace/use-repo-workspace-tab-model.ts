@@ -46,7 +46,7 @@ export function useBranchWorkspacePaneTabModelInput(
   const worktreeSnapshot = useWorktreeTerminalSnapshot(terminalWorktreeKey)
   const terminalSyncReady = useTerminalRepoSyncReady(repo.id)
   const selectedTerminalKey = useReposStore((s) =>
-    terminalWorktreeKey ? s.selectedTerminalByWorktree[terminalWorktreeKey] : undefined,
+    terminalWorktreeKey ? s.selectedTerminalSessionByWorktree[terminalWorktreeKey] : undefined,
   )
 
   const workspacePaneTabOrder = useMemo(

@@ -12,8 +12,8 @@ function isBackgroundSyncEligible(repo: RepoState | null | undefined): repo is R
 }
 
 export function backgroundSyncRepoIdsFromStore(state: Pick<ReposStore, 'activeId' | 'repos'>): string[] {
-  const activeRepo = activeRepoFromStore(state)
-  return isBackgroundSyncEligible(activeRepo) ? [activeRepo.id] : []
+  const activeRepoId = activeRepoFromStore(state)
+  return isBackgroundSyncEligible(activeRepoId) ? [activeRepoId.id] : []
 }
 
 export function useBackgroundFetch() {

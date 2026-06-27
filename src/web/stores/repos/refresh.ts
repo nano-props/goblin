@@ -4,7 +4,7 @@ import { refreshPullRequestsLog, refreshStatusLog } from '#/web/logger.ts'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 import { isRepoUnavailableReason, markRepoUnavailable } from '#/web/stores/repos/availability.ts'
 import { runExclusiveOperation, runLatestOperation } from '#/web/stores/repos/operation-runner.ts'
-import { persistRestorableRepoSnapshot } from '#/web/stores/repos/persistence.ts'
+import { persistRepoSnapshotCacheEntry } from '#/web/stores/repos/persistence.ts'
 import { runLatestResourceOperation } from '#/web/stores/repos/resource-runner.ts'
 import { applyStatusToWorktreeStates } from '#/web/stores/repos/worktree-state.ts'
 import { pruneRepoBranchPullRequestOperations } from '#/web/stores/repos/repo-operation-scheduler.ts'
@@ -225,7 +225,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
             return
           }
           applyPullRequestRefreshSuccess(id, token, branchNames, entries, requested, clearMissing, mode)
-          if (ctx.isCurrent()) persistRestorableRepoSnapshot(set, get().repos[id], token)
+          if (ctx.isCurrent()) persistRepoSnapshotCacheEntry(set, get().repos[id], token)
         },
         onStale: (ctx) => {
           applyPullRequestRefreshStale(id, token, branchNames, mode, ctx.operationId)
@@ -259,7 +259,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
         },
         onSuccess: (_status, ctx) => {
           const repoAfterStatus = get().repos[id]
-          if (ctx.isCurrent()) persistRestorableRepoSnapshot(set, repoAfterStatus, token)
+          if (ctx.isCurrent()) persistRepoSnapshotCacheEntry(set, repoAfterStatus, token)
         },
         onError: (message, r) => {
           if (isRepoUnavailableReason(message)) markRepoUnavailable(r, message)
@@ -325,7 +325,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
             finishDataLoadSuccess(r.resources.status)
           })
           if (result.status.length > 0 && ctx.isCurrent()) {
-            persistRestorableRepoSnapshot(set, get().repos[id], token)
+            persistRepoSnapshotCacheEntry(set, get().repos[id], token)
           }
           if (result.snapshot === null) {
             updateIfFresh(set, id, token, (r) => {

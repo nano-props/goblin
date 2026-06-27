@@ -95,13 +95,13 @@ export function resetReposStore(): void {
   mainWindowQueryClient.clear()
   useReposStore.setState({
     repos: {},
-    restorableRepoCache: {},
+    repoSnapshotCache: {},
     order: [],
     activeId: null,
     sessionReady: false,
     zenMode: DEFAULT_ZEN_MODE,
     workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
-    selectedTerminalByWorktree: {},
+    selectedTerminalSessionByWorktree: {},
   })
 }
 
@@ -536,7 +536,7 @@ export function seedRepoState(options: {
   }
   useReposStore.setState({
     repos: { [options.id]: repo },
-    restorableRepoCache: {},
+    repoSnapshotCache: {},
     order: [options.id],
     activeId: options.id,
     sessionReady: true,

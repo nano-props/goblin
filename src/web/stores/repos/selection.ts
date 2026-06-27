@@ -1,6 +1,6 @@
 import { selectedBranchForViewMode } from '#/web/stores/repos/branch-view-mode.ts'
 import { replaceRepoState } from '#/web/stores/repos/repo-state-factory.ts'
-import { persistRestorableRepoSnapshot } from '#/web/stores/repos/persistence.ts'
+import { persistRepoSnapshotCacheEntry } from '#/web/stores/repos/persistence.ts'
 import {
   DEFAULT_WORKSPACE_PANE_SIZE,
   normalizeWorkspacePaneSize,
@@ -100,20 +100,20 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
       })
     },
 
-    applySessionSelectedTerminalState(selectedTerminalByWorktree: Record<string, string>) {
+    applySessionSelectedTerminalState(selectedTerminalSessionByWorktree: Record<string, string>) {
       // One-shot boot/session restore of per-worktree terminal selection. This
       // seeds client state; later selection changes remain client-owned.
       set((s) => {
-        const current = s.selectedTerminalByWorktree
+        const current = s.selectedTerminalSessionByWorktree
         const currentEntries = Object.entries(current)
-        const nextEntries = Object.entries(selectedTerminalByWorktree)
+        const nextEntries = Object.entries(selectedTerminalSessionByWorktree)
         if (
           currentEntries.length === nextEntries.length &&
           nextEntries.every(([worktreeKey, key]) => current[worktreeKey] === key)
         ) {
           return s
         }
-        return { selectedTerminalByWorktree: { ...selectedTerminalByWorktree } }
+        return { selectedTerminalSessionByWorktree: { ...selectedTerminalSessionByWorktree } }
       })
     },
 
@@ -146,15 +146,17 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
 
     setSelectedTerminal(worktreeTerminalKey: string, key: string | null) {
       set((s) => {
-        const current = s.selectedTerminalByWorktree[worktreeTerminalKey]
+        const current = s.selectedTerminalSessionByWorktree[worktreeTerminalKey]
         if (key) {
           if (current === key) return s
-          return { selectedTerminalByWorktree: { ...s.selectedTerminalByWorktree, [worktreeTerminalKey]: key } }
+          return {
+            selectedTerminalSessionByWorktree: { ...s.selectedTerminalSessionByWorktree, [worktreeTerminalKey]: key },
+          }
         }
         if (current === undefined) return s
-        const selectedTerminalByWorktree = { ...s.selectedTerminalByWorktree }
-        delete selectedTerminalByWorktree[worktreeTerminalKey]
-        return { selectedTerminalByWorktree }
+        const selectedTerminalSessionByWorktree = { ...s.selectedTerminalSessionByWorktree }
+        delete selectedTerminalSessionByWorktree[worktreeTerminalKey]
+        return { selectedTerminalSessionByWorktree }
       })
     },
   }
@@ -167,7 +169,7 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
   function afterSelectionChange(id: string, token: number, branchForPullRequest: string | null): void {
     const repo = get().repos[id]
     if (!repo) return
-    persistRestorableRepoSnapshot(set, repo, token)
+    persistRepoSnapshotCacheEntry(set, repo, token)
     void runRepoRefreshIntent(get, {
       kind: 'visible-pull-request-changed',
       id,

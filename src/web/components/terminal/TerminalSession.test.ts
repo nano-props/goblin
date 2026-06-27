@@ -532,7 +532,7 @@ beforeEach(() => {
     configurable: true,
     value: (handle: number) => window.clearTimeout(handle),
   })
-  window.sessionStorage.setItem('goblin:web-terminal-client-id', 'client_local')
+  window.sessionStorage.setItem('goblin:terminal-client-id', 'client_local')
   HTMLElement.prototype.getBoundingClientRect = vi.fn(
     () =>
       ({

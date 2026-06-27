@@ -74,11 +74,11 @@ describe('settings snapshot partitions', () => {
         },
       ],
       session: {
-        openRepos: [{ kind: 'local', id: '/tmp/repo-b' }],
-        activeRepo: '/tmp/repo-b',
+        openRepoEntries: [{ kind: 'local', id: '/tmp/repo-b' }],
+        activeRepoId: '/tmp/repo-b',
         zenMode: false,
         workspacePaneSize: 50,
-        selectedTerminalByWorktree: { '/tmp/repo-b\0/tmp/repo-b': 'slot-1' },
+        selectedTerminalSessionByWorktree: { '/tmp/repo-b\0/tmp/repo-b': 'slot-1' },
         workspacePaneTabOrderByBranchByRepo: {
           '/tmp/repo-b': {
             main: [],
@@ -94,11 +94,11 @@ describe('settings snapshot partitions', () => {
       recentRepos: [{ kind: 'local', id: '/tmp/repo-b' }],
     })
     expect(restorableSessionStateFromSettingsSnapshot(snapshot)).toEqual({
-      openRepos: [{ kind: 'local', id: '/tmp/repo-b' }],
-      activeRepo: '/tmp/repo-b',
+      openRepoEntries: [{ kind: 'local', id: '/tmp/repo-b' }],
+      activeRepoId: '/tmp/repo-b',
       zenMode: false,
       workspacePaneSize: 50,
-      selectedTerminalByWorktree: { '/tmp/repo-b\0/tmp/repo-b': 'slot-1' },
+      selectedTerminalSessionByWorktree: { '/tmp/repo-b\0/tmp/repo-b': 'slot-1' },
       workspacePaneTabOrderByBranchByRepo: {
         '/tmp/repo-b': {
           main: [],

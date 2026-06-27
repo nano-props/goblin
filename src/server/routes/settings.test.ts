@@ -77,11 +77,11 @@ describe('settings routes', () => {
 
   test('delegates session writes to the settings command handler layer', async () => {
     const session = {
-      openRepos: [],
-      activeRepo: null,
+      openRepoEntries: [],
+      activeRepoId: null,
       zenMode: true,
       workspacePaneSize: 50,
-      selectedTerminalByWorktree: {},
+      selectedTerminalSessionByWorktree: {},
       workspacePaneTabOrderByBranchByRepo: {},
     } as const
     mocks.handleSetSession.mockResolvedValue({ ok: true, session })

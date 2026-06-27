@@ -41,8 +41,8 @@ function defaultIpcResult(path: string, input?: unknown) {
       globalShortcutRegistered: true,
       lanEnabled: false,
       session: {
-        openRepos: [],
-        activeRepo: null,
+        openRepoEntries: [],
+        activeRepoId: null,
         zenMode: true,
         workspacePaneSize: 50,
       },

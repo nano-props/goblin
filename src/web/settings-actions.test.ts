@@ -141,8 +141,8 @@ describe('settings actions', () => {
     mainWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
     const session = {
       ...defaultSessionState(),
-      openRepos: [{ kind: 'local' as const, id: '/tmp/repo-a' }],
-      activeRepo: '/tmp/repo-a',
+      openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo-a' }],
+      activeRepoId: '/tmp/repo-a',
     }
     appDataClientMocks.saveSession.mockResolvedValue(session)
     const { persistSessionState } = await import('#/web/settings-actions.ts')

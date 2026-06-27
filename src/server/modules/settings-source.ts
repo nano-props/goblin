@@ -36,7 +36,7 @@ import {
 } from '#/shared/settings-defaults.ts'
 
 type FetchIntervalListener = (sec: number) => void
-interface ServerSettingsData {
+interface UserSettingsData {
   lang: LangPref
   theme: ThemePref
   colorTheme: ColorTheme
@@ -54,7 +54,7 @@ interface ServerSettingsData {
 export type UserSettingsPatch = Partial<UserSettings>
 
 let cachedFetchIntervalSec = DEFAULT_FETCH_INTERVAL_SEC
-let settingsPromise: Promise<ServerSettingsData> | null = null
+let settingsPromise: Promise<UserSettingsData> | null = null
 const listeners = new Set<FetchIntervalListener>()
 
 function normalizeFetchInterval(value: unknown): number {
@@ -85,7 +85,7 @@ function normalizeLanEnabled(value: unknown): boolean {
   return value === true
 }
 
-function settingsPrefsFromData(data: ServerSettingsData): UserSettings {
+function settingsPrefsFromData(data: UserSettingsData): UserSettings {
   return {
     lang: data.lang,
     theme: data.theme,
@@ -115,7 +115,7 @@ function defaultSession(): WorkspaceSessionState {
   return defaultSessionState()
 }
 
-function normalizeSelectedTerminalByWorktree(value: unknown): Record<string, string> {
+function normalizeSelectedTerminalSessionByWorktree(value: unknown): Record<string, string> {
   if (!value || typeof value !== 'object') return {}
   const normalized: Record<string, string> = {}
   for (const [worktreeKey, key] of Object.entries(value)) {
@@ -128,13 +128,13 @@ function normalizeSelectedTerminalByWorktree(value: unknown): Record<string, str
   return normalized
 }
 
-function normalizePreferredWorkspacePaneViewByBranchByRepo(
+function normalizePreferredWorkspacePaneTabByBranchByRepo(
   value: unknown,
-  openRepos: RepoSessionEntry[],
+  openRepoEntries: RepoSessionEntry[],
   tabOrderByRepo: Record<string, Record<string, WorkspacePaneTabOrderEntry[]>>,
 ): Record<string, Record<string, WorkspacePaneSessionTabType>> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
-  const openRepoIds = new Set(openRepos.map(repoSessionEntryId))
+  const openRepoIds = new Set(openRepoEntries.map(repoSessionEntryId))
   const normalized: Record<string, Record<string, WorkspacePaneSessionTabType>> = {}
   for (const [repoId, rawByBranch] of Object.entries(value)) {
     const safeRepoId = toSafeRepoLocator(repoId)
@@ -164,10 +164,10 @@ function normalizePreferredWorkspacePaneViewByBranchByRepo(
 
 function normalizeWorkspacePaneTabOrderByBranchByRepo(
   value: unknown,
-  openRepos: RepoSessionEntry[],
+  openRepoEntries: RepoSessionEntry[],
 ): Record<string, Record<string, WorkspacePaneTabOrderEntry[]>> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
-  const openRepoIds = new Set(openRepos.map(repoSessionEntryId))
+  const openRepoIds = new Set(openRepoEntries.map(repoSessionEntryId))
   const normalized: Record<string, Record<string, WorkspacePaneTabOrderEntry[]>> = {}
   for (const [repoId, rawByBranch] of Object.entries(value)) {
     const safeRepoId = toSafeRepoLocator(repoId)
@@ -205,25 +205,30 @@ function normalizeWorkspacePaneTabOrderByBranchByRepo(
 function normalizeSession(value: unknown): WorkspaceSessionState {
   if (!value || typeof value !== 'object') return defaultSession()
   const partial = value as Partial<WorkspaceSessionState>
-  const openRepos = Array.isArray(partial.openRepos)
+  const openRepoEntries = Array.isArray(partial.openRepoEntries)
     ? dedupeRepoEntries(
-        partial.openRepos.map(toSafeSessionRepoEntry).filter((entry): entry is RepoSessionEntry => entry !== null),
+        partial.openRepoEntries
+          .map(toSafeSessionRepoEntry)
+          .filter((entry): entry is RepoSessionEntry => entry !== null),
       )
     : []
-  const activeRepo = toSafeRepoLocator(partial.activeRepo)
+  const activeRepoId = toSafeRepoLocator(partial.activeRepoId)
   const workspacePaneTabOrderByBranchByRepo = normalizeWorkspacePaneTabOrderByBranchByRepo(
     partial.workspacePaneTabOrderByBranchByRepo,
-    openRepos,
+    openRepoEntries,
   )
   return {
-    openRepos,
-    activeRepo: activeRepo && openRepos.some((entry) => repoSessionEntryId(entry) === activeRepo) ? activeRepo : null,
+    openRepoEntries,
+    activeRepoId:
+      activeRepoId && openRepoEntries.some((entry) => repoSessionEntryId(entry) === activeRepoId) ? activeRepoId : null,
     zenMode: typeof partial.zenMode === 'boolean' ? partial.zenMode : DEFAULT_ZEN_MODE,
     workspacePaneSize: normalizeWorkspacePaneSize(partial.workspacePaneSize),
-    selectedTerminalByWorktree: normalizeSelectedTerminalByWorktree(partial.selectedTerminalByWorktree),
-    preferredWorkspacePaneViewByBranchByRepo: normalizePreferredWorkspacePaneViewByBranchByRepo(
-      partial.preferredWorkspacePaneViewByBranchByRepo,
-      openRepos,
+    selectedTerminalSessionByWorktree: normalizeSelectedTerminalSessionByWorktree(
+      partial.selectedTerminalSessionByWorktree,
+    ),
+    preferredWorkspacePaneTabByBranchByRepo: normalizePreferredWorkspacePaneTabByBranchByRepo(
+      partial.preferredWorkspacePaneTabByBranchByRepo,
+      openRepoEntries,
       workspacePaneTabOrderByBranchByRepo,
     ),
     workspacePaneTabOrderByBranchByRepo,
@@ -284,10 +289,10 @@ function cloneRepoSettings(repoSettings: readonly RepoSettingsEntry[]): RepoSett
   }))
 }
 
-async function readServerSettingsFile(): Promise<ServerSettingsData | null> {
+async function readUserSettingsFile(): Promise<UserSettingsData | null> {
   try {
-    const raw = await readFile(serverDataFile('server-settings.json'), 'utf-8')
-    const parsed = JSON.parse(raw) as Partial<ServerSettingsData>
+    const raw = await readFile(serverDataFile('user-settings.json'), 'utf-8')
+    const parsed = JSON.parse(raw) as Partial<UserSettingsData>
     return {
       lang: normalizeLangPref(parsed.lang),
       theme: normalizeThemePref(parsed.theme),
@@ -307,22 +312,22 @@ async function readServerSettingsFile(): Promise<ServerSettingsData | null> {
   }
 }
 
-async function writeServerSettingsFile(data: ServerSettingsData): Promise<void> {
-  const file = serverDataFile('server-settings.json')
+async function writeUserSettingsFile(data: UserSettingsData): Promise<void> {
+  const file = serverDataFile('user-settings.json')
   await mkdir(path.dirname(file), { recursive: true })
   await writeFile(file, JSON.stringify(data, null, 2), 'utf-8')
 }
 
-async function loadServerSettings(): Promise<ServerSettingsData> {
+async function loadUserSettings(): Promise<UserSettingsData> {
   settingsPromise ??= (async () => {
-    const persisted = await readServerSettingsFile()
+    const persisted = await readUserSettingsFile()
     const data = persisted ?? {
       ...defaultSettingsPrefs(),
       session: defaultSession(),
       recentRepos: [],
       repoSettings: [],
     }
-    await writeServerSettingsFile(data)
+    await writeUserSettingsFile(data)
     cachedFetchIntervalSec = data.fetchIntervalSec
     return data
   })()
@@ -330,12 +335,12 @@ async function loadServerSettings(): Promise<ServerSettingsData> {
 }
 
 export async function getServerFetchIntervalSec(): Promise<number> {
-  await loadServerSettings()
+  await loadUserSettings()
   return cachedFetchIntervalSec
 }
 
 export async function getServerSettingsPrefs(): Promise<UserSettings> {
-  return settingsPrefsFromData(await loadServerSettings())
+  return settingsPrefsFromData(await loadUserSettings())
 }
 
 export function subscribeServerFetchInterval(listener: FetchIntervalListener): () => void {
@@ -344,11 +349,11 @@ export function subscribeServerFetchInterval(listener: FetchIntervalListener): (
 }
 
 export async function setServerFetchIntervalSec(sec: number): Promise<number> {
-  const data = await loadServerSettings()
+  const data = await loadUserSettings()
   const next = normalizeFetchInterval(sec)
   if (data.fetchIntervalSec !== next) {
     data.fetchIntervalSec = next
-    await writeServerSettingsFile(data)
+    await writeUserSettingsFile(data)
   }
   if (cachedFetchIntervalSec !== next) {
     cachedFetchIntervalSec = next
@@ -358,7 +363,7 @@ export async function setServerFetchIntervalSec(sec: number): Promise<number> {
 }
 
 export async function updateServerSettingsPrefs(patch: UserSettingsPatch): Promise<UserSettings> {
-  const data = await loadServerSettings()
+  const data = await loadUserSettings()
   const nextLang = patch.lang === undefined ? data.lang : normalizeLangPref(patch.lang)
   const nextTheme = patch.theme === undefined ? data.theme : normalizeThemePref(patch.theme)
   const nextColorTheme = patch.colorTheme === undefined ? data.colorTheme : normalizeColorTheme(patch.colorTheme)
@@ -394,7 +399,7 @@ export async function updateServerSettingsPrefs(patch: UserSettingsPatch): Promi
   data.globalShortcutDisabled = nextGlobalShortcutDisabled
   data.globalShortcut = nextGlobalShortcut
   data.lanEnabled = nextLanEnabled
-  if (changed) await writeServerSettingsFile(data)
+  if (changed) await writeUserSettingsFile(data)
   if (cachedFetchIntervalSec !== nextFetchIntervalSec) {
     cachedFetchIntervalSec = nextFetchIntervalSec
     for (const listener of listeners) listener(nextFetchIntervalSec)
@@ -403,30 +408,30 @@ export async function updateServerSettingsPrefs(patch: UserSettingsPatch): Promi
 }
 
 export async function getServerSessionState(): Promise<WorkspaceSessionState> {
-  return (await loadServerSettings()).session
+  return (await loadUserSettings()).session
 }
 
 export async function setServerSessionState(session: WorkspaceSessionState): Promise<WorkspaceSessionState> {
-  const data = await loadServerSettings()
+  const data = await loadUserSettings()
   const next = normalizeSession(session)
   data.session = next
-  await writeServerSettingsFile(data)
+  await writeUserSettingsFile(data)
   return next
 }
 
 export async function getServerRecentRepos(): Promise<RepoSessionEntry[]> {
-  return [...(await loadServerSettings()).recentRepos]
+  return [...(await loadUserSettings()).recentRepos]
 }
 
 export async function getServerRepoSettings(): Promise<RepoSettingsEntry[]> {
-  return cloneRepoSettings((await loadServerSettings()).repoSettings)
+  return cloneRepoSettings((await loadUserSettings()).repoSettings)
 }
 
 export async function trustServerRepoWorktreeBootstrapConfig(input: {
   repoId: string
   configHash: string
 }): Promise<RepoSettingsEntry[]> {
-  const data = await loadServerSettings()
+  const data = await loadUserSettings()
   const repoId = toSafeRepoLocator(input.repoId)
   if (!repoId || !isWorktreeBootstrapConfigHash(input.configHash)) return cloneRepoSettings(data.repoSettings)
   const worktreeBootstrapTrust: WorktreeBootstrapTrust = {
@@ -441,12 +446,12 @@ export async function trustServerRepoWorktreeBootstrapConfig(input: {
   } else {
     data.repoSettings = [...data.repoSettings, { repoId, worktreeBootstrapTrust }]
   }
-  await writeServerSettingsFile(data)
+  await writeUserSettingsFile(data)
   return cloneRepoSettings(data.repoSettings)
 }
 
 export async function addServerRecentRepo(repo: RepoSessionEntry): Promise<RepoSessionEntry[]> {
-  const data = await loadServerSettings()
+  const data = await loadUserSettings()
   const safeRepo = toSafeSessionRepoEntry(repo)
   if (!safeRepo) return [...data.recentRepos]
   const safeId = repoSessionEntryId(safeRepo)
@@ -454,15 +459,15 @@ export async function addServerRecentRepo(repo: RepoSessionEntry): Promise<RepoS
     0,
     MAX_RECENT_REPOS,
   )
-  await writeServerSettingsFile(data)
+  await writeUserSettingsFile(data)
   return [...data.recentRepos]
 }
 
 export async function clearServerRecentRepos(): Promise<void> {
-  const data = await loadServerSettings()
+  const data = await loadUserSettings()
   if (data.recentRepos.length === 0) return
   data.recentRepos = []
-  await writeServerSettingsFile(data)
+  await writeUserSettingsFile(data)
 }
 
 export function resetServerSettingsSourceForTests(): void {

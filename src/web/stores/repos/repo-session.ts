@@ -25,8 +25,8 @@ const SESSION_PROBE_CONCURRENCY = 4
 function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet): RestorableWorkspaceLifecycleActions {
   return {
     async hydrateRepoSession(
-      openRepos: RepoSessionEntry[],
-      activeRepo: string | null,
+      openRepoEntries: RepoSessionEntry[],
+      activeRepoId: string | null,
       options?: RepoSessionHydrationOptions,
     ) {
       const { signal, workspacePaneRestoreState } = options ?? {}
@@ -55,7 +55,7 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
       // per-repo body keeps showing its skeleton until its own snapshot
       // resolves, but that's a per-repo concern.
       const rankById = new Map<string, number>()
-      openRepos.forEach((entry, index) => {
+      openRepoEntries.forEach((entry, index) => {
         if (!rankById.has(entry.id)) rankById.set(entry.id, index)
       })
 
@@ -65,9 +65,9 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
         let nextRepos = s.repos
         let nextOrder = s.order
         let changed = false
-        for (const entry of openRepos) {
+        for (const entry of openRepoEntries) {
           const result = insertPlaceholderRepo(
-            { repos: nextRepos, restorableRepoCache: s.restorableRepoCache, order: nextOrder },
+            { repos: nextRepos, repoSnapshotCache: s.repoSnapshotCache, order: nextOrder },
             entry,
             rankById,
           )
@@ -79,7 +79,7 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
             nextActiveId,
             nextRepos,
             nextOrder,
-            activeRepo,
+            activeRepoId,
             managedActiveId,
           )
           if (s.activeId === null || s.activeId === managedActiveId) managedActiveId = nextActiveId
@@ -97,19 +97,25 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
       // With open repositories, the boot skeleton (shown only when no activeId) gives
       // way to a real workspace immediately — the per-repo body keeps
       // showing its own skeleton until each snapshot resolves. With no open
-      // repositories (openRepos was empty), there's nothing else to compute but
+      // repositories (openRepoEntries was empty), there's nothing else to compute but
       // we still need to clear the boot skeleton, so just flip the flag.
       set((s) => {
         if (s.sessionReady) return s
         if (s.order.length === 0) return { sessionReady: true }
-        const activeId = activeRepoIdAfterWorkspaceHydration(s.activeId, s.repos, s.order, activeRepo, managedActiveId)
+        const activeId = activeRepoIdAfterWorkspaceHydration(
+          s.activeId,
+          s.repos,
+          s.order,
+          activeRepoId,
+          managedActiveId,
+        )
         if (s.activeId === null || s.activeId === managedActiveId) managedActiveId = activeId
         return { activeId, sessionReady: true }
       })
 
       const limitProbe = pLimit(SESSION_PROBE_CONCURRENCY)
       await Promise.all(
-        openRepos.map((entry) =>
+        openRepoEntries.map((entry) =>
           limitProbe(async () => {
             // Respect the abort signal: if the caller (e.g. the boot
             // effect) unmounted, skip starting the probe and don't
@@ -134,7 +140,7 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
                     s.activeId,
                     repos,
                     order,
-                    activeRepo,
+                    activeRepoId,
                     managedActiveId,
                   )
                   if (s.activeId === null || s.activeId === managedActiveId) managedActiveId = activeId
@@ -159,7 +165,7 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
                   s.activeId,
                   repos,
                   order,
-                  activeRepo,
+                  activeRepoId,
                   managedActiveId,
                 )
                 if (s.activeId === null || s.activeId === managedActiveId) managedActiveId = activeId
@@ -187,7 +193,7 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
                 s.activeId,
                 repos,
                 order,
-                activeRepo,
+                activeRepoId,
                 managedActiveId,
               )
               if (s.activeId === null || s.activeId === managedActiveId) managedActiveId = activeId

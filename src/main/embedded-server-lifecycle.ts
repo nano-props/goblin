@@ -117,7 +117,7 @@ function pipeProcessLogs(proc: ServerChildProcess): void {
 
 function readLanEnabledFromSettings(): boolean {
   try {
-    const file = path.join(app.getPath('userData'), 'server-settings.json')
+    const file = path.join(app.getPath('userData'), 'user-settings.json')
     const raw = readFileSync(file, 'utf-8')
     const parsed = JSON.parse(raw)
     return parsed.lanEnabled === true

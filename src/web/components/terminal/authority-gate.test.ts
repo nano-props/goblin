@@ -67,7 +67,7 @@ beforeEach(() => {
   // across tests. The real `readOrCreateWebTerminalClientId`
   // reads `window.sessionStorage`, which the global vitest setup
   // already shimmed with an in-memory Storage.
-  window.sessionStorage.setItem('goblin:web-terminal-client-id', 'client_local')
+  window.sessionStorage.setItem('goblin:terminal-client-id', 'client_local')
   vi.clearAllMocks()
 })
 

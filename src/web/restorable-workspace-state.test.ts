@@ -24,20 +24,20 @@ describe('restorable-workspace-state', () => {
           activeId: repo.id,
           zenMode: false,
           workspacePaneSize: 55,
-          selectedTerminalByWorktree: {
+          selectedTerminalSessionByWorktree: {
             '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0slot-2',
           },
         },
       }),
     ).toEqual({
-      openRepos: [localRepoSessionEntry('/tmp/repo')],
-      activeRepo: '/tmp/repo',
+      openRepoEntries: [localRepoSessionEntry('/tmp/repo')],
+      activeRepoId: '/tmp/repo',
       zenMode: false,
       workspacePaneSize: 55,
-      selectedTerminalByWorktree: {
+      selectedTerminalSessionByWorktree: {
         '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0slot-2',
       },
-      preferredWorkspacePaneViewByBranchByRepo: { '/tmp/repo': { 'feature/worktree': 'terminal' } },
+      preferredWorkspacePaneTabByBranchByRepo: { '/tmp/repo': { 'feature/worktree': 'terminal' } },
       workspacePaneTabOrderByBranchByRepo: {
         '/tmp/repo': { 'feature/worktree': [workspacePaneStaticTabOrderEntry('status')] },
       },
@@ -63,11 +63,11 @@ describe('restorable-workspace-state', () => {
           activeId: repo.id,
           zenMode: false,
           workspacePaneSize: 55,
-          selectedTerminalByWorktree: {},
+          selectedTerminalSessionByWorktree: {},
         },
       }),
     ).toMatchObject({
-      preferredWorkspacePaneViewByBranchByRepo: { '/tmp/repo': { 'feature/worktree': 'changes' } },
+      preferredWorkspacePaneTabByBranchByRepo: { '/tmp/repo': { 'feature/worktree': 'changes' } },
       workspacePaneTabOrderByBranchByRepo: {
         '/tmp/repo': {
           'feature/worktree': [workspacePaneStaticTabOrderEntry('status'), workspacePaneStaticTabOrderEntry('changes')],
@@ -95,11 +95,11 @@ describe('restorable-workspace-state', () => {
           activeId: repo.id,
           zenMode: false,
           workspacePaneSize: 55,
-          selectedTerminalByWorktree: {},
+          selectedTerminalSessionByWorktree: {},
         },
       }),
     ).toMatchObject({
-      preferredWorkspacePaneViewByBranchByRepo: {},
+      preferredWorkspacePaneTabByBranchByRepo: {},
       workspacePaneTabOrderByBranchByRepo: {
         '/tmp/repo': { 'feature/worktree': [workspacePaneStaticTabOrderEntry('status')] },
       },
@@ -109,11 +109,11 @@ describe('restorable-workspace-state', () => {
   test('restores restorable workspace state from WorkspaceSessionState', () => {
     expect(
       restoreRestorableWorkspaceStateFromSession({
-        openRepos: [localRepoSessionEntry('/tmp/repo')],
-        activeRepo: '/tmp/repo',
+        openRepoEntries: [localRepoSessionEntry('/tmp/repo')],
+        activeRepoId: '/tmp/repo',
         zenMode: false,
         workspacePaneSize: 40,
-        selectedTerminalByWorktree: {
+        selectedTerminalSessionByWorktree: {
           '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0slot-1',
         },
         workspacePaneTabOrderByBranchByRepo: {
@@ -126,10 +126,10 @@ describe('restorable-workspace-state', () => {
       activeId: '/tmp/repo',
       zenMode: false,
       workspacePaneSize: 40,
-      selectedTerminalByWorktree: {
+      selectedTerminalSessionByWorktree: {
         '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0slot-1',
       },
-      preferredWorkspacePaneViewByBranchByRepo: {},
+      preferredWorkspacePaneTabByBranchByRepo: {},
       workspacePaneTabOrderByBranchByRepo: {
         '/tmp/repo': {
           main: [],

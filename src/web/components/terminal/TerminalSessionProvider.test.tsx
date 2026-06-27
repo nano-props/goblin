@@ -416,7 +416,7 @@ beforeEach(() => {
   })
   resetReposStore()
   useRepoSyncStore.setState(useRepoSyncStore.getInitialState())
-  window.sessionStorage.setItem('goblin:web-terminal-client-id', 'client_local')
+  window.sessionStorage.setItem('goblin:terminal-client-id', 'client_local')
   mainWindowQueryClient.clear()
   mainWindowQueryClient.setQueryData(
     settingsSnapshotQueryKey(),
@@ -747,7 +747,7 @@ describe('TerminalSessionProvider', () => {
         ['slot-1', true, false],
         ['slot-2', false, false],
       ])
-      expect(useReposStore.getState().selectedTerminalByWorktree).toMatchObject({
+      expect(useReposStore.getState().selectedTerminalSessionByWorktree).toMatchObject({
         [terminalWorktreeKey]: `${REPO_ID}\u0000${WORKTREE_PATH}\u0000slot-1`,
       })
     } finally {
@@ -1029,7 +1029,7 @@ describe('TerminalSessionProvider', () => {
     })
     const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
     useReposStore.setState({
-      selectedTerminalByWorktree: {
+      selectedTerminalSessionByWorktree: {
         [terminalWorktreeKey]: `${REPO_ID}\u0000${WORKTREE_PATH}\u0000slot-1`,
       },
     })
@@ -1071,7 +1071,7 @@ describe('TerminalSessionProvider', () => {
         ['slot-1', true],
         ['slot-2', false],
       ])
-      expect(useReposStore.getState().selectedTerminalByWorktree).toMatchObject({
+      expect(useReposStore.getState().selectedTerminalSessionByWorktree).toMatchObject({
         [terminalWorktreeKey]: `${REPO_ID}\u0000${WORKTREE_PATH}\u0000slot-1`,
       })
     } finally {

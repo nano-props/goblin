@@ -75,11 +75,11 @@ export function persistedWorkspacePaneTabOrderByBranchByRepoForSession(
 }
 
 export function persistedSelectedTerminalByWorktreeForSession(
-  selectedTerminalByWorktree: Record<string, string>,
+  selectedTerminalSessionByWorktree: Record<string, string>,
   repos: Record<string, { data?: { branches?: Array<{ worktree?: { path?: string } | undefined }> } } | undefined>,
 ): Record<string, string> {
   const persisted: Record<string, string> = {}
-  for (const [worktreeKey, key] of Object.entries(selectedTerminalByWorktree)) {
+  for (const [worktreeKey, key] of Object.entries(selectedTerminalSessionByWorktree)) {
     const parts = worktreeKey.split('\0')
     if (parts.length !== 2) continue
     const [repoRoot, worktreePath] = parts

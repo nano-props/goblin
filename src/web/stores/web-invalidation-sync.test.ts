@@ -223,8 +223,8 @@ describe('web invalidation sync', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(beforeInvalidationFetchCount)
     expect(useSessionRestoreStore.getState().bootSessionSnapshot).toMatchObject({
-      openRepos: [],
-      activeRepo: null,
+      openRepoEntries: [],
+      activeRepoId: null,
     })
     expect(useThemeStore.getState()).toMatchObject({ pref: 'auto', resolved: 'light', colorTheme: 'default' })
   })

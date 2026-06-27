@@ -17,7 +17,7 @@ export function restoreSessionWorkspacePaneStateInRepos(
   let nextRepos = repos
   const repoIds = new Set([
     ...Object.keys(restoreState.workspacePaneTabOrderByBranchByRepo),
-    ...Object.keys(restoreState.preferredWorkspacePaneViewByBranchByRepo),
+    ...Object.keys(restoreState.preferredWorkspacePaneTabByBranchByRepo),
   ])
 
   for (const id of repoIds) {
@@ -25,7 +25,7 @@ export function restoreSessionWorkspacePaneStateInRepos(
     if (!repo) continue
 
     const tabOrderByBranch = restoreState.workspacePaneTabOrderByBranchByRepo[id]
-    const preferredViewByBranch = restoreState.preferredWorkspacePaneViewByBranchByRepo[id]
+    const preferredViewByBranch = restoreState.preferredWorkspacePaneTabByBranchByRepo[id]
     let repoChanged = false
 
     const nextTabOrderByBranch =
@@ -67,7 +67,7 @@ export function restoreSessionWorkspacePaneStateInRepos(
 
 function restoredPreferredWorkspacePaneViews(
   repo: RepoState,
-  preferredViewByBranch: SessionWorkspacePaneRestoreState['preferredWorkspacePaneViewByBranchByRepo'][string],
+  preferredViewByBranch: SessionWorkspacePaneRestoreState['preferredWorkspacePaneTabByBranchByRepo'][string],
   tabOrderByBranch: Record<string, readonly WorkspacePaneTabOrderEntry[]>,
 ): RepoState['ui']['preferredWorkspacePaneViewByBranch'] {
   let next = repo.ui.preferredWorkspacePaneViewByBranch

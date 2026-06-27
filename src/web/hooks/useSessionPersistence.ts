@@ -11,7 +11,7 @@ export function useSessionPersistence() {
   const order = useReposStore((s) => s.order)
   const zenMode = useReposStore((s) => s.zenMode)
   const workspacePaneSize = useReposStore((s) => s.workspacePaneSize)
-  const selectedTerminalByWorktree = useReposStore((s) => s.selectedTerminalByWorktree)
+  const selectedTerminalSessionByWorktree = useReposStore((s) => s.selectedTerminalSessionByWorktree)
   const sessionReady = useReposStore((s) => s.sessionReady)
   const repos = useReposStore((s) => s.repos)
   const lastSavedRef = useRef<string | null>(null)
@@ -29,17 +29,17 @@ export function useSessionPersistence() {
         activeId,
         zenMode,
         workspacePaneSize,
-        selectedTerminalByWorktree,
+        selectedTerminalSessionByWorktree,
       }),
     })
     const serialized = JSON.stringify(session)
     const immediateKey = JSON.stringify({
-      openRepos: session.openRepos,
-      activeRepo: session.activeRepo,
+      openRepoEntries: session.openRepoEntries,
+      activeRepoId: session.activeRepoId,
       zenMode: session.zenMode,
       workspacePaneSize: session.workspacePaneSize,
-      selectedTerminalByWorktree: session.selectedTerminalByWorktree,
-      preferredWorkspacePaneViewByBranchByRepo: session.preferredWorkspacePaneViewByBranchByRepo,
+      selectedTerminalSessionByWorktree: session.selectedTerminalSessionByWorktree,
+      preferredWorkspacePaneTabByBranchByRepo: session.preferredWorkspacePaneTabByBranchByRepo,
       workspacePaneTabOrderByBranchByRepo: session.workspacePaneTabOrderByBranchByRepo,
     })
     const immediate = lastImmediateKeyRef.current !== immediateKey
@@ -58,5 +58,5 @@ export function useSessionPersistence() {
     }
     const timeout = window.setTimeout(save, SESSION_SAVE_DEBOUNCE_MS)
     return () => window.clearTimeout(timeout)
-  }, [sessionReady, order, activeId, workspacePaneSize, zenMode, selectedTerminalByWorktree, repos])
+  }, [sessionReady, order, activeId, workspacePaneSize, zenMode, selectedTerminalSessionByWorktree, repos])
 }

@@ -34,7 +34,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   // xterm views alive across settings → workspace round-trips.
   const currentRepoId = useReposStore((s) => s.activeId)
   const currentRepoInstanceToken = currentRepoId ? (repoIndex[currentRepoId]?.instanceToken ?? null) : null
-  const selectedTerminalByWorktree = useReposStore((s) => s.selectedTerminalByWorktree)
+  const selectedTerminalSessionByWorktree = useReposStore((s) => s.selectedTerminalSessionByWorktree)
   const setSelectedTerminal = useReposStore((s) => s.setSelectedTerminal)
   const parkingRootRef = useRef<HTMLDivElement | null>(null)
   const repoIndexRef = useRef(repoIndex)
@@ -139,8 +139,8 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   // Registry state sync
   useEffect(() => {
     registry.setRepoIndex(repoIndex)
-    registry.setPreferredSelectedTerminalKeys(selectedTerminalByWorktree)
-  }, [registry, repoIndex, selectedTerminalByWorktree])
+    registry.setPreferredSelectedTerminalKeys(selectedTerminalSessionByWorktree)
+  }, [registry, repoIndex, selectedTerminalSessionByWorktree])
 
   // Parking DOM
   useEffect(() => {

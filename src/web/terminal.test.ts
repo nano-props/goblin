@@ -183,7 +183,7 @@ describe('terminal web host bridge', () => {
   })
 
   test('prefers the bootstrap-provided shared terminal client id over localStorage state', async () => {
-    window.localStorage.setItem('goblin:web-terminal-client-id', 'web_oldpersistedclient')
+    window.localStorage.setItem('goblin:terminal-client-id', 'web_oldpersistedclient')
     const { terminalBridge } = await import('#/web/terminal.ts')
     const dispose = terminalBridge.onOutput(() => {})
     const socket = MockWebSocket.instances[0]
@@ -219,7 +219,7 @@ describe('terminal web host bridge', () => {
 
     await attachPromise
     expect(socket?.url).toContain('clientId=client_sharedterminal')
-    expect(window.localStorage.getItem('goblin:web-terminal-client-id')).toBe('web_oldpersistedclient')
+    expect(window.localStorage.getItem('goblin:terminal-client-id')).toBe('web_oldpersistedclient')
     dispose()
   })
 

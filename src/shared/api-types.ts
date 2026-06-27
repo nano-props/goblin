@@ -80,14 +80,14 @@ export interface ThemeState {
 
 export interface WorkspaceSessionState {
   /** Repo entries that were open, in switcher order. */
-  openRepos: RepoSessionEntry[]
+  openRepoEntries: RepoSessionEntry[]
   /** The active repository id — null when no repos were open. */
-  activeRepo: string | null
+  activeRepoId: string | null
   zenMode: boolean
   workspacePaneSize: number
-  selectedTerminalByWorktree?: Record<string, string>
+  selectedTerminalSessionByWorktree?: Record<string, string>
   /** Per-repo, per-branch workspace pane view preference that session restore can make renderable. */
-  preferredWorkspacePaneViewByBranchByRepo?: Record<string, Record<string, WorkspacePaneSessionTabType>>
+  preferredWorkspacePaneTabByBranchByRepo?: Record<string, Record<string, WorkspacePaneSessionTabType>>
   /** Per-repo, per-branch workspace pane tab strip order. Empty arrays are meaningful. */
   workspacePaneTabOrderByBranchByRepo: Record<string, Record<string, WorkspacePaneTabOrderEntry[]>>
 }

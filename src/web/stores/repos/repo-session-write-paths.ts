@@ -1,6 +1,6 @@
 import { lastPathSegment } from '#/web/lib/paths.ts'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
-import { restoreRepoProjectionFromSnapshot } from '#/web/stores/repos/persistence.ts'
+import { restoreRepoProjectionFromCacheEntry } from '#/web/stores/repos/persistence.ts'
 import { disposeRepoOperationScheduler } from '#/web/stores/repos/repo-operation-scheduler.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
 import { abortRepoOperation, probeRepo } from '#/web/repo-client.ts'
@@ -108,14 +108,14 @@ function orderedInsert(order: string[], id: string, rankById?: ReadonlyMap<strin
  *  id. The caller mutates the result (e.g. sets `remote.target`,
  *  flips availability) before returning it from `upsertRepo.create`. */
 function buildNewRepo(
-  s: Pick<ReposStore, 'restorableRepoCache'>,
+  s: Pick<ReposStore, 'repoSnapshotCache'>,
   id: string,
   nameHints: ReadonlyArray<string | undefined | null>,
 ): RepoState {
-  const cached = s.restorableRepoCache[id]
+  const cached = s.repoSnapshotCache[id]
   const hint = nameHints.find((value): value is string => !!value)
   const name = hint ?? cached?.name ?? lastPathSegment(id)
-  const repo = restoreRepoProjectionFromSnapshot(emptyRepo(id, name), cached)
+  const repo = restoreRepoProjectionFromCacheEntry(emptyRepo(id, name), cached)
   return hint ? { ...repo, name: hint } : repo
 }
 
@@ -142,7 +142,7 @@ function remoteTargetsEqual(a: RemoteRepoTarget | undefined | null, b: RemoteRep
  *    any in-place update that returns a non-null value, false when
  *    the existing repo was preserved (no-op or update returned null). */
 function upsertRepo(
-  s: Pick<ReposStore, 'repos' | 'restorableRepoCache' | 'order'>,
+  s: Pick<ReposStore, 'repos' | 'repoSnapshotCache' | 'order'>,
   id: string,
   options: {
     rankById?: ReadonlyMap<string, number>
@@ -171,7 +171,7 @@ function upsertRepo(
 }
 
 export function addResolvedRepo(
-  s: Pick<ReposStore, 'repos' | 'restorableRepoCache' | 'order'>,
+  s: Pick<ReposStore, 'repos' | 'repoSnapshotCache' | 'order'>,
   resolvedRepo: ResolvedRepo,
   rankById?: ReadonlyMap<string, number>,
 ): Pick<ReposStore, 'repos' | 'order'> & { changed: boolean; id: string } {
@@ -223,7 +223,7 @@ export function addResolvedRepo(
  *     availability is unavailable.)
  */
 export function addUnavailableRepo(
-  s: Pick<ReposStore, 'repos' | 'restorableRepoCache' | 'order'>,
+  s: Pick<ReposStore, 'repos' | 'repoSnapshotCache' | 'order'>,
   id: string,
   reason: string,
   target?: RemoteRepoTarget,
@@ -275,7 +275,7 @@ export function addUnavailableRepo(
  * is the signal callers should branch on rather than reading target fields.
  */
 export function insertPlaceholderRepo(
-  s: Pick<ReposStore, 'repos' | 'restorableRepoCache' | 'order'>,
+  s: Pick<ReposStore, 'repos' | 'repoSnapshotCache' | 'order'>,
   entry: RepoSessionEntry,
   rankById?: ReadonlyMap<string, number>,
 ): Pick<ReposStore, 'repos' | 'order'> & { changed: boolean; id: string } {
@@ -293,7 +293,7 @@ export function insertPlaceholderRepo(
       if (entry.kind === 'remote') markRemoteLifecycleConnecting(repo)
       // 'refreshing' so the cached branches render with a stale indicator
       // (dataLoadInitialLoading would hide them).
-      const cached = s.restorableRepoCache[entry.id]
+      const cached = s.repoSnapshotCache[entry.id]
       if (cached && cached.data.branches.length > 0) {
         repo.resources.snapshot = { ...repo.resources.snapshot, phase: 'refreshing', error: null, stale: true }
       }
@@ -333,7 +333,7 @@ export function createRuntimeRepoSessionActions(
         if (!get().repos[entry.id]) {
           set((s) => {
             const result = insertPlaceholderRepo(
-              { repos: s.repos, restorableRepoCache: s.restorableRepoCache, order: s.order },
+              { repos: s.repos, repoSnapshotCache: s.repoSnapshotCache, order: s.order },
               entry,
             )
             return { ...s, repos: result.repos, order: result.order }
@@ -389,16 +389,16 @@ export function createRuntimeRepoSessionActions(
       set((s) => {
         if (!s.repos[id]) return s
         const repos = { ...s.repos }
-        const selectedTerminalByWorktree = { ...s.selectedTerminalByWorktree }
+        const selectedTerminalSessionByWorktree = { ...s.selectedTerminalSessionByWorktree }
         delete repos[id]
-        for (const worktreeKey of Object.keys(selectedTerminalByWorktree)) {
-          if (worktreeKey.startsWith(`${id}\0`)) delete selectedTerminalByWorktree[worktreeKey]
+        for (const worktreeKey of Object.keys(selectedTerminalSessionByWorktree)) {
+          if (worktreeKey.startsWith(`${id}\0`)) delete selectedTerminalSessionByWorktree[worktreeKey]
         }
         const order = s.order.filter((x) => x !== id)
         const activeId = nextActiveRepoIdAfterWorkspaceClose(s.order, s.activeId, id)
         return {
           repos,
-          selectedTerminalByWorktree,
+          selectedTerminalSessionByWorktree,
           order,
           activeId,
         }

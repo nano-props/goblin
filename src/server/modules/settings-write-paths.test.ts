@@ -71,11 +71,11 @@ describe('settings command handlers', () => {
 
   test('persists session state without publishing settings invalidation', async () => {
     const session: WorkspaceSessionState = {
-      openRepos: [],
-      activeRepo: null,
+      openRepoEntries: [],
+      activeRepoId: null,
       zenMode: true,
       workspacePaneSize: 50,
-      selectedTerminalByWorktree: {},
+      selectedTerminalSessionByWorktree: {},
       workspacePaneTabOrderByBranchByRepo: {},
     }
     mocks.setServerSessionState.mockResolvedValue(session)
@@ -114,8 +114,8 @@ describe('settings command handlers', () => {
     const { parseHttpInput } = await import('#/server/common/http-validate.ts')
     const parsed = parseHttpInput(SETTINGS_PATCH_SCHEMAS.session, {
       session: {
-        openRepos: [],
-        activeRepo: null,
+        openRepoEntries: [],
+        activeRepoId: null,
         zenMode: true,
         workspacePaneSize: 42.5,
         workspacePaneTabOrderByBranchByRepo: {},
@@ -132,11 +132,11 @@ describe('settings command handlers', () => {
     expect(() =>
       parseHttpInput(SETTINGS_PATCH_SCHEMAS.session, {
         session: {
-          openRepos: [{ kind: 'local', id: '/tmp/repo' }],
-          activeRepo: '/tmp/repo',
+          openRepoEntries: [{ kind: 'local', id: '/tmp/repo' }],
+          activeRepoId: '/tmp/repo',
           zenMode: true,
           workspacePaneSize: 42.5,
-          preferredWorkspacePaneViewByBranchByRepo: {
+          preferredWorkspacePaneTabByBranchByRepo: {
             '/tmp/repo': {
               main: 'changes',
             },
@@ -156,8 +156,8 @@ describe('settings command handlers', () => {
     const { parseHttpInput } = await import('#/server/common/http-validate.ts')
 
     const session = {
-      openRepos: [{ kind: 'local', id: '/tmp/repo' }],
-      activeRepo: '/tmp/repo',
+      openRepoEntries: [{ kind: 'local', id: '/tmp/repo' }],
+      activeRepoId: '/tmp/repo',
       zenMode: true,
       workspacePaneSize: 42.5,
       workspacePaneTabOrderByBranchByRepo: {

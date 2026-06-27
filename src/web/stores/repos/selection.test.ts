@@ -88,7 +88,7 @@ function preferredViewFor(branchName?: string | null): WorkspacePaneTabType | nu
 function restoreWorkspacePaneState(restoreState: Partial<SessionWorkspacePaneRestoreState>) {
   const normalizedRestoreState: SessionWorkspacePaneRestoreState = {
     workspacePaneTabOrderByBranchByRepo: restoreState.workspacePaneTabOrderByBranchByRepo ?? {},
-    preferredWorkspacePaneViewByBranchByRepo: restoreState.preferredWorkspacePaneViewByBranchByRepo ?? {},
+    preferredWorkspacePaneTabByBranchByRepo: restoreState.preferredWorkspacePaneTabByBranchByRepo ?? {},
   }
   useReposStore.setState((s) => {
     const repos = restoreSessionWorkspacePaneStateInRepos(s.repos, normalizedRestoreState)
@@ -138,7 +138,7 @@ describe('setBranchViewMode', () => {
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.ui.branchViewMode).toBe('worktrees')
     expect(repo?.ui.selectedBranch).toBe('main')
-    expect(useReposStore.getState().restorableRepoCache[REPO_ID]?.ui).toMatchObject({
+    expect(useReposStore.getState().repoSnapshotCache[REPO_ID]?.ui).toMatchObject({
       branchViewMode: 'worktrees',
       selectedBranch: 'main',
     })
@@ -160,7 +160,7 @@ describe('setBranchViewMode', () => {
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.ui.branchViewMode).toBe('worktrees')
     expect(repo?.ui.selectedBranch).toBeNull()
-    expect(useReposStore.getState().restorableRepoCache[REPO_ID]?.ui.selectedBranch).toBeNull()
+    expect(useReposStore.getState().repoSnapshotCache[REPO_ID]?.ui.selectedBranch).toBeNull()
   })
 
   test('passes the current repo token to follow-up refreshes', () => {
@@ -229,7 +229,7 @@ describe('selectBranch', () => {
     resolve()
     await Promise.resolve()
     expect(calls).toEqual([{ branches: ['main'], mode: 'full' }])
-    expect(useReposStore.getState().restorableRepoCache[REPO_ID]?.ui.selectedBranch).toBe('main')
+    expect(useReposStore.getState().repoSnapshotCache[REPO_ID]?.ui.selectedBranch).toBe('main')
   })
 
   test('passes the current repo token to selected branch refreshes', () => {
@@ -305,7 +305,7 @@ describe('clearSelectedBranch', () => {
     await flushAsyncWork()
 
     expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBeNull()
-    expect(useReposStore.getState().restorableRepoCache[REPO_ID]?.ui.selectedBranch).toBeNull()
+    expect(useReposStore.getState().repoSnapshotCache[REPO_ID]?.ui.selectedBranch).toBeNull()
     expect(calls).toBe(0)
   })
 
@@ -374,7 +374,7 @@ describe('setWorkspacePaneTab', () => {
   test('does not restore a branch-level preferred view whose tab is closed', () => {
     seedRepo({ selectedBranch: 'main', preferredWorkspacePaneView: 'status', workspacePaneStaticViews: ['status'] })
 
-    restoreWorkspacePaneState({ preferredWorkspacePaneViewByBranchByRepo: { [REPO_ID]: { main: 'history' } } })
+    restoreWorkspacePaneState({ preferredWorkspacePaneTabByBranchByRepo: { [REPO_ID]: { main: 'history' } } })
 
     expect(preferredViewFor('main')).toBe('status')
     expect(openViewsFor('main')).toEqual(['status'])

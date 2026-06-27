@@ -14,11 +14,11 @@ export const DEFAULT_LAN_ENABLED = false
 
 export function defaultSessionState(): WorkspaceSessionState {
   return {
-    openRepos: [],
-    activeRepo: null,
+    openRepoEntries: [],
+    activeRepoId: null,
     zenMode: DEFAULT_ZEN_MODE,
     workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
-    selectedTerminalByWorktree: {},
+    selectedTerminalSessionByWorktree: {},
     workspacePaneTabOrderByBranchByRepo: {},
   }
 }

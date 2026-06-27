@@ -162,7 +162,7 @@ describe('repo lifecycle', () => {
     })
     expect(target).not.toBeNull()
     useReposStore.setState({
-      restorableRepoCache: {
+      repoSnapshotCache: {
         [target!.id]: {
           savedAt: Date.now(),
           name: 'example:/',

@@ -142,7 +142,7 @@ export interface RepoRemoteState {
 
 export type RepoAvailabilityState = { phase: 'available' } | { phase: 'unavailable'; reason: string; checkedAt: number }
 
-export interface RestorableRepoSnapshot {
+export interface RepoSnapshotCacheEntry {
   savedAt: number
   name: string
   data: Pick<RepoDataState, 'branches' | 'currentBranch'>
@@ -173,27 +173,27 @@ export interface RuntimeCoherentRepoProjectionState {
 
 export interface RestorableRepoCacheState {
   /** Warm-start cache used only for restore. This is not runtime-coherent shared state. */
-  restorableRepoCache: Record<string, RestorableRepoSnapshot>
+  repoSnapshotCache: Record<string, RepoSnapshotCacheEntry>
 }
 
 export interface RestorableWorkspaceState {
   /** Client workspace UI state that is serialized into WorkspaceSessionState for
    *  next-launch restore. This is restorable state, not runtime-coherent
    *  shared state. */
-  /** Open repository order restored from WorkspaceSessionState.openRepos. */
+  /** Open repository order restored from WorkspaceSessionState.openRepoEntries. */
   order: string[]
-  /** Active repository restored from WorkspaceSessionState.activeRepo. */
+  /** Active repository restored from WorkspaceSessionState.activeRepoId. */
   activeId: string | null
   /** Large-screen Zen Mode restored from WorkspaceSessionState. Compact UI is stronger and always shows one pane at a time. */
   zenMode: boolean
   workspacePaneSize: number
-  /** Per worktree terminal selection restored from WorkspaceSessionState.selectedTerminalByWorktree. */
-  selectedTerminalByWorktree: Record<string, string>
+  /** Per worktree terminal selection restored from WorkspaceSessionState.selectedTerminalSessionByWorktree. */
+  selectedTerminalSessionByWorktree: Record<string, string>
 }
 
 export interface SessionWorkspacePaneRestoreState {
   workspacePaneTabOrderByBranchByRepo: Record<string, Record<string, WorkspacePaneTabOrderEntry[]>>
-  preferredWorkspacePaneViewByBranchByRepo: Record<string, Record<string, WorkspacePaneSessionTabType>>
+  preferredWorkspacePaneTabByBranchByRepo: Record<string, Record<string, WorkspacePaneSessionTabType>>
 }
 
 export interface RepoSessionHydrationOptions {
@@ -212,7 +212,7 @@ export interface LocalWorkspaceState {
 export interface RestorableWorkspaceActions {
   setActive: (id: string) => void
   applySessionLayoutState: (layout: Pick<WorkspaceSessionState, 'zenMode' | 'workspacePaneSize'>) => void
-  applySessionSelectedTerminalState: (selectedTerminalByWorktree: Record<string, string>) => void
+  applySessionSelectedTerminalState: (selectedTerminalSessionByWorktree: Record<string, string>) => void
   setZenMode: (enabled: boolean) => void
   toggleZenMode: () => void
   setWorkspacePaneSize: (size: number) => void
@@ -277,8 +277,8 @@ export interface RuntimeCoherentRepoProjectionActions {
   setLastResult: (id: string, result: ExecResult, token: number, options?: RepoResultEventOptions) => void
   clearEvents: (id: string, eventIds: number[]) => void
   hydrateRepoSession: (
-    openRepos: RepoSessionEntry[],
-    activeRepo: string | null,
+    openRepoEntries: RepoSessionEntry[],
+    activeRepoId: string | null,
     options?: RepoSessionHydrationOptions,
   ) => Promise<void>
   /** Clear the fetchFailed flag — called by manual fetch success and

@@ -14,15 +14,15 @@ export function sessionStateFromRestorableWorkspaceState(input: {
 }): WorkspaceSessionState {
   const { repos, restorableWorkspaceState } = input
   return {
-    openRepos: persistedOpenWorkspaceEntries(restorableWorkspaceState.order, repos),
-    activeRepo: persistedActiveRepoIdForSession(restorableWorkspaceState.activeId),
+    openRepoEntries: persistedOpenWorkspaceEntries(restorableWorkspaceState.order, repos),
+    activeRepoId: persistedActiveRepoIdForSession(restorableWorkspaceState.activeId),
     zenMode: restorableWorkspaceState.zenMode,
     workspacePaneSize: restorableWorkspaceState.workspacePaneSize,
-    selectedTerminalByWorktree: persistedSelectedTerminalByWorktreeForSession(
-      restorableWorkspaceState.selectedTerminalByWorktree,
+    selectedTerminalSessionByWorktree: persistedSelectedTerminalByWorktreeForSession(
+      restorableWorkspaceState.selectedTerminalSessionByWorktree,
       repos,
     ),
-    preferredWorkspacePaneViewByBranchByRepo: persistedPreferredWorkspacePaneViewByBranchByRepoForSession(
+    preferredWorkspacePaneTabByBranchByRepo: persistedPreferredWorkspacePaneViewByBranchByRepoForSession(
       repos,
       restorableWorkspaceState.order,
     ),
@@ -38,24 +38,22 @@ export function sessionStateFromRestorableWorkspaceState(input: {
  *  subsequent updates flow through useSessionPersistence. */
 interface RestoredWorkspaceStateFromSession extends Pick<
   RestorableWorkspaceState,
-  'activeId' | 'zenMode' | 'workspacePaneSize' | 'selectedTerminalByWorktree'
+  'activeId' | 'zenMode' | 'workspacePaneSize' | 'selectedTerminalSessionByWorktree'
 > {
-  preferredWorkspacePaneViewByBranchByRepo: NonNullable<
-    WorkspaceSessionState['preferredWorkspacePaneViewByBranchByRepo']
-  >
+  preferredWorkspacePaneTabByBranchByRepo: NonNullable<WorkspaceSessionState['preferredWorkspacePaneTabByBranchByRepo']>
   workspacePaneTabOrderByBranchByRepo: WorkspaceSessionState['workspacePaneTabOrderByBranchByRepo']
 }
 
 export function restoreRestorableWorkspaceStateFromSession(
   session: WorkspaceSessionState,
-  activeId: string | null = session.activeRepo,
+  activeId: string | null = session.activeRepoId,
 ): RestoredWorkspaceStateFromSession {
   return {
     activeId,
     zenMode: session.zenMode,
     workspacePaneSize: session.workspacePaneSize,
-    selectedTerminalByWorktree: session.selectedTerminalByWorktree ?? {},
-    preferredWorkspacePaneViewByBranchByRepo: session.preferredWorkspacePaneViewByBranchByRepo ?? {},
+    selectedTerminalSessionByWorktree: session.selectedTerminalSessionByWorktree ?? {},
+    preferredWorkspacePaneTabByBranchByRepo: session.preferredWorkspacePaneTabByBranchByRepo ?? {},
     workspacePaneTabOrderByBranchByRepo: session.workspacePaneTabOrderByBranchByRepo ?? {},
   }
 }

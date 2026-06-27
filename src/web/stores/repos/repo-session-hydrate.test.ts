@@ -34,7 +34,7 @@ describe('repo session hydration', () => {
   test('hydrateRepoSession uses cached repo data while the initial refresh runs', async () => {
     const savedAt = Date.now()
     useReposStore.setState({
-      restorableRepoCache: {
+      repoSnapshotCache: {
         [REPO_A]: {
           savedAt,
           name: 'cached-a',
@@ -92,7 +92,7 @@ describe('repo session hydration', () => {
   test('hydrateRepoSession exposes resolved cached repos before slower probes finish', async () => {
     const savedAt = Date.now()
     useReposStore.setState({
-      restorableRepoCache: {
+      repoSnapshotCache: {
         [REPO_A]: {
           savedAt,
           name: 'cached-a',
@@ -165,7 +165,7 @@ describe('repo session hydration', () => {
   test('hydrateRepoSession applies restored branch tab open-sets before cached placeholders become ready', async () => {
     const savedAt = Date.now()
     useReposStore.setState({
-      restorableRepoCache: {
+      repoSnapshotCache: {
         [REPO_A]: {
           savedAt,
           name: 'cached-a',
@@ -197,7 +197,7 @@ describe('repo session hydration', () => {
     const work = useReposStore.getState().hydrateRepoSession([localRepoSessionEntry(REPO_A)], REPO_A, {
       workspacePaneRestoreState: {
         workspacePaneTabOrderByBranchByRepo: { [REPO_A]: { main: [] } },
-        preferredWorkspacePaneViewByBranchByRepo: { [REPO_A]: { main: 'status' } },
+        preferredWorkspacePaneTabByBranchByRepo: { [REPO_A]: { main: 'status' } },
       },
     })
 
@@ -223,7 +223,7 @@ describe('repo session hydration', () => {
     expect(useReposStore.getState().activeId).toBe(REPO_A)
   })
 
-  test('hydrateRepoSession flips sessionReady even when openRepos is empty', async () => {
+  test('hydrateRepoSession flips sessionReady even when openRepoEntries is empty', async () => {
     // Regression: a session with zero open repos used to leave the boot
     // skeleton up forever because sessionReady only flipped on the first
     // placeholder landing, and Phase 1 with no entries is a no-op.

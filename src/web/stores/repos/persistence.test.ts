@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, test } from 'vitest'
 import {
-  restoreRepoProjectionFromSnapshot,
-  normalizeRestorableRepoCache,
-  persistRestorableRepoSnapshot,
+  restoreRepoProjectionFromCacheEntry,
+  normalizeRepoSnapshotCache,
+  persistRepoSnapshotCacheEntry,
 } from '#/web/stores/repos/persistence.ts'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import {
@@ -12,8 +12,8 @@ import {
   seedRepoState,
 } from '#/web/stores/repos/test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import type { RestorableRepoSnapshot } from '#/web/stores/repos/types.ts'
-function cachedRepo(savedAt: number): RestorableRepoSnapshot {
+import type { RepoSnapshotCacheEntry } from '#/web/stores/repos/types.ts'
+function cachedRepo(savedAt: number): RepoSnapshotCacheEntry {
   return {
     savedAt,
     name: 'repo',
@@ -30,14 +30,14 @@ function cachedRepo(savedAt: number): RestorableRepoSnapshot {
 
 beforeEach(resetReposStore)
 
-describe('normalizeRestorableRepoCache', () => {
+describe('normalizeRepoSnapshotCache', () => {
   test('keeps only the newest 50 valid cache entries', () => {
     const now = Date.now()
     const raw = Object.fromEntries(
       Array.from({ length: 55 }, (_, index) => [`/repo-${index}`, cachedRepo(now + index)]),
     )
 
-    const normalized = normalizeRestorableRepoCache(raw)
+    const normalized = normalizeRepoSnapshotCache(raw)
 
     expect(Object.keys(normalized)).toHaveLength(50)
     expect(normalized['/repo-0']).toBeUndefined()
@@ -48,7 +48,7 @@ describe('normalizeRestorableRepoCache', () => {
 
   test('drops expired and invalid cache entries', () => {
     const now = Date.now()
-    const normalized = normalizeRestorableRepoCache({
+    const normalized = normalizeRepoSnapshotCache({
       fresh: cachedRepo(now),
       expired: cachedRepo(now - 15 * 24 * 60 * 60 * 1000),
       invalid: { savedAt: now, name: 'repo' },
@@ -62,14 +62,14 @@ describe('normalizeRestorableRepoCache', () => {
     const raw = cachedRepo(now)
     raw.data.branches = [createRepoBranch('feature/a', { worktree: { path: '/tmp/worktree-a' } })]
 
-    const normalized = normalizeRestorableRepoCache({ repo: raw })
+    const normalized = normalizeRepoSnapshotCache({ repo: raw })
 
     expect(normalized.repo?.data.branches[0]?.worktree).toEqual({ path: '/tmp/worktree-a' })
     expect(normalized.repo?.data.branches[0]?.pullRequest).toBeUndefined()
   })
 })
 
-describe('persistRestorableRepoSnapshot', () => {
+describe('persistRepoSnapshotCacheEntry', () => {
   test('does not write a stale cache entry after the repo instance changes', () => {
     const staleRepo = seedRepoState({
       id: '/repo',
@@ -80,9 +80,9 @@ describe('persistRestorableRepoSnapshot', () => {
     })
     seedRepoState({ id: '/repo', instanceToken: 2 })
 
-    persistRestorableRepoSnapshot(useReposStore.setState, staleRepo, 1)
+    persistRepoSnapshotCacheEntry(useReposStore.setState, staleRepo, 1)
 
-    expect(useReposStore.getState().restorableRepoCache['/repo']).toBeUndefined()
+    expect(useReposStore.getState().repoSnapshotCache['/repo']).toBeUndefined()
   })
 
   test('persists branch references without dynamic worktree or pull request state', () => {
@@ -113,15 +113,15 @@ describe('persistRestorableRepoSnapshot', () => {
       selectedBranch: 'feature/a',
     })
 
-    persistRestorableRepoSnapshot(useReposStore.setState, repo, 1)
+    persistRepoSnapshotCacheEntry(useReposStore.setState, repo, 1)
 
-    const cached = useReposStore.getState().restorableRepoCache['/repo']
+    const cached = useReposStore.getState().repoSnapshotCache['/repo']
     expect(cached?.data.branches[0]?.worktree).toEqual({ path: '/tmp/worktree-a' })
     expect(cached?.data.branches[0]?.pullRequest).toBeUndefined()
   })
 })
 
-describe('restoreRepoProjectionFromSnapshot', () => {
+describe('restoreRepoProjectionFromCacheEntry', () => {
   test('hydrates branch references without restoring dynamic worktree or pull request state', () => {
     const now = Date.now()
     const cached = cachedRepo(now)
@@ -138,7 +138,7 @@ describe('restoreRepoProjectionFromSnapshot', () => {
       }),
     ]
 
-    const repo = restoreRepoProjectionFromSnapshot(emptyRepo('/repo', 'repo'), cached)
+    const repo = restoreRepoProjectionFromCacheEntry(emptyRepo('/repo', 'repo'), cached)
 
     expect(repo.data.branches[0]?.worktree).toEqual({ path: '/tmp/worktree-a' })
     expect(repo.data.branches[0]?.pullRequest).toBeUndefined()
