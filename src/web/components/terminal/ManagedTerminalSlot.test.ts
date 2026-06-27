@@ -748,6 +748,51 @@ describe('ManagedTerminalSlot', () => {
     expect(term.refresh).not.toHaveBeenCalled()
   })
 
+  test('does not force scroll position across font refits', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
+    hydrateManagedSession(session)
+
+    session.attach(host)
+    await flushTerminalStart()
+    await flushUntil(() => session.snapshot().phase === 'open')
+
+    const term = xtermMocks.terminals[0]!
+    const fitAddon = xtermMocks.fitAddons[0]!
+    term.scrollToBottom.mockClear()
+    fitAddon.fit.mockClear()
+
+    mockFonts.resolveReady()
+    await flushFontRefit()
+
+    expect(fitAddon.fit).toHaveBeenCalledTimes(1)
+    expect(term.scrollToBottom).not.toHaveBeenCalled()
+  })
+
+  test('does not force scroll position while applying viewer canonical size', async () => {
+    terminalCalls.attach.mockResolvedValueOnce(
+      attachResult('pty_session_1_aaaaaaaaa', {
+        controller: { clientId: 'client_remote', status: 'connected' },
+        canonicalCols: 120,
+        canonicalRows: 40,
+      }),
+    )
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
+    hydrateManagedSession(session)
+
+    session.attach(host)
+    await flushTerminalStart()
+    await flushUntil(() => session.snapshot().phase === 'open')
+
+    const term = xtermMocks.terminals[0]!
+    expect(term.cols).toBe(120)
+    expect(term.rows).toBe(40)
+    expect(term.scrollToBottom).not.toHaveBeenCalled()
+  })
+
   test('loads terminal addons and exposes search and serialization', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
@@ -792,11 +837,13 @@ describe('ManagedTerminalSlot', () => {
       const term = xtermMocks.terminals[0]!
       expect(term.options.macOptionIsMeta).toBe(true)
       expect(term.customKeyEventHandler).toBeTypeOf('function')
+      term.scrollToBottom.mockClear()
 
       expect(term.customKeyEventHandler?.(optionArrow('ArrowLeft'))).toBe(false)
       expect(term.customKeyEventHandler?.(optionArrow('ArrowRight'))).toBe(false)
       expect(term.customKeyEventHandler?.(optionArrow('ArrowUp'))).toBe(false)
       expect(term.customKeyEventHandler?.(optionArrow('ArrowDown'))).toBe(false)
+      expect(term.scrollToBottom).toHaveBeenCalledTimes(4)
       await flushTerminalStart()
 
       // Rapid option-arrow keys are batched into a single write via queueMicrotask.
@@ -804,7 +851,9 @@ describe('ManagedTerminalSlot', () => {
       expect(terminalCalls.write).toHaveBeenCalledWith({ ptySessionId: 'pty_session_1_aaaaaaaaa', data: '\x1bb\x1bf\x1b[A\x1b[B' })
 
       term.modes.applicationCursorKeysMode = true
+      term.scrollToBottom.mockClear()
       expect(term.customKeyEventHandler?.(optionArrow('ArrowLeft'))).toBe(true)
+      expect(term.scrollToBottom).not.toHaveBeenCalled()
       expect(terminalCalls.write).toHaveBeenCalledTimes(1)
     } finally {
       Object.defineProperty(window.navigator, 'platform', { configurable: true, value: savedPlatform })
@@ -829,6 +878,7 @@ describe('ManagedTerminalSlot', () => {
 
       const term = xtermMocks.terminals[0]!
       expect(term.customKeyEventHandler).toBeTypeOf('function')
+      term.scrollToBottom.mockClear()
 
       // Safari reports unshifted '/' for Shift+Slash — workaround should send '?'.
       const slashEvent = new KeyboardEvent('keydown', { key: '/', code: 'Slash', shiftKey: true, cancelable: true })
@@ -837,6 +887,7 @@ describe('ManagedTerminalSlot', () => {
       // Safari reports empty key for Shift+Digit1 — workaround should send '!'.
       const digit1Event = new KeyboardEvent('keydown', { key: '', code: 'Digit1', shiftKey: true, cancelable: true })
       expect(term.customKeyEventHandler?.(digit1Event)).toBe(false)
+      expect(term.scrollToBottom).toHaveBeenCalledTimes(2)
 
       await flushTerminalStart()
 

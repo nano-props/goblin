@@ -56,7 +56,6 @@ export class TerminalSlotView {
   private disposeFontObserver: (() => void) | null = null
   private fitFlushTimer: number | null = null
   private fontFitTimer: number | null = null
-  private pinToBottomFrame: number | null = null
   private host: HTMLElement | null = null
   private readonly safariShiftKeyResolver = new SafariShiftKeyResolver()
   private pendingCoreUserInput = 0
@@ -195,7 +194,6 @@ export class TerminalSlotView {
     if (!this.term) return
     if (this.term.cols === cols && this.term.rows === rows) return
     this.term.resize(cols, rows)
-    this.pinToBottomSoon()
   }
 
   serialize(): string {
@@ -207,7 +205,7 @@ export class TerminalSlotView {
   }
 
   scrollToBottom(): void {
-    scrollTerminalToBottom(this.term)
+    this.term?.scrollToBottom()
   }
 
   scrollLines(amount: number): void {
@@ -238,7 +236,6 @@ export class TerminalSlotView {
   fitNow(): void {
     if (!this.term || !this.fitAddon || !hasMeasurableBox(this.xtermHost)) return
     this.fitAddon.fit()
-    this.pinToBottomSoon()
   }
 
   destroyTerminal(): void {
@@ -250,7 +247,6 @@ export class TerminalSlotView {
     this.disposeFontObserver?.()
     this.disposeFontObserver = null
     this.cancelFontFit()
-    this.cancelPinToBottom()
     this.safariShiftKeyResolver.reset()
     this.pendingCoreUserInput = 0
     this.pendingFallbackUserInput = []
@@ -276,18 +272,27 @@ export class TerminalSlotView {
       if (optionInput) {
         event.preventDefault()
         event.stopPropagation()
-        onInput(userTerminalInput(optionInput, 'keyboard'))
+        this.sendInterceptedKeyboardInput(term, optionInput, onInput)
         return false
       }
       const safariShiftInput = safariShiftKeyResolver.inputForEvent(event)
       if (safariShiftInput) {
         event.preventDefault()
         event.stopPropagation()
-        onInput(userTerminalInput(safariShiftInput, 'keyboard'))
+        this.sendInterceptedKeyboardInput(term, safariShiftInput, onInput)
         return false
       }
       return true
     })
+  }
+
+  private sendInterceptedKeyboardInput(
+    term: XTermTerminal,
+    data: string,
+    onInput: (input: TerminalInput) => void,
+  ): void {
+    if (term.options.scrollOnUserInput) term.scrollToBottom()
+    onInput(userTerminalInput(data, 'keyboard'))
   }
 
   private installCoreUserInputAttribution(term: XTermTerminal): boolean {
@@ -478,30 +483,12 @@ export class TerminalSlotView {
   private fitForFontLoad(term: XTermTerminal): void {
     if (this.term !== term || !this.fitAddon || !hasMeasurableBox(this.xtermHost)) return
     this.fitAddon.fit()
-    this.pinToBottomSoon()
   }
 
   private cancelFitFlush(): void {
     if (this.fitFlushTimer === null) return
     window.clearTimeout(this.fitFlushTimer)
     this.fitFlushTimer = null
-  }
-
-  private pinToBottomSoon(): void {
-    if (!this.term) return
-    // Product policy: after any local terminal resize/fit pass, always snap
-    // back to the live tail instead of preserving scroll position.
-    this.cancelPinToBottom()
-    this.pinToBottomFrame = requestAnimationFrame(() => {
-      this.pinToBottomFrame = null
-      scrollTerminalToBottom(this.term)
-    })
-  }
-
-  private cancelPinToBottom(): void {
-    if (this.pinToBottomFrame === null) return
-    cancelScheduledAnimationFrame(this.pinToBottomFrame)
-    this.pinToBottomFrame = null
   }
 }
 
@@ -539,14 +526,4 @@ function blurElementIfFocused(element: HTMLElement): void {
 function hasMeasurableBox(element: HTMLElement): boolean {
   const rect = element.getBoundingClientRect()
   return rect.width > 0 && rect.height > 0
-}
-
-function scrollTerminalToBottom(term: XTermTerminal | null): void {
-  if (!term) return
-  term.scrollToBottom()
-}
-
-function cancelScheduledAnimationFrame(frame: number): void {
-  if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(frame)
-  else clearTimeout(frame)
 }
