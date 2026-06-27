@@ -8,7 +8,7 @@ import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
 
 /**
  * Wire on `webUtils.getPathForFile`. This is the only Electron preload /
- * main-process surface that resolves a `File` (delivered via the
+ * native-host surface that resolves a `File` (delivered via the
  * `ClipboardEvent` / `DragEvent`) back to an absolute filesystem path —
  * the client uses it transparently through `pathForDroppedFile`.
  *

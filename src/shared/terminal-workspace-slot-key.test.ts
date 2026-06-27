@@ -7,8 +7,8 @@ import {
   terminalPruneKeyFromSlotKey,
 } from '#/shared/terminal-workspace-slot-key.ts'
 
-describe('terminal slot key helpers', () => {
-  test('formats and parses terminal slot keys round-trip', () => {
+describe('terminal workspace slot key helpers', () => {
+  test('formats and parses terminal workspace slot keys round-trip', () => {
     const key = formatTerminalWorkspaceSlotKey('/repo', '/repo/worktree', 'slot-2')
     expect(key).toBe('/repo\0/repo/worktree\0slot-2')
     expect(parseTerminalWorkspaceSlotKey(key)).toEqual({
@@ -18,7 +18,7 @@ describe('terminal slot key helpers', () => {
     })
   })
 
-  test('rejects malformed terminal slot keys', () => {
+  test('rejects malformed terminal workspace slot keys', () => {
     expect(parseTerminalWorkspaceSlotKey('')).toBeNull()
     expect(parseTerminalWorkspaceSlotKey('/repo')).toBeNull()
     expect(parseTerminalWorkspaceSlotKey('/repo\0/worktree')).toBeNull()

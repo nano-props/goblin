@@ -136,7 +136,7 @@ contract rules.
 
 ### Why
 
-The current client-side registry is still healthy, but it is accumulating several kinds of responsibility.
+The current TerminalSessionProjection is still healthy, but it is accumulating several kinds of responsibility.
 This is not yet a crisis, so it should follow the server-side lifecycle work rather than precede it.
 
 ## P2: Add contract tests for terminal invariants

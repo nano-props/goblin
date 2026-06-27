@@ -33,12 +33,12 @@ describe('client surface registry', () => {
     const registry = await import('#/main/client-surface-registry.ts')
     const primary = makeWindow()
 
-    registry.registerClientWindowSurface(primary, { windowKey: 'main' })
+    registry.registerClientWindowSurface(primary, { windowKey: 'primary' })
 
     expect(registry.getPrimaryWindow()).toBe(primary)
     expect(registry.isRegisteredClientSurfaceId(primary.webContents.id)).toBe(true)
     expect(registry.registeredClientSurfaceByWebContentsId(primary.webContents.id)).toEqual({
-      windowKey: 'main',
+      windowKey: 'primary',
       capabilities: {
         ipcBroadcast: true,
         themeSync: true,
@@ -48,7 +48,7 @@ describe('client surface registry', () => {
     mocks.getFocusedWindow.mockReturnValue(primary)
     expect(registry.getFocusedRegisteredWindow()).toBe(primary)
     expect(registry.focusedRegisteredSurface()).toEqual({
-      windowKey: 'main',
+      windowKey: 'primary',
       capabilities: {
         ipcBroadcast: true,
         themeSync: true,
@@ -62,7 +62,7 @@ describe('client surface registry', () => {
     const registry = await import('#/main/client-surface-registry.ts')
     const primary = makeWindow()
 
-    registry.registerClientWindowSurface(primary, { windowKey: 'main', capabilities: { ipcBroadcast: true } })
+    registry.registerClientWindowSurface(primary, { windowKey: 'primary', capabilities: { ipcBroadcast: true } })
     registry.broadcastToSurfaceCapability('ipcBroadcast', HOST_IPC_EVENT_CHANNEL, [{ type: 'settings-write-error' }])
 
     expect(primary.webContents.send).toHaveBeenCalledWith(HOST_IPC_EVENT_CHANNEL, { type: 'settings-write-error' })
@@ -72,11 +72,11 @@ describe('client surface registry', () => {
     const registry = await import('#/main/client-surface-registry.ts')
     const primary = makeWindow()
 
-    registry.registerClientWindowSurface(primary, { windowKey: 'main', capabilities: { themeSync: true } })
+    registry.registerClientWindowSurface(primary, { windowKey: 'primary', capabilities: { themeSync: true } })
 
     expect(registry.allRegisteredSurfacesWithCapability('themeSync')).toEqual([
       {
-        windowKey: 'main',
+        windowKey: 'primary',
         capabilities: {
           ipcBroadcast: true,
           themeSync: true,

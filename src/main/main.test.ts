@@ -31,7 +31,7 @@ const mocks = vi.hoisted(() => {
     syncGlobalShortcuts: vi.fn(),
     enqueueExternalOpenPath: vi.fn(() => true),
     unregisterAppShortcuts: vi.fn(),
-    wireIpc: vi.fn(),
+    wireNativeHostIpc: vi.fn(),
     broadcastClientEffectIntent: vi.fn(),
     wireShellIpc: vi.fn(),
     wireTerminalIpc: vi.fn(),
@@ -64,7 +64,7 @@ vi.mock('electron', () => ({
   dialog: {
     showErrorBox: vi.fn(),
   },
-  // wireMainProcessIpc() registers IPC handlers; the test never reads
+  // wireNativeHostIpc() registers IPC handlers; the test never reads
   // from them but the calls must not throw, so we expose a no-op ipcMain.
   ipcMain: {
     on: vi.fn(),
@@ -106,7 +106,7 @@ vi.mock('#/main/i18n/index.ts', () => ({
 }))
 
 vi.mock('#/main/native-host-ipc-router.ts', () => ({
-  wireIpc: mocks.wireIpc,
+  wireNativeHostIpc: mocks.wireNativeHostIpc,
 }))
 
 vi.mock('#/main/client-surface-events.ts', () => ({

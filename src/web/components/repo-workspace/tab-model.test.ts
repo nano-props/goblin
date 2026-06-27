@@ -7,8 +7,8 @@ import {
 import type { WorkspacePaneTabSummary } from '#/web/components/terminal/types.ts'
 import type { WorkspacePaneStaticTabType, WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
 
-const REPO_ID = '/tmp/gbl-workspace-pane-tab-model-repo'
-const WORKTREE_PATH = '/tmp/gbl-workspace-pane-tab-model-worktree'
+const REPO_ID = '/tmp/gbl-repo-workspace-tab-model-repo'
+const WORKTREE_PATH = '/tmp/gbl-repo-workspace-tab-model-worktree'
 const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
 
 describe('repo workspace pane tab model', () => {
@@ -262,7 +262,7 @@ describe('repo workspace pane tab model', () => {
   test('keeps terminal-host while create is pending after the last tab was closed', () => {
     // Regression: closing every workspace tab leaves a close context behind.
     // Creating a terminal from that empty strip must still mount the
-    // terminal host; otherwise the registry waits for host geometry until it
+    // terminal host; otherwise the projection waits for host geometry until it
     // times out with error.terminal-host-not-measurable.
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,

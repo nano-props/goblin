@@ -7,7 +7,7 @@
 // human-readable in logs.
 //
 // Scope normalization (`terminalSessionScope`) lives in
-// `server/terminal/terminal-slot-scope.ts` because it depends on
+// `server/terminal/terminal-session-scope.ts` because it depends on
 // `node:path`. This file stays pure so the client can import the
 // format/parse helpers via `web/components/terminal/terminal-workspace-slot-keys.ts`
 // without dragging Node built-ins into the bundle.

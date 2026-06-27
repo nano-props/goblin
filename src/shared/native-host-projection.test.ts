@@ -51,7 +51,7 @@ describe('native host projection helpers', () => {
     })
   })
 
-  test('rejects an empty shell projection payload', () => {
+  test('rejects an empty native host projection payload', () => {
     expect(v.safeParse(NativeHostProjectionSchema, {}).success).toBe(false)
   })
 })

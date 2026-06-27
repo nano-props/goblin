@@ -56,7 +56,7 @@ export class TerminalSession {
   // auto-promote-on-write path. The gate is constructed lazily so
   // the runtime/bridge dependency wiring stays inside the methods
   // that need it; this also keeps the gate from outliving the
-  // session when the registry disposes us.
+  // session when the projection disposes us.
   private authorityGate: TerminalAuthorityGate | null = null
   private startToken = 0
   private geometryAbortController: AbortController | null = null
@@ -77,7 +77,7 @@ export class TerminalSession {
     descriptor: TerminalDescriptor,
     notify: (reason: TerminalNotifyReason) => void,
     onBell: ((descriptor: TerminalDescriptor, event: TerminalBellEvent) => void) | null = null,
-    // Durable close hook. The registry passes this in so dispose() can
+    // Durable close hook. The projection passes this in so dispose() can
     // hand the close to a queue (drained on the next create for the
     // same worktree) instead of firing `terminalBridge.close` as a
     // fire-and-forget. The old `void … .catch(() => {})` path could
@@ -137,7 +137,7 @@ export class TerminalSession {
 
   dispose(options: { closeSession?: boolean } = {}): void {
     void this.disposeAndWait(options).catch(() => {
-      // Durable close failures are logged at the registry queue. The
+      // Durable close failures are logged at the projection queue. The
       // synchronous dispose surface intentionally preserves the old
       // fire-and-forget behaviour for callers that are not resource gates.
     })
@@ -153,7 +153,7 @@ export class TerminalSession {
     const ptySessionIds = this.runtime.disposePtySessionIds()
     const closePromises: Promise<void>[] = []
     if (options.closeSession !== false) {
-      // Hand the close to the registry's durable queue instead of
+      // Hand the close to the projection's durable queue instead of
       // firing `terminalBridge.close` directly. The queue resolves
       // only after the server close settles, so async close callers
       // can use this method as a resource-release barrier.
@@ -219,7 +219,7 @@ export class TerminalSession {
         // Post-dispose guard: the gate's takeover round-trip can
         // resolve after `dispose()` ran, in which case the session no
         // longer owns this ptySessionId. Drop the write — the
-        // registry's durable-close queue has already taken
+        // projection's durable-close queue has already taken
         // responsibility for the actual close.
         if (this.disposed || this.runtime.currentPtySessionId() !== ptySessionId) return
         if (result.kind === 'denied') {

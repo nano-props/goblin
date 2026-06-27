@@ -30,7 +30,7 @@ const BranchSchema = v.object({
   mergedToDefault: v.optional(v.boolean()),
 })
 
-const RestorableRepoSnapshotSchema = v.object({
+const RepoSnapshotCacheEntrySchema = v.object({
   savedAt: FiniteNumber,
   name: v.string(),
   data: v.object({
@@ -145,7 +145,7 @@ function isExpired(savedAt: number): boolean {
 }
 
 function normalizeRepoSnapshotCacheEntry(value: unknown): RepoSnapshotCacheEntry | null {
-  const parsed = v.safeParse(RestorableRepoSnapshotSchema, value)
+  const parsed = v.safeParse(RepoSnapshotCacheEntrySchema, value)
   if (!parsed.success) return null
   const snapshot = parsed.output
   return {

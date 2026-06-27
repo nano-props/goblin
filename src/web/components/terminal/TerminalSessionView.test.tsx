@@ -1411,7 +1411,7 @@ describe('TerminalSessionView', () => {
     // window to switch worktrees before the resolver returns. The
     // captured `slotKey` would otherwise be typed into a session
     // the user is no longer looking at — invisible to them, or worse,
-    // into a now-detached session that the registry silently drops.
+    // into a now-detached session that the projection silently drops.
     // The fix: capture `key` at handler invocation time, compare to
     // a `keyRef` updated by useEffect on every render, and bail if
     // they diverge.

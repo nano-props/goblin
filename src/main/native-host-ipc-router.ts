@@ -27,7 +27,7 @@ const ipcSignalStorage = new AsyncLocalStorage<AbortSignal>()
 
 let wired = false
 
-export function wireIpc(): void {
+export function wireNativeHostIpc(): void {
   if (wired) return
   wired = true
 

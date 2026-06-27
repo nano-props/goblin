@@ -75,7 +75,7 @@ describe('POST /api/repo/view', () => {
     expect(json.message).toBe('no Goblin window is currently listening for intents')
   })
 
-  test('rejects the terminal tab with 400 (terminal view is owned by the runtime)', async () => {
+  test('rejects the terminal tab with 400 (terminal tab is owned by the runtime)', async () => {
     const subscriber = { send: vi.fn(), close: vi.fn() }
     registerClientIntentSocket(subscriber)
 

@@ -2139,8 +2139,8 @@ describe('TerminalSession', () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
     // The new `requestDurableClose` callback is the seam TerminalSession
-    // uses to hand a close off to the registry's durable queue. In production
-    // the queue dedupes and the registry awaits it on the next create; in
+    // uses to hand a close off to the projection's durable queue. In production
+    // the queue dedupes and the projection awaits it on the next create; in
     // this test we wire it straight to `terminalCalls.close` so the same
     // assertions the old test made still hold.
     const pendingCloses: Array<Promise<unknown>> = []
@@ -2158,7 +2158,7 @@ describe('TerminalSession', () => {
     await flushTerminalStart()
     // The close is now routed through the durable callback, not the
     // bridge directly. Awaiting the queue's pending promise is the
-    // equivalent of "the registry's queue settled".
+    // equivalent of "the projection's queue settled".
     await Promise.allSettled(pendingCloses)
 
     expect(terminalCalls.restart).not.toHaveBeenCalled()

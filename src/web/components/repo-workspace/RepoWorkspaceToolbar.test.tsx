@@ -696,7 +696,7 @@ describe('RepoWorkspaceToolbar', () => {
 
   test('compact workspace tab strip keeps the popover switcher reachable while the terminal tab is loading', () => {
     // Regression: when the user is viewing the terminal panel while the
-    // terminal registry is still hydrating (`preferredWorkspacePaneTab =
+    // terminal session projection is still hydrating (`preferredWorkspacePaneTab =
     // 'terminal'`, no materialized terminal tabs), the toolbar's
     // `activeTabIdentity` is null because the tab-model's selection is
     // `terminal-host` with `tab: null`. The compact layout must still be
@@ -1022,7 +1022,7 @@ describe('RepoWorkspaceToolbar', () => {
     expect(busyNewButton?.disabled).toBe(true)
 
     // Once the provider calls markReady() (which the real Provider
-    // does at the end of syncServerSlots' finally block), the
+    // does at the end of syncServerSessions' finally block), the
     // busy state clears and the real button appears.
     useRepoSyncStore.getState().markReady(REPO_ID, 0)
     await flush()

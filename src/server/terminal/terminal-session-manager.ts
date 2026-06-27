@@ -496,7 +496,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     // surface all four frame fields synchronously so the client
     // doesn't have to wait for a follow-up realtime `identity`
     // event before painting the post-takeover frame. See
-    // `docs/terminal-slot-lifecycle.md` §Takeover atomicity.
+    // `docs/terminal-session-lifecycle.md` §Takeover atomicity.
     return {
       ok: true,
       ptySessionId: session.id,

@@ -493,7 +493,7 @@ describe('RepoWorkspaceContent', () => {
     expect(container?.textContent).not.toContain('workspace-pane-tabs.empty')
   })
 
-  test('mounts the terminal slot while terminal creation is pending with no sessions', () => {
+  test('mounts the terminal session while terminal creation is pending with no sessions', () => {
     const worktreePath = '/tmp/terminal-pending-worktree'
     const worktreeKey = `${REPO_ID}\0${worktreePath}`
     const repo = seedRepoState({
@@ -536,7 +536,7 @@ describe('RepoWorkspaceContent', () => {
     expect(registerHost).toHaveBeenCalledWith(worktreeKey, expect.any(HTMLDivElement))
   })
 
-  test('mounts the terminal slot while terminal creation is pending after every tab was closed', () => {
+  test('mounts the terminal session while terminal creation is pending after every tab was closed', () => {
     const worktreePath = '/tmp/terminal-pending-empty-strip-worktree'
     const worktreeKey = `${REPO_ID}\0${worktreePath}`
     const branchName = 'feature/terminal-pending-empty-strip'

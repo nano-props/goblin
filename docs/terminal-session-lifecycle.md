@@ -89,7 +89,7 @@ The combined symptom list across the root causes:
   broadcast, so other windows could not drop their local copy
   promptly.
 - **R3 — Empty-state session had no UI affordance.** `TerminalSessionView`
-  rendered a bare host when `!hasSessions && slotMode === 'opening'`.
+  rendered a bare host when `!hasSessions && sessionPhase === 'opening'`.
   The `terminal.empty` i18n key was defined but never rendered.
 
 ---
@@ -343,12 +343,12 @@ a coherent event across the system, not just a local view teardown.
 ### Why
 
 `TerminalSessionView` rendered a bare host when `!hasSessions &&
-slotMode === 'opening'`. The user had to guess where to click. The
+sessionPhase === 'opening'`. The user had to guess where to click. The
 `terminal.empty` i18n key was defined but never rendered.
 
 ### Design
 
-When `slotMode === 'opening' && !hasSessions`, render an overlay
+When `sessionPhase === 'opening' && !hasSessions`, render an overlay
 with a "New terminal" button.
 
 - Reuse the existing `terminal.new` and `terminal.empty` i18n keys.
@@ -507,7 +507,7 @@ order would have been:
 - **R2**: runtime-action tests cover emitting both broadcasts on
   successful user close, non-user closes not leaking phantom events,
   and failed closes not synthesizing fake broadcasts.
-- **R3**: slot tests cover rendering the CTA when the session has no
+- **R3**: session tests cover rendering the CTA when the session has no
   sessions, click triggering create, and failure toasting.
 
 ### Manual smoke (still applicable as a regression check)

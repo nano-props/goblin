@@ -1,7 +1,6 @@
-import type { TerminalOutputEvent } from '#/shared/terminal-types.ts'
+import type { TerminalOutputEvent, TerminalSessionPhase } from '#/shared/terminal-types.ts'
 import { createTerminalClientSnapshot } from '#/web/components/terminal/types.ts'
 import type {
-  TerminalPhase,
   TerminalProgressState,
   TerminalSearchResult,
   TerminalSnapshot,
@@ -14,7 +13,7 @@ export class TerminalSessionState {
    *  This is authoritative runtime shape for the client, but it is not
    *  the same thing as workspace/session persistence. */
   private runtimeState: {
-    phase: TerminalPhase
+    phase: TerminalSessionPhase
     message: string | null
     processName: string
     canonicalTitle: string | null
@@ -55,7 +54,7 @@ export class TerminalSessionState {
     progressState: null,
   }
 
-  getPhase(): TerminalPhase {
+  getPhase(): TerminalSessionPhase {
     return this.runtimeState.phase
   }
 
@@ -157,7 +156,7 @@ export class TerminalSessionState {
   }
 
   applyOpenResult(input: {
-    phase?: TerminalPhase
+    phase?: TerminalSessionPhase
     message?: string | null
     processName: string
     canonicalTitle?: string | null
@@ -310,7 +309,7 @@ export class TerminalSessionState {
     return this.runtimeState.takeoverPending
   }
 
-  private setPhaseAndMessage(phase: TerminalPhase, message: string | null): boolean {
+  private setPhaseAndMessage(phase: TerminalSessionPhase, message: string | null): boolean {
     if (this.runtimeState.phase === phase && this.runtimeState.message === message) return false
     this.runtimeState.phase = phase
     this.runtimeState.message = message

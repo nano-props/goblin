@@ -44,7 +44,7 @@ function shouldRebuildMenuFromSettingsProjection(patch: NativeSettingsProjection
   return patch.lang !== undefined || patch.shortcutsDisabled !== undefined
 }
 
-function applyI18nSettingsProjection(input: {
+function applyI18nProjectionPatch(input: {
   patch: NativeSettingsProjectionPatch
   settings: NativeSettingsProjectionState
 }): void {
@@ -52,7 +52,7 @@ function applyI18nSettingsProjection(input: {
   setCurrentLang(resolveLang(input.settings.lang))
 }
 
-function applyThemeUserSettingsProjection(input: {
+function applyThemeProjectionPatch(input: {
   patch: NativeSettingsProjectionPatch
   settings: NativeSettingsProjectionState
 }): void {
@@ -60,7 +60,7 @@ function applyThemeUserSettingsProjection(input: {
   applyThemeSettingsProjection({ theme: input.settings.theme, colorTheme: input.settings.colorTheme })
 }
 
-async function applyGlobalShortcutDisabledProjection(input: {
+async function applyGlobalShortcutDisabledProjectionPatch(input: {
   patch: NativeSettingsProjectionPatch
   settings: NativeSettingsProjectionState
 }): Promise<void> {
@@ -69,16 +69,16 @@ async function applyGlobalShortcutDisabledProjection(input: {
   await persistNativeHostGlobalShortcutState(registered)
 }
 
-export async function applyNativeHostUserSettingsProjection(input: {
+async function applyNativeHostUserSettingsProjection(input: {
   patch: NativeSettingsProjectionPatch
   settings: NativeSettingsProjectionState
 }): Promise<void> {
   const shouldRebuildMenu = shouldRebuildMenuFromSettingsProjection(input.patch)
   const menuStatePatch = menuStatePatchFromSettingsProjection(input)
-  applyI18nSettingsProjection(input)
-  applyThemeUserSettingsProjection(input)
+  applyI18nProjectionPatch(input)
+  applyThemeProjectionPatch(input)
   if (Object.keys(menuStatePatch).length > 0) applyMenuRuntimeState(menuStatePatch)
-  await applyGlobalShortcutDisabledProjection(input)
+  await applyGlobalShortcutDisabledProjectionPatch(input)
   if (shouldRebuildMenu) buildAppMenu()
 }
 

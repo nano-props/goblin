@@ -50,7 +50,7 @@ export async function resolveTerminalCreateGeometry(input: {
  * host is in a `display:none` subtree (and therefore cannot ever produce a
  * size), the function rejects immediately. The caller can pass `timeoutMs` to
  * bound the wait, or `signal` for explicit cancellation (for example on
- * registry teardown), so neither attach nor resize-driven waits leak subscriptions.
+ * projection teardown), so neither attach nor resize-driven waits leak subscriptions.
  *
  * `measure` is dependency-injected so tests can drive the host without
  * relying on jsdom layout. In production it defaults to `proposeTerminalGeometry`.

@@ -7,7 +7,7 @@ import { buildAppMenu } from '#/main/menu.ts'
 import { initializeMenuRuntimeState } from '#/main/menu-state.ts'
 import { syncRecentRepos } from '#/main/recent-repos.ts'
 import { assertDictionaryParity, resolveLang, setCurrentLang } from '#/main/i18n/index.ts'
-import { wireIpc } from '#/main/native-host-ipc-router.ts'
+import { wireNativeHostIpc } from '#/main/native-host-ipc-router.ts'
 import { wireShellIpc } from '#/main/shell-ipc.ts'
 import { wireClipboardIpc } from '#/main/clipboard-ipc.ts'
 import { wireAccessTokenIpc } from '#/main/access-token-ipc.ts'
@@ -97,6 +97,10 @@ async function initializeNativeHost(): Promise<void> {
   await initTheme({ theme: settingsSnapshot.theme, colorTheme: settingsSnapshot.colorTheme })
   await initializeRuntimeState(settingsSnapshot)
   wireNativeHostIpc()
+  wireShellIpc()
+  wireTerminalIpc()
+  wireClipboardIpc()
+  wireAccessTokenIpc()
   await syncInitialGlobalShortcutState(settingsSnapshot)
 }
 
@@ -123,14 +127,6 @@ async function initializeRuntimeState(settingsSnapshot: SettingsSnapshot): Promi
   setCurrentLang(resolveLang(settingsSnapshot.lang))
   syncRecentRepos(settingsSnapshot.recentRepos)
   buildAppMenu()
-}
-
-function wireNativeHostIpc(): void {
-  wireIpc()
-  wireShellIpc()
-  wireTerminalIpc()
-  wireClipboardIpc()
-  wireAccessTokenIpc()
 }
 
 async function syncInitialGlobalShortcutState(settingsSnapshot: SettingsSnapshot): Promise<void> {

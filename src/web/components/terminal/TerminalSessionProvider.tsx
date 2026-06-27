@@ -115,7 +115,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     [projection],
   )
 
-  const syncServerSlots = useCallback(
+  const syncServerSessions = useCallback(
     async (repoRoot: string) => {
       if (!repoRoot || !repoIndexRef.current[repoRoot]) return
       try {
@@ -230,13 +230,13 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   useEffect(() => {
     if (!currentRepoId) return
     const repoRoot = currentRepoId
-    void syncServerSlots(repoRoot)
+    void syncServerSessions(repoRoot)
 
     const handleFocus = () => {
       const focusedRepoRoot = useReposStore.getState().activeId
       if (!focusedRepoRoot) return
       if (!useRepoSyncStore.getState().shouldSync(focusedRepoRoot)) return
-      void syncServerSlots(focusedRepoRoot)
+      void syncServerSessions(focusedRepoRoot)
     }
     window.addEventListener('focus', handleFocus)
 
@@ -251,7 +251,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
         if (disposed) return
         const repoRoots = Array.from(pendingRepoRoots)
         pendingRepoRoots.clear()
-        for (const nextRepoRoot of repoRoots) void syncServerSlots(nextRepoRoot)
+        for (const nextRepoRoot of repoRoots) void syncServerSessions(nextRepoRoot)
       }, 0)
     }
     const offSessionsChanged = terminalBridge.onSessionsChanged(scheduleServerSync)
@@ -262,7 +262,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       window.removeEventListener('focus', handleFocus)
       offSessionsChanged()
     }
-  }, [currentRepoId, currentRepoInstanceToken, syncServerSlots])
+  }, [currentRepoId, currentRepoInstanceToken, syncServerSessions])
 
   const commandValue = useMemo<TerminalSessionContextValue>(
     () => ({

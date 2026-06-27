@@ -1,10 +1,10 @@
 /**
- * Per-file ceiling for clipboard paste / drop into the terminal slot.
+ * Per-file ceiling for clipboard paste / drop into the terminal session.
  *
  * Read by:
  * - `TerminalSessionView` paste / drop handlers (client): early bail-out with
  *   `terminal.paste-file-too-large` toast before any IPC / HTTP traffic.
- * - `src/main/clipboard-ipc.ts` (Electron main): defence in depth, reject
+ * - `src/main/clipboard-ipc.ts` (native host): defence in depth, reject
  *   oversized payloads before writing to disk.
  * - `src/server/modules/clipboard-write-paths.ts` (web server): same defence
  *   in depth for the HTTP path.

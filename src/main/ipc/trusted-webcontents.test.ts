@@ -60,7 +60,7 @@ describe('trusted app web contents', () => {
         isDestroyed: () => false,
         webContents: { id: 17, isDestroyed: () => false },
       } as any,
-      { windowKey: 'main' },
+      { windowKey: 'primary' },
     )
 
     expect(

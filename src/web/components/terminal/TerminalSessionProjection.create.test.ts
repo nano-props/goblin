@@ -180,7 +180,7 @@ function makeCreateResult(overrides: Partial<Record<string, unknown>> = {}) {
 }
 
 describe('TerminalSessionProjection create flow', () => {
-  let registry: TerminalSessionProjection
+  let projection: TerminalSessionProjection
 
   beforeEach(() => {
     mocks.createMock.mockReset()
@@ -191,9 +191,9 @@ describe('TerminalSessionProjection create flow', () => {
     mocks.proposeTerminalGeometryMock.mockClear()
     mocks.preloadTerminalFontMock.mockClear()
     mocks.clientIdMock.mockClear()
-    registry = new TerminalSessionProjection()
-    registry.setRepoIndex(makeRepoIndex())
-    setTerminalSessionProjectionForTests(registry)
+    projection = new TerminalSessionProjection()
+    projection.setRepoIndex(makeRepoIndex())
+    setTerminalSessionProjectionForTests(projection)
     originalResizeObserver = globalThis.ResizeObserver
     Object.defineProperty(globalThis, 'ResizeObserver', {
       configurable: true,
@@ -203,7 +203,7 @@ describe('TerminalSessionProjection create flow', () => {
   })
 
   afterEach(() => {
-    registry.destroy()
+    projection.destroy()
     setTerminalSessionProjectionForTests(null)
     document.body.innerHTML = ''
     if (originalResizeObserver) {
@@ -220,9 +220,9 @@ describe('TerminalSessionProjection create flow', () => {
   test('creates a terminal with the registered host geometry', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
-    registry.registerHost(WORKTREE_KEY, host)
+    projection.registerHost(WORKTREE_KEY, host)
 
-    await registry.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
+    await projection.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
 
     expect(mocks.preloadTerminalFontMock).toHaveBeenCalled()
     expect(mocks.proposeTerminalGeometryMock).toHaveBeenCalledWith(host)
@@ -237,7 +237,7 @@ describe('TerminalSessionProjection create flow', () => {
     })
   })
 
-  test('clears the native badge when the registry starts', () => {
+  test('clears the native badge when the projection starts', () => {
     expect(mocks.setBadgeMock).toHaveBeenCalledWith(0)
   })
 
@@ -246,42 +246,42 @@ describe('TerminalSessionProjection create flow', () => {
     mocks.createMock.mockReturnValueOnce(promise)
     const host = document.createElement('div')
     document.body.appendChild(host)
-    registry.registerHost(WORKTREE_KEY, host)
+    projection.registerHost(WORKTREE_KEY, host)
 
-    const pending = registry.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
+    const pending = projection.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
 
     await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
-    expect(registry.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(true)
-    expect(registry.worktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+    expect(projection.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(true)
+    expect(projection.worktreeSnapshot(WORKTREE_KEY).count).toBe(0)
 
     resolve(makeCreateResult())
     await expect(pending).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0slot-1`)
-    expect(registry.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
-    expect(registry.worktreeSnapshot(WORKTREE_KEY).count).toBe(1)
+    expect(projection.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
+    expect(projection.worktreeSnapshot(WORKTREE_KEY).count).toBe(1)
   })
 
   test('clears pendingCreate when create rejects', async () => {
     mocks.createMock.mockRejectedValueOnce(new Error('boom'))
     const host = document.createElement('div')
     document.body.appendChild(host)
-    registry.registerHost(WORKTREE_KEY, host)
+    projection.registerHost(WORKTREE_KEY, host)
 
     await expect(
-      registry.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH }),
+      projection.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH }),
     ).rejects.toThrow('boom')
-    expect(registry.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
-    expect(registry.worktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+    expect(projection.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
+    expect(projection.worktreeSnapshot(WORKTREE_KEY).count).toBe(0)
   })
 
   test('waits for host registration before creating when no geometry is available yet', async () => {
-    const pending = registry.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
+    const pending = projection.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
 
-    expect(registry.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(true)
+    expect(projection.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(true)
     expect(mocks.createMock).not.toHaveBeenCalled()
 
     const host = document.createElement('div')
     document.body.appendChild(host)
-    registry.registerHost(WORKTREE_KEY, host)
+    projection.registerHost(WORKTREE_KEY, host)
 
     await expect(pending).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0slot-1`)
     expect(mocks.createMock).toHaveBeenCalledTimes(1)
@@ -297,49 +297,49 @@ describe('TerminalSessionProjection create flow', () => {
   })
 
   test('pending create rejected on destroy while waiting for host registration', async () => {
-    const pending = registry.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
+    const pending = projection.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
 
-    expect(registry.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(true)
-    expect((registry as any).pendingCreateByWorktree.size).toBe(1)
+    expect(projection.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(true)
+    expect((projection as any).pendingCreateByWorktree.size).toBe(1)
     // The waiter is registered only after the flush reaches
     // `waitForHostRegistration` — that's several await boundaries past
     // the synchronous `enqueuePendingCreate`, so we must wait for it.
-    await vi.waitFor(() => expect((registry as any).hostWaitersByWorktree.size).toBe(1))
+    await vi.waitFor(() => expect((projection as any).hostWaitersByWorktree.size).toBe(1))
 
     // Attach the rejection handler before destroy() so the rejected
     // promise is not flagged as unhandled between the synchronous
     // `destroy()` call and the later `expect(...).rejects` chain.
     const expectation = expect(pending).rejects.toThrow('terminal session projection destroyed')
-    registry.destroy()
+    projection.destroy()
     await expectation
-    expect((registry as any).hostWaitersByWorktree.size).toBe(0)
-    expect((registry as any).pendingCreateByWorktree.size).toBe(0)
-    expect(registry.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
+    expect((projection as any).hostWaitersByWorktree.size).toBe(0)
+    expect((projection as any).pendingCreateByWorktree.size).toBe(0)
+    expect(projection.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
   })
 
   test('closeTerminalsForWorktree cancels a pending create before deleting a worktree', async () => {
-    const pending = registry.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
+    const pending = projection.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
 
-    expect(registry.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(true)
-    await vi.waitFor(() => expect((registry as any).hostWaitersByWorktree.size).toBe(1))
+    expect(projection.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(true)
+    await vi.waitFor(() => expect((projection as any).hostWaitersByWorktree.size).toBe(1))
 
     const expectation = expect(pending).rejects.toThrow('terminal create request canceled')
     await expect(
-      registry.closeTerminalsForWorktree({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH }),
+      projection.closeTerminalsForWorktree({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH }),
     ).resolves.toBe(true)
     await expectation
 
     expect(mocks.createMock).not.toHaveBeenCalled()
-    expect((registry as any).hostWaitersByWorktree.size).toBe(0)
-    expect((registry as any).pendingCreateByWorktree.size).toBe(0)
-    expect(registry.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
+    expect((projection as any).hostWaitersByWorktree.size).toBe(0)
+    expect((projection as any).pendingCreateByWorktree.size).toBe(0)
+    expect(projection.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
   })
 
   test('closeTerminalsForWorktree returns true when no terminal sessions exist', async () => {
-    expect(registry.worktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+    expect(projection.worktreeSnapshot(WORKTREE_KEY).count).toBe(0)
 
     await expect(
-      registry.closeTerminalsForWorktree({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH }),
+      projection.closeTerminalsForWorktree({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH }),
     ).resolves.toBe(true)
 
     expect(mocks.closeMock).not.toHaveBeenCalled()
@@ -350,9 +350,9 @@ describe('TerminalSessionProjection create flow', () => {
 
     const host = document.createElement('div')
     document.body.appendChild(host)
-    registry.registerHost(WORKTREE_KEY, host)
+    projection.registerHost(WORKTREE_KEY, host)
 
-    const pending = registry.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
+    const pending = projection.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
 
     await vi.waitFor(() => expect(MockResizeObserver.instances).toHaveLength(1))
     const observer = MockResizeObserver.instances[0]!
@@ -363,7 +363,7 @@ describe('TerminalSessionProjection create flow', () => {
     observer.trigger()
 
     await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
-    expect(registry.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
+    expect(projection.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
     await expect(pending).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0slot-1`)
   })
 
@@ -375,23 +375,23 @@ describe('TerminalSessionProjection create flow', () => {
     document.body.appendChild(container)
     const host = document.createElement('div')
     container.appendChild(host)
-    registry.registerHost(WORKTREE_KEY, host)
+    projection.registerHost(WORKTREE_KEY, host)
 
-    const pending = registry.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
+    const pending = projection.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
 
     await expect(pending).rejects.toThrow('host is inside a display:none subtree')
-    expect(registry.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
+    expect(projection.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
     expect(mocks.createMock).not.toHaveBeenCalled()
   })
 
   test('durable close: awaits an in-flight close for the same worktree before creating', async () => {
     // Regression for the duplicate `Restored session:` bug: the prior
     // dispose path was fire-and-forget, so a create could race the
-    // close and reattach to the orphan. The registry's durable-close
+    // close and reattach to the orphan. The projection's durable-close
     // queue guarantees create waits for the close to settle.
     const host = document.createElement('div')
     document.body.appendChild(host)
-    registry.registerHost(WORKTREE_KEY, host)
+    projection.registerHost(WORKTREE_KEY, host)
 
     // Order closeMock to record its call order relative to createMock.
     const callOrder: string[] = []
@@ -407,14 +407,14 @@ describe('TerminalSessionProjection create flow', () => {
     // Enqueue a durable close and DO NOT await it. The next
     // createTerminal must wait for the close to settle before
     // issuing its own create call.
-    const closePromise = registry.enqueueDurableClose({
+    const closePromise = projection.enqueueDurableClose({
       ptySessionId: 'session-stale',
       worktreeTerminalKey: WORKTREE_KEY,
     })
 
     // Start the create before the close settles. The promise must
     // resolve only after both have run, in the right order.
-    const createPromise = registry.createTerminal({
+    const createPromise = projection.createTerminal({
       repoRoot: REPO_ROOT,
       branch: BRANCH,
       worktreePath: WORKTREE_PATH,
@@ -430,7 +430,7 @@ describe('TerminalSessionProjection create flow', () => {
     expect(callOrder).toEqual(['close', 'create'])
 
     // The pending entry is cleaned up after the close settles.
-    expect((registry as any).pendingCloseByPtySessionId.size).toBe(0)
+    expect((projection as any).pendingCloseByPtySessionId.size).toBe(0)
   })
 
   test('durable close: failures do not block the next create', async () => {
@@ -439,21 +439,21 @@ describe('TerminalSessionProjection create flow', () => {
     // runs; the failure is already logged inside performDurableClose.
     const host = document.createElement('div')
     document.body.appendChild(host)
-    registry.registerHost(WORKTREE_KEY, host)
+    projection.registerHost(WORKTREE_KEY, host)
 
     mocks.closeMock.mockRejectedValueOnce(new Error('Terminal socket closed'))
 
-    const closePromise = registry.enqueueDurableClose({
+    const closePromise = projection.enqueueDurableClose({
       ptySessionId: 'session-stale',
       worktreeTerminalKey: WORKTREE_KEY,
     })
 
     await expect(closePromise).rejects.toThrow('Terminal socket closed')
-    expect((registry as any).pendingCloseByPtySessionId.size).toBe(0)
+    expect((projection as any).pendingCloseByPtySessionId.size).toBe(0)
 
     // The next create proceeds normally.
     await expect(
-      registry.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH }),
+      projection.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH }),
     ).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0slot-1`)
     expect(mocks.createMock).toHaveBeenCalledTimes(1)
   })
@@ -469,11 +469,11 @@ describe('TerminalSessionProjection create flow', () => {
       }),
     )
 
-    const first = registry.enqueueDurableClose({
+    const first = projection.enqueueDurableClose({
       ptySessionId: 'session-stale',
       worktreeTerminalKey: WORKTREE_KEY,
     })
-    const second = registry.enqueueDurableClose({
+    const second = projection.enqueueDurableClose({
       ptySessionId: 'session-stale',
       worktreeTerminalKey: WORKTREE_KEY,
     })
@@ -494,15 +494,15 @@ describe('TerminalSessionProjection create flow', () => {
     // pending when destroy runs.
     mocks.closeMock.mockReturnValueOnce(new Promise<boolean>(() => {}))
 
-    const closePromise = registry.enqueueDurableClose({
+    const closePromise = projection.enqueueDurableClose({
       ptySessionId: 'session-stale',
       worktreeTerminalKey: WORKTREE_KEY,
     })
 
-    expect((registry as any).pendingCloseByPtySessionId.size).toBe(1)
-    registry.destroy()
+    expect((projection as any).pendingCloseByPtySessionId.size).toBe(1)
+    projection.destroy()
     await expect(closePromise).rejects.toThrow('terminal session projection destroyed')
-    expect((registry as any).pendingCloseByPtySessionId.size).toBe(0)
+    expect((projection as any).pendingCloseByPtySessionId.size).toBe(0)
   })
 
   test('durable close: handleSessionClosed drops the matching local session', async () => {
@@ -512,24 +512,24 @@ describe('TerminalSessionProjection create flow', () => {
     // full reconcile.
     const host = document.createElement('div')
     document.body.appendChild(host)
-    registry.registerHost(WORKTREE_KEY, host)
-    await registry.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
+    projection.registerHost(WORKTREE_KEY, host)
+    await projection.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
 
-    expect(registry.worktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
+    expect(projection.worktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
 
-    registry.handleSessionClosed('pty_session_1_aaaaaaaaa')
+    projection.handleSessionClosed('pty_session_1_aaaaaaaaa')
 
     // The local session is gone; the worktree snapshot is empty.
-    expect(registry.worktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(0)
+    expect(projection.worktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(0)
   })
 
   test('prunes sessions missing from the repo index and clears their bell badge', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
-    registry.registerHost(WORKTREE_KEY, host)
-    const key = await registry.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
+    projection.registerHost(WORKTREE_KEY, host)
+    const key = await projection.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
     mocks.setBadgeMock.mockClear()
-    ;(registry as any).bellController.handleBell(
+    ;(projection as any).bellState.handleBell(
       {
         key,
         worktreeTerminalKey: WORKTREE_KEY,
@@ -543,25 +543,25 @@ describe('TerminalSessionProjection create flow', () => {
     )
     expect(mocks.setBadgeMock).toHaveBeenLastCalledWith(1)
 
-    registry.setRepoIndex({})
+    projection.setRepoIndex({})
 
-    expect(registry.worktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(0)
+    expect(projection.worktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(0)
     expect(mocks.setBadgeMock).toHaveBeenLastCalledWith(0)
   })
 
   test('does not prune sessions when the repo still exists but branch metadata is temporarily missing', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
-    registry.registerHost(WORKTREE_KEY, host)
-    await registry.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
+    projection.registerHost(WORKTREE_KEY, host)
+    await projection.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
 
-    registry.setRepoIndex({
+    projection.setRepoIndex({
       [REPO_ROOT]: {
         instanceToken: 2,
         branchByWorktreePath: {},
       },
     })
 
-    expect(registry.worktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
+    expect(projection.worktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
   })
 })

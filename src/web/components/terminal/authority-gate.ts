@@ -125,7 +125,7 @@ interface XtermAuthorityGateOptions {
 
 /**
  * Default implementation. One instance per `TerminalSession`
- * — the registry constructs them when a session becomes active.
+ * — the projection constructs them when a session becomes active.
  */
 export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): TerminalAuthorityGate {
   let role: 'controller' | 'viewer' | 'unowned' = 'unowned'

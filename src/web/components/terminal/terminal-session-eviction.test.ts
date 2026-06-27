@@ -8,7 +8,7 @@ describe('terminal session eviction helpers', () => {
   test('finds orphaned local sessions that no longer exist on the server', () => {
     const orphaned = countOrphanedTerminalSessionKeys({
       repoRoot: '/repo',
-      localSlotKeys: ['a', 'b', 'c'],
+      localSessionKeys: ['a', 'b', 'c'],
       getRepoRootForKey: (key) => (key === 'c' ? '/other' : '/repo'),
       hasServerPtySessionId: (key) => key !== 'b',
       serverKeys: new Set(['a']),
@@ -17,7 +17,7 @@ describe('terminal session eviction helpers', () => {
 
     const orphaned2 = countOrphanedTerminalSessionKeys({
       repoRoot: '/repo',
-      localSlotKeys: ['a', 'b', 'c'],
+      localSessionKeys: ['a', 'b', 'c'],
       getRepoRootForKey: (key) => (key === 'c' ? '/other' : '/repo'),
       hasServerPtySessionId: (key) => key === 'b',
       serverKeys: new Set(['a']),

@@ -114,7 +114,7 @@ export interface RepoWorkspaceTabModelInput {
     wasActive?: boolean
   } | null
   /**
-   * Selected terminal slot key for the current worktree from the repos store.
+   * Selected terminal session key for the current worktree from the repos store.
    * The model uses this as the canonical source for which terminal tab is
    * active, making the workspace pane tab model the single authority for
    * workspace tab selection. When null (no worktree or no explicit selection),

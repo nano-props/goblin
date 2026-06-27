@@ -10,7 +10,7 @@ import { getBrowserRemoteUrl, pullBranch } from '#/system/git/remote.ts'
 import { getBranchPullRequest, getBranchPullRequests } from '#/system/git/pull-requests.ts'
 import { openHttpsExternal } from '#/main/external-url.ts'
 import { registerTrustedAppUrl, registerTrustedWebContents } from '#/main/ipc/trusted-webcontents.ts'
-import { wireIpc } from '#/main/native-host-ipc-router.ts'
+import { wireNativeHostIpc } from '#/main/native-host-ipc-router.ts'
 import { getUserSettings } from '#/main/settings-server-client.ts'
 import type { IpcResponse, UserSettings } from '#/shared/api-types.ts'
 
@@ -246,7 +246,7 @@ describe('main repo ipc cancellation', () => {
   beforeAll(() => {
     registerTrustedAppUrl('http://127.0.0.1:5173/')
     registerTrustedWebContents({ id: 1, once: vi.fn() } as any)
-    wireIpc()
+    wireNativeHostIpc()
   })
 
   beforeEach(() => {

@@ -6,7 +6,7 @@
 //   which lives in window-security.ts.
 
 import { BrowserWindow, type BrowserWindow as BrowserWindowType } from 'electron'
-import { windowRegistryNodeLog } from '#/node/logger.ts'
+import { clientSurfaceRegistryNodeLog } from '#/node/logger.ts'
 
 export interface RegisteredClientSurfaceCapabilities {
   ipcBroadcast: boolean
@@ -137,7 +137,7 @@ export function sendToRegisteredWindow(
   try {
     if (!win.isDestroyed() && !win.webContents.isDestroyed()) win.webContents.send(channel, ...args)
   } catch (err) {
-    windowRegistryNodeLog.warn({ err }, 'failed to send event to window')
+    clientSurfaceRegistryNodeLog.warn({ err }, 'failed to send event to window')
   }
 }
 

@@ -66,7 +66,7 @@ describe('repo-client', () => {
     setClientBridgeForTests(null)
   })
 
-  test('opens repository remote through the native shell bridge when available', async () => {
+  test('opens repository remote through the native host bridge when available', async () => {
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
     window.open = vi.fn(() => null)
     const bridgeModule = await import('#/web/client-bridge.ts')
@@ -156,7 +156,7 @@ describe('repo-client', () => {
     )
   })
 
-  test('opens external workspace apps through embedded server routes even when a native shell exists', async () => {
+  test('opens external workspace apps through embedded server routes even when a native host exists', async () => {
     const openTerminal = vi.fn(async () => ({ ok: true, message: 'native-terminal' }))
     const openEditor = vi.fn(async () => ({ ok: true, message: 'native-editor' }))
     const fetchMock = vi

@@ -5,7 +5,7 @@ export async function createWorkspacePaneTerminalTab(input: {
   base: TerminalSessionBase
   createTerminal: (base: TerminalSessionBase) => Promise<string>
 }): Promise<string> {
-  // Only publish the tab after the registry has created a concrete session key.
+  // Only publish the tab after the projection has created a concrete session key.
   const key = await input.createTerminal(input.base)
   // Add the tab, switch to the terminal view, and select the new terminal
   // in a single atomic store update. Keeping the three writes together

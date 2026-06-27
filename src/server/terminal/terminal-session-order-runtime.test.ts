@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { createTerminalSessionOrderRuntime } from '#/server/terminal/terminal-session-order-runtime.ts'
 
-describe('terminal view order runtime', () => {
+describe('terminal session order runtime', () => {
   test('tracks terminal display order within a user worktree', () => {
     const runtime = createTerminalSessionOrderRuntime<string>()
 

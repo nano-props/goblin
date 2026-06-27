@@ -213,7 +213,7 @@ sees its cached role transition from `controller` to `unowned`
 (per the realtime `identity` event carrying `controller: null`)
 and back to `controller`.
 
-A's `ManagedTerminalSlot` reacts to the `unowned` event in
+A's `TerminalSession` reacts to the `unowned` event in
 `handleIdentity` by calling `start()` immediately if the view
 is connected, so the next identity event (carrying `controller:
 A`) lands while the auto-attach round-trip is already in
@@ -223,7 +223,7 @@ the microtask queue rather than the round-trip.
 
 If the user types **during** the `unowned` window, the gate's
 `authorize('write')` returns `{ kind: 'denied', reason:
-'slot-closed' }` — the gate deliberately distinguishes `unowned`
+'session-closed' }` — the gate deliberately distinguishes `unowned`
 from `viewer` so it does not auto-promote a write against a slot
 the server has just cleared. The keystroke is dropped at the
 gate. (Pre-PR, the gate collapsed `unowned` to `viewer` and
@@ -291,5 +291,5 @@ protects the user's mental model, not their secrets.
 
 - `terminal.md` — the terminal system overall.
 - `terminal-target-model.md` — target attachment shape and roles.
-- `terminal-slot-lifecycle.md` — session birth, lifetime, close.
+- `terminal-session-lifecycle.md` — session birth, lifetime, close.
 - `terminal-roadmap.md` — where this model sits in the refactor plan.

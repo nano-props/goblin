@@ -31,7 +31,7 @@ import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
 
 const DEFAULT_BOUNDS: WindowBounds = { width: 1100, height: 720 }
 const PRIMARY_WINDOW_SURFACE = {
-  windowKey: 'main',
+  windowKey: 'primary',
   capabilities: {
     ipcBroadcast: true,
     themeSync: true,

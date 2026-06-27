@@ -582,7 +582,7 @@ export function WorkspacePaneTabStrip({
           className="flex-1"
         >
           {compactItem ? (
-            <WorkspacePaneTabType
+            <WorkspacePaneTab
               item={compactItem}
               isActive={!!panelActive && compactItem.identity === activeTabIdentity}
               isSelected={compactItem.identity === activeTabIdentity}
@@ -662,7 +662,7 @@ export function WorkspacePaneTabStrip({
                   compact: false,
                 }
                 if (!isSortableWorkspacePaneTabItem(item)) {
-                  return <WorkspacePaneTabType key={item.identity} {...commonProps} />
+                  return <WorkspacePaneTab key={item.identity} {...commonProps} />
                 }
                 return (
                   <SortableWorkspacePaneTab key={item.identity} {...commonProps} sortableIdentity={item.sortableId} />
@@ -869,7 +869,7 @@ function WorkspacePaneTabChrome({
   )
 }
 
-function WorkspacePaneTabType({
+function WorkspacePaneTab({
   item,
   isActive,
   isSelected,

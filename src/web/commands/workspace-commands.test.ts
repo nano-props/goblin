@@ -453,7 +453,7 @@ describe('workspace commands', () => {
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     })
-    // Tab removal is owned by the registry's slot-removed callback, not the command.
+    // Tab removal is owned by the projection's onTerminalSessionRemoved callback, not the command.
     expect(tabOrderFor('feature/worktree')).toEqual([staticEntry('status'), terminalEntry('slot-1')])
     expect(closeWindow).not.toHaveBeenCalled()
   })

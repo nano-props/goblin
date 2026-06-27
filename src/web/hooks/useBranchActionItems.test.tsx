@@ -94,7 +94,7 @@ describe('useBranchActionItems', () => {
     expect(visibleBranchActionItems(actions!).map((item) => item.id)).not.toContain('copyPatch')
   })
 
-  test('keeps branch-static views visible for a branch without a worktree but hides changes', async () => {
+  test('keeps branch-static tabs visible for a branch without a worktree but hides changes', async () => {
     let actionIds: string[] = []
 
     await renderHookHost(

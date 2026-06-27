@@ -1,5 +1,5 @@
 // Branch list row wrapper. Resolves `terminalBellCount` from the
-// terminal-slot store and delegates rendering to BranchRow.
+// terminal session projection and delegates rendering to BranchRow.
 
 import { BranchRow, type BranchRowProps } from '#/web/components/branch-navigator/BranchRow.tsx'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-workspace-slot-keys.ts'

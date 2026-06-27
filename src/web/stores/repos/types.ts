@@ -118,7 +118,7 @@ export interface RepoRemoteState {
    * from `lifecycle.target` (ready / failed-with-target). The legacy
    * `target?: RemoteRepoTarget` field has been removed in Phase 4 of the
    * remote-repo refactor; new code should call `remoteRepoTarget(repo)`
-   * from `web/stores/repos/helpers.ts` instead of reaching into
+   * from `web/stores/repos/repo-guards.ts` instead of reaching into
    * `repo.remote.target`.
    */
   lifecycle: RemoteRepoConnectionLifecycle | null
@@ -171,7 +171,7 @@ export interface RuntimeCoherentRepoProjectionState {
   repos: Record<string, RepoState>
 }
 
-interface RestorableRepoCacheState {
+interface RepoSnapshotCacheState {
   /** Warm-start cache used only for restore. This is not runtime-coherent shared state. */
   repoSnapshotCache: Record<string, RepoSnapshotCacheEntry>
 }
@@ -302,7 +302,7 @@ interface RepoMutationActions {
 export interface ReposStore
   extends
     RuntimeCoherentRepoProjectionState,
-    RestorableRepoCacheState,
+    RepoSnapshotCacheState,
     RestorableWorkspaceState,
     LocalWorkspaceState,
     RestorableWorkspaceActions,

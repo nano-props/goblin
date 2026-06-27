@@ -112,7 +112,7 @@ class TerminalCatalog {
     const existingSessions = await this.options.manager.listSessionsForUser(userId, slotScope)
     // Build the target session key from the same form the manager uses
     // to scope user-scoped session lists — see the comment on
-    // `terminalSessionScope` in server/terminal/terminal-slot-scope.ts
+    // `terminalSessionScope` in server/terminal/terminal-session-scope.ts
     // for the normalization rationale.
     const targetSlotKey = formatTerminalWorkspaceSlotKey(
       slotScope,

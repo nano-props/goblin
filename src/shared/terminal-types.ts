@@ -90,7 +90,7 @@ export type TerminalTakeoverResult =
  * them on every success path, and the client can hydrate the UI
  * without waiting for any follow-up event. This mirrors the R0
  * first-frame atomicity contract for `create` (see
- * `docs/terminal-slot-lifecycle.md` §R0).
+ * `docs/terminal-session-lifecycle.md` §R0).
  */
 export type TerminalAttachResult =
   | {

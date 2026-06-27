@@ -3,9 +3,9 @@ import type {
   TerminalControllerStatus,
   TerminalExitEvent,
   TerminalOutputEvent,
+  TerminalSessionPhase,
 } from '#/shared/terminal-types.ts'
 import type { TerminalInput, TerminalUserInputSource } from '#/web/components/terminal/terminal-input.ts'
-export type TerminalPhase = 'opening' | 'restarting' | 'open' | 'error' | 'closed'
 
 export interface TerminalDescriptor {
   key: string
@@ -64,13 +64,13 @@ export interface TerminalIdentityViewModel extends TerminalControllerViewModel {
  */
 export interface TerminalLifecycleViewModel {
   ptySessionId: string
-  phase: TerminalPhase
+  phase: TerminalSessionPhase
   message: string | null
   takeoverPending: boolean
 }
 
 export interface TerminalSessionHydrationInput extends TerminalIdentityViewModel {
-  phase: TerminalPhase
+  phase: TerminalSessionPhase
   message: string | null
   processName: string
   canonicalTitle?: string | null
@@ -79,7 +79,7 @@ export interface TerminalSessionHydrationInput extends TerminalIdentityViewModel
 }
 
 export interface TerminalSnapshot {
-  phase: TerminalPhase
+  phase: TerminalSessionPhase
   message: string | null
   processName: string
   /** Server-canonical terminal title from attach hydration or realtime title events. */
@@ -121,7 +121,7 @@ export interface TerminalSessionSummary {
   title: string
   fullTitle?: string
   originalTitle?: string | null
-  phase: TerminalPhase
+  phase: TerminalSessionPhase
   selected: boolean
   hasBell: boolean
 }

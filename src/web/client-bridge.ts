@@ -89,7 +89,7 @@ function readServerTerminalConfig(): ClientServerTerminalConfig | null {
 // on every method call, so we must keep a stable singleton here.
 // The bridge's `notifyBell` / `sendTestNotification` / `setBadge`
 // callbacks re-read `goblinNative` on each invocation — that's
-// the lazy hook that lets the bell-controller tests swap the
+// the lazy hook that lets the bell-state tests swap the
 // preload between cases without rebuilding the WebSocket layer.
 let memoizedTerminalBridge: ClientTerminalBridge | null = null
 function getOrCreateTerminalBridge(): ClientTerminalBridge {

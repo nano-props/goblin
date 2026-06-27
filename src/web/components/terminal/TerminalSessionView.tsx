@@ -220,31 +220,36 @@ export function TerminalSessionView({
   // `isController` derived flag). Earlier drafts kept a parallel
   // `earlyIsController = hasSessions && snapshot.phase === 'open'
   // && attachment?.role === 'controller'` near the handlers and
-  // a separate `isController = slotMode === 'open-controller'`
+  // a separate `isController = sessionPhase === 'open-controller'`
   // definition below — those two stayed in sync by accident, not by
   // contract, and would have drifted the moment either side got
   // edited.
-  const slotMode: 'opening' | 'restarting' | 'open-controller' | 'open-viewer' | 'error-controller' | 'error-viewer' =
-    (() => {
-      if (!hasSessions) return 'opening'
-      if (snapshot.phase === 'opening') return 'opening'
-      if (snapshot.phase === 'restarting') return 'restarting'
-      if (snapshot.phase === 'error') {
-        return attachment?.role === 'controller' ? 'error-controller' : 'error-viewer'
-      }
-      // phase === 'open'
-      return attachment?.role === 'controller' ? 'open-controller' : 'open-viewer'
-    })()
+  const sessionPhase:
+    | 'opening'
+    | 'restarting'
+    | 'open-controller'
+    | 'open-viewer'
+    | 'error-controller'
+    | 'error-viewer' = (() => {
+    if (!hasSessions) return 'opening'
+    if (snapshot.phase === 'opening') return 'opening'
+    if (snapshot.phase === 'restarting') return 'restarting'
+    if (snapshot.phase === 'error') {
+      return attachment?.role === 'controller' ? 'error-controller' : 'error-viewer'
+    }
+    // phase === 'open'
+    return attachment?.role === 'controller' ? 'open-controller' : 'open-viewer'
+  })()
   // `isController` is the *interactive* affordance flag — it gates the
   // mobile toolbar, the paste/drop file handlers, and the xterm's
   // `aria-readonly`. The PTY is dead in `error-controller`, so we
   // deliberately exclude that state even though the controller status
   // is still ours. The error chip is shown via `showErrorChip`
   // instead.
-  const isController = slotMode === 'open-controller'
-  const isReadonly = slotMode === 'open-viewer' || slotMode === 'error-viewer'
+  const isController = sessionPhase === 'open-controller'
+  const isReadonly = sessionPhase === 'open-viewer' || sessionPhase === 'error-viewer'
   const showViewerOverlay = isReadonly
-  const showErrorChip = slotMode === 'error-controller'
+  const showErrorChip = sessionPhase === 'error-controller'
   const terminalErrorMessageKey = snapshot.message ?? DEFAULT_TERMINAL_ERROR_MESSAGE_KEY
   const readonlyBadge = attachment?.role === 'viewer' ? t('terminal.mirror-controlled') : t('terminal.unowned')
   const progressVariant =
@@ -265,7 +270,7 @@ export function TerminalSessionView({
     if (!(relatedTarget instanceof Node) || !event.currentTarget.contains(relatedTarget)) setDragOver(false)
   }, [])
   const writeResolutionToPty = useCallback(
-    (resolution: PasteResolution, slotKey: string, source: 'paste' | 'drop') => {
+    (resolution: PasteResolution, sessionKey: string, source: 'paste' | 'drop') => {
       const plan = planTerminalPathWrite(resolution.paths, {
         failedUnsafe: resolution.failedUnsafe,
         failedBackend: resolution.failedBackend,
@@ -279,7 +284,7 @@ export function TerminalSessionView({
         toast.error(t('terminal.paste-file-overflow'))
         return
       }
-      writeInput(slotKey, plan.data, source)
+      writeInput(sessionKey, plan.data, source)
       if (plan.failures.failedUnsafe > 0) toast.error(t('terminal.paste-file-unsafe'))
       if (plan.failures.failedBackend > 0) toast.error(t('terminal.paste-file-partial'))
     },
@@ -301,16 +306,16 @@ export function TerminalSessionView({
       // blob-save tier (web HTTP path) is a real roundtrip, so a
       // worktree switch during resolve would otherwise route the
       // write to a session the user is no longer looking at.
-      const slotKey = key
+      const sessionKey = key
       void processDrop({ files }).then(
         (outcome) => {
-          if (keyRef.current !== slotKey) return
+          if (keyRef.current !== sessionKey) return
           // `no-op` is unreachable at this call site: `handleDrop`
           // filters zero-byte files before calling `processDrop`, so
           // `processDrop` can only return `files` or `too-large`.
           // `handlePasteCapture` uses the same if-narrowing shape.
           if (outcome.kind === 'files') {
-            writeResolutionToPty(outcome.resolution, slotKey, 'drop')
+            writeResolutionToPty(outcome.resolution, sessionKey, 'drop')
             return
           }
           if (outcome.kind === 'too-large') {
@@ -321,7 +326,7 @@ export function TerminalSessionView({
           // IPC / network / server failure. Surface it instead of
           // silently swallowing the rejection.
           terminalLog.warn('drop resolver failed', { err })
-          if (keyRef.current === slotKey) toast.error(t('terminal.paste-file-failed'))
+          if (keyRef.current === sessionKey) toast.error(t('terminal.paste-file-failed'))
         },
       )
     },
@@ -366,18 +371,18 @@ export function TerminalSessionView({
 
       // 'files' — resolve paths asynchronously. Capture the session
       // key (see `handleDrop` for the worktree-switch rationale).
-      const slotKey = key
+      const sessionKey = key
       void resolvePastedFiles(files).then(
         (resolution) => {
-          if (keyRef.current !== slotKey) return
-          writeResolutionToPty(resolution, slotKey, 'paste')
+          if (keyRef.current !== sessionKey) return
+          writeResolutionToPty(resolution, sessionKey, 'paste')
         },
         (err) => {
           // IPC / network / server failure. Surface it instead of
           // silently swallowing the rejection — the user needs to
           // know their paste didn't land.
           terminalLog.warn('paste resolver failed', { err })
-          if (keyRef.current === slotKey) toast.error(t('terminal.paste-file-failed'))
+          if (keyRef.current === sessionKey) toast.error(t('terminal.paste-file-failed'))
         },
       )
     },
@@ -471,15 +476,15 @@ export function TerminalSessionView({
           takeoverPending={snapshot.takeoverPending}
         />
       )}
-      {slotMode === 'opening' && !hasSessions && !syncReady ? (
+      {sessionPhase === 'opening' && !hasSessions && !syncReady ? (
         <div className="goblin-terminal-session__status-overlay">
           <span>{t('terminal.loading')}</span>
         </div>
-      ) : slotMode === 'opening' && !hasSessions && pendingCreate ? (
+      ) : sessionPhase === 'opening' && !hasSessions && pendingCreate ? (
         <div className="goblin-terminal-session__status-overlay">
           <span>{t('terminal.opening')}</span>
         </div>
-      ) : slotMode === 'opening' && !hasSessions ? (
+      ) : sessionPhase === 'opening' && !hasSessions ? (
         // Empty state: the worktree has no terminals yet. The bare
         // host <div> renders a featureless black box otherwise, which
         // is what the user reported as "blank screen" on the first
@@ -501,7 +506,7 @@ export function TerminalSessionView({
           emptyLabel={t('terminal.empty')}
           newTerminalLabel={t('terminal.new')}
         />
-      ) : slotMode === 'opening' || slotMode === 'restarting' ? (
+      ) : sessionPhase === 'opening' || sessionPhase === 'restarting' ? (
         <div className="goblin-terminal-session__status-overlay">
           <span>{t('terminal.opening')}</span>
         </div>

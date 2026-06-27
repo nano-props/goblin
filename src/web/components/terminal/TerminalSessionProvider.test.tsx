@@ -678,7 +678,7 @@ describe('TerminalSessionProvider', () => {
       // With the derived-value pattern, the store never re-projects the
       // preferred tab when terminal sessions go to zero. The user's intent
       // is preserved; `resolveRenderableWorkspacePaneTab` resolves the rendered tab
-      // at read time (covered by `workspace-pane-tab.test.ts` and
+      // at read time (covered by `workspace-pane-tabs.ts` and
       // `workspace-pane-tab.test.ts`).
       await act(async () => {
         exitHandler?.({ ptySessionId: 'slot-1' })

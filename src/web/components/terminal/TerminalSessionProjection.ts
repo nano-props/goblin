@@ -71,7 +71,7 @@ export class TerminalSessionProjection {
   private repoIndex: TerminalRepoIndex = {}
   private parkingRoot: HTMLDivElement | null = null
   private readonly sessions = new Map<string, TerminalSession>()
-  private readonly slotKeyByPtySessionId = new Map<string, string>()
+  private readonly sessionKeyByPtySessionId = new Map<string, string>()
   private readonly ptySessionIdByKey = new Map<string, string>()
   private readonly selectedKeyByWorktree = new Map<string, string>()
   private readonly preferredSelectedKeyByWorktree = new Map<string, string>()
@@ -137,7 +137,7 @@ export class TerminalSessionProjection {
   private readonly worktreeListeners = new Map<string, Set<() => void>>()
   private readonly snapshotListeners = new Map<string, Set<() => void>>()
   private readonly displayOrderByKey = new Map<string, number>()
-  private readonly bellController = createTerminalBellState(
+  private readonly bellState = createTerminalBellState(
     (key) => {
       if (key) {
         const terminalWorktreeKey = this.sessions.get(key)?.descriptor.worktreeTerminalKey
@@ -196,7 +196,7 @@ export class TerminalSessionProjection {
       pending.reject(new Error('terminal session projection destroyed'))
     for (const session of this.sessions.values()) session.dispose({ closeSession: false })
     this.sessions.clear()
-    this.slotKeyByPtySessionId.clear()
+    this.sessionKeyByPtySessionId.clear()
     this.ptySessionIdByKey.clear()
     this.selectedKeyByWorktree.clear()
     this.preferredSelectedKeyByWorktree.clear()
@@ -210,12 +210,12 @@ export class TerminalSessionProjection {
     this.worktreeSnapshotCache.clear()
     this.worktreeListeners.clear()
     this.snapshotListeners.clear()
-    this.bellController.reset()
+    this.bellState.reset()
     if (projectionInstance === this) projectionInstance = null
   }
 
   handleOutput(event: { ptySessionId: string; data: string; seq: number; processName: string }): void {
-    const directKey = this.slotKeyByPtySessionId.get(event.ptySessionId)
+    const directKey = this.sessionKeyByPtySessionId.get(event.ptySessionId)
     const directSession = directKey ? this.sessions.get(directKey) : null
     if (directSession) {
       directSession.handleOutput(event)
@@ -223,7 +223,7 @@ export class TerminalSessionProjection {
   }
 
   handleServerTitle(event: { ptySessionId: string; canonicalTitle: string | null }): void {
-    const directKey = this.slotKeyByPtySessionId.get(event.ptySessionId)
+    const directKey = this.sessionKeyByPtySessionId.get(event.ptySessionId)
     const directSession = directKey ? this.sessions.get(directKey) : null
     if (directSession) {
       directSession.handleServerTitle(event.canonicalTitle)
@@ -231,7 +231,7 @@ export class TerminalSessionProjection {
   }
 
   handleExit(event: { ptySessionId: string }): void {
-    const directKey = this.slotKeyByPtySessionId.get(event.ptySessionId)
+    const directKey = this.sessionKeyByPtySessionId.get(event.ptySessionId)
     const directSession = directKey ? this.sessions.get(directKey) : null
     if (directKey && directSession?.handleExit(event)) {
       // Local runtime accepted the exit. Gating the discard on the
@@ -266,7 +266,7 @@ export class TerminalSessionProjection {
   // — calling `close` again would no-op the `closeSessionForUser` check
   // on the server and add a useless WS roundtrip.
   handleSessionClosed(ptySessionId: string): void {
-    const directKey = this.slotKeyByPtySessionId.get(ptySessionId)
+    const directKey = this.sessionKeyByPtySessionId.get(ptySessionId)
     if (!directKey) return
     const session = this.sessions.get(directKey)
     if (!session) return
@@ -274,7 +274,7 @@ export class TerminalSessionProjection {
   }
 
   handleIdentity(event: TerminalIdentityViewModel): void {
-    const directKey = this.slotKeyByPtySessionId.get(event.ptySessionId)
+    const directKey = this.sessionKeyByPtySessionId.get(event.ptySessionId)
     const directSession = directKey ? this.sessions.get(directKey) : null
     if (directSession) {
       directSession.handleIdentity(event)
@@ -282,7 +282,7 @@ export class TerminalSessionProjection {
   }
 
   handleLifecycle(event: TerminalLifecycleViewModel): void {
-    const directKey = this.slotKeyByPtySessionId.get(event.ptySessionId)
+    const directKey = this.sessionKeyByPtySessionId.get(event.ptySessionId)
     const directSession = directKey ? this.sessions.get(directKey) : null
     if (directSession) {
       directSession.handleLifecycle(event)
@@ -370,7 +370,7 @@ export class TerminalSessionProjection {
   private evictOrphanedLocalSessions(repoRoot: string, serverKeys: Set<string>): number {
     const orphanedKeys = countOrphanedTerminalSessionKeys({
       repoRoot,
-      localSlotKeys: Array.from(this.sessions.keys()),
+      localSessionKeys: Array.from(this.sessions.keys()),
       getRepoRootForKey: (key) => this.sessions.get(key)?.descriptor.repoRoot ?? null,
       hasServerPtySessionId: (key) => this.ptySessionIdByKey.has(key),
       serverKeys,
@@ -736,7 +736,7 @@ export class TerminalSessionProjection {
       selectedKey: this.selectedKeyByWorktree.get(worktreeTerminalKey) ?? null,
       getCachedSnapshot: (key) => this.snapshotCache.get(key) ?? null,
       cacheSnapshot: (key, nextSnapshot) => this.snapshotCache.set(key, nextSnapshot),
-      hasBell: (key) => this.bellController.hasBell(key),
+      hasBell: (key) => this.bellState.hasBell(key),
       getDisplayOrder: (session) => terminalSessionDisplayOrder(session.descriptor, this.displayOrderByKey),
     })
     this.worktreeSnapshotCache.set(worktreeTerminalKey, snapshot)
@@ -751,14 +751,14 @@ export class TerminalSessionProjection {
     const session = this.sessions.get(key)
     if (!session || session.descriptor.worktreeTerminalKey !== worktreeTerminalKey) return
     const wasSelected = this.selectedKeyByWorktree.get(worktreeTerminalKey) === key
-    const hadBell = this.bellController.hasBell(key)
+    const hadBell = this.bellState.hasBell(key)
     if (wasSelected && !hadBell) return
     this.selectTerminalKey(worktreeTerminalKey, key, { notify: !hadBell })
-    this.bellController.clear(key)
+    this.bellState.clear(key)
   }
 
   clearBell = (key: string): boolean => {
-    return this.bellController.clear(key)
+    return this.bellState.clear(key)
   }
 
   scrollToBottom = (key: string): void => {
@@ -911,7 +911,7 @@ export class TerminalSessionProjection {
       key,
       ptySessionId,
       ptySessionIdByKey: this.ptySessionIdByKey,
-      slotKeyByPtySessionId: this.slotKeyByPtySessionId,
+      sessionKeyByPtySessionId: this.sessionKeyByPtySessionId,
     })
   }
 
@@ -959,7 +959,7 @@ export class TerminalSessionProjection {
     this.displayOrderByKey.delete(key)
     this.notifyTerminalSessionRemoved(key, session.descriptor)
     this.notifySnapshot(key)
-    this.bellController.remove(key)
+    this.bellState.remove(key)
     if (options.dispose) session.dispose({ closeSession: options.closeSession !== false })
     if (wasSelected) {
       const nextKey = resolveAdjacentTerminalSelectionAfterRemoval(orderedKeysBeforeRemoval, key)
@@ -1033,7 +1033,7 @@ export class TerminalSessionProjection {
     const session = new TerminalSession(
       descriptor,
       () => this.notifySession(descriptor.key),
-      this.bellController.handleBell,
+      this.bellState.handleBell,
       (ptySessionId) => this.enqueueDurableClose({ ptySessionId, worktreeTerminalKey: descriptor.worktreeTerminalKey }),
     )
     this.sessions.set(descriptor.key, session)
