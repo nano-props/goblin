@@ -96,7 +96,7 @@ describe('attachTerminalClient (single-user model)', () => {
     expect(state.controller).toBeNull()
   })
 
-  test('same attachment that was controller reattaching auto-claims when slot cleared', () => {
+  test('same attachment that was controller reattaching auto-claims when controller role cleared', () => {
     // The previous design kept the controller in a 'grace' sub-state
     // for 30 s so a reattach could restore it without an explicit
     // takeover. The new design clears the controller role on disconnect

@@ -18,7 +18,7 @@ const RULES: Rule[] = [
   {
     fromPrefix: '/src/main/',
     disallow: ['#/web/', '#/server/'],
-    reason: 'main must only cover Electron-native shell concerns; must not import web or server runtime modules',
+    reason: 'main must only cover native-host concerns; must not import web or server runtime modules',
   },
   {
     fromPrefix: '/src/web/',

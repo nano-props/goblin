@@ -1,6 +1,6 @@
-// Canonical slot/worktree key encoding for the terminal subsystem.
-// The format is `${scope}\0${worktreePath}\0${sessionId}` for slot
-// keys and `${repoRoot}\0${worktreePath}` for worktree keys. Both
+// Canonical workspace-pane slot key / worktree key encoding for the terminal subsystem.
+// The format is `${scope}\0${worktreePath}\0${sessionId}` for
+// workspace-pane slot keys and `${repoRoot}\0${worktreePath}` for worktree keys. Both
 // segments are non-empty strings in normal use. The format is
 // deliberately NUL-delimited because neither segment can contain
 // `\0` (validated upstream) and a NUL split makes the key
@@ -50,8 +50,8 @@ export function parseWorktreeKey(key: string): ParsedWorktreeKey | null {
   return { repoRoot, worktreePath }
 }
 
-/** Build a `${scope}\0${worktreePath}` key from a slot key (drops the
- *  trailing sessionId segment). Used by catalog prune logic. */
+/** Build a `${scope}\0${worktreePath}` worktree key from a workspace-pane slot
+ *  key (drops the trailing sessionId segment). Used by catalog prune logic. */
 export function terminalPruneKeyFromSlotKey(slotKey: string): string | null {
   const parsed = parseTerminalWorkspaceSlotKey(slotKey)
   if (!parsed) return null

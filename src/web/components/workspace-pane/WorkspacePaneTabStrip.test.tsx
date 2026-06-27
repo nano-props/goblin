@@ -79,6 +79,7 @@ describe('WorkspacePaneTabStrip', () => {
       />,
     )
 
+    console.log('debug body:', document.body.innerHTML.substring(0, 2000))
     const tab = document.body.querySelector('[data-workspace-pane-tab-tooltip-id="terminal:t1"]')
     if (!(tab instanceof HTMLElement)) throw new Error('missing terminal tab')
     tab.getBoundingClientRect = () =>
@@ -224,7 +225,10 @@ describe('WorkspacePaneTabStrip', () => {
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         panelActive
-        sessions={[session({ key: 't1', selected: true }), session({ key: 't2', selected: false })]}
+        sessions={[
+          session({ key: 't1', selected: true }),
+          session({ key: 't2', selected: false, sessionId: 'session-2', index: 2 }),
+        ]}
         onNew={() => {}}
         onSelect={() => {}}
         onScrollToBottom={() => {}}

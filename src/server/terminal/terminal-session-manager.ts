@@ -212,7 +212,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       // Mirror the existing-session path: route the `attach` through
       // `applyIdentityEffect` so the returned `emitIdentity` flag
       // (true for the auto-claim case where the new clientId picks
-      // up an unowned slot) actually broadcasts the realtime
+      // up an unowned session) actually broadcasts the realtime
       // `identity` event to siblings. Without this the session's
       // controller and `userSticky` flags are set correctly but
       // sibling windows only learn about the new controller via the

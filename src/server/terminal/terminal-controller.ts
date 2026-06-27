@@ -187,7 +187,7 @@ export function restartTerminalClientControl(state: TerminalControllerState, cli
  * when the controller's attachment disconnects the controller role clears,
  * and the next attach from any attachment auto-claims. A controller
  * that reconnects within milliseconds is still treated as the
- * controller (the `clientId` matches) and gets its slot back.
+ * controller (the `clientId` matches) and gets its controller back.
  *
  * On reconnect of an attachment that was previously the controller
  * (and whose controller role was cleared while it was away), the controller role is
@@ -228,7 +228,7 @@ export function updateTerminalClientConnection(
   // session before. The first attach uses the same path via
   // `attachTerminalClient`, so we only reach here when the
   // attachment already exists in the map (e.g. a viewer coming
-  // online) — in that case there is no slot to claim.
+  // online) — in that case there is no controller role to claim.
   if (connected && !wasConnected && state.controller === null && state.userSticky) {
     return claimTerminalClientControl(state, clientId)
   }

@@ -157,7 +157,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           takeover: () =>
             Promise.resolve({
               ok: true as const,
-              ptySessionId: 'session-1',
+              ptySessionId: 'pty_test_aaaaaaaaa',
               controller: { clientId: 'attachment_local', status: 'connected' as const },
             }),
           close: () => Promise.resolve(true),
@@ -222,7 +222,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         case 'terminal.takeover':
           return {
             ok: true as const,
-            ptySessionId: 'session-1',
+            ptySessionId: 'pty_test_aaaaaaaaa',
             role: 'controller' as const,
             controllerStatus: 'connected' as const,
             controller: { clientId: 'attachment_local', status: 'connected' as const },

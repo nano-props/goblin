@@ -230,12 +230,12 @@ function RepoCacheIndicator({ repo }: { repo: RepoState }) {
   if (repo.projection.source !== 'cache') return null
 
   const time = repo.projection.savedAt ? new Date(repo.projection.savedAt).toLocaleString() : ''
-  const title = time ? t('tab.projectiond-title', { time }) : t('tab.projectiond')
+  const title = time ? t('tab.cached-title', { time }) : t('tab.cached')
 
   return (
     <span className="flex items-center gap-1 text-xs text-muted-foreground" title={title} aria-label={title}>
       <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/70" />
-      {t('tab.projectiond')}
+      {t('tab.cached')}
     </span>
   )
 }

@@ -35,7 +35,7 @@ describe('saveClipboardFiles', () => {
   })
 
   test('two single-file pastes in the same millisecond produce distinct filenames', async () => {
-    // Mirrors the main-process regression test. Locks the
+    // Mirrors the native-host regression test. Locks the
     // process-level counter into the filename so the
     // `<ISO>-<index>-<name>` collision across paste events
     // can't return.
@@ -70,7 +70,7 @@ describe('saveClipboardFiles', () => {
   })
 
   test('strips C1 control characters (0x7F-0x9F) from file names', async () => {
-    // Mirrors the main-process test. Locks the contract that the
+    // Mirrors the native-host test. Locks the contract that the
     // sanitiser covers the C0 (\x00-\x1F) and C1 (\x7F-\x9F) ranges
     // together — Windows NTFS treats both as reserved. If a future
     // refactor narrows the character class to \x00-\x1F, this
