@@ -16,7 +16,7 @@ html[data-color-theme='macos'][data-theme='light'] {
   --goblin-text-secondary-strong: #3c3c43;
   --goblin-text-secondary: #6e6e73;
   --goblin-text-selected-secondary: rgb(60 60 67 / 0.68);
-  --goblin-border-subtle: rgb(60 60 67 / 0.10);
+  --goblin-border-subtle: rgb(60 60 67 / 0.1);
   --goblin-border-default: rgb(60 60 67 / 0.22);
   --goblin-border-strong: rgb(60 60 67 / 0.26);
   --goblin-focus-ring: #007aff;

@@ -159,7 +159,7 @@ describe('client bootstrap', () => {
       onEffectIntent: () => () => {},
       pathForFile: () => '',
       saveClipboardFiles: () => Promise.resolve([]),
-      shell: () => null,
+      host: () => null,
       terminal: () => ({
         attach: async () => ({ ok: false, message: 'unavailable' }),
         restart: async () => ({ ok: false, message: 'unavailable' }),
@@ -200,12 +200,12 @@ describe('client bootstrap', () => {
                 canonicalCols: 80,
                 canonicalRows: 24,
                 sessions: [],
-        },
+              },
         pruneTerminals: async () => ({ pruned: 0, remaining: 0 }),
         listSessions: async () => [],
         prewarm: async () => {},
         kickReconnect: () => {},
-        getSlotSnapshot: async () => null,
+        getSessionSnapshot: async () => null,
         notifyBell: async () => false,
         sendTestNotification: async () => false,
         setBadge: () => {},
@@ -215,7 +215,7 @@ describe('client bootstrap', () => {
         onIdentity: () => () => {},
         onLifecycle: () => () => {},
         onSessionsChanged: () => () => {},
-        onSlotClosed: () => () => {},
+        onSessionClosed: () => () => {},
       }),
     })
 

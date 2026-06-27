@@ -414,7 +414,8 @@ async function validateSourcePathWithinRoot(
   } catch (err) {
     return { ok: false, message: `failed to inspect ${rel}: ${errorMessage(err)}` }
   }
-  if (!isWithinRoot(sourceRootReal, sourceReal)) return { ok: false, message: `bootstrap path escapes repo root: ${rel}` }
+  if (!isWithinRoot(sourceRootReal, sourceReal))
+    return { ok: false, message: `bootstrap path escapes repo root: ${rel}` }
   return { ok: true }
 }
 

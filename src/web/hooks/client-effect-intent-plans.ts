@@ -1,8 +1,11 @@
-import { parseTerminalSlotKey, worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
+import {
+  parseTerminalWorkspaceSlotKey,
+  worktreeTerminalKey,
+} from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
-import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import type { LangPref, ThemePref } from '#/shared/settings.ts'
 
@@ -56,7 +59,7 @@ export type WorkspaceIntentPlan =
   | { kind: 'close-window' }
   | { kind: 'cycle-repo'; direction: 1 | -1 }
   | { kind: 'refresh-repo'; repoId: string; token: number }
-  | { kind: 'show-workspace-pane-view'; repoId: string; tab: WorkspacePaneView }
+  | { kind: 'show-workspace-pane-view'; repoId: string; tab: WorkspacePaneTabType }
   | { kind: 'terminal-primary-action'; repoId: string }
   | { kind: 'toggle-zen-mode' }
 
@@ -79,7 +82,7 @@ export function createTerminalBellIntentPlan(
   event: Extract<ClientEffectIntent, { type: 'terminal-bell-click' }>,
 ): TerminalBellIntentPlan {
   if (!repo) return { kind: 'noop' }
-  const parsedKey = event.key ? parseTerminalSlotKey(event.key) : null
+  const parsedKey = event.key ? parseTerminalWorkspaceSlotKey(event.key) : null
   if (parsedKey && parsedKey.repoRoot === repo.id && event.key) {
     const branch = repo.data.branches.find((candidate) => candidate.worktree?.path === parsedKey.worktreePath)
     if (branch) {

@@ -9,8 +9,8 @@ import {
   type BranchCopyPatchAction,
 } from '#/web/hooks/branch-action-state.ts'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
-import type { WorkspacePaneBranchViewType, WorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
-import { openWorkspacePaneView } from '#/web/components/branch-workspace/open-workspace-pane-view.ts'
+import type { WorkspacePaneBranchTabType, WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
+import { openWorkspacePaneTab } from '#/web/components/repo-workspace/open-workspace-pane-tab.ts'
 export interface BranchActionItem {
   id: BranchActionItemId
   label: string
@@ -62,8 +62,8 @@ export function useBranchActionItems(
     if (phase === 'queued' && queuedKey) return t(queuedKey)
     return t(loadingKey)
   }
-  const openStaticWorkspacePaneView = (type: WorkspacePaneBranchViewType | WorkspacePaneStaticViewType) => {
-    void openWorkspacePaneView({
+  const openStaticWorkspacePaneView = (type: WorkspacePaneBranchTabType | WorkspacePaneStaticTabType) => {
+    void openWorkspacePaneTab({
       repoId: repo.id,
       branchName: branch.name,
       worktreePath: branch.worktree?.path,

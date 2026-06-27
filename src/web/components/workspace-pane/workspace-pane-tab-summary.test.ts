@@ -2,10 +2,10 @@ import { describe, expect, test } from 'vitest'
 import {
   PENDING_TERMINAL_WORKSPACE_PANE_VIEW_IDENTITY,
   isTerminalWorkspacePaneView,
-} from '#/web/components/workspace-pane/workspace-pane-view-model.ts'
-import type { WorkspacePaneViewSummary } from '#/web/components/terminal/types.ts'
+} from '#/web/components/workspace-pane/workspace-pane-tab-summary.ts'
+import type { WorkspacePaneTabSummary } from '#/web/components/terminal/types.ts'
 
-const terminalView: WorkspacePaneViewSummary = {
+const terminalView: WorkspacePaneTabSummary = {
   type: 'terminal',
   id: 'slot-1',
   key: 'slot-1',

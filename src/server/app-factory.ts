@@ -19,7 +19,7 @@ import { createRepoRoutes } from '#/server/routes/repo.ts'
 import { createRepoViewRoutes } from '#/server/routes/repo-view.ts'
 import { createSettingsRoutes } from '#/server/routes/settings.ts'
 import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
-import { createServerSettingsState } from '#/server/modules/settings-state.ts'
+import { createNativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
 import { getServerI18nSnapshot } from '#/server/modules/i18n.ts'
 import { MAX_PASTE_BATCH_BYTES } from '#/shared/clipboard-paste.ts'
 
@@ -82,7 +82,7 @@ function isServerRoutePath(requestPath: string): boolean {
 }
 
 export function createApp(options: ServerAppOptions): Hono {
-  const settingsState = createServerSettingsState()
+  const settingsState = createNativeShortcutRegistrationState()
   const app = new Hono()
   app.use('*', accessLog())
   const serverHost = options.serverHost ?? '127.0.0.1'

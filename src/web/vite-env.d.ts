@@ -18,7 +18,7 @@ interface GoblinNativeBridge {
   onEvent: (cb: (event: IpcEvent) => void) => () => void
   onIntent?: (cb: (event: ClientEffectIntent) => void) => () => void
   pathForFile: (file: File) => string
-  shell?: {
+  host?: {
     openSettingsWindow: (input?: { page?: SettingsPage }) => Promise<boolean>
     openExternalUrl: (input: { url: string; allowHttp?: boolean }) => Promise<ExecResult>
     openDirectoryDialog: (input?: { title?: string }) => Promise<string | null>

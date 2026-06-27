@@ -279,7 +279,7 @@ describe('useBranchActionDialogDisplay', () => {
     expect(handle.current?.entry?.payload.branch).toBe('main')
   })
 
-  test('displayContext becomes null when the retained entry\'s branch is deleted from the repo', () => {
+  test("displayContext becomes null when the retained entry's branch is deleted from the repo", () => {
     // If the user opens the dialog for branch X and X is deleted
     // upstream while the dialog is still mounted, the retained
     // display entry still has branchName='feature/x' but the live

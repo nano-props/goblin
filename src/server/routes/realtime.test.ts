@@ -21,7 +21,7 @@ function makeTerminalHost(overrides: Partial<ServerTerminalHost> = {}): ServerTe
     listSessions: vi.fn(async () => []),
     create: vi.fn(async () => ({ ok: true }) as never),
     prune: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
-    getSlotSnapshot: vi.fn(async () => null),
+    getSessionSnapshot: vi.fn(async () => null),
     handleRealtimeMessage: vi.fn(),
     shutdown: vi.fn(),
     ...overrides,

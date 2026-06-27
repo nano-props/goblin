@@ -3,7 +3,7 @@ import {
   getServerSshHosts,
   openServerRemoteEditor,
   openServerRemoteTerminal,
-  resolveServerRemoteRepoLifecycle,
+  resolveServerRemoteRepoConnection,
   resolveServerRemoteTarget,
   testServerRemoteRepository,
 } from '#/server/modules/remote.ts'
@@ -23,7 +23,7 @@ export function createRemoteRoutes() {
   // returns `connecting` — that's a client projection.
   app.post('/lifecycle', async (c) => {
     const { repoId } = await parseHttpBody(REMOTE_PROCEDURE_SCHEMAS.remoteLifecycle, c)
-    return c.json(await resolveServerRemoteRepoLifecycle({ repoId }, c.req.raw.signal))
+    return c.json(await resolveServerRemoteRepoConnection({ repoId }, c.req.raw.signal))
   })
   app.post('/path-suggestions', async (c) => {
     const { alias, remotePath, prefix } = await parseHttpBody(REMOTE_PROCEDURE_SCHEMAS.pathSuggestions, c)

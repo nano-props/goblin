@@ -1,21 +1,21 @@
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
-import { readTerminalSlotCommandBridge } from '#/web/components/terminal/terminal-slot-command-bridge.ts'
-import { openWorkspacePaneView } from '#/web/components/branch-workspace/open-workspace-pane-view.ts'
+import { worktreeTerminalKey } from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
+import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import { openWorkspacePaneTab } from '#/web/components/repo-workspace/open-workspace-pane-tab.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
-import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
-import type { TerminalSlotBase } from '#/web/components/terminal/types.ts'
+import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
+import type { TerminalSessionBase } from '#/web/components/terminal/types.ts'
 import {
   adjacentBranchWorkspacePaneTab,
   type BranchWorkspacePaneTab,
-  type BranchWorkspacePaneTabModel,
-} from '#/web/components/branch-workspace/workspace-pane-tab-model.ts'
+  type RepoWorkspaceTabModel,
+} from '#/web/components/repo-workspace/tab-model.ts'
 import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
 import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
 import {
   isWorkspacePaneStaticTabProvider,
   workspacePaneTabProvider,
-} from '#/web/workspace-pane/workspace-pane-tab-providers.ts'
+} from '#/web/components/workspace-pane/tab-providers.ts'
 import {
   closeWorkspacePaneTab,
   workspacePaneTabTargetForBranch,
@@ -23,7 +23,7 @@ import {
 
 interface ShowWorkspacePaneViewCommandOptions {
   repoId: string | null
-  tab: WorkspacePaneView
+  tab: WorkspacePaneTabType
   navigation: MainWindowNavigationActions
 }
 
@@ -71,7 +71,7 @@ export async function runShowWorkspacePaneViewCommand({
   if (isWorkspacePaneStaticTabProvider(provider)) {
     const target = selectedBranchWorkspaceTarget(repoId)
     if (target) {
-      return openWorkspacePaneView({
+      return openWorkspacePaneTab({
         repoId,
         branchName: target.branchName,
         worktreePath: target.worktreePath,
@@ -93,7 +93,7 @@ export async function runTerminalPrimaryActionCommand({
   await runShowWorkspacePaneViewCommand({ repoId, tab: 'terminal', navigation })
   const base = selectedTerminalBase(repoId)
   if (!base) return true
-  const bridge = readTerminalSlotCommandBridge()
+  const bridge = readTerminalSessionCommandBridge()
   if (!bridge) return true
   const worktreeKey = worktreeTerminalKey(base.repoRoot, base.worktreePath)
   const worktree = bridge.worktreeSnapshot(worktreeKey)
@@ -101,7 +101,7 @@ export async function runTerminalPrimaryActionCommand({
     // The user expects "click the Terminal menu" to land them on a working
     // terminal session: focus the first existing session instead of leaving
     // the selection on whatever the user had open before.
-    const firstSession = worktree.slots[0]
+    const firstSession = worktree.sessions[0]
     if (firstSession) bridge.selectTerminal(worktreeKey, firstSession.key)
     return true
   }
@@ -123,7 +123,7 @@ export async function runNewTerminalTabCommand({
   const base = selectedTerminalBase(repoId)
   if (!base) return false
   await runShowWorkspacePaneViewCommand({ repoId, tab: 'terminal', navigation })
-  const bridge = readTerminalSlotCommandBridge()
+  const bridge = readTerminalSessionCommandBridge()
   if (!bridge) return true
   const result = await runCreateTerminalTabCommand({
     base,
@@ -207,7 +207,7 @@ export function runMoveWorkspacePaneTabCommand({
   return true
 }
 
-function selectedTerminalBase(repoId: string): TerminalSlotBase | null {
+function selectedTerminalBase(repoId: string): TerminalSessionBase | null {
   const target = selectedBranchWorkspaceTarget(repoId)
   if (!target?.worktreePath) return null
   return {
@@ -226,17 +226,17 @@ function selectedBranchWorkspaceTarget(repoId: string): { branchName: string; wo
 }
 
 function showWorkspacePaneCommandTab(
-  target: BranchWorkspacePaneTabModel,
+  target: RepoWorkspaceTabModel,
   tab: BranchWorkspacePaneTab,
   navigation: MainWindowNavigationActions,
 ): void {
   navigation.showRepoWorkspacePaneView(target.repoId, tab.type)
   if (tab.kind === 'terminal' && target.worktreeTerminalKey) {
-    readTerminalSlotCommandBridge()?.selectTerminal(target.worktreeTerminalKey, tab.key)
+    readTerminalSessionCommandBridge()?.selectTerminal(target.worktreeTerminalKey, tab.key)
   }
 }
 
-function workspacePaneCommandTarget(repoId: string): BranchWorkspacePaneTabModel | null {
+function workspacePaneCommandTarget(repoId: string): RepoWorkspaceTabModel | null {
   const state = useReposStore.getState()
   const repo = state.repos[repoId]
   if (!repo?.ui.selectedBranch) return null

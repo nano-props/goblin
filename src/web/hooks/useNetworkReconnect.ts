@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
-import { runRemoteRepoLifecycle } from '#/web/stores/repos/remote-lifecycle-orchestrator.ts'
+import { runRemoteRepoConnection } from '#/web/stores/repos/remote-repo-connection-orchestrator.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 
@@ -25,7 +25,7 @@ import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
  * route change; in practice the user reopens wifi/VPN seconds
  * before the OS catches up, so the first probe often still
  * fails. We don't retry inside the hook — the failed
- * `runRemoteRepoLifecycle` call settles to `failed` and the
+ * `runRemoteRepoConnection` call settles to `failed` and the
  * next `online` event gives the next attempt.
  */
 export function useNetworkReconnect(): void {
@@ -48,7 +48,7 @@ export function useNetworkReconnect(): void {
         // kills the stale in-flight run and starts over with the
         // now-working network.
         if (lifecycle?.kind === 'ready') continue
-        void runRemoteRepoLifecycle(set, get, repo.id)
+        void runRemoteRepoConnection(set, get, repo.id)
       }
     }
     window.addEventListener('online', onOnline)

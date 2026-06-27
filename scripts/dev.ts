@@ -112,8 +112,8 @@ function launchElectron(): Bun.Subprocess {
   // stub, so every `import { app } from 'electron'` in the main process
   // fails with "does not provide an export named 'app'". Strip the flag
   // here so the Electron process starts as a real main process; the
-  // embedded server child process still re-applies it via server-manager.ts
-  // to spawn Node for the worker entry.
+  // embedded server child process still re-applies it via
+  // embedded-server-lifecycle.ts to spawn Node for the worker entry.
   const { ELECTRON_RUN_AS_NODE: _ignored, ...electronEnv } = process.env
   const proc = Bun.spawn(electronArgs, {
     cwd: repoRoot,

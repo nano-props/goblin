@@ -12,7 +12,7 @@
 //  - makes the Vite-served dev path identical to the embedded
 //    path (both go through HTTP; no "if Electron, then sync IPC"
 //    special case)
-//  - keeps the client identical across runtimes: it's
+//  - keeps the client identical across repoOperationSchedulers: it's
 //    just an HTTP fetch at boot
 
 import os from 'node:os'

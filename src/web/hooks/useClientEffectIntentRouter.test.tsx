@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { useClientEffectIntentRouter } from '#/web/hooks/useClientEffectIntentRouter.ts'
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
+import { worktreeTerminalKey } from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
@@ -17,8 +17,8 @@ const appDataClientMocks = vi.hoisted(() => ({
   clearRecentRepoHistory: vi.fn(async () => {}),
 }))
 
-vi.mock('#/web/settings-write-paths.ts', async () => {
-  const actual = await vi.importActual<typeof import('#/web/settings-write-paths.ts')>('#/web/settings-write-paths.ts')
+vi.mock('#/web/settings-actions.ts', async () => {
+  const actual = await vi.importActual<typeof import('#/web/settings-actions.ts')>('#/web/settings-actions.ts')
   return {
     ...actual,
     clearRecentRepoHistory: appDataClientMocks.clearRecentRepoHistory,
@@ -72,14 +72,14 @@ beforeEach(() => {
     showRepoWorkspacePaneView: (repoId, tab) => {
       const state = useReposStore.getState()
       state.setActive(repoId)
-      state.setWorkspacePaneView(repoId, tab)
+      state.setWorkspacePaneTab(repoId, tab)
     },
     showRepoBranchWorkspacePaneView: (repoId, branch, tab) => {
       showRepoBranchWorkspacePaneViewSpy(repoId, branch, tab)
       const state = useReposStore.getState()
       state.setActive(repoId)
       state.selectBranch(repoId, branch)
-      state.setWorkspacePaneView(repoId, tab)
+      state.setWorkspacePaneTab(repoId, tab)
     },
     openSettings: () => {},
   }
@@ -101,7 +101,7 @@ beforeEach(() => {
         }
       }),
       pathForFile: vi.fn(() => ''),
-      shell: {
+      host: {
         consumeExternalOpenPaths: consumeExternalOpenPathsSpy,
       },
       terminal: {

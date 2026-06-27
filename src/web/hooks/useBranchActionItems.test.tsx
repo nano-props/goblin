@@ -25,7 +25,7 @@ vi.mock('#/web/main-window-navigation.tsx', () => ({
 }))
 
 vi.mock('#/web/runtime-settings-external-apps.ts', () => ({
-  useRuntimeExternalAppSettings: () => ({
+  useExternalAppSettings: () => ({
     terminalAvailable: true,
     editorAvailable: true,
   }),

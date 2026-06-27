@@ -1,6 +1,6 @@
 import { FolderGit2 } from 'lucide-react'
-import { RepoShellSidebar } from '#/web/components/repo-shell/RepoShellSidebar.tsx'
-import { RepoWorkspaceShell } from '#/web/components/repo-shell/RepoWorkspaceShell.tsx'
+import { RepoLayoutSidebar } from '#/web/components/repo-layout/RepoLayoutSidebar.tsx'
+import { RepoLayoutWorkspaceShell } from '#/web/components/repo-layout/RepoLayoutWorkspaceShell.tsx'
 import { RepoWorkspacePane } from '#/web/components/Layout.tsx'
 import { WorkspaceChrome } from '#/web/components/workspace-toolbar-chrome.tsx'
 import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
@@ -19,7 +19,7 @@ export function EmptyRepoView({ onOpenSettings }: EmptyRepoViewProps) {
   const setWorkspacePaneSize = useReposStore((s) => s.setWorkspacePaneSize)
 
   return (
-    <RepoWorkspaceShell
+    <RepoLayoutWorkspaceShell
       compact={compact}
       zenMode={false}
       branchWorkspaceActive={false}
@@ -28,7 +28,7 @@ export function EmptyRepoView({ onOpenSettings }: EmptyRepoViewProps) {
       zenModeToggleEnabled={false}
       branchNavigatorPane={
         <RepoWorkspacePane>
-          <RepoShellSidebar compact={compact} onOpenSettings={onOpenSettings} />
+          <RepoLayoutSidebar compact={compact} onOpenSettings={onOpenSettings} />
         </RepoWorkspacePane>
       }
       branchWorkspacePane={

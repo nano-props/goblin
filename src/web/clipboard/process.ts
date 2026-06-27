@@ -8,7 +8,7 @@ import { resolvePastedFiles, type PasteResolution } from '#/web/clipboard/resolv
 
 /**
  * Pure helpers that decide what a `paste` event should do, given
- * just the relevant clipboard fields. The `TerminalSlot` handler is
+ * just the relevant clipboard fields. The `TerminalSessionView` handler is
  * a thin wrapper that reads `clipboardData` synchronously and routes
  * to one of three branches:
  *

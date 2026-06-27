@@ -7,7 +7,7 @@ import { RepoActivityControl } from '#/web/components/repo-activity/RepoActivity
 import { resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
-import { markRepoOperationTargets, nextRepoOperationId } from '#/web/stores/repos/runtime.ts'
+import { markRepoOperationTargets, nextRepoOperationId } from '#/web/stores/repos/repo-operation-scheduler.ts'
 
 const REPO_ID = '/tmp/repo-activity-control-component'
 

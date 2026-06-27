@@ -38,7 +38,10 @@ beforeEach(() => {
   container = document.createElement('div')
   document.body.append(container)
   root = createRoot(container)
-  vi.stubGlobal('fetch', vi.fn(async () => previewResponse({ hasOperations: false, configHash: null })))
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => previewResponse({ hasOperations: false, configHash: null })),
+  )
 })
 
 afterEach(() => {
@@ -470,7 +473,6 @@ describe('CreateWorktreeDialogHost', () => {
       expect.objectContaining({ refreshOnError: false }),
     )
   })
-
 })
 
 function previewResponse(input: { hasOperations: boolean; configHash: string | null }): Response {

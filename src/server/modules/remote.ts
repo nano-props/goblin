@@ -13,7 +13,7 @@ import {
   type RemoteDiagnosticCategory,
   type RemoteDiagnosticsResult,
   type RemotePathSuggestionsInput,
-  type RemoteRepoLifecycleResult,
+  type RemoteRepoConnectionResult,
   type RemoteRepoTarget,
   type ResolvedRemoteTarget,
   type SshConfigHostsResult,
@@ -93,7 +93,7 @@ export async function resolveServerRemoteTarget(
  *   3. probe the remote repo via `testRemoteRepository` (SSH
  *      handshake + `checkShell`/`checkGit`/`revParseTopLevel`)
  *   4. classify the failure into a `RemoteRepoFailureReason`
- *   5. return a converged {@link RemoteRepoLifecycleResult}
+ *   5. return a converged {@link RemoteRepoConnectionResult}
  *
  * The function NEVER returns a `connecting` lifecycle — that's
  * a client-side projection written by the orchestrator before
@@ -107,15 +107,15 @@ export async function resolveServerRemoteTarget(
  *     `runRemoteCommand` (the SSH handshake / checkShell / etc.
  *     execas in `system/ssh/commands.ts:runRemoteCommand`)
  *
- * Aborting the signal is the only way a `runRemoteRepoLifecycle`
+ * Aborting the signal is the only way a `runRemoteRepoConnection`
  * orchestrator run in the client can free the lane's
  * concurrency slot before its natural timeout — see
  * `runLatestOperation` with the `lifecycle` lane.
  */
-export async function resolveServerRemoteRepoLifecycle(
+export async function resolveServerRemoteRepoConnection(
   input: { repoId: string },
   signal?: AbortSignal,
-): Promise<RemoteRepoLifecycleResult> {
+): Promise<RemoteRepoConnectionResult> {
   const repoId = input.repoId
   // Defensive: local ids should never reach this server entry.
   // The orchestrator gates on `isRemoteRepoId` before calling;

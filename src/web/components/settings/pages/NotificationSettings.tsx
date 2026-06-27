@@ -3,14 +3,14 @@ import { toast } from 'sonner'
 import { Button } from '#/web/components/ui/button.tsx'
 import { Switch } from '#/web/components/ui/switch.tsx'
 import { SettingsGroup, SettingsList, SettingsRow } from '#/web/components/settings/SettingsPrimitives.tsx'
-import { useFetchSettingsController, useRuntimeFetchSettings } from '#/web/runtime-settings-fetch.ts'
+import { useFetchSettingsController, useFetchSettings } from '#/web/runtime-settings-fetch.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { terminalBridge } from '#/web/terminal.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import { settingsLog } from '#/web/logger.ts'
 export function NotificationSettings() {
   const t = useT()
-  const { terminalNotificationsEnabled } = useRuntimeFetchSettings()
+  const { terminalNotificationsEnabled } = useFetchSettings()
   const { setTerminalNotificationsEnabled } = useFetchSettingsController()
   const [testingTerminalNotification, setTestingTerminalNotification] = useState(false)
   // Pick the OS-specific hint at render time so the settings UI doesn't

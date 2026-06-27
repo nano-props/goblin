@@ -37,7 +37,7 @@ beforeEach(() => {
   })
   testWindow.goblinNative = {
     pathForFile: () => '',
-    shell: {
+    host: {
       openDirectoryDialog: async () => '/Users/tester/Developer/repo',
     },
     invokeIpc: async (request: { path: string; input?: unknown }) => {
@@ -135,7 +135,7 @@ describe('OpenRepositoryDialog', () => {
     await flush()
     expect(testWindow.goblinNative).toEqual(
       expect.objectContaining({
-        shell: expect.objectContaining({ openDirectoryDialog: expect.any(Function) }),
+        host: expect.objectContaining({ openDirectoryDialog: expect.any(Function) }),
       }),
     )
     expect(input('#open-repo-path').value).toBe('~/Developer/repo')

@@ -1,9 +1,9 @@
 import {
   isRemoteRepoId,
-  remoteRepoLifecycleTarget,
+  remoteRepoConnectionTarget,
   remoteRepoRefFromTarget,
   remoteRepoSessionEntry,
-  type RemoteRepoLifecycle,
+  type RemoteRepoConnectionLifecycle,
   type RepoSessionEntry,
 } from '#/shared/remote-repo.ts'
 
@@ -13,7 +13,7 @@ import {
 interface OpenWorkspaceRepoLike {
   id: string
   remote: {
-    lifecycle: RemoteRepoLifecycle | null
+    lifecycle: RemoteRepoConnectionLifecycle | null
   }
 }
 
@@ -33,7 +33,7 @@ export function persistedOpenWorkspaceEntries(
     // intentional trade-off as the pre-Phase-4 code: a
     // placeholder with no target is just a connecting spinner,
     // not a repo the user explicitly opened.
-    const target = remoteRepoLifecycleTarget(repo.remote.lifecycle)
+    const target = remoteRepoConnectionTarget(repo.remote.lifecycle)
     if (!target) return []
     return [remoteRepoSessionEntry(remoteRepoRefFromTarget(target))]
   })

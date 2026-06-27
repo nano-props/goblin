@@ -14,8 +14,8 @@ vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
   useIsCompactUi: () => responsiveMocks.mode === 'compact',
 }))
 
-vi.mock('#/web/components/repo-shell/RepoWorkspaceShell.tsx', () => ({
-  RepoWorkspaceShell: (props: any) => (
+vi.mock('#/web/components/repo-layout/RepoLayoutWorkspaceShell.tsx', () => ({
+  RepoLayoutWorkspaceShell: (props: any) => (
     <div
       data-testid="repo-workspace-shell"
       data-compact={String(props.compact)}
@@ -30,8 +30,8 @@ vi.mock('#/web/components/repo-shell/RepoWorkspaceShell.tsx', () => ({
   ),
 }))
 
-vi.mock('#/web/components/repo-shell/RepoShellSidebar.tsx', () => ({
-  RepoShellSidebar: (props: any) => <div data-testid="repo-shell-sidebar" data-compact={String(props.compact)} />,
+vi.mock('#/web/components/repo-layout/RepoLayoutSidebar.tsx', () => ({
+  RepoLayoutSidebar: (props: any) => <div data-testid="repo-shell-sidebar" data-compact={String(props.compact)} />,
 }))
 
 vi.mock('#/web/components/workspace-toolbar-chrome.tsx', () => ({

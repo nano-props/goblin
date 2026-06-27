@@ -4,15 +4,14 @@ import { Button } from '#/web/components/ui/button.tsx'
 import { Switch } from '#/web/components/ui/switch.tsx'
 import { canUseGlobalShortcutSettings } from '#/web/app-shell-client.ts'
 import { SettingsCard, SettingsListItem } from '#/web/components/settings/SettingsPrimitives.tsx'
-import { useShortcutSettingsController, useRuntimeShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
+import { useShortcutSettingsController, useShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { cn } from '#/web/lib/cn.ts'
 import { DEFAULT_GLOBAL_SHORTCUT, formatAccelerator, globalShortcutFromKeyboardEvent } from '#/shared/accelerator.ts'
 export function ShortcutSettings() {
   const t = useT()
   const shortcutStatusId = 'global-shortcut-status'
-  const { shortcutsDisabled, globalShortcutDisabled, globalShortcut, globalShortcutRegistered } =
-    useRuntimeShortcutSettings()
+  const { shortcutsDisabled, globalShortcutDisabled, globalShortcut, globalShortcutRegistered } = useShortcutSettings()
   const { setShortcutsDisabled, setGlobalShortcutDisabled, setGlobalShortcut } = useShortcutSettingsController()
   const [recordingShortcut, setRecordingShortcut] = useState(false)
   const [shortcutError, setShortcutError] = useState<string | null>(null)

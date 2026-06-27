@@ -7,13 +7,13 @@ import { Button } from '#/web/components/ui/button.tsx'
 import { getInitialBootstrap } from '#/web/bootstrap.ts'
 import { getClientBridge } from '#/web/client-bridge.ts'
 import { useLanInfoQuery } from '#/web/settings-queries.ts'
-import { useLanSettingsController, useRuntimeLanSettings } from '#/web/runtime-settings-lan.ts'
+import { useLanSettingsController, useLanSettings } from '#/web/runtime-settings-lan.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { fetchServerJson } from '#/web/lib/server-fetch.ts'
 
 /**
  * Settings page for everything related to the embedded / standalone
- * server that the client talks to. Visible in both runtimes:
+ * server that the client talks to. Visible in both repoOperationSchedulers:
  *
  * - Both: the server URL, the access token (with copy + auto-rotate
  *   QR), and any LAN URLs the server is currently bound to.
@@ -33,7 +33,7 @@ export function WebSettings() {
   const t = useT()
   const bridge = getClientBridge()
   const isElectron = bridge.kind() === 'electron'
-  const { lanEnabled } = useRuntimeLanSettings()
+  const { lanEnabled } = useLanSettings()
   const { data: lanInfo } = useLanInfoQuery()
   const { setLanEnabled } = useLanSettingsController()
 
@@ -123,10 +123,7 @@ export function WebSettings() {
             label={t('settings.web.url')}
             hint={t('settings.web.url-hint')}
             control={
-              <code
-                id="settings-web-url"
-                className="rounded border bg-muted px-2 py-1 font-mono text-xs"
-              >
+              <code id="settings-web-url" className="rounded border bg-muted px-2 py-1 font-mono text-xs">
                 {baseUrl || '—'}
               </code>
             }
@@ -137,10 +134,7 @@ export function WebSettings() {
             hint={t('settings.web.token-hint')}
             control={
               <div className="flex items-center gap-2">
-                <code
-                  id="settings-web-token"
-                  className="rounded border bg-muted px-2 py-1 font-mono text-xs"
-                >
+                <code id="settings-web-token" className="rounded border bg-muted px-2 py-1 font-mono text-xs">
                   {accessToken ?? '…'}
                 </code>
                 <Button

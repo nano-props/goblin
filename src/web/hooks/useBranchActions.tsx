@@ -1,16 +1,10 @@
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { remoteRepoTarget } from '#/web/stores/repos/helpers.ts'
+import { remoteRepoTarget } from '#/web/stores/repos/repo-guards.ts'
 import type { RepoBranchState } from '#/web/stores/repos/types.ts'
 import type { ExecResult } from '#/web/types.ts'
 import type { EditorApp, TerminalApp } from '#/shared/api-types.ts'
 import { PROTECTED_BRANCHES } from '#/shared/git-types.ts'
-import {
-  getRepositoryPatch,
-  openRepositoryEditor,
-  openRepositoryInFinder,
-  openRepositoryRemote,
-  openRepositoryTerminal,
-} from '#/web/repo-client.ts'
+import { getRepoPatch, openRepoEditor, openRepoInFinder, openRepoRemote, openRepoTerminal } from '#/web/repo-client.ts'
 import { openRemoteRepositoryEditor, openRemoteRepositoryTerminal } from '#/web/remote-client.ts'
 import { openBranchExternalTarget } from '#/web/hooks/openBranchExternalTarget.ts'
 import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
@@ -141,7 +135,7 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
     const worktreePath = branch.worktree?.path
     if (!worktreePath) return Promise.resolve(false)
     return runUiAction('copyPatch', async () => {
-      const result = await getRepositoryPatch(repo.id, worktreePath)
+      const result = await getRepoPatch(repo.id, worktreePath)
       if (!result.ok) return { ok: false, message: result.message }
       if (!result.message) return { ok: false, message: 'status.copy-patch-empty' }
       try {
@@ -181,7 +175,7 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
     if (remoteRepoTarget(repo.id, repo.remote.lifecycle)) {
       return runUiAction('terminal', () => openRemoteRepositoryTerminal(repo.id, worktreePath, app))
     }
-    return runUiAction('terminal', () => openRepositoryTerminal(worktreePath, app))
+    return runUiAction('terminal', () => openRepoTerminal(worktreePath, app))
   }
 
   function openEditor(app: EditorApp) {
@@ -190,14 +184,14 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
     if (remoteRepoTarget(repo.id, repo.remote.lifecycle)) {
       return runUiAction('editor', () => openRemoteRepositoryEditor(repo.id, worktreePath, app))
     }
-    return runUiAction('editor', () => openRepositoryEditor(worktreePath, app))
+    return runUiAction('editor', () => openRepoEditor(worktreePath, app))
   }
 
   function openFinder() {
     if (!branch.worktree?.path) return
     const worktreePath = branch.worktree.path
     if (remoteRepoTarget(repo.id, repo.remote.lifecycle)) return
-    return runUiAction('finder', () => openRepositoryInFinder(worktreePath))
+    return runUiAction('finder', () => openRepoInFinder(worktreePath))
   }
 
   function openRemote() {

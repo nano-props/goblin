@@ -5,7 +5,7 @@ import { cn } from '#/web/lib/cn.ts'
 import { DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
 import type { RepoWorkspaceMode } from '#/web/lib/workspace-layout.ts'
 import { WORKSPACE_PANE_MOTION_STYLE } from '#/web/components/workspace-motion.ts'
-import { REPO_SIDEBAR_MIN_WIDTH, REPO_WORKSPACE_MIN_WIDTH } from '#/web/components/repo-shell/sidebar-sizing.ts'
+import { REPO_SIDEBAR_MIN_WIDTH, REPO_WORKSPACE_MIN_WIDTH } from '#/web/components/repo-layout/sidebar-sizing.ts'
 
 interface ShellProps {
   children: ReactNode

@@ -2,7 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { dispatchRemoveWorktree } from '#/web/hooks/branchActionDispatch.ts'
-import { setTerminalSlotCommandBridge } from '#/web/components/terminal/terminal-slot-command-bridge.ts'
+import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import type { WorktreeTerminalSnapshot } from '#/web/components/terminal/types.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -17,7 +17,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  setTerminalSlotCommandBridge(null)
+  setTerminalSessionCommandBridge(null)
   resetReposStore()
 })
 
@@ -29,10 +29,7 @@ describe('branch action dispatch', () => {
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneView: 'terminal',
       workspacePaneTabOrderByBranch: {
-        'feature/worktree': [
-          workspacePaneStaticTabOrderEntry('status'),
-          { type: 'terminal', id: 'slot-1' },
-        ],
+        'feature/worktree': [workspacePaneStaticTabOrderEntry('status'), { type: 'terminal', id: 'slot-1' }],
       },
     })
     const calls: string[] = []
@@ -49,7 +46,7 @@ describe('branch action dispatch', () => {
           resolveClose = resolve
         }),
     )
-    setTerminalSlotCommandBridge({
+    setTerminalSessionCommandBridge({
       worktreeSnapshot: () => worktreeSnapshotWithTerminal(),
       createTerminal: vi.fn(async () => 'slot-2'),
       selectTerminal: vi.fn(),
@@ -97,15 +94,12 @@ describe('branch action dispatch', () => {
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneView: 'terminal',
       workspacePaneTabOrderByBranch: {
-        'feature/worktree': [
-          workspacePaneStaticTabOrderEntry('status'),
-          { type: 'terminal', id: 'slot-1' },
-        ],
+        'feature/worktree': [workspacePaneStaticTabOrderEntry('status'), { type: 'terminal', id: 'slot-1' }],
       },
     })
     const runBranchAction = vi.fn(async () => ({ ok: true, message: 'ok' }))
     useReposStore.setState({ runBranchAction })
-    setTerminalSlotCommandBridge({
+    setTerminalSessionCommandBridge({
       worktreeSnapshot: () => worktreeSnapshotWithTerminal(),
       createTerminal: vi.fn(async () => 'slot-2'),
       selectTerminal: vi.fn(),
@@ -147,7 +141,7 @@ describe('branch action dispatch', () => {
     const runBranchAction = vi.fn(async () => ({ ok: true, message: 'ok' }))
     useReposStore.setState({ runBranchAction })
     const closeTerminalsForWorktree = vi.fn(async () => true)
-    setTerminalSlotCommandBridge({
+    setTerminalSessionCommandBridge({
       worktreeSnapshot: () => emptyWorktreeSnapshot(),
       createTerminal: vi.fn(async () => 'slot-2'),
       selectTerminal: vi.fn(),
@@ -175,10 +169,7 @@ describe('branch action dispatch', () => {
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneView: 'terminal',
       workspacePaneTabOrderByBranch: {
-        'feature/worktree': [
-          workspacePaneStaticTabOrderEntry('status'),
-          { type: 'terminal', id: 'slot-1' },
-        ],
+        'feature/worktree': [workspacePaneStaticTabOrderEntry('status'), { type: 'terminal', id: 'slot-1' }],
       },
       worktreesByPath: {
         [WORKTREE_PATH]: {
@@ -192,7 +183,7 @@ describe('branch action dispatch', () => {
     const runBranchAction = vi.fn(async () => ({ ok: true, message: 'ok' }))
     const closeTerminalsForWorktree = vi.fn(async () => true)
     useReposStore.setState({ runBranchAction })
-    setTerminalSlotCommandBridge({
+    setTerminalSessionCommandBridge({
       worktreeSnapshot: () => worktreeSnapshotWithTerminal(),
       createTerminal: vi.fn(async () => 'slot-2'),
       selectTerminal: vi.fn(),
@@ -219,7 +210,7 @@ function emptyWorktreeSnapshot(): WorktreeTerminalSnapshot {
   return {
     worktreeTerminalKey: WORKTREE_KEY,
     selectedDescriptor: null,
-    slots: [],
+    sessions: [],
     count: 0,
     bellCount: 0,
     pendingCreate: false,
@@ -238,7 +229,7 @@ function worktreeSnapshotWithTerminal(): WorktreeTerminalSnapshot {
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     },
-    slots: [
+    sessions: [
       {
         type: 'terminal',
         id: 'slot-1',

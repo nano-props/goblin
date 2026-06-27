@@ -1,20 +1,19 @@
 import { Diff, GitBranch, History, Terminal, type LucideIcon } from 'lucide-react'
 import type {
-  WorkspacePaneStaticViewType,
+  WorkspacePaneStaticTabType,
   WorkspacePaneTabOrderEntry,
-  WorkspacePaneView,
-  WorkspacePaneViewScope,
+  WorkspacePaneTabType,
+  WorkspacePaneTabScope,
 } from '#/shared/workspace-pane.ts'
 import {
-  workspacePaneViewScope,
+  workspacePaneTabScope,
   workspacePaneStaticTabOrderEntry,
   workspacePaneTerminalTabOrderEntry,
 } from '#/shared/workspace-pane.ts'
-import type { TerminalSlotBase, WorkspacePaneViewSummary } from '#/web/components/terminal/types.ts'
+import type { TerminalSessionBase, WorkspacePaneTabSummary } from '#/web/components/terminal/types.ts'
 
 type T = (key: string, params?: Record<string, string | number>) => string
 
-export type WorkspacePaneTabScope = WorkspacePaneViewScope
 export type WorkspacePaneTabProviderKind = 'static' | 'runtime'
 
 export interface WorkspacePaneTabAvailabilityContext {
@@ -34,7 +33,7 @@ export interface WorkspacePaneRuntimeTabMetadataInput {
   t: T
   branchName: string
   statusCount: number
-  view: WorkspacePaneViewSummary
+  view: WorkspacePaneTabSummary
 }
 
 export interface WorkspacePanePendingTabMetadataInput {
@@ -52,13 +51,13 @@ export interface WorkspacePaneTabCloseInput {
   repoId: string
   branchName: string | null
   terminalKey?: string
-  terminalBase?: TerminalSlotBase | null
-  closeStaticView?: (repoId: string, type: WorkspacePaneStaticViewType, branchName: string) => void
-  closeTerminalByDescriptor?: (key: string, base: TerminalSlotBase) => Promise<boolean>
-  closeTerminalsForWorktree?: (base: TerminalSlotBase) => Promise<boolean>
+  terminalBase?: TerminalSessionBase | null
+  closeStaticView?: (repoId: string, type: WorkspacePaneStaticTabType, branchName: string) => void
+  closeTerminalByDescriptor?: (key: string, base: TerminalSessionBase) => Promise<boolean>
+  closeTerminalsForWorktree?: (base: TerminalSessionBase) => Promise<boolean>
 }
 
-export abstract class WorkspacePaneTabProvider<TType extends WorkspacePaneView = WorkspacePaneView> {
+export abstract class WorkspacePaneTabProvider<TType extends WorkspacePaneTabType = WorkspacePaneTabType> {
   readonly type: TType
   readonly icon: LucideIcon
   abstract readonly kind: WorkspacePaneTabProviderKind
@@ -70,7 +69,7 @@ export abstract class WorkspacePaneTabProvider<TType extends WorkspacePaneView =
   }
 
   get scope(): WorkspacePaneTabScope {
-    return workspacePaneViewScope(this.type)
+    return workspacePaneTabScope(this.type)
   }
 
   get requiresWorktree(): boolean {
@@ -101,7 +100,7 @@ export abstract class WorkspacePaneTabProvider<TType extends WorkspacePaneView =
 }
 
 export abstract class WorkspacePaneStaticTabProvider<
-  TType extends WorkspacePaneStaticViewType = WorkspacePaneStaticViewType,
+  TType extends WorkspacePaneStaticTabType = WorkspacePaneStaticTabType,
 > extends WorkspacePaneTabProvider<TType> {
   readonly kind = 'static' as const
 
@@ -221,9 +220,8 @@ export class TerminalWorkspacePaneTabProvider extends WorkspacePaneTabProvider<'
   }
 
   pendingLabel(input: WorkspacePanePendingTabMetadataInput): string {
-    const pendingLabelKey = input.terminalCreatePending || input.terminalSyncReady
-      ? 'terminal.opening'
-      : 'terminal.loading'
+    const pendingLabelKey =
+      input.terminalCreatePending || input.terminalSyncReady ? 'terminal.opening' : 'terminal.loading'
     return input.t(pendingLabelKey)
   }
 
@@ -255,7 +253,7 @@ export const changesWorkspacePaneTabProvider = new ChangesWorkspacePaneTabProvid
 export const historyWorkspacePaneTabProvider = new HistoryWorkspacePaneTabProvider()
 export const terminalWorkspacePaneTabProvider = new TerminalWorkspacePaneTabProvider()
 
-function isPlaceholderTerminalTitle(view: WorkspacePaneViewSummary): boolean {
+function isPlaceholderTerminalTitle(view: WorkspacePaneTabSummary): boolean {
   return view.type === 'terminal' && !view.originalTitle && view.title.trim().toLowerCase() === 'terminal'
 }
 
@@ -265,10 +263,7 @@ const STATIC_WORKSPACE_PANE_TAB_PROVIDERS = [
   historyWorkspacePaneTabProvider,
 ] as const
 
-const STATIC_WORKSPACE_PANE_TAB_PROVIDER_BY_TYPE: Record<
-  WorkspacePaneStaticViewType,
-  WorkspacePaneStaticTabProvider
-> = {
+const STATIC_WORKSPACE_PANE_TAB_PROVIDER_BY_TYPE: Record<WorkspacePaneStaticTabType, WorkspacePaneStaticTabProvider> = {
   status: statusWorkspacePaneTabProvider,
   changes: changesWorkspacePaneTabProvider,
   history: historyWorkspacePaneTabProvider,
@@ -283,11 +278,11 @@ export function workspacePaneStaticTabProviders(): readonly WorkspacePaneStaticT
   return STATIC_WORKSPACE_PANE_TAB_PROVIDERS
 }
 
-export function workspacePaneStaticTabProvider(type: WorkspacePaneStaticViewType): WorkspacePaneStaticTabProvider {
+export function workspacePaneStaticTabProvider(type: WorkspacePaneStaticTabType): WorkspacePaneStaticTabProvider {
   return STATIC_WORKSPACE_PANE_TAB_PROVIDER_BY_TYPE[type]
 }
 
-export function workspacePaneTabProvider(type: WorkspacePaneView): WorkspacePaneTabProvider {
+export function workspacePaneTabProvider(type: WorkspacePaneTabType): WorkspacePaneTabProvider {
   if (type === 'terminal') return terminalWorkspacePaneTabProvider
   return workspacePaneStaticTabProvider(type)
 }

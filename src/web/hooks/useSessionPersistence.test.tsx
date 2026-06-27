@@ -10,7 +10,7 @@ import { workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
 
 const persistSessionStateMock = vi.fn(async (_session: unknown) => {})
 
-vi.mock('#/web/settings-write-paths.ts', () => ({
+vi.mock('#/web/settings-actions.ts', () => ({
   persistSessionState: (session: unknown) => persistSessionStateMock(session),
 }))
 

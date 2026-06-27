@@ -40,4 +40,3 @@ export function useActionFeedback() {
 
   return { succeeded, trigger, reset }
 }
-

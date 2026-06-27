@@ -4,9 +4,9 @@ import { getClientBridge } from '#/web/client-bridge.ts'
 import { homeDirectory as hostInfoHomeDirectory } from '#/web/stores/host-info.ts'
 const PROJECT_GITHUB_URL = 'https://github.com/nano-props/goblin'
 
-function nativeShell() {
+function nativeHost() {
   try {
-    return getClientBridge().shell()
+    return getClientBridge().host()
   } catch {
     return null
   }
@@ -91,7 +91,7 @@ function openBrowserUrl(url: string): ExecResult {
   // iframes also surface as null. With noopener required for security, we
   // cannot distinguish "opened" from "blocked" synchronously, so trust the
   // browser. The URL has already been validated by isAllowedExternalUrl.
-  // Mirrors shell-bridge.ts's desktop behaviour, which likewise reports
+  // Mirrors shell-ipc.ts's desktop behaviour, which likewise reports
   // success based on the platform call rather than an observable side effect.
   window.open(url, '_blank', 'noopener,noreferrer')
   return { ok: true, message: url }
@@ -102,13 +102,13 @@ function openExternalUrlInBrowser(url: string, allowHttp: boolean): ExecResult {
 }
 
 async function openExternalUrlWithPolicy(url: string, allowHttp: boolean): Promise<ExecResult> {
-  const shell = nativeShell()
-  if (shell?.openExternalUrl) return await shell.openExternalUrl({ url, allowHttp })
+  const host = nativeHost()
+  if (host?.openExternalUrl) return await host.openExternalUrl({ url, allowHttp })
   return openExternalUrlInBrowser(url, allowHttp)
 }
 
 export async function openAppSettings(page: SettingsPage = 'general'): Promise<boolean> {
-  return (await nativeShell()?.openSettingsWindow?.({ page })) ?? false
+  return (await nativeHost()?.openSettingsWindow?.({ page })) ?? false
 }
 
 export async function openProjectGitHub(): Promise<ExecResult> {
@@ -120,13 +120,13 @@ export async function openExternalUrl(url: string): Promise<ExecResult> {
 }
 
 export async function chooseLocalRepositoryPath(): Promise<string | null> {
-  return (await nativeShell()?.openDirectoryDialog?.({ title: 'Open Git Repository' })) ?? null
+  return (await nativeHost()?.openDirectoryDialog?.({ title: 'Open Git Repository' })) ?? null
 }
 
 export async function chooseCloneParentPath(): Promise<string | null> {
-  return (await nativeShell()?.openDirectoryDialog?.({ title: 'Choose Clone Destination' })) ?? null
+  return (await nativeHost()?.openDirectoryDialog?.({ title: 'Choose Clone Destination' })) ?? null
 }
 
 export async function consumeExternalOpenPaths(): Promise<string[]> {
-  return (await nativeShell()?.consumeExternalOpenPaths?.()) ?? []
+  return (await nativeHost()?.consumeExternalOpenPaths?.()) ?? []
 }

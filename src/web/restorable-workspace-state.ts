@@ -1,4 +1,4 @@
-import type { SessionState } from '#/shared/api-types.ts'
+import type { WorkspaceSessionState } from '#/shared/api-types.ts'
 import type { RestorableWorkspaceState, ReposStore } from '#/web/stores/repos/types.ts'
 import { persistedOpenWorkspaceEntries } from '#/web/open-workspace-state.ts'
 import {
@@ -11,7 +11,7 @@ import {
 export function sessionStateFromRestorableWorkspaceState(input: {
   repos: ReposStore['repos']
   restorableWorkspaceState: RestorableWorkspaceState
-}): SessionState {
+}): WorkspaceSessionState {
   const { repos, restorableWorkspaceState } = input
   return {
     openRepos: persistedOpenWorkspaceEntries(restorableWorkspaceState.order, repos),
@@ -33,20 +33,21 @@ export function sessionStateFromRestorableWorkspaceState(input: {
   }
 }
 
-/** Restores only the restorable workspace UI projection from SessionState.
- *  It intentionally does not establish a live binding back to SessionState;
+/** Restores only the restorable workspace UI projection from WorkspaceSessionState.
+ *  It intentionally does not establish a live binding back to WorkspaceSessionState;
  *  subsequent updates flow through useSessionPersistence. */
-interface RestoredWorkspaceStateFromSession
-  extends Pick<
-    RestorableWorkspaceState,
-    'activeId' | 'zenMode' | 'workspacePaneSize' | 'selectedTerminalByWorktree'
-  > {
-  preferredWorkspacePaneViewByBranchByRepo: NonNullable<SessionState['preferredWorkspacePaneViewByBranchByRepo']>
-  workspacePaneTabOrderByBranchByRepo: SessionState['workspacePaneTabOrderByBranchByRepo']
+interface RestoredWorkspaceStateFromSession extends Pick<
+  RestorableWorkspaceState,
+  'activeId' | 'zenMode' | 'workspacePaneSize' | 'selectedTerminalByWorktree'
+> {
+  preferredWorkspacePaneViewByBranchByRepo: NonNullable<
+    WorkspaceSessionState['preferredWorkspacePaneViewByBranchByRepo']
+  >
+  workspacePaneTabOrderByBranchByRepo: WorkspaceSessionState['workspacePaneTabOrderByBranchByRepo']
 }
 
 export function restoreRestorableWorkspaceStateFromSession(
-  session: SessionState,
+  session: WorkspaceSessionState,
   activeId: string | null = session.activeRepo,
 ): RestoredWorkspaceStateFromSession {
   return {

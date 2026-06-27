@@ -37,8 +37,8 @@ vi.mock('#/web/components/BranchNavigator.tsx', () => ({
   ),
 }))
 
-vi.mock('#/web/components/BranchWorkspace.tsx', () => ({
-  BranchWorkspace: ({
+vi.mock('#/web/components/RepoWorkspace.tsx', () => ({
+  RepoWorkspace: ({
     selectedBranchName,
     shortcutsEnabled = true,
     toolbarTrafficLightOffset = false,
@@ -176,7 +176,7 @@ describe('RepoView workspace navigation', () => {
     expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBe('feature/a')
     expect(branchNavigator()).not.toBeNull()
     expect(workspace()?.dataset.mode).toBe('split')
-    expect(branchWorkspace()).not.toBeNull()
+    expect(repoWorkspace()).not.toBeNull()
   })
 
   test('large-screen Zen Mode uses Branch Navigator until a branch opens a collapsed split workspace', () => {
@@ -185,7 +185,7 @@ describe('RepoView workspace navigation', () => {
 
     expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBeNull()
     expect(branchNavigator()).not.toBeNull()
-    expect(branchWorkspace()).toBeNull()
+    expect(repoWorkspace()).toBeNull()
     expect(workspace()).toBeNull()
 
     act(() => {
@@ -196,14 +196,12 @@ describe('RepoView workspace navigation', () => {
     expect(branchNavigator()).not.toBeNull()
     expect(workspace()?.dataset.mode).toBe('split')
     expect(workspace()?.dataset.branchNavigatorCollapsed).toBe('true')
-    expect(branchWorkspace()).not.toBeNull()
-    expect(branchWorkspace()?.dataset.trafficLightOffset).toBe('true')
+    expect(repoWorkspace()).not.toBeNull()
+    expect(repoWorkspace()?.dataset.trafficLightOffset).toBe('true')
     expect(zenModeSidebarTrigger()).not.toBeNull()
     const sidebarTops = [...(container?.querySelectorAll<HTMLElement>('[data-testid="repo-shell-sidebar-top"]') ?? [])]
     expect(sidebarTops.length).toBeGreaterThan(0)
-    const closedRevealTop = zenModeSidebarReveal()?.querySelector<HTMLElement>(
-      '[data-testid="repo-shell-sidebar-top"]',
-    )
+    const closedRevealTop = zenModeSidebarReveal()?.querySelector<HTMLElement>('[data-testid="repo-shell-sidebar-top"]')
     expect(zenModeSidebarReveal()?.dataset.open).toBe('false')
     expect(zenModeSidebarReveal()?.dataset.interactive).toBe('false')
     expect(closedRevealTop?.dataset.windowChromeRegion).toBeUndefined()
@@ -379,9 +377,7 @@ describe('RepoView workspace navigation', () => {
     expect(zenModeSidebarReveal()?.dataset.open).toBe('true')
 
     act(() => {
-      zenModeSidebarReveal()?.dispatchEvent(
-        new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body }),
-      )
+      zenModeSidebarReveal()?.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body }))
     })
 
     expect(zenModeSidebarReveal()?.dataset.open).toBe('false')
@@ -601,7 +597,7 @@ describe('RepoView workspace navigation', () => {
     expect(compactWorkspace()?.dataset.activePane).toBe('workspace')
     expect(compactPane('navigator')?.getAttribute('aria-hidden')).toBe('true')
     expect(compactPane('workspace')?.getAttribute('aria-hidden')).toBeNull()
-    expect(branchWorkspace()).not.toBeNull()
+    expect(repoWorkspace()).not.toBeNull()
   })
 
   test('compact mode derives Branch Workspace from an existing selected branch', () => {
@@ -615,7 +611,7 @@ describe('RepoView workspace navigation', () => {
     expect(compactWorkspace()?.dataset.activePane).toBe('workspace')
     expect(compactPane('navigator')?.getAttribute('aria-hidden')).toBe('true')
     expect(compactPane('workspace')?.getAttribute('aria-hidden')).toBeNull()
-    expect(branchWorkspace()).not.toBeNull()
+    expect(repoWorkspace()).not.toBeNull()
   })
 
   test('compact back transition keeps the outgoing Branch Workspace content during slide-out', () => {
@@ -628,8 +624,8 @@ describe('RepoView workspace navigation', () => {
         useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
       })
 
-      expect(branchWorkspace()?.dataset.selectedBranchName).toBe('feature/a')
-      expect(branchWorkspace()?.dataset.shortcutsEnabled).toBe('true')
+      expect(repoWorkspace()?.dataset.selectedBranchName).toBe('feature/a')
+      expect(repoWorkspace()?.dataset.shortcutsEnabled).toBe('true')
 
       act(() => {
         useReposStore.getState().clearSelectedBranch(REPO_ID)
@@ -637,14 +633,14 @@ describe('RepoView workspace navigation', () => {
 
       expect(compactWorkspace()?.dataset.activePane).toBe('navigator')
       expect(compactPane('workspace')?.getAttribute('aria-hidden')).toBe('true')
-      expect(branchWorkspace()?.dataset.selectedBranchName).toBe('feature/a')
-      expect(branchWorkspace()?.dataset.shortcutsEnabled).toBe('false')
+      expect(repoWorkspace()?.dataset.selectedBranchName).toBe('feature/a')
+      expect(repoWorkspace()?.dataset.shortcutsEnabled).toBe('false')
 
       act(() => {
         vi.advanceTimersByTime(WORKSPACE_PANE_TRANSITION_MS)
       })
 
-      expect(branchWorkspace()?.dataset.selectedBranchName).toBe('')
+      expect(repoWorkspace()?.dataset.selectedBranchName).toBe('')
     } finally {
       vi.useRealTimers()
     }
@@ -719,7 +715,7 @@ describe('RepoView workspace navigation', () => {
 
     expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBe('feature/a')
     expect(branchNavigator()).not.toBeNull()
-    expect(branchWorkspace()).not.toBeNull()
+    expect(repoWorkspace()).not.toBeNull()
 
     act(() => {
       responsiveMocks.mode = 'compact'
@@ -729,7 +725,7 @@ describe('RepoView workspace navigation', () => {
     expect(compactWorkspace()?.dataset.activePane).toBe('workspace')
     expect(compactPane('navigator')?.getAttribute('aria-hidden')).toBe('true')
     expect(compactPane('workspace')?.getAttribute('aria-hidden')).toBeNull()
-    expect(branchWorkspace()).not.toBeNull()
+    expect(repoWorkspace()).not.toBeNull()
   })
 })
 
@@ -743,7 +739,7 @@ function branchNavigator(): HTMLButtonElement | null {
   return container?.querySelector<HTMLButtonElement>('[data-testid="branch-navigator"]') ?? null
 }
 
-function branchWorkspace(): HTMLElement | null {
+function repoWorkspace(): HTMLElement | null {
   return container?.querySelector<HTMLElement>('[data-testid="branch-workspace"]') ?? null
 }
 

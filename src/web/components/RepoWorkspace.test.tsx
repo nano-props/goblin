@@ -3,14 +3,14 @@
 import { act } from 'react'
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { BranchWorkspace } from '#/web/components/BranchWorkspace.tsx'
+import { RepoWorkspace } from '#/web/components/RepoWorkspace.tsx'
 import {
-  TerminalSlotContext,
-  TerminalSlotReadContext,
-} from '#/web/components/terminal/terminal-slot-context.ts'
+  TerminalSessionContext,
+  TerminalSessionReadContext,
+} from '#/web/components/terminal/terminal-session-context.ts'
 import type {
-  TerminalSlotContextValue,
-  TerminalSlotReadContextValue,
+  TerminalSessionContextValue,
+  TerminalSessionReadContextValue,
   WorktreeTerminalSnapshot,
 } from '#/web/components/terminal/types.ts'
 import { MainWindowNavigationProvider, type MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
@@ -22,20 +22,20 @@ const REPO_ID = '/tmp/branch-workspace-container-repo'
 const emptyWorktreeSnapshot: WorktreeTerminalSnapshot = {
   worktreeTerminalKey: '',
   selectedDescriptor: null,
-  slots: [],
+  sessions: [],
   count: 0,
   bellCount: 0,
   pendingCreate: false,
 }
 
-const terminalReadContext: TerminalSlotReadContextValue = {
+const terminalReadContext: TerminalSessionReadContextValue = {
   worktreeSnapshot: () => emptyWorktreeSnapshot,
   subscribeWorktree: () => () => {},
   snapshot: () => ({ phase: 'opening', message: null, processName: 'terminal' }),
   subscribeSnapshot: () => () => {},
 }
 
-const terminalCommandContext: TerminalSlotContextValue = {
+const terminalCommandContext: TerminalSessionContextValue = {
   createTerminal: vi.fn(async () => 'slot-1'),
   registerHost: vi.fn(),
   unregisterHost: vi.fn(),
@@ -76,15 +76,15 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-describe('BranchWorkspace', () => {
+describe('RepoWorkspace', () => {
   test('can render after the repo appears without changing hook order', () => {
     render(
       <MainWindowNavigationProvider value={navigation}>
-        <TerminalSlotContext.Provider value={terminalCommandContext}>
-          <TerminalSlotReadContext.Provider value={terminalReadContext}>
-            <BranchWorkspace repoId={REPO_ID} />
-          </TerminalSlotReadContext.Provider>
-        </TerminalSlotContext.Provider>
+        <TerminalSessionContext.Provider value={terminalCommandContext}>
+          <TerminalSessionReadContext.Provider value={terminalReadContext}>
+            <RepoWorkspace repoId={REPO_ID} />
+          </TerminalSessionReadContext.Provider>
+        </TerminalSessionContext.Provider>
       </MainWindowNavigationProvider>,
     )
 

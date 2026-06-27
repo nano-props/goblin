@@ -61,7 +61,11 @@ describe('WorkspaceZenModeToggle', () => {
 
   test('can own the window-chrome interactive surface without changing visual size', () => {
     render(
-      <WorkspaceZenModeToggle data-interactive data-window-chrome-region="interactive" className="pointer-events-auto" />,
+      <WorkspaceZenModeToggle
+        data-interactive
+        data-window-chrome-region="interactive"
+        className="pointer-events-auto"
+      />,
     )
 
     expect(zenModeToggle()?.dataset.windowChromeRegion).toBe('interactive')

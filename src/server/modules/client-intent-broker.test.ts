@@ -14,9 +14,7 @@ describe('client intent broker', () => {
   })
 
   test('returns false when no subscriber is attached', () => {
-    expect(
-      publishClientIntent({ type: 'show-workspace-pane-view-requested', tab: 'changes' }),
-    ).toBe(false)
+    expect(publishClientIntent({ type: 'show-workspace-pane-view-requested', tab: 'changes' })).toBe(false)
   })
 
   test('broadcasts the enveloped intent to every subscriber and returns true', () => {

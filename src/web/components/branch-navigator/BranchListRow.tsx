@@ -2,8 +2,8 @@
 // terminal-slot store and delegates rendering to BranchRow.
 
 import { BranchRow, type BranchRowProps } from '#/web/components/branch-navigator/BranchRow.tsx'
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
-import { useWorktreeTerminalBellCount } from '#/web/components/terminal/terminal-slot-store.ts'
+import { worktreeTerminalKey } from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
+import { useWorktreeTerminalBellCount } from '#/web/components/terminal/terminal-session-store.ts'
 import { branchActionDisplayPhase } from '#/web/hooks/branch-action-state.ts'
 
 export function BranchListRow(props: BranchRowProps) {

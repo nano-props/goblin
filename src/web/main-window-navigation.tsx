@@ -23,12 +23,11 @@ export function useMainWindowNavigation(): MainWindowNavigationActions {
     navigationWorkspaceStateFromStore,
     navigationWorkspaceStateEqual,
   )
-  const { setActive, closeRepo, cycleActive, selectBranch, setWorkspacePaneView } =
-    useStoreWithEqualityFn(
-      useReposStore,
-      mainWindowNavigationStoreActionsFromStore,
-      mainWindowNavigationStoreActionsEqual,
-    )
+  const { setActive, closeRepo, cycleActive, selectBranch, setWorkspacePaneTab } = useStoreWithEqualityFn(
+    useReposStore,
+    mainWindowNavigationStoreActionsFromStore,
+    mainWindowNavigationStoreActionsEqual,
+  )
   const fallbackNavigation = useMemo(
     () =>
       createMainWindowNavigationActions({
@@ -38,9 +37,9 @@ export function useMainWindowNavigation(): MainWindowNavigationActions {
         closeRepo,
         cycleActive,
         selectBranch,
-        setWorkspacePaneView,
+        setWorkspacePaneTab,
       }),
-    [activeId, closeRepo, cycleActive, order, selectBranch, setActive, setWorkspacePaneView],
+    [activeId, closeRepo, cycleActive, order, selectBranch, setActive, setWorkspacePaneTab],
   )
 
   return context ?? fallbackNavigation

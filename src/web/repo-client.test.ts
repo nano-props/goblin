@@ -51,7 +51,7 @@ function testBridge(overrides: Partial<ClientBridge> = {}): ClientBridge {
     onEffectIntent: () => () => {},
     pathForFile: () => '',
     saveClipboardFiles: () => Promise.resolve([]),
-    shell: () => null,
+    host: () => null,
     terminal: (() => {
       throw new Error('unused terminal bridge')
     }) as never,
@@ -77,7 +77,7 @@ describe('repo-client', () => {
           ...webBootstrap(),
           initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         }),
-        shell: () => ({
+        host: () => ({
           openSettingsWindow: vi.fn(),
           openExternalUrl,
           openDirectoryDialog: vi.fn(),
@@ -91,8 +91,8 @@ describe('repo-client', () => {
     }))
     vi.stubGlobal('fetch', fetchMock)
 
-    const { openRepositoryRemote } = await import('#/web/repo-client.ts')
-    await expect(openRepositoryRemote('/tmp/repo', 'feature/test')).resolves.toEqual({ ok: true, message: '' })
+    const { openRepoRemote } = await import('#/web/repo-client.ts')
+    await expect(openRepoRemote('/tmp/repo', 'feature/test')).resolves.toEqual({ ok: true, message: '' })
     expect(openExternalUrl).toHaveBeenCalledWith({
       url: 'https://github.com/acme/repo/tree/feature/test',
       allowHttp: true,
@@ -144,8 +144,8 @@ describe('repo-client', () => {
     }))
     vi.stubGlobal('fetch', fetchMock)
 
-    const { getRepositoryLog } = await import('#/web/repo-client.ts')
-    await expect(getRepositoryLog('/tmp/repo', 'feature/work')).rejects.toThrow('error.failed-read-repo')
+    const { getRepoLog } = await import('#/web/repo-client.ts')
+    await expect(getRepoLog('/tmp/repo', 'feature/work')).rejects.toThrow('error.failed-read-repo')
     expect(fetchMock).toHaveBeenCalledWith(
       'http://127.0.0.1:32100/api/repo/log',
       expect.objectContaining({
@@ -180,7 +180,7 @@ describe('repo-client', () => {
           abortIpc: async () => true,
           onEvent: () => () => {},
           pathForFile: () => '',
-          shell: {
+          host: {
             openSettingsWindow: vi.fn(),
             openExternalUrl: vi.fn(),
             openDirectoryDialog: vi.fn(),
@@ -199,13 +199,13 @@ describe('repo-client', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    const { openRepositoryEditor, openRepositoryInFinder, openRepositoryTerminal } = await import('#/web/repo-client.ts')
-    await expect(openRepositoryTerminal('/tmp/repo', 'ghostty')).resolves.toEqual({
+    const { openRepoEditor, openRepoInFinder, openRepoTerminal } = await import('#/web/repo-client.ts')
+    await expect(openRepoTerminal('/tmp/repo', 'ghostty')).resolves.toEqual({
       ok: true,
       message: 'server-terminal',
     })
-    await expect(openRepositoryEditor('/tmp/repo', 'windsurf')).resolves.toEqual({ ok: true, message: 'server-editor' })
-    await expect(openRepositoryInFinder('/tmp/repo')).resolves.toEqual({ ok: true, message: 'server-finder' })
+    await expect(openRepoEditor('/tmp/repo', 'windsurf')).resolves.toEqual({ ok: true, message: 'server-editor' })
+    await expect(openRepoInFinder('/tmp/repo')).resolves.toEqual({ ok: true, message: 'server-finder' })
     expect(openTerminal).not.toHaveBeenCalled()
     expect(openEditor).not.toHaveBeenCalled()
     expect(fetchMock).toHaveBeenNthCalledWith(
@@ -245,9 +245,9 @@ describe('repo-client', () => {
       .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, message: 'server-editor' }) })
     vi.stubGlobal('fetch', fetchMock)
 
-    const { openRepositoryEditor, openRepositoryTerminal } = await import('#/web/repo-client.ts')
-    await openRepositoryTerminal('/tmp/repo', 'ghostty')
-    await openRepositoryEditor('/tmp/repo', 'windsurf')
+    const { openRepoEditor, openRepoTerminal } = await import('#/web/repo-client.ts')
+    await openRepoTerminal('/tmp/repo', 'ghostty')
+    await openRepoEditor('/tmp/repo', 'windsurf')
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,

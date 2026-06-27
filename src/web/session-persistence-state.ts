@@ -1,9 +1,9 @@
 import {
-  isWorkspacePaneStaticViewType,
-  isWorkspacePaneSessionViewType,
-  type WorkspacePaneSessionView,
+  isWorkspacePaneStaticTabType,
+  isWorkspacePaneSessionTabType,
+  type WorkspacePaneSessionTabType,
   type WorkspacePaneTabOrderEntry,
-  type WorkspacePaneView,
+  type WorkspacePaneTabType,
 } from '#/shared/workspace-pane.ts'
 import { normalizeWorkspacePaneTabOrder } from '#/web/stores/repos/workspace-pane-tabs.ts'
 
@@ -18,25 +18,25 @@ export function persistedPreferredWorkspacePaneViewByBranchByRepoForSession(
         data?: { branches?: Array<{ name?: string }> }
         ui: {
           workspacePaneTabOrderByBranch: Record<string, WorkspacePaneTabOrderEntry[]>
-          preferredWorkspacePaneViewByBranch: Record<string, WorkspacePaneView>
+          preferredWorkspacePaneViewByBranch: Record<string, WorkspacePaneTabType>
         }
       }
     | undefined
   >,
   order: string[],
-): Record<string, Record<string, WorkspacePaneSessionView>> {
-  const byRepo: Record<string, Record<string, WorkspacePaneSessionView>> = {}
+): Record<string, Record<string, WorkspacePaneSessionTabType>> {
+  const byRepo: Record<string, Record<string, WorkspacePaneSessionTabType>> = {}
   for (const id of order) {
     const repo = repos[id]
     if (!repo) continue
     const knownBranches = new Set((repo.data?.branches ?? []).map((branch) => branch.name).filter(Boolean))
-    const byBranch: Record<string, WorkspacePaneSessionView> = {}
+    const byBranch: Record<string, WorkspacePaneSessionTabType> = {}
     for (const [branchName, tab] of Object.entries(repo.ui.preferredWorkspacePaneViewByBranch)) {
       if (!branchName || branchName.includes('\0')) continue
       if (knownBranches.size > 0 && !knownBranches.has(branchName)) continue
-      if (!isWorkspacePaneSessionViewType(tab)) continue
+      if (!isWorkspacePaneSessionTabType(tab)) continue
       if (
-        isWorkspacePaneStaticViewType(tab) &&
+        isWorkspacePaneStaticTabType(tab) &&
         !workspacePaneStaticViewsFromOrder(repo.ui.workspacePaneTabOrderByBranch[branchName] ?? []).includes(tab)
       )
         continue
@@ -91,6 +91,8 @@ export function persistedSelectedTerminalByWorktreeForSession(
   return persisted
 }
 
-function workspacePaneStaticViewsFromOrder(order: readonly WorkspacePaneTabOrderEntry[]): WorkspacePaneSessionView[] {
+function workspacePaneStaticViewsFromOrder(
+  order: readonly WorkspacePaneTabOrderEntry[],
+): WorkspacePaneSessionTabType[] {
   return normalizeWorkspacePaneTabOrder(order).flatMap((entry) => (entry.type === 'terminal' ? [] : [entry.type]))
 }

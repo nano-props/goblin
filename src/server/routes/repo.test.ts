@@ -2,30 +2,30 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { createRepoRoutes } from '#/server/routes/repo.ts'
 
 const mocks = vi.hoisted(() => ({
-  probeRepository: vi.fn(),
-  getRepositorySnapshot: vi.fn(),
-  getRepositoryStatus: vi.fn(),
-  getRepositoryLog: vi.fn(),
-  getRepositoryPatch: vi.fn(),
-  getRepositoryPullRequests: vi.fn(),
-  getRepositoryComposite: vi.fn(),
-  fetchRepository: vi.fn(),
+  probeRepo: vi.fn(),
+  getRepoSnapshot: vi.fn(),
+  getRepoStatus: vi.fn(),
+  getRepoLog: vi.fn(),
+  getRepoPatch: vi.fn(),
+  getRepoPullRequests: vi.fn(),
+  readRepoBulk: vi.fn(),
+  fetchRepo: vi.fn(),
   cloneRepository: vi.fn(),
   abortCloneOperation: vi.fn(),
-  pullRepositoryBranch: vi.fn(),
-  pushRepositoryBranch: vi.fn(),
-  createRepositoryWorktree: vi.fn(),
-  getRepositoryWorktreeBootstrapPreview: vi.fn(),
-  deleteRepositoryBranch: vi.fn(),
-  removeRepositoryWorktree: vi.fn(),
-  openRepositoryRemote: vi.fn(),
-  openRepositoryTerminal: vi.fn(),
-  openRepositoryEditor: vi.fn(),
-  openRepositoryInFinder: vi.fn(),
+  pullRepoBranch: vi.fn(),
+  pushRepoBranch: vi.fn(),
+  createRepoWorktree: vi.fn(),
+  getRepoWorktreeBootstrapPreview: vi.fn(),
+  deleteRepoBranch: vi.fn(),
+  removeRepoWorktree: vi.fn(),
+  openRepoRemote: vi.fn(),
+  openRepoTerminal: vi.fn(),
+  openRepoEditor: vi.fn(),
+  openRepoInFinder: vi.fn(),
   setBackgroundSyncRepos: vi.fn(),
   getBackgroundSyncRepos: vi.fn(),
   getServerFetchIntervalSec: vi.fn(),
-  abortRepositoryOperation: vi.fn(),
+  abortRepoOperation: vi.fn(),
 }))
 
 vi.mock('#/server/modules/background-sync.ts', () => ({
@@ -34,29 +34,29 @@ vi.mock('#/server/modules/background-sync.ts', () => ({
   getBackgroundSyncDiagnostics: vi.fn(),
 }))
 vi.mock('#/server/modules/repo-read-paths.ts', () => ({
-  probeRepository: mocks.probeRepository,
-  getRepositorySnapshot: mocks.getRepositorySnapshot,
-  getRepositoryStatus: mocks.getRepositoryStatus,
-  getRepositoryLog: mocks.getRepositoryLog,
-  getRepositoryPatch: mocks.getRepositoryPatch,
-  getRepositoryPullRequests: mocks.getRepositoryPullRequests,
-  getRepositoryComposite: mocks.getRepositoryComposite,
-  getRepositoryWorktreeBootstrapPreview: mocks.getRepositoryWorktreeBootstrapPreview,
+  probeRepo: mocks.probeRepo,
+  getRepoSnapshot: mocks.getRepoSnapshot,
+  getRepoStatus: mocks.getRepoStatus,
+  getRepoLog: mocks.getRepoLog,
+  getRepoPatch: mocks.getRepoPatch,
+  getRepoPullRequests: mocks.getRepoPullRequests,
+  readRepoBulk: mocks.readRepoBulk,
+  getRepoWorktreeBootstrapPreview: mocks.getRepoWorktreeBootstrapPreview,
 }))
 vi.mock('#/server/modules/repo-write-paths.ts', () => ({
   cloneRepository: mocks.cloneRepository,
   abortCloneOperation: mocks.abortCloneOperation,
-  pullRepositoryBranch: mocks.pullRepositoryBranch,
-  pushRepositoryBranch: mocks.pushRepositoryBranch,
-  createRepositoryWorktree: mocks.createRepositoryWorktree,
-  deleteRepositoryBranch: mocks.deleteRepositoryBranch,
-  removeRepositoryWorktree: mocks.removeRepositoryWorktree,
-  fetchRepository: mocks.fetchRepository,
-  abortRepositoryOperation: mocks.abortRepositoryOperation,
-  openRepositoryRemote: mocks.openRepositoryRemote,
-  openRepositoryTerminal: mocks.openRepositoryTerminal,
-  openRepositoryEditor: mocks.openRepositoryEditor,
-  openRepositoryInFinder: mocks.openRepositoryInFinder,
+  pullRepoBranch: mocks.pullRepoBranch,
+  pushRepoBranch: mocks.pushRepoBranch,
+  createRepoWorktree: mocks.createRepoWorktree,
+  deleteRepoBranch: mocks.deleteRepoBranch,
+  removeRepoWorktree: mocks.removeRepoWorktree,
+  fetchRepo: mocks.fetchRepo,
+  abortRepoOperation: mocks.abortRepoOperation,
+  openRepoRemote: mocks.openRepoRemote,
+  openRepoTerminal: mocks.openRepoTerminal,
+  openRepoEditor: mocks.openRepoEditor,
+  openRepoInFinder: mocks.openRepoInFinder,
 }))
 vi.mock('#/server/modules/settings-source.ts', () => ({
   getServerFetchIntervalSec: mocks.getServerFetchIntervalSec,
@@ -80,7 +80,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     const json = (await response.json()) as { ok: boolean; code: string; message: string }
     expect(json).toMatchObject({ ok: false, code: 'BAD_REQUEST' })
     expect(json.message).toContain('cwd')
-    expect(mocks.probeRepository).not.toHaveBeenCalled()
+    expect(mocks.probeRepo).not.toHaveBeenCalled()
   })
 
   test('returns 400 when the body is empty (no content-length)', async () => {
@@ -98,7 +98,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     expect(response.status).toBe(400)
     const json = (await response.json()) as { code: string }
     expect(json.code).toBe('BAD_REQUEST')
-    expect(mocks.probeRepository).not.toHaveBeenCalled()
+    expect(mocks.probeRepo).not.toHaveBeenCalled()
   })
 
   test('returns 400 for invalid picklist values in the body (e.g. pull-requests mode)', async () => {
@@ -113,11 +113,11 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     expect(response.status).toBe(400)
     const json = (await response.json()) as { ok: boolean; code: string }
     expect(json.code).toBe('BAD_REQUEST')
-    expect(mocks.getRepositoryPullRequests).not.toHaveBeenCalled()
+    expect(mocks.getRepoPullRequests).not.toHaveBeenCalled()
   })
 
   test('passes a valid body through to the module layer', async () => {
-    mocks.probeRepository.mockResolvedValue({ ok: true, root: '/tmp/repo', name: 'repo' })
+    mocks.probeRepo.mockResolvedValue({ ok: true, root: '/tmp/repo', name: 'repo' })
     const app = createRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/probe', {
@@ -128,11 +128,11 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     )
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ ok: true, root: '/tmp/repo', name: 'repo' })
-    expect(mocks.probeRepository).toHaveBeenCalledWith('/tmp/repo')
+    expect(mocks.probeRepo).toHaveBeenCalledWith('/tmp/repo')
   })
 
   test('passes worktree bootstrap preview requests through to the module layer', async () => {
-    mocks.getRepositoryWorktreeBootstrapPreview.mockResolvedValueOnce({
+    mocks.getRepoWorktreeBootstrapPreview.mockResolvedValueOnce({
       ok: true,
       preview: {
         hasConfig: false,
@@ -156,11 +156,11 @@ describe('repo routes — POST body validation (read endpoints)', () => {
 
     expect(response.status).toBe(200)
     expect(await response.json()).toMatchObject({ ok: true, preview: { hasOperations: false } })
-    expect(mocks.getRepositoryWorktreeBootstrapPreview).toHaveBeenCalledWith('/tmp/repo', expect.any(AbortSignal))
+    expect(mocks.getRepoWorktreeBootstrapPreview).toHaveBeenCalledWith('/tmp/repo', expect.any(AbortSignal))
   })
 
   test('passes an array of branches through the body to the module layer', async () => {
-    mocks.getRepositoryPullRequests.mockResolvedValue([])
+    mocks.getRepoPullRequests.mockResolvedValue([])
     const app = createRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/pull-requests', {
@@ -170,14 +170,14 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       }),
     )
     expect(response.status).toBe(200)
-    expect(mocks.getRepositoryPullRequests).toHaveBeenCalledWith('/tmp/repo', ['main', 'feature'], {
+    expect(mocks.getRepoPullRequests).toHaveBeenCalledWith('/tmp/repo', ['main', 'feature'], {
       mode: 'full',
       signal: expect.any(AbortSignal),
     })
   })
 
-  test('passes patch body through to getRepositoryPatch', async () => {
-    mocks.getRepositoryPatch.mockResolvedValue({ ok: true, message: 'diff --git a b' })
+  test('passes patch body through to getRepoPatch', async () => {
+    mocks.getRepoPatch.mockResolvedValue({ ok: true, message: 'diff --git a b' })
     const app = createRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/patch', {
@@ -187,7 +187,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       }),
     )
     expect(response.status).toBe(200)
-    expect(mocks.getRepositoryPatch).toHaveBeenCalledWith(
+    expect(mocks.getRepoPatch).toHaveBeenCalledWith(
       '/tmp/repo',
       '/tmp/repo/.worktrees/feature',
       expect.any(AbortSignal),
@@ -195,7 +195,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
   })
 
   test('returns an error envelope when repo log reading fails', async () => {
-    mocks.getRepositoryLog.mockRejectedValueOnce(new Error('fatal: bad revision'))
+    mocks.getRepoLog.mockRejectedValueOnce(new Error('fatal: bad revision'))
     const app = createRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/log', {
@@ -207,7 +207,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
 
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ ok: false, message: 'error.failed-read-repo' })
-    expect(mocks.getRepositoryLog).toHaveBeenCalledWith('/tmp/repo', 'feature/work', {
+    expect(mocks.getRepoLog).toHaveBeenCalledWith('/tmp/repo', 'feature/work', {
       count: 50,
       skip: 0,
       signal: expect.any(AbortSignal),
@@ -263,7 +263,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
 
 describe('repo routes — composite read', () => {
   test('returns all three sections by default', async () => {
-    mocks.getRepositoryComposite.mockResolvedValue({
+    mocks.readRepoBulk.mockResolvedValue({
       snapshot: { branches: [], current: 'main' },
       status: [],
       pullRequests: [],
@@ -285,7 +285,7 @@ describe('repo routes — composite read', () => {
   })
 
   test('forwards include, branches, and mode to the read function', async () => {
-    mocks.getRepositoryComposite.mockResolvedValue({ snapshot: null, status: [], pullRequests: null })
+    mocks.readRepoBulk.mockResolvedValue({ snapshot: null, status: [], pullRequests: null })
     const app = createRepoRoutes()
     await app.request(
       new Request('http://localhost/composite', {
@@ -299,7 +299,7 @@ describe('repo routes — composite read', () => {
         }),
       }),
     )
-    expect(mocks.getRepositoryComposite).toHaveBeenCalledWith('/tmp/repo', ['snapshot', 'status'], {
+    expect(mocks.readRepoBulk).toHaveBeenCalledWith('/tmp/repo', ['snapshot', 'status'], {
       branches: ['main', 'feature'],
       mode: 'summary',
       timeoutMs: undefined,
@@ -308,7 +308,7 @@ describe('repo routes — composite read', () => {
   })
 
   test('forwards timeoutMs to the read function when provided', async () => {
-    mocks.getRepositoryComposite.mockResolvedValue({ snapshot: null, status: [], pullRequests: null })
+    mocks.readRepoBulk.mockResolvedValue({ snapshot: null, status: [], pullRequests: null })
     const app = createRepoRoutes()
     await app.request(
       new Request('http://localhost/composite', {
@@ -317,7 +317,7 @@ describe('repo routes — composite read', () => {
         body: JSON.stringify({ cwd: '/tmp/repo', include: ['snapshot', 'status'], timeoutMs: 2500 }),
       }),
     )
-    expect(mocks.getRepositoryComposite).toHaveBeenCalledWith(
+    expect(mocks.readRepoBulk).toHaveBeenCalledWith(
       '/tmp/repo',
       ['snapshot', 'status'],
       expect.objectContaining({ timeoutMs: 2500 }),
@@ -369,7 +369,7 @@ describe('repo routes — composite read', () => {
     // and /pull-requests: a backend failure on the composite
     // endpoint returns the empty default rather than a 5xx, so
     // the client can keep rendering whatever it already has.
-    mocks.getRepositoryComposite.mockRejectedValue(new Error('backend exploded'))
+    mocks.readRepoBulk.mockRejectedValue(new Error('backend exploded'))
     const app = createRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/composite', {
@@ -396,7 +396,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
     expect(response.status).toBe(400)
     const json = (await response.json()) as { ok: boolean; code: string }
     expect(json.code).toBe('BAD_REQUEST')
-    expect(mocks.fetchRepository).not.toHaveBeenCalled()
+    expect(mocks.fetchRepo).not.toHaveBeenCalled()
   })
 
   test('returns 400 when the POST body is empty', async () => {
@@ -443,9 +443,9 @@ describe('repo routes — POST body validation (action endpoints)', () => {
   })
 
   test('forwards external workspace app open routes', async () => {
-    mocks.openRepositoryTerminal.mockResolvedValue({ ok: true, message: '' })
-    mocks.openRepositoryEditor.mockResolvedValue({ ok: true, message: '' })
-    mocks.openRepositoryInFinder.mockResolvedValue({ ok: true, message: '' })
+    mocks.openRepoTerminal.mockResolvedValue({ ok: true, message: '' })
+    mocks.openRepoEditor.mockResolvedValue({ ok: true, message: '' })
+    mocks.openRepoInFinder.mockResolvedValue({ ok: true, message: '' })
     const app = createRepoRoutes()
 
     await app.request(
@@ -470,9 +470,9 @@ describe('repo routes — POST body validation (action endpoints)', () => {
       }),
     )
 
-    expect(mocks.openRepositoryTerminal).toHaveBeenCalledWith('/tmp/repo', 'ghostty')
-    expect(mocks.openRepositoryEditor).toHaveBeenCalledWith('/tmp/repo', 'windsurf')
-    expect(mocks.openRepositoryInFinder).toHaveBeenCalledWith('/tmp/repo')
+    expect(mocks.openRepoTerminal).toHaveBeenCalledWith('/tmp/repo', 'ghostty')
+    expect(mocks.openRepoEditor).toHaveBeenCalledWith('/tmp/repo', 'windsurf')
+    expect(mocks.openRepoInFinder).toHaveBeenCalledWith('/tmp/repo')
   })
 
   test('returns 400 for invalid external app choices', async () => {
@@ -486,6 +486,6 @@ describe('repo routes — POST body validation (action endpoints)', () => {
     )
 
     expect(response.status).toBe(400)
-    expect(mocks.openRepositoryEditor).not.toHaveBeenCalled()
+    expect(mocks.openRepoEditor).not.toHaveBeenCalled()
   })
 })

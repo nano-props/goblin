@@ -41,16 +41,12 @@ import {
   RemoveWorktreeConfirmBody,
 } from '#/web/components/branch-action-dialogs/bodies.tsx'
 import { formatWorktreePath } from '#/web/lib/paths.ts'
-import { remoteRepoTarget } from '#/web/stores/repos/helpers.ts'
+import { remoteRepoTarget } from '#/web/stores/repos/repo-guards.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { PROTECTED_BRANCHES } from '#/shared/git-types.ts'
 import { useBranchActionDialogsStore } from '#/web/stores/repos/branch-action-dialogs.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import {
-  dispatchDeleteBranch,
-  dispatchPush,
-  dispatchRemoveWorktree,
-} from '#/web/hooks/branchActionDispatch.ts'
+import { dispatchDeleteBranch, dispatchPush, dispatchRemoveWorktree } from '#/web/hooks/branchActionDispatch.ts'
 import { useBranchActionDialogDisplay } from '#/web/hooks/useBranchActionDialogDisplay.ts'
 import type { RepoBranchState } from '#/web/stores/repos/types.ts'
 
@@ -175,11 +171,7 @@ export function BranchActionDialogHost({ activeRepoId, activeBranchName }: Props
               deleteAlsoUpstream={deleteConfirmView.displayCheckboxes.deleteAlsoUpstream}
               tracking={deleteConfirmView.displayContext.branch.tracking}
               onDeleteAlsoUpstreamChange={(value) =>
-                setDeleteAlsoUpstream(
-                  deleteConfirmView.entry!.repoId,
-                  deleteConfirmView.entry!.branchName,
-                  value,
-                )
+                setDeleteAlsoUpstream(deleteConfirmView.entry!.repoId, deleteConfirmView.entry!.branchName, value)
               }
               upstreamLabel={t('action.confirm-delete-branch-also-delete-upstream')}
             />
@@ -270,18 +262,10 @@ export function BranchActionDialogHost({ activeRepoId, activeBranchName }: Props
               tracking={removeConfirmView.displayContext.branch.tracking}
               removeAlsoUpstream={removeConfirmView.displayCheckboxes.removeAlsoUpstream}
               onRemoveAlsoDeletesChange={(value) =>
-                setRemoveAlsoDeletes(
-                  removeConfirmView.entry!.repoId,
-                  removeConfirmView.entry!.branchName,
-                  value,
-                )
+                setRemoveAlsoDeletes(removeConfirmView.entry!.repoId, removeConfirmView.entry!.branchName, value)
               }
               onRemoveAlsoUpstreamChange={(value) =>
-                setRemoveAlsoUpstream(
-                  removeConfirmView.entry!.repoId,
-                  removeConfirmView.entry!.branchName,
-                  value,
-                )
+                setRemoveAlsoUpstream(removeConfirmView.entry!.repoId, removeConfirmView.entry!.branchName, value)
               }
               alsoDeleteBranchLabel={t('action.confirm-remove-worktree-also-delete-branch')}
               alsoDeleteUpstreamLabel={t('action.confirm-delete-branch-also-delete-upstream')}

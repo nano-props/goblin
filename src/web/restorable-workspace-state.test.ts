@@ -8,7 +8,7 @@ import { createRepoBranch, seedRepoState } from '#/web/stores/repos/test-utils.t
 import { workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
 
 describe('restorable-workspace-state', () => {
-  test('maps restorable workspace state into SessionState', () => {
+  test('maps restorable workspace state into WorkspaceSessionState', () => {
     const repo = seedRepoState({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
@@ -106,7 +106,7 @@ describe('restorable-workspace-state', () => {
     })
   })
 
-  test('restores restorable workspace state from SessionState', () => {
+  test('restores restorable workspace state from WorkspaceSessionState', () => {
     expect(
       restoreRestorableWorkspaceStateFromSession({
         openRepos: [localRepoSessionEntry('/tmp/repo')],

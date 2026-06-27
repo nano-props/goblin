@@ -7,7 +7,7 @@ import {
   markRepoOperationTargets,
   nextRepoOperationId,
   settleRepoOperationTargets,
-} from '#/web/stores/repos/runtime.ts'
+} from '#/web/stores/repos/repo-operation-scheduler.ts'
 
 const REPO_ID = '/tmp/gbl-repo-activity-model'
 

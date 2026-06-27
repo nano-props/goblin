@@ -64,13 +64,7 @@ export function WorkspaceToolbarActions({ className, ...props }: WorkspaceToolba
   return <div className={cn('goblin-workspace-toolbar__actions', className)} {...props} />
 }
 
-export function WorkspaceToolbarLeadingSpacer({
-  reserve,
-  noDrag = reserve,
-}: {
-  reserve: boolean
-  noDrag?: boolean
-}) {
+export function WorkspaceToolbarLeadingSpacer({ reserve, noDrag = reserve }: { reserve: boolean; noDrag?: boolean }) {
   return (
     <div
       data-testid="workspace-toolbar-leading-spacer"

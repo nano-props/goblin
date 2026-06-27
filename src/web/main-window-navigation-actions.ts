@@ -1,4 +1,4 @@
-import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 
 export interface MainWindowNavigationActions {
@@ -6,8 +6,8 @@ export interface MainWindowNavigationActions {
   closeRepo: (repoId: string) => void
   cycleRepo: (direction: 1 | -1) => void
   selectRepoBranch: (repoId: string, branch: string) => void
-  showRepoWorkspacePaneView: (repoId: string, tab: WorkspacePaneView) => void
-  showRepoBranchWorkspacePaneView: (repoId: string, branch: string, tab: WorkspacePaneView) => void
+  showRepoWorkspacePaneView: (repoId: string, tab: WorkspacePaneTabType) => void
+  showRepoBranchWorkspacePaneView: (repoId: string, branch: string, tab: WorkspacePaneTabType) => void
   openSettings: (page: SettingsPage) => void
 }
 
@@ -18,7 +18,7 @@ interface CreateMainWindowNavigationActionsOptions {
   closeRepo: (repoId: string) => void
   cycleActive: (direction: 1 | -1) => void
   selectBranch: (repoId: string, branch: string) => void
-  setWorkspacePaneView: (repoId: string, tab: WorkspacePaneView) => void
+  setWorkspacePaneTab: (repoId: string, tab: WorkspacePaneTabType) => void
   onOpenSettings?: (page: SettingsPage) => void
 }
 
@@ -29,7 +29,7 @@ export function createMainWindowNavigationActions({
   closeRepo,
   cycleActive,
   selectBranch,
-  setWorkspacePaneView,
+  setWorkspacePaneTab,
   onOpenSettings,
 }: CreateMainWindowNavigationActionsOptions): MainWindowNavigationActions {
   return {
@@ -48,12 +48,12 @@ export function createMainWindowNavigationActions({
     },
     showRepoWorkspacePaneView(repoId, tab) {
       if (repoId !== activeId) setActive(repoId)
-      setWorkspacePaneView(repoId, tab)
+      setWorkspacePaneTab(repoId, tab)
     },
     showRepoBranchWorkspacePaneView(repoId, branch, tab) {
       if (repoId !== activeId) setActive(repoId)
       selectBranch(repoId, branch)
-      setWorkspacePaneView(repoId, tab)
+      setWorkspacePaneTab(repoId, tab)
     },
     openSettings(page) {
       onOpenSettings?.(page)

@@ -1,6 +1,6 @@
 import type { GoblinCommand, GoblinCommandContext } from '#/server/g-command/context.ts'
 import type { RepoViewResult } from '#/shared/repo-view.ts'
-import type { WorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 
 // Build a `g <name>` command that opens a workspace pane view. All
 // three commands share the same shape: validate args, POST
@@ -15,7 +15,7 @@ import type { WorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
 // The response shape lives in `#/shared/repo-view.ts` so the server
 // route and the CLI consume the same type — see that file for why
 // the contract must live in `shared/`.
-function createViewCommand(name: string, tab: WorkspacePaneStaticViewType): GoblinCommand {
+function createViewCommand(name: string, tab: WorkspacePaneStaticTabType): GoblinCommand {
   return {
     name,
     summary: `Open the ${tab} tab in the Goblin window`,

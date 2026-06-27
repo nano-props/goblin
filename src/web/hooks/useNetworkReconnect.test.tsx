@@ -3,9 +3,9 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { normalizeRemoteTarget, type RemoteRepoLifecycle } from '#/shared/remote-repo.ts'
+import { normalizeRemoteTarget, type RemoteRepoConnectionLifecycle } from '#/shared/remote-repo.ts'
 import { useNetworkReconnect } from '#/web/hooks/useNetworkReconnect.ts'
-import { resetLifecycleTest } from '#/web/stores/repos/lifecycle-test-utils.ts'
+import { resetLifecycleTest } from '#/web/stores/repos/repo-session-test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { RepoState, ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 
@@ -17,8 +17,8 @@ import type { RepoState, ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 // This is enough to verify WHICH repos the hook re-probes
 // (the actual orchestrator behavior is covered by
 // `remote-lifecycle-orchestrator.test.ts`).
-vi.mock('#/web/stores/repos/remote-lifecycle-orchestrator.ts', () => ({
-  runRemoteRepoLifecycle: vi.fn(async (_set: ReposSet, _get: ReposGet, id: string) => {
+vi.mock('#/web/stores/repos/remote-repo-connection-orchestrator.ts', () => ({
+  runRemoteRepoConnection: vi.fn(async (_set: ReposSet, _get: ReposGet, id: string) => {
     useReposStore.setState((s) => {
       const repo = s.repos[id]
       if (!repo) return s
@@ -74,7 +74,7 @@ beforeEach(() => {
   // `installGoblin({})` — the test-utils' fake `window` is
   // a plain object without `addEventListener`/`removeEventListener`,
   // which the hook needs. The hook itself doesn't go through
-  // the IPC bridge (it calls `runRemoteRepoLifecycle` which
+  // the IPC bridge (it calls `runRemoteRepoConnection` which
   // uses the orchestrator's task), so we don't need the
   // bridge installed for this test. We only need a clean
   // store; `resetLifecycleTest` covers that.
@@ -122,7 +122,7 @@ function remoteTargetFixture() {
   return target!
 }
 
-function seedRepo(id: string, lifecycle: RemoteRepoLifecycle | null) {
+function seedRepo(id: string, lifecycle: RemoteRepoConnectionLifecycle | null) {
   const set = useReposStore.setState as ReposSet
   set((s) => ({
     ...s,
@@ -275,7 +275,7 @@ describe('useNetworkReconnect', () => {
     for (let i = 0; i < 5; i += 1) await Promise.resolve()
 
     // Local repos don't have a lifecycle at all. The hook
-    // must not call `runRemoteRepoLifecycle` for them — which
+    // must not call `runRemoteRepoConnection` for them — which
     // means the repo remains untouched.
     const repo = useReposStore.getState().repos['/tmp/local-repo']
     expect(repo?.remote.lifecycle).toBeNull()

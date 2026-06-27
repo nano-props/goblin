@@ -1,8 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import {
-  disconnectAllClientIntentSockets,
-  registerClientIntentSocket,
-} from '#/server/modules/client-intent-broker.ts'
+import { disconnectAllClientIntentSockets, registerClientIntentSocket } from '#/server/modules/client-intent-broker.ts'
 import { createRepoViewRoutes } from '#/server/routes/repo-view.ts'
 import { createApp } from '#/server/app-factory.ts'
 import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
@@ -27,7 +24,7 @@ function makeTerminalHost(): ServerTerminalHost {
     listSessions: vi.fn(async () => []),
     create: vi.fn(async () => ({ ok: true }) as never),
     prune: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
-    getSlotSnapshot: vi.fn(async () => null),
+    getSessionSnapshot: vi.fn(async () => null),
     handleRealtimeMessage: vi.fn(),
     shutdown: vi.fn(),
   }

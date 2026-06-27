@@ -12,7 +12,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { CreateWorktreeDialog } from '#/web/components/create-worktree-dialog/CreateWorktreeDialog.tsx'
 import type { CreateWorktreeRequest } from '#/web/components/create-worktree-dialog/create-worktree-dialog.logic.ts'
-import { getRepositoryWorktreeBootstrapPreview } from '#/web/repo-client.ts'
+import { getRepoWorktreeBootstrapPreview } from '#/web/repo-client.ts'
 import { currentSettingsSnapshot } from '#/web/settings-read-projection.ts'
 import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -71,7 +71,7 @@ export function CreateWorktreeDialogHost({ open, onOpenChange, activeId }: Props
     setBootstrapPreviewLoading(true)
     setRememberBootstrapTrust(false)
 
-    void getRepositoryWorktreeBootstrapPreview(repoId, controller.signal)
+    void getRepoWorktreeBootstrapPreview(repoId, controller.signal)
       .then((result) => {
         if (ignore) return
         setBootstrapPreview(result.ok ? result.preview : null)

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { persistSessionState } from '#/web/settings-write-paths.ts'
+import { persistSessionState } from '#/web/settings-actions.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { restorableWorkspaceStateFromStore } from '#/web/stores/repos/selector-state.ts'
 import { sessionStateFromRestorableWorkspaceState } from '#/web/restorable-workspace-state.ts'
@@ -58,13 +58,5 @@ export function useSessionPersistence() {
     }
     const timeout = window.setTimeout(save, SESSION_SAVE_DEBOUNCE_MS)
     return () => window.clearTimeout(timeout)
-  }, [
-    sessionReady,
-    order,
-    activeId,
-    workspacePaneSize,
-    zenMode,
-    selectedTerminalByWorktree,
-    repos,
-  ])
+  }, [sessionReady, order, activeId, workspacePaneSize, zenMode, selectedTerminalByWorktree, repos])
 }

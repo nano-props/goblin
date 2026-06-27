@@ -4,7 +4,7 @@ import { act, createRef } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { BranchListRow } from '#/web/components/branch-navigator/BranchListRow.tsx'
-import { emptyRepo } from '#/web/stores/repos/helpers.ts'
+import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { createRepoBranch } from '#/web/stores/repos/test-utils.ts'
 
 vi.mock('#/web/stores/i18n.ts', () => ({
@@ -16,7 +16,7 @@ vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
   useIsCompactUi: () => false,
 }))
 
-vi.mock('#/web/components/terminal/terminal-slot-store.ts', () => ({
+vi.mock('#/web/components/terminal/terminal-session-store.ts', () => ({
   useWorktreeTerminalBellCount: () => 0,
 }))
 

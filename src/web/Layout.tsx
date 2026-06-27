@@ -3,7 +3,7 @@ import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { ErrorBoundary } from '#/web/components/ErrorBoundary.tsx'
-import { TerminalSlotProvider } from '#/web/components/terminal/TerminalSlotProvider.tsx'
+import { TerminalSessionProvider } from '#/web/components/terminal/TerminalSessionProvider.tsx'
 import { TokenGate } from '#/web/components/TokenGate.tsx'
 import { RepoCloneDialog } from '#/web/components/RepoCloneDialog.tsx'
 import { RepoOpenDialog } from '#/web/components/RepoOpenDialog.tsx'
@@ -46,9 +46,9 @@ export function Layout() {
   const modalOpen = overlays.anyOpen
 
   const activeId = useReposStore((s) => s.activeId)
-  const activeBranchName = useReposStore((s) => (s.activeId ? s.repos[s.activeId]?.ui.selectedBranch ?? null : null))
+  const activeBranchName = useReposStore((s) => (s.activeId ? (s.repos[s.activeId]?.ui.selectedBranch ?? null) : null))
   const order = useReposStore((s) => s.order)
-  const { setActive, closeRepo, cycleActive, selectBranch, setWorkspacePaneView } = useStoreWithEqualityFn(
+  const { setActive, closeRepo, cycleActive, selectBranch, setWorkspacePaneTab } = useStoreWithEqualityFn(
     useReposStore,
     mainWindowNavigationStoreActionsFromStore,
     mainWindowNavigationStoreActionsEqual,
@@ -62,10 +62,10 @@ export function Layout() {
         closeRepo,
         cycleActive,
         selectBranch,
-        setWorkspacePaneView,
+        setWorkspacePaneTab,
         onOpenSettings: (page) => void navigate({ to: `/settings/${page}` }),
       }),
-    [activeId, closeRepo, cycleActive, navigate, order, selectBranch, setWorkspacePaneView],
+    [activeId, closeRepo, cycleActive, navigate, order, selectBranch, setWorkspacePaneTab],
   )
 
   const workspaceShortcutsSuppressed = modalOpen || isSettingsOpen
@@ -107,7 +107,7 @@ export function Layout() {
               openCreateWorktree: overlays.openCreateWorktree,
             }}
           >
-            <TerminalSlotProvider>
+            <TerminalSessionProvider>
               <div
                 className="relative flex h-full flex-col"
                 onDragEnter={repoDrop.onDragEnter}
@@ -123,7 +123,7 @@ export function Layout() {
                   activeBranchName={activeBranchName}
                 />
               </div>
-            </TerminalSlotProvider>
+            </TerminalSessionProvider>
           </LayoutOverlayActions.Provider>
         </MainWindowNavigationProvider>
         {import.meta.env.DEV ? <TanStackRouterDevtools /> : null}

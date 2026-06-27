@@ -4,12 +4,12 @@
 // one-shot saved session snapshot.
 
 import { create, type StoreApi } from 'zustand'
-import type { SessionState, SettingsSnapshot } from '#/shared/api-types.ts'
+import type { WorkspaceSessionState, SettingsSnapshot } from '#/shared/api-types.ts'
 import { restorableSessionStateFromSettingsSnapshot } from '#/shared/settings-snapshot.ts'
 import { getSettingsSnapshot } from '#/web/settings-client.ts'
 import { DEFAULT_ZEN_MODE, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
 
-export const DEFAULT_RESTORABLE_SESSION_STATE: SessionState = {
+export const DEFAULT_RESTORABLE_SESSION_STATE: WorkspaceSessionState = {
   openRepos: [],
   activeRepo: null,
   zenMode: DEFAULT_ZEN_MODE,
@@ -22,16 +22,16 @@ interface SessionRestoreStore {
   /** Session snapshot from the previous run — consumed once during
    *  bootstrap, then cleared so it does not masquerade as live state or
    *  imply runtime two-way sync with the repos store. */
-  bootSessionSnapshot: SessionState | null
+  bootSessionSnapshot: WorkspaceSessionState | null
 
   /** Fetches the latest persisted settings snapshot plus the boot-only
    *  session snapshot; this is not runtime-coherent state. */
-  hydrate: () => Promise<SessionState>
+  hydrate: () => Promise<WorkspaceSessionState>
   /** Applies an already-fetched settings snapshot to avoid duplicate boot fetches. */
-  hydrateFromSettingsSnapshot: (snapshot: Pick<SettingsSnapshot, 'session'>) => SessionState
+  hydrateFromSettingsSnapshot: (snapshot: Pick<SettingsSnapshot, 'session'>) => WorkspaceSessionState
   /** Returns the boot session snapshot once, then clears it so all later
    *  session writes remain client -> persistence only. */
-  consumeBootSessionSnapshot: () => SessionState
+  consumeBootSessionSnapshot: () => WorkspaceSessionState
 }
 
 type SessionRestoreSet = StoreApi<SessionRestoreStore>['setState']
@@ -42,7 +42,7 @@ function commitBootSessionSnapshot(
   set: SessionRestoreSet,
   version: number,
   snapshot: Pick<SettingsSnapshot, 'session'>,
-): SessionState {
+): WorkspaceSessionState {
   const session = restorableSessionStateFromSettingsSnapshot(snapshot)
   if (version === hydrateVersion) set({ bootSessionSnapshot: session })
   return session
@@ -62,8 +62,8 @@ export const useSessionRestoreStore = create<SessionRestoreStore>((set, get) => 
     return commitBootSessionSnapshot(set, version, snapshot)
   },
 
-  consumeBootSessionSnapshot(): SessionState {
-    const snapshot: SessionState = get().bootSessionSnapshot ?? DEFAULT_RESTORABLE_SESSION_STATE
+  consumeBootSessionSnapshot(): WorkspaceSessionState {
+    const snapshot: WorkspaceSessionState = get().bootSessionSnapshot ?? DEFAULT_RESTORABLE_SESSION_STATE
     set((s) => (s.bootSessionSnapshot === null ? s : { bootSessionSnapshot: null }))
     return snapshot
   },

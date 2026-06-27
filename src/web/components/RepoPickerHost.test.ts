@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { latestRepoSyncTime } from '#/web/stores/repos/sync-time.ts'
 import { repoPickerReposEqual } from '#/web/components/repo-picker/summary-equality.ts'
 import type { RepoPickerRepo } from '#/web/components/repo-picker/types.ts'
-import { emptyRepo } from '#/web/stores/repos/helpers.ts'
+import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 
 describe('repoPickerReposEqual', () => {
   test('treats remote lifecycle target changes as unequal even when repo id stays the same', () => {

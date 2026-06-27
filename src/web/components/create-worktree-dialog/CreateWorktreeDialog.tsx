@@ -23,10 +23,10 @@ import { ToggleGroup, ToggleGroupItem } from '#/web/components/ui/toggle-group.t
 import { ConfirmCheckbox } from '#/web/components/ConfirmCheckbox.tsx'
 import { useRemotePathSuggestions } from '#/web/hooks/useRemotePathSuggestions.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
-import { remoteRepoTarget } from '#/web/stores/repos/helpers.ts'
+import { remoteRepoTarget } from '#/web/stores/repos/repo-guards.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import { getRepositoryRemoteBranches } from '#/web/repo-client.ts'
+import { getRepoRemoteBranches } from '#/web/repo-client.ts'
 import { cn } from '#/web/lib/cn.ts'
 import {
   deriveCreateWorktreeForm,
@@ -103,7 +103,7 @@ export function CreateWorktreeDialog({ open, repo, worktreeBootstrap, onClose, o
     if (!open || mode !== 'trackRemoteBranch' || remoteBranches.length > 0) return
     const ctrl = new AbortController()
     setRemoteBranchesLoading(true)
-    void getRepositoryRemoteBranches(repo.id, ctrl.signal)
+    void getRepoRemoteBranches(repo.id, ctrl.signal)
       .then((branches) => {
         if (ctrl.signal.aborted) return
         setRemoteBranches(branches)

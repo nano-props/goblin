@@ -2,17 +2,17 @@ import { useId } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import {
-  getSelectedBranchWorkspacePresentation,
-  type BranchWorkspaceRepo,
-  type SelectedBranchWorkspacePresentation,
-} from '#/web/components/branch-workspace/model.ts'
-import { BranchWorkspaceToolbar } from '#/web/components/branch-workspace/BranchWorkspaceToolbar.tsx'
-import { BranchWorkspaceContent } from '#/web/components/branch-workspace/BranchWorkspaceContent.tsx'
-import { useBranchWorkspacePaneTabModel } from '#/web/components/branch-workspace/use-branch-workspace-pane-tab-model.ts'
+  getSelectedRepoWorkspacePresentation,
+  type RepoWorkspaceRepo,
+  type SelectedRepoWorkspacePresentation,
+} from '#/web/components/repo-workspace/model.ts'
+import { RepoWorkspaceToolbar } from '#/web/components/repo-workspace/RepoWorkspaceToolbar.tsx'
+import { RepoWorkspaceContent } from '#/web/components/repo-workspace/RepoWorkspaceContent.tsx'
+import { useRepoWorkspaceTabModel } from '#/web/components/repo-workspace/use-repo-workspace-tab-model.ts'
 import { useBranchActionItems } from '#/web/hooks/useBranchActionItems.ts'
 import { useBranchActionShortcutRegistry } from '#/web/hooks/useBranchActionShortcutRegistry.ts'
 import { useBranchActions, type BranchActions } from '#/web/hooks/useBranchActions.tsx'
-import { BranchActionSurfaceContext } from '#/web/components/branch-workspace/branch-action-surface-context.ts'
+import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
 interface Props {
   repoId: string
   selectedBranchName?: string | null
@@ -20,8 +20,8 @@ interface Props {
   toolbarTrafficLightOffset?: boolean
 }
 
-// Keep this equality in sync with fields read by BranchWorkspace children.
-function branchWorkspaceRepoEqual(a: BranchWorkspaceRepo | undefined, b: BranchWorkspaceRepo | undefined): boolean {
+// Keep this equality in sync with fields read by RepoWorkspace children.
+function branchWorkspaceRepoEqual(a: RepoWorkspaceRepo | undefined, b: RepoWorkspaceRepo | undefined): boolean {
   return (
     a === b ||
     (!!a &&
@@ -49,7 +49,7 @@ function branchWorkspaceRepoEqual(a: BranchWorkspaceRepo | undefined, b: BranchW
   )
 }
 
-export function BranchWorkspace({
+export function RepoWorkspace({
   repoId,
   selectedBranchName,
   shortcutsEnabled = true,
@@ -104,7 +104,7 @@ export function BranchWorkspace({
   )
   if (!repo) return null
 
-  const detail = getSelectedBranchWorkspacePresentation(repo)
+  const detail = getSelectedRepoWorkspacePresentation(repo)
 
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-background">
@@ -131,8 +131,8 @@ export function BranchWorkspace({
 }
 
 interface BranchWorkspacePaneProps {
-  repo: BranchWorkspaceRepo
-  detail: SelectedBranchWorkspacePresentation
+  repo: RepoWorkspaceRepo
+  detail: SelectedRepoWorkspacePresentation
   workspacePaneId: string
   toolbarTrafficLightOffset?: boolean
   branchActions?: BranchActions
@@ -145,11 +145,11 @@ function BranchWorkspacePane({
   toolbarTrafficLightOffset = false,
   branchActions,
 }: BranchWorkspacePaneProps) {
-  const workspacePaneTabModel = useBranchWorkspacePaneTabModel(repo, detail)
+  const workspacePaneTabModel = useRepoWorkspaceTabModel(repo, detail)
 
   return (
     <>
-      <BranchWorkspaceToolbar
+      <RepoWorkspaceToolbar
         repo={repo}
         detail={detail}
         workspacePaneId={workspacePaneId}
@@ -157,7 +157,7 @@ function BranchWorkspacePane({
         workspacePaneTabModel={workspacePaneTabModel}
         branchActions={branchActions}
       />
-      <BranchWorkspaceContent
+      <RepoWorkspaceContent
         repo={repo}
         detail={detail}
         workspacePaneId={workspacePaneId}
@@ -168,9 +168,9 @@ function BranchWorkspacePane({
 }
 
 interface BranchShortcutHandlerProps {
-  repo: BranchWorkspaceRepo
-  detail: SelectedBranchWorkspacePresentation
-  branch: NonNullable<SelectedBranchWorkspacePresentation['branch']>
+  repo: RepoWorkspaceRepo
+  detail: SelectedRepoWorkspacePresentation
+  branch: NonNullable<SelectedRepoWorkspacePresentation['branch']>
   workspacePaneId: string
   shortcutsEnabled: boolean
   toolbarTrafficLightOffset?: boolean

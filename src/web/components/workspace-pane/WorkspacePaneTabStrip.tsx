@@ -27,11 +27,11 @@ import { DelegatedTooltipLayer } from '#/web/components/DelegatedTooltipLayer.ts
 import { createRestrictToTabStripBounds } from '#/web/components/tab-strip/drag-bounds.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import type {
-  WorkspacePaneStaticViewType,
+  WorkspacePaneStaticTabType,
   WorkspacePaneTabOrderEntry,
-  WorkspacePaneView,
+  WorkspacePaneTabType,
 } from '#/shared/workspace-pane.ts'
-import type { WorkspacePaneViewSummary } from '#/web/components/terminal/types.ts'
+import type { WorkspacePaneTabSummary } from '#/web/components/terminal/types.ts'
 import { ToolbarTabList, ToolbarTabStrip, ToolbarTabStripBody } from '#/web/components/tab-strip/ToolbarTabStrip.tsx'
 import { ToolbarClosableTab } from '#/web/components/tab-strip/ToolbarClosableTab.tsx'
 import {
@@ -41,16 +41,14 @@ import {
 } from '#/web/components/tab-strip/tab-variants.ts'
 import { useFocusRegistry, type FocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import { useSortableTab } from '#/web/components/tab-strip/useSortableTab.ts'
-import {
-  PENDING_TERMINAL_WORKSPACE_PANE_VIEW_IDENTITY,
-} from '#/web/components/workspace-pane/workspace-pane-view-model.ts'
+import { PENDING_TERMINAL_WORKSPACE_PANE_VIEW_IDENTITY } from '#/web/components/workspace-pane/workspace-pane-tab-summary.ts'
 import {
   terminalWorkspacePaneTabProvider,
   workspacePaneStaticTabProvider,
   workspacePaneTabProvider,
-} from '#/web/workspace-pane/workspace-pane-tab-providers.ts'
+} from '#/web/components/workspace-pane/tab-providers.ts'
 
-type TerminalWorkspacePaneViewSummary = Extract<WorkspacePaneViewSummary, { type: 'terminal' }>
+type TerminalWorkspacePaneViewSummary = Extract<WorkspacePaneTabSummary, { type: 'terminal' }>
 
 interface WorkspacePaneViewStripProps {
   worktreeTerminalKey: string | null
@@ -76,7 +74,7 @@ export type WorkspacePaneTabKind = 'static' | 'terminal' | 'pending'
 
 interface WorkspacePaneTabItemBase {
   identity: string
-  type: WorkspacePaneView
+  type: WorkspacePaneTabType
   kind: WorkspacePaneTabKind
   label: string
   tooltip: string
@@ -92,8 +90,8 @@ interface WorkspacePaneSortableTabItemBase extends WorkspacePaneTabItemBase {
 
 export interface WorkspacePaneStaticTabItem extends WorkspacePaneSortableTabItemBase {
   kind: 'static'
-  staticViewType: WorkspacePaneStaticViewType
-  orderEntry: Extract<WorkspacePaneTabOrderEntry, { type: WorkspacePaneStaticViewType }>
+  staticViewType: WorkspacePaneStaticTabType
+  orderEntry: Extract<WorkspacePaneTabOrderEntry, { type: WorkspacePaneStaticTabType }>
 }
 
 export interface WorkspacePaneTerminalTabItem extends WorkspacePaneSortableTabItemBase {
@@ -108,10 +106,13 @@ export interface WorkspacePanePendingTabItem extends WorkspacePaneTabItemBase {
   busy: true
 }
 
-export type WorkspacePaneTabItem = WorkspacePaneStaticTabItem | WorkspacePaneTerminalTabItem | WorkspacePanePendingTabItem
+export type WorkspacePaneTabItem =
+  | WorkspacePaneStaticTabItem
+  | WorkspacePaneTerminalTabItem
+  | WorkspacePanePendingTabItem
 
 export function createStaticWorkspacePaneTabItem(input: {
-  type: WorkspacePaneStaticViewType
+  type: WorkspacePaneStaticTabType
   label: string
   tooltip: string
   closeLabel: string
@@ -156,13 +157,12 @@ export function createTerminalWorkspacePaneTabItem(input: {
 }
 
 export function createPendingWorkspacePaneTabItem(input: {
-  type: WorkspacePaneView
+  type: WorkspacePaneTabType
   label: string
   tooltip: string
   panelId?: string
 }): WorkspacePanePendingTabItem {
-  const identity =
-    input.type === 'terminal' ? PENDING_TERMINAL_WORKSPACE_PANE_VIEW_IDENTITY : `${input.type}:pending`
+  const identity = input.type === 'terminal' ? PENDING_TERMINAL_WORKSPACE_PANE_VIEW_IDENTITY : `${input.type}:pending`
   return {
     identity,
     type: input.type,
@@ -327,7 +327,7 @@ function WorkspacePaneViewSwitcherPopover({
   )
 }
 
-export function WorkspacePaneViewStrip({
+export function WorkspacePaneTabStrip({
   worktreeTerminalKey,
   items,
   workspacePaneId,
@@ -542,7 +542,13 @@ export function WorkspacePaneViewStrip({
       const activeItem = sortableItems[oldIndex]
       const overItem = sortableItems[newIndex]
       if (!activeItem || !overItem) return
-      onReorder(arrayMove(sortableItems.map((item) => item.orderEntry), oldIndex, newIndex))
+      onReorder(
+        arrayMove(
+          sortableItems.map((item) => item.orderEntry),
+          oldIndex,
+          newIndex,
+        ),
+      )
     },
     [onReorder, sortableItems],
   )
@@ -576,7 +582,7 @@ export function WorkspacePaneViewStrip({
           className="flex-1"
         >
           {compactItem ? (
-            <WorkspacePaneView
+            <WorkspacePaneTabType
               item={compactItem}
               isActive={!!panelActive && compactItem.identity === activeTabIdentity}
               isSelected={compactItem.identity === activeTabIdentity}
@@ -642,13 +648,12 @@ export function WorkspacePaneViewStrip({
                   total: items.length,
                   tabId: tabIdForItem(item),
                   focusRegistry,
-                  showSeparator:
-                    shouldShowWorkspacePaneViewSeparator({
-                      leftId: item.identity,
-                      rightId,
-                      activeId: activeVisualIdentity,
-                      hoveredId: hoveredTabIdentity,
-                    }),
+                  showSeparator: shouldShowWorkspacePaneViewSeparator({
+                    leftId: item.identity,
+                    rightId,
+                    activeId: activeVisualIdentity,
+                    hoveredId: hoveredTabIdentity,
+                  }),
                   onHoverChange: setHoveredTabIdentity,
                   onSelect: handleSelect,
                   onClose: handleClose,
@@ -657,7 +662,7 @@ export function WorkspacePaneViewStrip({
                   compact: false,
                 }
                 if (!isSortableWorkspacePaneTabItem(item)) {
-                  return <WorkspacePaneView key={item.identity} {...commonProps} />
+                  return <WorkspacePaneTabType key={item.identity} {...commonProps} />
                 }
                 return (
                   <SortableWorkspacePaneView key={item.identity} {...commonProps} sortableIdentity={item.sortableId} />
@@ -864,7 +869,7 @@ function WorkspacePaneViewChrome({
   )
 }
 
-function WorkspacePaneView({
+function WorkspacePaneTabType({
   item,
   isActive,
   isSelected,

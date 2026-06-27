@@ -5,15 +5,15 @@ import type { ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import {
-  WorkspacePaneViewStrip,
+  WorkspacePaneTabStrip,
   createPendingWorkspacePaneTabItem,
   createTerminalWorkspacePaneTabItem,
   isTerminalWorkspacePaneTabItem,
   type WorkspacePaneTabItem,
-} from '#/web/components/workspace-pane/WorkspacePaneViewStrip.tsx'
-import { terminalWorkspacePaneTabProvider } from '#/web/workspace-pane/workspace-pane-tab-providers.ts'
+} from '#/web/components/workspace-pane/WorkspacePaneTabStrip.tsx'
+import { terminalWorkspacePaneTabProvider } from '#/web/components/workspace-pane/tab-providers.ts'
 import type { WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
-import type { TerminalSlotSummary } from '#/web/components/terminal/types.ts'
+import type { TerminalSessionSummary } from '#/web/components/terminal/types.ts'
 
 let container: HTMLDivElement | null = null
 let root: Root | null = null
@@ -57,7 +57,7 @@ afterEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
-describe('WorkspacePaneViewStrip', () => {
+describe('WorkspacePaneTabStrip', () => {
   test('shows terminal tooltip content with only the original title', async () => {
     render(
       <TestWorkspacePaneViewStrip
@@ -238,17 +238,13 @@ describe('WorkspacePaneViewStrip', () => {
     if (!(terminalTwo instanceof HTMLElement)) throw new Error('missing terminal view')
     if (!(newButton instanceof HTMLButtonElement)) throw new Error('missing new terminal button')
 
-    expect(
-      terminalTwo.querySelector(':scope > [data-slot="separator"][data-orientation="vertical"]'),
-    ).not.toBeNull()
+    expect(terminalTwo.querySelector(':scope > [data-slot="separator"][data-orientation="vertical"]')).not.toBeNull()
 
     act(() => {
       newButton.dispatchEvent(new MouseEvent('pointerover', { bubbles: true }))
     })
 
-    expect(
-      terminalTwo.querySelector(':scope > [data-slot="separator"][data-orientation="vertical"]'),
-    ).not.toBeNull()
+    expect(terminalTwo.querySelector(':scope > [data-slot="separator"][data-orientation="vertical"]')).not.toBeNull()
   })
 
   test('uses the full terminal title and unread state in the tab aria-label', () => {
@@ -683,10 +679,12 @@ describe('WorkspacePaneViewStrip', () => {
           onScrollToBottom={() => {}}
           onClose={(closed) => {
             setSessions((current) =>
-              current.filter((candidate) => candidate.key !== closed.key).map((candidate, index) => ({
-                ...candidate,
-                selected: index === 0,
-              })),
+              current
+                .filter((candidate) => candidate.key !== closed.key)
+                .map((candidate, index) => ({
+                  ...candidate,
+                  selected: index === 0,
+                })),
             )
           }}
           onReorder={() => {}}
@@ -805,7 +803,7 @@ describe('WorkspacePaneViewStrip', () => {
   })
 
   test('keeps placeholder terminal titles out of materialized tab text', () => {
-    const placeholderView: TerminalSlotSummary = {
+    const placeholderView: TerminalSessionSummary = {
       ...session({ key: 't1', title: 'terminal', selected: true }),
       fullTitle: 'terminal',
       originalTitle: null,
@@ -818,7 +816,7 @@ describe('WorkspacePaneViewStrip', () => {
     })
 
     render(
-      <WorkspacePaneViewStrip
+      <WorkspacePaneTabStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         panelActive
@@ -843,16 +841,16 @@ describe('WorkspacePaneViewStrip', () => {
 
 function TestWorkspacePaneViewStrip(props: {
   worktreeTerminalKey: string
-  sessions: TerminalSlotSummary[]
+  sessions: TerminalSessionSummary[]
   workspacePaneId: string
   pendingTerminal?: boolean
   responsiveCompact?: boolean
   panelActive?: boolean
   newTerminalBusy?: boolean
   onNew: () => void
-  onSelect: (worktreeTerminalKey: string, tab: TerminalSlotSummary) => void
+  onSelect: (worktreeTerminalKey: string, tab: TerminalSessionSummary) => void
   onScrollToBottom: (key: string) => void
-  onClose: (tab: TerminalSlotSummary) => void
+  onClose: (tab: TerminalSessionSummary) => void
   onReorder: (orderedTabs: WorkspacePaneTabOrderEntry[]) => void
   onNavigateOut?: (direction: 'prev' | 'next' | 'first' | 'last') => void
 }) {
@@ -876,7 +874,7 @@ function TestWorkspacePaneViewStrip(props: {
     )
   }
   return (
-    <WorkspacePaneViewStrip
+    <WorkspacePaneTabStrip
       {...workspacePaneProps}
       items={items}
       activeTabIdentity={selected ? terminalWorkspacePaneTabProvider.identity(selected.key) : null}
@@ -909,7 +907,7 @@ function rerender(element: ReactNode) {
   })
 }
 
-function session(overrides: Partial<TerminalSlotSummary> = {}): TerminalSlotSummary {
+function session(overrides: Partial<TerminalSessionSummary> = {}): TerminalSessionSummary {
   const key = overrides.key ?? 't1'
   const title = overrides.title ?? 'term-1'
   return {

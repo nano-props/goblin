@@ -10,7 +10,7 @@ import { SidebarRowButton } from '#/web/components/ui/sidebar-row-button.tsx'
 import { CurrentRepoSidebarButton, CurrentRepoToolbarButton } from '#/web/components/repo-picker/CurrentRepoButton.tsx'
 import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import type { RepoPickerLabels, RepoPickerRepo, RepoPickerSurface } from '#/web/components/repo-picker/types.ts'
-import { isRemoteRepoId, remoteRepoLifecycleTarget } from '#/shared/remote-repo.ts'
+import { isRemoteRepoId, remoteRepoConnectionTarget } from '#/shared/remote-repo.ts'
 import { formatRepoLocator } from '#/web/lib/paths.ts'
 
 function navigatedRepoId(
@@ -115,7 +115,7 @@ function RepoMenuContent({
               {repos.map((repo) => {
                 const selected = repo.id === activeId
                 const RepoIcon = isRemoteRepoId(repo.id) ? Server : FolderGit2
-                const remoteTarget = remoteRepoLifecycleTarget(repo.lifecycle)
+                const remoteTarget = remoteRepoConnectionTarget(repo.lifecycle)
                 return (
                   <div key={repo.id} className="group relative flex items-center" role="listitem">
                     <MenuRowButton

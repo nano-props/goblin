@@ -120,8 +120,7 @@ export async function dispatchRemoveWorktree({
     },
     useReposStore.getState().runBranchAction,
     {
-      deferResultMessages:
-        alsoDeleteBranch && !forceDeleteBranch ? ['error.cannot-remove-unpushed-worktree'] : [],
+      deferResultMessages: alsoDeleteBranch && !forceDeleteBranch ? ['error.cannot-remove-unpushed-worktree'] : [],
       handleResult: (result) => {
         if (removeWorktreeNeedsForceConfirm(result, alsoDeleteBranch, forceDeleteBranch)) {
           useBranchActionDialogsStore.getState().openForceRemoveWorktreeConfirm({

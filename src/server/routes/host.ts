@@ -19,7 +19,7 @@ import { getServerHostInfo, type HostInfo } from '#/server/modules/host-info.ts'
  * inside the gate too, on first paint).
  *
  * Replaces the Electron preload's `goblin:get-home-dir` /
- * `goblin:get-platform` IPC channels. Both runtimes now go through
+ * `goblin:get-platform` IPC channels. Both repoOperationSchedulers now go through
  * the same HTTP path; the embedded main no longer needs to plant
  * host info into the client's bootstrap script before loadURL.
  */

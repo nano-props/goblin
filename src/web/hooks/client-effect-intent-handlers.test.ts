@@ -125,13 +125,13 @@ function navigationWithStoreActions(): MainWindowNavigationActions {
     showRepoWorkspacePaneView: (repoId, tab) => {
       const state = useReposStore.getState()
       state.setActive(repoId)
-      state.setWorkspacePaneView(repoId, tab)
+      state.setWorkspacePaneTab(repoId, tab)
     },
     showRepoBranchWorkspacePaneView: (repoId, branch, tab) => {
       const state = useReposStore.getState()
       state.setActive(repoId)
       state.selectBranch(repoId, branch)
-      state.setWorkspacePaneView(repoId, tab)
+      state.setWorkspacePaneTab(repoId, tab)
     },
     openSettings: vi.fn(),
   }

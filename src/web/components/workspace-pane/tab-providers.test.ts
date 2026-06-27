@@ -7,21 +7,20 @@ import {
   workspacePaneStaticTabProvider,
   workspacePaneTabProviders,
   workspacePaneTabProvider,
-} from '#/web/workspace-pane/workspace-pane-tab-providers.ts'
-import type { WorkspacePaneViewSummary } from '#/web/components/terminal/types.ts'
+} from '#/web/components/workspace-pane/tab-providers.ts'
+import type { WorkspacePaneTabSummary } from '#/web/components/terminal/types.ts'
 import {
-  WORKSPACE_PANE_BRANCH_VIEW_TYPES,
-  WORKSPACE_PANE_STATIC_VIEW_TYPES,
-  WORKSPACE_PANE_VIEW_TYPES,
-  WORKSPACE_PANE_WORKTREE_STATIC_VIEW_TYPES,
-  workspacePaneStaticViewScope,
-  workspacePaneViewScope,
+  WORKSPACE_PANE_BRANCH_TAB_TYPES,
+  WORKSPACE_PANE_STATIC_TAB_TYPES,
+  WORKSPACE_PANE_TAB_TYPES,
+  WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES,
+  workspacePaneStaticTabScope,
+  workspacePaneTabScope,
 } from '#/shared/workspace-pane.ts'
 
-const t = (key: string, params?: Record<string, string | number>) =>
-  params ? `${key}:${JSON.stringify(params)}` : key
+const t = (key: string, params?: Record<string, string | number>) => (params ? `${key}:${JSON.stringify(params)}` : key)
 
-const terminalView: WorkspacePaneViewSummary = {
+const terminalView: WorkspacePaneTabSummary = {
   type: 'terminal',
   id: 'slot-1',
   key: 'slot-1',
@@ -49,22 +48,22 @@ describe('workspace pane tab providers', () => {
 
   test('derives provider scope from the shared workspace pane scope definitions', () => {
     for (const provider of workspacePaneTabProviders) {
-      expect(provider.scope).toBe(workspacePaneViewScope(provider.type))
+      expect(provider.scope).toBe(workspacePaneTabScope(provider.type))
     }
   })
 
   test('registers one provider per workspace pane view type', () => {
-    expect(workspacePaneTabProviders.map((provider) => provider.type)).toEqual([...WORKSPACE_PANE_VIEW_TYPES])
+    expect(workspacePaneTabProviders.map((provider) => provider.type)).toEqual([...WORKSPACE_PANE_TAB_TYPES])
   })
 
   test('derives shared static scope lists from the static scope map', () => {
-    const branchViews = WORKSPACE_PANE_STATIC_VIEW_TYPES.filter((type) => workspacePaneStaticViewScope(type) === 'branch')
-    const worktreeViews = WORKSPACE_PANE_STATIC_VIEW_TYPES.filter(
-      (type) => workspacePaneStaticViewScope(type) === 'worktree',
+    const branchViews = WORKSPACE_PANE_STATIC_TAB_TYPES.filter((type) => workspacePaneStaticTabScope(type) === 'branch')
+    const worktreeViews = WORKSPACE_PANE_STATIC_TAB_TYPES.filter(
+      (type) => workspacePaneStaticTabScope(type) === 'worktree',
     )
 
-    expect(WORKSPACE_PANE_BRANCH_VIEW_TYPES).toEqual(branchViews)
-    expect(WORKSPACE_PANE_WORKTREE_STATIC_VIEW_TYPES).toEqual(worktreeViews)
+    expect(WORKSPACE_PANE_BRANCH_TAB_TYPES).toEqual(branchViews)
+    expect(WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES).toEqual(worktreeViews)
   })
 
   test('resolves worktree availability through providers', () => {
@@ -131,13 +130,13 @@ describe('workspace pane tab providers', () => {
     expect(historyWorkspacePaneTabProvider.tooltip({ t, branchName: 'main', statusCount: 0 })).toBe(
       'workspace-pane-views.history-tooltip:{"branch":"main"}',
     )
-    expect(terminalWorkspacePaneTabProvider.tooltip({ t, branchName: 'main', statusCount: 0, view: terminalView })).toBe(
-      'Terminal 1 full',
-    )
+    expect(
+      terminalWorkspacePaneTabProvider.tooltip({ t, branchName: 'main', statusCount: 0, view: terminalView }),
+    ).toBe('Terminal 1 full')
   })
 
   test('keeps the internal terminal process placeholder out of runtime tab labels', () => {
-    const placeholderTerminalView: WorkspacePaneViewSummary = {
+    const placeholderTerminalView: WorkspacePaneTabSummary = {
       ...terminalView,
       title: 'terminal',
       fullTitle: 'terminal',
@@ -149,9 +148,7 @@ describe('workspace pane tab providers', () => {
 
     expect(terminalWorkspacePaneTabProvider.label(input)).toBe('')
     expect(terminalWorkspacePaneTabProvider.tooltip(input)).toBe('terminal.opening')
-    expect(terminalWorkspacePaneTabProvider.closeLabel(input)).toBe(
-      'terminal.close-named:{"name":"terminal.opening"}',
-    )
+    expect(terminalWorkspacePaneTabProvider.closeLabel(input)).toBe('terminal.close-named:{"name":"terminal.opening"}')
   })
 
   test('closes static tabs through the static view lifecycle callback', async () => {

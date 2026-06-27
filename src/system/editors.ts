@@ -43,11 +43,7 @@ export function openInPreferredEditor(path: string, app: EditorApp): Promise<Exe
 }
 
 /** Open a remote SSH workspace in the requested editor `app`. */
-export function openRemoteInPreferredEditor(
-  alias: string,
-  remotePath: string,
-  app: EditorApp,
-): Promise<ExecResult> {
+export function openRemoteInPreferredEditor(alias: string, remotePath: string, app: EditorApp): Promise<ExecResult> {
   if (!getEditorAppAvailability()[app]) {
     return Promise.resolve({ ok: false, message: 'error.editor-not-installed' })
   }

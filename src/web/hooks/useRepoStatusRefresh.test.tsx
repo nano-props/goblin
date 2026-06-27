@@ -2,13 +2,13 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { emptyRepo, replaceRepo } from '#/web/stores/repos/helpers.ts'
+import { emptyRepo, replaceRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { isRepoStatusRefreshable, useRepoStatusRefresh } from '#/web/hooks/useRepoStatusRefresh.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { resetReposStore } from '#/web/stores/repos/test-utils.ts'
 import { preferredWorkspacePaneViewByBranchRecordWith } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { workspacePaneTabOrderRecordWith } from '#/web/stores/repos/workspace-pane-tabs.ts'
-import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
 
 const originalRefreshStatus = useReposStore.getState().refreshStatus
@@ -21,7 +21,7 @@ function Harness() {
 function createRepo(
   id: string,
   options: {
-    preferredWorkspacePaneView?: WorkspacePaneView
+    preferredWorkspacePaneView?: WorkspacePaneTabType
     /**
      * Phase 4: the legacy `availability.phase` field is gone for
      * remote repos. The snapshot's `unavailable` boolean is
@@ -159,7 +159,7 @@ describe('useRepoStatusRefresh', () => {
     refreshStatus.mockClear()
 
     await act(async () => {
-      useReposStore.getState().setWorkspacePaneView('/repo-a', 'status')
+      useReposStore.getState().setWorkspacePaneTab('/repo-a', 'status')
     })
 
     expect(refreshStatus).toHaveBeenCalledWith('/repo-a', { token: 1 })
@@ -178,7 +178,7 @@ describe('useRepoStatusRefresh', () => {
     refreshStatus.mockClear()
 
     await act(async () => {
-      useReposStore.getState().setWorkspacePaneView('/repo-a', 'changes')
+      useReposStore.getState().setWorkspacePaneTab('/repo-a', 'changes')
     })
 
     expect(refreshStatus).toHaveBeenCalledWith('/repo-a', { token: 1 })
@@ -215,12 +215,12 @@ describe('useRepoStatusRefresh', () => {
     refreshStatus.mockClear()
 
     await act(async () => {
-      useReposStore.getState().setWorkspacePaneView('/repo-a', 'terminal')
+      useReposStore.getState().setWorkspacePaneTab('/repo-a', 'terminal')
     })
     expect(refreshStatus).not.toHaveBeenCalled()
 
     await act(async () => {
-      useReposStore.getState().setWorkspacePaneView('/repo-a', 'status')
+      useReposStore.getState().setWorkspacePaneTab('/repo-a', 'status')
     })
     expect(refreshStatus).toHaveBeenCalledWith('/repo-a', { token: 1 })
   })
@@ -238,7 +238,7 @@ describe('useRepoStatusRefresh', () => {
     refreshStatus.mockClear()
 
     await act(async () => {
-      useReposStore.getState().setWorkspacePaneView('/repo-a', 'status')
+      useReposStore.getState().setWorkspacePaneTab('/repo-a', 'status')
     })
 
     expect(refreshStatus).not.toHaveBeenCalled()
@@ -257,7 +257,7 @@ describe('useRepoStatusRefresh', () => {
     refreshStatus.mockClear()
 
     await act(async () => {
-      useReposStore.getState().setWorkspacePaneView('/repo-a', 'status')
+      useReposStore.getState().setWorkspacePaneTab('/repo-a', 'status')
     })
 
     expect(refreshStatus).not.toHaveBeenCalled()

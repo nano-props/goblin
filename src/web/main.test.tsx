@@ -37,7 +37,8 @@ beforeEach(() => {
   vi.doMock('#/web/auth/AuthProvider.tsx', async () => {
     const React = await import('react')
     return {
-      AuthProvider: ({ children }: { children: React.ReactNode }) => React.createElement(React.Fragment, null, children),
+      AuthProvider: ({ children }: { children: React.ReactNode }) =>
+        React.createElement(React.Fragment, null, children),
     }
   })
   vi.doMock('#/web/hooks/useResponsiveUiMode.tsx', async () => {

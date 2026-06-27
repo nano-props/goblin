@@ -1,7 +1,7 @@
 import * as v from 'valibot'
 import { publishClientIntent } from '#/server/modules/client-intent-broker.ts'
 import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'
-import { WORKSPACE_PANE_STATIC_VIEW_TYPES } from '#/shared/workspace-pane.ts'
+import { WORKSPACE_PANE_STATIC_TAB_TYPES } from '#/shared/workspace-pane.ts'
 import type { RepoViewResult } from '#/shared/repo-view.ts'
 
 // Body schema for `POST /api/repo/view`. Only the three static views
@@ -10,7 +10,7 @@ import type { RepoViewResult } from '#/shared/repo-view.ts'
 // (controller/takeover semantics — see docs/terminal-target-model.md)
 // and shouldn't be reachable via a CLI side-channel.
 const RepoViewBodySchema = v.object({
-  tab: v.picklist(WORKSPACE_PANE_STATIC_VIEW_TYPES),
+  tab: v.picklist(WORKSPACE_PANE_STATIC_TAB_TYPES),
 })
 
 export function createRepoViewRoutes() {

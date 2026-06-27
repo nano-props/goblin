@@ -5,7 +5,7 @@ describe('createMainWindowNavigationActions', () => {
   test('mutates store directly for repo branch workspace navigation', () => {
     const setActive = vi.fn()
     const selectBranch = vi.fn()
-    const setWorkspacePaneView = vi.fn()
+    const setWorkspacePaneTab = vi.fn()
     const actions = createMainWindowNavigationActions({
       activeId: '/tmp/repo-a',
       order: ['/tmp/repo-a', '/tmp/repo-b'],
@@ -13,7 +13,7 @@ describe('createMainWindowNavigationActions', () => {
       closeRepo: vi.fn(),
       cycleActive: vi.fn(),
       selectBranch,
-      setWorkspacePaneView,
+      setWorkspacePaneTab,
       onOpenSettings: vi.fn(),
     })
 
@@ -21,11 +21,11 @@ describe('createMainWindowNavigationActions', () => {
 
     expect(setActive).toHaveBeenCalledWith('/tmp/repo-b')
     expect(selectBranch).toHaveBeenCalledWith('/tmp/repo-b', 'feature/test')
-    expect(setWorkspacePaneView).toHaveBeenCalledWith('/tmp/repo-b', 'terminal')
+    expect(setWorkspacePaneTab).toHaveBeenCalledWith('/tmp/repo-b', 'terminal')
   })
 
   test('workspace pane navigation updates the preferred workspace pane view', () => {
-    const setWorkspacePaneView = vi.fn()
+    const setWorkspacePaneTab = vi.fn()
     const actions = createMainWindowNavigationActions({
       activeId: '/tmp/repo-a',
       order: ['/tmp/repo-a'],
@@ -33,12 +33,12 @@ describe('createMainWindowNavigationActions', () => {
       closeRepo: vi.fn(),
       cycleActive: vi.fn(),
       selectBranch: vi.fn(),
-      setWorkspacePaneView,
+      setWorkspacePaneTab,
     })
 
     actions.showRepoWorkspacePaneView('/tmp/repo-a', 'changes')
 
-    expect(setWorkspacePaneView).toHaveBeenCalledWith('/tmp/repo-a', 'changes')
+    expect(setWorkspacePaneTab).toHaveBeenCalledWith('/tmp/repo-a', 'changes')
   })
 
   test('cycles repos through the store action', () => {
@@ -50,7 +50,7 @@ describe('createMainWindowNavigationActions', () => {
       closeRepo: vi.fn(),
       cycleActive,
       selectBranch: vi.fn(),
-      setWorkspacePaneView: vi.fn(),
+      setWorkspacePaneTab: vi.fn(),
     })
 
     actions.cycleRepo(1)
@@ -67,7 +67,7 @@ describe('createMainWindowNavigationActions', () => {
       closeRepo,
       cycleActive: vi.fn(),
       selectBranch: vi.fn(),
-      setWorkspacePaneView: vi.fn(),
+      setWorkspacePaneTab: vi.fn(),
     })
 
     actions.closeRepo('/tmp/repo-b')

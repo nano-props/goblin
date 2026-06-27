@@ -17,15 +17,15 @@ function installWindow(openReturn: unknown = {}) {
 }
 
 function testBridge(overrides: Partial<ClientBridge> = {}): ClientBridge {
-  const nativeShell = overrides.shell?.() ?? null
+  const nativeHost = overrides.host?.() ?? null
   return {
     kind: () => 'web',
     hasCapability: (capability) => {
       if (capability === 'settings-ipc') return typeof overrides.invokeIpc === 'function'
-      if (capability === 'open-settings-window') return nativeShell?.openSettingsWindow !== undefined
-      if (capability === 'open-external-url') return nativeShell?.openExternalUrl !== undefined
-      if (capability === 'open-directory-dialog') return nativeShell?.openDirectoryDialog !== undefined
-      if (capability === 'consume-external-open-paths') return nativeShell?.consumeExternalOpenPaths !== undefined
+      if (capability === 'open-settings-window') return nativeHost?.openSettingsWindow !== undefined
+      if (capability === 'open-external-url') return nativeHost?.openExternalUrl !== undefined
+      if (capability === 'open-directory-dialog') return nativeHost?.openDirectoryDialog !== undefined
+      if (capability === 'consume-external-open-paths') return nativeHost?.consumeExternalOpenPaths !== undefined
       return false
     },
     getBootstrap: () => ({
@@ -38,7 +38,7 @@ function testBridge(overrides: Partial<ClientBridge> = {}): ClientBridge {
     onEffectIntent: () => () => {},
     pathForFile: () => '',
     saveClipboardFiles: () => Promise.resolve([]),
-    shell: () => null,
+    host: () => null,
     terminal: (() => {
       throw new Error('unused terminal bridge')
     }) as never,
@@ -53,12 +53,12 @@ describe('app shell client', () => {
     installWindow()
   })
 
-  test('opens app settings through the client bridge shell', async () => {
+  test('opens app settings through the client bridge host', async () => {
     const bridgeModule = await import('#/web/client-bridge.ts')
     const openSettingsWindow = vi.fn(async () => true)
     bridgeModule.setClientBridgeForTests(
       testBridge({
-        shell: () => ({
+        host: () => ({
           openSettingsWindow,
           openExternalUrl: vi.fn(),
           openDirectoryDialog: vi.fn(),
@@ -72,7 +72,7 @@ describe('app shell client', () => {
     expect(openSettingsWindow).toHaveBeenCalledWith({ page: 'about' })
   })
 
-  test('opens external URLs in the browser when no native shell is available', async () => {
+  test('opens external URLs in the browser when no native host is available', async () => {
     const { openExternalUrl } = await import('#/web/app-shell-client.ts')
     await expect(openExternalUrl('https://example.com')).resolves.toEqual({ ok: true, message: 'https://example.com' })
     expect(window.open).toHaveBeenCalledWith('https://example.com', '_blank', 'noopener,noreferrer')
@@ -89,14 +89,14 @@ describe('app shell client', () => {
     expect(window.open).toHaveBeenCalledWith('https://example.com', '_blank', 'noopener,noreferrer')
   })
 
-  test('opens the project GitHub URL through the native shell with https-only policy', async () => {
+  test('opens the project GitHub URL through the native host with https-only policy', async () => {
     const bridgeModule = await import('#/web/client-bridge.ts')
-    const shellOpenExternalUrl = vi.fn(async () => ({ ok: true, message: 'https://github.com/nano-props/goblin' }))
+    const hostOpenExternalUrl = vi.fn(async () => ({ ok: true, message: 'https://github.com/nano-props/goblin' }))
     bridgeModule.setClientBridgeForTests(
       testBridge({
-        shell: () => ({
+        host: () => ({
           openSettingsWindow: vi.fn(),
-          openExternalUrl: shellOpenExternalUrl,
+          openExternalUrl: hostOpenExternalUrl,
           openDirectoryDialog: vi.fn(),
           consumeExternalOpenPaths: vi.fn(),
         }),
@@ -105,21 +105,21 @@ describe('app shell client', () => {
 
     const { openProjectGitHub } = await import('#/web/app-shell-client.ts')
     await expect(openProjectGitHub()).resolves.toEqual({ ok: true, message: 'https://github.com/nano-props/goblin' })
-    expect(shellOpenExternalUrl).toHaveBeenCalledWith({
+    expect(hostOpenExternalUrl).toHaveBeenCalledWith({
       url: 'https://github.com/nano-props/goblin',
       allowHttp: false,
     })
     expect(window.open).not.toHaveBeenCalled()
   })
 
-  test('chooses repository paths through the client bridge shell', async () => {
+  test('chooses repository paths through the client bridge host', async () => {
     const bridgeModule = await import('#/web/client-bridge.ts')
     const openDirectoryDialog = vi.fn(async (input?: { title?: string }) =>
       input?.title === 'Open Git Repository' ? '/tmp/repo' : '/tmp',
     )
     bridgeModule.setClientBridgeForTests(
       testBridge({
-        shell: () => ({
+        host: () => ({
           openSettingsWindow: vi.fn(),
           openExternalUrl: vi.fn(),
           openDirectoryDialog,

@@ -6,7 +6,7 @@ import {
   runRepoRefreshIntent,
   type RepoStatusRefreshSnapshot,
 } from '#/web/stores/repos/refresh-coordinator.ts'
-import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 
 export { isRepoStatusRefreshable } from '#/web/stores/repos/refresh-coordinator.ts'
 
@@ -38,7 +38,7 @@ export function useRepoStatusRefresh() {
     activeRepoStatusSnapshotEqual,
   )
   const previousActiveRepoId = useRef<string | null>(null)
-  const previousPreferredWorkspacePaneView = useRef<WorkspacePaneView | null>(null)
+  const previousPreferredWorkspacePaneView = useRef<WorkspacePaneTabType | null>(null)
   const previousStatusViewOpen = useRef<boolean>(false)
 
   useEffect(() => {

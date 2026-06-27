@@ -115,9 +115,7 @@ describe('theme store OS-appearance sync', () => {
     // wipe only because of how `vi.resetModules` is implemented, so
     // explicit teardown matches the reference pattern in
     // `web-invalidation-sync.test.ts`.
-    const { resetServerInvalidationIngressForTests } = await import(
-      '#/web/server-invalidation-ingress.ts'
-    )
+    const { resetServerInvalidationIngressForTests } = await import('#/web/server-invalidation-ingress.ts')
     resetServerInvalidationIngressForTests()
     vi.unstubAllGlobals()
   })

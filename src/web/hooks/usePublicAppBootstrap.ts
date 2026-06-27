@@ -8,8 +8,11 @@ export function usePublicAppBootstrap() {
   useEffect(() => {
     if (hydratedRef.current) return
     hydratedRef.current = true
-    void useHostInfoStore.getState().hydrate().catch((err) => {
-      bootstrapLog.warn('public bootstrap failed', { err })
-    })
+    void useHostInfoStore
+      .getState()
+      .hydrate()
+      .catch((err) => {
+        bootstrapLog.warn('public bootstrap failed', { err })
+      })
   }, [])
 }
