@@ -111,20 +111,20 @@ export function useBranchActionItems(
       onSelect: () => openStaticWorkspacePaneTab('status'),
     },
     {
-      id: 'history',
-      label: t('tab.log'),
-      disabled,
-      visible: true,
-      icon: createElement(History),
-      onSelect: () => openStaticWorkspacePaneTab('history'),
-    },
-    {
       id: 'changes',
       label: t('tab.changes'),
       disabled,
       visible: !!branch.worktree?.path,
       icon: createElement(Diff),
       onSelect: () => openStaticWorkspacePaneTab('changes'),
+    },
+    {
+      id: 'history',
+      label: t('tab.log'),
+      disabled,
+      visible: true,
+      icon: createElement(History),
+      onSelect: () => openStaticWorkspacePaneTab('history'),
     },
   ]
 

@@ -13,7 +13,7 @@ import {
   type WorkspacePaneTabOrderEntry,
   type WorkspacePaneTabType,
 } from '#/shared/workspace-pane.ts'
-import { formatWorktreeKey } from '#/shared/terminal-slot-key.ts'
+import { formatWorktreeKey } from '#/shared/terminal-workspace-slot-key.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
 import {
   normalizeWorkspacePaneTabOrder,
@@ -236,9 +236,9 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
         if (!worktreePath) return s
         const currentOrder = workspacePaneTabOrderForBranch(repo.ui, branch)
         const nextOrder = workspacePaneTabOrderWithTerminal(currentOrder, terminalKey)
-        const currentView = preferredWorkspacePaneViewForBranch(repo.ui, branch)
+        const currentView = preferredWorkspacePaneTabForBranch(repo.ui, branch)
         const wtKey = formatWorktreeKey(id, worktreePath)
-        const currentSelected = s.selectedTerminalByWorktree[wtKey]
+        const currentSelected = s.selectedTerminalSessionByWorktree[wtKey]
         const orderChanged = !workspacePaneTabOrdersEqual(currentOrder, nextOrder)
         viewChanged = currentView !== 'terminal'
         const selectionChanged = currentSelected !== terminalKey
@@ -249,7 +249,7 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
             r.ui.workspacePaneTabOrderByBranch = workspacePaneTabOrderRecordWith(r.ui, branch, nextOrder)
           }
           if (viewChanged) {
-            r.ui.preferredWorkspacePaneViewByBranch = preferredWorkspacePaneViewByBranchRecordWith(
+            r.ui.preferredWorkspacePaneTabByBranch = preferredWorkspacePaneTabByBranchRecordWith(
               r.ui,
               branch,
               'terminal',
@@ -262,18 +262,18 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
         if (!selectionChanged) return repoPatch
         return {
           ...repoPatch,
-          selectedTerminalByWorktree: { ...s.selectedTerminalByWorktree, [wtKey]: terminalKey },
+          selectedTerminalSessionByWorktree: { ...s.selectedTerminalSessionByWorktree, [wtKey]: terminalKey },
         }
       })
       if (!viewChanged || token === undefined) return
       const repo = get().repos[id]
-      persistRestorableRepoSnapshot(set, repo, token)
+      persistRepoSnapshotCacheEntry(set, repo, token)
       void runRepoRefreshIntent(get, {
         kind: 'visible-pull-request-changed',
         id,
         token,
         branch:
-          repo && preferredWorkspacePaneViewForBranch(repo.ui, repo.ui.selectedBranch) === 'status'
+          repo && preferredWorkspacePaneTabForBranch(repo.ui, repo.ui.selectedBranch) === 'status'
             ? repo.ui.selectedBranch
             : null,
       })

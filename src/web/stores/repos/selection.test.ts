@@ -441,23 +441,28 @@ describe('setWorkspacePaneTab', () => {
   })
 
   test('addAndFocus adds the tab, switches to terminal view, and selects the new terminal', () => {
-    seedRepo({ selectedBranch: 'feature/worktree', preferredWorkspacePaneView: 'status' })
+    seedRepo({ selectedBranch: 'feature/worktree', preferredWorkspacePaneTab: 'status' })
 
     useReposStore.getState().addAndFocusWorkspacePaneTerminalTab(REPO_ID, 'slot-1')
 
-    expect(tabOrderFor('feature/worktree')).toEqual([workspacePaneStaticTabOrderEntry('status'), terminalEntry('slot-1')])
-    expect(preferredViewFor('feature/worktree')).toBe('terminal')
-    expect(useReposStore.getState().selectedTerminalByWorktree[`${REPO_ID}\0/tmp/feature-worktree`]).toBe('slot-1')
+    expect(tabOrderFor('feature/worktree')).toEqual([
+      workspacePaneStaticTabOrderEntry('status'),
+      terminalEntry('slot-1'),
+    ])
+    expect(preferredTabFor('feature/worktree')).toBe('terminal')
+    expect(useReposStore.getState().selectedTerminalSessionByWorktree[`${REPO_ID}\0/tmp/feature-worktree`]).toBe(
+      'slot-1',
+    )
   })
 
   test('addAndFocus is a no-op when everything is already focused', () => {
     seedRepo({
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'terminal',
+      preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabOrder: [terminalEntry('slot-1')],
     })
     useReposStore.setState({
-      selectedTerminalByWorktree: { [`${REPO_ID}\0/tmp/feature-worktree`]: 'slot-1' },
+      selectedTerminalSessionByWorktree: { [`${REPO_ID}\0/tmp/feature-worktree`]: 'slot-1' },
     })
 
     const before = useReposStore.getState().repos[REPO_ID]
@@ -467,13 +472,13 @@ describe('setWorkspacePaneTab', () => {
   })
 
   test('addAndFocus does nothing for a branch without a worktree', () => {
-    seedRepo({ selectedBranch: 'feature/plain', preferredWorkspacePaneView: 'status' })
+    seedRepo({ selectedBranch: 'feature/plain', preferredWorkspacePaneTab: 'status' })
 
     const before = useReposStore.getState().repos[REPO_ID]
     useReposStore.getState().addAndFocusWorkspacePaneTerminalTab(REPO_ID, 'slot-1')
 
     expect(useReposStore.getState().repos[REPO_ID]).toBe(before)
-    expect(preferredViewFor('feature/plain')).toBe('status')
+    expect(preferredTabFor('feature/plain')).toBe('status')
   })
 
   test('removes a terminal tab order entry when its terminal closes', () => {

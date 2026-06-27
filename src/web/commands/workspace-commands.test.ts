@@ -393,14 +393,14 @@ describe('workspace commands', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'status',
+      preferredWorkspacePaneTab: 'status',
       workspacePaneTabOrderByBranch: {
         'feature/worktree': [staticEntry('status'), terminalEntry('slot-1')],
       },
     })
     const { promise, resolve } = Promise.withResolvers<string>()
     const createTerminal = vi.fn(() => promise)
-    setTerminalSlotCommandBridge({
+    setTerminalSessionCommandBridge({
       worktreeSnapshot: () => worktreeSnapshotWithTerminal(),
       createTerminal,
       selectTerminal: vi.fn(),
@@ -410,8 +410,8 @@ describe('workspace commands', () => {
     await vi.waitFor(() => expect(createTerminal).toHaveBeenCalledTimes(1))
 
     // Simulate the user clicking a different tab while the create is in flight.
-    useReposStore.getState().setWorkspacePaneView(REPO_ID, 'status')
-    expect(preferredWorkspacePaneView()).toBe('status')
+    useReposStore.getState().setWorkspacePaneTab(REPO_ID, 'status')
+    expect(preferredWorkspacePaneTab()).toBe('status')
 
     resolve('slot-2')
     await command
@@ -421,8 +421,8 @@ describe('workspace commands', () => {
       terminalEntry('slot-1'),
       terminalEntry('slot-2'),
     ])
-    expect(preferredWorkspacePaneView()).toBe('terminal')
-    expect(useReposStore.getState().selectedTerminalByWorktree[WORKTREE_KEY]).toBe('slot-2')
+    expect(preferredWorkspacePaneTab()).toBe('terminal')
+    expect(useReposStore.getState().selectedTerminalSessionByWorktree[WORKTREE_KEY]).toBe('slot-2')
   })
 
   test('close workspace tab command closes the selected terminal when terminal is active', async () => {

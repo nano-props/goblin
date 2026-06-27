@@ -751,7 +751,7 @@ describe('TerminalSession', () => {
   test('does not force scroll position across font refits', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSlot(descriptor, vi.fn())
+    const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
 
     session.attach(host)
@@ -780,7 +780,7 @@ describe('TerminalSession', () => {
     )
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSlot(descriptor, vi.fn())
+    const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
 
     session.attach(host)
