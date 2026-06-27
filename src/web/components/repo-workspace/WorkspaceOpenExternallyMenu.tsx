@@ -141,20 +141,29 @@ export function WorkspaceOpenExternallyMenu({ repo, branch, branchActions }: Pro
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="space-y-0.5 p-1" role="list">
-          {localItems.map((item) => (
-            <div key={item.id} role="listitem">
-              <WorkspaceOpenExternallyItem
-                item={item}
-                pending={pending}
-                selected={item.id === primaryItem?.id}
-                onSelect={() => runItem(item)}
-              />
+        <div role="list">
+          {localItems.length > 0 && (
+            <div className="space-y-0.5 p-1">
+              {localItems.map((item) => (
+                <div key={item.id} role="listitem">
+                  <WorkspaceOpenExternallyItem
+                    item={item}
+                    pending={pending}
+                    selected={item.id === primaryItem?.id}
+                    onSelect={() => runItem(item)}
+                  />
+                </div>
+              ))}
             </div>
-          ))}
+          )}
+          {remoteOpenAction.visible && localItems.length > 0 && (
+            <div aria-hidden="true" className="border-t border-separator" />
+          )}
           {remoteOpenAction.visible && (
-            <div key={remoteOpenAction.id} role="listitem">
-              <WorkspaceOpenExternallyRemoteItem action={remoteOpenAction} pending={pending} onSelect={runRemoteItem} />
+            <div className="space-y-0.5 p-1" key={remoteOpenAction.id}>
+              <div role="listitem">
+                <WorkspaceOpenExternallyRemoteItem action={remoteOpenAction} pending={pending} onSelect={runRemoteItem} />
+              </div>
             </div>
           )}
         </div>
