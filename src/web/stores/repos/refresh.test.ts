@@ -4,7 +4,7 @@ import { terminalLog } from '#/web/logger.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { markRepoOperationTargets, repoOperation } from '#/web/stores/repos/repo-operation-scheduler.ts'
 import { branch, REPO_ID, resetRefreshTest, ipcHandlers, seedRepo } from '#/web/stores/repos/refresh-test-utils.ts'
-import { seedRepoState } from '#/web/stores/repos/test-utils.ts'
+import { seedRepoState } from '#/web/test-utils/bridge.ts'
 import { canStartRemoteFetch } from '#/web/stores/repos/sync-state.ts'
 import {
   preferredWorkspacePaneTabForBranch,

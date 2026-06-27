@@ -12,7 +12,7 @@ vi.mock('sonner', () => ({
     success: vi.fn(),
   },
 }))
-import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
+import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'

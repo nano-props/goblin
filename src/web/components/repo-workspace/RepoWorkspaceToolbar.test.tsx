@@ -34,7 +34,7 @@ import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
-import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
+import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import {
   WORKSPACE_EXTERNAL_APP_RECENT_STORAGE_KEY,

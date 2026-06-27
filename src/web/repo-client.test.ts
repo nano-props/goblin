@@ -3,6 +3,7 @@ import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import type { ClientBridge } from '#/web/client-bridge-types.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
+import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
 function webBootstrap(overrides: Partial<ClientBootstrapSnapshot> = {}): ClientBootstrapSnapshot {
   return {
@@ -85,12 +86,10 @@ describe('repo-client', () => {
         }),
       }),
     )
-    const fetchMock = vi.fn(async () => ({
+    const fetchMock = mockFetch(async () => ({
       ok: true,
       json: async () => ({ ok: true, message: 'https://github.com/acme/repo/tree/feature/test' }),
     }))
-    vi.stubGlobal('fetch', fetchMock)
-
     const { openRepoRemote } = await import('#/web/repo-client.ts')
     await expect(openRepoRemote('/tmp/repo', 'feature/test')).resolves.toEqual({ ok: true, message: '' })
     expect(openExternalUrl).toHaveBeenCalledWith({
@@ -110,12 +109,10 @@ describe('repo-client', () => {
 
   test('clones repositories through the embedded server when no Electron bridge exists', async () => {
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
-    const fetchMock = vi.fn(async () => ({
+    const fetchMock = mockFetch(async () => ({
       ok: true,
       json: async () => ({ ok: true, message: 'ok', path: '/tmp/repo' }),
     }))
-    vi.stubGlobal('fetch', fetchMock)
-
     const { cloneRepository } = await import('#/web/repo-client.ts')
     const { hasNativeDirectoryPicker } = await import('#/web/app-shell-client.ts')
     expect(hasNativeDirectoryPicker()).toBe(false)
@@ -138,12 +135,10 @@ describe('repo-client', () => {
 
   test('throws when repository log returns an error envelope', async () => {
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
-    const fetchMock = vi.fn(async () => ({
+    const fetchMock = mockFetch(async () => ({
       ok: true,
       json: async () => ({ ok: false, message: 'error.failed-read-repo' }),
     }))
-    vi.stubGlobal('fetch', fetchMock)
-
     const { getRepoLog } = await import('#/web/repo-client.ts')
     await expect(getRepoLog('/tmp/repo', 'feature/work')).rejects.toThrow('error.failed-read-repo')
     expect(fetchMock).toHaveBeenCalledWith(
@@ -159,11 +154,13 @@ describe('repo-client', () => {
   test('opens external workspace apps through embedded server routes even when a native host exists', async () => {
     const openTerminal = vi.fn(async () => ({ ok: true, message: 'native-terminal' }))
     const openEditor = vi.fn(async () => ({ ok: true, message: 'native-editor' }))
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, message: 'server-terminal' }) })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, message: 'server-editor' }) })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, message: 'server-finder' }) })
+    const fetchMock = mockFetch(
+      vi
+        .fn()
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, message: 'server-terminal' }) })
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, message: 'server-editor' }) })
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, message: 'server-finder' }) }),
+    )
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
@@ -197,8 +194,6 @@ describe('repo-client', () => {
         matchMedia: vi.fn(() => ({ matches: true })),
       },
     })
-    vi.stubGlobal('fetch', fetchMock)
-
     const { openRepoEditor, openRepoInFinder, openRepoTerminal } = await import('#/web/repo-client.ts')
     await expect(openRepoTerminal('/tmp/repo', 'ghostty')).resolves.toEqual({
       ok: true,
@@ -239,12 +234,12 @@ describe('repo-client', () => {
 
   test('sends explicit external app choices in open route bodies', async () => {
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, message: 'server-terminal' }) })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, message: 'server-editor' }) })
-    vi.stubGlobal('fetch', fetchMock)
-
+    const fetchMock = mockFetch(
+      vi
+        .fn()
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, message: 'server-terminal' }) })
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, message: 'server-editor' }) }),
+    )
     const { openRepoEditor, openRepoTerminal } = await import('#/web/repo-client.ts')
     await openRepoTerminal('/tmp/repo', 'ghostty')
     await openRepoEditor('/tmp/repo', 'windsurf')

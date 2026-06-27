@@ -11,7 +11,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { BranchList } from '#/web/components/branch-navigator/BranchList.tsx'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
-import { createRepoBranch } from '#/web/stores/repos/test-utils.ts'
+import { createRepoBranch } from '#/web/test-utils/bridge.ts'
 
 vi.mock('#/web/stores/i18n.ts', () => ({
   useI18nStore: (selector: (state: { lang: string }) => string) => selector({ lang: 'zh' }),

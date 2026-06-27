@@ -22,7 +22,7 @@ import {
   type RemoveWorktreeDialogPayload,
 } from '#/web/stores/repos/branch-action-dialogs.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
+import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 
 const REPO_ID = '/tmp/gbl-dialog-display-test'
 const OTHER_REPO_ID = '/tmp/gbl-dialog-display-test-other'

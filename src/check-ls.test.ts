@@ -1,27 +1,13 @@
 // @vitest-environment jsdom
-import { test, expect, beforeEach } from 'vitest'
-beforeEach(() => {
-  const store: Record<string, string> = {}
-  Object.defineProperty(window, 'localStorage', {
-    value: {
-      getItem: (k: string) => store[k] ?? null,
-      setItem: (k: string, v: string) => {
-        store[k] = v
-      },
-      removeItem: (k: string) => {
-        delete store[k]
-      },
-      clear: () => {
-        for (const k of Object.keys(store)) delete store[k]
-      },
-      key: (i: number) => Object.keys(store)[i] ?? null,
-      get length() {
-        return Object.keys(store).length
-      },
-    },
-    configurable: true,
-  })
-})
+//
+// Smoke test for the `localStorage` shim installed by `vitest.setup.ts`.
+// The setup file installs an in-memory `Storage` for both
+// `localStorage` and `sessionStorage` so Zustand's persist middleware
+// always finds a valid store. This test verifies the shim behaves like
+// a browser Storage: set → get round-trips, clear empties it.
+
+import { expect, test } from 'vitest'
+
 test('localStorage with polyfill', () => {
   window.localStorage.setItem('foo', 'bar')
   expect(window.localStorage.getItem('foo')).toBe('bar')

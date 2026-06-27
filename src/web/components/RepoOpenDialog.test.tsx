@@ -12,7 +12,7 @@ import {
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { resetReposStore } from '#/web/stores/repos/test-utils.ts'
+import { resetReposStore } from '#/web/test-utils/bridge.ts'
 
 let container: HTMLDivElement | null = null
 let root: Root | null = null

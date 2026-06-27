@@ -1,6 +1,6 @@
-import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
-import { toRemoteRepoFailureReason } from '#/shared/remote-repo.ts'
-import { createBranchSnapshot, installGoblinTestBridge, resetReposStore } from '#/web/stores/repos/test-utils.ts'
+import type { RepoSessionEntry, RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import { resolveServerRemoteRepoConnection, type RemoteRepoConnectionDeps } from '#/server/modules/remote.ts'
+import { createBranchSnapshot, installGoblinTestBridge, resetReposStore } from '#/web/test-utils/bridge.ts'
 export const REPO_A = '/tmp/gbl-lifecycle-a'
 export const REPO_B = '/tmp/gbl-lifecycle-b'
 export const branchSnapshot = createBranchSnapshot
@@ -66,83 +66,32 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
     else if (key === 'composite') handlers['repo.composite'] = handler
     else handlers[key] = handler
   }
-  // Phase 3: unified server-side lifecycle boundary. Wired
-  // AFTER the override pass so it can dynamically read the
-  // (possibly-overridden) `remote.resolveTarget` and
-  // `repo.probe` handlers. The mock composes them into a
-  // converged `RemoteRepoConnectionResult` (ready or failed,
-  // never connecting) — same shape the real server returns.
-  handlers['remote.lifecycle'] = ({ repoId }: { repoId: string }) => {
-    // Step 1: server-side resolveTarget. The mock's resolveTarget
-    // is called with the lifecycle's `alias` + `remotePath` (or
-    // whatever the mock wants to look at — the production server
-    // uses the id's parsed alias/remotePath). Tests can override
-    // `remote.resolveTarget` to return different targets per
-    // call; the lifecycle mock uses whatever it returns.
-    const resolveResult = handlers['remote.resolveTarget']?.({ alias: 'example', remotePath: '/srv/repo' }) as
-      | {
-          target?: {
-            id: string
-            alias: string
-            host: string
-            user: string
-            port: number
-            remotePath: string
-            displayName: string
-          }
-          error?: string
-        }
-      | undefined
-    if (resolveResult?.error) {
-      return {
-        kind: 'failed',
-        repoId,
-        name: repoId,
-        lifecycle: { kind: 'failed', reason: 'config-changed' },
-      }
-    }
-    // Step 2: server-side probe.
-    const probeResult = handlers['repo.probe']?.({ cwd: repoId }) as
-      | { ok: boolean; root?: string; name?: string; message?: string }
-      | undefined
-    if (probeResult && probeResult.ok === false) {
-      // The real server maps probe.message → RemoteRepoFailureReason
-      // via `toRemoteRepoFailureReason`. The mock mirrors the
-      // same mapping. The server-side composeTarget-then-probe
-      // order means a failed probe STILL has the resolved
-      // target — we forward it in `lifecycle.target` so the
-      // UI keeps showing the remote locator on the failed repo.
-      const failureTarget = resolveResult?.target
-      return {
-        kind: 'failed',
-        repoId,
-        name: failureTarget?.displayName ?? 'example:repo',
-        lifecycle: {
-          kind: 'failed',
-          reason: toRemoteRepoFailureReason(probeResult.message ?? 'unknown'),
-          ...(failureTarget ? { target: failureTarget } : {}),
-        },
-      }
-    }
-    // The mock uses the resolved target (if the resolveTarget
-    // mock produced one) so per-call target overrides propagate
-    // through the lifecycle. Fall back to a hardcoded target
-    // when the resolveTarget mock returns nothing.
-    const target = resolveResult?.target ?? {
-      id: repoId,
-      alias: 'example',
-      host: 'example.com',
-      user: 'alice',
-      port: 22,
-      remotePath: '/srv/repo',
-      displayName: 'example:repo',
-    }
-    return {
-      kind: 'ready',
-      repoId,
-      name: target.displayName,
-      lifecycle: { kind: 'ready', target },
-    }
+  // Phase 3: unified server-side lifecycle boundary. Instead of
+  // hand-rolling the same compose logic the server already owns,
+  // we inject test doubles into the real `resolveServerRemoteRepoConnection`
+  // so the exact same classification / mapping code runs in tests.
+  const deps: RemoteRepoConnectionDeps = {
+    resolveTarget: async ({ alias, remotePath }) => {
+      const result = handlers['remote.resolveTarget']?.({ alias, remotePath }) as
+        | { target: RemoteRepoTarget; error?: undefined }
+        | { error: string; target?: undefined }
+        | undefined
+      if (!result) return { error: 'missing-resolve-target' }
+      if ('target' in result && result.target !== undefined) return { target: result.target }
+      return { error: result.error ?? 'resolve-target-error' }
+    },
+    probeRemote: async (target, { signal }) => {
+      const parsed = handlers['repo.probe']?.({ cwd: target.remotePath }) as
+        | { ok: true; root?: string; name?: string }
+        | { ok: false; message: string }
+        | undefined
+      if (!parsed) return { ok: false, message: 'missing-probe' }
+      if (!parsed.ok) return { ok: false, message: parsed.message }
+      return { ok: true }
+    },
+  }
+  handlers['remote.lifecycle'] = async ({ repoId }: { repoId: string }) => {
+    return resolveServerRemoteRepoConnection({ repoId }, undefined, deps)
   }
   installGoblinTestBridge(handlers)
   return calls

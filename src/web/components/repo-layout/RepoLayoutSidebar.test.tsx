@@ -4,7 +4,7 @@ import { act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { RepoLayoutSidebar } from '#/web/components/repo-layout/RepoLayoutSidebar.tsx'
-import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
+import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 
 vi.mock('#/web/components/RepoPickerHost.tsx', () => ({
   RepoPickerHost: () => <button type="button" data-testid="repo-picker-host" className="h-10 w-full shrink-0" />,

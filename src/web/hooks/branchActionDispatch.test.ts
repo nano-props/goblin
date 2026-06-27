@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { dispatchRemoveWorktree } from '#/web/hooks/branchActionDispatch.ts'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import type { WorktreeTerminalSnapshot } from '#/web/components/terminal/types.ts'
-import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
+import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
 

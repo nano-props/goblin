@@ -13,7 +13,7 @@ import {
   installGoblinTestBridge,
   resetReposStore,
   seedRepoState,
-} from '#/web/stores/repos/test-utils.ts'
+} from '#/web/test-utils/bridge.ts'
 import {
   workspacePaneStaticTabsForBranch,
   workspacePaneTabOrderForBranch,

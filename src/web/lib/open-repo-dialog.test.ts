@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { openRepoFromDialog } from '#/web/lib/open-repo-dialog.ts'
-import { installGoblinTestBridge } from '#/web/stores/repos/test-utils.ts'
+import { installGoblinTestBridge } from '#/web/test-utils/bridge.ts'
 import type { OpenRepoResult } from '#/web/stores/repos/types.ts'
 const mocks = vi.hoisted(() => ({
   toastError: vi.fn(),

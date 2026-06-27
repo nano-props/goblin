@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { selectedBranchForBranchSet } from '#/web/stores/repos/branch-view-mode.ts'
-import { createRepoBranch } from '#/web/stores/repos/test-utils.ts'
+import { createRepoBranch } from '#/web/test-utils/bridge.ts'
 
 describe('selectedBranchForBranchSet', () => {
   test('preserves no selection instead of selecting the current branch implicitly', () => {

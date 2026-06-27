@@ -2,7 +2,7 @@ import { describe, expect, test, vi } from 'vitest'
 import { runSnapshotSuccessWorkflow } from '#/web/stores/repos/refresh-workflows.ts'
 import type { ReposGet } from '#/web/stores/repos/types.ts'
 import type { ReposSet } from '#/web/stores/repos/types.ts'
-import { createBranchSnapshot, installGoblinTestBridge } from '#/web/stores/repos/test-utils.ts'
+import { createBranchSnapshot, installGoblinTestBridge } from '#/web/test-utils/bridge.ts'
 
 describe('repo refresh workflows', () => {
   test('snapshot success backfills summary then visible selected repo workspace', async () => {

@@ -17,7 +17,7 @@ import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-queries.ts'
-import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
+import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import {
   preferredWorkspacePaneTabForBranch,

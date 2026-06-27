@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { openWorkspacePaneTab } from '#/web/components/repo-workspace/open-workspace-pane-tab.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
+import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import { workspacePaneStaticTabsForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'

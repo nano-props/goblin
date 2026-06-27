@@ -4,7 +4,7 @@ import {
   restoreRestorableWorkspaceStateFromSession,
   workspaceSessionStateFromRestorableWorkspaceState,
 } from '#/web/restorable-workspace-state.ts'
-import { createRepoBranch, seedRepoState } from '#/web/stores/repos/test-utils.ts'
+import { createRepoBranch, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
 
 describe('restorable-workspace-state', () => {

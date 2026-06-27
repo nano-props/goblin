@@ -112,9 +112,28 @@ export async function resolveServerRemoteTarget(
  * concurrency slot before its natural timeout — see
  * `runLatestOperation` with the `lifecycle` lane.
  */
+export interface RemoteRepoConnectionDeps {
+  resolveTarget: (
+    input: { alias: string; remotePath: string },
+    signal?: AbortSignal,
+  ) => Promise<{ target: RemoteRepoTarget } | { error: string }>
+  probeRemote: (
+    target: RemoteRepoTarget,
+    options: { signal?: AbortSignal; timeoutMs: number },
+  ) => Promise<{ ok: true } | { ok: false; category?: string; message?: string }>
+}
+
+function defaultRemoteRepoConnectionDeps(): RemoteRepoConnectionDeps {
+  return {
+    resolveTarget: resolveServerRemoteTarget,
+    probeRemote: testRemoteRepo,
+  }
+}
+
 export async function resolveServerRemoteRepoConnection(
   input: { repoId: string },
   signal?: AbortSignal,
+  deps: RemoteRepoConnectionDeps = defaultRemoteRepoConnectionDeps(),
 ): Promise<RemoteRepoConnectionResult> {
   const repoId = input.repoId
   // Defensive: local ids should never reach this server entry.
@@ -143,7 +162,7 @@ export async function resolveServerRemoteRepoConnection(
   }
 
   // Step 2: resolve the SSH target.
-  const targetResult = await resolveServerRemoteTarget({ alias: ref.alias, remotePath: ref.remotePath }, signal)
+  const targetResult = await deps.resolveTarget({ alias: ref.alias, remotePath: ref.remotePath }, signal)
   if ('error' in targetResult) {
     return {
       kind: 'failed',
@@ -158,7 +177,7 @@ export async function resolveServerRemoteRepoConnection(
   const target = targetResult.target
 
   // Step 3: probe the remote repo.
-  const probe = await testRemoteRepo(target, {
+  const probe = await deps.probeRemote(target, {
     signal,
     timeoutMs: SSH_BOOT_PROBE_TIMEOUT_MS,
   })

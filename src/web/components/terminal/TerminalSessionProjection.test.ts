@@ -9,7 +9,7 @@ import {
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
 import type { TerminalDescriptor, TerminalRepoIndex } from '#/web/components/terminal/types.ts'
 import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
-import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
+import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { workspacePaneTabOrderForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
 import { workspacePaneStaticTabOrderEntry, workspacePaneTerminalTabOrderEntry } from '#/shared/workspace-pane.ts'

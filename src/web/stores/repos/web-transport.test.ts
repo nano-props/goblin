@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
 describe('repo web transport helpers', () => {
   beforeEach(() => {
@@ -23,11 +24,10 @@ describe('repo web transport helpers', () => {
   })
 
   test('copy-patch helper uses embedded server route in web host mode', async () => {
-    const fetchMock = vi.fn(async () => ({
+    const fetchMock = mockFetch(async () => ({
       ok: true,
       json: async () => ({ ok: true, message: 'diff --git a/file b/file' }),
     }))
-    vi.stubGlobal('fetch', fetchMock)
     const { getRepoPatch } = await import('#/web/repo-client.ts')
 
     await expect(getRepoPatch('/tmp/repo', '/tmp/repo')).resolves.toEqual({
@@ -37,11 +37,10 @@ describe('repo web transport helpers', () => {
   })
 
   test('open remote opens browser with server-provided URL in web host mode', async () => {
-    const fetchMock = vi.fn(async () => ({
+    const fetchMock = mockFetch(async () => ({
       ok: true,
       json: async () => ({ ok: true, message: 'https://example.com/repo/tree/feature/a' }),
     }))
-    vi.stubGlobal('fetch', fetchMock)
     const { openRepoRemote } = await import('#/web/repo-client.ts')
 
     await expect(openRepoRemote('/tmp/repo', 'feature/a')).resolves.toEqual({ ok: true, message: '' })
@@ -63,13 +62,12 @@ describe('repo web transport helpers', () => {
         },
       },
     })
-    const fetchMock = vi.fn(async () => ({
+    const fetchMock = mockFetch(async () => ({
       ok: true,
       json: async () => ({
         target: { id: 'remote:test', displayName: 'repo', alias: 'example', remotePath: '/srv/repo' },
       }),
     }))
-    vi.stubGlobal('fetch', fetchMock)
     const { resolveRemoteRepositoryTarget } = await import('#/web/remote-client.ts')
 
     await expect(

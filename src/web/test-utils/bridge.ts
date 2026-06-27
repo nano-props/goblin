@@ -1,12 +1,37 @@
+// Web IPC bridge helpers used by tests that need to simulate the
+// Goblin client's interaction with the embedded server.
+//
+// The previous home for these helpers was
+// `src/web/stores/repos/test-utils.ts`. They moved here so non-repo
+// tests (e.g. workspace, settings, branch actions) can depend on the
+// same IPC + bridge plumbing without pulling in the repo store. The
+// old module still re-exports everything for backward compatibility
+// and is marked `@deprecated` — it will be removed in the next
+// testing-refactor PR after consumers update their imports.
+//
+// Design choices preserved from the original module:
+//   - `handlers` is a `Record<string, IpcTestHandler>` keyed by IPC
+//     pathname (`'repo.probe'`, `'repo.snapshot'`, etc.) and server
+//     route (`'/api/repo/probe'`, etc.). `installGoblinTestBridge`
+//     wires each pathname to the matching fetch URL.
+//   - The bridge mock composes the same `goblinNative` shape the real
+//     client bridge exposes, including `host`, `terminal`, `invokeIpc`,
+//     and `onEvent`.
+//   - `seedRepoState` / `resetReposStore` interact with the live
+//     `useReposStore` (Zustand) — they do not mock the store; they
+//     drive it. Tests that need a fresh store call `resetReposStore`
+//     in `beforeEach`.
+
+import type { RepoState, RepoBranchState } from '#/web/stores/repos/types.ts'
+import { stripBranchWorktreeMetadata, worktreeStatesFromBranches } from '#/web/stores/repos/worktree-state.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { disposeAllRepoOperationSchedulers } from '#/web/stores/repos/repo-operation-scheduler.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
-import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
-import { vi } from 'vitest'
-import { stripBranchWorktreeMetadata, worktreeStatesFromBranches } from '#/web/stores/repos/worktree-state.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { normalizeWorkspacePaneTabOrderRecord } from '#/web/stores/repos/workspace-pane-tabs.ts'
+import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import { DEFAULT_ZEN_MODE, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
 import type {
   TerminalAttachResult,
   TerminalCatalogMutationResult,
@@ -17,8 +42,9 @@ import type {
 } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabOrderEntry, WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import type { BranchSnapshotInfo, PullRequestInfo, WorktreeStatus } from '#/web/types.ts'
-import type { RepoBranchState, RepoState } from '#/web/stores/repos/types.ts'
-import { DEFAULT_ZEN_MODE, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
+import { vi } from 'vitest'
+import { installWebSocketMock } from '#/web/test-utils/websocket-mock.ts'
+
 export type IpcTestHandler = (input: any) => unknown
 
 interface TerminalBridgeTestOutputs {
@@ -260,83 +286,54 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
     }
     return handler(payload) as TerminalBridgeTestOutputs[keyof TerminalBridgeTestOutputs]
   }
-  class MockWebSocket {
-    static readonly CONNECTING = 0
-    static readonly OPEN = 1
-    static readonly CLOSING = 2
-    static readonly CLOSED = 3
-    readyState = MockWebSocket.CONNECTING
-    private readonly listeners = new Map<string, Set<(event: any) => void>>()
-
-    constructor(_url: string) {
-      queueMicrotask(() => {
-        if (this.readyState !== MockWebSocket.CONNECTING) return
-        this.readyState = MockWebSocket.OPEN
-        this.emit('open', {})
-      })
+  // Use the shared `installWebSocketMock` for the WebSocket surface and
+  // wrap each new socket's `send` so JSON `request` frames are routed to
+  // the matching terminal handler and the response is emitted back over
+  // the same socket. This keeps one canonical `MockWebSocket` shape
+  // across `src/web/test-utils/`, instead of a second inline copy.
+  const socketMock = installWebSocketMock({ autoOpen: true })
+  const OriginalSend = socketMock.MockWebSocket.prototype.send
+  socketMock.MockWebSocket.prototype.send = function patchedSend(
+    this: InstanceType<typeof socketMock.MockWebSocket>,
+    data: string,
+  ) {
+    OriginalSend.call(this, data)
+    let parsed: { type?: string; requestId?: string; action?: string; input?: unknown } | null = null
+    try {
+      parsed = JSON.parse(data)
+    } catch {
+      return
     }
-
-    addEventListener(type: string, cb: (event: any) => void) {
-      let listeners = this.listeners.get(type)
-      if (!listeners) {
-        listeners = new Set()
-        this.listeners.set(type, listeners)
-      }
-      listeners.add(cb)
-    }
-
-    removeEventListener(type: string, cb: (event: any) => void) {
-      this.listeners.get(type)?.delete(cb)
-    }
-
-    send(data: string) {
-      let parsed: { type?: string; requestId?: string; action?: string; input?: unknown } | null = null
-      try {
-        parsed = JSON.parse(data)
-      } catch {
-        return
-      }
-      if (parsed?.type !== 'request' || !parsed.requestId || typeof parsed.action !== 'string') return
-      const handlerName = terminalHandlerNameForSocketAction(parsed.action)
-      if (!handlerName) return
-      Promise.resolve()
-        .then(() => callTerminalHandler(handlerName, parsed.input))
-        .then(
-          (payload) => {
-            this.emit('message', {
-              data: JSON.stringify({
-                type: 'response',
-                requestId: parsed?.requestId,
-                ok: true,
-                action: parsed?.action,
-                payload,
-              }),
-            })
-          },
-          (error) => {
-            this.emit('message', {
-              data: JSON.stringify({
-                type: 'response',
-                requestId: parsed?.requestId,
-                ok: false,
-                action: parsed?.action,
-                error: error instanceof Error ? error.message : String(error),
-              }),
-            })
-          },
-        )
-    }
-
-    close() {
-      this.readyState = MockWebSocket.CLOSED
-      this.emit('close', {})
-    }
-
-    private emit(type: string, event: any) {
-      for (const listener of this.listeners.get(type) ?? []) listener(event)
-    }
+    if (parsed?.type !== 'request' || !parsed.requestId || typeof parsed.action !== 'string') return
+    const handlerName = terminalHandlerNameForSocketAction(parsed.action)
+    if (!handlerName) return
+    Promise.resolve()
+      .then(() => callTerminalHandler(handlerName, parsed.input))
+      .then(
+        (payload) => {
+          this.emit('message', {
+            data: JSON.stringify({
+              type: 'response',
+              requestId: parsed?.requestId,
+              ok: true,
+              action: parsed?.action,
+              payload,
+            }),
+          })
+        },
+        (error) => {
+          this.emit('message', {
+            data: JSON.stringify({
+              type: 'response',
+              requestId: parsed?.requestId,
+              ok: false,
+              action: parsed?.action,
+              error: error instanceof Error ? error.message : String(error),
+            }),
+          })
+        },
+      )
   }
-  Object.defineProperty(globalThis, 'WebSocket', { configurable: true, value: MockWebSocket })
   setClientBridgeForTests({
     kind: () => 'electron',
     hasCapability: () => false,

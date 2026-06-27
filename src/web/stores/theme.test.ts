@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
 import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
+import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
 interface FakeMediaQueryList {
   matches: boolean
@@ -123,12 +124,10 @@ describe('theme store OS-appearance sync', () => {
   test('pref=auto + OS dark→light flips store and data-theme without a server round-trip', async () => {
     const mql = createMediaQuery(true) // OS starts dark
     installWindow({ matchMedia: mql })
-    const fetchMock = vi.fn(async () => ({
+    const fetchMock = mockFetch(async () => ({
       ok: true,
       json: async () => settingsResponse({ theme: 'auto', colorTheme: 'macos' }),
     }))
-    vi.stubGlobal('fetch', fetchMock)
-
     const { useThemeStore } = await import('#/web/stores/theme.ts')
     await useThemeStore.getState().hydrate()
 

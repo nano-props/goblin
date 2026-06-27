@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { useRepoToasts } from '#/web/hooks/useRepoToasts.tsx'
-import { resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
+import { resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 
 const toastMocks = vi.hoisted(() => ({

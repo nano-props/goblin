@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { getRepoActivityControlView, isRepoPrimaryRefreshBusy } from '#/web/components/repo-activity/model.ts'
-import { seedRepoState, resetReposStore } from '#/web/stores/repos/test-utils.ts'
+import { seedRepoState, resetReposStore } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { markRepoOperationTargets, nextRepoOperationId } from '#/web/stores/repos/repo-operation-scheduler.ts'
 

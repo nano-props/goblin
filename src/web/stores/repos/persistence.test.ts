@@ -5,12 +5,7 @@ import {
   persistRepoSnapshotCacheEntry,
 } from '#/web/stores/repos/persistence.ts'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
-import {
-  createBranchSnapshot,
-  createRepoBranch,
-  resetReposStore,
-  seedRepoState,
-} from '#/web/stores/repos/test-utils.ts'
+import { createBranchSnapshot, createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { RepoSnapshotCacheEntry } from '#/web/stores/repos/types.ts'
 function cachedRepo(savedAt: number): RepoSnapshotCacheEntry {

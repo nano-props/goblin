@@ -4,7 +4,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { RepoView } from '#/web/components/RepoView.tsx'
-import { resetReposStore, seedRepoState, createRepoBranch } from '#/web/stores/repos/test-utils.ts'
+import { resetReposStore, seedRepoState, createRepoBranch } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
 

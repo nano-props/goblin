@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
+import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
 describe('remote client web helpers', () => {
   beforeEach(() => {
@@ -24,11 +25,10 @@ describe('remote client web helpers', () => {
   })
 
   test('loads ssh hosts from embedded server in web host mode', async () => {
-    const fetchMock = vi.fn(async () => ({
+    const fetchMock = mockFetch(async () => ({
       ok: true,
       json: async () => ({ hosts: [{ alias: 'prod' }], hasInclude: true }),
     }))
-    vi.stubGlobal('fetch', fetchMock)
     const { getRemoteSshHosts } = await import('#/web/remote-client.ts')
 
     await expect(getRemoteSshHosts()).resolves.toEqual({ hosts: [{ alias: 'prod' }], hasInclude: true })
@@ -41,7 +41,7 @@ describe('remote client web helpers', () => {
   })
 
   test('tests remote repository through embedded server in web host mode', async () => {
-    const fetchMock = vi.fn(async () => ({
+    const fetchMock = mockFetch(async () => ({
       ok: true,
       json: async () => ({
         ok: true,
@@ -57,7 +57,6 @@ describe('remote client web helpers', () => {
         stages: [],
       }),
     }))
-    vi.stubGlobal('fetch', fetchMock)
     const { testRemoteRepoConnection } = await import('#/web/remote-client.ts')
 
     await expect(
