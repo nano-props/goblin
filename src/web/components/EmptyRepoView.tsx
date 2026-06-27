@@ -22,7 +22,7 @@ export function EmptyRepoView({ onOpenSettings }: EmptyRepoViewProps) {
     <RepoLayoutWorkspaceShell
       compact={compact}
       zenMode={false}
-      branchWorkspaceActive={false}
+      repoWorkspaceActive={false}
       workspacePaneSize={workspacePaneSize}
       onWorkspacePaneSizeChange={setWorkspacePaneSize}
       zenModeToggleEnabled={false}
@@ -31,7 +31,7 @@ export function EmptyRepoView({ onOpenSettings }: EmptyRepoViewProps) {
           <RepoLayoutSidebar compact={compact} onOpenSettings={onOpenSettings} />
         </RepoWorkspacePane>
       }
-      branchWorkspacePane={
+      repoWorkspacePane={
         <RepoWorkspacePane>
           <WorkspaceChrome />
           <div className="flex flex-1 items-center justify-center">

@@ -3,7 +3,7 @@ import type { RepoWorkspaceRepo, SelectedRepoWorkspacePresentation } from '#/web
 import {
   createRepoWorkspaceTabModel,
   type RepoWorkspaceTabModel,
-  type BranchWorkspacePaneTabModelInput,
+  type RepoWorkspaceTabModelInput,
 } from '#/web/components/repo-workspace/tab-model.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
 import {
@@ -14,8 +14,8 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { workspacePaneTabOrderForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
 
-export interface BranchWorkspacePaneTabModelInputState {
-  input: BranchWorkspacePaneTabModelInput
+export interface RepoWorkspaceTabModelInputState {
+  input: RepoWorkspaceTabModelInput
   selectedTerminalKey: string | undefined
 }
 
@@ -23,9 +23,9 @@ export function useRepoWorkspaceTabModel(
   repo: Pick<RepoWorkspaceRepo, 'id' | 'ui'>,
   detail: SelectedRepoWorkspacePresentation,
 ) {
-  const { input, selectedTerminalKey } = useBranchWorkspacePaneTabModelInput(repo, detail)
+  const { input, selectedTerminalKey } = useRepoWorkspaceTabModelInput(repo, detail)
   const model = useMemo(() => createRepoWorkspaceTabModel(input), [input])
-  useSyncBranchWorkspacePaneTerminalSelection(model, selectedTerminalKey)
+  useSyncRepoWorkspaceTerminalSelection(model, selectedTerminalKey)
   return model
 }
 
@@ -34,10 +34,10 @@ export function useRepoWorkspaceTabModel(
  * No writes happen here; this is the data boundary into the workspace pane tab
  * projection.
  */
-export function useBranchWorkspacePaneTabModelInput(
+export function useRepoWorkspaceTabModelInput(
   repo: Pick<RepoWorkspaceRepo, 'id' | 'ui'>,
   detail: SelectedRepoWorkspacePresentation,
-): BranchWorkspacePaneTabModelInputState {
+): RepoWorkspaceTabModelInputState {
   const { branch } = detail
   const branchName = branch?.name ?? null
   const worktreePath = branch?.worktree?.path ?? null
@@ -66,7 +66,7 @@ export function useBranchWorkspacePaneTabModelInput(
 
   const modelSelectedTerminalKey = terminalWorktreeKey ? (selectedTerminalKey ?? null) : null
 
-  const input = useMemo<BranchWorkspacePaneTabModelInput>(
+  const input = useMemo<RepoWorkspaceTabModelInput>(
     () => ({
       repoId: repo.id,
       branchName,
@@ -103,7 +103,7 @@ export function useBranchWorkspacePaneTabModelInput(
  * this separate from input collection makes the single write-side effect in
  * the tab-model hook explicit.
  */
-export function useSyncBranchWorkspacePaneTerminalSelection(
+export function useSyncRepoWorkspaceTerminalSelection(
   model: Pick<RepoWorkspaceTabModel, 'activeTab' | 'worktreeTerminalKey'>,
   selectedTerminalKey: string | undefined,
 ): void {

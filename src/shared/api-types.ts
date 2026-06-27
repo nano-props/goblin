@@ -96,7 +96,7 @@ export interface RuntimeSettingsSnapshot extends UserSettings {
   globalShortcutRegistered: boolean
 }
 
-export type RepositoryLogResponse = LogEntry[] | { ok: false; message: string }
+export type RepoLogResponse = LogEntry[] | { ok: false; message: string }
 
 export interface RuntimeRecentReposState {
   recentRepos: RepoSessionEntry[]

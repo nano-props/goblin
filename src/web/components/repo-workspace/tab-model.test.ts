@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'vitest'
 import {
-  adjacentBranchWorkspacePaneTab,
+  adjacentRepoWorkspaceTab,
   createRepoWorkspaceTabModel,
-  nextBranchWorkspacePaneTabAfterClose,
+  nextRepoWorkspaceTabAfterClose,
 } from '#/web/components/repo-workspace/tab-model.ts'
 import type { WorkspacePaneTabSummary } from '#/web/components/terminal/types.ts'
 import type { WorkspacePaneStaticTabType, WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
@@ -453,9 +453,9 @@ describe('branch workspace pane tab model', () => {
       lastClosedTabContext: null,
     })
 
-    expect(nextBranchWorkspacePaneTabAfterClose(model.tabs, 'status:status')?.identity).toBe('terminal:slot-1')
-    expect(nextBranchWorkspacePaneTabAfterClose(model.tabs, 'changes:changes')?.identity).toBe('terminal:slot-1')
-    expect(nextBranchWorkspacePaneTabAfterClose(model.tabs, 'missing:missing')).toBeNull()
+    expect(nextRepoWorkspaceTabAfterClose(model.tabs, 'status:status')?.identity).toBe('terminal:slot-1')
+    expect(nextRepoWorkspaceTabAfterClose(model.tabs, 'changes:changes')?.identity).toBe('terminal:slot-1')
+    expect(nextRepoWorkspaceTabAfterClose(model.tabs, 'missing:missing')).toBeNull()
   })
 
   test('skips pending terminal tabs when resolving the next tab after close', () => {
@@ -473,7 +473,7 @@ describe('branch workspace pane tab model', () => {
       lastClosedTabContext: null,
     })
 
-    expect(nextBranchWorkspacePaneTabAfterClose(model.tabs, 'status:status')).toBeNull()
+    expect(nextRepoWorkspaceTabAfterClose(model.tabs, 'status:status')).toBeNull()
   })
 
   test('moves through the shared tab list from the active tab identity', () => {
@@ -490,10 +490,10 @@ describe('branch workspace pane tab model', () => {
       lastClosedTabContext: null,
     })
 
-    expect(adjacentBranchWorkspacePaneTab(model.tabs, model.activeTab?.identity, 1)?.identity).toBe('changes:changes')
-    expect(adjacentBranchWorkspacePaneTab(model.tabs, model.activeTab?.identity, -1)?.identity).toBe('terminal:slot-1')
-    expect(adjacentBranchWorkspacePaneTab(model.tabs, null, -1)).toBeNull()
-    expect(adjacentBranchWorkspacePaneTab(model.tabs, 'missing:missing', 1)).toBeNull()
+    expect(adjacentRepoWorkspaceTab(model.tabs, model.activeTab?.identity, 1)?.identity).toBe('changes:changes')
+    expect(adjacentRepoWorkspaceTab(model.tabs, model.activeTab?.identity, -1)?.identity).toBe('terminal:slot-1')
+    expect(adjacentRepoWorkspaceTab(model.tabs, null, -1)).toBeNull()
+    expect(adjacentRepoWorkspaceTab(model.tabs, 'missing:missing', 1)).toBeNull()
   })
 
   test('prefers the spatial neighbor when the active terminal is closed and another terminal remains', () => {

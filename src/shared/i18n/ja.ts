@@ -202,7 +202,7 @@ export const ja: Record<DictKey, string> = {
 
   // ---- Workspace pane views ---------------------------------------------
   'tab.branches': 'ブランチ',
-  'tab.branch-workspace': 'ブランチワークスペース',
+  'tab.repo-workspace': 'ブランチワークスペース',
   'tab.status': 'ステータス',
   'tab.changes': '変更',
   'tab.changes-with-count': '変更 · {count}件',

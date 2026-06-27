@@ -64,7 +64,7 @@ describe('RepoWorkspace', () => {
   test('defaults the split layout to a 30/70 sidebar/workspace ratio', () => {
     act(() => {
       root!.render(
-        <RepoWorkspace branchNavigatorPane={<div>navigator</div>} branchWorkspacePane={<div>workspace</div>} />,
+        <RepoWorkspace branchNavigatorPane={<div>navigator</div>} repoWorkspacePane={<div>workspace</div>} />,
       )
     })
 
@@ -78,7 +78,7 @@ function renderCompactWorkspace(activePane: 'navigator' | 'workspace') {
       <CompactRepoWorkspace
         activePane={activePane}
         branchNavigatorPane={<button type="button">navigator</button>}
-        branchWorkspacePane={<button type="button">workspace</button>}
+        repoWorkspacePane={<button type="button">workspace</button>}
       />,
     )
   })

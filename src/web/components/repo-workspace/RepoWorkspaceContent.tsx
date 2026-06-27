@@ -4,15 +4,15 @@ import type { RepoWorkspaceRepo, SelectedRepoWorkspacePresentation } from '#/web
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import type {
   RepoWorkspaceTabModel,
-  BranchWorkspacePaneTab,
-  BranchWorkspacePaneSelection,
+  RepoWorkspaceTab,
+  RepoWorkspaceSelection,
 } from '#/web/components/repo-workspace/tab-model.ts'
 import {
   terminalWorkspacePaneTabProvider,
   workspacePaneStaticTabProvider,
   type WorkspacePanePanelLabel,
 } from '#/web/components/workspace-pane/tab-providers.ts'
-import { renderBranchWorkspacePanePanel } from '#/web/components/repo-workspace/panels.tsx'
+import { renderRepoWorkspacePanePanel } from '#/web/components/repo-workspace/panels.tsx'
 
 interface Props {
   repo: Pick<RepoWorkspaceRepo, 'id' | 'data' | 'ui'> & {
@@ -57,7 +57,7 @@ export function RepoWorkspaceContent({ repo, detail, workspacePaneId, workspaceP
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {renderedView
-        ? renderBranchWorkspacePanePanel({
+        ? renderRepoWorkspacePanePanel({
             type: renderedView,
             repo,
             detail,
@@ -71,8 +71,8 @@ export function RepoWorkspaceContent({ repo, detail, workspacePaneId, workspaceP
 }
 
 function workspacePanePanelLabel(input: {
-  selection: BranchWorkspacePaneSelection | null
-  tabs: readonly BranchWorkspacePaneTab[]
+  selection: RepoWorkspaceSelection | null
+  tabs: readonly RepoWorkspaceTab[]
   workspacePaneId: string
   compact: boolean
   t: (key: string, params?: Record<string, string | number>) => string

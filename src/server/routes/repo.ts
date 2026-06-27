@@ -29,7 +29,7 @@ import {
 import { getServerFetchIntervalSec } from '#/server/modules/settings-source.ts'
 import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'
 import { REPO_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
-import type { RepositoryLogResponse } from '#/shared/api-types.ts'
+import type { RepoLogResponse } from '#/shared/api-types.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 
 // Soft-fail envelope returned by `jsonOr` for every repo action that
@@ -64,7 +64,7 @@ export function createRepoRoutes() {
   app.post('/log', async (c) => {
     const { cwd, branch, count, skip } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.log, c)
     return c.json(
-      await jsonOr<RepositoryLogResponse>(
+      await jsonOr<RepoLogResponse>(
         () =>
           getRepoLog(cwd, branch, {
             count: count ?? DEFAULT_REPOSITORY_LOG_COUNT,

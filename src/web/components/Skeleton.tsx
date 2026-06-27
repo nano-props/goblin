@@ -33,7 +33,7 @@ interface RowCountProps {
 interface WorkspaceSkeletonProps {
   singlePane?: boolean
   singlePaneView?: 'navigator' | 'workspace'
-  branchWorkspaceState?: 'empty' | 'content'
+  repoWorkspaceState?: 'empty' | 'content'
 }
 
 export function BranchNavigatorSkeleton({ rows = 6 }: BranchNavigatorSkeletonProps) {
@@ -57,17 +57,17 @@ export function StatusListSkeleton({ rows = 6 }: RowCountProps) {
   )
 }
 
-// RepoWorkspaceSkeleton renders the branch navigator + workspace pane while
+// RepoWorkspaceLayoutSkeleton renders the branch navigator + workspace pane while
 // a repo is being hydrated. The active repo shell owns the sidebar
 // chrome, so the workspace skeleton just shows the panes.
-export function RepoWorkspaceSkeleton({
+export function RepoWorkspaceLayoutSkeleton({
   singlePane = false,
   singlePaneView = 'navigator',
-  branchWorkspaceState = 'empty',
+  repoWorkspaceState = 'empty',
 }: WorkspaceSkeletonProps) {
-  const branchWorkspacePane = (
+  const repoWorkspacePane = (
     <RepoWorkspacePane>
-      {branchWorkspaceState === 'content' ? <BranchWorkspaceSkeleton /> : <BranchWorkspaceEmptySkeleton />}
+      {repoWorkspaceState === 'content' ? <RepoWorkspaceSkeleton /> : <RepoWorkspaceEmptySkeleton />}
     </RepoWorkspacePane>
   )
   const branchNavigatorPane = (
@@ -79,19 +79,19 @@ export function RepoWorkspaceSkeleton({
   if (singlePane) {
     return (
       <section className="flex min-w-0 flex-1 flex-col">
-        {singlePaneView === 'workspace' ? branchWorkspacePane : branchNavigatorPane}
+        {singlePaneView === 'workspace' ? repoWorkspacePane : branchNavigatorPane}
       </section>
     )
   }
 
   return (
     <section className="flex min-w-0 flex-1 flex-col">
-      <RepoWorkspace mode="split" branchNavigatorPane={branchNavigatorPane} branchWorkspacePane={branchWorkspacePane} />
+      <RepoWorkspace mode="split" branchNavigatorPane={branchNavigatorPane} repoWorkspacePane={repoWorkspacePane} />
     </section>
   )
 }
 
-export function BranchWorkspaceSkeleton({
+export function RepoWorkspaceSkeleton({
   toolbarDraggable = true,
   toolbarTrafficLightOffset = false,
 }: {
@@ -99,7 +99,7 @@ export function BranchWorkspaceSkeleton({
   toolbarTrafficLightOffset?: boolean
 }) {
   return (
-    <section data-testid="branch-workspace-skeleton" className="flex min-h-0 flex-1 flex-col bg-background">
+    <section data-testid="repo-workspace-skeleton" className="flex min-h-0 flex-1 flex-col bg-background">
       <WorkspaceToolbar draggable={toolbarDraggable} trafficLightOffset={toolbarTrafficLightOffset}>
         <WorkspaceToolbarLeadingSpacer reserve={toolbarTrafficLightOffset} />
         <WorkspaceToolbarContent>
@@ -119,9 +119,9 @@ export function BranchWorkspaceSkeleton({
   )
 }
 
-export function BranchWorkspaceEmptySkeleton() {
+export function RepoWorkspaceEmptySkeleton() {
   return (
-    <section data-testid="branch-workspace-empty-skeleton" className="flex min-h-0 flex-1 flex-col bg-background">
+    <section data-testid="repo-workspace-empty-skeleton" className="flex min-h-0 flex-1 flex-col bg-background">
       <div className="flex flex-1 items-center justify-center p-6 text-center">
         <Skeleton className="mx-auto h-4 w-32" />
       </div>

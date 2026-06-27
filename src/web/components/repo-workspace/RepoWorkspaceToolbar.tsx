@@ -225,7 +225,7 @@ export function RepoWorkspaceToolbar({
 
   const backLabel = t('workspace.back-to-branch-navigator')
   const handleBackToBranchNavigator = () => clearSelectedBranch(repo.id)
-  const branchWorkspaceBackAction = compact ? (
+  const repoWorkspaceBackAction = compact ? (
     <Tip label={backLabel}>
       <Button
         variant="ghost"
@@ -249,7 +249,7 @@ export function RepoWorkspaceToolbar({
               from the branch workspace. It must stay visible even when the tab
               strip below is empty, so it lives at the toolbar level rather than
               inside WorkspacePaneTabStrip's tab chrome. */}
-          {compact && branchWorkspaceBackAction}
+          {compact && repoWorkspaceBackAction}
           {showBranchLevelTabs && (
             <WorkspacePaneTabStrip
               worktreeTerminalKey={workspacePaneTabModel.worktreeTerminalKey}

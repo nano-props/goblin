@@ -39,18 +39,18 @@ interface TabPanelProps {
   children: ReactNode
 }
 
-type BranchWorkspaceBranch = NonNullable<SelectedRepoWorkspacePresentation['branch']>
+type RepoWorkspaceBranch = NonNullable<SelectedRepoWorkspacePresentation['branch']>
 type WorkspacePanePanelComponent = (props: WorkspacePanePanelProps) => ReactNode
 
-const BRANCH_WORKSPACE_PANE_PANEL_BY_TYPE = {
+const REPO_WORKSPACE_PANE_PANEL_BY_TYPE = {
   status: StatusWorkspacePanePanel,
   changes: ChangesWorkspacePanePanel,
   history: HistoryWorkspacePanePanel,
   terminal: TerminalWorkspacePanePanel,
 } satisfies Record<WorkspacePaneTabType, WorkspacePanePanelComponent>
 
-export function renderBranchWorkspacePanePanel(input: WorkspacePanePanelRenderInput): ReactNode {
-  const Panel = BRANCH_WORKSPACE_PANE_PANEL_BY_TYPE[input.type]
+export function renderRepoWorkspacePanePanel(input: WorkspacePanePanelRenderInput): ReactNode {
+  const Panel = REPO_WORKSPACE_PANE_PANEL_BY_TYPE[input.type]
   return <Panel {...input} />
 }
 
@@ -269,7 +269,7 @@ function BranchTerminalTab({
   panelLabel: WorkspacePanePanelLabel
   repoId: string
   terminalSyncReady: boolean
-  branch: BranchWorkspaceBranch
+  branch: RepoWorkspaceBranch
 }) {
   const { createTerminal } = useTerminalSessionContext()
   const t = useT()
@@ -311,7 +311,7 @@ function BranchChangesTab({
   workspacePaneId: string
   panelLabel: WorkspacePanePanelLabel
   repo: WorkspacePanePanelRenderInput['repo']
-  branch: BranchWorkspaceBranch
+  branch: RepoWorkspaceBranch
   selectedStatus: SelectedRepoWorkspacePresentation['selectedStatus']
   statusLoading: boolean
   statusError: string | null

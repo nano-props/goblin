@@ -94,8 +94,8 @@ vi.mock('sonner', () => ({
   },
 }))
 
-const REPO_ID = '/tmp/gbl-branch-workspace-toolbar-repo'
-const WORKTREE_PATH = '/tmp/gbl-branch-workspace-toolbar-worktree'
+const REPO_ID = '/tmp/gbl-repo-workspace-toolbar-repo'
+const WORKTREE_PATH = '/tmp/gbl-repo-workspace-toolbar-worktree'
 compactUi = false
 
 function defaultRuntimeExternalAppSettings() {
@@ -112,12 +112,12 @@ let root: Root | null = null
 let queryClient: QueryClient | null = null
 const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 
-type BranchWorkspaceToolbarHarnessProps = Omit<
+type RepoWorkspaceToolbarHarnessProps = Omit<
   ComponentProps<typeof RepoWorkspaceToolbar>,
   'workspacePaneTabModel' | 'branchActions'
 >
 
-function BranchWorkspaceToolbarHarness(props: BranchWorkspaceToolbarHarnessProps) {
+function RepoWorkspaceToolbarHarness(props: RepoWorkspaceToolbarHarnessProps) {
   const workspacePaneTabModel = useRepoWorkspaceTabModel(props.repo, props.detail)
   const branchActions = useBranchActions(props.repo, props.detail.branch!)
   return <RepoWorkspaceToolbar {...props} workspacePaneTabModel={workspacePaneTabModel} branchActions={branchActions} />
@@ -399,7 +399,7 @@ describe('RepoWorkspaceToolbar', () => {
   })
 
   test('reloads the scoped recent external app when the worktree path changes', async () => {
-    const nextWorktreePath = '/tmp/gbl-branch-workspace-toolbar-worktree-next'
+    const nextWorktreePath = '/tmp/gbl-repo-workspace-toolbar-worktree-next'
     window.localStorage.setItem(
       `${WORKSPACE_EXTERNAL_APP_RECENT_STORAGE_KEY}:${workspaceExternalAppRecentScope(REPO_ID, WORKTREE_PATH)}`,
       'finder',
@@ -878,7 +878,7 @@ describe('RepoWorkspaceToolbar', () => {
     })
 
     expect(c.querySelector('button[aria-label="action.menu"]')).toBeNull()
-    expect(c.querySelector('[data-testid="branch-workspace-toolbar-divider"]')).toBeNull()
+    expect(c.querySelector('[data-testid="repo-workspace-toolbar-divider"]')).toBeNull()
   })
 
   test('keeps terminal focus when pressing End on the compact terminal view', async () => {
@@ -1237,7 +1237,7 @@ function renderToolbar(options: {
         <MainWindowNavigationProvider value={options.navigation}>
           <TerminalSessionContext.Provider value={commandContext}>
             <TerminalSessionReadContext.Provider value={readContext}>
-              <BranchWorkspaceToolbarHarness
+              <RepoWorkspaceToolbarHarness
                 repo={repo}
                 detail={detail}
                 workspacePaneId="workspace"

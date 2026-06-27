@@ -81,7 +81,7 @@ describe('App boot skeleton', () => {
     render(<App />)
 
     expect(container?.querySelectorAll('[data-testid="branch-navigator-skeleton-action"]')).toHaveLength(6)
-    expect(container?.querySelector('[data-testid="branch-workspace-empty-skeleton"]')).toBeNull()
+    expect(container?.querySelector('[data-testid="repo-workspace-empty-skeleton"]')).toBeNull()
   })
 })
 

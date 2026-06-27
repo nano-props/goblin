@@ -48,7 +48,7 @@ vi.mock('#/web/components/RepoWorkspace.tsx', () => ({
     toolbarTrafficLightOffset?: boolean
   }) => (
     <div
-      data-testid="branch-workspace"
+      data-testid="repo-workspace"
       data-selected-branch-name={selectedBranchName ?? ''}
       data-shortcuts-enabled={shortcutsEnabled ? 'true' : 'false'}
       data-traffic-light-offset={toolbarTrafficLightOffset ? 'true' : 'false'}
@@ -79,24 +79,24 @@ vi.mock('#/web/components/Layout.tsx', () => ({
     mode,
     branchNavigatorCollapsed,
     branchNavigatorPane,
-    branchWorkspacePane,
+    repoWorkspacePane,
   }: {
     mode?: 'split' | 'single-pane'
     branchNavigatorCollapsed?: boolean
     branchNavigatorPane: React.ReactNode
-    branchWorkspacePane: React.ReactNode
+    repoWorkspacePane: React.ReactNode
   }) => (
     <div
-      data-testid="repo-workspace"
+      data-testid="repo-workspace-layout"
       data-mode={mode ?? 'split'}
       data-branch-navigator-collapsed={branchNavigatorCollapsed ? 'true' : 'false'}
     >
       {mode === 'single-pane' ? (
-        branchWorkspacePane
+        repoWorkspacePane
       ) : (
         <>
           {branchNavigatorPane}
-          {branchWorkspacePane}
+          {repoWorkspacePane}
         </>
       )}
     </div>
@@ -105,18 +105,18 @@ vi.mock('#/web/components/Layout.tsx', () => ({
   CompactRepoWorkspace: ({
     activePane,
     branchNavigatorPane,
-    branchWorkspacePane,
+    repoWorkspacePane,
   }: {
     activePane: 'navigator' | 'workspace'
     branchNavigatorPane: React.ReactNode
-    branchWorkspacePane: React.ReactNode
+    repoWorkspacePane: React.ReactNode
   }) => (
     <div data-compact-workspace="" data-active-pane={activePane}>
       <div data-compact-workspace-pane="navigator" aria-hidden={activePane === 'workspace' ? 'true' : undefined}>
         {branchNavigatorPane}
       </div>
       <div data-compact-workspace-pane="workspace" aria-hidden={activePane === 'navigator' ? 'true' : undefined}>
-        {branchWorkspacePane}
+        {repoWorkspacePane}
       </div>
     </div>
   ),
@@ -653,8 +653,8 @@ describe('RepoView workspace navigation', () => {
     expect(workspace()?.dataset.mode).toBe('split')
     expect(container?.querySelector('[data-testid="repo-picker"]')).not.toBeNull()
     expect(container?.querySelector('[data-testid="create-worktree-row-action"]')).not.toBeNull()
-    expect(container?.querySelector('[data-testid="branch-workspace-empty-skeleton"]')).not.toBeNull()
-    expect(container?.querySelector('[data-testid="branch-workspace-skeleton"]')).toBeNull()
+    expect(container?.querySelector('[data-testid="repo-workspace-empty-skeleton"]')).not.toBeNull()
+    expect(container?.querySelector('[data-testid="repo-workspace-skeleton"]')).toBeNull()
     expect(container?.querySelectorAll('[data-testid="branch-navigator-skeleton-action"]')).toHaveLength(6)
   })
 
@@ -701,8 +701,8 @@ describe('RepoView workspace navigation', () => {
     render(<RepoView repoId={REPO_ID} />)
 
     expect(workspace()).toBeNull()
-    expect(container?.querySelector('[data-testid="branch-workspace-skeleton"]')).not.toBeNull()
-    expect(container?.querySelector('[data-testid="branch-workspace-empty-skeleton"]')).toBeNull()
+    expect(container?.querySelector('[data-testid="repo-workspace-skeleton"]')).not.toBeNull()
+    expect(container?.querySelector('[data-testid="repo-workspace-empty-skeleton"]')).toBeNull()
     expect(container?.querySelectorAll('[data-testid="branch-navigator-skeleton-action"]')).toHaveLength(0)
   })
 
@@ -740,11 +740,11 @@ function branchNavigator(): HTMLButtonElement | null {
 }
 
 function repoWorkspace(): HTMLElement | null {
-  return container?.querySelector<HTMLElement>('[data-testid="branch-workspace"]') ?? null
+  return container?.querySelector<HTMLElement>('[data-testid="repo-workspace"]') ?? null
 }
 
 function workspace(): HTMLElement | null {
-  return container?.querySelector<HTMLElement>('[data-testid="repo-workspace"]') ?? null
+  return container?.querySelector<HTMLElement>('[data-testid="repo-workspace-layout"]') ?? null
 }
 
 function compactWorkspace(): HTMLElement | null {

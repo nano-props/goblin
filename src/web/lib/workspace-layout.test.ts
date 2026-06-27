@@ -25,7 +25,7 @@ describe('repoWorkspaceBehavior', () => {
       repoWorkspaceBehavior({
         compact: false,
         zenMode: true,
-        branchWorkspaceActive: true,
+        repoWorkspaceActive: true,
       }),
     ).toMatchObject({
       mode: 'split',
@@ -50,7 +50,7 @@ describe('repoWorkspaceBehavior', () => {
       repoWorkspaceBehavior({
         compact: true,
         zenMode: false,
-        branchWorkspaceActive: true,
+        repoWorkspaceActive: true,
       }),
     ).toMatchObject({
       mode: 'single-pane',

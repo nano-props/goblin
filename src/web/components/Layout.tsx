@@ -13,7 +13,7 @@ interface ShellProps {
 
 interface RepoWorkspaceProps {
   branchNavigatorPane: ReactNode
-  branchWorkspacePane: ReactNode
+  repoWorkspacePane: ReactNode
   mode?: RepoWorkspaceMode
   branchNavigatorCollapsed?: boolean
   workspacePaneSize?: number
@@ -23,7 +23,7 @@ interface RepoWorkspaceProps {
 interface CompactRepoWorkspaceProps {
   activePane: 'navigator' | 'workspace'
   branchNavigatorPane: ReactNode
-  branchWorkspacePane: ReactNode
+  repoWorkspacePane: ReactNode
 }
 
 interface PaneProps {
@@ -39,18 +39,18 @@ interface EmptyStateProps {
 
 export function RepoWorkspace({
   branchNavigatorPane,
-  branchWorkspacePane,
+  repoWorkspacePane,
   mode = 'split',
   branchNavigatorCollapsed = false,
   workspacePaneSize = DEFAULT_WORKSPACE_PANE_SIZE,
   onWorkspacePaneSizeChange,
 }: RepoWorkspaceProps) {
-  if (mode === 'single-pane') return <div className="flex min-h-0 flex-1">{branchWorkspacePane}</div>
+  if (mode === 'single-pane') return <div className="flex min-h-0 flex-1">{repoWorkspacePane}</div>
 
   return (
     <SplitPane
       before={branchNavigatorPane}
-      after={branchWorkspacePane}
+      after={repoWorkspacePane}
       afterSize={workspacePaneSize}
       onAfterSizeChange={onWorkspacePaneSizeChange}
       beforeCollapsed={branchNavigatorCollapsed}
@@ -71,7 +71,7 @@ export function RepoWorkspacePane({ children }: PaneProps) {
 export function CompactRepoWorkspace({
   activePane,
   branchNavigatorPane,
-  branchWorkspacePane,
+  repoWorkspacePane,
 }: CompactRepoWorkspaceProps) {
   const workspaceActive = activePane === 'workspace'
 
@@ -96,7 +96,7 @@ export function CompactRepoWorkspace({
         inert={!workspaceActive || undefined}
         className="goblin-compact-workspace__pane goblin-compact-workspace__pane--workspace absolute inset-0 flex min-h-0 min-w-0 bg-background"
       >
-        {branchWorkspacePane}
+        {repoWorkspacePane}
       </div>
     </div>
   )

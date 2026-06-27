@@ -21,7 +21,7 @@ interface Props {
 }
 
 // Keep this equality in sync with fields read by RepoWorkspace children.
-function branchWorkspaceRepoEqual(a: RepoWorkspaceRepo | undefined, b: RepoWorkspaceRepo | undefined): boolean {
+function repoWorkspaceRepoEqual(a: RepoWorkspaceRepo | undefined, b: RepoWorkspaceRepo | undefined): boolean {
   return (
     a === b ||
     (!!a &&
@@ -100,7 +100,7 @@ export function RepoWorkspace({
           }
         : undefined
     },
-    branchWorkspaceRepoEqual,
+    repoWorkspaceRepoEqual,
   )
   if (!repo) return null
 
@@ -119,7 +119,7 @@ export function RepoWorkspace({
           toolbarTrafficLightOffset={toolbarTrafficLightOffset}
         />
       ) : (
-        <BranchWorkspacePane
+        <RepoWorkspacePane
           repo={repo}
           detail={detail}
           workspacePaneId={workspacePaneId}
@@ -130,7 +130,7 @@ export function RepoWorkspace({
   )
 }
 
-interface BranchWorkspacePaneProps {
+interface RepoWorkspacePaneProps {
   repo: RepoWorkspaceRepo
   detail: SelectedRepoWorkspacePresentation
   workspacePaneId: string
@@ -138,13 +138,13 @@ interface BranchWorkspacePaneProps {
   branchActions?: BranchActions
 }
 
-function BranchWorkspacePane({
+function RepoWorkspacePane({
   repo,
   detail,
   workspacePaneId,
   toolbarTrafficLightOffset = false,
   branchActions,
-}: BranchWorkspacePaneProps) {
+}: RepoWorkspacePaneProps) {
   const workspacePaneTabModel = useRepoWorkspaceTabModel(repo, detail)
 
   return (
@@ -190,7 +190,7 @@ function BranchShortcutHandler({
 
   return (
     <BranchActionSurfaceContext.Provider value={actions}>
-      <BranchWorkspacePane
+      <RepoWorkspacePane
         repo={repo}
         detail={detail}
         workspacePaneId={workspacePaneId}

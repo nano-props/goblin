@@ -17,7 +17,7 @@ import { MainWindowNavigationProvider, type MainWindowNavigationActions } from '
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import { resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 
-const REPO_ID = '/tmp/branch-workspace-container-repo'
+const REPO_ID = '/tmp/repo-workspace-container-repo'
 
 const emptyWorktreeSnapshot: WorktreeTerminalSnapshot = {
   worktreeTerminalKey: '',

@@ -204,7 +204,7 @@ export const en = {
 
   // ---- Workspace pane views ----------------------------------------------
   'tab.branches': 'Branches',
-  'tab.branch-workspace': 'Branch workspace',
+  'tab.repo-workspace': 'Branch workspace',
   'tab.status': 'Status',
   'tab.changes': 'Changes',
   'tab.changes-with-count': 'Changes · {count}',

@@ -7,11 +7,11 @@ interface RepoWorkspaceShellProps {
   repoId?: string
   compact: boolean
   zenMode: boolean
-  branchWorkspaceActive: boolean
+  repoWorkspaceActive: boolean
   workspacePaneSize: number
   onWorkspacePaneSizeChange: (size: number) => void
   branchNavigatorPane: ReactNode
-  branchWorkspacePane: ReactNode
+  repoWorkspacePane: ReactNode
   singlePaneActivePane?: 'navigator' | 'workspace'
   zenModeToggleEnabled?: boolean
   onOpenSettings?: () => void
@@ -21,11 +21,11 @@ export function RepoLayoutWorkspaceShell({
   repoId,
   compact,
   zenMode,
-  branchWorkspaceActive,
+  repoWorkspaceActive,
   workspacePaneSize,
   onWorkspacePaneSizeChange,
   branchNavigatorPane,
-  branchWorkspacePane,
+  repoWorkspacePane,
   singlePaneActivePane = 'navigator',
   zenModeToggleEnabled = true,
   onOpenSettings,
@@ -34,7 +34,7 @@ export function RepoLayoutWorkspaceShell({
   const behavior = repoWorkspaceBehavior({
     compact,
     zenMode: effectiveZenMode,
-    branchWorkspaceActive,
+    repoWorkspaceActive,
   })
   const sidebarPaneSize = 100 - workspacePaneSize
   const zenRevealEnabled = !compact && behavior.branchNavigatorCollapsed
@@ -49,7 +49,7 @@ export function RepoLayoutWorkspaceShell({
         <CompactRepoWorkspace
           activePane={activePane}
           branchNavigatorPane={navigatorPane}
-          branchWorkspacePane={workspacePane}
+          repoWorkspacePane={workspacePane}
         />
       )
     }
@@ -63,14 +63,14 @@ export function RepoLayoutWorkspaceShell({
         onWorkspacePaneSizeChange={onWorkspacePaneSizeChange}
         branchNavigatorCollapsed={behavior.branchNavigatorCollapsed}
         branchNavigatorPane={navigatorPane}
-        branchWorkspacePane={workspacePane}
+        repoWorkspacePane={workspacePane}
       />
     )
   }
 
   return (
     <section className="relative flex min-w-0 flex-1 flex-col">
-      {renderWorkspaceBody(branchWorkspacePane, branchNavigatorPane)}
+      {renderWorkspaceBody(repoWorkspacePane, branchNavigatorPane)}
       {!compact ? (
         <ZenModeSidebarChrome
           repoId={repoId}

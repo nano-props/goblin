@@ -2,7 +2,7 @@ import { worktreeTerminalKey } from '#/web/components/terminal/terminal-workspac
 import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import {
   createRepoWorkspaceTabModel,
-  type BranchWorkspacePaneTab,
+  type RepoWorkspaceTab,
   type RepoWorkspaceTabModel,
 } from '#/web/components/repo-workspace/tab-model.ts'
 import { workspacePaneTabOrderForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
@@ -21,10 +21,7 @@ interface CloseWorkspacePaneTabsForWorktreeOptions {
   worktreePath: string
 }
 
-export async function closeWorkspacePaneTab(
-  target: RepoWorkspaceTabModel,
-  tab: BranchWorkspacePaneTab,
-): Promise<boolean> {
+export async function closeWorkspacePaneTab(target: RepoWorkspaceTabModel, tab: RepoWorkspaceTab): Promise<boolean> {
   if (tab.kind === 'pending') return false
   const provider = workspacePaneTabProvider(tab.type)
   const bridge = readTerminalSessionCommandBridge()

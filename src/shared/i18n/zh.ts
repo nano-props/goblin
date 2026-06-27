@@ -187,7 +187,7 @@ export const zh: Record<DictKey, string> = {
 
   // ---- Workspace pane views ---------------------------------------------
   'tab.branches': '分支',
-  'tab.branch-workspace': '分支工作区',
+  'tab.repo-workspace': '分支工作区',
   'tab.status': '状态',
   'tab.changes': '变更',
   'tab.changes-with-count': '变更 · {count}个',

@@ -6,8 +6,8 @@ import type { MainWindowNavigationActions } from '#/web/main-window-navigation.t
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import type { TerminalSessionBase } from '#/web/components/terminal/types.ts'
 import {
-  adjacentBranchWorkspacePaneTab,
-  type BranchWorkspacePaneTab,
+  adjacentRepoWorkspaceTab,
+  type RepoWorkspaceTab,
   type RepoWorkspaceTabModel,
 } from '#/web/components/repo-workspace/tab-model.ts'
 import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
@@ -69,7 +69,7 @@ export async function runShowWorkspacePaneTabCommand({
   if (!repoId) return false
   const provider = workspacePaneTabProvider(tab)
   if (isWorkspacePaneStaticTabProvider(provider)) {
-    const target = selectedBranchWorkspaceTarget(repoId)
+    const target = selectedRepoWorkspaceTarget(repoId)
     if (target) {
       return openWorkspacePaneTab({
         repoId,
@@ -201,14 +201,14 @@ export function runMoveWorkspacePaneTabCommand({
 }: MoveWorkspacePaneTabCommandOptions): boolean {
   if (!repoId) return false
   const target = workspacePaneCommandTarget(repoId)
-  const tab = target ? adjacentBranchWorkspacePaneTab(target.tabs, target.activeTab?.identity, direction) : null
+  const tab = target ? adjacentRepoWorkspaceTab(target.tabs, target.activeTab?.identity, direction) : null
   if (!target || !tab) return false
   showWorkspacePaneCommandTab(target, tab, navigation)
   return true
 }
 
 function selectedTerminalBase(repoId: string): TerminalSessionBase | null {
-  const target = selectedBranchWorkspaceTarget(repoId)
+  const target = selectedRepoWorkspaceTarget(repoId)
   if (!target?.worktreePath) return null
   return {
     repoRoot: repoId,
@@ -217,7 +217,7 @@ function selectedTerminalBase(repoId: string): TerminalSessionBase | null {
   }
 }
 
-function selectedBranchWorkspaceTarget(repoId: string): { branchName: string; worktreePath: string | null } | null {
+function selectedRepoWorkspaceTarget(repoId: string): { branchName: string; worktreePath: string | null } | null {
   const repo = useReposStore.getState().repos[repoId]
   if (!repo?.ui.selectedBranch) return null
   const branch = repo.data.branches.find((candidate) => candidate.name === repo.ui.selectedBranch)
@@ -227,7 +227,7 @@ function selectedBranchWorkspaceTarget(repoId: string): { branchName: string; wo
 
 function showWorkspacePaneCommandTab(
   target: RepoWorkspaceTabModel,
-  tab: BranchWorkspacePaneTab,
+  tab: RepoWorkspaceTab,
   navigation: MainWindowNavigationActions,
 ): void {
   navigation.showRepoWorkspacePaneTab(target.repoId, tab.type)

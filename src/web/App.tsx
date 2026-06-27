@@ -2,7 +2,7 @@ import { EmptyRepoView } from '#/web/components/EmptyRepoView.tsx'
 import { ErrorBoundary } from '#/web/components/ErrorBoundary.tsx'
 import { SettingsPageScreen } from '#/web/components/SettingsPageScreen.tsx'
 import { RepoView } from '#/web/components/RepoView.tsx'
-import { RepoWorkspaceSkeleton } from '#/web/components/Skeleton.tsx'
+import { RepoWorkspaceLayoutSkeleton } from '#/web/components/Skeleton.tsx'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
@@ -44,10 +44,10 @@ export function App({ routeSettingsPage = null, onRouteSettingsPageChange }: App
         {activeId ? (
           <RepoView repoId={activeId} onOpenSettings={() => onRouteSettingsPageChange?.('general')} />
         ) : !sessionReady ? (
-          <RepoWorkspaceSkeleton
+          <RepoWorkspaceLayoutSkeleton
             singlePane={bootWorkspaceBehavior.singlePane}
             singlePaneView="navigator"
-            branchWorkspaceState="empty"
+            repoWorkspaceState="empty"
           />
         ) : (
           <EmptyRepoView onOpenSettings={() => onRouteSettingsPageChange?.('general')} />

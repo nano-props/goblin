@@ -20,12 +20,12 @@ vi.mock('#/web/components/repo-layout/RepoLayoutWorkspaceShell.tsx', () => ({
       data-testid="repo-workspace-shell"
       data-compact={String(props.compact)}
       data-zen-mode={String(props.zenMode)}
-      data-branch-workspace-active={String(props.branchWorkspaceActive)}
+      data-repo-workspace-active={String(props.repoWorkspaceActive)}
       data-zen-mode-toggle-enabled={String(props.zenModeToggleEnabled)}
       data-single-pane-active-pane={props.singlePaneActivePane}
     >
       {props.branchNavigatorPane}
-      {props.branchWorkspacePane}
+      {props.repoWorkspacePane}
     </div>
   ),
 }))
@@ -84,6 +84,6 @@ describe('EmptyRepoView', () => {
 
     const shell = container!.querySelector<HTMLElement>('[data-testid="repo-workspace-shell"]')
     expect(shell?.dataset.zenMode).toBe('false')
-    expect(shell?.dataset.branchWorkspaceActive).toBe('false')
+    expect(shell?.dataset.repoWorkspaceActive).toBe('false')
   })
 })

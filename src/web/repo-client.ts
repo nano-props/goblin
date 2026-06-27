@@ -1,6 +1,6 @@
 import { openExternalUrl } from '#/web/app-shell-client.ts'
 import { postServerJson } from '#/web/lib/server-fetch.ts'
-import type { CloneRepoResult, PullRequestEntry, RepoSnapshot, RepositoryLogResponse } from '#/shared/api-types.ts'
+import type { CloneRepoResult, PullRequestEntry, RepoSnapshot, RepoLogResponse } from '#/shared/api-types.ts'
 import type { EditorApp, TerminalApp } from '#/shared/api-types.ts'
 import type { ExecResult, LogEntry, PullRequestFetchMode, WorktreeStatus } from '#/shared/git-types.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
@@ -43,7 +43,7 @@ export async function getRepoLog(
     { cwd, branch, count: options?.count ?? DEFAULT_REPOSITORY_LOG_COUNT, skip: options?.skip ?? 0 },
     { signal: options?.signal },
   )
-  const log = result as RepositoryLogResponse
+  const log = result as RepoLogResponse
   if (Array.isArray(log)) return log
   throw new Error(log.message)
 }

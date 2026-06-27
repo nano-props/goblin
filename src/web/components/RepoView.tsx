@@ -5,8 +5,8 @@ import { isRepoUnavailable } from '#/web/stores/repos/repo-guards.ts'
 import { RepoWorkspace } from '#/web/components/RepoWorkspace.tsx'
 import {
   BranchNavigatorSkeleton,
-  BranchWorkspaceEmptySkeleton,
-  BranchWorkspaceSkeleton,
+  RepoWorkspaceEmptySkeleton,
+  RepoWorkspaceSkeleton,
 } from '#/web/components/Skeleton.tsx'
 import { RepoWorkspacePane } from '#/web/components/Layout.tsx'
 import { useRepoToasts } from '#/web/hooks/useRepoToasts.tsx'
@@ -50,7 +50,7 @@ export function RepoView({ repoId, onOpenSettings }: Props) {
   const repo = useReposStore((s) => s.repos[repoId])
   useRepoToasts(repoId)
 
-  const branchWorkspaceActive = !!repo?.ui.selectedBranch
+  const repoWorkspaceActive = !!repo?.ui.selectedBranch
   const selectedBranch = repo?.ui.selectedBranch ?? null
   const singlePane = selectedBranch ? 'workspace' : 'navigator'
   const compactWorkspaceSelectedBranch = useRetainedValueDuringExit({
@@ -84,7 +84,7 @@ export function RepoView({ repoId, onOpenSettings }: Props) {
 
   if (!view.exists || !repo) return <div />
 
-  const zenModeCollapsed = !compact && view.zenMode && branchWorkspaceActive
+  const zenModeCollapsed = !compact && view.zenMode && repoWorkspaceActive
   const workspaceTrafficLightOffset = zenModeCollapsed
 
   const renderBranchNavigatorPane = (branchContent?: ReactNode) => (
@@ -105,11 +105,11 @@ export function RepoView({ repoId, onOpenSettings }: Props) {
         repoId={repoId}
         compact={compact}
         zenMode={view.zenMode}
-        branchWorkspaceActive={branchWorkspaceActive}
+        repoWorkspaceActive={repoWorkspaceActive}
         workspacePaneSize={view.workspacePaneSize}
         onWorkspacePaneSizeChange={setWorkspacePaneSize}
         branchNavigatorPane={renderBranchNavigatorPane(compact ? <UnavailableRepoView repo={repo} /> : undefined)}
-        branchWorkspacePane={
+        repoWorkspacePane={
           <RepoWorkspacePane>
             <WorkspaceChrome trafficLightOffset={workspaceTrafficLightOffset} />
             <UnavailableRepoView repo={repo} />
@@ -127,23 +127,23 @@ export function RepoView({ repoId, onOpenSettings }: Props) {
         repoId={repoId}
         compact={compact}
         zenMode={view.zenMode}
-        branchWorkspaceActive={branchWorkspaceActive}
+        repoWorkspaceActive={repoWorkspaceActive}
         workspacePaneSize={view.workspacePaneSize}
         onWorkspacePaneSizeChange={setWorkspacePaneSize}
         branchNavigatorPane={renderBranchNavigatorPane(
           compact && selectedBranch ? undefined : <BranchNavigatorSkeleton />,
         )}
-        branchWorkspacePane={
+        repoWorkspacePane={
           <RepoWorkspacePane>
             {selectedBranch ? (
-              <BranchWorkspaceSkeleton
+              <RepoWorkspaceSkeleton
                 toolbarDraggable={!compact}
                 toolbarTrafficLightOffset={workspaceTrafficLightOffset}
               />
             ) : (
               <>
                 <WorkspaceChrome trafficLightOffset={workspaceTrafficLightOffset} />
-                <BranchWorkspaceEmptySkeleton />
+                <RepoWorkspaceEmptySkeleton />
               </>
             )}
           </RepoWorkspacePane>
@@ -159,11 +159,11 @@ export function RepoView({ repoId, onOpenSettings }: Props) {
       repoId={repoId}
       compact={compact}
       zenMode={view.zenMode}
-      branchWorkspaceActive={branchWorkspaceActive}
+      repoWorkspaceActive={repoWorkspaceActive}
       workspacePaneSize={view.workspacePaneSize}
       onWorkspacePaneSizeChange={setWorkspacePaneSize}
       branchNavigatorPane={renderBranchNavigatorPane()}
-      branchWorkspacePane={
+      repoWorkspacePane={
         <RepoWorkspacePane>
           <RepoWorkspace
             repoId={repoId}
