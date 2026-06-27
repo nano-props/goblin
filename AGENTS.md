@@ -12,8 +12,9 @@ The project runs in Node.js strip-only mode (no `tsc` emit). Do not use these un
 ## Core conventions
 
 - Pin new package versions exactly in `package.json`; no range prefixes.
-- Use repo-alias imports with explicit `.ts`/`.tsx` extensions. Import canonical modules directly; do not add re-export shims.
+- Use repo-alias imports with explicit `.ts`/`.tsx` extensions. Import canonical modules directly; do not add re-export shims. The `src/web/stores/repos/test-utils.ts` re-export shim is a documented exception, kept until consumers migrate to `#/web/test-utils/bridge.ts` in a follow-up PR.
 - Verify with `bun run typecheck` and `bun run test` (`bun run test:watch` for watch mode). Never use `bun test` directly — it bypasses the project's test config and guards.
+- For detailed testing conventions (helpers, library policy, anti-patterns), follow `docs/testing.md`.
 - Keep examples, tests, docs, and snapshots privacy-safe: use generic placeholders, not real users, paths, emails, tokens, or internal identifiers.
 - Keep i18n keys traceable: do not put conditionals, template strings, concatenation, or fallback expressions directly inside `t(...)`. Choose a named `*Key` variable first, or use a typed/static key map for dynamic states, then call `t(key)`.
 
