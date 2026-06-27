@@ -3,8 +3,8 @@
 // share the same key format.
 
 export {
-  formatTerminalSlotKey as terminalSlotKey,
+  formatTerminalWorkspaceSlotKey as terminalSlotKey,
   formatWorktreeKey as worktreeTerminalKey,
-  parseTerminalSlotKey,
+  parseTerminalWorkspaceSlotKey,
   parseWorktreeKey,
-} from '#/shared/terminal-slot-key.ts'
+} from '#/shared/terminal-workspace-slot-key.ts'

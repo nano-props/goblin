@@ -1,10 +1,6 @@
 import { describe, expect, test, vi } from 'vitest'
-import { buildWorktreeTerminalSnapshot } from '#/web/components/terminal/terminal-slot-worktree-snapshot.ts'
-import type {
-  ManagedTerminalSlotLike,
-  TerminalDescriptor,
-  TerminalSnapshot,
-} from '#/web/components/terminal/types.ts'
+import { buildWorktreeTerminalSnapshot } from '#/web/components/terminal/terminal-session-worktree-snapshot.ts'
+import type { TerminalSessionLike, TerminalDescriptor, TerminalSnapshot } from '#/web/components/terminal/types.ts'
 
 function makeDescriptor(slotId: string, index: number): TerminalDescriptor {
   return {
@@ -21,7 +17,7 @@ function makeDescriptor(slotId: string, index: number): TerminalDescriptor {
 function makeSession(
   descriptor: TerminalDescriptor,
   snapshot: TerminalSnapshot,
-): ManagedTerminalSlotLike & { snapshotSpy: ReturnType<typeof vi.fn> } {
+): TerminalSessionLike & { snapshotSpy: ReturnType<typeof vi.fn> } {
   const snapshotSpy = vi.fn(() => snapshot)
   return {
     descriptor,
@@ -52,7 +48,7 @@ function makeSession(
 
 describe('terminal session worktree snapshot helper', () => {
   test('builds summaries and populates snapshot cache lazily', () => {
-    const descriptor = makeDescriptor('slot-1', 1)
+    const descriptor = makeDescriptor('session-1', 1)
     const session = makeSession(descriptor, {
       phase: 'open',
       message: null,
@@ -65,7 +61,7 @@ describe('terminal session worktree snapshot helper', () => {
       worktreeTerminalKey: descriptor.worktreeTerminalKey,
       selectedDescriptor: descriptor,
       pendingCreate: false,
-      slots: [session],
+      sessions: [session],
       selectedKey: descriptor.key,
       getCachedSnapshot: (key) => cache.get(key) ?? null,
       cacheSnapshot: (key, value) => cache.set(key, value),
@@ -76,12 +72,12 @@ describe('terminal session worktree snapshot helper', () => {
     expect(snapshot).toEqual({
       worktreeTerminalKey: descriptor.worktreeTerminalKey,
       selectedDescriptor: descriptor,
-      slots: [
+      sessions: [
         expect.objectContaining({
           type: 'terminal',
           id: descriptor.key,
           key: descriptor.key,
-          slotId: 'slot-1',
+          slotId: 'session-1',
           selected: true,
           hasBell: true,
           phase: 'open',
@@ -98,7 +94,7 @@ describe('terminal session worktree snapshot helper', () => {
       worktreeTerminalKey: descriptor.worktreeTerminalKey,
       selectedDescriptor: descriptor,
       pendingCreate: false,
-      slots: [session],
+      sessions: [session],
       selectedKey: descriptor.key,
       getCachedSnapshot: (key) => cache.get(key) ?? null,
       cacheSnapshot: (key, value) => cache.set(key, value),

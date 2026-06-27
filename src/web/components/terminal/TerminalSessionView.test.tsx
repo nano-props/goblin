@@ -3,12 +3,15 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import { TerminalSlot } from '#/web/components/terminal/TerminalSlot.tsx'
-import { TerminalSlotContext, TerminalSlotReadContext } from '#/web/components/terminal/terminal-slot-context.ts'
+import { TerminalSessionView } from '#/web/components/terminal/TerminalSessionView.tsx'
+import {
+  TerminalSessionContext,
+  TerminalSessionReadContext,
+} from '#/web/components/terminal/terminal-session-context.ts'
 import type {
-  TerminalSlotContextValue,
-  TerminalSlotReadContextValue,
-  TerminalSlotSummary,
+  TerminalSessionContextValue,
+  TerminalSessionReadContextValue,
+  TerminalSessionSummary,
   WorktreeTerminalSnapshot,
 } from '#/web/components/terminal/types.ts'
 
@@ -33,16 +36,16 @@ afterEach(() => {
   document.body.innerHTML = ''
 })
 
-type TestTerminalSummary = Omit<TerminalSlotSummary, 'type' | 'id' | 'displayOrder'> &
-  Partial<Pick<TerminalSlotSummary, 'type' | 'id' | 'displayOrder'>>
+type TestTerminalSummary = Omit<TerminalSessionSummary, 'type' | 'id' | 'displayOrder'> &
+  Partial<Pick<TerminalSessionSummary, 'type' | 'id' | 'displayOrder'>>
 
-type TestWorktreeSnapshot = Omit<WorktreeTerminalSnapshot, 'slots' | 'bellCount'> & {
-  slots: TestTerminalSummary[]
+type TestWorktreeSnapshot = Omit<WorktreeTerminalSnapshot, 'sessions' | 'bellCount'> & {
+  sessions: TestTerminalSummary[]
   bellCount?: number
 }
 
 function completeWorktreeSnapshot(snapshot: TestWorktreeSnapshot): WorktreeTerminalSnapshot {
-  const slots = snapshot.slots.map((session, index) => ({
+  const sessions = snapshot.sessions.map((session, index) => ({
     ...session,
     type: 'terminal' as const,
     id: session.id ?? session.key,
@@ -50,8 +53,8 @@ function completeWorktreeSnapshot(snapshot: TestWorktreeSnapshot): WorktreeTermi
   }))
   return {
     ...snapshot,
-    slots,
-    bellCount: snapshot.bellCount ?? slots.filter((session) => session.hasBell).length,
+    sessions,
+    bellCount: snapshot.bellCount ?? sessions.filter((session) => session.hasBell).length,
   }
 }
 
@@ -62,9 +65,9 @@ async function renderControllerSlot() {
   const root: Root = createRoot(container)
   const writeInput = vi.fn()
   const descriptor = {
-    key: 'slot-1',
+    key: 'session-1',
     worktreeTerminalKey: '/repo\0/worktree',
-    slotId: 'slot-1',
+    slotId: 'session-1',
     index: 1,
     repoRoot: '/repo',
     branch: 'feature',
@@ -73,11 +76,11 @@ async function renderControllerSlot() {
   const worktreeSnapshot = {
     worktreeTerminalKey: '/repo\0/worktree',
     selectedDescriptor: descriptor,
-    slots: [
+    sessions: [
       {
-        key: 'slot-1',
+        key: 'session-1',
         worktreeTerminalKey: '/repo\0/worktree',
-        slotId: 'slot-1',
+        slotId: 'session-1',
         index: 1,
         title: 'zsh',
         phase: 'open' as const,
@@ -102,8 +105,8 @@ async function renderControllerSlot() {
       phase: 'open' as const,
     },
   }
-  const context: TerminalSlotContextValue = {
-    createTerminal: async () => 'slot-1',
+  const context: TerminalSessionContextValue = {
+    createTerminal: async () => 'session-1',
     registerHost: vi.fn(),
     unregisterHost: vi.fn(),
     selectTerminal: vi.fn(),
@@ -122,7 +125,7 @@ async function renderControllerSlot() {
     takeover: vi.fn(),
     serialize: vi.fn(() => ''),
   }
-  const readContext: TerminalSlotReadContextValue = {
+  const readContext: TerminalSessionReadContextValue = {
     worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
     subscribeWorktree: () => () => {},
     snapshot: () => snapshot,
@@ -131,16 +134,16 @@ async function renderControllerSlot() {
 
   await act(async () => {
     root.render(
-      <TerminalSlotContext.Provider value={context}>
-        <TerminalSlotReadContext.Provider value={readContext}>
-          <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-        </TerminalSlotReadContext.Provider>
-      </TerminalSlotContext.Provider>,
+      <TerminalSessionContext.Provider value={context}>
+        <TerminalSessionReadContext.Provider value={readContext}>
+          <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+        </TerminalSessionReadContext.Provider>
+      </TerminalSessionContext.Provider>,
     )
   })
 
   return {
-    slotRoot: container.querySelector('.goblin-terminal-slot') as HTMLElement,
+    slotRoot: container.querySelector('.goblin-terminal-session') as HTMLElement,
     writeInput,
     async cleanup() {
       await act(async () => root.unmount())
@@ -151,7 +154,7 @@ async function renderControllerSlot() {
 
 function clipboardDataWithFiles(files: File[]): DataTransfer {
   // jsdom's `DataTransfer` is a partial stub; we add `getData` so
-  // the slot's capture-phase handler can read `text/plain` and treat
+  // the session's capture-phase handler can read `text/plain` and treat
   // the absence of text as empty string (matching the real browser
   // behaviour for a file-only clipboard).
   const base = {
@@ -167,7 +170,7 @@ function clipboardDataWithFiles(files: File[]): DataTransfer {
 
 /**
  * Build a `DataTransfer`-shaped object with both a `files` collection
- * and `getData('text/plain')`. The slot's capture-phase paste handler
+ * and `getData('text/plain')`. The session's capture-phase paste handler
  * reads both channels synchronously, so we need to fake both.
  */
 function clipboardDataWithTextAndFiles(text: string, files: File[]): DataTransfer {
@@ -203,7 +206,7 @@ async function dispatchPasteWithText(slotRoot: HTMLElement, text: string, files:
   return pasteEvent
 }
 
-describe('TerminalSlot', () => {
+describe('TerminalSessionView', () => {
   test('renders mirror attach banner and triggers takeover', async () => {
     ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
     const container = document.createElement('div')
@@ -212,9 +215,9 @@ describe('TerminalSlot', () => {
     const takeover = vi.fn().mockResolvedValue(true)
     const summaries = [
       {
-        key: 'slot-1',
+        key: 'session-1',
         worktreeTerminalKey: '/repo\0/worktree',
-        slotId: 'slot-1',
+        slotId: 'session-1',
         index: 1,
         title: 'zsh',
         phase: 'open' as const,
@@ -223,9 +226,9 @@ describe('TerminalSlot', () => {
       },
     ]
     const descriptor = {
-      key: 'slot-1',
+      key: 'session-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      slotId: 'slot-1',
+      slotId: 'session-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -234,7 +237,7 @@ describe('TerminalSlot', () => {
     const worktreeSnapshot = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
-      slots: summaries,
+      sessions: summaries,
       count: 1,
       pendingCreate: false,
     }
@@ -252,8 +255,8 @@ describe('TerminalSlot', () => {
         phase: 'open' as const,
       },
     }
-    const context: TerminalSlotContextValue = {
-      createTerminal: async () => 'slot-1',
+    const context: TerminalSessionContextValue = {
+      createTerminal: async () => 'session-1',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -272,7 +275,7 @@ describe('TerminalSlot', () => {
       takeover,
       serialize: vi.fn(() => ''),
     }
-    const readContext: TerminalSlotReadContextValue = {
+    const readContext: TerminalSessionReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => snapshot,
@@ -281,19 +284,19 @@ describe('TerminalSlot', () => {
 
     await act(async () => {
       root.render(
-        <TerminalSlotContext.Provider value={context}>
-          <TerminalSlotReadContext.Provider value={readContext}>
-            <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-          </TerminalSlotReadContext.Provider>
-        </TerminalSlotContext.Provider>,
+        <TerminalSessionContext.Provider value={context}>
+          <TerminalSessionReadContext.Provider value={readContext}>
+            <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+          </TerminalSessionReadContext.Provider>
+        </TerminalSessionContext.Provider>,
       )
     })
 
     try {
       expect(container.textContent).toContain('terminal.mirror-controlled')
-      const host = container.querySelector('.goblin-terminal-slot__host')
+      const host = container.querySelector('.goblin-terminal-session__host')
       expect(host?.getAttribute('aria-readonly')).toBe('true')
-      expect(container.querySelector('.goblin-terminal-slot__viewer-overlay')).toBeTruthy()
+      expect(container.querySelector('.goblin-terminal-session__viewer-overlay')).toBeTruthy()
       const button = Array.from(container.querySelectorAll('button')).find(
         (node) => node.textContent === 'terminal.takeover',
       )
@@ -303,7 +306,7 @@ describe('TerminalSlot', () => {
         button?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       })
 
-      expect(takeover).toHaveBeenCalledWith('slot-1')
+      expect(takeover).toHaveBeenCalledWith('session-1')
     } finally {
       await act(async () => root.unmount())
       container.remove()
@@ -318,13 +321,13 @@ describe('TerminalSlot', () => {
     const emptyWorktreeSnapshot = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: null,
-      slots: [],
+      sessions: [],
       count: 0,
       pendingCreate: false,
     }
     const emptySnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
-    const context: TerminalSlotContextValue = {
-      createTerminal: vi.fn(async () => 'slot-2'),
+    const context: TerminalSessionContextValue = {
+      createTerminal: vi.fn(async () => 'session-2'),
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -343,7 +346,7 @@ describe('TerminalSlot', () => {
       takeover: vi.fn(),
       serialize: vi.fn(() => ''),
     }
-    const readContext: TerminalSlotReadContextValue = {
+    const readContext: TerminalSessionReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(emptyWorktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => emptySnapshot,
@@ -352,23 +355,23 @@ describe('TerminalSlot', () => {
 
     await act(async () => {
       root.render(
-        <TerminalSlotContext.Provider value={context}>
-          <TerminalSlotReadContext.Provider value={readContext}>
-            <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-          </TerminalSlotReadContext.Provider>
-        </TerminalSlotContext.Provider>,
+        <TerminalSessionContext.Provider value={context}>
+          <TerminalSessionReadContext.Provider value={readContext}>
+            <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+          </TerminalSessionReadContext.Provider>
+        </TerminalSessionContext.Provider>,
       )
     })
 
     try {
-      expect(container.querySelector('.goblin-terminal-slot__empty')).toBeNull()
+      expect(container.querySelector('.goblin-terminal-session__empty')).toBeNull()
       await act(async () => {
         root.render(
-          <TerminalSlotContext.Provider value={context}>
-            <TerminalSlotReadContext.Provider value={readContext}>
-              <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-            </TerminalSlotReadContext.Provider>
-          </TerminalSlotContext.Provider>,
+          <TerminalSessionContext.Provider value={context}>
+            <TerminalSessionReadContext.Provider value={readContext}>
+              <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+            </TerminalSessionReadContext.Provider>
+          </TerminalSessionContext.Provider>,
         )
       })
     } finally {
@@ -389,9 +392,9 @@ describe('TerminalSlot', () => {
     const takeover = vi.fn().mockResolvedValue(true)
     const restart = vi.fn()
     const descriptor = {
-      key: 'slot-1',
+      key: 'session-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      slotId: 'slot-1',
+      slotId: 'session-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -400,11 +403,11 @@ describe('TerminalSlot', () => {
     const worktreeSnapshot = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
-      slots: [
+      sessions: [
         {
-          key: 'slot-1',
+          key: 'session-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          slotId: 'slot-1',
+          slotId: 'session-1',
           index: 1,
           title: 'zsh',
           phase: 'error' as const,
@@ -429,8 +432,8 @@ describe('TerminalSlot', () => {
         phase: 'error' as const,
       },
     }
-    const context: TerminalSlotContextValue = {
-      createTerminal: async () => 'slot-1',
+    const context: TerminalSessionContextValue = {
+      createTerminal: async () => 'session-1',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -449,7 +452,7 @@ describe('TerminalSlot', () => {
       takeover,
       serialize: vi.fn(() => ''),
     }
-    const readContext: TerminalSlotReadContextValue = {
+    const readContext: TerminalSessionReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => snapshot,
@@ -458,18 +461,18 @@ describe('TerminalSlot', () => {
 
     await act(async () => {
       root.render(
-        <TerminalSlotContext.Provider value={context}>
-          <TerminalSlotReadContext.Provider value={readContext}>
-            <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-          </TerminalSlotReadContext.Provider>
-        </TerminalSlotContext.Provider>,
+        <TerminalSessionContext.Provider value={context}>
+          <TerminalSessionReadContext.Provider value={readContext}>
+            <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+          </TerminalSessionReadContext.Provider>
+        </TerminalSessionContext.Provider>,
       )
     })
 
     try {
       // Viewer overlay is the primary affordance, with a takeover
       // button that the user must click before they can restart.
-      expect(container.querySelector('.goblin-terminal-slot__viewer-overlay')).toBeTruthy()
+      expect(container.querySelector('.goblin-terminal-session__viewer-overlay')).toBeTruthy()
       const takeoverButton = Array.from(container.querySelectorAll('button')).find(
         (node) => node.textContent === 'terminal.takeover',
       )
@@ -477,7 +480,7 @@ describe('TerminalSlot', () => {
 
       // The error chip with its restart button must NOT render for
       // a viewer — that button would silently no-op on the server.
-      const errorChips = container.querySelectorAll('.goblin-terminal-slot__status-overlay--error')
+      const errorChips = container.querySelectorAll('.goblin-terminal-session__status-overlay--error')
       expect(errorChips).toHaveLength(0)
       const restartButton = Array.from(container.querySelectorAll('button')).find(
         (node) => node.textContent === 'terminal.restart',
@@ -486,7 +489,7 @@ describe('TerminalSlot', () => {
 
       // The xterm host is still marked readonly so the underlying
       // a11y tree reflects the role.
-      const host = container.querySelector('.goblin-terminal-slot__host')
+      const host = container.querySelector('.goblin-terminal-session__host')
       expect(host?.getAttribute('aria-readonly')).toBe('true')
     } finally {
       await act(async () => root.unmount())
@@ -494,7 +497,7 @@ describe('TerminalSlot', () => {
     }
   })
 
-  test('drop on a viewer slot is ignored (isController gate matches paste)', async () => {
+  test('drop on a viewer session is ignored (isController gate matches paste)', async () => {
     // Regression for the previous drop handler that only checked `!key`.
     // A viewer dropping a file would silently route input into the
     // controller's PTY; the isController gate added alongside paste
@@ -505,9 +508,9 @@ describe('TerminalSlot', () => {
     const root: Root = createRoot(container)
     const writeInput = vi.fn()
     const descriptor = {
-      key: 'slot-1',
+      key: 'session-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      slotId: 'slot-1',
+      slotId: 'session-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -516,11 +519,11 @@ describe('TerminalSlot', () => {
     const worktreeSnapshot = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
-      slots: [
+      sessions: [
         {
-          key: 'slot-1',
+          key: 'session-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          slotId: 'slot-1',
+          slotId: 'session-1',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -547,8 +550,8 @@ describe('TerminalSlot', () => {
         phase: 'open' as const,
       },
     }
-    const context: TerminalSlotContextValue = {
-      createTerminal: async () => 'slot-1',
+    const context: TerminalSessionContextValue = {
+      createTerminal: async () => 'session-1',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -567,7 +570,7 @@ describe('TerminalSlot', () => {
       takeover: vi.fn(),
       serialize: vi.fn(() => ''),
     }
-    const readContext: TerminalSlotReadContextValue = {
+    const readContext: TerminalSessionReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => snapshot,
@@ -576,16 +579,16 @@ describe('TerminalSlot', () => {
 
     await act(async () => {
       root.render(
-        <TerminalSlotContext.Provider value={context}>
-          <TerminalSlotReadContext.Provider value={readContext}>
-            <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-          </TerminalSlotReadContext.Provider>
-        </TerminalSlotContext.Provider>,
+        <TerminalSessionContext.Provider value={context}>
+          <TerminalSessionReadContext.Provider value={readContext}>
+            <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+          </TerminalSessionReadContext.Provider>
+        </TerminalSessionContext.Provider>,
       )
     })
 
     try {
-      const slotRoot = container.querySelector('.goblin-terminal-slot') as HTMLElement
+      const slotRoot = container.querySelector('.goblin-terminal-session') as HTMLElement
       expect(slotRoot).toBeTruthy()
       // Synthesize a Drop event with one file. jsdom's DataTransfer
       // doesn't accept programmatic `files` assignment cleanly, so we
@@ -611,13 +614,13 @@ describe('TerminalSlot', () => {
     }
   })
 
-  test('drop on a controller slot writes shell-escaped paths to the PTY', async () => {
+  test('drop on a controller session writes shell-escaped paths to the PTY', async () => {
     // Happy-path companion to the viewer-rejection test above. Locks
     // the contract: a controller drop that resolves to a path
     // (Electron path-attempt tier) calls writeInput with the
     // shell-escaped path; a controller drop with no path falls
     // through to the blob-save tier. Without this test, the
-    // resolver wiring inside TerminalSlot only had negative
+    // resolver wiring inside TerminalSessionView only had negative
     // coverage — a regression that swapped the two paths or
     // dropped the controller gate would have slipped through.
     ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -626,9 +629,9 @@ describe('TerminalSlot', () => {
     const root: Root = createRoot(container)
     const writeInput = vi.fn()
     const descriptor = {
-      key: 'slot-1',
+      key: 'session-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      slotId: 'slot-1',
+      slotId: 'session-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -637,11 +640,11 @@ describe('TerminalSlot', () => {
     const worktreeSnapshot = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
-      slots: [
+      sessions: [
         {
-          key: 'slot-1',
+          key: 'session-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          slotId: 'slot-1',
+          slotId: 'session-1',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -668,8 +671,8 @@ describe('TerminalSlot', () => {
         phase: 'open' as const,
       },
     }
-    const context: TerminalSlotContextValue = {
-      createTerminal: async () => 'slot-1',
+    const context: TerminalSessionContextValue = {
+      createTerminal: async () => 'session-1',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -688,7 +691,7 @@ describe('TerminalSlot', () => {
       takeover: vi.fn(),
       serialize: vi.fn(() => ''),
     }
-    const readContext: TerminalSlotReadContextValue = {
+    const readContext: TerminalSessionReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => snapshot,
@@ -707,15 +710,15 @@ describe('TerminalSlot', () => {
     try {
       await act(async () => {
         root.render(
-          <TerminalSlotContext.Provider value={context}>
-            <TerminalSlotReadContext.Provider value={readContext}>
-              <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-            </TerminalSlotReadContext.Provider>
-          </TerminalSlotContext.Provider>,
+          <TerminalSessionContext.Provider value={context}>
+            <TerminalSessionReadContext.Provider value={readContext}>
+              <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+            </TerminalSessionReadContext.Provider>
+          </TerminalSessionContext.Provider>,
         )
       })
 
-      const slotRoot = container.querySelector('.goblin-terminal-slot') as HTMLElement
+      const slotRoot = container.querySelector('.goblin-terminal-session') as HTMLElement
       expect(slotRoot).toBeTruthy()
       const file = new File([new Uint8Array([1, 2, 3])], 'shot with space.png', { type: 'image/png' })
       const dataTransfer = {
@@ -738,7 +741,7 @@ describe('TerminalSlot', () => {
       // quotes — if the escape regresses to plain concat this
       // assertion catches it.
       expect(writeInput).toHaveBeenCalledTimes(1)
-      expect(writeInput).toHaveBeenCalledWith('slot-1', "'/resolved/shot with space.png'", 'drop')
+      expect(writeInput).toHaveBeenCalledWith('session-1', "'/resolved/shot with space.png'", 'drop')
       // The path-attempt tier succeeded, so the blob-save backend
       // was never consulted.
       expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
@@ -748,16 +751,16 @@ describe('TerminalSlot', () => {
     }
   })
 
-  test('paste on a viewer slot is ignored (isController gate)', async () => {
+  test('paste on a viewer session is ignored (isController gate)', async () => {
     // Companion to the viewer-drop rejection test. The paste handler
-    // runs in capture phase on the slot root (`onPasteCapture`); xterm
+    // runs in capture phase on the session root (`onPasteCapture`); xterm
     // renders inside the root, so DOM dispatch order beats xterm and
     // we don't need any extra `stopPropagation`. This test locks the
     // controller gate for paste the same way the drop test does.
     //
     // jsdom does not implement ClipboardEvent, so we synthesise one:
     // a plain Event with `clipboardData` grafted on via defineProperty,
-    // bubbling so it reaches the slot's React listener. We only need
+    // bubbling so it reaches the session's React listener. We only need
     // a `files`-like accessor for the paste handler's happy/early-exit
     // paths.
     ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -766,9 +769,9 @@ describe('TerminalSlot', () => {
     const root: Root = createRoot(container)
     const writeInput = vi.fn()
     const descriptor = {
-      key: 'slot-1',
+      key: 'session-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      slotId: 'slot-1',
+      slotId: 'session-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -777,11 +780,11 @@ describe('TerminalSlot', () => {
     const worktreeSnapshot = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
-      slots: [
+      sessions: [
         {
-          key: 'slot-1',
+          key: 'session-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          slotId: 'slot-1',
+          slotId: 'session-1',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -806,8 +809,8 @@ describe('TerminalSlot', () => {
         phase: 'open' as const,
       },
     }
-    const context: TerminalSlotContextValue = {
-      createTerminal: async () => 'slot-1',
+    const context: TerminalSessionContextValue = {
+      createTerminal: async () => 'session-1',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -826,7 +829,7 @@ describe('TerminalSlot', () => {
       takeover: vi.fn(),
       serialize: vi.fn(() => ''),
     }
-    const readContext: TerminalSlotReadContextValue = {
+    const readContext: TerminalSessionReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => snapshot,
@@ -836,14 +839,14 @@ describe('TerminalSlot', () => {
     try {
       await act(async () => {
         root.render(
-          <TerminalSlotContext.Provider value={context}>
-            <TerminalSlotReadContext.Provider value={readContext}>
-              <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-            </TerminalSlotReadContext.Provider>
-          </TerminalSlotContext.Provider>,
+          <TerminalSessionContext.Provider value={context}>
+            <TerminalSessionReadContext.Provider value={readContext}>
+              <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+            </TerminalSessionReadContext.Provider>
+          </TerminalSessionContext.Provider>,
         )
       })
-      const slotRoot = container.querySelector('.goblin-terminal-slot') as HTMLElement
+      const slotRoot = container.querySelector('.goblin-terminal-session') as HTMLElement
       const file = new File([new Uint8Array([1, 2, 3])], 'shot.png')
       const clipboardData = {
         files: {
@@ -866,7 +869,7 @@ describe('TerminalSlot', () => {
     }
   })
 
-  test('paste on a controller slot writes shell-escaped paths to the PTY (files branch)', async () => {
+  test('paste on a controller session writes shell-escaped paths to the PTY (files branch)', async () => {
     // Happy-path paste test. Mirrors the controller drop test but
     // exercises the capture-phase handler on `clipboardData.files`.
     // The path-attempt tier returns a real path; the blob-save tier
@@ -877,9 +880,9 @@ describe('TerminalSlot', () => {
     const root: Root = createRoot(container)
     const writeInput = vi.fn()
     const descriptor = {
-      key: 'slot-1',
+      key: 'session-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      slotId: 'slot-1',
+      slotId: 'session-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -888,11 +891,11 @@ describe('TerminalSlot', () => {
     const worktreeSnapshot = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
-      slots: [
+      sessions: [
         {
-          key: 'slot-1',
+          key: 'session-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          slotId: 'slot-1',
+          slotId: 'session-1',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -917,8 +920,8 @@ describe('TerminalSlot', () => {
         phase: 'open' as const,
       },
     }
-    const context: TerminalSlotContextValue = {
-      createTerminal: async () => 'slot-1',
+    const context: TerminalSessionContextValue = {
+      createTerminal: async () => 'session-1',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -937,7 +940,7 @@ describe('TerminalSlot', () => {
       takeover: vi.fn(),
       serialize: vi.fn(() => ''),
     }
-    const readContext: TerminalSlotReadContextValue = {
+    const readContext: TerminalSessionReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => snapshot,
@@ -951,15 +954,15 @@ describe('TerminalSlot', () => {
     try {
       await act(async () => {
         root.render(
-          <TerminalSlotContext.Provider value={context}>
-            <TerminalSlotReadContext.Provider value={readContext}>
-              <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-            </TerminalSlotReadContext.Provider>
-          </TerminalSlotContext.Provider>,
+          <TerminalSessionContext.Provider value={context}>
+            <TerminalSessionReadContext.Provider value={readContext}>
+              <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+            </TerminalSessionReadContext.Provider>
+          </TerminalSessionContext.Provider>,
         )
       })
 
-      const slotRoot = container.querySelector('.goblin-terminal-slot') as HTMLElement
+      const slotRoot = container.querySelector('.goblin-terminal-session') as HTMLElement
       const file = new File([new Uint8Array([1, 2, 3])], 'weird name & space.png')
       const clipboardData = {
         files: {
@@ -981,7 +984,7 @@ describe('TerminalSlot', () => {
       // both of which `shellEscapePath` wraps in single quotes — if
       // the escape regresses to plain concat this catches it.
       expect(writeInput).toHaveBeenCalledTimes(1)
-      expect(writeInput).toHaveBeenCalledWith('slot-1', "'/resolved/weird name & space.png'", 'paste')
+      expect(writeInput).toHaveBeenCalledWith('session-1', "'/resolved/weird name & space.png'", 'paste')
       expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
     } finally {
       await act(async () => root.unmount())
@@ -1001,9 +1004,9 @@ describe('TerminalSlot', () => {
     const root: Root = createRoot(container)
     const writeInput = vi.fn()
     const descriptor = {
-      key: 'slot-1',
+      key: 'session-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      slotId: 'slot-1',
+      slotId: 'session-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -1012,11 +1015,11 @@ describe('TerminalSlot', () => {
     const worktreeSnapshot = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
-      slots: [
+      sessions: [
         {
-          key: 'slot-1',
+          key: 'session-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          slotId: 'slot-1',
+          slotId: 'session-1',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -1041,8 +1044,8 @@ describe('TerminalSlot', () => {
         phase: 'open' as const,
       },
     }
-    const context: TerminalSlotContextValue = {
-      createTerminal: async () => 'slot-1',
+    const context: TerminalSessionContextValue = {
+      createTerminal: async () => 'session-1',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -1061,7 +1064,7 @@ describe('TerminalSlot', () => {
       takeover: vi.fn(),
       serialize: vi.fn(() => ''),
     }
-    const readContext: TerminalSlotReadContextValue = {
+    const readContext: TerminalSessionReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => snapshot,
@@ -1078,15 +1081,15 @@ describe('TerminalSlot', () => {
     try {
       await act(async () => {
         root.render(
-          <TerminalSlotContext.Provider value={context}>
-            <TerminalSlotReadContext.Provider value={readContext}>
-              <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-            </TerminalSlotReadContext.Provider>
-          </TerminalSlotContext.Provider>,
+          <TerminalSessionContext.Provider value={context}>
+            <TerminalSessionReadContext.Provider value={readContext}>
+              <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+            </TerminalSessionReadContext.Provider>
+          </TerminalSessionContext.Provider>,
         )
       })
 
-      const slotRoot = container.querySelector('.goblin-terminal-slot') as HTMLElement
+      const slotRoot = container.querySelector('.goblin-terminal-session') as HTMLElement
       const clipboardData = {
         files: {
           length: 1,
@@ -1143,7 +1146,7 @@ describe('TerminalSlot', () => {
     try {
       await dispatchPaste(rendered.slotRoot, [new File([new Uint8Array([1])], 'bad.png')])
 
-      expect(rendered.writeInput).toHaveBeenCalledWith('slot-1', "'/tmp/safe-name.png'", 'paste')
+      expect(rendered.writeInput).toHaveBeenCalledWith('session-1', "'/tmp/safe-name.png'", 'paste')
       expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('terminal.paste-file-unsafe')
       expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('terminal.paste-file-failed')
     } finally {
@@ -1172,7 +1175,7 @@ describe('TerminalSlot', () => {
 
   test('paste surfaces paste-file-failed when the resolver throws (no silent failure)', async () => {
     // Defensive regression: if `resolvePastedFiles` rejects (IPC
-    // channel error, network failure, server 5xx) the slot must
+    // channel error, network failure, server 5xx) the session must
     // surface a toast instead of silently dropping the paste. Force
     // the blob-save tier by giving path-attempt a no-path result.
     const shellClient = await import('#/web/app-shell-client.ts')
@@ -1258,7 +1261,7 @@ describe('TerminalSlot', () => {
         new File([new Uint8Array([1])], 'c.png'),
       ])
 
-      expect(rendered.writeInput).toHaveBeenCalledWith('slot-1', "'/abs/a.png' '/tmp/b.png'", 'paste')
+      expect(rendered.writeInput).toHaveBeenCalledWith('session-1', "'/abs/a.png' '/tmp/b.png'", 'paste')
       expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-partial')
       expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('terminal.paste-file-failed')
     } finally {
@@ -1273,7 +1276,7 @@ describe('TerminalSlot', () => {
     // (a) write the resolved paths to the PTY and (b) toast a
     // paste-file-partial so the user notices the silent loss. The
     // resolver counts failed correctly (resolver.test.ts), but
-    // without this integration test nothing pinned the slot's
+    // without this integration test nothing pinned the session's
     // writeResolutionToPty wiring.
     ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
     const container = document.createElement('div')
@@ -1281,9 +1284,9 @@ describe('TerminalSlot', () => {
     const root: Root = createRoot(container)
     const writeInput = vi.fn()
     const descriptor = {
-      key: 'slot-1',
+      key: 'session-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      slotId: 'slot-1',
+      slotId: 'session-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -1292,11 +1295,11 @@ describe('TerminalSlot', () => {
     const worktreeSnapshot = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
-      slots: [
+      sessions: [
         {
-          key: 'slot-1',
+          key: 'session-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          slotId: 'slot-1',
+          slotId: 'session-1',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -1321,8 +1324,8 @@ describe('TerminalSlot', () => {
         phase: 'open' as const,
       },
     }
-    const context: TerminalSlotContextValue = {
-      createTerminal: async () => 'slot-1',
+    const context: TerminalSessionContextValue = {
+      createTerminal: async () => 'session-1',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -1341,7 +1344,7 @@ describe('TerminalSlot', () => {
       takeover: vi.fn(),
       serialize: vi.fn(() => ''),
     }
-    const readContext: TerminalSlotReadContextValue = {
+    const readContext: TerminalSessionReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => snapshot,
@@ -1361,16 +1364,16 @@ describe('TerminalSlot', () => {
     try {
       await act(async () => {
         root.render(
-          <TerminalSlotContext.Provider value={context}>
-            <TerminalSlotReadContext.Provider value={readContext}>
-              <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-            </TerminalSlotReadContext.Provider>
-          </TerminalSlotContext.Provider>,
+          <TerminalSessionContext.Provider value={context}>
+            <TerminalSessionReadContext.Provider value={readContext}>
+              <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+            </TerminalSessionReadContext.Provider>
+          </TerminalSessionContext.Provider>,
         )
       })
       vi.mocked(toast.error).mockClear()
 
-      const slotRoot = container.querySelector('.goblin-terminal-slot') as HTMLElement
+      const slotRoot = container.querySelector('.goblin-terminal-session') as HTMLElement
       const files = [
         new File([new Uint8Array([1])], 'a.png'),
         new File([new Uint8Array([1])], 'b.png'),
@@ -1392,7 +1395,7 @@ describe('TerminalSlot', () => {
       // the order the resolver returns them (path-attempt tier first,
       // then blob-save). paste-file-partial toasts once.
       expect(writeInput).toHaveBeenCalledTimes(1)
-      expect(writeInput).toHaveBeenCalledWith('slot-1', "'/abs/a.png' '/tmp/b.png'", 'drop')
+      expect(writeInput).toHaveBeenCalledWith('session-1', "'/abs/a.png' '/tmp/b.png'", 'drop')
       expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-partial')
       expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('terminal.paste-file-failed')
     } finally {
@@ -1418,18 +1421,18 @@ describe('TerminalSlot', () => {
     const root: Root = createRoot(container)
     const writeInput = vi.fn()
     const descriptorA = {
-      key: 'slot-1',
+      key: 'session-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      slotId: 'slot-1',
+      slotId: 'session-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
       worktreePath: '/worktree',
     }
     const descriptorB = {
-      key: 'slot-2',
+      key: 'session-2',
       worktreeTerminalKey: '/repo\0/worktree-other',
-      slotId: 'slot-2',
+      slotId: 'session-2',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -1438,11 +1441,11 @@ describe('TerminalSlot', () => {
     const worktreeSnapshotA = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: descriptorA,
-      slots: [
+      sessions: [
         {
-          key: 'slot-1',
+          key: 'session-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          slotId: 'slot-1',
+          slotId: 'session-1',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -1456,11 +1459,11 @@ describe('TerminalSlot', () => {
     const worktreeSnapshotB = {
       worktreeTerminalKey: '/repo\0/worktree-other',
       selectedDescriptor: descriptorB,
-      slots: [
+      sessions: [
         {
-          key: 'slot-2',
+          key: 'session-2',
           worktreeTerminalKey: '/repo\0/worktree-other',
-          slotId: 'slot-2',
+          slotId: 'session-2',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -1485,8 +1488,8 @@ describe('TerminalSlot', () => {
         phase: 'open' as const,
       },
     }
-    const context: TerminalSlotContextValue = {
-      createTerminal: async () => 'slot-1',
+    const context: TerminalSessionContextValue = {
+      createTerminal: async () => 'session-1',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -1506,7 +1509,7 @@ describe('TerminalSlot', () => {
       serialize: vi.fn(() => ''),
     }
     let activeWorktreeSnapshot = worktreeSnapshotA
-    const readContext: TerminalSlotReadContextValue = {
+    const readContext: TerminalSessionReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(activeWorktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => snapshotOpen,
@@ -1530,15 +1533,15 @@ describe('TerminalSlot', () => {
     try {
       await act(async () => {
         root.render(
-          <TerminalSlotContext.Provider value={context}>
-            <TerminalSlotReadContext.Provider value={readContext}>
-              <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-            </TerminalSlotReadContext.Provider>
-          </TerminalSlotContext.Provider>,
+          <TerminalSessionContext.Provider value={context}>
+            <TerminalSessionReadContext.Provider value={readContext}>
+              <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+            </TerminalSessionReadContext.Provider>
+          </TerminalSessionContext.Provider>,
         )
       })
 
-      const slotRoot = container.querySelector('.goblin-terminal-slot') as HTMLElement
+      const slotRoot = container.querySelector('.goblin-terminal-session') as HTMLElement
       const file = new File([new Uint8Array([1])], 'a.png')
       const dataTransfer = {
         types: ['Files'],
@@ -1555,17 +1558,17 @@ describe('TerminalSlot', () => {
         await Promise.resolve()
       })
 
-      // User switches worktrees mid-resolve. The slot re-renders with
+      // User switches worktrees mid-resolve. The session re-renders with
       // the new descriptor, which updates `keyRef.current` via the
       // useEffect on `key`.
       activeWorktreeSnapshot = worktreeSnapshotB
       await act(async () => {
         root.render(
-          <TerminalSlotContext.Provider value={context}>
-            <TerminalSlotReadContext.Provider value={readContext}>
-              <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree-other" />
-            </TerminalSlotReadContext.Provider>
-          </TerminalSlotContext.Provider>,
+          <TerminalSessionContext.Provider value={context}>
+            <TerminalSessionReadContext.Provider value={readContext}>
+              <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree-other" />
+            </TerminalSessionReadContext.Provider>
+          </TerminalSessionContext.Provider>,
         )
       })
 
@@ -1590,23 +1593,23 @@ describe('TerminalSlot', () => {
 
   test('empty worktree shows a New terminal CTA that calls createTerminal', async () => {
     // Regression for the "blank screen on first click" symptom: when
-    // a worktree has no sessions yet, the slot renders a CTA so the
+    // a worktree has no sessions yet, the session renders a CTA so the
     // user doesn't see a featureless black box and can discover the
     // affordance without reaching for the per-worktree "+" tab.
     ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
     const container = document.createElement('div')
     document.body.appendChild(container)
     const root: Root = createRoot(container)
-    const createTerminal = vi.fn(async () => 'slot-1')
+    const createTerminal = vi.fn(async () => 'session-1')
     const emptyWorktreeSnapshot = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: null,
-      slots: [],
+      sessions: [],
       count: 0,
       pendingCreate: false,
     }
     const emptySnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
-    const context: TerminalSlotContextValue = {
+    const context: TerminalSessionContextValue = {
       createTerminal,
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
@@ -1626,7 +1629,7 @@ describe('TerminalSlot', () => {
       takeover: vi.fn(),
       serialize: vi.fn(() => ''),
     }
-    const readContext: TerminalSlotReadContextValue = {
+    const readContext: TerminalSessionReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(emptyWorktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => emptySnapshot,
@@ -1635,21 +1638,21 @@ describe('TerminalSlot', () => {
 
     await act(async () => {
       root.render(
-        <TerminalSlotContext.Provider value={context}>
-          <TerminalSlotReadContext.Provider value={readContext}>
-            <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-          </TerminalSlotReadContext.Provider>
-        </TerminalSlotContext.Provider>,
+        <TerminalSessionContext.Provider value={context}>
+          <TerminalSessionReadContext.Provider value={readContext}>
+            <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+          </TerminalSessionReadContext.Provider>
+        </TerminalSessionContext.Provider>,
       )
     })
 
     try {
       // The empty-state CTA is present, with the i18n key as its
       // accessible label and the create button visible.
-      const cta = container.querySelector('.goblin-terminal-slot__empty-cta')
+      const cta = container.querySelector('.goblin-terminal-session__empty-cta')
       expect(cta).toBeTruthy()
       expect(cta?.getAttribute('aria-label')).toBe('terminal.empty')
-      const title = container.querySelector('.goblin-terminal-slot__empty-title')
+      const title = container.querySelector('.goblin-terminal-session__empty-title')
       expect(title?.textContent).toBe('terminal.empty')
       const button = Array.from(container.querySelectorAll('button')).find(
         (node) => node.textContent === 'terminal.new',
@@ -1675,8 +1678,8 @@ describe('TerminalSlot', () => {
   test('empty-state CTA failure uses terminal create feedback toast', async () => {
     // Locks the failure path of the new empty-state CTA. The create
     // throws (e.g., server rejected with error.terminal-create-failed),
-    // and the slot surfaces that to the user via sonner.error so they
-    // can retry instead of staring at a still-empty slot.
+    // and the session surfaces that to the user via sonner.error so they
+    // can retry instead of staring at a still-empty session.
     ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
     const container = document.createElement('div')
     document.body.appendChild(container)
@@ -1688,12 +1691,12 @@ describe('TerminalSlot', () => {
     const emptyWorktreeSnapshot = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: null,
-      slots: [],
+      sessions: [],
       count: 0,
       pendingCreate: false,
     }
     const emptySnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
-    const context: TerminalSlotContextValue = {
+    const context: TerminalSessionContextValue = {
       createTerminal,
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
@@ -1713,7 +1716,7 @@ describe('TerminalSlot', () => {
       takeover: vi.fn(),
       serialize: vi.fn(() => ''),
     }
-    const readContext: TerminalSlotReadContextValue = {
+    const readContext: TerminalSessionReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(emptyWorktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => emptySnapshot,
@@ -1722,11 +1725,11 @@ describe('TerminalSlot', () => {
 
     await act(async () => {
       root.render(
-        <TerminalSlotContext.Provider value={context}>
-          <TerminalSlotReadContext.Provider value={readContext}>
-            <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-          </TerminalSlotReadContext.Provider>
-        </TerminalSlotContext.Provider>,
+        <TerminalSessionContext.Provider value={context}>
+          <TerminalSessionReadContext.Provider value={readContext}>
+            <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+          </TerminalSessionReadContext.Provider>
+        </TerminalSessionContext.Provider>,
       )
     })
 
@@ -1803,7 +1806,7 @@ describe('TerminalSlot', () => {
       const event = await dispatchPasteWithText(rendered.slotRoot, 'file:///home/user/foo.png', [file])
 
       expect(event.defaultPrevented).toBe(true)
-      expect(rendered.writeInput).toHaveBeenCalledWith('slot-1', "'/home/user/foo.png'", 'paste')
+      expect(rendered.writeInput).toHaveBeenCalledWith('session-1', "'/home/user/foo.png'", 'paste')
       expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
     } finally {
       await rendered.cleanup()
@@ -1825,7 +1828,7 @@ describe('TerminalSlot', () => {
       const event = await dispatchPasteWithText(rendered.slotRoot, 'C:\\Users\\me\\bar.png', [file])
 
       expect(event.defaultPrevented).toBe(true)
-      expect(rendered.writeInput).toHaveBeenCalledWith('slot-1', "'C:\\Users\\me\\bar.png'", 'paste')
+      expect(rendered.writeInput).toHaveBeenCalledWith('session-1', "'C:\\Users\\me\\bar.png'", 'paste')
     } finally {
       await rendered.cleanup()
     }
@@ -1900,7 +1903,7 @@ describe('TerminalSlot', () => {
   })
 
   test('pure-text paste (no files) does not preventDefault and does not call writeInput', async () => {
-    // The slot must NOT intercept a text-only paste. xterm.js's native
+    // The session must NOT intercept a text-only paste. xterm.js's native
     // paste handler reads `clipboardData.getData('text/plain')` and
     // writes the text to PTY itself (with bracketed-paste wrap when
     // applicable).

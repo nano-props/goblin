@@ -26,7 +26,7 @@ export const terminalBridge: ClientTerminalBridge = {
   listSessions: bindTerminalMethod('listSessions'),
   prewarm: bindTerminalMethod('prewarm'),
   kickReconnect: bindTerminalMethod('kickReconnect'),
-  getSlotSnapshot: bindTerminalMethod('getSlotSnapshot'),
+  getSessionSnapshot: bindTerminalMethod('getSessionSnapshot'),
   notifyBell: bindTerminalMethod('notifyBell'),
   sendTestNotification: bindTerminalMethod('sendTestNotification'),
   setBadge: bindTerminalMethod('setBadge'),
@@ -36,5 +36,5 @@ export const terminalBridge: ClientTerminalBridge = {
   onIdentity: bindTerminalMethod('onIdentity'),
   onLifecycle: bindTerminalMethod('onLifecycle'),
   onSessionsChanged: bindTerminalMethod('onSessionsChanged'),
-  onSlotClosed: bindTerminalMethod('onSlotClosed'),
+  onSessionClosed: bindTerminalMethod('onSessionClosed'),
 }

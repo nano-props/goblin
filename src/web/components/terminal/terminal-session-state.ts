@@ -9,7 +9,7 @@ import type {
   TerminalIdentityViewModel,
   TerminalLifecycleViewModel,
 } from '#/web/components/terminal/types.ts'
-export class TerminalSlotState {
+export class TerminalSessionState {
   /** Terminal runtime metadata mirrored from attach/session/identity events.
    *  This is authoritative runtime shape for the client, but it is not
    *  the same thing as workspace/session persistence. */
@@ -75,7 +75,7 @@ export class TerminalSlotState {
   // of the PTY? Use this for any decision that should track the
   // controller role alone — teardown on role change, render-time
   // role banner, focus, etc. A transitional phase update must
-  // never make this return false for a slot whose role is still
+  // never make this return false for a session whose role is still
   // `'controller'`. Named after the role enum value (not the
   // older "user" terminology) to match the userId/clientId/
   // ptySessionId identity split: the role is `controller`, not
@@ -85,7 +85,7 @@ export class TerminalSlotState {
   }
 
   // Write-path predicate. Use this only at the actual input gate
-  // — never as a stand-in for "is the controller". A slot that is
+  // — never as a stand-in for "is the controller". A session that is
   // 'controller' but still in `'opening'` cannot accept writes
   // (the PTY is still starting up) but is still the controller;
   // the teardown decision uses `isController()` and the write
@@ -109,7 +109,7 @@ export class TerminalSlotState {
       processName: this.runtimeState.processName,
       canonicalTitle: this.runtimeState.canonicalTitle,
     }
-    // The `attachment` slot is only populated when the slot is
+    // The `attachment` session is only populated when the session is
     // open AND we have a ptySessionId, matching the previous
     // behaviour. The fields are identity-only — phase is at the
     // top level of the snapshot already.
@@ -244,10 +244,7 @@ export class TerminalSlotState {
   }
 
   finishReplay(replayGeneration?: number): TerminalOutputEvent[] {
-    if (
-      replayGeneration !== undefined &&
-      this.replayBufferState.replayGeneration !== replayGeneration
-    ) {
+    if (replayGeneration !== undefined && this.replayBufferState.replayGeneration !== replayGeneration) {
       return []
     }
     const replaySeq = this.replayBufferState.replayBoundarySeq
@@ -261,10 +258,7 @@ export class TerminalSlotState {
   // term or appending to the output summary. Cheaper than
   // `finishReplay` because it skips the splice + filter.
   discardReplay(replayGeneration?: number): void {
-    if (
-      replayGeneration !== undefined &&
-      this.replayBufferState.replayGeneration !== replayGeneration
-    ) {
+    if (replayGeneration !== undefined && this.replayBufferState.replayGeneration !== replayGeneration) {
       return
     }
     this.replayBufferState.replayBoundarySeq = null

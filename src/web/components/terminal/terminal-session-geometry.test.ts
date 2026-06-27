@@ -6,7 +6,7 @@ import {
   resolveTerminalCreateGeometry,
   TerminalHostNotMeasurableError,
   waitForMeasurableHost,
-} from '#/web/components/terminal/terminal-slot-geometry.ts'
+} from '#/web/components/terminal/terminal-session-geometry.ts'
 import type { TerminalDescriptor } from '#/web/components/terminal/types.ts'
 
 const geometryMocks = vi.hoisted(() => ({
@@ -40,7 +40,7 @@ function descriptor(): TerminalDescriptor {
   return {
     key: '/repo\0/repo\0slot-1',
     worktreeTerminalKey: '/repo\0/repo',
-    slotId: 'slot-1',
+    slotId: 'session-1',
     index: 1,
     repoRoot: '/repo',
     branch: 'main',

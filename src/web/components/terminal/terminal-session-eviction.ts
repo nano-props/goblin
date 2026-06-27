@@ -1,4 +1,4 @@
-export function countOrphanedTerminalSlotKeys(input: {
+export function countOrphanedTerminalSessionKeys(input: {
   repoRoot: string
   localSlotKeys: string[]
   getRepoRootForKey: (key: string) => string | null

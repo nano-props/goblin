@@ -1,4 +1,4 @@
-interface TerminalConnectionStateOptions {
+interface TerminalDetachedUserTimerOptions {
   /**
    * Time after the user's last socket disconnects before the
    * server-side sessions owned by that user are torn down entirely
@@ -25,11 +25,11 @@ interface UserTimerEntry {
  * server now clears the controller slot on disconnect and the next
  * attach auto-claims (see `terminal-controller.ts`).
  */
-export class TerminalConnectionState {
-  private readonly options: TerminalConnectionStateOptions
+export class TerminalDetachedUserTimer {
+  private readonly options: TerminalDetachedUserTimerOptions
   private readonly disconnectTimerByUserId = new Map<string, UserTimerEntry>()
 
-  constructor(options: TerminalConnectionStateOptions) {
+  constructor(options: TerminalDetachedUserTimerOptions) {
     this.options = options
   }
 

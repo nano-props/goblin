@@ -14,7 +14,7 @@ import type { TerminalClientMessage } from '#/shared/terminal-socket.ts'
 import { normalizeTerminalClientMessage } from '#/shared/terminal-validators.ts'
 import { serverLogger } from '#/server/logger.ts'
 import { createTerminalCatalog } from '#/server/terminal/terminal-catalog.ts'
-import { createTerminalViewOrderRuntime } from '#/server/terminal/terminal-view-order-runtime.ts'
+import { createTerminalSessionOrderRuntime } from '#/server/terminal/terminal-session-order-runtime.ts'
 import type { TerminalRealtimeSocket } from '#/server/terminal/terminal-realtime-broker.ts'
 import { createTerminalRuntimeActions } from '#/server/terminal/terminal-runtime-actions.ts'
 import { createTerminalRuntimeCoordinator } from '#/server/terminal/terminal-runtime-coordinator.ts'
@@ -23,11 +23,8 @@ import {
   handleTerminalRealtimeRequestMessage,
   shouldPauseRealtimeRequest,
 } from '#/server/terminal/terminal-runtime-realtime.ts'
-import {
-  isValidTerminalClientId,
-  isValidSlotId,
-} from '#/server/terminal/terminal-runtime-support.ts'
-import { TerminalSlotManager } from '#/server/terminal/terminal-slot-manager.ts'
+import { isValidTerminalClientId, isValidTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
+import { TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
 import { type PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 import { type ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 import type { GoblinTerminalCommandRuntime } from '#/server/terminal/g-command.ts'
@@ -53,7 +50,7 @@ export interface ServerTerminalRuntime {
 
 export function createServerTerminalRuntime(options: ServerTerminalRuntimeOptions): ServerTerminalRuntime {
   const { ptySupervisor } = options
-  const terminalViewOrder = createTerminalViewOrderRuntime<string>()
+  const terminalSessionOrder = createTerminalSessionOrderRuntime<string>()
 
   // Sink callbacks fan out to every clientId that shares the
   // session's userId. The manager passes `userId` (a string
@@ -61,7 +58,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   // live output event reaches a sibling tab (different `clientId`,
   // same `userId`) without an extra attach roundtrip. See
   // `identity.ts` for the model.
-  const manager = new TerminalSlotManager<string>(
+  const manager = new TerminalSessionManager<string>(
     ptySupervisor,
     {
       onOutput(userId, event) {
@@ -71,7 +68,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
         broker.broadcastToUser(userId, { type: 'title', event })
       },
       onExit(userId, event) {
-        const repoRoot = manager.getSlot(userId, event.ptySessionId)?.scope
+        const repoRoot = manager.getSession(userId, event.ptySessionId)?.scope
         broker.broadcastToUser(userId, { type: 'exit', event })
         if (repoRoot) broadcastRepoSessionsChanged(userId, repoRoot)
       },
@@ -82,16 +79,16 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
         broker.broadcastToUser(userId, { type: 'lifecycle', event })
       },
     },
-    terminalViewOrder,
+    terminalSessionOrder,
   )
   const { broker, connectionState } = createTerminalRuntimeCoordinator({
     manager,
-    terminalViewOrder,
+    terminalSessionOrder,
     detachedTtlMs: TERMINAL_DETACHED_TTL_MS,
   })
   const catalog = createTerminalCatalog({
     isValidClientId: isValidTerminalClientId,
-    isValidSlotId,
+    isValidTerminalSessionId,
     manager,
     isClientConnected(userId, clientId) {
       return broker.isClientConnected(userId, clientId)
@@ -185,8 +182,8 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     async prune(clientId, userId, repoRoot) {
       return await actions.prune(clientId, userId, repoRoot)
     },
-    async getSlotSnapshot(clientId, userId, input) {
-      return await actions.getSlotSnapshot(clientId, userId, input)
+    async getSessionSnapshot(clientId, userId, input) {
+      return await actions.getSessionSnapshot(clientId, userId, input)
     },
     handleRealtimeMessage(clientId, userId, socket, payload) {
       // Log invalid identifier/parse drops so a stuck takeover
@@ -199,10 +196,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
         return
       }
       if (!userId) {
-        terminalRuntimeLogger.warn(
-          { clientId },
-          'invalid realtime message: missing userId from auth context',
-        )
+        terminalRuntimeLogger.warn({ clientId }, 'invalid realtime message: missing userId from auth context')
         return
       }
       let message: TerminalClientMessage | null = null

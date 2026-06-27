@@ -7,16 +7,16 @@ import {
   type TerminalIdentityEvent,
   type TerminalLifecycleEvent,
   type TerminalOutputEvent,
-  type TerminalSlotPhase,
-  type TerminalSlotSnapshot,
-  type TerminalSlotSummary,
+  type TerminalSessionPhase,
+  type TerminalSessionSnapshot,
+  type TerminalSessionSummary,
   type TerminalTakeoverResult,
 } from '#/shared/terminal-types.ts'
 import { cloneTerminalController } from '#/shared/terminal-controller.ts'
 import { isValidTerminalPtySessionId, normalizeTerminalSize } from '#/shared/terminal-validators.ts'
-import { parseTerminalSlotKey } from '#/shared/terminal-slot-key.ts'
+import { parseTerminalWorkspaceSlotKey } from '#/shared/terminal-workspace-slot-key.ts'
 import { serverLogger } from '#/server/logger.ts'
-import type { TerminalViewOrderRuntime } from '#/server/terminal/terminal-view-order-runtime.ts'
+import type { TerminalSessionOrderRuntime } from '#/server/terminal/terminal-session-order-runtime.ts'
 import {
   attachTerminalClient,
   claimTerminalClientControl,
@@ -39,20 +39,20 @@ import {
   type TerminalRenderState,
 } from '#/server/terminal/terminal-render-state.ts'
 import {
-  markTerminalSlotClosed,
-  markTerminalSlotError,
-  markTerminalSlotOpen,
-  markTerminalSlotOpening,
-  markTerminalSlotRestarting,
-} from '#/server/terminal/terminal-slot-lifecycle.ts'
+  markTerminalSessionClosed,
+  markTerminalSessionError,
+  markTerminalSessionOpen,
+  markTerminalSessionOpening,
+  markTerminalSessionRestarting,
+} from '#/server/terminal/terminal-session-lifecycle.ts'
 import type { PtyHandle, PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 
 const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
-const slotManagerLogger = serverLogger.child({ module: 'terminal-slot-manager' })
+const sessionManagerLogger = serverLogger.child({ module: 'terminal-session-manager' })
 
-type TerminalViewOrderRuntimeLike<TUser extends string | number> = Pick<
-  TerminalViewOrderRuntime<TUser>,
-  'registerTerminalView' | 'unregisterTerminalView' | 'viewDisplayOrder'
+type TerminalSessionOrderRuntimeLike<TUser extends string | number> = Pick<
+  TerminalSessionOrderRuntime<TUser>,
+  'registerTerminalSessionOrder' | 'unregisterTerminalSessionOrder' | 'sessionDisplayOrder'
 >
 
 export interface TerminalEnsureSessionInput<TUser extends string | number> {
@@ -70,7 +70,7 @@ export interface TerminalEnsureSessionInput<TUser extends string | number> {
   env?: Record<string, string>
 }
 
-interface TerminalSlot<TUser extends string | number> {
+interface TerminalSessionView<TUser extends string | number> {
   id: string
   userId: TUser
   scope: string
@@ -95,7 +95,7 @@ interface TerminalSlot<TUser extends string | number> {
    * auto-claim when no controller is alive.
    */
   userSticky: boolean
-  phase: TerminalSlotPhase
+  phase: TerminalSessionPhase
   message: string | null
   /** Mirrors the client's `takeoverPending` flag so a lifecycle
    *  realtime event can tell siblings to disable the write path
@@ -119,24 +119,24 @@ export interface TerminalEventSink<TUser extends string | number> {
   onLifecycle?(userId: TUser, event: TerminalLifecycleEvent): void
 }
 
-export class TerminalSlotManager<TUser extends string | number> {
-  private readonly slotsByPtySessionId = new Map<string, TerminalSlot<TUser>>()
+export class TerminalSessionManager<TUser extends string | number> {
+  private readonly sessionsByPtySessionId = new Map<string, TerminalSessionView<TUser>>()
   private readonly ptySessionIdByUserSlotKey = new Map<string, string>()
   private readonly sink: TerminalEventSink<TUser>
   private readonly ptySupervisor: PtySupervisor
-  private readonly terminalViewOrder: TerminalViewOrderRuntimeLike<TUser>
+  private readonly terminalSessionOrder: TerminalSessionOrderRuntimeLike<TUser>
 
   constructor(
     ptySupervisor: PtySupervisor,
     sink: TerminalEventSink<TUser>,
-    terminalViewOrder: TerminalViewOrderRuntimeLike<TUser>,
+    terminalSessionOrder: TerminalSessionOrderRuntimeLike<TUser>,
   ) {
     this.ptySupervisor = ptySupervisor
     this.sink = sink
-    this.terminalViewOrder = terminalViewOrder
+    this.terminalSessionOrder = terminalSessionOrder
   }
 
-  async ensureSlot(input: TerminalEnsureSessionInput<TUser>): Promise<TerminalAttachResult> {
+  async ensureSession(input: TerminalEnsureSessionInput<TUser>): Promise<TerminalAttachResult> {
     const size = normalizeTerminalSize(input.cols, input.rows)
     if (!size) return { ok: false, message: 'error.invalid-arguments' }
 
@@ -146,9 +146,9 @@ export class TerminalSlotManager<TUser extends string | number> {
     const userKey = this.userSlotKey(userId, input.key)
     if (input.forceNew) this.closeUserKey(userId, input.key)
     const existingId = this.ptySessionIdByUserSlotKey.get(userKey)
-    const existing = existingId ? this.slotsByPtySessionId.get(existingId) : undefined
+    const existing = existingId ? this.sessionsByPtySessionId.get(existingId) : undefined
     if (existing) {
-      this.terminalViewOrder.registerTerminalView({
+      this.terminalSessionOrder.registerTerminalSessionOrder({
         userId,
         scope: existing.scope,
         worktreePath: existing.worktreePath,
@@ -163,7 +163,7 @@ export class TerminalSlotManager<TUser extends string | number> {
 
     const worktreePath = parseWorktreePathFromKey(input.key) ?? input.key
     const id = createPtySessionId()
-    const session: TerminalSlot<TUser> = {
+    const session: TerminalSessionView<TUser> = {
       id,
       userId,
       scope: input.scope,
@@ -190,9 +190,9 @@ export class TerminalSlotManager<TUser extends string | number> {
       inputQueue: [],
       inputFlushScheduled: false,
     }
-    this.slotsByPtySessionId.set(id, session)
+    this.sessionsByPtySessionId.set(id, session)
     this.ptySessionIdByUserSlotKey.set(userKey, id)
-    this.terminalViewOrder.registerTerminalView({
+    this.terminalSessionOrder.registerTerminalSessionOrder({
       userId,
       scope: input.scope,
       worktreePath,
@@ -224,18 +224,18 @@ export class TerminalSlotManager<TUser extends string | number> {
       // Spawn failed: do not leave a zombie session in the maps. The
       // catalog would otherwise find it on retry and surface it as a
       // successful attach with an empty buffer and a null pty — i.e.
-      // a blank, non-responsive terminal. `closeSlot` removes the
+      // a blank, non-responsive terminal. `closeSession` removes the
       // map entry and frees pty/listener resources via the standard
       // disposal path.
-      this.closeSlot(id)
+      this.closeSession(id)
       return result
     }
     return result
   }
 
-  writeSlot(userId: TUser, ptySessionId: string, data: string, clientId: string): boolean {
+  writeSession(userId: TUser, ptySessionId: string, data: string, clientId: string): boolean {
     if (!isValidTerminalPtySessionId(ptySessionId) || !isValidTerminalWriteData(data)) return false
-    const session = this.getSlot(userId, ptySessionId)
+    const session = this.getSession(userId, ptySessionId)
     if (!session?.pty) return false
     // Register the attachment first so a brand-new socket can satisfy
     // the unknown-attachment gate, then defer to the shared
@@ -247,7 +247,7 @@ export class TerminalSlotManager<TUser extends string | number> {
     return true
   }
 
-  async attachSlot(
+  async attachSession(
     userId: TUser,
     ptySessionId: string,
     cols: number,
@@ -258,14 +258,14 @@ export class TerminalSlotManager<TUser extends string | number> {
     if (!isValidTerminalPtySessionId(ptySessionId)) return { ok: false, message: 'error.invalid-arguments' }
     const size = normalizeTerminalSize(cols, rows)
     if (!size) return { ok: false, message: 'error.invalid-arguments' }
-    const session = this.getSlot(userId, ptySessionId)
+    const session = this.getSession(userId, ptySessionId)
     if (!session) return { ok: false, message: 'error.invalid-arguments' }
     registerTerminalClient(session, clientId, size.cols, size.rows, clientConnected)
     this.applyIdentityEffect(session, attachTerminalClient(session, clientId))
     return await this.attachResult(session)
   }
 
-  resizeSlot(
+  resizeSession(
     userId: TUser,
     ptySessionId: string,
     cols: number,
@@ -276,14 +276,14 @@ export class TerminalSlotManager<TUser extends string | number> {
     if (!isValidTerminalPtySessionId(ptySessionId)) return false
     const size = normalizeTerminalSize(cols, rows)
     if (!size) return false
-    const session = this.getSlot(userId, ptySessionId)
+    const session = this.getSession(userId, ptySessionId)
     if (!session) return false
     registerTerminalClient(session, clientId, size.cols, size.rows, clientConnected)
     if (!isAuthoritative(session, clientId, 'resize')) return false
     return this.resizeSessionPty(session, size.cols, size.rows)
   }
 
-  takeoverSlot(
+  takeoverSession(
     userId: TUser,
     ptySessionId: string,
     cols: number,
@@ -294,7 +294,7 @@ export class TerminalSlotManager<TUser extends string | number> {
     if (!isValidTerminalPtySessionId(ptySessionId)) return { ok: false, message: 'error.invalid-arguments' }
     const size = normalizeTerminalSize(cols, rows)
     if (!size) return { ok: false, message: 'error.invalid-arguments' }
-    const session = this.getSlot(userId, ptySessionId)
+    const session = this.getSession(userId, ptySessionId)
     if (!session) return { ok: false, message: 'error.invalid-arguments' }
     // Takeover is the only path that may preempt, but it still
     // requires the caller to be a known attachment. Use the same
@@ -321,7 +321,7 @@ export class TerminalSlotManager<TUser extends string | number> {
     return this.takeoverResult(session)
   }
 
-  async restartSlot(
+  async restartSession(
     userId: TUser,
     ptySessionId: string,
     cols: number,
@@ -332,7 +332,7 @@ export class TerminalSlotManager<TUser extends string | number> {
     if (!isValidTerminalPtySessionId(ptySessionId)) return { ok: false, message: 'error.invalid-arguments' }
     const size = normalizeTerminalSize(cols, rows)
     if (!size) return { ok: false, message: 'error.invalid-arguments' }
-    const session = this.getSlot(userId, ptySessionId)
+    const session = this.getSession(userId, ptySessionId)
     if (!session) return { ok: false, message: 'error.invalid-arguments' }
     registerTerminalClient(session, clientId, size.cols, size.rows, clientConnected)
     const denyReason = explainAuthority(session, clientId, 'restart')
@@ -342,28 +342,28 @@ export class TerminalSlotManager<TUser extends string | number> {
     restartTerminalClientControl(session, clientId)
     this.resetSessionState(session, size.cols, size.rows, 'restarting')
     // `resetSessionState` itself just called
-    // `markTerminalSlotRestarting` and broadcast the lifecycle event.
+    // `markTerminalSessionRestarting` and broadcast the lifecycle event.
     const result = await this.spawnSessionPty(session)
     if (!result.ok) {
-      if (markTerminalSlotError(session, result.message)) this.emitLifecycle(session)
+      if (markTerminalSessionError(session, result.message)) this.emitLifecycle(session)
     }
     return result
   }
 
-  closeSlotForUser(userId: TUser, ptySessionId: string): boolean {
-    if (!this.getSlot(userId, ptySessionId)) return false
-    this.closeSlot(ptySessionId)
+  closeSessionForUser(userId: TUser, ptySessionId: string): boolean {
+    if (!this.getSession(userId, ptySessionId)) return false
+    this.closeSession(ptySessionId)
     return true
   }
 
-  closeSlot(ptySessionId: string): void {
-    const session = this.slotsByPtySessionId.get(ptySessionId)
+  closeSession(ptySessionId: string): void {
+    const session = this.sessionsByPtySessionId.get(ptySessionId)
     if (!session) return
-    if (markTerminalSlotClosed(session)) this.emitLifecycle(session)
-    this.slotsByPtySessionId.delete(ptySessionId)
+    if (markTerminalSessionClosed(session)) this.emitLifecycle(session)
+    this.sessionsByPtySessionId.delete(ptySessionId)
     const userKey = this.userSlotKey(session.userId, session.key)
     if (this.ptySessionIdByUserSlotKey.get(userKey) === ptySessionId) this.ptySessionIdByUserSlotKey.delete(userKey)
-    this.terminalViewOrder.unregisterTerminalView({
+    this.terminalSessionOrder.unregisterTerminalSessionOrder({
       userId: session.userId,
       scope: session.scope,
       worktreePath: session.worktreePath,
@@ -373,35 +373,35 @@ export class TerminalSlotManager<TUser extends string | number> {
   }
 
   closeSessionsForUser(userId: TUser): void {
-    for (const session of Array.from(this.slotsByPtySessionId.values())) {
-      if (session.userId === userId) this.closeSlot(session.id)
+    for (const session of Array.from(this.sessionsByPtySessionId.values())) {
+      if (session.userId === userId) this.closeSession(session.id)
     }
   }
 
   setClientConnected(userId: TUser, clientId: string, connected: boolean): void {
-    for (const session of Array.from(this.slotsByPtySessionId.values())) {
+    for (const session of Array.from(this.sessionsByPtySessionId.values())) {
       if (session.userId !== userId) continue
       this.applyIdentityEffect(session, updateTerminalClientConnection(session, clientId, connected))
     }
   }
 
   closeAll(): void {
-    for (const ptySessionId of Array.from(this.slotsByPtySessionId.keys())) this.closeSlot(ptySessionId)
+    for (const ptySessionId of Array.from(this.sessionsByPtySessionId.keys())) this.closeSession(ptySessionId)
   }
 
-  async getSlotSnapshot(userId: TUser, ptySessionId: string): Promise<TerminalSlotSnapshot | null> {
-    const session = this.getSlot(userId, ptySessionId)
+  async getSessionSnapshot(userId: TUser, ptySessionId: string): Promise<TerminalSessionSnapshot | null> {
+    const session = this.getSession(userId, ptySessionId)
     if (!session) return null
     const snap = await takeSnapshot(session.render)
     if (!snap) return null
     return { ptySessionId, snapshot: snap.snapshot, snapshotSeq: snap.snapshotSeq }
   }
 
-  async listSlotsForUser(userId: TUser, scope: string): Promise<TerminalSlotSummary[]> {
-    const slots: TerminalSlotSummary[] = []
-    for (const session of Array.from(this.slotsByPtySessionId.values())) {
+  async listSessionsForUser(userId: TUser, scope: string): Promise<TerminalSessionSummary[]> {
+    const sessions: TerminalSessionSummary[] = []
+    for (const session of Array.from(this.sessionsByPtySessionId.values())) {
       if (session.userId === userId && session.scope === scope) {
-        slots.push({
+        sessions.push({
           ptySessionId: session.id,
           key: session.key,
           viewType: 'terminal',
@@ -414,21 +414,21 @@ export class TerminalSlotManager<TUser extends string | number> {
           message: session.message,
           cols: session.cols,
           rows: session.rows,
-          displayOrder: this.terminalViewDisplayOrder(session),
+          displayOrder: this.terminalSessionDisplayOrder(session),
         })
       }
     }
-    slots.sort((a, b) => a.displayOrder - b.displayOrder)
-    return slots
+    sessions.sort((a, b) => a.displayOrder - b.displayOrder)
+    return sessions
   }
 
   // Look up a session by id and verify it belongs to the given
   // user. Public so the runtime can resolve the scope for
   // `sessions-changed` broadcasts without exposing the rest of the
   // session internals.
-  getSlot(userId: TUser, ptySessionId: string): TerminalSlot<TUser> | undefined {
+  getSession(userId: TUser, ptySessionId: string): TerminalSessionView<TUser> | undefined {
     if (!this.isValidUserId(userId) || !isValidTerminalPtySessionId(ptySessionId)) return undefined
-    const session = this.slotsByPtySessionId.get(ptySessionId)
+    const session = this.sessionsByPtySessionId.get(ptySessionId)
     return session?.userId === userId ? session : undefined
   }
 
@@ -442,7 +442,7 @@ export class TerminalSlotManager<TUser extends string | number> {
     let count = 0
     let totalBufferChars = 0
     let maxBufferChars = 0
-    for (const session of this.slotsByPtySessionId.values()) {
+    for (const session of this.sessionsByPtySessionId.values()) {
       count += 1
       const chars = session.render.buffer.length
       totalBufferChars += chars
@@ -453,12 +453,12 @@ export class TerminalSlotManager<TUser extends string | number> {
 
   private closeUserKey(userId: TUser, key: string): void {
     const id = this.ptySessionIdByUserSlotKey.get(this.userSlotKey(userId, key))
-    if (id) this.closeSlot(id)
+    if (id) this.closeSession(id)
   }
 
-  private terminalViewDisplayOrder(session: TerminalSlot<TUser>): number {
+  private terminalSessionDisplayOrder(session: TerminalSessionView<TUser>): number {
     return (
-      this.terminalViewOrder.viewDisplayOrder({
+      this.terminalSessionOrder.sessionDisplayOrder({
         userId: session.userId,
         scope: session.scope,
         worktreePath: session.worktreePath,
@@ -472,7 +472,7 @@ export class TerminalSlotManager<TUser extends string | number> {
   // arrives through the regular `onData` path, but snapshots taken during
   // the transition are serialized from a screen model with the canonical
   // dimensions instead of replaying raw historical bytes into the client.
-  private resizeSessionPty(session: TerminalSlot<TUser>, cols: number, rows: number): boolean {
+  private resizeSessionPty(session: TerminalSessionView<TUser>, cols: number, rows: number): boolean {
     if (!session.pty) return false
     if (session.cols === cols && session.rows === rows) return true
     try {
@@ -483,14 +483,14 @@ export class TerminalSlotManager<TUser extends string | number> {
       this.emitIdentity(session)
       return true
     } catch (err) {
-      slotManagerLogger.warn({ ptySessionId: session.id, err }, 'failed to resize PTY')
+      sessionManagerLogger.warn({ ptySessionId: session.id, err }, 'failed to resize PTY')
       return false
     }
   }
 
-  private takeoverResult(session: TerminalSlot<TUser>): TerminalTakeoverResult {
+  private takeoverResult(session: TerminalSessionView<TUser>): TerminalTakeoverResult {
     // By the time we get here, `applyIdentityEffect` has already
-    // executed in `takeoverSlot()` — the requesting attachment
+    // executed in `takeoverSession()` — the requesting attachment
     // is the controller and `session.cols`/`session.rows` reflect
     // any resize effect that ran during the control claim. We
     // surface all four frame fields synchronously so the client
@@ -509,7 +509,7 @@ export class TerminalSlotManager<TUser extends string | number> {
     }
   }
 
-  private async attachResult(session: TerminalSlot<TUser>): Promise<TerminalAttachResult> {
+  private async attachResult(session: TerminalSessionView<TUser>): Promise<TerminalAttachResult> {
     const snap = await replaySnapshot(session.render)
     if (!snap) return { ok: false, message: 'error.unavailable' }
     return {
@@ -531,7 +531,7 @@ export class TerminalSlotManager<TUser extends string | number> {
     return `${String(userId)}\0${key}`
   }
 
-  private emitIdentity(session: TerminalSlot<TUser>): void {
+  private emitIdentity(session: TerminalSessionView<TUser>): void {
     this.sink.onIdentity?.(session.userId, {
       ptySessionId: session.id,
       controller: cloneTerminalController(session.controller),
@@ -546,7 +546,7 @@ export class TerminalSlotManager<TUser extends string | number> {
   // subscribe to this channel; the wire keeps the two concerns on
   // separate paths so the type-level separation in the client
   // (`applyIdentity` vs `applyLifecycle`) cannot be circumvented.
-  private emitLifecycle(session: TerminalSlot<TUser>): void {
+  private emitLifecycle(session: TerminalSessionView<TUser>): void {
     this.sink.onLifecycle?.(session.userId, {
       ptySessionId: session.id,
       phase: session.phase,
@@ -556,7 +556,7 @@ export class TerminalSlotManager<TUser extends string | number> {
   }
 
   private applyIdentityEffect(
-    session: TerminalSlot<TUser>,
+    session: TerminalSessionView<TUser>,
     effect: { resizeTo?: { cols: number; rows: number }; emitIdentity: boolean },
   ): void {
     if (effect.resizeTo) this.resizeSessionPty(session, effect.resizeTo.cols, effect.resizeTo.rows)
@@ -564,28 +564,28 @@ export class TerminalSlotManager<TUser extends string | number> {
   }
 
   private resetSessionState(
-    session: TerminalSlot<TUser>,
+    session: TerminalSessionView<TUser>,
     cols: number,
     rows: number,
-    phase: TerminalSlotPhase = 'opening',
+    phase: TerminalSessionPhase = 'opening',
   ): void {
     this.disposeSessionResources(session)
     session.cols = cols
     session.rows = rows
     const phaseChanged =
-      phase === 'restarting' ? markTerminalSlotRestarting(session) : markTerminalSlotOpening(session)
+      phase === 'restarting' ? markTerminalSessionRestarting(session) : markTerminalSessionOpening(session)
     resetRender(session.render, cols, rows)
     session.inputQueue = []
     session.inputFlushScheduled = false
     if (phaseChanged) this.emitLifecycle(session)
   }
 
-  private async spawnSessionPty(session: TerminalSlot<TUser>): Promise<TerminalAttachResult> {
+  private async spawnSessionPty(session: TerminalSessionView<TUser>): Promise<TerminalAttachResult> {
     // We do NOT call `disposeSessionResources` on the failure path
     // here. The caller decides what to do with a failed spawn:
-    //   - `ensureSlot` removes the just-created session from the
+    //   - `ensureSession` removes the just-created session from the
     //     maps so the catalog doesn't surface a zombie on retry.
-    //   - `restartSlot` keeps the session in the maps (the new
+    //   - `restartSession` keeps the session in the maps (the new
     //     pty simply wasn't created) so a later retry can succeed.
     // In both cases the failed spawn itself does not need any
     // listener/pty cleanup — the spawn attempt never wired them.
@@ -606,7 +606,7 @@ export class TerminalSlotManager<TUser extends string | number> {
       return resolved
     }
     session.pty = resolved.handle
-    if (markTerminalSlotOpen(session)) this.emitLifecycle(session)
+    if (markTerminalSessionOpen(session)) this.emitLifecycle(session)
     const handle = resolved.handle
     const supervisor = this.ptySupervisor
     let lastBroadcastTitle: string | null = session.render.title
@@ -661,20 +661,20 @@ export class TerminalSlotManager<TUser extends string | number> {
       this.ptySupervisor.onExit(handle, () => {
         session.pty = null
         this.sink.onExit(session.userId, { ptySessionId: session.id })
-        this.closeSlot(session.id)
+        this.closeSession(session.id)
       }),
     )
     return await this.attachResult(session)
   }
 
-  private disposeSessionResources(session: TerminalSlot<TUser>): void {
+  private disposeSessionResources(session: TerminalSessionView<TUser>): void {
     disposeSessionListeners(session)
     disposeRender(session.render)
     if (session.pty) {
       try {
         this.ptySupervisor.kill(session.pty)
       } catch (err) {
-        slotManagerLogger.warn({ ptySessionId: session.id, err }, 'failed to kill PTY')
+        sessionManagerLogger.warn({ ptySessionId: session.id, err }, 'failed to kill PTY')
       }
     }
     session.pty = null
@@ -682,7 +682,7 @@ export class TerminalSlotManager<TUser extends string | number> {
     session.inputFlushScheduled = false
   }
 
-  private scheduleInputFlush(session: TerminalSlot<TUser>): void {
+  private scheduleInputFlush(session: TerminalSessionView<TUser>): void {
     if (session.inputFlushScheduled || session.inputQueue.length === 0 || !session.pty) return
     session.inputFlushScheduled = true
     queueMicrotask(() => {
@@ -691,13 +691,13 @@ export class TerminalSlotManager<TUser extends string | number> {
     })
   }
 
-  private drainInputQueue(session: TerminalSlot<TUser>): void {
+  private drainInputQueue(session: TerminalSessionView<TUser>): void {
     if (session.inputQueue.length === 0 || !session.pty) return
     const batch = session.inputQueue.splice(0).join('')
     try {
       this.ptySupervisor.write(session.pty, batch)
     } catch (err) {
-      slotManagerLogger.warn({ ptySessionId: session.id, err, bytes: batch.length }, 'failed to write PTY')
+      sessionManagerLogger.warn({ ptySessionId: session.id, err, bytes: batch.length }, 'failed to write PTY')
     }
   }
 
@@ -717,11 +717,11 @@ export function isValidTerminalWriteData(value: unknown): value is string {
 // keys. Lives next to the manager because the keys are the wire
 // protocol's; the decision function itself stays string-free so it
 // can be reused for non-IPC paths (e.g. internal supervisor logic).
-function authorityReasonToMessage(reason: 'not-controller' | 'slot-unowned' | 'unknown-client'): string {
+function authorityReasonToMessage(reason: 'not-controller' | 'session-unowned' | 'unknown-client'): string {
   switch (reason) {
     case 'not-controller':
       return 'error.not-controller'
-    case 'slot-unowned':
+    case 'session-unowned':
       // Unowned sessions must be explicitly taken over before they
       // can be restarted. The same error key is appropriate: a
       // different session already "owns" the recovery, even if the
@@ -732,12 +732,12 @@ function authorityReasonToMessage(reason: 'not-controller' | 'slot-unowned' | 'u
   }
 }
 
-function disposeSessionListeners<TUser extends string | number>(session: TerminalSlot<TUser>): void {
+function disposeSessionListeners<TUser extends string | number>(session: TerminalSessionView<TUser>): void {
   for (const disposable of session.disposables.splice(0)) {
     try {
       disposable.dispose()
     } catch (err) {
-      slotManagerLogger.warn({ ptySessionId: session.id, err }, 'failed to dispose PTY listener')
+      sessionManagerLogger.warn({ ptySessionId: session.id, err }, 'failed to dispose PTY listener')
     }
   }
 }
@@ -747,5 +747,5 @@ function createPtySessionId(): string {
 }
 
 function parseWorktreePathFromKey(key: string): string | null {
-  return parseTerminalSlotKey(key)?.worktreePath ?? null
+  return parseTerminalWorkspaceSlotKey(key)?.worktreePath ?? null
 }

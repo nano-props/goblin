@@ -2,17 +2,17 @@ import type {
   TerminalAttachResult,
   TerminalClientRole,
   TerminalOutputEvent,
-  TerminalSlotPhase,
+  TerminalSessionPhase,
   TerminalTakeoverResult,
 } from '#/shared/terminal-types.ts'
-import { TerminalSlotState } from '#/web/components/terminal/terminal-slot-state.ts'
+import { TerminalSessionState } from '#/web/components/terminal/terminal-session-state.ts'
 import type {
   TerminalIdentityViewModel,
   TerminalLifecycleViewModel,
   TerminalSearchResult,
 } from '#/web/components/terminal/types.ts'
-export class TerminalSlotRuntime {
-  private readonly state = new TerminalSlotState()
+export class TerminalSessionRuntime {
+  private readonly state = new TerminalSessionState()
   private ptySessionId: string | null = null
   private replacingPtySessionId: string | null = null
   private restartOnStart = false
@@ -47,7 +47,7 @@ export class TerminalSlotRuntime {
 
   // Role-only predicate: is this client the active controller of
   // the PTY? The teardown decision in
-  // `ManagedTerminalSlot.handleIdentity` must use this — never
+  // `TerminalSession.handleIdentity` must use this — never
   // `canSendInput` — so a transitional phase update cannot be
   // misread as a controller→viewer transition.
   isController(): boolean {
@@ -105,9 +105,9 @@ export class TerminalSlotRuntime {
     })
   }
 
-  hydrateSession(input: {
+  hydrateRepoSession(input: {
     ptySessionId: string
-    phase: TerminalSlotPhase
+    phase: TerminalSessionPhase
     message: string | null
     processName: string
     canonicalTitle?: string | null
@@ -255,9 +255,7 @@ export class TerminalSlotRuntime {
   }
 
   ptySessionIdsForClose(): string[] {
-    return Array.from(
-      new Set([this.ptySessionId, this.replacingPtySessionId].filter((id): id is string => !!id)),
-    )
+    return Array.from(new Set([this.ptySessionId, this.replacingPtySessionId].filter((id): id is string => !!id)))
   }
 
   disposePtySessionIds(): string[] {

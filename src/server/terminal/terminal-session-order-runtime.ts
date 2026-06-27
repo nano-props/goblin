@@ -1,4 +1,4 @@
-interface TerminalViewOrderRecord<TUser extends string | number> {
+interface TerminalSessionOrderRecord<TUser extends string | number> {
   userId: TUser
   scope: string
   worktreePath: string
@@ -6,25 +6,26 @@ interface TerminalViewOrderRecord<TUser extends string | number> {
   displayOrder: number
 }
 
-export interface TerminalViewOrderWorktreeInput<TUser extends string | number> {
+export interface TerminalSessionOrderWorktreeInput<TUser extends string | number> {
   userId: TUser
   scope: string
   worktreePath: string
 }
 
-export interface TerminalViewOrderInput<TUser extends string | number>
-  extends TerminalViewOrderWorktreeInput<TUser> {
+export interface TerminalSessionOrderInput<
+  TUser extends string | number,
+> extends TerminalSessionOrderWorktreeInput<TUser> {
   id: string
 }
 
-export class TerminalViewOrderRuntime<TUser extends string | number> {
-  private readonly viewsByWorktree = new Map<string, Map<string, TerminalViewOrderRecord<TUser>>>()
+export class TerminalSessionOrderRuntime<TUser extends string | number> {
+  private readonly sessionsByWorktree = new Map<string, Map<string, TerminalSessionOrderRecord<TUser>>>()
 
-  registerTerminalView(input: TerminalViewOrderInput<TUser>): void {
+  registerTerminalSessionOrder(input: TerminalSessionOrderInput<TUser>): void {
     const worktreeKey = this.worktreeKey(input)
-    const views = this.viewsByWorktree.get(worktreeKey) ?? new Map()
+    const views = this.sessionsByWorktree.get(worktreeKey) ?? new Map()
     if (views.has(input.id)) {
-      this.viewsByWorktree.set(worktreeKey, views)
+      this.sessionsByWorktree.set(worktreeKey, views)
       return
     }
     views.set(input.id, {
@@ -34,39 +35,39 @@ export class TerminalViewOrderRuntime<TUser extends string | number> {
       id: input.id,
       displayOrder: nextDisplayOrder(views),
     })
-    this.viewsByWorktree.set(worktreeKey, views)
+    this.sessionsByWorktree.set(worktreeKey, views)
   }
 
-  unregisterTerminalView(input: TerminalViewOrderInput<TUser>): void {
+  unregisterTerminalSessionOrder(input: TerminalSessionOrderInput<TUser>): void {
     const worktreeKey = this.worktreeKey(input)
-    const views = this.viewsByWorktree.get(worktreeKey)
+    const views = this.sessionsByWorktree.get(worktreeKey)
     if (!views) return
     views.delete(input.id)
-    if (views.size === 0) this.viewsByWorktree.delete(worktreeKey)
+    if (views.size === 0) this.sessionsByWorktree.delete(worktreeKey)
   }
 
-  viewDisplayOrder(input: TerminalViewOrderInput<TUser>): number | null {
-    return this.viewsByWorktree.get(this.worktreeKey(input))?.get(input.id)?.displayOrder ?? null
+  sessionDisplayOrder(input: TerminalSessionOrderInput<TUser>): number | null {
+    return this.sessionsByWorktree.get(this.worktreeKey(input))?.get(input.id)?.displayOrder ?? null
   }
 
-  closeViewsForUser(userId: TUser): void {
-    for (const [key, views] of Array.from(this.viewsByWorktree.entries())) {
+  closeSessionsForUser(userId: TUser): void {
+    for (const [key, views] of Array.from(this.sessionsByWorktree.entries())) {
       const hasUserViews = Array.from(views.values()).some((view) => view.userId === userId)
-      if (hasUserViews) this.viewsByWorktree.delete(key)
+      if (hasUserViews) this.sessionsByWorktree.delete(key)
     }
   }
 
-  private worktreeKey(input: TerminalViewOrderWorktreeInput<TUser>): string {
+  private worktreeKey(input: TerminalSessionOrderWorktreeInput<TUser>): string {
     return `${String(input.userId)}\0${input.scope}\0${input.worktreePath}`
   }
 }
 
-export function createTerminalViewOrderRuntime<TUser extends string | number>(): TerminalViewOrderRuntime<TUser> {
-  return new TerminalViewOrderRuntime<TUser>()
+export function createTerminalSessionOrderRuntime<TUser extends string | number>(): TerminalSessionOrderRuntime<TUser> {
+  return new TerminalSessionOrderRuntime<TUser>()
 }
 
 function nextDisplayOrder<TUser extends string | number>(
-  views: ReadonlyMap<string, TerminalViewOrderRecord<TUser>>,
+  views: ReadonlyMap<string, TerminalSessionOrderRecord<TUser>>,
 ): number {
   let max = -1
   for (const view of views.values()) {

@@ -1,12 +1,12 @@
-import type { TerminalSlotPhase } from '#/shared/terminal-types.ts'
+import type { TerminalSessionPhase } from '#/shared/terminal-types.ts'
 
 export interface TerminalLifecycleState {
-  phase: TerminalSlotPhase
+  phase: TerminalSessionPhase
   message: string | null
 }
 
 /**
- * All `markTerminalSlot*` helpers return `true` when the state
+ * All `markTerminalSession*` helpers return `true` when the state
  * actually changed (so the caller can broadcast a lifecycle realtime
  * event) and `false` when the new value is identical to the current
  * one (so the caller can skip the broadcast). Centralising the
@@ -14,9 +14,9 @@ export interface TerminalLifecycleState {
  * call sites honest: identity events are never piggybacked on a
  * lifecycle setter that didn't actually change.
  */
-function setTerminalSlotPhase(
+function setTerminalSessionPhase(
   state: TerminalLifecycleState,
-  phase: TerminalSlotPhase,
+  phase: TerminalSessionPhase,
   message: string | null = null,
 ): boolean {
   if (state.phase === phase && state.message === message) return false
@@ -25,22 +25,22 @@ function setTerminalSlotPhase(
   return true
 }
 
-export function markTerminalSlotOpening(state: TerminalLifecycleState): boolean {
-  return setTerminalSlotPhase(state, 'opening')
+export function markTerminalSessionOpening(state: TerminalLifecycleState): boolean {
+  return setTerminalSessionPhase(state, 'opening')
 }
 
-export function markTerminalSlotRestarting(state: TerminalLifecycleState): boolean {
-  return setTerminalSlotPhase(state, 'restarting')
+export function markTerminalSessionRestarting(state: TerminalLifecycleState): boolean {
+  return setTerminalSessionPhase(state, 'restarting')
 }
 
-export function markTerminalSlotOpen(state: TerminalLifecycleState): boolean {
-  return setTerminalSlotPhase(state, 'open')
+export function markTerminalSessionOpen(state: TerminalLifecycleState): boolean {
+  return setTerminalSessionPhase(state, 'open')
 }
 
-export function markTerminalSlotError(state: TerminalLifecycleState, message: string | null): boolean {
-  return setTerminalSlotPhase(state, 'error', message)
+export function markTerminalSessionError(state: TerminalLifecycleState, message: string | null): boolean {
+  return setTerminalSessionPhase(state, 'error', message)
 }
 
-export function markTerminalSlotClosed(state: TerminalLifecycleState): boolean {
-  return setTerminalSlotPhase(state, 'closed')
+export function markTerminalSessionClosed(state: TerminalLifecycleState): boolean {
+  return setTerminalSessionPhase(state, 'closed')
 }

@@ -101,7 +101,10 @@ export function waitForMeasurableHost(
     options.signal?.addEventListener('abort', onAbort)
     const timeoutMs = options.timeoutMs
     if (timeoutMs != null && timeoutMs > 0) {
-      timeoutId = setTimeout(() => settle(() => reject(new Error(`terminal host measurable wait timed out after ${timeoutMs}ms`))), timeoutMs)
+      timeoutId = setTimeout(
+        () => settle(() => reject(new Error(`terminal host measurable wait timed out after ${timeoutMs}ms`))),
+        timeoutMs,
+      )
     }
   })
 }

@@ -7,7 +7,7 @@ describe('createTerminalRealtimeHandlers', () => {
     expect(shouldPauseRealtimeRequest('restart')).toBe(true)
     expect(shouldPauseRealtimeRequest('create')).toBe(true)
     expect(shouldPauseRealtimeRequest('takeover')).toBe(true)
-    expect(shouldPauseRealtimeRequest('slot-snapshot')).toBe(false)
+    expect(shouldPauseRealtimeRequest('session-snapshot')).toBe(false)
     expect(shouldPauseRealtimeRequest('resize')).toBe(false)
   })
 })

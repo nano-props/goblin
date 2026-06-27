@@ -4,7 +4,7 @@ import { WRITE_BLOCKED_KEY_BY_REASON } from '#/web/components/terminal/authority
 
 // Every denial reason must be mapped to either a non-null i18n
 // key (the user gets a toast) or `null` (intentionally silent for
-// `slot-closed` — the session is gone, no need to nag).
+// `session-closed` — the session is gone, no need to nag).
 //
 // This test exists because the map is the single source of truth for
 // the user-visible denial feedback; a typo in a key, a missing
@@ -14,13 +14,15 @@ import { WRITE_BLOCKED_KEY_BY_REASON } from '#/web/components/terminal/authority
 describe('WRITE_BLOCKED_KEY_BY_REASON', () => {
   test('every denial reason has a mapped i18n key or an intentional null', () => {
     const expectedShape: Record<AuthorizationDenialReason, string | null> = {
-      'slot-closed': null,
+      'session-closed': null,
       'no-bridge': 'terminal.write-blocked-bridge-unavailable',
       'session-unknown': 'terminal.write-blocked-session-gone',
       'client-offline': 'terminal.write-blocked-reconnecting',
       'takeover-rejected': 'terminal.write-blocked-rejected',
     }
-    for (const [reason, expectedKey] of Object.entries(expectedShape) as Array<[AuthorizationDenialReason, string | null]>) {
+    for (const [reason, expectedKey] of Object.entries(expectedShape) as Array<
+      [AuthorizationDenialReason, string | null]
+    >) {
       expect(WRITE_BLOCKED_KEY_BY_REASON[reason]).toBe(expectedKey)
     }
   })

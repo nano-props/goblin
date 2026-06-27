@@ -40,7 +40,7 @@ const DEFAULT_PARKING_HEIGHT = 400
 const RESIZE_DEBOUNCE_MS = 80
 const FONT_REMEASURE_DEBOUNCE_MS = 80
 
-export class TerminalSlotView {
+export class TerminalSessionView {
   private readonly frame: HTMLDivElement
   private readonly xtermHost: HTMLDivElement
   private readonly parkingElement: HTMLDivElement
@@ -131,7 +131,7 @@ export class TerminalSlotView {
   /**
    * Exposes the xterm DOM host so the orchestrator can drive geometry
    * measurement (see `waitForMeasurableHost` in
-   * `terminal-slot-geometry.ts`). The view itself never falls back to
+   * `terminal-session-geometry.ts`). The view itself never falls back to
    * a default geometry — it is given one by the orchestrator and trusts it.
    */
   measurableHost(): HTMLElement {

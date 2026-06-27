@@ -15,7 +15,7 @@ import type { TerminalController } from '#/shared/terminal-types.ts'
  */
 export type TerminalAuthorityAction = 'write' | 'resize' | 'restart' | 'takeover'
 
-export type TerminalAuthorityReason = 'not-controller' | 'slot-unowned' | 'unknown-client'
+export type TerminalAuthorityReason = 'not-controller' | 'session-unowned' | 'unknown-client'
 
 type TerminalAuthorityDecision = { kind: 'allow' } | { kind: 'deny'; reason: TerminalAuthorityReason }
 
@@ -46,7 +46,7 @@ function decideTerminalActionAuthority(
   if (action === 'takeover') return { kind: 'allow' }
   // write / resize / restart require the caller to currently hold
   // the controller slot.
-  if (state.controller === null) return { kind: 'deny', reason: 'slot-unowned' }
+  if (state.controller === null) return { kind: 'deny', reason: 'session-unowned' }
   if (state.controller.clientId !== clientId) return { kind: 'deny', reason: 'not-controller' }
   return { kind: 'allow' }
 }
@@ -100,7 +100,7 @@ export function registerTerminalClient(
 }
 
 /**
- * Called when an attachment issues `attach` (or `ensureSlot` /
+ * Called when an attachment issues `attach` (or `ensureSession` /
  * `create` with an clientId).
  *
  * Semantics (single-user model):
@@ -143,17 +143,14 @@ export function attachTerminalClient(state: TerminalControllerState, clientId: s
 /**
  * Forcefully claims control for `clientId`, preempting any
  * existing controller. This is the only path that can preempt; it
- * is what `takeoverSlot` calls server-side, and (transitively)
+ * is what `takeoverSession` calls server-side, and (transitively)
  * what the client's AuthorityGate fires when a viewer issues a
  * write. Because the model is user-scoped there is no cross-user
  * ambiguity — every attachment from the session's userId is the
  * same user. The `userSticky` flag is set on takeover so that
  * future disconnects don't strand the session.
  */
-export function claimTerminalClientControl(
-  state: TerminalControllerState,
-  clientId: string,
-): TerminalControllerEffect {
+export function claimTerminalClientControl(state: TerminalControllerState, clientId: string): TerminalControllerEffect {
   const attachment = state.attachments.get(clientId)
   if (!attachment?.connected) return { emitIdentity: false }
   const sizeChanged = state.cols !== attachment.cols || state.rows !== attachment.rows

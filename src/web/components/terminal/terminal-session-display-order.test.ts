@@ -2,18 +2,18 @@ import { describe, expect, test } from 'vitest'
 import {
   restoreSlotDisplayOrder,
   slotSnapshotDisplayOrder,
-  terminalSlotDisplayOrder,
-} from '#/web/components/terminal/terminal-slot-display-order.ts'
+  terminalSessionDisplayOrder,
+} from '#/web/components/terminal/terminal-session-display-order.ts'
 
-describe('terminal slot display order helpers', () => {
+describe('terminal session display order helpers', () => {
   test('derives display rank from persisted order or descriptor index fallback', () => {
-    const orders = new Map([['slot-2', 0]])
+    const orders = new Map([['session-2', 0]])
     expect(
-      terminalSlotDisplayOrder(
+      terminalSessionDisplayOrder(
         {
-          key: 'slot-2',
+          key: 'session-2',
           worktreeTerminalKey: 'repo\0wt',
-          slotId: 'slot-2',
+          slotId: 'session-2',
           index: 2,
           repoRoot: '/repo',
           branch: 'main',
@@ -23,11 +23,11 @@ describe('terminal slot display order helpers', () => {
       ),
     ).toBe(0)
     expect(
-      terminalSlotDisplayOrder(
+      terminalSessionDisplayOrder(
         {
-          key: 'slot-3',
+          key: 'session-3',
           worktreeTerminalKey: 'repo\0wt',
-          slotId: 'slot-3',
+          slotId: 'session-3',
           index: 3,
           repoRoot: '/repo',
           branch: 'main',
@@ -40,22 +40,22 @@ describe('terminal slot display order helpers', () => {
 
   test('snapshots and restores optimistic reorder state', () => {
     const orders = new Map<string, number>([
-      ['slot-1', 1],
-      ['slot-2', 0],
+      ['session-1', 1],
+      ['session-2', 0],
     ])
-    const previous = slotSnapshotDisplayOrder(['slot-1', 'slot-2', 'slot-3'], orders)
-    orders.set('slot-3', 0)
-    orders.set('slot-1', 1)
-    orders.set('slot-2', 2)
+    const previous = slotSnapshotDisplayOrder(['session-1', 'session-2', 'session-3'], orders)
+    orders.set('session-3', 0)
+    orders.set('session-1', 1)
+    orders.set('session-2', 2)
     expect(Array.from(orders.entries())).toEqual([
-      ['slot-1', 1],
-      ['slot-2', 2],
-      ['slot-3', 0],
+      ['session-1', 1],
+      ['session-2', 2],
+      ['session-3', 0],
     ])
     restoreSlotDisplayOrder(orders, previous)
     expect(Array.from(orders.entries())).toEqual([
-      ['slot-1', 1],
-      ['slot-2', 0],
+      ['session-1', 1],
+      ['session-2', 0],
     ])
   })
 })

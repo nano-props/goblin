@@ -1,32 +1,32 @@
 import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 
-import type { TerminalSlotSnapshot, TerminalSlotSummary } from '#/shared/terminal-types.ts'
-import '#/web/components/terminal/terminal-slot.css'
+import type { TerminalSessionSnapshot, TerminalSessionSummary } from '#/shared/terminal-types.ts'
+import '#/web/components/terminal/terminal-session.css'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import { terminalBridge } from '#/web/terminal.ts'
-import { terminalSlotProviderLog } from '#/web/logger.ts'
+import { terminalSessionProviderLog } from '#/web/logger.ts'
 import {
-  TerminalSlotContext,
-  TerminalSlotReadContext,
-} from '#/web/components/terminal/terminal-slot-context.ts'
+  TerminalSessionContext,
+  TerminalSessionReadContext,
+} from '#/web/components/terminal/terminal-session-context.ts'
 import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-bridge.ts'
 import { preloadTerminalFont } from '#/web/components/terminal/terminal-geometry.ts'
-import { loadTerminalSlots } from '#/web/terminal-slot-queries.ts'
+import { loadTerminalSessions } from '#/web/terminal-session-queries.ts'
 import {
-  TerminalSlotRegistry,
-  getTerminalSlotRegistry,
-} from '#/web/components/terminal/TerminalSlotRegistry.ts'
-import { setTerminalSlotCommandBridge } from '#/web/components/terminal/terminal-slot-command-bridge.ts'
+  TerminalSessionProjection,
+  getTerminalSessionProjection,
+} from '#/web/components/terminal/TerminalSessionProjection.ts'
+import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { repoIndexEqual, repoIndexFromRepos } from '#/web/components/terminal/terminal-repo-index.ts'
-import type { TerminalSlotContextValue, TerminalSlotReadContextValue } from '#/web/components/terminal/types.ts'
+import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
 
-interface TerminalSlotProviderProps {
+interface TerminalSessionProviderProps {
   children: ReactNode
 }
 
-export function TerminalSlotProvider({ children }: TerminalSlotProviderProps) {
+export function TerminalSessionProvider({ children }: TerminalSessionProviderProps) {
   const repoIndex = useStoreWithEqualityFn(useReposStore, (s) => repoIndexFromRepos(s.repos), repoIndexEqual)
   // The provider lives at the router root (above the per-route App), so it
   // reads the active repo directly from the repos store rather than via a
@@ -63,13 +63,13 @@ export function TerminalSlotProvider({ children }: TerminalSlotProviderProps) {
   }, [currentRepoId])
 
   // The registry is a client-level singleton (terminal-roadmap.md P1.7).
-  // The first Provider mount constructs it via `getTerminalSlotRegistry`;
+  // The first Provider mount constructs it via `getTerminalSessionProjection`;
   // subsequent mounts (StrictMode re-mount, route round-trip) reuse the
   // same instance. The ref is kept only so the rest of this component can
   // reach the singleton without re-calling the getter on every render.
-  const registryRef = useRef<TerminalSlotRegistry | null>(null)
+  const registryRef = useRef<TerminalSessionProjection | null>(null)
   if (!registryRef.current) {
-    registryRef.current = getTerminalSlotRegistry({
+    registryRef.current = getTerminalSessionProjection({
       onSelectedWorktreeChange: setSelectedTerminal,
       // Terminal-session lifetime owns terminal tab lifetime. User closes,
       // server exits, and reconcile removals all converge through this hook.
@@ -77,7 +77,7 @@ export function TerminalSlotProvider({ children }: TerminalSlotProviderProps) {
       // at read time when the active tab disappears, so this callback only
       // needs to drop the tab from the branch-scoped tab order — no
       // navigation or view-switch call required.
-      onTerminalSlotRemoved: (key, base) => {
+      onTerminalSessionRemoved: (key, base) => {
         useReposStore.getState().removeWorkspacePaneTerminalTab(base.repoRoot, key, base.branch)
       },
     })
@@ -85,28 +85,28 @@ export function TerminalSlotProvider({ children }: TerminalSlotProviderProps) {
   const registry = registryRef.current
 
   const loadMissingSnapshots = useCallback(
-    async (serverSlots: TerminalSlotSummary[]): Promise<Map<string, TerminalSlotSnapshot>> => {
+    async (serverSlots: TerminalSessionSummary[]): Promise<Map<string, TerminalSessionSnapshot>> => {
       // allSettled (not all) so a single rejected snapshot fetch does not
       // cancel the rest of the reconciliation. Each request is bounded by
       // the bridge's per-request timeout, so the worst case here is that
-      // one slow slot delays the final map by that timeout — but every
-      // other slot's snapshot is delivered to the caller regardless.
+      // one slow session delays the final map by that timeout — but every
+      // other session's snapshot is delivered to the caller regardless.
       // Rejections are surfaced via `result.reason` so they remain visible
       // in logs without poisoning the reconciliation.
       const settled = await Promise.allSettled(
-        serverSlots.map((slot) => terminalBridge.getSlotSnapshot({ ptySessionId: slot.ptySessionId })),
+        serverSlots.map((session) => terminalBridge.getSessionSnapshot({ ptySessionId: session.ptySessionId })),
       )
-      const entries: Array<readonly [string, TerminalSlotSnapshot]> = []
+      const entries: Array<readonly [string, TerminalSessionSnapshot]> = []
       settled.forEach((result, index) => {
-        const slot = serverSlots[index]
-        if (!slot) return
+        const session = serverSlots[index]
+        if (!session) return
         if (result.status === 'fulfilled') {
           const snapshot = result.value
-          if (snapshot) entries.push([slot.ptySessionId, snapshot])
+          if (snapshot) entries.push([session.ptySessionId, snapshot])
           return
         }
-        terminalSlotProviderLog.debug('failed to load terminal slot snapshot', {
-          ptySessionId: slot.ptySessionId,
+        terminalSessionProviderLog.debug('failed to load terminal session snapshot', {
+          ptySessionId: session.ptySessionId,
           err: result.reason,
         })
       })
@@ -120,12 +120,12 @@ export function TerminalSlotProvider({ children }: TerminalSlotProviderProps) {
       if (!repoRoot || !repoIndexRef.current[repoRoot]) return
       try {
         const clientId = readOrCreateWebTerminalClientId()
-        const serverSlots = await loadTerminalSlots(repoRoot)
+        const serverSlots = await loadTerminalSessions(repoRoot)
         const snapshotsByPtySessionId = await loadMissingSnapshots(serverSlots)
         if (!repoIndexRef.current[repoRoot]) return
-        registry.reconcileServerSlots(repoRoot, serverSlots, clientId, snapshotsByPtySessionId)
+        registry.reconcileServerSessions(repoRoot, serverSlots, clientId, snapshotsByPtySessionId)
       } catch (err) {
-        terminalSlotProviderLog.debug('failed to sync server sessions', { err })
+        terminalSessionProviderLog.debug('failed to sync server sessions', { err })
       } finally {
         const instanceToken = repoIndexRef.current[repoRoot]?.instanceToken
         if (typeof instanceToken === 'number') {
@@ -204,11 +204,11 @@ export function TerminalSlotProvider({ children }: TerminalSlotProviderProps) {
     // window) doesn't reattach to the orphan. The originating window
     // already disposed the local entry, so the handler is a no-op
     // there — the broadcast is multi-window safe by construction.
-    const offSlotClosed = terminalBridge.onSlotClosed((event) => {
+    const offSlotClosed = terminalBridge.onSessionClosed((event) => {
       registry.handleSlotClosed(event.ptySessionId)
     })
 
-    setTerminalSlotCommandBridge({
+    setTerminalSessionCommandBridge({
       worktreeSnapshot: registry.worktreeSnapshot,
       createTerminal: registry.createTerminal,
       selectTerminal: registry.selectTerminal,
@@ -264,7 +264,7 @@ export function TerminalSlotProvider({ children }: TerminalSlotProviderProps) {
     }
   }, [currentRepoId, currentRepoInstanceToken, syncServerSlots])
 
-  const commandValue = useMemo<TerminalSlotContextValue>(
+  const commandValue = useMemo<TerminalSessionContextValue>(
     () => ({
       createTerminal: registry.createTerminal,
       registerHost: registry.registerHost,
@@ -287,7 +287,7 @@ export function TerminalSlotProvider({ children }: TerminalSlotProviderProps) {
     }),
     [registry],
   )
-  const readValue = useMemo<TerminalSlotReadContextValue>(
+  const readValue = useMemo<TerminalSessionReadContextValue>(
     () => ({
       worktreeSnapshot: registry.worktreeSnapshot,
       subscribeWorktree: registry.subscribeWorktree,
@@ -298,11 +298,11 @@ export function TerminalSlotProvider({ children }: TerminalSlotProviderProps) {
   )
 
   return (
-    <TerminalSlotContext.Provider value={commandValue}>
-      <TerminalSlotReadContext.Provider value={readValue}>
+    <TerminalSessionContext.Provider value={commandValue}>
+      <TerminalSessionReadContext.Provider value={readValue}>
         {children}
         <div ref={parkingRootRef} className="goblin-terminal-parking" aria-hidden="true" />
-      </TerminalSlotReadContext.Provider>
-    </TerminalSlotContext.Provider>
+      </TerminalSessionReadContext.Provider>
+    </TerminalSessionContext.Provider>
   )
 }

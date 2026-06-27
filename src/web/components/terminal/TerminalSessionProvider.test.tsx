@@ -4,15 +4,15 @@ import { act, useEffect, useRef } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
-import { TerminalSlotProvider } from '#/web/components/terminal/TerminalSlotProvider.tsx'
-import { setTerminalSlotRegistryForTests } from '#/web/components/terminal/TerminalSlotRegistry.ts'
-import { terminalSlotProviderLog } from '#/web/logger.ts'
-import { useTerminalSlotContext } from '#/web/components/terminal/terminal-slot-context.ts'
+import { TerminalSessionProvider } from '#/web/components/terminal/TerminalSessionProvider.tsx'
+import { setTerminalSessionProjectionForTests } from '#/web/components/terminal/TerminalSessionProjection.ts'
+import { terminalSessionProviderLog } from '#/web/logger.ts'
+import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import {
   useWorktreeTerminalCount,
-  useTerminalSlotSummaries,
-} from '#/web/components/terminal/terminal-slot-store.ts'
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
+  useTerminalSessionSummaries,
+} from '#/web/components/terminal/terminal-session-store.ts'
+import { worktreeTerminalKey } from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
@@ -30,7 +30,7 @@ import type {
   TerminalIdentityViewModel,
   TerminalLifecycleViewModel,
   TerminalSearchResult,
-  TerminalSlotContextValue,
+  TerminalSessionContextValue,
   TerminalSnapshot,
 } from '#/web/components/terminal/types.ts'
 import type {
@@ -39,8 +39,8 @@ import type {
   TerminalExitEvent,
   TerminalAttachResult,
   TerminalOutputEvent,
-  TerminalSlotSnapshot,
-  TerminalSlotSummary,
+  TerminalSessionSnapshot,
+  TerminalSessionSummary,
   TerminalTitleEvent,
 } from '#/shared/terminal-types.ts'
 
@@ -75,8 +75,8 @@ function selectedWorkspacePaneView(repoId: string) {
   return repo ? preferredWorkspacePaneViewForBranch(repo.ui, repo.ui.selectedBranch) : null
 }
 
-vi.mock('#/web/components/terminal/ManagedTerminalSlot.ts', () => {
-  class ManagedTerminalSlot {
+vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
+  class TerminalSession {
     descriptor: TerminalDescriptor
     private readonly onBell: (descriptor: TerminalDescriptor, event: TerminalBellEvent) => void
     private readonly notify: () => void
@@ -240,7 +240,7 @@ vi.mock('#/web/components/terminal/ManagedTerminalSlot.ts', () => {
     }
   }
 
-  return { ManagedTerminalSlot }
+  return { TerminalSession }
 })
 
 const REPO_ID = '/tmp/gbl-terminal-provider-repo'
@@ -256,19 +256,19 @@ let lifecycleHandler: ((event: TerminalLifecycleViewModel) => void) | null = nul
 let sessionsChangedHandler: ((repoRoot: string) => void) | null = null
 let workspacePaneChangedHandler: ((repoRoot: string) => void) | null = null
 let sessionClosedHandler: ((event: { ptySessionId: string; repoRoot: string }) => void) | null = null
-type TestTerminalSlotSummary = Omit<TerminalSlotSummary, 'viewType' | 'viewId'> &
-  Partial<Pick<TerminalSlotSummary, 'viewType' | 'viewId'>>
+type TestTerminalSlotSummary = Omit<TerminalSessionSummary, 'viewType' | 'viewId'> &
+  Partial<Pick<TerminalSessionSummary, 'viewType' | 'viewId'>>
 const listSessionsMock = vi.fn<(...args: Array<{ repoRoot: string }>) => Promise<TestTerminalSlotSummary[]>>(
   async () => [],
 )
 const getSlotSnapshotMock = vi.fn<
-  (...args: Array<{ ptySessionId: string }>) => Promise<TerminalSlotSnapshot | null>
+  (...args: Array<{ ptySessionId: string }>) => Promise<TerminalSessionSnapshot | null>
 >(async () => null)
 const closeMock = vi.fn(async () => true)
 const createTerminalMock = vi.fn<(input: TerminalCreateInput) => Promise<TerminalCatalogMutationResult>>()
 let managedServerSessions: TestTerminalSlotSummary[] = []
 
-function completeServerSession(session: TestTerminalSlotSummary): TerminalSlotSummary {
+function completeServerSession(session: TestTerminalSlotSummary): TerminalSessionSummary {
   return {
     ...session,
     viewType: session.viewType ?? 'terminal',
@@ -276,7 +276,7 @@ function completeServerSession(session: TestTerminalSlotSummary): TerminalSlotSu
   }
 }
 
-function completeServerSessions(sessions: TestTerminalSlotSummary[]): TerminalSlotSummary[] {
+function completeServerSessions(sessions: TestTerminalSlotSummary[]): TerminalSessionSummary[] {
   return sessions.map(completeServerSession)
 }
 
@@ -476,7 +476,7 @@ beforeEach(() => {
         pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
         listSessions: async (input: { repoRoot: string }) => completeServerSessions(await listSessionsMock(input)),
         listViews: vi.fn(async () => []),
-        getSlotSnapshot: getSlotSnapshotMock,
+        getSessionSnapshot: getSlotSnapshotMock,
         onOutput: vi.fn((cb: (event: TerminalOutputEvent) => void) => {
           outputHandler = cb
           return () => {}
@@ -547,7 +547,7 @@ beforeEach(() => {
     onEffectIntent: vi.fn(() => () => {}),
     pathForFile: vi.fn(() => ''),
     saveClipboardFiles: vi.fn(() => Promise.resolve([])),
-    shell: () => null,
+    host: () => null,
     terminal: () => ({
       attach: vi.fn(async () => attachResult()),
       restart: vi.fn(async () => attachResult()),
@@ -572,7 +572,7 @@ beforeEach(() => {
       closeView: vi.fn(async () => true),
       prewarm: vi.fn(async () => {}),
       kickReconnect: vi.fn(() => {}),
-      getSlotSnapshot: getSlotSnapshotMock,
+      getSessionSnapshot: getSlotSnapshotMock,
       reorderViews: vi.fn(async () => true),
       notifyBell: window.goblinNative.terminal.notifyBell ?? vi.fn(async () => true),
       sendTestNotification: vi.fn(async () => true),
@@ -609,7 +609,7 @@ beforeEach(() => {
           if (workspacePaneChangedHandler === cb) workspacePaneChangedHandler = null
         }
       }),
-      onSlotClosed: vi.fn((cb: (event: { ptySessionId: string; repoRoot: string }) => void) => {
+      onSessionClosed: vi.fn((cb: (event: { ptySessionId: string; repoRoot: string }) => void) => {
         sessionClosedHandler = cb
         return () => {
           if (sessionClosedHandler === cb) sessionClosedHandler = null
@@ -619,13 +619,13 @@ beforeEach(() => {
   })
 })
 
-describe('TerminalSlotProvider', () => {
+describe('TerminalSessionProvider', () => {
   // The Provider reaches the registry via the client-level singleton.
   // Each test must clear the slot so a previous test's bridge wiring
   // doesn't leak into the next one. Mirrors
-  // `setTerminalSlotRegistryForTests(null)` in the registry tests.
+  // `setTerminalSessionProjectionForTests(null)` in the registry tests.
   afterEach(() => {
-    setTerminalSlotRegistryForTests(null)
+    setTerminalSessionProjectionForTests(null)
   })
   test('keeps terminal detail open and switches the selected session when one of multiple terminals exits', async () => {
     seedRepoState({
@@ -640,7 +640,7 @@ describe('TerminalSlotProvider', () => {
     try {
       const base = { repoRoot: REPO_ID, branch: 'feature/worktree', worktreePath: WORKTREE_PATH }
       await act(async () => {
-        useReposStore.getState().setWorkspacePaneView(REPO_ID, 'terminal')
+        useReposStore.getState().setWorkspacePaneTab(REPO_ID, 'terminal')
         await getContext().createTerminal(base)
         await getContext().createTerminal(base)
       })
@@ -920,9 +920,7 @@ describe('TerminalSlotProvider', () => {
     try {
       await emitSessionsChanged()
 
-      expect(getProbe().summaries).toEqual([
-        expect.objectContaining({ slotId: 'slot-1', title: 'zsh', phase: 'open' }),
-      ])
+      expect(getProbe().summaries).toEqual([expect.objectContaining({ slotId: 'slot-1', title: 'zsh', phase: 'open' })])
       const hydrated = mockSessions.find((session) => session.descriptor.slotId === 'slot-1')
       expect(hydrated?.hydrate).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1000,9 +998,7 @@ describe('TerminalSlotProvider', () => {
 
     try {
       await emitSessionsChanged()
-      expect(getProbe().summaries.map((session) => [session.slotId, session.selected])).toEqual([
-        ['slot-1', true],
-      ])
+      expect(getProbe().summaries.map((session) => [session.slotId, session.selected])).toEqual([['slot-1', true]])
 
       const base = { repoRoot: REPO_ID, branch: 'feature/worktree', worktreePath: WORKTREE_PATH }
       await act(async () => {
@@ -1635,12 +1631,12 @@ describe('TerminalSlotProvider', () => {
     // First snapshot rejects, second resolves. The provider uses
     // Promise.allSettled (not Promise.all) so the rejection does not
     // cancel the whole reconcile. Rejections are surfaced via
-    // result.reason and logged via terminalSlotProviderLog.debug;
+    // result.reason and logged via terminalSessionProviderLog.debug;
     // healthy results are collected into the snapshot map. A
     // regression to Promise.all would either cancel reconcile
     // entirely or surface the rejection to the caller as an
     // unhandled promise.
-    const debugSpy = vi.spyOn(terminalSlotProviderLog, 'debug').mockImplementation(() => {})
+    const debugSpy = vi.spyOn(terminalSessionProviderLog, 'debug').mockImplementation(() => {})
     getSlotSnapshotMock.mockImplementation(async ({ ptySessionId }) => {
       if (ptySessionId === 'session_fail') throw new Error('snapshot unavailable')
       return { ptySessionId: 'session_ok', snapshot: 'ok-snapshot', snapshotSeq: 1 }
@@ -1657,7 +1653,7 @@ describe('TerminalSlotProvider', () => {
       )
       // The failed session's rejection is logged but does not poison
       // the other session's hydrate path.
-      expect(debugSpy).toHaveBeenCalledWith('failed to load terminal slot snapshot', {
+      expect(debugSpy).toHaveBeenCalledWith('failed to load terminal session snapshot', {
         ptySessionId: 'session_fail',
         err: expect.any(Error),
       })
@@ -1745,16 +1741,16 @@ describe('TerminalSlotProvider', () => {
     // Mount the Provider with no children that go through the host
     // registration path (no RegisterHost, no probes) so the only
     // preloadTerminalFont call comes from the new useEffect in
-    // TerminalSlotProvider itself.
+    // TerminalSessionProvider itself.
     const container = document.createElement('div')
     document.body.appendChild(container)
     const root = createRoot(container)
     try {
       await act(async () => {
         root.render(
-          <TerminalSlotProvider>
+          <TerminalSessionProvider>
             <span>probe</span>
-          </TerminalSlotProvider>,
+          </TerminalSessionProvider>,
         )
       })
       expect(geometryMocks.preloadTerminalFont).toHaveBeenCalledTimes(1)
@@ -1783,7 +1779,7 @@ describe('TerminalSlotProvider', () => {
       onEffectIntent: vi.fn(() => () => {}),
       pathForFile: vi.fn(() => ''),
       saveClipboardFiles: vi.fn(async () => []),
-      shell: () => null,
+      host: () => null,
       terminal: () => ({
         attach: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
         restart: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
@@ -1814,7 +1810,7 @@ describe('TerminalSlotProvider', () => {
         closeView: vi.fn(async () => false),
         prewarm,
         kickReconnect: vi.fn(() => {}),
-        getSlotSnapshot: vi.fn(async () => null),
+        getSessionSnapshot: vi.fn(async () => null),
         reorderViews: vi.fn(async () => false),
         notifyBell: vi.fn(async () => false),
         sendTestNotification: vi.fn(async () => false),
@@ -1826,7 +1822,7 @@ describe('TerminalSlotProvider', () => {
         onLifecycle: () => () => {},
         onSessionsChanged: () => () => {},
         onWorkspacePaneChanged: () => () => {},
-        onSlotClosed: () => () => {},
+        onSessionClosed: () => () => {},
       }),
     })
 
@@ -1836,9 +1832,9 @@ describe('TerminalSlotProvider', () => {
     try {
       await act(async () => {
         root.render(
-          <TerminalSlotProvider>
+          <TerminalSessionProvider>
             <span>probe</span>
-          </TerminalSlotProvider>,
+          </TerminalSessionProvider>,
         )
       })
 
@@ -1883,7 +1879,7 @@ describe('TerminalSlotProvider', () => {
       onEffectIntent: vi.fn(() => () => {}),
       pathForFile: vi.fn(() => ''),
       saveClipboardFiles: vi.fn(async () => []),
-      shell: () => null,
+      host: () => null,
       terminal: () => ({
         attach: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
         restart: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
@@ -1914,7 +1910,7 @@ describe('TerminalSlotProvider', () => {
         closeView: vi.fn(async () => false),
         prewarm: vi.fn(async () => {}),
         kickReconnect,
-        getSlotSnapshot: vi.fn(async () => null),
+        getSessionSnapshot: vi.fn(async () => null),
         reorderViews: vi.fn(async () => false),
         notifyBell: vi.fn(async () => false),
         sendTestNotification: vi.fn(async () => false),
@@ -1926,7 +1922,7 @@ describe('TerminalSlotProvider', () => {
         onLifecycle: () => () => {},
         onSessionsChanged: () => () => {},
         onWorkspacePaneChanged: () => () => {},
-        onSlotClosed: () => () => {},
+        onSessionClosed: () => () => {},
       }),
     })
 
@@ -1936,9 +1932,9 @@ describe('TerminalSlotProvider', () => {
     try {
       await act(async () => {
         root.render(
-          <TerminalSlotProvider>
+          <TerminalSessionProvider>
             <span>probe</span>
-          </TerminalSlotProvider>,
+          </TerminalSessionProvider>,
         )
       })
 
@@ -2019,7 +2015,7 @@ describe('TerminalSlotProvider', () => {
     const second = await renderProviderWithProbe(terminalWorktreeKey)
     try {
       // The second mount reaches the singleton via
-      // `getTerminalSlotRegistry`. If state survived, the prior
+      // `getTerminalSessionProjection`. If state survived, the prior
       // session is observable; if not, count is 0. The point is
       // that we did NOT have to clear the slot between mounts.
       expect(second.getProbe().count).toBeGreaterThanOrEqual(1)
@@ -2029,8 +2025,8 @@ describe('TerminalSlotProvider', () => {
   })
 })
 
-function CaptureContext({ onContext }: { onContext: (value: TerminalSlotContextValue) => void }) {
-  onContext(useTerminalSlotContext())
+function CaptureContext({ onContext }: { onContext: (value: TerminalSessionContextValue) => void }) {
+  onContext(useTerminalSessionContext())
   return null
 }
 
@@ -2052,7 +2048,7 @@ function CaptureGroupProbe({
     }>
   }) => void
 }) {
-  const summaries = useTerminalSlotSummaries(worktreeTerminalKey)
+  const summaries = useTerminalSessionSummaries(worktreeTerminalKey)
   onProbe({
     count: useWorktreeTerminalCount(worktreeTerminalKey),
     terminalIds: summaries.map((session) => session.slotId),
@@ -2069,27 +2065,27 @@ function CaptureGroupProbe({
 }
 
 async function renderProvider(): Promise<{
-  getContext: () => TerminalSlotContextValue
+  getContext: () => TerminalSessionContextValue
   unmount: () => Promise<void>
 }> {
   return renderProviderWithHost()
 }
 
 async function renderProviderWithHost(): Promise<{
-  getContext: () => TerminalSlotContextValue
+  getContext: () => TerminalSessionContextValue
   unmount: () => Promise<void>
 }> {
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root: Root = createRoot(container)
-  let context: TerminalSlotContextValue | null = null
+  let context: TerminalSessionContextValue | null = null
 
   await act(async () => {
     root.render(
-      <TerminalSlotProvider>
+      <TerminalSessionProvider>
         <CaptureContext onContext={(value) => (context = value)} />
         <RegisterHost worktreeTerminalKey={worktreeTerminalKey(REPO_ID, WORKTREE_PATH)} />
-      </TerminalSlotProvider>,
+      </TerminalSessionProvider>,
     )
   })
 
@@ -2106,7 +2102,7 @@ async function renderProviderWithHost(): Promise<{
 }
 
 async function renderProviderWithProbe(worktreeTerminalKey: string): Promise<{
-  getContext: () => TerminalSlotContextValue
+  getContext: () => TerminalSessionContextValue
   getProbe: () => {
     count: number
     terminalIds: string[]
@@ -2124,7 +2120,7 @@ async function renderProviderWithProbe(worktreeTerminalKey: string): Promise<{
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root: Root = createRoot(container)
-  let context: TerminalSlotContextValue | null = null
+  let context: TerminalSessionContextValue | null = null
   let probe: {
     count: number
     terminalIds: string[]
@@ -2140,11 +2136,11 @@ async function renderProviderWithProbe(worktreeTerminalKey: string): Promise<{
 
   await act(async () => {
     root.render(
-      <TerminalSlotProvider>
+      <TerminalSessionProvider>
         <CaptureContext onContext={(value) => (context = value)} />
         <RegisterHost worktreeTerminalKey={worktreeTerminalKey} />
         <CaptureGroupProbe worktreeTerminalKey={worktreeTerminalKey} onProbe={(value) => (probe = value)} />
-      </TerminalSlotProvider>,
+      </TerminalSessionProvider>,
     )
   })
 
@@ -2165,7 +2161,7 @@ async function renderProviderWithProbe(worktreeTerminalKey: string): Promise<{
 }
 
 function RegisterHost({ worktreeTerminalKey }: { worktreeTerminalKey: string }) {
-  const context = useTerminalSlotContext()
+  const context = useTerminalSessionContext()
   const ref = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {

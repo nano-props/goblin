@@ -1,16 +1,16 @@
 import { createContext, useContext } from 'react'
-import type { TerminalSlotContextValue, TerminalSlotReadContextValue } from '#/web/components/terminal/types.ts'
-export const TerminalSlotContext = createContext<TerminalSlotContextValue | null>(null)
-export const TerminalSlotReadContext = createContext<TerminalSlotReadContextValue | null>(null)
+import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
+export const TerminalSessionContext = createContext<TerminalSessionContextValue | null>(null)
+export const TerminalSessionReadContext = createContext<TerminalSessionReadContextValue | null>(null)
 
-export function useTerminalSlotContext(): TerminalSlotContextValue {
-  const value = useContext(TerminalSlotContext)
+export function useTerminalSessionContext(): TerminalSessionContextValue {
+  const value = useContext(TerminalSessionContext)
   if (!value) throw new Error('Terminal session context is unavailable')
   return value
 }
 
-export function useTerminalSlotReadContext(): TerminalSlotReadContextValue {
-  const value = useContext(TerminalSlotReadContext)
+export function useTerminalSessionReadContext(): TerminalSessionReadContextValue {
+  const value = useContext(TerminalSessionReadContext)
   if (!value) throw new Error('Terminal session read context is unavailable')
   return value
 }

@@ -1,12 +1,12 @@
 import { describe, expect, test } from 'vitest'
 import {
-  markTerminalSlotClosed,
-  markTerminalSlotError,
-  markTerminalSlotOpen,
-  markTerminalSlotOpening,
-  markTerminalSlotRestarting,
+  markTerminalSessionClosed,
+  markTerminalSessionError,
+  markTerminalSessionOpen,
+  markTerminalSessionOpening,
+  markTerminalSessionRestarting,
   type TerminalLifecycleState,
-} from '#/server/terminal/terminal-slot-lifecycle.ts'
+} from '#/server/terminal/terminal-session-lifecycle.ts'
 
 describe('terminal session lifecycle helpers', () => {
   test('drives the session through explicit lifecycle phases', () => {
@@ -15,19 +15,19 @@ describe('terminal session lifecycle helpers', () => {
       message: 'stale',
     }
 
-    markTerminalSlotOpening(state)
+    markTerminalSessionOpening(state)
     expect(state).toEqual({ phase: 'opening', message: null })
 
-    markTerminalSlotOpen(state)
+    markTerminalSessionOpen(state)
     expect(state).toEqual({ phase: 'open', message: null })
 
-    markTerminalSlotRestarting(state)
+    markTerminalSessionRestarting(state)
     expect(state).toEqual({ phase: 'restarting', message: null })
 
-    markTerminalSlotError(state, 'pty failed')
+    markTerminalSessionError(state, 'pty failed')
     expect(state).toEqual({ phase: 'error', message: 'pty failed' })
 
-    markTerminalSlotClosed(state)
+    markTerminalSessionClosed(state)
     expect(state).toEqual({ phase: 'closed', message: null })
   })
 })

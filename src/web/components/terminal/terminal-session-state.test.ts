@@ -1,10 +1,10 @@
 import { describe, expect, test } from 'vitest'
-import { TerminalSlotState } from '#/web/components/terminal/terminal-slot-state.ts'
+import { TerminalSessionState } from '#/web/components/terminal/terminal-session-state.ts'
 import type { TerminalIdentityViewModel, TerminalLifecycleViewModel } from '#/web/components/terminal/types.ts'
 
-describe('TerminalSlotState', () => {
+describe('TerminalSessionState', () => {
   test('initial state has the opening phase, default process name, and no attachment', () => {
-    const state = new TerminalSlotState()
+    const state = new TerminalSessionState()
     expect(state.snapshot(null)).toEqual({
       phase: 'opening',
       message: null,
@@ -19,7 +19,7 @@ describe('TerminalSlotState', () => {
   })
 
   test('applyOpenResult sets identity and lifecycle in one shot', () => {
-    const state = new TerminalSlotState()
+    const state = new TerminalSessionState()
     expect(
       state.applyOpenResult({
         processName: 'zsh',
@@ -56,7 +56,7 @@ describe('TerminalSlotState', () => {
     // phase/message/takeoverPending and returns `changed` only for
     // those fields. A future caller cannot accidentally re-introduce
     // the conflation because the types do not overlap.
-    const state = new TerminalSlotState()
+    const state = new TerminalSessionState()
     state.applyOpenResult({
       processName: 'zsh',
       canonicalTitle: null,
@@ -97,7 +97,7 @@ describe('TerminalSlotState', () => {
     // requirement) is the write-path gate. They are intentionally
     // separate so the conflation in the pre-split `canResize()` is
     // not possible.
-    const state = new TerminalSlotState()
+    const state = new TerminalSessionState()
     state.applyOpenResult({
       processName: 'zsh',
       canonicalTitle: null,
@@ -121,7 +121,7 @@ describe('TerminalSlotState', () => {
   })
 
   test('canSendInput requires both role=controller AND phase=open', () => {
-    const state = new TerminalSlotState()
+    const state = new TerminalSessionState()
     state.applyOpenResult({
       processName: 'zsh',
       canonicalTitle: null,
@@ -178,11 +178,11 @@ describe('TerminalSlotState', () => {
       takeoverPending: false,
     }
 
-    const a = new TerminalSlotState()
+    const a = new TerminalSessionState()
     a.applyIdentity(identity)
     a.applyLifecycle(lifecycle)
 
-    const b = new TerminalSlotState()
+    const b = new TerminalSessionState()
     b.applyLifecycle(lifecycle)
     b.applyIdentity(identity)
 
@@ -190,7 +190,7 @@ describe('TerminalSlotState', () => {
   })
 
   test('restarting state is non-interactive until open resumes', () => {
-    const state = new TerminalSlotState()
+    const state = new TerminalSessionState()
     state.applyOpenResult({
       processName: 'zsh',
       canonicalTitle: null,
@@ -214,7 +214,7 @@ describe('TerminalSlotState', () => {
   })
 
   test('resetTransientState clears transient state without overwriting identity or lifecycle', () => {
-    const state = new TerminalSlotState()
+    const state = new TerminalSessionState()
     state.applyOpenResult({
       processName: 'zsh',
       canonicalTitle: '~/Developer/goblin — npm run dev',
@@ -249,7 +249,7 @@ describe('TerminalSlotState', () => {
   })
 
   test('normalizes empty titles back to null', () => {
-    const state = new TerminalSlotState()
+    const state = new TerminalSessionState()
 
     expect(state.setCanonicalTitle('  hello   world  ')).toBe(true)
     expect(state.snapshot(null).canonicalTitle).toBe('hello world')

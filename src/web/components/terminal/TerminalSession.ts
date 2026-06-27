@@ -15,13 +15,13 @@ import { preloadTerminalFont, proposeTerminalGeometry } from '#/web/components/t
 import {
   TerminalHostNotMeasurableError,
   waitForMeasurableHost,
-} from '#/web/components/terminal/terminal-slot-geometry.ts'
+} from '#/web/components/terminal/terminal-session-geometry.ts'
 import {
   projectTerminalAttachResultForClient,
   type TerminalAttachResultWithController,
-} from '#/web/components/terminal/terminal-slot-projection.ts'
-import { TerminalSlotRuntime } from '#/web/components/terminal/terminal-slot-runtime.ts'
-import { TerminalSlotView } from '#/web/components/terminal/terminal-slot-view.ts'
+} from '#/web/components/terminal/terminal-session-projection.ts'
+import { TerminalSessionRuntime } from '#/web/components/terminal/terminal-session-runtime.ts'
+import { TerminalSessionView } from '#/web/components/terminal/terminal-session-view.ts'
 import { isTerminalEmulatorInput, type TerminalInput } from '#/web/components/terminal/terminal-input.ts'
 import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-bridge.ts'
 import {
@@ -38,20 +38,20 @@ import type {
   TerminalDescriptor,
   TerminalIdentityViewModel,
   TerminalLifecycleViewModel,
-  TerminalSlotHydrationInput,
+  TerminalSessionHydrationInput,
   TerminalSearchResult,
 } from '#/web/components/terminal/types.ts'
 const EMPTY_SEARCH_RESULT: TerminalSearchResult = { resultIndex: -1, resultCount: 0, found: false }
 
 export type TerminalNotifyReason = 'metadata'
 
-export class ManagedTerminalSlot {
+export class TerminalSession {
   descriptor: TerminalDescriptor
   private readonly notify: (reason: TerminalNotifyReason) => void
   private readonly onBell: ((descriptor: TerminalDescriptor, event: TerminalBellEvent) => void) | null
   private readonly requestDurableClose: (ptySessionId: string) => Promise<void>
-  private readonly runtime = new TerminalSlotRuntime()
-  private readonly view: TerminalSlotView
+  private readonly runtime = new TerminalSessionRuntime()
+  private readonly view: TerminalSessionView
   // Authority gate owns the "am I the controller?" cache and the
   // auto-promote-on-write path. The gate is constructed lazily so
   // the runtime/bridge dependency wiring stays inside the methods
@@ -83,14 +83,14 @@ export class ManagedTerminalSlot {
     // fire-and-forget. The old `void … .catch(() => {})` path could
     // drop the request if the WebSocket was already closing, leaving
     // the server PTY alive and the next create reattaching to the
-    // orphan. See `TerminalSlotRegistry.pendingCloseByPtySessionId`.
+    // orphan. See `TerminalSessionProjection.pendingCloseByPtySessionId`.
     requestDurableClose: (ptySessionId: string) => Promise<void> = () => Promise.resolve(),
   ) {
     this.descriptor = descriptor
     this.notify = notify
     this.onBell = onBell
     this.requestDurableClose = requestDurableClose
-    this.view = new TerminalSlotView({
+    this.view = new TerminalSessionView({
       onInput: (data) => this.writeInput(data),
       onBell: () => this.handleBell(),
       onResize: ({ cols, rows }) => this.queueResize(cols, rows),
@@ -135,7 +135,7 @@ export class ManagedTerminalSlot {
     this.start()
   }
 
-  dispose(options: { closeSlot?: boolean } = {}): void {
+  dispose(options: { closeSession?: boolean } = {}): void {
     void this.disposeAndWait(options).catch(() => {
       // Durable close failures are logged at the registry queue. The
       // synchronous dispose surface intentionally preserves the old
@@ -143,7 +143,7 @@ export class ManagedTerminalSlot {
     })
   }
 
-  async disposeAndWait(options: { closeSlot?: boolean } = {}): Promise<void> {
+  async disposeAndWait(options: { closeSession?: boolean } = {}): Promise<void> {
     if (this.disposed) return
     this.disposed = true
     this.geometryAbortController?.abort()
@@ -152,7 +152,7 @@ export class ManagedTerminalSlot {
     this.view.blurIfFocused()
     const ptySessionIds = this.runtime.disposePtySessionIds()
     const closePromises: Promise<void>[] = []
-    if (options.closeSlot !== false) {
+    if (options.closeSession !== false) {
       // Hand the close to the registry's durable queue instead of
       // firing `terminalBridge.close` directly. The queue resolves
       // only after the server close settles, so async close callers
@@ -217,7 +217,7 @@ export class ManagedTerminalSlot {
       .authorize('write')
       .then((result) => {
         // Post-dispose guard: the gate's takeover round-trip can
-        // resolve after `dispose()` ran, in which case the slot no
+        // resolve after `dispose()` ran, in which case the session no
         // longer owns this ptySessionId. Drop the write — the
         // registry's durable-close queue has already taken
         // responsibility for the actual close.
@@ -253,7 +253,7 @@ export class ManagedTerminalSlot {
       .then((result) => {
         // Post-dispose guard: see `flushInput` for the same
         // race. Without this, a resize queued before `dispose()`
-        // could land on a torn-down slot's ptySessionId and the
+        // could land on a torn-down session's ptySessionId and the
         // server would echo the resize back to whichever sibling
         // tab is now the controller.
         if (this.disposed || this.runtime.currentPtySessionId() !== ptySessionId) return
@@ -276,7 +276,7 @@ export class ManagedTerminalSlot {
   /**
    * Map a structured gate denial to a toast. Per the AGENTS.md i18n
    * rule, the key is read from the typed `WRITE_BLOCKED_KEY_BY_REASON`
-   * map rather than concatenated inline. `slot-closed` is intentionally
+   * map rather than concatenated inline. `session-closed` is intentionally
    * silent (the session is gone, no need to nag) so the lookup is
    * `null` in that case.
    */
@@ -350,8 +350,7 @@ export class ManagedTerminalSlot {
             return fallback
           }
         },
-        isSessionAlive: (ptySessionId) =>
-          !this.disposed && this.runtime.currentPtySessionId() === ptySessionId,
+        isSessionAlive: (ptySessionId) => !this.disposed && this.runtime.currentPtySessionId() === ptySessionId,
         onPromoted: (result) => {
           // Mirror the runtime's `applyTakeover` so the new
           // controller's view (cols/rows/phase) is applied
@@ -364,10 +363,10 @@ export class ManagedTerminalSlot {
     return this.authorityGate
   }
 
-  hydrate(input: TerminalSlotHydrationInput): void {
+  hydrate(input: TerminalSessionHydrationInput): void {
     const previousPtySessionId = this.runtime.currentPtySessionId()
     this.hydratedSnapshot = { snapshot: input.snapshot, snapshotSeq: input.snapshotSeq }
-    const changed = this.runtime.hydrateSession({
+    const changed = this.runtime.hydrateRepoSession({
       ptySessionId: input.ptySessionId,
       phase: input.phase,
       message: input.message,
@@ -411,7 +410,7 @@ export class ManagedTerminalSlot {
       // Sync the gate's role cache. Pass `newRole` through directly
       // (not the boolean `isControllerNow` collapsed form) so the
       // gate can distinguish 'unowned' from 'viewer' — the gate
-      // returns `denied: slot-closed` for unowned and triggers an
+      // returns `denied: session-closed` for unowned and triggers an
       // auto-promote for viewer.
       this.authority().setRole(newRole)
       // Note: the takeover-pending flag is owned by the takeover
@@ -440,8 +439,8 @@ export class ManagedTerminalSlot {
         if (this.view.isConnected()) this.start()
         if (this.view.isVisible()) this.view.focus()
       } else if (wasRole === 'viewer' && newRole === 'unowned' && this.view.isConnected()) {
-        // A mounted viewer slot became unowned: the previous PTY
-        // controller released the slot. Auto-attach as the new
+        // A mounted viewer session became unowned: the previous PTY
+        // controller released the session. Auto-attach as the new
         // controller so the user does not have to click into the
         // tab. This branch
         // is independent of the controller→viewer transition above
@@ -755,7 +754,7 @@ export class ManagedTerminalSlot {
       term.reset()
       if (hydratedSnapshot.snapshot) await termWrite(term, hydratedSnapshot.snapshot)
       // Post-await dispose guard: `termWrite` may have resolved
-      // after `dispose()` ran (the slot is no longer the current
+      // after `dispose()` ran (the session is no longer the current
       // controller of this ptySessionId, the term is destroyed, and any
       // `term.write` callback would land on a freed term and throw
       // an unhandled-rejection). Drop the replay window before

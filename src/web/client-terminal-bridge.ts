@@ -3,8 +3,8 @@ import { resolveWebSocketProtocol } from '#/web/lib/websocket-url.ts'
 import { ACCESS_TOKEN_QUERY } from '#/shared/access-token.ts'
 import {
   normalizeTerminalSocketServerMessage,
-  normalizeTerminalSlotSnapshot,
-  normalizeTerminalSlotSummaryList,
+  normalizeTerminalSessionSnapshot,
+  normalizeTerminalSessionSummaryList,
 } from '#/shared/terminal-validators.ts'
 import { resolveTerminalController } from '#/shared/terminal-controller.ts'
 import type {
@@ -23,9 +23,9 @@ import type {
   TerminalMutationResult,
   TerminalNotifyBellInput,
   TerminalOutputEvent,
-  TerminalSlotSnapshot,
-  TerminalSlotSnapshotInput,
-  TerminalSlotSummary,
+  TerminalSessionSnapshot,
+  TerminalSessionSnapshotInput,
+  TerminalSessionSummary,
   TerminalTakeoverResult,
   TerminalTitleEvent,
   TerminalRestartInput,
@@ -75,7 +75,7 @@ export function createServerTerminalBridge(options: {
   const identitySubscribers = new Set<(event: TerminalIdentityViewModel) => void>()
   const lifecycleSubscribers = new Set<(event: TerminalLifecycleViewModel) => void>()
   const sessionsChangedSubscribers = new Set<(repoRoot: string) => void>()
-  const slotClosedSubscribers = new Set<(event: { ptySessionId: string; repoRoot: string }) => void>()
+  const sessionClosedSubscribers = new Set<(event: { ptySessionId: string; repoRoot: string }) => void>()
   const clientId = options.getClientId()
   let socket: WebSocket | null = null
   let reconnectTimer: number | null = null
@@ -98,7 +98,7 @@ export function createServerTerminalBridge(options: {
       identitySubscribers.size > 0 ||
       lifecycleSubscribers.size > 0 ||
       sessionsChangedSubscribers.size > 0 ||
-      slotClosedSubscribers.size > 0
+      sessionClosedSubscribers.size > 0
     )
   }
 
@@ -198,8 +198,8 @@ export function createServerTerminalBridge(options: {
         for (const subscriber of exitSubscribers) subscriber(message.event)
       } else if (message.type === 'sessions-changed') {
         for (const subscriber of sessionsChangedSubscribers) subscriber(message.repoRoot)
-      } else if (message.type === 'slot-closed') {
-        for (const subscriber of slotClosedSubscribers)
+      } else if (message.type === 'session-closed') {
+        for (const subscriber of sessionClosedSubscribers)
           subscriber({ ptySessionId: message.ptySessionId, repoRoot: message.repoRoot })
       } else if (message.type === 'identity') {
         const identityEvent = {
@@ -337,7 +337,7 @@ export function createServerTerminalBridge(options: {
     },
     listSessions(input) {
       return requestOverSocket('list-sessions', input).then((value) => {
-        const sessions = normalizeTerminalSlotSummaryList(value)
+        const sessions = normalizeTerminalSessionSummaryList(value)
         if (!sessions) throw new Error('Terminal socket response failed: invalid terminal sessions response')
         return sessions
       })
@@ -354,10 +354,10 @@ export function createServerTerminalBridge(options: {
         .then(() => undefined)
         .catch(() => {})
     },
-    getSlotSnapshot(input) {
-      return requestOverSocket('slot-snapshot', input satisfies TerminalSlotSnapshotInput).then((value) => {
+    getSessionSnapshot(input) {
+      return requestOverSocket('session-snapshot', input satisfies TerminalSessionSnapshotInput).then((value) => {
         if (value === null) return null
-        const snapshot = normalizeTerminalSlotSnapshot(value)
+        const snapshot = normalizeTerminalSessionSnapshot(value)
         if (!snapshot) throw new Error('Terminal socket response failed: invalid terminal session snapshot response')
         return snapshot
       })
@@ -438,12 +438,12 @@ export function createServerTerminalBridge(options: {
         closeSocketIfIdle()
       }
     },
-    onSlotClosed(cb) {
-      slotClosedSubscribers.add(cb)
+    onSessionClosed(cb) {
+      sessionClosedSubscribers.add(cb)
       manualSocketClose = false
       ensureSocket()
       return () => {
-        slotClosedSubscribers.delete(cb)
+        sessionClosedSubscribers.delete(cb)
         closeSocketIfIdle()
       }
     },
@@ -472,11 +472,11 @@ export function createServerTerminalBridge(options: {
   async function requestOverSocket(
     action: 'list-sessions',
     input: { repoRoot: string },
-  ): Promise<TerminalSlotSummary[]>
+  ): Promise<TerminalSessionSummary[]>
   async function requestOverSocket(
-    action: 'slot-snapshot',
-    input: TerminalSlotSnapshotInput,
-  ): Promise<TerminalSlotSnapshot | null>
+    action: 'session-snapshot',
+    input: TerminalSessionSnapshotInput,
+  ): Promise<TerminalSessionSnapshot | null>
   async function requestOverSocket(
     action: 'write',
     input: TerminalSocketRequestInputs['write'],
@@ -585,11 +585,7 @@ export function createServerTerminalBridge(options: {
   }
 }
 
-export function createTerminalWebSocketUrl(
-  baseUrl: string,
-  accessToken: string,
-  clientId: string,
-): string {
+export function createTerminalWebSocketUrl(baseUrl: string, accessToken: string, clientId: string): string {
   const httpUrl = new URL('/ws/terminal', baseUrl)
   httpUrl.protocol = resolveWebSocketProtocol()
   // `?t=` is the WebSocket auth channel for the access token. The

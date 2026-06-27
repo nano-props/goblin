@@ -2,7 +2,7 @@ import { isValidTerminalClientId } from '#/shared/terminal-validators.ts'
 
 const SLOT_ID_RE = /^[A-Za-z0-9_-]{1,64}$/
 
-export function isValidSlotId(value: unknown): value is string {
+export function isValidTerminalSessionId(value: unknown): value is string {
   return typeof value === 'string' && SLOT_ID_RE.test(value)
 }
 

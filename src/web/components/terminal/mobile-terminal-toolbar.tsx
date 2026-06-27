@@ -21,12 +21,7 @@ const KEYS: ToolbarKey[] = [
   { type: 'scroll', icon: <ChevronsDown className="size-4" />, amount: 12, accessibleName: 'Page Down (scroll down)' },
 ]
 
-export function MobileTerminalToolbar({
-  onInput,
-  onScrollLines,
-  disabled,
-  className,
-}: MobileTerminalToolbarProps) {
+export function MobileTerminalToolbar({ onInput, onScrollLines, disabled, className }: MobileTerminalToolbarProps) {
   return (
     <div className={cn('goblin-terminal-mobile-toolbar', className)} role="toolbar" aria-label="Terminal input helpers">
       <div className="goblin-terminal-mobile-toolbar__row">
@@ -53,9 +48,7 @@ export function MobileTerminalToolbar({
                 onInput(key.value)
               }}
             >
-              <span aria-hidden="true">
-                {key.type === 'scroll' || key.type === 'command' ? key.icon : key.label}
-              </span>
+              <span aria-hidden="true">{key.type === 'scroll' || key.type === 'command' ? key.icon : key.label}</span>
               <span className="sr-only">{key.accessibleName}</span>
             </Button>
           )

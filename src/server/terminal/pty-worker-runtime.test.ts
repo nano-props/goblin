@@ -106,8 +106,9 @@ describe('PtyWorkerRuntime', () => {
     runtime.handleMessage({ type: 'pty-spawn', requestId: 'req', input: { cwd: '/repo', cols: 80, rows: 24 } })
     const pty = mockPtys[0]
     if (!pty) throw new Error('no pty')
-    const ptySessionId = (emitted.find((m) => m.type === 'pty-spawn-result' && m.ok) as { ptySessionId: string } | undefined)
-      ?.ptySessionId
+    const ptySessionId = (
+      emitted.find((m) => m.type === 'pty-spawn-result' && m.ok) as { ptySessionId: string } | undefined
+    )?.ptySessionId
     if (!ptySessionId) throw new Error('no session id')
 
     pty.emitData('hello')
@@ -152,8 +153,9 @@ describe('PtyWorkerRuntime', () => {
     const pty = mockPtys[0]
     expect(pty).toBeDefined()
     if (!pty) return
-    const ptySessionId = (emitted.find((m) => m.type === 'pty-spawn-result' && m.ok) as { ptySessionId: string } | undefined)
-      ?.ptySessionId
+    const ptySessionId = (
+      emitted.find((m) => m.type === 'pty-spawn-result' && m.ok) as { ptySessionId: string } | undefined
+    )?.ptySessionId
     expect(ptySessionId).toBeDefined()
     if (!ptySessionId) return
     runtime.handleMessage({ type: 'pty-write', ptySessionId, data: 'ls\n' })
@@ -170,8 +172,9 @@ describe('PtyWorkerRuntime', () => {
     runtime.handleMessage({ type: 'pty-spawn', requestId: 'req', input: { cwd: '/repo', cols: 80, rows: 24 } })
     const pty = mockPtys[0]
     if (!pty) throw new Error('no pty')
-    const ptySessionId = (emitted.find((m) => m.type === 'pty-spawn-result' && m.ok) as { ptySessionId: string } | undefined)
-      ?.ptySessionId
+    const ptySessionId = (
+      emitted.find((m) => m.type === 'pty-spawn-result' && m.ok) as { ptySessionId: string } | undefined
+    )?.ptySessionId
     expect(ptySessionId).toBeDefined()
     if (!ptySessionId) return
 
@@ -187,8 +190,9 @@ describe('PtyWorkerRuntime', () => {
   test('emits a title-OSC-driven process-name change on subsequent data chunks', () => {
     const { runtime, emitted } = buildRuntime()
     runtime.handleMessage({ type: 'pty-spawn', requestId: 'req', input: { cwd: '/repo', cols: 80, rows: 24 } })
-    const ptySessionId = (emitted.find((m) => m.type === 'pty-spawn-result' && m.ok) as { ptySessionId: string } | undefined)
-      ?.ptySessionId
+    const ptySessionId = (
+      emitted.find((m) => m.type === 'pty-spawn-result' && m.ok) as { ptySessionId: string } | undefined
+    )?.ptySessionId
     if (!ptySessionId) throw new Error('no session id')
 
     const pty = mockPtys[0]

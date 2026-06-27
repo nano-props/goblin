@@ -33,9 +33,7 @@ type HeadlessTerminalConstructor = new (
   options?: ITerminalOptions & ITerminalInitOnlyOptions,
 ) => HeadlessTerminalInstance
 
-const headlessModule = (
-  'default' in xtermHeadlessImport ? xtermHeadlessImport.default : xtermHeadlessImport
-) as {
+const headlessModule = ('default' in xtermHeadlessImport ? xtermHeadlessImport.default : xtermHeadlessImport) as {
   Terminal: HeadlessTerminalConstructor
 }
 const HeadlessTerminal = headlessModule.Terminal

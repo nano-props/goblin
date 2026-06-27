@@ -1,18 +1,18 @@
 import { resolveTerminalController } from '#/shared/terminal-controller.ts'
 import { parseSlotIdIndex } from '#/shared/slot-ids.ts'
-import { parseTerminalSlotKey } from '#/shared/terminal-slot-key.ts'
+import { parseTerminalWorkspaceSlotKey } from '#/shared/terminal-workspace-slot-key.ts'
 import type {
   TerminalAttachResult,
-  TerminalSlotSnapshot,
-  TerminalSlotSummary as ServerTerminalSlotSummary,
+  TerminalSessionSnapshot,
+  TerminalSessionSummary as ServerTerminalSessionSummary,
 } from '#/shared/terminal-types.ts'
 import { terminalDescriptor } from '#/web/components/terminal/terminal-descriptor.ts'
 import { branchForTerminalWorktree } from '#/web/components/terminal/terminal-repo-index.ts'
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
+import { worktreeTerminalKey } from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
 import type {
   TerminalDescriptor,
   TerminalRepoIndex,
-  TerminalSlotHydrationInput,
+  TerminalSessionHydrationInput,
   TerminalIdentityViewModel,
 } from '#/web/components/terminal/types.ts'
 
@@ -27,10 +27,10 @@ export type TerminalAttachResultWithController = Extract<TerminalAttachResult, {
   controllerStatus: TerminalIdentityViewModel['controllerStatus']
 }
 
-export interface ProjectedServerTerminalSlot {
+export interface ProjectedServerTerminalSession {
   descriptor: TerminalDescriptor
   worktreeTerminalKey: string
-  hydrateInput: TerminalSlotHydrationInput
+  hydrateInput: TerminalSessionHydrationInput
   controlsTerminal: boolean
   displayOrder: number
 }
@@ -45,15 +45,15 @@ export function projectTerminalAttachResultForClient(
   }
 }
 
-export function projectServerTerminalSlot(input: {
+export function projectServerTerminalSession(input: {
   repoIndex: TerminalRepoIndex
   repoRoot: string
-  serverSlot: ServerTerminalSlotSummary
+  serverSession: ServerTerminalSessionSummary
   clientId: string
-  serverSnapshot?: TerminalSlotSnapshot | null
+  serverSnapshot?: TerminalSessionSnapshot | null
   reattachSnapshot?: ReattachSnapshotCacheEntry | null
-}): ProjectedServerTerminalSlot | null {
-  const parsed = parseTerminalSlotKey(input.serverSlot.key)
+}): ProjectedServerTerminalSession | null {
+  const parsed = parseTerminalWorkspaceSlotKey(input.serverSession.key)
   if (!parsed || parsed.repoRoot !== input.repoRoot) return null
   const branch = branchForTerminalWorktree(input.repoIndex, parsed.repoRoot, parsed.worktreePath)
   if (!branch) return null
@@ -63,26 +63,26 @@ export function projectServerTerminalSlot(input: {
     parseSlotIdIndex(parsed.slotId) ?? 1,
   )
   const terminalWorktree = worktreeTerminalKey(parsed.repoRoot, parsed.worktreePath)
-  const controller = resolveTerminalController(input.serverSlot.controller, input.clientId)
-  const isReattachMatch = input.reattachSnapshot?.ptySessionId === input.serverSlot.ptySessionId
+  const controller = resolveTerminalController(input.serverSession.controller, input.clientId)
+  const isReattachMatch = input.reattachSnapshot?.ptySessionId === input.serverSession.ptySessionId
   return {
     descriptor,
     worktreeTerminalKey: terminalWorktree,
     hydrateInput: {
-      ptySessionId: input.serverSlot.ptySessionId,
-      processName: input.serverSlot.processName,
-      canonicalTitle: input.serverSlot.canonicalTitle,
-      phase: input.serverSlot.phase,
-      message: input.serverSlot.message,
+      ptySessionId: input.serverSession.ptySessionId,
+      processName: input.serverSession.processName,
+      canonicalTitle: input.serverSession.canonicalTitle,
+      phase: input.serverSession.phase,
+      message: input.serverSession.message,
       role: controller.role,
       controllerStatus: controller.controllerStatus,
-      canonicalCols: input.serverSlot.cols,
-      canonicalRows: input.serverSlot.rows,
+      canonicalCols: input.serverSession.cols,
+      canonicalRows: input.serverSession.rows,
       snapshot: input.serverSnapshot?.snapshot ?? (isReattachMatch ? (input.reattachSnapshot?.snapshot ?? '') : ''),
       snapshotSeq:
         input.serverSnapshot?.snapshotSeq ?? (isReattachMatch ? (input.reattachSnapshot?.snapshotSeq ?? 0) : 0),
     },
-    controlsTerminal: input.serverSlot.controller?.clientId === input.clientId,
-    displayOrder: input.serverSlot.displayOrder,
+    controlsTerminal: input.serverSession.controller?.clientId === input.clientId,
+    displayOrder: input.serverSession.displayOrder,
   }
 }

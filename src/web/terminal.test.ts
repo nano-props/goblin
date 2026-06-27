@@ -137,9 +137,7 @@ describe('terminal web host bridge', () => {
 
     const dispose = terminalBridge.onOutput(() => {})
     const socket = MockWebSocket.instances[0]
-    expect(socket?.url).toMatch(
-      /^ws:\/\/127\.0\.0\.1:32100\/ws\/terminal\?t=secret&clientId=client_sharedterminal$/,
-    )
+    expect(socket?.url).toMatch(/^ws:\/\/127\.0\.0\.1:32100\/ws\/terminal\?t=secret&clientId=client_sharedterminal$/)
     const attachPromise = terminalBridge.attach({
       ptySessionId: 'pty_1234567890123456',
       cols: 100,
@@ -354,15 +352,15 @@ describe('terminal web host bridge', () => {
     const dispose = terminalBridge.onOutput(() => {})
     const socket = MockWebSocket.instances[0]
 
-    const snapshotPromise = terminalBridge.getSlotSnapshot({ ptySessionId: 'pty_1234567890123456' })
+    const snapshotPromise = terminalBridge.getSessionSnapshot({ ptySessionId: 'pty_1234567890123456' })
     socket?.emitOpen()
     await Promise.resolve()
     const request = socket?.sent
       .map((payload) => JSON.parse(payload))
-      .find((message) => message.action === 'slot-snapshot')
+      .find((message) => message.action === 'session-snapshot')
     expect(request).toMatchObject({
       type: 'request',
-      action: 'slot-snapshot',
+      action: 'session-snapshot',
       input: {
         ptySessionId: 'pty_1234567890123456',
       },
@@ -372,7 +370,7 @@ describe('terminal web host bridge', () => {
         type: 'response',
         requestId: request?.requestId,
         ok: true,
-        action: 'slot-snapshot',
+        action: 'session-snapshot',
         payload: { ptySessionId: 'pty_1', snapshotSeq: 'bad' },
       }),
     )
@@ -490,7 +488,7 @@ describe('terminal web host bridge', () => {
     const { terminalBridge } = await import('#/web/terminal.ts')
     const dispose = terminalBridge.onOutput(() => {})
     const socket = MockWebSocket.instances[0]
-    const snapshotPromise = terminalBridge.getSlotSnapshot({ ptySessionId: 'pty_1234567890123456' })
+    const snapshotPromise = terminalBridge.getSessionSnapshot({ ptySessionId: 'pty_1234567890123456' })
 
     socket?.close()
 

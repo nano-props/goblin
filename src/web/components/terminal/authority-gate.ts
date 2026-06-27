@@ -31,7 +31,7 @@ import type { TerminalTakeoverResult } from '#/shared/terminal-types.ts'
  * right toast can be shown (and to logs so the failure mode is
  * diagnosable from production).
  *
- * - `slot-closed` — gate-internal: the runtime no longer has a
+ * - `session-closed` — gate-internal: the runtime no longer has a
  *   ptySessionId, or the session was disposed mid-call. The takeover
  *   round-trip never started.
  * - `no-bridge` — gate-internal: the client bridge is unavailable
@@ -48,7 +48,7 @@ import type { TerminalTakeoverResult } from '#/shared/terminal-types.ts'
  *   `message` field carries the server's i18n key.
  */
 export type AuthorizationDenialReason =
-  | 'slot-closed'
+  | 'session-closed'
   | 'no-bridge'
   | 'session-unknown'
   | 'client-offline'
@@ -93,7 +93,7 @@ export interface TerminalAuthorityGate {
   /**
    * Push the latest role the server believes this clientId has.
    * Called by the realtime identity event handler in
-   * `ManagedTerminalSlot.handleIdentity`.
+   * `TerminalSession.handleIdentity`.
    */
   setRole(role: 'controller' | 'viewer' | 'unowned'): void
   /**
@@ -124,7 +124,7 @@ interface XtermAuthorityGateOptions {
 }
 
 /**
- * Default implementation. One instance per `ManagedTerminalSlot`
+ * Default implementation. One instance per `TerminalSession`
  * — the registry constructs them when a session becomes active.
  */
 export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): TerminalAuthorityGate {
@@ -145,7 +145,7 @@ export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): Termi
 
     async authorize(action) {
       if (role === 'controller') return { kind: 'allowed' }
-      if (role === 'unowned') return { kind: 'denied', reason: 'slot-closed' }
+      if (role === 'unowned') return { kind: 'denied', reason: 'session-closed' }
       // role === 'viewer': auto-promote
       const takeover = await doTakeover()
       if (takeover.kind === 'allowed') return { kind: 'promoted' }
@@ -181,15 +181,13 @@ export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): Termi
       ...(extra.message !== undefined ? { message: extra.message } : {}),
       ...(extra.err !== undefined ? { err: extra.err } : {}),
     })
-    return extra.message !== undefined
-      ? { kind: 'denied', reason, message: extra.message }
-      : { kind: 'denied', reason }
+    return extra.message !== undefined ? { kind: 'denied', reason, message: extra.message } : { kind: 'denied', reason }
   }
 
   async function doTakeover(): Promise<AuthorizationResult> {
     const ptySessionId = opts.getPtySessionId()
-    if (!ptySessionId) return deny('slot-closed', 'preflight')
-    if (!opts.isSessionAlive(ptySessionId)) return deny('slot-closed', 'isSessionAlive', { ptySessionId })
+    if (!ptySessionId) return deny('session-closed', 'preflight')
+    if (!opts.isSessionAlive(ptySessionId)) return deny('session-closed', 'isSessionAlive', { ptySessionId })
     let size: { cols: number; rows: number }
     try {
       size = await opts.resolveSize()
@@ -214,13 +212,13 @@ export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): Termi
       })
     }
     // Post-await dispose guard: the bridge's takeover round-trip
-    // can resolve after the slot was disposed (e.g. the user
+    // can resolve after the session was disposed (e.g. the user
     // navigated away mid-takeover). Without this re-check the
     // `onPromoted` callback would mutate a destroyed runtime and
     // flip the gate's role to `controller`, leaving stale state
     // for the next sibling attach on the same `ptySessionId`.
     if (!opts.isSessionAlive(ptySessionId)) {
-      return deny('slot-closed', 'post-await isSessionAlive', { ptySessionId })
+      return deny('session-closed', 'post-await isSessionAlive', { ptySessionId })
     }
     // ORDERING CONTRACT: `onPromoted` MUST run before `role` is
     // flipped to 'controller'. Callers of `takeover()` /

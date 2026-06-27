@@ -20,42 +20,42 @@ import { planTerminalPathWrite } from '#/web/clipboard/terminal-path-write.ts'
 import type { PasteResolution } from '#/web/clipboard/resolver.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { terminalLog } from '#/web/logger.ts'
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
-import { useTerminalSlotContext } from '#/web/components/terminal/terminal-slot-context.ts'
+import { worktreeTerminalKey } from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
+import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import {
   useWorktreeTerminalSelectedDescriptor,
   useWorktreeTerminalCount,
   useWorktreeTerminalPendingCreate,
   useTerminalSnapshot,
-} from '#/web/components/terminal/terminal-slot-store.ts'
+} from '#/web/components/terminal/terminal-session-store.ts'
 import { MobileTerminalToolbar } from '#/web/components/terminal/mobile-terminal-toolbar.tsx'
 import { isMobileDevice } from '#/web/components/terminal/mobile-detection.ts'
-import type { TerminalSlotBase } from '#/web/components/terminal/types.ts'
+import type { TerminalSessionBase } from '#/web/components/terminal/types.ts'
 import { showTerminalCreateErrorToast } from '#/web/components/terminal/terminal-create-feedback.ts'
 
 const DEFAULT_TERMINAL_ERROR_MESSAGE_KEY = 'error.unknown'
 
-interface TerminalSlotProps {
+interface TerminalSessionViewProps {
   repoRoot: string
   branch: string
   worktreePath: string
   syncReady?: boolean
-  createTerminalForSlot?: (base: TerminalSlotBase) => Promise<unknown>
+  createTerminalForSlot?: (base: TerminalSessionBase) => Promise<unknown>
 }
 
-export function TerminalSlot({
+export function TerminalSessionView({
   repoRoot,
   branch,
   worktreePath,
   syncReady = true,
   createTerminalForSlot,
-}: TerminalSlotProps) {
+}: TerminalSessionViewProps) {
   const t = useT()
   const hostRef = useRef<HTMLDivElement | null>(null)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
-  const context = useTerminalSlotContext()
+  const context = useTerminalSessionContext()
   const {
     clearBell,
     attach,
@@ -293,7 +293,7 @@ export function TerminalSlot({
       // `isController` gate matches paste: a viewer dropping files into
       // a session it doesn't own would otherwise silently route input
       // to the controller's PTY. The `!key` half preserves the
-      // pre-existing guard against slots with no session.
+      // pre-existing guard against sessions with no session.
       if (!key || !isController) return
       const files = Array.from(event.dataTransfer.files).filter(isNonPlaceholderClipboardFile)
       if (files.length === 0) return
@@ -386,7 +386,7 @@ export function TerminalSlot({
 
   return (
     <div
-      className="goblin-terminal-slot focus-visible:outline-none"
+      className="goblin-terminal-session focus-visible:outline-none"
       tabIndex={-1}
       onFocusCapture={handleFocus}
       onBlurCapture={handleBlur}
@@ -414,21 +414,21 @@ export function TerminalSlot({
       )}
       <div
         ref={hostRef}
-        className={cn('goblin-terminal-slot__host', isReadonly && 'goblin-terminal-slot__host--hidden')}
+        className={cn('goblin-terminal-session__host', isReadonly && 'goblin-terminal-session__host--hidden')}
         aria-readonly={(!isController && hasSessions) || undefined}
       />
       {searchOpen && (
-        <div className="goblin-terminal-slot__search">
+        <div className="goblin-terminal-session__search">
           <input
             ref={searchInputRef}
-            className="goblin-terminal-slot__search-input"
+            className="goblin-terminal-session__search-input"
             value={searchTerm}
             aria-label={t('terminal.search-placeholder')}
             placeholder={t('terminal.search-placeholder')}
             onChange={(event) => handleSearchChange(event.target.value)}
             onKeyDown={handleSearchKeyDown}
           />
-          <span className="goblin-terminal-slot__search-result" role="status" aria-live="polite" aria-atomic="true">
+          <span className="goblin-terminal-session__search-result" role="status" aria-live="polite" aria-atomic="true">
             {resultLabel}
           </span>
           <Button type="button" size="sm" variant="ghost" onClick={searchPrevious} disabled={!searchTerm}>
@@ -472,11 +472,11 @@ export function TerminalSlot({
         />
       )}
       {slotMode === 'opening' && !hasSessions && !syncReady ? (
-        <div className="goblin-terminal-slot__status-overlay">
+        <div className="goblin-terminal-session__status-overlay">
           <span>{t('terminal.loading')}</span>
         </div>
       ) : slotMode === 'opening' && !hasSessions && pendingCreate ? (
-        <div className="goblin-terminal-slot__status-overlay">
+        <div className="goblin-terminal-session__status-overlay">
           <span>{t('terminal.opening')}</span>
         </div>
       ) : slotMode === 'opening' && !hasSessions ? (
@@ -502,7 +502,7 @@ export function TerminalSlot({
           newTerminalLabel={t('terminal.new')}
         />
       ) : slotMode === 'opening' || slotMode === 'restarting' ? (
-        <div className="goblin-terminal-slot__status-overlay">
+        <div className="goblin-terminal-session__status-overlay">
           <span>{t('terminal.opening')}</span>
         </div>
       ) : null}
@@ -513,7 +513,7 @@ export function TerminalSlot({
           overlays. The empty-message case is reserved for the
           "no sessions yet" placeholder and never renders the chip. */}
       {showErrorChip && snapshot.message !== 'terminal.empty' && (
-        <div className="goblin-terminal-slot__status-overlay goblin-terminal-slot__status-overlay--error">
+        <div className="goblin-terminal-session__status-overlay goblin-terminal-session__status-overlay--error">
           <span>{t(terminalErrorMessageKey)}</span>
           {key && (
             <Button type="button" size="sm" variant="ghost" onClick={() => restart(key)}>
@@ -523,7 +523,7 @@ export function TerminalSlot({
         </div>
       )}
       {dragOver && (
-        <div className="goblin-terminal-slot__drop-overlay">
+        <div className="goblin-terminal-session__drop-overlay">
           <span>{t('terminal.drop-hint')}</span>
         </div>
       )}
@@ -549,7 +549,7 @@ interface EmptyTerminalCtaProps {
 // Empty-state CTA. Rendered when the worktree has no terminal
 // sessions yet. The button is the only way for the user to
 // materialize a session on a fresh worktree without reaching for
-// the per-worktree "+" affordance in the tab strip — the slot's
+// the per-worktree "+" affordance in the tab strip — the session's
 // bare host <div> would otherwise be a featureless black box, which
 // is the "blank screen" symptom the user reported on first click.
 //
@@ -569,9 +569,9 @@ function EmptyTerminalCta({ onCreate, emptyLabel, newTerminalLabel }: EmptyTermi
     }
   }, [creating, onCreate])
   return (
-    <div className="goblin-terminal-slot__empty-cta" role="region" aria-label={emptyLabel}>
-      <div className="goblin-terminal-slot__empty-message">
-        <span className="goblin-terminal-slot__empty-title">{emptyLabel}</span>
+    <div className="goblin-terminal-session__empty-cta" role="region" aria-label={emptyLabel}>
+      <div className="goblin-terminal-session__empty-message">
+        <span className="goblin-terminal-session__empty-title">{emptyLabel}</span>
       </div>
       <Button type="button" size="sm" variant="secondary" onClick={handleClick} disabled={creating}>
         {creating ? `${newTerminalLabel}…` : newTerminalLabel}
@@ -589,13 +589,13 @@ function ViewerOverlay({
   takeoverPending,
 }: ViewerOverlayProps) {
   return (
-    <div className="goblin-terminal-slot__viewer-overlay">
-      <div className="goblin-terminal-slot__viewer-content">
-        <div className="goblin-terminal-slot__viewer-badge">{badge}</div>
-        <div className="goblin-terminal-slot__viewer-meta">
-          <span className="goblin-terminal-slot__viewer-process">{snapshot.processName}</span>
+    <div className="goblin-terminal-session__viewer-overlay">
+      <div className="goblin-terminal-session__viewer-content">
+        <div className="goblin-terminal-session__viewer-badge">{badge}</div>
+        <div className="goblin-terminal-session__viewer-meta">
+          <span className="goblin-terminal-session__viewer-process">{snapshot.processName}</span>
           {snapshot.canonicalTitle && (
-            <span className="goblin-terminal-slot__viewer-title">{snapshot.canonicalTitle}</span>
+            <span className="goblin-terminal-session__viewer-title">{snapshot.canonicalTitle}</span>
           )}
         </div>
         <Button

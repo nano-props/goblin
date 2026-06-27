@@ -1,6 +1,6 @@
 import type { TerminalDescriptor } from '#/web/components/terminal/types.ts'
 
-export function terminalSlotDisplayOrder(
+export function terminalSessionDisplayOrder(
   descriptor: TerminalDescriptor,
   displayOrderByKey: ReadonlyMap<string, number>,
 ): number {

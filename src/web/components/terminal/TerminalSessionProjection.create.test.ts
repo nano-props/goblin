@@ -33,8 +33,8 @@ vi.mock('#/web/components/terminal/terminal-geometry.ts', () => ({
   proposeTerminalGeometry: mocks.proposeTerminalGeometryMock,
 }))
 
-vi.mock('#/web/components/terminal/ManagedTerminalSlot.ts', () => {
-  class MockManagedTerminalSlot {
+vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
+  class MockTerminalSession {
     descriptor: any
     private ptySessionId: string | null = null
     private snapshotState: any = { phase: 'opening', message: null, processName: 'terminal', canonicalTitle: null }
@@ -106,13 +106,13 @@ vi.mock('#/web/components/terminal/ManagedTerminalSlot.ts', () => {
     }
   }
 
-  return { ManagedTerminalSlot: MockManagedTerminalSlot }
+  return { TerminalSession: MockTerminalSession }
 })
 
 import {
-  TerminalSlotRegistry,
-  setTerminalSlotRegistryForTests,
-} from '#/web/components/terminal/TerminalSlotRegistry.ts'
+  TerminalSessionProjection,
+  setTerminalSessionProjectionForTests,
+} from '#/web/components/terminal/TerminalSessionProjection.ts'
 
 const REPO_ROOT = '/repo'
 const WORKTREE_PATH = '/repo'
@@ -179,8 +179,8 @@ function makeCreateResult(overrides: Partial<Record<string, unknown>> = {}) {
   }
 }
 
-describe('TerminalSlotRegistry create flow', () => {
-  let registry: TerminalSlotRegistry
+describe('TerminalSessionProjection create flow', () => {
+  let registry: TerminalSessionProjection
 
   beforeEach(() => {
     mocks.createMock.mockReset()
@@ -191,9 +191,9 @@ describe('TerminalSlotRegistry create flow', () => {
     mocks.proposeTerminalGeometryMock.mockClear()
     mocks.preloadTerminalFontMock.mockClear()
     mocks.clientIdMock.mockClear()
-    registry = new TerminalSlotRegistry()
+    registry = new TerminalSessionProjection()
     registry.setRepoIndex(makeRepoIndex())
-    setTerminalSlotRegistryForTests(registry)
+    setTerminalSessionProjectionForTests(registry)
     originalResizeObserver = globalThis.ResizeObserver
     Object.defineProperty(globalThis, 'ResizeObserver', {
       configurable: true,
@@ -204,7 +204,7 @@ describe('TerminalSlotRegistry create flow', () => {
 
   afterEach(() => {
     registry.destroy()
-    setTerminalSlotRegistryForTests(null)
+    setTerminalSessionProjectionForTests(null)
     document.body.innerHTML = ''
     if (originalResizeObserver) {
       Object.defineProperty(globalThis, 'ResizeObserver', {
@@ -459,7 +459,7 @@ describe('TerminalSlotRegistry create flow', () => {
   })
 
   test('durable close: deduplicates concurrent enqueues for the same session', async () => {
-    // The catalog may surface a slot-closed event AND a parallel
+    // The catalog may surface a session-closed event AND a parallel
     // dispose() call for the same ptySessionId. The first call owns the
     // request; the second observes the same outcome.
     let resolveClose!: (value: boolean) => void
@@ -506,7 +506,7 @@ describe('TerminalSlotRegistry create flow', () => {
   })
 
   test('durable close: handleSlotClosed drops the matching local session', async () => {
-    // The server emits a slot-closed broadcast when window A
+    // The server emits a session-closed broadcast when window A
     // closes a session. Sibling windows route the event into
     // handleSlotClosed to drop the local entry without a
     // full reconcile.
@@ -515,12 +515,12 @@ describe('TerminalSlotRegistry create flow', () => {
     registry.registerHost(WORKTREE_KEY, host)
     await registry.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
 
-    expect(registry.worktreeSnapshot(WORKTREE_KEY).slots.length).toBe(1)
+    expect(registry.worktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
 
     registry.handleSlotClosed('pty_session_1_aaaaaaaaa')
 
     // The local session is gone; the worktree snapshot is empty.
-    expect(registry.worktreeSnapshot(WORKTREE_KEY).slots.length).toBe(0)
+    expect(registry.worktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(0)
   })
 
   test('prunes sessions missing from the repo index and clears their bell badge', async () => {
@@ -546,7 +546,7 @@ describe('TerminalSlotRegistry create flow', () => {
 
     registry.setRepoIndex({})
 
-    expect(registry.worktreeSnapshot(WORKTREE_KEY).slots.length).toBe(0)
+    expect(registry.worktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(0)
     expect(mocks.setBadgeMock).toHaveBeenLastCalledWith(0)
   })
 
@@ -563,7 +563,6 @@ describe('TerminalSlotRegistry create flow', () => {
       },
     })
 
-    expect(registry.worktreeSnapshot(WORKTREE_KEY).slots.length).toBe(1)
+    expect(registry.worktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
   })
-
 })
