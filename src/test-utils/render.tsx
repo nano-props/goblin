@@ -76,10 +76,3 @@ export async function flushMicrotasks(ticks = 3): Promise<void> {
   }
 }
 
-/**
- * Manually trigger cleanup without removing the act environment. Most
- * tests should let `renderInJsdom`'s `afterEach` handle this.
- */
-export function cleanupAfterEach(): void {
-  ensureAfterEachRegistered()
-}

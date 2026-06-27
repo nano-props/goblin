@@ -56,10 +56,10 @@ export default defineConfig({
             'src/system/**/*.test.ts',
             'src/system/**/*.test.tsx',
             'src/check-ls.test.ts',
-            // Cross-cutting helpers under `src/test-utils/` run under the
-            // `node` project because they do not need DOM; the jsdom
-            // project re-includes them below so a partial run still
-            // exercises them.
+            // Cross-cutting helpers under `src/test-utils/` and
+            // `src/web/test-utils/` run under the `node` project because
+            // they do not need DOM. They are intentionally excluded from
+            // the jsdom project so they are not executed twice.
             'src/test-utils/**/*.test.ts',
             'src/test-utils/**/*.test.tsx',
             'src/web/test-utils/**/*.test.ts',
