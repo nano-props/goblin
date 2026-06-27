@@ -277,10 +277,6 @@ items:
    files, so the `xterm` mock classes cannot be shared between files
    today. This is blocked until Vitest supports it or the project moves
    to a non-hoisted mock mechanism.
-3. **Delete `src/web/stores/repos/test-utils.ts` shim** — It now
-   re-exports `installGoblinTestBridge` etc. from
-   `#/web/test-utils/bridge.ts`. Once all 45 consumers are migrated to
-   the new path, remove the shim.
 
 ## 12. Adding a new test — checklist
 
