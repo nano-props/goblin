@@ -2,7 +2,7 @@ import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 
 /**
  * `controllerStatus === 'connected'` while the controller's client has
- * a live socket. The server clears the controller slot on disconnect
+ * a live socket. The server clears the controller role on disconnect
  * (no grace), so the only transient state the client needs to render is
  * `connected` vs `none`.
  */
@@ -85,7 +85,7 @@ export type TerminalTakeoverResult =
  * events the runtime captures.
  *
  * First-frame contract: a successful `attach`/`restart` response is
- * the authoritative handshake for that slot's frame state. All
+ * the authoritative handshake for that session's frame state. All
  * fields are required at the type level — the server must populate
  * them on every success path, and the client can hydrate the UI
  * without waiting for any follow-up event. This mirrors the R0

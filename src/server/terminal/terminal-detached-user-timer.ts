@@ -22,7 +22,7 @@ interface UserTimerEntry {
  * Tracks the per-user detached TTL. The previous revision also
  * managed a per-attachment controller grace timer (30 s after a
  * controller's socket dropped) — that timer has been removed: the
- * server now clears the controller slot on disconnect and the next
+ * server now clears the controller role on disconnect and the next
  * attach auto-claims (see `terminal-controller.ts`).
  */
 export class TerminalDetachedUserTimer {

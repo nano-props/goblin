@@ -6,7 +6,7 @@ import type { TerminalController } from '#/shared/terminal-types.ts'
  * The model is user-scoped: a single userId owns each session and
  * every attachment from that userId is considered the same logical
  * user. `write` and `resize` are restricted to whichever attachment
- * currently holds the controller slot — every other attachment is a
+ * currently holds the controller role — every other attachment is a
  * viewer. `takeover` is the one action that can preempt the existing
  * controller, and (in the client) it is the action the AuthorityGate
  * fires automatically when a viewer issues a write. `restart` reuses
@@ -45,7 +45,7 @@ function decideTerminalActionAuthority(
   if (!attachment) return { kind: 'deny', reason: 'unknown-client' }
   if (action === 'takeover') return { kind: 'allow' }
   // write / resize / restart require the caller to currently hold
-  // the controller slot.
+  // the controller role.
   if (state.controller === null) return { kind: 'deny', reason: 'session-unowned' }
   if (state.controller.clientId !== clientId) return { kind: 'deny', reason: 'not-controller' }
   return { kind: 'allow' }
@@ -105,8 +105,8 @@ export function registerTerminalClient(
  *
  * Semantics (single-user model):
  * - The same attachment reconnecting to a session it already
- *   controlled restores its controller slot if the slot was cleared
- *   while it was disconnected. (The server also clears the slot on
+ *   controlled restores its controller role if the controller role was cleared
+ *   while it was disconnected. (The server also clears the controller role on
  *   disconnect, so this is the post-clear restore path.)
  * - If no controller is present, the attachment auto-claims. The
  *   `userSticky` flag is set so a later attach from a different
@@ -120,7 +120,7 @@ export function attachTerminalClient(state: TerminalControllerState, clientId: s
 
   if (state.controller?.clientId === clientId) {
     // Reattaching as the same attachment that previously controlled
-    // (after a disconnect that cleared the slot). Promote back to
+    // (after a disconnect that cleared the controller role). Promote back to
     // controller and adopt the latest geometry.
     const sizeChanged = state.cols !== attachment.cols || state.rows !== attachment.rows
     state.controller = { clientId, status: 'connected' }
@@ -184,13 +184,13 @@ export function restartTerminalClientControl(state: TerminalControllerState, cli
  * slot in a 'grace' sub-state for 30 seconds so a transient network
  * blip wouldn't strand the controller. With user-scoped auto-claim
  * + sticky `userSticky`, that protection is no longer needed —
- * when the controller's attachment disconnects the slot clears,
+ * when the controller's attachment disconnects the controller role clears,
  * and the next attach from any attachment auto-claims. A controller
  * that reconnects within milliseconds is still treated as the
  * controller (the `clientId` matches) and gets its slot back.
  *
  * On reconnect of an attachment that was previously the controller
- * (and whose slot was cleared while it was away), the slot is
+ * (and whose controller role was cleared while it was away), the controller role is
  * restored. This is the post-disconnect restore path — it preserves
  * the previous design's "same clientId keeps control" invariant.
  */
@@ -206,7 +206,7 @@ export function updateTerminalClientConnection(
   attachment.connected = connected
 
   // Controller transition: connection state changed for whoever
-  // currently holds the slot.
+  // currently holds the controller role.
   if (state.controller?.clientId === clientId) {
     if (connected && !wasConnected) {
       // Came back online; emit so the client's viewer sees the
@@ -214,7 +214,7 @@ export function updateTerminalClientConnection(
       return { emitIdentity: true }
     }
     if (!connected && wasConnected) {
-      // Disconnected: clear the slot immediately. emitIdentity so
+      // Disconnected: clear the controller role immediately. emitIdentity so
       // sibling viewers (including the disconnected tab if it ever
       // comes back) see controller=null.
       state.controller = null

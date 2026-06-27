@@ -202,7 +202,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       // The new-session path defaults `clientConnected` to `true`
       // when undefined, while the existing-session path (line 148)
       // lets it fall through to `registerTerminalClient`'s own
-      // fallback (which resolves to the existing slot's stored
+      // fallback (which resolves to the existing session's stored
       // value, defaulting to `false` if unknown). For a brand-new
       // slot there is no existing value to consult, so the `?? true`
       // here reflects "no prior liveness info; treat as live" — the
@@ -213,7 +213,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       // `applyIdentityEffect` so the returned `emitIdentity` flag
       // (true for the auto-claim case where the new clientId picks
       // up an unowned slot) actually broadcasts the realtime
-      // `identity` event to siblings. Without this the slot's
+      // `identity` event to siblings. Without this the session's
       // controller and `userSticky` flags are set correctly but
       // sibling windows only learn about the new controller via the
       // next `sessions-changed` list-rescan.
@@ -726,7 +726,7 @@ function authorityReasonToMessage(reason: 'not-controller' | 'session-unowned' |
       // Unowned sessions must be explicitly taken over before they
       // can be restarted. The same error key is appropriate: a
       // different session already "owns" the recovery, even if the
-      // controller slot is currently empty.
+      // controller role is currently empty.
       return 'error.not-controller'
     case 'unknown-client':
       return 'error.invalid-arguments'

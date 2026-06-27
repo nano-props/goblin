@@ -231,8 +231,8 @@ describe('server terminal runtime', () => {
 
   test('reattaching after a disconnect auto-reclaims control and canonical geometry', async () => {
     // The previous revision had a 30s grace sub-state that kept the
-    // controller slot occupied between disconnect and reconnect. The
-    // current model clears the slot on disconnect (no grace) and
+    // controller role occupied between disconnect and reconnect. The
+    // current model clears the controller role on disconnect (no grace) and
     // treats a reconnect as a fresh attach — for a session that has
     // already been claimed by the user (userSticky=true), the
     // reattach auto-claims.
@@ -951,8 +951,8 @@ describe('server terminal runtime', () => {
     // Device-switch scenario in the new model: A was the controller
     // (from create); A's socket closes; B (a different clientId)
     // attaches. The previous revision refused the auto-claim because
-    // the slot was still in the 30s grace sub-state. The current
-    // model clears the slot on disconnect, so B's attach auto-claims.
+    // the controller role was still in the 30s grace sub-state. The current
+    // model clears the controller role on disconnect, so B's attach auto-claims.
     vi.useFakeTimers()
     const { host, shutdown } = buildRuntime()
     const socketA = { send: vi.fn(), close: vi.fn() }
@@ -975,7 +975,7 @@ describe('server terminal runtime', () => {
     host.unregisterSocket('client_a', USER_1, socketA)
 
     // B comes online and attaches — no explicit takeover needed
-    // because the slot was cleared on A's disconnect.
+    // because the controller role was cleared on A's disconnect.
     host.registerSocket('client_b', USER_1, socketB)
     const viewerAttach = await host.attach('client_a', USER_1, {
       ptySessionId,
@@ -995,11 +995,11 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
-  test('a late-returning original controller stays a viewer once a sibling has claimed the slot (no grace restore)', async () => {
-    // The new user-sticky model clears the controller slot on
+  test('a late-returning original controller stays a viewer once a sibling has claimed control (no grace restore)', async () => {
+    // The new user-sticky model clears the controller role on
     // disconnect with no grace period. If a sibling attachment
     // attaches in the window before the original controller
-    // reconnects, the sibling claims the slot. When the original
+    // reconnects, the sibling claims control. When the original
     // controller eventually reconnects, it is a viewer — the
     // previous design's grace restore ("same clientId keeps
     // control after a brief disconnect") does not apply. The

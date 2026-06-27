@@ -36,7 +36,7 @@ export function createTerminalRuntimeCoordinator(
       manager.setClientConnected(userId, clientId, true)
     },
     onClientDisconnected(clientId, userId) {
-      // Disconnect is immediate: the controller slot clears on
+      // Disconnect is immediate: the controller role clears on
       // disconnect and the next attach from any sibling attachment
       // auto-claims (see `terminal-controller.ts`). The detached TTL
       // is the only timer we still schedule on disconnect — it
