@@ -2,33 +2,33 @@ import * as v from 'valibot'
 import { COLOR_THEMES } from '#/shared/color-theme.ts'
 import { RepoSessionEntrySchema } from '#/shared/remote-repo-schema.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
-import type { SettingsPrefs } from '#/shared/settings.ts'
+import type { UserSettings } from '#/shared/settings.ts'
 
 export const LANG_PREF_VALUES = ['auto', 'en', 'zh', 'ko', 'ja'] as const
 export const THEME_PREF_VALUES = ['auto', 'light', 'dark'] as const
 
 export interface NativeSettingsProjectionPatch {
-  lang?: SettingsPrefs['lang']
-  theme?: SettingsPrefs['theme']
-  colorTheme?: SettingsPrefs['colorTheme']
-  shortcutsDisabled?: SettingsPrefs['shortcutsDisabled']
-  globalShortcutDisabled?: SettingsPrefs['globalShortcutDisabled']
+  lang?: UserSettings['lang']
+  theme?: UserSettings['theme']
+  colorTheme?: UserSettings['colorTheme']
+  shortcutsDisabled?: UserSettings['shortcutsDisabled']
+  globalShortcutDisabled?: UserSettings['globalShortcutDisabled']
 }
 
 export interface NativeSettingsProjectionState {
-  lang: SettingsPrefs['lang']
-  theme: SettingsPrefs['theme']
-  colorTheme: SettingsPrefs['colorTheme']
-  shortcutsDisabled: SettingsPrefs['shortcutsDisabled']
-  globalShortcutDisabled: SettingsPrefs['globalShortcutDisabled']
-  globalShortcut: SettingsPrefs['globalShortcut']
+  lang: UserSettings['lang']
+  theme: UserSettings['theme']
+  colorTheme: UserSettings['colorTheme']
+  shortcutsDisabled: UserSettings['shortcutsDisabled']
+  globalShortcutDisabled: UserSettings['globalShortcutDisabled']
+  globalShortcut: UserSettings['globalShortcut']
 }
 
 export interface NativeRecentReposProjection {
   recentRepos: RepoSessionEntry[]
 }
 
-export interface NativeShellProjection {
+export interface NativeHostProjection {
   prefs?: {
     patch: NativeSettingsProjectionPatch
     settings: NativeSettingsProjectionState
@@ -65,7 +65,7 @@ export const NativeRecentReposProjectionSchema = v.object({
   recentRepos: v.array(RepoSessionEntrySchema),
 })
 
-export const NativeShellProjectionSchema = v.pipe(
+export const NativeHostProjectionSchema = v.pipe(
   v.object({
     prefs: v.optional(
       v.object({
@@ -77,12 +77,12 @@ export const NativeShellProjectionSchema = v.pipe(
   }),
   v.check(
     (input) => input.prefs !== undefined || input.recentRepos !== undefined,
-    'Missing native shell projection payload',
+    'Missing native host projection payload',
   ),
 )
 
 export function pickNativeSettingsProjectionPatch(
-  settings: Partial<SettingsPrefs>,
+  settings: Partial<UserSettings>,
 ): NativeSettingsProjectionPatch | null {
   const patch: NativeSettingsProjectionPatch = {}
   if (settings.lang !== undefined) patch.lang = settings.lang
@@ -93,7 +93,7 @@ export function pickNativeSettingsProjectionPatch(
   return NATIVE_SETTINGS_PROJECTION_KEYS.some((key) => patch[key] !== undefined) ? patch : null
 }
 
-export function nativeSettingsProjectionStateFromSettings(settings: SettingsPrefs): NativeSettingsProjectionState {
+export function nativeSettingsProjectionStateFromSettings(settings: UserSettings): NativeSettingsProjectionState {
   return {
     lang: settings.lang,
     theme: settings.theme,
