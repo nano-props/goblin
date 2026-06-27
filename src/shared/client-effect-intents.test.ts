@@ -3,13 +3,13 @@ import { isClientEffectIntent } from '#/shared/client-effect-intents.ts'
 
 describe('isClientEffectIntent', () => {
   test('accepts workspace pane view intents with a known tab type', () => {
-    expect(isClientEffectIntent({ type: 'show-workspace-pane-view-requested', tab: 'changes' })).toBe(true)
-    expect(isClientEffectIntent({ type: 'show-workspace-pane-view-requested', tab: 'terminal' })).toBe(true)
+    expect(isClientEffectIntent({ type: 'show-workspace-pane-tab-requested', tab: 'changes' })).toBe(true)
+    expect(isClientEffectIntent({ type: 'show-workspace-pane-tab-requested', tab: 'terminal' })).toBe(true)
   })
 
   test('rejects malformed workspace pane view intents before command routing', () => {
-    expect(isClientEffectIntent({ type: 'show-workspace-pane-view-requested', tab: 'bad' })).toBe(false)
-    expect(isClientEffectIntent({ type: 'show-workspace-pane-view-requested' })).toBe(false)
+    expect(isClientEffectIntent({ type: 'show-workspace-pane-tab-requested', tab: 'bad' })).toBe(false)
+    expect(isClientEffectIntent({ type: 'show-workspace-pane-tab-requested' })).toBe(false)
   })
 
   test('validates payload-bearing intent variants', () => {

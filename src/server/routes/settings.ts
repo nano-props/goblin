@@ -2,7 +2,7 @@ import { getServerExternalAppsSnapshot } from '#/server/modules/external-apps.ts
 import { getServerGitHubCliState } from '#/server/modules/github-cli.ts'
 import { getServerI18nSnapshot } from '#/server/modules/i18n.ts'
 import { getSettingsSnapshot } from '#/server/modules/settings-snapshot.ts'
-import { getServerSettingsPrefs } from '#/server/modules/settings-source.ts'
+import { getUserSettings } from '#/server/modules/settings-source.ts'
 import type { NativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
 import {
   handleSetFetchInterval,
@@ -34,7 +34,7 @@ export function createSettingsRoutes(settingsState: NativeShortcutRegistrationSt
   })
   app.get('/external-apps', async (c) => c.json(await getServerExternalAppsSnapshot(c.req.raw.signal)))
   app.post('/external-apps/refresh', async (c) => c.json(await getServerExternalAppsSnapshot(c.req.raw.signal)))
-  app.get('/prefs', async (c) => c.json(await getServerSettingsPrefs()))
+  app.get('/prefs', async (c) => c.json(await getUserSettings()))
   app.get('/lan', async (c) => {
     const host = process.env.GOBLIN_SERVER_HOST?.trim() || '127.0.0.1'
     const port = Number(process.env.GOBLIN_SERVER_PORT) || 32100

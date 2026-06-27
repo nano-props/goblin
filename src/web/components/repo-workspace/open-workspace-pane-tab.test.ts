@@ -5,7 +5,7 @@ import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/r
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import { workspacePaneStaticViewsForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
-import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 
 const REPO_ID = '/tmp/workspace-pane-view-repo'
 const WORKTREE_PATH = '/tmp/workspace-pane-view-worktree'
@@ -39,7 +39,7 @@ describe('openWorkspacePaneTab', () => {
     ).resolves.toBe(true)
 
     expect(openViewsFor('feature/worktree')).toEqual(['status'])
-    expect(preferredWorkspacePaneView()).toBe('status')
+    expect(preferredWorkspacePaneTab()).toBe('status')
     expect(refreshStatus).toHaveBeenCalledWith(REPO_ID, { token })
   })
 
@@ -60,7 +60,7 @@ describe('openWorkspacePaneTab', () => {
     ).resolves.toBe(true)
 
     expect(openViewsFor('feature/worktree')).toEqual(['status', 'changes'])
-    expect(preferredWorkspacePaneView()).toBe('changes')
+    expect(preferredWorkspacePaneTab()).toBe('changes')
     expect(refreshStatus).toHaveBeenCalledWith(REPO_ID, { token })
   })
 
@@ -69,7 +69,7 @@ describe('openWorkspacePaneTab', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/no-worktree')],
       selectedBranch: 'feature/no-worktree',
-      preferredWorkspacePaneView: 'status',
+      preferredWorkspacePaneTab: 'status',
     })
     const refreshStatus = vi.fn(async () => {})
     useReposStore.setState({ refreshStatus: refreshStatus as typeof originalRefreshStatus })
@@ -84,7 +84,7 @@ describe('openWorkspacePaneTab', () => {
       }),
     ).resolves.toBe(false)
 
-    expect(preferredWorkspacePaneView()).toBe('status')
+    expect(preferredWorkspacePaneTab()).toBe('status')
     expect(openViewsFor('feature/no-worktree')).toEqual(['status'])
     expect(refreshStatus).not.toHaveBeenCalled()
   })
@@ -94,7 +94,7 @@ describe('openWorkspacePaneTab', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/no-worktree')],
       selectedBranch: 'feature/no-worktree',
-      preferredWorkspacePaneView: 'changes',
+      preferredWorkspacePaneTab: 'changes',
     })
 
     await expect(
@@ -107,7 +107,7 @@ describe('openWorkspacePaneTab', () => {
       }),
     ).resolves.toBe(true)
 
-    expect(preferredWorkspacePaneView()).toBe('status')
+    expect(preferredWorkspacePaneTab()).toBe('status')
   })
 
   test('opens history as a branch-static workspace pane view', async () => {
@@ -126,17 +126,17 @@ describe('openWorkspacePaneTab', () => {
     ).resolves.toBe(true)
 
     expect(openViewsFor('feature/worktree')).toContain('history')
-    expect(preferredWorkspacePaneView()).toBe('history')
+    expect(preferredWorkspacePaneTab()).toBe('history')
     expect(refreshStatus).not.toHaveBeenCalled()
   })
 })
 
-function seedWorktreeRepo(preferredWorkspacePaneView: WorkspacePaneStaticTabType) {
+function seedWorktreeRepo(preferredWorkspacePaneTab: WorkspacePaneStaticTabType) {
   seedRepoState({
     id: REPO_ID,
     branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
     selectedBranch: 'feature/worktree',
-    preferredWorkspacePaneView,
+    preferredWorkspacePaneTab,
   })
 }
 
@@ -145,23 +145,23 @@ function openViewsFor(branchName: string): WorkspacePaneStaticTabType[] {
   return repo ? workspacePaneStaticViewsForBranch(repo.ui, branchName) : []
 }
 
-function preferredWorkspacePaneView() {
+function preferredWorkspacePaneTab() {
   const repo = useReposStore.getState().repos[REPO_ID]
-  return repo ? preferredWorkspacePaneViewForBranch(repo.ui, repo.ui.selectedBranch) : null
+  return repo ? preferredWorkspacePaneTabForBranch(repo.ui, repo.ui.selectedBranch) : null
 }
 
 function navigationWithStoreActions(): Pick<
   MainWindowNavigationActions,
-  'showRepoBranchWorkspacePaneView' | 'showRepoWorkspacePaneView'
+  'showRepoBranchWorkspacePaneTab' | 'showRepoWorkspacePaneTab'
 > {
   return {
-    showRepoBranchWorkspacePaneView: (repoId, branch, tab) => {
+    showRepoBranchWorkspacePaneTab: (repoId, branch, tab) => {
       const state = useReposStore.getState()
       state.setActive(repoId)
       state.selectBranch(repoId, branch)
       state.setWorkspacePaneTab(repoId, tab)
     },
-    showRepoWorkspacePaneView: (repoId, tab) => {
+    showRepoWorkspacePaneTab: (repoId, tab) => {
       const state = useReposStore.getState()
       state.setActive(repoId)
       state.setWorkspacePaneTab(repoId, tab)

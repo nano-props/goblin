@@ -13,7 +13,7 @@ import { externalOpenLog } from '#/web/logger.ts'
 import {
   runCloseWorkspacePaneTabOrWindowCommand,
   runNewTerminalTabCommand,
-  runShowWorkspacePaneViewCommand,
+  runShowWorkspacePaneTabCommand,
   runTerminalPrimaryActionCommand,
 } from '#/web/commands/workspace-commands.ts'
 import {
@@ -66,10 +66,10 @@ export function handleTerminalBellClickIntent(
   switch (plan.kind) {
     case 'show-worktree-terminal':
       deps.setSelectedTerminal(plan.worktreeTerminalKey, plan.key)
-      deps.navigation.showRepoBranchWorkspacePaneView(plan.repoId, plan.branch, 'terminal')
+      deps.navigation.showRepoBranchWorkspacePaneTab(plan.repoId, plan.branch, 'terminal')
       return
     case 'show-repo-terminal':
-      deps.navigation.showRepoWorkspacePaneView(plan.repoId, 'terminal')
+      deps.navigation.showRepoWorkspacePaneTab(plan.repoId, 'terminal')
       return
   }
 }
@@ -178,7 +178,7 @@ export async function handleWorkspaceClientIntent(
       })
       return true
     case 'show-workspace-pane-view':
-      return await runShowWorkspacePaneViewCommand({
+      return await runShowWorkspacePaneTabCommand({
         repoId: plan.repoId,
         tab: plan.tab,
         navigation: deps.navigation,

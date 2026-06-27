@@ -27,7 +27,7 @@ describe('branch action dispatch', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'terminal',
+      preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabOrderByBranch: {
         'feature/worktree': [workspacePaneStaticTabOrderEntry('status'), { type: 'terminal', id: 'slot-1' }],
       },
@@ -92,7 +92,7 @@ describe('branch action dispatch', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'terminal',
+      preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabOrderByBranch: {
         'feature/worktree': [workspacePaneStaticTabOrderEntry('status'), { type: 'terminal', id: 'slot-1' }],
       },
@@ -135,7 +135,7 @@ describe('branch action dispatch', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'status',
+      preferredWorkspacePaneTab: 'status',
       workspacePaneTabOrderByBranch: {},
     })
     const runBranchAction = vi.fn(async () => ({ ok: true, message: 'ok' }))
@@ -167,7 +167,7 @@ describe('branch action dispatch', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'terminal',
+      preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabOrderByBranch: {
         'feature/worktree': [workspacePaneStaticTabOrderEntry('status'), { type: 'terminal', id: 'slot-1' }],
       },

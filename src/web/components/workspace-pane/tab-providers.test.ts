@@ -111,24 +111,24 @@ describe('workspace pane tab providers', () => {
     expect(workspacePaneStaticTabProvider('status').panelId('workspace-pane')).toBe('workspace-pane-status-panel')
     expect(workspacePaneStaticTabProvider('changes').orderEntry()).toEqual({ type: 'changes', id: 'changes' })
     expect(terminalWorkspacePaneTabProvider.identity('slot-1')).toBe('terminal:slot-1')
-    expect(terminalWorkspacePaneTabProvider.buttonId('workspace-pane', 0)).toBe('workspace-pane-workspace-pane-view')
-    expect(terminalWorkspacePaneTabProvider.buttonId('workspace-pane', 2)).toBe('workspace-pane-workspace-pane-view-2')
+    expect(terminalWorkspacePaneTabProvider.buttonId('workspace-pane', 0)).toBe('workspace-pane-workspace-pane-tab')
+    expect(terminalWorkspacePaneTabProvider.buttonId('workspace-pane', 2)).toBe('workspace-pane-workspace-pane-tab-2')
     expect(terminalWorkspacePaneTabProvider.orderEntry('slot-1')).toEqual({ type: 'terminal', id: 'slot-1' })
     expect(changesWorkspacePaneTabProvider.label({ t, branchName: 'main', statusCount: 3 })).toBe(
       'tab.changes-with-count:{"count":3}',
     )
     expect(changesWorkspacePaneTabProvider.closeLabel({ t, branchName: 'main', statusCount: 3 })).toBe(
-      'workspace-pane-views.close-named:{"name":"tab.changes"}',
+      'workspace-pane-tabs.close-named:{"name":"tab.changes"}',
     )
     expect(changesWorkspacePaneTabProvider.tooltip({ t, branchName: 'main', statusCount: 7 })).toBe(
-      'workspace-pane-views.changes-tooltip:{"count":7}',
+      'workspace-pane-tabs.changes-tooltip:{"count":7}',
     )
     expect(statusWorkspacePaneTabProvider.tooltip({ t, branchName: 'main', statusCount: 0 })).toBe(
-      'workspace-pane-views.status-tooltip:{"branch":"main"}',
+      'workspace-pane-tabs.status-tooltip:{"branch":"main"}',
     )
     expect(statusWorkspacePaneTabProvider.tooltip({ t, branchName: '', statusCount: 0 })).toBe('tab.status')
     expect(historyWorkspacePaneTabProvider.tooltip({ t, branchName: 'main', statusCount: 0 })).toBe(
-      'workspace-pane-views.history-tooltip:{"branch":"main"}',
+      'workspace-pane-tabs.history-tooltip:{"branch":"main"}',
     )
     expect(
       terminalWorkspacePaneTabProvider.tooltip({ t, branchName: 'main', statusCount: 0, view: terminalView }),

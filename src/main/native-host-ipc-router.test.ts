@@ -11,7 +11,7 @@ import { getBranchPullRequest, getBranchPullRequests } from '#/system/git/pull-r
 import { openHttpsExternal } from '#/main/external-url.ts'
 import { registerTrustedAppUrl, registerTrustedWebContents } from '#/main/ipc/trusted-webcontents.ts'
 import { wireIpc } from '#/main/native-host-ipc-router.ts'
-import { getSettingsPrefs } from '#/main/settings-server-client.ts'
+import { getUserSettings } from '#/main/settings-server-client.ts'
 import type { IpcResponse, UserSettings } from '#/shared/api-types.ts'
 
 const ipcHandlers = new Map<string, (_event: unknown, input: any) => Promise<unknown>>()
@@ -24,7 +24,7 @@ const getEmbeddedServerRuntimeMock = vi.hoisted(() =>
   vi.fn<() => { url: string; accessToken: string } | null>(() => null),
 )
 
-function settingsPrefs(overrides: Partial<UserSettings> = {}): UserSettings {
+function userSettings(overrides: Partial<UserSettings> = {}): UserSettings {
   return {
     lang: 'auto',
     theme: 'auto',
@@ -176,10 +176,10 @@ vi.mock('#/main/client-surface-events.ts', () => ({
 }))
 
 vi.mock('#/main/settings-server-client.ts', () => ({
-  setSettingsGlobalShortcutState: vi.fn(async () => true),
-  getSettingsPrefs: vi.fn(async () => settingsPrefs()),
+  setGlobalShortcutState: vi.fn(async () => true),
+  getUserSettings: vi.fn(async () => userSettings()),
   getSettingsSnapshot: vi.fn(),
-  updateSettingsPrefs: vi.fn(async (patch: Record<string, unknown>) => ({ ...settingsPrefs(), ...patch })),
+  updateUserSettings: vi.fn(async (patch: Record<string, unknown>) => ({ ...userSettings(), ...patch })),
 }))
 
 vi.mock('#/system/github-cli.ts', () => ({
@@ -415,7 +415,7 @@ describe('main repo ipc cancellation', () => {
   test('projects recent repos into native host state, syncing both menu and Dock recents', async () => {
     const repo = { kind: 'local' as const, id: '/repo' }
 
-    const result = await invokeIpc('settings.applyShellProjection', { recentRepos: { recentRepos: [repo] } })
+    const result = await invokeIpc('settings.applyNativeHostProjection', { recentRepos: { recentRepos: [repo] } })
 
     expect(result).toEqual({ ok: true, data: undefined })
     expect(app.clearRecentDocuments).toHaveBeenCalledTimes(1)
@@ -430,7 +430,7 @@ describe('main repo ipc cancellation', () => {
       ref: { id: 'gh:owner/repo', alias: 'gh', remotePath: '/owner/repo', displayName: 'gh:repo' },
     }
 
-    const result = await invokeIpc('settings.applyShellProjection', {
+    const result = await invokeIpc('settings.applyNativeHostProjection', {
       recentRepos: { recentRepos: [localRepo, remoteRepo] },
     })
 
@@ -441,7 +441,7 @@ describe('main repo ipc cancellation', () => {
   })
 
   test('projects server-owned prefs into native host state when the client updates them', async () => {
-    const result = await invokeIpc('settings.applyShellProjection', {
+    const result = await invokeIpc('settings.applyNativeHostProjection', {
       prefs: {
         patch: {
           lang: 'ja',
@@ -477,7 +477,7 @@ describe('main repo ipc cancellation', () => {
   })
 
   test('rejects an empty native host projection payload', async () => {
-    const result = await invokeIpc('settings.applyShellProjection', {})
+    const result = await invokeIpc('settings.applyNativeHostProjection', {})
 
     expect(result).toEqual({
       ok: false,
@@ -486,7 +486,7 @@ describe('main repo ipc cancellation', () => {
   })
 
   test('rejects recent repo projections with invalid remote paths', async () => {
-    const result = await invokeIpc('settings.applyShellProjection', {
+    const result = await invokeIpc('settings.applyNativeHostProjection', {
       recentRepos: {
         recentRepos: [
           {
@@ -510,8 +510,8 @@ describe('main repo ipc cancellation', () => {
   })
 
   test('prefers embedded server prefs when validating a global shortcut change', async () => {
-    vi.mocked(getSettingsPrefs).mockResolvedValueOnce(
-      settingsPrefs({
+    vi.mocked(getUserSettings).mockResolvedValueOnce(
+      userSettings({
         globalShortcut: 'Alt+G',
         globalShortcutDisabled: false,
       }),

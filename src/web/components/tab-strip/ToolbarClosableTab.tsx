@@ -49,7 +49,12 @@ export function ToolbarClosableTab({
   ...closeProps
 }: ToolbarClosableTabProps) {
   return (
-    <div ref={containerRef} {...containerProps} data-window-chrome-region="interactive" className={containerClassName}>
+    <div
+      ref={containerRef}
+      {...containerProps}
+      data-title-bar-chrome-region="interactive"
+      className={containerClassName}
+    >
       {overlay}
       <button
         ref={buttonRef}

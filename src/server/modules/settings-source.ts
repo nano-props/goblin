@@ -32,7 +32,7 @@ import {
   DEFAULT_THEME_PREF,
   MAX_RECENT_REPOS,
   defaultSessionState,
-  defaultSettingsPrefs,
+  defaultUserSettings,
 } from '#/shared/settings-defaults.ts'
 
 type FetchIntervalListener = (sec: number) => void
@@ -85,7 +85,7 @@ function normalizeLanEnabled(value: unknown): boolean {
   return value === true
 }
 
-function settingsPrefsFromData(data: UserSettingsData): UserSettings {
+function userSettingsFromData(data: UserSettingsData): UserSettings {
   return {
     lang: data.lang,
     theme: data.theme,
@@ -322,7 +322,7 @@ async function loadUserSettings(): Promise<UserSettingsData> {
   settingsPromise ??= (async () => {
     const persisted = await readUserSettingsFile()
     const data = persisted ?? {
-      ...defaultSettingsPrefs(),
+      ...defaultUserSettings(),
       session: defaultSession(),
       recentRepos: [],
       repoSettings: [],
@@ -339,8 +339,8 @@ export async function getServerFetchIntervalSec(): Promise<number> {
   return cachedFetchIntervalSec
 }
 
-export async function getServerSettingsPrefs(): Promise<UserSettings> {
-  return settingsPrefsFromData(await loadUserSettings())
+export async function getUserSettings(): Promise<UserSettings> {
+  return userSettingsFromData(await loadUserSettings())
 }
 
 export function subscribeServerFetchInterval(listener: FetchIntervalListener): () => void {
@@ -362,7 +362,7 @@ export async function setServerFetchIntervalSec(sec: number): Promise<number> {
   return next
 }
 
-export async function updateServerSettingsPrefs(patch: UserSettingsPatch): Promise<UserSettings> {
+export async function updateUserSettings(patch: UserSettingsPatch): Promise<UserSettings> {
   const data = await loadUserSettings()
   const nextLang = patch.lang === undefined ? data.lang : normalizeLangPref(patch.lang)
   const nextTheme = patch.theme === undefined ? data.theme : normalizeThemePref(patch.theme)
@@ -404,7 +404,7 @@ export async function updateServerSettingsPrefs(patch: UserSettingsPatch): Promi
     cachedFetchIntervalSec = nextFetchIntervalSec
     for (const listener of listeners) listener(nextFetchIntervalSec)
   }
-  return settingsPrefsFromData(data)
+  return userSettingsFromData(data)
 }
 
 export async function getServerSessionState(): Promise<WorkspaceSessionState> {

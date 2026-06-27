@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
 </html>`,
   ),
   existsSync: vi.fn(() => true),
-  getServerSettingsPrefs: vi.fn(async () => ({
+  getUserSettings: vi.fn(async () => ({
     lang: 'auto',
     theme: 'auto',
     colorTheme: 'macos',
@@ -104,7 +104,7 @@ vi.mock('node:fs', async () => {
 })
 
 vi.mock('#/server/modules/settings-source.ts', () => ({
-  getServerSettingsPrefs: mocks.getServerSettingsPrefs,
+  getUserSettings: mocks.getUserSettings,
 }))
 
 describe('server app body limit', () => {

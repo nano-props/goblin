@@ -17,7 +17,7 @@ describe('createMainWindowNavigationActions', () => {
       onOpenSettings: vi.fn(),
     })
 
-    actions.showRepoBranchWorkspacePaneView('/tmp/repo-b', 'feature/test', 'terminal')
+    actions.showRepoBranchWorkspacePaneTab('/tmp/repo-b', 'feature/test', 'terminal')
 
     expect(setActive).toHaveBeenCalledWith('/tmp/repo-b')
     expect(selectBranch).toHaveBeenCalledWith('/tmp/repo-b', 'feature/test')
@@ -36,7 +36,7 @@ describe('createMainWindowNavigationActions', () => {
       setWorkspacePaneTab,
     })
 
-    actions.showRepoWorkspacePaneView('/tmp/repo-a', 'changes')
+    actions.showRepoWorkspacePaneTab('/tmp/repo-a', 'changes')
 
     expect(setWorkspacePaneTab).toHaveBeenCalledWith('/tmp/repo-a', 'changes')
   })

@@ -61,8 +61,8 @@ const navigation: MainWindowNavigationActions = {
   closeRepo: vi.fn(),
   cycleRepo: vi.fn(),
   selectRepoBranch: vi.fn(),
-  showRepoWorkspacePaneView: vi.fn(),
-  showRepoBranchWorkspacePaneView: vi.fn(),
+  showRepoWorkspacePaneTab: vi.fn(),
+  showRepoBranchWorkspacePaneTab: vi.fn(),
   openSettings: vi.fn(),
 }
 

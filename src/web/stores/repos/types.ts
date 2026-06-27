@@ -74,7 +74,7 @@ export interface RepoUiState {
   workspacePaneTabOrderByBranch: Record<string, WorkspacePaneTabOrderEntry[]>
   /** Branch-scoped selected workspace pane view. Branch switches read this
    *  first so selecting a tab on one branch does not select it on another. */
-  preferredWorkspacePaneViewByBranch: Record<string, WorkspacePaneTabType>
+  preferredWorkspacePaneTabByBranch: Record<string, WorkspacePaneTabType>
   /**
    * Per-branch hint about the most recent user-initiated workspace pane tab
    * close. Set by `setLastClosedTabContext` after `runCloseWorkspacePaneTabCommand`

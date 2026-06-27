@@ -44,8 +44,8 @@ describe('RepoLayoutSidebar', () => {
     render(<RepoLayoutSidebar repoId={REPO_ID} compact={false} branchContent={<div data-testid="branch-content" />} />)
 
     const sidebarTop = document.body.querySelector<HTMLElement>('[data-testid="repo-shell-sidebar-top"]')
-    expect(sidebarTop?.dataset.windowChromeRegion).toBe('drag')
-    expect(sidebarTop?.querySelector('[data-window-chrome-region="no-drag"]')).toBeNull()
+    expect(sidebarTop?.dataset.titleBarChromeRegion).toBe('drag')
+    expect(sidebarTop?.querySelector('[data-title-bar-chrome-region="no-drag"]')).toBeNull()
 
     const repoPicker = document.body.querySelector('[data-testid="repo-picker-host"]')
     expect(repoPicker).not.toBeNull()
@@ -86,10 +86,10 @@ describe('RepoLayoutSidebar', () => {
     render(<RepoLayoutSidebar repoId={REPO_ID} compact={false} branchContent={<div data-testid="branch-content" />} />)
 
     const sidebarTop = document.body.querySelector<HTMLElement>('[data-testid="repo-shell-sidebar-top"]')
-    expect(sidebarTop?.dataset.windowChromeRegion).toBe('drag')
-    expect(sidebarTop?.className).toContain('window-chrome')
+    expect(sidebarTop?.dataset.titleBarChromeRegion).toBe('drag')
+    expect(sidebarTop?.className).toContain('title-bar-chrome')
     expect(sidebarTop?.className).not.toContain('relative')
-    expect(sidebarTop?.querySelector('[data-window-chrome-region="no-drag"]')).toBeNull()
+    expect(sidebarTop?.querySelector('[data-title-bar-chrome-region="no-drag"]')).toBeNull()
     expect(sidebarTop?.hasAttribute('data-interactive')).toBe(false)
   })
 
@@ -104,8 +104,8 @@ describe('RepoLayoutSidebar', () => {
     )
 
     const sidebarTop = document.body.querySelector<HTMLElement>('[data-testid="repo-shell-sidebar-top"]')
-    expect(sidebarTop?.dataset.windowChromeRegion).toBeUndefined()
-    expect(sidebarTop?.querySelector('[data-window-chrome-region="no-drag"]')).toBeNull()
+    expect(sidebarTop?.dataset.titleBarChromeRegion).toBeUndefined()
+    expect(sidebarTop?.querySelector('[data-title-bar-chrome-region="no-drag"]')).toBeNull()
     expect(sidebarTop?.hasAttribute('data-interactive')).toBe(false)
   })
 })

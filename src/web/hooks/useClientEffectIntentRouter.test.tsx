@@ -11,7 +11,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 import { createBranchSnapshot, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
-import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 
 const appDataClientMocks = vi.hoisted(() => ({
   clearRecentRepoHistory: vi.fn(async () => {}),
@@ -69,12 +69,12 @@ beforeEach(() => {
       state.setActive(repoId)
       state.selectBranch(repoId, branch)
     },
-    showRepoWorkspacePaneView: (repoId, tab) => {
+    showRepoWorkspacePaneTab: (repoId, tab) => {
       const state = useReposStore.getState()
       state.setActive(repoId)
       state.setWorkspacePaneTab(repoId, tab)
     },
-    showRepoBranchWorkspacePaneView: (repoId, branch, tab) => {
+    showRepoBranchWorkspacePaneTab: (repoId, branch, tab) => {
       showRepoBranchWorkspacePaneViewSpy(repoId, branch, tab)
       const state = useReposStore.getState()
       state.setActive(repoId)
@@ -143,7 +143,7 @@ describe('useClientEffectIntentRouter', () => {
       id: '/tmp/repo',
       currentBranch: 'main',
       selectedBranch: 'main',
-      preferredWorkspacePaneView: 'status',
+      preferredWorkspacePaneTab: 'status',
       branchSnapshots: [createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-worktree' } })],
     })
     currentRepoId = repo.id
@@ -159,7 +159,7 @@ describe('useClientEffectIntentRouter', () => {
     expect(closeAllOverlays).toHaveBeenCalledTimes(1)
     const state = useReposStore.getState()
     expect(state.activeId).toBe(repo.id)
-    expect(preferredWorkspacePaneView(repo.id)).toBe('terminal')
+    expect(preferredWorkspacePaneTab(repo.id)).toBe('terminal')
   })
 
   test('terminal bell clicks switch to the emitting worktree branch and selected terminal', async () => {
@@ -167,7 +167,7 @@ describe('useClientEffectIntentRouter', () => {
       id: '/tmp/repo',
       currentBranch: 'main',
       selectedBranch: 'main',
-      preferredWorkspacePaneView: 'status',
+      preferredWorkspacePaneTab: 'status',
       branchSnapshots: [
         createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-main' } }),
         createBranchSnapshot('feature/test', { worktree: { path: '/tmp/repo-feature' } }),
@@ -186,7 +186,7 @@ describe('useClientEffectIntentRouter', () => {
     const state = useReposStore.getState()
     expect(showRepoBranchWorkspacePaneViewSpy).toHaveBeenCalledWith(repo.id, 'feature/test', 'terminal')
     expect(state.repos[repo.id]?.ui.selectedBranch).toBe('feature/test')
-    expect(preferredWorkspacePaneView(repo.id)).toBe('terminal')
+    expect(preferredWorkspacePaneTab(repo.id)).toBe('terminal')
     expect(state.selectedTerminalSessionByWorktree).toMatchObject({
       [worktreeTerminalKey(repo.id, '/tmp/repo-feature')]: key,
     })
@@ -197,7 +197,7 @@ describe('useClientEffectIntentRouter', () => {
       id: '/tmp/repo',
       currentBranch: 'main',
       selectedBranch: 'main',
-      preferredWorkspacePaneView: 'status',
+      preferredWorkspacePaneTab: 'status',
       branchSnapshots: [
         createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-main' } }),
         createBranchSnapshot('feature/test', { worktree: { path: '/tmp/repo-feature' } }),
@@ -207,8 +207,8 @@ describe('useClientEffectIntentRouter', () => {
     navigation = {
       ...navigation,
       selectRepoBranch: vi.fn(),
-      showRepoWorkspacePaneView: vi.fn(),
-      showRepoBranchWorkspacePaneView: (repoId, branch, tab) => {
+      showRepoWorkspacePaneTab: vi.fn(),
+      showRepoBranchWorkspacePaneTab: (repoId, branch, tab) => {
         routeNavigationCalls.push({ repoId, branch, tab })
       },
     }
@@ -332,7 +332,7 @@ describe('useClientEffectIntentRouter', () => {
       id: '/tmp/repo',
       currentBranch: 'main',
       selectedBranch: 'main',
-      preferredWorkspacePaneView: 'status',
+      preferredWorkspacePaneTab: 'status',
       branchSnapshots: [createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-worktree' } })],
     })
     currentRepoId = repo.id
@@ -342,7 +342,7 @@ describe('useClientEffectIntentRouter', () => {
 
     await act(async () => {
       for (const listener of intentListeners) {
-        listener({ type: 'show-workspace-pane-view-requested', tab: 'terminal' })
+        listener({ type: 'show-workspace-pane-tab-requested', tab: 'terminal' })
         listener({ type: 'terminal-primary-action-requested' })
         listener({ type: 'workspace-zen-mode-toggle-requested' })
         listener({ type: 'close-repo-requested' })
@@ -351,7 +351,7 @@ describe('useClientEffectIntentRouter', () => {
     })
 
     const state = useReposStore.getState()
-    expect(preferredWorkspacePaneView(repo.id)).toBe('status')
+    expect(preferredWorkspacePaneTab(repo.id)).toBe('status')
     expect(state.zenMode).toBe(false)
     expect(closeRepoSpy).not.toHaveBeenCalled()
   })
@@ -419,9 +419,9 @@ describe('useClientEffectIntentRouter', () => {
   })
 })
 
-function preferredWorkspacePaneView(repoId: string) {
+function preferredWorkspacePaneTab(repoId: string) {
   const repo = useReposStore.getState().repos[repoId]
-  return repo ? preferredWorkspacePaneViewForBranch(repo.ui, repo.ui.selectedBranch) : null
+  return repo ? preferredWorkspacePaneTabForBranch(repo.ui, repo.ui.selectedBranch) : null
 }
 
 async function renderHookHost() {

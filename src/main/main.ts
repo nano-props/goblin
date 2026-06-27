@@ -16,7 +16,7 @@ import { wireTerminalIpc } from '#/main/terminal.ts'
 import { syncGlobalShortcuts, unregisterAppShortcuts } from '#/main/shortcuts.ts'
 import { enqueueExternalOpenPath } from '#/main/external-open.ts'
 import { broadcastClientEffectIntent } from '#/main/client-surface-events.ts'
-import { getSettingsSnapshot, setSettingsGlobalShortcutState } from '#/main/settings-server-client.ts'
+import { getSettingsSnapshot, setGlobalShortcutState } from '#/main/settings-server-client.ts'
 import { startEmbeddedServer, stopEmbeddedServer } from '#/main/embedded-server-lifecycle.ts'
 
 function activatePrimaryWindowFromEvent(): void {
@@ -138,7 +138,7 @@ async function syncInitialGlobalShortcutState(settingsSnapshot: SettingsSnapshot
     settingsSnapshot.globalShortcutDisabled,
     settingsSnapshot.globalShortcut,
   )
-  await setSettingsGlobalShortcutState(globalShortcutRegistered)
+  await setGlobalShortcutState(globalShortcutRegistered)
 }
 
 void main()

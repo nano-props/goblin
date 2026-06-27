@@ -26,7 +26,7 @@ test('initializes user-settings.json with defaults when no persisted settings ex
   const sec = await mod.getServerFetchIntervalSec()
 
   expect(sec).toBe(120)
-  expect(await mod.getServerSettingsPrefs()).toMatchObject({
+  expect(await mod.getUserSettings()).toMatchObject({
     lang: 'auto',
     theme: 'auto',
     colorTheme: 'macos',
@@ -58,7 +58,7 @@ test('persists updates and notifies subscribers from the server settings store',
   const unsubscribe = mod.subscribeServerFetchInterval(listener)
 
   const sec = await mod.setServerFetchIntervalSec(42)
-  await mod.updateServerSettingsPrefs({
+  await mod.updateUserSettings({
     lang: 'ko',
     theme: 'dark',
     colorTheme: 'github',
@@ -92,7 +92,7 @@ test('persists updates and notifies subscribers from the server settings store',
   vi.resetModules()
   const reloaded = await import('#/server/modules/settings-source.ts')
   expect(await reloaded.getServerFetchIntervalSec()).toBe(42)
-  expect(await reloaded.getServerSettingsPrefs()).toMatchObject({
+  expect(await reloaded.getUserSettings()).toMatchObject({
     lang: 'ko',
     theme: 'dark',
     colorTheme: 'github',

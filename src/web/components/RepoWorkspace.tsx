@@ -34,7 +34,7 @@ function branchWorkspaceRepoEqual(a: RepoWorkspaceRepo | undefined, b: RepoWorks
       a.data.statusLoaded === b.data.statusLoaded &&
       a.data.worktreesByPath === b.data.worktreesByPath &&
       a.ui.selectedBranch === b.ui.selectedBranch &&
-      a.ui.preferredWorkspacePaneViewByBranch === b.ui.preferredWorkspacePaneViewByBranch &&
+      a.ui.preferredWorkspacePaneTabByBranch === b.ui.preferredWorkspacePaneTabByBranch &&
       a.ui.workspacePaneTabOrderByBranch === b.ui.workspacePaneTabOrderByBranch &&
       a.ui.lastClosedTabContextByBranch === b.ui.lastClosedTabContextByBranch &&
       a.resources.status === b.resources.status &&
@@ -78,7 +78,7 @@ export function RepoWorkspace({
             },
             ui: {
               selectedBranch,
-              preferredWorkspacePaneViewByBranch: repo.ui.preferredWorkspacePaneViewByBranch,
+              preferredWorkspacePaneTabByBranch: repo.ui.preferredWorkspacePaneTabByBranch,
               workspacePaneTabOrderByBranch: repo.ui.workspacePaneTabOrderByBranch,
               lastClosedTabContextByBranch: repo.ui.lastClosedTabContextByBranch,
             },

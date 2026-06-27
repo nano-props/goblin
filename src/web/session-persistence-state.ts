@@ -18,7 +18,7 @@ export function persistedPreferredWorkspacePaneViewByBranchByRepoForSession(
         data?: { branches?: Array<{ name?: string }> }
         ui: {
           workspacePaneTabOrderByBranch: Record<string, WorkspacePaneTabOrderEntry[]>
-          preferredWorkspacePaneViewByBranch: Record<string, WorkspacePaneTabType>
+          preferredWorkspacePaneTabByBranch: Record<string, WorkspacePaneTabType>
         }
       }
     | undefined
@@ -31,7 +31,7 @@ export function persistedPreferredWorkspacePaneViewByBranchByRepoForSession(
     if (!repo) continue
     const knownBranches = new Set((repo.data?.branches ?? []).map((branch) => branch.name).filter(Boolean))
     const byBranch: Record<string, WorkspacePaneSessionTabType> = {}
-    for (const [branchName, tab] of Object.entries(repo.ui.preferredWorkspacePaneViewByBranch)) {
+    for (const [branchName, tab] of Object.entries(repo.ui.preferredWorkspacePaneTabByBranch)) {
       if (!branchName || branchName.includes('\0')) continue
       if (knownBranches.size > 0 && !knownBranches.has(branchName)) continue
       if (!isWorkspacePaneSessionTabType(tab)) continue

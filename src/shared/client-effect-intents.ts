@@ -15,7 +15,7 @@ export type ClientEffectIntent =
   | { type: 'close-repo-requested' }
   | { type: 'cycle-repo-requested'; direction: 1 | -1 }
   | { type: 'repo-refresh-requested' }
-  | { type: 'show-workspace-pane-view-requested'; tab: WorkspacePaneTabType }
+  | { type: 'show-workspace-pane-tab-requested'; tab: WorkspacePaneTabType }
   | { type: 'terminal-primary-action-requested' }
   | { type: 'workspace-zen-mode-toggle-requested' }
   | { type: 'layout-reset-requested' }
@@ -50,7 +50,7 @@ export function isClientEffectIntent(event: unknown): event is ClientEffectInten
       return true
     case 'cycle-repo-requested':
       return event.direction === 1 || event.direction === -1
-    case 'show-workspace-pane-view-requested':
+    case 'show-workspace-pane-tab-requested':
       return isWorkspacePaneTabType(typeof event.tab === 'string' ? event.tab : null)
     case 'open-settings-requested':
       return isSettingsPage(typeof event.page === 'string' ? event.page : null)

@@ -177,7 +177,7 @@ export function createPendingWorkspacePaneTabItem(input: {
 
 export const EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY = '__workspace-pane-empty__'
 
-const WORKSPACE_PANE_VIEW_TOOLTIP_SELECTOR = '[data-workspace-pane-view-tooltip-id]'
+const WORKSPACE_PANE_VIEW_TOOLTIP_SELECTOR = '[data-workspace-pane-tab-tooltip-id]'
 // Virtual right-edge for the compact tab's separator computation. The popover
 // trigger that follows the tab is the only real DOM node on that side, but it
 // doesn't report hover state, so we use this sentinel identity instead.
@@ -558,7 +558,7 @@ export function WorkspacePaneTabStrip({
     return (
       <WorkspacePaneNewButton
         ref={focusRegistry.setRef(emptyFocusKey)}
-        id={`${workspacePaneId}-workspace-pane-view-empty`}
+        id={`${workspacePaneId}-workspace-pane-tab-empty`}
         onClick={onNew}
         busy={newTerminalBusy}
         t={t}
@@ -578,7 +578,7 @@ export function WorkspacePaneTabStrip({
         <WorkspacePaneViewTooltipLayer
           items={items}
           role="tablist"
-          aria-label={t('workspace-pane-views.tabs')}
+          aria-label={t('workspace-pane-tabs.tabs')}
           className="flex-1"
         >
           {compactItem ? (
@@ -611,7 +611,7 @@ export function WorkspacePaneTabStrip({
         <WorkspacePaneViewSwitcherPopover
           items={items}
           activeTabIdentity={activeTabIdentity}
-          label={t('workspace-pane-views.tabs')}
+          label={t('workspace-pane-tabs.tabs')}
           newLabel={t(newTerminalLabelKey)}
           canCreateNew={canCreateNew && !newTerminalBusy}
           onNew={onNew}
@@ -635,7 +635,7 @@ export function WorkspacePaneTabStrip({
       >
         <ToolbarTabStripBody scroll>
           <SortableContext items={sortableIds} strategy={horizontalListSortingStrategy}>
-            <WorkspacePaneViewTooltipLayer items={items} role="tablist" aria-label={t('workspace-pane-views.tabs')}>
+            <WorkspacePaneViewTooltipLayer items={items} role="tablist" aria-label={t('workspace-pane-tabs.tabs')}>
               {items.map((item, index) => {
                 const nextItem = items[index + 1]
                 const rightId = nextItem ? nextItem.identity : WORKSPACE_PANE_NEW_ACTION_ID
@@ -673,7 +673,7 @@ export function WorkspacePaneTabStrip({
           {canCreateNew ? (
             <WorkspacePaneNewButton
               ref={newButtonRef}
-              id={items.length === 0 ? `${workspacePaneId}-workspace-pane-view-empty` : undefined}
+              id={items.length === 0 ? `${workspacePaneId}-workspace-pane-tab-empty` : undefined}
               onClick={onNew}
               busy={newTerminalBusy}
               t={t}
@@ -809,7 +809,7 @@ function WorkspacePaneViewChrome({
     <ToolbarClosableTab
       containerProps={{
         ...containerProps,
-        'data-workspace-pane-view-tooltip-id': item.identity,
+        'data-workspace-pane-tab-tooltip-id': item.identity,
         'data-workspace-pane-pending-view': isPendingWorkspacePaneTabItem(item) ? item.type : undefined,
         onPointerEnter: (event) => {
           containerProps?.onPointerEnter?.(event)
@@ -966,7 +966,7 @@ function WorkspacePaneViewTooltipLayer({ items, children, ...props }: WorkspaceP
     <DelegatedTooltipLayer
       items={items}
       selector={WORKSPACE_PANE_VIEW_TOOLTIP_SELECTOR}
-      attributeName="data-workspace-pane-view-tooltip-id"
+      attributeName="data-workspace-pane-tab-tooltip-id"
       getItemId={(item) => item.identity}
       renderTooltip={(item) => <div className="truncate text-xs font-semibold text-foreground">{item.tooltip}</div>}
       placement="bottom-start"

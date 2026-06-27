@@ -7,8 +7,8 @@ import { branch, REPO_ID, resetRefreshTest, ipcHandlers, seedRepo } from '#/web/
 import { seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { canStartRemoteFetch } from '#/web/stores/repos/sync-state.ts'
 import {
-  preferredWorkspacePaneViewForBranch,
-  preferredWorkspacePaneViewByBranchRecordWith,
+  preferredWorkspacePaneTabForBranch,
+  preferredWorkspacePaneTabByBranchRecordWith,
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import type { LogEntry, WorktreeStatus } from '#/web/types.ts'
 beforeEach(resetRefreshTest)
@@ -837,7 +837,7 @@ describe('core refresh request ordering', () => {
     const token = seedRepo([branch('main', undefined, { worktree: { path: '/repo' } }), branch('feature/a')])
     updateRepoForTest((repo) => {
       repo.ui.selectedBranch = 'feature/a'
-      repo.ui.preferredWorkspacePaneViewByBranch = preferredWorkspacePaneViewByBranchRecordWith(
+      repo.ui.preferredWorkspacePaneTabByBranch = preferredWorkspacePaneTabByBranchRecordWith(
         repo.ui,
         'feature/a',
         'terminal',
@@ -849,7 +849,7 @@ describe('core refresh request ordering', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.ui.selectedBranch).toBe('feature/a')
-    expect(repo ? preferredWorkspacePaneViewForBranch(repo.ui, 'feature/a') : null).toBe('terminal')
+    expect(repo ? preferredWorkspacePaneTabForBranch(repo.ui, 'feature/a') : null).toBe('terminal')
   })
 
   test('snapshot refresh prunes terminal sessions to current worktree paths', async () => {

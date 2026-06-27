@@ -1,6 +1,6 @@
 import type { ComponentPropsWithoutRef, ReactNode, Ref } from 'react'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
-import { WindowChromeDragRegion } from '#/web/components/window-chrome-region.tsx'
+import { TitleBarDragRegion } from '#/web/components/title-bar-chrome-region.tsx'
 import { cn } from '#/web/lib/cn.ts'
 
 interface ToolbarTabStripProps {
@@ -30,7 +30,7 @@ export function ToolbarTabStrip({ compact, compactContent, scrollContent, viewpo
       >
         {scrollContent}
       </ScrollArea>
-      <WindowChromeDragRegion reserveWindowControls={false} className="min-w-0 flex-1 self-stretch" aria-hidden />
+      <TitleBarDragRegion reserveWindowControls={false} className="min-w-0 flex-1 self-stretch" aria-hidden />
     </div>
   )
 }

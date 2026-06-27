@@ -17,9 +17,9 @@ import {
 } from '#/web/components/repo-layout/sidebar-sizing.ts'
 import { ResizeHandleLine, resizeHandleClassNames } from '#/web/components/ui/resizable.tsx'
 import { useElementInlineSize } from '#/web/hooks/useElementInlineSize.ts'
-import { WINDOW_CHROME_HEIGHT_PX } from '#/shared/window-chrome.ts'
+import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
-import { WindowChromeInteractiveRegion } from '#/web/components/window-chrome-region.tsx'
+import { TitleBarInteractiveRegion } from '#/web/components/title-bar-chrome-region.tsx'
 
 const ZEN_REVEAL_SURFACE_SELECTOR = '[data-floating-surface],[data-zen-reveal-surface]'
 const ZEN_REVEAL_CLOSE_MS = 260
@@ -163,7 +163,7 @@ function ZenModeSidebarRevealTriggerLayer({ revealEnabled = false, onMouseEnter 
       data-testid="zen-mode-toggle-overlay"
       data-zen-reveal-surface={revealEnabled ? '' : undefined}
       className="goblin-zen-reveal-trigger-layer pointer-events-none absolute left-0 top-0 z-40 flex items-center bg-transparent"
-      style={{ height: WINDOW_CHROME_HEIGHT_PX }}
+      style={{ height: TITLE_BAR_HEIGHT_PX }}
     >
       <ZenModeSidebarRevealTrigger revealEnabled={revealEnabled} onMouseEnter={onMouseEnter} />
     </div>
@@ -172,14 +172,14 @@ function ZenModeSidebarRevealTriggerLayer({ revealEnabled = false, onMouseEnter 
 
 function ZenModeSidebarRevealTrigger({ revealEnabled = false, onMouseEnter }: ZenModeSidebarRevealTriggerProps) {
   return (
-    <WindowChromeInteractiveRegion asChild>
+    <TitleBarInteractiveRegion asChild>
       <WorkspaceZenModeToggle
         data-zen-reveal-surface={revealEnabled ? '' : undefined}
         data-testid="zen-mode-sidebar-trigger"
         className="pointer-events-auto"
         onMouseEnter={revealEnabled ? onMouseEnter : undefined}
       />
-    </WindowChromeInteractiveRegion>
+    </TitleBarInteractiveRegion>
   )
 }
 
@@ -364,7 +364,7 @@ function ZenModeSidebarReveal({
         data-zen-reveal-surface=""
         data-testid="zen-mode-sidebar-hit-area"
         className={cn('absolute bottom-0 left-0 w-3', interactive ? 'pointer-events-auto' : 'pointer-events-none')}
-        style={{ top: WINDOW_CHROME_HEIGHT_PX }}
+        style={{ top: TITLE_BAR_HEIGHT_PX }}
         onMouseEnter={interactive ? onSurfaceEnter : undefined}
         onMouseLeave={interactive ? handleSurfaceLeave : undefined}
         aria-hidden
@@ -389,7 +389,7 @@ function ZenModeSidebarReveal({
           chromeRegion={panelInteractive ? 'drag' : 'none'}
           onOpenSettings={onOpenSettings}
         />
-        <WindowChromeInteractiveRegion
+        <TitleBarInteractiveRegion
           data-testid="zen-mode-sidebar-resize-handle"
           data-separator={resizeRailState === 'idle' ? undefined : resizeRailState}
           role="separator"
@@ -404,7 +404,7 @@ function ZenModeSidebarReveal({
           onMouseLeave={panelInteractive ? handleResizeRailMouseLeave : undefined}
         >
           <ResizeHandleLine />
-        </WindowChromeInteractiveRegion>
+        </TitleBarInteractiveRegion>
       </div>
     </div>
   )

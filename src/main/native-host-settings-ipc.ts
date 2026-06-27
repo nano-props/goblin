@@ -1,7 +1,7 @@
 import type { NativeHostIpcHandlers } from '#/shared/api-types.ts'
 import { isReservedGlobalShortcut, parseGlobalShortcut } from '#/shared/accelerator.ts'
-import { getSettingsPrefs, setSettingsGlobalShortcutState, updateSettingsPrefs } from '#/main/settings-server-client.ts'
-import { applyNativeHostShellProjection } from '#/main/native-host-settings-effects.ts'
+import { getUserSettings, setGlobalShortcutState, updateUserSettings } from '#/main/settings-server-client.ts'
+import { applyNativeHostProjection } from '#/main/native-host-settings-effects.ts'
 import { isGlobalShortcutRegistered, replaceGlobalShortcut } from '#/main/shortcuts.ts'
 
 // Native-host settings IPC handlers: read/write server-owned settings, then
@@ -10,26 +10,26 @@ function globalShortcutPayload(accelerator: string): { accelerator: string; regi
   return { accelerator, registered: isGlobalShortcutRegistered() }
 }
 
-async function getRuntimeServerSettingsPrefs() {
-  return await getSettingsPrefs()
+async function getRuntimeUserSettings() {
+  return await getUserSettings()
 }
 
 export function createNativeHostSettingsIpcHandlers(): Pick<NativeHostIpcHandlers, 'settings'> {
   return {
     settings: {
-      applyShellProjection: async (input) => await applyNativeHostShellProjection(input),
+      applyNativeHostProjection: async (input) => await applyNativeHostProjection(input),
       setGlobalShortcut: async ({ accelerator }) => {
         const parsed = parseGlobalShortcut(accelerator)
-        const serverSettings = await getRuntimeServerSettingsPrefs()
+        const serverSettings = await getRuntimeUserSettings()
         const currentGlobalShortcut = serverSettings.globalShortcut
         const currentGlobalShortcutDisabled = serverSettings.globalShortcutDisabled
         if (!parsed) return globalShortcutPayload(currentGlobalShortcut)
         if (isReservedGlobalShortcut(parsed)) return globalShortcutPayload(currentGlobalShortcut)
         const registered = currentGlobalShortcutDisabled || replaceGlobalShortcut(false, currentGlobalShortcut, parsed)
         if (!registered && !currentGlobalShortcutDisabled) return globalShortcutPayload(currentGlobalShortcut)
-        const saved = (await updateSettingsPrefs({ globalShortcut: parsed })).globalShortcut
+        const saved = (await updateUserSettings({ globalShortcut: parsed })).globalShortcut
         const payload = globalShortcutPayload(saved)
-        await setSettingsGlobalShortcutState(payload.registered)
+        await setGlobalShortcutState(payload.registered)
         return payload
       },
     },

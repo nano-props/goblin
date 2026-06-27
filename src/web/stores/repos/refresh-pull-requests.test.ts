@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { PULL_REQUEST_UNKNOWN_RETRY_DELAY_MS } from '#/shared/pull-request-state.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { replaceRepo } from '#/web/stores/repos/repo-state-factory.ts'
-import { preferredWorkspacePaneViewByBranchRecordWith } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { preferredWorkspacePaneTabByBranchRecordWith } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import type { PullRequestInfo } from '#/web/types.ts'
 import {
   branch,
@@ -386,7 +386,7 @@ describe('refreshPullRequests', () => {
       repos: {
         ...s.repos,
         [REPO_ID]: replaceRepo(s.repos[REPO_ID]!, (repo) => {
-          repo.ui.preferredWorkspacePaneViewByBranch = preferredWorkspacePaneViewByBranchRecordWith(
+          repo.ui.preferredWorkspacePaneTabByBranch = preferredWorkspacePaneTabByBranchRecordWith(
             repo.ui,
             repo.ui.selectedBranch ?? 'feature/a',
             'terminal',

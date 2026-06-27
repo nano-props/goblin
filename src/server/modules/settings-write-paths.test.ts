@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   clearServerRecentRepos: vi.fn(),
   setServerFetchIntervalSec: vi.fn(),
   setServerSessionState: vi.fn(),
-  updateServerSettingsPrefs: vi.fn(),
+  updateUserSettings: vi.fn(),
   settingsInvalidationScopesForPrefsPatch: vi.fn(),
 }))
 
@@ -21,7 +21,7 @@ vi.mock('#/server/modules/settings-source.ts', () => ({
   clearServerRecentRepos: mocks.clearServerRecentRepos,
   setServerFetchIntervalSec: mocks.setServerFetchIntervalSec,
   setServerSessionState: mocks.setServerSessionState,
-  updateServerSettingsPrefs: mocks.updateServerSettingsPrefs,
+  updateUserSettings: mocks.updateUserSettings,
 }))
 
 vi.mock('#/shared/server-invalidation.ts', async () => {
@@ -52,7 +52,7 @@ describe('settings command handlers', () => {
       lanEnabled: false,
     } as const
     const i18nSnapshot = resolveI18nSnapshot('ja', 'ja-JP,ja;q=0.9,en;q=0.8')
-    mocks.updateServerSettingsPrefs.mockResolvedValue(updatedSettings)
+    mocks.updateUserSettings.mockResolvedValue(updatedSettings)
     mocks.settingsInvalidationScopesForPrefsPatch.mockReturnValue(['i18n'])
     const { handleUpdateUserSettings } = await import('#/server/modules/settings-write-paths.ts')
 

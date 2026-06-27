@@ -13,7 +13,7 @@ describe('restorable-workspace-state', () => {
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'terminal',
+      preferredWorkspacePaneTab: 'terminal',
     })
 
     expect(
@@ -49,7 +49,7 @@ describe('restorable-workspace-state', () => {
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'changes',
+      preferredWorkspacePaneTab: 'changes',
       workspacePaneTabOrderByBranch: {
         'feature/worktree': [workspacePaneStaticTabOrderEntry('status'), workspacePaneStaticTabOrderEntry('changes')],
       },
@@ -81,7 +81,7 @@ describe('restorable-workspace-state', () => {
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'history',
+      preferredWorkspacePaneTab: 'history',
       workspacePaneTabOrderByBranch: {
         'feature/worktree': [workspacePaneStaticTabOrderEntry('status')],
       },

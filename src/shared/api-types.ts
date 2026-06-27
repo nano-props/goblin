@@ -277,7 +277,7 @@ export interface AppIpcHandlers {
     setGlobalShortcutDisabled: (input: { disabled: boolean }) => Promise<void>
     setGlobalShortcut: (input: { accelerator: string }) => Promise<GlobalShortcutState>
     saveSession: (input: { session: WorkspaceSessionState }) => Promise<void>
-    applyShellProjection: (input: NativeHostProjection) => Promise<void>
+    applyNativeHostProjection: (input: NativeHostProjection) => Promise<void>
     addRecentRepo: (input: { repo: RepoSessionEntry }) => Promise<RepoSessionEntry[]>
     clearRecentRepos: () => Promise<void>
   }
@@ -298,7 +298,7 @@ export interface AppIpcHandlers {
 export interface NativeHostIpcHandlers {
   settings: {
     setGlobalShortcut: (input: { accelerator: string }) => Promise<GlobalShortcutState>
-    applyShellProjection: (input: NativeHostProjection) => Promise<void>
+    applyNativeHostProjection: (input: NativeHostProjection) => Promise<void>
   }
 }
 

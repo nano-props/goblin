@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import {
   PENDING_TERMINAL_WORKSPACE_PANE_VIEW_IDENTITY,
-  isTerminalWorkspacePaneView,
+  isTerminalWorkspacePaneTab,
 } from '#/web/components/workspace-pane/workspace-pane-tab-summary.ts'
 import type { WorkspacePaneTabSummary } from '#/web/components/terminal/types.ts'
 
@@ -25,6 +25,6 @@ describe('workspace pane view model', () => {
   })
 
   test('narrows terminal workspace pane views', () => {
-    expect(isTerminalWorkspacePaneView(terminalView)).toBe(true)
+    expect(isTerminalWorkspacePaneTab(terminalView)).toBe(true)
   })
 })

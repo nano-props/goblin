@@ -20,7 +20,7 @@ vi.mock('#/web/hooks/useBranchActions.tsx', () => ({
 
 vi.mock('#/web/main-window-navigation.tsx', () => ({
   useMainWindowNavigation: () => ({
-    showRepoBranchWorkspacePaneView: vi.fn(),
+    showRepoBranchWorkspacePaneTab: vi.fn(),
   }),
 }))
 

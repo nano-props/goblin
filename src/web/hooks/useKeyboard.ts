@@ -223,13 +223,13 @@ export function useKeyboard({
           if (moveBranchSelection({ repo, selectBranch: state.selectBranch }, -1, navigation)) e.preventDefault()
           break
         }
-        case 'next-workspace-pane-view':
-        case 'prev-workspace-pane-view': {
+        case 'next-workspace-pane-tab':
+        case 'prev-workspace-pane-tab': {
           if (overlayOpen || !repo || !repo.ui.selectedBranch) break
           if (
             runMoveWorkspacePaneTabCommand({
               repoId: repo.id,
-              direction: action === 'next-workspace-pane-view' ? 1 : -1,
+              direction: action === 'next-workspace-pane-tab' ? 1 : -1,
               navigation,
             })
           ) {

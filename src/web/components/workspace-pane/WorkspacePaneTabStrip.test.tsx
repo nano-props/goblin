@@ -79,7 +79,7 @@ describe('WorkspacePaneTabStrip', () => {
       />,
     )
 
-    const tab = document.body.querySelector('[data-workspace-pane-view-tooltip-id="terminal:t1"]')
+    const tab = document.body.querySelector('[data-workspace-pane-tab-tooltip-id="terminal:t1"]')
     if (!(tab instanceof HTMLElement)) throw new Error('missing terminal view')
     tab.getBoundingClientRect = () =>
       ({
@@ -123,7 +123,7 @@ describe('WorkspacePaneTabStrip', () => {
       />,
     )
 
-    const trigger = document.body.querySelector('button[aria-label="workspace-pane-views.tabs"]')
+    const trigger = document.body.querySelector('button[aria-label="workspace-pane-tabs.tabs"]')
     if (!(trigger instanceof HTMLButtonElement)) throw new Error('missing terminal popover trigger')
 
     await act(async () => {
@@ -165,7 +165,7 @@ describe('WorkspacePaneTabStrip', () => {
       />,
     )
 
-    const tab = document.body.querySelector('#workspace-workspace-pane-view')
+    const tab = document.body.querySelector('#workspace-workspace-pane-tab')
     if (!(tab instanceof HTMLButtonElement)) throw new Error('missing collapsed terminal view')
 
     act(() => {
@@ -200,20 +200,20 @@ describe('WorkspacePaneTabStrip', () => {
       />,
     )
 
-    const tablist = document.body.querySelector('[role="tablist"][aria-label="workspace-pane-views.tabs"]')
+    const tablist = document.body.querySelector('[role="tablist"][aria-label="workspace-pane-tabs.tabs"]')
     expect(tablist).not.toBeNull()
     expect(tablist?.getAttribute('aria-orientation')).toBe('horizontal')
-    expect(document.body.querySelector('button[aria-label="workspace-pane-views.tabs"]')).toBeNull()
+    expect(document.body.querySelector('button[aria-label="workspace-pane-tabs.tabs"]')).toBeNull()
     expect(tablist?.className).toContain('h-full')
     expect(tablist?.parentElement?.className).toContain('w-max')
     expect(
-      [...document.body.querySelectorAll('[data-workspace-pane-view-tooltip-id]')].every(
+      [...document.body.querySelectorAll('[data-workspace-pane-tab-tooltip-id]')].every(
         (tab) =>
           tab.className.includes('w-36') && !tab.className.includes('min-w-') && !tab.className.includes('max-w-'),
       ),
     ).toBe(true)
     expect(document.body.querySelectorAll('[role="tab"]').length).toBe(3)
-    const firstTab = document.body.querySelector('#workspace-workspace-pane-view')
+    const firstTab = document.body.querySelector('#workspace-workspace-pane-tab')
     expect(firstTab?.getAttribute('aria-posinset')).toBe('1')
     expect(firstTab?.getAttribute('aria-setsize')).toBe('3')
   })
@@ -233,7 +233,7 @@ describe('WorkspacePaneTabStrip', () => {
       />,
     )
 
-    const terminalTwo = document.body.querySelector('[data-workspace-pane-view-tooltip-id="terminal:t2"]')
+    const terminalTwo = document.body.querySelector('[data-workspace-pane-tab-tooltip-id="terminal:t2"]')
     const newButton = document.body.querySelector('button[aria-label="terminal.new"]')
     if (!(terminalTwo instanceof HTMLElement)) throw new Error('missing terminal view')
     if (!(newButton instanceof HTMLButtonElement)) throw new Error('missing new terminal button')
@@ -269,7 +269,7 @@ describe('WorkspacePaneTabStrip', () => {
       />,
     )
 
-    const tab = document.body.querySelector('#workspace-workspace-pane-view')
+    const tab = document.body.querySelector('#workspace-workspace-pane-tab')
     expect(tab?.getAttribute('aria-label')).toContain('~/repo/worktree — npm run dev')
     expect(tab?.getAttribute('aria-label')).toContain('terminal.bell-unread')
     expect(tab?.querySelector('.bg-notification')).not.toBeNull()
@@ -301,9 +301,9 @@ describe('WorkspacePaneTabStrip', () => {
       />,
     )
 
-    const tab1 = document.body.querySelector('#workspace-workspace-pane-view')
-    const tab2 = document.body.querySelector('#workspace-workspace-pane-view-1')
-    const tab3 = document.body.querySelector('#workspace-workspace-pane-view-2')
+    const tab1 = document.body.querySelector('#workspace-workspace-pane-tab')
+    const tab2 = document.body.querySelector('#workspace-workspace-pane-tab-1')
+    const tab3 = document.body.querySelector('#workspace-workspace-pane-tab-2')
     if (
       !(tab1 instanceof HTMLButtonElement) ||
       !(tab2 instanceof HTMLButtonElement) ||
@@ -355,8 +355,8 @@ describe('WorkspacePaneTabStrip', () => {
       />,
     )
 
-    const tab1 = document.body.querySelector('#workspace-workspace-pane-view')
-    const tab2 = document.body.querySelector('#workspace-workspace-pane-view-1')
+    const tab1 = document.body.querySelector('#workspace-workspace-pane-tab')
+    const tab2 = document.body.querySelector('#workspace-workspace-pane-tab-1')
     if (!(tab1 instanceof HTMLButtonElement) || !(tab2 instanceof HTMLButtonElement)) {
       throw new Error('missing terminal views')
     }
@@ -599,8 +599,8 @@ describe('WorkspacePaneTabStrip', () => {
     )
 
     expect(document.body.querySelectorAll('[role="tab"]').length).toBe(1)
-    const compactTablist = document.body.querySelector('[role="tablist"][aria-label="workspace-pane-views.tabs"]')
-    const compactTab = document.body.querySelector('[data-workspace-pane-view-tooltip-id]')
+    const compactTablist = document.body.querySelector('[role="tablist"][aria-label="workspace-pane-tabs.tabs"]')
+    const compactTab = document.body.querySelector('[data-workspace-pane-tab-tooltip-id]')
     expect(compactTablist?.className).toContain('flex-1')
     expect(compactTablist?.parentElement?.className).toContain('flex-1')
     expect(compactTab?.className).toContain('min-w-0')
@@ -616,7 +616,7 @@ describe('WorkspacePaneTabStrip', () => {
     // matching the expanded strip's unselected-tab behaviour.
     const compactCloseButton = compactTab?.querySelector('button[aria-label="close term-1"]')
     expect(compactCloseButton?.className).toContain('opacity-0')
-    expect(document.body.querySelector('button[aria-label="workspace-pane-views.tabs"]')).not.toBeNull()
+    expect(document.body.querySelector('button[aria-label="workspace-pane-tabs.tabs"]')).not.toBeNull()
 
     rerender(
       <TestWorkspacePaneViewStrip
@@ -632,7 +632,7 @@ describe('WorkspacePaneTabStrip', () => {
     )
 
     expect(document.body.querySelectorAll('[role="tab"]').length).toBe(2)
-    expect(document.body.querySelector('button[aria-label="workspace-pane-views.tabs"]')).toBeNull()
+    expect(document.body.querySelector('button[aria-label="workspace-pane-tabs.tabs"]')).toBeNull()
   })
 
   test('keeps the compact tab visually unselected even when its panel is active', () => {
@@ -651,7 +651,7 @@ describe('WorkspacePaneTabStrip', () => {
       />,
     )
 
-    const compactTab = document.body.querySelector('[data-workspace-pane-view-tooltip-id]')
+    const compactTab = document.body.querySelector('[data-workspace-pane-tab-tooltip-id]')
     // The active panel makes isActive=true, but the compact tab still mutes
     // the active chrome — so the close button stays hidden-until-hover, just
     // like an unselected tab on the expanded strip.
@@ -701,7 +701,7 @@ describe('WorkspacePaneTabStrip', () => {
     })
     await flushTimers()
 
-    expect(document.activeElement?.id).toBe('workspace-workspace-pane-view')
+    expect(document.activeElement?.id).toBe('workspace-workspace-pane-tab')
     expect(document.activeElement?.textContent).toContain('term-2')
   })
 
@@ -733,8 +733,8 @@ describe('WorkspacePaneTabStrip', () => {
     // items[0]: the toolbar must not lie about the user's active view
     // when the body is rendering a non-materialized terminal panel.
     const tabs = Array.from(document.body.querySelectorAll<HTMLButtonElement>('[role="tab"]'))
-    const tablist = document.body.querySelector('[role="tablist"][aria-label="workspace-pane-views.tabs"]')
-    const switcherTrigger = document.body.querySelector('button[aria-label="workspace-pane-views.tabs"]')
+    const tablist = document.body.querySelector('[role="tablist"][aria-label="workspace-pane-tabs.tabs"]')
+    const switcherTrigger = document.body.querySelector('button[aria-label="workspace-pane-tabs.tabs"]')
 
     expect(tabs).toHaveLength(0)
     expect(tablist).not.toBeNull()
@@ -761,7 +761,7 @@ describe('WorkspacePaneTabStrip', () => {
     )
 
     const pendingView = document.body.querySelector('[data-workspace-pane-pending-view="terminal"]')
-    const tablist = document.body.querySelector('[role="tablist"][aria-label="workspace-pane-views.tabs"]')
+    const tablist = document.body.querySelector('[role="tablist"][aria-label="workspace-pane-tabs.tabs"]')
     const tab = document.body.querySelector('[role="tab"][aria-label="terminal.opening"]')
 
     expect(pendingView).not.toBeNull()
@@ -772,7 +772,7 @@ describe('WorkspacePaneTabStrip', () => {
     expect(pendingView?.textContent).not.toContain('terminal.opening')
     expect(document.body.querySelectorAll('[role="tab"]')).toHaveLength(1)
     expect(document.body.querySelector('button[aria-label="terminal.loading"]')).toBeNull()
-    expect(document.body.querySelector('button[aria-label="workspace-pane-views.tabs"]')).not.toBeNull()
+    expect(document.body.querySelector('button[aria-label="workspace-pane-tabs.tabs"]')).not.toBeNull()
   })
 
   test('renders the same pending item as a busy tab in expanded mode', () => {
@@ -831,7 +831,7 @@ describe('WorkspacePaneTabStrip', () => {
     )
 
     const tab = document.body.querySelector('[role="tab"][aria-label="terminal.opening"]')
-    const terminalView = document.body.querySelector('[data-workspace-pane-view-tooltip-id="terminal:t1"]')
+    const terminalView = document.body.querySelector('[data-workspace-pane-tab-tooltip-id="terminal:t1"]')
 
     expect(tab).not.toBeNull()
     expect(terminalView?.textContent).not.toContain('terminal')

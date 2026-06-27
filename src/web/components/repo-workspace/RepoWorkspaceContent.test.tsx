@@ -111,7 +111,7 @@ describe('RepoWorkspaceContent', () => {
         }),
       ],
       selectedBranch: 'feature/changes',
-      preferredWorkspacePaneView: 'status',
+      preferredWorkspacePaneTab: 'status',
       workspacePaneTabOrderByBranch: {
         'feature/changes': [staticEntry('status'), staticEntry('changes')],
       },
@@ -175,7 +175,7 @@ describe('RepoWorkspaceContent', () => {
         }),
       ],
       selectedBranch: 'feature/copy-success',
-      preferredWorkspacePaneView: 'status',
+      preferredWorkspacePaneTab: 'status',
       workspacePaneTabOrderByBranch: {
         'feature/copy-success': [staticEntry('status')],
       },
@@ -241,7 +241,7 @@ describe('RepoWorkspaceContent', () => {
         }),
       ],
       selectedBranch: 'feature/clean',
-      preferredWorkspacePaneView: 'status',
+      preferredWorkspacePaneTab: 'status',
       workspacePaneTabOrderByBranch: {
         'feature/clean': [staticEntry('status')],
       },
@@ -284,7 +284,7 @@ describe('RepoWorkspaceContent', () => {
         }),
       ],
       selectedBranch: 'feature/hidden',
-      preferredWorkspacePaneView: 'status',
+      preferredWorkspacePaneTab: 'status',
       workspacePaneTabOrderByBranch: {
         'feature/hidden': [staticEntry('status')],
       },
@@ -332,7 +332,7 @@ describe('RepoWorkspaceContent', () => {
         }),
       ],
       selectedBranch: 'feature/changes-panel',
-      preferredWorkspacePaneView: 'changes',
+      preferredWorkspacePaneTab: 'changes',
       workspacePaneTabOrderByBranch: {
         'feature/changes-panel': [staticEntry('status'), staticEntry('changes')],
       },
@@ -384,7 +384,7 @@ describe('RepoWorkspaceContent', () => {
         }),
       ],
       selectedBranch: 'feature/no-worktree',
-      preferredWorkspacePaneView: 'status',
+      preferredWorkspacePaneTab: 'status',
     })
     const detail = getSelectedRepoWorkspacePresentation(repo)
 
@@ -401,7 +401,7 @@ describe('RepoWorkspaceContent', () => {
     expect(container?.querySelector('#workspace-status-panel')).not.toBeNull()
     expect(container?.textContent).toContain('feature/no-worktree')
     expect(container?.textContent).toContain('branch-status.worktree.none')
-    expect(container?.textContent).not.toContain('workspace-pane-views.empty')
+    expect(container?.textContent).not.toContain('workspace-pane-tabs.empty')
   })
 
   test('shows the workspace empty state when the status tab is closed', () => {
@@ -417,7 +417,7 @@ describe('RepoWorkspaceContent', () => {
         }),
       ],
       selectedBranch: 'feature/no-worktree',
-      preferredWorkspacePaneView: 'status',
+      preferredWorkspacePaneTab: 'status',
       workspacePaneTabOrderByBranch: { 'feature/no-worktree': [] },
     })
     const detail = getSelectedRepoWorkspacePresentation(repo)
@@ -431,7 +431,7 @@ describe('RepoWorkspaceContent', () => {
     })
 
     expect(container?.querySelector('#workspace-status-panel')).toBeNull()
-    expect(container?.textContent).toContain('workspace-pane-views.empty')
+    expect(container?.textContent).toContain('workspace-pane-tabs.empty')
   })
 
   test('falls back to status when a worktree-scoped preference is unrenderable on a branch without a worktree', () => {
@@ -439,7 +439,7 @@ describe('RepoWorkspaceContent', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/no-worktree')],
       selectedBranch: 'feature/no-worktree',
-      preferredWorkspacePaneView: 'terminal',
+      preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabOrderByBranch: { 'feature/no-worktree': [staticEntry('status')] },
     })
     const detail = getSelectedRepoWorkspacePresentation(repo)
@@ -459,7 +459,7 @@ describe('RepoWorkspaceContent', () => {
     // so the user lands on a real view instead of the empty pane.
     expect(container?.querySelector('#workspace-status-panel')).not.toBeNull()
     expect(container?.querySelector('#workspace-terminal-panel')).toBeNull()
-    expect(container?.textContent).not.toContain('workspace-pane-views.empty')
+    expect(container?.textContent).not.toContain('workspace-pane-tabs.empty')
   })
 
   test('falls back to status when terminal is preferred but sync confirms no terminal tabs', () => {
@@ -468,7 +468,7 @@ describe('RepoWorkspaceContent', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/terminal-empty', { worktree: { path: worktreePath } })],
       selectedBranch: 'feature/terminal-empty',
-      preferredWorkspacePaneView: 'terminal',
+      preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabOrderByBranch: { 'feature/terminal-empty': [staticEntry('status')] },
     })
     useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceToken)
@@ -490,7 +490,7 @@ describe('RepoWorkspaceContent', () => {
     // the user does not land on the empty pane.
     expect(container?.querySelector('#workspace-status-panel')).not.toBeNull()
     expect(container?.querySelector('#workspace-terminal-panel')).toBeNull()
-    expect(container?.textContent).not.toContain('workspace-pane-views.empty')
+    expect(container?.textContent).not.toContain('workspace-pane-tabs.empty')
   })
 
   test('mounts the terminal slot while terminal creation is pending with no sessions', () => {
@@ -500,7 +500,7 @@ describe('RepoWorkspaceContent', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/terminal-pending', { worktree: { path: worktreePath } })],
       selectedBranch: 'feature/terminal-pending',
-      preferredWorkspacePaneView: 'terminal',
+      preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabOrderByBranch: { 'feature/terminal-pending': [staticEntry('status')] },
     })
     useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceToken)
@@ -532,7 +532,7 @@ describe('RepoWorkspaceContent', () => {
     expect(panel?.hasAttribute('aria-label')).toBe(false)
     expect(container?.querySelector('.goblin-terminal-session__host')).not.toBeNull()
     expect(container?.textContent).toContain('terminal.opening')
-    expect(container?.textContent).not.toContain('workspace-pane-views.empty')
+    expect(container?.textContent).not.toContain('workspace-pane-tabs.empty')
     expect(registerHost).toHaveBeenCalledWith(worktreeKey, expect.any(HTMLDivElement))
   })
 
@@ -544,7 +544,7 @@ describe('RepoWorkspaceContent', () => {
       id: REPO_ID,
       branches: [createRepoBranch(branchName, { worktree: { path: worktreePath } })],
       selectedBranch: branchName,
-      preferredWorkspacePaneView: 'terminal',
+      preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabOrderByBranch: { [branchName]: [] },
     })
     useRepoSyncStore.getState().markReady(REPO_ID, seededRepo.instanceToken)
@@ -574,7 +574,7 @@ describe('RepoWorkspaceContent', () => {
     )
 
     expect(screen.getByRole('tabpanel').id).toBe('workspace-terminal-panel')
-    expect(screen.queryByText('workspace-pane-views.empty')).toBeNull()
+    expect(screen.queryByText('workspace-pane-tabs.empty')).toBeNull()
     expect(registerHost).toHaveBeenCalledWith(worktreeKey, expect.any(HTMLDivElement))
   })
 
@@ -585,7 +585,7 @@ describe('RepoWorkspaceContent', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/terminal-loading', { worktree: { path: worktreePath } })],
       selectedBranch: 'feature/terminal-loading',
-      preferredWorkspacePaneView: 'terminal',
+      preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabOrderByBranch: { 'feature/terminal-loading': [staticEntry('status')] },
     })
     const detail = getSelectedRepoWorkspacePresentation(repo)
@@ -629,7 +629,7 @@ describe('RepoWorkspaceContent', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/terminal-reordered', { worktree: { path: worktreePath } })],
       selectedBranch: 'feature/terminal-reordered',
-      preferredWorkspacePaneView: 'terminal',
+      preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabOrderByBranch: {
         'feature/terminal-reordered': [terminalEntry('t2'), staticEntry('status'), terminalEntry('t1')],
       },
@@ -659,7 +659,7 @@ describe('RepoWorkspaceContent', () => {
     })
 
     expect(container?.querySelector('#workspace-terminal-panel')?.getAttribute('aria-labelledby')).toBe(
-      'workspace-workspace-pane-view',
+      'workspace-workspace-pane-tab',
     )
     expect(registerHost).toHaveBeenCalledWith(worktreeKey, expect.any(HTMLDivElement))
   })
@@ -669,7 +669,7 @@ describe('RepoWorkspaceContent', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/a'), createRepoBranch('feature/b')],
       selectedBranch: 'feature/b',
-      preferredWorkspacePaneView: 'history',
+      preferredWorkspacePaneTab: 'history',
       workspacePaneTabOrderByBranch: {
         'feature/a': [staticEntry('status'), staticEntry('history')],
       },
@@ -695,7 +695,7 @@ describe('RepoWorkspaceContent', () => {
     // view (history) so opening history later returns to it.
     expect(container?.querySelector('#workspace-status-panel')).not.toBeNull()
     expect(container?.querySelector('#workspace-history-panel')).toBeNull()
-    expect(container?.textContent).not.toContain('workspace-pane-views.empty')
+    expect(container?.textContent).not.toContain('workspace-pane-tabs.empty')
     expect(repoClientMocks.getRepoLog).not.toHaveBeenCalled()
   })
 
@@ -714,7 +714,7 @@ describe('RepoWorkspaceContent', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/history')],
       selectedBranch: 'feature/history',
-      preferredWorkspacePaneView: 'history',
+      preferredWorkspacePaneTab: 'history',
       workspacePaneTabOrderByBranch: { 'feature/history': [staticEntry('status'), staticEntry('history')] },
     })
     const detail = getSelectedRepoWorkspacePresentation(repo)
@@ -768,7 +768,7 @@ describe('RepoWorkspaceContent', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/history', { worktree: { path: '/tmp/history-worktree' } })],
       selectedBranch: 'feature/history',
-      preferredWorkspacePaneView: 'history',
+      preferredWorkspacePaneTab: 'history',
       workspacePaneTabOrderByBranch: { 'feature/history': [staticEntry('status'), staticEntry('history')] },
     })
     const detail = getSelectedRepoWorkspacePresentation(repo)
@@ -793,7 +793,7 @@ describe('RepoWorkspaceContent', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/history')],
       selectedBranch: 'feature/history',
-      preferredWorkspacePaneView: 'history',
+      preferredWorkspacePaneTab: 'history',
       workspacePaneTabOrderByBranch: { 'feature/history': [staticEntry('history')] },
     })
     const detail = getSelectedRepoWorkspacePresentation(repo)

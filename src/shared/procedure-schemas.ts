@@ -188,7 +188,7 @@ export const SETTINGS_PROCEDURE_SCHEMAS = {
 } as const
 
 // `prefs` accepts a permissive patch — the underlying
-// `updateServerSettingsPrefs` does field-level validation (and
+// `updateUserSettings` does field-level validation (and
 // ignores unknown keys), so we only enforce that the body is an
 // object at the perimeter.
 export const SETTINGS_PATCH_SCHEMAS = {
@@ -201,6 +201,6 @@ export const SETTINGS_PATCH_SCHEMAS = {
 export const NATIVE_HOST_IPC_PROCEDURE_SCHEMAS = {
   settings: {
     setGlobalShortcut: v.object({ accelerator: v.string() }),
-    applyShellProjection: NativeHostProjectionSchema,
+    applyNativeHostProjection: NativeHostProjectionSchema,
   },
 } as const

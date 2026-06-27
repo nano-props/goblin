@@ -5,8 +5,8 @@ export type BranchActionShortcutAction = 'pull' | 'push'
 export type ClientNavigationShortcutAction =
   | 'next-branch'
   | 'prev-branch'
-  | 'next-workspace-pane-view'
-  | 'prev-workspace-pane-view'
+  | 'next-workspace-pane-tab'
+  | 'prev-workspace-pane-tab'
 export type ClientAppShortcutAction = 'show-help' | 'dismiss'
 export type ClientKeyboardShortcutAction =
   | BranchActionShortcutAction
@@ -81,8 +81,8 @@ export interface ClientKeyboardShortcutDefinition<
 export const CLIENT_NAVIGATION_SHORTCUTS: ClientKeyboardShortcutDefinition<ClientNavigationShortcutAction>[] = [
   keyboardShortcut([{ key: 'j' }, { key: 'ArrowDown' }], 'next-branch', [['j'], ['↓']], 'help.row.next-branch'),
   keyboardShortcut([{ key: 'k' }, { key: 'ArrowUp' }], 'prev-branch', [['k'], ['↑']], 'help.row.prev-branch'),
-  keyboardShortcut([{ key: 'ArrowRight' }], 'next-workspace-pane-view', [['→']], 'help.row.switch-workspace-pane-view'),
-  keyboardShortcut([{ key: 'ArrowLeft' }], 'prev-workspace-pane-view', [['←']], 'help.row.switch-workspace-pane-view'),
+  keyboardShortcut([{ key: 'ArrowRight' }], 'next-workspace-pane-tab', [['→']], 'help.row.switch-workspace-pane-tab'),
+  keyboardShortcut([{ key: 'ArrowLeft' }], 'prev-workspace-pane-tab', [['←']], 'help.row.switch-workspace-pane-tab'),
 ]
 
 export const BRANCH_ACTION_SHORTCUTS: BranchActionShortcutDefinition[] = [
@@ -189,7 +189,7 @@ export const CLIENT_MENU_COMMANDS: ClientMenuCommandDefinition[] = [
   clientMenuCommand(
     'view-status',
     'menu.view.status',
-    { type: 'show-workspace-pane-view-requested', tab: 'status' },
+    { type: 'show-workspace-pane-tab-requested', tab: 'status' },
     {
       helpLabelKey: 'help.row.view-status',
     },
@@ -197,7 +197,7 @@ export const CLIENT_MENU_COMMANDS: ClientMenuCommandDefinition[] = [
   clientMenuCommand(
     'view-history',
     'menu.view.history',
-    { type: 'show-workspace-pane-view-requested', tab: 'history' },
+    { type: 'show-workspace-pane-tab-requested', tab: 'history' },
     {
       helpLabelKey: 'help.row.view-log',
     },
@@ -205,7 +205,7 @@ export const CLIENT_MENU_COMMANDS: ClientMenuCommandDefinition[] = [
   clientMenuCommand(
     'view-changes',
     'menu.view.changes',
-    { type: 'show-workspace-pane-view-requested', tab: 'changes' },
+    { type: 'show-workspace-pane-tab-requested', tab: 'changes' },
     {
       helpLabelKey: 'help.row.view-changes',
     },

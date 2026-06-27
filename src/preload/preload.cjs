@@ -30,10 +30,10 @@ const IPC = {
     effectIntent: 'goblin:client-effect-intent',
   },
   host: {
-    openSettingsWindow: 'goblin:shell-open-settings-window',
-    openExternalUrl: 'goblin:shell-open-external-url',
-    openDirectoryDialog: 'goblin:shell-open-directory-dialog',
-    consumeExternalOpenPaths: 'goblin:shell-consume-external-open-paths',
+    openSettingsWindow: 'goblin:host-open-settings-window',
+    openExternalUrl: 'goblin:host-open-external-url',
+    openDirectoryDialog: 'goblin:host-open-directory-dialog',
+    consumeExternalOpenPaths: 'goblin:host-consume-external-open-paths',
   },
   terminal: {
     notifyBell: 'goblin:terminal-notify-bell',

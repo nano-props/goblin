@@ -21,7 +21,7 @@ import {
   workspacePaneTabTargetForBranch,
 } from '#/web/workspace-pane/workspace-pane-tab-close.ts'
 
-interface ShowWorkspacePaneViewCommandOptions {
+interface ShowWorkspacePaneTabCommandOptions {
   repoId: string | null
   tab: WorkspacePaneTabType
   navigation: MainWindowNavigationActions
@@ -61,11 +61,11 @@ interface MoveWorkspacePaneTabCommandOptions {
   navigation: MainWindowNavigationActions
 }
 
-export async function runShowWorkspacePaneViewCommand({
+export async function runShowWorkspacePaneTabCommand({
   repoId,
   tab,
   navigation,
-}: ShowWorkspacePaneViewCommandOptions): Promise<boolean> {
+}: ShowWorkspacePaneTabCommandOptions): Promise<boolean> {
   if (!repoId) return false
   const provider = workspacePaneTabProvider(tab)
   if (isWorkspacePaneStaticTabProvider(provider)) {
@@ -80,7 +80,7 @@ export async function runShowWorkspacePaneViewCommand({
       })
     }
   }
-  navigation.showRepoWorkspacePaneView(repoId, tab)
+  navigation.showRepoWorkspacePaneTab(repoId, tab)
   return true
 }
 
@@ -90,7 +90,7 @@ export async function runTerminalPrimaryActionCommand({
   t,
 }: TerminalPrimaryActionCommandOptions): Promise<boolean> {
   if (!repoId) return false
-  await runShowWorkspacePaneViewCommand({ repoId, tab: 'terminal', navigation })
+  await runShowWorkspacePaneTabCommand({ repoId, tab: 'terminal', navigation })
   const base = selectedTerminalBase(repoId)
   if (!base) return true
   const bridge = readTerminalSessionCommandBridge()
@@ -122,7 +122,7 @@ export async function runNewTerminalTabCommand({
   if (!repoId) return false
   const base = selectedTerminalBase(repoId)
   if (!base) return false
-  await runShowWorkspacePaneViewCommand({ repoId, tab: 'terminal', navigation })
+  await runShowWorkspacePaneTabCommand({ repoId, tab: 'terminal', navigation })
   const bridge = readTerminalSessionCommandBridge()
   if (!bridge) return true
   const result = await runCreateTerminalTabCommand({
@@ -230,7 +230,7 @@ function showWorkspacePaneCommandTab(
   tab: BranchWorkspacePaneTab,
   navigation: MainWindowNavigationActions,
 ): void {
-  navigation.showRepoWorkspacePaneView(target.repoId, tab.type)
+  navigation.showRepoWorkspacePaneTab(target.repoId, tab.type)
   if (tab.kind === 'terminal' && target.worktreeTerminalKey) {
     readTerminalSessionCommandBridge()?.selectTerminal(target.worktreeTerminalKey, tab.key)
   }

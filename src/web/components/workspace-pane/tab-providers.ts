@@ -116,7 +116,7 @@ export abstract class WorkspacePaneStaticTabProvider<
   abstract tooltip(input: WorkspacePaneStaticTabMetadataInput): string
 
   closeLabel(input: WorkspacePaneStaticTabMetadataInput): string {
-    return input.t('workspace-pane-views.close-named', { name: this.label({ ...input, statusCount: 0 }) })
+    return input.t('workspace-pane-tabs.close-named', { name: this.label({ ...input, statusCount: 0 }) })
   }
 
   close(input: WorkspacePaneTabCloseInput): Promise<boolean> {
@@ -138,7 +138,7 @@ class StatusWorkspacePaneTabProvider extends WorkspacePaneStaticTabProvider<'sta
   }
 
   tooltip(input: WorkspacePaneStaticTabMetadataInput): string {
-    return branchScopedViewTooltip({ kind: 'status', ...input })
+    return branchScopedTabTooltip({ kind: 'status', ...input })
   }
 }
 
@@ -157,7 +157,7 @@ class ChangesWorkspacePaneTabProvider extends WorkspacePaneStaticTabProvider<'ch
   }
 
   tooltip(input: WorkspacePaneStaticTabMetadataInput): string {
-    return input.t('workspace-pane-views.changes-tooltip', { count: input.statusCount })
+    return input.t('workspace-pane-tabs.changes-tooltip', { count: input.statusCount })
   }
 }
 
@@ -173,7 +173,7 @@ class HistoryWorkspacePaneTabProvider extends WorkspacePaneStaticTabProvider<'hi
   }
 
   tooltip(input: WorkspacePaneStaticTabMetadataInput): string {
-    return branchScopedViewTooltip({ kind: 'history', ...input })
+    return branchScopedTabTooltip({ kind: 'history', ...input })
   }
 }
 
@@ -190,7 +190,7 @@ export class TerminalWorkspacePaneTabProvider extends WorkspacePaneTabProvider<'
   }
 
   buttonId(workspacePaneId: string, index: number): string {
-    return index <= 0 ? `${workspacePaneId}-workspace-pane-view` : `${workspacePaneId}-workspace-pane-view-${index}`
+    return index <= 0 ? `${workspacePaneId}-workspace-pane-tab` : `${workspacePaneId}-workspace-pane-tab-${index}`
   }
 
   override isRenderable(context: WorkspacePaneTabAvailabilityContext): boolean {
@@ -237,15 +237,15 @@ export class TerminalWorkspacePaneTabProvider extends WorkspacePaneTabProvider<'
   }
 }
 
-const BRANCH_SCOPED_VIEW_TOOLTIP_KEYS: Record<'status' | 'history', string> = {
-  status: 'workspace-pane-views.status-tooltip',
-  history: 'workspace-pane-views.history-tooltip',
+const BRANCH_SCOPED_TAB_TOOLTIP_KEYS: Record<'status' | 'history', string> = {
+  status: 'workspace-pane-tabs.status-tooltip',
+  history: 'workspace-pane-tabs.history-tooltip',
 }
 
-function branchScopedViewTooltip(input: WorkspacePaneStaticTabMetadataInput & { kind: 'status' | 'history' }): string {
+function branchScopedTabTooltip(input: WorkspacePaneStaticTabMetadataInput & { kind: 'status' | 'history' }): string {
   const fallbackKey = input.kind === 'status' ? 'tab.status' : 'tab.log'
   if (!input.branchName) return input.t(fallbackKey)
-  return input.t(BRANCH_SCOPED_VIEW_TOOLTIP_KEYS[input.kind], { branch: input.branchName })
+  return input.t(BRANCH_SCOPED_TAB_TOOLTIP_KEYS[input.kind], { branch: input.branchName })
 }
 
 export const statusWorkspacePaneTabProvider = new StatusWorkspacePaneTabProvider()

@@ -26,8 +26,8 @@ import {
   workspacePaneTabOrderWithoutTerminal,
 } from '#/web/stores/repos/workspace-pane-tabs.ts'
 import {
-  preferredWorkspacePaneViewForBranch,
-  preferredWorkspacePaneViewByBranchRecordWith,
+  preferredWorkspacePaneTabForBranch,
+  preferredWorkspacePaneTabByBranchRecordWith,
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
 
 type RestorableWorkspaceSelectionActions = Pick<
@@ -375,14 +375,14 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
       set((s) => {
         const repo = s.repos[id]
         const branch = repo?.ui.selectedBranch
-        const current = repo ? preferredWorkspacePaneViewForBranch(repo.ui, branch) : null
+        const current = repo ? preferredWorkspacePaneTabForBranch(repo.ui, branch) : null
         if (!repo || !branch || current === tab) return s
         changed = true
         token = repo.instanceToken
         return replaceRepoState(s, repo, (r) => {
           const selectedBranch = r.ui.selectedBranch
           if (selectedBranch) {
-            r.ui.preferredWorkspacePaneViewByBranch = preferredWorkspacePaneViewByBranchRecordWith(
+            r.ui.preferredWorkspacePaneTabByBranch = preferredWorkspacePaneTabByBranchRecordWith(
               r.ui,
               selectedBranch,
               tab,
@@ -396,7 +396,7 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
       afterSelectionChange(
         id,
         token,
-        repo && preferredWorkspacePaneViewForBranch(repo.ui, repo.ui.selectedBranch) === 'status'
+        repo && preferredWorkspacePaneTabForBranch(repo.ui, repo.ui.selectedBranch) === 'status'
           ? repo.ui.selectedBranch
           : null,
       )

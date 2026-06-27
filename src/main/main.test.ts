@@ -23,7 +23,7 @@ const mocks = vi.hoisted(() => {
     buildAppMenu: vi.fn(),
     flushWindowState: vi.fn(() => Promise.resolve(true)),
     getSettingsSnapshot: vi.fn<() => Promise<SettingsSnapshot>>(),
-    setSettingsGlobalShortcutState: vi.fn(async () => true),
+    setGlobalShortcutState: vi.fn(async () => true),
     initializeMenuRuntimeState: vi.fn(),
     initTheme: vi.fn(() => Promise.resolve()),
     resolveLang: vi.fn(() => 'en'),
@@ -123,7 +123,7 @@ vi.mock('#/main/terminal.ts', () => ({
 
 vi.mock('#/main/settings-server-client.ts', () => ({
   getSettingsSnapshot: mocks.getSettingsSnapshot,
-  setSettingsGlobalShortcutState: mocks.setSettingsGlobalShortcutState,
+  setGlobalShortcutState: mocks.setGlobalShortcutState,
 }))
 
 vi.mock('#/main/embedded-server-lifecycle.ts', () => ({

@@ -262,7 +262,7 @@ describe('settings-client', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(invokeIpc).toHaveBeenCalledWith(
       expect.objectContaining({
-        path: 'settings.applyShellProjection',
+        path: 'settings.applyNativeHostProjection',
         input: {
           prefs: {
             patch: { lang: 'ja' },
@@ -332,7 +332,7 @@ describe('settings-client', () => {
     )
     expect(invokeIpc).toHaveBeenCalledWith(
       expect.objectContaining({
-        path: 'settings.applyShellProjection',
+        path: 'settings.applyNativeHostProjection',
         input: {
           recentRepos: {
             recentRepos: [{ kind: 'local', id: '/tmp/repo' }],
@@ -388,7 +388,7 @@ describe('settings-client', () => {
     expect(invokeIpc).toHaveBeenCalledTimes(1)
     expect(invokeIpc).toHaveBeenCalledWith(
       expect.objectContaining({
-        path: 'settings.applyShellProjection',
+        path: 'settings.applyNativeHostProjection',
         input: { recentRepos: { recentRepos: [] } },
       }),
     )
@@ -440,7 +440,7 @@ describe('settings-client', () => {
     })
     expect(invokeIpc).toHaveBeenCalledWith(
       expect.objectContaining({
-        path: 'settings.applyShellProjection',
+        path: 'settings.applyNativeHostProjection',
         input: {
           recentRepos: {
             recentRepos: [{ kind: 'local', id: '/existing' }],

@@ -20,7 +20,7 @@ function activeRepoStatusSnapshotEqual(
       !!b &&
       a.id === b.id &&
       a.token === b.token &&
-      a.preferredWorkspacePaneView === b.preferredWorkspacePaneView &&
+      a.preferredWorkspacePaneTab === b.preferredWorkspacePaneTab &&
       a.statusViewOpen === b.statusViewOpen &&
       a.unavailable === b.unavailable &&
       a.statusPhase === b.statusPhase)
@@ -46,7 +46,7 @@ export function useRepoStatusRefresh() {
     const lastPreferredWorkspacePaneView = previousPreferredWorkspacePaneView.current
     const lastStatusViewOpen = previousStatusViewOpen.current
     const nextActiveRepoId = activeRepoId?.id ?? null
-    const nextPreferredWorkspacePaneView = activeRepoId?.preferredWorkspacePaneView ?? null
+    const nextPreferredWorkspacePaneView = activeRepoId?.preferredWorkspacePaneTab ?? null
     const nextStatusViewOpen = activeRepoId?.statusViewOpen ?? false
     const activeRepoChanged = nextActiveRepoId !== lastActiveRepoId
     const openedStatusLikeTab =

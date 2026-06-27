@@ -14,7 +14,7 @@ vi.mock('#/server/modules/repo-source.ts', () => ({
 // Tests only need the read surface; cast to the full interface at the
 // boundary so individual stub objects stay focused.
 type BackendTask = (backend: RepoSource) => Promise<unknown>
-function asRepoBackend(backend: ReadBackend): RepoSource {
+function asRepoSource(backend: ReadBackend): RepoSource {
   return backend as unknown as RepoSource
 }
 
@@ -60,7 +60,7 @@ function makeBackend(overrides: Partial<ReadBackend> = {}): ReadBackend {
 
 beforeEach(() => {
   mocks.runWithRepoSource.mockReset()
-  mocks.runWithRepoSource.mockImplementation((_cwd: string, task: BackendTask) => task(asRepoBackend(makeBackend())))
+  mocks.runWithRepoSource.mockImplementation((_cwd: string, task: BackendTask) => task(asRepoSource(makeBackend())))
 })
 
 afterEach(() => {
@@ -81,7 +81,7 @@ describe('getRepoLog', () => {
     ]
     const getLog = vi.fn(() => Promise.resolve(entries))
     mocks.runWithRepoSource.mockImplementation((_cwd: string, task: BackendTask) =>
-      task(asRepoBackend(makeBackend({ getLog }))),
+      task(asRepoSource(makeBackend({ getLog }))),
     )
     const { getRepoLog } = await import('#/server/modules/repo-read-paths.ts')
     const signal = new AbortController().signal
@@ -93,7 +93,7 @@ describe('getRepoLog', () => {
   test('uses the shared default branch history count', async () => {
     const getLog = vi.fn(() => Promise.resolve<LogEntry[]>([]))
     mocks.runWithRepoSource.mockImplementation((_cwd: string, task: BackendTask) =>
-      task(asRepoBackend(makeBackend({ getLog }))),
+      task(asRepoSource(makeBackend({ getLog }))),
     )
     const { getRepoLog } = await import('#/server/modules/repo-read-paths.ts')
 
@@ -119,7 +119,7 @@ describe('getRepoWorktreeBootstrapPreview', () => {
       }),
     )
     mocks.runWithRepoSource.mockImplementation((_cwd: string, task: BackendTask) =>
-      task(asRepoBackend(makeBackend({ getWorktreeBootstrapPreview }))),
+      task(asRepoSource(makeBackend({ getWorktreeBootstrapPreview }))),
     )
     const { getRepoWorktreeBootstrapPreview } = await import('#/server/modules/repo-read-paths.ts')
     const signal = new AbortController().signal
@@ -141,7 +141,7 @@ describe('readRepoBulk timeout', () => {
     const status: WorktreeStatus[] = []
     mocks.runWithRepoSource.mockImplementation((_cwd: string, task: BackendTask) =>
       task(
-        asRepoBackend(
+        asRepoSource(
           makeBackend({
             getSnapshot: () => Promise.resolve(snapshot),
             getStatus: () => Promise.resolve(status),
@@ -163,7 +163,7 @@ describe('readRepoBulk timeout', () => {
     // returns null after a short delay.
     mocks.runWithRepoSource.mockImplementation((_cwd: string, task: BackendTask) =>
       task(
-        asRepoBackend(
+        asRepoSource(
           makeBackend({
             getSnapshot: () =>
               Promise.resolve<RepoSnapshot | null>({
@@ -196,7 +196,7 @@ describe('readRepoBulk timeout', () => {
     let observedSignal: AbortSignal | undefined
     mocks.runWithRepoSource.mockImplementation((_cwd: string, task: BackendTask) =>
       task(
-        asRepoBackend(
+        asRepoSource(
           makeBackend({
             getStatus: (signal?: AbortSignal) => {
               observedSignal = signal
@@ -232,7 +232,7 @@ describe('readRepoBulk timeout', () => {
     let prsSignal: AbortSignal | undefined
     mocks.runWithRepoSource.mockImplementation((_cwd: string, task: BackendTask) =>
       task(
-        asRepoBackend(
+        asRepoSource(
           makeBackend({
             getSnapshot: (signal?: AbortSignal) => {
               snapshotSignal = signal

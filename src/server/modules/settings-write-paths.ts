@@ -4,7 +4,7 @@ import {
   clearServerRecentRepos,
   setServerFetchIntervalSec,
   setServerSessionState,
-  updateServerSettingsPrefs,
+  updateUserSettings,
 } from '#/server/modules/settings-source.ts'
 import type { NativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
 import { resolveI18nSnapshot } from '#/shared/i18n/snapshot.ts'
@@ -52,7 +52,7 @@ export async function handleUpdateUserSettings(
   options: { acceptLanguage?: string; signal: AbortSignal },
 ): Promise<UserSettingsUpdateResponse> {
   const patch = input.prefs
-  const settings = await updateServerSettingsPrefs(patch)
+  const settings = await updateUserSettings(patch)
   publishSettingsInvalidation(settingsInvalidationScopesForPrefsPatch(patch))
   return {
     ok: true,

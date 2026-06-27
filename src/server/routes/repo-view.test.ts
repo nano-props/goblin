@@ -52,7 +52,7 @@ describe('POST /api/repo/view', () => {
     expect(subscriber.send).toHaveBeenCalledWith(
       JSON.stringify({
         type: 'client-effect-intent',
-        intent: { type: 'show-workspace-pane-view-requested', tab: 'changes' },
+        intent: { type: 'show-workspace-pane-tab-requested', tab: 'changes' },
       }),
     )
   })
@@ -172,7 +172,7 @@ describe('POST /api/repo/view — auth integration via createApp()', () => {
     expect(subscriber.send).toHaveBeenCalledWith(
       JSON.stringify({
         type: 'client-effect-intent',
-        intent: { type: 'show-workspace-pane-view-requested', tab: 'changes' },
+        intent: { type: 'show-workspace-pane-tab-requested', tab: 'changes' },
       }),
     )
   })

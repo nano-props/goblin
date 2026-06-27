@@ -6,7 +6,7 @@ import {
   type RepoWorkspaceTabModel,
 } from '#/web/components/repo-workspace/tab-model.ts'
 import { workspacePaneTabOrderForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
-import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import {
@@ -91,7 +91,7 @@ export function workspacePaneTabTargetForBranch(repoId: string, branchName: stri
     repoId,
     branchName,
     worktreePath: worktreePath ?? null,
-    preferredView: preferredWorkspacePaneViewForBranch(repo.ui, branchName),
+    preferredView: preferredWorkspacePaneTabForBranch(repo.ui, branchName),
     tabOrder: workspacePaneTabOrderForBranch(repo.ui, branchName),
     runtimeTerminalViews: snapshot?.sessions ?? [],
     terminalSessionCount: snapshot?.count ?? 0,

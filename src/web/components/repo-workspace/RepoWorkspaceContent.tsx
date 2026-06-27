@@ -49,7 +49,7 @@ export function RepoWorkspaceContent({ repo, detail, workspacePaneId, workspaceP
   if (!selection) {
     return (
       <div className="flex min-h-0 flex-1 flex-col">
-        <EmptyState title={t('workspace-pane-views.empty')} />
+        <EmptyState title={t('workspace-pane-tabs.empty')} />
       </div>
     )
   }

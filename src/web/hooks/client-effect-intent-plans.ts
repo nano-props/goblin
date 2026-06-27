@@ -21,7 +21,7 @@ type ClientWorkspaceIntent = Extract<
   | { type: 'close-repo-requested' }
   | { type: 'cycle-repo-requested' }
   | { type: 'repo-refresh-requested' }
-  | { type: 'show-workspace-pane-view-requested' }
+  | { type: 'show-workspace-pane-tab-requested' }
   | { type: 'terminal-primary-action-requested' }
   | { type: 'workspace-zen-mode-toggle-requested' }
 >
@@ -153,7 +153,7 @@ export function createWorkspaceIntentPlan(
       if (context.workspaceShortcutSuppressed || context.terminalFocused || !context.currentRepo)
         return { kind: 'noop' }
       return { kind: 'refresh-repo', repoId: context.currentRepo.id, token: context.currentRepo.instanceToken }
-    case 'show-workspace-pane-view-requested':
+    case 'show-workspace-pane-tab-requested':
       if (context.workspaceShortcutSuppressed || !context.currentRepoId) return { kind: 'noop' }
       return { kind: 'show-workspace-pane-view', repoId: context.currentRepoId, tab: event.tab }
     case 'terminal-primary-action-requested':
@@ -187,7 +187,7 @@ function isClientWorkspaceIntent(event: ClientEffectIntent): event is ClientWork
     event.type === 'close-repo-requested' ||
     event.type === 'cycle-repo-requested' ||
     event.type === 'repo-refresh-requested' ||
-    event.type === 'show-workspace-pane-view-requested' ||
+    event.type === 'show-workspace-pane-tab-requested' ||
     event.type === 'terminal-primary-action-requested' ||
     event.type === 'workspace-zen-mode-toggle-requested'
   )

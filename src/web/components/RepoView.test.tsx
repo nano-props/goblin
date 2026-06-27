@@ -204,8 +204,8 @@ describe('RepoView workspace navigation', () => {
     const closedRevealTop = zenModeSidebarReveal()?.querySelector<HTMLElement>('[data-testid="repo-shell-sidebar-top"]')
     expect(zenModeSidebarReveal()?.dataset.open).toBe('false')
     expect(zenModeSidebarReveal()?.dataset.interactive).toBe('false')
-    expect(closedRevealTop?.dataset.windowChromeRegion).toBeUndefined()
-    expect(closedRevealTop?.querySelector('[data-window-chrome-region="no-drag"]')).toBeNull()
+    expect(closedRevealTop?.dataset.titleBarChromeRegion).toBeUndefined()
+    expect(closedRevealTop?.querySelector('[data-title-bar-chrome-region="no-drag"]')).toBeNull()
   })
 
   test('large-screen collapsed Zen Mode reveals the sidebar on left-edge hover', () => {
@@ -235,9 +235,9 @@ describe('RepoView workspace navigation', () => {
       '[data-testid="repo-shell-sidebar-top"]',
     )
     expect(floatingSidebarTop?.hasAttribute('data-interactive')).toBe(false)
-    expect(floatingSidebarTop?.dataset.windowChromeRegion).toBe('drag')
-    expect(floatingSidebarTop?.querySelector('[data-window-chrome-region="no-drag"]')).toBeNull()
-    expect(zenModeSidebarTrigger()?.dataset.windowChromeRegion).toBe('interactive')
+    expect(floatingSidebarTop?.dataset.titleBarChromeRegion).toBe('drag')
+    expect(floatingSidebarTop?.querySelector('[data-title-bar-chrome-region="no-drag"]')).toBeNull()
+    expect(zenModeSidebarTrigger()?.dataset.titleBarChromeRegion).toBe('interactive')
     expect(zenModeSidebarTrigger()?.tagName).toBe('BUTTON')
   })
 
@@ -249,10 +249,10 @@ describe('RepoView workspace navigation', () => {
     const revealLayer = zenModeSidebarLayer()
     const toggleOverlay = zenModeToggleOverlay()
     expect(zenModeToggleOverlay()?.hasAttribute('data-interactive')).toBe(false)
-    expect(zenModeToggleOverlay()?.dataset.windowChromeRegion).toBeUndefined()
+    expect(zenModeToggleOverlay()?.dataset.titleBarChromeRegion).toBeUndefined()
     expect(zenModeToggleOverlay()?.hasAttribute('data-zen-reveal-surface')).toBe(true)
     expect(zenModeToggleOverlay()?.className).toContain('goblin-zen-reveal-trigger-layer')
-    expect(zenModeToggleOverlay()?.className).not.toContain('window-chrome')
+    expect(zenModeToggleOverlay()?.className).not.toContain('title-bar-chrome')
     expect(zenModeToggleOverlay()?.className).not.toContain('app-drag-region')
     expect(revealLayer).not.toBeNull()
     expect(toggleOverlay).not.toBeNull()
@@ -260,7 +260,7 @@ describe('RepoView workspace navigation', () => {
       Node.DOCUMENT_POSITION_FOLLOWING,
     )
     expect(zenModeSidebarTrigger()?.hasAttribute('data-interactive')).toBe(true)
-    expect(zenModeSidebarTrigger()?.dataset.windowChromeRegion).toBe('interactive')
+    expect(zenModeSidebarTrigger()?.dataset.titleBarChromeRegion).toBe('interactive')
     expect(zenModeSidebarReveal()?.dataset.open).toBe('false')
 
     act(() => {
@@ -270,7 +270,7 @@ describe('RepoView workspace navigation', () => {
     expect(zenModeSidebarReveal()?.dataset.open).toBe('true')
   })
 
-  test('large-screen collapsed Zen Mode keeps the sidebar open across the window-chrome reveal surface', () => {
+  test('large-screen collapsed Zen Mode keeps the sidebar open across the title-bar-chrome reveal surface', () => {
     useReposStore.getState().setZenMode(true)
     useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
     render(<RepoView repoId={REPO_ID} />)
@@ -527,8 +527,8 @@ describe('RepoView workspace navigation', () => {
       const retainedSidebarTop = zenModeSidebarReveal()?.querySelector<HTMLElement>(
         '[data-testid="repo-shell-sidebar-top"]',
       )
-      expect(retainedSidebarTop?.dataset.windowChromeRegion).toBeUndefined()
-      expect(retainedSidebarTop?.querySelector('[data-window-chrome-region="no-drag"]')).toBeNull()
+      expect(retainedSidebarTop?.dataset.titleBarChromeRegion).toBeUndefined()
+      expect(retainedSidebarTop?.querySelector('[data-title-bar-chrome-region="no-drag"]')).toBeNull()
 
       act(() => {
         document.body.dispatchEvent(new PointerEvent('pointermove', { bubbles: true }))

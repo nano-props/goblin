@@ -10,8 +10,8 @@ import {
 import { useT } from '#/web/stores/i18n.ts'
 import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
 import { SidebarRowButton } from '#/web/components/ui/sidebar-row-button.tsx'
-import { WINDOW_CHROME_HEIGHT_PX } from '#/shared/window-chrome.ts'
-import { WindowChromeDragRegion } from '#/web/components/window-chrome-region.tsx'
+import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
+import { TitleBarDragRegion } from '#/web/components/title-bar-chrome-region.tsx'
 
 const NOOP = () => {}
 const SIDEBAR_TOP_CLASS_NAME = 'flex shrink-0 items-center gap-1 bg-card text-sm'
@@ -37,16 +37,16 @@ export function RepoLayoutSidebar({
     <aside className="flex min-h-0 min-w-0 flex-1 flex-col bg-card">
       {!compact &&
         (chromeRegion === 'drag' ? (
-          <WindowChromeDragRegion
+          <TitleBarDragRegion
             className={SIDEBAR_TOP_CLASS_NAME}
             data-testid="repo-shell-sidebar-top"
-            style={{ height: WINDOW_CHROME_HEIGHT_PX }}
+            style={{ height: TITLE_BAR_HEIGHT_PX }}
           />
         ) : (
           <div
             className={SIDEBAR_TOP_CLASS_NAME}
             data-testid="repo-shell-sidebar-top"
-            style={{ height: WINDOW_CHROME_HEIGHT_PX }}
+            style={{ height: TITLE_BAR_HEIGHT_PX }}
           />
         ))}
       <RepoShellPrimaryActions repoId={repoId} />

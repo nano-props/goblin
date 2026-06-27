@@ -24,7 +24,7 @@ import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import { useIsInitialSyncInFlight } from '#/web/stores/repo-sync.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
 import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
 import {
@@ -68,7 +68,7 @@ export function RepoWorkspaceToolbar({
   // of every syncServerSlots.
   const isInitialSyncInFlight = useIsInitialSyncInFlight(repo.id)
   const branchName = detail.branch?.name ?? null
-  const preferredWorkspacePaneView = preferredWorkspacePaneViewForBranch(repo.ui, branchName)
+  const preferredWorkspacePaneTab = preferredWorkspacePaneTabForBranch(repo.ui, branchName)
   const showBranchLevelTabs = !!detail.branch
 
   const { createTerminal, selectTerminal, scrollToBottom } = useTerminalSessionContext()
@@ -90,10 +90,10 @@ export function RepoWorkspaceToolbar({
   // (worktree + sessions) is decided at read time by
   // the shared workspace pane tab model — we only assert user intent here.
   const enterTerminalTab = useCallback(() => {
-    if (preferredWorkspacePaneView !== 'terminal') {
-      navigation.showRepoWorkspacePaneView(repo.id, 'terminal')
+    if (preferredWorkspacePaneTab !== 'terminal') {
+      navigation.showRepoWorkspacePaneTab(repo.id, 'terminal')
     }
-  }, [navigation, repo.id, preferredWorkspacePaneView])
+  }, [navigation, repo.id, preferredWorkspacePaneTab])
 
   const handleNewTerminal = useCallback(() => {
     if (!terminalBase) return
@@ -108,7 +108,7 @@ export function RepoWorkspaceToolbar({
   const showWorkspacePaneTabItem = useCallback(
     (item: WorkspacePaneTabItem) => {
       if (isStaticWorkspacePaneTabItem(item)) {
-        navigation.showRepoWorkspacePaneView(repo.id, item.staticViewType)
+        navigation.showRepoWorkspacePaneTab(repo.id, item.staticViewType)
         return
       }
       if (isTerminalWorkspacePaneTabItem(item)) {
@@ -128,7 +128,7 @@ export function RepoWorkspaceToolbar({
     [enterTerminalTab, scrollToBottom],
   )
 
-  const handleReorderWorkspacePaneViewStrip = useCallback(
+  const handleReorderWorkspacePaneTabStrip = useCallback(
     (orderedTabs: WorkspacePaneTabOrderEntry[]) => {
       useReposStore.getState().reorderWorkspacePaneTabs(repo.id, orderedTabs, branchName ?? undefined)
     },
@@ -199,7 +199,7 @@ export function RepoWorkspaceToolbar({
     },
     [activeTabIdentity, handleScrollToBottom, showWorkspacePaneTabItem],
   )
-  const handleCloseWorkspacePaneView = useCallback(
+  const handleCloseWorkspacePaneTab = useCallback(
     (item: WorkspacePaneTabItem) => {
       if (isPendingWorkspacePaneTabItem(item)) return
       void runCloseWorkspacePaneTabCommand({
@@ -267,8 +267,8 @@ export function RepoWorkspaceToolbar({
               onNew={handleNewTerminal}
               onSelect={handleSelectWorkspacePaneTabItem}
               onScrollToBottom={handleScrollToBottom}
-              onClose={handleCloseWorkspacePaneView}
-              onReorder={handleReorderWorkspacePaneViewStrip}
+              onClose={handleCloseWorkspacePaneTab}
+              onReorder={handleReorderWorkspacePaneTabStrip}
               activateKeyboardNavigationSelection
             />
           )}

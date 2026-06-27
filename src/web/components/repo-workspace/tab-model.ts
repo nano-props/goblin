@@ -7,7 +7,7 @@ import { resolveRenderableWorkspacePaneTab } from '#/web/lib/workspace-pane-tab.
 import type { TerminalSessionBase, WorkspacePaneTabSummary } from '#/web/components/terminal/types.ts'
 import {
   PENDING_TERMINAL_WORKSPACE_PANE_VIEW_IDENTITY,
-  isTerminalWorkspacePaneView,
+  isTerminalWorkspacePaneTab,
 } from '#/web/components/workspace-pane/workspace-pane-tab-summary.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
 import { normalizeWorkspacePaneTabOrder } from '#/web/stores/repos/workspace-pane-tabs.ts'
@@ -127,7 +127,7 @@ export function createRepoWorkspaceTabModel(input: BranchWorkspacePaneTabModelIn
   const tabOrder = input.branchName ? normalizeWorkspacePaneTabOrder(input.tabOrder) : []
   const worktreePath = input.branchName ? input.worktreePath : null
   const worktreeKey = worktreePath ? worktreeTerminalKey(input.repoId, worktreePath) : null
-  const terminalViews = worktreeKey ? input.runtimeTerminalViews.filter(isTerminalWorkspacePaneView) : []
+  const terminalViews = worktreeKey ? input.runtimeTerminalViews.filter(isTerminalWorkspacePaneTab) : []
   const materializedTabs = materializedWorkspacePaneTabs({ tabOrder, terminalViews, hasWorktree: !!worktreeKey })
   const staticViews = materializedTabs.flatMap((tab) => (tab.kind === 'static' ? [tab.type] : []))
   const candidateView = resolveRenderableWorkspacePaneTab(input.preferredView, {

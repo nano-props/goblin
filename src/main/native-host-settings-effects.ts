@@ -2,7 +2,7 @@ import { resolveLang, setCurrentLang } from '#/main/i18n/index.ts'
 import { buildAppMenu } from '#/main/menu.ts'
 import { applyMenuRuntimeState } from '#/main/menu-state.ts'
 import { syncRecentRepos } from '#/main/recent-repos.ts'
-import { setSettingsGlobalShortcutState } from '#/main/settings-server-client.ts'
+import { setGlobalShortcutState } from '#/main/settings-server-client.ts'
 import { syncGlobalShortcuts } from '#/main/shortcuts.ts'
 import { applyThemeSettingsProjection } from '#/main/theme.ts'
 import type {
@@ -21,7 +21,7 @@ import type {
 // Keep this module narrow: only retain effects that are actually shared across
 // multiple main-side call sites.
 async function persistNativeHostGlobalShortcutState(registered: boolean): Promise<void> {
-  await setSettingsGlobalShortcutState(registered)
+  await setGlobalShortcutState(registered)
 }
 
 function menuStatePatchFromSettingsProjection(input: {
@@ -52,7 +52,7 @@ function applyI18nSettingsProjection(input: {
   setCurrentLang(resolveLang(input.settings.lang))
 }
 
-function applyThemeSettingsPrefsProjection(input: {
+function applyThemeUserSettingsProjection(input: {
   patch: NativeSettingsProjectionPatch
   settings: NativeSettingsProjectionState
 }): void {
@@ -69,22 +69,22 @@ async function applyGlobalShortcutDisabledProjection(input: {
   await persistNativeHostGlobalShortcutState(registered)
 }
 
-export async function applyNativeHostSettingsPrefsProjection(input: {
+export async function applyNativeHostUserSettingsProjection(input: {
   patch: NativeSettingsProjectionPatch
   settings: NativeSettingsProjectionState
 }): Promise<void> {
   const shouldRebuildMenu = shouldRebuildMenuFromSettingsProjection(input.patch)
   const menuStatePatch = menuStatePatchFromSettingsProjection(input)
   applyI18nSettingsProjection(input)
-  applyThemeSettingsPrefsProjection(input)
+  applyThemeUserSettingsProjection(input)
   if (Object.keys(menuStatePatch).length > 0) applyMenuRuntimeState(menuStatePatch)
   await applyGlobalShortcutDisabledProjection(input)
   if (shouldRebuildMenu) buildAppMenu()
 }
 
-export async function applyNativeHostShellProjection(input: NativeHostProjection): Promise<void> {
+export async function applyNativeHostProjection(input: NativeHostProjection): Promise<void> {
   if (input.prefs) {
-    await applyNativeHostSettingsPrefsProjection({
+    await applyNativeHostUserSettingsProjection({
       patch: input.prefs.patch,
       settings: input.prefs.settings,
     })

@@ -75,10 +75,10 @@ describe('useKeyboard', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'status',
+      preferredWorkspacePaneTab: 'status',
     })
     const selectTerminal = vi.fn()
-    const showRepoWorkspacePaneView = vi.fn()
+    const showRepoWorkspacePaneTab = vi.fn()
     setTerminalSessionCommandBridge({
       worktreeSnapshot: () => worktreeSnapshot(),
       createTerminal: vi.fn(async () => 'slot-1'),
@@ -86,7 +86,7 @@ describe('useKeyboard', () => {
     })
     await renderHookHost({
       currentRepoId: REPO_ID,
-      navigation: navigationWith({ showRepoWorkspacePaneView }),
+      navigation: navigationWith({ showRepoWorkspacePaneTab }),
     })
 
     await act(async () => {
@@ -94,7 +94,7 @@ describe('useKeyboard', () => {
       await Promise.resolve()
     })
 
-    expect(showRepoWorkspacePaneView).toHaveBeenCalledWith(REPO_ID, 'terminal')
+    expect(showRepoWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'terminal')
     expect(selectTerminal).toHaveBeenCalledWith(WORKTREE_KEY, 'slot-1')
   })
 
@@ -103,7 +103,7 @@ describe('useKeyboard', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/no-worktree')],
       selectedBranch: 'feature/no-worktree',
-      preferredWorkspacePaneView: 'status',
+      preferredWorkspacePaneTab: 'status',
       workspacePaneTabOrderByBranch: {
         'feature/no-worktree': [
           workspacePaneStaticTabOrderEntry('status'),
@@ -111,12 +111,12 @@ describe('useKeyboard', () => {
         ],
       },
     })
-    const showRepoWorkspacePaneView = vi.fn((repoId, tab) => {
+    const showRepoWorkspacePaneTab = vi.fn((repoId, tab) => {
       useReposStore.getState().setWorkspacePaneTab(repoId, tab)
     })
     await renderHookHost({
       currentRepoId: REPO_ID,
-      navigation: navigationWith({ showRepoWorkspacePaneView }),
+      navigation: navigationWith({ showRepoWorkspacePaneTab }),
     })
 
     await act(async () => {
@@ -124,7 +124,7 @@ describe('useKeyboard', () => {
       await Promise.resolve()
     })
 
-    expect(showRepoWorkspacePaneView).toHaveBeenCalledWith(REPO_ID, 'history')
+    expect(showRepoWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'history')
   })
 
   test('primary modifier plus number selects workspace pane tabs even while terminal is focused', async () => {
@@ -134,10 +134,10 @@ describe('useKeyboard', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'status',
+      preferredWorkspacePaneTab: 'status',
     })
     const selectTerminal = vi.fn()
-    const showRepoWorkspacePaneView = vi.fn()
+    const showRepoWorkspacePaneTab = vi.fn()
     setTerminalSessionCommandBridge({
       worktreeSnapshot: () => worktreeSnapshot(),
       createTerminal: vi.fn(async () => 'slot-1'),
@@ -145,7 +145,7 @@ describe('useKeyboard', () => {
     })
     await renderHookHost({
       currentRepoId: REPO_ID,
-      navigation: navigationWith({ showRepoWorkspacePaneView }),
+      navigation: navigationWith({ showRepoWorkspacePaneTab }),
     })
     const terminalHost = document.createElement('div')
     terminalHost.className = 'goblin-managed-terminal-host'
@@ -158,7 +158,7 @@ describe('useKeyboard', () => {
       await Promise.resolve()
     })
 
-    expect(showRepoWorkspacePaneView).toHaveBeenCalledWith(REPO_ID, 'terminal')
+    expect(showRepoWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'terminal')
     expect(selectTerminal).toHaveBeenCalledWith(WORKTREE_KEY, 'slot-1')
     terminalHost.remove()
   })
@@ -169,7 +169,7 @@ describe('useKeyboard', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'terminal',
+      preferredWorkspacePaneTab: 'terminal',
     })
     const createTerminal = vi.fn(async () => 'slot-2')
     setTerminalSessionCommandBridge({
@@ -285,7 +285,7 @@ describe('useKeyboard', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'terminal',
+      preferredWorkspacePaneTab: 'terminal',
     })
     const createTerminal = vi.fn(async () => 'slot-2')
     const closeTerminalByDescriptor = vi.fn(async () => true)
@@ -317,7 +317,7 @@ describe('useKeyboard', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'terminal',
+      preferredWorkspacePaneTab: 'terminal',
     })
     const closeTerminalByDescriptor = vi.fn(async () => true)
     setTerminalSessionCommandBridge({
@@ -370,8 +370,8 @@ function navigationWith(overrides: Partial<MainWindowNavigationActions> = {}): M
     closeRepo: () => {},
     cycleRepo: () => {},
     selectRepoBranch: () => {},
-    showRepoWorkspacePaneView: () => {},
-    showRepoBranchWorkspacePaneView: () => {},
+    showRepoWorkspacePaneTab: () => {},
+    showRepoBranchWorkspacePaneTab: () => {},
     openSettings: () => {},
     ...overrides,
   }

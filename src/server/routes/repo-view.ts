@@ -22,7 +22,7 @@ export function createRepoViewRoutes() {
     // queue: a queued intent that lands in a stale UI state is
     // worse than no-op, and `g` is human-triggered so the user can
     // simply rerun it.
-    const delivered = publishClientIntent({ type: 'show-workspace-pane-view-requested', tab })
+    const delivered = publishClientIntent({ type: 'show-workspace-pane-tab-requested', tab })
     const result: RepoViewResult = delivered
       ? { ok: true }
       : {

@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   getServerExternalAppsSnapshot: vi.fn(),
   getServerGitHubCliState: vi.fn(),
   getSettingsSnapshot: vi.fn(),
-  getServerSettingsPrefs: vi.fn(),
+  getUserSettings: vi.fn(),
   handleSetFetchInterval: vi.fn(),
   handleSetGlobalShortcutRegistered: vi.fn(),
   handleAddRecentRepo: vi.fn(),
@@ -27,7 +27,7 @@ vi.mock('#/server/modules/settings-snapshot.ts', () => ({
 }))
 
 vi.mock('#/server/modules/settings-source.ts', () => ({
-  getServerSettingsPrefs: mocks.getServerSettingsPrefs,
+  getUserSettings: mocks.getUserSettings,
 }))
 
 vi.mock('#/server/modules/settings-write-paths.ts', () => ({

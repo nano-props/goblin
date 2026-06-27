@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
-import { WINDOW_CHROME_HEIGHT_PX } from '#/shared/window-chrome.ts'
+import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
 
 interface SettingsContentFrameProps {
   topInset?: number
@@ -9,7 +9,7 @@ interface SettingsContentFrameProps {
 }
 
 export function SettingsContentFrame({ topInset = 0, title, children }: SettingsContentFrameProps) {
-  const chromeHeight = topInset > 0 ? topInset : WINDOW_CHROME_HEIGHT_PX
+  const chromeHeight = topInset > 0 ? topInset : TITLE_BAR_HEIGHT_PX
 
   return (
     <section className="flex min-w-0 flex-1 flex-col bg-background">

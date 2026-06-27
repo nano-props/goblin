@@ -6,8 +6,8 @@ export interface MainWindowNavigationActions {
   closeRepo: (repoId: string) => void
   cycleRepo: (direction: 1 | -1) => void
   selectRepoBranch: (repoId: string, branch: string) => void
-  showRepoWorkspacePaneView: (repoId: string, tab: WorkspacePaneTabType) => void
-  showRepoBranchWorkspacePaneView: (repoId: string, branch: string, tab: WorkspacePaneTabType) => void
+  showRepoWorkspacePaneTab: (repoId: string, tab: WorkspacePaneTabType) => void
+  showRepoBranchWorkspacePaneTab: (repoId: string, branch: string, tab: WorkspacePaneTabType) => void
   openSettings: (page: SettingsPage) => void
 }
 
@@ -46,11 +46,11 @@ export function createMainWindowNavigationActions({
       if (repoId !== activeId) setActive(repoId)
       selectBranch(repoId, branch)
     },
-    showRepoWorkspacePaneView(repoId, tab) {
+    showRepoWorkspacePaneTab(repoId, tab) {
       if (repoId !== activeId) setActive(repoId)
       setWorkspacePaneTab(repoId, tab)
     },
-    showRepoBranchWorkspacePaneView(repoId, branch, tab) {
+    showRepoBranchWorkspacePaneTab(repoId, branch, tab) {
       if (repoId !== activeId) setActive(repoId)
       selectBranch(repoId, branch)
       setWorkspacePaneTab(repoId, tab)

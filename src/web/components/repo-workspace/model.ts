@@ -34,7 +34,7 @@ export interface RepoWorkspaceRepo extends BranchActionRepo {
   ui: Pick<
     RepoState['ui'],
     | 'selectedBranch'
-    | 'preferredWorkspacePaneViewByBranch'
+    | 'preferredWorkspacePaneTabByBranch'
     | 'workspacePaneTabOrderByBranch'
     | 'lastClosedTabContextByBranch'
   >

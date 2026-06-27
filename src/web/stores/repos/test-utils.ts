@@ -485,8 +485,8 @@ export function seedRepoState(options: {
   branchSnapshots?: BranchSnapshotInfo[]
   currentBranch?: string
   selectedBranch?: string | null
-  preferredWorkspacePaneView?: WorkspacePaneTabType
-  preferredWorkspacePaneViewByBranch?: Record<string, WorkspacePaneTabType>
+  preferredWorkspacePaneTab?: WorkspacePaneTabType
+  preferredWorkspacePaneTabByBranch?: Record<string, WorkspacePaneTabType>
   workspacePaneTabOrderByBranch?: Record<string, WorkspacePaneTabOrderEntry[]>
   instanceToken?: number
   status?: WorktreeStatus[]
@@ -505,11 +505,11 @@ export function seedRepoState(options: {
     rawWorkspacePaneTabOrderByBranch,
     branches.map((branch) => branch.name),
   )
-  const preferredWorkspacePaneViewByBranch =
-    options.preferredWorkspacePaneViewByBranch ??
-    (selectedBranch && options.preferredWorkspacePaneView !== undefined
-      ? { [selectedBranch]: options.preferredWorkspacePaneView }
-      : base.ui.preferredWorkspacePaneViewByBranch)
+  const preferredWorkspacePaneTabByBranch =
+    options.preferredWorkspacePaneTabByBranch ??
+    (selectedBranch && options.preferredWorkspacePaneTab !== undefined
+      ? { [selectedBranch]: options.preferredWorkspacePaneTab }
+      : base.ui.preferredWorkspacePaneTabByBranch)
   const repo: RepoState = {
     ...base,
     instanceToken: options.instanceToken ?? base.instanceToken,
@@ -527,7 +527,7 @@ export function seedRepoState(options: {
       ...base.ui,
       selectedBranch,
       workspacePaneTabOrderByBranch,
-      preferredWorkspacePaneViewByBranch,
+      preferredWorkspacePaneTabByBranch,
     },
     remote: {
       ...base.remote,

@@ -11,7 +11,7 @@ import {
   useWorktreeTerminalSnapshot,
 } from '#/web/components/terminal/terminal-session-store.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { workspacePaneTabOrderForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
 
 export interface BranchWorkspacePaneTabModelInputState {
@@ -60,8 +60,8 @@ export function useBranchWorkspacePaneTabModelInput(
   )
 
   const preferredView = useMemo(
-    () => preferredWorkspacePaneViewForBranch(repo.ui, branchName),
-    [repo.ui.preferredWorkspacePaneViewByBranch, branchName],
+    () => preferredWorkspacePaneTabForBranch(repo.ui, branchName),
+    [repo.ui.preferredWorkspacePaneTabByBranch, branchName],
   )
 
   const modelSelectedTerminalKey = terminalWorktreeKey ? (selectedTerminalKey ?? null) : null

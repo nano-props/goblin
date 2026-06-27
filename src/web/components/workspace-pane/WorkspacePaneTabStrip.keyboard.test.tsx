@@ -93,7 +93,7 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
       )
     })
 
-    const tabChrome = document.body.querySelector('[data-workspace-pane-view-tooltip-id="terminal:t1"]')
+    const tabChrome = document.body.querySelector('[data-workspace-pane-tab-tooltip-id="terminal:t1"]')
     if (!(tabChrome instanceof HTMLDivElement)) throw new Error('missing terminal view')
     expect(tabChrome.className).toContain('bg-selected')
     expect(tabChrome.className).toContain('cursor-grabbing')
@@ -131,12 +131,12 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
       expect.objectContaining({ coordinateGetter: expect.any(Function) }),
     )
 
-    const tab = document.body.querySelector('#workspace-workspace-pane-view')
+    const tab = document.body.querySelector('#workspace-workspace-pane-tab')
     if (!(tab instanceof HTMLButtonElement)) throw new Error('missing terminal view')
-    const tabChrome = document.body.querySelector('[data-workspace-pane-view-tooltip-id="terminal:t1"]')
+    const tabChrome = document.body.querySelector('[data-workspace-pane-tab-tooltip-id="terminal:t1"]')
     if (!(tabChrome instanceof HTMLDivElement)) throw new Error('missing terminal chrome')
 
-    expect(tabChrome.dataset.windowChromeRegion).toBe('interactive')
+    expect(tabChrome.dataset.titleBarChromeRegion).toBe('interactive')
 
     act(() => {
       tab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', code: 'ArrowRight', bubbles: true }))

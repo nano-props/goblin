@@ -34,7 +34,7 @@ export async function getSettingsSnapshot(): Promise<SettingsSnapshot> {
   )
 }
 
-export async function updateSettingsPrefs(settings: UserSettingsPatch): Promise<UserSettings> {
+export async function updateUserSettings(settings: UserSettingsPatch): Promise<UserSettings> {
   const runtime = requireEmbeddedServerRuntime()
   const json = await postEmbeddedServerJson<{ settings?: UserSettings }>(runtime, '/api/settings/prefs', {
     prefs: settings,
@@ -45,7 +45,7 @@ export async function updateSettingsPrefs(settings: UserSettingsPatch): Promise<
   return json.settings
 }
 
-export async function getSettingsPrefs(): Promise<UserSettings> {
+export async function getUserSettings(): Promise<UserSettings> {
   return await requestSettingsJson<UserSettings>(
     '/api/settings/prefs',
     undefined,
@@ -53,7 +53,7 @@ export async function getSettingsPrefs(): Promise<UserSettings> {
   )
 }
 
-export async function setSettingsGlobalShortcutState(registered: boolean): Promise<boolean> {
+export async function setGlobalShortcutState(registered: boolean): Promise<boolean> {
   const runtime = requireEmbeddedServerRuntime()
   const json = await postEmbeddedServerJson<{ registered?: unknown }>(runtime, '/api/settings/global-shortcut-state', {
     registered,

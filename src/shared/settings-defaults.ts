@@ -23,7 +23,7 @@ export function defaultSessionState(): WorkspaceSessionState {
   }
 }
 
-export function defaultSettingsPrefs(overrides: Partial<UserSettings> = {}): UserSettings {
+export function defaultUserSettings(overrides: Partial<UserSettings> = {}): UserSettings {
   return {
     lang: overrides.lang ?? DEFAULT_LANG_PREF,
     theme: overrides.theme ?? DEFAULT_THEME_PREF,
@@ -38,7 +38,7 @@ export function defaultSettingsPrefs(overrides: Partial<UserSettings> = {}): Use
 }
 
 export function defaultSettingsSnapshot(overrides: Partial<SettingsSnapshot> = {}): SettingsSnapshot {
-  const prefs = defaultSettingsPrefs(overrides)
+  const prefs = defaultUserSettings(overrides)
   return {
     ...prefs,
     globalShortcutRegistered: overrides.globalShortcutRegistered ?? false,
