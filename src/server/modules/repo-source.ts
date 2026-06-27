@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { checkGitAvailable } from '#/system/git/helper.ts'
+import { checkGitAvailable } from '#/system/git/git-exec.ts'
 import {
   deleteBranch,
   deleteUpstreamBranch,
@@ -43,13 +43,13 @@ import { isValidCwd } from '#/shared/input-validation.ts'
 import { validateBranchDeletionPolicy, validateRemovableWorktreeState } from '#/shared/repo-action-policy.ts'
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 import { resolveRemoteTarget as resolveSshRemoteTarget } from '#/system/ssh/config.ts'
-import { testRemoteRepository } from '#/system/ssh/diagnostics.ts'
+import { testRemoteRepo } from '#/system/ssh/diagnostics.ts'
 import { SSH_BOOT_PROBE_TIMEOUT_MS } from '#/system/ssh/commands.ts'
 import {
   bootstrapRemoteWorktreeAfterCreate,
   createRemoteWorktree,
   deleteRemoteBranch,
-  fetchRemoteRepository,
+  fetchRemoteRepo,
   getRemoteBrowserUrl,
   getRemoteLog,
   getRemotePatch,
@@ -182,7 +182,7 @@ function classifyPathProbeError(err: unknown): string {
   return 'error.invalid-path'
 }
 
-async function probeGitRepository(cwd: string): Promise<ProbeAvailability> {
+async function probeGitRepo(cwd: string): Promise<ProbeAvailability> {
   const ok = await isGitRepo(cwd)
   if (ok) return { ok: true }
   const readable = await probeReadableDirectory(cwd)
@@ -256,7 +256,7 @@ function createLocalRepoSource(repoId: string): RepoSource {
     },
     async getSnapshot(signal) {
       if (!isValidCwd(repoId)) return null
-      const available = await probeGitRepository(repoId)
+      const available = await probeGitRepo(repoId)
       if (!available.ok) throw new Error(available.message)
       try {
         const worktrees = await getWorktrees(repoId, { signal })
@@ -277,7 +277,7 @@ function createLocalRepoSource(repoId: string): RepoSource {
     },
     async getStatus(signal) {
       if (!isValidCwd(repoId)) return []
-      const available = await probeGitRepository(repoId)
+      const available = await probeGitRepo(repoId)
       if (!available.ok) throw new Error(available.message)
       const status = await getWorkingStatus(repoId, { signal })
       return signal?.aborted ? [] : status
@@ -292,7 +292,7 @@ function createLocalRepoSource(repoId: string): RepoSource {
     },
     async getLog(branch, options) {
       if (!isValidCwd(repoId)) return []
-      const available = await probeGitRepository(repoId)
+      const available = await probeGitRepo(repoId)
       if (!available.ok) throw new Error(available.message)
       return await getBranchLog(repoId, branch, options?.count, options?.skip, { signal: options?.signal })
     },
@@ -302,7 +302,7 @@ function createLocalRepoSource(repoId: string): RepoSource {
     },
     async fetch(signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
-      const available = await probeGitRepository(repoId)
+      const available = await probeGitRepo(repoId)
       if (!available.ok) return available
       return await fetchAll(repoId, signal)
     },
@@ -400,7 +400,7 @@ async function createRemoteRepoSource(repoId: string): Promise<RepoSource> {
     id: repoId,
     kind: 'remote',
     async probe() {
-      const result = await testRemoteRepository(target, { timeoutMs: SSH_BOOT_PROBE_TIMEOUT_MS })
+      const result = await testRemoteRepo(target, { timeoutMs: SSH_BOOT_PROBE_TIMEOUT_MS })
       if (!result.ok) return { ok: false, message: result.message || 'error.failed-read-repo' }
       return { ok: true, root: target.id, name: target.displayName }
     },
@@ -432,7 +432,7 @@ async function createRemoteRepoSource(repoId: string): Promise<RepoSource> {
       return await getSshRemoteTrackingBranches(target, { signal })
     },
     async fetch(signal) {
-      return await fetchRemoteRepository(target, { signal })
+      return await fetchRemoteRepo(target, { signal })
     },
     async pull(branch, worktreePath, signal) {
       return await pullRemoteBranch(target, branch, worktreePath, { signal })

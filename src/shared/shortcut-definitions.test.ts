@@ -42,7 +42,7 @@ describe('shortcut definitions', () => {
     expect(resolveClientMenuCommandAccelerator(command, {})).toBeUndefined()
   })
 
-  test('defines history as a workspace pane view menu command', () => {
+  test('defines history as a workspace pane tab menu command', () => {
     const command = clientMenuCommandById('view-history')
     expect(command.menuLabelKey).toBe('menu.view.history')
     expect(command.intent).toEqual({ type: 'show-workspace-pane-tab-requested', tab: 'history' })

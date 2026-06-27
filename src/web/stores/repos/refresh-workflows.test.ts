@@ -5,7 +5,7 @@ import type { ReposSet } from '#/web/stores/repos/types.ts'
 import { createBranchSnapshot, installGoblinTestBridge } from '#/web/stores/repos/test-utils.ts'
 
 describe('repo refresh workflows', () => {
-  test('snapshot success backfills summary then visible selected branch workspace', async () => {
+  test('snapshot success backfills summary then visible selected repo workspace', async () => {
     const calls: string[] = []
     installGoblinTestBridge({})
     const get: ReposGet = () =>

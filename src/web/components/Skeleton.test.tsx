@@ -53,7 +53,7 @@ describe('RepoWorkspaceLayoutSkeleton', () => {
     expect(container?.querySelector('[data-testid="repo-toolbar-skeleton-pager"]')).toBeNull()
   })
 
-  test('renders split workspace content when a branch workspace is selected', () => {
+  test('renders split workspace content when a repo workspace is selected', () => {
     render(<RepoWorkspaceLayoutSkeleton repoWorkspaceState="content" />)
 
     expect(container?.querySelectorAll('li')).toHaveLength(14)
@@ -71,7 +71,7 @@ describe('RepoWorkspaceLayoutSkeleton', () => {
     expect(container?.querySelector('[data-testid="mock-split-pane"]')).toBeNull()
   })
 
-  test('renders a single Branch Workspace skeleton in selected single-pane mode', () => {
+  test('renders a single Repo Workspace skeleton in selected single-pane mode', () => {
     render(<RepoWorkspaceLayoutSkeleton singlePane singlePaneView="workspace" repoWorkspaceState="content" />)
 
     expect(container?.querySelectorAll('li')).toHaveLength(8)

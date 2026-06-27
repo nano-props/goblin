@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { createTerminalBellController } from '#/web/components/terminal/terminal-bell-controller.ts'
+import { createTerminalBellState } from '#/web/components/terminal/terminal-bell-state.ts'
 import type { TerminalDescriptor } from '#/web/components/terminal/types.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
@@ -45,11 +45,11 @@ beforeEach(() => {
   })
 })
 
-describe('terminal bell controller', () => {
+describe('terminal bell state', () => {
   test('publishes the initial unread count from the source of truth', () => {
     const onBadgeChange = vi.fn()
 
-    createTerminalBellController(vi.fn(), onBadgeChange)
+    createTerminalBellState(vi.fn(), onBadgeChange)
 
     expect(onBadgeChange).toHaveBeenCalledWith(0)
   })
@@ -61,7 +61,7 @@ describe('terminal bell controller', () => {
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({ terminalNotificationsEnabled: true }),
     )
-    const controller = createTerminalBellController(notify, vi.fn())
+    const controller = createTerminalBellState(notify, vi.fn())
 
     controller.handleBell(descriptor, { processName: 'zsh', visible: false })
     await Promise.resolve()
@@ -85,7 +85,7 @@ describe('terminal bell controller', () => {
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({ terminalNotificationsEnabled: true }),
     )
-    const controller = createTerminalBellController(notify, vi.fn())
+    const controller = createTerminalBellState(notify, vi.fn())
 
     controller.handleBell(descriptor, {
       processName: 'zsh',
@@ -111,7 +111,7 @@ describe('terminal bell controller', () => {
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({ terminalNotificationsEnabled: false }),
     )
-    const controller = createTerminalBellController(notify, vi.fn())
+    const controller = createTerminalBellState(notify, vi.fn())
 
     controller.handleBell(descriptor, { processName: 'zsh', visible: false })
     await Promise.resolve()
@@ -130,7 +130,7 @@ describe('terminal bell controller', () => {
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({ terminalNotificationsEnabled: true }),
     )
-    const controller = createTerminalBellController(notify, vi.fn())
+    const controller = createTerminalBellState(notify, vi.fn())
 
     controller.handleBell(descriptor, { processName: 'zsh', visible: true })
     await Promise.resolve()
@@ -150,7 +150,7 @@ describe('terminal bell controller', () => {
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({ terminalNotificationsEnabled: true }),
     )
-    const controller = createTerminalBellController(notify, vi.fn())
+    const controller = createTerminalBellState(notify, vi.fn())
 
     now.mockReturnValueOnce(10_000)
     controller.handleBell(descriptor, { processName: 'zsh', visible: false })
@@ -172,7 +172,7 @@ describe('terminal bell controller', () => {
   })
 
   test('supports clearing and removing tracked bell state', () => {
-    const controller = createTerminalBellController(vi.fn(), vi.fn())
+    const controller = createTerminalBellState(vi.fn(), vi.fn())
 
     controller.handleBell(descriptor, { processName: 'zsh', visible: false })
     expect(controller.hasBell(descriptor.key)).toBe(true)
@@ -192,7 +192,7 @@ describe('terminal bell controller', () => {
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({ terminalNotificationsEnabled: true }),
     )
-    const controller = createTerminalBellController(vi.fn(), vi.fn())
+    const controller = createTerminalBellState(vi.fn(), vi.fn())
 
     now.mockReturnValueOnce(20_000)
     controller.handleBell(descriptor, { processName: 'zsh', visible: false })

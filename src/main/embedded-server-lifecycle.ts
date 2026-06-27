@@ -18,9 +18,9 @@ interface EmbeddedServerRuntime {
   port: number
   url: string
   /**
-   * Held in main-process memory so the IPC client
+   * Held in native-host memory so the IPC client
    * (`#/shared/embedded-server-client.ts`) can attach the header
-   * when the main process calls into the embedded server's HTTP
+   * when the native host calls into the embedded server's HTTP
    * API (e.g. settings, session). Not exposed to the client.
    */
   accessToken: string
@@ -99,7 +99,7 @@ function pipeProcessLogs(proc: ServerChildProcess): void {
   proc.stdout.setEncoding('utf8')
   proc.stderr.setEncoding('utf8')
   // These `console.*` writes forward the child process's own stdout/stderr
-  // line-for-line to the main process's stdio. They are not our logs —
+  // line-for-line to the native host's stdio. They are not our logs —
   // they go to the operator's terminal unchanged, with the child's
   // original format and level. Routing them through pino would (a) wrap
   // raw server output in JSON, losing the child's own format, and (b)

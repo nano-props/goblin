@@ -5,7 +5,7 @@ import {
   openServerRemoteTerminal,
   resolveServerRemoteRepoConnection,
   resolveServerRemoteTarget,
-  testServerRemoteRepository,
+  testServerRemoteRepo,
 } from '#/server/modules/remote.ts'
 import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'
 import { REMOTE_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
@@ -31,7 +31,7 @@ export function createRemoteRoutes() {
   })
   app.post('/test-repository', async (c) => {
     const { target } = await parseHttpBody(REMOTE_PROCEDURE_SCHEMAS.testRepository, c)
-    return c.json(await testServerRemoteRepository(target, c.req.raw.signal))
+    return c.json(await testServerRemoteRepo(target, c.req.raw.signal))
   })
   app.post('/open-editor', async (c) => {
     const { repoId, worktreePath, app } = await parseHttpBody(REMOTE_PROCEDURE_SCHEMAS.openEditor, c)

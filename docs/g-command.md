@@ -15,7 +15,7 @@ The server sits between `g` and the client on the control plane. It does not int
 
 ## Why the server brokers intents
 
-In a typical desktop app, a CLI would talk to the main process directly. Goblin puts the broker in the server because:
+In a typical desktop app, a CLI would talk to the native host directly. Goblin puts the broker in the server because:
 
 - The server is the only process that exists in both Electron mode and standalone (`serve.sh`) mode. Putting the broker in the server means `g` works the same way in either mode — the client subscribes the same way regardless of how the server was launched.
 - The client's intent router already exists. Adding a new producer means adding a subscription, not a new router.
@@ -57,7 +57,7 @@ The CLI exit codes are conventional: `0` success, `1` server or transport error,
 
 Two runtime modes, identical from `g`'s perspective:
 
-- **Electron** — the main process spawns the server as a child. Clients in BrowserWindows connect over HTTP + WS as usual.
+- **Electron** — the native host spawns the server as a child. Clients in BrowserWindows connect over HTTP + WS as usual.
 - **`serve.sh`** — a standalone server, no Electron process. Browser tabs (or a manually-launched Electron window) connect the same way.
 
 The only difference `g` can observe: when no client is listening on the control-plane WS, the server returns a clear "no client" error. This is the same error in both modes and is the intended behaviour — `g` is a frontend command, not a backend one.

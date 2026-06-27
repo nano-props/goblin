@@ -67,12 +67,12 @@ export interface RepoUiState {
   selectedBranch: string | null
   branchViewMode: BranchViewMode
   /**
-   * Single branch-scoped workspace pane tab strip order. Static view entries
+   * Single branch-scoped workspace pane tab strip order. Static tab entries
    * are the opened static tabs; terminal entries are ordering hints for live
    * terminal sessions, whose lifecycle remains terminal-runtime owned.
    */
   workspacePaneTabOrderByBranch: Record<string, WorkspacePaneTabOrderEntry[]>
-  /** Branch-scoped selected workspace pane view. Branch switches read this
+  /** Branch-scoped selected workspace pane tab. Branch switches read this
    *  first so selecting a tab on one branch does not select it on another. */
   preferredWorkspacePaneTabByBranch: Record<string, WorkspacePaneTabType>
   /**
@@ -80,7 +80,7 @@ export interface RepoUiState {
    * close. Set by `setLastClosedTabContext` after `runCloseWorkspacePaneTabCommand`
    * commits. Read by `createRepoWorkspaceTabModel` to prefer the spatial
    * neighbor of the closed tab over the generic tabs[0] fallback when the
-   * preferred view becomes unrenderable, and also when the closed tab was the
+   * preferred tab becomes unrenderable, and also when the closed tab was the
    * active tab so the workspace pane does not jump to a different remaining
    * terminal instead of the adjacent tab. Overwritten by the next close on the
    * same branch.
@@ -100,7 +100,7 @@ export interface RepoUiState {
       previousTabIdentities: readonly string[]
       /** True when the closed tab was the active tab at the moment of close.
        *  The model uses this to prefer the spatial neighbor even if the user's
-       *  preferred view (e.g. terminal) remains renderable via another tab. */
+       *  preferred tab (e.g. terminal) remains renderable via another tab. */
       wasActive?: boolean
     } | null
   >
@@ -235,8 +235,8 @@ export interface RuntimeCoherentRepoProjectionActions {
    * Returns the new outcome, or `null` for non-remote ids.
    */
   retryRemoteRepoConnection: (id: string) => Promise<{ ok: boolean; reason?: string } | null>
-  /** Updates the selected branch's workspace pane view type. The store does not project
-   *  against terminal session count, worktree presence, or opened workspace pane views;
+  /** Updates the selected branch's workspace pane tab type. The store does not project
+   *  against terminal session count, worktree presence, or opened workspace pane tabs;
    *  the UI resolves the active pane at read time so session restore preserves
    *  branch-scoped user intent. */
   setWorkspacePaneTab: (id: string, tab: WorkspacePaneTabType) => void
@@ -248,7 +248,7 @@ export interface RuntimeCoherentRepoProjectionActions {
   reorderWorkspacePaneTabs: (id: string, orderedTabs: WorkspacePaneTabOrderEntry[], branchName?: string) => void
   /** Records the most recent user-initiated close on a branch so the
    *  workspace pane tab model can prefer the spatial neighbor of the
-   *  closed tab when the preferred view becomes unrenderable or when the
+   *  closed tab when the preferred tab becomes unrenderable or when the
    *  closed tab was the active tab. The pre-close tab identities carry
    *  enough information for the model to compute the neighbor without the
    *  command imperatively re-selecting anything. */

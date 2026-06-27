@@ -578,7 +578,7 @@ describe('RepoView workspace navigation', () => {
     }
   })
 
-  test('compact branch activation slides Branch Workspace into the active pane', () => {
+  test('compact branch activation slides Repo Workspace into the active pane', () => {
     responsiveMocks.mode = 'compact'
     render(<RepoView repoId={REPO_ID} />)
 
@@ -600,7 +600,7 @@ describe('RepoView workspace navigation', () => {
     expect(repoWorkspace()).not.toBeNull()
   })
 
-  test('compact mode derives Branch Workspace from an existing selected branch', () => {
+  test('compact mode derives Repo Workspace from an existing selected branch', () => {
     responsiveMocks.mode = 'compact'
     render(<RepoView repoId={REPO_ID} />)
 
@@ -614,7 +614,7 @@ describe('RepoView workspace navigation', () => {
     expect(repoWorkspace()).not.toBeNull()
   })
 
-  test('compact back transition keeps the outgoing Branch Workspace content during slide-out', () => {
+  test('compact back transition keeps the outgoing Repo Workspace content during slide-out', () => {
     vi.useFakeTimers()
     try {
       responsiveMocks.mode = 'compact'
@@ -693,7 +693,7 @@ describe('RepoView workspace navigation', () => {
     expect(zenModeSidebarReveal()?.dataset.open).toBe('false')
   })
 
-  test('compact initial loading shows the selected Branch Workspace skeleton as the single pane', () => {
+  test('compact initial loading shows the selected Repo Workspace skeleton as the single pane', () => {
     responsiveMocks.mode = 'compact'
     useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
     setSnapshotLoading(REPO_ID)
@@ -706,7 +706,7 @@ describe('RepoView workspace navigation', () => {
     expect(container?.querySelectorAll('[data-testid="branch-navigator-skeleton-action"]')).toHaveLength(0)
   })
 
-  test('resizing from split large-screen mode to compact shows Branch Workspace when a branch is selected', () => {
+  test('resizing from split large-screen mode to compact shows Repo Workspace when a branch is selected', () => {
     render(<RepoView repoId={REPO_ID} />)
 
     act(() => {

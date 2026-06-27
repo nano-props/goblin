@@ -424,7 +424,7 @@ describe('remote fetch timestamps', () => {
     })
   })
 
-  test('remove worktree delegates terminal cleanup to the main process action', async () => {
+  test('remove worktree delegates terminal cleanup to the native host action', async () => {
     const token = seedRepo([branch('feature/a', undefined, { worktree: { path: '/tmp/worktree-a' } })])
     const calls: string[] = []
     ipcHandlers['repo.removeWorktree'] = async () => {

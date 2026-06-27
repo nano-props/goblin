@@ -1,10 +1,10 @@
 import path from 'node:path'
-import { gitResultWithOptions } from '#/system/git/helper.ts'
+import { gitResultWithOptions } from '#/system/git/git-exec.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
 
 const CLONE_TIMEOUT_MS = 300_000
 
-export async function cloneRepository(
+export async function cloneRepo(
   parentPath: string,
   directoryName: string,
   url: string,

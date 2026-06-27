@@ -196,7 +196,7 @@ describe('setBranchViewMode', () => {
     expect(calls).toEqual([{ branches: ['main'], mode: 'full' }])
   })
 
-  test('keeps the hidden branch workspace pane selection on that branch', () => {
+  test('keeps the hidden repo workspace pane selection on that branch', () => {
     seedRepo({
       selectedBranch: 'feature/plain',
       preferredWorkspacePaneTab: 'terminal',

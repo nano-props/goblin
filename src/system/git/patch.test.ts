@@ -4,8 +4,8 @@ import { getWorktreePatch } from '#/system/git/patch.ts'
 const gitMock = vi.hoisted(() => vi.fn())
 const execaMock = vi.hoisted(() => vi.fn())
 
-vi.mock('#/system/git/helper.ts', async () => {
-  const actual = await vi.importActual<typeof import('#/system/git/helper.ts')>('#/system/git/helper.ts')
+vi.mock('#/system/git/git-exec.ts', async () => {
+  const actual = await vi.importActual<typeof import('#/system/git/git-exec.ts')>('#/system/git/git-exec.ts')
   return {
     ...actual,
     git: vi.fn((cwd: string, args: string[], options?: unknown) => gitMock(cwd, args, options)),

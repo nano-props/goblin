@@ -155,7 +155,7 @@ test('updates repo-level worktree bootstrap trust by repo id', async () => {
   ])
 })
 
-test('normalizes branch-scoped workspace pane view preferences in server sessions', async () => {
+test('normalizes branch-scoped workspace pane tab preferences in server sessions', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp

@@ -5,7 +5,7 @@
 // http-only cookie set by `POST /api/login`. The web path is
 // trivial — the user pastes the token into the gate, the cookie
 // sticks, done. The Electron path can't ask the user to paste a
-// token on first run, so the main process has to do the
+// token on first run, so the native host has to do the
 // equivalent: log in once with the access token it spawned the
 // server with, then plant the resulting cookie on the client's
 // session so the very first request the client fires already
@@ -43,7 +43,7 @@ const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365
 
 export interface EmbedAuthCookieOptions {
   /**
-   * The access token the main process used to spawn the embedded
+   * The access token the native host used to spawn the embedded
    * server. Will be wrapped as an http-only session cookie so the
    * client's first request authenticates without a token gate.
    */

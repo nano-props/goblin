@@ -12,7 +12,7 @@ import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
  * `ClipboardEvent` / `DragEvent`) back to an absolute filesystem path —
  * the client uses it transparently through `pathForDroppedFile`.
  *
- * The main process only owns the *blob save* path: when a file has no
+ * The native host only owns the *blob save* path: when a file has no
  * filesystem path (image copied from a browser tab, screenshot, etc.) the
  * client ships `{name, bytes}` over IPC and we persist it under a temp
  * dir so the PTY can read it as a real file.

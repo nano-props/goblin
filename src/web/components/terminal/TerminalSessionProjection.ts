@@ -1,7 +1,7 @@
 import { setTerminalFocused } from '#/web/terminal-focus.ts'
 import { terminalSessionProviderLog } from '#/web/logger.ts'
 import { TerminalSession } from '#/web/components/terminal/TerminalSession.ts'
-import { createTerminalBellController } from '#/web/components/terminal/terminal-bell-controller.ts'
+import { createTerminalBellState } from '#/web/components/terminal/terminal-bell-state.ts'
 import { terminalDescriptor } from '#/web/components/terminal/terminal-descriptor.ts'
 import { parseWorktreeKey, worktreeTerminalKey } from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
 import { terminalBridge } from '#/web/terminal.ts'
@@ -137,7 +137,7 @@ export class TerminalSessionProjection {
   private readonly worktreeListeners = new Map<string, Set<() => void>>()
   private readonly snapshotListeners = new Map<string, Set<() => void>>()
   private readonly displayOrderByKey = new Map<string, number>()
-  private readonly bellController = createTerminalBellController(
+  private readonly bellController = createTerminalBellState(
     (key) => {
       if (key) {
         const terminalWorktreeKey = this.sessions.get(key)?.descriptor.worktreeTerminalKey

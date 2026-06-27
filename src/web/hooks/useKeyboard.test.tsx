@@ -70,7 +70,7 @@ describe('useKeyboard', () => {
     expect(onExitSettings).toHaveBeenCalledTimes(1)
   })
 
-  test('workspace pane view shortcuts move through currently opened workspace pane views', async () => {
+  test('workspace pane tab shortcuts move through currently opened workspace pane tabs', async () => {
     seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -98,7 +98,7 @@ describe('useKeyboard', () => {
     expect(selectTerminal).toHaveBeenCalledWith(WORKTREE_KEY, 'slot-1')
   })
 
-  test('workspace pane view shortcuts move through branch tabs without a worktree', async () => {
+  test('workspace pane tab shortcuts move through branch tabs without a worktree', async () => {
     seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/no-worktree')],

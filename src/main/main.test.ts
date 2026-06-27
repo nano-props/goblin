@@ -148,7 +148,7 @@ vi.mock('#/main/external-open.ts', () => ({
   enqueueExternalOpenPath: mocks.enqueueExternalOpenPath,
 }))
 
-describe('main process startup lifecycle', () => {
+describe('native host startup lifecycle', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()

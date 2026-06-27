@@ -33,7 +33,7 @@ export function workspacePaneTabRequiresWorktree(tab: WorkspacePaneTabType): boo
 }
 
 /**
- * The runtime truth that determines whether a preferred workspace pane view
+ * The runtime truth that determines whether a preferred workspace pane tab
  * has a backing surface that can be rendered now.
  * Grouped into an object so callers can't accidentally swap two
  * booleans at the call site.
@@ -50,8 +50,8 @@ export interface WorkspacePaneRenderabilityContext {
 }
 
 /**
- * Resolve whether the stored preferred view can still be considered as the
- * current selection. This never substitutes another tab: unavailable views
+ * Resolve whether the stored preferred tab can still be considered as the
+ * current selection. This never substitutes another tab: unavailable tabs
  * resolve to null, and the tab projection decides whether a matching tab
  * actually exists.
  */

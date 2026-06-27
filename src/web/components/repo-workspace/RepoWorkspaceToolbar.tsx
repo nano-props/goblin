@@ -246,7 +246,7 @@ export function RepoWorkspaceToolbar({
       <WorkspaceToolbarContent>
         <WorkspaceToolbarPrimary>
           {/* Compact UI only: back-to-branch-navigator is the user's escape hatch
-              from the branch workspace. It must stay visible even when the tab
+              from the repo workspace. It must stay visible even when the tab
               strip below is empty, so it lives at the toolbar level rather than
               inside WorkspacePaneTabStrip's tab chrome. */}
           {compact && repoWorkspaceBackAction}

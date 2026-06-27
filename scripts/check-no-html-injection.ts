@@ -130,7 +130,7 @@ const RULES: Rule[] = [
   },
   // Env vars whose only purpose was to gate the HTML inlining.
   // `GOBLIN_HOME_DIR` / `GOBLIN_PLATFORM` are still set in the
-  // main process spawn-env (legacy compat, harmless) but the
+  // native host spawn-env (legacy compat, harmless) but the
   // server must not read them — that would mean the bootstrap is
   // being populated server-side.
   {

@@ -4,7 +4,7 @@ import type { TerminalBellEvent, TerminalDescriptor } from '#/web/components/ter
 import { getRuntimeFetchSettings } from '#/web/runtime-settings-fetch.ts'
 const BELL_NOTIFICATION_DEBOUNCE_MS = 5000
 
-export interface TerminalBellController {
+export interface TerminalBellState {
   hasBell: (key: string) => boolean
   clear: (key: string) => boolean
   remove: (key: string) => void
@@ -12,10 +12,10 @@ export interface TerminalBellController {
   handleBell: (descriptor: TerminalDescriptor, event: TerminalBellEvent) => void
 }
 
-export function createTerminalBellController(
+export function createTerminalBellState(
   notify: (key?: string) => void,
   onBadgeChange: (count: number) => void,
-): TerminalBellController {
+): TerminalBellState {
   const unreadKeys = new Set<string>()
   const lastNotificationAt = new Map<string, number>()
 

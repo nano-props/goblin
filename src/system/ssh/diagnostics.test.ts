@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest'
-import { classifySshFailure, testRemoteRepository } from '#/system/ssh/diagnostics.ts'
+import { classifySshFailure, testRemoteRepo } from '#/system/ssh/diagnostics.ts'
 import type { RemoteCommandKind, RemoteCommandResult } from '#/system/ssh/commands.ts'
 import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
 
@@ -32,7 +32,7 @@ describe('classifySshFailure', () => {
   })
 })
 
-describe('testRemoteRepository parallel stages', () => {
+describe('testRemoteRepo parallel stages', () => {
   const target: RemoteRepoTarget = {
     id: 'ssh-config://example/srv%2Frepo',
     alias: 'example',
@@ -63,7 +63,7 @@ describe('testRemoteRepository parallel stages', () => {
       return { ok: false, stdout: '', stderr: '', message: 'unexpected command', timedOut: false }
     })
 
-    const result = await testRemoteRepository(target, { run })
+    const result = await testRemoteRepo(target, { run })
 
     expect(result.ok).toBe(false)
     expect(result.category).toBe('git-missing')
@@ -88,7 +88,7 @@ describe('testRemoteRepository parallel stages', () => {
       return { ok: false, stdout: '', stderr: '', message: 'unexpected command', timedOut: false }
     })
 
-    const result = await testRemoteRepository(target, { run })
+    const result = await testRemoteRepo(target, { run })
 
     expect(result.ok).toBe(true)
     expect(result.stages.find((stage) => stage.name === 'shell')?.status).toBe('passed')

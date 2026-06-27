@@ -20,7 +20,7 @@ import { fetchServerJson } from '#/web/lib/server-fetch.ts'
  * - Electron only: the `lanEnabled` toggle (the bind address is
  *   owned by the host process) and the `Rotate token` action
  *   (the rotation requires restarting the embedded server, which
- *   only the main process can do).
+ *   only the native host can do).
  *
  * In web / `bun run serve.sh` mode the operator owns the process
  * and the bind address; rotation is a manual delete + restart, so
@@ -86,7 +86,7 @@ export function WebSettings() {
     try {
       const { accessToken: next } = await bridge.rotateAccessToken()
       setFetchedToken(next)
-      // The main process replants the embedded client's auth
+      // The native host replants the embedded client's auth
       // cookie with the new token before this IPC returns, so the
       // cookie path is now self-consistent. A full reload is still
       // required because the preload's `__GOBLIN_BOOTSTRAP__` was

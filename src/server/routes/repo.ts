@@ -13,7 +13,7 @@ import {
 import {
   abortCloneOperation,
   abortRepoOperation,
-  cloneRepository,
+  cloneRepo,
   createRepoWorktree,
   deleteRepoBranch,
   fetchRepo,
@@ -129,9 +129,7 @@ export function createRepoRoutes() {
   })
   app.post('/clone', async (c) => {
     const { operationId, url, parentPath, directoryName } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.clone, c)
-    return c.json(
-      await jsonOr(() => cloneRepository(operationId, url, parentPath, directoryName), READ_REPO_ERROR, 'clone'),
-    )
+    return c.json(await jsonOr(() => cloneRepo(operationId, url, parentPath, directoryName), READ_REPO_ERROR, 'clone'))
   })
   app.post('/abort-clone', async (c) => {
     const { operationId } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.abortClone, c)

@@ -2,7 +2,7 @@ import { describe, expect, test, vi } from 'vitest'
 import { createPrimaryWindowNavigationActions } from '#/web/primary-window-navigation-actions.ts'
 
 describe('createPrimaryWindowNavigationActions', () => {
-  test('mutates store directly for repo branch workspace navigation', () => {
+  test('mutates store directly for repo workspace navigation', () => {
     const setActive = vi.fn()
     const selectBranch = vi.fn()
     const setWorkspacePaneTab = vi.fn()
@@ -24,7 +24,7 @@ describe('createPrimaryWindowNavigationActions', () => {
     expect(setWorkspacePaneTab).toHaveBeenCalledWith('/tmp/repo-b', 'terminal')
   })
 
-  test('workspace pane navigation updates the preferred workspace pane view', () => {
+  test('workspace pane navigation updates the preferred workspace pane tab', () => {
     const setWorkspacePaneTab = vi.fn()
     const actions = createPrimaryWindowNavigationActions({
       activeId: '/tmp/repo-a',

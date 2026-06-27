@@ -54,7 +54,7 @@ vi.mock('#/system/git/branches.ts', () => ({
   isGitRepo: mocks.isGitRepo,
 }))
 
-vi.mock('#/system/git/helper.ts', () => ({
+vi.mock('#/system/git/git-exec.ts', () => ({
   checkGitAvailable: mocks.checkGitAvailable,
 }))
 
@@ -112,14 +112,14 @@ vi.mock('#/system/ssh/config.ts', () => ({
 }))
 
 vi.mock('#/system/ssh/diagnostics.ts', () => ({
-  testRemoteRepository: vi.fn(),
+  testRemoteRepo: vi.fn(),
 }))
 
 vi.mock('#/system/ssh/git.ts', () => ({
   bootstrapRemoteWorktreeAfterCreate: mocks.bootstrapRemoteWorktreeAfterCreate,
   createRemoteWorktree: mocks.createRemoteWorktree,
   deleteRemoteBranch: vi.fn(),
-  fetchRemoteRepository: vi.fn(),
+  fetchRemoteRepo: vi.fn(),
   getRemoteBrowserUrl: vi.fn(),
   getRemoteLog: vi.fn(),
   getRemotePatch: vi.fn(),

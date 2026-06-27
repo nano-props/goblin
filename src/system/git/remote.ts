@@ -1,4 +1,4 @@
-import { git, gitResultWithOptions, NETWORK_TIMEOUT_MS } from '#/system/git/helper.ts'
+import { git, gitResultWithOptions, NETWORK_TIMEOUT_MS } from '#/system/git/git-exec.ts'
 import type { BrowserRemoteProvider, ExecResult, GitRemoteInfo, RepoRemoteInfo } from '#/shared/git-types.ts'
 import { getCurrentBranch } from '#/system/git/branches.ts'
 import { isGitHubHost, isGitLabHost, parseGitRemoteUrl, remoteUrlToHttps } from '#/system/git/remote-url.ts'

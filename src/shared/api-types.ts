@@ -86,7 +86,7 @@ export interface WorkspaceSessionState {
   zenMode: boolean
   workspacePaneSize: number
   selectedTerminalSessionByWorktree?: Record<string, string>
-  /** Per-repo, per-branch workspace pane view preference that session restore can make renderable. */
+  /** Per-repo, per-branch workspace pane tab preference that session restore can make renderable. */
   preferredWorkspacePaneTabByBranchByRepo?: Record<string, Record<string, WorkspacePaneSessionTabType>>
   /** Per-repo, per-branch workspace pane tab strip order. Empty arrays are meaningful. */
   workspacePaneTabOrderByBranchByRepo: Record<string, Record<string, WorkspacePaneTabOrderEntry[]>>

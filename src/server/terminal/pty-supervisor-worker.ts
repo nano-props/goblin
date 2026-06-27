@@ -204,7 +204,7 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
       if (this.worker === worker) this.worker = null
       // Capture "did we have any active sessions" before the listener-fanout
       // step clears them. If we had live PTYs when the worker died, the
-      // main process likely still needs the worker back to serve them.
+      // native host likely still needs the worker back to serve them.
       const hadSessions = this.sessions.size > 0
       if (!this.shuttingDown) {
         const uptimeMs = Math.max(0, this.now() - this.workerStartedAt)

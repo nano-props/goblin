@@ -125,7 +125,7 @@ describe('settings command handlers', () => {
     expect(parsed.session.workspacePaneSize).toBe(42.5)
   })
 
-  test('schema accepts changes as a session-restorable preferred view', async () => {
+  test('schema accepts changes as a session-restorable preferred tab', async () => {
     const { SETTINGS_PATCH_SCHEMAS } = await import('#/shared/procedure-schemas.ts')
     const { parseHttpInput } = await import('#/server/common/http-validate.ts')
 

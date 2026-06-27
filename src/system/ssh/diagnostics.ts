@@ -13,7 +13,7 @@ type DiagnosticsRunner = (
   options?: { signal?: AbortSignal; timeoutMs?: number },
 ) => Promise<RemoteCommandResult>
 
-export async function testRemoteRepository(
+export async function testRemoteRepo(
   target: RemoteRepoTarget,
   options: { signal?: AbortSignal; run?: DiagnosticsRunner; timeoutMs?: number } = {},
 ): Promise<RemoteDiagnosticsResult> {

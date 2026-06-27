@@ -148,11 +148,11 @@ export async function runCloseWorkspacePaneTabCommand({
 
   // Capture pre-close state for the workspace pane tab model. The model uses
   // `lastClosedTabContext` to prefer the spatial neighbor of the closed tab
-  // over its generic tabs[0] fallback when the preferred view becomes
+  // over its generic tabs[0] fallback when the preferred tab becomes
   // unrenderable — preserving spatial locality without this command
   // imperatively re-selecting anything. When the closed tab was the active
   // tab, `wasActive` tells the model to apply the same neighbor preference
-  // even if another tab of the preferred view (e.g. another terminal) is
+  // even if another tab of the preferred tab (e.g. another terminal) is
   // still available, so the tab strip order is respected.
   const previousTabIdentities = target.tabs.map((t) => t.identity)
   const closingIdentity = tab.identity

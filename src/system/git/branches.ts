@@ -1,4 +1,4 @@
-import { git, gitResultWithOptions, NETWORK_TIMEOUT_MS } from '#/system/git/helper.ts'
+import { git, gitResultWithOptions, NETWORK_TIMEOUT_MS } from '#/system/git/git-exec.ts'
 import { FIELD_SEP, parseBranches, parseLog } from '#/system/git/parsers.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
 import {

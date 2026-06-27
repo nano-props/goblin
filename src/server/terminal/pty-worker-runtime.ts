@@ -4,7 +4,7 @@
 // protocol into node-pty calls and emits data/exit events.
 //
 // Process-name is sampled on every onData chunk (cheap property
-// read from node-pty) so the main process always has a fresh view
+// read from node-pty) so the native host always has a fresh view
 // of the foreground process — even after a child exits without
 // emitting a title-OSC.
 
@@ -93,10 +93,10 @@ export class PtyWorkerRuntime {
 
   private wireDataAndExitEvents(ptySessionId: string, runtime: TerminalPtyRuntime): void {
     runtime.onData((data) => {
-      // Always sample process name so the main process has a fresh view
+      // Always sample process name so the native host has a fresh view
       // of the foreground process, even after a child exits without
       // setting a title-OSC. Emit the name-change BEFORE pty-data so
-      // the main process's cache is updated when it processes this chunk.
+      // the native host's cache is updated when it processes this chunk.
       const nextName = safeProcessName(runtime)
       const entry = this.ptys.get(ptySessionId)
       if (entry && nextName && nextName !== entry.processName) {

@@ -193,7 +193,7 @@ export const ko: Record<DictKey, string> = {
   'drop.body': 'Git 리포지토리 폴더를 Goblin 어디에나 놓으세요.',
   'drop.open-failed': '로컬 리포지토리를 열 수 없음',
 
-  // ---- Workspace pane views ---------------------------------------------
+  // ---- Workspace pane tabs ------------------------------------------------
   'tab.branches': '브랜치',
   'tab.repo-workspace': '브랜치 작업 공간',
   'tab.status': '상태',

@@ -306,7 +306,7 @@ describe('primary window navigation boundaries', () => {
 
   test('uses the client dev server origin in window URL during development', async () => {
     // The bootstrap (access token, server URL, home dir, platform)
-    // is ferried from the main process to the preload via IPC; the
+    // is ferried from the native host to the preload via IPC; the
     // `webDevUrl` env override just changes which URL the client
     // window is pointed at (Vite vs the embedded server's static
     // file route). The dev-URL override flows through

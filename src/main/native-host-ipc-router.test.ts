@@ -86,7 +86,7 @@ vi.mock('#/shared/worktree-guards.ts', () => ({
   resolveRemovableWorktree: vi.fn(),
 }))
 
-vi.mock('#/system/git/helper.ts', () => ({
+vi.mock('#/system/git/git-exec.ts', () => ({
   checkGitAvailable: vi.fn(() => ({ ok: true })),
 }))
 
@@ -107,7 +107,7 @@ vi.mock('#/system/git/patch.ts', () => ({
 }))
 
 vi.mock('#/system/git/clone.ts', () => ({
-  cloneRepository: vi.fn(),
+  cloneRepo: vi.fn(),
 }))
 
 vi.mock('#/system/git/pull-requests.ts', () => ({

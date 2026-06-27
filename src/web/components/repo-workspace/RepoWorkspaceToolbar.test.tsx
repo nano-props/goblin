@@ -917,7 +917,7 @@ describe('RepoWorkspaceToolbar', () => {
     const statusTab = c.querySelector<HTMLButtonElement>('#workspace-status-tab')
     const changesTab = c.querySelector<HTMLButtonElement>('#workspace-changes-tab')
     const terminalTab = c.querySelector<HTMLButtonElement>('#workspace-workspace-pane-tab')
-    if (!statusTab || !changesTab || !terminalTab) throw new Error('missing branch workspace pane tabs')
+    if (!statusTab || !changesTab || !terminalTab) throw new Error('missing repo workspace pane tabs')
 
     act(() => {
       statusTab.focus()
@@ -954,7 +954,7 @@ describe('RepoWorkspaceToolbar', () => {
     expect(c.querySelector('[data-workspace-pane-tab-tooltip-id="changes:changes"]')).toBeNull()
     const statusTab = c.querySelector<HTMLButtonElement>('#workspace-status-tab')
     const terminalTab = c.querySelector<HTMLButtonElement>('#workspace-workspace-pane-tab')
-    if (!statusTab || !terminalTab) throw new Error('missing branch workspace pane tabs')
+    if (!statusTab || !terminalTab) throw new Error('missing repo workspace pane tabs')
 
     act(() => {
       statusTab.focus()

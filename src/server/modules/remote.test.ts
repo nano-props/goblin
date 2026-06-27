@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   resolveRemoteTarget: vi.fn(),
   resolveTrackedRemoteTarget: vi.fn(),
   runRemoteCommand: vi.fn(),
-  testRemoteRepository: vi.fn(),
+  testRemoteRepo: vi.fn(),
 }))
 
 vi.mock('#/system/ssh/commands.ts', () => ({
@@ -17,7 +17,7 @@ vi.mock('#/system/ssh/commands.ts', () => ({
 
 vi.mock('#/system/ssh/diagnostics.ts', () => ({
   makeUnresolvedTargetDiagnostic: mocks.makeUnresolvedTargetDiagnostic,
-  testRemoteRepository: mocks.testRemoteRepository,
+  testRemoteRepo: mocks.testRemoteRepo,
 }))
 
 vi.mock('#/system/ssh/config.ts', () => ({

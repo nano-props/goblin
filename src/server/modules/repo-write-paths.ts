@@ -3,14 +3,14 @@ import { runServerCancellable, abortServerNetworkOp } from '#/server/common/netw
 import { publishRepoQueryInvalidation, publishSettingsInvalidation } from '#/server/modules/invalidation-broker.ts'
 import { resolveRepoSource, runWithRepoSource, type RepoMutationResult } from '#/server/modules/repo-source.ts'
 import { getServerRepoSettings, trustServerRepoWorktreeBootstrapConfig } from '#/server/modules/settings-source.ts'
-import { cloneRepository as cloneGitRepository } from '#/system/git/clone.ts'
+import { cloneRepo as cloneGitRepo } from '#/system/git/clone.ts'
 import { openInPreferredEditor } from '#/system/editors.ts'
 import { openInPreferredTerminal } from '#/system/terminals.ts'
 import { openInFinder } from '#/system/finder.ts'
 import { type ExecResult } from '#/shared/git-types.ts'
 import { type NetworkOpKind } from '#/shared/api-types.ts'
 import type { EditorApp, TerminalApp } from '#/shared/api-types.ts'
-import { checkGitAvailable } from '#/system/git/helper.ts'
+import { checkGitAvailable } from '#/system/git/git-exec.ts'
 import { isValidCwd, isValidRepoLocator, toSafeRepoLocator } from '#/shared/input-validation.ts'
 import { isRepoWorktreeBootstrapConfigTrusted } from '#/shared/repo-settings.ts'
 import { type CloneRepoResult, type ProbeResult } from '#/shared/api-types.ts'
@@ -171,7 +171,7 @@ async function runUserNetworkMutation(
   )
 }
 
-export async function cloneRepository(
+export async function cloneRepo(
   operationId: string,
   url: string,
   parentPath: string,
@@ -193,7 +193,7 @@ export async function cloneRepository(
   const ctrl = new AbortController()
   activeCloneControllers.set(operationId, ctrl)
   try {
-    return await cloneGitRepository(targetParent, targetName, repoUrl, ctrl.signal)
+    return await cloneGitRepo(targetParent, targetName, repoUrl, ctrl.signal)
   } finally {
     if (activeCloneControllers.get(operationId) === ctrl) activeCloneControllers.delete(operationId)
   }

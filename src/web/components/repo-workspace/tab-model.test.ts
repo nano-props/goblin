@@ -11,7 +11,7 @@ const REPO_ID = '/tmp/gbl-workspace-pane-tab-model-repo'
 const WORKTREE_PATH = '/tmp/gbl-workspace-pane-tab-model-worktree'
 const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
 
-describe('branch workspace pane tab model', () => {
+describe('repo workspace pane tab model', () => {
   test('projects a single tab order across static and terminal tabs', () => {
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,

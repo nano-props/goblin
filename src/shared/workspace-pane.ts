@@ -62,12 +62,12 @@ export function workspacePaneStaticTabScope(tab: WorkspacePaneStaticTabType): Wo
   return WORKSPACE_PANE_STATIC_TAB_SCOPES[tab]
 }
 
-export function workspacePaneTabScope(view: WorkspacePaneTabType): WorkspacePaneTabScope {
-  return view === 'terminal' ? 'worktree' : workspacePaneStaticTabScope(view)
+export function workspacePaneTabScope(tab: WorkspacePaneTabType): WorkspacePaneTabScope {
+  return tab === 'terminal' ? 'worktree' : workspacePaneStaticTabScope(tab)
 }
 
-export function workspacePaneTabRequiresWorktree(view: WorkspacePaneTabType): boolean {
-  return workspacePaneTabScope(view) === 'worktree'
+export function workspacePaneTabRequiresWorktree(tab: WorkspacePaneTabType): boolean {
+  return workspacePaneTabScope(tab) === 'worktree'
 }
 
 export function isWorkspacePaneSessionTabType(value: string | null | undefined): value is WorkspacePaneSessionTabType {

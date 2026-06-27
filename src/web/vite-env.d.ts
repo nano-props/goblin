@@ -36,7 +36,7 @@ interface GoblinNativeBridge {
     setBadge?: (count: number) => void
   }
   /**
-   * Persist clipboard / drop file blobs through the main process.
+   * Persist clipboard / drop file blobs through the native host.
    * Always returns `[]` on failure (preload swallows errors); callers
    * should treat an empty result as "no blob made it across" and count
    * backend transfer failures separately from unsafe path filtering.

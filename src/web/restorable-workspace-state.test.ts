@@ -44,7 +44,7 @@ describe('restorable-workspace-state', () => {
     })
   })
 
-  test('persists changes as a session-restorable preferred view when its static tab is open', () => {
+  test('persists changes as a session-restorable preferred tab when its static tab is open', () => {
     const repo = seedRepoState({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
@@ -76,7 +76,7 @@ describe('restorable-workspace-state', () => {
     })
   })
 
-  test('does not persist a branch preferred view whose tab is closed', () => {
+  test('does not persist a branch preferred tab whose tab is closed', () => {
     const repo = seedRepoState({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],

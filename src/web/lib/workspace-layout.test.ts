@@ -11,7 +11,7 @@ describe('repoWorkspaceBehavior', () => {
     })
   })
 
-  test('uses Branch Navigator as the single pane when large-screen Zen Mode has no active branch workspace', () => {
+  test('uses Branch Navigator as the single pane when large-screen Zen Mode has no active repo workspace', () => {
     expect(repoWorkspaceBehavior({ compact: false, zenMode: true })).toMatchObject({
       mode: 'single-pane',
       singlePane: true,
@@ -20,7 +20,7 @@ describe('repoWorkspaceBehavior', () => {
     })
   })
 
-  test('collapses Branch Navigator inside split layout when large-screen Zen Mode has an active branch workspace', () => {
+  test('collapses Branch Navigator inside split layout when large-screen Zen Mode has an active repo workspace', () => {
     expect(
       repoWorkspaceBehavior({
         compact: false,
@@ -45,7 +45,7 @@ describe('repoWorkspaceBehavior', () => {
     })
   })
 
-  test('hides Branch Navigator in compact mode once a branch workspace is active', () => {
+  test('hides Branch Navigator in compact mode once a repo workspace is active', () => {
     expect(
       repoWorkspaceBehavior({
         compact: true,

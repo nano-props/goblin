@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
   getRepoPullRequests: vi.fn(),
   readRepoBulk: vi.fn(),
   fetchRepo: vi.fn(),
-  cloneRepository: vi.fn(),
+  cloneRepo: vi.fn(),
   abortCloneOperation: vi.fn(),
   pullRepoBranch: vi.fn(),
   pushRepoBranch: vi.fn(),
@@ -44,7 +44,7 @@ vi.mock('#/server/modules/repo-read-paths.ts', () => ({
   getRepoWorktreeBootstrapPreview: mocks.getRepoWorktreeBootstrapPreview,
 }))
 vi.mock('#/server/modules/repo-write-paths.ts', () => ({
-  cloneRepository: mocks.cloneRepository,
+  cloneRepo: mocks.cloneRepo,
   abortCloneOperation: mocks.abortCloneOperation,
   pullRepoBranch: mocks.pullRepoBranch,
   pushRepoBranch: mocks.pushRepoBranch,
@@ -424,7 +424,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
   })
 
   test('clone route forwards operationId/url/parentPath/directoryName', async () => {
-    mocks.cloneRepository.mockResolvedValue({ ok: true, message: 'ok', path: '/tmp/repo' })
+    mocks.cloneRepo.mockResolvedValue({ ok: true, message: 'ok', path: '/tmp/repo' })
     const app = createRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/clone', {
@@ -439,7 +439,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
       }),
     )
     expect(response.status).toBe(200)
-    expect(mocks.cloneRepository).toHaveBeenCalledWith('op_1', 'https://example.com/r.git', '/tmp', 'r')
+    expect(mocks.cloneRepo).toHaveBeenCalledWith('op_1', 'https://example.com/r.git', '/tmp', 'r')
   })
 
   test('forwards external workspace app open routes', async () => {

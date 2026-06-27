@@ -40,7 +40,7 @@ export const ACCESS_TOKEN_URL_PARAM = 'accessToken'
 export const ACCESS_TOKEN_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365
 
 /** File name (under `dataDir`) that holds the persistent access
- *  token. Server and main process share this constant; the file
+ *  token. Server and native host share this constant; the file
  *  reader (`access-token-file.ts`) imports it back from here so the
  *  string lives in exactly one place. */
 export const ACCESS_TOKEN_FILE_NAME = 'server-token'

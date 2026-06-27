@@ -3,7 +3,7 @@ import { getRemoteTrackingBranches } from '#/system/git/remote-refs.ts'
 
 const gitMock = vi.hoisted(() => vi.fn())
 
-vi.mock('#/system/git/helper.ts', () => ({
+vi.mock('#/system/git/git-exec.ts', () => ({
   git: gitMock,
 }))
 

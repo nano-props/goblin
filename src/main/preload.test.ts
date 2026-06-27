@@ -130,7 +130,7 @@ describe('preload goblinNative bridge', () => {
     expect(goblinNative).toHaveProperty('onIntent')
   })
 
-  test('forwards IPC request ids to the main process', async () => {
+  test('forwards IPC request ids to the native host', async () => {
     const { goblinNative, invocations } = loadPreload()
 
     await goblinNative.invokeIpc({ path: 'repo.status', input: { cwd: '/repo' }, requestId: 'ipc_test_1' })
@@ -327,7 +327,7 @@ describe('preload goblinNative bridge', () => {
         'paired with TERMINAL_NOTIFY_BELL_CHANNEL for the settings-page "test" button',
       [TERMINAL_SET_BADGE_CHANNEL]: 'app.dock.setBadge / taskbar badge count — Electron BrowserWindow only',
       [CLIPBOARD_SAVE_FILES_CHANNEL]:
-        'main process writes blob to <os.tmpdir>/goblin-clipboard-<pid>/ so the PTY can read it as a real file',
+        'native host writes blob to <os.tmpdir>/goblin-clipboard-<pid>/ so the PTY can read it as a real file',
       [ROTATE_ACCESS_TOKEN_CHANNEL]: 'embedded-server restart — only Electron main owns the server lifecycle',
     }
 

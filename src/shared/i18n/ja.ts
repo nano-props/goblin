@@ -200,7 +200,7 @@ export const ja: Record<DictKey, string> = {
   'drop.body': 'Git リポジトリフォルダを Goblin のどこにでもドロップできます。',
   'drop.open-failed': 'ローカルリポジトリを開けませんでした',
 
-  // ---- Workspace pane views ---------------------------------------------
+  // ---- Workspace pane tabs ------------------------------------------------
   'tab.branches': 'ブランチ',
   'tab.repo-workspace': 'ブランチワークスペース',
   'tab.status': 'ステータス',

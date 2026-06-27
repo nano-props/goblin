@@ -109,9 +109,9 @@ function launchElectron(): Bun.Subprocess {
   // ELECTRON_RUN_AS_NODE=1 in the shell environment makes the spawned
   // electron process run as a plain Node.js child — the `electron` module
   // is then resolved from npm and is just the binary-path downloader
-  // stub, so every `import { app } from 'electron'` in the main process
+  // stub, so every `import { app } from 'electron'` in the native host
   // fails with "does not provide an export named 'app'". Strip the flag
-  // here so the Electron process starts as a real main process; the
+  // here so the Electron process starts as a real native host; the
   // embedded server child process still re-applies it via
   // embedded-server-lifecycle.ts to spawn Node for the worker entry.
   const { ELECTRON_RUN_AS_NODE: _ignored, ...electronEnv } = process.env

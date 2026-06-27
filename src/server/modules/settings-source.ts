@@ -147,15 +147,15 @@ function normalizePreferredWorkspacePaneTabByBranchByRepo(
     )
       continue
     const byBranch: Record<string, WorkspacePaneSessionTabType> = {}
-    for (const [branchName, paneView] of Object.entries(rawByBranch)) {
+    for (const [branchName, paneTab] of Object.entries(rawByBranch)) {
       if (!branchName || branchName.includes('\0')) continue
-      if (typeof paneView !== 'string' || !isWorkspacePaneSessionTabType(paneView)) continue
+      if (typeof paneTab !== 'string' || !isWorkspacePaneSessionTabType(paneTab)) continue
       if (
-        isWorkspacePaneStaticTabType(paneView) &&
-        !workspacePaneStaticTabs(tabOrderByRepo[safeRepoId]?.[branchName] ?? []).includes(paneView)
+        isWorkspacePaneStaticTabType(paneTab) &&
+        !workspacePaneStaticTabs(tabOrderByRepo[safeRepoId]?.[branchName] ?? []).includes(paneTab)
       )
         continue
-      byBranch[branchName] = paneView
+      byBranch[branchName] = paneTab
     }
     if (Object.keys(byBranch).length > 0) normalized[safeRepoId] = byBranch
   }

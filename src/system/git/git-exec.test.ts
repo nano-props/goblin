@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from 'vitest'
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { git } from '#/system/git/helper.ts'
+import { git } from '#/system/git/git-exec.ts'
 
 let tmp: string | null = null
 

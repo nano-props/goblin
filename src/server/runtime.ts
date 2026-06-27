@@ -11,7 +11,7 @@ export interface ServerRuntimeOptions extends Omit<ServerAppOptions, 'terminalHo
   /**
    * On-disk path of the bundled PTY worker entry. When provided, the
    * runtime uses a dedicated subprocess for node-pty work, so a PTY
-   * crash never tears down the main process. When omitted the runtime
+   * crash never tears down the native host. When omitted the runtime
    * hosts PTY sessions in-process (cheap, useful for tests).
    */
   ptyWorkerEntry?: string

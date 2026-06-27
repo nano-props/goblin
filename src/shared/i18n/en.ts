@@ -37,7 +37,7 @@ export const en = {
   'menu.file.clear-recent': 'Clear Menu',
   'menu.file.open-in-browser': 'Open in Browser',
   'menu.file.open-data-folder': 'Open Data Folder',
-  // Platform variants picked at menu-build time in the main process
+  // Platform variants picked at menu-build time in the native host
   // (where `process.platform` is the source of truth — the client is
   // sandboxed and only sees `bootstrap.platform`).
   'menu.file.open-data-folder.mac': 'Open Data Folder in Finder',
@@ -202,9 +202,9 @@ export const en = {
   'drop.body': 'Drop a Git repository folder anywhere in Goblin.',
   'drop.open-failed': 'Could not open local repository',
 
-  // ---- Workspace pane views ----------------------------------------------
+  // ---- Workspace pane tabs -----------------------------------------------
   'tab.branches': 'Branches',
-  'tab.repo-workspace': 'Branch workspace',
+  'tab.repo-workspace': 'Repo workspace',
   'tab.status': 'Status',
   'tab.changes': 'Changes',
   'tab.changes-with-count': 'Changes · {count}',

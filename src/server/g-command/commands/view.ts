@@ -2,7 +2,7 @@ import type { GoblinCommand, GoblinCommandContext } from '#/server/g-command/con
 import type { RepoViewResult } from '#/shared/repo-view.ts'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 
-// Build a `g <name>` command that opens a workspace pane view. All
+// Build a `g <name>` command that opens a workspace pane tab. All
 // three commands share the same shape: validate args, POST
 // `{ tab }` to the server, map the response to a process exit code.
 //
