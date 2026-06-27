@@ -8,7 +8,7 @@ import { useT } from '#/web/stores/i18n.ts'
 import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
 import { SidebarRowButton } from '#/web/components/ui/sidebar-row-button.tsx'
 
-export interface SettingsSidebarItem<TPage extends string> {
+interface SettingsSidebarItem<TPage extends string> {
   page: TPage
   label: string
   Icon: ComponentType<{ className?: string }>

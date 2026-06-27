@@ -27,7 +27,7 @@ export interface RemoveWorktreeDialogPayload {
   path: string
 }
 
-export type BranchActionDialogKey =
+type BranchActionDialogKey =
   | 'pushConfirm'
   | 'deleteConfirm'
   | 'forceDeleteConfirm'

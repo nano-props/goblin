@@ -13,7 +13,7 @@ import type { RepoState, ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 import type { RepoOperationLane } from '#/web/stores/repos/repo-operation-scheduler.ts'
 type RepoDraft = Draft<RepoState>
 
-export interface RunLatestDataLoadOperationOptions<T> {
+interface RunLatestDataLoadOperationOptions<T> {
   set: ReposSet
   get: ReposGet
   id: string

@@ -195,7 +195,7 @@ export const ko: Record<DictKey, string> = {
 
   // ---- Workspace pane tabs ------------------------------------------------
   'tab.branches': '브랜치',
-  'tab.repo-workspace': '브랜치 작업 공간',
+  'tab.repo-workspace': '리포지토리 작업 공간',
   'tab.status': '상태',
   'tab.changes': '변경',
   'tab.changes-with-count': '변경 · {count}개',

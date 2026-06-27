@@ -83,7 +83,7 @@ const primaryWindowRouteTree = rootRoute.addChildren([
   layoutRoute.addChildren([indexRoute, appRoute, settingsIndexRoute, settingsRoute]),
 ])
 
-export const primaryWindowRouter = createRouter({
+const primaryWindowRouter = createRouter({
   routeTree: primaryWindowRouteTree,
   history: createBrowserHistory(),
 })

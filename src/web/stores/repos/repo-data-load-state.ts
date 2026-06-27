@@ -2,7 +2,7 @@
 // Executability decisions use the operations system (operations.ts) instead;
 // keeping the two separate eliminates the risk of drift.
 import type { PullRequestFetchMode } from '#/web/types.ts'
-export type RepoDataLoadPhase = 'idle' | 'loading' | 'refreshing'
+type RepoDataLoadPhase = 'idle' | 'loading' | 'refreshing'
 
 export interface RepoDataLoadState {
   phase: RepoDataLoadPhase
@@ -79,7 +79,7 @@ export function finishDataLoadError(dataLoad: RepoDataLoadState, error: string):
   dataLoad.stale = stale
 }
 
-export function finishDataLoadUnavailable(dataLoad: RepoDataLoadState): void {
+function finishDataLoadUnavailable(dataLoad: RepoDataLoadState): void {
   const stale = dataLoad.loadedAt !== null || dataLoad.phase === 'refreshing'
   dataLoad.phase = 'idle'
   dataLoad.error = null

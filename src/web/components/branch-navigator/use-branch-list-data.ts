@@ -27,7 +27,7 @@ const branchListRepoEqualFields: Array<keyof BranchListRepo> = [
   'remote',
 ]
 
-export function branchListRepoEqual(a: BranchListRepo | undefined, b: BranchListRepo | undefined): boolean {
+function branchListRepoEqual(a: BranchListRepo | undefined, b: BranchListRepo | undefined): boolean {
   if (a === b) return true
   if (!a || !b) return false
   for (const field of branchListRepoEqualFields) {

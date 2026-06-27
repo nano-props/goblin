@@ -7,7 +7,7 @@ import {
   workspacePaneTabOrderEntryIdentity,
 } from '#/shared/workspace-pane.ts'
 
-export const DEFAULT_WORKSPACE_PANE_TAB_ORDER: readonly WorkspacePaneTabOrderEntry[] = [
+const DEFAULT_WORKSPACE_PANE_TAB_ORDER: readonly WorkspacePaneTabOrderEntry[] = [
   workspacePaneStaticTabOrderEntry('status'),
 ]
 

@@ -21,7 +21,7 @@ import type { RepoState, ReposSet } from '#/web/stores/repos/types.ts'
  *   - `unreachable`: remote repo whose last probe converged to
  *     `failed`
  */
-export type RepoConnectivity = 'connecting' | 'connected' | 'unreachable'
+type RepoConnectivity = 'connecting' | 'connected' | 'unreachable'
 
 export function deriveConnectivity(repo: RepoState): RepoConnectivity {
   if (!isRemoteRepoId(repo.id)) return 'connected'

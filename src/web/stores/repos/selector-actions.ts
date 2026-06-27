@@ -1,37 +1,37 @@
 import type { ReposStore } from '#/web/stores/repos/types.ts'
 
-export interface RestorableWorkspaceViewportStoreActions extends Pick<ReposStore, 'setActive' | 'cycleActive'> {}
+interface RestorableWorkspaceViewportStoreActions extends Pick<ReposStore, 'setActive' | 'cycleActive'> {}
 
-export interface RestorableWorkspaceLayoutStoreActions extends Pick<
+interface RestorableWorkspaceLayoutStoreActions extends Pick<
   ReposStore,
   'resetLayout' | 'setSelectedTerminal' | 'toggleZenMode'
 > {}
 
-export interface RestorableWorkspaceLayoutPreferenceStoreActions extends Pick<
+interface RestorableWorkspaceLayoutPreferenceStoreActions extends Pick<
   ReposStore,
   'resetLayout' | 'setSelectedTerminal' | 'toggleZenMode'
 > {}
 
-export interface RuntimeCoherentRepoOpenStoreActions extends Pick<ReposStore, 'ensureWorkspaceOpen'> {}
+interface RuntimeCoherentRepoOpenStoreActions extends Pick<ReposStore, 'ensureWorkspaceOpen'> {}
 
-export interface RuntimeCoherentRepoNavigationStoreActions extends Pick<
+interface RuntimeCoherentRepoNavigationStoreActions extends Pick<
   ReposStore,
   'closeRepo' | 'selectBranch' | 'setWorkspacePaneTab'
 > {}
 
-export interface RuntimeCoherentRepoProjectionStoreActions extends Pick<
+interface RuntimeCoherentRepoProjectionStoreActions extends Pick<
   ReposStore,
   'ensureWorkspaceOpen' | 'closeRepo' | 'selectBranch' | 'setWorkspacePaneTab'
 > {}
 
-export interface PrimaryWindowNavigationStoreActions extends Pick<
+interface PrimaryWindowNavigationStoreActions extends Pick<
   ReposStore,
   'setActive' | 'closeRepo' | 'cycleActive' | 'selectBranch' | 'setWorkspacePaneTab'
 > {}
 
-export interface RepoPickerStoreActions extends Pick<ReposStore, 'ensureWorkspaceOpen'> {}
+interface RepoPickerStoreActions extends Pick<ReposStore, 'ensureWorkspaceOpen'> {}
 
-export interface ClientEffectIntentStoreActions extends Pick<
+interface ClientEffectIntentStoreActions extends Pick<
   ReposStore,
   'ensureWorkspaceOpen' | 'setSelectedTerminal' | 'resetLayout' | 'toggleZenMode'
 > {}

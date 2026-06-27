@@ -154,6 +154,6 @@ function BranchActionPopoverItem({
   )
 }
 
-export function branchActionMenuItemDisabled(item: BranchActionItem, busy: BranchActionItem['id'] | null): boolean {
+function branchActionMenuItemDisabled(item: BranchActionItem, busy: BranchActionItem['id'] | null): boolean {
   return item.disabled || busy !== null
 }

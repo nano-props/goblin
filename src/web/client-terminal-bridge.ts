@@ -585,7 +585,7 @@ export function createServerTerminalBridge(options: {
   }
 }
 
-export function createTerminalWebSocketUrl(baseUrl: string, accessToken: string, clientId: string): string {
+function createTerminalWebSocketUrl(baseUrl: string, accessToken: string, clientId: string): string {
   const httpUrl = new URL('/ws/terminal', baseUrl)
   httpUrl.protocol = resolveWebSocketProtocol()
   // `?t=` is the WebSocket auth channel for the access token. The
@@ -599,7 +599,7 @@ export function createTerminalWebSocketUrl(baseUrl: string, accessToken: string,
   return httpUrl.toString()
 }
 
-export function parseTerminalSocketServerMessage(data: unknown): TerminalSocketServerMessage | null {
+function parseTerminalSocketServerMessage(data: unknown): TerminalSocketServerMessage | null {
   if (typeof data !== 'string') return null
   try {
     return normalizeTerminalSocketServerMessage(JSON.parse(data))

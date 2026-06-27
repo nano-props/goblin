@@ -12,8 +12,8 @@ interface SidebarRowButtonProps extends Omit<ComponentPropsWithoutRef<'button'>,
   size?: 'default' | 'compact' | 'dense' | 'icon'
 }
 
-export const SIDEBAR_ROW_ICON_CLASS = 'flex size-4 shrink-0 items-center justify-center'
-export const SIDEBAR_ROW_BUTTON_CLASS =
+const SIDEBAR_ROW_ICON_CLASS = 'flex size-4 shrink-0 items-center justify-center'
+const SIDEBAR_ROW_BUTTON_CLASS =
   'flex min-w-0 cursor-pointer items-center rounded-md border border-transparent bg-transparent text-left text-sm font-medium outline-none transition-colors duration-100 disabled:pointer-events-none disabled:opacity-50'
 
 export const SidebarRowButton = forwardRef<HTMLButtonElement, SidebarRowButtonProps>(function SidebarRowButton(

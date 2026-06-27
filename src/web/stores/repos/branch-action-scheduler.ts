@@ -1,13 +1,13 @@
 import type { RepoBranchActionKind } from '#/web/stores/repos/branch-action-types.ts'
 import type { RepoOperationPhase } from '#/web/stores/repos/operations.ts'
-export interface BranchActionScheduleInput {
+interface BranchActionScheduleInput {
   actionKind: RepoBranchActionKind
   fetchBusy: boolean
   branchOperationPhase: RepoOperationPhase
   coreRefreshBusy: boolean
 }
 
-export interface BranchActionScheduleDecision {
+interface BranchActionScheduleDecision {
   blockedMessage?: string
 }
 

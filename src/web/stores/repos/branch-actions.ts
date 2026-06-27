@@ -54,7 +54,7 @@ const NETWORK_FETCH_REASON_BY_KIND: Record<NetworkRepoBranchAction['kind'], Netw
   push: 'push',
 }
 
-export function repoBranchActionReason(kind: RepoBranchActionKind): RepoBranchActionReason {
+function repoBranchActionReason(kind: RepoBranchActionKind): RepoBranchActionReason {
   return BRANCH_ACTION_REASON_BY_KIND[kind]
 }
 

@@ -5,20 +5,17 @@ import type {
   RuntimeCoherentRepoProjectionState,
 } from '#/web/stores/repos/types.ts'
 
-export interface PrimaryWindowWorkspaceState extends Pick<
-  ReposStore,
-  'activeId' | 'order' | 'sessionReady' | 'zenMode'
-> {}
+interface PrimaryWindowWorkspaceState extends Pick<ReposStore, 'activeId' | 'order' | 'sessionReady' | 'zenMode'> {}
 
-export interface PrimaryWindowNavigationState extends Pick<ReposStore, 'activeId' | 'order'> {}
+interface PrimaryWindowNavigationState extends Pick<ReposStore, 'activeId' | 'order'> {}
 
-export interface KeyboardRuntimeState {
+interface KeyboardRuntimeState {
   repo: RepoState | null
 }
 
-export interface RestorableWorkspaceViewportState extends Pick<ReposStore, 'activeId' | 'order' | 'zenMode'> {}
+interface RestorableWorkspaceViewportState extends Pick<ReposStore, 'activeId' | 'order' | 'zenMode'> {}
 
-export interface RestorableWorkspaceNavigationState extends Pick<ReposStore, 'activeId' | 'order'> {}
+interface RestorableWorkspaceNavigationState extends Pick<ReposStore, 'activeId' | 'order'> {}
 
 export function runtimeCoherentRepoProjectionStateFromStore(
   state: Pick<ReposStore, 'repos'>,

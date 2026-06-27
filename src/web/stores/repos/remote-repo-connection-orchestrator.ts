@@ -45,7 +45,7 @@ import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
 import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 import { resolveRemoteRepoConnection } from '#/web/remote-client.ts'
 
-export interface RemoteRepoConnectionOutcome {
+interface RemoteRepoConnectionOutcome {
   kind: 'ready' | 'failed'
   reason?: RemoteRepoFailureReason
   repoId: string

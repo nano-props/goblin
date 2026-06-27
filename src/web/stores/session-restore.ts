@@ -9,7 +9,7 @@ import { restorableWorkspaceSessionStateFromSettingsSnapshot } from '#/shared/se
 import { getSettingsSnapshot } from '#/web/settings-client.ts'
 import { DEFAULT_ZEN_MODE, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
 
-export const DEFAULT_RESTORABLE_SESSION_STATE: WorkspaceSessionState = {
+const DEFAULT_RESTORABLE_SESSION_STATE: WorkspaceSessionState = {
   openRepoEntries: [],
   activeRepoId: null,
   zenMode: DEFAULT_ZEN_MODE,

@@ -37,11 +37,11 @@ function mergePullRequest(
   }
 }
 
-export function existingBranchNames(r: { data: { branches: Array<{ name: string }> } }): Set<string> {
+function existingBranchNames(r: { data: { branches: Array<{ name: string }> } }): Set<string> {
   return new Set(r.data.branches.map((branch) => branch.name))
 }
 
-export function finishPullRequestBranchDataLoads(
+function finishPullRequestBranchDataLoads(
   r: {
     dataLoads: {
       pullRequestsByBranch: Record<string, ReturnType<typeof idlePullRequestDataLoad>>
@@ -137,7 +137,7 @@ export function startPullRequestRefreshDataLoads(
   }
 }
 
-export function applyPullRequestEntries(
+function applyPullRequestEntries(
   r: RepoState,
   entries: Array<{ branch: string; pullRequest: PullRequestInfo }>,
   requested: Set<string>,

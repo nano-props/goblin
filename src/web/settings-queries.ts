@@ -26,7 +26,7 @@ export {
   settingsSnapshotQueryKey,
 } from '#/web/settings-query-cache.ts'
 
-export function settingsSnapshotQueryOptions() {
+function settingsSnapshotQueryOptions() {
   return queryOptions<SettingsSnapshot>({
     queryKey: settingsSnapshotQueryKey(),
     queryFn: getSettingsSnapshot,
@@ -38,7 +38,7 @@ export function settingsSnapshotQueryOptions() {
   })
 }
 
-export function externalAppsQueryOptions() {
+function externalAppsQueryOptions() {
   return queryOptions<ExternalAppsSnapshot>({
     queryKey: externalAppsQueryKey(),
     queryFn: getExternalAppsSnapshot,
@@ -48,7 +48,7 @@ export function externalAppsQueryOptions() {
   })
 }
 
-export function githubCliQueryOptions(hosts?: string[]) {
+function githubCliQueryOptions(hosts?: string[]) {
   return queryOptions<GitHubCliState>({
     queryKey: githubCliQueryKey(hosts),
     queryFn: () => getGitHubCliState(hosts),
@@ -58,7 +58,7 @@ export function githubCliQueryOptions(hosts?: string[]) {
   })
 }
 
-export function lanInfoQueryOptions() {
+function lanInfoQueryOptions() {
   return queryOptions<LanInfo>({
     queryKey: lanInfoQueryKey(),
     queryFn: async () => await getLanInfo(),

@@ -1,6 +1,6 @@
 import { createContext } from 'react'
 
-export interface LayoutOverlayActionsValue {
+interface LayoutOverlayActionsValue {
   openRepoPathDialog: () => void
   openCloneRepo: () => void
   openRemoteRepo: () => void

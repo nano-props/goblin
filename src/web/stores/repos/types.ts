@@ -19,7 +19,7 @@ import type { RepoBranchAction, RunBranchActionOptions } from '#/web/stores/repo
 import type { RepoOperationsState } from '#/web/stores/repos/operations.ts'
 import type { RepoDataLoadBundle, RepoDataLoadState } from '#/web/stores/repos/repo-data-load-state.ts'
 export type BranchViewMode = 'all' | 'worktrees'
-export type RepoDataSource = 'cache' | 'fresh'
+type RepoDataSource = 'cache' | 'fresh'
 // Client branches keep only the worktree reference; metadata lives in worktreesByPath.
 export type RepoBranchState = Omit<BranchSnapshotInfo, 'worktree'> & {
   worktree?: Pick<NonNullable<BranchSnapshotInfo['worktree']>, 'path'>
@@ -106,7 +106,7 @@ export interface RepoUiState {
   >
 }
 
-export interface RepoProjectionMeta {
+interface RepoProjectionMeta {
   source: RepoDataSource
   savedAt: number | null
 }
@@ -140,7 +140,7 @@ export interface RepoRemoteState {
   fetchError: string | null
 }
 
-export type RepoAvailabilityState = { phase: 'available' } | { phase: 'unavailable'; reason: string; checkedAt: number }
+type RepoAvailabilityState = { phase: 'available' } | { phase: 'unavailable'; reason: string; checkedAt: number }
 
 export interface RepoSnapshotCacheEntry {
   savedAt: number
@@ -171,7 +171,7 @@ export interface RuntimeCoherentRepoProjectionState {
   repos: Record<string, RepoState>
 }
 
-export interface RestorableRepoCacheState {
+interface RestorableRepoCacheState {
   /** Warm-start cache used only for restore. This is not runtime-coherent shared state. */
   repoSnapshotCache: Record<string, RepoSnapshotCacheEntry>
 }
@@ -201,7 +201,7 @@ export interface RepoSessionHydrationOptions {
   workspacePaneRestoreState?: SessionWorkspacePaneRestoreState
 }
 
-export interface LocalWorkspaceState {
+interface LocalWorkspaceState {
   /** Client-only workspace UI state that should never be serialized into
    *  WorkspaceSessionState or treated as restorable workspace state. */
   /** Hydration flag — true once boot session is restored, so we don't
@@ -209,7 +209,7 @@ export interface LocalWorkspaceState {
   sessionReady: boolean
 }
 
-export interface RestorableWorkspaceActions {
+interface RestorableWorkspaceActions {
   setActive: (id: string) => void
   applySessionLayoutState: (layout: Pick<WorkspaceSessionState, 'zenMode' | 'workspacePaneSize'>) => void
   applySessionSelectedTerminalState: (selectedTerminalSessionByWorktree: Record<string, string>) => void
@@ -221,7 +221,7 @@ export interface RestorableWorkspaceActions {
   cycleActive: (direction: 1 | -1) => void
 }
 
-export interface RuntimeCoherentRepoProjectionActions {
+interface RuntimeCoherentRepoProjectionActions {
   /** Ensure a repo belongs to the open workspace set without implying
    *  anything about the current active selection. */
   ensureWorkspaceOpen: (path: string | RepoSessionEntry) => Promise<OpenRepoResult>
@@ -287,7 +287,7 @@ export interface RuntimeCoherentRepoProjectionActions {
   clearFetchFailed: (id: string, token: number) => void
 }
 
-export interface RepoMutationActions {
+interface RepoMutationActions {
   runBranchAction: (
     id: string,
     action: RepoBranchAction,

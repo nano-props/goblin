@@ -1,6 +1,6 @@
 import type { BranchSnapshotInfo, WorktreeStatus } from '#/web/types.ts'
 import type { RepoBranchState, RepoState, RepoWorktreeState } from '#/web/stores/repos/types.ts'
-export interface BranchWorktreeState {
+interface BranchWorktreeState {
   path: string
   dirty: boolean
   changeCount: number

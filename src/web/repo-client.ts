@@ -147,7 +147,7 @@ export async function getRepoPatch(cwd: string, worktreePath: string, signal?: A
   return await postServerJson('/api/repo/patch', { cwd, worktreePath }, { signal })
 }
 
-export interface RepoBulkReadResult {
+interface RepoBulkReadResult {
   snapshot: RepoSnapshot | null
   status: WorktreeStatus[]
   pullRequests: PullRequestEntry[] | null

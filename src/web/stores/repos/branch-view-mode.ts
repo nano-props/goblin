@@ -11,7 +11,7 @@ interface VisibleBranchesInput {
   viewMode: BranchViewMode
 }
 
-export function branchMatchesViewMode(branch: RepoBranchState, viewMode: BranchViewMode): boolean {
+function branchMatchesViewMode(branch: RepoBranchState, viewMode: BranchViewMode): boolean {
   if (viewMode === 'worktrees') return !!branch.worktree?.path
   return true
 }
@@ -41,6 +41,6 @@ export function selectedBranchForViewMode(repo: RepoState, viewMode: BranchViewM
   })
 }
 
-export function branchForVisibleLog(repo: RepoState): string | null {
+function branchForVisibleLog(repo: RepoState): string | null {
   return repo.ui.selectedBranch ?? (repo.ui.branchViewMode === 'all' ? repo.data.currentBranch : null)
 }

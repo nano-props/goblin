@@ -2,7 +2,7 @@ import type { RepoState } from '#/web/stores/repos/types.ts'
 import { repoOperationBusy } from '#/web/stores/repos/repo-operation-scheduler.ts'
 import { repoBranchActionLoadingLabel, type RepoActionLabel } from '#/web/stores/repos/action-labels.ts'
 import { branchActionKindFromReason, isBranchActionReason } from '#/web/stores/repos/operations.ts'
-export type RepoActivityKind = 'branch-action'
+type RepoActivityKind = 'branch-action'
 
 export interface RepoActivity {
   kind: RepoActivityKind

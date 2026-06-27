@@ -15,7 +15,7 @@ export function currentSettingsSnapshot(): SettingsSnapshot | undefined {
   return primaryWindowQueryClient.getQueryData<SettingsSnapshot>(settingsSnapshotQueryKey())
 }
 
-export function runtimeSettingsSnapshotOrUndefined(
+function runtimeSettingsSnapshotOrUndefined(
   snapshot: SettingsSnapshot | undefined,
 ): RuntimeSettingsSnapshot | undefined {
   return snapshot ? runtimeSettingsSnapshotFromSettingsSnapshot(snapshot) : undefined
@@ -25,13 +25,13 @@ export function currentRuntimeSettingsSnapshot(): RuntimeSettingsSnapshot | unde
   return runtimeSettingsSnapshotOrUndefined(currentSettingsSnapshot())
 }
 
-export function runtimeRecentReposStateOrUndefined(
+function runtimeRecentReposStateOrUndefined(
   snapshot: SettingsSnapshot | undefined,
 ): RuntimeRecentReposState | undefined {
   return snapshot ? runtimeRecentReposStateFromSettingsSnapshot(snapshot) : undefined
 }
 
-export function currentRuntimeRecentReposState(): RuntimeRecentReposState | undefined {
+function currentRuntimeRecentReposState(): RuntimeRecentReposState | undefined {
   return runtimeRecentReposStateOrUndefined(currentSettingsSnapshot())
 }
 
@@ -40,12 +40,12 @@ export function useRuntimeSettingsSnapshot(): RuntimeSettingsSnapshot | undefine
   return runtimeSettingsSnapshotOrUndefined(data)
 }
 
-export function useRuntimeRecentReposState(): RuntimeRecentReposState | undefined {
+function useRuntimeRecentReposState(): RuntimeRecentReposState | undefined {
   const { data } = useSettingsSnapshotQuery()
   return runtimeRecentReposStateOrUndefined(data)
 }
 
-export function currentExternalAppsSnapshot(): ExternalAppsSnapshot | undefined {
+function currentExternalAppsSnapshot(): ExternalAppsSnapshot | undefined {
   return primaryWindowQueryClient.getQueryData<ExternalAppsSnapshot>(externalAppsQueryKey())
 }
 
@@ -84,7 +84,7 @@ export function readRuntimeLanSettings(data: RuntimeSettingsSnapshot | undefined
   }
 }
 
-export function getRuntimeRecentRepos() {
+function getRuntimeRecentRepos() {
   return currentRuntimeRecentReposState()?.recentRepos ?? []
 }
 
