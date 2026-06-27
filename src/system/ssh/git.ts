@@ -182,7 +182,7 @@ export async function getRemotePatch(
   return { ok: true, message: combined.length > 0 ? `${combined}\n` : '' }
 }
 
-export async function fetchRemoteRepository(
+export async function fetchRemoteRepo(
   target: RemoteRepoTarget,
   options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
 ): Promise<ExecResult> {

@@ -10,9 +10,9 @@ import type {
   LangPref,
   LanInfo,
   RuntimeRecentReposState,
-  SessionState,
-  SettingsPrefs,
-  SettingsPrefsUpdateResponse,
+  WorkspaceSessionState,
+  UserSettings,
+  UserSettingsUpdateResponse,
   SettingsSnapshot,
   ThemePref,
   ThemeState,
@@ -21,7 +21,7 @@ import type { ColorTheme } from '#/shared/color-theme.ts'
 import {
   nativeSettingsProjectionStateFromSettings,
   pickNativeSettingsProjectionPatch,
-} from '#/shared/native-shell-projection.ts'
+} from '#/shared/native-host-projection.ts'
 import { runtimeSettingsSnapshotFromSettingsSnapshot } from '#/shared/settings-snapshot.ts'
 
 type RecentReposUpdateResponse = { ok: boolean; addedRepo?: RepoSessionEntry | null } & RuntimeRecentReposState
@@ -31,7 +31,7 @@ export async function getSettingsSnapshot(): Promise<SettingsSnapshot> {
   return await fetchServerJson<SettingsSnapshot>('/api/settings')
 }
 
-function resolveThemeStateFromPrefs(settings: Pick<SettingsPrefs, 'theme' | 'colorTheme'>): ThemeState {
+function resolveThemeStateFromUserSettings(settings: Pick<UserSettings, 'theme' | 'colorTheme'>): ThemeState {
   const resolved =
     settings.theme === 'auto'
       ? window.matchMedia?.('(prefers-color-scheme: dark)').matches
@@ -41,20 +41,20 @@ function resolveThemeStateFromPrefs(settings: Pick<SettingsPrefs, 'theme' | 'col
   return { pref: settings.theme, resolved, colorTheme: settings.colorTheme }
 }
 
-export function resolveThemeStateFromSettings(settings: Pick<SettingsPrefs, 'theme' | 'colorTheme'>): ThemeState {
-  return resolveThemeStateFromPrefs(settings)
+export function resolveThemeStateFromSettings(settings: Pick<UserSettings, 'theme' | 'colorTheme'>): ThemeState {
+  return resolveThemeStateFromUserSettings(settings)
 }
 
 export async function getThemeState(): Promise<ThemeState> {
   return resolveThemeStateFromSettings(runtimeSettingsSnapshotFromSettingsSnapshot(await getSettingsSnapshot()))
 }
 
-async function updateSettingsPrefsPatch(settings: Record<string, unknown>): Promise<SettingsPrefsUpdateResponse> {
-  const result = await postServerJson<{ settings: Record<string, unknown> }, SettingsPrefsUpdateResponse>(
+async function updateUserSettingsPatch(settings: Record<string, unknown>): Promise<UserSettingsUpdateResponse> {
+  const result = await postServerJson<{ prefs: Record<string, unknown> }, UserSettingsUpdateResponse>(
     '/api/settings/prefs',
-    { settings },
+    { prefs: settings },
   )
-  const patch = pickNativeSettingsProjectionPatch(settings as Partial<SettingsPrefs>)
+  const patch = pickNativeSettingsProjectionPatch(settings as Partial<UserSettings>)
   if (!patch || !canUseNativeIpcBridge()) return result
   // The embedded server is the authority for settings — the
   // client just mirrors them to the native menu. A projection
@@ -65,15 +65,15 @@ async function updateSettingsPrefsPatch(settings: Record<string, unknown>): Prom
   // so a transient menu IPC failure doesn't surface as a
   // settings-write failure to the UI.
   try {
-    await invokeNativeIpcPath<void>('settings.applyShellProjection', {
+    await invokeNativeIpcPath<void>('settings.applyNativeHostProjection', {
       prefs: {
         patch,
-        settings: nativeSettingsProjectionStateFromSettings(result.settings),
+        settings: nativeSettingsProjectionStateFromSettings(result.prefs),
       },
     })
   } catch (err) {
     sessionLog.warn(
-      'settings.applyShellProjection failed; server write committed, menu will catch up on next rebuild',
+      'settings.applyNativeHostProjection failed; server write committed, menu will catch up on next rebuild',
       {
         err,
       },
@@ -83,11 +83,11 @@ async function updateSettingsPrefsPatch(settings: Record<string, unknown>): Prom
 }
 
 export async function setThemePref(pref: ThemePref): Promise<ThemeState> {
-  return resolveThemeStateFromPrefs((await updateSettingsPrefsPatch({ theme: pref })).settings)
+  return resolveThemeStateFromUserSettings((await updateUserSettingsPatch({ theme: pref })).prefs)
 }
 
 export async function setThemeColorTheme(colorTheme: ColorTheme): Promise<ThemeState> {
-  return resolveThemeStateFromPrefs((await updateSettingsPrefsPatch({ colorTheme })).settings)
+  return resolveThemeStateFromUserSettings((await updateUserSettingsPatch({ colorTheme })).prefs)
 }
 
 export async function getI18nSnapshot(options?: { signal?: AbortSignal }): Promise<I18nSnapshot> {
@@ -99,7 +99,7 @@ export async function getI18nSnapshot(options?: { signal?: AbortSignal }): Promi
 }
 
 export async function setI18nPref(pref: LangPref): Promise<I18nSnapshot> {
-  const result = await updateSettingsPrefsPatch({ lang: pref })
+  const result = await updateUserSettingsPatch({ lang: pref })
   return result.i18n ?? (await getI18nSnapshot())
 }
 
@@ -117,7 +117,7 @@ export async function getLanInfo(): Promise<LanInfo> {
 }
 
 export async function setLanEnabled(enabled: boolean): Promise<void> {
-  await updateSettingsPrefsPatch({ lanEnabled: enabled })
+  await updateUserSettingsPatch({ lanEnabled: enabled })
 }
 
 export async function getExternalAppsSnapshot(): Promise<ExternalAppsSnapshot> {
@@ -134,13 +134,13 @@ export async function addRecentRepo(repo: RepoSessionEntry): Promise<RecentRepos
     { repo },
   )
   if (!canUseNativeIpcBridge()) return result
-  // See `updateSettingsPrefsPatch` for the rationale: the server
+  // See `updateUserSettingsPatch` for the rationale: the server
   // is authoritative, the projection is best-effort. A rejected
   // IPC here would previously bubble up as "failed to add recent
   // repo" even though the server write succeeded — the user
   // would see the toast, refresh, and find the repo in the list.
   try {
-    await invokeNativeIpcPath<void>('settings.applyShellProjection', {
+    await invokeNativeIpcPath<void>('settings.applyNativeHostProjection', {
       recentRepos: { recentRepos: result.recentRepos },
     })
   } catch (err) {
@@ -159,7 +159,7 @@ export async function clearRecentRepos(): Promise<void> {
   // here, so an IPC failure must not reject the caller's promise
   // — the user already saw the optimistic "cleared" state.
   try {
-    await invokeNativeIpcPath<void>('settings.applyShellProjection', {
+    await invokeNativeIpcPath<void>('settings.applyNativeHostProjection', {
       recentRepos: { recentRepos: [] },
     })
   } catch (err) {
@@ -172,11 +172,11 @@ export async function clearRecentRepos(): Promise<void> {
   }
 }
 
-export async function saveSession(session: SessionState): Promise<SessionState> {
-  const result = await postServerJson<{ session: SessionState }, { ok: boolean; session: SessionState }>(
-    '/api/settings/session',
-    { session },
-  )
+export async function saveSession(session: WorkspaceSessionState): Promise<WorkspaceSessionState> {
+  const result = await postServerJson<
+    { session: WorkspaceSessionState },
+    { ok: boolean; session: WorkspaceSessionState }
+  >('/api/settings/session', { session })
   return result.session
 }
 
@@ -189,15 +189,15 @@ export async function setSettingsFetchInterval(sec: number): Promise<number> {
 }
 
 export async function setTerminalNotificationsEnabled(enabled: boolean): Promise<void> {
-  await updateSettingsPrefsPatch({ terminalNotificationsEnabled: enabled })
+  await updateUserSettingsPatch({ terminalNotificationsEnabled: enabled })
 }
 
 export async function setShortcutsDisabled(disabled: boolean): Promise<void> {
-  await updateSettingsPrefsPatch({ shortcutsDisabled: disabled })
+  await updateUserSettingsPatch({ shortcutsDisabled: disabled })
 }
 
 export async function setGlobalShortcutDisabled(disabled: boolean): Promise<void> {
-  await updateSettingsPrefsPatch({ globalShortcutDisabled: disabled })
+  await updateUserSettingsPatch({ globalShortcutDisabled: disabled })
 }
 
 export async function setGlobalShortcut(accelerator: string): Promise<GlobalShortcutState> {

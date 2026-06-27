@@ -1,7 +1,7 @@
 import { app, dialog, shell } from 'electron'
 import { promises as fs } from 'node:fs'
 import { openDataFolderMenuKey, t } from '#/main/i18n/index.ts'
-import { getEmbeddedServerUrl } from '#/main/window-shell.ts'
+import { getEmbeddedServerUrl } from '#/main/window-security.ts'
 import { openHttpExternal } from '#/main/external-url.ts'
 import { menuNodeLog } from '#/node/logger.ts'
 

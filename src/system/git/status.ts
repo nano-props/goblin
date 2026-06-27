@@ -1,4 +1,4 @@
-import { git } from '#/system/git/helper.ts'
+import { git } from '#/system/git/git-exec.ts'
 import { parseStatus, parseWorktrees } from '#/system/git/parsers.ts'
 import { mapWithConcurrency } from '#/system/git/concurrency.ts'
 import type { WorktreeStatus } from '#/shared/git-types.ts'

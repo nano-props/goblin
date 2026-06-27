@@ -1,6 +1,6 @@
 import { ShortcutSettings } from '#/web/components/settings/ShortcutSettings.tsx'
 import { SettingsCard, SettingsGroup, SettingsListItem } from '#/web/components/settings/SettingsPrimitives.tsx'
-import { useRuntimeShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
+import { useShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { helpShortcutSections, type HelpShortcutRow, type HelpShortcutSection } from '#/web/keyboard/help-shortcuts.ts'
 function KeyCombo({ keys }: { keys: string[] }) {
@@ -64,7 +64,7 @@ function ShortcutList({ sections }: { sections: HelpShortcutSection[] }) {
 
 export function KeyboardShortcutSettings() {
   const t = useT()
-  const { globalShortcut } = useRuntimeShortcutSettings()
+  const { globalShortcut } = useShortcutSettings()
   return (
     <>
       <SettingsGroup label={t('settings.shortcuts')}>

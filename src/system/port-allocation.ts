@@ -3,7 +3,7 @@ import { createServer } from 'node:net'
 export async function findAvailablePort(
   host: string,
   preferredPort = 0,
-  errorMessage = 'Failed to allocate local server port',
+  errorMessage = 'Failed to allocate embedded server port',
 ): Promise<number> {
   return await new Promise((resolve, reject) => {
     const server = createServer()
@@ -29,7 +29,7 @@ export async function findAvailablePort(
 export async function reserveAvailablePort(
   host: string,
   preferredPort: number,
-  errorMessage = 'Failed to allocate local server port',
+  errorMessage = 'Failed to allocate embedded server port',
 ): Promise<number> {
   try {
     return await findAvailablePort(host, preferredPort, errorMessage)

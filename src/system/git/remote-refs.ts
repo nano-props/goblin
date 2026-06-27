@@ -1,4 +1,4 @@
-import { git } from '#/system/git/helper.ts'
+import { git } from '#/system/git/git-exec.ts'
 import { parseRemoteTrackingRefs } from '#/shared/worktree-create.ts'
 
 /** List remote-tracking branches for a local repo.

@@ -29,13 +29,13 @@ describe('saveClipboardFiles', () => {
     // Literal-segment basename assertion — the regex `\.png$` form
     // would have silently passed if `sanitizeBaseName` turned
     // `shot.png` into `shot_png` (the `.` is a regex wildcard). See
-    // the same fix in main/clipboard-bridge.test.ts for context.
+    // the same fix in main/clipboard-ipc.test.ts for context.
     expect(path.basename(paths[0]).endsWith('shot.png')).toBe(true)
     expect(await readFile(paths[0])).toEqual(Buffer.from([1, 2, 3]))
   })
 
   test('two single-file pastes in the same millisecond produce distinct filenames', async () => {
-    // Mirrors the main-process regression test. Locks the
+    // Mirrors the native-host regression test. Locks the
     // process-level counter into the filename so the
     // `<ISO>-<index>-<name>` collision across paste events
     // can't return.
@@ -65,12 +65,12 @@ describe('saveClipboardFiles', () => {
     expect(paths[0]).not.toContain('../')
     // Literal substring assertion — the regex `\.bin$` form used to
     // silently pass even when the sanitiser replaced the dot with
-    // `_`. See sibling fix in main/clipboard-bridge.test.ts.
+    // `_`. See sibling fix in main/clipboard-ipc.test.ts.
     expect(path.basename(paths[0]).endsWith('attempt.bin')).toBe(true)
   })
 
   test('strips C1 control characters (0x7F-0x9F) from file names', async () => {
-    // Mirrors the main-process test. Locks the contract that the
+    // Mirrors the native-host test. Locks the contract that the
     // sanitiser covers the C0 (\x00-\x1F) and C1 (\x7F-\x9F) ranges
     // together — Windows NTFS treats both as reserved. If a future
     // refactor narrows the character class to \x00-\x1F, this

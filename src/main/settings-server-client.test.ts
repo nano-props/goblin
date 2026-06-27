@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { defaultSettingsPrefs, defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
+import { defaultUserSettings, defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 
 const mocks = vi.hoisted(() => ({
   getEmbeddedServerRuntime: vi.fn<() => { url: string; accessToken: string } | null>(() => ({
@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
   postEmbeddedServerJson: vi.fn(),
 }))
 
-vi.mock('#/main/server-manager.ts', () => ({
+vi.mock('#/main/embedded-server-lifecycle.ts', () => ({
   getEmbeddedServerRuntime: mocks.getEmbeddedServerRuntime,
 }))
 
@@ -43,11 +43,11 @@ describe('main settings server client', () => {
   })
 
   test('loads settings prefs through the embedded server runtime', async () => {
-    const prefs = defaultSettingsPrefs({ lang: 'ja', theme: 'dark', colorTheme: 'github' })
+    const prefs = defaultUserSettings({ lang: 'ja', theme: 'dark', colorTheme: 'github' })
     mocks.requestEmbeddedServerJson.mockResolvedValueOnce(prefs)
 
     const mod = await import('#/main/settings-server-client.ts')
-    await expect(mod.getSettingsPrefs()).resolves.toBe(prefs)
+    await expect(mod.getUserSettings()).resolves.toBe(prefs)
     expect(mocks.requestEmbeddedServerJson).toHaveBeenCalledWith(
       { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
       '/api/settings/prefs',
@@ -56,15 +56,15 @@ describe('main settings server client', () => {
   })
 
   test('persists settings prefs patches through the embedded server runtime', async () => {
-    const prefs = defaultSettingsPrefs({ theme: 'dark', colorTheme: 'github', globalShortcut: 'Alt+K' })
-    mocks.postEmbeddedServerJson.mockResolvedValueOnce({ settings: prefs })
+    const prefs = defaultUserSettings({ theme: 'dark', colorTheme: 'github', globalShortcut: 'Alt+K' })
+    mocks.postEmbeddedServerJson.mockResolvedValueOnce({ prefs })
 
     const mod = await import('#/main/settings-server-client.ts')
-    await expect(mod.updateSettingsPrefs({ theme: 'dark' })).resolves.toBe(prefs)
+    await expect(mod.updateUserSettings({ theme: 'dark' })).resolves.toBe(prefs)
     expect(mocks.postEmbeddedServerJson).toHaveBeenCalledWith(
       { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
       '/api/settings/prefs',
-      { settings: { theme: 'dark' } },
+      { prefs: { theme: 'dark' } },
     )
   })
 
@@ -72,7 +72,7 @@ describe('main settings server client', () => {
     mocks.postEmbeddedServerJson.mockResolvedValueOnce({ registered: true })
 
     const mod = await import('#/main/settings-server-client.ts')
-    await expect(mod.setSettingsGlobalShortcutState(true)).resolves.toBe(true)
+    await expect(mod.setGlobalShortcutState(true)).resolves.toBe(true)
     expect(mocks.postEmbeddedServerJson).toHaveBeenCalledWith(
       { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
       '/api/settings/global-shortcut-state',

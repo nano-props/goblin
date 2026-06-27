@@ -11,10 +11,10 @@ import { createPullRequest, createRepoBranch, resetReposStore, seedRepoState } f
 
 const mocks = vi.hoisted(() => ({
   openExternalUrl: vi.fn(),
-  openRepositoryRemote: vi.fn(),
-  openRepositoryEditor: vi.fn(),
-  openRepositoryInFinder: vi.fn(),
-  openRepositoryTerminal: vi.fn(),
+  openRepoRemote: vi.fn(),
+  openRepoEditor: vi.fn(),
+  openRepoInFinder: vi.fn(),
+  openRepoTerminal: vi.fn(),
   openRemoteRepositoryEditor: vi.fn(),
   openRemoteRepositoryTerminal: vi.fn(),
 }))
@@ -24,11 +24,11 @@ vi.mock('#/web/app-shell-client.ts', () => ({
 }))
 
 vi.mock('#/web/repo-client.ts', () => ({
-  getRepositoryPatch: vi.fn(),
-  openRepositoryEditor: mocks.openRepositoryEditor,
-  openRepositoryInFinder: mocks.openRepositoryInFinder,
-  openRepositoryRemote: mocks.openRepositoryRemote,
-  openRepositoryTerminal: mocks.openRepositoryTerminal,
+  getRepoPatch: vi.fn(),
+  openRepoEditor: mocks.openRepoEditor,
+  openRepoInFinder: mocks.openRepoInFinder,
+  openRepoRemote: mocks.openRepoRemote,
+  openRepoTerminal: mocks.openRepoTerminal,
 }))
 
 vi.mock('#/web/remote-client.ts', () => ({
@@ -46,10 +46,10 @@ describe('useBranchActions', () => {
   beforeEach(() => {
     resetReposStore()
     mocks.openExternalUrl.mockReset()
-    mocks.openRepositoryRemote.mockReset()
-    mocks.openRepositoryEditor.mockReset()
-    mocks.openRepositoryInFinder.mockReset()
-    mocks.openRepositoryTerminal.mockReset()
+    mocks.openRepoRemote.mockReset()
+    mocks.openRepoEditor.mockReset()
+    mocks.openRepoInFinder.mockReset()
+    mocks.openRepoTerminal.mockReset()
     mocks.openRemoteRepositoryEditor.mockReset()
     mocks.openRemoteRepositoryTerminal.mockReset()
     reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
@@ -95,7 +95,7 @@ describe('useBranchActions', () => {
     })
 
     expect(mocks.openExternalUrl).toHaveBeenCalledWith('https://github.com/acme/repo/pull/28689')
-    expect(mocks.openRepositoryRemote).not.toHaveBeenCalled()
+    expect(mocks.openRepoRemote).not.toHaveBeenCalled()
   })
 
   test('falls back to the branch remote URL when no pull request exists', async () => {
@@ -112,7 +112,7 @@ describe('useBranchActions', () => {
         hasGitHubRemote: true,
       },
     })
-    mocks.openRepositoryRemote.mockResolvedValue({ ok: true, message: '' })
+    mocks.openRepoRemote.mockResolvedValue({ ok: true, message: '' })
 
     let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
     root = createRoot(container)
@@ -124,7 +124,7 @@ describe('useBranchActions', () => {
       await actions?.openRemote?.()
     })
 
-    expect(mocks.openRepositoryRemote).toHaveBeenCalledWith(REPO_ID, 'feature/no-pr')
+    expect(mocks.openRepoRemote).toHaveBeenCalledWith(REPO_ID, 'feature/no-pr')
     expect(mocks.openExternalUrl).not.toHaveBeenCalled()
   })
 
@@ -164,7 +164,7 @@ describe('useBranchActions', () => {
     })
 
     expect(mocks.openRemoteRepositoryTerminal).toHaveBeenCalledWith(target!.id, '/srv/repo-feature', 'ghostty')
-    expect(mocks.openRepositoryTerminal).not.toHaveBeenCalled()
+    expect(mocks.openRepoTerminal).not.toHaveBeenCalled()
   })
 
   test('openEditor routes to the remote IPC for remote repos', async () => {
@@ -203,7 +203,7 @@ describe('useBranchActions', () => {
     })
 
     expect(mocks.openRemoteRepositoryEditor).toHaveBeenCalledWith(target!.id, '/srv/repo-feature', 'windsurf')
-    expect(mocks.openRepositoryEditor).not.toHaveBeenCalled()
+    expect(mocks.openRepoEditor).not.toHaveBeenCalled()
   })
 
   test('openTerminal and openEditor forward explicit app choices for remote repos', async () => {
@@ -247,17 +247,17 @@ describe('useBranchActions', () => {
 
     expect(mocks.openRemoteRepositoryTerminal).toHaveBeenCalledWith(target!.id, '/srv/repo-feature', 'ghostty')
     expect(mocks.openRemoteRepositoryEditor).toHaveBeenCalledWith(target!.id, '/srv/repo-feature', 'windsurf')
-    expect(mocks.openRepositoryTerminal).not.toHaveBeenCalled()
-    expect(mocks.openRepositoryEditor).not.toHaveBeenCalled()
+    expect(mocks.openRepoTerminal).not.toHaveBeenCalled()
+    expect(mocks.openRepoEditor).not.toHaveBeenCalled()
   })
 
-  test('openTerminal uses the local server route for non-remote repos', async () => {
+  test('openTerminal uses the embedded server route for non-remote repos', async () => {
     const branch = createRepoBranch('feature/local', { worktree: { path: '/tmp/local-feature' } })
     const repo = seedRepoState({
       id: REPO_ID,
       branches: [branch],
     })
-    mocks.openRepositoryTerminal.mockResolvedValue({ ok: true, message: '' })
+    mocks.openRepoTerminal.mockResolvedValue({ ok: true, message: '' })
 
     let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
     root = createRoot(container)
@@ -269,7 +269,7 @@ describe('useBranchActions', () => {
       await actions?.openTerminal?.('ghostty')
     })
 
-    expect(mocks.openRepositoryTerminal).toHaveBeenCalledWith('/tmp/local-feature', 'ghostty')
+    expect(mocks.openRepoTerminal).toHaveBeenCalledWith('/tmp/local-feature', 'ghostty')
     expect(mocks.openRemoteRepositoryTerminal).not.toHaveBeenCalled()
   })
 
@@ -279,7 +279,7 @@ describe('useBranchActions', () => {
       id: REPO_ID,
       branches: [branch],
     })
-    mocks.openRepositoryEditor.mockResolvedValue({ ok: true, message: '' })
+    mocks.openRepoEditor.mockResolvedValue({ ok: true, message: '' })
 
     let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
     root = createRoot(container)
@@ -291,17 +291,17 @@ describe('useBranchActions', () => {
       await actions?.openEditor?.('windsurf')
     })
 
-    expect(mocks.openRepositoryEditor).toHaveBeenCalledWith('/tmp/local-feature', 'windsurf')
+    expect(mocks.openRepoEditor).toHaveBeenCalledWith('/tmp/local-feature', 'windsurf')
     expect(mocks.openRemoteRepositoryEditor).not.toHaveBeenCalled()
   })
 
-  test('openFinder uses the local server route for non-remote repos', async () => {
+  test('openFinder uses the embedded server route for non-remote repos', async () => {
     const branch = createRepoBranch('feature/local', { worktree: { path: '/tmp/local-feature' } })
     const repo = seedRepoState({
       id: REPO_ID,
       branches: [branch],
     })
-    mocks.openRepositoryInFinder.mockResolvedValue({ ok: true, message: '/tmp/local-feature' })
+    mocks.openRepoInFinder.mockResolvedValue({ ok: true, message: '/tmp/local-feature' })
 
     let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
     root = createRoot(container)
@@ -313,14 +313,14 @@ describe('useBranchActions', () => {
       await actions?.openFinder?.()
     })
 
-    expect(mocks.openRepositoryInFinder).toHaveBeenCalledWith('/tmp/local-feature')
+    expect(mocks.openRepoInFinder).toHaveBeenCalledWith('/tmp/local-feature')
   })
 })
 
 describe('openBranchExternalTarget', () => {
   beforeEach(() => {
     mocks.openExternalUrl.mockReset()
-    mocks.openRepositoryRemote.mockReset()
+    mocks.openRepoRemote.mockReset()
   })
 
   test('prefers the existing pull request URL', async () => {
@@ -332,18 +332,18 @@ describe('openBranchExternalTarget', () => {
     })
 
     expect(mocks.openExternalUrl).toHaveBeenCalledWith('https://github.com/acme/repo/pull/28689')
-    expect(mocks.openRepositoryRemote).not.toHaveBeenCalled()
+    expect(mocks.openRepoRemote).not.toHaveBeenCalled()
   })
 
   test('falls back to the branch remote target when no pull request exists', async () => {
-    mocks.openRepositoryRemote.mockResolvedValue({ ok: true, message: '' })
+    mocks.openRepoRemote.mockResolvedValue({ ok: true, message: '' })
 
     await openBranchExternalTarget(REPO_ID, {
       name: 'feature/no-pr',
       pullRequest: undefined,
     })
 
-    expect(mocks.openRepositoryRemote).toHaveBeenCalledWith(REPO_ID, 'feature/no-pr')
+    expect(mocks.openRepoRemote).toHaveBeenCalledWith(REPO_ID, 'feature/no-pr')
     expect(mocks.openExternalUrl).not.toHaveBeenCalled()
   })
 })

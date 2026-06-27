@@ -25,11 +25,11 @@ function installBridge(sessionOverrides: Record<string, unknown> = {}) {
             globalShortcutRegistered: false,
             lanEnabled: false,
             session: {
-              openRepos: [],
-              activeRepo: null,
+              openRepoEntries: [],
+              activeRepoId: null,
               zenMode: true,
               workspacePaneSize: 0.5,
-              selectedTerminalByWorktree: {},
+              selectedTerminalSessionByWorktree: {},
               workspacePaneTabOrderByBranchByRepo: {},
               ...sessionOverrides,
             },
@@ -72,16 +72,16 @@ describe('session restore store', () => {
     await useSessionRestoreStore.getState().hydrate()
 
     expect(useSessionRestoreStore.getState().bootSessionSnapshot).toMatchObject({
-      openRepos: [],
-      activeRepo: null,
+      openRepoEntries: [],
+      activeRepoId: null,
       workspacePaneSize: 0.5,
     })
   })
 
   test('consumeBootSessionSnapshot returns the hydrated session snapshot once and then clears it', async () => {
     installBridge({
-      openRepos: [{ kind: 'local', id: '/tmp/repo' }],
-      activeRepo: '/tmp/repo',
+      openRepoEntries: [{ kind: 'local', id: '/tmp/repo' }],
+      activeRepoId: '/tmp/repo',
       zenMode: false,
       workspacePaneSize: 0.4,
     })
@@ -89,15 +89,15 @@ describe('session restore store', () => {
     await useSessionRestoreStore.getState().hydrate()
 
     expect(useSessionRestoreStore.getState().consumeBootSessionSnapshot()).toMatchObject({
-      openRepos: [{ kind: 'local', id: '/tmp/repo' }],
-      activeRepo: '/tmp/repo',
+      openRepoEntries: [{ kind: 'local', id: '/tmp/repo' }],
+      activeRepoId: '/tmp/repo',
       zenMode: false,
       workspacePaneSize: 0.4,
     })
     expect(useSessionRestoreStore.getState().bootSessionSnapshot).toBeNull()
     expect(useSessionRestoreStore.getState().consumeBootSessionSnapshot()).toMatchObject({
-      openRepos: [],
-      activeRepo: null,
+      openRepoEntries: [],
+      activeRepoId: null,
       zenMode: false,
       workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
     })

@@ -183,13 +183,15 @@ export function toRemoteRepoFailureReason(reason: string): RemoteRepoFailureReas
  * `target` is intentionally only accessible inside the union — this is
  * what forbids the legacy `if (!repo.remote.target) /* connecting *​/` pattern.
  */
-export type RemoteRepoLifecycle =
+export type RemoteRepoConnectionLifecycle =
   | { kind: 'connecting' }
   | { kind: 'ready'; target: RemoteRepoTarget }
   | { kind: 'failed'; reason: RemoteRepoFailureReason; target?: RemoteRepoTarget }
 
 /** Narrow a lifecycle to its concrete target, if any. */
-export function remoteRepoLifecycleTarget(lifecycle: RemoteRepoLifecycle | null | undefined): RemoteRepoTarget | null {
+export function remoteRepoConnectionTarget(
+  lifecycle: RemoteRepoConnectionLifecycle | null | undefined,
+): RemoteRepoTarget | null {
   if (!lifecycle) return null
   if (lifecycle.kind === 'ready') return lifecycle.target
   if (lifecycle.kind === 'failed') return lifecycle.target ?? null
@@ -197,13 +199,13 @@ export function remoteRepoLifecycleTarget(lifecycle: RemoteRepoLifecycle | null 
 }
 
 /** Whether the lifecycle is in the transient `connecting` state. */
-export function isRemoteRepoLifecycleConnecting(lifecycle: RemoteRepoLifecycle | null | undefined): boolean {
+export function isRemoteRepoConnectionConnecting(lifecycle: RemoteRepoConnectionLifecycle | null | undefined): boolean {
   return !!lifecycle && lifecycle.kind === 'connecting'
 }
 
 /** Whether the lifecycle has converged to a terminal state. */
-export function isRemoteRepoLifecycleTerminal(
-  lifecycle: RemoteRepoLifecycle | null | undefined,
+export function isRemoteRepoConnectionTerminal(
+  lifecycle: RemoteRepoConnectionLifecycle | null | undefined,
 ): lifecycle is
   | { kind: 'ready'; target: RemoteRepoTarget }
   | { kind: 'failed'; reason: RemoteRepoFailureReason; target?: RemoteRepoTarget } {
@@ -226,7 +228,7 @@ export function isRemoteRepoLifecycleTerminal(
  * variant retains the last-known target so the UI keeps
  * showing the remote locator on a failed repository.
  */
-export type RemoteRepoLifecycleResult =
+export type RemoteRepoConnectionResult =
   | {
       kind: 'ready'
       repoId: string

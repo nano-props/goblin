@@ -37,7 +37,7 @@ export const en = {
   'menu.file.clear-recent': 'Clear Menu',
   'menu.file.open-in-browser': 'Open in Browser',
   'menu.file.open-data-folder': 'Open Data Folder',
-  // Platform variants picked at menu-build time in the main process
+  // Platform variants picked at menu-build time in the native host
   // (where `process.platform` is the source of truth — the client is
   // sandboxed and only sees `bootstrap.platform`).
   'menu.file.open-data-folder.mac': 'Open Data Folder in Finder',
@@ -202,9 +202,9 @@ export const en = {
   'drop.body': 'Drop a Git repository folder anywhere in Goblin.',
   'drop.open-failed': 'Could not open local repository',
 
-  // ---- Workspace pane views ----------------------------------------------
+  // ---- Workspace pane tabs -----------------------------------------------
   'tab.branches': 'Branches',
-  'tab.branch-workspace': 'Branch workspace',
+  'tab.repo-workspace': 'Repo workspace',
   'tab.status': 'Status',
   'tab.changes': 'Changes',
   'tab.changes-with-count': 'Changes · {count}',
@@ -218,14 +218,14 @@ export const en = {
   'tab.refreshing-prs': 'Checking PRs',
   'tab.refreshing-log': 'Loading log',
   'tab.refreshing-cache': 'Updating cached data',
-  'tab.projectiond': 'cached',
-  'tab.projectiond-title': 'Showing cached data from {time}. Refreshing in the background.',
-  'workspace-pane-views.tabs': 'Workspace views',
-  'workspace-pane-views.empty': 'No workspace pane view open',
-  'workspace-pane-views.close-named': 'Close {name}',
-  'workspace-pane-views.changes-tooltip': '{count} file changes',
-  'workspace-pane-views.status-tooltip': 'Status · {branch}',
-  'workspace-pane-views.history-tooltip': 'History · {branch}',
+  'tab.cached': 'cached',
+  'tab.cached-title': 'Showing cached data from {time}. Refreshing in the background.',
+  'workspace-pane-tabs.tabs': 'Workspace tabs',
+  'workspace-pane-tabs.empty': 'No workspace pane tab open',
+  'workspace-pane-tabs.close-named': 'Close {name}',
+  'workspace-pane-tabs.changes-tooltip': '{count} file changes',
+  'workspace-pane-tabs.status-tooltip': 'Status · {branch}',
+  'workspace-pane-tabs.history-tooltip': 'History · {branch}',
   'tab.local-only': 'local only',
   'tab.local-only-title': 'This repository has no remotes; remote sync and PR checks are skipped.',
   'tab.fetch-failed': 'fetch failed',
@@ -332,7 +332,7 @@ export const en = {
     'Could not take over the terminal. It may have closed or the connection may not be ready; try again.',
   'terminal.takeover-failed-generic': 'Failed to take over the terminal.',
   'terminal.takeover-session-gone': 'Terminal is no longer available.',
-  // AuthorityGate denial feedback. `slot-closed` is intentionally
+  // AuthorityGate denial feedback. `session-closed` is intentionally
   // silent (the session vanished, no need to nag) and has no key
   // here; the rest maps 1:1 to `AuthorizationDenialReason`.
   'terminal.write-blocked-reconnecting': 'Reconnecting — try again in a moment.',
@@ -683,7 +683,7 @@ export const en = {
   'help.row.new-terminal': 'New terminal tab',
   'help.row.create-worktree': 'New worktree',
   'help.row.select-workspace-tab': 'Select tab',
-  'help.row.switch-workspace-pane-view': 'Previous / next workspace view',
+  'help.row.switch-workspace-pane-tab': 'Previous / next workspace tab',
   'help.row.open-local-repo': 'Open local repository',
   'help.row.clone-repo': 'Clone repository',
   'help.row.activate-window': 'Show Goblin window',

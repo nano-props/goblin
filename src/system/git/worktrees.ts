@@ -1,4 +1,4 @@
-import { git, gitResultWithOptions } from '#/system/git/helper.ts'
+import { git, gitResultWithOptions } from '#/system/git/git-exec.ts'
 import { parseStatus, parseWorktrees } from '#/system/git/parsers.ts'
 import { mapWithConcurrency } from '#/system/git/concurrency.ts'
 import type { ExecResult, WorktreeInfo } from '#/shared/git-types.ts'

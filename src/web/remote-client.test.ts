@@ -58,10 +58,10 @@ describe('remote client web helpers', () => {
       }),
     }))
     vi.stubGlobal('fetch', fetchMock)
-    const { testRemoteRepositoryConnection } = await import('#/web/remote-client.ts')
+    const { testRemoteRepoConnection } = await import('#/web/remote-client.ts')
 
     await expect(
-      testRemoteRepositoryConnection({
+      testRemoteRepoConnection({
         id: 'ssh-config://prod/srv/repo',
         alias: 'prod',
         host: 'example.com',

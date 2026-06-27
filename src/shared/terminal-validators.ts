@@ -8,9 +8,9 @@ import type {
 import type {
   TerminalControllerStatus,
   TerminalNotifyBellInput,
-  TerminalSlotPhase,
-  TerminalSlotSnapshot,
-  TerminalSlotSummary,
+  TerminalSessionPhase,
+  TerminalSessionSnapshot,
+  TerminalSessionSummary,
 } from '#/shared/terminal-types.ts'
 
 const MIN_TERMINAL_COLS = 1
@@ -32,19 +32,16 @@ const TERMINAL_SOCKET_ACTIONS = [
   'list-sessions',
   'create',
   'prune',
-  'slot-snapshot',
+  'session-snapshot',
 ] as const satisfies TerminalSocketRequestAction[]
-const TERMINAL_CONNECTED_CONTROLLER_STATUS_VALUES = ['connected'] satisfies Exclude<
-  TerminalControllerStatus,
-  'none'
->[]
-const TERMINAL_SLOT_PHASE_VALUES = [
+const TERMINAL_CONNECTED_CONTROLLER_STATUS_VALUES = ['connected'] satisfies Exclude<TerminalControllerStatus, 'none'>[]
+const TERMINAL_SESSION_PHASE_VALUES = [
   'opening',
   'restarting',
   'open',
   'error',
   'closed',
-] satisfies TerminalSlotPhase[]
+] satisfies TerminalSessionPhase[]
 const TerminalPtySessionIdSchema = v.pipe(v.string(), v.regex(TERMINAL_PTY_SESSION_ID_RE))
 const TerminalClientIdSchema = v.pipe(v.string(), v.regex(TERMINAL_CLIENT_ID_RE))
 const TerminalRequestIdSchema = v.pipe(v.string(), v.regex(TERMINAL_REQUEST_ID_RE))
@@ -68,7 +65,7 @@ const TerminalWriteInputSchema = v.object({
   clientId: TerminalOptionalClientIdSchema,
 })
 const TerminalResizeInputSchema = TerminalAttachInputSchema
-const TerminalSlotInputSchema = v.object({
+const TerminalSessionInputSchema = v.object({
   ptySessionId: TerminalPtySessionIdSchema,
 })
 const TerminalListSessionsInputSchema = v.object({
@@ -86,10 +83,10 @@ const TerminalCreateInputSchema = v.object({
 const TerminalPruneInputSchema = v.object({
   repoRoot: v.string(),
 })
-const TerminalSlotSnapshotInputSchema = v.object({
+const TerminalSessionSnapshotInputSchema = v.object({
   ptySessionId: TerminalPtySessionIdSchema,
 })
-const TerminalSlotSummarySchema = v.object({
+const TerminalSessionSummarySchema = v.object({
   ptySessionId: v.string(),
   key: v.string(),
   viewType: v.literal('terminal'),
@@ -98,13 +95,13 @@ const TerminalSlotSummarySchema = v.object({
   controller: v.nullable(TerminalControllerSchema),
   processName: v.string(),
   canonicalTitle: v.nullable(v.string()),
-  phase: v.picklist(TERMINAL_SLOT_PHASE_VALUES),
+  phase: v.picklist(TERMINAL_SESSION_PHASE_VALUES),
   message: v.nullable(v.string()),
   cols: v.number(),
   rows: v.number(),
   displayOrder: v.number(),
 })
-const TerminalSlotSnapshotSchema = v.object({
+const TerminalSessionSnapshotSchema = v.object({
   ptySessionId: v.string(),
   snapshot: v.string(),
   snapshotSeq: v.number(),
@@ -122,8 +119,8 @@ const TerminalTitleEventSchema = v.object({
 const TerminalExitEventSchema = v.object({
   ptySessionId: v.string(),
 })
-const TerminalSlotClosedEventSchema = v.object({
-  type: v.literal('slot-closed'),
+const TerminalSessionClosedEventSchema = v.object({
+  type: v.literal('session-closed'),
   ptySessionId: v.string(),
   repoRoot: v.string(),
 })
@@ -139,7 +136,7 @@ const TerminalIdentityEventSchema = v.object({
 })
 const TerminalLifecycleEventSchema = v.object({
   ptySessionId: v.string(),
-  phase: v.picklist(TERMINAL_SLOT_PHASE_VALUES),
+  phase: v.picklist(TERMINAL_SESSION_PHASE_VALUES),
   message: v.nullable(v.string()),
   takeoverPending: v.boolean(),
 })
@@ -150,7 +147,7 @@ const TerminalRealtimeMessageVariants = [
   v.object({ type: v.literal('identity'), event: TerminalIdentityEventSchema }),
   v.object({ type: v.literal('lifecycle'), event: TerminalLifecycleEventSchema }),
   v.object({ type: v.literal('sessions-changed'), repoRoot: v.string() }),
-  TerminalSlotClosedEventSchema,
+  TerminalSessionClosedEventSchema,
 ] as const
 const TerminalRealtimeMessageSchema = v.variant('type', TerminalRealtimeMessageVariants)
 const TerminalSocketServerMessageSchema = v.variant('type', [
@@ -205,7 +202,7 @@ const TerminalClientMessageSchema = v.variant('type', [
     type: v.literal('request'),
     requestId: TerminalRequestIdSchema,
     action: v.literal('close'),
-    input: TerminalSlotInputSchema,
+    input: TerminalSessionInputSchema,
   }),
   v.object({
     type: v.literal('request'),
@@ -228,8 +225,8 @@ const TerminalClientMessageSchema = v.variant('type', [
   v.object({
     type: v.literal('request'),
     requestId: TerminalRequestIdSchema,
-    action: v.literal('slot-snapshot'),
-    input: TerminalSlotSnapshotInputSchema,
+    action: v.literal('session-snapshot'),
+    input: TerminalSessionSnapshotInputSchema,
   }),
   v.object({
     type: v.literal('heartbeat'),
@@ -300,13 +297,13 @@ export function isValidTerminalNotifyBellInput(value: unknown): value is Termina
   )
 }
 
-export function normalizeTerminalSlotSummaryList(value: unknown): TerminalSlotSummary[] | null {
-  const parsed = v.safeParse(v.array(TerminalSlotSummarySchema), value)
+export function normalizeTerminalSessionSummaryList(value: unknown): TerminalSessionSummary[] | null {
+  const parsed = v.safeParse(v.array(TerminalSessionSummarySchema), value)
   return parsed.success ? parsed.output : null
 }
 
-export function normalizeTerminalSlotSnapshot(value: unknown): TerminalSlotSnapshot | null {
-  const parsed = v.safeParse(TerminalSlotSnapshotSchema, value)
+export function normalizeTerminalSessionSnapshot(value: unknown): TerminalSessionSnapshot | null {
+  const parsed = v.safeParse(TerminalSessionSnapshotSchema, value)
   return parsed.success ? parsed.output : null
 }
 

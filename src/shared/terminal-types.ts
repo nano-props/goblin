@@ -1,14 +1,14 @@
-import type { WorkspacePaneViewType } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 
 /**
  * `controllerStatus === 'connected'` while the controller's client has
- * a live socket. The server clears the controller slot on disconnect
+ * a live socket. The server clears the controller role on disconnect
  * (no grace), so the only transient state the client needs to render is
  * `connected` vs `none`.
  */
 export type TerminalControllerStatus = 'connected' | 'none'
 export type TerminalClientRole = 'controller' | 'viewer' | 'unowned'
-export type TerminalSlotPhase = 'opening' | 'restarting' | 'open' | 'error' | 'closed'
+export type TerminalSessionPhase = 'opening' | 'restarting' | 'open' | 'error' | 'closed'
 
 export interface TerminalResolvedController {
   role: TerminalClientRole
@@ -72,25 +72,25 @@ export type TerminalTakeoverResult =
       controller: TerminalController | null
       canonicalCols: number
       canonicalRows: number
-      phase: TerminalSlotPhase
+      phase: TerminalSessionPhase
     }
   | { ok: false; message: string }
 
 /**
  * Successful attach/restart result.
  *
- * `snapshot`/`snapshotSeq` are the slot's server-side serialized
+ * `snapshot`/`snapshotSeq` are the session's server-side serialized
  * xterm screen and the last PTY output sequence included in that screen.
  * The client hydrates from these and re-replays any post-snapshot
  * events the runtime captures.
  *
  * First-frame contract: a successful `attach`/`restart` response is
- * the authoritative handshake for that slot's frame state. All
+ * the authoritative handshake for that session's frame state. All
  * fields are required at the type level — the server must populate
  * them on every success path, and the client can hydrate the UI
  * without waiting for any follow-up event. This mirrors the R0
  * first-frame atomicity contract for `create` (see
- * `docs/terminal-slot-lifecycle.md` §R0).
+ * `docs/terminal-session-lifecycle.md` §R0).
  */
 export type TerminalAttachResult =
   | {
@@ -98,7 +98,7 @@ export type TerminalAttachResult =
       ptySessionId: string
       processName: string
       canonicalTitle: string | null
-      phase: TerminalSlotPhase
+      phase: TerminalSessionPhase
       message: string | null
       snapshot: string
       snapshotSeq: number
@@ -120,7 +120,7 @@ export interface TerminalFirstFrame {
   ptySessionId: string
   processName: string
   canonicalTitle: string | null
-  phase: TerminalSlotPhase
+  phase: TerminalSessionPhase
   message: string | null
   snapshot: string
   snapshotSeq: number
@@ -134,7 +134,7 @@ export type TerminalCatalogMutationResult =
       ok: true
       action: TerminalCatalogAction
       key: string
-      sessions: TerminalSlotSummary[]
+      sessions: TerminalSessionSummary[]
     } & TerminalFirstFrame)
   | { ok: false; message: string }
 
@@ -153,7 +153,7 @@ export interface TerminalResizeInput {
 
 export type TerminalTakeoverInput = TerminalResizeInput
 
-export interface TerminalSlotInput {
+export interface TerminalSessionInput {
   ptySessionId: string
 }
 
@@ -168,27 +168,27 @@ export interface TerminalListSessionsInput {
   repoRoot: string
 }
 
-export interface TerminalSlotSummary {
+export interface TerminalSessionSummary {
   ptySessionId: string
   key: string
-  viewType: Extract<WorkspacePaneViewType, 'terminal'>
+  viewType: Extract<WorkspacePaneTabType, 'terminal'>
   viewId: string
   cwd: string
   controller: TerminalController | null
   processName: string
   canonicalTitle: string | null
-  phase: TerminalSlotPhase
+  phase: TerminalSessionPhase
   message: string | null
   cols: number
   rows: number
   displayOrder: number
 }
 
-export interface TerminalSlotSnapshotInput {
+export interface TerminalSessionSnapshotInput {
   ptySessionId: string
 }
 
-export interface TerminalSlotSnapshot {
+export interface TerminalSessionSnapshot {
   ptySessionId: string
   snapshot: string
   snapshotSeq: number
@@ -242,7 +242,7 @@ export interface TerminalIdentityEvent {
  */
 export interface TerminalLifecycleEvent {
   ptySessionId: string
-  phase: TerminalSlotPhase
+  phase: TerminalSessionPhase
   message: string | null
   takeoverPending: boolean
 }

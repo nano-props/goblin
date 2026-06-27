@@ -9,7 +9,7 @@ export type EditorApp = 'vscode' | 'cursor' | 'windsurf'
 export type TerminalAppAvailability = Record<TerminalApp, boolean>
 export type EditorAppAvailability = Record<EditorApp, boolean>
 
-export interface SettingsPrefs {
+export interface UserSettings {
   theme: ThemePref
   colorTheme: ColorTheme
   lang: LangPref

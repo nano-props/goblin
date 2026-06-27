@@ -184,9 +184,7 @@ describe('GET /api/whoami', () => {
 
   test('returns 200 when the ?t= query matches', async () => {
     const app = buildApp()
-    const res = await app.request(
-      new Request(`http://localhost/whoami?t=${ACCESS_TOKEN}`),
-    )
+    const res = await app.request(new Request(`http://localhost/whoami?t=${ACCESS_TOKEN}`))
     expect(res.status).toBe(200)
   })
 

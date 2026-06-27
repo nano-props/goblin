@@ -28,9 +28,9 @@ describe('repo web transport helpers', () => {
       json: async () => ({ ok: true, message: 'diff --git a/file b/file' }),
     }))
     vi.stubGlobal('fetch', fetchMock)
-    const { getRepositoryPatch } = await import('#/web/repo-client.ts')
+    const { getRepoPatch } = await import('#/web/repo-client.ts')
 
-    await expect(getRepositoryPatch('/tmp/repo', '/tmp/repo')).resolves.toEqual({
+    await expect(getRepoPatch('/tmp/repo', '/tmp/repo')).resolves.toEqual({
       ok: true,
       message: 'diff --git a/file b/file',
     })
@@ -42,9 +42,9 @@ describe('repo web transport helpers', () => {
       json: async () => ({ ok: true, message: 'https://example.com/repo/tree/feature/a' }),
     }))
     vi.stubGlobal('fetch', fetchMock)
-    const { openRepositoryRemote } = await import('#/web/repo-client.ts')
+    const { openRepoRemote } = await import('#/web/repo-client.ts')
 
-    await expect(openRepositoryRemote('/tmp/repo', 'feature/a')).resolves.toEqual({ ok: true, message: '' })
+    await expect(openRepoRemote('/tmp/repo', 'feature/a')).resolves.toEqual({ ok: true, message: '' })
     expect(window.open).toHaveBeenCalledWith('https://example.com/repo/tree/feature/a', '_blank', 'noopener,noreferrer')
   })
 

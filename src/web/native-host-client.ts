@@ -1,4 +1,4 @@
-import type { NativeIpcPath, IpcRequest } from '#/shared/api-types.ts'
+import type { NativeHostIpcPath, IpcRequest } from '#/shared/api-types.ts'
 import { getClientBridge } from '#/web/client-bridge.ts'
 
 let nextNativeRequestId = 1
@@ -43,7 +43,7 @@ async function invokeNativeIpc(request: IpcRequest, signal?: AbortSignal): Promi
 }
 
 export async function invokeNativeIpcPath<TOutput>(
-  path: NativeIpcPath,
+  path: NativeHostIpcPath,
   input: unknown,
   signal?: AbortSignal,
 ): Promise<TOutput> {

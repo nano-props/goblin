@@ -13,7 +13,7 @@ import type { RepoState } from '#/web/stores/repos/types.ts'
 
 export type CreateWorktreeDialogMode = CreateWorktreeInput['mode']['kind']
 
-export interface CreateWorktreeFormState {
+interface CreateWorktreeFormState {
   mode: CreateWorktreeDialogMode
   base: string
   branch: string
@@ -28,7 +28,7 @@ export interface CreateWorktreeRequest {
   input: CreateWorktreeInput
 }
 
-export interface CreateWorktreeDerived {
+interface CreateWorktreeDerived {
   selectedRemoteRef: string
   derivedLocalBranch: string
   trackLocalBranch: string
@@ -201,7 +201,7 @@ function buildCreateWorktreeInput(state: CreateWorktreeFormState, ctx: BuildInpu
   return exhaustive
 }
 
-export function worktreePathName(input: {
+function worktreePathName(input: {
   mode: CreateWorktreeDialogMode
   branchTrimmed: string
   existingBranch: string
@@ -219,7 +219,7 @@ export function worktreePathName(input: {
   return exhaustive
 }
 
-export function defaultRemoteWorktreePath(repoPath: string, name: string): string {
+function defaultRemoteWorktreePath(repoPath: string, name: string): string {
   const slug = name.trim().replaceAll('/', '-')
   if (!slug) return ''
   const normalized = repoPath.replace(/\/+$/, '')

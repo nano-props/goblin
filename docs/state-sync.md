@@ -62,14 +62,14 @@ Representative examples:
 - saved session state
 - workspace layout and pane sizes
 - active repo and open repo set for next launch
-- `restorableRepoCache` for warm restore
+- `repoSnapshotCache` for warm restore
 - boot-only `useSessionRestoreStore`
 
 Notes:
 
-- `RestorableWorkspaceState` names the workspace fields that serialize into `SessionState`.
-- `RestorableRepoCacheState` names the warm-start repo cache slice.
-- `RestorableRepoSnapshot` is the stored snapshot shape inside that cache.
+- `RestorableWorkspaceState` names the workspace fields that serialize into `WorkspaceSessionState`.
+- `repoSnapshotCache` names the warm-start repo cache slice.
+- `RepoSnapshotCacheEntry` is the stored snapshot shape inside that cache.
 - Restorable helpers should focus on boot restore and persistence boundaries, not on live runtime convergence.
 - `hydrateSession` belongs to the restorable boot path, while `ensureWorkspaceOpen` and `closeRepo` belong to runtime repo lifecycle.
 - Restorable state is not runtime-coherent shared state.

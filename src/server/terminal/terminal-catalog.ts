@@ -11,13 +11,13 @@ import {
   type TerminalCatalogMutationResult,
   type TerminalControllerStatus,
   type TerminalCreateInput,
-  type TerminalSlotPhase,
-  type TerminalSlotSummary,
+  type TerminalSessionPhase,
+  type TerminalSessionSummary,
 } from '#/shared/terminal-types.ts'
-import { formatSlotId, parseSlotIdIndex } from '#/shared/slot-ids.ts'
+import { formatTerminalSessionId, parseTerminalSessionIdIndex } from '#/shared/terminal-session-id-format.ts'
 import { isValidTerminalClientId, isValidTerminalSize } from '#/shared/terminal-validators.ts'
-import { formatTerminalSlotKey, parseTerminalSlotKey } from '#/shared/terminal-slot-key.ts'
-import { terminalSlotScope } from '#/server/terminal/terminal-slot-scope.ts'
+import { formatTerminalWorkspaceSlotKey, parseTerminalWorkspaceSlotKey } from '#/shared/terminal-workspace-slot-key.ts'
+import { terminalSessionScope } from '#/server/terminal/terminal-session-scope.ts'
 import {
   buildGoblinTerminalCommandEnvironment,
   type GoblinTerminalCommandRuntime,
@@ -27,7 +27,7 @@ interface EnsureTerminalCatalogInput {
   repoRoot: string
   branch: string
   worktreePath: string
-  slotId?: string
+  sessionId?: string
   cols?: number
   rows?: number
   clientId?: string
@@ -45,7 +45,7 @@ type EnsureTerminalCatalogResult =
       action: TerminalCatalogAction
       processName: string
       canonicalTitle: string | null
-      phase: TerminalSlotPhase
+      phase: TerminalSessionPhase
       message: string | null
       snapshot: string
       snapshotSeq: number
@@ -71,14 +71,14 @@ interface TerminalCatalogEnsureSessionInput {
 }
 
 interface TerminalCatalogManager {
-  ensureSlot(input: TerminalCatalogEnsureSessionInput): Promise<TerminalAttachResult>
-  listSlotsForUser(userId: string, repoRoot: string): Promise<TerminalSlotSummary[]>
-  closeSlot(ptySessionId: string): void
+  ensureSession(input: TerminalCatalogEnsureSessionInput): Promise<TerminalAttachResult>
+  listSessionsForUser(userId: string, repoRoot: string): Promise<TerminalSessionSummary[]>
+  closeSession(ptySessionId: string): void
 }
 
 interface TerminalCatalogOptions {
   isValidClientId(value: unknown): value is string
-  isValidSlotId(value: unknown): value is string
+  isValidTerminalSessionId(value: unknown): value is string
   manager: TerminalCatalogManager
   isClientConnected(userId: string, clientId?: string): boolean | undefined
   broadcastSessionsChanged(userId: string, repoRoot: string): void
@@ -102,49 +102,47 @@ class TerminalCatalog {
     if (!isValidBranch(input.branch)) return { ok: false, message: 'error.invalid-arguments' }
     if (!isValidCwd(input.worktreePath)) return { ok: false, message: 'error.invalid-arguments' }
 
-    const slotId = input.slotId ?? formatSlotId(1)
+    const sessionId = input.sessionId ?? formatTerminalSessionId(1)
     const cols = input.cols ?? 80
     const rows = input.rows ?? 24
-    if (!this.options.isValidSlotId(slotId)) return { ok: false, message: 'error.invalid-arguments' }
+    if (!this.options.isValidTerminalSessionId(sessionId)) return { ok: false, message: 'error.invalid-arguments' }
     if (!isValidTerminalSize(cols, rows)) return { ok: false, message: 'error.invalid-arguments' }
 
-    const slotScope = terminalSlotScope(input.repoRoot)
-    const existingSessions = await this.options.manager.listSlotsForUser(userId, slotScope)
+    const sessionScope = terminalSessionScope(input.repoRoot)
+    const existingSessions = await this.options.manager.listSessionsForUser(userId, sessionScope)
     // Build the target session key from the same form the manager uses
     // to scope user-scoped session lists — see the comment on
-    // `terminalSlotScope` in server/terminal/terminal-slot-scope.ts
+    // `terminalSessionScope` in server/terminal/terminal-session-scope.ts
     // for the normalization rationale.
-    const targetSlotKey = formatTerminalSlotKey(
-      slotScope,
+    const targetWorkspaceSlotKey = formatTerminalWorkspaceSlotKey(
+      sessionScope,
       isRemoteRepoId(input.repoRoot) ? input.worktreePath : path.resolve(input.worktreePath),
-      slotId,
+      sessionId,
     )
-    const existingSlot = existingSessions.find((session) => session.key === targetSlotKey)
-    const action: TerminalCatalogAction = existingSlot
-      ? existingSlot.controller
+    const existingSession = existingSessions.find((session) => session.key === targetWorkspaceSlotKey)
+    const action: TerminalCatalogAction = existingSession
+      ? existingSession.controller
         ? 'restored'
         : 'reused'
       : 'created'
 
     if (isRemoteRepoId(input.repoRoot)) {
-      return await this.ensureRemote(userId, input, { slotId, cols, rows, targetSlotKey, action })
+      return await this.ensureRemote(userId, input, { sessionId, cols, rows, targetSlotKey: targetWorkspaceSlotKey, action })
     }
-    return await this.ensureLocal(userId, input, { cols, rows, targetSlotKey, action })
+    return await this.ensureLocal(userId, input, { cols, rows, targetSlotKey: targetWorkspaceSlotKey, action })
   }
 
   async create(clientId: string, userId: string, input: TerminalCreateInput): Promise<TerminalCatalogMutationResult> {
     if (!this.options.isValidClientId(clientId)) return { ok: false, message: 'error.invalid-arguments' }
     if (!isValidRepoLocator(input.repoRoot)) return { ok: false, message: 'error.invalid-arguments' }
-    const slotClientId = input.clientId ?? clientId
-    if (!isValidTerminalClientId(slotClientId)) return { ok: false, message: 'error.invalid-arguments' }
+    const terminalClientId = input.clientId ?? clientId
+    if (!isValidTerminalClientId(terminalClientId)) return { ok: false, message: 'error.invalid-arguments' }
 
     const createResult = await this.ensureOrRestore(clientId, userId, {
       ...input,
-      clientId: slotClientId,
-      slotId:
-        input.kind === 'primary'
-          ? 'slot-1'
-          : await this.nextSlotId(userId, input.repoRoot, input.worktreePath),
+      clientId: terminalClientId,
+      sessionId:
+        input.kind === 'primary' ? 'session-1' : await this.nextSessionId(userId, input.repoRoot, input.worktreePath),
     })
     if (!createResult.ok) return { ok: false, message: createResult.message }
     return {
@@ -165,59 +163,59 @@ class TerminalCatalog {
     }
   }
 
-  async listSessions(userId: string, repoRoot: string): Promise<TerminalSlotSummary[]> {
+  async listSessions(userId: string, repoRoot: string): Promise<TerminalSessionSummary[]> {
     if (!isValidRepoLocator(repoRoot)) return []
-    return await this.options.manager.listSlotsForUser(userId, terminalSlotScope(repoRoot))
+    return await this.options.manager.listSessionsForUser(userId, terminalSessionScope(repoRoot))
   }
 
   async prune(clientId: string, userId: string, repoRoot: string): Promise<{ pruned: number; remaining: number }> {
     if (!this.options.isValidClientId(clientId)) return { pruned: 0, remaining: 0 }
     if (!isValidRepoLocator(repoRoot)) return { pruned: 0, remaining: 0 }
 
-    const slotScope = terminalSlotScope(repoRoot)
-    const allSessions = await this.options.manager.listSlotsForUser(userId, slotScope)
+    const sessionScope = terminalSessionScope(repoRoot)
+    const allSessions = await this.options.manager.listSessionsForUser(userId, sessionScope)
     if (isRemoteRepoId(repoRoot)) return { pruned: 0, remaining: allSessions.length }
 
     const worktrees = await getWorktrees(repoRoot, { includeStatus: false })
     const liveWorktreePaths = new Set(worktrees.map((worktree) => path.resolve(worktree.path)))
     let pruned = 0
     for (const session of allSessions) {
-      const parsed = parseTerminalSlotKey(session.key)
+      const parsed = parseTerminalWorkspaceSlotKey(session.key)
       if (!parsed) continue
       if (path.resolve(parsed.repoRoot) !== path.resolve(repoRoot)) continue
       if (liveWorktreePaths.has(path.resolve(parsed.worktreePath))) continue
-      this.options.manager.closeSlot(session.ptySessionId)
+      this.options.manager.closeSession(session.ptySessionId)
       pruned += 1
     }
     if (pruned > 0) this.options.broadcastSessionsChanged(userId, repoRoot)
     const remaining = await this.options.manager
-      .listSlotsForUser(userId, slotScope)
+      .listSessionsForUser(userId, sessionScope)
       .then((sessions) => sessions.length)
     return { pruned, remaining }
   }
 
-  async nextSlotId(userId: string, repoRoot: string, worktreePath: string): Promise<string> {
+  async nextSessionId(userId: string, repoRoot: string, worktreePath: string): Promise<string> {
     // Compare against the canonical form so a forward-slash Windows path
     // matches the resolved back-slash form used as the session key prefix.
-    const scopedRepoRoot = terminalSlotScope(repoRoot)
+    const scopedRepoRoot = terminalSessionScope(repoRoot)
     const scopedWorktreePath = isRemoteRepoId(repoRoot) ? worktreePath : path.resolve(worktreePath)
-    const sessions = await this.options.manager.listSlotsForUser(userId, scopedRepoRoot)
+    const sessions = await this.options.manager.listSessionsForUser(userId, scopedRepoRoot)
     let maxIndex = 0
     for (const session of sessions) {
-      const parsed = parseTerminalSlotKey(session.key)
+      const parsed = parseTerminalWorkspaceSlotKey(session.key)
       if (!parsed || parsed.repoRoot !== scopedRepoRoot || parsed.worktreePath !== scopedWorktreePath) continue
-      const index = parseSlotIdIndex(parsed.slotId)
+      const index = parseTerminalSessionIdIndex(parsed.sessionId)
       if (index === null) continue
       if (index > maxIndex) maxIndex = index
     }
-    return formatSlotId(maxIndex + 1)
+    return formatTerminalSessionId(maxIndex + 1)
   }
 
   private async ensureRemote(
     userId: string,
     input: EnsureTerminalCatalogInput,
     context: {
-      slotId: string
+      sessionId: string
       cols: number
       rows: number
       targetSlotKey: string
@@ -236,7 +234,7 @@ class TerminalCatalog {
       cols: context.cols,
       rows: context.rows,
     })
-    const result = await this.options.manager.ensureSlot({
+    const result = await this.options.manager.ensureSession({
       userId,
       scope: input.repoRoot,
       key: context.targetSlotKey,
@@ -277,7 +275,7 @@ class TerminalCatalog {
           worktreePath,
         }) ?? undefined)
       : undefined
-    const result = await this.options.manager.ensureSlot({
+    const result = await this.options.manager.ensureSession({
       userId,
       scope: repoRoot,
       key: context.targetSlotKey,

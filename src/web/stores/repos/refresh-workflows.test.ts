@@ -5,7 +5,7 @@ import type { ReposSet } from '#/web/stores/repos/types.ts'
 import { createBranchSnapshot, installGoblinTestBridge } from '#/web/stores/repos/test-utils.ts'
 
 describe('repo refresh workflows', () => {
-  test('snapshot success backfills summary then visible selected branch workspace', async () => {
+  test('snapshot success backfills summary then visible selected repo workspace', async () => {
     const calls: string[] = []
     installGoblinTestBridge({})
     const get: ReposGet = () =>
@@ -26,10 +26,10 @@ describe('repo refresh workflows', () => {
               selectedBranch: 'feature/a',
               branchViewMode: 'all',
               workspacePaneTabOrderByBranch: { 'feature/a': [{ type: 'status', id: 'status' }] },
-              preferredWorkspacePaneViewByBranch: {},
+              preferredWorkspacePaneTabByBranch: {},
               lastClosedTabContextByBranch: {},
             },
-            resources: { pullRequests: { error: null } },
+            dataLoads: { pullRequests: { error: null } },
           },
         },
         refreshPullRequests: (
@@ -86,10 +86,10 @@ describe('repo refresh workflows', () => {
               selectedBranch: 'feature/a',
               branchViewMode: 'all',
               workspacePaneTabOrderByBranch: { 'feature/a': [{ type: 'status', id: 'status' }] },
-              preferredWorkspacePaneViewByBranch: {},
+              preferredWorkspacePaneTabByBranch: {},
               lastClosedTabContextByBranch: {},
             },
-            resources: { pullRequests: { error: null } },
+            dataLoads: { pullRequests: { error: null } },
           },
         },
         refreshPullRequests: (

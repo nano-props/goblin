@@ -50,11 +50,11 @@ describe('app bootstrap hooks', () => {
   test('public bootstrap hydrates only unauthenticated-safe stores', async () => {
     const hydrateTheme = vi.spyOn(useThemeStore.getState(), 'hydrate').mockResolvedValue(undefined)
     const hydrateSessionRestore = vi.spyOn(useSessionRestoreStore.getState(), 'hydrate').mockResolvedValue({
-      openRepos: [{ kind: 'local', id: '/tmp/repo' }],
-      activeRepo: '/tmp/repo',
+      openRepoEntries: [{ kind: 'local', id: '/tmp/repo' }],
+      activeRepoId: '/tmp/repo',
       zenMode: true,
       workspacePaneSize: 50,
-      selectedTerminalByWorktree: {},
+      selectedTerminalSessionByWorktree: {},
       workspacePaneTabOrderByBranchByRepo: {},
     })
     const hydrateI18n = vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
@@ -71,11 +71,11 @@ describe('app bootstrap hooks', () => {
 
   test('canonicalizes boot session pane state before applying it to the repos store', async () => {
     const session = {
-      openRepos: [{ kind: 'local' as const, id: '/tmp/repo' }],
-      activeRepo: '/tmp/repo',
+      openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
+      activeRepoId: '/tmp/repo',
       zenMode: false,
       workspacePaneSize: 45,
-      selectedTerminalByWorktree: { '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0slot-2' },
+      selectedTerminalSessionByWorktree: { '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0session-2' },
       workspacePaneTabOrderByBranchByRepo: {
         '/tmp/repo': {
           main: [],
@@ -87,24 +87,24 @@ describe('app bootstrap hooks', () => {
     const hydrateTheme = vi.spyOn(useThemeStore.getState(), 'hydrateFromSettingsSnapshot').mockResolvedValue(undefined)
     vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
     vi.spyOn(useHostInfoStore.getState(), 'hydrate').mockResolvedValue(undefined)
-    const hydrateSession = vi.spyOn(useReposStore.getState(), 'hydrateSession').mockResolvedValue(undefined)
+    const hydrateRepoSession = vi.spyOn(useReposStore.getState(), 'hydrateRepoSession').mockResolvedValue(undefined)
 
     await render(<Harness />)
 
     const state = useReposStore.getState()
     expect(state.zenMode).toBe(false)
     expect(state.workspacePaneSize).toBe(45)
-    expect(state.selectedTerminalByWorktree).toEqual({
-      '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0slot-2',
+    expect(state.selectedTerminalSessionByWorktree).toEqual({
+      '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0session-2',
     })
-    expect(hydrateSession).toHaveBeenCalledWith([{ kind: 'local', id: '/tmp/repo' }], '/tmp/repo', {
+    expect(hydrateRepoSession).toHaveBeenCalledWith([{ kind: 'local', id: '/tmp/repo' }], '/tmp/repo', {
       workspacePaneRestoreState: {
         workspacePaneTabOrderByBranchByRepo: {
           '/tmp/repo': {
             main: [],
           },
         },
-        preferredWorkspacePaneViewByBranchByRepo: {},
+        preferredWorkspacePaneTabByBranchByRepo: {},
       },
     })
     expect(hydrateTheme).toHaveBeenCalledWith(settings)
@@ -113,25 +113,25 @@ describe('app bootstrap hooks', () => {
 
   test('restores the boot session when non-critical authenticated hydrates fail', async () => {
     const session = {
-      openRepos: [{ kind: 'local' as const, id: '/tmp/repo' }],
-      activeRepo: '/tmp/repo',
+      openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
+      activeRepoId: '/tmp/repo',
       zenMode: true,
       workspacePaneSize: 55,
-      selectedTerminalByWorktree: {},
+      selectedTerminalSessionByWorktree: {},
       workspacePaneTabOrderByBranchByRepo: {},
     }
     mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot({ session }))
     vi.spyOn(useThemeStore.getState(), 'hydrateFromSettingsSnapshot').mockRejectedValue(new Error('theme unavailable'))
     vi.spyOn(useI18nStore.getState(), 'hydrate').mockRejectedValue(new Error('i18n unavailable'))
     vi.spyOn(useHostInfoStore.getState(), 'hydrate').mockRejectedValue(new Error('host unavailable'))
-    const hydrateSession = vi.spyOn(useReposStore.getState(), 'hydrateSession').mockResolvedValue(undefined)
+    const hydrateRepoSession = vi.spyOn(useReposStore.getState(), 'hydrateRepoSession').mockResolvedValue(undefined)
 
     await render(<Harness />)
 
-    expect(hydrateSession).toHaveBeenCalledWith([{ kind: 'local', id: '/tmp/repo' }], '/tmp/repo', {
+    expect(hydrateRepoSession).toHaveBeenCalledWith([{ kind: 'local', id: '/tmp/repo' }], '/tmp/repo', {
       workspacePaneRestoreState: {
         workspacePaneTabOrderByBranchByRepo: {},
-        preferredWorkspacePaneViewByBranchByRepo: {},
+        preferredWorkspacePaneTabByBranchByRepo: {},
       },
     })
     expect(useReposStore.getState().workspacePaneSize).toBe(55)

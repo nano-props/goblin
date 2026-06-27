@@ -1,4 +1,4 @@
-// Shared, mockable "is this macOS?" check for main-process code.
+// Shared, mockable "is this macOS?" check for native-host code.
 //
 // Pulled out of menu.ts so terminal.ts (and any future platform-branching
 // module) can branch on it without each one owning a copy of the literal

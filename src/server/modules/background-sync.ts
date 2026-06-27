@@ -1,7 +1,7 @@
 import { Cron } from 'croner'
 import PQueue from 'p-queue'
 import { abortBackgroundServerNetworkOp } from '#/server/common/network-ops.ts'
-import { fetchRepository } from '#/server/modules/repo-write-paths.ts'
+import { fetchRepo } from '#/server/modules/repo-write-paths.ts'
 import { serverLogger } from '#/server/logger.ts'
 import { getServerFetchIntervalSec, subscribeServerFetchInterval } from '#/server/modules/settings-source.ts'
 
@@ -162,7 +162,7 @@ async function runScheduledFetch(generation: number): Promise<void> {
     if (!repoId || state.intervalMs <= 0) return
     state.lastFetchAtByRepo[repoId] = now
     const fetchStart = Date.now()
-    const result = await fetchRepository(repoId, 'background')
+    const result = await fetchRepo(repoId, 'background')
     const fetchDuration = Date.now() - fetchStart
     // Log slow fetchs for performance monitoring
     if (fetchDuration > 5000) {

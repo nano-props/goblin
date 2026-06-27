@@ -5,8 +5,8 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { Loader2 } from 'lucide-react'
 import { AuthProvider } from '#/web/auth/AuthProvider.tsx'
 import { ResponsiveUiProvider } from '#/web/hooks/useResponsiveUiMode.tsx'
-import { MainWindowRouterProvider } from '#/web/main-router.tsx'
-import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
+import { PrimaryWindowRouterProvider } from '#/web/primary-window-router.tsx'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { bootstrapLog } from '#/web/logger.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 
@@ -48,10 +48,10 @@ function createTimeoutController(ms: number): { signal: AbortSignal; dispose: ()
 function AppRoot() {
   return (
     <StrictMode>
-      <QueryClientProvider client={mainWindowQueryClient}>
+      <QueryClientProvider client={primaryWindowQueryClient}>
         <ResponsiveUiProvider>
           <AuthProvider>
-            <MainWindowRouterProvider />
+            <PrimaryWindowRouterProvider />
           </AuthProvider>
         </ResponsiveUiProvider>
         {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-right" />}

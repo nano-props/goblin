@@ -45,7 +45,7 @@ const mocks = vi.hoisted(() => {
           isDestroyed: () => false,
           once: vi.fn(),
           // Mirror Electron's per-window session shape so the
-          // cookie-bootstrap call in `createMainWindow` can plant
+          // cookie-bootstrap call in `createPrimaryWindow` can plant
           // the auth cookie on `webContents.session.cookies`. The
           // mock records every `set` call so the window test can
           // verify the dev/prod URL distinction.
@@ -130,11 +130,11 @@ vi.mock('#/main/external-url.ts', () => ({
   openHttpExternal: mocks.openHttpExternal,
 }))
 
-vi.mock('#/main/server-manager.ts', () => ({
+vi.mock('#/main/embedded-server-lifecycle.ts', () => ({
   getEmbeddedServerRuntime: mocks.getEmbeddedServerRuntime,
 }))
 
-describe('main window navigation boundaries', () => {
+describe('primary window navigation boundaries', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()
@@ -155,8 +155,8 @@ describe('main window navigation boundaries', () => {
   })
 
   test('prevents client navigation away from the packaged app page', async () => {
-    const { getOrCreateMainWindow } = await import('#/main/window.ts')
-    await getOrCreateMainWindow()
+    const { getOrCreatePrimaryWindow } = await import('#/main/window.ts')
+    await getOrCreatePrimaryWindow()
 
     const willNavigate = mocks.webContentsOn.mock.calls.find(([eventName]) => eventName === 'will-navigate')?.[1]
     expect(willNavigate).toBeTypeOf('function')
@@ -168,8 +168,8 @@ describe('main window navigation boundaries', () => {
   })
 
   test('denies new windows and opens web links externally', async () => {
-    const { getOrCreateMainWindow } = await import('#/main/window.ts')
-    await getOrCreateMainWindow()
+    const { getOrCreatePrimaryWindow } = await import('#/main/window.ts')
+    await getOrCreatePrimaryWindow()
 
     const handler = mocks.setWindowOpenHandler.mock.calls[0]?.[0]
     expect(handler).toBeTypeOf('function')
@@ -179,8 +179,8 @@ describe('main window navigation boundaries', () => {
     expect(handler({ url: 'file:///tmp/other.html' })).toEqual({ action: 'deny' })
   })
 
-  test('coalesces concurrent main window creation', async () => {
-    const { getOrCreateMainWindow } = await import('#/main/window.ts')
+  test('coalesces concurrent primary window creation', async () => {
+    const { getOrCreatePrimaryWindow } = await import('#/main/window.ts')
     let resolveSettings: (settings: { windowBounds: null }) => void = () => {}
     mocks.loadWindowState.mockImplementationOnce(
       () =>
@@ -189,8 +189,8 @@ describe('main window navigation boundaries', () => {
         }),
     )
 
-    const first = getOrCreateMainWindow()
-    const second = getOrCreateMainWindow()
+    const first = getOrCreatePrimaryWindow()
+    const second = getOrCreatePrimaryWindow()
     resolveSettings({ windowBounds: null })
     const [firstWindow, secondWindow] = await Promise.all([first, second])
 
@@ -208,12 +208,12 @@ describe('main window navigation boundaries', () => {
     // uses. The side-effect assertions below still cover the behavior:
     // the window is preserved (singleton), BrowserWindow is not called
     // a second time (no recreation), and the load failure is handled
-    // without throwing out of `getOrCreateMainWindow()`.
+    // without throwing out of `getOrCreatePrimaryWindow()`.
     mocks.loadURL.mockRejectedValueOnce(new Error('load failed'))
-    const { getOrCreateMainWindow } = await import('#/main/window.ts')
+    const { getOrCreatePrimaryWindow } = await import('#/main/window.ts')
 
-    const first = await getOrCreateMainWindow()
-    const second = await getOrCreateMainWindow()
+    const first = await getOrCreatePrimaryWindow()
+    const second = await getOrCreatePrimaryWindow()
 
     expect(first).toBe(second)
     expect(mocks.BrowserWindow).toHaveBeenCalledTimes(1)
@@ -221,18 +221,18 @@ describe('main window navigation boundaries', () => {
 
   test('loads the configured client dev server URL in development', async () => {
     process.env.GOBLIN_WEB_DEV_URL = 'http://127.0.0.1:5173/'
-    const { getOrCreateMainWindow } = await import('#/main/window.ts')
+    const { getOrCreatePrimaryWindow } = await import('#/main/window.ts')
 
-    await getOrCreateMainWindow()
+    await getOrCreatePrimaryWindow()
 
     expect(mocks.loadURL).toHaveBeenCalledWith('http://127.0.0.1:5173/?theme=light&colorTheme=macos')
   })
 
   test('adds a client build cache key to the embedded server URL', async () => {
     mocks.isPackaged = true
-    const { getOrCreateMainWindow } = await import('#/main/window.ts')
+    const { getOrCreatePrimaryWindow } = await import('#/main/window.ts')
 
-    await getOrCreateMainWindow()
+    await getOrCreatePrimaryWindow()
 
     const loadedUrl = new URL(mocks.loadURL.mock.calls[0]?.[0])
     const expectedBuild = createHash('sha256').update(mocks.clientIndexHtml).digest('hex').slice(0, 12)
@@ -251,9 +251,9 @@ describe('main window navigation boundaries', () => {
     // otherwise the very first whoami probe fails and the token
     // gate reappears on every fresh dev run.
     process.env.GOBLIN_WEB_DEV_URL = 'http://127.0.0.1:5173/'
-    const { getOrCreateMainWindow } = await import('#/main/window.ts')
+    const { getOrCreatePrimaryWindow } = await import('#/main/window.ts')
 
-    await getOrCreateMainWindow()
+    await getOrCreatePrimaryWindow()
 
     expect(mocks.cookieSetMock).toHaveBeenCalledTimes(1)
     expect(mocks.cookieSetMock.mock.calls[0]?.[0]).toMatchObject({
@@ -271,9 +271,9 @@ describe('main window navigation boundaries', () => {
     // the cookie must carry the embedded server's port, not the
     // default port 80.
     mocks.isPackaged = true
-    const { getOrCreateMainWindow } = await import('#/main/window.ts')
+    const { getOrCreatePrimaryWindow } = await import('#/main/window.ts')
 
-    await getOrCreateMainWindow()
+    await getOrCreatePrimaryWindow()
 
     expect(mocks.cookieSetMock).toHaveBeenCalledTimes(1)
     expect(mocks.cookieSetMock.mock.calls[0]?.[0]).toMatchObject({
@@ -287,18 +287,18 @@ describe('main window navigation boundaries', () => {
   })
 
   test('uses the source preload path while unpackaged', async () => {
-    const { getOrCreateMainWindow } = await import('#/main/window.ts')
+    const { getOrCreatePrimaryWindow } = await import('#/main/window.ts')
 
-    await getOrCreateMainWindow()
+    await getOrCreatePrimaryWindow()
 
     expect(mocks.windowOptions[0]?.webPreferences?.preload).toBe('/app/src/preload/preload.cjs')
   })
 
   test('uses the hashed preload artifact from the packaged manifest', async () => {
     mocks.isPackaged = true
-    const { getOrCreateMainWindow } = await import('#/main/window.ts')
+    const { getOrCreatePrimaryWindow } = await import('#/main/window.ts')
 
-    await getOrCreateMainWindow()
+    await getOrCreatePrimaryWindow()
 
     expect(mocks.readFileSync).toHaveBeenCalledWith('/app/dist/preload/manifest.json', 'utf8')
     expect(mocks.windowOptions[0]?.webPreferences?.preload).toBe('/app/dist/preload/preload-0.1.0-testhash.cjs')
@@ -306,31 +306,31 @@ describe('main window navigation boundaries', () => {
 
   test('uses the client dev server origin in window URL during development', async () => {
     // The bootstrap (access token, server URL, home dir, platform)
-    // is ferried from the main process to the preload via IPC; the
+    // is ferried from the native host to the preload via IPC; the
     // `webDevUrl` env override just changes which URL the client
     // window is pointed at (Vite vs the embedded server's static
     // file route). The dev-URL override flows through
-    // `createClientEntryUrl`; the bootstrap-IPC behavior is
+    // `createBrowserEntryUrl`; the bootstrap-IPC behavior is
     // covered by the IPC handler tests.
     process.env.GOBLIN_WEB_DEV_URL = 'http://127.0.0.1:5173/'
-    const { getOrCreateMainWindow } = await import('#/main/window.ts')
+    const { getOrCreatePrimaryWindow } = await import('#/main/window.ts')
 
-    await getOrCreateMainWindow()
+    await getOrCreatePrimaryWindow()
 
     expect(mocks.windowOptions[0]?.webPreferences?.preload).toBeTruthy()
   })
 
   test('fails window creation when no client base URL is available', async () => {
     mocks.getEmbeddedServerRuntime.mockReturnValue(null)
-    const { getOrCreateMainWindow } = await import('#/main/window.ts')
+    const { getOrCreatePrimaryWindow } = await import('#/main/window.ts')
 
-    await expect(getOrCreateMainWindow()).rejects.toThrow('Client base URL is unavailable')
+    await expect(getOrCreatePrimaryWindow()).rejects.toThrow('Client base URL is unavailable')
   })
 
   test('configures chrome to match the current platform', async () => {
-    const { applyMainWindowChromeTheme, getOrCreateMainWindow } = await import('#/main/window.ts')
+    const { applyPrimaryWindowTitleBarTheme, getOrCreatePrimaryWindow } = await import('#/main/window.ts')
 
-    await getOrCreateMainWindow()
+    await getOrCreatePrimaryWindow()
 
     if (process.platform === 'darwin') {
       expect(mocks.windowOptions[0]).toMatchObject({
@@ -339,7 +339,7 @@ describe('main window navigation boundaries', () => {
         autoHideMenuBar: false,
       })
 
-      applyMainWindowChromeTheme('dark')
+      applyPrimaryWindowTitleBarTheme('dark')
       expect(mocks.setTitleBarOverlay).not.toHaveBeenCalled()
       return
     }
@@ -354,7 +354,7 @@ describe('main window navigation boundaries', () => {
       autoHideMenuBar: true,
     })
 
-    applyMainWindowChromeTheme('dark')
+    applyPrimaryWindowTitleBarTheme('dark')
 
     expect(mocks.setTitleBarOverlay).toHaveBeenCalledWith({
       color: '#1c1c1e',
@@ -364,44 +364,44 @@ describe('main window navigation boundaries', () => {
   })
 
   test('opens a fresh window at the 1100x720 default when no bounds are saved', async () => {
-    const { getOrCreateMainWindow } = await import('#/main/window.ts')
+    const { getOrCreatePrimaryWindow } = await import('#/main/window.ts')
 
-    await getOrCreateMainWindow()
+    await getOrCreatePrimaryWindow()
 
     expect(mocks.windowOptions[0]).toMatchObject({ width: 1100, height: 720 })
   })
 
-  test('resetMainWindowToDefault recenters the window on its current display at default size', async () => {
-    const { getOrCreateMainWindow, resetMainWindowToDefault } = await import('#/main/window.ts')
-    await getOrCreateMainWindow()
+  test('resetPrimaryWindow recenters the window on its current display at default size', async () => {
+    const { getOrCreatePrimaryWindow, resetPrimaryWindow } = await import('#/main/window.ts')
+    await getOrCreatePrimaryWindow()
 
-    resetMainWindowToDefault()
+    resetPrimaryWindow()
 
     // workArea is 1440x900 in the mock; 1100x720 centered → x=170, y=90.
     expect(mocks.setBounds).toHaveBeenCalledWith({ x: 170, y: 90, width: 1100, height: 720 }, true)
   })
 
-  test('resetMainWindowToDefault unwinds maximize/minimize inline and centers at default size', async () => {
+  test('resetPrimaryWindow unwinds maximize/minimize inline and centers at default size', async () => {
     mocks.isMaximized.mockReturnValueOnce(true)
     mocks.isMinimized.mockReturnValueOnce(true)
 
-    const { getOrCreateMainWindow, resetMainWindowToDefault } = await import('#/main/window.ts')
-    await getOrCreateMainWindow()
+    const { getOrCreatePrimaryWindow, resetPrimaryWindow } = await import('#/main/window.ts')
+    await getOrCreatePrimaryWindow()
 
-    resetMainWindowToDefault()
+    resetPrimaryWindow()
 
     expect(mocks.unmaximize).toHaveBeenCalled()
     expect(mocks.setFullScreen).not.toHaveBeenCalled()
     expect(mocks.setBounds).toHaveBeenCalledWith({ x: 170, y: 90, width: 1100, height: 720 }, true)
   })
 
-  test('resetMainWindowToDefault defers the resize until macOS leaves fullscreen', async () => {
+  test('resetPrimaryWindow defers the resize until macOS leaves fullscreen', async () => {
     mocks.isFullScreen.mockReturnValueOnce(true)
 
-    const { getOrCreateMainWindow, resetMainWindowToDefault } = await import('#/main/window.ts')
-    await getOrCreateMainWindow()
+    const { getOrCreatePrimaryWindow, resetPrimaryWindow } = await import('#/main/window.ts')
+    await getOrCreatePrimaryWindow()
 
-    resetMainWindowToDefault()
+    resetPrimaryWindow()
 
     expect(mocks.setFullScreen).toHaveBeenCalledWith(false)
     // Resize is held until the transition completes — firing setBounds
@@ -414,10 +414,10 @@ describe('main window navigation boundaries', () => {
     expect(mocks.setBounds).toHaveBeenCalledWith({ x: 170, y: 90, width: 1100, height: 720 }, true)
   })
 
-  test('resetMainWindowToDefault is a no-op when no main window exists', async () => {
-    const { resetMainWindowToDefault } = await import('#/main/window.ts')
+  test('resetPrimaryWindow is a no-op when no primary window exists', async () => {
+    const { resetPrimaryWindow } = await import('#/main/window.ts')
 
-    resetMainWindowToDefault()
+    resetPrimaryWindow()
 
     expect(mocks.setBounds).not.toHaveBeenCalled()
   })

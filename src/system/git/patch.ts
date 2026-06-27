@@ -23,7 +23,7 @@
 // caller's IPC timeout bound the whole thing.
 
 import { execa } from 'execa'
-import { git } from '#/system/git/helper.ts'
+import { git } from '#/system/git/git-exec.ts'
 import { parseStatus } from '#/system/git/parsers.ts'
 import { mapWithConcurrency } from '#/system/git/concurrency.ts'
 

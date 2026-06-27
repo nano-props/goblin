@@ -1,8 +1,11 @@
-import { parseTerminalSlotKey, worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
+import {
+  parseTerminalWorkspaceSlotKey,
+  worktreeTerminalKey,
+} from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
-import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import type { LangPref, ThemePref } from '#/shared/settings.ts'
 
@@ -18,7 +21,7 @@ type ClientWorkspaceIntent = Extract<
   | { type: 'close-repo-requested' }
   | { type: 'cycle-repo-requested' }
   | { type: 'repo-refresh-requested' }
-  | { type: 'show-workspace-pane-view-requested' }
+  | { type: 'show-workspace-pane-tab-requested' }
   | { type: 'terminal-primary-action-requested' }
   | { type: 'workspace-zen-mode-toggle-requested' }
 >
@@ -56,7 +59,7 @@ export type WorkspaceIntentPlan =
   | { kind: 'close-window' }
   | { kind: 'cycle-repo'; direction: 1 | -1 }
   | { kind: 'refresh-repo'; repoId: string; token: number }
-  | { kind: 'show-workspace-pane-view'; repoId: string; tab: WorkspacePaneView }
+  | { kind: 'show-workspace-pane-tab'; repoId: string; tab: WorkspacePaneTabType }
   | { kind: 'terminal-primary-action'; repoId: string }
   | { kind: 'toggle-zen-mode' }
 
@@ -79,7 +82,7 @@ export function createTerminalBellIntentPlan(
   event: Extract<ClientEffectIntent, { type: 'terminal-bell-click' }>,
 ): TerminalBellIntentPlan {
   if (!repo) return { kind: 'noop' }
-  const parsedKey = event.key ? parseTerminalSlotKey(event.key) : null
+  const parsedKey = event.key ? parseTerminalWorkspaceSlotKey(event.key) : null
   if (parsedKey && parsedKey.repoRoot === repo.id && event.key) {
     const branch = repo.data.branches.find((candidate) => candidate.worktree?.path === parsedKey.worktreePath)
     if (branch) {
@@ -150,9 +153,9 @@ export function createWorkspaceIntentPlan(
       if (context.workspaceShortcutSuppressed || context.terminalFocused || !context.currentRepo)
         return { kind: 'noop' }
       return { kind: 'refresh-repo', repoId: context.currentRepo.id, token: context.currentRepo.instanceToken }
-    case 'show-workspace-pane-view-requested':
+    case 'show-workspace-pane-tab-requested':
       if (context.workspaceShortcutSuppressed || !context.currentRepoId) return { kind: 'noop' }
-      return { kind: 'show-workspace-pane-view', repoId: context.currentRepoId, tab: event.tab }
+      return { kind: 'show-workspace-pane-tab', repoId: context.currentRepoId, tab: event.tab }
     case 'terminal-primary-action-requested':
       if (context.workspaceShortcutSuppressed || !context.currentRepoId) return { kind: 'noop' }
       return { kind: 'terminal-primary-action', repoId: context.currentRepoId }
@@ -184,7 +187,7 @@ function isClientWorkspaceIntent(event: ClientEffectIntent): event is ClientWork
     event.type === 'close-repo-requested' ||
     event.type === 'cycle-repo-requested' ||
     event.type === 'repo-refresh-requested' ||
-    event.type === 'show-workspace-pane-view-requested' ||
+    event.type === 'show-workspace-pane-tab-requested' ||
     event.type === 'terminal-primary-action-requested' ||
     event.type === 'workspace-zen-mode-toggle-requested'
   )

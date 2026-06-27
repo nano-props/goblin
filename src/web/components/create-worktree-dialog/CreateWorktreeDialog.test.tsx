@@ -4,16 +4,16 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { CreateWorktreeDialog } from '#/web/components/create-worktree-dialog/CreateWorktreeDialog.tsx'
-import { emptyRepo } from '#/web/stores/repos/helpers.ts'
+import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
-import { getRepositoryRemoteBranches } from '#/web/repo-client.ts'
+import { getRepoRemoteBranches } from '#/web/repo-client.ts'
 
 vi.mock('#/web/repo-client.ts', async () => {
   const actual = await vi.importActual<typeof import('#/web/repo-client.ts')>('#/web/repo-client.ts')
   return {
     ...actual,
-    getRepositoryRemoteBranches: vi.fn(),
+    getRepoRemoteBranches: vi.fn(),
   }
 })
 
@@ -34,7 +34,7 @@ beforeEach(() => {
     abortIpc: async () => true,
     onEvent: () => () => {},
   }
-  vi.mocked(getRepositoryRemoteBranches).mockResolvedValue([])
+  vi.mocked(getRepoRemoteBranches).mockResolvedValue([])
 })
 
 afterEach(() => {
@@ -136,7 +136,7 @@ describe('CreateWorktreeDialog', () => {
   })
 
   test('loads remote branches and submits trackRemoteBranch with the first ref', async () => {
-    vi.mocked(getRepositoryRemoteBranches).mockResolvedValue(['origin/feature', 'origin/main'])
+    vi.mocked(getRepoRemoteBranches).mockResolvedValue(['origin/feature', 'origin/main'])
     const user = userEvent.setup()
     const onCreate = vi.fn(async () => {})
 
@@ -145,7 +145,7 @@ describe('CreateWorktreeDialog', () => {
     await user.click(screen.getByRole('radio', { name: /action.create-worktree-mode-remote/i }))
 
     await waitFor(() => {
-      expect(getRepositoryRemoteBranches).toHaveBeenCalledTimes(1)
+      expect(getRepoRemoteBranches).toHaveBeenCalledTimes(1)
     })
 
     const submitButton = screen.getByRole('button', { name: /action.create-worktree-confirm/i }) as HTMLButtonElement

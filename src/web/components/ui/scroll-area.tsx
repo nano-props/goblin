@@ -66,7 +66,7 @@ interface ScrollBarProps extends ComponentPropsWithoutRef<typeof ScrollAreaPrimi
   mode?: ScrollbarMode
 }
 
-export const ScrollBar = forwardRef<ComponentRef<typeof ScrollAreaPrimitive.ScrollAreaScrollbar>, ScrollBarProps>(
+const ScrollBar = forwardRef<ComponentRef<typeof ScrollAreaPrimitive.ScrollAreaScrollbar>, ScrollBarProps>(
   function ScrollBar({ className, orientation = 'vertical', mode = 'default', ...props }, ref) {
     return (
       <ScrollAreaPrimitive.Scrollbar

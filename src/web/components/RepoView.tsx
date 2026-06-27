@@ -1,12 +1,12 @@
 import { useEffect, type ReactNode } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { isRepoUnavailable } from '#/web/stores/repos/helpers.ts'
-import { BranchWorkspace } from '#/web/components/BranchWorkspace.tsx'
+import { isRepoUnavailable } from '#/web/stores/repos/repo-guards.ts'
+import { RepoWorkspace } from '#/web/components/RepoWorkspace.tsx'
 import {
   BranchNavigatorSkeleton,
-  BranchWorkspaceEmptySkeleton,
-  BranchWorkspaceSkeleton,
+  RepoWorkspaceEmptySkeleton,
+  RepoWorkspaceSkeleton,
 } from '#/web/components/Skeleton.tsx'
 import { RepoWorkspacePane } from '#/web/components/Layout.tsx'
 import { useRepoToasts } from '#/web/hooks/useRepoToasts.tsx'
@@ -16,9 +16,9 @@ import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
 import { useRetainedValueDuringExit } from '#/web/hooks/useRetainedValueDuringExit.ts'
 import { useUiTransitionStore } from '#/web/stores/ui-transition.ts'
-import { RepoShellSidebar } from '#/web/components/repo-shell/RepoShellSidebar.tsx'
+import { RepoLayoutSidebar } from '#/web/components/repo-layout/RepoLayoutSidebar.tsx'
 import { WorkspaceChrome } from '#/web/components/workspace-toolbar-chrome.tsx'
-import { RepoWorkspaceShell } from '#/web/components/repo-shell/RepoWorkspaceShell.tsx'
+import { RepoLayoutWorkspaceShell } from '#/web/components/repo-layout/RepoLayoutWorkspaceShell.tsx'
 
 interface Props {
   repoId: string
@@ -50,7 +50,7 @@ export function RepoView({ repoId, onOpenSettings }: Props) {
   const repo = useReposStore((s) => s.repos[repoId])
   useRepoToasts(repoId)
 
-  const branchWorkspaceActive = !!repo?.ui.selectedBranch
+  const repoWorkspaceActive = !!repo?.ui.selectedBranch
   const selectedBranch = repo?.ui.selectedBranch ?? null
   const singlePane = selectedBranch ? 'workspace' : 'navigator'
   const compactWorkspaceSelectedBranch = useRetainedValueDuringExit({
@@ -84,12 +84,12 @@ export function RepoView({ repoId, onOpenSettings }: Props) {
 
   if (!view.exists || !repo) return <div />
 
-  const zenModeCollapsed = !compact && view.zenMode && branchWorkspaceActive
+  const zenModeCollapsed = !compact && view.zenMode && repoWorkspaceActive
   const workspaceTrafficLightOffset = zenModeCollapsed
 
   const renderBranchNavigatorPane = (branchContent?: ReactNode) => (
     <RepoWorkspacePane>
-      <RepoShellSidebar
+      <RepoLayoutSidebar
         repoId={repoId}
         compact={compact}
         branchContent={branchContent}
@@ -101,15 +101,15 @@ export function RepoView({ repoId, onOpenSettings }: Props) {
 
   if (isRepoUnavailable(repo)) {
     return (
-      <RepoWorkspaceShell
+      <RepoLayoutWorkspaceShell
         repoId={repoId}
         compact={compact}
         zenMode={view.zenMode}
-        branchWorkspaceActive={branchWorkspaceActive}
+        repoWorkspaceActive={repoWorkspaceActive}
         workspacePaneSize={view.workspacePaneSize}
         onWorkspacePaneSizeChange={setWorkspacePaneSize}
         branchNavigatorPane={renderBranchNavigatorPane(compact ? <UnavailableRepoView repo={repo} /> : undefined)}
-        branchWorkspacePane={
+        repoWorkspacePane={
           <RepoWorkspacePane>
             <WorkspaceChrome trafficLightOffset={workspaceTrafficLightOffset} />
             <UnavailableRepoView repo={repo} />
@@ -123,27 +123,27 @@ export function RepoView({ repoId, onOpenSettings }: Props) {
 
   if (view.initialLoading) {
     return (
-      <RepoWorkspaceShell
+      <RepoLayoutWorkspaceShell
         repoId={repoId}
         compact={compact}
         zenMode={view.zenMode}
-        branchWorkspaceActive={branchWorkspaceActive}
+        repoWorkspaceActive={repoWorkspaceActive}
         workspacePaneSize={view.workspacePaneSize}
         onWorkspacePaneSizeChange={setWorkspacePaneSize}
         branchNavigatorPane={renderBranchNavigatorPane(
           compact && selectedBranch ? undefined : <BranchNavigatorSkeleton />,
         )}
-        branchWorkspacePane={
+        repoWorkspacePane={
           <RepoWorkspacePane>
             {selectedBranch ? (
-              <BranchWorkspaceSkeleton
+              <RepoWorkspaceSkeleton
                 toolbarDraggable={!compact}
                 toolbarTrafficLightOffset={workspaceTrafficLightOffset}
               />
             ) : (
               <>
                 <WorkspaceChrome trafficLightOffset={workspaceTrafficLightOffset} />
-                <BranchWorkspaceEmptySkeleton />
+                <RepoWorkspaceEmptySkeleton />
               </>
             )}
           </RepoWorkspacePane>
@@ -155,17 +155,17 @@ export function RepoView({ repoId, onOpenSettings }: Props) {
   }
 
   return (
-    <RepoWorkspaceShell
+    <RepoLayoutWorkspaceShell
       repoId={repoId}
       compact={compact}
       zenMode={view.zenMode}
-      branchWorkspaceActive={branchWorkspaceActive}
+      repoWorkspaceActive={repoWorkspaceActive}
       workspacePaneSize={view.workspacePaneSize}
       onWorkspacePaneSizeChange={setWorkspacePaneSize}
       branchNavigatorPane={renderBranchNavigatorPane()}
-      branchWorkspacePane={
+      repoWorkspacePane={
         <RepoWorkspacePane>
-          <BranchWorkspace
+          <RepoWorkspace
             repoId={repoId}
             selectedBranchName={compact ? compactWorkspaceSelectedBranch : undefined}
             shortcutsEnabled={!compact || singlePane === 'workspace'}

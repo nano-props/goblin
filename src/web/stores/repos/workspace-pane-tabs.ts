@@ -1,5 +1,5 @@
 import type { RepoUiState } from '#/web/stores/repos/types.ts'
-import type { WorkspacePaneStaticViewType, WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneStaticTabType, WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
 import {
   isWorkspacePaneTabOrderEntry,
   workspacePaneStaticTabOrderEntry,
@@ -7,7 +7,7 @@ import {
   workspacePaneTabOrderEntryIdentity,
 } from '#/shared/workspace-pane.ts'
 
-export const DEFAULT_WORKSPACE_PANE_TAB_ORDER: readonly WorkspacePaneTabOrderEntry[] = [
+const DEFAULT_WORKSPACE_PANE_TAB_ORDER: readonly WorkspacePaneTabOrderEntry[] = [
   workspacePaneStaticTabOrderEntry('status'),
 ]
 
@@ -19,10 +19,10 @@ export function workspacePaneTabOrderForBranch(
   return [...(ui.workspacePaneTabOrderByBranch[branch] ?? DEFAULT_WORKSPACE_PANE_TAB_ORDER)]
 }
 
-export function workspacePaneStaticViewsForBranch(
+export function workspacePaneStaticTabsForBranch(
   ui: Pick<RepoUiState, 'workspacePaneTabOrderByBranch'>,
   branch: string | null | undefined,
-): WorkspacePaneStaticViewType[] {
+): WorkspacePaneStaticTabType[] {
   return workspacePaneTabOrderForBranch(ui, branch).flatMap((entry) => (entry.type === 'terminal' ? [] : [entry.type]))
 }
 
@@ -37,19 +37,19 @@ export function workspacePaneTabOrderRecordWith(
   }
 }
 
-export function workspacePaneTabOrderWithStaticView(
+export function workspacePaneTabOrderWithStaticTab(
   current: readonly WorkspacePaneTabOrderEntry[],
-  view: WorkspacePaneStaticViewType,
+  tab: WorkspacePaneStaticTabType,
 ): WorkspacePaneTabOrderEntry[] {
-  if (current.some((entry) => entry.type === view)) return normalizeWorkspacePaneTabOrder(current)
-  return normalizeWorkspacePaneTabOrder([...current, workspacePaneStaticTabOrderEntry(view)])
+  if (current.some((entry) => entry.type === tab)) return normalizeWorkspacePaneTabOrder(current)
+  return normalizeWorkspacePaneTabOrder([...current, workspacePaneStaticTabOrderEntry(tab)])
 }
 
-export function workspacePaneTabOrderWithoutStaticView(
+export function workspacePaneTabOrderWithoutStaticTab(
   current: readonly WorkspacePaneTabOrderEntry[],
-  view: WorkspacePaneStaticViewType,
+  tab: WorkspacePaneStaticTabType,
 ): WorkspacePaneTabOrderEntry[] {
-  return normalizeWorkspacePaneTabOrder(current.filter((entry) => entry.type !== view))
+  return normalizeWorkspacePaneTabOrder(current.filter((entry) => entry.type !== tab))
 }
 
 export function workspacePaneTabOrderWithTerminal(
@@ -65,7 +65,9 @@ export function workspacePaneTabOrderWithoutTerminal(
   current: readonly WorkspacePaneTabOrderEntry[],
   terminalKey: string,
 ): WorkspacePaneTabOrderEntry[] {
-  return normalizeWorkspacePaneTabOrder(current.filter((entry) => entry.type !== 'terminal' || entry.id !== terminalKey))
+  return normalizeWorkspacePaneTabOrder(
+    current.filter((entry) => entry.type !== 'terminal' || entry.id !== terminalKey),
+  )
 }
 
 export function normalizeWorkspacePaneTabOrderRecord(
@@ -89,9 +91,7 @@ export function normalizeWorkspacePaneTabOrder(
   for (const raw of order) {
     if (!isWorkspacePaneTabOrderEntry(raw)) continue
     const entry =
-      raw.type === 'terminal'
-        ? workspacePaneTerminalTabOrderEntry(raw.id)
-        : workspacePaneStaticTabOrderEntry(raw.type)
+      raw.type === 'terminal' ? workspacePaneTerminalTabOrderEntry(raw.id) : workspacePaneStaticTabOrderEntry(raw.type)
     const identity = workspacePaneTabOrderEntryIdentity(entry)
     if (seen.has(identity)) continue
     seen.add(identity)

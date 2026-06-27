@@ -51,7 +51,7 @@ function testBridge(overrides: Partial<ClientBridge> = {}): ClientBridge {
     onEffectIntent: () => () => {},
     pathForFile: () => '',
     saveClipboardFiles: () => Promise.resolve([]),
-    shell: () => null,
+    host: () => null,
     terminal: (() => {
       throw new Error('unused terminal bridge')
     }) as never,
@@ -83,11 +83,11 @@ describe('settings-client', () => {
           globalShortcutRegistered: false,
           lanEnabled: false,
           session: {
-            openRepos: [],
-            activeRepo: null,
+            openRepoEntries: [],
+            activeRepoId: null,
             zenMode: true,
             workspacePaneSize: 50,
-            selectedTerminalByWorktree: {},
+            selectedTerminalSessionByWorktree: {},
             workspacePaneTabOrderByBranchByRepo: {},
           },
           recentRepos: [],
@@ -105,7 +105,7 @@ describe('settings-client', () => {
       ok: true,
       json: async () => ({
         ok: true,
-        settings: {
+        prefs: {
           lang: 'auto',
           theme: 'dark',
           colorTheme: 'github',
@@ -241,7 +241,7 @@ describe('settings-client', () => {
       ok: true,
       json: async () => ({
         ok: true,
-        settings: {
+        prefs: {
           lang: 'ja',
           theme: 'auto',
           colorTheme: 'macos',
@@ -262,7 +262,7 @@ describe('settings-client', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(invokeIpc).toHaveBeenCalledWith(
       expect.objectContaining({
-        path: 'settings.applyShellProjection',
+        path: 'settings.applyNativeHostProjection',
         input: {
           prefs: {
             patch: { lang: 'ja' },
@@ -332,7 +332,7 @@ describe('settings-client', () => {
     )
     expect(invokeIpc).toHaveBeenCalledWith(
       expect.objectContaining({
-        path: 'settings.applyShellProjection',
+        path: 'settings.applyNativeHostProjection',
         input: {
           recentRepos: {
             recentRepos: [{ kind: 'local', id: '/tmp/repo' }],
@@ -388,7 +388,7 @@ describe('settings-client', () => {
     expect(invokeIpc).toHaveBeenCalledTimes(1)
     expect(invokeIpc).toHaveBeenCalledWith(
       expect.objectContaining({
-        path: 'settings.applyShellProjection',
+        path: 'settings.applyNativeHostProjection',
         input: { recentRepos: { recentRepos: [] } },
       }),
     )
@@ -440,7 +440,7 @@ describe('settings-client', () => {
     })
     expect(invokeIpc).toHaveBeenCalledWith(
       expect.objectContaining({
-        path: 'settings.applyShellProjection',
+        path: 'settings.applyNativeHostProjection',
         input: {
           recentRepos: {
             recentRepos: [{ kind: 'local', id: '/existing' }],
@@ -489,7 +489,7 @@ describe('settings-client', () => {
       ok: true,
       json: async () => ({
         ok: true,
-        settings: {
+        prefs: {
           theme: 'dark',
           colorTheme: 'macos',
           shortcutsDisabled: false,

@@ -1,47 +1,47 @@
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
-import { readTerminalSlotCommandBridge } from '#/web/components/terminal/terminal-slot-command-bridge.ts'
-import { openWorkspacePaneView } from '#/web/components/branch-workspace/open-workspace-pane-view.ts'
+import { worktreeTerminalKey } from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
+import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import { openWorkspacePaneTab } from '#/web/components/repo-workspace/open-workspace-pane-tab.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
-import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
-import type { TerminalSlotBase } from '#/web/components/terminal/types.ts'
+import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
+import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
+import type { TerminalSessionBase } from '#/web/components/terminal/types.ts'
 import {
-  adjacentBranchWorkspacePaneTab,
-  type BranchWorkspacePaneTab,
-  type BranchWorkspacePaneTabModel,
-} from '#/web/components/branch-workspace/workspace-pane-tab-model.ts'
+  adjacentRepoWorkspaceTab,
+  type RepoWorkspaceTab,
+  type RepoWorkspaceTabModel,
+} from '#/web/components/repo-workspace/tab-model.ts'
 import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
 import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
 import {
   isWorkspacePaneStaticTabProvider,
   workspacePaneTabProvider,
-} from '#/web/workspace-pane/workspace-pane-tab-providers.ts'
+} from '#/web/components/workspace-pane/tab-providers.ts'
 import {
   closeWorkspacePaneTab,
   workspacePaneTabTargetForBranch,
 } from '#/web/workspace-pane/workspace-pane-tab-close.ts'
 
-interface ShowWorkspacePaneViewCommandOptions {
+interface ShowWorkspacePaneTabCommandOptions {
   repoId: string | null
-  tab: WorkspacePaneView
-  navigation: MainWindowNavigationActions
+  tab: WorkspacePaneTabType
+  navigation: PrimaryWindowNavigationActions
 }
 
 interface TerminalPrimaryActionCommandOptions {
   repoId: string | null
-  navigation: MainWindowNavigationActions
+  navigation: PrimaryWindowNavigationActions
   t?: TerminalCreateTranslator
 }
 
 interface NewTerminalTabCommandOptions {
   repoId: string | null
-  navigation: MainWindowNavigationActions
+  navigation: PrimaryWindowNavigationActions
   t?: TerminalCreateTranslator
 }
 
 interface CloseWorkspacePaneTabCommandOptions {
   repoId: string | null
-  navigation: MainWindowNavigationActions
+  navigation: PrimaryWindowNavigationActions
   targetIdentity?: string
 }
 
@@ -52,26 +52,26 @@ interface CloseWorkspacePaneTabOrWindowCommandOptions extends CloseWorkspacePane
 interface SelectWorkspacePaneTabByIndexCommandOptions {
   repoId: string | null
   tabIndex: number
-  navigation: MainWindowNavigationActions
+  navigation: PrimaryWindowNavigationActions
 }
 
 interface MoveWorkspacePaneTabCommandOptions {
   repoId: string | null
   direction: 1 | -1
-  navigation: MainWindowNavigationActions
+  navigation: PrimaryWindowNavigationActions
 }
 
-export async function runShowWorkspacePaneViewCommand({
+export async function runShowWorkspacePaneTabCommand({
   repoId,
   tab,
   navigation,
-}: ShowWorkspacePaneViewCommandOptions): Promise<boolean> {
+}: ShowWorkspacePaneTabCommandOptions): Promise<boolean> {
   if (!repoId) return false
   const provider = workspacePaneTabProvider(tab)
   if (isWorkspacePaneStaticTabProvider(provider)) {
-    const target = selectedBranchWorkspaceTarget(repoId)
+    const target = selectedRepoWorkspaceTarget(repoId)
     if (target) {
-      return openWorkspacePaneView({
+      return openWorkspacePaneTab({
         repoId,
         branchName: target.branchName,
         worktreePath: target.worktreePath,
@@ -80,7 +80,7 @@ export async function runShowWorkspacePaneViewCommand({
       })
     }
   }
-  navigation.showRepoWorkspacePaneView(repoId, tab)
+  navigation.showRepoWorkspacePaneTab(repoId, tab)
   return true
 }
 
@@ -90,10 +90,10 @@ export async function runTerminalPrimaryActionCommand({
   t,
 }: TerminalPrimaryActionCommandOptions): Promise<boolean> {
   if (!repoId) return false
-  await runShowWorkspacePaneViewCommand({ repoId, tab: 'terminal', navigation })
+  await runShowWorkspacePaneTabCommand({ repoId, tab: 'terminal', navigation })
   const base = selectedTerminalBase(repoId)
   if (!base) return true
-  const bridge = readTerminalSlotCommandBridge()
+  const bridge = readTerminalSessionCommandBridge()
   if (!bridge) return true
   const worktreeKey = worktreeTerminalKey(base.repoRoot, base.worktreePath)
   const worktree = bridge.worktreeSnapshot(worktreeKey)
@@ -101,7 +101,7 @@ export async function runTerminalPrimaryActionCommand({
     // The user expects "click the Terminal menu" to land them on a working
     // terminal session: focus the first existing session instead of leaving
     // the selection on whatever the user had open before.
-    const firstSession = worktree.slots[0]
+    const firstSession = worktree.sessions[0]
     if (firstSession) bridge.selectTerminal(worktreeKey, firstSession.key)
     return true
   }
@@ -122,8 +122,8 @@ export async function runNewTerminalTabCommand({
   if (!repoId) return false
   const base = selectedTerminalBase(repoId)
   if (!base) return false
-  await runShowWorkspacePaneViewCommand({ repoId, tab: 'terminal', navigation })
-  const bridge = readTerminalSlotCommandBridge()
+  await runShowWorkspacePaneTabCommand({ repoId, tab: 'terminal', navigation })
+  const bridge = readTerminalSessionCommandBridge()
   if (!bridge) return true
   const result = await runCreateTerminalTabCommand({
     base,
@@ -148,11 +148,11 @@ export async function runCloseWorkspacePaneTabCommand({
 
   // Capture pre-close state for the workspace pane tab model. The model uses
   // `lastClosedTabContext` to prefer the spatial neighbor of the closed tab
-  // over its generic tabs[0] fallback when the preferred view becomes
+  // over its generic tabs[0] fallback when the preferred tab becomes
   // unrenderable — preserving spatial locality without this command
   // imperatively re-selecting anything. When the closed tab was the active
   // tab, `wasActive` tells the model to apply the same neighbor preference
-  // even if another tab of the preferred view (e.g. another terminal) is
+  // even if another tab of the preferred tab (e.g. another terminal) is
   // still available, so the tab strip order is respected.
   const previousTabIdentities = target.tabs.map((t) => t.identity)
   const closingIdentity = tab.identity
@@ -201,14 +201,14 @@ export function runMoveWorkspacePaneTabCommand({
 }: MoveWorkspacePaneTabCommandOptions): boolean {
   if (!repoId) return false
   const target = workspacePaneCommandTarget(repoId)
-  const tab = target ? adjacentBranchWorkspacePaneTab(target.tabs, target.activeTab?.identity, direction) : null
+  const tab = target ? adjacentRepoWorkspaceTab(target.tabs, target.activeTab?.identity, direction) : null
   if (!target || !tab) return false
   showWorkspacePaneCommandTab(target, tab, navigation)
   return true
 }
 
-function selectedTerminalBase(repoId: string): TerminalSlotBase | null {
-  const target = selectedBranchWorkspaceTarget(repoId)
+function selectedTerminalBase(repoId: string): TerminalSessionBase | null {
+  const target = selectedRepoWorkspaceTarget(repoId)
   if (!target?.worktreePath) return null
   return {
     repoRoot: repoId,
@@ -217,7 +217,7 @@ function selectedTerminalBase(repoId: string): TerminalSlotBase | null {
   }
 }
 
-function selectedBranchWorkspaceTarget(repoId: string): { branchName: string; worktreePath: string | null } | null {
+function selectedRepoWorkspaceTarget(repoId: string): { branchName: string; worktreePath: string | null } | null {
   const repo = useReposStore.getState().repos[repoId]
   if (!repo?.ui.selectedBranch) return null
   const branch = repo.data.branches.find((candidate) => candidate.name === repo.ui.selectedBranch)
@@ -226,17 +226,17 @@ function selectedBranchWorkspaceTarget(repoId: string): { branchName: string; wo
 }
 
 function showWorkspacePaneCommandTab(
-  target: BranchWorkspacePaneTabModel,
-  tab: BranchWorkspacePaneTab,
-  navigation: MainWindowNavigationActions,
+  target: RepoWorkspaceTabModel,
+  tab: RepoWorkspaceTab,
+  navigation: PrimaryWindowNavigationActions,
 ): void {
-  navigation.showRepoWorkspacePaneView(target.repoId, tab.type)
+  navigation.showRepoWorkspacePaneTab(target.repoId, tab.type)
   if (tab.kind === 'terminal' && target.worktreeTerminalKey) {
-    readTerminalSlotCommandBridge()?.selectTerminal(target.worktreeTerminalKey, tab.key)
+    readTerminalSessionCommandBridge()?.selectTerminal(target.worktreeTerminalKey, tab.key)
   }
 }
 
-function workspacePaneCommandTarget(repoId: string): BranchWorkspacePaneTabModel | null {
+function workspacePaneCommandTarget(repoId: string): RepoWorkspaceTabModel | null {
   const state = useReposStore.getState()
   const repo = state.repos[repoId]
   if (!repo?.ui.selectedBranch) return null

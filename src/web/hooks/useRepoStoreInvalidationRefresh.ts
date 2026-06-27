@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { subscribeRepoQueryInvalidation } from '#/web/repo-query-invalidation-ingress.ts'
-import { isRepoUnavailable } from '#/web/stores/repos/helpers.ts'
+import { isRepoUnavailable } from '#/web/stores/repos/repo-guards.ts'
 import { handleRepoInvalidationRefresh } from '#/web/stores/repos/refresh-coordinator.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 export function useRepoStoreInvalidationRefresh() {

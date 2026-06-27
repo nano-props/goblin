@@ -3,11 +3,11 @@ import {
   shouldSuppressRepoInvalidationSource,
   resetRepoInvalidationSourceState,
 } from '#/web/stores/repos/invalidation-sources.ts'
-import { isRepoUnavailable } from '#/web/stores/repos/helpers.ts'
+import { isRepoUnavailable } from '#/web/stores/repos/repo-guards.ts'
 import type { RepoState, ReposGet } from '#/web/stores/repos/types.ts'
-import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
-import { workspacePaneStaticViewsForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
-import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
+import { workspacePaneStaticTabsForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
+import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 
 interface RepoRefreshIntentBase {
   id: string
@@ -27,7 +27,7 @@ type RepoInvalidationRefreshDisposition = 'refresh' | 'suppress'
 export interface RepoStatusRefreshSnapshot {
   id: string
   token: number
-  preferredWorkspacePaneView: WorkspacePaneView
+  preferredWorkspacePaneTab: WorkspacePaneTabType
   statusViewOpen: boolean
   unavailable: boolean
   statusPhase: 'idle' | 'loading' | 'refreshing'
@@ -37,10 +37,10 @@ export function repoStatusRefreshSnapshot(repo: RepoState): RepoStatusRefreshSna
   return {
     id: repo.id,
     token: repo.instanceToken,
-    preferredWorkspacePaneView: preferredWorkspacePaneViewForBranch(repo.ui, repo.ui.selectedBranch),
-    statusViewOpen: workspacePaneStaticViewsForBranch(repo.ui, repo.ui.selectedBranch).includes('status'),
+    preferredWorkspacePaneTab: preferredWorkspacePaneTabForBranch(repo.ui, repo.ui.selectedBranch),
+    statusViewOpen: workspacePaneStaticTabsForBranch(repo.ui, repo.ui.selectedBranch).includes('status'),
     unavailable: isRepoUnavailable(repo),
-    statusPhase: repo.resources.status.phase,
+    statusPhase: repo.dataLoads.status.phase,
   }
 }
 

@@ -1,10 +1,5 @@
 import type { ComponentType } from 'react'
-import type {
-  EditorAppAvailability,
-  EditorApp,
-  TerminalApp,
-  TerminalAppAvailability,
-} from '#/shared/api-types.ts'
+import type { EditorAppAvailability, EditorApp, TerminalApp, TerminalAppAvailability } from '#/shared/api-types.ts'
 import {
   AppleTerminalIcon,
   CursorIcon,

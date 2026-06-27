@@ -4,14 +4,18 @@ import {
   type RepoOperationTarget,
 } from '#/web/stores/repos/operation-runner.ts'
 import type { RepoBranchActionReason, RepoOperationReason } from '#/web/stores/repos/operations.ts'
-import { isRepoUnavailable, updateIfFresh } from '#/web/stores/repos/helpers.ts'
-import { repoOperation, repoOperationBusy, waitForRepoOperationsIdle } from '#/web/stores/repos/runtime.ts'
+import { isRepoUnavailable, updateIfFresh } from '#/web/stores/repos/repo-guards.ts'
 import {
-  cancelResource,
-  finishResourceError,
-  finishResourceSuccess,
-  startResource,
-} from '#/web/stores/repos/resources.ts'
+  repoOperation,
+  repoOperationBusy,
+  waitForRepoOperationsIdle,
+} from '#/web/stores/repos/repo-operation-scheduler.ts'
+import {
+  cancelDataLoad,
+  finishDataLoadError,
+  finishDataLoadSuccess,
+  startDataLoad,
+} from '#/web/stores/repos/repo-data-load-state.ts'
 import type {
   RepoBranchAction,
   RepoBranchActionKind,
@@ -26,11 +30,11 @@ import type { ExecResult } from '#/web/types.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
 import { runWithRepoInvalidationSource } from '#/web/stores/repos/invalidation-sources.ts'
 import {
-  createRepositoryWorktree,
-  deleteRepositoryBranch,
-  pullRepositoryBranch,
-  pushRepositoryBranch,
-  removeRepositoryWorktree,
+  createRepoWorktree,
+  deleteRepoBranch,
+  pullRepoBranch,
+  pushRepoBranch,
+  removeRepoWorktree,
 } from '#/web/repo-client.ts'
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 const BRANCH_NETWORK_OPERATION_KEY = 'branch-network-action'
@@ -50,7 +54,7 @@ const NETWORK_FETCH_REASON_BY_KIND: Record<NetworkRepoBranchAction['kind'], Netw
   push: 'push',
 }
 
-export function repoBranchActionReason(kind: RepoBranchActionKind): RepoBranchActionReason {
+function repoBranchActionReason(kind: RepoBranchActionKind): RepoBranchActionReason {
   return BRANCH_ACTION_REASON_BY_KIND[kind]
 }
 
@@ -144,7 +148,7 @@ function throwIfStale(get: ReposGet, id: string, token: number): void {
   if (get().repos[id]?.instanceToken !== token) throw new Error('cancelled')
 }
 
-function syncNetworkFetchResourceState(
+function syncNetworkFetchDataLoadState(
   set: ReposSet,
   id: string,
   token: number,
@@ -154,11 +158,11 @@ function syncNetworkFetchResourceState(
   if (!network) return
   updateIfFresh(set, id, token, (r) => {
     if (result.message === 'cancelled') {
-      cancelResource(r.resources.fetch)
+      cancelDataLoad(r.dataLoads.fetch)
       return
     }
-    if (result.ok) finishResourceSuccess(r.resources.fetch)
-    else finishResourceError(r.resources.fetch, result.message)
+    if (result.ok) finishDataLoadSuccess(r.dataLoads.fetch)
+    else finishDataLoadError(r.dataLoads.fetch, result.message)
   })
 }
 
@@ -214,13 +218,13 @@ function runBranchActionIpc(
 ): Promise<ExecResult> {
   switch (action.kind) {
     case 'pull':
-      return pullRepositoryBranch(repoId, action.branch, action.worktreePath, signal, sourceToken)
+      return pullRepoBranch(repoId, action.branch, action.worktreePath, signal, sourceToken)
     case 'push':
-      return pushRepositoryBranch(repoId, action.branch, signal, sourceToken)
+      return pushRepoBranch(repoId, action.branch, signal, sourceToken)
     case 'createWorktree':
-      return createRepositoryWorktree(repoId, action.input, action.worktreeBootstrap, signal, sourceToken)
+      return createRepoWorktree(repoId, action.input, action.worktreeBootstrap, signal, sourceToken)
     case 'deleteBranch':
-      return deleteRepositoryBranch(
+      return deleteRepoBranch(
         repoId,
         action.branch,
         { force: action.force, alsoDeleteUpstream: action.alsoDeleteUpstream },
@@ -228,7 +232,7 @@ function runBranchActionIpc(
         sourceToken,
       )
     case 'removeWorktree':
-      return removeRepositoryWorktree(
+      return removeRepoWorktree(
         repoId,
         {
           branch: action.branch,
@@ -290,10 +294,10 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
         return result
       }
       updateIfFresh(set, id, token, (r) => {
-        if (network) startResource(r.resources.fetch, { hasData: r.resources.fetch.loadedAt !== null })
+        if (network) startDataLoad(r.dataLoads.fetch, { hasData: r.dataLoads.fetch.loadedAt !== null })
       })
       const handleResult = async (result: ExecResult) => {
-        syncNetworkFetchResourceState(set, id, token, network, result)
+        syncNetworkFetchDataLoadState(set, id, token, network, result)
         if (!shouldSuppressBranchActionResultMessage(result, options)) {
           get().setLastResult(id, result, token, { action: branchActionEventAction(action) })
         }
@@ -307,7 +311,7 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
         if (result.ok && network) get().clearFetchFailed(id, token)
       }
       const handleError = (message: string) => {
-        syncNetworkFetchResourceState(set, id, token, network, { ok: false, message })
+        syncNetworkFetchDataLoadState(set, id, token, network, { ok: false, message })
         if (message === 'cancelled') return
         get().setLastResult(id, { ok: false, message }, token, { action: branchActionEventAction(action) })
       }

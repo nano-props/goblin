@@ -1,10 +1,10 @@
-import { isWorkspacePaneSessionViewType, isWorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
-import type { WorkspacePaneStaticViewType, WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
-import { replaceRepo } from '#/web/stores/repos/helpers.ts'
+import { isWorkspacePaneSessionTabType, isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneStaticTabType, WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
+import { replaceRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { normalizeWorkspacePaneTabOrderRecord } from '#/web/stores/repos/workspace-pane-tabs.ts'
 import {
-  preferredWorkspacePaneViewForBranch,
-  preferredWorkspacePaneViewByBranchRecordWith,
+  preferredWorkspacePaneTabForBranch,
+  preferredWorkspacePaneTabByBranchRecordWith,
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import type { RepoState, SessionWorkspacePaneRestoreState } from '#/web/stores/repos/types.ts'
 
@@ -17,7 +17,7 @@ export function restoreSessionWorkspacePaneStateInRepos(
   let nextRepos = repos
   const repoIds = new Set([
     ...Object.keys(restoreState.workspacePaneTabOrderByBranchByRepo),
-    ...Object.keys(restoreState.preferredWorkspacePaneViewByBranchByRepo),
+    ...Object.keys(restoreState.preferredWorkspacePaneTabByBranchByRepo),
   ])
 
   for (const id of repoIds) {
@@ -25,7 +25,7 @@ export function restoreSessionWorkspacePaneStateInRepos(
     if (!repo) continue
 
     const tabOrderByBranch = restoreState.workspacePaneTabOrderByBranchByRepo[id]
-    const preferredViewByBranch = restoreState.preferredWorkspacePaneViewByBranchByRepo[id]
+    const preferredTabByBranch = restoreState.preferredWorkspacePaneTabByBranchByRepo[id]
     let repoChanged = false
 
     const nextTabOrderByBranch =
@@ -46,11 +46,11 @@ export function restoreSessionWorkspacePaneStateInRepos(
       repoChanged = true
     }
 
-    const nextPreferredViewByBranch = preferredViewByBranch
-      ? restoredPreferredWorkspacePaneViews(repo, preferredViewByBranch, nextTabOrderByBranch)
-      : repo.ui.preferredWorkspacePaneViewByBranch
+    const nextPreferredTabByBranch = preferredTabByBranch
+      ? restoredPreferredWorkspacePaneTabs(repo, preferredTabByBranch, nextTabOrderByBranch)
+      : repo.ui.preferredWorkspacePaneTabByBranch
 
-    if (nextPreferredViewByBranch !== repo.ui.preferredWorkspacePaneViewByBranch) {
+    if (nextPreferredTabByBranch !== repo.ui.preferredWorkspacePaneTabByBranch) {
       repoChanged = true
     }
 
@@ -58,32 +58,32 @@ export function restoreSessionWorkspacePaneStateInRepos(
     if (nextRepos === repos) nextRepos = { ...repos }
     nextRepos[id] = replaceRepo(repo, (r) => {
       r.ui.workspacePaneTabOrderByBranch = nextTabOrderByBranch
-      r.ui.preferredWorkspacePaneViewByBranch = nextPreferredViewByBranch
+      r.ui.preferredWorkspacePaneTabByBranch = nextPreferredTabByBranch
     })
   }
 
   return nextRepos
 }
 
-function restoredPreferredWorkspacePaneViews(
+function restoredPreferredWorkspacePaneTabs(
   repo: RepoState,
-  preferredViewByBranch: SessionWorkspacePaneRestoreState['preferredWorkspacePaneViewByBranchByRepo'][string],
+  preferredTabByBranch: SessionWorkspacePaneRestoreState['preferredWorkspacePaneTabByBranchByRepo'][string],
   tabOrderByBranch: Record<string, readonly WorkspacePaneTabOrderEntry[]>,
-): RepoState['ui']['preferredWorkspacePaneViewByBranch'] {
-  let next = repo.ui.preferredWorkspacePaneViewByBranch
-  for (const [branch, view] of Object.entries(preferredViewByBranch)) {
+): RepoState['ui']['preferredWorkspacePaneTabByBranch'] {
+  let next = repo.ui.preferredWorkspacePaneTabByBranch
+  for (const [branch, tab] of Object.entries(preferredTabByBranch)) {
     if (!isRestorableBranchName(branch)) continue
-    if (!isWorkspacePaneSessionViewType(view)) continue
-    if (isWorkspacePaneStaticViewType(view) && !workspacePaneStaticViews(tabOrderByBranch[branch] ?? []).includes(view))
+    if (!isWorkspacePaneSessionTabType(tab)) continue
+    if (isWorkspacePaneStaticTabType(tab) && !workspacePaneStaticTabs(tabOrderByBranch[branch] ?? []).includes(tab))
       continue
     const current =
-      next === repo.ui.preferredWorkspacePaneViewByBranch
-        ? preferredWorkspacePaneViewForBranch(repo.ui, branch)
+      next === repo.ui.preferredWorkspacePaneTabByBranch
+        ? preferredWorkspacePaneTabForBranch(repo.ui, branch)
         : (next[branch] ?? 'status')
-    if (current === view) continue
+    if (current === tab) continue
     const source =
-      next === repo.ui.preferredWorkspacePaneViewByBranch ? repo.ui : { preferredWorkspacePaneViewByBranch: next }
-    next = preferredWorkspacePaneViewByBranchRecordWith(source, branch, view)
+      next === repo.ui.preferredWorkspacePaneTabByBranch ? repo.ui : { preferredWorkspacePaneTabByBranch: next }
+    next = preferredWorkspacePaneTabByBranchRecordWith(source, branch, tab)
   }
   return next
 }
@@ -123,6 +123,6 @@ function workspacePaneTabOrderRecordsEqual(
   })
 }
 
-function workspacePaneStaticViews(order: readonly WorkspacePaneTabOrderEntry[]): WorkspacePaneStaticViewType[] {
+function workspacePaneStaticTabs(order: readonly WorkspacePaneTabOrderEntry[]): WorkspacePaneStaticTabType[] {
   return order.flatMap((entry) => (entry.type === 'terminal' ? [] : [entry.type]))
 }

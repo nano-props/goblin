@@ -34,10 +34,7 @@ export const HEARTBEAT_DEADLINE_MS = 90_000
 export class TerminalRealtimeBroker {
   private readonly options: TerminalBrokerOptions
   private readonly socketsByUserId = new Map<string, Set<TerminalRealtimeSocket>>()
-  private readonly socketMetaBySocket = new Map<
-    TerminalRealtimeSocket,
-    { clientId: string; userId: string }
-  >()
+  private readonly socketMetaBySocket = new Map<TerminalRealtimeSocket, { clientId: string; userId: string }>()
   private readonly socketCountByUserClientKey = new Map<string, number>()
   private readonly lastHeartbeatAtByClientKey = new Map<string, number>()
   // Tracks clientKeys whose `onClientDisconnected` has been fired

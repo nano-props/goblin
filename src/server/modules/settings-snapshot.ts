@@ -2,14 +2,14 @@ import {
   getServerRecentRepos,
   getServerRepoSettings,
   getServerSessionState,
-  getServerSettingsPrefs,
+  getUserSettings,
 } from '#/server/modules/settings-source.ts'
-import type { ServerSettingsState } from '#/server/modules/settings-state.ts'
+import type { NativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
 import { buildSettingsSnapshot } from '#/shared/settings-snapshot.ts'
 import type { SettingsSnapshot } from '#/shared/api-types.ts'
 
-export async function getSettingsSnapshot(state: ServerSettingsState): Promise<SettingsSnapshot> {
-  const serverSettings = await getServerSettingsPrefs()
+export async function getSettingsSnapshot(state: NativeShortcutRegistrationState): Promise<SettingsSnapshot> {
+  const serverSettings = await getUserSettings()
   return buildSettingsSnapshot({
     prefs: serverSettings,
     globalShortcutRegistered: state.globalShortcutRegistered,

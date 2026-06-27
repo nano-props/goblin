@@ -86,7 +86,7 @@ function seedElectronBootstrap() {
     onEffectIntent: vi.fn(() => () => {}),
     pathForFile: () => '',
     saveClipboardFiles: vi.fn(async () => []),
-    shell: () => null,
+    host: () => null,
     terminal: () => ({
       attach: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
       restart: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
@@ -114,7 +114,7 @@ function seedElectronBootstrap() {
       listSessions: vi.fn(async () => []),
       prewarm: vi.fn(async () => {}),
       kickReconnect: vi.fn(() => {}),
-      getSlotSnapshot: vi.fn(async () => null),
+      getSessionSnapshot: vi.fn(async () => null),
       notifyBell: vi.fn(async () => false),
       sendTestNotification: vi.fn(async () => false),
       setBadge: () => {},
@@ -122,9 +122,9 @@ function seedElectronBootstrap() {
       onTitle: () => () => {},
       onExit: () => () => {},
       onIdentity: () => () => {},
-        onLifecycle: () => () => {},
+      onLifecycle: () => () => {},
       onSessionsChanged: () => () => {},
-      onSlotClosed: () => () => {},
+      onSessionClosed: () => () => {},
     }),
     rotateAccessToken: vi.fn(async () => ({ accessToken: 'rotated-secret' })),
   })
@@ -155,7 +155,7 @@ function seedWebBootstrap() {
     onEffectIntent: vi.fn(() => () => {}),
     pathForFile: () => '',
     saveClipboardFiles: vi.fn(async () => []),
-    shell: () => null,
+    host: () => null,
     terminal: () => ({
       attach: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
       restart: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
@@ -183,7 +183,7 @@ function seedWebBootstrap() {
       listSessions: vi.fn(async () => []),
       prewarm: vi.fn(async () => {}),
       kickReconnect: vi.fn(() => {}),
-      getSlotSnapshot: vi.fn(async () => null),
+      getSessionSnapshot: vi.fn(async () => null),
       notifyBell: vi.fn(async () => false),
       sendTestNotification: vi.fn(async () => false),
       setBadge: () => {},
@@ -191,9 +191,9 @@ function seedWebBootstrap() {
       onTitle: () => () => {},
       onExit: () => () => {},
       onIdentity: () => () => {},
-        onLifecycle: () => () => {},
+      onLifecycle: () => () => {},
       onSessionsChanged: () => () => {},
-      onSlotClosed: () => () => {},
+      onSessionClosed: () => () => {},
     }),
   })
 }
@@ -224,9 +224,9 @@ describe('WebSettings runtime parity', () => {
     expect(html).not.toContain('settings.lan.enabled')
   })
 
-  test('still shows the server URL and token copy button in both runtimes', async () => {
+  test('still shows the server URL and token copy button in both repoOperationSchedulers', async () => {
     // The shared surface (URL display, token copy, QR codes when
-    // LAN URLs are present) must render in both runtimes so the
+    // LAN URLs are present) must render in both repoOperationSchedulers so the
     // web operator can still paste the access token into the
     // auth gate. Regression guard for the cross-runtime split
     // accidentally dropping the shared chrome.

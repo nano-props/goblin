@@ -1,12 +1,12 @@
 import type { GitRemoteInfo } from '#/web/types.ts'
-import type { RemoteRepoLifecycle } from '#/shared/remote-repo.ts'
+import type { RemoteRepoConnectionLifecycle } from '#/shared/remote-repo.ts'
 export interface RepoPickerRepo {
   id: string
   name: string
   remoteDetails: GitRemoteInfo[]
   /**
    * Last time this client refreshed repo data after a sync/invalidation.
-   * Null until snapshot/fetch resources have completed at least once.
+   * Null until snapshot/fetch data loads have completed at least once.
    */
   lastSyncedAt: number | null
   /**
@@ -14,7 +14,7 @@ export interface RepoPickerRepo {
    * for local repos. The picker reads `lifecycle.kind` directly
    * to decide which badge to show on the current repo button.
    */
-  lifecycle: RemoteRepoLifecycle | null
+  lifecycle: RemoteRepoConnectionLifecycle | null
 }
 
 export type RepoPickerSurface = 'toolbar' | 'sidebar'

@@ -19,15 +19,7 @@ interface Props {
   onClick: () => void
 }
 
-export function IconCopyButton({
-  label,
-  succeeded,
-  busy,
-  disabled,
-  side = 'right',
-  className,
-  onClick,
-}: Props) {
+export function IconCopyButton({ label, succeeded, busy, disabled, side = 'right', className, onClick }: Props) {
   return (
     <Tip label={label} side={side} forceOpen={succeeded}>
       <Button

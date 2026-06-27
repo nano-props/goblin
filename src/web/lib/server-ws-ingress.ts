@@ -39,9 +39,7 @@ export interface ServerWebSocketIngress<T> {
   resetForTests: () => void
 }
 
-export function createServerWebSocketIngress<T>(
-  config: ServerWebSocketIngressConfig<T>,
-): ServerWebSocketIngress<T> {
+export function createServerWebSocketIngress<T>(config: ServerWebSocketIngressConfig<T>): ServerWebSocketIngress<T> {
   const { path, parseMessage, reconnectDelayMs = DEFAULT_RECONNECT_DELAY_MS } = config
 
   const listeners = new Set<(message: T) => void>()

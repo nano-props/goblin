@@ -130,11 +130,7 @@ export function useBranchActionDialogDisplay<P>(
   // `slot === null` and `entry` is the retained value — we use the
   // retained `liveContext` (which was resolved from `entry` before
   // close) instead of re-resolving against the post-mutation `repos`.
-  const displayContext = entry
-    ? entry === slot
-      ? liveContext
-      : retainedLiveContext
-    : null
+  const displayContext = entry ? (entry === slot ? liveContext : retainedLiveContext) : null
   const displayCheckboxes = useBranchActionDialogsStore((s) =>
     entry ? branchCheckboxesFor(s, entry.repoId, entry.branchName) : EMPTY_CHECKBOXES,
   )

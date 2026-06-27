@@ -5,15 +5,11 @@ import { FormDialog } from '#/web/components/ui/form-dialog.tsx'
 import { Field, FieldDescription, FieldError, FieldLabel } from '#/web/components/ui/field.tsx'
 import { Input } from '#/web/components/ui/input.tsx'
 import { RemotePathSuggestions } from '#/web/components/ui/remote-path-suggestions.tsx'
-import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
+import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/web/components/ui/select.tsx'
 import { useRemotePathSuggestions } from '#/web/hooks/useRemotePathSuggestions.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
-import {
-  getRemoteSshHosts,
-  resolveRemoteRepositoryTarget,
-  testRemoteRepositoryConnection,
-} from '#/web/remote-client.ts'
+import { getRemoteSshHosts, resolveRemoteRepositoryTarget, testRemoteRepoConnection } from '#/web/remote-client.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { RemoteDiagnosticsPanel } from '#/web/components/RemoteDiagnosticsPanel.tsx'
@@ -28,7 +24,7 @@ interface Props {
 export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
   const t = useT()
   const compact = useIsCompactUi()
-  const navigation = useMainWindowNavigation()
+  const navigation = usePrimaryWindowNavigation()
   const [hosts, setHosts] = useState<SshConfigHost[]>([])
   const [hasInclude, setHasInclude] = useState(false)
   const [alias, setAlias] = useState('')
@@ -106,7 +102,7 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
     try {
       const nextTarget = await resolveCurrentTarget()
       if (!nextTarget) return
-      const result = await testRemoteRepositoryConnection(nextTarget)
+      const result = await testRemoteRepoConnection(nextTarget)
       setDiagnostics(result)
     } catch (err) {
       setActionError(formatRemoteDialogError(t, err))
@@ -131,7 +127,7 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
       }
       const needsTest = !diagnostics?.ok || diagnostics.target.id !== nextTarget.id
       if (needsTest) {
-        const result = await testRemoteRepositoryConnection(nextTarget)
+        const result = await testRemoteRepoConnection(nextTarget)
         if (!result.ok) {
           setDiagnostics(result)
           setLoading(false)

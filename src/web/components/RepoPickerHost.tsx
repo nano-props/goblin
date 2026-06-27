@@ -6,10 +6,10 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { RepoPicker } from '#/web/components/repo-picker/RepoPicker.tsx'
 import { repoPickerReposEqual } from '#/web/components/repo-picker/summary-equality.ts'
-import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
+import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import type { RepoPickerRepo, RepoPickerSurface } from '#/web/components/repo-picker/types.ts'
 import { openRepoFromDialog } from '#/web/lib/open-repo-dialog.ts'
-import { useRuntimeShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
+import { useShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
 import { repoPickerStoreActionsEqual, repoPickerStoreActionsFromStore } from '#/web/stores/repos/selector-actions.ts'
 import { latestRepoSyncTime } from '#/web/stores/repos/sync-time.ts'
 
@@ -29,7 +29,7 @@ export function RepoPickerHost({
   surface = 'toolbar',
 }: RepoPickerHostProps) {
   const t = useT()
-  const { shortcutsDisabled } = useRuntimeShortcutSettings()
+  const { shortcutsDisabled } = useShortcutSettings()
   // Build the summary array inside the selector but compare with our
   // explicit equality fn so re-derivations with identical contents
   // don't trigger a re-render. Zustand v5's primary `useReposStore`
@@ -55,7 +55,7 @@ export function RepoPickerHost({
         .filter((x): x is RepoPickerRepo => x !== null),
     repoPickerReposEqual,
   )
-  const navigation = useMainWindowNavigation()
+  const navigation = usePrimaryWindowNavigation()
   const { ensureWorkspaceOpen } = useStoreWithEqualityFn(
     useReposStore,
     repoPickerStoreActionsFromStore,

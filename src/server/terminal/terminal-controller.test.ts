@@ -96,10 +96,10 @@ describe('attachTerminalClient (single-user model)', () => {
     expect(state.controller).toBeNull()
   })
 
-  test('same attachment that was controller reattaching auto-claims when slot cleared', () => {
+  test('same attachment that was controller reattaching auto-claims when controller role cleared', () => {
     // The previous design kept the controller in a 'grace' sub-state
     // for 30 s so a reattach could restore it without an explicit
-    // takeover. The new design clears the slot on disconnect
+    // takeover. The new design clears the controller role on disconnect
     // (see updateTerminalClientConnection), so reattaching is
     // functionally the same as a fresh attach.
     const state = createState({
@@ -194,7 +194,7 @@ describe('updateTerminalClientConnection', () => {
     expect(effect.emitIdentity).toBe(false)
   })
 
-  test('clears the controller slot immediately on disconnect (no grace)', () => {
+  test('clears the controller role immediately on disconnect (no grace)', () => {
     const state = createState({
       attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]),
       controller: { clientId: 'a1', status: 'connected' },
@@ -205,7 +205,7 @@ describe('updateTerminalClientConnection', () => {
     expect(state.attachments.get('a1')?.connected).toBe(false)
   })
 
-  test('reconnect of a freshly-disconnected controller restores the slot', () => {
+  test('reconnect of a freshly-disconnected controller restores the controller role', () => {
     const state = createState({
       attachments: new Map([['a1', { cols: 80, rows: 24, connected: false }]]),
       controller: null,
@@ -216,7 +216,7 @@ describe('updateTerminalClientConnection', () => {
     expect(state.controller).toEqual({ clientId: 'a1', status: 'connected' })
   })
 
-  test('auto-claims when a viewer reconnects and the slot is empty', () => {
+  test('auto-claims when a viewer reconnects and no controller is present', () => {
     const state = createState({
       attachments: new Map([['a1', { cols: 80, rows: 24, connected: false }]]),
       controller: null,
@@ -270,7 +270,7 @@ describe('updateTerminalClientConnection', () => {
     expect(state.attachments.get('a2')).toEqual({ cols: 100, rows: 30, connected: false })
   })
 
-  test('disconnecting the controller hands the slot to a reconnecting sibling', () => {
+  test('disconnecting the controller hands control to a reconnecting sibling', () => {
     // Device-switch simulation: A controls; A disconnects; B
     // reconnects (or first connects) and becomes the new controller.
     const state = createState({
@@ -370,7 +370,7 @@ describe('explainAuthority', () => {
     const unownedState = createState({
       attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]),
     })
-    expect(explainAuthority(unownedState, 'a1', 'write')).toBe('slot-unowned')
+    expect(explainAuthority(unownedState, 'a1', 'write')).toBe('session-unowned')
 
     const unknownState = createState({
       attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]),

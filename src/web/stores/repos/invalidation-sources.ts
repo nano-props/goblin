@@ -3,7 +3,7 @@ const RECENT_SOURCE_TOKEN_TTL_MS = 10_000
 const activeSourceTokens = new Set<string>()
 const recentSourceTokens = new Map<string, number>()
 
-export function createRepoInvalidationSourceToken(prefix: 'manual' | 'branch'): string {
+function createRepoInvalidationSourceToken(prefix: 'manual' | 'branch'): string {
   const random =
     typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
       ? crypto.randomUUID().replace(/-/g, '')

@@ -7,30 +7,27 @@ import type {
   TerminalMutationResult,
   TerminalRestartInput,
   TerminalResizeInput,
-  TerminalSlotInput,
-  TerminalSlotSnapshot,
-  TerminalSlotSnapshotInput,
-  TerminalSlotSummary,
+  TerminalSessionInput,
+  TerminalSessionSnapshot,
+  TerminalSessionSnapshotInput,
+  TerminalSessionSummary,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
   TerminalWriteInput,
 } from '#/shared/terminal-types.ts'
-import {
-  isValidTerminalPtySessionId,
-  isValidTerminalSize,
-} from '#/shared/terminal-validators.ts'
-import { isValidTerminalClientId } from '#/server/terminal/terminal-runtime-support.ts'
+import { isValidTerminalPtySessionId, isValidTerminalSize } from '#/shared/terminal-validators.ts'
+import { isValidTerminalClientId } from '#/server/terminal/terminal-session-ids.ts'
 import type { TerminalRealtimeBroker } from '#/server/terminal/terminal-realtime-broker.ts'
-import { isValidTerminalWriteData, type TerminalSlotManager } from '#/server/terminal/terminal-slot-manager.ts'
+import { isValidTerminalWriteData, type TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
 
 interface TerminalCatalogLike {
   create(clientId: string, userId: string, input: TerminalCreateInput): Promise<TerminalCatalogMutationResult>
   prune(clientId: string, userId: string, repoRoot: string): Promise<{ pruned: number; remaining: number }>
-  listSessions(userId: string, repoRoot: string): Promise<TerminalSlotSummary[]>
+  listSessions(userId: string, repoRoot: string): Promise<TerminalSessionSummary[]>
 }
 
 interface TerminalRuntimeActionDependencies {
-  manager: TerminalSlotManager<string>
+  manager: TerminalSessionManager<string>
   broker: Pick<TerminalRealtimeBroker, 'broadcastToUser'>
   catalog: TerminalCatalogLike
   isValidTerminalClientId(value: unknown): value is string
@@ -53,20 +50,20 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       ) {
         return { ok: false, message: 'error.invalid-arguments' }
       }
-      const slotClientId = input.clientId ?? clientId
-      const result = await manager.attachSlot(
+      const terminalClientId = input.clientId ?? clientId
+      const result = await manager.attachSession(
         userId,
         input.ptySessionId,
         input.cols,
         input.rows,
-        slotClientId,
-        resolveClientConnected(userId, slotClientId),
+        terminalClientId,
+        resolveClientConnected(userId, terminalClientId),
       )
       return result
     },
 
     async restart(clientId: string, userId: string, input: TerminalRestartInput): Promise<TerminalAttachResult> {
-      const repoRoot = manager.getSlot(userId, input.ptySessionId)?.scope
+      const repoRoot = manager.getSession(userId, input.ptySessionId)?.scope
       if (
         !isValidTerminalClientId(clientId) ||
         !isValidTerminalPtySessionId(input?.ptySessionId) ||
@@ -74,24 +71,20 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       ) {
         return { ok: false, message: 'error.invalid-arguments' }
       }
-      const slotClientId = input.clientId ?? clientId
-      const result = await manager.restartSlot(
+      const terminalClientId = input.clientId ?? clientId
+      const result = await manager.restartSession(
         userId,
         input.ptySessionId,
         input.cols,
         input.rows,
-        slotClientId,
-        resolveClientConnected(userId, slotClientId),
+        terminalClientId,
+        resolveClientConnected(userId, terminalClientId),
       )
       if (repoRoot) broadcastRepoSessionsChanged(userId, repoRoot)
       return result
     },
 
-    async create(
-      clientId: string,
-      userId: string,
-      input: TerminalCreateInput,
-    ): Promise<TerminalCatalogMutationResult> {
+    async create(clientId: string, userId: string, input: TerminalCreateInput): Promise<TerminalCatalogMutationResult> {
       return await catalog.create(clientId, userId, input)
     },
 
@@ -101,57 +94,51 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
 
     write(clientId: string, userId: string, input: TerminalWriteInput): TerminalMutationResult {
       if (!isValidTerminalClientId(clientId)) return false
-      if (
-        !isValidTerminalPtySessionId(input?.ptySessionId) ||
-        !isValidTerminalWriteData(input?.data)
-      ) {
+      if (!isValidTerminalPtySessionId(input?.ptySessionId) || !isValidTerminalWriteData(input?.data)) {
         return false
       }
-      const slotClientId = input.clientId ?? clientId
-      return manager.writeSlot(userId, input.ptySessionId, input.data, slotClientId)
+      const terminalClientId = input.clientId ?? clientId
+      return manager.writeSession(userId, input.ptySessionId, input.data, terminalClientId)
     },
 
     resize(clientId: string, userId: string, input: TerminalResizeInput): TerminalMutationResult {
       if (!isValidTerminalClientId(clientId)) return false
-      if (
-        !isValidTerminalPtySessionId(input?.ptySessionId) ||
-        !isValidTerminalSize(input?.cols, input?.rows)
-      ) {
+      if (!isValidTerminalPtySessionId(input?.ptySessionId) || !isValidTerminalSize(input?.cols, input?.rows)) {
         return false
       }
-      const slotClientId = input.clientId ?? clientId
-      return manager.resizeSlot(
+      const terminalClientId = input.clientId ?? clientId
+      return manager.resizeSession(
         userId,
         input.ptySessionId,
         input.cols,
         input.rows,
-        slotClientId,
-        resolveClientConnected(userId, slotClientId),
+        terminalClientId,
+        resolveClientConnected(userId, terminalClientId),
       )
     },
 
-    close(clientId: string, userId: string, input: TerminalSlotInput): TerminalMutationResult {
+    close(clientId: string, userId: string, input: TerminalSessionInput): TerminalMutationResult {
       if (!isValidTerminalClientId(clientId)) return false
       // Look up the session BEFORE closing so we know its scope
       // (for the per-session broadcast). The session is gone after
-      // `closeSlotForUser` returns, so a post-close lookup would
+      // `closeSessionForUser` returns, so a post-close lookup would
       // always miss. The lookup is also gated on validity so a
       // malformed input never throws inside the action.
       const repoRoot = isValidTerminalPtySessionId(input?.ptySessionId)
-        ? manager.getSlot(userId, input.ptySessionId)?.scope
+        ? manager.getSession(userId, input.ptySessionId)?.scope
         : undefined
       const closed = isValidTerminalPtySessionId(input?.ptySessionId)
-        ? manager.closeSlotForUser(userId, input.ptySessionId)
+        ? manager.closeSessionForUser(userId, input.ptySessionId)
         : false
       if (closed && repoRoot) {
         // `sessions-changed` keeps the full repo list in sync for
-        // observers that only watch that primitive. `slot-closed`
+        // observers that only watch that primitive. `session-closed`
         // is the immediate invalidation for any sibling window under
         // the same user. Other users must not hear about this
         // session id.
         broadcastRepoSessionsChanged(userId, repoRoot)
         broker.broadcastToUser(userId, {
-          type: 'slot-closed',
+          type: 'session-closed',
           ptySessionId: input.ptySessionId,
           repoRoot,
         })
@@ -161,39 +148,35 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
 
     takeover(clientId: string, userId: string, input: TerminalTakeoverInput): TerminalTakeoverResult {
       if (!isValidTerminalClientId(clientId)) return { ok: false, message: 'error.invalid-arguments' }
-      if (
-        !isValidTerminalPtySessionId(input?.ptySessionId) ||
-        !isValidTerminalSize(input?.cols, input?.rows)
-      ) {
+      if (!isValidTerminalPtySessionId(input?.ptySessionId) || !isValidTerminalSize(input?.cols, input?.rows)) {
         return { ok: false, message: 'error.invalid-arguments' }
       }
-      const slotClientId = input.clientId ?? clientId
-      return manager.takeoverSlot(
+      const terminalClientId = input.clientId ?? clientId
+      return manager.takeoverSession(
         userId,
         input.ptySessionId,
         input.cols,
         input.rows,
-        slotClientId,
-        resolveClientConnected(userId, slotClientId),
+        terminalClientId,
+        resolveClientConnected(userId, terminalClientId),
       )
     },
 
-    async listSessions(clientId: string, userId: string, repoRoot: string): Promise<TerminalSlotSummary[]> {
+    async listSessions(clientId: string, userId: string, repoRoot: string): Promise<TerminalSessionSummary[]> {
       if (!isValidTerminalClientId(clientId)) return []
       if (!isValidRepoLocator(repoRoot)) return []
       return await catalog.listSessions(userId, repoRoot)
     },
 
-    async getSlotSnapshot(
+    async getSessionSnapshot(
       clientId: string,
       userId: string,
-      input: TerminalSlotSnapshotInput,
-    ): Promise<TerminalSlotSnapshot | null> {
+      input: TerminalSessionSnapshotInput,
+    ): Promise<TerminalSessionSnapshot | null> {
       if (!isValidTerminalClientId(clientId)) return null
       if (!isValidTerminalPtySessionId(input?.ptySessionId)) return null
-      return await manager.getSlotSnapshot(userId, input.ptySessionId)
+      return await manager.getSessionSnapshot(userId, input.ptySessionId)
     },
-
   }
 
   function broadcastRepoSessionsChanged(userId: string, repoRoot: string): void {

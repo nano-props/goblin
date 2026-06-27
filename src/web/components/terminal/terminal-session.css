@@ -1,0 +1,299 @@
+.goblin-terminal-session {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-background);
+  --goblin-terminal-surface-inset: 4px;
+  --goblin-terminal-float-offset: 10px;
+  --goblin-terminal-overlay-offset: 12px;
+  --goblin-terminal-float-padding: 6px 8px;
+  --goblin-terminal-float-radius: 8px;
+  --goblin-terminal-control-radius: 6px;
+}
+
+.goblin-terminal-session__host {
+  display: flex;
+  position: relative;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.goblin-terminal-session__empty {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.goblin-terminal-progress {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 1;
+  height: 2px;
+  background: color-mix(in srgb, var(--color-brand) 20%, transparent);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.goblin-terminal-progress__bar {
+  height: 100%;
+  background: var(--color-brand);
+  transition: width 200ms ease;
+}
+
+.goblin-terminal-progress--error {
+  background: color-mix(in srgb, var(--color-danger) 20%, transparent);
+}
+
+.goblin-terminal-progress--error .goblin-terminal-progress__bar {
+  background: var(--color-danger);
+}
+
+.goblin-terminal-progress--warning {
+  background: color-mix(in srgb, var(--color-attention) 20%, transparent);
+}
+
+.goblin-terminal-progress--warning .goblin-terminal-progress__bar {
+  background: var(--color-attention);
+}
+
+.goblin-terminal-progress--indeterminate {
+  background: color-mix(in srgb, var(--color-brand) 20%, transparent);
+}
+
+.goblin-terminal-progress--indeterminate::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: var(--color-brand);
+  animation: goblin-terminal-progress-indeterminate 1.5s ease-in-out infinite;
+}
+
+@keyframes goblin-terminal-progress-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(350%);
+  }
+}
+
+.goblin-managed-terminal-frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 6px;
+  overflow: hidden;
+}
+
+.goblin-managed-terminal-host {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.goblin-managed-terminal-host .xterm {
+  width: 100%;
+  height: 100%;
+  overflow-anchor: none;
+}
+
+.goblin-managed-terminal-host .xterm-viewport {
+  background: var(--goblin-terminal-background, var(--color-terminal-background)) !important;
+}
+
+.goblin-terminal-session__search {
+  position: absolute;
+  top: var(--goblin-terminal-float-offset);
+  right: var(--goblin-terminal-float-offset);
+  z-index: 2;
+  display: flex;
+  max-width: calc(100% - 20px);
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--goblin-terminal-float-radius);
+  background: color-mix(in srgb, var(--color-popover) 96%, transparent);
+  padding: 6px;
+  box-shadow: var(--shadow-sm);
+}
+
+.goblin-terminal-session__search-input {
+  height: 24px;
+  min-width: 80px;
+  width: clamp(80px, 32vw, 190px);
+  border: 1px solid var(--color-input);
+  border-radius: var(--goblin-terminal-control-radius);
+  background: var(--color-control);
+  padding: 0 8px;
+  color: var(--color-foreground);
+  font-size: 12px;
+  outline: none;
+}
+
+.goblin-terminal-session__search-input:focus {
+  border-color: var(--color-ring);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-ring) 25%, transparent);
+}
+
+.goblin-terminal-session__search-result {
+  flex: 0 0 auto;
+  min-width: 42px;
+  color: var(--color-muted-foreground);
+  font-size: 11px;
+  text-align: center;
+}
+
+.goblin-terminal-session__status-overlay {
+  position: absolute;
+  right: var(--goblin-terminal-overlay-offset);
+  bottom: var(--goblin-terminal-overlay-offset);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--goblin-terminal-control-radius);
+  background: color-mix(in srgb, var(--color-popover) 95%, transparent);
+  padding: var(--goblin-terminal-float-padding);
+  color: var(--color-muted-foreground);
+  font-size: 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+.goblin-terminal-session__drop-overlay {
+  position: absolute;
+  inset: var(--goblin-terminal-surface-inset);
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--color-brand);
+  border-radius: var(--goblin-terminal-float-radius);
+  background: color-mix(in srgb, var(--color-background) 85%, transparent);
+  pointer-events: none;
+  color: var(--color-muted-foreground);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.goblin-terminal-session__host--hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.goblin-terminal-session__viewer-overlay {
+  position: absolute;
+  inset: var(--goblin-terminal-surface-inset);
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--goblin-terminal-float-radius);
+  background: var(--color-background);
+  padding: 24px;
+}
+
+.goblin-terminal-session__viewer-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 480px;
+  text-align: center;
+}
+
+.goblin-terminal-session__viewer-badge {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-muted-foreground);
+  border: 1px solid var(--color-border);
+  border-radius: var(--goblin-terminal-control-radius);
+  padding: 2px 8px;
+}
+
+.goblin-terminal-session__viewer-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.goblin-terminal-session__viewer-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-foreground);
+  word-break: break-word;
+}
+
+.goblin-terminal-session__viewer-process {
+  font-size: 14px;
+  color: var(--color-muted-foreground);
+}
+
+.goblin-terminal-parking {
+  position: fixed;
+  left: -10000px;
+  top: -10000px;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.goblin-terminal-parking__item {
+  overflow: hidden;
+}
+
+.goblin-terminal-mobile-toolbar {
+  display: flex;
+  flex-direction: column;
+  /* No background / border / shadow on the container — the toolbar
+     should feel like a control surface hovering on the terminal canvas,
+     not a popover. Tap-target spacing comes from the row gap. */
+}
+
+.goblin-terminal-mobile-toolbar--floating {
+  position: absolute;
+  right: var(--goblin-terminal-float-offset);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+}
+
+.goblin-terminal-mobile-toolbar__row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.goblin-terminal-mobile-toolbar__btn {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0;
+  font-size: 14px;
+  font-weight: 500;
+  flex-shrink: 0;
+  /* Tinted surface sits over the terminal so the glyph stays legible on
+     both light and dark palettes; the border is a hairline at low alpha
+     so individual buttons remain distinguishable without looking like
+     a hard-edged panel. */
+  background-color: color-mix(in srgb, var(--color-secondary) 35%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-border) 30%, transparent);
+}
+
+.goblin-terminal-mobile-toolbar__btn:hover {
+  background-color: color-mix(in srgb, var(--color-secondary) 55%, transparent);
+}

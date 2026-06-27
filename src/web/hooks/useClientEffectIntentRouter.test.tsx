@@ -4,21 +4,21 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { useClientEffectIntentRouter } from '#/web/hooks/useClientEffectIntentRouter.ts'
-import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
+import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
+import { worktreeTerminalKey } from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 import { createBranchSnapshot, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
-import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 
 const appDataClientMocks = vi.hoisted(() => ({
   clearRecentRepoHistory: vi.fn(async () => {}),
 }))
 
-vi.mock('#/web/settings-write-paths.ts', async () => {
-  const actual = await vi.importActual<typeof import('#/web/settings-write-paths.ts')>('#/web/settings-write-paths.ts')
+vi.mock('#/web/settings-actions.ts', async () => {
+  const actual = await vi.importActual<typeof import('#/web/settings-actions.ts')>('#/web/settings-actions.ts')
   return {
     ...actual,
     clearRecentRepoHistory: appDataClientMocks.clearRecentRepoHistory,
@@ -34,10 +34,10 @@ const closeAllOverlays = vi.fn()
 let overlayOpen = false
 let workspaceShortcutSuppressed = false
 let currentRepoId: string | null = null
-let navigation!: MainWindowNavigationActions
+let navigation!: PrimaryWindowNavigationActions
 const activateRepoSpy = vi.fn()
 const closeRepoSpy = vi.fn()
-const showRepoBranchWorkspacePaneViewSpy = vi.fn()
+const showRepoBranchWorkspacePaneTabSpy = vi.fn()
 const consumeExternalOpenPathsSpy = vi.fn<() => Promise<string[]>>(async () => [])
 
 beforeEach(() => {
@@ -47,7 +47,7 @@ beforeEach(() => {
   closeAllOverlays.mockClear()
   activateRepoSpy.mockClear()
   closeRepoSpy.mockClear()
-  showRepoBranchWorkspacePaneViewSpy.mockClear()
+  showRepoBranchWorkspacePaneTabSpy.mockClear()
   appDataClientMocks.clearRecentRepoHistory.mockClear()
   consumeExternalOpenPathsSpy.mockReset()
   consumeExternalOpenPathsSpy.mockResolvedValue([])
@@ -69,17 +69,17 @@ beforeEach(() => {
       state.setActive(repoId)
       state.selectBranch(repoId, branch)
     },
-    showRepoWorkspacePaneView: (repoId, tab) => {
+    showRepoWorkspacePaneTab: (repoId, tab) => {
       const state = useReposStore.getState()
       state.setActive(repoId)
-      state.setWorkspacePaneView(repoId, tab)
+      state.setWorkspacePaneTab(repoId, tab)
     },
-    showRepoBranchWorkspacePaneView: (repoId, branch, tab) => {
-      showRepoBranchWorkspacePaneViewSpy(repoId, branch, tab)
+    showRepoBranchWorkspacePaneTab: (repoId, branch, tab) => {
+      showRepoBranchWorkspacePaneTabSpy(repoId, branch, tab)
       const state = useReposStore.getState()
       state.setActive(repoId)
       state.selectBranch(repoId, branch)
-      state.setWorkspacePaneView(repoId, tab)
+      state.setWorkspacePaneTab(repoId, tab)
     },
     openSettings: () => {},
   }
@@ -101,7 +101,7 @@ beforeEach(() => {
         }
       }),
       pathForFile: vi.fn(() => ''),
-      shell: {
+      host: {
         consumeExternalOpenPaths: consumeExternalOpenPathsSpy,
       },
       terminal: {
@@ -143,7 +143,7 @@ describe('useClientEffectIntentRouter', () => {
       id: '/tmp/repo',
       currentBranch: 'main',
       selectedBranch: 'main',
-      preferredWorkspacePaneView: 'status',
+      preferredWorkspacePaneTab: 'status',
       branchSnapshots: [createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-worktree' } })],
     })
     currentRepoId = repo.id
@@ -159,7 +159,7 @@ describe('useClientEffectIntentRouter', () => {
     expect(closeAllOverlays).toHaveBeenCalledTimes(1)
     const state = useReposStore.getState()
     expect(state.activeId).toBe(repo.id)
-    expect(preferredWorkspacePaneView(repo.id)).toBe('terminal')
+    expect(preferredWorkspacePaneTab(repo.id)).toBe('terminal')
   })
 
   test('terminal bell clicks switch to the emitting worktree branch and selected terminal', async () => {
@@ -167,14 +167,14 @@ describe('useClientEffectIntentRouter', () => {
       id: '/tmp/repo',
       currentBranch: 'main',
       selectedBranch: 'main',
-      preferredWorkspacePaneView: 'status',
+      preferredWorkspacePaneTab: 'status',
       branchSnapshots: [
         createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-main' } }),
         createBranchSnapshot('feature/test', { worktree: { path: '/tmp/repo-feature' } }),
       ],
     })
     currentRepoId = repo.id
-    const key = '/tmp/repo\0/tmp/repo-feature\0slot-2'
+    const key = '/tmp/repo\0/tmp/repo-feature\0session-2'
 
     await renderHookHost()
 
@@ -184,10 +184,10 @@ describe('useClientEffectIntentRouter', () => {
     })
 
     const state = useReposStore.getState()
-    expect(showRepoBranchWorkspacePaneViewSpy).toHaveBeenCalledWith(repo.id, 'feature/test', 'terminal')
+    expect(showRepoBranchWorkspacePaneTabSpy).toHaveBeenCalledWith(repo.id, 'feature/test', 'terminal')
     expect(state.repos[repo.id]?.ui.selectedBranch).toBe('feature/test')
-    expect(preferredWorkspacePaneView(repo.id)).toBe('terminal')
-    expect(state.selectedTerminalByWorktree).toMatchObject({
+    expect(preferredWorkspacePaneTab(repo.id)).toBe('terminal')
+    expect(state.selectedTerminalSessionByWorktree).toMatchObject({
       [worktreeTerminalKey(repo.id, '/tmp/repo-feature')]: key,
     })
   })
@@ -197,7 +197,7 @@ describe('useClientEffectIntentRouter', () => {
       id: '/tmp/repo',
       currentBranch: 'main',
       selectedBranch: 'main',
-      preferredWorkspacePaneView: 'status',
+      preferredWorkspacePaneTab: 'status',
       branchSnapshots: [
         createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-main' } }),
         createBranchSnapshot('feature/test', { worktree: { path: '/tmp/repo-feature' } }),
@@ -207,13 +207,13 @@ describe('useClientEffectIntentRouter', () => {
     navigation = {
       ...navigation,
       selectRepoBranch: vi.fn(),
-      showRepoWorkspacePaneView: vi.fn(),
-      showRepoBranchWorkspacePaneView: (repoId, branch, tab) => {
+      showRepoWorkspacePaneTab: vi.fn(),
+      showRepoBranchWorkspacePaneTab: (repoId, branch, tab) => {
         routeNavigationCalls.push({ repoId, branch, tab })
       },
     }
     currentRepoId = repo.id
-    const key = '/tmp/repo\0/tmp/repo-feature\0slot-2'
+    const key = '/tmp/repo\0/tmp/repo-feature\0session-2'
 
     await renderHookHost()
 
@@ -266,7 +266,7 @@ describe('useClientEffectIntentRouter', () => {
   })
 
   test('current repo menu actions prefer the visible routed repo over store activeId', async () => {
-    const activeRepo = seedRepoState({
+    const activeRepoId = seedRepoState({
       id: '/tmp/active-repo',
       currentBranch: 'main',
       selectedBranch: 'main',
@@ -285,11 +285,11 @@ describe('useClientEffectIntentRouter', () => {
     useReposStore.setState((state) => ({
       ...state,
       repos: {
-        [activeRepo.id]: activeRepo,
+        [activeRepoId.id]: activeRepoId,
         [visibleRepo.id]: visibleRepo,
       },
-      order: [activeRepo.id, visibleRepo.id],
-      activeId: activeRepo.id,
+      order: [activeRepoId.id, visibleRepo.id],
+      activeId: activeRepoId.id,
       sessionReady: true,
     }))
     currentRepoId = visibleRepo.id
@@ -303,7 +303,7 @@ describe('useClientEffectIntentRouter', () => {
 
     expect(closeRepoSpy).toHaveBeenCalledWith(visibleRepo.id)
     expect(useReposStore.getState().repos[visibleRepo.id]).toBeUndefined()
-    expect(useReposStore.getState().repos[activeRepo.id]).toBeDefined()
+    expect(useReposStore.getState().repos[activeRepoId.id]).toBeDefined()
   })
 
   test('open-recent-repo opens without store activation and then delegates activation to navigation', async () => {
@@ -332,7 +332,7 @@ describe('useClientEffectIntentRouter', () => {
       id: '/tmp/repo',
       currentBranch: 'main',
       selectedBranch: 'main',
-      preferredWorkspacePaneView: 'status',
+      preferredWorkspacePaneTab: 'status',
       branchSnapshots: [createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-worktree' } })],
     })
     currentRepoId = repo.id
@@ -342,7 +342,7 @@ describe('useClientEffectIntentRouter', () => {
 
     await act(async () => {
       for (const listener of intentListeners) {
-        listener({ type: 'show-workspace-pane-view-requested', tab: 'terminal' })
+        listener({ type: 'show-workspace-pane-tab-requested', tab: 'terminal' })
         listener({ type: 'terminal-primary-action-requested' })
         listener({ type: 'workspace-zen-mode-toggle-requested' })
         listener({ type: 'close-repo-requested' })
@@ -351,7 +351,7 @@ describe('useClientEffectIntentRouter', () => {
     })
 
     const state = useReposStore.getState()
-    expect(preferredWorkspacePaneView(repo.id)).toBe('status')
+    expect(preferredWorkspacePaneTab(repo.id)).toBe('status')
     expect(state.zenMode).toBe(false)
     expect(closeRepoSpy).not.toHaveBeenCalled()
   })
@@ -419,9 +419,9 @@ describe('useClientEffectIntentRouter', () => {
   })
 })
 
-function preferredWorkspacePaneView(repoId: string) {
+function preferredWorkspacePaneTab(repoId: string) {
   const repo = useReposStore.getState().repos[repoId]
-  return repo ? preferredWorkspacePaneViewForBranch(repo.ui, repo.ui.selectedBranch) : null
+  return repo ? preferredWorkspacePaneTabForBranch(repo.ui, repo.ui.selectedBranch) : null
 }
 
 async function renderHookHost() {

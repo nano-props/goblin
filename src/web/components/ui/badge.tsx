@@ -69,9 +69,4 @@ function Badge({
   )
 }
 
-// Re-export the variant union as a named type so call sites that
-// compute the variant dynamically (e.g. status code → variant) can
-// be type-checked.
-export type BadgeVariant = NonNullable<VariantProps<typeof badgeVariants>['variant']>
-
 export { Badge, badgeVariants }

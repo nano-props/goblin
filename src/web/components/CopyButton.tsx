@@ -4,7 +4,10 @@ import { useT } from '#/web/stores/i18n.ts'
 import { IconCopyButton } from '#/web/components/IconCopyButton.tsx'
 import { useActionFeedback } from '#/web/hooks/useActionFeedback.ts'
 
-type CopyButtonProps = Omit<ComponentPropsWithoutRef<typeof IconCopyButton>, 'busy' | 'label' | 'onClick' | 'succeeded'> & {
+type CopyButtonProps = Omit<
+  ComponentPropsWithoutRef<typeof IconCopyButton>,
+  'busy' | 'label' | 'onClick' | 'succeeded'
+> & {
   value: string
   copyLabel: string
   copiedLabel: string

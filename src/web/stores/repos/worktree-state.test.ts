@@ -6,7 +6,7 @@ import {
   stripBranchWorktreeMetadata,
   worktreeStatesFromBranches,
 } from '#/web/stores/repos/worktree-state.ts'
-import { emptyRepo } from '#/web/stores/repos/helpers.ts'
+import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { createBranchSnapshot, createRepoBranch } from '#/web/stores/repos/test-utils.ts'
 function assertRepoBranchStateTypeGuards() {
   createRepoBranch('feature/a', {

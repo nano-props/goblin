@@ -8,12 +8,8 @@ import {
 describe('shared terminal controller helpers', () => {
   test('resolves controller, viewer, and unowned attachment roles', () => {
     expect(resolveTerminalClientRole(null, 'client_a')).toBe('unowned')
-    expect(resolveTerminalClientRole({ clientId: 'client_a', status: 'connected' }, 'client_a')).toBe(
-      'controller',
-    )
-    expect(resolveTerminalClientRole({ clientId: 'client_a', status: 'connected' }, 'client_b')).toBe(
-      'viewer',
-    )
+    expect(resolveTerminalClientRole({ clientId: 'client_a', status: 'connected' }, 'client_a')).toBe('controller')
+    expect(resolveTerminalClientRole({ clientId: 'client_a', status: 'connected' }, 'client_b')).toBe('viewer')
   })
 
   test('resolves controller view model with controller status fallback', () => {

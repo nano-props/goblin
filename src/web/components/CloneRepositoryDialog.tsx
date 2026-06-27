@@ -237,7 +237,7 @@ function directoryNameFromGitUrl(url: string): string {
 }
 
 function isValidDirectoryName(name: string): boolean {
-  // Match main-process validation: reject path-shaping characters, but
+  // Match native-host validation: reject path-shaping characters, but
   // keep valid single folder names such as `...` or `-repo`.
   return name.length > 0 && name.length <= 255 && name !== '.' && name !== '..' && !/[\\/:\0]/.test(name)
 }

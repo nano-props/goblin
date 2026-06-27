@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from 'vitest'
 import { runExclusiveOperation, runLatestOperation } from '#/web/stores/repos/operation-runner.ts'
-import { repoOperation, repoOperationBusy } from '#/web/stores/repos/runtime.ts'
+import { repoOperation, repoOperationBusy } from '#/web/stores/repos/repo-operation-scheduler.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 const REPO_ID = '/tmp/gbl-operation-runner-test-repo'

@@ -8,10 +8,10 @@ import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/r
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
 
-const persistSessionStateMock = vi.fn(async (_session: unknown) => {})
+const persistWorkspaceSessionStateMock = vi.fn(async (_session: unknown) => {})
 
-vi.mock('#/web/settings-write-paths.ts', () => ({
-  persistSessionState: (session: unknown) => persistSessionStateMock(session),
+vi.mock('#/web/settings-actions.ts', () => ({
+  persistWorkspaceSessionState: (session: unknown) => persistWorkspaceSessionStateMock(session),
 }))
 
 let container: HTMLDivElement | null = null
@@ -20,7 +20,7 @@ let root: Root | null = null
 beforeEach(() => {
   ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   resetReposStore()
-  persistSessionStateMock.mockReset()
+  persistWorkspaceSessionStateMock.mockReset()
 })
 
 afterEach(() => {
@@ -39,26 +39,26 @@ describe('useSessionPersistence', () => {
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'terminal',
+      preferredWorkspacePaneTab: 'terminal',
     })
     useReposStore.setState({
       repos: { [repo.id]: repo },
       order: [repo.id],
       activeId: repo.id,
       sessionReady: true,
-      selectedTerminalByWorktree: {
-        '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0slot-2',
+      selectedTerminalSessionByWorktree: {
+        '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0session-2',
       },
     })
 
     await render(<Harness />)
 
-    expect(persistSessionStateMock).toHaveBeenCalledWith(
+    expect(persistWorkspaceSessionStateMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        openRepos: [{ kind: 'local', id: '/tmp/repo' }],
-        activeRepo: '/tmp/repo',
-        selectedTerminalByWorktree: {
-          '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0slot-2',
+        openRepoEntries: [{ kind: 'local', id: '/tmp/repo' }],
+        activeRepoId: '/tmp/repo',
+        selectedTerminalSessionByWorktree: {
+          '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0session-2',
         },
         workspacePaneTabOrderByBranchByRepo: {
           '/tmp/repo': {
@@ -74,13 +74,13 @@ describe('useSessionPersistence', () => {
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'status',
+      preferredWorkspacePaneTab: 'status',
     })
-    useReposStore.getState().closeWorkspacePaneStaticView(repo.id, 'status', 'feature/worktree')
+    useReposStore.getState().closeWorkspacePaneStaticTab(repo.id, 'status', 'feature/worktree')
 
     await render(<Harness />)
 
-    expect(persistSessionStateMock).toHaveBeenCalledWith(
+    expect(persistWorkspaceSessionStateMock).toHaveBeenCalledWith(
       expect.objectContaining({
         workspacePaneTabOrderByBranchByRepo: {
           '/tmp/repo': {

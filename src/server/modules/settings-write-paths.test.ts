@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import type { SessionState } from '#/shared/api-types.ts'
+import type { WorkspaceSessionState } from '#/shared/api-types.ts'
 import { resolveI18nSnapshot } from '#/shared/i18n/snapshot.ts'
 
 const mocks = vi.hoisted(() => ({
@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   clearServerRecentRepos: vi.fn(),
   setServerFetchIntervalSec: vi.fn(),
   setServerSessionState: vi.fn(),
-  updateServerSettingsPrefs: vi.fn(),
+  updateUserSettings: vi.fn(),
   settingsInvalidationScopesForPrefsPatch: vi.fn(),
 }))
 
@@ -21,7 +21,7 @@ vi.mock('#/server/modules/settings-source.ts', () => ({
   clearServerRecentRepos: mocks.clearServerRecentRepos,
   setServerFetchIntervalSec: mocks.setServerFetchIntervalSec,
   setServerSessionState: mocks.setServerSessionState,
-  updateServerSettingsPrefs: mocks.updateServerSettingsPrefs,
+  updateUserSettings: mocks.updateUserSettings,
 }))
 
 vi.mock('#/shared/server-invalidation.ts', async () => {
@@ -34,7 +34,7 @@ vi.mock('#/shared/server-invalidation.ts', async () => {
   }
 })
 
-describe('settings write paths', () => {
+describe('settings command handlers', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
@@ -52,37 +52,37 @@ describe('settings write paths', () => {
       lanEnabled: false,
     } as const
     const i18nSnapshot = resolveI18nSnapshot('ja', 'ja-JP,ja;q=0.9,en;q=0.8')
-    mocks.updateServerSettingsPrefs.mockResolvedValue(updatedSettings)
+    mocks.updateUserSettings.mockResolvedValue(updatedSettings)
     mocks.settingsInvalidationScopesForPrefsPatch.mockReturnValue(['i18n'])
-    const { applyServerSettingsPrefsWrite } = await import('#/server/modules/settings-write-paths.ts')
+    const { handleUpdateUserSettings } = await import('#/server/modules/settings-write-paths.ts')
 
     await expect(
-      applyServerSettingsPrefsWrite(
-        { settings: { lang: 'ja' } },
+      handleUpdateUserSettings(
+        { prefs: { lang: 'ja' } },
         { acceptLanguage: 'ja-JP,ja;q=0.9,en;q=0.8', signal: new AbortController().signal },
       ),
     ).resolves.toEqual({
       ok: true,
-      settings: updatedSettings,
+      prefs: updatedSettings,
       i18n: i18nSnapshot,
     })
     expect(mocks.publishSettingsInvalidation).toHaveBeenCalledWith(['i18n'])
   })
 
   test('persists session state without publishing settings invalidation', async () => {
-    const session: SessionState = {
-      openRepos: [],
-      activeRepo: null,
+    const session: WorkspaceSessionState = {
+      openRepoEntries: [],
+      activeRepoId: null,
       zenMode: true,
       workspacePaneSize: 50,
-      selectedTerminalByWorktree: {},
+      selectedTerminalSessionByWorktree: {},
       workspacePaneTabOrderByBranchByRepo: {},
     }
     mocks.setServerSessionState.mockResolvedValue(session)
-    mocks.setServerSessionState.mockResolvedValue(session as SessionState)
-    const { applyServerSessionWrite } = await import('#/server/modules/settings-write-paths.ts')
+    mocks.setServerSessionState.mockResolvedValue(session as WorkspaceSessionState)
+    const { handleSetSession } = await import('#/server/modules/settings-write-paths.ts')
 
-    await expect(applyServerSessionWrite({ session })).resolves.toEqual({
+    await expect(handleSetSession({ session })).resolves.toEqual({
       ok: true,
       session,
     })
@@ -93,9 +93,9 @@ describe('settings write paths', () => {
   test('adds recent repos and publishes settings snapshot invalidation', async () => {
     const repo = { kind: 'local', id: '/tmp/repo-a' } as const
     mocks.addServerRecentRepo.mockResolvedValue([repo])
-    const { applyServerRecentRepoAddWrite } = await import('#/server/modules/settings-write-paths.ts')
+    const { handleAddRecentRepo } = await import('#/server/modules/settings-write-paths.ts')
 
-    await expect(applyServerRecentRepoAddWrite({ repo })).resolves.toEqual({
+    await expect(handleAddRecentRepo({ repo })).resolves.toEqual({
       ok: true,
       recentRepos: [repo],
       addedRepo: repo,
@@ -114,8 +114,8 @@ describe('settings write paths', () => {
     const { parseHttpInput } = await import('#/server/common/http-validate.ts')
     const parsed = parseHttpInput(SETTINGS_PATCH_SCHEMAS.session, {
       session: {
-        openRepos: [],
-        activeRepo: null,
+        openRepoEntries: [],
+        activeRepoId: null,
         zenMode: true,
         workspacePaneSize: 42.5,
         workspacePaneTabOrderByBranchByRepo: {},
@@ -125,18 +125,18 @@ describe('settings write paths', () => {
     expect(parsed.session.workspacePaneSize).toBe(42.5)
   })
 
-  test('schema accepts changes as a session-restorable preferred view', async () => {
+  test('schema accepts changes as a session-restorable preferred tab', async () => {
     const { SETTINGS_PATCH_SCHEMAS } = await import('#/shared/procedure-schemas.ts')
     const { parseHttpInput } = await import('#/server/common/http-validate.ts')
 
     expect(() =>
       parseHttpInput(SETTINGS_PATCH_SCHEMAS.session, {
         session: {
-          openRepos: [{ kind: 'local', id: '/tmp/repo' }],
-          activeRepo: '/tmp/repo',
+          openRepoEntries: [{ kind: 'local', id: '/tmp/repo' }],
+          activeRepoId: '/tmp/repo',
           zenMode: true,
           workspacePaneSize: 42.5,
-          preferredWorkspacePaneViewByBranchByRepo: {
+          preferredWorkspacePaneTabByBranchByRepo: {
             '/tmp/repo': {
               main: 'changes',
             },
@@ -156,8 +156,8 @@ describe('settings write paths', () => {
     const { parseHttpInput } = await import('#/server/common/http-validate.ts')
 
     const session = {
-      openRepos: [{ kind: 'local', id: '/tmp/repo' }],
-      activeRepo: '/tmp/repo',
+      openRepoEntries: [{ kind: 'local', id: '/tmp/repo' }],
+      activeRepoId: '/tmp/repo',
       zenMode: true,
       workspacePaneSize: 42.5,
       workspacePaneTabOrderByBranchByRepo: {

@@ -137,9 +137,7 @@ describe('terminal web host bridge', () => {
 
     const dispose = terminalBridge.onOutput(() => {})
     const socket = MockWebSocket.instances[0]
-    expect(socket?.url).toMatch(
-      /^ws:\/\/127\.0\.0\.1:32100\/ws\/terminal\?t=secret&clientId=client_sharedterminal$/,
-    )
+    expect(socket?.url).toMatch(/^ws:\/\/127\.0\.0\.1:32100\/ws\/terminal\?t=secret&clientId=client_sharedterminal$/)
     const attachPromise = terminalBridge.attach({
       ptySessionId: 'pty_1234567890123456',
       cols: 100,
@@ -185,7 +183,7 @@ describe('terminal web host bridge', () => {
   })
 
   test('prefers the bootstrap-provided shared terminal client id over localStorage state', async () => {
-    window.localStorage.setItem('goblin:web-terminal-client-id', 'web_oldpersistedclient')
+    window.localStorage.setItem('goblin:terminal-client-id', 'web_oldpersistedclient')
     const { terminalBridge } = await import('#/web/terminal.ts')
     const dispose = terminalBridge.onOutput(() => {})
     const socket = MockWebSocket.instances[0]
@@ -221,7 +219,7 @@ describe('terminal web host bridge', () => {
 
     await attachPromise
     expect(socket?.url).toContain('clientId=client_sharedterminal')
-    expect(window.localStorage.getItem('goblin:web-terminal-client-id')).toBe('web_oldpersistedclient')
+    expect(window.localStorage.getItem('goblin:terminal-client-id')).toBe('web_oldpersistedclient')
     dispose()
   })
 
@@ -297,7 +295,7 @@ describe('terminal web host bridge', () => {
         payload: {
           ok: true,
           action: 'created',
-          key: '/tmp/repo\u0000/tmp/repo\u0000slot-1',
+          key: '/tmp/repo\u0000/tmp/repo\u0000session-1',
           sessions: [],
         },
       }),
@@ -354,15 +352,15 @@ describe('terminal web host bridge', () => {
     const dispose = terminalBridge.onOutput(() => {})
     const socket = MockWebSocket.instances[0]
 
-    const snapshotPromise = terminalBridge.getSlotSnapshot({ ptySessionId: 'pty_1234567890123456' })
+    const snapshotPromise = terminalBridge.getSessionSnapshot({ ptySessionId: 'pty_1234567890123456' })
     socket?.emitOpen()
     await Promise.resolve()
     const request = socket?.sent
       .map((payload) => JSON.parse(payload))
-      .find((message) => message.action === 'slot-snapshot')
+      .find((message) => message.action === 'session-snapshot')
     expect(request).toMatchObject({
       type: 'request',
-      action: 'slot-snapshot',
+      action: 'session-snapshot',
       input: {
         ptySessionId: 'pty_1234567890123456',
       },
@@ -372,7 +370,7 @@ describe('terminal web host bridge', () => {
         type: 'response',
         requestId: request?.requestId,
         ok: true,
-        action: 'slot-snapshot',
+        action: 'session-snapshot',
         payload: { ptySessionId: 'pty_1', snapshotSeq: 'bad' },
       }),
     )
@@ -490,7 +488,7 @@ describe('terminal web host bridge', () => {
     const { terminalBridge } = await import('#/web/terminal.ts')
     const dispose = terminalBridge.onOutput(() => {})
     const socket = MockWebSocket.instances[0]
-    const snapshotPromise = terminalBridge.getSlotSnapshot({ ptySessionId: 'pty_1234567890123456' })
+    const snapshotPromise = terminalBridge.getSessionSnapshot({ ptySessionId: 'pty_1234567890123456' })
 
     socket?.close()
 
@@ -817,7 +815,7 @@ describe('terminal web host bridge', () => {
     const { onClientLocalEventType, resetClientLocalEventsForTests } = await import('#/web/local-events.ts')
     const bellClick = vi.fn()
     const dispose = onClientLocalEventType('terminal-bell-click', bellClick)
-    const key = '/tmp/repo\0/tmp/repo\0slot-2'
+    const key = '/tmp/repo\0/tmp/repo\0session-2'
 
     await expect(
       terminalBridge.notifyBell({ title: 'repo', body: 'feature/test\\nzsh', key, repoRoot: '/tmp/repo' }),

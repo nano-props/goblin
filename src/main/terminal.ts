@@ -1,7 +1,7 @@
 import { BrowserWindow, Notification, app, ipcMain } from 'electron'
 import type { WebContents } from 'electron'
 import { broadcastClientEffectIntent } from '#/main/client-surface-events.ts'
-import { activateMainWindow } from '#/main/window.ts'
+import { activatePrimaryWindow } from '#/main/window.ts'
 import { platform } from '#/main/platform.ts'
 import { t } from '#/main/i18n/index.ts'
 import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
@@ -113,7 +113,7 @@ function showNotificationWithResult(
     notif.once('click', () => {
       // Bring the window to the foreground, then tell the client to switch
       // to the repo and open the terminal view (only when repoRoot is known).
-      void activateMainWindow().catch(() => {})
+      void activatePrimaryWindow().catch(() => {})
       if (repoRoot) broadcastClientEffectIntent({ type: 'terminal-bell-click', repoRoot, key })
     })
     notif.show()

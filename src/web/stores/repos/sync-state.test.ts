@@ -1,8 +1,12 @@
 import { afterEach, describe, expect, test } from 'vitest'
-import { emptyRepo } from '#/web/stores/repos/helpers.ts'
-import { disposeRepoRuntime, markRepoOperationTargets, nextRepoOperationId } from '#/web/stores/repos/runtime.ts'
+import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
+import {
+  disposeRepoOperationScheduler,
+  markRepoOperationTargets,
+  nextRepoOperationId,
+} from '#/web/stores/repos/repo-operation-scheduler.ts'
 import { canStartRemoteFetch } from '#/web/stores/repos/sync-state.ts'
-import type { RepoRuntimeOperationTarget } from '#/web/stores/repos/runtime.ts'
+import type { RepoOperationTarget } from '#/web/stores/repos/repo-operation-scheduler.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 type CoreRemoteFetchBlockerKey = 'fetch' | 'branchAction' | 'snapshot' | 'status'
 
@@ -41,7 +45,7 @@ function repo(overrides: RepoOverrides = {}): RepoState {
 }
 
 afterEach(() => {
-  disposeRepoRuntime('/tmp/goblin-sync-state-test')
+  disposeRepoOperationScheduler('/tmp/goblin-sync-state-test')
 })
 
 describe('canStartRemoteFetch', () => {
@@ -59,7 +63,7 @@ describe('canStartRemoteFetch', () => {
     (key) => {
       const r = repo()
       const operationId = nextRepoOperationId(r.id)
-      const target: RepoRuntimeOperationTarget = { key, reason: key === 'branchAction' ? 'branch:pull' : key }
+      const target: RepoOperationTarget = { key, reason: key === 'branchAction' ? 'branch:pull' : key }
 
       markRepoOperationTargets(r.id, operationId, [target], 'running')
 

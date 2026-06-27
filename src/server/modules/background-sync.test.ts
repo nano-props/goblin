@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   abortBackgroundServerNetworkOp: vi.fn(),
-  fetchRepository: vi.fn(),
+  fetchRepo: vi.fn(),
   getServerFetchIntervalSec: vi.fn(),
   subscribeServerFetchInterval: vi.fn(),
 }))
@@ -12,7 +12,7 @@ vi.mock('#/server/common/network-ops.ts', () => ({
 }))
 
 vi.mock('#/server/modules/repo-write-paths.ts', () => ({
-  fetchRepository: mocks.fetchRepository,
+  fetchRepo: mocks.fetchRepo,
 }))
 
 vi.mock('#/server/modules/settings-source.ts', () => ({
@@ -36,22 +36,22 @@ describe('server background sync scheduler', () => {
   })
 
   test('runs immediate background fetches for registered repos and repeats by interval', async () => {
-    mocks.fetchRepository.mockResolvedValue({ ok: true, message: 'ok' })
+    mocks.fetchRepo.mockResolvedValue({ ok: true, message: 'ok' })
     const { setBackgroundSyncRepos } = await import('#/server/modules/background-sync.ts')
 
     await setBackgroundSyncRepos(['/tmp/repo-a', '/tmp/repo-b'])
     await vi.runOnlyPendingTimersAsync()
 
-    expect(mocks.fetchRepository).toHaveBeenNthCalledWith(1, '/tmp/repo-a', 'background')
+    expect(mocks.fetchRepo).toHaveBeenNthCalledWith(1, '/tmp/repo-a', 'background')
     await vi.runOnlyPendingTimersAsync()
-    expect(mocks.fetchRepository).toHaveBeenNthCalledWith(2, '/tmp/repo-b', 'background')
+    expect(mocks.fetchRepo).toHaveBeenNthCalledWith(2, '/tmp/repo-b', 'background')
 
     await vi.advanceTimersByTimeAsync(5000)
-    expect(mocks.fetchRepository).toHaveBeenNthCalledWith(3, '/tmp/repo-a', 'background')
+    expect(mocks.fetchRepo).toHaveBeenNthCalledWith(3, '/tmp/repo-a', 'background')
   })
 
   test('stops scheduling when the repo set is cleared', async () => {
-    mocks.fetchRepository.mockResolvedValue({ ok: true, message: 'ok' })
+    mocks.fetchRepo.mockResolvedValue({ ok: true, message: 'ok' })
     const { setBackgroundSyncRepos } = await import('#/server/modules/background-sync.ts')
 
     await setBackgroundSyncRepos(['/tmp/repo'])
@@ -59,11 +59,11 @@ describe('server background sync scheduler', () => {
     await setBackgroundSyncRepos([])
     await vi.advanceTimersByTimeAsync(10000)
 
-    expect(mocks.fetchRepository).toHaveBeenCalledTimes(1)
+    expect(mocks.fetchRepo).toHaveBeenCalledTimes(1)
   })
 
   test('aborts in-flight background fetches for repos removed from the active set', async () => {
-    mocks.fetchRepository.mockResolvedValue({ ok: true, message: 'ok' })
+    mocks.fetchRepo.mockResolvedValue({ ok: true, message: 'ok' })
     const { setBackgroundSyncRepos } = await import('#/server/modules/background-sync.ts')
 
     await setBackgroundSyncRepos(['/tmp/repo-a'])
@@ -73,22 +73,22 @@ describe('server background sync scheduler', () => {
   })
 
   test('only re-fetches a repo on re-activation once its previous fetch is overdue', async () => {
-    mocks.fetchRepository.mockResolvedValue({ ok: true, message: 'ok' })
+    mocks.fetchRepo.mockResolvedValue({ ok: true, message: 'ok' })
     const { getBackgroundSyncDiagnostics, setBackgroundSyncRepos } = await import('#/server/modules/background-sync.ts')
 
     await setBackgroundSyncRepos(['/tmp/repo-a'])
     await vi.runOnlyPendingTimersAsync()
-    expect(mocks.fetchRepository).toHaveBeenNthCalledWith(1, '/tmp/repo-a', 'background')
+    expect(mocks.fetchRepo).toHaveBeenNthCalledWith(1, '/tmp/repo-a', 'background')
 
     await vi.advanceTimersByTimeAsync(1000)
     await setBackgroundSyncRepos(['/tmp/repo-b'])
     await vi.runOnlyPendingTimersAsync()
-    expect(mocks.fetchRepository).toHaveBeenNthCalledWith(2, '/tmp/repo-b', 'background')
+    expect(mocks.fetchRepo).toHaveBeenNthCalledWith(2, '/tmp/repo-b', 'background')
 
     await vi.advanceTimersByTimeAsync(1000)
     await setBackgroundSyncRepos(['/tmp/repo-a'])
     await vi.runOnlyPendingTimersAsync()
-    expect(mocks.fetchRepository).toHaveBeenCalledTimes(2)
+    expect(mocks.fetchRepo).toHaveBeenCalledTimes(2)
 
     const now = Date.now()
     const repoA = getBackgroundSyncDiagnostics(now).repos.find((repo) => repo.repoId === '/tmp/repo-a')
@@ -97,15 +97,15 @@ describe('server background sync scheduler', () => {
     const remainingUntilDue = (repoA?.nextEligibleAt ?? now) - now
 
     await vi.advanceTimersByTimeAsync(Math.max(remainingUntilDue - 1, 0))
-    expect(mocks.fetchRepository).toHaveBeenCalledTimes(2)
+    expect(mocks.fetchRepo).toHaveBeenCalledTimes(2)
 
     await vi.advanceTimersByTimeAsync(1000)
-    expect(mocks.fetchRepository).toHaveBeenNthCalledWith(3, '/tmp/repo-a', 'background')
+    expect(mocks.fetchRepo).toHaveBeenNthCalledWith(3, '/tmp/repo-a', 'background')
   })
 
   test('re-schedules when the server fetch interval changes', async () => {
     let onChange: ((sec: number) => void) | undefined
-    mocks.fetchRepository.mockResolvedValue({ ok: true, message: 'ok' })
+    mocks.fetchRepo.mockResolvedValue({ ok: true, message: 'ok' })
     mocks.subscribeServerFetchInterval.mockImplementation((listener: (sec: number) => void) => {
       onChange = listener
       return () => {}
@@ -114,38 +114,38 @@ describe('server background sync scheduler', () => {
 
     await setBackgroundSyncRepos(['/tmp/repo'])
     await vi.runOnlyPendingTimersAsync()
-    expect(mocks.fetchRepository).toHaveBeenCalledTimes(1)
+    expect(mocks.fetchRepo).toHaveBeenCalledTimes(1)
 
     onChange?.(0)
     await vi.advanceTimersByTimeAsync(5000)
-    expect(mocks.fetchRepository).toHaveBeenCalledTimes(1)
+    expect(mocks.fetchRepo).toHaveBeenCalledTimes(1)
 
     onChange?.(5)
     await vi.runOnlyPendingTimersAsync()
-    expect(mocks.fetchRepository).toHaveBeenCalledTimes(2)
+    expect(mocks.fetchRepo).toHaveBeenCalledTimes(2)
   })
 
   test('does not abort or re-fetch when re-registering the same repo set', async () => {
-    mocks.fetchRepository.mockResolvedValue({ ok: true, message: 'ok' })
+    mocks.fetchRepo.mockResolvedValue({ ok: true, message: 'ok' })
     const { setBackgroundSyncRepos } = await import('#/server/modules/background-sync.ts')
 
     await setBackgroundSyncRepos(['/tmp/repo-a'])
     await vi.runOnlyPendingTimersAsync()
-    const callsAfterFirst = mocks.fetchRepository.mock.calls.length
+    const callsAfterFirst = mocks.fetchRepo.mock.calls.length
 
     // Re-registering the same set must not abort the in-flight task or
     // re-trigger an immediate fetch — the interval hasn't elapsed.
     await setBackgroundSyncRepos(['/tmp/repo-a'])
     await vi.advanceTimersByTimeAsync(1000)
 
-    expect(mocks.fetchRepository.mock.calls.length).toBe(callsAfterFirst)
+    expect(mocks.fetchRepo.mock.calls.length).toBe(callsAfterFirst)
     expect(mocks.abortBackgroundServerNetworkOp).not.toHaveBeenCalled()
   })
 
-  test('re-enqueues a tab-switched repo from the previous fetch\'s finally', async () => {
+  test("re-enqueues a tab-switched repo from the previous fetch's finally", async () => {
     let resolveFetchA: (value: { ok: boolean; message: string }) => void = () => {}
     const fetchAStarted = vi.fn()
-    mocks.fetchRepository.mockImplementation(async (repoId: string) => {
+    mocks.fetchRepo.mockImplementation(async (repoId: string) => {
       if (repoId === '/repo-a') {
         fetchAStarted()
         return await new Promise<{ ok: boolean; message: string }>((resolve) => {
@@ -164,21 +164,19 @@ describe('server background sync scheduler', () => {
     // is skipped because the queue is busy, but the `finally` on A's task must
     // re-enqueue as soon as A settles — without waiting for the next cron tick.
     await setBackgroundSyncRepos(['/repo-b'])
-    expect(mocks.fetchRepository.mock.calls.some((c) => c[0] === '/repo-b')).toBe(false)
+    expect(mocks.fetchRepo.mock.calls.some((c) => c[0] === '/repo-b')).toBe(false)
 
     resolveFetchA({ ok: true, message: 'ok' })
     // waitFor polls microtasks; using advanceTimersByTime would risk letting
     // the per-second cron catch B for us and mask a broken `finally` re-enqueue.
-    await vi.waitFor(() =>
-      expect(mocks.fetchRepository).toHaveBeenCalledWith('/repo-b', 'background'),
-    )
+    await vi.waitFor(() => expect(mocks.fetchRepo).toHaveBeenCalledWith('/repo-b', 'background'))
 
-    const bCalls = mocks.fetchRepository.mock.calls.filter((c) => c[0] === '/repo-b' && c[1] === 'background')
+    const bCalls = mocks.fetchRepo.mock.calls.filter((c) => c[0] === '/repo-b' && c[1] === 'background')
     expect(bCalls.length).toBe(1)
   })
 
   test('backs off retries after a fetch failure and resumes normal cadence after success', async () => {
-    mocks.fetchRepository
+    mocks.fetchRepo
       .mockResolvedValueOnce({ ok: false, message: 'fatal: offline' })
       .mockResolvedValueOnce({ ok: true, message: 'ok' })
       .mockResolvedValue({ ok: true, message: 'ok' })
@@ -186,20 +184,20 @@ describe('server background sync scheduler', () => {
 
     await setBackgroundSyncRepos(['/tmp/repo'])
     await vi.runOnlyPendingTimersAsync()
-    expect(mocks.fetchRepository).toHaveBeenCalledTimes(1)
+    expect(mocks.fetchRepo).toHaveBeenCalledTimes(1)
 
     await vi.advanceTimersByTimeAsync(5000)
-    expect(mocks.fetchRepository).toHaveBeenCalledTimes(1)
+    expect(mocks.fetchRepo).toHaveBeenCalledTimes(1)
 
     await vi.advanceTimersByTimeAsync(5000)
-    expect(mocks.fetchRepository).toHaveBeenCalledTimes(2)
+    expect(mocks.fetchRepo).toHaveBeenCalledTimes(2)
 
     await vi.advanceTimersByTimeAsync(5000)
-    expect(mocks.fetchRepository).toHaveBeenCalledTimes(3)
+    expect(mocks.fetchRepo).toHaveBeenCalledTimes(3)
   })
 
   test('reports diagnostics for registered repos', async () => {
-    mocks.fetchRepository.mockResolvedValue({ ok: true, message: 'ok' })
+    mocks.fetchRepo.mockResolvedValue({ ok: true, message: 'ok' })
     const { getBackgroundSyncDiagnostics, setBackgroundSyncRepos } = await import('#/server/modules/background-sync.ts')
 
     await setBackgroundSyncRepos(['/tmp/repo-a'])

@@ -57,33 +57,33 @@ body,
 }
 
 html {
-  --goblin-window-chrome-left: 16px;
-  --goblin-window-chrome-right: 16px;
+  --goblin-title-bar-chrome-left: 16px;
+  --goblin-title-bar-chrome-right: 16px;
 }
 
 html[data-host='electron']:not([data-chrome='overlay']) {
-  --goblin-window-chrome-left: 92px;
+  --goblin-title-bar-chrome-left: 92px;
 }
 
 html[data-host='electron'][data-chrome='overlay'] {
-  --goblin-window-chrome-left: 16px;
-  --goblin-window-chrome-right: 150px;
+  --goblin-title-bar-chrome-left: 16px;
+  --goblin-title-bar-chrome-right: 150px;
 }
 
 /* Window-chrome drag region — leaves room for macOS traffic lights on the left.
  * Use this on empty chrome surfaces and structural chrome overlays. Controls
  * opt out through the interactive/no-drag chrome regions; marking a layout host
  * as interactive removes that whole rectangle from native dragging. */
-.window-chrome {
+.title-bar-chrome {
   -webkit-app-region: drag;
-  padding-left: var(--goblin-window-chrome-left);
-  padding-right: var(--goblin-window-chrome-right);
+  padding-left: var(--goblin-title-bar-chrome-left);
+  padding-right: var(--goblin-title-bar-chrome-right);
 }
 
 button,
-[data-window-chrome-region='interactive'],
+[data-title-bar-chrome-region='interactive'],
 [data-interactive],
-[data-window-chrome-region='no-drag'] {
+[data-title-bar-chrome-region='no-drag'] {
   -webkit-app-region: no-drag;
 }
 
@@ -95,8 +95,8 @@ button,
  * workspace toolbar or revealed sidebar owns blank-space dragging; the child
  * trigger opts out through an interactive chrome region. */
 .goblin-zen-reveal-trigger-layer {
-  padding-left: var(--goblin-window-chrome-left);
-  padding-right: var(--goblin-window-chrome-right);
+  padding-left: var(--goblin-title-bar-chrome-left);
+  padding-right: var(--goblin-title-bar-chrome-right);
 }
 
 /* Visible focus ring for keyboard users. Tailwind v4 preflight removes
@@ -269,7 +269,7 @@ button,
    adjusted; right padding stays at the toolbar's standard padding so
    trailing actions (e.g. open-external button group) don't shift. */
 .goblin-workspace-toolbar--traffic-offset {
-  padding-left: var(--goblin-window-chrome-left);
+  padding-left: var(--goblin-title-bar-chrome-left);
 }
 
 .goblin-zen-reveal-panel {

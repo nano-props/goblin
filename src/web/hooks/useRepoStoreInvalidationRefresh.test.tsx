@@ -13,7 +13,7 @@ const storeState = {
       id: '/tmp/repo',
       availability: { phase: 'available' },
       instanceToken: 7,
-      resources: {
+      dataLoads: {
         snapshot: { phase: 'idle', loadedAt: 0, stale: false, error: null },
         status: { phase: 'idle', loadedAt: 0, stale: false, error: null },
       },
@@ -57,7 +57,7 @@ describe('useRepoStoreInvalidationRefresh', () => {
       id: '/tmp/repo',
       availability: { phase: 'available' },
       instanceToken: 7,
-      resources: {
+      dataLoads: {
         snapshot: { phase: 'idle', loadedAt: Date.now(), stale: false, error: null },
         status: { phase: 'idle', loadedAt: Date.now(), stale: false, error: null },
       },

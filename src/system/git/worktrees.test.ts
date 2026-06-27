@@ -3,8 +3,8 @@ import { createWorktree, removeWorktree } from '#/system/git/worktrees.ts'
 
 const gitResultWithOptionsMock = vi.hoisted(() => vi.fn())
 
-vi.mock('#/system/git/helper.ts', async () => {
-  const actual = await vi.importActual<typeof import('#/system/git/helper.ts')>('#/system/git/helper.ts')
+vi.mock('#/system/git/git-exec.ts', async () => {
+  const actual = await vi.importActual<typeof import('#/system/git/git-exec.ts')>('#/system/git/git-exec.ts')
   return {
     ...actual,
     gitResultWithOptions: vi.fn((cwd: string, opts: unknown, ...args: string[]) =>

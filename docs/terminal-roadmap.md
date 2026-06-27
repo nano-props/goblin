@@ -107,14 +107,14 @@ This is manageable now, but it will become a maintenance bottleneck as the featu
 
 ## P1.7: Decouple terminal runtime lifetime from React provider lifetime (completed)
 
-**Status: completed.** `TerminalSlotRegistry` is now a client-level
+**Status: completed.** `TerminalSessionProjection` is now a client-level
 singleton: one instance per client process, created on first access,
-living until process teardown. The `TerminalSlotProvider` is only a
+living until process teardown. The `TerminalSessionProvider` is only a
 wiring adapter that forwards bridge events into the singleton and
 exposes its API via React context. A StrictMode re-mount no longer
-recreates the registry, so the previous provider-owned lifetime and
+recreates the projection, so the previous provider-owned lifetime and
 its destroy debounce have been removed. See
-`docs/terminal-slot-lifecycle.md` for the bug analysis and why this
+`docs/terminal-session-lifecycle.md` for the bug analysis and why this
 work is related but separate.
 
 ## P1.8: Make create deliver an atomic first frame (completed)
@@ -125,7 +125,7 @@ geometry, and controller info) directly. `TerminalCatalogMutationResult`
 intersects with `TerminalFirstFrame` at the type level, and the client
 hydrates from the response without a follow-up snapshot fetch.
 `create.sessions` remains projection data only. See
-`docs/terminal-slot-lifecycle.md` for the detailed bug write-up and
+`docs/terminal-session-lifecycle.md` for the detailed bug write-up and
 contract rules.
 
 ## P2: Further tighten client projection boundaries
@@ -136,7 +136,7 @@ contract rules.
 
 ### Why
 
-The current client-side registry is still healthy, but it is accumulating several kinds of responsibility.
+The current TerminalSessionProjection is still healthy, but it is accumulating several kinds of responsibility.
 This is not yet a crisis, so it should follow the server-side lifecycle work rather than precede it.
 
 ## P2: Add contract tests for terminal invariants

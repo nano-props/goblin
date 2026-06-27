@@ -10,7 +10,7 @@ import type { ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { BranchList } from '#/web/components/branch-navigator/BranchList.tsx'
-import { emptyRepo } from '#/web/stores/repos/helpers.ts'
+import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { createRepoBranch } from '#/web/stores/repos/test-utils.ts'
 
 vi.mock('#/web/stores/i18n.ts', () => ({
@@ -22,7 +22,7 @@ vi.mock('#/web/components/BranchActionsMenu.tsx', () => ({
   BranchActionsMenu: () => null,
 }))
 
-vi.mock('#/web/components/terminal/terminal-slot-store.ts', () => ({
+vi.mock('#/web/components/terminal/terminal-session-store.ts', () => ({
   useWorktreeTerminalBellCount: () => 0,
 }))
 

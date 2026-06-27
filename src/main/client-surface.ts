@@ -1,15 +1,15 @@
-// Bridge between the window shell and the surface registry.
+// Bridge between BrowserWindow security policy and the surface registry.
 //
 // This module is intentionally tiny: attaching a client surface means
-// "apply trusted shell policy" + "register the surface identity/capabilities".
+// "apply trusted BrowserWindow policy" + "register the surface identity/capabilities".
 
 import type { BrowserWindow } from 'electron'
 import {
   registerClientWindowSurface,
   unregisterClientWindowSurface,
   type ClientSurfaceSpec,
-} from '#/main/window-registry.ts'
-import { configureTrustedClientWindow } from '#/main/window-shell.ts'
+} from '#/main/client-surface-registry.ts'
+import { configureTrustedBrowserWindow } from '#/main/window-security.ts'
 
 interface AttachClientSurfaceWindowOptions {
   logLabel: string
@@ -20,7 +20,7 @@ export function attachClientSurfaceWindow(
   win: BrowserWindow,
   { logLabel, surface }: AttachClientSurfaceWindowOptions,
 ): void {
-  configureTrustedClientWindow(win, logLabel)
+  configureTrustedBrowserWindow(win, logLabel)
   registerClientWindowSurface(win, surface)
 }
 

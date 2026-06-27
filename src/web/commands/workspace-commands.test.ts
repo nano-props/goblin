@@ -6,22 +6,22 @@ import {
   runMoveWorkspacePaneTabCommand,
   runNewTerminalTabCommand,
   runSelectWorkspacePaneTabByIndexCommand,
-  runShowWorkspacePaneViewCommand,
+  runShowWorkspacePaneTabCommand,
   runTerminalPrimaryActionCommand,
 } from '#/web/commands/workspace-commands.ts'
 import { closeWorkspacePaneTabsForWorktree } from '#/web/workspace-pane/workspace-pane-tab-close.ts'
-import { setTerminalSlotCommandBridge } from '#/web/components/terminal/terminal-slot-command-bridge.ts'
+import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import {
-  workspacePaneStaticViewsForBranch,
+  workspacePaneStaticTabsForBranch,
   workspacePaneTabOrderForBranch,
 } from '#/web/stores/repos/workspace-pane-tabs.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
-import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
+import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { WorktreeTerminalSnapshot } from '#/web/components/terminal/types.ts'
-import type { WorkspacePaneStaticViewType, WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneStaticTabType, WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
 
 const toastMocks = vi.hoisted(() => ({
@@ -44,191 +44,193 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  setTerminalSlotCommandBridge(null)
+  setTerminalSessionCommandBridge(null)
   toastMocks.error.mockClear()
 })
 
 describe('workspace commands', () => {
-  test('show workspace pane view command opens status as a branch static view when a worktree exists', async () => {
+  test('show workspace pane tab command opens status as a branch static tab when a worktree exists', async () => {
     seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'terminal',
+      preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabOrderByBranch: { 'feature/worktree': [] },
     })
-    setTerminalSlotCommandBridge({
+    setTerminalSessionCommandBridge({
       worktreeSnapshot: () => ({
         worktreeTerminalKey: WORKTREE_KEY,
         selectedDescriptor: null,
-        slots: [],
+        sessions: [],
         count: 0,
         bellCount: 0,
         pendingCreate: false,
       }),
-      createTerminal: vi.fn(async () => 'slot-1'),
+      createTerminal: vi.fn(async () => 'session-1'),
       selectTerminal: vi.fn(),
     })
     const navigation = navigationWith()
 
-    await expect(runShowWorkspacePaneViewCommand({ repoId: REPO_ID, tab: 'status', navigation })).resolves.toBe(true)
-    expect(preferredWorkspacePaneView()).toBe('status')
-    expect(openViewsFor('feature/worktree')).toEqual(['status'])
+    await expect(runShowWorkspacePaneTabCommand({ repoId: REPO_ID, tab: 'status', navigation })).resolves.toBe(true)
+    expect(preferredWorkspacePaneTab()).toBe('status')
+    expect(openTabsFor('feature/worktree')).toEqual(['status'])
   })
 
-  test('show workspace pane view command opens history without routing through status', async () => {
+  test('show workspace pane tab command opens history without routing through status', async () => {
     seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'status',
+      preferredWorkspacePaneTab: 'status',
       workspacePaneTabOrderByBranch: { 'feature/worktree': [staticEntry('status')] },
     })
-    setTerminalSlotCommandBridge({
+    setTerminalSessionCommandBridge({
       worktreeSnapshot: () => ({
         worktreeTerminalKey: WORKTREE_KEY,
         selectedDescriptor: null,
-        slots: [],
+        sessions: [],
         count: 0,
         bellCount: 0,
         pendingCreate: false,
       }),
-      createTerminal: vi.fn(async () => 'slot-1'),
+      createTerminal: vi.fn(async () => 'session-1'),
       selectTerminal: vi.fn(),
     })
     const navigation = navigationWith()
 
-    await expect(runShowWorkspacePaneViewCommand({ repoId: REPO_ID, tab: 'history', navigation })).resolves.toBe(true)
-    expect(preferredWorkspacePaneView()).toBe('history')
-    expect(openViewsFor('feature/worktree')).toEqual(['status', 'history'])
+    await expect(runShowWorkspacePaneTabCommand({ repoId: REPO_ID, tab: 'history', navigation })).resolves.toBe(true)
+    expect(preferredWorkspacePaneTab()).toBe('history')
+    expect(openTabsFor('feature/worktree')).toEqual(['status', 'history'])
   })
 
-  test('show workspace pane view command opens changes as a workspace static tab', async () => {
+  test('show workspace pane tab command opens changes as a workspace static tab', async () => {
     seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'terminal',
+      preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabOrderByBranch: { 'feature/worktree': [] },
     })
-    setTerminalSlotCommandBridge({
+    setTerminalSessionCommandBridge({
       worktreeSnapshot: () => ({
         worktreeTerminalKey: WORKTREE_KEY,
         selectedDescriptor: null,
-        slots: [],
+        sessions: [],
         count: 0,
         bellCount: 0,
         pendingCreate: false,
       }),
-      createTerminal: vi.fn(async () => 'slot-1'),
+      createTerminal: vi.fn(async () => 'session-1'),
       selectTerminal: vi.fn(),
     })
     const navigation = navigationWith()
 
-    await expect(runShowWorkspacePaneViewCommand({ repoId: REPO_ID, tab: 'changes', navigation })).resolves.toBe(true)
-    expect(preferredWorkspacePaneView()).toBe('changes')
-    expect(openViewsFor('feature/worktree')).toEqual(['changes'])
+    await expect(runShowWorkspacePaneTabCommand({ repoId: REPO_ID, tab: 'changes', navigation })).resolves.toBe(true)
+    expect(preferredWorkspacePaneTab()).toBe('changes')
+    expect(openTabsFor('feature/worktree')).toEqual(['changes'])
   })
 
   test.each(['status', 'changes'] as const)(
-    'show workspace pane view command refreshes status when opening %s',
+    'show workspace pane tab command refreshes status when opening %s',
     async (tab) => {
       seedRepoState({
         id: REPO_ID,
         branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
         selectedBranch: 'feature/worktree',
-        preferredWorkspacePaneView: 'history',
+        preferredWorkspacePaneTab: 'history',
         workspacePaneTabOrderByBranch: { 'feature/worktree': [] },
       })
-      setTerminalSlotCommandBridge({
+      setTerminalSessionCommandBridge({
         worktreeSnapshot: () => ({
           worktreeTerminalKey: WORKTREE_KEY,
           selectedDescriptor: null,
-          slots: [],
+          sessions: [],
           count: 0,
           bellCount: 0,
           pendingCreate: false,
         }),
-        createTerminal: vi.fn(async () => 'slot-1'),
+        createTerminal: vi.fn(async () => 'session-1'),
         selectTerminal: vi.fn(),
       })
       const refreshStatus = vi.fn(async () => {})
       const token = useReposStore.getState().repos[REPO_ID]!.instanceToken
-      useReposStore.setState({ refreshStatus: refreshStatus as ReturnType<typeof useReposStore.getState>['refreshStatus'] })
+      useReposStore.setState({
+        refreshStatus: refreshStatus as ReturnType<typeof useReposStore.getState>['refreshStatus'],
+      })
 
-      await expect(runShowWorkspacePaneViewCommand({ repoId: REPO_ID, tab, navigation: navigationWith() })).resolves.toBe(
-        true,
-      )
+      await expect(
+        runShowWorkspacePaneTabCommand({ repoId: REPO_ID, tab, navigation: navigationWith() }),
+      ).resolves.toBe(true)
 
       expect(refreshStatus).toHaveBeenCalledWith(REPO_ID, { token })
     },
   )
 
-  test('show workspace pane view command keeps the previous view when changes has no worktree', async () => {
+  test('show workspace pane tab command keeps the previous tab when changes has no worktree', async () => {
     seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/no-worktree')],
       selectedBranch: 'feature/no-worktree',
-      preferredWorkspacePaneView: 'terminal',
+      preferredWorkspacePaneTab: 'terminal',
     })
-    setTerminalSlotCommandBridge({
+    setTerminalSessionCommandBridge({
       worktreeSnapshot: () => ({
         worktreeTerminalKey: WORKTREE_KEY,
         selectedDescriptor: null,
-        slots: [],
+        sessions: [],
         count: 0,
         bellCount: 0,
         pendingCreate: false,
       }),
-      createTerminal: vi.fn(async () => 'slot-1'),
+      createTerminal: vi.fn(async () => 'session-1'),
       selectTerminal: vi.fn(),
     })
     const navigation = navigationWith()
 
-    await expect(runShowWorkspacePaneViewCommand({ repoId: REPO_ID, tab: 'changes', navigation })).resolves.toBe(false)
-    expect(preferredWorkspacePaneView()).toBe('terminal')
-    expect(openViewsFor('feature/no-worktree')).toEqual(['status'])
+    await expect(runShowWorkspacePaneTabCommand({ repoId: REPO_ID, tab: 'changes', navigation })).resolves.toBe(false)
+    expect(preferredWorkspacePaneTab()).toBe('terminal')
+    expect(openTabsFor('feature/no-worktree')).toEqual(['status'])
   })
 
-  test('show workspace pane view command opens status for a selected branch without a worktree', async () => {
+  test('show workspace pane tab command opens status for a selected branch without a worktree', async () => {
     seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/no-worktree')],
       selectedBranch: 'feature/no-worktree',
-      preferredWorkspacePaneView: 'terminal',
+      preferredWorkspacePaneTab: 'terminal',
     })
-    setTerminalSlotCommandBridge({
+    setTerminalSessionCommandBridge({
       worktreeSnapshot: () => ({
         worktreeTerminalKey: WORKTREE_KEY,
         selectedDescriptor: null,
-        slots: [],
+        sessions: [],
         count: 0,
         bellCount: 0,
         pendingCreate: false,
       }),
-      createTerminal: vi.fn(async () => 'slot-1'),
+      createTerminal: vi.fn(async () => 'session-1'),
       selectTerminal: vi.fn(),
     })
     const navigation = navigationWith()
 
-    await expect(runShowWorkspacePaneViewCommand({ repoId: REPO_ID, tab: 'status', navigation })).resolves.toBe(true)
-    expect(preferredWorkspacePaneView()).toBe('status')
+    await expect(runShowWorkspacePaneTabCommand({ repoId: REPO_ID, tab: 'status', navigation })).resolves.toBe(true)
+    expect(preferredWorkspacePaneTab()).toBe('status')
   })
 
-  test('terminal primary action opens the terminal view and creates the first terminal when missing', async () => {
+  test('terminal primary action opens the terminal tab and creates the first terminal when missing', async () => {
     seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'status',
+      preferredWorkspacePaneTab: 'status',
       workspacePaneTabOrderByBranch: { 'feature/worktree': [staticEntry('status')] },
     })
-    const createTerminal = vi.fn(async () => 'slot-1')
-    setTerminalSlotCommandBridge({
+    const createTerminal = vi.fn(async () => 'session-1')
+    setTerminalSessionCommandBridge({
       worktreeSnapshot: () => ({
         worktreeTerminalKey: WORKTREE_KEY,
         selectedDescriptor: null,
-        slots: [],
+        sessions: [],
         count: 0,
         bellCount: 0,
         pendingCreate: false,
@@ -240,7 +242,7 @@ describe('workspace commands', () => {
 
     await runTerminalPrimaryActionCommand({ repoId: REPO_ID, navigation })
 
-    expect(preferredWorkspacePaneView()).toBe('terminal')
+    expect(preferredWorkspacePaneTab()).toBe('terminal')
     expect(createTerminal).toHaveBeenCalledWith({
       repoRoot: REPO_ID,
       branch: 'feature/worktree',
@@ -253,22 +255,22 @@ describe('workspace commands', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'status',
+      preferredWorkspacePaneTab: 'status',
       workspacePaneTabOrderByBranch: { 'feature/worktree': [staticEntry('status')] },
     })
     const createTerminal = vi.fn(async () => 'terminal-new')
     const selectTerminal = vi.fn()
-    setTerminalSlotCommandBridge({
+    setTerminalSessionCommandBridge({
       worktreeSnapshot: () => ({
         worktreeTerminalKey: WORKTREE_KEY,
         selectedDescriptor: null,
-        slots: [
+        sessions: [
           {
             type: 'terminal',
-            id: 'slot-1',
-            key: 'slot-1',
+            id: 'session-1',
+            key: 'session-1',
             worktreeTerminalKey: WORKTREE_KEY,
-            slotId: 'slot-1',
+            sessionId: 'session-1',
             index: 1,
             displayOrder: 1,
             title: 'terminal 1',
@@ -278,10 +280,10 @@ describe('workspace commands', () => {
           },
           {
             type: 'terminal',
-            id: 'slot-2',
-            key: 'slot-2',
+            id: 'session-2',
+            key: 'session-2',
             worktreeTerminalKey: WORKTREE_KEY,
-            slotId: 'slot-2',
+            sessionId: 'session-2',
             index: 2,
             displayOrder: 2,
             title: 'terminal 2',
@@ -290,7 +292,7 @@ describe('workspace commands', () => {
             hasBell: false,
           },
         ],
-            count: 2,
+        count: 2,
         bellCount: 0,
         pendingCreate: false,
       }),
@@ -301,9 +303,9 @@ describe('workspace commands', () => {
 
     await runTerminalPrimaryActionCommand({ repoId: REPO_ID, navigation })
 
-    expect(preferredWorkspacePaneView()).toBe('terminal')
+    expect(preferredWorkspacePaneTab()).toBe('terminal')
     expect(createTerminal).not.toHaveBeenCalled()
-    expect(selectTerminal).toHaveBeenCalledWith(WORKTREE_KEY, 'slot-1')
+    expect(selectTerminal).toHaveBeenCalledWith(WORKTREE_KEY, 'session-1')
   })
 
   test('new terminal tab command creates another terminal even when one already exists', async () => {
@@ -311,10 +313,10 @@ describe('workspace commands', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'status',
+      preferredWorkspacePaneTab: 'status',
     })
-    const createTerminal = vi.fn(async () => 'slot-2')
-    setTerminalSlotCommandBridge({
+    const createTerminal = vi.fn(async () => 'session-2')
+    setTerminalSessionCommandBridge({
       worktreeSnapshot: () => worktreeSnapshotWithTerminal(),
       createTerminal,
       selectTerminal: vi.fn(),
@@ -323,7 +325,7 @@ describe('workspace commands', () => {
 
     await runNewTerminalTabCommand({ repoId: REPO_ID, navigation })
 
-    expect(preferredWorkspacePaneView()).toBe('terminal')
+    expect(preferredWorkspacePaneTab()).toBe('terminal')
     expect(createTerminal).toHaveBeenCalledWith({
       repoRoot: REPO_ID,
       branch: 'feature/worktree',
@@ -336,13 +338,13 @@ describe('workspace commands', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'status',
+      preferredWorkspacePaneTab: 'status',
       workspacePaneTabOrderByBranch: {
-        'feature/worktree': [terminalEntry('slot-1'), staticEntry('status')],
+        'feature/worktree': [terminalEntry('session-1'), staticEntry('status')],
       },
     })
-    const createTerminal = vi.fn(async () => 'slot-1')
-    setTerminalSlotCommandBridge({
+    const createTerminal = vi.fn(async () => 'session-1')
+    setTerminalSessionCommandBridge({
       worktreeSnapshot: () => emptyWorktreeSnapshot(),
       createTerminal,
       selectTerminal: vi.fn(),
@@ -350,7 +352,7 @@ describe('workspace commands', () => {
 
     await runNewTerminalTabCommand({ repoId: REPO_ID, navigation: navigationWith() })
 
-    expect(tabOrderFor('feature/worktree')).toEqual([staticEntry('status'), terminalEntry('slot-1')])
+    expect(tabOrderFor('feature/worktree')).toEqual([staticEntry('status'), terminalEntry('session-1')])
   })
 
   test('new terminal tab command catches create failures and shows feedback', async () => {
@@ -358,7 +360,7 @@ describe('workspace commands', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'status',
+      preferredWorkspacePaneTab: 'status',
       workspacePaneTabOrderByBranch: {
         'feature/worktree': [staticEntry('status')],
       },
@@ -366,7 +368,7 @@ describe('workspace commands', () => {
     const createTerminal = vi.fn(async () => {
       throw new Error('Terminal socket open timed out')
     })
-    setTerminalSlotCommandBridge({
+    setTerminalSessionCommandBridge({
       worktreeSnapshot: () => emptyWorktreeSnapshot(),
       createTerminal,
       selectTerminal: vi.fn(),
@@ -391,14 +393,14 @@ describe('workspace commands', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'status',
+      preferredWorkspacePaneTab: 'status',
       workspacePaneTabOrderByBranch: {
-        'feature/worktree': [staticEntry('status'), terminalEntry('slot-1')],
+        'feature/worktree': [staticEntry('status'), terminalEntry('session-1')],
       },
     })
     const { promise, resolve } = Promise.withResolvers<string>()
     const createTerminal = vi.fn(() => promise)
-    setTerminalSlotCommandBridge({
+    setTerminalSessionCommandBridge({
       worktreeSnapshot: () => worktreeSnapshotWithTerminal(),
       createTerminal,
       selectTerminal: vi.fn(),
@@ -408,19 +410,19 @@ describe('workspace commands', () => {
     await vi.waitFor(() => expect(createTerminal).toHaveBeenCalledTimes(1))
 
     // Simulate the user clicking a different tab while the create is in flight.
-    useReposStore.getState().setWorkspacePaneView(REPO_ID, 'status')
-    expect(preferredWorkspacePaneView()).toBe('status')
+    useReposStore.getState().setWorkspacePaneTab(REPO_ID, 'status')
+    expect(preferredWorkspacePaneTab()).toBe('status')
 
-    resolve('slot-2')
+    resolve('session-2')
     await command
 
     expect(tabOrderFor('feature/worktree')).toEqual([
       staticEntry('status'),
-      terminalEntry('slot-1'),
-      terminalEntry('slot-2'),
+      terminalEntry('session-1'),
+      terminalEntry('session-2'),
     ])
-    expect(preferredWorkspacePaneView()).toBe('terminal')
-    expect(useReposStore.getState().selectedTerminalByWorktree[WORKTREE_KEY]).toBe('slot-2')
+    expect(preferredWorkspacePaneTab()).toBe('terminal')
+    expect(useReposStore.getState().selectedTerminalSessionByWorktree[WORKTREE_KEY]).toBe('session-2')
   })
 
   test('close workspace tab command closes the selected terminal when terminal is active', async () => {
@@ -428,16 +430,16 @@ describe('workspace commands', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'terminal',
+      preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabOrderByBranch: {
-        'feature/worktree': [staticEntry('status'), terminalEntry('slot-1')],
+        'feature/worktree': [staticEntry('status'), terminalEntry('session-1')],
       },
     })
     const closeTerminalByDescriptor = vi.fn(async () => true)
     const closeWindow = vi.fn()
-    setTerminalSlotCommandBridge({
+    setTerminalSessionCommandBridge({
       worktreeSnapshot: () => worktreeSnapshotWithTerminal(),
-      createTerminal: vi.fn(async () => 'slot-2'),
+      createTerminal: vi.fn(async () => 'session-2'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor,
     })
@@ -446,13 +448,13 @@ describe('workspace commands', () => {
       await runCloseWorkspacePaneTabOrWindowCommand({ repoId: REPO_ID, navigation: navigationWith(), closeWindow }),
     ).toBe(true)
 
-    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('slot-1', {
+    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('session-1', {
       repoRoot: REPO_ID,
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     })
-    // Tab removal is owned by the registry's slot-removed callback, not the command.
-    expect(tabOrderFor('feature/worktree')).toEqual([staticEntry('status'), terminalEntry('slot-1')])
+    // Tab removal is owned by the projection's onTerminalSessionRemoved callback, not the command.
+    expect(tabOrderFor('feature/worktree')).toEqual([staticEntry('status'), terminalEntry('session-1')])
     expect(closeWindow).not.toHaveBeenCalled()
   })
 
@@ -461,9 +463,9 @@ describe('workspace commands', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'terminal',
+      preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabOrderByBranch: {
-        'feature/worktree': [staticEntry('status'), terminalEntry('slot-1')],
+        'feature/worktree': [staticEntry('status'), terminalEntry('session-1')],
       },
     })
     let resolveClose!: (value: boolean) => void
@@ -474,9 +476,9 @@ describe('workspace commands', () => {
         }),
     )
     const closeWindow = vi.fn()
-    setTerminalSlotCommandBridge({
+    setTerminalSessionCommandBridge({
       worktreeSnapshot: () => worktreeSnapshotWithTerminal(),
-      createTerminal: vi.fn(async () => 'slot-2'),
+      createTerminal: vi.fn(async () => 'session-2'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor,
     })
@@ -492,25 +494,23 @@ describe('workspace commands', () => {
     })
     await Promise.resolve()
 
-    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('slot-1', {
+    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('session-1', {
       repoRoot: REPO_ID,
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     })
     expect(settled).toBe(false)
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.lastClosedTabContextByBranch['feature/worktree'])
-      .toBeUndefined()
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.lastClosedTabContextByBranch['feature/worktree']).toBeUndefined()
 
     resolveClose(true)
     await expect(closePromise).resolves.toBe(true)
 
     expect(settled).toBe(true)
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.lastClosedTabContextByBranch['feature/worktree'])
-      .toEqual({
-        closingIdentity: 'terminal:slot-1',
-        previousTabIdentities: ['status:status', 'terminal:slot-1'],
-        wasActive: true,
-      })
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.lastClosedTabContextByBranch['feature/worktree']).toEqual({
+      closingIdentity: 'terminal:session-1',
+      previousTabIdentities: ['status:status', 'terminal:session-1'],
+      wasActive: true,
+    })
     expect(closeWindow).not.toHaveBeenCalled()
   })
 
@@ -519,14 +519,14 @@ describe('workspace commands', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'terminal',
+      preferredWorkspacePaneTab: 'terminal',
     })
-    useReposStore.getState().setSelectedTerminal(WORKTREE_KEY, 'slot-2')
+    useReposStore.getState().setSelectedTerminal(WORKTREE_KEY, 'session-2')
     const closeTerminalByDescriptor = vi.fn(async () => true)
     const closeWindow = vi.fn()
-    setTerminalSlotCommandBridge({
+    setTerminalSessionCommandBridge({
       worktreeSnapshot: () => worktreeSnapshotWithSecondTerminalSelected(),
-      createTerminal: vi.fn(async () => 'slot-3'),
+      createTerminal: vi.fn(async () => 'session-3'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor,
     })
@@ -535,7 +535,7 @@ describe('workspace commands', () => {
       await runCloseWorkspacePaneTabOrWindowCommand({ repoId: REPO_ID, navigation: navigationWith(), closeWindow }),
     ).toBe(true)
 
-    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('slot-2', {
+    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('session-2', {
       repoRoot: REPO_ID,
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
@@ -548,13 +548,13 @@ describe('workspace commands', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'status',
+      preferredWorkspacePaneTab: 'status',
     })
     const closeWindow = vi.fn()
-    const showRepoWorkspacePaneView = vi.fn()
-    setTerminalSlotCommandBridge({
+    const showRepoWorkspacePaneTab = vi.fn()
+    setTerminalSessionCommandBridge({
       worktreeSnapshot: () => worktreeSnapshotWithTerminal(),
-      createTerminal: vi.fn(async () => 'slot-2'),
+      createTerminal: vi.fn(async () => 'session-2'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor: vi.fn(async () => true),
     })
@@ -562,22 +562,21 @@ describe('workspace commands', () => {
     expect(
       await runCloseWorkspacePaneTabOrWindowCommand({
         repoId: REPO_ID,
-        navigation: navigationWith({ showRepoWorkspacePaneView }),
+        navigation: navigationWith({ showRepoWorkspacePaneTab }),
         closeWindow,
       }),
     ).toBe(true)
-    expect(openViewsFor('feature/worktree')).toEqual([])
+    expect(openTabsFor('feature/worktree')).toEqual([])
     // The close command no longer imperatively re-selects the adjacent tab;
     // it records the closing context in the store so the workspace pane tab
     // model can derive the spatial neighbor at read time. Navigation is
     // untouched here.
-    expect(showRepoWorkspacePaneView).not.toHaveBeenCalled()
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.lastClosedTabContextByBranch['feature/worktree'])
-      .toEqual({
-        closingIdentity: 'status:status',
-        previousTabIdentities: ['status:status', 'terminal:slot-1'],
-        wasActive: true,
-      })
+    expect(showRepoWorkspacePaneTab).not.toHaveBeenCalled()
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.lastClosedTabContextByBranch['feature/worktree']).toEqual({
+      closingIdentity: 'status:status',
+      previousTabIdentities: ['status:status', 'terminal:session-1'],
+      wasActive: true,
+    })
     expect(closeWindow).not.toHaveBeenCalled()
   })
 
@@ -586,16 +585,16 @@ describe('workspace commands', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'changes',
+      preferredWorkspacePaneTab: 'changes',
       workspacePaneTabOrderByBranch: {
-        'feature/worktree': [staticEntry('status'), terminalEntry('slot-1'), staticEntry('changes')],
+        'feature/worktree': [staticEntry('status'), terminalEntry('session-1'), staticEntry('changes')],
       },
     })
     const closeWindow = vi.fn()
-    const showRepoWorkspacePaneView = vi.fn()
-    setTerminalSlotCommandBridge({
+    const showRepoWorkspacePaneTab = vi.fn()
+    setTerminalSessionCommandBridge({
       worktreeSnapshot: () => worktreeSnapshotWithTerminal(),
-      createTerminal: vi.fn(async () => 'slot-2'),
+      createTerminal: vi.fn(async () => 'session-2'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor: vi.fn(async () => true),
     })
@@ -603,29 +602,28 @@ describe('workspace commands', () => {
     expect(
       await runCloseWorkspacePaneTabOrWindowCommand({
         repoId: REPO_ID,
-        navigation: navigationWith({ showRepoWorkspacePaneView }),
+        navigation: navigationWith({ showRepoWorkspacePaneTab }),
         closeWindow,
       }),
     ).toBe(true)
-    expect(openViewsFor('feature/worktree')).toEqual(['status'])
+    expect(openTabsFor('feature/worktree')).toEqual(['status'])
     // The close command records what was closed (and the pre-close tab order)
     // so the model can derive the spatial neighbor at read time. Preferred
-    // view is unchanged — the model flips it to the neighbor via the same
+    // tab is unchanged — the model flips it to the neighbor via the same
     // derivation.
-    expect(showRepoWorkspacePaneView).not.toHaveBeenCalled()
-    expect(preferredWorkspacePaneView()).toBe('changes')
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.lastClosedTabContextByBranch['feature/worktree'])
-      .toEqual({
-        closingIdentity: 'changes:changes',
-        previousTabIdentities: ['status:status', 'terminal:slot-1', 'changes:changes'],
-        wasActive: true,
-      })
+    expect(showRepoWorkspacePaneTab).not.toHaveBeenCalled()
+    expect(preferredWorkspacePaneTab()).toBe('changes')
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.lastClosedTabContextByBranch['feature/worktree']).toEqual({
+      closingIdentity: 'changes:changes',
+      previousTabIdentities: ['status:status', 'terminal:session-1', 'changes:changes'],
+      wasActive: true,
+    })
     expect(closeWindow).not.toHaveBeenCalled()
   })
 
   test('close workspace tab command on the only terminal in a mixed strip records the context for spatial adjacency', async () => {
-    // Regression: with preferred=terminal and tabOrder=[status, slot-1, changes],
-    // closing slot-1 must let the model surface changes (the spatial neighbor),
+    // Regression: with preferred=terminal and tabOrder=[status, session-1, changes],
+    // closing session-1 must let the model surface changes (the spatial neighbor),
     // not status (materializedTabs[0]). The fix routes adjacency through
     // `lastClosedTabContextByBranch` so the model — not the close command —
     // decides where the user lands. The next model computation reads the
@@ -634,16 +632,16 @@ describe('workspace commands', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'terminal',
+      preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabOrderByBranch: {
-        'feature/worktree': [staticEntry('status'), terminalEntry('slot-1'), staticEntry('changes')],
+        'feature/worktree': [staticEntry('status'), terminalEntry('session-1'), staticEntry('changes')],
       },
     })
     const closeWindow = vi.fn()
-    const showRepoWorkspacePaneView = vi.fn()
-    setTerminalSlotCommandBridge({
+    const showRepoWorkspacePaneTab = vi.fn()
+    setTerminalSessionCommandBridge({
       worktreeSnapshot: () => worktreeSnapshotWithTerminal(),
-      createTerminal: vi.fn(async () => 'slot-2'),
+      createTerminal: vi.fn(async () => 'session-2'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor: vi.fn(async () => true),
     })
@@ -651,20 +649,19 @@ describe('workspace commands', () => {
     expect(
       await runCloseWorkspacePaneTabOrWindowCommand({
         repoId: REPO_ID,
-        navigation: navigationWith({ showRepoWorkspacePaneView }),
+        navigation: navigationWith({ showRepoWorkspacePaneTab }),
         closeWindow,
-        targetIdentity: 'terminal:slot-1',
+        targetIdentity: 'terminal:session-1',
       }),
     ).toBe(true)
     // The close command does not imperatively navigate. It only records the
     // closing context so the model can derive the spatial neighbor at read time.
-    expect(showRepoWorkspacePaneView).not.toHaveBeenCalled()
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.lastClosedTabContextByBranch['feature/worktree'])
-      .toEqual({
-        closingIdentity: 'terminal:slot-1',
-        previousTabIdentities: ['status:status', 'terminal:slot-1', 'changes:changes'],
-        wasActive: true,
-      })
+    expect(showRepoWorkspacePaneTab).not.toHaveBeenCalled()
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.lastClosedTabContextByBranch['feature/worktree']).toEqual({
+      closingIdentity: 'terminal:session-1',
+      previousTabIdentities: ['status:status', 'terminal:session-1', 'changes:changes'],
+      wasActive: true,
+    })
     expect(closeWindow).not.toHaveBeenCalled()
   })
 
@@ -673,15 +670,15 @@ describe('workspace commands', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'terminal',
+      preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabOrderByBranch: { 'feature/worktree': [] },
     })
     useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceToken)
     const closeTerminalByDescriptor = vi.fn(async () => true)
     const closeWindow = vi.fn()
-    setTerminalSlotCommandBridge({
+    setTerminalSessionCommandBridge({
       worktreeSnapshot: () => emptyWorktreeSnapshot(),
-      createTerminal: vi.fn(async () => 'slot-1'),
+      createTerminal: vi.fn(async () => 'session-1'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor,
     })
@@ -699,14 +696,14 @@ describe('workspace commands', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'terminal',
+      preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabOrderByBranch: { 'feature/worktree': [staticEntry('status')] },
     })
     useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceToken)
     const closeWindow = vi.fn()
-    setTerminalSlotCommandBridge({
+    setTerminalSessionCommandBridge({
       worktreeSnapshot: () => ({ ...emptyWorktreeSnapshot(), pendingCreate: true }),
-      createTerminal: vi.fn(async () => 'slot-1'),
+      createTerminal: vi.fn(async () => 'session-1'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor: vi.fn(async () => true),
     })
@@ -716,8 +713,8 @@ describe('workspace commands', () => {
     ).toBe(true)
 
     expect(closeWindow).not.toHaveBeenCalled()
-    expect(preferredWorkspacePaneView()).toBe('terminal')
-    expect(openViewsFor('feature/worktree')).toEqual(['status'])
+    expect(preferredWorkspacePaneTab()).toBe('terminal')
+    expect(openTabsFor('feature/worktree')).toEqual(['status'])
   })
 
   test('close workspace tab command does not close the window while terminal sync is unresolved', async () => {
@@ -725,13 +722,13 @@ describe('workspace commands', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'terminal',
+      preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabOrderByBranch: { 'feature/worktree': [staticEntry('status')] },
     })
     const closeWindow = vi.fn()
-    setTerminalSlotCommandBridge({
+    setTerminalSessionCommandBridge({
       worktreeSnapshot: () => emptyWorktreeSnapshot(),
-      createTerminal: vi.fn(async () => 'slot-1'),
+      createTerminal: vi.fn(async () => 'session-1'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor: vi.fn(async () => true),
     })
@@ -741,8 +738,8 @@ describe('workspace commands', () => {
     ).toBe(true)
 
     expect(closeWindow).not.toHaveBeenCalled()
-    expect(preferredWorkspacePaneView()).toBe('terminal')
-    expect(openViewsFor('feature/worktree')).toEqual(['status'])
+    expect(preferredWorkspacePaneTab()).toBe('terminal')
+    expect(openTabsFor('feature/worktree')).toEqual(['status'])
   })
 
   test('close workspace tabs for worktree closes worktree-scoped tabs only', async () => {
@@ -750,20 +747,20 @@ describe('workspace commands', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'status',
+      preferredWorkspacePaneTab: 'status',
       workspacePaneTabOrderByBranch: {
         'feature/worktree': [
           staticEntry('status'),
-          terminalEntry('slot-1'),
+          terminalEntry('session-1'),
           staticEntry('changes'),
           staticEntry('history'),
         ],
       },
     })
     const closeTerminalsForWorktree = vi.fn(async () => true)
-    setTerminalSlotCommandBridge({
+    setTerminalSessionCommandBridge({
       worktreeSnapshot: () => worktreeSnapshotWithTerminal(),
-      createTerminal: vi.fn(async () => 'slot-2'),
+      createTerminal: vi.fn(async () => 'session-2'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor: vi.fn(async () => true),
       closeTerminalsForWorktree,
@@ -782,7 +779,7 @@ describe('workspace commands', () => {
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     })
-    expect(openViewsFor('feature/worktree')).toEqual(['status', 'history'])
+    expect(openTabsFor('feature/worktree')).toEqual(['status', 'history'])
   })
 
   test('close workspace tabs for worktree releases pending terminal resources even without a terminal tab', async () => {
@@ -790,15 +787,15 @@ describe('workspace commands', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'status',
+      preferredWorkspacePaneTab: 'status',
       workspacePaneTabOrderByBranch: {
         'feature/worktree': [staticEntry('status')],
       },
     })
     const closeTerminalsForWorktree = vi.fn(async () => true)
-    setTerminalSlotCommandBridge({
+    setTerminalSessionCommandBridge({
       worktreeSnapshot: () => ({ ...emptyWorktreeSnapshot(), pendingCreate: true }),
-      createTerminal: vi.fn(async () => 'slot-1'),
+      createTerminal: vi.fn(async () => 'session-1'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor: vi.fn(async () => true),
       closeTerminalsForWorktree,
@@ -817,7 +814,7 @@ describe('workspace commands', () => {
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     })
-    expect(openViewsFor('feature/worktree')).toEqual(['status'])
+    expect(openTabsFor('feature/worktree')).toEqual(['status'])
   })
 
   test('select workspace pane tab by index follows the mixed tab strip order', () => {
@@ -825,28 +822,28 @@ describe('workspace commands', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'status',
+      preferredWorkspacePaneTab: 'status',
       workspacePaneTabOrderByBranch: {
-        'feature/worktree': [staticEntry('status'), terminalEntry('slot-1'), staticEntry('changes')],
+        'feature/worktree': [staticEntry('status'), terminalEntry('session-1'), staticEntry('changes')],
       },
     })
     const selectTerminal = vi.fn()
-    const showRepoWorkspacePaneView = vi.fn((repoId, tab) => {
-      useReposStore.getState().setWorkspacePaneView(repoId, tab)
+    const showRepoWorkspacePaneTab = vi.fn((repoId, tab) => {
+      useReposStore.getState().setWorkspacePaneTab(repoId, tab)
     })
-    setTerminalSlotCommandBridge({
+    setTerminalSessionCommandBridge({
       worktreeSnapshot: () => worktreeSnapshotWithTerminal(),
-      createTerminal: vi.fn(async () => 'slot-2'),
+      createTerminal: vi.fn(async () => 'session-2'),
       selectTerminal,
     })
-    const navigation = navigationWith({ showRepoWorkspacePaneView })
+    const navigation = navigationWith({ showRepoWorkspacePaneTab })
 
     expect(runSelectWorkspacePaneTabByIndexCommand({ repoId: REPO_ID, tabIndex: 2, navigation })).toBe(true)
     expect(runSelectWorkspacePaneTabByIndexCommand({ repoId: REPO_ID, tabIndex: 3, navigation })).toBe(true)
 
-    expect(showRepoWorkspacePaneView).toHaveBeenCalledWith(REPO_ID, 'terminal')
-    expect(showRepoWorkspacePaneView).toHaveBeenCalledWith(REPO_ID, 'changes')
-    expect(selectTerminal).toHaveBeenCalledWith(WORKTREE_KEY, 'slot-1')
+    expect(showRepoWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'terminal')
+    expect(showRepoWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'changes')
+    expect(selectTerminal).toHaveBeenCalledWith(WORKTREE_KEY, 'session-1')
   })
 
   test('select workspace pane tab by index ignores a pending terminal tab', () => {
@@ -854,23 +851,23 @@ describe('workspace commands', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'terminal',
+      preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabOrderByBranch: { 'feature/worktree': [staticEntry('status')] },
     })
     useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceToken)
-    const showRepoWorkspacePaneView = vi.fn((repoId, tab) => {
-      useReposStore.getState().setWorkspacePaneView(repoId, tab)
+    const showRepoWorkspacePaneTab = vi.fn((repoId, tab) => {
+      useReposStore.getState().setWorkspacePaneTab(repoId, tab)
     })
-    setTerminalSlotCommandBridge({
+    setTerminalSessionCommandBridge({
       worktreeSnapshot: () => ({ ...emptyWorktreeSnapshot(), pendingCreate: true }),
-      createTerminal: vi.fn(async () => 'slot-1'),
+      createTerminal: vi.fn(async () => 'session-1'),
       selectTerminal: vi.fn(),
     })
-    const navigation = navigationWith({ showRepoWorkspacePaneView })
+    const navigation = navigationWith({ showRepoWorkspacePaneTab })
 
     expect(runSelectWorkspacePaneTabByIndexCommand({ repoId: REPO_ID, tabIndex: 2, navigation })).toBe(false)
 
-    expect(showRepoWorkspacePaneView).not.toHaveBeenCalled()
+    expect(showRepoWorkspacePaneTab).not.toHaveBeenCalled()
   })
 
   test('move workspace pane tab command follows the mixed tab strip order', () => {
@@ -878,28 +875,28 @@ describe('workspace commands', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneView: 'status',
+      preferredWorkspacePaneTab: 'status',
       workspacePaneTabOrderByBranch: {
-        'feature/worktree': [staticEntry('status'), terminalEntry('slot-1'), staticEntry('changes')],
+        'feature/worktree': [staticEntry('status'), terminalEntry('session-1'), staticEntry('changes')],
       },
     })
     const selectTerminal = vi.fn()
-    const showRepoWorkspacePaneView = vi.fn((repoId, tab) => {
-      useReposStore.getState().setWorkspacePaneView(repoId, tab)
+    const showRepoWorkspacePaneTab = vi.fn((repoId, tab) => {
+      useReposStore.getState().setWorkspacePaneTab(repoId, tab)
     })
-    setTerminalSlotCommandBridge({
+    setTerminalSessionCommandBridge({
       worktreeSnapshot: () => worktreeSnapshotWithTerminal(),
-      createTerminal: vi.fn(async () => 'slot-2'),
+      createTerminal: vi.fn(async () => 'session-2'),
       selectTerminal,
     })
-    const navigation = navigationWith({ showRepoWorkspacePaneView })
+    const navigation = navigationWith({ showRepoWorkspacePaneTab })
 
     expect(runMoveWorkspacePaneTabCommand({ repoId: REPO_ID, direction: 1, navigation })).toBe(true)
     expect(runMoveWorkspacePaneTabCommand({ repoId: REPO_ID, direction: 1, navigation })).toBe(true)
 
-    expect(showRepoWorkspacePaneView).toHaveBeenNthCalledWith(1, REPO_ID, 'terminal')
-    expect(showRepoWorkspacePaneView).toHaveBeenNthCalledWith(2, REPO_ID, 'changes')
-    expect(selectTerminal).toHaveBeenCalledWith(WORKTREE_KEY, 'slot-1')
+    expect(showRepoWorkspacePaneTab).toHaveBeenNthCalledWith(1, REPO_ID, 'terminal')
+    expect(showRepoWorkspacePaneTab).toHaveBeenNthCalledWith(2, REPO_ID, 'changes')
+    expect(selectTerminal).toHaveBeenCalledWith(WORKTREE_KEY, 'session-1')
   })
 
   test('move workspace pane tab command works for branch-scope tabs without a worktree', () => {
@@ -907,29 +904,29 @@ describe('workspace commands', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/no-worktree')],
       selectedBranch: 'feature/no-worktree',
-      preferredWorkspacePaneView: 'status',
+      preferredWorkspacePaneTab: 'status',
       workspacePaneTabOrderByBranch: { 'feature/no-worktree': [staticEntry('status'), staticEntry('history')] },
     })
-    const showRepoWorkspacePaneView = vi.fn((repoId, tab) => {
-      useReposStore.getState().setWorkspacePaneView(repoId, tab)
+    const showRepoWorkspacePaneTab = vi.fn((repoId, tab) => {
+      useReposStore.getState().setWorkspacePaneTab(repoId, tab)
     })
-    const navigation = navigationWith({ showRepoWorkspacePaneView })
+    const navigation = navigationWith({ showRepoWorkspacePaneTab })
 
     expect(runMoveWorkspacePaneTabCommand({ repoId: REPO_ID, direction: 1, navigation })).toBe(true)
 
-    expect(showRepoWorkspacePaneView).toHaveBeenCalledWith(REPO_ID, 'history')
-    expect(preferredWorkspacePaneView()).toBe('history')
+    expect(showRepoWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'history')
+    expect(preferredWorkspacePaneTab()).toBe('history')
   })
 })
 
-function preferredWorkspacePaneView() {
+function preferredWorkspacePaneTab() {
   const repo = useReposStore.getState().repos[REPO_ID]
-  return repo ? preferredWorkspacePaneViewForBranch(repo.ui, repo.ui.selectedBranch) : null
+  return repo ? preferredWorkspacePaneTabForBranch(repo.ui, repo.ui.selectedBranch) : null
 }
 
-function openViewsFor(branch: string) {
+function openTabsFor(branch: string) {
   const repo = useReposStore.getState().repos[REPO_ID]
-  return repo ? workspacePaneStaticViewsForBranch(repo.ui, branch) : []
+  return repo ? workspacePaneStaticTabsForBranch(repo.ui, branch) : []
 }
 
 function tabOrderFor(branch: string): WorkspacePaneTabOrderEntry[] {
@@ -937,7 +934,7 @@ function tabOrderFor(branch: string): WorkspacePaneTabOrderEntry[] {
   return repo ? workspacePaneTabOrderForBranch(repo.ui, branch) : []
 }
 
-function staticEntry(type: WorkspacePaneStaticViewType) {
+function staticEntry(type: WorkspacePaneStaticTabType) {
   return workspacePaneStaticTabOrderEntry(type)
 }
 
@@ -945,22 +942,22 @@ function terminalEntry(id: string) {
   return { type: 'terminal' as const, id }
 }
 
-function navigationWith(overrides: Partial<MainWindowNavigationActions> = {}): MainWindowNavigationActions {
+function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {}): PrimaryWindowNavigationActions {
   return {
     activateRepo: (repoId) => useReposStore.getState().setActive(repoId),
     closeRepo: () => {},
     cycleRepo: () => {},
     selectRepoBranch: () => {},
-    showRepoWorkspacePaneView: (repoId, tab) => {
+    showRepoWorkspacePaneTab: (repoId, tab) => {
       const state = useReposStore.getState()
       state.setActive(repoId)
-      state.setWorkspacePaneView(repoId, tab)
+      state.setWorkspacePaneTab(repoId, tab)
     },
-    showRepoBranchWorkspacePaneView: (repoId, branch, tab) => {
+    showRepoBranchWorkspacePaneTab: (repoId, branch, tab) => {
       const state = useReposStore.getState()
       state.setActive(repoId)
       state.selectBranch(repoId, branch)
-      state.setWorkspacePaneView(repoId, tab)
+      state.setWorkspacePaneTab(repoId, tab)
     },
     openSettings: () => {},
     ...overrides,
@@ -971,21 +968,21 @@ function worktreeSnapshotWithTerminal(): WorktreeTerminalSnapshot {
   return {
     worktreeTerminalKey: WORKTREE_KEY,
     selectedDescriptor: {
-      key: 'slot-1',
+      key: 'session-1',
       worktreeTerminalKey: WORKTREE_KEY,
-      slotId: 'slot-1',
+      sessionId: 'session-1',
       index: 1,
       repoRoot: REPO_ID,
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     },
-    slots: [
+    sessions: [
       {
         type: 'terminal',
-        id: 'slot-1',
-        key: 'slot-1',
+        id: 'session-1',
+        key: 'session-1',
         worktreeTerminalKey: WORKTREE_KEY,
-        slotId: 'slot-1',
+        sessionId: 'session-1',
         index: 1,
         displayOrder: 1,
         title: 'terminal 1',
@@ -1004,7 +1001,7 @@ function emptyWorktreeSnapshot(): WorktreeTerminalSnapshot {
   return {
     worktreeTerminalKey: WORKTREE_KEY,
     selectedDescriptor: null,
-    slots: [],
+    sessions: [],
     count: 0,
     bellCount: 0,
     pendingCreate: false,
@@ -1015,21 +1012,21 @@ function worktreeSnapshotWithSecondTerminalSelected(): WorktreeTerminalSnapshot 
   return {
     worktreeTerminalKey: WORKTREE_KEY,
     selectedDescriptor: {
-      key: 'slot-2',
+      key: 'session-2',
       worktreeTerminalKey: WORKTREE_KEY,
-      slotId: 'slot-2',
+      sessionId: 'session-2',
       index: 2,
       repoRoot: REPO_ID,
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     },
-    slots: [
+    sessions: [
       {
         type: 'terminal',
-        id: 'slot-1',
-        key: 'slot-1',
+        id: 'session-1',
+        key: 'session-1',
         worktreeTerminalKey: WORKTREE_KEY,
-        slotId: 'slot-1',
+        sessionId: 'session-1',
         index: 1,
         displayOrder: 1,
         title: 'terminal 1',
@@ -1039,10 +1036,10 @@ function worktreeSnapshotWithSecondTerminalSelected(): WorktreeTerminalSnapshot 
       },
       {
         type: 'terminal',
-        id: 'slot-2',
-        key: 'slot-2',
+        id: 'session-2',
+        key: 'session-2',
         worktreeTerminalKey: WORKTREE_KEY,
-        slotId: 'slot-2',
+        sessionId: 'session-2',
         index: 2,
         displayOrder: 2,
         title: 'terminal 2',

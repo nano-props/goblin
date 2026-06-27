@@ -2,11 +2,11 @@ import { resolveLang, setCurrentLang } from '#/main/i18n/index.ts'
 import { buildAppMenu } from '#/main/menu.ts'
 import { applyMenuRuntimeState } from '#/main/menu-state.ts'
 import { syncRecentRepos } from '#/main/recent-repos.ts'
-import { setSettingsGlobalShortcutState } from '#/main/settings-server-client.ts'
+import { setGlobalShortcutState } from '#/main/settings-server-client.ts'
 import { syncGlobalShortcuts } from '#/main/shortcuts.ts'
 import { applyThemeSettingsProjection } from '#/main/theme.ts'
 import type {
-  NativeShellProjection,
+  NativeHostProjection,
   NativeSettingsProjectionPatch,
   NativeSettingsProjectionState,
 } from '#/shared/api-types.ts'
@@ -21,7 +21,7 @@ import type {
 // Keep this module narrow: only retain effects that are actually shared across
 // multiple main-side call sites.
 async function persistNativeHostGlobalShortcutState(registered: boolean): Promise<void> {
-  await setSettingsGlobalShortcutState(registered)
+  await setGlobalShortcutState(registered)
 }
 
 function menuStatePatchFromSettingsProjection(input: {
@@ -44,7 +44,7 @@ function shouldRebuildMenuFromSettingsProjection(patch: NativeSettingsProjection
   return patch.lang !== undefined || patch.shortcutsDisabled !== undefined
 }
 
-function applyI18nSettingsProjection(input: {
+function applyI18nProjectionPatch(input: {
   patch: NativeSettingsProjectionPatch
   settings: NativeSettingsProjectionState
 }): void {
@@ -52,7 +52,7 @@ function applyI18nSettingsProjection(input: {
   setCurrentLang(resolveLang(input.settings.lang))
 }
 
-function applyThemeSettingsPrefsProjection(input: {
+function applyThemeProjectionPatch(input: {
   patch: NativeSettingsProjectionPatch
   settings: NativeSettingsProjectionState
 }): void {
@@ -60,7 +60,7 @@ function applyThemeSettingsPrefsProjection(input: {
   applyThemeSettingsProjection({ theme: input.settings.theme, colorTheme: input.settings.colorTheme })
 }
 
-async function applyGlobalShortcutDisabledProjection(input: {
+async function applyGlobalShortcutDisabledProjectionPatch(input: {
   patch: NativeSettingsProjectionPatch
   settings: NativeSettingsProjectionState
 }): Promise<void> {
@@ -69,22 +69,22 @@ async function applyGlobalShortcutDisabledProjection(input: {
   await persistNativeHostGlobalShortcutState(registered)
 }
 
-export async function applyNativeHostSettingsPrefsProjection(input: {
+async function applyNativeHostSettingsProjection(input: {
   patch: NativeSettingsProjectionPatch
   settings: NativeSettingsProjectionState
 }): Promise<void> {
   const shouldRebuildMenu = shouldRebuildMenuFromSettingsProjection(input.patch)
   const menuStatePatch = menuStatePatchFromSettingsProjection(input)
-  applyI18nSettingsProjection(input)
-  applyThemeSettingsPrefsProjection(input)
+  applyI18nProjectionPatch(input)
+  applyThemeProjectionPatch(input)
   if (Object.keys(menuStatePatch).length > 0) applyMenuRuntimeState(menuStatePatch)
-  await applyGlobalShortcutDisabledProjection(input)
+  await applyGlobalShortcutDisabledProjectionPatch(input)
   if (shouldRebuildMenu) buildAppMenu()
 }
 
-export async function applyNativeHostShellProjection(input: NativeShellProjection): Promise<void> {
+export async function applyNativeHostProjection(input: NativeHostProjection): Promise<void> {
   if (input.prefs) {
-    await applyNativeHostSettingsPrefsProjection({
+    await applyNativeHostSettingsProjection({
       patch: input.prefs.patch,
       settings: input.prefs.settings,
     })

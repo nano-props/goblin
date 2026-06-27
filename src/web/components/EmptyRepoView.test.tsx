@@ -14,24 +14,24 @@ vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
   useIsCompactUi: () => responsiveMocks.mode === 'compact',
 }))
 
-vi.mock('#/web/components/repo-shell/RepoWorkspaceShell.tsx', () => ({
-  RepoWorkspaceShell: (props: any) => (
+vi.mock('#/web/components/repo-layout/RepoLayoutWorkspaceShell.tsx', () => ({
+  RepoLayoutWorkspaceShell: (props: any) => (
     <div
       data-testid="repo-workspace-shell"
       data-compact={String(props.compact)}
       data-zen-mode={String(props.zenMode)}
-      data-branch-workspace-active={String(props.branchWorkspaceActive)}
+      data-repo-workspace-active={String(props.repoWorkspaceActive)}
       data-zen-mode-toggle-enabled={String(props.zenModeToggleEnabled)}
       data-single-pane-active-pane={props.singlePaneActivePane}
     >
       {props.branchNavigatorPane}
-      {props.branchWorkspacePane}
+      {props.repoWorkspacePane}
     </div>
   ),
 }))
 
-vi.mock('#/web/components/repo-shell/RepoShellSidebar.tsx', () => ({
-  RepoShellSidebar: (props: any) => <div data-testid="repo-shell-sidebar" data-compact={String(props.compact)} />,
+vi.mock('#/web/components/repo-layout/RepoLayoutSidebar.tsx', () => ({
+  RepoLayoutSidebar: (props: any) => <div data-testid="repo-shell-sidebar" data-compact={String(props.compact)} />,
 }))
 
 vi.mock('#/web/components/workspace-toolbar-chrome.tsx', () => ({
@@ -84,6 +84,6 @@ describe('EmptyRepoView', () => {
 
     const shell = container!.querySelector<HTMLElement>('[data-testid="repo-workspace-shell"]')
     expect(shell?.dataset.zenMode).toBe('false')
-    expect(shell?.dataset.branchWorkspaceActive).toBe('false')
+    expect(shell?.dataset.repoWorkspaceActive).toBe('false')
   })
 })

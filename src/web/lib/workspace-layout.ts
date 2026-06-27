@@ -11,14 +11,14 @@ export interface RepoWorkspaceBehavior {
 export function repoWorkspaceBehavior({
   compact = false,
   zenMode = false,
-  branchWorkspaceActive = false,
+  repoWorkspaceActive = false,
 }: {
   compact?: boolean
   zenMode?: boolean
-  branchWorkspaceActive?: boolean
+  repoWorkspaceActive?: boolean
 }): RepoWorkspaceBehavior {
-  const branchNavigatorCollapsed = !compact && zenMode && branchWorkspaceActive
-  const singlePane = compact || (zenMode && !branchWorkspaceActive)
+  const branchNavigatorCollapsed = !compact && zenMode && repoWorkspaceActive
+  const singlePane = compact || (zenMode && !repoWorkspaceActive)
   return {
     mode: singlePane ? 'single-pane' : 'split',
     singlePane,

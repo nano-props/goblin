@@ -1,8 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import {
-  disconnectAllClientIntentSockets,
-  registerClientIntentSocket,
-} from '#/server/modules/client-intent-broker.ts'
+import { disconnectAllClientIntentSockets, registerClientIntentSocket } from '#/server/modules/client-intent-broker.ts'
 import { createRepoViewRoutes } from '#/server/routes/repo-view.ts'
 import { createApp } from '#/server/app-factory.ts'
 import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
@@ -27,7 +24,7 @@ function makeTerminalHost(): ServerTerminalHost {
     listSessions: vi.fn(async () => []),
     create: vi.fn(async () => ({ ok: true }) as never),
     prune: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
-    getSlotSnapshot: vi.fn(async () => null),
+    getSessionSnapshot: vi.fn(async () => null),
     handleRealtimeMessage: vi.fn(),
     shutdown: vi.fn(),
   }
@@ -55,7 +52,7 @@ describe('POST /api/repo/view', () => {
     expect(subscriber.send).toHaveBeenCalledWith(
       JSON.stringify({
         type: 'client-effect-intent',
-        intent: { type: 'show-workspace-pane-view-requested', tab: 'changes' },
+        intent: { type: 'show-workspace-pane-tab-requested', tab: 'changes' },
       }),
     )
   })
@@ -78,7 +75,7 @@ describe('POST /api/repo/view', () => {
     expect(json.message).toBe('no Goblin window is currently listening for intents')
   })
 
-  test('rejects the terminal tab with 400 (terminal view is owned by the runtime)', async () => {
+  test('rejects the terminal tab with 400 (terminal tab is owned by the runtime)', async () => {
     const subscriber = { send: vi.fn(), close: vi.fn() }
     registerClientIntentSocket(subscriber)
 
@@ -175,7 +172,7 @@ describe('POST /api/repo/view — auth integration via createApp()', () => {
     expect(subscriber.send).toHaveBeenCalledWith(
       JSON.stringify({
         type: 'client-effect-intent',
-        intent: { type: 'show-workspace-pane-view-requested', tab: 'changes' },
+        intent: { type: 'show-workspace-pane-tab-requested', tab: 'changes' },
       }),
     )
   })

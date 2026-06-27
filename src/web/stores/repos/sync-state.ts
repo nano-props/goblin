@@ -1,5 +1,5 @@
-import { repoOperationBusy } from '#/web/stores/repos/runtime.ts'
-import { isRepoUnavailable } from '#/web/stores/repos/helpers.ts'
+import { repoOperationBusy } from '#/web/stores/repos/repo-operation-scheduler.ts'
+import { isRepoUnavailable } from '#/web/stores/repos/repo-guards.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 
 export function canStartRemoteFetch(repo: RepoState | undefined): repo is RepoState {

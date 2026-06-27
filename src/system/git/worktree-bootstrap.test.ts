@@ -310,52 +310,46 @@ hardlink = ["cache"]
     })
   })
 
-  test.each(['copy', 'symlink', 'hardlink'] as const)(
-    'rejects %s sources under a symlink parent',
-    async (mode) => {
-      const outside = path.join(tmp, 'outside')
-      await mkdir(outside, { recursive: true })
-      await writeFile(path.join(outside, 'secret.txt'), 'secret\n')
-      await symlink(outside, path.join(sourceRoot, 'linked-dir'))
-      await writeConfig(`
+  test.each(['copy', 'symlink', 'hardlink'] as const)('rejects %s sources under a symlink parent', async (mode) => {
+    const outside = path.join(tmp, 'outside')
+    await mkdir(outside, { recursive: true })
+    await writeFile(path.join(outside, 'secret.txt'), 'secret\n')
+    await symlink(outside, path.join(sourceRoot, 'linked-dir'))
+    await writeConfig(`
 [worktree]
 ${mode} = ["linked-dir/secret.txt"]
 `)
 
-      const result = await bootstrapWorktreeAfterCreate(sourceRoot, targetRoot)
+    const result = await bootstrapWorktreeAfterCreate(sourceRoot, targetRoot)
 
-      expect(result).toEqual({
-        ok: false,
-        message: 'Worktree bootstrap failed: bootstrap path uses symlink parent: linked-dir',
-      })
-      await expect(readFile(path.join(targetRoot, 'linked-dir', 'secret.txt'), 'utf8')).rejects.toMatchObject({
-        code: 'ENOENT',
-      })
-    },
-  )
+    expect(result).toEqual({
+      ok: false,
+      message: 'Worktree bootstrap failed: bootstrap path uses symlink parent: linked-dir',
+    })
+    await expect(readFile(path.join(targetRoot, 'linked-dir', 'secret.txt'), 'utf8')).rejects.toMatchObject({
+      code: 'ENOENT',
+    })
+  })
 
-  test.each(['copy', 'symlink', 'hardlink'] as const)(
-    'rejects %s targets under a symlink parent',
-    async (mode) => {
-      const outside = path.join(tmp, 'outside')
-      await mkdir(outside, { recursive: true })
-      await mkdir(path.join(sourceRoot, 'linked-dir'), { recursive: true })
-      await writeFile(path.join(sourceRoot, 'linked-dir', 'secret.txt'), 'secret\n')
-      await symlink(outside, path.join(targetRoot, 'linked-dir'))
-      await writeConfig(`
+  test.each(['copy', 'symlink', 'hardlink'] as const)('rejects %s targets under a symlink parent', async (mode) => {
+    const outside = path.join(tmp, 'outside')
+    await mkdir(outside, { recursive: true })
+    await mkdir(path.join(sourceRoot, 'linked-dir'), { recursive: true })
+    await writeFile(path.join(sourceRoot, 'linked-dir', 'secret.txt'), 'secret\n')
+    await symlink(outside, path.join(targetRoot, 'linked-dir'))
+    await writeConfig(`
 [worktree]
 ${mode} = ["linked-dir/secret.txt"]
 `)
 
-      const result = await bootstrapWorktreeAfterCreate(sourceRoot, targetRoot)
+    const result = await bootstrapWorktreeAfterCreate(sourceRoot, targetRoot)
 
-      expect(result).toEqual({
-        ok: false,
-        message: 'Worktree bootstrap failed: bootstrap target path uses symlink parent: linked-dir',
-      })
-      await expect(readFile(path.join(outside, 'secret.txt'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
-    },
-  )
+    expect(result).toEqual({
+      ok: false,
+      message: 'Worktree bootstrap failed: bootstrap target path uses symlink parent: linked-dir',
+    })
+    await expect(readFile(path.join(outside, 'secret.txt'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
+  })
 
   test('fails when setup exits non-zero', async () => {
     const setupCommand = `${JSON.stringify(process.execPath)} -e "process.exit(7)"`

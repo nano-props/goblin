@@ -115,9 +115,7 @@ describe('theme store OS-appearance sync', () => {
     // wipe only because of how `vi.resetModules` is implemented, so
     // explicit teardown matches the reference pattern in
     // `web-invalidation-sync.test.ts`.
-    const { resetServerInvalidationIngressForTests } = await import(
-      '#/web/server-invalidation-ingress.ts'
-    )
+    const { resetServerInvalidationIngressForTests } = await import('#/web/server-invalidation-ingress.ts')
     resetServerInvalidationIngressForTests()
     vi.unstubAllGlobals()
   })
@@ -237,7 +235,7 @@ describe('theme store OS-appearance sync', () => {
   })
 
   test('matchMedia unavailable: hydrate still completes and listener is a no-op', async () => {
-    // Use `theme: 'light'` so `resolveThemeStateFromPrefs` in
+    // Use `theme: 'light'` so `resolveThemeStateFromUserSettings` in
     // `settings-client.ts` never dereferences `matchMedia` (the
     // optional chain there yields `undefined` when matchMedia is
     // absent, and `.matches` would throw).

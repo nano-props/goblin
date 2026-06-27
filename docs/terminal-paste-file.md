@@ -2,7 +2,7 @@
 
 ## Background
 
-Today the terminal slot accepts external content only via drag-and-drop. `Cmd/Ctrl+V` falls through to xterm.js's native text-only paste — copying a file in Finder and pasting produces nothing. Web clients have the same gap (`pathForDroppedFile` returns `''`, no equivalent IPC for paste). This PR closes the paste path on both Electron and web by routing paste through the same resolver drag-and-drop already uses.
+Today the terminal session accepts external content only via drag-and-drop. `Cmd/Ctrl+V` falls through to xterm.js's native text-only paste — copying a file in Finder and pasting produces nothing. Web clients have the same gap (`pathForDroppedFile` returns `''`, no equivalent IPC for paste). This PR closes the paste path on both Electron and web by routing paste through the same resolver drag-and-drop already uses.
 
 ## Goal
 
@@ -35,7 +35,7 @@ Two-tier, runtime-agnostic:
 
 If a native path-attempt result contains terminal control bytes, the resolver now treats that file like a blob-save candidate instead of dropping it. That keeps legitimate-but-dirty filenames usable by falling back to a sanitised temp-file path.
 
-The slot writes the shell-escaped path list to PTY via the existing `writeInput` channel.
+The session writes the shell-escaped path list to PTY via the existing `writeInput` channel.
 
 ## Path-aware decision matrix
 
@@ -59,7 +59,7 @@ Routing is split between `src/shared/clipboard-paste.ts` and `src/web/clipboard/
 - `looksLikeAbsolutePathList(text)` — multi-line absolute paths (POSIX `/…`, Windows drive letter `C:\…`, UNC `\\…`). Non-file URIs deliberately excluded.
 - `isAbsolutePathLike(line)` — single-line primitive used by both the multi-line predicate and the single-line + files branch.
 
-The router itself is `previewPaste({ text, files }) → PastePreview` in `src/web/clipboard/process.ts` — synchronous, side-effect free. When it returns `'files'`, `TerminalSlot` then calls `resolvePastedFiles(files)` asynchronously. The slot uses this split so it can call `event.preventDefault()` / `event.stopPropagation()` before the event reaches xterm.js's descendant textarea listener.
+The router itself is `previewPaste({ text, files }) → PastePreview` in `src/web/clipboard/process.ts` — synchronous, side-effect free. When it returns `'files'`, `TerminalSessionView` then calls `resolvePastedFiles(files)` asynchronously. The view uses this split so it can call `event.preventDefault()` / `event.stopPropagation()` before the event reaches xterm.js's descendant textarea listener.
 
 **Don't preventDefault on the text branch.** xterm.js's native paste handler reads `text/plain` itself and wraps with `\x1b[200~…\x1b[201~` when the shell has enabled bracketed-paste mode. Letting it run is what gives the user correct bracketed-paste semantics for free.
 
@@ -79,7 +79,7 @@ i18n keys (`terminal.paste-file-*`):
 
 ## Architectural invariants
 
-- **Capture-phase paste listener** on the slot root fires before xterm.js's descendant listener. Both `preventDefault()` and `stopPropagation()` are needed — `preventDefault` alone does not stop xterm's JS handler from reading `clipboardData.getData('text/plain')`.
+- **Capture-phase paste listener** on the session root fires before xterm.js's descendant listener. Both `preventDefault()` and `stopPropagation()` are needed — `preventDefault` alone does not stop xterm's JS handler from reading `clipboardData.getData('text/plain')`.
 - **Synchronous routing**: `previewPaste` runs before any `await`, so the `preventDefault` / `stopPropagation` calls land in the capture-phase tick.
 - **`isController` gate** matches between paste and drop — viewers / mirrors silently no-op for files; text paste still flows through xterm.
 - **Same resolver on both runtimes** — `resolvePastedFiles` is the single entry point; the runtime dispatch is hidden inside `saveClipboardFiles`.

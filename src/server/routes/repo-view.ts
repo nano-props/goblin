@@ -1,16 +1,16 @@
 import * as v from 'valibot'
 import { publishClientIntent } from '#/server/modules/client-intent-broker.ts'
 import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'
-import { WORKSPACE_PANE_STATIC_VIEW_TYPES } from '#/shared/workspace-pane.ts'
+import { WORKSPACE_PANE_STATIC_TAB_TYPES } from '#/shared/workspace-pane.ts'
 import type { RepoViewResult } from '#/shared/repo-view.ts'
 
 // Body schema for `POST /api/repo/view`. Only the three static views
 // are addressable through `g` commands; `terminal` is intentionally
-// excluded because the terminal view is owned by the runtime
+// excluded because the terminal tab is owned by the runtime
 // (controller/takeover semantics — see docs/terminal-target-model.md)
 // and shouldn't be reachable via a CLI side-channel.
 const RepoViewBodySchema = v.object({
-  tab: v.picklist(WORKSPACE_PANE_STATIC_VIEW_TYPES),
+  tab: v.picklist(WORKSPACE_PANE_STATIC_TAB_TYPES),
 })
 
 export function createRepoViewRoutes() {
@@ -22,7 +22,7 @@ export function createRepoViewRoutes() {
     // queue: a queued intent that lands in a stale UI state is
     // worse than no-op, and `g` is human-triggered so the user can
     // simply rerun it.
-    const delivered = publishClientIntent({ type: 'show-workspace-pane-view-requested', tab })
+    const delivered = publishClientIntent({ type: 'show-workspace-pane-tab-requested', tab })
     const result: RepoViewResult = delivered
       ? { ok: true }
       : {

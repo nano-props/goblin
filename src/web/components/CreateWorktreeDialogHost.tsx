@@ -1,5 +1,5 @@
 // Layout-level host for the create-worktree dialog. Mounted in
-// `Layout.MainWindowOverlays` so it survives settings ⇄ workspace
+// `Layout.PrimaryWindowOverlays` so it survives settings ⇄ workspace
 // navigation. Source of truth is `useAppOverlays.createWorktree`
 // (exposed via `LayoutOverlayActions`).
 //
@@ -12,9 +12,9 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { CreateWorktreeDialog } from '#/web/components/create-worktree-dialog/CreateWorktreeDialog.tsx'
 import type { CreateWorktreeRequest } from '#/web/components/create-worktree-dialog/create-worktree-dialog.logic.ts'
-import { getRepositoryWorktreeBootstrapPreview } from '#/web/repo-client.ts'
+import { getRepoWorktreeBootstrapPreview } from '#/web/repo-client.ts'
 import { currentSettingsSnapshot } from '#/web/settings-read-projection.ts'
-import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { isRepoWorktreeBootstrapConfigTrusted } from '#/shared/repo-settings.ts'
 import type { SettingsSnapshot } from '#/shared/api-types.ts'
@@ -71,7 +71,7 @@ export function CreateWorktreeDialogHost({ open, onOpenChange, activeId }: Props
     setBootstrapPreviewLoading(true)
     setRememberBootstrapTrust(false)
 
-    void getRepositoryWorktreeBootstrapPreview(repoId, controller.signal)
+    void getRepoWorktreeBootstrapPreview(repoId, controller.signal)
       .then((result) => {
         if (ignore) return
         setBootstrapPreview(result.ok ? result.preview : null)
@@ -158,7 +158,7 @@ export function CreateWorktreeDialogHost({ open, onOpenChange, activeId }: Props
 
 function useCurrentSettingsSnapshot(): SettingsSnapshot | undefined {
   return useSyncExternalStore(
-    (onChange) => mainWindowQueryClient.getQueryCache().subscribe(() => onChange()),
+    (onChange) => primaryWindowQueryClient.getQueryCache().subscribe(() => onChange()),
     currentSettingsSnapshot,
     currentSettingsSnapshot,
   )

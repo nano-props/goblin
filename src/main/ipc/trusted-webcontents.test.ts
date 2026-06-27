@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest'
-import { registerClientWindowSurface } from '#/main/window-registry.ts'
+import { registerClientWindowSurface } from '#/main/client-surface-registry.ts'
 import {
   allowTrustedAppUrlForWebContents,
   isTrustedAppUrl,
@@ -60,7 +60,7 @@ describe('trusted app web contents', () => {
         isDestroyed: () => false,
         webContents: { id: 17, isDestroyed: () => false },
       } as any,
-      { windowKey: 'main' },
+      { windowKey: 'primary' },
     )
 
     expect(

@@ -10,8 +10,8 @@ vi.mock('sonner', () => ({
     success: vi.fn(),
   },
 }))
-import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
-import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
+import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 
@@ -31,15 +31,15 @@ describe('client effect intent handlers', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/no-worktree')],
       selectedBranch: 'feature/no-worktree',
-      preferredWorkspacePaneView: 'status',
+      preferredWorkspacePaneTab: 'status',
     })
 
     await expect(
-      handleWorkspaceClientIntent({ type: 'show-workspace-pane-view-requested', tab: 'changes' }, deps(REPO_ID)),
+      handleWorkspaceClientIntent({ type: 'show-workspace-pane-tab-requested', tab: 'changes' }, deps(REPO_ID)),
     ).resolves.toBe(false)
 
     const repo = useReposStore.getState().repos[REPO_ID]
-    expect(repo ? preferredWorkspacePaneViewForBranch(repo.ui, repo.ui.selectedBranch) : null).toBe('status')
+    expect(repo ? preferredWorkspacePaneTabForBranch(repo.ui, repo.ui.selectedBranch) : null).toBe('status')
   })
 
   test('create-worktree-requested opens create-worktree for the current repo', async () => {
@@ -112,7 +112,7 @@ function deps(currentRepoId: string | null) {
   }
 }
 
-function navigationWithStoreActions(): MainWindowNavigationActions {
+function navigationWithStoreActions(): PrimaryWindowNavigationActions {
   return {
     activateRepo: (repoId) => useReposStore.getState().setActive(repoId),
     closeRepo: (repoId) => useReposStore.getState().closeRepo(repoId),
@@ -122,16 +122,16 @@ function navigationWithStoreActions(): MainWindowNavigationActions {
       state.setActive(repoId)
       state.selectBranch(repoId, branch)
     },
-    showRepoWorkspacePaneView: (repoId, tab) => {
+    showRepoWorkspacePaneTab: (repoId, tab) => {
       const state = useReposStore.getState()
       state.setActive(repoId)
-      state.setWorkspacePaneView(repoId, tab)
+      state.setWorkspacePaneTab(repoId, tab)
     },
-    showRepoBranchWorkspacePaneView: (repoId, branch, tab) => {
+    showRepoBranchWorkspacePaneTab: (repoId, branch, tab) => {
       const state = useReposStore.getState()
       state.setActive(repoId)
       state.selectBranch(repoId, branch)
-      state.setWorkspacePaneView(repoId, tab)
+      state.setWorkspacePaneTab(repoId, tab)
     },
     openSettings: vi.fn(),
   }

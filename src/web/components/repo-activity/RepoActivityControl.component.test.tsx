@@ -7,7 +7,7 @@ import { RepoActivityControl } from '#/web/components/repo-activity/RepoActivity
 import { resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
-import { markRepoOperationTargets, nextRepoOperationId } from '#/web/stores/repos/runtime.ts'
+import { markRepoOperationTargets, nextRepoOperationId } from '#/web/stores/repos/repo-operation-scheduler.ts'
 
 const REPO_ID = '/tmp/repo-activity-control-component'
 
@@ -85,13 +85,13 @@ describe('RepoActivityControl component', () => {
         ...state.repos,
         [REPO_ID]: {
           ...repo,
-          // Use the fetch resource since `latestRepoSyncTime` reads
-          // `resources.fetch.loadedAt` directly; setting snapshot
+          // Use the fetch data load since `latestRepoSyncTime` reads
+          // `dataLoads.fetch.loadedAt` directly; setting snapshot
           // requires `projection.source === 'fresh'` which would also
           // work but couples this test to a second code path.
-          resources: {
-            ...repo.resources,
-            fetch: { ...repo.resources.fetch, loadedAt },
+          dataLoads: {
+            ...repo.dataLoads,
+            fetch: { ...repo.dataLoads.fetch, loadedAt },
           },
         },
       },

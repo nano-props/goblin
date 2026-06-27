@@ -21,8 +21,8 @@ beforeEach(() => {
   vi.doMock('#/web/logger.ts', () => ({
     bootstrapLog: { warn: vi.fn() },
   }))
-  vi.doMock('#/web/main-window-queries.ts', () => ({
-    mainWindowQueryClient: {},
+  vi.doMock('#/web/primary-window-queries.ts', () => ({
+    primaryWindowQueryClient: {},
   }))
   vi.doMock('@tanstack/react-query', async () => {
     const React = await import('react')
@@ -37,7 +37,8 @@ beforeEach(() => {
   vi.doMock('#/web/auth/AuthProvider.tsx', async () => {
     const React = await import('react')
     return {
-      AuthProvider: ({ children }: { children: React.ReactNode }) => React.createElement(React.Fragment, null, children),
+      AuthProvider: ({ children }: { children: React.ReactNode }) =>
+        React.createElement(React.Fragment, null, children),
     }
   })
   vi.doMock('#/web/hooks/useResponsiveUiMode.tsx', async () => {
@@ -47,10 +48,10 @@ beforeEach(() => {
         React.createElement(React.Fragment, null, children),
     }
   })
-  vi.doMock('#/web/main-router.tsx', async () => {
+  vi.doMock('#/web/primary-window-router.tsx', async () => {
     const React = await import('react')
     return {
-      MainWindowRouterProvider: () => React.createElement('div', null, 'app mounted'),
+      PrimaryWindowRouterProvider: () => React.createElement('div', null, 'app mounted'),
     }
   })
 })

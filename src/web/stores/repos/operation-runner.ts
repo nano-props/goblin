@@ -3,11 +3,11 @@ import {
   nextRepoOperationId,
   repoOperationBusy,
   repoOperationCurrent,
-  scheduleRepoTask,
+  scheduleRepoOperation,
   settleRepoOperationTargets,
-  type RepoTaskLane,
-} from '#/web/stores/repos/runtime.ts'
-import { updateIfFresh } from '#/web/stores/repos/helpers.ts'
+  type RepoOperationLane,
+} from '#/web/stores/repos/repo-operation-scheduler.ts'
+import { updateIfFresh } from '#/web/stores/repos/repo-guards.ts'
 import {
   markRepoOperationViews,
   settleRepoOperationViews,
@@ -29,7 +29,7 @@ interface RepoOperationBaseOptions<T> {
   get: ReposGet
   id: string
   token?: number
-  lane: RepoTaskLane
+  lane: RepoOperationLane
   priority: number
   targets: [RepoOperationTarget, ...RepoOperationTarget[]]
   task: (signal: AbortSignal, ctx: RepoOperationContext) => Promise<T>
@@ -119,7 +119,7 @@ async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Pr
 
   let outcome: Outcome
   try {
-    const result = await scheduleRepoTask(options.id, options.lane, (signal) => options.task(signal, ctx), {
+    const result = await scheduleRepoOperation(options.id, options.lane, (signal) => options.task(signal, ctx), {
       priority: options.priority,
       replaceQueuedKey:
         options.policy === 'latest-wins' ? `${options.lane}:${options.operationKey ?? primary.key}` : undefined,

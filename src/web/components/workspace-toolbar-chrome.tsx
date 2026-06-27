@@ -1,9 +1,9 @@
 import type { CSSProperties, HTMLAttributes, ReactNode } from 'react'
-import { WINDOW_CHROME_HEIGHT_PX } from '#/shared/window-chrome.ts'
+import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
 import { cn } from '#/web/lib/cn.ts'
-import { WindowChromeDragRegion, WindowChromeNoDragRegion } from '#/web/components/window-chrome-region.tsx'
+import { TitleBarDragRegion, TitleBarNoDragRegion } from '#/web/components/title-bar-chrome-region.tsx'
 
-const WORKSPACE_TOOLBAR_STYLE = { height: WINDOW_CHROME_HEIGHT_PX } satisfies CSSProperties
+const WORKSPACE_TOOLBAR_STYLE = { height: TITLE_BAR_HEIGHT_PX } satisfies CSSProperties
 const WORKSPACE_TOOLBAR_BASE_CLASS =
   'goblin-workspace-toolbar flex min-w-0 shrink-0 items-center justify-between gap-0 border-b border-border/60 bg-card'
 
@@ -46,9 +46,9 @@ export function WorkspaceToolbar({
   }
 
   return (
-    <WindowChromeDragRegion reserveWindowControls={false} {...toolbarProps}>
+    <TitleBarDragRegion reserveWindowControls={false} {...toolbarProps}>
       {children}
-    </WindowChromeDragRegion>
+    </TitleBarDragRegion>
   )
 }
 
@@ -64,13 +64,7 @@ export function WorkspaceToolbarActions({ className, ...props }: WorkspaceToolba
   return <div className={cn('goblin-workspace-toolbar__actions', className)} {...props} />
 }
 
-export function WorkspaceToolbarLeadingSpacer({
-  reserve,
-  noDrag = reserve,
-}: {
-  reserve: boolean
-  noDrag?: boolean
-}) {
+export function WorkspaceToolbarLeadingSpacer({ reserve, noDrag = reserve }: { reserve: boolean; noDrag?: boolean }) {
   return (
     <div
       data-testid="workspace-toolbar-leading-spacer"
@@ -82,7 +76,7 @@ export function WorkspaceToolbarLeadingSpacer({
       aria-hidden
     >
       {noDrag ? (
-        <WindowChromeNoDragRegion
+        <TitleBarNoDragRegion
           data-testid="workspace-toolbar-leading-no-drag"
           className="absolute left-0 top-1/2 size-8 -translate-y-1/2"
         />

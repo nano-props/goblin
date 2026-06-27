@@ -1,4 +1,4 @@
-import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { externalAppsQueryKey, settingsSnapshotQueryKey, useSettingsSnapshotQuery } from '#/web/settings-queries.ts'
 import type {
   ExternalAppsSnapshot,
@@ -12,10 +12,10 @@ import {
 } from '#/shared/settings-snapshot.ts'
 
 export function currentSettingsSnapshot(): SettingsSnapshot | undefined {
-  return mainWindowQueryClient.getQueryData<SettingsSnapshot>(settingsSnapshotQueryKey())
+  return primaryWindowQueryClient.getQueryData<SettingsSnapshot>(settingsSnapshotQueryKey())
 }
 
-export function runtimeSettingsSnapshotOrUndefined(
+function runtimeSettingsSnapshotOrUndefined(
   snapshot: SettingsSnapshot | undefined,
 ): RuntimeSettingsSnapshot | undefined {
   return snapshot ? runtimeSettingsSnapshotFromSettingsSnapshot(snapshot) : undefined
@@ -25,13 +25,13 @@ export function currentRuntimeSettingsSnapshot(): RuntimeSettingsSnapshot | unde
   return runtimeSettingsSnapshotOrUndefined(currentSettingsSnapshot())
 }
 
-export function runtimeRecentReposStateOrUndefined(
+function runtimeRecentReposStateOrUndefined(
   snapshot: SettingsSnapshot | undefined,
 ): RuntimeRecentReposState | undefined {
   return snapshot ? runtimeRecentReposStateFromSettingsSnapshot(snapshot) : undefined
 }
 
-export function currentRuntimeRecentReposState(): RuntimeRecentReposState | undefined {
+function currentRuntimeRecentReposState(): RuntimeRecentReposState | undefined {
   return runtimeRecentReposStateOrUndefined(currentSettingsSnapshot())
 }
 
@@ -40,13 +40,13 @@ export function useRuntimeSettingsSnapshot(): RuntimeSettingsSnapshot | undefine
   return runtimeSettingsSnapshotOrUndefined(data)
 }
 
-export function useRuntimeRecentReposState(): RuntimeRecentReposState | undefined {
+function useRuntimeRecentReposState(): RuntimeRecentReposState | undefined {
   const { data } = useSettingsSnapshotQuery()
   return runtimeRecentReposStateOrUndefined(data)
 }
 
-export function currentExternalAppsSnapshot(): ExternalAppsSnapshot | undefined {
-  return mainWindowQueryClient.getQueryData<ExternalAppsSnapshot>(externalAppsQueryKey())
+function currentExternalAppsSnapshot(): ExternalAppsSnapshot | undefined {
+  return primaryWindowQueryClient.getQueryData<ExternalAppsSnapshot>(externalAppsQueryKey())
 }
 
 export function readRuntimeShortcutSettings(data: RuntimeSettingsSnapshot | undefined) {
@@ -84,7 +84,7 @@ export function readRuntimeLanSettings(data: RuntimeSettingsSnapshot | undefined
   }
 }
 
-export function getRuntimeRecentRepos() {
+function getRuntimeRecentRepos() {
   return currentRuntimeRecentReposState()?.recentRepos ?? []
 }
 

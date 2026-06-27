@@ -20,7 +20,7 @@ export const EMBEDDED_SERVER_IPC_ROUTES = {
   'remote.listSshHosts': { route: '/api/remote/ssh-hosts', method: 'GET' },
   'remote.resolveTarget': { route: '/api/remote/resolve-target', method: 'POST' },
   'remote.listPathSuggestions': { route: '/api/remote/path-suggestions', method: 'POST' },
-  'remote.testRepository': { route: '/api/remote/test-repository', method: 'POST' },
+  'remote.testRepo': { route: '/api/remote/test-repo', method: 'POST' },
   'remote.openEditor': { route: '/api/remote/open-editor', method: 'POST' },
   'remote.openTerminal': { route: '/api/remote/open-terminal', method: 'POST' },
 } as const

@@ -1,39 +1,36 @@
-export const WORKSPACE_PANE_STATIC_VIEW_TYPES = ['status', 'changes', 'history'] as const
-export const WORKSPACE_PANE_VIEW_TYPES = [...WORKSPACE_PANE_STATIC_VIEW_TYPES, 'terminal'] as const
+export const WORKSPACE_PANE_STATIC_TAB_TYPES = ['status', 'changes', 'history'] as const
+export const WORKSPACE_PANE_TAB_TYPES = [...WORKSPACE_PANE_STATIC_TAB_TYPES, 'terminal'] as const
 
-export type WorkspacePaneStaticViewType = (typeof WORKSPACE_PANE_STATIC_VIEW_TYPES)[number]
-export type WorkspacePaneViewType = (typeof WORKSPACE_PANE_VIEW_TYPES)[number]
-export type WorkspacePaneView = WorkspacePaneViewType
-export type WorkspacePaneViewScope = 'branch' | 'worktree'
-export const WORKSPACE_PANE_STATIC_VIEW_SCOPES = {
+export type WorkspacePaneStaticTabType = (typeof WORKSPACE_PANE_STATIC_TAB_TYPES)[number]
+export type WorkspacePaneTabType = (typeof WORKSPACE_PANE_TAB_TYPES)[number]
+export type WorkspacePaneTabScope = 'branch' | 'worktree'
+export const WORKSPACE_PANE_STATIC_TAB_SCOPES = {
   status: 'branch',
   changes: 'worktree',
   history: 'branch',
-} as const satisfies Record<WorkspacePaneStaticViewType, WorkspacePaneViewScope>
-type WorkspacePaneStaticViewTypeWithScope<TScope extends WorkspacePaneViewScope> = {
-  [TType in WorkspacePaneStaticViewType]: (typeof WORKSPACE_PANE_STATIC_VIEW_SCOPES)[TType] extends TScope
-    ? TType
-    : never
-}[WorkspacePaneStaticViewType]
-export type WorkspacePaneBranchViewType = WorkspacePaneStaticViewTypeWithScope<'branch'>
-export type WorkspacePaneWorktreeStaticViewType = WorkspacePaneStaticViewTypeWithScope<'worktree'>
-export type WorkspacePaneWorktreeViewType = WorkspacePaneWorktreeStaticViewType | 'terminal'
-export const WORKSPACE_PANE_BRANCH_VIEW_TYPES = WORKSPACE_PANE_STATIC_VIEW_TYPES.filter(
-  (type): type is WorkspacePaneBranchViewType => WORKSPACE_PANE_STATIC_VIEW_SCOPES[type] === 'branch',
+} as const satisfies Record<WorkspacePaneStaticTabType, WorkspacePaneTabScope>
+type WorkspacePaneStaticTabTypeWithScope<TScope extends WorkspacePaneTabScope> = {
+  [TType in WorkspacePaneStaticTabType]: (typeof WORKSPACE_PANE_STATIC_TAB_SCOPES)[TType] extends TScope ? TType : never
+}[WorkspacePaneStaticTabType]
+export type WorkspacePaneBranchTabType = WorkspacePaneStaticTabTypeWithScope<'branch'>
+export type WorkspacePaneWorktreeStaticTabType = WorkspacePaneStaticTabTypeWithScope<'worktree'>
+export type WorkspacePaneWorktreeTabType = WorkspacePaneWorktreeStaticTabType | 'terminal'
+export const WORKSPACE_PANE_BRANCH_TAB_TYPES = WORKSPACE_PANE_STATIC_TAB_TYPES.filter(
+  (type): type is WorkspacePaneBranchTabType => WORKSPACE_PANE_STATIC_TAB_SCOPES[type] === 'branch',
 )
-export const WORKSPACE_PANE_WORKTREE_STATIC_VIEW_TYPES = WORKSPACE_PANE_STATIC_VIEW_TYPES.filter(
-  (type): type is WorkspacePaneWorktreeStaticViewType => WORKSPACE_PANE_STATIC_VIEW_SCOPES[type] === 'worktree',
+export const WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES = WORKSPACE_PANE_STATIC_TAB_TYPES.filter(
+  (type): type is WorkspacePaneWorktreeStaticTabType => WORKSPACE_PANE_STATIC_TAB_SCOPES[type] === 'worktree',
 )
-export const WORKSPACE_PANE_WORKTREE_VIEW_TYPES = [
-  ...WORKSPACE_PANE_WORKTREE_STATIC_VIEW_TYPES,
+export const WORKSPACE_PANE_WORKTREE_TAB_TYPES = [
+  ...WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES,
   'terminal',
-] as readonly WorkspacePaneWorktreeViewType[]
-export const WORKSPACE_PANE_SESSION_VIEW_TYPES = WORKSPACE_PANE_VIEW_TYPES
-export type WorkspacePaneSessionView = (typeof WORKSPACE_PANE_SESSION_VIEW_TYPES)[number]
+] as readonly WorkspacePaneWorktreeTabType[]
+export const WORKSPACE_PANE_SESSION_TAB_TYPES = WORKSPACE_PANE_TAB_TYPES
+export type WorkspacePaneSessionTabType = (typeof WORKSPACE_PANE_SESSION_TAB_TYPES)[number]
 
 export interface WorkspacePaneStaticTabOrderEntry {
-  type: WorkspacePaneStaticViewType
-  id: WorkspacePaneStaticViewType
+  type: WorkspacePaneStaticTabType
+  id: WorkspacePaneStaticTabType
 }
 
 export interface WorkspacePaneTerminalTabOrderEntry {
@@ -43,54 +40,48 @@ export interface WorkspacePaneTerminalTabOrderEntry {
 
 export type WorkspacePaneTabOrderEntry = WorkspacePaneStaticTabOrderEntry | WorkspacePaneTerminalTabOrderEntry
 
-export function isWorkspacePaneViewType(value: string | null | undefined): value is WorkspacePaneViewType {
-  return typeof value === 'string' && (WORKSPACE_PANE_VIEW_TYPES as readonly string[]).includes(value)
+export function isWorkspacePaneTabType(value: string | null | undefined): value is WorkspacePaneTabType {
+  return typeof value === 'string' && (WORKSPACE_PANE_TAB_TYPES as readonly string[]).includes(value)
 }
 
-export function isWorkspacePaneStaticViewType(
+export function isWorkspacePaneStaticTabType(value: string | null | undefined): value is WorkspacePaneStaticTabType {
+  return typeof value === 'string' && (WORKSPACE_PANE_STATIC_TAB_TYPES as readonly string[]).includes(value)
+}
+
+export function isWorkspacePaneBranchTabType(value: string | null | undefined): value is WorkspacePaneBranchTabType {
+  return typeof value === 'string' && (WORKSPACE_PANE_BRANCH_TAB_TYPES as readonly string[]).includes(value)
+}
+
+export function isWorkspacePaneWorktreeStaticTabType(
   value: string | null | undefined,
-): value is WorkspacePaneStaticViewType {
-  return typeof value === 'string' && (WORKSPACE_PANE_STATIC_VIEW_TYPES as readonly string[]).includes(value)
+): value is WorkspacePaneWorktreeStaticTabType {
+  return typeof value === 'string' && (WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES as readonly string[]).includes(value)
 }
 
-export function isWorkspacePaneBranchViewType(
-  value: string | null | undefined,
-): value is WorkspacePaneBranchViewType {
-  return typeof value === 'string' && (WORKSPACE_PANE_BRANCH_VIEW_TYPES as readonly string[]).includes(value)
+export function workspacePaneStaticTabScope(tab: WorkspacePaneStaticTabType): WorkspacePaneTabScope {
+  return WORKSPACE_PANE_STATIC_TAB_SCOPES[tab]
 }
 
-export function isWorkspacePaneWorktreeStaticViewType(
-  value: string | null | undefined,
-): value is WorkspacePaneWorktreeStaticViewType {
-  return typeof value === 'string' && (WORKSPACE_PANE_WORKTREE_STATIC_VIEW_TYPES as readonly string[]).includes(value)
+export function workspacePaneTabScope(tab: WorkspacePaneTabType): WorkspacePaneTabScope {
+  return tab === 'terminal' ? 'worktree' : workspacePaneStaticTabScope(tab)
 }
 
-export function workspacePaneStaticViewScope(view: WorkspacePaneStaticViewType): WorkspacePaneViewScope {
-  return WORKSPACE_PANE_STATIC_VIEW_SCOPES[view]
+export function workspacePaneTabRequiresWorktree(tab: WorkspacePaneTabType): boolean {
+  return workspacePaneTabScope(tab) === 'worktree'
 }
 
-export function workspacePaneViewScope(view: WorkspacePaneViewType): WorkspacePaneViewScope {
-  return view === 'terminal' ? 'worktree' : workspacePaneStaticViewScope(view)
-}
-
-export function workspacePaneViewRequiresWorktree(view: WorkspacePaneViewType): boolean {
-  return workspacePaneViewScope(view) === 'worktree'
-}
-
-export function isWorkspacePaneSessionViewType(
-  value: string | null | undefined,
-): value is WorkspacePaneSessionView {
-  return typeof value === 'string' && (WORKSPACE_PANE_SESSION_VIEW_TYPES as readonly string[]).includes(value)
+export function isWorkspacePaneSessionTabType(value: string | null | undefined): value is WorkspacePaneSessionTabType {
+  return typeof value === 'string' && (WORKSPACE_PANE_SESSION_TAB_TYPES as readonly string[]).includes(value)
 }
 
 export function isWorkspacePaneTabOrderEntry(value: unknown): value is WorkspacePaneTabOrderEntry {
   if (!value || typeof value !== 'object') return false
   const entry = value as Partial<WorkspacePaneTabOrderEntry>
   if (entry.type === 'terminal') return typeof entry.id === 'string' && entry.id.length > 0
-  return isWorkspacePaneStaticViewType(entry.type) && entry.id === entry.type
+  return isWorkspacePaneStaticTabType(entry.type) && entry.id === entry.type
 }
 
-export function workspacePaneStaticTabOrderEntry(type: WorkspacePaneStaticViewType): WorkspacePaneStaticTabOrderEntry {
+export function workspacePaneStaticTabOrderEntry(type: WorkspacePaneStaticTabType): WorkspacePaneStaticTabOrderEntry {
   return { type, id: type }
 }
 

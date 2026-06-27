@@ -5,7 +5,7 @@ import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
-import { clearRecentRepoHistory } from '#/web/settings-write-paths.ts'
+import { clearRecentRepoHistory } from '#/web/settings-actions.ts'
 import { openRepoFromDialog } from '#/web/lib/open-repo-dialog.ts'
 import { consumeExternalOpenPaths } from '#/web/app-shell-client.ts'
 import { openRepoPaths } from '#/web/lib/open-repo-paths.ts'
@@ -13,7 +13,7 @@ import { externalOpenLog } from '#/web/logger.ts'
 import {
   runCloseWorkspacePaneTabOrWindowCommand,
   runNewTerminalTabCommand,
-  runShowWorkspacePaneViewCommand,
+  runShowWorkspacePaneTabCommand,
   runTerminalPrimaryActionCommand,
 } from '#/web/commands/workspace-commands.ts'
 import {
@@ -23,18 +23,18 @@ import {
   createWorkspaceIntentPlan,
 } from '#/web/hooks/client-effect-intent-plans.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
-import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
+import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { OpenRepoResult } from '#/web/stores/repos/types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 
 interface TerminalBellIntentDeps {
-  navigation: MainWindowNavigationActions
+  navigation: PrimaryWindowNavigationActions
   closeAllOverlays: () => void
   setSelectedTerminal: (worktreeKey: string, key: string) => void
 }
 
 interface SharedClientIntentDeps {
-  navigation: MainWindowNavigationActions
+  navigation: PrimaryWindowNavigationActions
   currentRepoId: string | null
   closeAllOverlays: () => void
   openRepoPathDialog: () => void
@@ -66,10 +66,10 @@ export function handleTerminalBellClickIntent(
   switch (plan.kind) {
     case 'show-worktree-terminal':
       deps.setSelectedTerminal(plan.worktreeTerminalKey, plan.key)
-      deps.navigation.showRepoBranchWorkspacePaneView(plan.repoId, plan.branch, 'terminal')
+      deps.navigation.showRepoBranchWorkspacePaneTab(plan.repoId, plan.branch, 'terminal')
       return
     case 'show-repo-terminal':
-      deps.navigation.showRepoWorkspacePaneView(plan.repoId, 'terminal')
+      deps.navigation.showRepoWorkspacePaneTab(plan.repoId, 'terminal')
       return
   }
 }
@@ -177,8 +177,8 @@ export async function handleWorkspaceClientIntent(
         token: plan.token,
       })
       return true
-    case 'show-workspace-pane-view':
-      return await runShowWorkspacePaneViewCommand({
+    case 'show-workspace-pane-tab':
+      return await runShowWorkspacePaneTabCommand({
         repoId: plan.repoId,
         tab: plan.tab,
         navigation: deps.navigation,

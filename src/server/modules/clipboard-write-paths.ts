@@ -4,7 +4,7 @@ import { serverDataDir } from '#/shared/data-dir.ts'
 import { CLIPBOARD_TEMP_FILE_MAX_AGE_MS, PASTE_FILE_MAX_BYTES } from '#/shared/clipboard-paste.ts'
 
 /**
- * Web counterpart to `src/main/clipboard-bridge.ts`. Web clients reach
+ * Web counterpart to `src/main/clipboard-ipc.ts`. Web clients reach
  * the server over HTTP via `POST /api/clipboard/files`; the route layer
  * normalises the multipart body and hands a `File[]` to this module.
  *

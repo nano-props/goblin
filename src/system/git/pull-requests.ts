@@ -414,7 +414,7 @@ function logGraphqlError(error: GraphqlRequestError): void {
   } catch {}
 }
 
-async function queryRepositoryPullRequests(
+async function queryRepoPullRequests(
   cwd: string,
   repo: GitHubRepoRef,
   mode: PullRequestFetchMode,
@@ -456,14 +456,14 @@ function mapPullRequestsByBranch(prs: PullRequestInfo[]): Map<string, PullReques
 // and keep the scopeId (local path or remote ID) for cache isolation only.
 const ghWorkingDirectory = process.cwd()
 
-async function fetchRepositoryPullRequestMap(
+async function fetchRepoPullRequestMap(
   scopeId: string,
   repo: GitHubRepoRef,
   mode: PullRequestFetchMode,
   signal?: AbortSignal,
 ): Promise<Map<string, PullRequestInfo> | null> {
   if (signal?.aborted) return null
-  const prs = await queryRepositoryPullRequests(ghWorkingDirectory, repo, mode, signal)
+  const prs = await queryRepoPullRequests(ghWorkingDirectory, repo, mode, signal)
   if (!prs) return null
   const byBranch = mapPullRequestsByBranch(prs)
   prCache.set(repoCacheKey(scopeId, repo), {
@@ -523,7 +523,7 @@ export async function getBranchPullRequestsForRepoRef(
     const key = pendingRequestKey(repoRequestKey(scopeId, repo, mode), options?.signal)
     if (!(await hasPullRequestQueryCapability(repo, options?.signal))) return null
     const existing = pendingRepoRequests.get(key)
-    const byBranch = existing ?? fetchRepositoryPullRequestMap(scopeId, repo, mode, options?.signal)
+    const byBranch = existing ?? fetchRepoPullRequestMap(scopeId, repo, mode, options?.signal)
     if (!existing) pendingRepoRequests.set(key, byBranch)
     try {
       return filterPullRequests(await byBranch, branchNames)

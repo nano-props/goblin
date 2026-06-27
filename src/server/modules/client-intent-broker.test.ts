@@ -14,9 +14,7 @@ describe('client intent broker', () => {
   })
 
   test('returns false when no subscriber is attached', () => {
-    expect(
-      publishClientIntent({ type: 'show-workspace-pane-view-requested', tab: 'changes' }),
-    ).toBe(false)
+    expect(publishClientIntent({ type: 'show-workspace-pane-tab-requested', tab: 'changes' })).toBe(false)
   })
 
   test('broadcasts the enveloped intent to every subscriber and returns true', () => {
@@ -25,12 +23,12 @@ describe('client intent broker', () => {
     registerClientIntentSocket(first)
     registerClientIntentSocket(second)
 
-    const ok = publishClientIntent({ type: 'show-workspace-pane-view-requested', tab: 'changes' })
+    const ok = publishClientIntent({ type: 'show-workspace-pane-tab-requested', tab: 'changes' })
     expect(ok).toBe(true)
 
     const expected = JSON.stringify({
       type: 'client-effect-intent',
-      intent: { type: 'show-workspace-pane-view-requested', tab: 'changes' },
+      intent: { type: 'show-workspace-pane-tab-requested', tab: 'changes' },
     })
     expect(first.send).toHaveBeenCalledWith(expected)
     expect(second.send).toHaveBeenCalledWith(expected)
@@ -43,7 +41,7 @@ describe('client intent broker', () => {
     registerClientIntentSocket(second)
 
     disconnectAllClientIntentSockets()
-    publishClientIntent({ type: 'show-workspace-pane-view-requested', tab: 'changes' })
+    publishClientIntent({ type: 'show-workspace-pane-tab-requested', tab: 'changes' })
 
     expect(first.close).toHaveBeenCalledWith(1001, 'server shutting down')
     expect(second.close).toHaveBeenCalledWith(1001, 'server shutting down')

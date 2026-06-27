@@ -12,10 +12,7 @@ import { getWorktrees } from '#/system/git/worktrees.ts'
 import { resolveRemoteTarget } from '#/system/ssh/config.ts'
 import { createInProcessPtySupervisor } from '#/server/terminal/pty-supervisor-inprocess.ts'
 import { createServerTerminalRuntime } from '#/server/terminal/terminal-runtime.ts'
-import {
-  HEARTBEAT_DEADLINE_MS,
-  HEARTBEAT_INTERVAL_MS,
-} from '#/server/terminal/terminal-realtime-broker.ts'
+import { HEARTBEAT_DEADLINE_MS, HEARTBEAT_INTERVAL_MS } from '#/server/terminal/terminal-realtime-broker.ts'
 import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 
 // Under method 2 the host threads `userId` (derived from the
@@ -109,11 +106,7 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
-async function createTerminalSlot(
-  host: ServerTerminalHost,
-  clientId: string,
-  userId = USER_1,
-): Promise<string> {
+async function createTerminalSession(host: ServerTerminalHost, clientId: string, userId = USER_1): Promise<string> {
   const result = await host.create(clientId, userId, {
     repoRoot: '/repo',
     branch: 'feature',
@@ -215,7 +208,7 @@ describe('server terminal runtime', () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
-    const ptySessionId = await createTerminalSlot(host, 'client_1')
+    const ptySessionId = await createTerminalSession(host, 'client_1')
     const prompt =
       '\x1b[1m\x1b[7m%\x1b[27m\x1b[1m\x1b[0m                                                                            \r \r\r\x1b[0m\x1b[27m\x1b[24m\x1b[J👾:~/repo\r\n$ '
     mockPtys[0]?.emitData(prompt)
@@ -226,7 +219,7 @@ describe('server terminal runtime', () => {
       rows: 24,
       clientId: 'client_a',
     })
-    const snapshot = await host.getSlotSnapshot('client_1', USER_1, { ptySessionId })
+    const snapshot = await host.getSessionSnapshot('client_1', USER_1, { ptySessionId })
 
     expect(attach.ok).toBe(true)
     if (!attach.ok) return
@@ -238,8 +231,8 @@ describe('server terminal runtime', () => {
 
   test('reattaching after a disconnect auto-reclaims control and canonical geometry', async () => {
     // The previous revision had a 30s grace sub-state that kept the
-    // controller slot occupied between disconnect and reconnect. The
-    // current model clears the slot on disconnect (no grace) and
+    // controller role occupied between disconnect and reconnect. The
+    // current model clears the controller role on disconnect (no grace) and
     // treats a reconnect as a fresh attach — for a session that has
     // already been claimed by the user (userSticky=true), the
     // reattach auto-claims.
@@ -314,7 +307,10 @@ describe('server terminal runtime', () => {
     if (!ptySessionId) throw new Error('expected session id')
     socket.send.mockClear()
 
-    host.handleRealtimeMessage('client_a', USER_1, socket,
+    host.handleRealtimeMessage(
+      'client_a',
+      USER_1,
+      socket,
       JSON.stringify({
         type: 'request',
         requestId: 'req_attach_resize',
@@ -355,7 +351,7 @@ describe('server terminal runtime', () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
-    const ptySessionId = await createTerminalSlot(host, 'client_1')
+    const ptySessionId = await createTerminalSession(host, 'client_1')
 
     const result = await host.attach('client_a', USER_1, {
       ptySessionId,
@@ -401,7 +397,7 @@ describe('server terminal runtime', () => {
     expect(resolveRemoteTarget).toHaveBeenCalledWith({ alias: 'prod', remotePath: '/srv/repo' })
     expect(result.sessions).toEqual([
       expect.objectContaining({
-        key: 'ssh-config://prod/srv/repo\0/srv/repo\0slot-1',
+        key: 'ssh-config://prod/srv/repo\0/srv/repo\0session-1',
       }),
     ])
 
@@ -546,7 +542,7 @@ describe('server terminal runtime', () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
-    const ptySessionId = await createTerminalSlot(host, 'client_a')
+    const ptySessionId = await createTerminalSession(host, 'client_a')
 
     const { spawn } = await import('node-pty')
     vi.mocked(spawn).mockImplementationOnce(() => {
@@ -584,7 +580,7 @@ describe('server terminal runtime', () => {
     const socketB = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socketA)
     host.registerSocket('client_b', USER_1, socketB)
-    const ptySessionId = await createTerminalSlot(host, 'client_1')
+    const ptySessionId = await createTerminalSession(host, 'client_1')
 
     const restarted = await host.restart('client_a', USER_1, {
       ptySessionId,
@@ -622,10 +618,13 @@ describe('server terminal runtime', () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
-    const ptySessionId = await createTerminalSlot(host, 'client_1')
+    const ptySessionId = await createTerminalSession(host, 'client_1')
     socket.send.mockClear()
 
-    host.handleRealtimeMessage('client_1', USER_1, socket,
+    host.handleRealtimeMessage(
+      'client_1',
+      USER_1,
+      socket,
       JSON.stringify({
         type: 'request',
         requestId: 'req_attach',
@@ -665,7 +664,10 @@ describe('server terminal runtime', () => {
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
 
-    host.handleRealtimeMessage('client_1', USER_1, socket,
+    host.handleRealtimeMessage(
+      'client_1',
+      USER_1,
+      socket,
       JSON.stringify({
         type: 'request',
         requestId: 'req_create',
@@ -733,7 +735,7 @@ describe('server terminal runtime', () => {
     const socketA = { send: vi.fn(), close: vi.fn() }
     const socketB = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socketA)
-    const ptySessionId = await createTerminalSlot(host, 'client_1')
+    const ptySessionId = await createTerminalSession(host, 'client_1')
     host.registerSocket('client_b', USER_1, socketB)
 
     const result = host.takeover('client_a', USER_1, {
@@ -765,11 +767,14 @@ describe('server terminal runtime', () => {
     const socketA = { send: vi.fn(), close: vi.fn() }
     const socketB = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socketA)
-    const ptySessionId = await createTerminalSlot(host, 'client_a')
+    const ptySessionId = await createTerminalSession(host, 'client_a')
     host.registerSocket('client_b', USER_1, socketB)
     socketB.send.mockClear()
 
-    host.handleRealtimeMessage('client_b', USER_1, socketB,
+    host.handleRealtimeMessage(
+      'client_b',
+      USER_1,
+      socketB,
       JSON.stringify({
         type: 'request',
         requestId: 'req_takeover',
@@ -817,7 +822,7 @@ describe('server terminal runtime', () => {
     const socketB = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socketA)
     host.registerSocket('client2_b', USER_1, socketB)
-    const ptySessionId = await createTerminalSlot(host, 'client_1')
+    const ptySessionId = await createTerminalSession(host, 'client_1')
 
     const result = await host.attach('client_a', USER_1, {
       ptySessionId,
@@ -866,7 +871,7 @@ describe('server terminal runtime', () => {
 
     expect(await host.listSessions('client_shared', USER_2, '/repo')).toEqual([])
     await expect(
-      host.getSlotSnapshot('client_shared', USER_2, { ptySessionId: userASession.ptySessionId }),
+      host.getSessionSnapshot('client_shared', USER_2, { ptySessionId: userASession.ptySessionId }),
     ).resolves.toBeNull()
     expect(host.close('client_shared', USER_2, { ptySessionId: userASession.ptySessionId })).toBe(false)
     expect(
@@ -909,7 +914,7 @@ describe('server terminal runtime', () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
-    const ptySessionId = await createTerminalSlot(host, 'client_1')
+    const ptySessionId = await createTerminalSession(host, 'client_1')
 
     const first = await host.attach('client_a', USER_1, {
       ptySessionId,
@@ -927,7 +932,7 @@ describe('server terminal runtime', () => {
 
     const socket2 = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_b', USER_1, socket2)
-    const recreatedSessionId = await createTerminalSlot(host, 'client_1')
+    const recreatedSessionId = await createTerminalSession(host, 'client_1')
     const replacementAttach = await host.attach('client_a', USER_1, {
       ptySessionId: recreatedSessionId,
       cols: 80,
@@ -946,8 +951,8 @@ describe('server terminal runtime', () => {
     // Device-switch scenario in the new model: A was the controller
     // (from create); A's socket closes; B (a different clientId)
     // attaches. The previous revision refused the auto-claim because
-    // the slot was still in the 30s grace sub-state. The current
-    // model clears the slot on disconnect, so B's attach auto-claims.
+    // the controller role was still in the 30s grace sub-state. The current
+    // model clears the controller role on disconnect, so B's attach auto-claims.
     vi.useFakeTimers()
     const { host, shutdown } = buildRuntime()
     const socketA = { send: vi.fn(), close: vi.fn() }
@@ -970,7 +975,7 @@ describe('server terminal runtime', () => {
     host.unregisterSocket('client_a', USER_1, socketA)
 
     // B comes online and attaches — no explicit takeover needed
-    // because the slot was cleared on A's disconnect.
+    // because the controller role was cleared on A's disconnect.
     host.registerSocket('client_b', USER_1, socketB)
     const viewerAttach = await host.attach('client_a', USER_1, {
       ptySessionId,
@@ -990,11 +995,11 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
-  test('a late-returning original controller stays a viewer once a sibling has claimed the slot (no grace restore)', async () => {
-    // The new user-sticky model clears the controller slot on
+  test('a late-returning original controller stays a viewer once a sibling has claimed control (no grace restore)', async () => {
+    // The new user-sticky model clears the controller role on
     // disconnect with no grace period. If a sibling attachment
     // attaches in the window before the original controller
-    // reconnects, the sibling claims the slot. When the original
+    // reconnects, the sibling claims control. When the original
     // controller eventually reconnects, it is a viewer — the
     // previous design's grace restore ("same clientId keeps
     // control after a brief disconnect") does not apply. The
@@ -1026,7 +1031,7 @@ describe('server terminal runtime', () => {
     const ptySessionId = created.sessions[0]?.ptySessionId
     if (!ptySessionId) throw new Error('expected session id')
 
-    // A disconnects; B attaches and claims the now-empty slot.
+    // A disconnects; B attaches and claims the now-empty controller role.
     host.unregisterSocket('client_a', USER_1, socketA)
     host.registerSocket('client_b', USER_1, socketB)
     const bAttach = await host.attach('client_a', USER_1, {
@@ -1040,7 +1045,7 @@ describe('server terminal runtime', () => {
       controller: { clientId: 'client_b', status: 'connected' },
     })
 
-    // A reconnects later. The slot is held by B; A's attach must
+    // A reconnects later. B still holds the controller role; A's attach must
     // NOT preempt B — A becomes a viewer.
     host.registerSocket('client_a', USER_1, socketAReconnect)
     const aReattach = await host.attach('client_a', USER_1, {
@@ -1151,7 +1156,7 @@ describe('server terminal runtime', () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
-    const ptySessionId = await createTerminalSlot(host, 'client_1')
+    const ptySessionId = await createTerminalSession(host, 'client_1')
 
     const attach = await host.attach('client_a', USER_1, {
       ptySessionId,
@@ -1189,7 +1194,7 @@ describe('server terminal runtime', () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
-    const ptySessionId = await createTerminalSlot(host, 'client_1')
+    const ptySessionId = await createTerminalSession(host, 'client_1')
     socket.send.mockClear()
 
     const result = await host.takeover('client_a', USER_1, {
@@ -1228,8 +1233,8 @@ describe('server terminal runtime', () => {
       expect(stats.maxRingBufferChars).toBe(0)
 
       // Create two sessions; their buffers start empty.
-      const sessionA = await createTerminalSlot(host, 'client_1')
-      const sessionB = await createTerminalSlot(host, 'client_1')
+      const sessionA = await createTerminalSession(host, 'client_1')
+      const sessionB = await createTerminalSession(host, 'client_1')
       stats = host.getDiagnostics()
       expect(stats.liveSessionCount).toBe(2)
       expect(stats.totalRingBufferChars).toBe(0)
@@ -1288,23 +1293,13 @@ describe('server terminal runtime', () => {
       vi.setSystemTime(new Date('2026-06-24T00:00:00Z'))
 
       // First heartbeat at t=0.
-      host.handleRealtimeMessage(
-        'client_a',
-        USER_1,
-        socket,
-        JSON.stringify({ type: 'heartbeat', at: Date.now() }),
-      )
+      host.handleRealtimeMessage('client_a', USER_1, socket, JSON.stringify({ type: 'heartbeat', at: Date.now() }))
       // Advance just shy of the original deadline.
       vi.advanceTimersByTime(HEARTBEAT_DEADLINE_MS - 1_000)
       // Heartbeat again — this MUST use the right (userId, clientId, at)
       // order, otherwise the broker's clock never updates and the
       // very next scan would synthesize a disconnect.
-      host.handleRealtimeMessage(
-        'client_a',
-        USER_1,
-        socket,
-        JSON.stringify({ type: 'heartbeat', at: Date.now() }),
-      )
+      host.handleRealtimeMessage('client_a', USER_1, socket, JSON.stringify({ type: 'heartbeat', at: Date.now() }))
       // Advance past the original 90 s deadline. A correctly routed
       // heartbeat (a real client sending every 30 s) means the
       // broker clock is fresh, so the synthetic disconnect must NOT

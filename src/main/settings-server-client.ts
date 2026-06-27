@@ -1,9 +1,9 @@
-import type { SettingsPrefs, SettingsSnapshot } from '#/shared/api-types.ts'
+import type { UserSettings, SettingsSnapshot } from '#/shared/api-types.ts'
 import { postEmbeddedServerJson, requestEmbeddedServerJson } from '#/shared/embedded-server-client.ts'
-import { getEmbeddedServerRuntime } from '#/main/server-manager.ts'
+import { getEmbeddedServerRuntime } from '#/main/embedded-server-lifecycle.ts'
 
 // Main-process client for server-owned settings/session APIs.
-export type SettingsPrefsPatch = Partial<SettingsPrefs>
+export type UserSettingsPatch = Partial<UserSettings>
 
 function requireEmbeddedServerRuntime() {
   const runtime = getEmbeddedServerRuntime()
@@ -34,26 +34,26 @@ export async function getSettingsSnapshot(): Promise<SettingsSnapshot> {
   )
 }
 
-export async function updateSettingsPrefs(settings: SettingsPrefsPatch): Promise<SettingsPrefs> {
+export async function updateUserSettings(settings: UserSettingsPatch): Promise<UserSettings> {
   const runtime = requireEmbeddedServerRuntime()
-  const json = await postEmbeddedServerJson<{ settings?: SettingsPrefs }>(runtime, '/api/settings/prefs', {
-    settings,
+  const json = await postEmbeddedServerJson<{ prefs?: UserSettings }>(runtime, '/api/settings/prefs', {
+    prefs: settings,
   }).catch((error) => {
     throw new Error(`Embedded server rejected settings update${error instanceof Error ? `: ${error.message}` : ''}`)
   })
-  if (!json?.settings) throw new Error('Embedded server returned an invalid settings payload')
-  return json.settings
+  if (!json?.prefs) throw new Error('Embedded server returned an invalid settings payload')
+  return json.prefs
 }
 
-export async function getSettingsPrefs(): Promise<SettingsPrefs> {
-  return await requestSettingsJson<SettingsPrefs>(
+export async function getUserSettings(): Promise<UserSettings> {
+  return await requestSettingsJson<UserSettings>(
     '/api/settings/prefs',
     undefined,
     'Embedded server rejected settings prefs request',
   )
 }
 
-export async function setSettingsGlobalShortcutState(registered: boolean): Promise<boolean> {
+export async function setGlobalShortcutState(registered: boolean): Promise<boolean> {
   const runtime = requireEmbeddedServerRuntime()
   const json = await postEmbeddedServerJson<{ registered?: unknown }>(runtime, '/api/settings/global-shortcut-state', {
     registered,

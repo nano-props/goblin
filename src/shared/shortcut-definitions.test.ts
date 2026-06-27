@@ -19,7 +19,7 @@ describe('shortcut definitions', () => {
   test('matches client navigation and app shortcuts from keyboard input', () => {
     expect(matchClientKeyboardShortcut({ key: 'j', code: 'KeyJ', shiftKey: false })).toBe('next-branch')
     expect(matchClientKeyboardShortcut({ key: 'ArrowLeft', code: 'ArrowLeft', shiftKey: false })).toBe(
-      'prev-workspace-pane-view',
+      'prev-workspace-pane-tab',
     )
     expect(matchClientKeyboardShortcut({ key: 'Enter', code: 'Enter', shiftKey: false })).toBeNull()
     expect(matchClientKeyboardShortcut({ key: '?', code: 'Slash', shiftKey: true })).toBe('show-help')
@@ -42,10 +42,10 @@ describe('shortcut definitions', () => {
     expect(resolveClientMenuCommandAccelerator(command, {})).toBeUndefined()
   })
 
-  test('defines history as a workspace pane view menu command', () => {
+  test('defines history as a workspace pane tab menu command', () => {
     const command = clientMenuCommandById('view-history')
     expect(command.menuLabelKey).toBe('menu.view.history')
-    expect(command.intent).toEqual({ type: 'show-workspace-pane-view-requested', tab: 'history' })
+    expect(command.intent).toEqual({ type: 'show-workspace-pane-tab-requested', tab: 'history' })
     expect(resolveClientMenuCommandAccelerator(command, {})).toBeUndefined()
   })
 

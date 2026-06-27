@@ -9,8 +9,8 @@ import { visibleBranches } from '#/web/stores/repos/branch-view-mode.ts'
 import { BranchList } from '#/web/components/branch-navigator/BranchList.tsx'
 import { useBranchListRepo } from '#/web/components/branch-navigator/use-branch-list-data.ts'
 import { EmptyState } from '#/web/components/Layout.tsx'
-import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
-import { openWorkspacePaneView } from '#/web/components/branch-workspace/open-workspace-pane-view.ts'
+import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
+import { openWorkspacePaneTab } from '#/web/components/repo-workspace/open-workspace-pane-tab.ts'
 
 interface Props {
   repoId: string
@@ -23,7 +23,7 @@ interface Props {
 
 export function BranchView({ repoId, onAfterSelect, onAfterOpenStatus }: Props) {
   const t = useT()
-  const navigation = useMainWindowNavigation()
+  const navigation = usePrimaryWindowNavigation()
   const repo = useBranchListRepo(repoId)
 
   const branches = useMemo(
@@ -44,7 +44,7 @@ export function BranchView({ repoId, onAfterSelect, onAfterOpenStatus }: Props) 
 
   const handleOpenBranchStatus = (branchName: string) => {
     const branch = repo?.data.branches.find((candidate) => candidate.name === branchName)
-    void openWorkspacePaneView({
+    void openWorkspacePaneTab({
       repoId,
       branchName,
       worktreePath: branch?.worktree?.path ?? null,

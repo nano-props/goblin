@@ -10,11 +10,7 @@
 // via the `GoblinCommandContext` parameter, so this file has no
 // server-internal imports beyond the registry.
 
-import type {
-  GoblinCommandContext,
-  GoblinCommandIo,
-  GoblinCommandTransport,
-} from '#/server/g-command/context.ts'
+import type { GoblinCommandContext, GoblinCommandIo, GoblinCommandTransport } from '#/server/g-command/context.ts'
 import { findCommand, formatUsage, COMMANDS } from '#/server/g-command/registry.ts'
 
 export async function runGoblinCommand(

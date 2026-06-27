@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import type { SettingsSnapshot } from '#/shared/api-types.ts'
 import { normalizeWorkspaceSessionLayoutState } from '#/shared/workspace-layout.ts'
 import { bootstrapLog } from '#/web/logger.ts'
-import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { restoreRestorableWorkspaceStateFromSession } from '#/web/restorable-workspace-state.ts'
 import { getExternalAppsSnapshot, getSettingsSnapshot } from '#/web/settings-client.ts'
 import { externalAppsQueryKey, settingsSnapshotQueryKey } from '#/web/settings-queries.ts'
@@ -48,18 +48,18 @@ async function restoreBootSession(settingsSnapshot: Promise<SettingsSnapshot>): 
     useSessionRestoreStore.getState().hydrateFromSettingsSnapshot(await settingsSnapshot)
     const session = useSessionRestoreStore.getState().consumeBootSessionSnapshot()
     const normalizedLayout = normalizeWorkspaceSessionLayoutState(session)
-    const { hydrateSession, applySessionLayoutState, applySessionSelectedTerminalState } = useReposStore.getState()
+    const { hydrateRepoSession, applySessionLayoutState, applySessionSelectedTerminalState } = useReposStore.getState()
     // Apply layout prefs before repo probing finishes so the first
     // restored paint uses the saved geometry. useSessionPersistence
     // still waits for sessionReady, so this cannot overwrite the
     // persisted session with a partially hydrated one.
     const restoredWorkspaceState = restoreRestorableWorkspaceStateFromSession(session)
     applySessionLayoutState(normalizedLayout)
-    applySessionSelectedTerminalState(restoredWorkspaceState.selectedTerminalByWorktree)
-    await hydrateSession(session.openRepos, session.activeRepo, {
+    applySessionSelectedTerminalState(restoredWorkspaceState.selectedTerminalSessionByWorktree)
+    await hydrateRepoSession(session.openRepoEntries, session.activeRepoId, {
       workspacePaneRestoreState: {
         workspacePaneTabOrderByBranchByRepo: restoredWorkspaceState.workspacePaneTabOrderByBranchByRepo,
-        preferredWorkspacePaneViewByBranchByRepo: restoredWorkspaceState.preferredWorkspacePaneViewByBranchByRepo,
+        preferredWorkspacePaneTabByBranchByRepo: restoredWorkspaceState.preferredWorkspacePaneTabByBranchByRepo,
       },
     })
   } catch (err) {
@@ -93,7 +93,7 @@ async function primeSettingsQueryCache(settingsSnapshot: Promise<SettingsSnapsho
   const fetchAndPrime = async (fetcher: () => Promise<unknown>, queryKey: readonly unknown[]): Promise<void> => {
     try {
       const snapshot = await fetcher()
-      mainWindowQueryClient.setQueryData(queryKey, snapshot)
+      primaryWindowQueryClient.setQueryData(queryKey, snapshot)
     } catch {
       // Settings fetch failure must not block boot - the page will
       // retry the auto-fetch on first use. The empty cache is the

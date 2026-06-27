@@ -1,7 +1,7 @@
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
-import { emptyRepo } from '#/web/stores/repos/helpers.ts'
-import { disposeAllRepoRuntimes } from '#/web/stores/repos/runtime.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
+import { disposeAllRepoOperationSchedulers } from '#/web/stores/repos/repo-operation-scheduler.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { vi } from 'vitest'
@@ -11,11 +11,11 @@ import type {
   TerminalAttachResult,
   TerminalCatalogMutationResult,
   TerminalMutationResult,
-  TerminalSlotSnapshot,
-  TerminalSlotSummary,
+  TerminalSessionSnapshot,
+  TerminalSessionSummary,
   TerminalTakeoverResult,
 } from '#/shared/terminal-types.ts'
-import type { WorkspacePaneTabOrderEntry, WorkspacePaneView } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabOrderEntry, WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import type { BranchSnapshotInfo, PullRequestInfo, WorktreeStatus } from '#/web/types.ts'
 import type { RepoBranchState, RepoState } from '#/web/stores/repos/types.ts'
 import { DEFAULT_ZEN_MODE, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
@@ -30,8 +30,8 @@ interface TerminalBridgeTestOutputs {
   'terminal.close': TerminalMutationResult
   'terminal.create': TerminalCatalogMutationResult
   'terminal.prune': { pruned: number; remaining: number }
-  'terminal.listSessions': TerminalSlotSummary[]
-  'terminal.getSlotSnapshot': TerminalSlotSnapshot | null
+  'terminal.listSessions': TerminalSessionSummary[]
+  'terminal.getSessionSnapshot': TerminalSessionSnapshot | null
   'terminal.notifyBell': TerminalMutationResult
 }
 
@@ -55,8 +55,8 @@ function terminalHandlerNameForSocketAction(action: string): keyof TerminalBridg
       return 'terminal.prune'
     case 'list-sessions':
       return 'terminal.listSessions'
-    case 'slot-snapshot':
-      return 'terminal.getSlotSnapshot'
+    case 'session-snapshot':
+      return 'terminal.getSessionSnapshot'
     default:
       return null
   }
@@ -91,26 +91,25 @@ export function createPullRequest(number: number, options: Partial<PullRequestIn
 }
 
 export function resetReposStore(): void {
-  disposeAllRepoRuntimes()
-  mainWindowQueryClient.clear()
+  disposeAllRepoOperationSchedulers()
+  primaryWindowQueryClient.clear()
   useReposStore.setState({
     repos: {},
-    restorableRepoCache: {},
+    repoSnapshotCache: {},
     order: [],
     activeId: null,
     sessionReady: false,
     zenMode: DEFAULT_ZEN_MODE,
     workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
-    selectedTerminalByWorktree: {},
+    selectedTerminalSessionByWorktree: {},
   })
 }
 
 export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>): void {
-  const shellOpenExternalUrl = handlers['shell.openExternalUrl'] ?? handlers['app.openExternalUrl']
-  const shellOpenDirectoryDialog = handlers['shell.openDirectoryDialog'] ?? handlers['repo.openDialog']
-  const shellConsumeExternalOpenPaths =
-    handlers['shell.consumeExternalOpenPaths'] ?? handlers['repo.consumeExternalOpenPaths']
-  const shellOpenSettingsWindow = handlers['shell.openSettingsWindow'] ?? handlers['app.openSettingsWindow']
+  const hostOpenExternalUrl = handlers['app.openExternalUrl']
+  const hostOpenDirectoryDialog = handlers['repo.openDialog']
+  const hostConsumeExternalOpenPaths = handlers['repo.consumeExternalOpenPaths']
+  const hostOpenSettingsWindow = handlers['app.openSettingsWindow']
   Object.defineProperty(globalThis, 'window', {
     configurable: true,
     value: {
@@ -131,23 +130,23 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         abortIpc: () => Promise.resolve(false),
         onEvent: () => () => {},
         pathForFile: () => '',
-        shell: {
+        host: {
           openSettingsWindow: (input: unknown) =>
-            shellOpenSettingsWindow ? Promise.resolve(shellOpenSettingsWindow(input)) : Promise.resolve(false),
+            hostOpenSettingsWindow ? Promise.resolve(hostOpenSettingsWindow(input)) : Promise.resolve(false),
           openExternalUrl: (input: unknown) =>
-            shellOpenExternalUrl
-              ? Promise.resolve(shellOpenExternalUrl(input))
+            hostOpenExternalUrl
+              ? Promise.resolve(hostOpenExternalUrl(input))
               : Promise.resolve({ ok: false, message: 'error.invalid-url' }),
           openDirectoryDialog: (input: { title?: string }) => {
             const handler =
               input?.title === 'Choose Clone Destination' && handlers['repo.cloneParentDialog']
                 ? handlers['repo.cloneParentDialog']
-                : shellOpenDirectoryDialog
+                : hostOpenDirectoryDialog
             return handler ? Promise.resolve(handler(input)) : Promise.resolve(null)
           },
           consumeExternalOpenPaths: () =>
-            shellConsumeExternalOpenPaths
-              ? Promise.resolve(shellConsumeExternalOpenPaths(undefined))
+            hostConsumeExternalOpenPaths
+              ? Promise.resolve(hostConsumeExternalOpenPaths(undefined))
               : Promise.resolve([]),
         },
         terminal: {
@@ -158,7 +157,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           takeover: () =>
             Promise.resolve({
               ok: true as const,
-              ptySessionId: 'session-1',
+              ptySessionId: 'pty_test_aaaaaaaaa',
               controller: { clientId: 'attachment_local', status: 'connected' as const },
             }),
           close: () => Promise.resolve(true),
@@ -194,9 +193,9 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
     payload: unknown,
   ): TerminalBridgeTestOutputs['terminal.listSessions']
   function callTerminalHandler(
-    name: 'terminal.getSlotSnapshot',
+    name: 'terminal.getSessionSnapshot',
     payload: unknown,
-  ): TerminalBridgeTestOutputs['terminal.getSlotSnapshot']
+  ): TerminalBridgeTestOutputs['terminal.getSessionSnapshot']
   function callTerminalHandler(
     name: 'terminal.notifyBell',
     payload: unknown,
@@ -223,7 +222,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         case 'terminal.takeover':
           return {
             ok: true as const,
-            ptySessionId: 'session-1',
+            ptySessionId: 'pty_test_aaaaaaaaa',
             role: 'controller' as const,
             controllerStatus: 'connected' as const,
             controller: { clientId: 'attachment_local', status: 'connected' as const },
@@ -235,7 +234,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           return { pruned: 0, remaining: 0 }
         case 'terminal.listSessions':
           return []
-        case 'terminal.getSlotSnapshot':
+        case 'terminal.getSessionSnapshot':
           return null
         case 'terminal.create': {
           const terminalKind = (payload as { kind?: string } | undefined)?.kind
@@ -361,7 +360,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
     onEffectIntent: () => () => {},
     pathForFile: () => '',
     saveClipboardFiles: () => Promise.resolve([]),
-    shell: () => window.goblinNative.shell ?? null,
+    host: () => window.goblinNative.host ?? null,
     terminal: () => ({
       attach: async (input) => callTerminalHandler('terminal.attach', input),
       restart: async (input) => callTerminalHandler('terminal.restart', input),
@@ -374,7 +373,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       listSessions: async (input) => callTerminalHandler('terminal.listSessions', input),
       prewarm: async () => {},
       kickReconnect: () => {},
-      getSlotSnapshot: async (input) => callTerminalHandler('terminal.getSlotSnapshot', input),
+      getSessionSnapshot: async (input) => callTerminalHandler('terminal.getSessionSnapshot', input),
       notifyBell: async (input) => callTerminalHandler('terminal.notifyBell', input),
       sendTestNotification: async () => true,
       setBadge: () => {},
@@ -384,7 +383,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       onIdentity: () => () => {},
       onLifecycle: () => () => {},
       onSessionsChanged: () => () => {},
-      onSlotClosed: () => () => {},
+      onSessionClosed: () => () => {},
     }),
   })
   vi.stubGlobal(
@@ -411,12 +410,12 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         if (url.pathname === '/api/settings/recent-repos/add') return call('settings.addRecentRepo', body)
         if (url.pathname === '/api/settings/session') return call('settings.saveSession', body)
         if (url.pathname === '/api/settings/fetch-interval') return call('settings.setFetchInterval', body)
-        if (url.pathname === '/api/settings/prefs') return call('settings.updatePrefs', body)
+        if (url.pathname === '/api/settings/prefs') return call('settings.updateUserSettings', body)
         if (url.pathname === '/api/remote/ssh-hosts') return call('remote.listSshHosts', undefined)
         if (url.pathname === '/api/remote/resolve-target') return call('remote.resolveTarget', body)
         if (url.pathname === '/api/remote/lifecycle') return call('remote.lifecycle', body)
         if (url.pathname === '/api/remote/path-suggestions') return call('remote.listPathSuggestions', body)
-        if (url.pathname === '/api/remote/test-repository') return call('remote.testRepository', body)
+        if (url.pathname === '/api/remote/test-repo') return call('remote.testRepo', body)
         if (url.pathname === '/api/repo/probe') return call('repo.probe', body)
         if (url.pathname === '/api/repo/snapshot') return call('repo.snapshot', body)
         if (url.pathname === '/api/repo/status') return call('repo.status', body)
@@ -485,8 +484,8 @@ export function seedRepoState(options: {
   branchSnapshots?: BranchSnapshotInfo[]
   currentBranch?: string
   selectedBranch?: string | null
-  preferredWorkspacePaneView?: WorkspacePaneView
-  preferredWorkspacePaneViewByBranch?: Record<string, WorkspacePaneView>
+  preferredWorkspacePaneTab?: WorkspacePaneTabType
+  preferredWorkspacePaneTabByBranch?: Record<string, WorkspacePaneTabType>
   workspacePaneTabOrderByBranch?: Record<string, WorkspacePaneTabOrderEntry[]>
   instanceToken?: number
   status?: WorktreeStatus[]
@@ -505,11 +504,11 @@ export function seedRepoState(options: {
     rawWorkspacePaneTabOrderByBranch,
     branches.map((branch) => branch.name),
   )
-  const preferredWorkspacePaneViewByBranch =
-    options.preferredWorkspacePaneViewByBranch ??
-    (selectedBranch && options.preferredWorkspacePaneView !== undefined
-      ? { [selectedBranch]: options.preferredWorkspacePaneView }
-      : base.ui.preferredWorkspacePaneViewByBranch)
+  const preferredWorkspacePaneTabByBranch =
+    options.preferredWorkspacePaneTabByBranch ??
+    (selectedBranch && options.preferredWorkspacePaneTab !== undefined
+      ? { [selectedBranch]: options.preferredWorkspacePaneTab }
+      : base.ui.preferredWorkspacePaneTabByBranch)
   const repo: RepoState = {
     ...base,
     instanceToken: options.instanceToken ?? base.instanceToken,
@@ -527,7 +526,7 @@ export function seedRepoState(options: {
       ...base.ui,
       selectedBranch,
       workspacePaneTabOrderByBranch,
-      preferredWorkspacePaneViewByBranch,
+      preferredWorkspacePaneTabByBranch,
     },
     remote: {
       ...base.remote,
@@ -536,7 +535,7 @@ export function seedRepoState(options: {
   }
   useReposStore.setState({
     repos: { [options.id]: repo },
-    restorableRepoCache: {},
+    repoSnapshotCache: {},
     order: [options.id],
     activeId: options.id,
     sessionReady: true,

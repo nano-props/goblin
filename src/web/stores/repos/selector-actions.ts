@@ -1,37 +1,37 @@
 import type { ReposStore } from '#/web/stores/repos/types.ts'
 
-export interface RestorableWorkspaceViewportStoreActions extends Pick<ReposStore, 'setActive' | 'cycleActive'> {}
+interface RestorableWorkspaceViewportStoreActions extends Pick<ReposStore, 'setActive' | 'cycleActive'> {}
 
-export interface RestorableWorkspaceLayoutStoreActions extends Pick<
+interface RestorableWorkspaceLayoutStoreActions extends Pick<
   ReposStore,
   'resetLayout' | 'setSelectedTerminal' | 'toggleZenMode'
 > {}
 
-export interface RestorableWorkspaceLayoutPreferenceStoreActions extends Pick<
+interface RestorableWorkspaceLayoutPreferenceStoreActions extends Pick<
   ReposStore,
   'resetLayout' | 'setSelectedTerminal' | 'toggleZenMode'
 > {}
 
-export interface RuntimeCoherentRepoOpenStoreActions extends Pick<ReposStore, 'ensureWorkspaceOpen'> {}
+interface RuntimeCoherentRepoOpenStoreActions extends Pick<ReposStore, 'ensureWorkspaceOpen'> {}
 
-export interface RuntimeCoherentRepoNavigationStoreActions extends Pick<
+interface RuntimeCoherentRepoNavigationStoreActions extends Pick<
   ReposStore,
-  'closeRepo' | 'selectBranch' | 'setWorkspacePaneView'
+  'closeRepo' | 'selectBranch' | 'setWorkspacePaneTab'
 > {}
 
-export interface RuntimeCoherentRepoProjectionStoreActions extends Pick<
+interface RuntimeCoherentRepoProjectionStoreActions extends Pick<
   ReposStore,
-  'ensureWorkspaceOpen' | 'closeRepo' | 'selectBranch' | 'setWorkspacePaneView'
+  'ensureWorkspaceOpen' | 'closeRepo' | 'selectBranch' | 'setWorkspacePaneTab'
 > {}
 
-export interface MainWindowNavigationStoreActions extends Pick<
+interface PrimaryWindowNavigationStoreActions extends Pick<
   ReposStore,
-  'setActive' | 'closeRepo' | 'cycleActive' | 'selectBranch' | 'setWorkspacePaneView'
+  'setActive' | 'closeRepo' | 'cycleActive' | 'selectBranch' | 'setWorkspacePaneTab'
 > {}
 
-export interface RepoPickerStoreActions extends Pick<ReposStore, 'ensureWorkspaceOpen'> {}
+interface RepoPickerStoreActions extends Pick<ReposStore, 'ensureWorkspaceOpen'> {}
 
-export interface ClientEffectIntentStoreActions extends Pick<
+interface ClientEffectIntentStoreActions extends Pick<
   ReposStore,
   'ensureWorkspaceOpen' | 'setSelectedTerminal' | 'resetLayout' | 'toggleZenMode'
 > {}
@@ -54,12 +54,12 @@ export function runtimeCoherentRepoOpenStoreActionsFromStore(
 }
 
 export function runtimeCoherentRepoNavigationStoreActionsFromStore(
-  state: Pick<ReposStore, 'closeRepo' | 'selectBranch' | 'setWorkspacePaneView'>,
+  state: Pick<ReposStore, 'closeRepo' | 'selectBranch' | 'setWorkspacePaneTab'>,
 ): RuntimeCoherentRepoNavigationStoreActions {
   return {
     closeRepo: state.closeRepo,
     selectBranch: state.selectBranch,
-    setWorkspacePaneView: state.setWorkspacePaneView,
+    setWorkspacePaneTab: state.setWorkspacePaneTab,
   }
 }
 
@@ -84,25 +84,25 @@ export function restorableWorkspaceLayoutPreferenceStoreActionsFromStore(
 }
 
 export function runtimeCoherentRepoProjectionStoreActionsFromStore(
-  state: Pick<ReposStore, 'ensureWorkspaceOpen' | 'closeRepo' | 'selectBranch' | 'setWorkspacePaneView'>,
+  state: Pick<ReposStore, 'ensureWorkspaceOpen' | 'closeRepo' | 'selectBranch' | 'setWorkspacePaneTab'>,
 ): RuntimeCoherentRepoProjectionStoreActions {
   const open = runtimeCoherentRepoOpenStoreActionsFromStore({ ensureWorkspaceOpen: state.ensureWorkspaceOpen })
   const navigation = runtimeCoherentRepoNavigationStoreActionsFromStore({
     closeRepo: state.closeRepo,
     selectBranch: state.selectBranch,
-    setWorkspacePaneView: state.setWorkspacePaneView,
+    setWorkspacePaneTab: state.setWorkspacePaneTab,
   })
   return {
     ensureWorkspaceOpen: open.ensureWorkspaceOpen,
     closeRepo: navigation.closeRepo,
     selectBranch: navigation.selectBranch,
-    setWorkspacePaneView: navigation.setWorkspacePaneView,
+    setWorkspacePaneTab: navigation.setWorkspacePaneTab,
   }
 }
 
-export function mainWindowNavigationStoreActionsFromStore(
-  state: Pick<ReposStore, 'setActive' | 'cycleActive' | 'closeRepo' | 'selectBranch' | 'setWorkspacePaneView'>,
-): MainWindowNavigationStoreActions {
+export function primaryWindowNavigationStoreActionsFromStore(
+  state: Pick<ReposStore, 'setActive' | 'cycleActive' | 'closeRepo' | 'selectBranch' | 'setWorkspacePaneTab'>,
+): PrimaryWindowNavigationStoreActions {
   const restorable = restorableWorkspaceViewportStoreActionsFromStore({
     setActive: state.setActive,
     cycleActive: state.cycleActive,
@@ -110,14 +110,14 @@ export function mainWindowNavigationStoreActionsFromStore(
   const runtimeCoherent = runtimeCoherentRepoNavigationStoreActionsFromStore({
     closeRepo: state.closeRepo,
     selectBranch: state.selectBranch,
-    setWorkspacePaneView: state.setWorkspacePaneView,
+    setWorkspacePaneTab: state.setWorkspacePaneTab,
   })
   return {
     setActive: restorable.setActive,
     closeRepo: runtimeCoherent.closeRepo,
     cycleActive: restorable.cycleActive,
     selectBranch: runtimeCoherent.selectBranch,
-    setWorkspacePaneView: runtimeCoherent.setWorkspacePaneView,
+    setWorkspacePaneTab: runtimeCoherent.setWorkspacePaneTab,
   }
 }
 
@@ -146,16 +146,16 @@ export function clientEffectIntentStoreActionsFromStore(
   }
 }
 
-export function mainWindowNavigationStoreActionsEqual(
-  a: MainWindowNavigationStoreActions,
-  b: MainWindowNavigationStoreActions,
+export function primaryWindowNavigationStoreActionsEqual(
+  a: PrimaryWindowNavigationStoreActions,
+  b: PrimaryWindowNavigationStoreActions,
 ): boolean {
   return (
     a.setActive === b.setActive &&
     a.closeRepo === b.closeRepo &&
     a.cycleActive === b.cycleActive &&
     a.selectBranch === b.selectBranch &&
-    a.setWorkspacePaneView === b.setWorkspacePaneView
+    a.setWorkspacePaneTab === b.setWorkspacePaneTab
   )
 }
 

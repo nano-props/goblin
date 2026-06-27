@@ -11,8 +11,8 @@ interface MenuRowButtonProps extends Omit<ComponentPropsWithoutRef<'button'>, 'c
   size?: 'compact' | 'roomy'
 }
 
-export const MENU_ROW_ICON_CLASS = 'flex size-3.5 shrink-0 items-center justify-center'
-export const MENU_ROW_BUTTON_BASE_CLASS =
+const MENU_ROW_ICON_CLASS = 'flex size-3.5 shrink-0 items-center justify-center'
+const MENU_ROW_BUTTON_BASE_CLASS =
   'flex w-full min-w-0 shrink-0 cursor-pointer items-center rounded-sm text-left text-sm outline-none transition-colors duration-100 disabled:pointer-events-none disabled:opacity-50'
 
 export const MenuRowButton = forwardRef<HTMLButtonElement, MenuRowButtonProps>(function MenuRowButton(

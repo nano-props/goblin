@@ -1,16 +1,16 @@
 import path from 'node:path'
 import { runServerCancellable, abortServerNetworkOp } from '#/server/common/network-ops.ts'
 import { publishRepoQueryInvalidation, publishSettingsInvalidation } from '#/server/modules/invalidation-broker.ts'
-import { resolveRepoBackend, runWithRepoBackend, type RepoMutationResult } from '#/server/modules/repo-backend.ts'
+import { resolveRepoSource, runWithRepoSource, type RepoMutationResult } from '#/server/modules/repo-source.ts'
 import { getServerRepoSettings, trustServerRepoWorktreeBootstrapConfig } from '#/server/modules/settings-source.ts'
-import { cloneRepository as cloneGitRepository } from '#/system/git/clone.ts'
+import { cloneRepo as cloneGitRepo } from '#/system/git/clone.ts'
 import { openInPreferredEditor } from '#/system/editors.ts'
 import { openInPreferredTerminal } from '#/system/terminals.ts'
 import { openInFinder } from '#/system/finder.ts'
 import { type ExecResult } from '#/shared/git-types.ts'
 import { type NetworkOpKind } from '#/shared/api-types.ts'
 import type { EditorApp, TerminalApp } from '#/shared/api-types.ts'
-import { checkGitAvailable } from '#/system/git/helper.ts'
+import { checkGitAvailable } from '#/system/git/git-exec.ts'
 import { isValidCwd, isValidRepoLocator, toSafeRepoLocator } from '#/shared/input-validation.ts'
 import { isRepoWorktreeBootstrapConfigTrusted } from '#/shared/repo-settings.ts'
 import { type CloneRepoResult, type ProbeResult } from '#/shared/api-types.ts'
@@ -171,7 +171,7 @@ async function runUserNetworkMutation(
   )
 }
 
-export async function cloneRepository(
+export async function cloneRepo(
   operationId: string,
   url: string,
   parentPath: string,
@@ -193,7 +193,7 @@ export async function cloneRepository(
   const ctrl = new AbortController()
   activeCloneControllers.set(operationId, ctrl)
   try {
-    return await cloneGitRepository(targetParent, targetName, repoUrl, ctrl.signal)
+    return await cloneGitRepo(targetParent, targetName, repoUrl, ctrl.signal)
   } finally {
     if (activeCloneControllers.get(operationId) === ctrl) activeCloneControllers.delete(operationId)
   }
@@ -207,7 +207,7 @@ export function abortCloneOperation(operationId: string): boolean {
   return true
 }
 
-export async function fetchRepository(
+export async function fetchRepo(
   cwd: string,
   kind: NetworkOpKind = 'user',
   sourceToken?: string,
@@ -218,7 +218,7 @@ export async function fetchRepository(
     return result
   }
   async function executeFetch(): Promise<{ ok: boolean; message: string }> {
-    return await runWithRepoBackend(cwd, async (backend) => await runFetch((signal) => backend.fetch(signal)))
+    return await runWithRepoSource(cwd, async (source) => await runFetch((signal) => source.fetch(signal)))
   }
 
   if (kind === 'user') {
@@ -236,32 +236,32 @@ export async function fetchRepository(
   return await backgroundFetch
 }
 
-export async function pullRepositoryBranch(
+export async function pullRepoBranch(
   cwd: string,
   branch: string,
   worktreePath?: string,
   signal?: AbortSignal,
   sourceToken?: string,
 ): Promise<ExecResult> {
-  const backend = await resolveRepoBackend(cwd)
+  const source = await resolveRepoSource(cwd)
   return await runUserNetworkMutation(cwd, signal, sourceToken, async (mergedSignal) => {
-    return await backend.pull(branch, worktreePath, mergedSignal)
+    return await source.pull(branch, worktreePath, mergedSignal)
   })
 }
 
-export async function pushRepositoryBranch(
+export async function pushRepoBranch(
   cwd: string,
   branch: string,
   signal?: AbortSignal,
   sourceToken?: string,
 ): Promise<ExecResult> {
-  const backend = await resolveRepoBackend(cwd)
+  const source = await resolveRepoSource(cwd)
   return await runUserNetworkMutation(cwd, signal, sourceToken, async (mergedSignal) => {
-    return await backend.push(branch, mergedSignal)
+    return await source.push(branch, mergedSignal)
   })
 }
 
-export async function createRepositoryWorktree(
+export async function createRepoWorktree(
   cwd: string,
   input: CreateWorktreeInput,
   signal?: AbortSignal,
@@ -277,16 +277,12 @@ export async function createRepositoryWorktree(
     return { ok: false, message: 'error.invalid-path' }
   }
   const worktreeBootstrap = options?.worktreeBootstrap ?? { kind: 'skip' }
-  return await runWithRepoBackend(cwd, async (backend) => {
-    const result = await backend.createWorktree(normalized, signal, {
+  return await runWithRepoSource(cwd, async (source) => {
+    const result = await source.createWorktree(normalized, signal, {
       worktreeBootstrap,
     })
     const trustedResult = await trustWorktreeBootstrapAfterSuccessfulRun(repoId, worktreeBootstrap, result)
-    return await publishSnapshotInvalidationAfterMutation(
-      cwd,
-      trustedResult,
-      sourceToken,
-    )
+    return await publishSnapshotInvalidationAfterMutation(cwd, trustedResult, sourceToken)
   })
 }
 
@@ -307,28 +303,28 @@ async function trustWorktreeBootstrapAfterSuccessfulRun(
   }
 }
 
-export async function getRepositoryRemoteBranches(cwd: string, signal?: AbortSignal): Promise<string[]> {
+export async function getRepoRemoteBranches(cwd: string, signal?: AbortSignal): Promise<string[]> {
   if (!isValidRepoLocator(cwd)) return []
-  return await runWithRepoBackend(cwd, async (backend) => await backend.getRemoteBranches(signal))
+  return await runWithRepoSource(cwd, async (source) => await source.getRemoteBranches(signal))
 }
 
-export async function deleteRepositoryBranch(
+export async function deleteRepoBranch(
   cwd: string,
   branch: string,
   options?: { force?: boolean; alsoDeleteUpstream?: boolean },
   signal?: AbortSignal,
   sourceToken?: string,
 ): Promise<ExecResult> {
-  return await runWithRepoBackend(cwd, async (backend) => {
+  return await runWithRepoSource(cwd, async (source) => {
     return await publishSnapshotInvalidationAfterMutation(
       cwd,
-      await backend.deleteBranch(branch, options, signal),
+      await source.deleteBranch(branch, options, signal),
       sourceToken,
     )
   })
 }
 
-export async function removeRepositoryWorktree(
+export async function removeRepoWorktree(
   cwd: string,
   input: {
     branch: string
@@ -340,29 +336,29 @@ export async function removeRepositoryWorktree(
   signal?: AbortSignal,
   sourceToken?: string,
 ): Promise<ExecResult> {
-  return await runWithRepoBackend(cwd, async (backend) => {
-    return await publishSnapshotInvalidationAfterMutation(cwd, await backend.removeWorktree(input, signal), sourceToken)
+  return await runWithRepoSource(cwd, async (source) => {
+    return await publishSnapshotInvalidationAfterMutation(cwd, await source.removeWorktree(input, signal), sourceToken)
   })
 }
 
-export async function openRepositoryRemote(cwd: string, branch?: string, signal?: AbortSignal): Promise<ExecResult> {
-  const url = await runWithRepoBackend(cwd, async (backend) => await backend.getBrowserRemoteUrl(branch, signal))
+export async function openRepoRemote(cwd: string, branch?: string, signal?: AbortSignal): Promise<ExecResult> {
+  const url = await runWithRepoSource(cwd, async (source) => await source.getBrowserRemoteUrl(branch, signal))
   return url ? { ok: true, message: url } : { ok: false, message: 'error.no-remote-url' }
 }
 
-export async function openRepositoryTerminal(path: string, app: TerminalApp): Promise<ExecResult> {
+export async function openRepoTerminal(path: string, app: TerminalApp): Promise<ExecResult> {
   return await openInPreferredTerminal(path, app)
 }
 
-export async function openRepositoryEditor(path: string, app: EditorApp): Promise<ExecResult> {
+export async function openRepoEditor(path: string, app: EditorApp): Promise<ExecResult> {
   return await openInPreferredEditor(path, app)
 }
 
-export async function openRepositoryInFinder(path: string): Promise<ExecResult> {
+export async function openRepoInFinder(path: string): Promise<ExecResult> {
   return await openInFinder(path)
 }
 
-export function abortRepositoryOperation(cwd: string): boolean {
+export function abortRepoOperation(cwd: string): boolean {
   if (!isValidRepoLocator(cwd)) return false
   return abortServerNetworkOp(cwd)
 }

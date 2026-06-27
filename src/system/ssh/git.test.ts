@@ -9,7 +9,7 @@ import {
   getRemoteTrackingBranches,
   getRemoteWorktreeBootstrapPreview,
   pullRemoteBranch,
-  fetchRemoteRepository,
+  fetchRemoteRepo,
   pushRemoteBranch,
   remoteExecResult,
   removeRemoteWorktree,
@@ -434,7 +434,7 @@ describe('remote git helpers', () => {
     )
   })
 
-  test('fetchRemoteRepository prefers the current branch upstream remote over fetch --all', async () => {
+  test('fetchRemoteRepo prefers the current branch upstream remote over fetch --all', async () => {
     const run = vi.fn(async (command: { type: string; remote?: string; branch?: string }) => {
       switch (command.type) {
         case 'gitSnapshot':
@@ -466,7 +466,7 @@ describe('remote git helpers', () => {
       }
     })
 
-    const result = await fetchRemoteRepository(TARGET, { run: run as any })
+    const result = await fetchRemoteRepo(TARGET, { run: run as any })
 
     expect(result).toEqual({ ok: true, message: 'fetched fork' })
     expect(run).toHaveBeenCalledWith({ type: 'gitFetchRemote', path: '/srv/repo', remote: 'fork' }, TARGET, {

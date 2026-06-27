@@ -1,5 +1,5 @@
 import { runRemoteCommand, SSH_BOOT_PROBE_TIMEOUT_MS } from '#/system/ssh/commands.ts'
-import { makeUnresolvedTargetDiagnostic, testRemoteRepository } from '#/system/ssh/diagnostics.ts'
+import { makeUnresolvedTargetDiagnostic, testRemoteRepo } from '#/system/ssh/diagnostics.ts'
 import {
   parseRemoteRepoId,
   normalizeRemoteRepoRef,
@@ -13,7 +13,7 @@ import {
   type RemoteDiagnosticCategory,
   type RemoteDiagnosticsResult,
   type RemotePathSuggestionsInput,
-  type RemoteRepoLifecycleResult,
+  type RemoteRepoConnectionResult,
   type RemoteRepoTarget,
   type ResolvedRemoteTarget,
   type SshConfigHostsResult,
@@ -90,10 +90,10 @@ export async function resolveServerRemoteTarget(
  *   2. resolve the SSH target via the existing
  *      `resolveServerRemoteTarget` (parses the SSH config, runs
  *      `ssh -G` to compute the effective config, expands `~/`)
- *   3. probe the remote repo via `testRemoteRepository` (SSH
+ *   3. probe the remote repo via `testRemoteRepo` (SSH
  *      handshake + `checkShell`/`checkGit`/`revParseTopLevel`)
  *   4. classify the failure into a `RemoteRepoFailureReason`
- *   5. return a converged {@link RemoteRepoLifecycleResult}
+ *   5. return a converged {@link RemoteRepoConnectionResult}
  *
  * The function NEVER returns a `connecting` lifecycle — that's
  * a client-side projection written by the orchestrator before
@@ -103,19 +103,19 @@ export async function resolveServerRemoteTarget(
  * The signal is plumbed through the entire pipeline:
  *   - `resolveServerRemoteTarget` propagates to the `ssh -G`
  *     execa call (`system/ssh/config.ts:resolveEffectiveConfig`)
- *   - `testRemoteRepository` propagates to each per-stage
+ *   - `testRemoteRepo` propagates to each per-stage
  *     `runRemoteCommand` (the SSH handshake / checkShell / etc.
  *     execas in `system/ssh/commands.ts:runRemoteCommand`)
  *
- * Aborting the signal is the only way a `runRemoteRepoLifecycle`
+ * Aborting the signal is the only way a `runRemoteRepoConnection`
  * orchestrator run in the client can free the lane's
  * concurrency slot before its natural timeout — see
  * `runLatestOperation` with the `lifecycle` lane.
  */
-export async function resolveServerRemoteRepoLifecycle(
+export async function resolveServerRemoteRepoConnection(
   input: { repoId: string },
   signal?: AbortSignal,
-): Promise<RemoteRepoLifecycleResult> {
+): Promise<RemoteRepoConnectionResult> {
   const repoId = input.repoId
   // Defensive: local ids should never reach this server entry.
   // The orchestrator gates on `isRemoteRepoId` before calling;
@@ -158,7 +158,7 @@ export async function resolveServerRemoteRepoLifecycle(
   const target = targetResult.target
 
   // Step 3: probe the remote repo.
-  const probe = await testRemoteRepository(target, {
+  const probe = await testRemoteRepo(target, {
     signal,
     timeoutMs: SSH_BOOT_PROBE_TIMEOUT_MS,
   })
@@ -226,7 +226,7 @@ export async function getServerRemotePathSuggestions(
   return output.slice(0, 20)
 }
 
-export async function testServerRemoteRepository(
+export async function testServerRemoteRepo(
   target: RemoteRepoTarget,
   signal?: AbortSignal,
 ): Promise<RemoteDiagnosticsResult> {
@@ -236,7 +236,7 @@ export async function testServerRemoteRepository(
   }
   try {
     const resolved = await resolveTrackedRemoteTarget(normalized, signal)
-    return await testRemoteRepository(resolved.target, { signal })
+    return await testRemoteRepo(resolved.target, { signal })
   } catch (err) {
     // Translation key — client formats via i18n. resolveTrackedRemoteTarget
     // raises either an i18n key (e.g. error.ssh-config-changed) or a real

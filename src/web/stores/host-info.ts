@@ -36,7 +36,7 @@ import { fetchServerJson } from '#/web/lib/server-fetch.ts'
  */
 export type ClientPlatform = NodeJS.Platform | 'web'
 
-export interface HostInfoSnapshot {
+interface HostInfoSnapshot {
   /** Absolute path of the user's home directory. `''` if the server couldn't determine it. */
   homeDir: string
   /** Node.js platform identifier returned by the server. */
@@ -89,7 +89,7 @@ export const useHostInfoStore = create<HostInfoState>((set) => ({
  * `null` snapshot should use `homeDirectory()` / `getPlatform()`
  * (which fall back to safe defaults) instead.
  */
-export function getHostInfo(): HostInfoSnapshot | null {
+function getHostInfo(): HostInfoSnapshot | null {
   return useHostInfoStore.getState().snapshot
 }
 

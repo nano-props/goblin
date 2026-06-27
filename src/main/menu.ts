@@ -16,7 +16,7 @@
 // rebuilds this menu on lang change).
 
 import { app, Menu, type MenuItemConstructorOptions } from 'electron'
-import { activateMainWindow, getMainWindow, resetMainWindowToDefault } from '#/main/window.ts'
+import { activatePrimaryWindow, getPrimaryWindow, resetPrimaryWindow } from '#/main/window.ts'
 import { menuNodeLog } from '#/node/logger.ts'
 import { openDataFolderMenuKey, t } from '#/main/i18n/index.ts'
 import { sendClientEffectIntent } from '#/main/client-surface-events.ts'
@@ -25,7 +25,7 @@ import { tildifyPath } from '#/shared/paths.ts'
 import type { LangPref, ThemePref } from '#/shared/api-types.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
-import { focusedRegisteredSurface } from '#/main/window-registry.ts'
+import { focusedRegisteredSurface } from '#/main/client-surface-registry.ts'
 import { applyMenuRuntimeState, readMenuRuntimeState } from '#/main/menu-state.ts'
 import {
   clientMenuCommandById,
@@ -70,7 +70,7 @@ function send(intent: ClientEffectIntent): void {
 
 async function sendClientIntent(intent: ClientEffectIntent): Promise<void> {
   try {
-    const win = getMainWindow() ?? focusedRegisteredSurface()?.window ?? (await activateMainWindow())
+    const win = getPrimaryWindow() ?? focusedRegisteredSurface()?.window ?? (await activatePrimaryWindow())
     sendClientEffectIntent(win, intent)
   } catch (err) {
     menuNodeLog.warn({ err }, 'failed to send client intent')
@@ -257,7 +257,7 @@ function createWindowMenu(state: AppMenuState): MenuItemConstructorOptions {
         // Reset Window also restores the main window itself to its default
         // size, so users have a one-click escape from an awkward
         // drag-resize — not just from an awkward pane split.
-        beforeIntent: () => resetMainWindowToDefault(),
+        beforeIntent: () => resetPrimaryWindow(),
       }),
       ...(state.isMac ? [separator(), { role: 'front' as const, label: t('menu.window.front') }] : []),
     ],

@@ -1,15 +1,18 @@
 import type { ReposStore } from '#/web/stores/repos/types.ts'
-import type { TerminalDescriptor, TerminalSlotBase } from '#/web/components/terminal/types.ts'
-import { terminalSlotKey, worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
+import type { TerminalDescriptor, TerminalSessionBase } from '#/web/components/terminal/types.ts'
+import {
+  formatTerminalWorkspaceSlotKey,
+  worktreeTerminalKey,
+} from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
 
-export function terminalDescriptor(base: TerminalSlotBase, slotId: string, index: number): TerminalDescriptor {
+export function terminalDescriptor(base: TerminalSessionBase, sessionId: string, index: number): TerminalDescriptor {
   const terminalWorktreeKey = worktreeTerminalKey(base.repoRoot, base.worktreePath)
   return {
     ...base,
     worktreeTerminalKey: terminalWorktreeKey,
-    slotId,
+    sessionId,
     index,
-    key: terminalSlotKey(base.repoRoot, base.worktreePath, slotId),
+    key: formatTerminalWorkspaceSlotKey(base.repoRoot, base.worktreePath, sessionId),
   }
 }
 

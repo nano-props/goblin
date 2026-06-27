@@ -8,5 +8,5 @@ if (isVitest) {
 }
 
 console.error("[test] Don't use `bun test` — this project runs on Vitest.")
-console.error("[test] Use `bun run test` (or `bun run test:watch` for watch mode).")
+console.error('[test] Use `bun run test` (or `bun run test:watch` for watch mode).')
 process.exit(1)

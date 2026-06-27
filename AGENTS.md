@@ -44,7 +44,7 @@ The project runs in Node.js strip-only mode (no `tsc` emit). Do not use these un
 
 ## HTTP request conventions
 
-**POST is the default for all client→server traffic.** GET is the exception. (We don't follow REST conventions.) The embedded server runs on Node's `http.Server` via `@hono/node-server`, which inherits Node's default 16 KiB `maxHeaderSize`; past that, Node returns `431` *before* Hono runs — URL payloads are a structural footgun.
+**POST is the default for all client→server traffic.** GET is the exception. (We don't follow REST conventions.) The embedded server runs on Node's `http.Server` via `@hono/node-server`, which inherits Node's default 16 KiB `maxHeaderSize`; past that, Node returns `431` _before_ Hono runs — URL payloads are a structural footgun.
 
 Rules:
 

@@ -3,14 +3,14 @@ import type {
   TerminalControllerStatus,
   TerminalExitEvent,
   TerminalOutputEvent,
+  TerminalSessionPhase,
 } from '#/shared/terminal-types.ts'
 import type { TerminalInput, TerminalUserInputSource } from '#/web/components/terminal/terminal-input.ts'
-export type TerminalPhase = 'opening' | 'restarting' | 'open' | 'error' | 'closed'
 
 export interface TerminalDescriptor {
   key: string
   worktreeTerminalKey: string
-  slotId: string
+  sessionId: string
   index: number
   repoRoot: string
   branch: string
@@ -64,13 +64,13 @@ export interface TerminalIdentityViewModel extends TerminalControllerViewModel {
  */
 export interface TerminalLifecycleViewModel {
   ptySessionId: string
-  phase: TerminalPhase
+  phase: TerminalSessionPhase
   message: string | null
   takeoverPending: boolean
 }
 
-export interface TerminalSlotHydrationInput extends TerminalIdentityViewModel {
-  phase: TerminalPhase
+export interface TerminalSessionHydrationInput extends TerminalIdentityViewModel {
+  phase: TerminalSessionPhase
   message: string | null
   processName: string
   canonicalTitle?: string | null
@@ -79,7 +79,7 @@ export interface TerminalSlotHydrationInput extends TerminalIdentityViewModel {
 }
 
 export interface TerminalSnapshot {
-  phase: TerminalPhase
+  phase: TerminalSessionPhase
   message: string | null
   processName: string
   /** Server-canonical terminal title from attach hydration or realtime title events. */
@@ -97,7 +97,7 @@ export interface TerminalSearchResult {
   found: boolean
 }
 
-export interface TerminalSlotBase {
+export interface TerminalSessionBase {
   repoRoot: string
   branch: string
   worktreePath: string
@@ -110,42 +110,42 @@ export interface TerminalRepoSnapshot {
 
 export type TerminalRepoIndex = Record<string, TerminalRepoSnapshot>
 
-export interface TerminalSlotSummary {
+export interface TerminalSessionSummary {
   type: 'terminal'
   id: string
   key: string
   worktreeTerminalKey: string
-  slotId: string
+  sessionId: string
   index: number
   displayOrder: number
   title: string
   fullTitle?: string
   originalTitle?: string | null
-  phase: TerminalPhase
+  phase: TerminalSessionPhase
   selected: boolean
   hasBell: boolean
 }
 
-export type WorkspacePaneViewSummary = TerminalSlotSummary
+export type WorkspacePaneTabSummary = TerminalSessionSummary
 
 export interface WorktreeTerminalSnapshot {
   worktreeTerminalKey: string
   selectedDescriptor: TerminalDescriptor | null
-  slots: TerminalSlotSummary[]
+  sessions: TerminalSessionSummary[]
   count: number
   bellCount: number
   pendingCreate: boolean
 }
 
-export interface TerminalSlotContextValue {
-  createTerminal: (base: TerminalSlotBase) => Promise<string>
+export interface TerminalSessionContextValue {
+  createTerminal: (base: TerminalSessionBase) => Promise<string>
   registerHost: (worktreeTerminalKey: string, host: HTMLElement) => void
   unregisterHost: (worktreeTerminalKey: string, host: HTMLElement) => void
   selectTerminal: (worktreeTerminalKey: string, key: string) => void
   scrollToBottom: (key: string) => void
   scrollLines: (key: string, amount: number) => void
   clearBell: (key: string) => boolean
-  closeTerminalByDescriptor: (key: string, base: TerminalSlotBase) => Promise<boolean>
+  closeTerminalByDescriptor: (key: string, base: TerminalSessionBase) => Promise<boolean>
   attach: (descriptor: TerminalDescriptor, host: HTMLElement) => void
   detach: (key: string, host: HTMLElement) => void
   restart: (key: string) => void
@@ -159,21 +159,21 @@ export interface TerminalSlotContextValue {
   serialize: (key: string) => string
 }
 
-export interface TerminalSlotReadContextValue {
+export interface TerminalSessionReadContextValue {
   worktreeSnapshot: (worktreeTerminalKey: string) => WorktreeTerminalSnapshot
   subscribeWorktree: (worktreeTerminalKey: string, listener: () => void) => () => void
   snapshot: (key: string) => TerminalSnapshot
   subscribeSnapshot: (key: string, listener: () => void) => () => void
 }
 
-export interface ManagedTerminalSlotLike {
+export interface TerminalSessionLike {
   descriptor: TerminalDescriptor
   updateDescriptor: (descriptor: TerminalDescriptor) => void
   attach: (host: HTMLElement) => void
   detach: (host: HTMLElement, parkingRoot: HTMLElement) => void
   restart: () => void
-  dispose: (options?: { closeSlot?: boolean }) => void
-  disposeAndWait: (options?: { closeSlot?: boolean }) => Promise<void>
+  dispose: (options?: { closeSession?: boolean }) => void
+  disposeAndWait: (options?: { closeSession?: boolean }) => Promise<void>
   snapshot: () => TerminalSnapshot
   isTerminalFocusTarget: (target: EventTarget | null) => boolean
   findNext: (term: string, incremental?: boolean) => TerminalSearchResult

@@ -5,7 +5,10 @@ import type { ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { RepoOpenDialog } from '#/web/components/RepoOpenDialog.tsx'
-import { MainWindowNavigationProvider, type MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
+import {
+  PrimaryWindowNavigationProvider,
+  type PrimaryWindowNavigationActions,
+} from '#/web/primary-window-navigation.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -73,9 +76,9 @@ describe('RepoOpenDialog', () => {
     const onOpenChange = vi.fn()
 
     render(
-      <MainWindowNavigationProvider value={navigationWith({ activateRepo })}>
+      <PrimaryWindowNavigationProvider value={navigationWith({ activateRepo })}>
         <RepoOpenDialog open onOpenChange={onOpenChange} />
-      </MainWindowNavigationProvider>,
+      </PrimaryWindowNavigationProvider>,
     )
 
     setInputValue('#open-repo-path', '~/Developer/repo')
@@ -88,14 +91,14 @@ describe('RepoOpenDialog', () => {
   })
 })
 
-function navigationWith(overrides: Partial<MainWindowNavigationActions>): MainWindowNavigationActions {
+function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): PrimaryWindowNavigationActions {
   return {
     activateRepo: () => {},
     closeRepo: () => {},
     cycleRepo: () => {},
     selectRepoBranch: () => {},
-    showRepoWorkspacePaneView: () => {},
-    showRepoBranchWorkspacePaneView: () => {},
+    showRepoWorkspacePaneTab: () => {},
+    showRepoBranchWorkspacePaneTab: () => {},
     openSettings: () => {},
     ...overrides,
   }

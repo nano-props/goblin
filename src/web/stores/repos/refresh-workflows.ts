@@ -1,9 +1,10 @@
-import { appendRepoEvent, errorEvent, isRepoUnavailable, updateIfFresh } from '#/web/stores/repos/helpers.ts'
-import { persistRestorableRepoSnapshot } from '#/web/stores/repos/persistence.ts'
+import { appendRepoEvent, errorEvent } from '#/web/stores/repos/repo-state-factory.ts'
+import { isRepoUnavailable, updateIfFresh } from '#/web/stores/repos/repo-guards.ts'
+import { persistRepoSnapshotCacheEntry } from '#/web/stores/repos/persistence.ts'
 import { refreshPullRequestsLog, terminalLog } from '#/web/logger.ts'
 import { terminalBridge } from '#/web/terminal.ts'
-import { workspacePaneStaticViewsForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
-import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { workspacePaneStaticTabsForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
+import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import {
   PULL_REQUEST_UNKNOWN_RETRY_DELAY_MS,
   PULL_REQUEST_UNKNOWN_RETRY_LIMIT,
@@ -18,17 +19,17 @@ function repoFresh(get: ReposGet, id: string, token: number): boolean {
 
 function pullRequestRefreshFailed(get: ReposGet, id: string, token: number): boolean {
   const repo = get().repos[id]
-  return !!repo && repo.instanceToken === token && repo.resources.pullRequests.error !== null
+  return !!repo && repo.instanceToken === token && repo.dataLoads.pullRequests.error !== null
 }
 
 function visibleDetailPullRequestPending(get: ReposGet, id: string, token: number): boolean {
   const repo = get().repos[id]
   if (!repo) return false
-  const openStaticViews = workspacePaneStaticViewsForBranch(repo.ui, repo.ui.selectedBranch)
+  const openStaticTabs = workspacePaneStaticTabsForBranch(repo.ui, repo.ui.selectedBranch)
   if (
     repo.instanceToken !== token ||
-    preferredWorkspacePaneViewForBranch(repo.ui, repo.ui.selectedBranch) !== 'status' ||
-    !openStaticViews.includes('status') ||
+    preferredWorkspacePaneTabForBranch(repo.ui, repo.ui.selectedBranch) !== 'status' ||
+    !openStaticTabs.includes('status') ||
     !repo.ui.selectedBranch
   )
     return false
@@ -39,11 +40,11 @@ function visibleDetailPullRequestPending(get: ReposGet, id: string, token: numbe
 async function refreshVisibleDetailPullRequest(get: ReposGet, id: string, token: number): Promise<void> {
   const repo = get().repos[id]
   if (!repo) return
-  const openStaticViews = workspacePaneStaticViewsForBranch(repo.ui, repo.ui.selectedBranch)
+  const openStaticTabs = workspacePaneStaticTabsForBranch(repo.ui, repo.ui.selectedBranch)
   if (
     repo.instanceToken !== token ||
-    preferredWorkspacePaneViewForBranch(repo.ui, repo.ui.selectedBranch) !== 'status' ||
-    !openStaticViews.includes('status') ||
+    preferredWorkspacePaneTabForBranch(repo.ui, repo.ui.selectedBranch) !== 'status' ||
+    !openStaticTabs.includes('status') ||
     !repo.ui.selectedBranch
   )
     return
@@ -94,7 +95,7 @@ export async function runSnapshotSuccessWorkflow(
   },
 ): Promise<void> {
   if (!options.isSnapshotCurrent()) return
-  persistRestorableRepoSnapshot(set, get().repos[options.id], options.token)
+  persistRepoSnapshotCacheEntry(set, get().repos[options.id], options.token)
   void terminalBridge.pruneTerminals(options.id).catch((err) => {
     terminalLog.warn('failed to prune repo sessions', { err })
   })

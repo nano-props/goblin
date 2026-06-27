@@ -1,19 +1,19 @@
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
-import { readTerminalSlotCommandBridge } from '#/web/components/terminal/terminal-slot-command-bridge.ts'
+import { worktreeTerminalKey } from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
+import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import {
-  createBranchWorkspacePaneTabModel,
-  type BranchWorkspacePaneTab,
-  type BranchWorkspacePaneTabModel,
-} from '#/web/components/branch-workspace/workspace-pane-tab-model.ts'
+  createRepoWorkspaceTabModel,
+  type RepoWorkspaceTab,
+  type RepoWorkspaceTabModel,
+} from '#/web/components/repo-workspace/tab-model.ts'
 import { workspacePaneTabOrderForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
-import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import {
   isWorkspacePaneStaticTabProvider,
   workspacePaneTabProvider,
   workspacePaneTabProviders,
-} from '#/web/workspace-pane/workspace-pane-tab-providers.ts'
+} from '#/web/components/workspace-pane/tab-providers.ts'
 
 interface CloseWorkspacePaneTabsForWorktreeOptions {
   repoId: string
@@ -21,19 +21,16 @@ interface CloseWorkspacePaneTabsForWorktreeOptions {
   worktreePath: string
 }
 
-export async function closeWorkspacePaneTab(
-  target: BranchWorkspacePaneTabModel,
-  tab: BranchWorkspacePaneTab,
-): Promise<boolean> {
+export async function closeWorkspacePaneTab(target: RepoWorkspaceTabModel, tab: RepoWorkspaceTab): Promise<boolean> {
   if (tab.kind === 'pending') return false
   const provider = workspacePaneTabProvider(tab.type)
-  const bridge = readTerminalSlotCommandBridge()
+  const bridge = readTerminalSessionCommandBridge()
   return await provider.close({
     repoId: target.repoId,
     branchName: target.branchName,
     terminalKey: tab.kind === 'terminal' ? tab.key : undefined,
     terminalBase: target.terminalBase,
-    closeStaticView: useReposStore.getState().closeWorkspacePaneStaticView,
+    closeStaticTab: useReposStore.getState().closeWorkspacePaneStaticTab,
     closeTerminalByDescriptor: bridge?.closeTerminalByDescriptor,
     closeTerminalsForWorktree: bridge?.closeTerminalsForWorktree,
   })
@@ -54,12 +51,12 @@ export async function closeWorkspacePaneTabsForWorktree({
       return provider.scope === 'worktree' ? [tab.type] : []
     }),
   )
-  const bridge = readTerminalSlotCommandBridge()
+  const bridge = readTerminalSessionCommandBridge()
   const closeInput = {
     repoId,
     branchName,
     terminalBase,
-    closeStaticView: useReposStore.getState().closeWorkspacePaneStaticView,
+    closeStaticTab: useReposStore.getState().closeWorkspacePaneStaticTab,
     closeTerminalByDescriptor: bridge?.closeTerminalByDescriptor,
     closeTerminalsForWorktree: bridge?.closeTerminalsForWorktree,
   }
@@ -77,10 +74,7 @@ export async function closeWorkspacePaneTabsForWorktree({
   }
 }
 
-export function workspacePaneTabTargetForBranch(
-  repoId: string,
-  branchName: string,
-): BranchWorkspacePaneTabModel | null {
+export function workspacePaneTabTargetForBranch(repoId: string, branchName: string): RepoWorkspaceTabModel | null {
   const state = useReposStore.getState()
   const repo = state.repos[repoId]
   if (!repo) return null
@@ -89,18 +83,18 @@ export function workspacePaneTabTargetForBranch(
   const worktreePath = branch.worktree?.path
   const terminalSyncReady = useRepoSyncStore.getState().ready.get(repoId) === repo.instanceToken
   const worktreeKey = worktreePath ? worktreeTerminalKey(repo.id, worktreePath) : null
-  const snapshot = worktreeKey ? (readTerminalSlotCommandBridge()?.worktreeSnapshot(worktreeKey) ?? null) : null
-  return createBranchWorkspacePaneTabModel({
+  const snapshot = worktreeKey ? (readTerminalSessionCommandBridge()?.worktreeSnapshot(worktreeKey) ?? null) : null
+  return createRepoWorkspaceTabModel({
     repoId,
     branchName,
     worktreePath: worktreePath ?? null,
-    preferredView: preferredWorkspacePaneViewForBranch(repo.ui, branchName),
+    preferredTab: preferredWorkspacePaneTabForBranch(repo.ui, branchName),
     tabOrder: workspacePaneTabOrderForBranch(repo.ui, branchName),
-    runtimeTerminalViews: snapshot?.slots ?? [],
+    runtimeTerminalViews: snapshot?.sessions ?? [],
     terminalSessionCount: snapshot?.count ?? 0,
     terminalCreatePending: snapshot?.pendingCreate ?? false,
     terminalSyncReady,
     lastClosedTabContext: repo.ui.lastClosedTabContextByBranch[branchName] ?? null,
-    selectedTerminalKey: worktreeKey ? (state.selectedTerminalByWorktree[worktreeKey] ?? null) : null,
+    selectedTerminalKey: worktreeKey ? (state.selectedTerminalSessionByWorktree[worktreeKey] ?? null) : null,
   })
 }

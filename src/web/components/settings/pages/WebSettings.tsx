@@ -7,20 +7,20 @@ import { Button } from '#/web/components/ui/button.tsx'
 import { getInitialBootstrap } from '#/web/bootstrap.ts'
 import { getClientBridge } from '#/web/client-bridge.ts'
 import { useLanInfoQuery } from '#/web/settings-queries.ts'
-import { useLanSettingsController, useRuntimeLanSettings } from '#/web/runtime-settings-lan.ts'
+import { useLanSettingsController, useLanSettings } from '#/web/runtime-settings-lan.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { fetchServerJson } from '#/web/lib/server-fetch.ts'
 
 /**
  * Settings page for everything related to the embedded / standalone
- * server that the client talks to. Visible in both runtimes:
+ * server that the client talks to. Visible in both repoOperationSchedulers:
  *
  * - Both: the server URL, the access token (with copy + auto-rotate
  *   QR), and any LAN URLs the server is currently bound to.
  * - Electron only: the `lanEnabled` toggle (the bind address is
  *   owned by the host process) and the `Rotate token` action
  *   (the rotation requires restarting the embedded server, which
- *   only the main process can do).
+ *   only the native host can do).
  *
  * In web / `bun run serve.sh` mode the operator owns the process
  * and the bind address; rotation is a manual delete + restart, so
@@ -33,7 +33,7 @@ export function WebSettings() {
   const t = useT()
   const bridge = getClientBridge()
   const isElectron = bridge.kind() === 'electron'
-  const { lanEnabled } = useRuntimeLanSettings()
+  const { lanEnabled } = useLanSettings()
   const { data: lanInfo } = useLanInfoQuery()
   const { setLanEnabled } = useLanSettingsController()
 
@@ -86,7 +86,7 @@ export function WebSettings() {
     try {
       const { accessToken: next } = await bridge.rotateAccessToken()
       setFetchedToken(next)
-      // The main process replants the embedded client's auth
+      // The native host replants the embedded client's auth
       // cookie with the new token before this IPC returns, so the
       // cookie path is now self-consistent. A full reload is still
       // required because the preload's `__GOBLIN_BOOTSTRAP__` was
@@ -123,10 +123,7 @@ export function WebSettings() {
             label={t('settings.web.url')}
             hint={t('settings.web.url-hint')}
             control={
-              <code
-                id="settings-web-url"
-                className="rounded border bg-muted px-2 py-1 font-mono text-xs"
-              >
+              <code id="settings-web-url" className="rounded border bg-muted px-2 py-1 font-mono text-xs">
                 {baseUrl || '—'}
               </code>
             }
@@ -137,10 +134,7 @@ export function WebSettings() {
             hint={t('settings.web.token-hint')}
             control={
               <div className="flex items-center gap-2">
-                <code
-                  id="settings-web-token"
-                  className="rounded border bg-muted px-2 py-1 font-mono text-xs"
-                >
+                <code id="settings-web-token" className="rounded border bg-muted px-2 py-1 font-mono text-xs">
                   {accessToken ?? '…'}
                 </code>
                 <Button

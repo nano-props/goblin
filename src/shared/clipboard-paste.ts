@@ -1,10 +1,10 @@
 /**
- * Per-file ceiling for clipboard paste / drop into the terminal slot.
+ * Per-file ceiling for clipboard paste / drop into the terminal session.
  *
  * Read by:
- * - `TerminalSlot` paste / drop handlers (client): early bail-out with
+ * - `TerminalSessionView` paste / drop handlers (client): early bail-out with
  *   `terminal.paste-file-too-large` toast before any IPC / HTTP traffic.
- * - `src/main/clipboard-bridge.ts` (Electron main): defence in depth, reject
+ * - `src/main/clipboard-ipc.ts` (native host): defence in depth, reject
  *   oversized payloads before writing to disk.
  * - `src/server/modules/clipboard-write-paths.ts` (web server): same defence
  *   in depth for the HTTP path.
@@ -44,7 +44,7 @@ export const CLIPBOARD_TEMP_FILE_MAX_AGE_MS = 24 * 60 * 60 * 1000
  * `sanitizeBaseName` then preserves this literal (it contains no
  * Windows-reserved characters). Both the Electron preload and the web
  * HTTP backend must use this constant so the upload shape stays
- * symmetric across runtimes.
+ * symmetric across repoOperationSchedulers.
  */
 export const CLIPBOARD_FALLBACK_FILE_NAME = 'clipboard.bin'
 

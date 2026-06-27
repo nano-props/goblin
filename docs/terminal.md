@@ -125,9 +125,9 @@ It is useful to keep three lifetimes separate:
 - **View lifetime**: client-local xterm and DOM resources for rendering a session.
 - **Tab lifetime**: user-visible workspace surface that decides which feature resources must be released before the tab is considered closed.
 
-A Workspace Pane tab is not the authoritative owner of a terminal session. The terminal registry and slot own terminal resource cleanup. The tab close path is the orchestration boundary that waits for those owners to finish.
+A Workspace Pane tab is not the authoritative owner of a terminal session. The tab is a workspace-pane slot in the UI; the terminal server (TerminalSessionManager) and client projection (TerminalSessionProjection) own terminal resource cleanup for the session rendered in that slot. The tab close path is the orchestration boundary that waits for those owners to finish.
 
-This distinction matters for destructive worktree operations. Before a worktree directory is removed, the client should close every worktree-scoped Workspace Pane tab for that worktree and await each tab's close contract. For terminal tabs, that close contract delegates to the terminal registry's worktree release barrier: cancel pending creates that have not reached the server, wait for in-flight creates that cannot be cancelled, close materialized sessions, and wait for pending durable closes to settle. For future worktree-scoped tabs, such as a file tree or another long-lived tool surface, the same tab close contract should release that tab's resources before the worktree mutation starts.
+This distinction matters for destructive worktree operations. Before a worktree directory is removed, the client should close every worktree-scoped Workspace Pane tab for that worktree and await each tab's close contract. For terminal tabs, that close contract delegates to the client projection's worktree release barrier: cancel pending creates that have not reached the server, wait for in-flight creates that cannot be cancelled, close materialized sessions, and wait for pending durable closes to settle. For future worktree-scoped tabs, such as a file tree or another long-lived tool surface, the same tab close contract should release that tab's resources before the worktree mutation starts.
 
 Repo routes and server-side repo write paths should not know about Workspace Pane tabs or terminal UI resources. They remain responsible for repository mutation. UI resource release belongs to the Workspace Pane tab lifecycle on the client.
 
@@ -162,7 +162,7 @@ Control is a business concept, not just a transport detail.
 
 - Only the controller may drive PTY writes and PTY resize.
 - Attach may result in controller, viewer, or unowned state.
-- On disconnect, the controller slot clears immediately; the per-session `userSticky` flag stays set so a subsequent attach from any of the user's attachments auto-claims when no controller is present.
+- On disconnect, the controller role clears immediately; the per-session `userSticky` flag stays set so a subsequent attach from any of the user's attachments auto-claims when no controller is present.
 - Takeover should be explicit and confirmed by server-owned control state. See `terminal-takeover.md` for the model.
 
 ### Why this matters
@@ -316,7 +316,7 @@ The terminal system should optimize for continuity, but it still needs clear fai
 ### Design expectations
 
 - Failed create or restart must not leave zombie sessions presented as healthy terminals.
-- Disconnect should not destroy the session itself: a 24h detached TTL keeps the catalog alive so a later attach from the same user can re-enter via auto-claim. The controller slot, however, clears on disconnect so siblings can claim it without waiting.
+- Disconnect should not destroy the session itself: a 24h detached TTL keeps the catalog alive so a later attach from the same user can re-enter via auto-claim. The controller role, however, clears on disconnect so siblings can claim it without waiting.
 - View destruction should clean up local resources without corrupting session state.
 - Server shutdown should end the runtime cleanly and stop further dispatch.
 
@@ -325,7 +325,7 @@ The terminal system should optimize for continuity, but it still needs clear fai
 - The PTY worker direction is the right architectural boundary.
 - The server-first model is appropriate for terminal state.
 - Control is modeled explicitly instead of being hidden in UI heuristics.
-- Client code already separates registry/projection concerns from xterm view concerns.
+- Client code already separates TerminalSessionProjection concerns from xterm view concerns.
 - The design supports mirroring, reconnect, and takeover without requiring Electron-specific assumptions.
 
 ## Main risks to watch
@@ -340,7 +340,7 @@ The terminal system should optimize for continuity, but it still needs clear fai
 
 - Keep the server as the source of terminal business truth.
 - Keep PTY execution behind the supervisor boundary.
-- Keep client registry code as projection and orchestration, not as an alternative authority.
+- Keep client TerminalSessionProjection code as projection and orchestration, not as an alternative authority.
 - Keep xterm view code focused on rendering and local interaction.
 - Treat geometry as a correctness path, not as optional polish.
 - Prefer explicit control transitions over implicit heuristics.

@@ -37,8 +37,7 @@ if (values['data-dir']?.trim()) process.env.GOBLIN_SERVER_DATA_DIR = values['dat
 // `GOBLIN_SERVER_ACCESS_TOKEN` is set, so we pass the token via env so
 // the server's startup log doesn't double-print and so the value
 // printed here matches the in-memory value the server uses.
-const accessToken =
-  values.token?.trim() || (await readOrCreateAccessToken(serverDataDir()))
+const accessToken = values.token?.trim() || (await readOrCreateAccessToken(serverDataDir()))
 process.env.GOBLIN_SERVER_ACCESS_TOKEN = accessToken
 
 if (!process.env.npm_package_version?.trim()) {

@@ -3,7 +3,7 @@ import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { ErrorBoundary } from '#/web/components/ErrorBoundary.tsx'
-import { TerminalSlotProvider } from '#/web/components/terminal/TerminalSlotProvider.tsx'
+import { TerminalSessionProvider } from '#/web/components/terminal/TerminalSessionProvider.tsx'
 import { TokenGate } from '#/web/components/TokenGate.tsx'
 import { RepoCloneDialog } from '#/web/components/RepoCloneDialog.tsx'
 import { RepoOpenDialog } from '#/web/components/RepoOpenDialog.tsx'
@@ -25,13 +25,13 @@ import { useRepoStoreInvalidationRefresh } from '#/web/hooks/useRepoStoreInvalid
 import { useSessionPersistence } from '#/web/hooks/useSessionPersistence.ts'
 import { useSettingsWriteErrorToast } from '#/web/hooks/useSettingsWriteErrorToast.ts'
 import { useSettingsQueryInvalidationSync } from '#/web/settings-queries.ts'
-import { createMainWindowNavigationActions } from '#/web/main-window-navigation-actions.ts'
-import { MainWindowNavigationProvider } from '#/web/main-window-navigation.tsx'
+import { createPrimaryWindowNavigationActions } from '#/web/primary-window-navigation-actions.ts'
+import { PrimaryWindowNavigationProvider } from '#/web/primary-window-navigation.tsx'
 import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import {
-  mainWindowNavigationStoreActionsEqual,
-  mainWindowNavigationStoreActionsFromStore,
+  primaryWindowNavigationStoreActionsEqual,
+  primaryWindowNavigationStoreActionsFromStore,
 } from '#/web/stores/repos/selector-actions.ts'
 
 export function Layout() {
@@ -46,26 +46,26 @@ export function Layout() {
   const modalOpen = overlays.anyOpen
 
   const activeId = useReposStore((s) => s.activeId)
-  const activeBranchName = useReposStore((s) => (s.activeId ? s.repos[s.activeId]?.ui.selectedBranch ?? null : null))
+  const activeBranchName = useReposStore((s) => (s.activeId ? (s.repos[s.activeId]?.ui.selectedBranch ?? null) : null))
   const order = useReposStore((s) => s.order)
-  const { setActive, closeRepo, cycleActive, selectBranch, setWorkspacePaneView } = useStoreWithEqualityFn(
+  const { setActive, closeRepo, cycleActive, selectBranch, setWorkspacePaneTab } = useStoreWithEqualityFn(
     useReposStore,
-    mainWindowNavigationStoreActionsFromStore,
-    mainWindowNavigationStoreActionsEqual,
+    primaryWindowNavigationStoreActionsFromStore,
+    primaryWindowNavigationStoreActionsEqual,
   )
   const navigation = useMemo(
     () =>
-      createMainWindowNavigationActions({
+      createPrimaryWindowNavigationActions({
         activeId,
         order,
         setActive,
         closeRepo,
         cycleActive,
         selectBranch,
-        setWorkspacePaneView,
+        setWorkspacePaneTab,
         onOpenSettings: (page) => void navigate({ to: `/settings/${page}` }),
       }),
-    [activeId, closeRepo, cycleActive, navigate, order, selectBranch, setWorkspacePaneView],
+    [activeId, closeRepo, cycleActive, navigate, order, selectBranch, setWorkspacePaneTab],
   )
 
   const workspaceShortcutsSuppressed = modalOpen || isSettingsOpen
@@ -98,7 +98,7 @@ export function Layout() {
     <ErrorBoundary>
       <TokenGate>
         <AuthenticatedSideEffects />
-        <MainWindowNavigationProvider value={navigation}>
+        <PrimaryWindowNavigationProvider value={navigation}>
           <LayoutOverlayActions.Provider
             value={{
               openRepoPathDialog: overlays.openRepoPathDialog,
@@ -107,7 +107,7 @@ export function Layout() {
               openCreateWorktree: overlays.openCreateWorktree,
             }}
           >
-            <TerminalSlotProvider>
+            <TerminalSessionProvider>
               <div
                 className="relative flex h-full flex-col"
                 onDragEnter={repoDrop.onDragEnter}
@@ -116,30 +116,30 @@ export function Layout() {
                 onDrop={repoDrop.onDrop}
               >
                 <Outlet />
-                <MainWindowOverlays
+                <PrimaryWindowOverlays
                   overlays={overlays}
                   repoDrop={repoDrop}
                   activeId={activeId}
                   activeBranchName={activeBranchName}
                 />
               </div>
-            </TerminalSlotProvider>
+            </TerminalSessionProvider>
           </LayoutOverlayActions.Provider>
-        </MainWindowNavigationProvider>
+        </PrimaryWindowNavigationProvider>
         {import.meta.env.DEV ? <TanStackRouterDevtools /> : null}
       </TokenGate>
     </ErrorBoundary>
   )
 }
 
-interface MainWindowOverlaysProps {
+interface PrimaryWindowOverlaysProps {
   overlays: ReturnType<typeof useAppOverlays>
   repoDrop: ReturnType<typeof useRepoDrop>
   activeId: string | null
   activeBranchName: string | null
 }
 
-function MainWindowOverlays({ overlays, repoDrop, activeId, activeBranchName }: MainWindowOverlaysProps) {
+function PrimaryWindowOverlays({ overlays, repoDrop, activeId, activeBranchName }: PrimaryWindowOverlaysProps) {
   return (
     <>
       <RepoOpenDialog open={overlays.state.openRepo.open} onOpenChange={overlays.setOpenRepoOpen} />

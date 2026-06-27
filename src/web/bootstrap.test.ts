@@ -159,7 +159,7 @@ describe('client bootstrap', () => {
       onEffectIntent: () => () => {},
       pathForFile: () => '',
       saveClipboardFiles: () => Promise.resolve([]),
-      shell: () => null,
+      host: () => null,
       terminal: () => ({
         attach: async () => ({ ok: false, message: 'unavailable' }),
         restart: async () => ({ ok: false, message: 'unavailable' }),
@@ -172,7 +172,7 @@ describe('client bootstrap', () => {
             ? {
                 ok: true as const,
                 action: 'reused' as const,
-                key: 'repo\0worktree\0slot-1',
+                key: 'repo\0worktree\0session-1',
                 ptySessionId: 'pty_session_1_aaaaaaaaa',
                 processName: 'zsh',
                 canonicalTitle: null,
@@ -188,7 +188,7 @@ describe('client bootstrap', () => {
             : {
                 ok: true as const,
                 action: 'created' as const,
-                key: 'repo\0worktree\0slot-2',
+                key: 'repo\0worktree\0session-2',
                 ptySessionId: 'pty_session_2_aaaaaaaaa',
                 processName: 'zsh',
                 canonicalTitle: null,
@@ -200,12 +200,12 @@ describe('client bootstrap', () => {
                 canonicalCols: 80,
                 canonicalRows: 24,
                 sessions: [],
-        },
+              },
         pruneTerminals: async () => ({ pruned: 0, remaining: 0 }),
         listSessions: async () => [],
         prewarm: async () => {},
         kickReconnect: () => {},
-        getSlotSnapshot: async () => null,
+        getSessionSnapshot: async () => null,
         notifyBell: async () => false,
         sendTestNotification: async () => false,
         setBadge: () => {},
@@ -215,7 +215,7 @@ describe('client bootstrap', () => {
         onIdentity: () => () => {},
         onLifecycle: () => () => {},
         onSessionsChanged: () => () => {},
-        onSlotClosed: () => () => {},
+        onSessionClosed: () => () => {},
       }),
     })
 

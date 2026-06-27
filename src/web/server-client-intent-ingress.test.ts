@@ -91,12 +91,12 @@ describe('server client intent source', () => {
     socket.emitMessage(
       JSON.stringify({
         type: 'client-effect-intent',
-        intent: { type: 'show-workspace-pane-view-requested', tab: 'changes' },
+        intent: { type: 'show-workspace-pane-tab-requested', tab: 'changes' },
       }),
     )
 
     expect(listener).toHaveBeenCalledWith({
-      type: 'show-workspace-pane-view-requested',
+      type: 'show-workspace-pane-tab-requested',
       tab: 'changes',
     })
     dispose()
@@ -118,7 +118,10 @@ describe('server client intent source', () => {
     // Right discriminator but invalid intent shape.
     socket.emitMessage(JSON.stringify({ type: 'client-effect-intent', intent: { type: 'banana' } }))
     socket.emitMessage(
-      JSON.stringify({ type: 'client-effect-intent', intent: { type: 'show-workspace-pane-view-requested', tab: 'bad' } }),
+      JSON.stringify({
+        type: 'client-effect-intent',
+        intent: { type: 'show-workspace-pane-tab-requested', tab: 'bad' },
+      }),
     )
     // Garbage payload.
     socket.emitMessage('not json')
@@ -147,14 +150,14 @@ describe('server client intent source', () => {
 
     const payload = JSON.stringify({
       type: 'client-effect-intent',
-      intent: { type: 'show-workspace-pane-view-requested', tab: 'changes' },
+      intent: { type: 'show-workspace-pane-tab-requested', tab: 'changes' },
     })
     firstSocket.emitMessage(payload) // stale; should be ignored
     secondSocket.emitMessage(payload) // fresh; should be delivered
 
     expect(listener).toHaveBeenCalledTimes(1)
     expect(listener).toHaveBeenCalledWith({
-      type: 'show-workspace-pane-view-requested',
+      type: 'show-workspace-pane-tab-requested',
       tab: 'changes',
     })
     dispose()

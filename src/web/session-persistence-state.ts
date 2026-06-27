@@ -1,9 +1,9 @@
 import {
-  isWorkspacePaneStaticViewType,
-  isWorkspacePaneSessionViewType,
-  type WorkspacePaneSessionView,
+  isWorkspacePaneStaticTabType,
+  isWorkspacePaneSessionTabType,
+  type WorkspacePaneSessionTabType,
   type WorkspacePaneTabOrderEntry,
-  type WorkspacePaneView,
+  type WorkspacePaneTabType,
 } from '#/shared/workspace-pane.ts'
 import { normalizeWorkspacePaneTabOrder } from '#/web/stores/repos/workspace-pane-tabs.ts'
 
@@ -11,33 +11,33 @@ export function persistedActiveRepoIdForSession(activeId: string | null): string
   return activeId
 }
 
-export function persistedPreferredWorkspacePaneViewByBranchByRepoForSession(
+export function persistedPreferredWorkspacePaneTabByBranchByRepoForSession(
   repos: Record<
     string,
     | {
         data?: { branches?: Array<{ name?: string }> }
         ui: {
           workspacePaneTabOrderByBranch: Record<string, WorkspacePaneTabOrderEntry[]>
-          preferredWorkspacePaneViewByBranch: Record<string, WorkspacePaneView>
+          preferredWorkspacePaneTabByBranch: Record<string, WorkspacePaneTabType>
         }
       }
     | undefined
   >,
   order: string[],
-): Record<string, Record<string, WorkspacePaneSessionView>> {
-  const byRepo: Record<string, Record<string, WorkspacePaneSessionView>> = {}
+): Record<string, Record<string, WorkspacePaneSessionTabType>> {
+  const byRepo: Record<string, Record<string, WorkspacePaneSessionTabType>> = {}
   for (const id of order) {
     const repo = repos[id]
     if (!repo) continue
     const knownBranches = new Set((repo.data?.branches ?? []).map((branch) => branch.name).filter(Boolean))
-    const byBranch: Record<string, WorkspacePaneSessionView> = {}
-    for (const [branchName, tab] of Object.entries(repo.ui.preferredWorkspacePaneViewByBranch)) {
+    const byBranch: Record<string, WorkspacePaneSessionTabType> = {}
+    for (const [branchName, tab] of Object.entries(repo.ui.preferredWorkspacePaneTabByBranch)) {
       if (!branchName || branchName.includes('\0')) continue
       if (knownBranches.size > 0 && !knownBranches.has(branchName)) continue
-      if (!isWorkspacePaneSessionViewType(tab)) continue
+      if (!isWorkspacePaneSessionTabType(tab)) continue
       if (
-        isWorkspacePaneStaticViewType(tab) &&
-        !workspacePaneStaticViewsFromOrder(repo.ui.workspacePaneTabOrderByBranch[branchName] ?? []).includes(tab)
+        isWorkspacePaneStaticTabType(tab) &&
+        !workspacePaneStaticTabsFromOrder(repo.ui.workspacePaneTabOrderByBranch[branchName] ?? []).includes(tab)
       )
         continue
       byBranch[branchName] = tab
@@ -75,11 +75,11 @@ export function persistedWorkspacePaneTabOrderByBranchByRepoForSession(
 }
 
 export function persistedSelectedTerminalByWorktreeForSession(
-  selectedTerminalByWorktree: Record<string, string>,
+  selectedTerminalSessionByWorktree: Record<string, string>,
   repos: Record<string, { data?: { branches?: Array<{ worktree?: { path?: string } | undefined }> } } | undefined>,
 ): Record<string, string> {
   const persisted: Record<string, string> = {}
-  for (const [worktreeKey, key] of Object.entries(selectedTerminalByWorktree)) {
+  for (const [worktreeKey, key] of Object.entries(selectedTerminalSessionByWorktree)) {
     const parts = worktreeKey.split('\0')
     if (parts.length !== 2) continue
     const [repoRoot, worktreePath] = parts
@@ -91,6 +91,6 @@ export function persistedSelectedTerminalByWorktreeForSession(
   return persisted
 }
 
-function workspacePaneStaticViewsFromOrder(order: readonly WorkspacePaneTabOrderEntry[]): WorkspacePaneSessionView[] {
+function workspacePaneStaticTabsFromOrder(order: readonly WorkspacePaneTabOrderEntry[]): WorkspacePaneSessionTabType[] {
   return normalizeWorkspacePaneTabOrder(order).flatMap((entry) => (entry.type === 'terminal' ? [] : [entry.type]))
 }

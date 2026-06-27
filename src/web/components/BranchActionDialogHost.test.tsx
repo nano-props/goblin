@@ -48,7 +48,14 @@ const titlePropsByDialog: Record<string, { title: string; message: unknown }> = 
 }
 
 vi.mock('#/web/components/ConfirmDialog.tsx', () => ({
-  ConfirmDialog: ({ open, title, message, confirmLabel, onConfirm, onCancel }: {
+  ConfirmDialog: ({
+    open,
+    title,
+    message,
+    confirmLabel,
+    onConfirm,
+    onCancel,
+  }: {
     open: boolean
     title: string
     message: unknown
@@ -164,10 +171,9 @@ describe('BranchActionDialogHost', () => {
     // (a) Caller opens the dialog via the store — this is what
     // `useBranchActions.requestRemoveWorktree` does internally today.
     act(() => {
-      useBranchActionDialogsStore.getState().openRemoveWorktreeConfirm(
-        { repoId: repo.id, branchName: branch.name, payload },
-        { isProtectedBranch: false },
-      )
+      useBranchActionDialogsStore
+        .getState()
+        .openRemoveWorktreeConfirm({ repoId: repo.id, branchName: branch.name, payload }, { isProtectedBranch: false })
     })
 
     // Mount the host. Active workspace = (repo, branch).
@@ -202,7 +208,11 @@ describe('BranchActionDialogHost', () => {
 
     act(() => {
       useBranchActionDialogsStore.getState().openRemoveWorktreeConfirm(
-        { repoId: repoA.id, branchName: branchA.name, payload: { branch: branchA.name, path: branchA.worktree!.path } },
+        {
+          repoId: repoA.id,
+          branchName: branchA.name,
+          payload: { branch: branchA.name, path: branchA.worktree!.path },
+        },
         { isProtectedBranch: false },
       )
     })
@@ -240,7 +250,11 @@ describe('BranchActionDialogHost', () => {
 
     act(() => {
       useBranchActionDialogsStore.getState().openRemoveWorktreeConfirm(
-        { repoId: repo.id, branchName: branchX.name, payload: { branch: branchX.name, path: branchX.worktree!.path } },
+        {
+          repoId: repo.id,
+          branchName: branchX.name,
+          payload: { branch: branchX.name, path: branchX.worktree!.path },
+        },
         { isProtectedBranch: false },
       )
     })
@@ -280,7 +294,7 @@ describe('BranchActionDialogHost', () => {
     expect(useBranchActionDialogsStore.getState().deleteConfirm).not.toBeNull()
   })
 
-  test('regression: force-promote preserves the user\'s deleteAlsoUpstream choice', () => {
+  test("regression: force-promote preserves the user's deleteAlsoUpstream choice", () => {
     const { repo, branch } = setupRepo()
     // Seed: user opens deleteConfirm and toggles deleteAlsoUpstream on.
     act(() => {
@@ -303,23 +317,22 @@ describe('BranchActionDialogHost', () => {
     expect(useBranchActionDialogsStore.getState().deleteConfirm).toBeNull()
     // The user's deleteAlsoUpstream=true should be preserved into
     // the force confirm's checkbox read.
-    const checkboxes = useBranchActionDialogsStore.getState().checkboxStateByBranch[
-      branchCheckboxKey(repo.id, branch.name)
-    ]
+    const checkboxes =
+      useBranchActionDialogsStore.getState().checkboxStateByBranch[branchCheckboxKey(repo.id, branch.name)]
     expect(checkboxes?.deleteAlsoUpstream).toBe(true)
   })
 
   test('protected branch seeds removeAlsoDeletes off on first open', () => {
     const { repo } = setupRepo()
     act(() => {
-      useBranchActionDialogsStore.getState().openRemoveWorktreeConfirm(
-        { repoId: repo.id, branchName: 'main', payload: { branch: 'main', path: '/tmp/main' } },
-        { isProtectedBranch: true },
-      )
+      useBranchActionDialogsStore
+        .getState()
+        .openRemoveWorktreeConfirm(
+          { repoId: repo.id, branchName: 'main', payload: { branch: 'main', path: '/tmp/main' } },
+          { isProtectedBranch: true },
+        )
     })
-    const checkboxes = useBranchActionDialogsStore.getState().checkboxStateByBranch[
-      branchCheckboxKey(repo.id, 'main')
-    ]
+    const checkboxes = useBranchActionDialogsStore.getState().checkboxStateByBranch[branchCheckboxKey(repo.id, 'main')]
     expect(checkboxes?.removeAlsoDeletes).toBe(false)
   })
 
@@ -332,7 +345,7 @@ describe('BranchActionDialogHost', () => {
   // immediately when none is found, so the dialog unmounts before
   // we can inspect content.
 
-  test('integration: clicking Confirm dispatches against the dialog payload, not the host\'s active workspace', async () => {
+  test("integration: clicking Confirm dispatches against the dialog payload, not the host's active workspace", async () => {
     // The headline contract of this refactor: the user can open a
     // dialog for a non-selected branch row (e.g. a row in the
     // zen-mode HoverCard popover) and the Confirm click dispatches
@@ -404,9 +417,7 @@ describe('BranchActionDialogHost', () => {
       confirmButton!.click()
     })
 
-    expect(dispatch.dispatchDeleteBranch).toHaveBeenCalledWith(
-      expect.objectContaining({ alsoDeleteUpstream: true }),
-    )
+    expect(dispatch.dispatchDeleteBranch).toHaveBeenCalledWith(expect.objectContaining({ alsoDeleteUpstream: true }))
   })
 
   test('integration: clicking Confirm on a force-promoted dialog dispatches with force: true', async () => {
@@ -459,10 +470,12 @@ describe('BranchActionDialogHost', () => {
     const dispatch = await import('#/web/hooks/branchActionDispatch.ts')
     const { repo, branch } = setupRepo()
     act(() => {
-      useBranchActionDialogsStore.getState().openRemoveWorktreeConfirm(
-        { repoId: repo.id, branchName: branch.name, payload: { branch: branch.name, path: branch.worktree!.path } },
-        { isProtectedBranch: false },
-      )
+      useBranchActionDialogsStore
+        .getState()
+        .openRemoveWorktreeConfirm(
+          { repoId: repo.id, branchName: branch.name, payload: { branch: branch.name, path: branch.worktree!.path } },
+          { isProtectedBranch: false },
+        )
     })
     render(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branch.name} />)
 
@@ -525,10 +538,12 @@ describe('BranchActionDialogHost', () => {
     const dispatch = await import('#/web/hooks/branchActionDispatch.ts')
     const { repo, branch } = setupRepo()
     act(() => {
-      useBranchActionDialogsStore.getState().openRemoveWorktreeConfirm(
-        { repoId: repo.id, branchName: branch.name, payload: { branch: branch.name, path: branch.worktree!.path } },
-        { isProtectedBranch: false },
-      )
+      useBranchActionDialogsStore
+        .getState()
+        .openRemoveWorktreeConfirm(
+          { repoId: repo.id, branchName: branch.name, payload: { branch: branch.name, path: branch.worktree!.path } },
+          { isProtectedBranch: false },
+        )
       useBranchActionDialogsStore.getState().setRemoveAlsoDeletes(repo.id, branch.name, true)
       useBranchActionDialogsStore.getState().setRemoveAlsoUpstream(repo.id, branch.name, true)
     })
@@ -646,9 +661,7 @@ describe('BranchActionDialogHost', () => {
     function dropBranchFromRepo(branchName: string): void {
       act(() => {
         useReposStore.setState((state) => {
-          const next = state.repos[REPO_ID]!.data.branches.filter(
-            (b: { name: string }) => b.name !== branchName,
-          )
+          const next = state.repos[REPO_ID]!.data.branches.filter((b: { name: string }) => b.name !== branchName)
           return {
             repos: {
               ...state.repos,
@@ -666,10 +679,12 @@ describe('BranchActionDialogHost', () => {
       const { repo, branch } = setupRepo()
       const payload: RemoveWorktreeDialogPayload = { branch: branch.name, path: branch.worktree!.path }
       act(() => {
-        useBranchActionDialogsStore.getState().openRemoveWorktreeConfirm(
-          { repoId: repo.id, branchName: branch.name, payload },
-          { isProtectedBranch: false },
-        )
+        useBranchActionDialogsStore
+          .getState()
+          .openRemoveWorktreeConfirm(
+            { repoId: repo.id, branchName: branch.name, payload },
+            { isProtectedBranch: false },
+          )
       })
       render(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branch.name} />)
       // Pre-close: title is the static i18n key.
@@ -764,9 +779,7 @@ describe('BranchActionDialogHost', () => {
     function dropBranchFromRepo(branchName: string): void {
       act(() => {
         useReposStore.setState((state) => {
-          const next = state.repos[REPO_ID]!.data.branches.filter(
-            (b: { name: string }) => b.name !== branchName,
-          )
+          const next = state.repos[REPO_ID]!.data.branches.filter((b: { name: string }) => b.name !== branchName)
           return {
             repos: {
               ...state.repos,
@@ -784,10 +797,12 @@ describe('BranchActionDialogHost', () => {
       const { repo, branch } = setupRepo()
       const payload: RemoveWorktreeDialogPayload = { branch: branch.name, path: branch.worktree!.path }
       act(() => {
-        useBranchActionDialogsStore.getState().openRemoveWorktreeConfirm(
-          { repoId: repo.id, branchName: branch.name, payload },
-          { isProtectedBranch: false },
-        )
+        useBranchActionDialogsStore
+          .getState()
+          .openRemoveWorktreeConfirm(
+            { repoId: repo.id, branchName: branch.name, payload },
+            { isProtectedBranch: false },
+          )
       })
       render(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branch.name} />)
       // Pre-close: message is the full body (a React element, not

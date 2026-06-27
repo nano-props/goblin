@@ -5,7 +5,7 @@ import type {
   RepoSettingsState,
   RuntimeRecentReposState,
   RuntimeSettingsSnapshot,
-  SessionState,
+  WorkspaceSessionState,
   SettingsSnapshot,
 } from '#/shared/api-types.ts'
 import { runtimeSettingsSnapshotFromSettingsSnapshot } from '#/shared/settings-snapshot.ts'
@@ -52,7 +52,10 @@ export function updateRuntimeRecentReposStateCache(queryClient: QueryClient, nex
   }))
 }
 
-export function updateRestorableSessionStateCache(queryClient: QueryClient, session: SessionState): void {
+export function updateRestorableWorkspaceSessionStateCache(
+  queryClient: QueryClient,
+  session: WorkspaceSessionState,
+): void {
   updateSettingsSnapshotCache(queryClient, (current) => ({
     ...current,
     session,

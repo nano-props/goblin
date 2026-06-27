@@ -3,7 +3,7 @@
  * `DragEvent.dataTransfer`, mirroring the existing drop semantics.
  *
  * Prefers the modern `data.files` collection (browser already filtered
- * to `kind === 'file'` items). Falls back to `data.items` for runtimes
+ * to `kind === 'file'` items). Falls back to `data.items` for repoOperationSchedulers
  * that surface clipboard blobs only there — even though `DataTransfer`
  * is a partial stub in jsdom, real browsers populate one or the other,
  * so trying both shapes is the right contract.

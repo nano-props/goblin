@@ -4,11 +4,11 @@ import {
   SettingsRow,
   SettingsSelect,
 } from '#/web/components/settings/SettingsPrimitives.tsx'
-import { useFetchSettingsController, useRuntimeFetchSettings } from '#/web/runtime-settings-fetch.ts'
+import { useFetchSettingsController, useFetchSettings } from '#/web/runtime-settings-fetch.ts'
 import { useT } from '#/web/stores/i18n.ts'
 export function SyncSettings() {
   const t = useT()
-  const { fetchIntervalSec: fetchInterval } = useRuntimeFetchSettings()
+  const { fetchIntervalSec: fetchInterval } = useFetchSettings()
   const { setFetchInterval } = useFetchSettingsController()
   const intervalOptions: { value: number; labelKey: string }[] = [
     { value: 0, labelKey: 'settings.fetch.off' },

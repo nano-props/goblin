@@ -6,10 +6,10 @@ import type {
   TerminalMutationResult,
   TerminalResizeInput,
   TerminalRestartInput,
-  TerminalSlotInput,
-  TerminalSlotSnapshot,
-  TerminalSlotSnapshotInput,
-  TerminalSlotSummary,
+  TerminalSessionInput,
+  TerminalSessionSnapshot,
+  TerminalSessionSnapshotInput,
+  TerminalSessionSummary,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
   TerminalWriteInput,
@@ -99,21 +99,16 @@ export interface ServerTerminalHost {
   write(clientId: string, userId: string, input: TerminalWriteInput): MaybePromise<TerminalMutationResult>
   resize(clientId: string, userId: string, input: TerminalResizeInput): MaybePromise<TerminalMutationResult>
   takeover(clientId: string, userId: string, input: TerminalTakeoverInput): MaybePromise<TerminalTakeoverResult>
-  close(clientId: string, userId: string, input: TerminalSlotInput): MaybePromise<TerminalMutationResult>
-  listSessions(clientId: string, userId: string, repoRoot: string): MaybePromise<TerminalSlotSummary[]>
+  close(clientId: string, userId: string, input: TerminalSessionInput): MaybePromise<TerminalMutationResult>
+  listSessions(clientId: string, userId: string, repoRoot: string): MaybePromise<TerminalSessionSummary[]>
   create(clientId: string, userId: string, input: TerminalCreateInput): MaybePromise<TerminalCatalogMutationResult>
   prune(clientId: string, userId: string, repoRoot: string): MaybePromise<{ pruned: number; remaining: number }>
-  getSlotSnapshot(
+  getSessionSnapshot(
     clientId: string,
     userId: string,
-    input: TerminalSlotSnapshotInput,
-  ): MaybePromise<TerminalSlotSnapshot | null>
+    input: TerminalSessionSnapshotInput,
+  ): MaybePromise<TerminalSessionSnapshot | null>
   /** Handle an incoming realtime message from a client socket. */
-  handleRealtimeMessage(
-    clientId: string,
-    userId: string,
-    socket: ServerTerminalSocket,
-    message: string,
-  ): void
+  handleRealtimeMessage(clientId: string, userId: string, socket: ServerTerminalSocket, message: string): void
   shutdown(): void
 }

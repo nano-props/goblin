@@ -1,16 +1,16 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import { defaultSessionState } from '#/shared/settings-defaults.ts'
-import { createServerSettingsState } from '#/server/modules/settings-state.ts'
+import { defaultWorkspaceSessionState } from '#/shared/settings-defaults.ts'
+import { createNativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
 
 const mocks = vi.hoisted(() => ({
-  getServerSettingsPrefs: vi.fn(),
+  getUserSettings: vi.fn(),
   getServerSessionState: vi.fn(),
   getServerRecentRepos: vi.fn(),
   getServerRepoSettings: vi.fn(),
 }))
 
 vi.mock('#/server/modules/settings-source.ts', () => ({
-  getServerSettingsPrefs: mocks.getServerSettingsPrefs,
+  getUserSettings: mocks.getUserSettings,
   getServerSessionState: mocks.getServerSessionState,
   getServerRecentRepos: mocks.getServerRecentRepos,
   getServerRepoSettings: mocks.getServerRepoSettings,
@@ -23,7 +23,7 @@ describe('server settings snapshot runtime state', () => {
   })
 
   test('reports the mirrored global shortcut registration state', async () => {
-    mocks.getServerSettingsPrefs.mockResolvedValue({
+    mocks.getUserSettings.mockResolvedValue({
       lang: 'auto',
       theme: 'dark',
       colorTheme: 'macos',
@@ -34,11 +34,11 @@ describe('server settings snapshot runtime state', () => {
       globalShortcut: 'Alt+G',
       lanEnabled: false,
     })
-    mocks.getServerSessionState.mockResolvedValue(defaultSessionState())
+    mocks.getServerSessionState.mockResolvedValue(defaultWorkspaceSessionState())
     mocks.getServerRecentRepos.mockResolvedValue([])
     mocks.getServerRepoSettings.mockResolvedValue([])
 
-    const state = createServerSettingsState()
+    const state = createNativeShortcutRegistrationState()
     state.globalShortcutRegistered = true
 
     const snapshotMod = await import('#/server/modules/settings-snapshot.ts')

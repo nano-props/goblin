@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
 </html>`,
   ),
   existsSync: vi.fn(() => true),
-  getServerSettingsPrefs: vi.fn(async () => ({
+  getUserSettings: vi.fn(async () => ({
     lang: 'auto',
     theme: 'auto',
     colorTheme: 'macos',
@@ -67,7 +67,7 @@ const terminalHostStub = {
   listSessions: vi.fn(),
   create: vi.fn(),
   prune: vi.fn(),
-  getSlotSnapshot: vi.fn(),
+  getSessionSnapshot: vi.fn(),
   handleRealtimeMessage: vi.fn(),
   shutdown: vi.fn(),
 } satisfies ServerTerminalHost
@@ -104,7 +104,7 @@ vi.mock('node:fs', async () => {
 })
 
 vi.mock('#/server/modules/settings-source.ts', () => ({
-  getServerSettingsPrefs: mocks.getServerSettingsPrefs,
+  getUserSettings: mocks.getUserSettings,
 }))
 
 describe('server app body limit', () => {

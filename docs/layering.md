@@ -194,7 +194,7 @@ Use the current codebase as a guide, not as a rigid template.
 
 - boundary: `src/server/routes/settings.ts`, `src/web/settings-client.ts`
 - read: `src/web/settings-queries.ts`
-- write: `src/server/modules/settings-write-paths.ts`, `src/web/settings-write-paths.ts`
+- write: `src/server/modules/settings-write-paths.ts`, `src/web/settings-actions.ts`
 - source: `src/server/modules/settings-source.ts`
 - runtime facade: `src/web/runtime-settings-*.ts` (only files that combine read + write)
 
@@ -205,9 +205,9 @@ It also shows a feature where a separate source layer makes sense.
 
 - boundary: `src/server/routes/repo.ts`, `src/web/repo-client.ts`
 - read: `src/web/stores/repos/refresh.ts` (read-side refresh orchestration)
-- write: `src/web/stores/repos/lifecycle-write-paths.ts`, `src/web/stores/repos/branch-actions.ts`
+- write: `src/web/stores/repos/repo-session-write-paths.ts`, `src/web/stores/repos/branch-actions.ts`
 - server write: `src/server/modules/repo-write-paths.ts` (to be extracted from `repo.ts`)
-- source: `src/server/modules/repo-backend.ts`
+- source: `src/server/modules/repo-source.ts`
 - runtime projection/facade: `src/web/stores/repos/store.ts`, related repo store slices
 - restorable/runtime distinction: repo store types and lifecycle modules
 
@@ -217,12 +217,12 @@ It also shows that not every complex feature needs a separate runtime facade lay
 ### Terminal
 
 - boundary: `src/server/routes/realtime.ts`, `src/web/terminal.ts`
-- read: `src/web/terminal-slot-queries.ts` (loader helper), `src/web/components/terminal/TerminalSlotRegistry.ts` (read projection)
-- write: `src/server/terminal/terminal-runtime.ts` (factory; the authoritative source for session/catalog/broker/dispatch), `src/web/components/terminal/TerminalSlotRegistry.ts` (client-side write paths for `attach`/`select`/`create`)
-- source: `src/server/terminal/terminal-slot-manager.ts` (in-process state for sessions, control, render), `src/server/terminal/pty-supervisor.ts` (PtySupervisor interface), `src/server/terminal/pty-supervisor-inprocess.ts` + `pty-supervisor-worker.ts` (PTY pool impls)
-- protocol types: `src/shared/terminal-types.ts`, `src/shared/terminal-socket.ts`, `src/shared/terminal-validators.ts`, `src/shared/terminal-controller.ts`, `src/shared/slot-ids.ts` (client↔server wire types, validation, controller helpers), `src/shared/terminal-slot-key.ts` (canonical session/worktree key encoding), `src/server/terminal/pty-worker-protocol.ts` (main↔PTY-worker wire types)
+- read: `src/web/terminal-session-queries.ts` (loader helper), `src/web/components/terminal/TerminalSessionProjection.ts` (read projection)
+- write: `src/server/terminal/terminal-runtime.ts` (factory; the authoritative source for session/catalog/broker/dispatch), `src/web/components/terminal/TerminalSessionProjection.ts` (client-side write paths for `attach`/`select`/`create`)
+- source: `src/server/terminal/terminal-session-manager.ts` (in-process state for sessions, control, render), `src/server/terminal/pty-supervisor.ts` (PtySupervisor interface), `src/server/terminal/pty-supervisor-inprocess.ts` + `pty-supervisor-worker.ts` (PTY pool impls)
+- protocol types: `src/shared/terminal-types.ts`, `src/shared/terminal-socket.ts`, `src/shared/terminal-validators.ts`, `src/shared/terminal-controller.ts`, `src/shared/terminal-session-id-format.ts` (client↔server wire types, validation, controller helpers), `src/shared/terminal-workspace-slot-key.ts` (canonical workspace-pane slot/worktree key encoding), `src/server/terminal/pty-worker-protocol.ts` (main↔PTY-worker wire types)
 
-The server-side terminal runtime is created by `createServerTerminalRuntime({ ptySupervisor })` and is the only place that implements `ServerTerminalHost`. The realtime route receives the host via dependency injection from the server factory. The TerminalSlotProvider on the client side keeps `TerminalSlotRegistry` as the single source of truth for live session state and uses the bridge only for fetches and mutations.
+The server-side terminal runtime is created by `createServerTerminalRuntime({ ptySupervisor })` and is the only place that implements `ServerTerminalHost`. The realtime route receives the host via dependency injection from the server factory. The TerminalSessionProvider on the client side keeps `TerminalSessionProjection` as the single source of truth for live session state and uses the bridge only for fetches and mutations.
 
 **PtySupervisor exit metadata — deliberate asymmetry.** The in-process supervisor (`pty-supervisor-inprocess.ts`) reports `pty-exit` to listeners as `(code, signal) = (null, null)` because `node-pty`'s `onExit` only signals "exited" without those values, and by the time the callback fires the underlying term is already gone. The worker-backed supervisor delivers the real values carried by the IPC `pty-exit` event. The session manager does not currently branch on `code`/`signal` — `pty === null` is the canonical "session ended" signal — so the asymmetry is invisible at higher layers. A future need for `code`/`signal` (e.g. for status-bar UI) would require a more invasive change: the in-process supervisor would have to register an `onExit` listener at spawn time and persist the metadata, similar to how it currently caches the process name.
 

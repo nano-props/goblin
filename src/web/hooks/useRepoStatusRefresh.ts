@@ -6,7 +6,7 @@ import {
   runRepoRefreshIntent,
   type RepoStatusRefreshSnapshot,
 } from '#/web/stores/repos/refresh-coordinator.ts'
-import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 
 export { isRepoStatusRefreshable } from '#/web/stores/repos/refresh-coordinator.ts'
 
@@ -20,7 +20,7 @@ function activeRepoStatusSnapshotEqual(
       !!b &&
       a.id === b.id &&
       a.token === b.token &&
-      a.preferredWorkspacePaneView === b.preferredWorkspacePaneView &&
+      a.preferredWorkspacePaneTab === b.preferredWorkspacePaneTab &&
       a.statusViewOpen === b.statusViewOpen &&
       a.unavailable === b.unavailable &&
       a.statusPhase === b.statusPhase)
@@ -28,7 +28,7 @@ function activeRepoStatusSnapshotEqual(
 }
 
 export function useRepoStatusRefresh() {
-  const activeRepo = useStoreWithEqualityFn(
+  const activeRepoId = useStoreWithEqualityFn(
     useReposStore,
     (state): RepoStatusRefreshSnapshot | null => {
       const id = state.activeId
@@ -38,31 +38,31 @@ export function useRepoStatusRefresh() {
     activeRepoStatusSnapshotEqual,
   )
   const previousActiveRepoId = useRef<string | null>(null)
-  const previousPreferredWorkspacePaneView = useRef<WorkspacePaneView | null>(null)
+  const previousPreferredWorkspacePaneTab = useRef<WorkspacePaneTabType | null>(null)
   const previousStatusViewOpen = useRef<boolean>(false)
 
   useEffect(() => {
     const lastActiveRepoId = previousActiveRepoId.current
-    const lastPreferredWorkspacePaneView = previousPreferredWorkspacePaneView.current
+    const lastPreferredWorkspacePaneTab = previousPreferredWorkspacePaneTab.current
     const lastStatusViewOpen = previousStatusViewOpen.current
-    const nextActiveRepoId = activeRepo?.id ?? null
-    const nextPreferredWorkspacePaneView = activeRepo?.preferredWorkspacePaneView ?? null
-    const nextStatusViewOpen = activeRepo?.statusViewOpen ?? false
+    const nextActiveRepoId = activeRepoId?.id ?? null
+    const nextPreferredWorkspacePaneTab = activeRepoId?.preferredWorkspacePaneTab ?? null
+    const nextStatusViewOpen = activeRepoId?.statusViewOpen ?? false
     const activeRepoChanged = nextActiveRepoId !== lastActiveRepoId
     const openedStatusLikeTab =
       !activeRepoChanged &&
       nextActiveRepoId !== null &&
-      ((nextPreferredWorkspacePaneView === 'status' && nextStatusViewOpen && !lastStatusViewOpen) ||
-        ((nextPreferredWorkspacePaneView === 'status' || nextPreferredWorkspacePaneView === 'changes') &&
-          nextPreferredWorkspacePaneView !== lastPreferredWorkspacePaneView))
+      ((nextPreferredWorkspacePaneTab === 'status' && nextStatusViewOpen && !lastStatusViewOpen) ||
+        ((nextPreferredWorkspacePaneTab === 'status' || nextPreferredWorkspacePaneTab === 'changes') &&
+          nextPreferredWorkspacePaneTab !== lastPreferredWorkspacePaneTab))
     previousActiveRepoId.current = nextActiveRepoId
-    previousPreferredWorkspacePaneView.current = nextPreferredWorkspacePaneView
+    previousPreferredWorkspacePaneTab.current = nextPreferredWorkspacePaneTab
     previousStatusViewOpen.current = nextStatusViewOpen
-    if (!activeRepo || (!activeRepoChanged && !openedStatusLikeTab)) return
+    if (!activeRepoId || (!activeRepoChanged && !openedStatusLikeTab)) return
     void runRepoRefreshIntent(useReposStore.getState, {
       kind: 'visible-status-like-view-opened',
-      id: activeRepo.id,
-      token: activeRepo.token,
+      id: activeRepoId.id,
+      token: activeRepoId.token,
     })
-  }, [activeRepo])
+  }, [activeRepoId])
 }

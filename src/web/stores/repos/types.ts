@@ -7,19 +7,19 @@ import type {
   PullRequestFetchMode,
   WorktreeStatus,
 } from '#/web/types.ts'
-import type { RemoteRepoLifecycle, RepoSessionEntry } from '#/shared/remote-repo.ts'
-import type { SessionState } from '#/shared/api-types.ts'
+import type { RemoteRepoConnectionLifecycle, RepoSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionState } from '#/shared/api-types.ts'
 import type {
-  WorkspacePaneSessionView,
-  WorkspacePaneStaticViewType,
+  WorkspacePaneSessionTabType,
+  WorkspacePaneStaticTabType,
   WorkspacePaneTabOrderEntry,
-  WorkspacePaneView,
+  WorkspacePaneTabType,
 } from '#/shared/workspace-pane.ts'
 import type { RepoBranchAction, RunBranchActionOptions } from '#/web/stores/repos/branch-action-types.ts'
 import type { RepoOperationsState } from '#/web/stores/repos/operations.ts'
-import type { RepoResourcesState } from '#/web/stores/repos/resources.ts'
+import type { RepoDataLoadBundle, RepoDataLoadState } from '#/web/stores/repos/repo-data-load-state.ts'
 export type BranchViewMode = 'all' | 'worktrees'
-export type RepoDataSource = 'cache' | 'fresh'
+type RepoDataSource = 'cache' | 'fresh'
 // Client branches keep only the worktree reference; metadata lives in worktreesByPath.
 export type RepoBranchState = Omit<BranchSnapshotInfo, 'worktree'> & {
   worktree?: Pick<NonNullable<BranchSnapshotInfo['worktree']>, 'path'>
@@ -67,25 +67,25 @@ export interface RepoUiState {
   selectedBranch: string | null
   branchViewMode: BranchViewMode
   /**
-   * Single branch-scoped workspace pane tab strip order. Static view entries
+   * Single branch-scoped workspace pane tab strip order. Static tab entries
    * are the opened static tabs; terminal entries are ordering hints for live
    * terminal sessions, whose lifecycle remains terminal-runtime owned.
    */
   workspacePaneTabOrderByBranch: Record<string, WorkspacePaneTabOrderEntry[]>
-  /** Branch-scoped selected workspace pane view. Branch switches read this
+  /** Branch-scoped selected workspace pane tab. Branch switches read this
    *  first so selecting a tab on one branch does not select it on another. */
-  preferredWorkspacePaneViewByBranch: Record<string, WorkspacePaneView>
+  preferredWorkspacePaneTabByBranch: Record<string, WorkspacePaneTabType>
   /**
    * Per-branch hint about the most recent user-initiated workspace pane tab
    * close. Set by `setLastClosedTabContext` after `runCloseWorkspacePaneTabCommand`
-   * commits. Read by `createBranchWorkspacePaneTabModel` to prefer the spatial
+   * commits. Read by `createRepoWorkspaceTabModel` to prefer the spatial
    * neighbor of the closed tab over the generic tabs[0] fallback when the
-   * preferred view becomes unrenderable, and also when the closed tab was the
+   * preferred tab becomes unrenderable, and also when the closed tab was the
    * active tab so the workspace pane does not jump to a different remaining
    * terminal instead of the adjacent tab. Overwritten by the next close on the
    * same branch.
    *
-   * Runtime-coherent only: not persisted to SessionState and not restored on
+   * Runtime-coherent only: not persisted to WorkspaceSessionState and not restored on
    * relaunch. A fresh session starts with an empty record; the first user
    * close populates it for that branch. Context is cleared by explicit
    * selection/tab-order changes so a stale close hint cannot override later
@@ -100,13 +100,13 @@ export interface RepoUiState {
       previousTabIdentities: readonly string[]
       /** True when the closed tab was the active tab at the moment of close.
        *  The model uses this to prefer the spatial neighbor even if the user's
-       *  preferred view (e.g. terminal) remains renderable via another tab. */
+       *  preferred tab (e.g. terminal) remains renderable via another tab. */
       wasActive?: boolean
     } | null
   >
 }
 
-export interface RepoProjectionMeta {
+interface RepoProjectionMeta {
   source: RepoDataSource
   savedAt: number | null
 }
@@ -118,10 +118,10 @@ export interface RepoRemoteState {
    * from `lifecycle.target` (ready / failed-with-target). The legacy
    * `target?: RemoteRepoTarget` field has been removed in Phase 4 of the
    * remote-repo refactor; new code should call `remoteRepoTarget(repo)`
-   * from `web/stores/repos/helpers.ts` instead of reaching into
+   * from `web/stores/repos/repo-guards.ts` instead of reaching into
    * `repo.remote.target`.
    */
-  lifecycle: RemoteRepoLifecycle | null
+  lifecycle: RemoteRepoConnectionLifecycle | null
   remotes?: string[]
   remoteDetails?: GitRemoteInfo[]
   hasRemotes?: boolean
@@ -130,7 +130,7 @@ export interface RepoRemoteState {
   remoteProviders?: Record<string, BrowserRemoteProvider>
   hasGitHubRemote?: boolean
   /** Sticky connectivity badge for background fetch failures. Unlike
-   *  `resources.fetch.error`, this persists after the operation settles and
+   *  `dataLoads.fetch.error`, this persists after the operation settles and
    *  is cleared by the next successful network operation. */
   fetchFailed: boolean
   /** Last fetch failure message — populated when fetchFailed flips
@@ -140,9 +140,9 @@ export interface RepoRemoteState {
   fetchError: string | null
 }
 
-export type RepoAvailabilityState = { phase: 'available' } | { phase: 'unavailable'; reason: string; checkedAt: number }
+type RepoAvailabilityState = { phase: 'available' } | { phase: 'unavailable'; reason: string; checkedAt: number }
 
-export interface RestorableRepoSnapshot {
+export interface RepoSnapshotCacheEntry {
   savedAt: number
   name: string
   data: Pick<RepoDataState, 'branches' | 'currentBranch'>
@@ -157,7 +157,7 @@ export interface RepoState {
   instanceToken: number
   /** Client-local projection of runtime-coherent repo truth. */
   data: RepoDataState
-  resources: RepoResourcesState
+  dataLoads: RepoDataLoadBundle
   operations: RepoOperationsState
   ui: RepoUiState
   projection: RepoProjectionMeta
@@ -171,29 +171,29 @@ export interface RuntimeCoherentRepoProjectionState {
   repos: Record<string, RepoState>
 }
 
-export interface RestorableRepoCacheState {
+interface RepoSnapshotCacheState {
   /** Warm-start cache used only for restore. This is not runtime-coherent shared state. */
-  restorableRepoCache: Record<string, RestorableRepoSnapshot>
+  repoSnapshotCache: Record<string, RepoSnapshotCacheEntry>
 }
 
 export interface RestorableWorkspaceState {
-  /** Client workspace UI state that is serialized into SessionState for
+  /** Client workspace UI state that is serialized into WorkspaceSessionState for
    *  next-launch restore. This is restorable state, not runtime-coherent
    *  shared state. */
-  /** Open repository order restored from SessionState.openRepos. */
+  /** Open repository order restored from WorkspaceSessionState.openRepoEntries. */
   order: string[]
-  /** Active repository restored from SessionState.activeRepo. */
+  /** Active repository restored from WorkspaceSessionState.activeRepoId. */
   activeId: string | null
-  /** Large-screen Zen Mode restored from SessionState. Compact UI is stronger and always shows one pane at a time. */
+  /** Large-screen Zen Mode restored from WorkspaceSessionState. Compact UI is stronger and always shows one pane at a time. */
   zenMode: boolean
   workspacePaneSize: number
-  /** Per worktree terminal selection restored from SessionState.selectedTerminalByWorktree. */
-  selectedTerminalByWorktree: Record<string, string>
+  /** Per worktree terminal selection restored from WorkspaceSessionState.selectedTerminalSessionByWorktree. */
+  selectedTerminalSessionByWorktree: Record<string, string>
 }
 
 export interface SessionWorkspacePaneRestoreState {
   workspacePaneTabOrderByBranchByRepo: Record<string, Record<string, WorkspacePaneTabOrderEntry[]>>
-  preferredWorkspacePaneViewByBranchByRepo: Record<string, Record<string, WorkspacePaneSessionView>>
+  preferredWorkspacePaneTabByBranchByRepo: Record<string, Record<string, WorkspacePaneSessionTabType>>
 }
 
 export interface RepoSessionHydrationOptions {
@@ -201,18 +201,18 @@ export interface RepoSessionHydrationOptions {
   workspacePaneRestoreState?: SessionWorkspacePaneRestoreState
 }
 
-export interface LocalWorkspaceState {
+interface LocalWorkspaceState {
   /** Client-only workspace UI state that should never be serialized into
-   *  SessionState or treated as restorable workspace state. */
+   *  WorkspaceSessionState or treated as restorable workspace state. */
   /** Hydration flag — true once boot session is restored, so we don't
    *  overwrite the saved session with an empty one before restore. */
   sessionReady: boolean
 }
 
-export interface RestorableWorkspaceActions {
+interface RestorableWorkspaceActions {
   setActive: (id: string) => void
-  applySessionLayoutState: (layout: Pick<SessionState, 'zenMode' | 'workspacePaneSize'>) => void
-  applySessionSelectedTerminalState: (selectedTerminalByWorktree: Record<string, string>) => void
+  applySessionLayoutState: (layout: Pick<WorkspaceSessionState, 'zenMode' | 'workspacePaneSize'>) => void
+  applySessionSelectedTerminalState: (selectedTerminalSessionByWorktree: Record<string, string>) => void
   setZenMode: (enabled: boolean) => void
   toggleZenMode: () => void
   setWorkspacePaneSize: (size: number) => void
@@ -221,7 +221,7 @@ export interface RestorableWorkspaceActions {
   cycleActive: (direction: 1 | -1) => void
 }
 
-export interface RuntimeCoherentRepoProjectionActions {
+interface RuntimeCoherentRepoProjectionActions {
   /** Ensure a repo belongs to the open workspace set without implying
    *  anything about the current active selection. */
   ensureWorkspaceOpen: (path: string | RepoSessionEntry) => Promise<OpenRepoResult>
@@ -234,21 +234,21 @@ export interface RuntimeCoherentRepoProjectionActions {
    * phase — the orchestrator flips to `connecting` and re-runs.
    * Returns the new outcome, or `null` for non-remote ids.
    */
-  retryRemoteRepoLifecycle: (id: string) => Promise<{ ok: boolean; reason?: string } | null>
-  /** Updates the selected branch's workspace pane view type. The store does not project
-   *  against terminal session count, worktree presence, or opened workspace pane views;
+  retryRemoteRepoConnection: (id: string) => Promise<{ ok: boolean; reason?: string } | null>
+  /** Updates the selected branch's workspace pane tab type. The store does not project
+   *  against terminal session count, worktree presence, or opened workspace pane tabs;
    *  the UI resolves the active pane at read time so session restore preserves
    *  branch-scoped user intent. */
-  setWorkspacePaneView: (id: string, tab: WorkspacePaneView) => void
-  openWorkspacePaneStaticView: (id: string, tab: WorkspacePaneStaticViewType, branchName?: string) => void
-  closeWorkspacePaneStaticView: (id: string, tab: WorkspacePaneStaticViewType, branchName?: string) => void
+  setWorkspacePaneTab: (id: string, tab: WorkspacePaneTabType) => void
+  openWorkspacePaneStaticTab: (id: string, tab: WorkspacePaneStaticTabType, branchName?: string) => void
+  closeWorkspacePaneStaticTab: (id: string, tab: WorkspacePaneStaticTabType, branchName?: string) => void
   addWorkspacePaneTerminalTab: (id: string, terminalKey: string, branchName?: string) => void
   addAndFocusWorkspacePaneTerminalTab: (id: string, terminalKey: string, branchName?: string) => void
   removeWorkspacePaneTerminalTab: (id: string, terminalKey: string, branchName?: string) => void
   reorderWorkspacePaneTabs: (id: string, orderedTabs: WorkspacePaneTabOrderEntry[], branchName?: string) => void
   /** Records the most recent user-initiated close on a branch so the
    *  workspace pane tab model can prefer the spatial neighbor of the
-   *  closed tab when the preferred view becomes unrenderable or when the
+   *  closed tab when the preferred tab becomes unrenderable or when the
    *  closed tab was the active tab. The pre-close tab identities carry
    *  enough information for the model to compute the neighbor without the
    *  command imperatively re-selecting anything. */
@@ -276,9 +276,9 @@ export interface RuntimeCoherentRepoProjectionActions {
   syncAndRefresh: (id: string, options?: { token?: number }) => Promise<void>
   setLastResult: (id: string, result: ExecResult, token: number, options?: RepoResultEventOptions) => void
   clearEvents: (id: string, eventIds: number[]) => void
-  hydrateSession: (
-    openRepos: RepoSessionEntry[],
-    activeRepo: string | null,
+  hydrateRepoSession: (
+    openRepoEntries: RepoSessionEntry[],
+    activeRepoId: string | null,
     options?: RepoSessionHydrationOptions,
   ) => Promise<void>
   /** Clear the fetchFailed flag — called by manual fetch success and
@@ -287,7 +287,7 @@ export interface RuntimeCoherentRepoProjectionActions {
   clearFetchFailed: (id: string, token: number) => void
 }
 
-export interface RepoMutationActions {
+interface RepoMutationActions {
   runBranchAction: (
     id: string,
     action: RepoBranchAction,
@@ -302,7 +302,7 @@ export interface RepoMutationActions {
 export interface ReposStore
   extends
     RuntimeCoherentRepoProjectionState,
-    RestorableRepoCacheState,
+    RepoSnapshotCacheState,
     RestorableWorkspaceState,
     LocalWorkspaceState,
     RestorableWorkspaceActions,

@@ -4,8 +4,8 @@
 // client also listens for `(prefers-color-scheme: dark)` changes so
 // OS appearance flips propagate without a server round-trip —
 // Chromium's matchMedia tracks `nativeTheme` in Electron, so this
-// covers both the desktop and plain-browser runtimes. Electron main
-// still projects the server-owned preference into native shell state,
+// covers both the desktop and plain-browser repoOperationSchedulers. Electron main
+// still projects the server-owned preference into native host state,
 // but it is not the business source of truth.
 
 import { create, type StoreApi } from 'zustand'
@@ -67,7 +67,7 @@ function resolveOsTheme(): ResolvedTheme | null {
   // client shares Chromium's media-query implementation with the
   // host process; in a plain browser it tracks the OS via the
   // browser's own plumbing. Either way the listener below covers
-  // both runtimes.
+  // both repoOperationSchedulers.
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return null
   return window.matchMedia(PREFERS_DARK_MEDIA_QUERY).matches ? 'dark' : 'light'
 }
@@ -80,9 +80,7 @@ function resolveOsTheme(): ResolvedTheme | null {
 // re-rendering on no-op writes.
 function commitThemeState(set: ThemeSet, next: ThemeState): void {
   applyHtmlAttrs(next.resolved, next.colorTheme)
-  set((s) =>
-    s.pref === next.pref && s.resolved === next.resolved && s.colorTheme === next.colorTheme ? s : next,
-  )
+  set((s) => (s.pref === next.pref && s.resolved === next.resolved && s.colorTheme === next.colorTheme ? s : next))
 }
 
 // Only auto mode is OS-driven. Explicit 'light' / 'dark' picks pin

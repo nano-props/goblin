@@ -102,18 +102,17 @@ describe('shared terminal validators', () => {
     ).toBeNull()
   })
 
-  test('normalizes targeted slot-closed realtime messages', () => {
+  test('normalizes targeted session-closed realtime messages', () => {
     expect(
       normalizeTerminalSocketServerMessage({
-        type: 'slot-closed',
+        type: 'session-closed',
         ptySessionId: 'pty_session_1_aaaaaaaaa',
         repoRoot: '/repo',
       }),
     ).toEqual({
-      type: 'slot-closed',
+      type: 'session-closed',
       ptySessionId: 'pty_session_1_aaaaaaaaa',
       repoRoot: '/repo',
     })
   })
-
 })

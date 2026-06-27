@@ -1,20 +1,20 @@
 import type { RepoUiState } from '#/web/stores/repos/types.ts'
-import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 
-export function preferredWorkspacePaneViewForBranch(
-  ui: Pick<RepoUiState, 'selectedBranch' | 'preferredWorkspacePaneViewByBranch'>,
+export function preferredWorkspacePaneTabForBranch(
+  ui: Pick<RepoUiState, 'selectedBranch' | 'preferredWorkspacePaneTabByBranch'>,
   branchName: string | null | undefined = ui.selectedBranch,
-): WorkspacePaneView {
-  return branchName ? (ui.preferredWorkspacePaneViewByBranch[branchName] ?? 'status') : 'status'
+): WorkspacePaneTabType {
+  return branchName ? (ui.preferredWorkspacePaneTabByBranch[branchName] ?? 'status') : 'status'
 }
 
-export function preferredWorkspacePaneViewByBranchRecordWith(
-  ui: Pick<RepoUiState, 'preferredWorkspacePaneViewByBranch'>,
+export function preferredWorkspacePaneTabByBranchRecordWith(
+  ui: Pick<RepoUiState, 'preferredWorkspacePaneTabByBranch'>,
   branchName: string,
-  view: WorkspacePaneView,
-): Record<string, WorkspacePaneView> {
+  view: WorkspacePaneTabType,
+): Record<string, WorkspacePaneTabType> {
   return {
-    ...ui.preferredWorkspacePaneViewByBranch,
+    ...ui.preferredWorkspacePaneTabByBranch,
     [branchName]: view,
   }
 }

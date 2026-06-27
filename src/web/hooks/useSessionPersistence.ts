@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react'
-import { persistSessionState } from '#/web/settings-write-paths.ts'
+import { persistWorkspaceSessionState } from '#/web/settings-actions.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { restorableWorkspaceStateFromStore } from '#/web/stores/repos/selector-state.ts'
-import { sessionStateFromRestorableWorkspaceState } from '#/web/restorable-workspace-state.ts'
+import { workspaceSessionStateFromRestorableWorkspaceState } from '#/web/restorable-workspace-state.ts'
 import { sessionLog } from '#/web/logger.ts'
 const SESSION_SAVE_DEBOUNCE_MS = 200
 
@@ -11,7 +11,7 @@ export function useSessionPersistence() {
   const order = useReposStore((s) => s.order)
   const zenMode = useReposStore((s) => s.zenMode)
   const workspacePaneSize = useReposStore((s) => s.workspacePaneSize)
-  const selectedTerminalByWorktree = useReposStore((s) => s.selectedTerminalByWorktree)
+  const selectedTerminalSessionByWorktree = useReposStore((s) => s.selectedTerminalSessionByWorktree)
   const sessionReady = useReposStore((s) => s.sessionReady)
   const repos = useReposStore((s) => s.repos)
   const lastSavedRef = useRef<string | null>(null)
@@ -22,24 +22,24 @@ export function useSessionPersistence() {
     // sessionReady gates this effect so we never overwrite restorable session
     // state with an empty pre-bootstrap workspace.
     if (!sessionReady) return
-    const session = sessionStateFromRestorableWorkspaceState({
+    const session = workspaceSessionStateFromRestorableWorkspaceState({
       repos,
       restorableWorkspaceState: restorableWorkspaceStateFromStore({
         order,
         activeId,
         zenMode,
         workspacePaneSize,
-        selectedTerminalByWorktree,
+        selectedTerminalSessionByWorktree,
       }),
     })
     const serialized = JSON.stringify(session)
     const immediateKey = JSON.stringify({
-      openRepos: session.openRepos,
-      activeRepo: session.activeRepo,
+      openRepoEntries: session.openRepoEntries,
+      activeRepoId: session.activeRepoId,
       zenMode: session.zenMode,
       workspacePaneSize: session.workspacePaneSize,
-      selectedTerminalByWorktree: session.selectedTerminalByWorktree,
-      preferredWorkspacePaneViewByBranchByRepo: session.preferredWorkspacePaneViewByBranchByRepo,
+      selectedTerminalSessionByWorktree: session.selectedTerminalSessionByWorktree,
+      preferredWorkspacePaneTabByBranchByRepo: session.preferredWorkspacePaneTabByBranchByRepo,
       workspacePaneTabOrderByBranchByRepo: session.workspacePaneTabOrderByBranchByRepo,
     })
     const immediate = lastImmediateKeyRef.current !== immediateKey
@@ -47,7 +47,7 @@ export function useSessionPersistence() {
     if (lastSavedRef.current === serialized) return
     const save = () => {
       lastSavedRef.current = serialized
-      void persistSessionState(session).catch((err) => {
+      void persistWorkspaceSessionState(session).catch((err) => {
         lastSavedRef.current = null
         sessionLog.warn('save failed', { err })
       })
@@ -58,13 +58,5 @@ export function useSessionPersistence() {
     }
     const timeout = window.setTimeout(save, SESSION_SAVE_DEBOUNCE_MS)
     return () => window.clearTimeout(timeout)
-  }, [
-    sessionReady,
-    order,
-    activeId,
-    workspacePaneSize,
-    zenMode,
-    selectedTerminalByWorktree,
-    repos,
-  ])
+  }, [sessionReady, order, activeId, workspacePaneSize, zenMode, selectedTerminalSessionByWorktree, repos])
 }

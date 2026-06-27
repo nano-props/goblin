@@ -9,7 +9,7 @@ import type { ClientTerminalBridge } from '#/web/client-bridge-types.ts'
 // Focused unit tests for the AuthorityGate. The gate is the single
 // source of truth for write-side authorization, so its decision
 // branches and ordering contracts are pinned here without booting a
-// full ManagedTerminalSlot.
+// full TerminalSession.
 
 function makeBridge(
   takeoverImpl?: (input: TerminalTakeoverInput) => Promise<TerminalTakeoverResult>,
@@ -41,11 +41,13 @@ interface GateHarness {
   isSessionAlive: ReturnType<typeof vi.fn>
 }
 
-function buildGate(overrides: {
-  takeoverImpl?: (input: TerminalTakeoverInput) => Promise<TerminalTakeoverResult>
-  isSessionAlive?: (ptySessionId: string) => boolean
-  getPtySessionId?: () => string | null
-} = {}): GateHarness {
+function buildGate(
+  overrides: {
+    takeoverImpl?: (input: TerminalTakeoverInput) => Promise<TerminalTakeoverResult>
+    isSessionAlive?: (ptySessionId: string) => boolean
+    getPtySessionId?: () => string | null
+  } = {},
+): GateHarness {
   const bridge = makeBridge(overrides.takeoverImpl)
   const promoted = vi.fn()
   const isSessionAlive = vi.fn(overrides.isSessionAlive ?? (() => true))
@@ -65,7 +67,7 @@ beforeEach(() => {
   // across tests. The real `readOrCreateWebTerminalClientId`
   // reads `window.sessionStorage`, which the global vitest setup
   // already shimmed with an in-memory Storage.
-  window.sessionStorage.setItem('goblin:web-terminal-client-id', 'client_local')
+  window.sessionStorage.setItem('goblin:terminal-client-id', 'client_local')
   vi.clearAllMocks()
 })
 
@@ -117,11 +119,11 @@ describe('AuthorityGate.authorize', () => {
     expect(gate.isController()).toBe(true)
   })
 
-  test('unowned role short-circuits with slot-closed and never touches the bridge', async () => {
+  test('unowned role short-circuits with session-closed and never touches the bridge', async () => {
     const { gate, bridge } = buildGate()
     // role is 'unowned' by default
     const result = await gate.authorize('write')
-    expect(result).toEqual({ kind: 'denied', reason: 'slot-closed' })
+    expect(result).toEqual({ kind: 'denied', reason: 'session-closed' })
     expect(bridge.takeover).not.toHaveBeenCalled()
   })
 
@@ -154,21 +156,21 @@ describe('AuthorityGate.takeover (explicit button path)', () => {
     expect(promoted).toHaveBeenCalledTimes(1)
   })
 
-  test('returns slot-closed when the session id is null', async () => {
+  test('returns session-closed when the session id is null', async () => {
     const { gate, bridge } = buildGate({ getPtySessionId: () => null })
     gate.setRole('viewer')
     const result = await gate.takeover()
-    expect(result).toEqual({ kind: 'denied', reason: 'slot-closed' })
+    expect(result).toEqual({ kind: 'denied', reason: 'session-closed' })
     expect(bridge.takeover).not.toHaveBeenCalled()
   })
 
-  test('returns slot-closed when the session was disposed mid-call', async () => {
+  test('returns session-closed when the session was disposed mid-call', async () => {
     const { gate, bridge, isSessionAlive, promoted } = buildGate({
       isSessionAlive: () => false,
     })
     gate.setRole('viewer')
     const result = await gate.takeover()
-    expect(result).toEqual({ kind: 'denied', reason: 'slot-closed' })
+    expect(result).toEqual({ kind: 'denied', reason: 'session-closed' })
     expect(bridge.takeover).not.toHaveBeenCalled()
     expect(isSessionAlive).toHaveBeenCalledWith('pty_session_1_aaaaaaaaa')
     expect(promoted).not.toHaveBeenCalled()
@@ -277,7 +279,7 @@ describe('AuthorityGate synchronous getPtySessionId + isSessionAlive contract', 
     })
     gate.setRole('viewer')
     const result = await gate.takeover()
-    expect(result).toEqual({ kind: 'denied', reason: 'slot-closed' })
+    expect(result).toEqual({ kind: 'denied', reason: 'session-closed' })
     expect(bridge.takeover).not.toHaveBeenCalled()
   })
 
@@ -322,7 +324,7 @@ describe('AuthorityGate ordering contract', () => {
     expect(gate.isController()).toBe(false)
     const result = await gate.takeover()
     expect(result).toEqual({ kind: 'allowed' })
-    // The takeover contract for callers (e.g. ManagedTerminalSlot
+    // The takeover contract for callers (e.g. TerminalSession
     // uses wasController then runtime.canResize()) requires
     // onPromoted → role='controller' to be observable as soon as
     // the returned promise resolves. Both layers must agree by the
@@ -366,7 +368,7 @@ describe('AuthorityGate single-emit deny log', () => {
     await gate.takeover()
     expect(warnSpy).toHaveBeenCalledWith(
       'authority gate: takeover denied',
-      expect.objectContaining({ reason: 'slot-closed', stage: 'preflight' }),
+      expect.objectContaining({ reason: 'session-closed', stage: 'preflight' }),
     )
     warnSpy.mockRestore()
   })
@@ -378,7 +380,11 @@ describe('AuthorityGate single-emit deny log', () => {
     await gate.takeover()
     expect(warnSpy).toHaveBeenCalledWith(
       'authority gate: takeover denied',
-      expect.objectContaining({ reason: 'slot-closed', stage: 'isSessionAlive', ptySessionId: 'pty_session_1_aaaaaaaaa' }),
+      expect.objectContaining({
+        reason: 'session-closed',
+        stage: 'isSessionAlive',
+        ptySessionId: 'pty_session_1_aaaaaaaaa',
+      }),
     )
     warnSpy.mockRestore()
   })

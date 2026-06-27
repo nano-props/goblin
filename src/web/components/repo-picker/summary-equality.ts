@@ -1,5 +1,9 @@
 import type { RepoPickerRepo } from '#/web/components/repo-picker/types.ts'
-import { isRemoteRepoLifecycleTerminal, type RemoteRepoLifecycle, type RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import {
+  isRemoteRepoConnectionTerminal,
+  type RemoteRepoConnectionLifecycle,
+  type RemoteRepoTarget,
+} from '#/shared/remote-repo.ts'
 
 /**
  * Structural equality for the lifecycle union as it appears on a
@@ -18,7 +22,7 @@ function remoteTargetEqual(a: RemoteRepoTarget, b: RemoteRepoTarget): boolean {
   )
 }
 
-function lifecycleEqual(a: RemoteRepoLifecycle | null, b: RemoteRepoLifecycle | null): boolean {
+function lifecycleEqual(a: RemoteRepoConnectionLifecycle | null, b: RemoteRepoConnectionLifecycle | null): boolean {
   if (a === b) return true
   if (!a || !b) return false
   if (a.kind !== b.kind) return false
@@ -35,7 +39,7 @@ function lifecycleEqual(a: RemoteRepoLifecycle | null, b: RemoteRepoLifecycle | 
     }
     return true
   }
-  return !isRemoteRepoLifecycleTerminal(a) && !isRemoteRepoLifecycleTerminal(b)
+  return !isRemoteRepoConnectionTerminal(a) && !isRemoteRepoConnectionTerminal(b)
 }
 
 export function repoPickerReposEqual(a: RepoPickerRepo[], b: RepoPickerRepo[]): boolean {

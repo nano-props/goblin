@@ -1,5 +1,5 @@
 import { globalShortcut } from 'electron'
-import { activateMainWindow } from '#/main/window.ts'
+import { activatePrimaryWindow } from '#/main/window.ts'
 import { shortcutsNodeLog } from '#/node/logger.ts'
 import { DEFAULT_GLOBAL_SHORTCUT, normalizeGlobalShortcut } from '#/shared/accelerator.ts'
 
@@ -11,7 +11,7 @@ export function syncGlobalShortcuts(disabled: boolean, accelerator = DEFAULT_GLO
   const normalized = normalizeGlobalShortcut(accelerator)
   try {
     const registered = globalShortcut.register(normalized, () => {
-      void activateMainWindow()
+      void activatePrimaryWindow()
     })
     registeredShortcut = registered ? normalized : null
     return registered

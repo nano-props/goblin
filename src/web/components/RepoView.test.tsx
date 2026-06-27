@@ -37,8 +37,8 @@ vi.mock('#/web/components/BranchNavigator.tsx', () => ({
   ),
 }))
 
-vi.mock('#/web/components/BranchWorkspace.tsx', () => ({
-  BranchWorkspace: ({
+vi.mock('#/web/components/RepoWorkspace.tsx', () => ({
+  RepoWorkspace: ({
     selectedBranchName,
     shortcutsEnabled = true,
     toolbarTrafficLightOffset = false,
@@ -48,7 +48,7 @@ vi.mock('#/web/components/BranchWorkspace.tsx', () => ({
     toolbarTrafficLightOffset?: boolean
   }) => (
     <div
-      data-testid="branch-workspace"
+      data-testid="repo-workspace"
       data-selected-branch-name={selectedBranchName ?? ''}
       data-shortcuts-enabled={shortcutsEnabled ? 'true' : 'false'}
       data-traffic-light-offset={toolbarTrafficLightOffset ? 'true' : 'false'}
@@ -79,24 +79,24 @@ vi.mock('#/web/components/Layout.tsx', () => ({
     mode,
     branchNavigatorCollapsed,
     branchNavigatorPane,
-    branchWorkspacePane,
+    repoWorkspacePane,
   }: {
     mode?: 'split' | 'single-pane'
     branchNavigatorCollapsed?: boolean
     branchNavigatorPane: React.ReactNode
-    branchWorkspacePane: React.ReactNode
+    repoWorkspacePane: React.ReactNode
   }) => (
     <div
-      data-testid="repo-workspace"
+      data-testid="repo-workspace-layout"
       data-mode={mode ?? 'split'}
       data-branch-navigator-collapsed={branchNavigatorCollapsed ? 'true' : 'false'}
     >
       {mode === 'single-pane' ? (
-        branchWorkspacePane
+        repoWorkspacePane
       ) : (
         <>
           {branchNavigatorPane}
-          {branchWorkspacePane}
+          {repoWorkspacePane}
         </>
       )}
     </div>
@@ -105,18 +105,18 @@ vi.mock('#/web/components/Layout.tsx', () => ({
   CompactRepoWorkspace: ({
     activePane,
     branchNavigatorPane,
-    branchWorkspacePane,
+    repoWorkspacePane,
   }: {
     activePane: 'navigator' | 'workspace'
     branchNavigatorPane: React.ReactNode
-    branchWorkspacePane: React.ReactNode
+    repoWorkspacePane: React.ReactNode
   }) => (
     <div data-compact-workspace="" data-active-pane={activePane}>
       <div data-compact-workspace-pane="navigator" aria-hidden={activePane === 'workspace' ? 'true' : undefined}>
         {branchNavigatorPane}
       </div>
       <div data-compact-workspace-pane="workspace" aria-hidden={activePane === 'navigator' ? 'true' : undefined}>
-        {branchWorkspacePane}
+        {repoWorkspacePane}
       </div>
     </div>
   ),
@@ -176,7 +176,7 @@ describe('RepoView workspace navigation', () => {
     expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBe('feature/a')
     expect(branchNavigator()).not.toBeNull()
     expect(workspace()?.dataset.mode).toBe('split')
-    expect(branchWorkspace()).not.toBeNull()
+    expect(repoWorkspace()).not.toBeNull()
   })
 
   test('large-screen Zen Mode uses Branch Navigator until a branch opens a collapsed split workspace', () => {
@@ -185,7 +185,7 @@ describe('RepoView workspace navigation', () => {
 
     expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBeNull()
     expect(branchNavigator()).not.toBeNull()
-    expect(branchWorkspace()).toBeNull()
+    expect(repoWorkspace()).toBeNull()
     expect(workspace()).toBeNull()
 
     act(() => {
@@ -196,18 +196,16 @@ describe('RepoView workspace navigation', () => {
     expect(branchNavigator()).not.toBeNull()
     expect(workspace()?.dataset.mode).toBe('split')
     expect(workspace()?.dataset.branchNavigatorCollapsed).toBe('true')
-    expect(branchWorkspace()).not.toBeNull()
-    expect(branchWorkspace()?.dataset.trafficLightOffset).toBe('true')
+    expect(repoWorkspace()).not.toBeNull()
+    expect(repoWorkspace()?.dataset.trafficLightOffset).toBe('true')
     expect(zenModeSidebarTrigger()).not.toBeNull()
     const sidebarTops = [...(container?.querySelectorAll<HTMLElement>('[data-testid="repo-shell-sidebar-top"]') ?? [])]
     expect(sidebarTops.length).toBeGreaterThan(0)
-    const closedRevealTop = zenModeSidebarReveal()?.querySelector<HTMLElement>(
-      '[data-testid="repo-shell-sidebar-top"]',
-    )
+    const closedRevealTop = zenModeSidebarReveal()?.querySelector<HTMLElement>('[data-testid="repo-shell-sidebar-top"]')
     expect(zenModeSidebarReveal()?.dataset.open).toBe('false')
     expect(zenModeSidebarReveal()?.dataset.interactive).toBe('false')
-    expect(closedRevealTop?.dataset.windowChromeRegion).toBeUndefined()
-    expect(closedRevealTop?.querySelector('[data-window-chrome-region="no-drag"]')).toBeNull()
+    expect(closedRevealTop?.dataset.titleBarChromeRegion).toBeUndefined()
+    expect(closedRevealTop?.querySelector('[data-title-bar-chrome-region="no-drag"]')).toBeNull()
   })
 
   test('large-screen collapsed Zen Mode reveals the sidebar on left-edge hover', () => {
@@ -237,9 +235,9 @@ describe('RepoView workspace navigation', () => {
       '[data-testid="repo-shell-sidebar-top"]',
     )
     expect(floatingSidebarTop?.hasAttribute('data-interactive')).toBe(false)
-    expect(floatingSidebarTop?.dataset.windowChromeRegion).toBe('drag')
-    expect(floatingSidebarTop?.querySelector('[data-window-chrome-region="no-drag"]')).toBeNull()
-    expect(zenModeSidebarTrigger()?.dataset.windowChromeRegion).toBe('interactive')
+    expect(floatingSidebarTop?.dataset.titleBarChromeRegion).toBe('drag')
+    expect(floatingSidebarTop?.querySelector('[data-title-bar-chrome-region="no-drag"]')).toBeNull()
+    expect(zenModeSidebarTrigger()?.dataset.titleBarChromeRegion).toBe('interactive')
     expect(zenModeSidebarTrigger()?.tagName).toBe('BUTTON')
   })
 
@@ -251,10 +249,10 @@ describe('RepoView workspace navigation', () => {
     const revealLayer = zenModeSidebarLayer()
     const toggleOverlay = zenModeToggleOverlay()
     expect(zenModeToggleOverlay()?.hasAttribute('data-interactive')).toBe(false)
-    expect(zenModeToggleOverlay()?.dataset.windowChromeRegion).toBeUndefined()
+    expect(zenModeToggleOverlay()?.dataset.titleBarChromeRegion).toBeUndefined()
     expect(zenModeToggleOverlay()?.hasAttribute('data-zen-reveal-surface')).toBe(true)
     expect(zenModeToggleOverlay()?.className).toContain('goblin-zen-reveal-trigger-layer')
-    expect(zenModeToggleOverlay()?.className).not.toContain('window-chrome')
+    expect(zenModeToggleOverlay()?.className).not.toContain('title-bar-chrome')
     expect(zenModeToggleOverlay()?.className).not.toContain('app-drag-region')
     expect(revealLayer).not.toBeNull()
     expect(toggleOverlay).not.toBeNull()
@@ -262,7 +260,7 @@ describe('RepoView workspace navigation', () => {
       Node.DOCUMENT_POSITION_FOLLOWING,
     )
     expect(zenModeSidebarTrigger()?.hasAttribute('data-interactive')).toBe(true)
-    expect(zenModeSidebarTrigger()?.dataset.windowChromeRegion).toBe('interactive')
+    expect(zenModeSidebarTrigger()?.dataset.titleBarChromeRegion).toBe('interactive')
     expect(zenModeSidebarReveal()?.dataset.open).toBe('false')
 
     act(() => {
@@ -272,7 +270,7 @@ describe('RepoView workspace navigation', () => {
     expect(zenModeSidebarReveal()?.dataset.open).toBe('true')
   })
 
-  test('large-screen collapsed Zen Mode keeps the sidebar open across the window-chrome reveal surface', () => {
+  test('large-screen collapsed Zen Mode keeps the sidebar open across the title-bar-chrome reveal surface', () => {
     useReposStore.getState().setZenMode(true)
     useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
     render(<RepoView repoId={REPO_ID} />)
@@ -379,9 +377,7 @@ describe('RepoView workspace navigation', () => {
     expect(zenModeSidebarReveal()?.dataset.open).toBe('true')
 
     act(() => {
-      zenModeSidebarReveal()?.dispatchEvent(
-        new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body }),
-      )
+      zenModeSidebarReveal()?.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body }))
     })
 
     expect(zenModeSidebarReveal()?.dataset.open).toBe('false')
@@ -531,8 +527,8 @@ describe('RepoView workspace navigation', () => {
       const retainedSidebarTop = zenModeSidebarReveal()?.querySelector<HTMLElement>(
         '[data-testid="repo-shell-sidebar-top"]',
       )
-      expect(retainedSidebarTop?.dataset.windowChromeRegion).toBeUndefined()
-      expect(retainedSidebarTop?.querySelector('[data-window-chrome-region="no-drag"]')).toBeNull()
+      expect(retainedSidebarTop?.dataset.titleBarChromeRegion).toBeUndefined()
+      expect(retainedSidebarTop?.querySelector('[data-title-bar-chrome-region="no-drag"]')).toBeNull()
 
       act(() => {
         document.body.dispatchEvent(new PointerEvent('pointermove', { bubbles: true }))
@@ -582,7 +578,7 @@ describe('RepoView workspace navigation', () => {
     }
   })
 
-  test('compact branch activation slides Branch Workspace into the active pane', () => {
+  test('compact branch activation slides Repo Workspace into the active pane', () => {
     responsiveMocks.mode = 'compact'
     render(<RepoView repoId={REPO_ID} />)
 
@@ -601,10 +597,10 @@ describe('RepoView workspace navigation', () => {
     expect(compactWorkspace()?.dataset.activePane).toBe('workspace')
     expect(compactPane('navigator')?.getAttribute('aria-hidden')).toBe('true')
     expect(compactPane('workspace')?.getAttribute('aria-hidden')).toBeNull()
-    expect(branchWorkspace()).not.toBeNull()
+    expect(repoWorkspace()).not.toBeNull()
   })
 
-  test('compact mode derives Branch Workspace from an existing selected branch', () => {
+  test('compact mode derives Repo Workspace from an existing selected branch', () => {
     responsiveMocks.mode = 'compact'
     render(<RepoView repoId={REPO_ID} />)
 
@@ -615,10 +611,10 @@ describe('RepoView workspace navigation', () => {
     expect(compactWorkspace()?.dataset.activePane).toBe('workspace')
     expect(compactPane('navigator')?.getAttribute('aria-hidden')).toBe('true')
     expect(compactPane('workspace')?.getAttribute('aria-hidden')).toBeNull()
-    expect(branchWorkspace()).not.toBeNull()
+    expect(repoWorkspace()).not.toBeNull()
   })
 
-  test('compact back transition keeps the outgoing Branch Workspace content during slide-out', () => {
+  test('compact back transition keeps the outgoing Repo Workspace content during slide-out', () => {
     vi.useFakeTimers()
     try {
       responsiveMocks.mode = 'compact'
@@ -628,8 +624,8 @@ describe('RepoView workspace navigation', () => {
         useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
       })
 
-      expect(branchWorkspace()?.dataset.selectedBranchName).toBe('feature/a')
-      expect(branchWorkspace()?.dataset.shortcutsEnabled).toBe('true')
+      expect(repoWorkspace()?.dataset.selectedBranchName).toBe('feature/a')
+      expect(repoWorkspace()?.dataset.shortcutsEnabled).toBe('true')
 
       act(() => {
         useReposStore.getState().clearSelectedBranch(REPO_ID)
@@ -637,14 +633,14 @@ describe('RepoView workspace navigation', () => {
 
       expect(compactWorkspace()?.dataset.activePane).toBe('navigator')
       expect(compactPane('workspace')?.getAttribute('aria-hidden')).toBe('true')
-      expect(branchWorkspace()?.dataset.selectedBranchName).toBe('feature/a')
-      expect(branchWorkspace()?.dataset.shortcutsEnabled).toBe('false')
+      expect(repoWorkspace()?.dataset.selectedBranchName).toBe('feature/a')
+      expect(repoWorkspace()?.dataset.shortcutsEnabled).toBe('false')
 
       act(() => {
         vi.advanceTimersByTime(WORKSPACE_PANE_TRANSITION_MS)
       })
 
-      expect(branchWorkspace()?.dataset.selectedBranchName).toBe('')
+      expect(repoWorkspace()?.dataset.selectedBranchName).toBe('')
     } finally {
       vi.useRealTimers()
     }
@@ -657,8 +653,8 @@ describe('RepoView workspace navigation', () => {
     expect(workspace()?.dataset.mode).toBe('split')
     expect(container?.querySelector('[data-testid="repo-picker"]')).not.toBeNull()
     expect(container?.querySelector('[data-testid="create-worktree-row-action"]')).not.toBeNull()
-    expect(container?.querySelector('[data-testid="branch-workspace-empty-skeleton"]')).not.toBeNull()
-    expect(container?.querySelector('[data-testid="branch-workspace-skeleton"]')).toBeNull()
+    expect(container?.querySelector('[data-testid="repo-workspace-empty-skeleton"]')).not.toBeNull()
+    expect(container?.querySelector('[data-testid="repo-workspace-skeleton"]')).toBeNull()
     expect(container?.querySelectorAll('[data-testid="branch-navigator-skeleton-action"]')).toHaveLength(6)
   })
 
@@ -697,7 +693,7 @@ describe('RepoView workspace navigation', () => {
     expect(zenModeSidebarReveal()?.dataset.open).toBe('false')
   })
 
-  test('compact initial loading shows the selected Branch Workspace skeleton as the single pane', () => {
+  test('compact initial loading shows the selected Repo Workspace skeleton as the single pane', () => {
     responsiveMocks.mode = 'compact'
     useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
     setSnapshotLoading(REPO_ID)
@@ -705,12 +701,12 @@ describe('RepoView workspace navigation', () => {
     render(<RepoView repoId={REPO_ID} />)
 
     expect(workspace()).toBeNull()
-    expect(container?.querySelector('[data-testid="branch-workspace-skeleton"]')).not.toBeNull()
-    expect(container?.querySelector('[data-testid="branch-workspace-empty-skeleton"]')).toBeNull()
+    expect(container?.querySelector('[data-testid="repo-workspace-skeleton"]')).not.toBeNull()
+    expect(container?.querySelector('[data-testid="repo-workspace-empty-skeleton"]')).toBeNull()
     expect(container?.querySelectorAll('[data-testid="branch-navigator-skeleton-action"]')).toHaveLength(0)
   })
 
-  test('resizing from split large-screen mode to compact shows Branch Workspace when a branch is selected', () => {
+  test('resizing from split large-screen mode to compact shows Repo Workspace when a branch is selected', () => {
     render(<RepoView repoId={REPO_ID} />)
 
     act(() => {
@@ -719,7 +715,7 @@ describe('RepoView workspace navigation', () => {
 
     expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBe('feature/a')
     expect(branchNavigator()).not.toBeNull()
-    expect(branchWorkspace()).not.toBeNull()
+    expect(repoWorkspace()).not.toBeNull()
 
     act(() => {
       responsiveMocks.mode = 'compact'
@@ -729,7 +725,7 @@ describe('RepoView workspace navigation', () => {
     expect(compactWorkspace()?.dataset.activePane).toBe('workspace')
     expect(compactPane('navigator')?.getAttribute('aria-hidden')).toBe('true')
     expect(compactPane('workspace')?.getAttribute('aria-hidden')).toBeNull()
-    expect(branchWorkspace()).not.toBeNull()
+    expect(repoWorkspace()).not.toBeNull()
   })
 })
 
@@ -743,12 +739,12 @@ function branchNavigator(): HTMLButtonElement | null {
   return container?.querySelector<HTMLButtonElement>('[data-testid="branch-navigator"]') ?? null
 }
 
-function branchWorkspace(): HTMLElement | null {
-  return container?.querySelector<HTMLElement>('[data-testid="branch-workspace"]') ?? null
+function repoWorkspace(): HTMLElement | null {
+  return container?.querySelector<HTMLElement>('[data-testid="repo-workspace"]') ?? null
 }
 
 function workspace(): HTMLElement | null {
-  return container?.querySelector<HTMLElement>('[data-testid="repo-workspace"]') ?? null
+  return container?.querySelector<HTMLElement>('[data-testid="repo-workspace-layout"]') ?? null
 }
 
 function compactWorkspace(): HTMLElement | null {
@@ -841,10 +837,10 @@ function setSnapshotLoading(repoId: string) {
     repos: {
       [repoId]: {
         ...repo,
-        resources: {
-          ...repo.resources,
+        dataLoads: {
+          ...repo.dataLoads,
           snapshot: {
-            ...repo.resources.snapshot,
+            ...repo.dataLoads.snapshot,
             phase: 'loading' as const,
             loadedAt: null,
             error: null,

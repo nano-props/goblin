@@ -9,7 +9,12 @@ interface InlineShortcutProps {
   'aria-hidden'?: boolean
 }
 
-export function InlineShortcut({ shortcut, showOnHover = false, className, 'aria-hidden': ariaHidden }: InlineShortcutProps) {
+export function InlineShortcut({
+  shortcut,
+  showOnHover = false,
+  className,
+  'aria-hidden': ariaHidden,
+}: InlineShortcutProps) {
   return (
     <span
       aria-hidden={ariaHidden}

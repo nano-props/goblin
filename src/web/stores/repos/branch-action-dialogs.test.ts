@@ -66,9 +66,7 @@ describe('useBranchActionDialogsStore', () => {
       },
       { isProtectedBranch: true },
     )
-    expect(
-      useBranchActionDialogsStore.getState().checkboxStateByBranch[branchCheckboxKey('repo-1', 'main')],
-    ).toEqual({
+    expect(useBranchActionDialogsStore.getState().checkboxStateByBranch[branchCheckboxKey('repo-1', 'main')]).toEqual({
       removeAlsoDeletes: false,
       removeAlsoUpstream: false,
       deleteAlsoUpstream: false,
@@ -103,10 +101,9 @@ describe('useBranchActionDialogsStore', () => {
 
   test('openForceRemoveWorktreeConfirm closes the regular removeConfirm slot', () => {
     const payload: RemoveWorktreeDialogPayload = { branch: 'feature/x', path: '/tmp/x' }
-    useBranchActionDialogsStore.getState().openRemoveWorktreeConfirm(
-      { repoId: 'repo-1', branchName: 'feature/x', payload },
-      { isProtectedBranch: false },
-    )
+    useBranchActionDialogsStore
+      .getState()
+      .openRemoveWorktreeConfirm({ repoId: 'repo-1', branchName: 'feature/x', payload }, { isProtectedBranch: false })
     expect(useBranchActionDialogsStore.getState().removeConfirm).not.toBeNull()
 
     useBranchActionDialogsStore.getState().openForceRemoveWorktreeConfirm({
@@ -221,14 +218,18 @@ describe('useBranchActionDialogsStore', () => {
   })
 
   test('checkbox state is independent per branch', () => {
-    useBranchActionDialogsStore.getState().openRemoveWorktreeConfirm(
-      { repoId: 'repo-1', branchName: 'feature/a', payload: { branch: 'feature/a', path: '/a' } },
-      { isProtectedBranch: false },
-    )
-    useBranchActionDialogsStore.getState().openRemoveWorktreeConfirm(
-      { repoId: 'repo-1', branchName: 'feature/b', payload: { branch: 'feature/b', path: '/b' } },
-      { isProtectedBranch: false },
-    )
+    useBranchActionDialogsStore
+      .getState()
+      .openRemoveWorktreeConfirm(
+        { repoId: 'repo-1', branchName: 'feature/a', payload: { branch: 'feature/a', path: '/a' } },
+        { isProtectedBranch: false },
+      )
+    useBranchActionDialogsStore
+      .getState()
+      .openRemoveWorktreeConfirm(
+        { repoId: 'repo-1', branchName: 'feature/b', payload: { branch: 'feature/b', path: '/b' } },
+        { isProtectedBranch: false },
+      )
     useBranchActionDialogsStore.getState().setRemoveAlsoUpstream('repo-1', 'feature/a', true)
 
     expect(branchCheckboxesFor(useBranchActionDialogsStore.getState(), 'repo-1', 'feature/a')).toMatchObject({

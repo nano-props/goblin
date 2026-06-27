@@ -8,9 +8,9 @@ import {
   type BranchActionRepo,
   type BranchCopyPatchAction,
 } from '#/web/hooks/branch-action-state.ts'
-import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
-import type { WorkspacePaneBranchViewType, WorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
-import { openWorkspacePaneView } from '#/web/components/branch-workspace/open-workspace-pane-view.ts'
+import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
+import type { WorkspacePaneBranchTabType, WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
+import { openWorkspacePaneTab } from '#/web/components/repo-workspace/open-workspace-pane-tab.ts'
 export interface BranchActionItem {
   id: BranchActionItemId
   label: string
@@ -47,7 +47,7 @@ export function useBranchActionItems(
   branchActions: BranchActions,
 ): BranchActionSurface {
   const t = useT()
-  const navigation = useMainWindowNavigation()
+  const navigation = usePrimaryWindowNavigation()
   const { blocked, busyAction, capabilities, actions } = branchActions
   const disabled = blocked
   const busy = (id: BranchActionItemId) => busyAction === id
@@ -62,8 +62,8 @@ export function useBranchActionItems(
     if (phase === 'queued' && queuedKey) return t(queuedKey)
     return t(loadingKey)
   }
-  const openStaticWorkspacePaneView = (type: WorkspacePaneBranchViewType | WorkspacePaneStaticViewType) => {
-    void openWorkspacePaneView({
+  const openStaticWorkspacePaneTab = (type: WorkspacePaneBranchTabType | WorkspacePaneStaticTabType) => {
+    void openWorkspacePaneTab({
       repoId: repo.id,
       branchName: branch.name,
       worktreePath: branch.worktree?.path,
@@ -108,7 +108,7 @@ export function useBranchActionItems(
       disabled,
       visible: true,
       icon: createElement(GitBranch),
-      onSelect: () => openStaticWorkspacePaneView('status'),
+      onSelect: () => openStaticWorkspacePaneTab('status'),
     },
     {
       id: 'changes',
@@ -116,7 +116,7 @@ export function useBranchActionItems(
       disabled,
       visible: !!branch.worktree?.path,
       icon: createElement(Diff),
-      onSelect: () => openStaticWorkspacePaneView('changes'),
+      onSelect: () => openStaticWorkspacePaneTab('changes'),
     },
     {
       id: 'history',
@@ -124,7 +124,7 @@ export function useBranchActionItems(
       disabled,
       visible: true,
       icon: createElement(History),
-      onSelect: () => openStaticWorkspacePaneView('history'),
+      onSelect: () => openStaticWorkspacePaneTab('history'),
     },
   ]
 

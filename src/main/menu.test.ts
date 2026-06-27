@@ -25,11 +25,11 @@ const mocks = vi.hoisted(() => {
     applyMenuRuntimeState: vi.fn(),
     template,
     win,
-    activateMainWindow: vi.fn(() => Promise.resolve(win)),
+    activatePrimaryWindow: vi.fn(() => Promise.resolve(win)),
     getFocusedWindow: vi.fn((): any => null),
     focusedRegisteredSurface: vi.fn((): any => null),
-    getMainWindow: vi.fn((): any => null),
-    resetMainWindowToDefault: vi.fn(),
+    getPrimaryWindow: vi.fn((): any => null),
+    resetPrimaryWindow: vi.fn(),
     sendClientEffectIntent: vi.fn(),
     buildFromTemplate: vi.fn((nextTemplate: any[]) => {
       template.splice(0, template.length, ...nextTemplate)
@@ -60,12 +60,12 @@ vi.mock('electron', () => ({
 }))
 
 vi.mock('#/main/window.ts', () => ({
-  activateMainWindow: mocks.activateMainWindow,
-  getMainWindow: mocks.getMainWindow,
-  resetMainWindowToDefault: mocks.resetMainWindowToDefault,
+  activatePrimaryWindow: mocks.activatePrimaryWindow,
+  getPrimaryWindow: mocks.getPrimaryWindow,
+  resetPrimaryWindow: mocks.resetPrimaryWindow,
 }))
 
-vi.mock('#/main/window-registry.ts', () => ({
+vi.mock('#/main/client-surface-registry.ts', () => ({
   focusedRegisteredSurface: mocks.focusedRegisteredSurface,
 }))
 
@@ -84,7 +84,7 @@ vi.mock('#/main/client-surface-events.ts', () => ({
   sendClientEffectIntent: mocks.sendClientEffectIntent,
 }))
 
-vi.mock('#/main/window-shell.ts', () => ({
+vi.mock('#/main/window-security.ts', () => ({
   getClientBaseUrl: vi.fn(() => 'http://127.0.0.1:32100'),
   getEmbeddedServerUrl: vi.fn(() => 'http://127.0.0.1:32100'),
 }))
@@ -107,39 +107,39 @@ describe('app menu actions', () => {
     mocks.template.length = 0
     mocks.appGetPath.mockImplementation((name: string) => (name === 'home' ? '/home/user' : '/data'))
     mocks.readMenuRuntimeState.mockReturnValue(defaultMenuRuntimeState())
-    mocks.getMainWindow.mockReturnValue(null)
+    mocks.getPrimaryWindow.mockReturnValue(null)
     mocks.getFocusedWindow.mockReturnValue(null)
     mocks.focusedRegisteredSurface.mockReturnValue(null)
-    mocks.activateMainWindow.mockResolvedValue(mocks.win)
+    mocks.activatePrimaryWindow.mockResolvedValue(mocks.win)
     const { platform } = await import('#/main/platform.ts')
     vi.spyOn(platform, 'isMacOS').mockReturnValue(true)
   })
 
-  test('activates the main window before sending an action when no window exists', async () => {
+  test('activates the primary window before sending an action when no window exists', async () => {
     const { buildAppMenu } = await import('#/main/menu.ts')
     buildAppMenu()
 
     clickMenuItem('menu.file', 'menu.file.open-local-repo')
     await Promise.resolve()
 
-    expect(mocks.activateMainWindow).toHaveBeenCalledTimes(1)
+    expect(mocks.activatePrimaryWindow).toHaveBeenCalledTimes(1)
     expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, { type: 'open-repo-requested' })
   })
 
-  test('reuses an existing main window for menu actions', async () => {
-    mocks.getMainWindow.mockReturnValue(mocks.win)
+  test('reuses an existing primary window for menu actions', async () => {
+    mocks.getPrimaryWindow.mockReturnValue(mocks.win)
     const { buildAppMenu } = await import('#/main/menu.ts')
     buildAppMenu()
 
     clickMenuItem('menu.file', 'menu.file.open-local-repo')
     await Promise.resolve()
 
-    expect(mocks.activateMainWindow).not.toHaveBeenCalled()
+    expect(mocks.activatePrimaryWindow).not.toHaveBeenCalled()
     expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, { type: 'open-repo-requested' })
   })
 
   test('sends the path dialog action from the file menu', async () => {
-    mocks.getMainWindow.mockReturnValue(mocks.win)
+    mocks.getPrimaryWindow.mockReturnValue(mocks.win)
     const { buildAppMenu } = await import('#/main/menu.ts')
     buildAppMenu()
 
@@ -364,15 +364,15 @@ describe('app menu actions', () => {
     ])
   })
 
-  test('reset layout resets the main window and dispatches the layout reset intent', async () => {
-    mocks.getMainWindow.mockReturnValue(mocks.win)
+  test('reset layout resets the primary window and dispatches the layout reset intent', async () => {
+    mocks.getPrimaryWindow.mockReturnValue(mocks.win)
     const { buildAppMenu } = await import('#/main/menu.ts')
     buildAppMenu()
 
     clickMenuItem('menu.window', 'menu.window.reset-window')
     await Promise.resolve()
 
-    expect(mocks.resetMainWindowToDefault).toHaveBeenCalledTimes(1)
+    expect(mocks.resetPrimaryWindow).toHaveBeenCalledTimes(1)
     expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, {
       type: 'layout-reset-requested',
     })

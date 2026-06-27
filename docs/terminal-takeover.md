@@ -10,11 +10,11 @@ has to decide, at every moment, **which window is allowed to type**.
 The answer to that question is what this document is about.
 
 This is a principles-level document. It does not describe fields,
-methods, timers, or flags. It describes the *shape* of the answer
-and the *constraints* the answer has to respect. Implementation
+methods, timers, or flags. It describes the _shape_ of the answer
+and the _constraints_ the answer has to respect. Implementation
 lives in `src/server/terminal/terminal-controller.ts`,
 `src/web/components/terminal/authority-gate.ts`, and the
-`ManagedTerminalSlot` glue.
+`TerminalSession` glue.
 
 ## The product premise
 
@@ -36,8 +36,8 @@ intent to win**, without ceremony.
 ## What "control" means
 
 A terminal session in Goblin has one writer at a time. Exactly one
-window is *the controller* — the one whose keystrokes reach the
-shell. All other windows are *viewers*: they see the same screen,
+window is _the controller_ — the one whose keystrokes reach the
+shell. All other windows are _viewers_: they see the same screen,
 they read the same output, but their input is dropped at the
 boundary.
 
@@ -59,15 +59,15 @@ following all mean the same thing:
 - I just opened this terminal on another device.
 - I just clicked 接管 because the cursor was stuck elsewhere.
 
-Each of those is a clear signal that the user wants *this window*
+Each of those is a clear signal that the user wants _this window_
 to be the one in control. The system must honor that signal
 without requiring the user to first close the previous window.
 
 Crucially, the system has no business distinguishing "another
 device of mine" from "another tab of mine" from "another Electron
 window of mine". They're all the same user. The boundary that
-matters is *write intent just happened*, not *what kind of
-attachment produced that intent*.
+matters is _write intent just happened_, not _what kind of
+attachment produced that intent_.
 
 ## The button, demoted
 
@@ -84,7 +84,7 @@ The main path is:
    touched the session before and grants control.
 3. Window is now the controller.
 4. User types. Keystrokes flow through the local gate.
-5. If the window is a *viewer* (some sibling window is currently
+5. If the window is a _viewer_ (some sibling window is currently
    the controller), the gate promotes it before the keystroke
    reaches the server. The user sees no interruption — they
    typed, the keystroke arrived.
@@ -98,7 +98,7 @@ The server remembers, for the lifetime of a session, that **this
 user has touched this session**. That single bit of sticky
 memory is what makes the roam scenarios work:
 
-- User closes the controller window. The controller slot is
+- User closes the controller window. The controller role is
   cleared at once.
 - User opens a new window elsewhere, attached to the same session.
 - The server sees: "user has been here before, no live
@@ -126,7 +126,7 @@ impose a richer contract than the OS provides.
 
 When a window's network briefly drops and comes back to the same
 attachment, the user perceives no interruption: the new attach is
-recognized as a continuation of the same window, the slot is
+recognized as a continuation of the same window, the controller role is
 cleared on disconnect, and the reattach re-claims through the
 user-sticky path. Because the reconnect and the reclaim happen
 back-to-back, the user sees their next keystroke flow as expected.
@@ -137,19 +137,19 @@ survives a socket-level reconnect within the same window**, and
 The two-tier identity means the model can tell "same window, brief
 network issue" apart from "different window, deliberate switch".
 
-## When the original controller is *not* the next to arrive
+## When the original controller is _not_ the next to arrive
 
 The same-window reconnect is the friendly case. The less-friendly
 case is a small but real race:
 
 1. Window A is the controller.
-2. A's network drops. The server clears the controller slot on
+2. A's network drops. The server clears the controller role on
    the same event (no grace period).
 3. Window B — a sibling tab, an Electron window on another
    machine, anything the user opened while A was away — attaches
-   first. B auto-claims because the slot is empty and the user
+   first. B auto-claims because no controller is present and the user
    has touched this session before.
-4. A's network comes back. A reconnects, but the slot is held by
+4. A's network comes back. A reconnects, but the controller role is held by
    B. A is now a viewer.
 
 This is intentional. The "most recent write intent wins" rule
@@ -174,7 +174,7 @@ A controller's process can die (laptop sleep, OS kill, NIC
 stuck) while the OS keeps the underlying TCP socket in
 `ESTABLISHED` for minutes or hours. Without intervention the
 server would still believe that `(userId, clientId)` is
-connected, the slot's controller would stay pinned to the
+connected, the controller role's controller would stay pinned to the
 dead client, and every sibling viewer would be stranded in
 viewer mode with no path to auto-claim.
 
@@ -189,7 +189,7 @@ A per-`clientId` heartbeat closes this gap:
   every `HEARTBEAT_INTERVAL_MS`. A `(userId, clientId)` whose
   last beat is older than `HEARTBEAT_DEADLINE_MS` (90 s, i.e.
   3 missed beats) gets a synthetic `onClientDisconnected`,
-  which clears the slot's controller slot and emits
+  which clears the controller role's controller role and emits
   `controller: null` to every sibling.
 - The next `attach` from any sibling (or from a freshly
   reconnected A) takes the auto-claim path — same as the
@@ -205,7 +205,7 @@ broker cannot drift out of sync.
 ## Known behavior: self-reconnect mid-flight
 
 The friendly reconnect case has one observable wrinkle. When A's
-socket drops, the server clears the slot and emits a
+socket drops, the server clears the controller role and emits a
 `controller: null` event. When A's socket comes back, the
 server re-emits `controller: A` after the auto-claim. Between
 those two events — typically a few milliseconds — A's client
@@ -213,7 +213,7 @@ sees its cached role transition from `controller` to `unowned`
 (per the realtime `identity` event carrying `controller: null`)
 and back to `controller`.
 
-A's `ManagedTerminalSlot` reacts to the `unowned` event in
+A's `TerminalSession` reacts to the `unowned` event in
 `handleIdentity` by calling `start()` immediately if the view
 is connected, so the next identity event (carrying `controller:
 A`) lands while the auto-attach round-trip is already in
@@ -223,9 +223,9 @@ the microtask queue rather than the round-trip.
 
 If the user types **during** the `unowned` window, the gate's
 `authorize('write')` returns `{ kind: 'denied', reason:
-'slot-closed' }` — the gate deliberately distinguishes `unowned`
-from `viewer` so it does not auto-promote a write against a slot
-the server has just cleared. The keystroke is dropped at the
+'session-closed' }` — the gate deliberately distinguishes `unowned`
+from `viewer` so it does not auto-promote a write against a session
+whose controller role the server has just cleared. The keystroke is dropped at the
 gate. (Pre-PR, the gate collapsed `unowned` to `viewer` and
 auto-promoted, which caused the spurious takeover round-trip
 this PR's identity/lifecycle split fixes.) Once the second
@@ -282,7 +282,7 @@ protects the user's mental model, not their secrets.
   they take over via the button).
 - If a design decision is "should the user see a 'takeover
   required' modal", the answer is: only when the takeover button
-  is the *only* way to make progress. In normal use it is not.
+  is the _only_ way to make progress. In normal use it is not.
 - If a design decision is "does this distinguish between user
   devices", the answer is no. Two devices of the same user are
   one user.
@@ -291,5 +291,5 @@ protects the user's mental model, not their secrets.
 
 - `terminal.md` — the terminal system overall.
 - `terminal-target-model.md` — target attachment shape and roles.
-- `terminal-slot-lifecycle.md` — session birth, lifetime, close.
+- `terminal-session-lifecycle.md` — session birth, lifetime, close.
 - `terminal-roadmap.md` — where this model sits in the refactor plan.

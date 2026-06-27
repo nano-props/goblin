@@ -13,10 +13,10 @@ import type {
   TerminalOutputEvent,
   TerminalResizeInput,
   TerminalRestartInput,
-  TerminalSlotSnapshot,
-  TerminalSlotSnapshotInput,
-  TerminalSlotSummary,
-  TerminalSlotInput,
+  TerminalSessionSnapshot,
+  TerminalSessionSnapshotInput,
+  TerminalSessionSummary,
+  TerminalSessionInput,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
   TerminalTitleEvent,
@@ -30,10 +30,10 @@ export interface ClientTerminalBridge {
   write: (input: TerminalWriteInput) => Promise<TerminalMutationResult>
   resize: (input: TerminalResizeInput) => Promise<TerminalMutationResult>
   takeover: (input: TerminalTakeoverInput) => Promise<TerminalTakeoverResult>
-  close: (input: TerminalSlotInput) => Promise<TerminalMutationResult>
+  close: (input: TerminalSessionInput) => Promise<TerminalMutationResult>
   create: (input: TerminalCreateInput) => Promise<TerminalCatalogMutationResult>
   pruneTerminals: (repoRoot: string) => Promise<{ pruned: number; remaining: number }>
-  listSessions: (input: { repoRoot: string }) => Promise<TerminalSlotSummary[]>
+  listSessions: (input: { repoRoot: string }) => Promise<TerminalSessionSummary[]>
   /**
    * Open the underlying WebSocket (if not already open) and resolve
    * once it reaches the OPEN state. Used as a T1.2 prewarm when the
@@ -53,7 +53,7 @@ export interface ClientTerminalBridge {
    * already healthy. Never force-closes a working socket.
    */
   kickReconnect: () => void
-  getSlotSnapshot: (input: TerminalSlotSnapshotInput) => Promise<TerminalSlotSnapshot | null>
+  getSessionSnapshot: (input: TerminalSessionSnapshotInput) => Promise<TerminalSessionSnapshot | null>
   notifyBell: (input: TerminalNotifyBellInput) => Promise<TerminalMutationResult>
   sendTestNotification: () => Promise<boolean>
   setBadge: (count: number) => void
@@ -66,16 +66,16 @@ export interface ClientTerminalBridge {
   /**
    * Subscribe to per-session close broadcasts from the server. Emitted
    * after a successful `close` IPC alongside the broader
-   * `sessions-changed` event. The `TerminalSlotRegistry` uses this
+   * `sessions-changed` event. The `TerminalSessionProjection` uses this
    * to drop a stale local entry immediately, without waiting for the
    * next reconcile — the critical fix for the "open new terminal and
    * see the previous shell's `Restored session: …` line print twice"
    * bug, where a lost close request left the server PTY alive.
    */
-  onSlotClosed: (cb: (event: { ptySessionId: string; repoRoot: string }) => void) => () => void
+  onSessionClosed: (cb: (event: { ptySessionId: string; repoRoot: string }) => void) => () => void
 }
 
-export interface ClientShellBridge {
+export interface ClientHostBridge {
   openSettingsWindow: (input?: { page?: SettingsPage }) => Promise<boolean>
   openExternalUrl: (input: { url: string; allowHttp?: boolean }) => Promise<ExecResult>
   openDirectoryDialog: (input?: { title?: string }) => Promise<string | null>
@@ -110,6 +110,6 @@ export interface ClientBridge {
    * gates the rotation button on `kind() === 'electron'`.
    */
   rotateAccessToken?(): Promise<{ accessToken: string }>
-  shell(): ClientShellBridge | null
+  host(): ClientHostBridge | null
   terminal(): ClientTerminalBridge
 }

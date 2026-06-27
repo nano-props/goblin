@@ -36,10 +36,7 @@ function isClientBootstrapSnapshot(value: unknown): value is ClientBootstrapSnap
   // keep working without having to fill in both surfaces. The
   // `getBootstrap()` reader in `client-bridge.ts` substitutes a
   // sensible default when the field is missing.
-  return (
-    (candidate.runtime === undefined || isClientRuntimeSnapshot(candidate.runtime)) &&
-    'initialServer' in candidate
-  )
+  return (candidate.runtime === undefined || isClientRuntimeSnapshot(candidate.runtime)) && 'initialServer' in candidate
 }
 
 function normalizeServerUrl(value: string | null | undefined): string | null {

@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { latestRepoSyncTime } from '#/web/stores/repos/sync-time.ts'
 import { repoPickerReposEqual } from '#/web/components/repo-picker/summary-equality.ts'
 import type { RepoPickerRepo } from '#/web/components/repo-picker/types.ts'
-import { emptyRepo } from '#/web/stores/repos/helpers.ts'
+import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 
 describe('repoPickerReposEqual', () => {
   test('treats remote lifecycle target changes as unequal even when repo id stays the same', () => {
@@ -121,16 +121,16 @@ describe('repoPickerReposEqual', () => {
   test('does not treat warm cache snapshot time as a sync time', () => {
     const repo = emptyRepo('/tmp/repo', 'repo')
     repo.projection = { source: 'cache', savedAt: 2_000 }
-    repo.resources.snapshot.loadedAt = 2_000
+    repo.dataLoads.snapshot.loadedAt = 2_000
 
     expect(latestRepoSyncTime(repo)).toBeNull()
   })
 
-  test('uses fresh snapshot and fetch resource times as sync candidates', () => {
+  test('uses fresh snapshot and fetch data-load times as sync candidates', () => {
     const repo = emptyRepo('/tmp/repo', 'repo')
     repo.projection = { source: 'fresh', savedAt: null }
-    repo.resources.snapshot.loadedAt = 2_000
-    repo.resources.fetch.loadedAt = 3_000
+    repo.dataLoads.snapshot.loadedAt = 2_000
+    repo.dataLoads.fetch.loadedAt = 3_000
 
     expect(latestRepoSyncTime(repo)).toBe(3_000)
   })

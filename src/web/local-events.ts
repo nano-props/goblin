@@ -8,13 +8,11 @@ type Listener = (event: ClientLocalEvent) => void
 
 const listeners = new Set<Listener>()
 
-export function emitClientLocalEvent<TType extends ClientLocalEventType>(
-  event: ClientLocalEventMap[TType],
-): void {
+export function emitClientLocalEvent<TType extends ClientLocalEventType>(event: ClientLocalEventMap[TType]): void {
   for (const listener of listeners) listener(event)
 }
 
-export function onClientLocalEvent(cb: (event: ClientLocalEvent) => void): () => void {
+function onClientLocalEvent(cb: (event: ClientLocalEvent) => void): () => void {
   listeners.add(cb)
   return () => {
     listeners.delete(cb)

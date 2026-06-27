@@ -1,28 +1,28 @@
-import type { SessionState } from '#/shared/api-types.ts'
+import type { WorkspaceSessionState } from '#/shared/api-types.ts'
 import type { RestorableWorkspaceState, ReposStore } from '#/web/stores/repos/types.ts'
 import { persistedOpenWorkspaceEntries } from '#/web/open-workspace-state.ts'
 import {
   persistedActiveRepoIdForSession,
   persistedWorkspacePaneTabOrderByBranchByRepoForSession,
   persistedSelectedTerminalByWorktreeForSession,
-  persistedPreferredWorkspacePaneViewByBranchByRepoForSession,
+  persistedPreferredWorkspacePaneTabByBranchByRepoForSession,
 } from '#/web/session-persistence-state.ts'
 
-export function sessionStateFromRestorableWorkspaceState(input: {
+export function workspaceSessionStateFromRestorableWorkspaceState(input: {
   repos: ReposStore['repos']
   restorableWorkspaceState: RestorableWorkspaceState
-}): SessionState {
+}): WorkspaceSessionState {
   const { repos, restorableWorkspaceState } = input
   return {
-    openRepos: persistedOpenWorkspaceEntries(restorableWorkspaceState.order, repos),
-    activeRepo: persistedActiveRepoIdForSession(restorableWorkspaceState.activeId),
+    openRepoEntries: persistedOpenWorkspaceEntries(restorableWorkspaceState.order, repos),
+    activeRepoId: persistedActiveRepoIdForSession(restorableWorkspaceState.activeId),
     zenMode: restorableWorkspaceState.zenMode,
     workspacePaneSize: restorableWorkspaceState.workspacePaneSize,
-    selectedTerminalByWorktree: persistedSelectedTerminalByWorktreeForSession(
-      restorableWorkspaceState.selectedTerminalByWorktree,
+    selectedTerminalSessionByWorktree: persistedSelectedTerminalByWorktreeForSession(
+      restorableWorkspaceState.selectedTerminalSessionByWorktree,
       repos,
     ),
-    preferredWorkspacePaneViewByBranchByRepo: persistedPreferredWorkspacePaneViewByBranchByRepoForSession(
+    preferredWorkspacePaneTabByBranchByRepo: persistedPreferredWorkspacePaneTabByBranchByRepoForSession(
       repos,
       restorableWorkspaceState.order,
     ),
@@ -33,28 +33,27 @@ export function sessionStateFromRestorableWorkspaceState(input: {
   }
 }
 
-/** Restores only the restorable workspace UI projection from SessionState.
- *  It intentionally does not establish a live binding back to SessionState;
+/** Restores only the restorable workspace UI projection from WorkspaceSessionState.
+ *  It intentionally does not establish a live binding back to WorkspaceSessionState;
  *  subsequent updates flow through useSessionPersistence. */
-interface RestoredWorkspaceStateFromSession
-  extends Pick<
-    RestorableWorkspaceState,
-    'activeId' | 'zenMode' | 'workspacePaneSize' | 'selectedTerminalByWorktree'
-  > {
-  preferredWorkspacePaneViewByBranchByRepo: NonNullable<SessionState['preferredWorkspacePaneViewByBranchByRepo']>
-  workspacePaneTabOrderByBranchByRepo: SessionState['workspacePaneTabOrderByBranchByRepo']
+interface RestoredWorkspaceStateFromSession extends Pick<
+  RestorableWorkspaceState,
+  'activeId' | 'zenMode' | 'workspacePaneSize' | 'selectedTerminalSessionByWorktree'
+> {
+  preferredWorkspacePaneTabByBranchByRepo: NonNullable<WorkspaceSessionState['preferredWorkspacePaneTabByBranchByRepo']>
+  workspacePaneTabOrderByBranchByRepo: WorkspaceSessionState['workspacePaneTabOrderByBranchByRepo']
 }
 
 export function restoreRestorableWorkspaceStateFromSession(
-  session: SessionState,
-  activeId: string | null = session.activeRepo,
+  session: WorkspaceSessionState,
+  activeId: string | null = session.activeRepoId,
 ): RestoredWorkspaceStateFromSession {
   return {
     activeId,
     zenMode: session.zenMode,
     workspacePaneSize: session.workspacePaneSize,
-    selectedTerminalByWorktree: session.selectedTerminalByWorktree ?? {},
-    preferredWorkspacePaneViewByBranchByRepo: session.preferredWorkspacePaneViewByBranchByRepo ?? {},
+    selectedTerminalSessionByWorktree: session.selectedTerminalSessionByWorktree ?? {},
+    preferredWorkspacePaneTabByBranchByRepo: session.preferredWorkspacePaneTabByBranchByRepo ?? {},
     workspacePaneTabOrderByBranchByRepo: session.workspacePaneTabOrderByBranchByRepo ?? {},
   }
 }

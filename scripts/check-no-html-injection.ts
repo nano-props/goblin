@@ -50,7 +50,11 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 
 const repoRoot = path.resolve(import.meta.dirname, '..')
-const searchRoots = [path.join(repoRoot, 'src', 'server'), path.join(repoRoot, 'src', 'main'), path.join(repoRoot, 'src', 'shared')]
+const searchRoots = [
+  path.join(repoRoot, 'src', 'server'),
+  path.join(repoRoot, 'src', 'main'),
+  path.join(repoRoot, 'src', 'shared'),
+]
 
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.cjs', '.mjs'])
 const TEST_FILE_RE = /\.(test|spec)\.(ts|tsx|js|cjs|mjs)$/
@@ -126,7 +130,7 @@ const RULES: Rule[] = [
   },
   // Env vars whose only purpose was to gate the HTML inlining.
   // `GOBLIN_HOME_DIR` / `GOBLIN_PLATFORM` are still set in the
-  // main process spawn-env (legacy compat, harmless) but the
+  // native host spawn-env (legacy compat, harmless) but the
   // server must not read them — that would mean the bootstrap is
   // being populated server-side.
   {

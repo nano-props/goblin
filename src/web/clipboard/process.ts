@@ -8,7 +8,7 @@ import { resolvePastedFiles, type PasteResolution } from '#/web/clipboard/resolv
 
 /**
  * Pure helpers that decide what a `paste` event should do, given
- * just the relevant clipboard fields. The `TerminalSlot` handler is
+ * just the relevant clipboard fields. The `TerminalSessionView` handler is
  * a thin wrapper that reads `clipboardData` synchronously and routes
  * to one of three branches:
  *
@@ -21,8 +21,8 @@ import { resolvePastedFiles, type PasteResolution } from '#/web/clipboard/resolv
  * - **too-large branch**: stop the event, toast
  *   `terminal.paste-file-too-large`, return.
  *
- * `previewPaste` is **synchronous** and side-effect free. The slot
- * handler calls it in the capture-phase listener so it can call
+ * `previewPaste` is **synchronous** and side-effect free. The
+ * `TerminalSessionView` handler calls it in the capture-phase listener so it can call
  * `event.preventDefault()` and `event.stopPropagation()` *before* the
  * event reaches xterm.js's descendant textarea listener — awaiting
  * a Promise first would let xterm.js fire and write the text to PTY

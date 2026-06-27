@@ -73,9 +73,7 @@ export function createAuthRoutes({ accessToken }: AuthRouteOptions): Hono {
   // token without reading the server log. Always auth-gated; the
   // token is the only thing that authenticates, so the only callers
   // are callers who already have it.
-  app.get('/access-token', createAccessTokenMiddleware(accessToken), (c) =>
-    c.json({ accessToken }),
-  )
+  app.get('/access-token', createAccessTokenMiddleware(accessToken), (c) => c.json({ accessToken }))
 
   return app
 }

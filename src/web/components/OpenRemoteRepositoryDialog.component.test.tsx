@@ -5,7 +5,10 @@ import type { ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { OpenRemoteRepositoryDialog } from '#/web/components/OpenRemoteRepositoryDialog.tsx'
-import { MainWindowNavigationProvider, type MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
+import {
+  PrimaryWindowNavigationProvider,
+  type PrimaryWindowNavigationActions,
+} from '#/web/primary-window-navigation.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -45,7 +48,7 @@ beforeEach(() => {
           json: async () => ({ target: { ...target, alias: body.alias, remotePath: body.remotePath } }),
         }
       }
-      if (url.pathname === '/api/remote/test-repository') {
+      if (url.pathname === '/api/remote/test-repo') {
         return { ok: true, json: async () => ({ ok: true, target: body.target, stages: [] }) }
       }
       if (url.pathname === '/api/remote/path-suggestions') {
@@ -94,9 +97,9 @@ afterEach(() => {
 describe('OpenRemoteRepositoryDialog', () => {
   test('keeps the remote status row mounted before running a connection test', async () => {
     render(
-      <MainWindowNavigationProvider value={navigationWith({})}>
+      <PrimaryWindowNavigationProvider value={navigationWith({})}>
         <OpenRemoteRepositoryDialog open onOpenChange={vi.fn()} />
-      </MainWindowNavigationProvider>,
+      </PrimaryWindowNavigationProvider>,
     )
     await flush()
 
@@ -105,9 +108,9 @@ describe('OpenRemoteRepositoryDialog', () => {
 
   test('renders a minimal remote status row in the initial state', async () => {
     render(
-      <MainWindowNavigationProvider value={navigationWith({})}>
+      <PrimaryWindowNavigationProvider value={navigationWith({})}>
         <OpenRemoteRepositoryDialog open onOpenChange={vi.fn()} />
-      </MainWindowNavigationProvider>,
+      </PrimaryWindowNavigationProvider>,
     )
     await flush()
 
@@ -119,9 +122,9 @@ describe('OpenRemoteRepositoryDialog', () => {
 
   test('updates typed values in the host and path inputs', async () => {
     render(
-      <MainWindowNavigationProvider value={navigationWith({})}>
+      <PrimaryWindowNavigationProvider value={navigationWith({})}>
         <OpenRemoteRepositoryDialog open onOpenChange={vi.fn()} />
-      </MainWindowNavigationProvider>,
+      </PrimaryWindowNavigationProvider>,
     )
     await flush()
 
@@ -151,7 +154,7 @@ describe('OpenRemoteRepositoryDialog', () => {
             }),
           }
         }
-        if (url.pathname === '/api/remote/test-repository') {
+        if (url.pathname === '/api/remote/test-repo') {
           return { ok: true, json: async () => ({ ok: true, target: body.target, stages: [] }) }
         }
         if (url.pathname === '/api/remote/path-suggestions') {
@@ -162,9 +165,9 @@ describe('OpenRemoteRepositoryDialog', () => {
     )
 
     render(
-      <MainWindowNavigationProvider value={navigationWith({})}>
+      <PrimaryWindowNavigationProvider value={navigationWith({})}>
         <OpenRemoteRepositoryDialog open onOpenChange={vi.fn()} />
-      </MainWindowNavigationProvider>,
+      </PrimaryWindowNavigationProvider>,
     )
     await flush()
 
@@ -193,7 +196,7 @@ describe('OpenRemoteRepositoryDialog', () => {
             json: async () => ({ target: { ...target, alias: body.alias, remotePath: body.remotePath } }),
           }
         }
-        if (url.pathname === '/api/remote/test-repository') {
+        if (url.pathname === '/api/remote/test-repo') {
           return {
             ok: true,
             json: () =>
@@ -210,9 +213,9 @@ describe('OpenRemoteRepositoryDialog', () => {
     )
 
     render(
-      <MainWindowNavigationProvider value={navigationWith({})}>
+      <PrimaryWindowNavigationProvider value={navigationWith({})}>
         <OpenRemoteRepositoryDialog open onOpenChange={vi.fn()} />
-      </MainWindowNavigationProvider>,
+      </PrimaryWindowNavigationProvider>,
     )
     await flush()
 
@@ -243,7 +246,7 @@ describe('OpenRemoteRepositoryDialog', () => {
             json: async () => ({ target: { ...target, alias: body.alias, remotePath: body.remotePath } }),
           }
         }
-        if (url.pathname === '/api/remote/test-repository') {
+        if (url.pathname === '/api/remote/test-repo') {
           return {
             ok: true,
             json: async () => ({
@@ -264,9 +267,9 @@ describe('OpenRemoteRepositoryDialog', () => {
     )
 
     render(
-      <MainWindowNavigationProvider value={navigationWith({})}>
+      <PrimaryWindowNavigationProvider value={navigationWith({})}>
         <OpenRemoteRepositoryDialog open onOpenChange={vi.fn()} />
-      </MainWindowNavigationProvider>,
+      </PrimaryWindowNavigationProvider>,
     )
     await flush()
 
@@ -300,7 +303,7 @@ describe('OpenRemoteRepositoryDialog', () => {
             json: async () => ({ target: { ...target, alias: body.alias, remotePath: body.remotePath } }),
           }
         }
-        if (url.pathname === '/api/remote/test-repository') {
+        if (url.pathname === '/api/remote/test-repo') {
           return { ok: true, json: async () => ({ ok: true, target: body.target, stages: [] }) }
         }
         if (url.pathname === '/api/remote/path-suggestions') {
@@ -311,9 +314,9 @@ describe('OpenRemoteRepositoryDialog', () => {
     )
 
     render(
-      <MainWindowNavigationProvider value={navigationWith({})}>
+      <PrimaryWindowNavigationProvider value={navigationWith({})}>
         <OpenRemoteRepositoryDialog open onOpenChange={vi.fn()} />
-      </MainWindowNavigationProvider>,
+      </PrimaryWindowNavigationProvider>,
     )
     await flush()
 
@@ -323,9 +326,9 @@ describe('OpenRemoteRepositoryDialog', () => {
 
   test('keeps the empty remote path in a neutral state until the user types an invalid path', async () => {
     render(
-      <MainWindowNavigationProvider value={navigationWith({})}>
+      <PrimaryWindowNavigationProvider value={navigationWith({})}>
         <OpenRemoteRepositoryDialog open onOpenChange={vi.fn()} />
-      </MainWindowNavigationProvider>,
+      </PrimaryWindowNavigationProvider>,
     )
     await flush()
 
@@ -340,9 +343,9 @@ describe('OpenRemoteRepositoryDialog', () => {
     const onOpenChange = vi.fn()
 
     render(
-      <MainWindowNavigationProvider value={navigationWith({})}>
+      <PrimaryWindowNavigationProvider value={navigationWith({})}>
         <OpenRemoteRepositoryDialog open onOpenChange={onOpenChange} />
-      </MainWindowNavigationProvider>,
+      </PrimaryWindowNavigationProvider>,
     )
     await flush()
 
@@ -368,7 +371,7 @@ describe('OpenRemoteRepositoryDialog', () => {
             json: async () => ({ target: { ...target, alias: body.alias, remotePath: body.remotePath } }),
           }
         }
-        if (url.pathname === '/api/remote/test-repository') {
+        if (url.pathname === '/api/remote/test-repo') {
           return { ok: true, json: async () => ({ ok: true, target: body.target, stages: [] }) }
         }
         if (url.pathname === '/api/remote/path-suggestions') {
@@ -379,9 +382,9 @@ describe('OpenRemoteRepositoryDialog', () => {
     )
 
     render(
-      <MainWindowNavigationProvider value={navigationWith({})}>
+      <PrimaryWindowNavigationProvider value={navigationWith({})}>
         <OpenRemoteRepositoryDialog open onOpenChange={vi.fn()} />
-      </MainWindowNavigationProvider>,
+      </PrimaryWindowNavigationProvider>,
     )
     await flush()
 
@@ -395,9 +398,9 @@ describe('OpenRemoteRepositoryDialog', () => {
     const onOpenChange = vi.fn()
 
     render(
-      <MainWindowNavigationProvider value={navigationWith({ activateRepo })}>
+      <PrimaryWindowNavigationProvider value={navigationWith({ activateRepo })}>
         <OpenRemoteRepositoryDialog open onOpenChange={onOpenChange} />
-      </MainWindowNavigationProvider>,
+      </PrimaryWindowNavigationProvider>,
     )
     await flush()
 
@@ -436,7 +439,7 @@ describe('OpenRemoteRepositoryDialog', () => {
             json: async () => ({ target: { ...target, alias: body.alias, remotePath: body.remotePath } }),
           }
         }
-        if (url.pathname === '/api/remote/test-repository') {
+        if (url.pathname === '/api/remote/test-repo') {
           throw new Error('Permission denied')
         }
         if (url.pathname === '/api/remote/path-suggestions') {
@@ -447,9 +450,9 @@ describe('OpenRemoteRepositoryDialog', () => {
     )
 
     render(
-      <MainWindowNavigationProvider value={navigationWith({})}>
+      <PrimaryWindowNavigationProvider value={navigationWith({})}>
         <OpenRemoteRepositoryDialog open onOpenChange={vi.fn()} />
-      </MainWindowNavigationProvider>,
+      </PrimaryWindowNavigationProvider>,
     )
     await flush()
 
@@ -481,9 +484,9 @@ describe('OpenRemoteRepositoryDialog', () => {
     )
 
     render(
-      <MainWindowNavigationProvider value={navigationWith({})}>
+      <PrimaryWindowNavigationProvider value={navigationWith({})}>
         <OpenRemoteRepositoryDialog open onOpenChange={vi.fn()} />
-      </MainWindowNavigationProvider>,
+      </PrimaryWindowNavigationProvider>,
     )
     await flush()
 
@@ -495,14 +498,14 @@ describe('OpenRemoteRepositoryDialog', () => {
   })
 })
 
-function navigationWith(overrides: Partial<MainWindowNavigationActions>): MainWindowNavigationActions {
+function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): PrimaryWindowNavigationActions {
   return {
     activateRepo: () => {},
     closeRepo: () => {},
     cycleRepo: () => {},
     selectRepoBranch: () => {},
-    showRepoWorkspacePaneView: () => {},
-    showRepoBranchWorkspacePaneView: () => {},
+    showRepoWorkspacePaneTab: () => {},
+    showRepoBranchWorkspacePaneTab: () => {},
     openSettings: () => {},
     ...overrides,
   }

@@ -27,7 +27,7 @@ export function BranchActionsMenu({ repo, branch, open, onOpenChange }: Props) {
 
   // Dialogs are no longer rendered here. The shared
   // `BranchActionDialogHost` is mounted once at the workspace level
-  // (`BranchWorkspace`), and its open/close state is held by
+  // (`RepoWorkspace`), and its open/close state is held by
   // `useBranchActionDialogsStore` so that triggering a confirm from a
   // temporary surface (e.g. the zen-mode HoverCard popover) does
   // not get its dialog torn down when the surface unmounts.
@@ -154,6 +154,6 @@ function BranchActionPopoverItem({
   )
 }
 
-export function branchActionMenuItemDisabled(item: BranchActionItem, busy: BranchActionItem['id'] | null): boolean {
+function branchActionMenuItemDisabled(item: BranchActionItem, busy: BranchActionItem['id'] | null): boolean {
   return item.disabled || busy !== null
 }
