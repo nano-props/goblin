@@ -323,6 +323,9 @@ export const en = {
   'filetree.status.staged': 'Staged',
   'filetree.status.untracked': 'Untracked',
   'filetree.status.ignored': 'Ignored',
+  'filetree.confirm-trash-title': 'Move file to Trash?',
+  'filetree.confirm-trash-body': 'This will move the file to the system Trash:',
+  'filetree.confirm-trash-confirm': 'Move to Trash',
 
   // ---- Terminal -----------------------------------------------------------
   'terminal.opening': 'Opening terminal…',
@@ -486,6 +489,10 @@ export const en = {
   'error.invalid-url': 'Invalid URL',
   'error.invalid-path': 'Invalid path',
   'error.invalid-worktree-path': 'Invalid worktree path',
+  'error.file-not-found': 'File not found',
+  'error.filetree-delete-directory-unsupported': 'Only files can be moved to Trash from the file tree',
+  'error.trash-unavailable': 'System Trash is not available',
+  'error.failed-trash-file': 'Could not move the file to Trash',
   'error.invalid-arguments': 'Invalid arguments',
   'error.not-controller': 'Another session is controlling this terminal',
   'error.network-op-in-progress': 'Another git network operation is already running.',

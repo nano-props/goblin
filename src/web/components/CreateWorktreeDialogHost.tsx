@@ -9,7 +9,7 @@
 // and the typed name is still there. Active repo switches still
 // close the dialog to match the previous per-repo trigger behaviour.
 
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CreateWorktreeDialog } from '#/web/components/create-worktree-dialog/CreateWorktreeDialog.tsx'
 import type { CreateWorktreeRequest } from '#/web/components/create-worktree-dialog/create-worktree-dialog.logic.ts'
 import { getRepoWorktreeBootstrapPreview } from '#/web/repo-client.ts'
@@ -27,21 +27,7 @@ interface Props {
 }
 
 export function CreateWorktreeDialogHost({ open, onOpenChange, activeId }: Props) {
-  const repo = useReposStore((s) => (activeId ? s.repos[activeId] : undefined))
-  const submitBranchAction = useReposStore((s) => s.submitBranchAction)
-  const [bootstrapPreview, setBootstrapPreview] = useState<WorktreeBootstrapPreview | null>(null)
-  const [bootstrapPreviewError, setBootstrapPreviewError] = useState(false)
-  const [bootstrapPreviewLoading, setBootstrapPreviewLoading] = useState(false)
-  const [rememberBootstrapTrust, setRememberBootstrapTrust] = useState(false)
-  const settingsSnapshot = useCurrentSettingsSnapshot()
   const previousActiveIdRef = useRef(activeId)
-
-  function resetBootstrapPreflightState(): void {
-    setBootstrapPreview(null)
-    setBootstrapPreviewError(false)
-    setBootstrapPreviewLoading(false)
-    setRememberBootstrapTrust(false)
-  }
 
   // Force-close when the active repo changes. Without this a
   // half-typed branch name from repo A could leak into a submission
@@ -50,10 +36,30 @@ export function CreateWorktreeDialogHost({ open, onOpenChange, activeId }: Props
     const previousActiveId = previousActiveIdRef.current
     previousActiveIdRef.current = activeId
     if (previousActiveId !== activeId) {
-      resetBootstrapPreflightState()
       if (open) onOpenChange(false)
     }
   }, [activeId, onOpenChange, open])
+
+  if (!open || !activeId) return null
+
+  return <CreateWorktreeDialogSession key={activeId} open={open} onOpenChange={onOpenChange} activeId={activeId} />
+}
+
+function CreateWorktreeDialogSession({ open, onOpenChange, activeId }: Props) {
+  const repo = useReposStore((s) => (activeId ? s.repos[activeId] : undefined))
+  const submitBranchAction = useReposStore((s) => s.submitBranchAction)
+  const [bootstrapPreview, setBootstrapPreview] = useState<WorktreeBootstrapPreview | null>(null)
+  const [bootstrapPreviewError, setBootstrapPreviewError] = useState(false)
+  const [bootstrapPreviewLoading, setBootstrapPreviewLoading] = useState(false)
+  const [rememberBootstrapTrust, setRememberBootstrapTrust] = useState(false)
+  const settingsSnapshot = useCurrentSettingsSnapshot()
+
+  function resetBootstrapPreflightState(): void {
+    setBootstrapPreview(null)
+    setBootstrapPreviewError(false)
+    setBootstrapPreviewLoading(false)
+    setRememberBootstrapTrust(false)
+  }
 
   const repoId = repo?.id ?? null
   const repoToken = repo?.instanceToken ?? null
@@ -157,9 +163,32 @@ export function CreateWorktreeDialogHost({ open, onOpenChange, activeId }: Props
 }
 
 function useCurrentSettingsSnapshot(): SettingsSnapshot | undefined {
-  return useSyncExternalStore(
-    (onChange) => primaryWindowQueryClient.getQueryCache().subscribe(() => onChange()),
-    currentSettingsSnapshot,
-    currentSettingsSnapshot,
-  )
+  const [snapshot, setSnapshot] = useState(() => currentSettingsSnapshot())
+
+  useEffect(() => {
+    let disposed = false
+    let queued = false
+
+    function syncSnapshot(): void {
+      if (disposed) return
+      setSnapshot(currentSettingsSnapshot())
+    }
+
+    syncSnapshot()
+
+    const unsubscribe = primaryWindowQueryClient.getQueryCache().subscribe(() => {
+      if (queued) return
+      queued = true
+      queueMicrotask(() => {
+        queued = false
+        syncSnapshot()
+      })
+    })
+    return () => {
+      disposed = true
+      unsubscribe()
+    }
+  }, [])
+
+  return snapshot
 }

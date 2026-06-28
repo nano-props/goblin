@@ -321,6 +321,9 @@ export const ja: Record<DictKey, string> = {
   'filetree.status.staged': 'ステージ済み',
   'filetree.status.untracked': '未追跡',
   'filetree.status.ignored': '無視',
+  'filetree.confirm-trash-title': 'ファイルをごみ箱に移動しますか？',
+  'filetree.confirm-trash-body': 'このファイルをシステムのごみ箱に移動します：',
+  'filetree.confirm-trash-confirm': 'ごみ箱に移動',
 
   // ---- Terminal ----------------------------------------------------------
   'terminal.opening': 'ターミナルを開いています…',
@@ -482,6 +485,10 @@ export const ja: Record<DictKey, string> = {
   'error.invalid-url': '無効な URL',
   'error.invalid-path': '無効なパス',
   'error.invalid-worktree-path': '無効なワークツリーパス',
+  'error.file-not-found': 'ファイルが見つかりません',
+  'error.filetree-delete-directory-unsupported': 'ファイルツリーからごみ箱に移動できるのはファイルのみです',
+  'error.trash-unavailable': 'システムのごみ箱を利用できません',
+  'error.failed-trash-file': 'ファイルをごみ箱に移動できませんでした',
   'error.invalid-arguments': '無効な引数',
   'error.not-controller': 'このターミナルは他のセッションが制御しています',
   'error.network-op-in-progress': '別の git ネットワーク操作がすでに実行中です。',

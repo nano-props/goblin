@@ -7,6 +7,7 @@ export const EMBEDDED_SERVER_IPC_ROUTES = {
   'repo.composite': { route: '/api/repo/composite', method: 'POST' },
   'repo.status': { route: '/api/repo/status', method: 'POST' },
   'repo.patch': { route: '/api/repo/patch', method: 'POST' },
+  'repo.trashFile': { route: '/api/repo/trash-file', method: 'POST' },
   'repo.deleteBranch': { route: '/api/repo/delete-branch', method: 'POST' },
   'repo.removeWorktree': { route: '/api/repo/remove-worktree', method: 'POST' },
   'repo.createWorktree': { route: '/api/repo/create-worktree', method: 'POST' },

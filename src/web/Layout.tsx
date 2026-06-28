@@ -10,6 +10,7 @@ import { RepoOpenDialog } from '#/web/components/RepoOpenDialog.tsx'
 import { OpenRemoteRepositoryDialog } from '#/web/components/OpenRemoteRepositoryDialog.tsx'
 import { CreateWorktreeDialogHost } from '#/web/components/CreateWorktreeDialogHost.tsx'
 import { BranchActionDialogHost } from '#/web/components/BranchActionDialogHost.tsx'
+import { FiletreeActionDialogHost } from '#/web/components/FiletreeActionDialogHost.tsx'
 import { RepoDropOverlay } from '#/web/components/RepoDropOverlay.tsx'
 import { Toaster } from '#/web/components/ui/sonner.tsx'
 import { useAuthenticatedAppBootstrap } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
@@ -154,6 +155,7 @@ function PrimaryWindowOverlays({ overlays, repoDrop, activeId, activeBranchName 
         activeId={activeId}
       />
       <BranchActionDialogHost activeRepoId={activeId} activeBranchName={activeBranchName} />
+      <FiletreeActionDialogHost activeRepoId={activeId} />
       <RepoDropOverlay active={repoDrop.active} />
       <Toaster position="bottom-right" closeButton />
     </>

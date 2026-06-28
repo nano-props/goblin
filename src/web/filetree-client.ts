@@ -15,7 +15,8 @@
 //     decides how to surface that.
 
 import { postServerJson } from '#/web/lib/server-fetch.ts'
-import type { RepoTreeResult } from '#/shared/api-types.ts'
+import type { RepoFileViewerResult, RepoTreeResult } from '#/shared/api-types.ts'
+import type { ExecResult } from '#/shared/git-types.ts'
 
 export interface GetRepositoryTreeClientOptions {
   readonly prefix?: string
@@ -38,4 +39,21 @@ export async function getRepositoryTree(
     },
     { signal: options.signal },
   )
+}
+
+export async function trashRepositoryFile(
+  cwd: string,
+  worktreePath: string,
+  path: string,
+  options: { readonly signal?: AbortSignal } = {},
+): Promise<ExecResult> {
+  return await postServerJson('/api/repo/trash-file', { cwd, worktreePath, path }, { signal: options.signal })
+}
+
+export async function getRepositoryFileViewer(
+  cwd: string,
+  worktreePath: string,
+  options: { readonly signal?: AbortSignal } = {},
+): Promise<RepoFileViewerResult> {
+  return await postServerJson('/api/repo/file-viewer', { cwd, worktreePath }, { signal: options.signal })
 }

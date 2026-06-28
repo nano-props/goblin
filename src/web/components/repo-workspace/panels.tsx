@@ -1,5 +1,6 @@
 import { FolderTree } from 'lucide-react'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { toast } from 'sonner'
 import { useT } from '#/web/stores/i18n.ts'
 import { EmptyState, ScrollPane } from '#/web/components/Layout.tsx'
 import { StatusListSkeleton } from '#/web/components/Skeleton.tsx'
@@ -11,12 +12,17 @@ import { FiletreeNoWorktreeView, FiletreeView } from '#/web/components/repo-work
 import { useRepoTreeRefresh } from '#/web/hooks/useRepoTreeRefresh.ts'
 import { TerminalSessionView } from '#/web/components/terminal/TerminalSessionView.tsx'
 import type { TerminalSessionBase } from '#/web/components/terminal/types.ts'
+import type { RepoTreeNode } from '#/shared/api-types.ts'
 import type { RepoWorkspaceRepo, SelectedRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
 import type { WorkspacePanePanelLabel } from '#/web/components/workspace-pane/tab-providers.ts'
+import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
+import { shellEscapePath } from '#/web/clipboard/terminal-path-write.ts'
+import { useFiletreeActionDialogsStore } from '#/web/stores/repos/filetree-action-dialogs.ts'
+import { getRepositoryFileViewer } from '#/web/filetree-client.ts'
 
 const DEFAULT_BRANCH_HISTORY_ERROR_KEY = 'error.failed-read-repo'
 
@@ -130,21 +136,82 @@ function FilesWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel }: 
   }
   return (
     <BranchTabPanel id={`${workspacePaneId}-files-panel`} {...panelLabel}>
-      <FiletreeTab repoId={repo.id} worktreePath={worktreePath} />
+      <FiletreeTab repoId={repo.id} branchName={branch.name} worktreePath={worktreePath} />
     </BranchTabPanel>
   )
 }
 
-function FiletreeTab({ repoId, worktreePath }: { repoId: string; worktreePath: string }) {
+function FiletreeTab({
+  repoId,
+  branchName,
+  worktreePath,
+}: {
+  repoId: string
+  branchName: string
+  worktreePath: string
+}) {
+  const t = useT()
   const result = useRepoTreeRefresh({ repoId, worktreePath })
+  const navigation = usePrimaryWindowNavigation()
+  const { createTerminal, writeInput } = useTerminalSessionContext()
+  const openTrashFileConfirm = useFiletreeActionDialogsStore((s) => s.openTrashFileConfirm)
+
+  const openFileInTerminal = useCallback(
+    async (node: RepoTreeNode) => {
+      if (node.kind !== 'file') return
+      navigation.showRepoWorkspacePaneTab(repoId, 'terminal')
+      const [viewerResult, terminalResult] = await Promise.all([
+        getRepositoryFileViewer(repoId, worktreePath).catch(() => ({ viewer: 'cat' as const })),
+        runCreateTerminalTabCommand({
+          base: { repoRoot: repoId, branch: branchName, worktreePath },
+          createTerminal,
+          t,
+          logMessage: 'filetree open file terminal create failed',
+        }),
+      ])
+      if (!terminalResult.ok) return
+      writeInput(
+        terminalResult.key,
+        fileReadCommand(viewerResult.viewer, absoluteFilePathForTerminal(worktreePath, node.path)),
+      )
+    },
+    [branchName, createTerminal, navigation, repoId, t, worktreePath, writeInput],
+  )
+
+  const requestTrashFile = useCallback(
+    (node: RepoTreeNode) => {
+      if (node.kind !== 'file') return
+      openTrashFileConfirm({ repoId, worktreePath, path: node.path, name: node.name })
+    },
+    [openTrashFileConfirm, repoId, worktreePath],
+  )
+
   return (
     <FiletreeView
       tree={result.tree}
       loading={result.loading}
       error={result.error}
-      stale={result.stale}
+      onOpenFile={(node) => {
+        void openFileInTerminal(node).catch((err) => {
+          toast.error(t(err instanceof Error ? err.message : 'error.terminal-create-failed'))
+        })
+      }}
+      onRequestTrashFile={requestTrashFile}
     />
   )
+}
+
+function absoluteFilePathForTerminal(worktreePath: string, filePath: string): string {
+  const normalizedRoot = worktreePath.replace(/[\\/]+$/u, '')
+  if (/^[A-Za-z]:[\\/]/u.test(worktreePath) || worktreePath.includes('\\')) {
+    return `${normalizedRoot}\\${filePath.split('/').join('\\')}`
+  }
+  return `${normalizedRoot}/${filePath}`
+}
+
+function fileReadCommand(viewer: 'bat' | 'cat', filePath: string): string {
+  const quotedPath = shellEscapePath(filePath)
+  return `${viewer} ${quotedPath}\r`
 }
 
 function BranchTabPanel({ id, labelledById, label, busy = false, children }: TabPanelProps) {

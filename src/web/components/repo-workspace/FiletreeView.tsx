@@ -6,7 +6,15 @@
 // (keyboard navigation, typeahead, roving focus, expansion and
 // selection) to React Aria Components.
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useState,
+  type MouseEvent,
+  type ReactNode,
+} from 'react'
 import {
   Button as AriaButton,
   Tree,
@@ -16,10 +24,11 @@ import {
   type Selection,
   type TreeItemProps,
 } from 'react-aria-components'
-import { ChevronRight, File, Folder, FolderTree } from 'lucide-react'
+import { ChevronRight, File, Folder, FolderTree, Trash2 } from 'lucide-react'
 import type { RepoTreeNode, RepoTreeNodeStatus, RepoTreeResult } from '#/shared/api-types.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { EmptyState } from '#/web/components/Layout.tsx'
+import { ActionPopover, ActionPopoverItem } from '#/web/components/ActionPopover.tsx'
 import { focusRingInset } from '#/web/components/ui/focus.ts'
 import { cn } from '#/web/lib/cn.ts'
 
@@ -27,9 +36,10 @@ export interface FiletreeViewProps {
   readonly tree: RepoTreeResult | null
   readonly loading: boolean
   readonly error: string | null
-  readonly stale: boolean
   readonly onSelect?: (node: RepoTreeNode) => void
   readonly onActivate?: (node: RepoTreeNode) => void
+  readonly onOpenFile?: (node: RepoTreeNode) => void
+  readonly onRequestTrashFile?: (node: RepoTreeNode) => void
 }
 
 const FILE_TREE_I18N_KEYS = {
@@ -44,6 +54,9 @@ const FILE_TREE_I18N_KEYS = {
   statusStaged: 'filetree.status.staged',
   statusUntracked: 'filetree.status.untracked',
   statusIgnored: 'filetree.status.ignored',
+  open: 'app-chrome.open',
+  delete: 'menu.edit.delete',
+  actionMenu: 'action.menu',
 } as const satisfies Record<string, string>
 
 const STATUS_LABEL_KEYS: Record<Exclude<RepoTreeNodeStatus, 'clean'>, string> = {
@@ -65,6 +78,47 @@ interface FiletreeCollection {
 }
 
 type TreeItemPressEvent = Parameters<NonNullable<TreeItemProps['onPress']>>[0]
+
+interface FiletreeInteractionState {
+  readonly selectedKeys: Set<Key>
+  readonly expandedKeys: Set<Key>
+}
+
+type FiletreeInteractionAction =
+  | { readonly type: 'reset' }
+  | { readonly type: 'set-selected-keys'; readonly keys: Set<Key> }
+  | { readonly type: 'set-expanded-keys'; readonly keys: Set<Key> }
+  | { readonly type: 'press-row'; readonly node: RepoTreeNode }
+
+function initialFiletreeInteractionState(): FiletreeInteractionState {
+  return {
+    selectedKeys: new Set(),
+    expandedKeys: new Set(),
+  }
+}
+
+function filetreeInteractionReducer(
+  state: FiletreeInteractionState,
+  action: FiletreeInteractionAction,
+): FiletreeInteractionState {
+  switch (action.type) {
+    case 'reset':
+      return initialFiletreeInteractionState()
+    case 'set-selected-keys':
+      return { ...state, selectedKeys: action.keys }
+    case 'set-expanded-keys':
+      return { ...state, expandedKeys: action.keys }
+    case 'press-row': {
+      const selectedKeys = new Set<Key>([action.node.id])
+      if (action.node.kind !== 'directory') return { ...state, selectedKeys }
+
+      const expandedKeys = new Set(state.expandedKeys)
+      if (expandedKeys.has(action.node.id)) expandedKeys.delete(action.node.id)
+      else expandedKeys.add(action.node.id)
+      return { selectedKeys, expandedKeys }
+    }
+  }
+}
 
 function buildCollection(result: RepoTreeResult | null): FiletreeCollection {
   const byId = new Map<string, FiletreeItem>()
@@ -102,21 +156,31 @@ function compareNodesForRender(a: RepoTreeNode, b: RepoTreeNode): number {
   return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
 }
 
-export function FiletreeView({ tree, loading, error, onSelect, onActivate }: FiletreeViewProps) {
+export function FiletreeView({
+  tree,
+  loading,
+  error,
+  onSelect,
+  onActivate,
+  onOpenFile,
+  onRequestTrashFile,
+}: FiletreeViewProps) {
   const t = useT()
   const collection = useMemo(() => buildCollection(tree), [tree])
-  const [expandedKeys, setExpandedKeys] = useState<Set<Key>>(() => new Set())
-  const [selectedKeys, setSelectedKeys] = useState<Set<Key>>(() => new Set())
+  const [interaction, dispatchInteraction] = useReducer(
+    filetreeInteractionReducer,
+    undefined,
+    initialFiletreeInteractionState,
+  )
 
   useEffect(() => {
-    setExpandedKeys(new Set())
-    setSelectedKeys(new Set())
+    dispatchInteraction({ type: 'reset' })
   }, [tree])
 
   const handleSelectionChange = useCallback(
     (selection: Selection) => {
       const next = selection === 'all' ? new Set<Key>() : new Set(selection)
-      setSelectedKeys(next)
+      dispatchInteraction({ type: 'set-selected-keys', keys: next })
       const first = next.values().next().value
       if (typeof first !== 'string') return
       const item = collection.byId.get(first)
@@ -125,27 +189,38 @@ export function FiletreeView({ tree, loading, error, onSelect, onActivate }: Fil
     [collection, onSelect],
   )
 
-  const toggleExpandedKey = useCallback((id: string) => {
-    setExpandedKeys((current) => {
-      const next = new Set(current)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
+  const handleExpandedChange = useCallback((keys: Set<Key>) => {
+    dispatchInteraction({ type: 'set-expanded-keys', keys })
   }, [])
+
+  const handleRowPress = useCallback(
+    (node: RepoTreeNode) => {
+      dispatchInteraction({ type: 'press-row', node })
+    },
+    [],
+  )
+
+  const handleOpenFile = useCallback(
+    (node: RepoTreeNode) => {
+      if (node.kind !== 'file') return
+      onOpenFile?.(node)
+      onActivate?.(node)
+    },
+    [onActivate, onOpenFile],
+  )
 
   const handlePressItem = useCallback(
     (node: RepoTreeNode, event: TreeItemPressEvent) => {
-      const row = event.target.closest('[role="row"]')
-      const wasSelected = row?.getAttribute('aria-selected') === 'true' || row?.hasAttribute('data-selected') === true
+      if (event.target.closest('[data-action-popover-trigger]')) return
       const pressedChevron = event.target.closest('button[slot="chevron"]') !== null
-      setSelectedKeys(new Set<Key>([node.id]))
-      if (node.kind === 'directory' && event.pointerType !== 'keyboard' && wasSelected && !pressedChevron) {
-        toggleExpandedKey(node.id)
+      if (pressedChevron) return
+      if (event.pointerType === 'keyboard') {
+        handleOpenFile(node)
+        return
       }
-      onSelect?.(node)
+      handleRowPress(node)
     },
-    [onSelect, toggleExpandedKey],
+    [handleOpenFile, handleRowPress],
   )
 
   if (error) {
@@ -157,10 +232,12 @@ export function FiletreeView({ tree, loading, error, onSelect, onActivate }: Fil
   }
 
   if (!tree) {
-    const titleKey = loading ? FILE_TREE_I18N_KEYS.loading : FILE_TREE_I18N_KEYS.empty
+    if (loading) {
+      return <FiletreeShell loading={loading} />
+    }
     return (
       <FiletreeShell loading={loading}>
-        <EmptyState icon={<FolderTree size={16} />} title={t(titleKey)} />
+        <EmptyState icon={<FolderTree size={16} />} title={t(FILE_TREE_I18N_KEYS.empty)} />
       </FiletreeShell>
     )
   }
@@ -181,13 +258,20 @@ export function FiletreeView({ tree, loading, error, onSelect, onActivate }: Fil
         dependencies={[collection]}
         selectionMode="single"
         selectionBehavior="replace"
-        selectedKeys={selectedKeys}
+        selectedKeys={interaction.selectedKeys}
         onSelectionChange={handleSelectionChange}
-        expandedKeys={expandedKeys}
-        onExpandedChange={setExpandedKeys}
-        className={cn('min-h-0 flex-1 overflow-auto py-1.5 font-mono text-sm', focusRingInset)}
+        expandedKeys={interaction.expandedKeys}
+        onExpandedChange={handleExpandedChange}
+        className={cn('min-h-0 flex-1 overflow-auto py-1.5 font-sans text-sm', focusRingInset)}
       >
-        {(item) => <FiletreeTreeItem item={item} onPressItem={handlePressItem} onActivate={onActivate} />}
+        {(item) => (
+          <FiletreeTreeItem
+            item={item}
+            onPressItem={handlePressItem}
+            onOpenFile={handleOpenFile}
+            onRequestTrashFile={onRequestTrashFile}
+          />
+        )}
       </Tree>
       {tree.truncated ? (
         <div className="border-t border-border bg-muted px-4 py-1 text-xs text-muted-foreground">
@@ -198,7 +282,7 @@ export function FiletreeView({ tree, loading, error, onSelect, onActivate }: Fil
   )
 }
 
-function FiletreeShell({ loading, children }: { readonly loading: boolean; readonly children: ReactNode }) {
+function FiletreeShell({ loading, children }: { readonly loading: boolean; readonly children?: ReactNode }) {
   return (
     <div data-filetree="" aria-busy={loading || undefined} className="flex min-h-0 flex-1 flex-col">
       {children}
@@ -209,11 +293,13 @@ function FiletreeShell({ loading, children }: { readonly loading: boolean; reado
 function FiletreeTreeItem({
   item,
   onPressItem,
-  onActivate,
+  onOpenFile,
+  onRequestTrashFile,
 }: {
   readonly item: FiletreeItem
   readonly onPressItem: (node: RepoTreeNode, event: TreeItemPressEvent) => void
-  readonly onActivate?: (node: RepoTreeNode) => void
+  readonly onOpenFile: (node: RepoTreeNode) => void
+  readonly onRequestTrashFile?: (node: RepoTreeNode) => void
 }) {
   const { node, children } = item
   const isDirectory = node.kind === 'directory'
@@ -225,12 +311,10 @@ function FiletreeTreeItem({
       aria-label={node.name}
       hasChildItems={isDirectory}
       onPress={(event) => onPressItem(node, event)}
-      onAction={() => {
-        if (!isDirectory) onActivate?.(node)
-      }}
+      onDoubleClick={(event) => handleItemDoubleClick(event, node, onOpenFile)}
       className={({ isSelected, isFocused, isFocusVisible, isHovered, isPressed }) =>
         cn(
-          'group/filetree-row cursor-pointer rounded-sm text-foreground outline-none transition-colors duration-100',
+          'group/filetree-row cursor-pointer text-foreground outline-none transition-colors duration-100',
           (isHovered || isFocused || isPressed) && !isSelected && 'bg-muted',
           isSelected && 'bg-selected text-selected-foreground',
           isFocusVisible && focusRingInset,
@@ -240,7 +324,7 @@ function FiletreeTreeItem({
       <TreeItemContent>
         {({ isExpanded, level, hasChildItems }) => (
           <div
-            className="flex min-w-0 items-center gap-1 px-1.5 py-0.5"
+            className="flex w-full min-w-0 items-center gap-1 px-1.5 py-0.5"
             style={{ paddingLeft: `${(level - 1) * 12 + 6}px` }}
           >
             <span className="flex w-3 shrink-0 items-center justify-center text-muted-foreground">
@@ -258,14 +342,95 @@ function FiletreeTreeItem({
               {isDirectory ? <Folder size={12} aria-hidden /> : <File size={12} aria-hidden />}
             </span>
             <StatusDot status={node.status} />
-            <span className="truncate text-current">{node.name}</span>
+            <span className="min-w-0 flex-1 truncate text-current">{node.name}</span>
+            {!isDirectory ? (
+              <FiletreeActionMenu
+                node={node}
+                onOpenFile={onOpenFile}
+                onRequestTrashFile={onRequestTrashFile}
+              />
+            ) : null}
           </div>
         )}
       </TreeItemContent>
       {children.map((child) => (
-        <FiletreeTreeItem key={child.id} item={child} onPressItem={onPressItem} onActivate={onActivate} />
+        <FiletreeTreeItem
+          key={child.id}
+          item={child}
+          onPressItem={onPressItem}
+          onOpenFile={onOpenFile}
+          onRequestTrashFile={onRequestTrashFile}
+        />
       ))}
     </TreeItem>
+  )
+}
+
+function handleItemDoubleClick(
+  event: MouseEvent<HTMLElement>,
+  node: RepoTreeNode,
+  onOpenFile: (node: RepoTreeNode) => void,
+): void {
+  if (node.kind !== 'file') return
+  if ((event.target as HTMLElement | null)?.closest('[data-action-popover-trigger]')) return
+  onOpenFile(node)
+}
+
+function FiletreeActionMenu({
+  node,
+  onOpenFile,
+  onRequestTrashFile,
+}: {
+  readonly node: RepoTreeNode
+  readonly onOpenFile: (node: RepoTreeNode) => void
+  readonly onRequestTrashFile?: (node: RepoTreeNode) => void
+}) {
+  const t = useT()
+  const [open, setOpen] = useState(false)
+
+  return (
+    <ActionPopover
+      label={t(FILE_TREE_I18N_KEYS.actionMenu)}
+      open={open}
+      onOpenChange={setOpen}
+      triggerClassName={cn(
+        'ml-auto size-5 shrink-0 p-0 opacity-0 transition-opacity duration-100',
+        'group-hover/filetree-row:opacity-100',
+        open && 'opacity-100',
+      )}
+      contentClassName="min-w-32 max-w-56"
+    >
+      {({ close }) => (
+        <div role="list">
+          <div className="space-y-0.5 p-1" role="group">
+            <div role="listitem">
+              <ActionPopoverItem
+                label={t(FILE_TREE_I18N_KEYS.open)}
+                onSelect={() => {
+                  close()
+                  onOpenFile(node)
+                }}
+              />
+            </div>
+          </div>
+          {onRequestTrashFile ? (
+            <div className="space-y-0.5 border-t border-border p-1" role="group">
+              <div role="listitem">
+                <ActionPopoverItem
+                  label={t(FILE_TREE_I18N_KEYS.delete)}
+                  icon={<Trash2 />}
+                  destructive
+                  onSelect={() => {
+                    close()
+                    onRequestTrashFile(node)
+                  }}
+                />
+              </div>
+            </div>
+          ) : null}
+        </div>
+      )}
+    </ActionPopover>
   )
 }
 

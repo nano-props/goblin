@@ -57,7 +57,7 @@ import {
   type WorktreeBootstrapSummary,
 } from '#/shared/worktree-bootstrap-summary.ts'
 
-type RemoteGitRunner = (
+export type RemoteGitRunner = (
   command: RemoteCommandKind,
   target: RemoteRepoTarget,
   options?: { signal?: AbortSignal; timeoutMs?: number },
@@ -67,6 +67,7 @@ const REMOTE_WORKTREE_STATUS_CONCURRENCY = 8
 const REMOTE_PATCH_UNTRACKED_DIFF_CONCURRENCY = 8
 const REMOTE_BRANCH_OP_TIMEOUT_MS = 180_000
 const REMOTE_PATCH_TIMEOUT_MS = 90_000
+const REMOTE_COMMAND_NAME_RE = /^[A-Za-z0-9._+-]+$/
 
 export interface RemoteRepoSnapshot {
   branches: BranchSnapshotInfo[]
@@ -209,6 +210,51 @@ export async function getRemoteTreeWalk(
   if (options.signal?.aborted) return { ok: false, message: 'cancelled' }
   if (!result.ok) return remoteExecResult(result)
   return { ok: true, message: result.stdout }
+}
+
+export async function trashRemoteFile(
+  target: RemoteRepoTarget,
+  worktreePath: string,
+  filePath: string,
+  options: {
+    signal?: AbortSignal
+    run?: RemoteGitRunner
+    knownWorktrees?: ReadonlyArray<WorktreeInfo>
+  } = {},
+): Promise<ExecResult> {
+  const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
+  const known = await resolveKnownRemoteWorktree(target, worktreePath, {
+    signal: options.signal,
+    run,
+    knownWorktrees: options.knownWorktrees,
+  })
+  if ('ok' in known) return known
+  const result = await run({ type: 'trashFile', path: known.path, filePath }, target, { signal: options.signal })
+  if (options.signal?.aborted) return { ok: false, message: 'cancelled' }
+  if (!result.ok) return remoteExecResult(result)
+  return { ok: true, message: 'ok', repoChanged: true }
+}
+
+export async function remoteCommandExists(
+  target: RemoteRepoTarget,
+  worktreePath: string,
+  commandName: string,
+  options: {
+    signal?: AbortSignal
+    run?: RemoteGitRunner
+    knownWorktrees?: ReadonlyArray<WorktreeInfo>
+  } = {},
+): Promise<boolean> {
+  if (!REMOTE_COMMAND_NAME_RE.test(commandName)) return false
+  const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
+  const known = await resolveKnownRemoteWorktree(target, worktreePath, {
+    signal: options.signal,
+    run,
+    knownWorktrees: options.knownWorktrees,
+  })
+  if ('ok' in known) return false
+  const result = await run({ type: 'commandExists', path: known.path, commandName }, target, { signal: options.signal })
+  return !options.signal?.aborted && result.ok
 }
 
 export async function getRemotePatch(

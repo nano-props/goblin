@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-import { act } from 'react'
+import { StrictMode, act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { useRepoTreeRefresh } from '#/web/hooks/useRepoTreeRefresh.ts'
 import type { RepoTreeResult } from '#/shared/api-types.ts'
@@ -26,7 +27,6 @@ type HarnessSnapshot = {
   tree: RepoTreeResult | null
   loading: boolean
   error: string | null
-  stale: boolean
   refresh: () => void
 }
 
@@ -45,9 +45,11 @@ function Harness({ repoId, worktreePath, onSnapshot }: HarnessProps) {
 let container: HTMLDivElement | null = null
 let root: Root | null = null
 let lastSnapshot: HarnessSnapshot | null = null
+let queryClient: QueryClient
 
 beforeEach(() => {
   ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   mocks.getRepositoryTree.mockReset()
   listeners.clear()
   lastSnapshot = null
@@ -58,6 +60,7 @@ beforeEach(() => {
 
 afterEach(() => {
   act(() => root?.unmount())
+  queryClient.clear()
   container?.remove()
   root = null
   container = null
@@ -69,13 +72,21 @@ afterEach(() => {
 
 function render(props: HarnessProps): Promise<void> {
   return act(async () => {
-    root!.render(<Harness {...props} />)
+    root!.render(
+      <QueryClientProvider client={queryClient}>
+        <Harness {...props} />
+      </QueryClientProvider>,
+    )
   })
 }
 
 function setProps(props: HarnessProps): Promise<void> {
   return act(async () => {
-    root!.render(<Harness {...props} />)
+    root!.render(
+      <QueryClientProvider client={queryClient}>
+        <Harness {...props} />
+      </QueryClientProvider>,
+    )
   })
 }
 
@@ -98,6 +109,7 @@ function makeDeferred<T>(): Deferred<T> {
 async function flush() {
   await act(async () => {
     await Promise.resolve()
+    await new Promise((resolve) => setTimeout(resolve, 0))
   })
 }
 
@@ -121,7 +133,6 @@ describe('useRepoTreeRefresh', () => {
     )
     expect(lastSnapshot?.loading).toBe(true)
     expect(lastSnapshot?.error).toBeNull()
-    expect(lastSnapshot?.stale).toBe(false)
   })
 
   test('resolves to the fetched tree and clears loading on success', async () => {
@@ -143,7 +154,35 @@ describe('useRepoTreeRefresh', () => {
     expect(lastSnapshot?.tree).toEqual(result)
     expect(lastSnapshot?.loading).toBe(false)
     expect(lastSnapshot?.error).toBeNull()
-    expect(lastSnapshot?.stale).toBe(false)
+  })
+
+  test('applies the latest result after StrictMode re-runs mount effects', async () => {
+    const result: RepoTreeResult = {
+      nodes: [{ id: 'README.md', path: 'README.md', name: 'README.md', parentId: null, kind: 'file', status: 'clean' }],
+      truncated: false,
+    }
+    mocks.getRepositoryTree.mockResolvedValue(result)
+
+    await act(async () => {
+      root!.render(
+        <QueryClientProvider client={queryClient}>
+          <StrictMode>
+            <Harness
+              repoId="/repo-a"
+              worktreePath="/repo-a/main"
+              onSnapshot={(snapshot) => {
+                lastSnapshot = snapshot
+              }}
+            />
+          </StrictMode>
+        </QueryClientProvider>,
+      )
+    })
+    await flush()
+
+    expect(mocks.getRepositoryTree).toHaveBeenCalled()
+    expect(lastSnapshot?.tree).toEqual(result)
+    expect(lastSnapshot?.loading).toBe(false)
   })
 
   test('treats a soft-fail empty envelope as success (no error, no throw)', async () => {
@@ -209,7 +248,7 @@ describe('useRepoTreeRefresh', () => {
     expect(mocks.getRepositoryTree).toHaveBeenCalledTimes(2)
     expect(mocks.getRepositoryTree.mock.calls[1]?.[1]).toBe('/repo-a/feature')
 
-    // Resolving the first (now-stale) promise must not clobber the
+    // Resolving the first superseded promise must not clobber the
     // hook's state.
     await act(async () => {
       first.resolve({ nodes: [], truncated: false })
@@ -225,8 +264,8 @@ describe('useRepoTreeRefresh', () => {
         ],
         truncated: false,
       })
-      await Promise.resolve()
     })
+    await flush()
     expect(lastSnapshot?.tree?.nodes).toHaveLength(1)
   })
 
@@ -316,11 +355,20 @@ describe('useRepoTreeRefresh', () => {
     expect(mocks.getRepositoryTree).toHaveBeenCalledTimes(2)
   })
 
-  test('marks the tree as stale while a refetch triggered by invalidation is in flight', async () => {
-    const first = makeDeferred<RepoTreeResult>()
-    const second = makeDeferred<RepoTreeResult>()
-    mocks.getRepositoryTree.mockReturnValueOnce(first.promise)
-    mocks.getRepositoryTree.mockReturnValueOnce(second.promise)
+  test('invalidating after a successful read refreshes the cached tree', async () => {
+    mocks.getRepositoryTree
+      .mockResolvedValueOnce({
+        nodes: [
+          { id: 'first.ts', path: 'first.ts', name: 'first.ts', parentId: null, kind: 'file', status: 'clean' },
+        ],
+        truncated: false,
+      })
+      .mockResolvedValueOnce({
+        nodes: [
+          { id: 'second.ts', path: 'second.ts', name: 'second.ts', parentId: null, kind: 'file', status: 'clean' },
+        ],
+        truncated: false,
+      })
 
     await render({
       repoId: '/repo-a',
@@ -329,55 +377,25 @@ describe('useRepoTreeRefresh', () => {
         lastSnapshot = snapshot
       },
     })
-
-    await act(async () => {
-      first.resolve({
-        nodes: [
-          { id: 'first.ts', path: 'first.ts', name: 'first.ts', parentId: null, kind: 'file', status: 'clean' },
-        ],
-        truncated: false,
-      })
-      await Promise.resolve()
-    })
-    expect(lastSnapshot?.stale).toBe(false)
-
-    await act(async () => {
-      for (const listener of listeners) {
-        listener({ type: 'repo-query-invalidated', repoId: '/repo-a', query: 'repo-snapshot' })
-      }
-      // The invalidation handler enqueues a fresh fetch but does
-      // not await the promise -- we need a microtask flush to
-      // observe the loading=true transition.
-      await Promise.resolve()
-    })
-    // While the second request is pending, the previous tree is
-    // visibly stale. (loading flips to true; stale flips to true.)
-    expect(lastSnapshot?.stale).toBe(true)
-    expect(lastSnapshot?.loading).toBe(true)
-    // The first tree is still served -- we do not clear it on
-    // invalidation, only mark it stale.
+    await flush()
+    expect(lastSnapshot?.loading).toBe(false)
     expect(lastSnapshot?.tree?.nodes[0]?.id).toBe('first.ts')
 
     await act(async () => {
-      second.resolve({ nodes: [], truncated: false })
-      await Promise.resolve()
+      for (const listener of listeners) {
+        listener({ type: 'repo-query-invalidated', repoId: '/repo-a', query: 'repo-snapshot' })
+      }
     })
-    expect(lastSnapshot?.stale).toBe(false)
+    await flush()
+
+    expect(mocks.getRepositoryTree).toHaveBeenCalledTimes(2)
     expect(lastSnapshot?.loading).toBe(false)
+    expect(lastSnapshot?.tree?.nodes[0]?.id).toBe('second.ts')
   })
 
-  test('two rapid invalidations: stale flag resets between fetches and prior request is aborted', async () => {
-    // Regression for the stale-flag bleed across worktree switches
-    // (and across rapid same-input invalidations). The flag must be
-    // cleared at fetch entry, not just on resolution, so the second
-    // refetch does not inherit "stale" from the first.
+  test('manual refresh() while a request is in flight reuses the in-flight query', async () => {
     const first = makeDeferred<RepoTreeResult>()
-    const second = makeDeferred<RepoTreeResult>()
-    const third = makeDeferred<RepoTreeResult>()
-    mocks.getRepositoryTree
-      .mockReturnValueOnce(first.promise)
-      .mockReturnValueOnce(second.promise)
-      .mockReturnValueOnce(third.promise)
+    mocks.getRepositoryTree.mockReturnValueOnce(first.promise)
 
     await render({
       repoId: '/repo-a',
@@ -386,106 +404,14 @@ describe('useRepoTreeRefresh', () => {
         lastSnapshot = snapshot
       },
     })
-
-    // Resolve the mount fetch to land the hook in a known good state.
-    await act(async () => {
-      first.resolve({
-        nodes: [
-          { id: 'first.ts', path: 'first.ts', name: 'first.ts', parentId: null, kind: 'file', status: 'clean' },
-        ],
-        truncated: false,
-      })
-      await Promise.resolve()
-    })
-    expect(lastSnapshot?.stale).toBe(false)
-    expect(lastSnapshot?.loading).toBe(false)
-
-    const firstSignal = mocks.getRepositoryTree.mock.calls[0]?.[2]?.signal as AbortSignal
-
-    // First invalidation kicks a refetch; stale should become true
-    // until the second fetch resolves.
-    await act(async () => {
-      for (const listener of listeners) {
-        listener({ type: 'repo-query-invalidated', repoId: '/repo-a', query: 'repo-snapshot' })
-      }
-      await Promise.resolve()
-    })
-    expect(lastSnapshot?.stale).toBe(true)
-    expect(lastSnapshot?.loading).toBe(true)
-
-    const secondSignal = mocks.getRepositoryTree.mock.calls[1]?.[2]?.signal as AbortSignal
-    expect(secondSignal).not.toBe(firstSignal)
-    expect(secondSignal.aborted).toBe(false)
-
-    // Second invalidation fires while the first refetch is still
-    // pending. The hook must abort the in-flight second request and
-    // start a third one. Inputs did not change, so the input-change
-    // effect does not re-fire — the stale flag, last set true by
-    // the first invalidation, stays true until the third fetch
-    // resolves.
-    await act(async () => {
-      for (const listener of listeners) {
-        listener({ type: 'repo-query-invalidated', repoId: '/repo-a', query: 'repo-snapshot' })
-      }
-      await Promise.resolve()
-    })
-
-    expect(secondSignal.aborted).toBe(true)
-    expect(mocks.getRepositoryTree).toHaveBeenCalledTimes(3)
-    expect(lastSnapshot?.loading).toBe(true)
-    expect(lastSnapshot?.stale).toBe(true)
-
-    // Resolving the orphaned second request must not clobber state.
-    await act(async () => {
-      second.resolve({ nodes: [], truncated: false })
-      await Promise.resolve()
-    })
-    expect(lastSnapshot?.loading).toBe(true)
-
-    // Resolving the third request lands the final tree.
-    await act(async () => {
-      third.resolve({
-        nodes: [
-          { id: 'third.ts', path: 'third.ts', name: 'third.ts', parentId: null, kind: 'file', status: 'clean' },
-        ],
-        truncated: false,
-      })
-      await Promise.resolve()
-    })
-    expect(lastSnapshot?.stale).toBe(false)
-    expect(lastSnapshot?.loading).toBe(false)
-    expect(lastSnapshot?.tree?.nodes[0]?.id).toBe('third.ts')
-  })
-
-  test('manual refresh() while a request is in flight aborts the prior request', async () => {
-    // Regression: refresh() must abort any in-flight request, so the
-    // consumer never sees stale data applied on top of a newer one.
-    const first = makeDeferred<RepoTreeResult>()
-    const second = makeDeferred<RepoTreeResult>()
-    mocks.getRepositoryTree.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
-
-    await render({
-      repoId: '/repo-a',
-      worktreePath: '/repo-a/main',
-      onSnapshot: (snapshot) => {
-        lastSnapshot = snapshot
-      },
-    })
-
-    const firstSignal = mocks.getRepositoryTree.mock.calls[0]?.[2]?.signal as AbortSignal
-    expect(firstSignal.aborted).toBe(false)
 
     await act(async () => {
       lastSnapshot?.refresh()
       await Promise.resolve()
     })
 
-    const secondSignal = mocks.getRepositoryTree.mock.calls[1]?.[2]?.signal as AbortSignal
-    expect(firstSignal.aborted).toBe(true)
-    expect(secondSignal.aborted).toBe(false)
-    expect(mocks.getRepositoryTree).toHaveBeenCalledTimes(2)
+    expect(mocks.getRepositoryTree).toHaveBeenCalledTimes(1)
 
-    // The orphaned first resolution must not change state.
     await act(async () => {
       first.resolve({
         nodes: [
@@ -500,14 +426,8 @@ describe('useRepoTreeRefresh', () => {
         ],
         truncated: false,
       })
-      await Promise.resolve()
     })
-    expect(lastSnapshot?.tree).toBeNull()
-
-    await act(async () => {
-      second.resolve({ nodes: [], truncated: false })
-      await Promise.resolve()
-    })
-    expect(lastSnapshot?.tree).toEqual({ nodes: [], truncated: false })
+    await flush()
+    expect(lastSnapshot?.tree?.nodes[0]?.id).toBe('first.ts')
   })
 })

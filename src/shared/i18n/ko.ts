@@ -314,6 +314,9 @@ export const ko: Record<DictKey, string> = {
   'filetree.status.staged': '스테이지됨',
   'filetree.status.untracked': '추적 안 됨',
   'filetree.status.ignored': '무시됨',
+  'filetree.confirm-trash-title': '파일을 휴지통으로 이동할까요?',
+  'filetree.confirm-trash-body': '이 파일을 시스템 휴지통으로 이동합니다:',
+  'filetree.confirm-trash-confirm': '휴지통으로 이동',
 
   // ---- Terminal ----------------------------------------------------------
   'terminal.opening': '터미널 여는 중…',
@@ -474,6 +477,10 @@ export const ko: Record<DictKey, string> = {
   'error.invalid-url': 'URL이 올바르지 않습니다',
   'error.invalid-path': '경로가 올바르지 않습니다',
   'error.invalid-worktree-path': '워크트리 경로가 올바르지 않습니다',
+  'error.file-not-found': '파일을 찾을 수 없습니다',
+  'error.filetree-delete-directory-unsupported': '파일 트리에서는 파일만 휴지통으로 이동할 수 있습니다',
+  'error.trash-unavailable': '시스템 휴지통을 사용할 수 없습니다',
+  'error.failed-trash-file': '파일을 휴지통으로 이동할 수 없습니다',
   'error.invalid-arguments': '인수가 올바르지 않습니다',
   'error.not-controller': '이 터미널은 다른 세션이 제어하고 있습니다',
   'error.network-op-in-progress': '다른 git 네트워크 작업이 이미 실행 중입니다.',

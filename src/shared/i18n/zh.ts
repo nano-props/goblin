@@ -306,6 +306,9 @@ export const zh: Record<DictKey, string> = {
   'filetree.status.staged': '已暂存',
   'filetree.status.untracked': '未跟踪',
   'filetree.status.ignored': '已忽略',
+  'filetree.confirm-trash-title': '移到废纸篓？',
+  'filetree.confirm-trash-body': '将会把此文件移到系统废纸篓：',
+  'filetree.confirm-trash-confirm': '移到废纸篓',
 
   // ---- Terminal ----------------------------------------------------------
   'terminal.opening': '正在打开终端…',
@@ -461,6 +464,10 @@ export const zh: Record<DictKey, string> = {
   'error.invalid-url': 'URL 无效',
   'error.invalid-path': '路径无效',
   'error.invalid-worktree-path': '工作树路径无效',
+  'error.file-not-found': '文件不存在',
+  'error.filetree-delete-directory-unsupported': '文件树中只能将文件移到废纸篓',
+  'error.trash-unavailable': '系统废纸篓不可用',
+  'error.failed-trash-file': '无法将文件移到废纸篓',
   'error.invalid-arguments': '参数无效',
   'error.not-controller': '此终端正由另一个会话控制',
   'error.network-op-in-progress': '另一个 git 网络操作正在进行中。',

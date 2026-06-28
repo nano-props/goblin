@@ -12,6 +12,7 @@ import {
   getRemoteWorktreeBootstrapPreview,
   pullRemoteBranch,
   fetchRemoteRepo,
+  remoteCommandExists,
   pushRemoteBranch,
   remoteExecResult,
   removeRemoteWorktree,
@@ -851,6 +852,56 @@ describe('getRemoteTreeWalk knownWorktrees path', () => {
       knownWorktrees,
     })
     expect(result).toEqual({ ok: false, message: 'error.worktree-not-found' })
+    expect(run).not.toHaveBeenCalled()
+  })
+})
+
+describe('remoteCommandExists', () => {
+  test('validates the remote worktree before checking the command', async () => {
+    const knownWorktrees: WorktreeInfo[] = [
+      { path: '/srv/repo-feature', branch: 'feature/test', isBare: false, isPrimary: false },
+    ]
+    const run = vi.fn(async (command: { type: string }) => {
+      if (command.type === 'commandExists') return okRemoteResult('')
+      return failRemoteResult('unexpected')
+    })
+
+    const result = await remoteCommandExists(TARGET, '/srv/repo-feature', 'bat', {
+      run: run as any,
+      knownWorktrees,
+    })
+
+    expect(result).toBe(true)
+    expect(run).toHaveBeenCalledWith(
+      { type: 'commandExists', path: '/srv/repo-feature', commandName: 'bat' },
+      TARGET,
+      { signal: undefined },
+    )
+    expect(run).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'gitWorktreeList' }),
+      expect.anything(),
+      expect.anything(),
+    )
+  })
+
+  test('returns false for unsafe command names without touching the remote', async () => {
+    const run = vi.fn()
+
+    const result = await remoteCommandExists(TARGET, '/srv/repo-feature', 'bat; whoami', { run: run as any })
+
+    expect(result).toBe(false)
+    expect(run).not.toHaveBeenCalled()
+  })
+
+  test('returns false for unknown worktrees', async () => {
+    const run = vi.fn()
+
+    const result = await remoteCommandExists(TARGET, '/srv/missing', 'bat', {
+      run: run as any,
+      knownWorktrees: [{ path: '/srv/repo-feature', branch: 'feature/test', isBare: false, isPrimary: false }],
+    })
+
+    expect(result).toBe(false)
     expect(run).not.toHaveBeenCalled()
   })
 })

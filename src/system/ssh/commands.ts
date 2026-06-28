@@ -76,6 +76,8 @@ export type RemoteCommandKind =
   | { type: 'gitRemoteBranches'; path: string }
   | { type: 'gitWorktreeAdd'; path: string; input: CreateWorktreeInput }
   | { type: 'gitWorktreeRemove'; path: string; worktreePath: string }
+  | { type: 'trashFile'; path: string; filePath: string }
+  | { type: 'commandExists'; path: string; commandName: string }
   | { type: 'gitBranchDelete'; path: string; branch: string; force?: boolean }
   | { type: 'gitUpstream'; path: string; branch: string }
   | { type: 'gitIsAncestor'; path: string; ancestor: string; descendant: string }
@@ -212,37 +214,13 @@ function scriptForCommand(command: RemoteCommandKind): string {
       )} -mindepth 1 -maxdepth 1 -type d -print 2>/dev/null | LC_ALL=C sort | head -n ${limit}`
     }
     case 'gitTreeWalk': {
-      const depth = Math.max(1, Math.min(10, Math.floor(command.depth)))
-      // NUL-separated file paths, excludes .git by default, traverses
-      // to the requested depth. Directories are derived from file paths
-      // by the source layer so empty directories are not shown in v1.
-      // We deliberately do not apply a .gitignore filter on the remote
-      // -- the local source layer is in charge of the gitignore overlay
-      // (see docs/filetree.md).
-      //
-      // We intentionally omit `2>/dev/null`: a permission-denied on
-      // a subdirectory should propagate up so the read layer can
-      // surface a soft-fail envelope instead of silently reporting
-      // a partial walk as complete. Avoid `find --`: GNU/BSD find
-      // accept it, but BusyBox and stricter POSIX find variants may
-      // not, and SSH targets are often minimal environments.
-      return [
-        'find',
-        shellQuote(command.path),
-        '-mindepth 1',
-        `-maxdepth ${depth}`,
-        '-type f',
-        // The local walker hides every `.gitignore` regardless of
-        // directory (tinyglobby's `**/.gitignore` pattern). Match
-        // that here by combining basename (for the root-level file)
-        // and path (for nested ones) so the remote surface mirrors
-        // the local one -- otherwise a `src/.gitignore` would
-        // appear in the tree, breaking parity with the local view.
-        '-not -name .git',
-        '-not -path ' + shellQuote('*/.gitignore'),
-        '-not -path ' + shellQuote('*/.git/*'),
-        '-print0',
-      ].join(' ')
+      void command.depth
+      // NUL-separated relative file paths. Git owns the visibility
+      // semantics here: tracked + untracked files, excluding ignored
+      // files via the repo's standard exclude stack. Directories are
+      // derived from file paths by the source layer, so empty
+      // directories are not shown in v1.
+      return `git -C ${shellQuote(command.path)} ls-files -co --exclude-standard -z`
     }
     case 'revParseTopLevel':
       return `git -C ${shellQuote(command.path)} rev-parse --show-toplevel`
@@ -481,6 +459,10 @@ function scriptForCommand(command: RemoteCommandKind): string {
       return `git -C ${shellQuote(command.path)} worktree add ${remoteWorktreeAddArgs(command.input)}`
     case 'gitWorktreeRemove':
       return `git -C ${shellQuote(command.path)} worktree remove -- ${shellQuote(command.worktreePath)}`
+    case 'trashFile':
+      return remoteTrashFileScript(command.path, command.filePath)
+    case 'commandExists':
+      return remoteCommandExistsScript(command.path, command.commandName)
     case 'gitBranchDelete':
       return `git -C ${shellQuote(command.path)} branch ${command.force ? '-D' : '-d'} -- ${shellQuote(command.branch)}`
     case 'gitUpstream':
@@ -506,6 +488,34 @@ function scriptForCommand(command: RemoteCommandKind): string {
   }
   const exhaustive: never = command
   return exhaustive
+}
+
+function remoteTrashFileScript(worktreePath: string, filePath: string): string {
+  const worktree = shellQuote(worktreePath)
+  const file = shellQuote(filePath)
+  return [
+    `cd -- ${worktree}`,
+    `if [ ! -e ${file} ] && [ ! -L ${file} ]; then printf '%s\\n' 'error.file-not-found' >&2; exit 65; fi`,
+    `if [ -d ${file} ]; then printf '%s\\n' 'error.filetree-delete-directory-unsupported' >&2; exit 66; fi`,
+    `if command -v gio >/dev/null 2>&1; then exec gio trash -- ${file}; fi`,
+    `if command -v trash-put >/dev/null 2>&1; then exec trash-put -- ${file}; fi`,
+    `if command -v kioclient6 >/dev/null 2>&1; then exec kioclient6 move ${file} trash:/; fi`,
+    `if command -v kioclient5 >/dev/null 2>&1; then exec kioclient5 move ${file} trash:/; fi`,
+    `printf '%s\\n' 'error.trash-unavailable' >&2`,
+    `exit 64`,
+  ].join('\n')
+}
+
+const REMOTE_COMMAND_NAME_RE = /^[A-Za-z0-9._+-]+$/
+
+function remoteCommandExistsScript(worktreePath: string, commandName: string): string {
+  if (!REMOTE_COMMAND_NAME_RE.test(commandName)) return 'exit 1'
+  const check = `command -v ${shellQuote(commandName)} >/dev/null 2>&1`
+  return [
+    `cd -- ${shellQuote(worktreePath)}`,
+    `if [ -n "$SHELL" ]; then "$SHELL" -ilc ${shellQuote(check)}; exit $?; fi`,
+    `exec /bin/sh -c ${shellQuote(check)}`,
+  ].join('\n')
 }
 
 function remoteWorktreeAddArgs(input: CreateWorktreeInput): string {

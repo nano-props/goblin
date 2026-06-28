@@ -192,6 +192,12 @@ export interface RepoTreeResult {
   readonly truncated: boolean
 }
 
+export type RepoFileViewer = 'bat' | 'cat'
+
+export interface RepoFileViewerResult {
+  readonly viewer: RepoFileViewer
+}
+
 export interface ProbeResult {
   ok: boolean
   root?: string
@@ -259,6 +265,7 @@ export interface AppIpcHandlers {
     }) => Promise<PullRequestEntry[] | null>
     status: (input: { cwd: string }) => Promise<WorktreeStatus[]>
     patch: (input: { cwd: string; worktreePath: string }) => Promise<ExecResult>
+    trashFile: (input: { cwd: string; worktreePath: string; path: string }) => Promise<ExecResult>
     deleteBranch: (input: {
       cwd: string
       branch: string

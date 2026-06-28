@@ -96,7 +96,7 @@ function buildTree(): RepoTreeResult {
 describe('FiletreeView', () => {
   test('renders the empty state when the tree has no nodes', () => {
     const tree: RepoTreeResult = { nodes: [], truncated: false }
-    renderView({ tree, loading: false, error: null, stale: false })
+    renderView({ tree, loading: false, error: null })
     expect(container?.querySelector('[data-filetree=""]')).not.toBeNull()
     expect(container?.querySelectorAll('[role="row"]').length).toBe(0)
     expect(container?.textContent).toMatch(/filetree\.empty/)
@@ -114,7 +114,7 @@ describe('FiletreeView', () => {
 
   test('renders error state when error is set', () => {
     const tree: RepoTreeResult = { nodes: [], truncated: false }
-    renderView({ tree, loading: false, error: 'boom', stale: false })
+    renderView({ tree, loading: false, error: 'boom' })
     expect(container?.textContent).toMatch(/filetree\.error/)
   })
 
@@ -123,7 +123,6 @@ describe('FiletreeView', () => {
       tree: { nodes: [fileNode('README.md')], truncated: false },
       loading: false,
       error: null,
-      stale: false,
     })
     expect(treegrid().getAttribute('aria-label')).toBe('filetree.aria-label')
   })
@@ -133,9 +132,18 @@ describe('FiletreeView', () => {
       tree: { nodes: [fileNode('README.md')], truncated: false },
       loading: false,
       error: null,
-      stale: false,
     })
     expect(treegrid().className).not.toContain('border-l')
+  })
+
+  test('uses the app sans font for explorer file names', () => {
+    renderView({
+      tree: { nodes: [fileNode('README.md')], truncated: false },
+      loading: false,
+      error: null,
+    })
+    expect(treegrid().className).toContain('font-sans')
+    expect(treegrid().className).not.toContain('font-mono')
   })
 
   test('lists root-level files and directories, directories before files', () => {
@@ -149,30 +157,25 @@ describe('FiletreeView', () => {
       ],
       truncated: false,
     }
-    renderView({ tree, loading: false, error: null, stale: false })
+    renderView({ tree, loading: false, error: null })
 
     expect(rowNames()).toEqual(['src', 'README.md'])
     expect(row('src').getAttribute('aria-level')).toBe('1')
     expect(row('README.md').getAttribute('aria-level')).toBe('1')
   })
 
-  test('selects a directory first, then toggles it by clicking the selected row', async () => {
+  test('selects and toggles a directory when clicking the row', async () => {
     const user = userEvent.setup()
     const tree: RepoTreeResult = {
       nodes: [dirNode('src'), fileNode('src/index.ts', 'src')],
       truncated: false,
     }
-    renderView({ tree, loading: false, error: null, stale: false })
-
-    await user.click(row('src'))
-
-    expect(rowNames()).toEqual(['src'])
-    expect(row('src').getAttribute('aria-selected')).toBe('true')
-    expect(row('src').getAttribute('aria-expanded')).toBe('false')
+    renderView({ tree, loading: false, error: null })
 
     await user.click(row('src'))
 
     expect(rowNames()).toEqual(['src', 'index.ts'])
+    expect(row('src').getAttribute('aria-selected')).toBe('true')
     expect(row('src').getAttribute('aria-expanded')).toBe('true')
     expect(row('index.ts').getAttribute('aria-level')).toBe('2')
 
@@ -180,6 +183,86 @@ describe('FiletreeView', () => {
 
     expect(rowNames()).toEqual(['src'])
     expect(row('src').getAttribute('aria-expanded')).toBe('false')
+
+    await user.click(row('src'))
+
+    expect(rowNames()).toEqual(['src', 'index.ts'])
+    expect(row('src').getAttribute('aria-expanded')).toBe('true')
+  })
+
+  test('row click replaces selection and toggles directory expansion in one interaction', async () => {
+    const user = userEvent.setup()
+    const tree: RepoTreeResult = {
+      nodes: [dirNode('src'), fileNode('src/index.ts', 'src'), fileNode('README.md')],
+      truncated: false,
+    }
+    renderView({ tree, loading: false, error: null })
+
+    await user.click(row('README.md'))
+    expect(row('README.md').getAttribute('aria-selected')).toBe('true')
+
+    await user.click(row('src'))
+
+    expect(row('README.md').getAttribute('aria-selected')).toBe('false')
+    expect(row('src').getAttribute('aria-selected')).toBe('true')
+    expect(row('src').getAttribute('aria-expanded')).toBe('true')
+  })
+
+  test('shows a file action menu with open and delete items without selecting the row', async () => {
+    const user = userEvent.setup()
+    const onOpenFile = vi.fn()
+    const onRequestTrashFile = vi.fn()
+    const tree: RepoTreeResult = { nodes: [fileNode('README.md')], truncated: false }
+    renderView({ tree, loading: false, error: null, onOpenFile, onRequestTrashFile })
+
+    const actionButton = row('README.md').querySelector<HTMLButtonElement>('[data-action-popover-trigger]')
+    expect(actionButton).toBeTruthy()
+    expect(actionButton?.className).toContain('group-hover/filetree-row:opacity-100')
+    expect(actionButton?.className).not.toContain('group-focus-within/filetree-row:opacity-100')
+
+    await user.click(actionButton!)
+
+    expect(row('README.md').getAttribute('aria-selected')).toBe('false')
+    expect(document.body.textContent).toMatch(/app-chrome\.open/)
+    expect(document.body.textContent).toMatch(/menu\.edit\.delete/)
+    expect(document.body.querySelector('.border-t')).toBeTruthy()
+    const openItem = Array.from(document.body.querySelectorAll<HTMLButtonElement>('button')).find(
+      (button) => button.textContent === 'app-chrome.open',
+    )
+    expect(document.activeElement).not.toBe(openItem)
+
+    const deleteItem = Array.from(document.body.querySelectorAll<HTMLButtonElement>('button')).find(
+      (button) => button.textContent === 'menu.edit.delete',
+    )
+    await user.click(deleteItem!)
+
+    expect(row('README.md').getAttribute('aria-selected')).toBe('false')
+    expect(onRequestTrashFile).toHaveBeenCalledTimes(1)
+    expect(onRequestTrashFile.mock.calls[0]?.[0]?.path).toBe('README.md')
+    expect(onOpenFile).not.toHaveBeenCalled()
+  })
+
+  test('opens a file on double click', async () => {
+    const user = userEvent.setup()
+    const onOpenFile = vi.fn()
+    const tree: RepoTreeResult = { nodes: [fileNode('README.md')], truncated: false }
+    renderView({ tree, loading: false, error: null, onOpenFile })
+
+    await user.dblClick(row('README.md'))
+
+    expect(onOpenFile).toHaveBeenCalledTimes(1)
+    expect(onOpenFile.mock.calls[0]?.[0]?.path).toBe('README.md')
+  })
+
+  test('renders selected rows without rounded corners', async () => {
+    const user = userEvent.setup()
+    const tree: RepoTreeResult = { nodes: [fileNode('README.md')], truncated: false }
+    renderView({ tree, loading: false, error: null })
+
+    await user.click(row('README.md'))
+
+    expect(row('README.md').className).toContain('bg-selected')
+    expect(row('README.md').className).not.toMatch(/\brounded-/)
   })
 
   test('still expands a directory via the React Aria chevron slot', async () => {
@@ -188,19 +271,20 @@ describe('FiletreeView', () => {
       nodes: [dirNode('src'), fileNode('src/index.ts', 'src')],
       truncated: false,
     }
-    renderView({ tree, loading: false, error: null, stale: false })
+    renderView({ tree, loading: false, error: null })
 
     await user.click(row('src').querySelector<HTMLButtonElement>('button[slot="chevron"]')!)
 
     expect(rowNames()).toEqual(['src', 'index.ts'])
     expect(row('src').getAttribute('aria-expanded')).toBe('true')
+    expect(row('src').getAttribute('aria-selected')).toBe('false')
   })
 
   test('emits onSelect when a row is clicked', async () => {
     const user = userEvent.setup()
     const onSelect = vi.fn()
     const tree: RepoTreeResult = { nodes: [fileNode('README.md')], truncated: false }
-    renderView({ tree, loading: false, error: null, stale: false, onSelect })
+    renderView({ tree, loading: false, error: null, onSelect })
 
     await user.click(row('README.md'))
 
@@ -213,7 +297,7 @@ describe('FiletreeView', () => {
     const user = userEvent.setup()
     const onActivate = vi.fn()
     const tree: RepoTreeResult = { nodes: [fileNode('README.md')], truncated: false }
-    renderView({ tree, loading: false, error: null, stale: false, onActivate })
+    renderView({ tree, loading: false, error: null, onActivate })
 
     row('README.md').focus()
     await user.keyboard('{Enter}')
@@ -227,14 +311,8 @@ describe('FiletreeView', () => {
       nodes: [fileNode('README.md')],
       truncated: true,
     }
-    renderView({ tree, loading: false, error: null, stale: false })
+    renderView({ tree, loading: false, error: null })
     expect(container?.textContent).toMatch(/filetree\.truncated/)
-  })
-
-  test('does not flash a visible stale footer during background refresh', () => {
-    const tree: RepoTreeResult = { nodes: [fileNode('README.md')], truncated: false }
-    renderView({ tree, loading: false, error: null, stale: true })
-    expect(container?.textContent).not.toMatch(/status\.stale-title/)
   })
 
   test('marks a dirty file with a status dot', () => {
@@ -242,16 +320,16 @@ describe('FiletreeView', () => {
       nodes: [fileNode('README.md', null, 'modified')],
       truncated: false,
     }
-    renderView({ tree, loading: false, error: null, stale: false })
+    renderView({ tree, loading: false, error: null })
     const dot = container?.querySelector('[aria-label="filetree.status.modified"]') as HTMLElement
     expect(dot).toBeTruthy()
     expect(dot.style.background).toContain('--color-warning')
   })
 
-  test('treats loading=true with no tree as a placeholder and announces aria-busy', () => {
-    renderView({ tree: null, loading: true, error: null, stale: false })
+  test('keeps the initial loading state visually quiet and announces aria-busy', () => {
+    renderView({ tree: null, loading: true, error: null })
     expect(container?.querySelectorAll('[role="row"]').length).toBe(0)
-    expect(container?.textContent).toMatch(/filetree\.loading/)
+    expect(container?.textContent).not.toMatch(/filetree\.loading/)
     expect(container?.textContent).not.toMatch(/filetree\.empty/)
     expect(container?.querySelector('[data-filetree=""]')?.getAttribute('aria-busy')).toBe('true')
   })
@@ -262,9 +340,8 @@ describe('FiletreeView', () => {
       nodes: [dirNode('src'), fileNode('src/index.ts', 'src'), fileNode('README.md')],
       truncated: false,
     }
-    renderView({ tree: treeA, loading: false, error: null, stale: false })
+    renderView({ tree: treeA, loading: false, error: null })
 
-    await user.click(row('src'))
     await user.click(row('src'))
     await user.click(row('README.md'))
     expect(rowNames()).toEqual(['src', 'index.ts', 'README.md'])
@@ -275,7 +352,7 @@ describe('FiletreeView', () => {
       truncated: false,
     }
     await act(async () => {
-      root?.render(<FiletreeView tree={treeB} loading={false} error={null} stale={false} />)
+      root?.render(<FiletreeView tree={treeB} loading={false} error={null} />)
     })
 
     expect(rowNames()).toEqual(['docs', 'CHANGELOG.md'])
@@ -286,7 +363,7 @@ describe('FiletreeView', () => {
 describe('FiletreeView — React Aria keyboard integration', () => {
   test('ArrowRight expands the focused directory', async () => {
     const user = userEvent.setup()
-    renderView({ tree: buildTree(), loading: false, error: null, stale: false })
+    renderView({ tree: buildTree(), loading: false, error: null })
 
     row('src').focus()
     await user.keyboard('{ArrowRight}')
@@ -297,7 +374,7 @@ describe('FiletreeView — React Aria keyboard integration', () => {
 
   test('ArrowLeft collapses the focused expanded directory', async () => {
     const user = userEvent.setup()
-    renderView({ tree: buildTree(), loading: false, error: null, stale: false })
+    renderView({ tree: buildTree(), loading: false, error: null })
 
     row('src').focus()
     await user.keyboard('{ArrowRight}')
@@ -314,7 +391,7 @@ describe('FiletreeView — locale-aware sorting', () => {
       nodes: [fileNode('10.txt'), dirNode('a'), fileNode('2.txt'), dirNode('A'), fileNode('b.txt'), fileNode('a.txt')],
       truncated: false,
     }
-    renderView({ tree, loading: false, error: null, stale: false })
+    renderView({ tree, loading: false, error: null })
 
     expect(rowNames()).toEqual(['a', 'A', '2.txt', '10.txt', 'a.txt', 'b.txt'])
   })

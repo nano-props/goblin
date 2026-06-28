@@ -78,9 +78,31 @@ describe('remote ssh command builders', () => {
       depth: 4,
     })
 
-    expect(invocation.script).toContain('-type f')
-    expect(invocation.script).toContain('-print0')
+    expect(invocation.script).toContain('git -C')
+    expect(invocation.script).toContain('ls-files -co --exclude-standard -z')
     expect(invocation.script).not.toMatch(/\bfind\s+--\b/)
+  })
+
+  test('remote commandExists checks the command in the remote login shell', () => {
+    const invocation = buildRemoteCommandInvocation(target(), {
+      type: 'commandExists',
+      path: '/srv/repo worktree',
+      commandName: 'bat',
+    })
+
+    expect(invocation.script).toContain("cd -- '/srv/repo worktree'")
+    expect(invocation.script).toContain('"$SHELL" -ilc')
+    expect(invocation.script).toContain("command -v '\\''bat'\\'' >/dev/null 2>&1")
+  })
+
+  test('remote commandExists rejects unsafe command names', () => {
+    const invocation = buildRemoteCommandInvocation(target(), {
+      type: 'commandExists',
+      path: '/srv/repo',
+      commandName: 'bat; touch /tmp/pwned',
+    })
+
+    expect(invocation.script).toBe('exit 1')
   })
 
   test('remote bootstrap script handles space paths and excludes copied tree children', async () => {

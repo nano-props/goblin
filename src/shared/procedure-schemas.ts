@@ -121,6 +121,15 @@ export const REPO_PROCEDURE_SCHEMAS = {
     prefix: v.optional(RepoTreePrefixSchema),
     depth: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(10))),
   }),
+  trashFile: v.object({
+    cwd: v.string(),
+    worktreePath: v.string(),
+    path: RepoTreePrefixSchema,
+  }),
+  fileViewer: v.object({
+    cwd: v.string(),
+    worktreePath: v.string(),
+  }),
   pullRequests: v.object({
     cwd: v.string(),
     branches: v.optional(StringArray),

@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { execa } from 'execa'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   MAX_REPO_TREE_DEPTH,
@@ -9,22 +10,18 @@ import {
   getRepoTreeSourceLocal,
   getRepoTreeSourceRemote,
 } from '#/server/modules/repo-tree-source.ts'
-import { buildNodes, buildStatusOverlay } from '#/server/modules/repo-tree-source-pure.ts'
-import type { StatusEntry, WorktreeStatus } from '#/shared/git-types.ts'
+import { buildNodes } from '#/server/modules/repo-tree-source-pure.ts'
 import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
 
 async function makeTempWorktree(files: Record<string, string>): Promise<string> {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'repo-tree-source-'))
+  await execa('git', ['-C', root, 'init', '-q'])
   for (const [relpath, contents] of Object.entries(files)) {
     const full = path.join(root, relpath)
     await fs.mkdir(path.dirname(full), { recursive: true })
     await fs.writeFile(full, contents, 'utf8')
   }
   return root
-}
-
-function statusEntry(x: string, y: string, p: string): StatusEntry {
-  return { x, y, path: p }
 }
 
 describe('repo-tree-source — local FS walk', () => {
@@ -71,10 +68,10 @@ describe('repo-tree-source — local FS walk', () => {
     expect(result.truncated).toBe(false)
   })
 
-  test('always excludes .git and respects root .gitignore', async () => {
+  test('uses git exclude rules while keeping ordinary dotfiles visible', async () => {
     worktree = await makeTempWorktree({
-      '.git/HEAD': 'ref: refs/heads/main',
       '.gitignore': 'node_modules\ndist/\n*.log',
+      '.env': 'VISIBLE=true',
       'src/index.ts': '',
       'node_modules/lib/index.js': '',
       'dist/bundle.js': '',
@@ -85,7 +82,6 @@ describe('repo-tree-source — local FS walk', () => {
     const result = await getRepoTreeSourceLocal(worktree, {}, undefined)
     const ids = result.nodes.map((n) => n.id).sort()
     expect(ids).not.toContain('.git')
-    expect(ids).not.toContain('.gitignore')
     expect(ids).not.toContain('.git/HEAD')
     expect(ids).not.toContain('node_modules')
     expect(ids).not.toContain('node_modules/lib')
@@ -95,6 +91,8 @@ describe('repo-tree-source — local FS walk', () => {
     expect(ids).not.toContain('app.log')
     expect(ids).toContain('src')
     expect(ids).toContain('README.md')
+    expect(ids).toContain('.env')
+    expect(ids).toContain('.gitignore')
   })
 
   test('clamps depth to MAX_REPO_TREE_DEPTH', async () => {
@@ -103,11 +101,8 @@ describe('repo-tree-source — local FS walk', () => {
     })
     const options: RepoTreeSourceOptions = { depth: MAX_REPO_TREE_DEPTH + 5 }
     const result = await getRepoTreeSourceLocal(worktree, options, undefined)
-    // With a clamped depth of 10, none of the deeper file should be
-    // reachable from the root (we'd need to descend 6 levels which
-    // is within the cap, but tinyglobby's `deep` is directory depth
-    // so we are safe either way). Assert the response is internally
-    // consistent.
+    // With a clamped depth of 10, this file is within the cap. Assert
+    // the response is internally consistent.
     expect(result.truncated).toBe(false)
     expect(result.nodes.every((n) => n.id.length > 0)).toBe(true)
   })
@@ -152,37 +147,6 @@ describe('repo-tree-source — local FS walk', () => {
     expect(result.truncated).toBe(true)
   })
 
-  test('translates a precomputed status overlay onto matching paths', async () => {
-    worktree = await makeTempWorktree({
-      'README.md': '',
-      'src/index.ts': '',
-      'src/new.ts': '',
-    })
-
-    const status: WorktreeStatus[] = [
-      {
-        path: worktree,
-        branch: 'main',
-        isMain: true,
-        entries: [
-          statusEntry('M', ' ', 'README.md'),
-          statusEntry(' ', 'M', 'src/index.ts'),
-          statusEntry('?', '?', 'src/new.ts'),
-          statusEntry('!', '!', 'src/ignored.ts'),
-          statusEntry(' ', ' ', 'src/clean.ts'),
-        ],
-      },
-    ]
-
-    const result = await getRepoTreeSourceLocal(worktree, {}, undefined, status)
-    const byId = new Map(result.nodes.map((n) => [n.id, n]))
-    expect(byId.get('README.md')?.status).toBe('staged')
-    expect(byId.get('src/index.ts')?.status).toBe('modified')
-    expect(byId.get('src/new.ts')?.status).toBe('untracked')
-    // Files not listed in the overlay default to 'clean'.
-    expect(result.nodes.every((n) => n.status !== 'ignored')).toBe(true)
-  })
-
   test('aborts mid-walk when the signal fires', async () => {
     worktree = await makeTempWorktree({
       'a.ts': '',
@@ -204,27 +168,6 @@ describe('repo-tree-source — local FS walk', () => {
     expect(result.truncated).toBe(false)
   })
 
-  test('reads only the worktree status matching the requested path', async () => {
-    const overlay = buildStatusOverlay(
-      [
-        {
-          path: '/tmp/other-worktree',
-          branch: 'other',
-          isMain: false,
-          entries: [statusEntry(' ', 'M', 'foo.ts')],
-        },
-        {
-          path: '/tmp/target-worktree',
-          branch: 'main',
-          isMain: true,
-          entries: [statusEntry(' ', 'M', 'bar.ts')],
-        },
-      ],
-      '/tmp/target-worktree',
-    )
-    expect(overlay.get('bar.ts')).toBe('modified')
-    expect(overlay.has('foo.ts')).toBe(false)
-  })
 })
 
 describe('repo-tree-source — buildNodes pure helper', () => {
@@ -233,7 +176,7 @@ describe('repo-tree-source — buildNodes pure helper', () => {
       worktreePath: '/x',
       prefix: '',
       depth: 5,
-      entries: ['src/a.ts', 'src', 'src/b.ts', 'README.md'],
+      entries: ['src/a.ts', 'src/b.ts', 'README.md'],
     })
     // First the `src` directory should appear before any file at the
     // root. Then `README.md` and `src/a.ts` / `src/b.ts`.
@@ -243,16 +186,39 @@ describe('repo-tree-source — buildNodes pure helper', () => {
     expect(dirIdx).toBeLessThan(readmeIdx)
   })
 
-  test('does not emit duplicate file nodes for directory entries with children', () => {
+  test('derives directory nodes from file entries', () => {
     const nodes = buildNodes({
       worktreePath: '/x',
       prefix: '',
       depth: 5,
-      entries: ['src', 'src/a.ts'],
+      entries: ['src/a.ts'],
     })
     const srcNodes = nodes.filter((n) => n.id === 'src')
     expect(srcNodes).toHaveLength(1)
     expect(srcNodes[0]?.kind).toBe('directory')
+  })
+
+  test('does not double-count prefix segments when applying depth', () => {
+    const nodes = buildNodes({
+      worktreePath: '/x',
+      prefix: 'src',
+      depth: 2,
+      entries: ['src/a.ts', 'src/nested/b.ts'],
+    })
+    const ids = nodes.map((n) => n.id)
+    expect(ids).toContain('src/a.ts')
+    expect(ids).not.toContain('src/nested/b.ts')
+  })
+
+  test('drops the worktree root entry instead of emitting an empty node', () => {
+    const nodes = buildNodes({
+      worktreePath: '/x',
+      prefix: '',
+      depth: 5,
+      entries: ['', 'README.md'],
+    })
+    const ids = nodes.map((n) => n.id)
+    expect(ids).toEqual(['README.md'])
   })
 
   test('strips absolute paths and parent traversals', () => {
@@ -269,8 +235,8 @@ describe('repo-tree-source — buildNodes pure helper', () => {
   })
 
   test('rejects mid-path `..` traversal that escapes the worktree root', () => {
-    // Defense-in-depth: a remote-side find that follows a symlink
-    // could surface paths like `foo/../../etc/passwd` whose
+    // Defense-in-depth: a malformed remote result could surface paths
+    // like `foo/../../etc/passwd` whose
     // segment set contains `..`. They must not become tree nodes.
     const nodes = buildNodes({
       worktreePath: '/x',
@@ -299,12 +265,12 @@ describe('repo-tree-source — buildNodes pure helper', () => {
   })
 })
 
-describe('repo-tree-source — translateGitignoreLine coverage', () => {
+describe('repo-tree-source — git exclude coverage', () => {
   // Indirect test via the read path: a `.gitignore` containing the
   // patterns below should drop matching files but keep the rest.
   test('negation and anchored patterns affect the result set', async () => {
     const worktree = await makeTempWorktree({
-      '.gitignore': ['/rooted-ignored', '!should-not-unignore'].join('\n'),
+      '.gitignore': ['/rooted-ignored', '!should-not-unignore.ts'].join('\n'),
       'rooted-ignored': '',
       'src/rooted-ignored': '',
       'should-not-unignore.ts': '',
@@ -316,9 +282,8 @@ describe('repo-tree-source — translateGitignoreLine coverage', () => {
       // anchored `/rooted-ignored` only excludes the root one.
       expect(ids).toContain('src/rooted-ignored')
       // Negation is intentionally a no-op in v1 — the file is
-      // neither created nor excluded by `!` lines; the spec is
-      // explicit that we ship a minimal reader.
-      void ids
+      // neither created nor excluded by `!` lines.
+      expect(ids).toContain('should-not-unignore.ts')
     } finally {
       await fs.rm(worktree, { recursive: true, force: true })
     }
@@ -371,14 +336,12 @@ function makeRemoteInput(
   worktreePath: string,
   options: RepoTreeSourceOptions = {},
   signal: AbortSignal | undefined = undefined,
-  precomputedStatus: ReadonlyArray<WorktreeStatus> | undefined = undefined,
 ) {
   return {
     target: remoteTarget(),
     worktreePath,
     options,
     signal,
-    precomputedStatus,
   }
 }
 
@@ -397,7 +360,7 @@ describe('repo-tree-source — remote SSH walk', () => {
     expect(remoteMocks.getRemoteTreeWalk).not.toHaveBeenCalled()
   })
 
-  test('walks NUL-separated entries and applies the status overlay', async () => {
+  test('walks NUL-separated entries into directory and file nodes', async () => {
     remoteMocks.getRemoteTreeWalk.mockResolvedValueOnce({
       ok: true,
       message: [
@@ -407,21 +370,10 @@ describe('repo-tree-source — remote SSH walk', () => {
       ].join(NUL),
     })
 
-    const precomputed: WorktreeStatus[] = [
-      {
-        path: '/srv/repos/myrepo/.worktrees/feature',
-        branch: 'main',
-        isMain: false,
-        entries: [statusEntry('M', ' ', 'README.md'), statusEntry('?', '?', 'src/new.ts')],
-      },
-    ]
-
-    const result = await getRepoTreeSourceRemote(
-      makeRemoteInput('/srv/repos/myrepo/.worktrees/feature', {}, undefined, precomputed),
-    )
+    const result = await getRepoTreeSourceRemote(makeRemoteInput('/srv/repos/myrepo/.worktrees/feature'))
 
     const byId = new Map(result.nodes.map((n) => [n.id, n]))
-    expect(byId.get('README.md')?.status).toBe('staged')
+    expect(byId.get('README.md')?.status).toBe('clean')
     expect(byId.get('src')?.kind).toBe('directory')
     expect(byId.get('src/index.ts')?.kind).toBe('file')
     expect(byId.get('src/util')?.kind).toBe('directory')

@@ -8,13 +8,11 @@
 // `(input) -> output` transforms over already-fetched strings.
 
 import path from 'node:path'
-import type { RepoTreeNode, RepoTreeNodeStatus } from '#/shared/api-types.ts'
-import type { WorktreeStatus } from '#/shared/git-types.ts'
+import type { RepoTreeNode } from '#/shared/api-types.ts'
 
-/** NUL byte used as the record separator for `find -print0` output
- *  from the remote side. Declared as a constant so the source
- *  layer does not have to spell out the escape inline (which is
- *  fragile in some editors). */
+/** NUL byte used as the record separator for git path streams.
+ *  Declared as a constant so the source layer does not have to spell
+ *  out the escape inline, which is fragile in some editors. */
 export const NULL = String.fromCharCode(0)
 
 export interface BuildNodesInput {
@@ -24,7 +22,7 @@ export interface BuildNodesInput {
   readonly entries: ReadonlyArray<string>
 }
 
-/** Convert a list of tinyglobby entries (relative POSIX paths) into
+/** Convert a list of git-owned file entries (relative POSIX paths) into
  *  a flat list of RepoTreeNodes with derived directory nodes. */
 export function buildNodes(input: BuildNodesInput): RepoTreeNode[] {
   const { prefix, depth, entries } = input
@@ -33,19 +31,19 @@ export function buildNodes(input: BuildNodesInput): RepoTreeNode[] {
 
   for (const rawEntry of entries) {
     const relative = rawEntry.split(path.sep).join('/')
+    if (relative === '') continue
+    if (prefix && relative !== prefix && !relative.startsWith(`${prefix}/`)) continue
     // Reject anything that escapes the worktree root: top-level
     // `..`, mid-path `..` (e.g. `foo/../../etc/passwd`), and
-    // absolute paths. The local walker never produces these --
-    // tinyglobby's `cwd` is the worktree root and it refuses to
-    // ascend -- but the remote side hands us whatever `find
-    // -print0` returned, and `find` will follow symlinks into a
-    // symlinked ancestor without complaint.
+    // absolute paths. The source layer should only provide relative
+    // git paths, but this pure helper is a defense-in-depth boundary
+    // for malformed remote output.
     if (relative.startsWith('../') || relative === '..' || path.isAbsolute(relative)) continue
     if (relative.split('/').includes('..')) continue
-    if (!isWithinDepth(relative, prefix, depth)) continue
+    if (!isWithinDepth(relative, depth)) continue
 
-    const kind: RepoTreeNode['kind'] = relative.endsWith('/') ? 'directory' : 'file'
-    const id = stripTrailingSlash(relative)
+    const kind: RepoTreeNode['kind'] = 'file'
+    const id = relative
     const name = basename(id)
     const parentId = parentDirectoryId(id, prefix)
     fileNodes.push({ id, path: id, name, parentId, kind, status: 'clean' })
@@ -69,9 +67,7 @@ export function buildNodes(input: BuildNodesInput): RepoTreeNode[] {
 
   const visibleFileNodes = fileNodes.filter((node) => !dirIds.has(node.id))
 
-  // Sort directories first, then files, both alphabetical. Children
-  // of the same parent appear next to each other because we already
-  // walk in tree order via tinyglobby.
+  // Sort directories first, then files, both alphabetical.
   return [...dirNodes, ...visibleFileNodes].sort(compareNodes)
 }
 
@@ -106,60 +102,18 @@ function basename(id: string): string {
   return slash < 0 ? id : id.slice(slash + 1)
 }
 
-function stripTrailingSlash(id: string): string {
-  return id.endsWith('/') ? id.slice(0, -1) : id
-}
-
-function isWithinDepth(relative: string, prefix: string, depth: number): boolean {
+function isWithinDepth(relative: string, depth: number): boolean {
   const segments = relative.split('/').filter(Boolean).length
-  const prefixSegments = prefix ? prefix.split('/').filter(Boolean).length : 0
-  return segments + prefixSegments <= depth
-}
-
-/** Map a worktree status report to a path -> status lookup, scoped
- *  to the requested worktree. The read layer supplies the full
- *  WorktreeStatus list; we pick out the worktree that matches the
- *  requested path and translate each entry x/y codes into a
- *  RepoTreeNodeStatus. */
-export function buildStatusOverlay(
-  precomputedStatus: ReadonlyArray<WorktreeStatus> | undefined,
-  worktreePath: string,
-): Map<string, RepoTreeNodeStatus> {
-  const out = new Map<string, RepoTreeNodeStatus>()
-  if (!precomputedStatus) return out
-
-  const matched = precomputedStatus.find((wt) => path.resolve(wt.path) === path.resolve(worktreePath))
-  if (!matched) return out
-
-  for (const entry of matched.entries) {
-    const status = translateStatusEntry(entry.x, entry.y)
-    if (status === 'clean') continue
-    out.set(entry.path, status)
-  }
-  return out
-}
-
-function translateStatusEntry(x: string, y: string): RepoTreeNodeStatus {
-  // git status --porcelain codes:
-  //   x = index (staged), y = worktree (unstaged)
-  //   ?? = untracked, !! = ignored
-  if (x === '?' && y === '?') return 'untracked'
-  if (x === '!' && y === '!') return 'ignored'
-  if (x !== ' ' && x !== '?') return 'staged'
-  if (y !== ' ' && y !== '?') return 'modified'
-  return 'clean'
+  return segments <= depth
 }
 
 export function parseNullSeparatedPaths(input: string): string[] {
-  // `find -print0` emits NUL-separated records with no line terminator
+  // Git emits NUL-separated records with no line terminator
   // on the last entry, so the only legitimate "junk" between records is
   // the empty trailing element from the trailing NUL. We deliberately
   // do NOT strip leading/trailing newlines from individual parts -- a
-  // path can legitimately contain an embedded newline when git status -z
-  // quotes it, and `find -print0` would still hand us the line-boundary
-  // inside that quoted segment. Touching the bytes here would silently
-  // mangle valid Linux paths. See parsers.test.ts: 'handles paths with
-  // embedded newlines (quoted paths in git status -z)'.
+  // path can legitimately contain an embedded newline. Touching the
+  // bytes here would silently mangle valid Linux paths.
   if (input.length === 0) return []
   return input.split(NULL).filter((part) => part.length > 0)
 }
