@@ -6,7 +6,7 @@
 // (keyboard navigation, typeahead, roving focus, expansion and
 // selection) to React Aria Components.
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Button as AriaButton, Tree, TreeItem, TreeItemContent, type Key, type Selection } from 'react-aria-components'
 import { ChevronRight, File, Folder, FolderTree } from 'lucide-react'
 import type { RepoTreeNode, RepoTreeNodeStatus, RepoTreeResult } from '#/shared/api-types.ts'
@@ -97,15 +97,19 @@ export function FiletreeView({ tree, loading, error, stale, onSelect, onActivate
   const collection = useMemo(() => buildCollection(tree), [tree])
   const [expandedKeys, setExpandedKeys] = useState<Set<Key>>(() => new Set())
   const [selectedKeys, setSelectedKeys] = useState<Set<Key>>(() => new Set())
+  const selectedKeysRef = useRef<Set<Key>>(selectedKeys)
 
   useEffect(() => {
     setExpandedKeys(new Set())
-    setSelectedKeys(new Set())
+    const next = new Set<Key>()
+    selectedKeysRef.current = next
+    setSelectedKeys(next)
   }, [tree])
 
   const handleSelectionChange = useCallback(
     (selection: Selection) => {
       const next = selection === 'all' ? new Set<Key>() : new Set(selection)
+      selectedKeysRef.current = next
       setSelectedKeys(next)
       const first = next.values().next().value
       if (typeof first !== 'string') return
@@ -126,8 +130,11 @@ export function FiletreeView({ tree, loading, error, stale, onSelect, onActivate
 
   const handlePressItem = useCallback(
     (node: RepoTreeNode) => {
-      setSelectedKeys(new Set<Key>([node.id]))
-      if (node.kind === 'directory') toggleExpandedKey(node.id)
+      const alreadySelected = selectedKeysRef.current.has(node.id)
+      const nextSelectedKeys = new Set<Key>([node.id])
+      selectedKeysRef.current = nextSelectedKeys
+      setSelectedKeys(nextSelectedKeys)
+      if (node.kind === 'directory' && alreadySelected) toggleExpandedKey(node.id)
       onSelect?.(node)
     },
     [onSelect, toggleExpandedKey],

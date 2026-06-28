@@ -156,13 +156,19 @@ describe('FiletreeView', () => {
     expect(row('README.md').getAttribute('aria-level')).toBe('1')
   })
 
-  test('toggles a directory by clicking the full row', async () => {
+  test('selects a directory first, then toggles it by clicking the selected row', async () => {
     const user = userEvent.setup()
     const tree: RepoTreeResult = {
       nodes: [dirNode('src'), fileNode('src/index.ts', 'src')],
       truncated: false,
     }
     renderView({ tree, loading: false, error: null, stale: false })
+
+    await user.click(row('src'))
+
+    expect(rowNames()).toEqual(['src'])
+    expect(row('src').getAttribute('aria-selected')).toBe('true')
+    expect(row('src').getAttribute('aria-expanded')).toBe('false')
 
     await user.click(row('src'))
 
@@ -258,6 +264,7 @@ describe('FiletreeView', () => {
     }
     renderView({ tree: treeA, loading: false, error: null, stale: false })
 
+    await user.click(row('src'))
     await user.click(row('src'))
     await user.click(row('README.md'))
     expect(rowNames()).toEqual(['src', 'index.ts', 'README.md'])
