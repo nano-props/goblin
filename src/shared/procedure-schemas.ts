@@ -15,6 +15,7 @@ import {
   RemoteTargetSchema,
 } from '#/shared/api-types.ts'
 import { NativeHostProjectionSchema } from '#/shared/native-host-projection.ts'
+import { RepoTreePrefixSchema } from '#/shared/repo-tree-schema.ts'
 import { WORKTREE_BOOTSTRAP_CONFIG_HASH_RE } from '#/shared/repo-settings.ts'
 
 const SourceToken = v.optional(v.string())
@@ -105,6 +106,29 @@ export const REPO_PROCEDURE_SCHEMAS = {
     skip: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(100_000))),
   }),
   patch: v.object({ cwd: v.string(), worktreePath: v.string() }),
+  // Worktree-scoped file tree (docs/filetree.md). `prefix` enables
+  // incremental loading for very deep trees; `depth` is bounded 1..10
+  // so a bad client cannot ask the server to walk forever. The
+  // perimeter rejects absolute paths, `..` segments, control
+  // characters and backslashes inside `prefix` so a hostile or
+  // buggy client cannot escape the worktree root. The read layer
+  // still verifies `worktreePath` against the worktree list as a
+  // defense-in-depth check.
+  tree: v.object({
+    cwd: v.string(),
+    worktreePath: v.string(),
+    prefix: v.optional(RepoTreePrefixSchema),
+    depth: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(10))),
+  }),
+  trashFile: v.object({
+    cwd: v.string(),
+    worktreePath: v.string(),
+    path: RepoTreePrefixSchema,
+  }),
+  fileViewer: v.object({
+    cwd: v.string(),
+    worktreePath: v.string(),
+  }),
   pullRequests: v.object({
     cwd: v.string(),
     branches: v.optional(StringArray),
@@ -149,10 +173,16 @@ const WorkspacePaneStaticTabOrderEntrySchema = v.variant('type', [
   v.object({ type: v.literal('status'), id: v.literal('status') }),
   v.object({ type: v.literal('changes'), id: v.literal('changes') }),
   v.object({ type: v.literal('history'), id: v.literal('history') }),
+  v.object({ type: v.literal('files'), id: v.literal('files') }),
 ])
 const WorkspacePaneTerminalTabOrderEntrySchema = v.object({
   type: v.literal('terminal'),
   id: v.pipe(v.string(), v.minLength(1)),
+})
+const FiletreeSessionViewStateSchema = v.object({
+  selectedKeys: v.array(v.string()),
+  expandedKeys: v.array(v.string()),
+  topVisibleRowIndex: v.number(),
 })
 const WorkspaceSessionStateSchema = v.object({
   openRepoEntries: v.array(RepoSessionEntrySchema),
@@ -161,7 +191,7 @@ const WorkspaceSessionStateSchema = v.object({
   workspacePaneSize: v.number(),
   selectedTerminalSessionByWorktree: v.optional(v.record(v.string(), v.string())),
   preferredWorkspacePaneTabByBranchByRepo: v.optional(
-    v.record(v.string(), v.record(v.string(), v.picklist(['status', 'changes', 'history', 'terminal']))),
+    v.record(v.string(), v.record(v.string(), v.picklist(['status', 'changes', 'history', 'files', 'terminal']))),
   ),
   workspacePaneTabOrderByBranchByRepo: v.record(
     v.string(),
@@ -169,6 +199,9 @@ const WorkspaceSessionStateSchema = v.object({
       v.string(),
       v.array(v.union([WorkspacePaneStaticTabOrderEntrySchema, WorkspacePaneTerminalTabOrderEntrySchema])),
     ),
+  ),
+  filetreeViewStateByWorktreeByRepo: v.optional(
+    v.record(v.string(), v.record(v.string(), FiletreeSessionViewStateSchema)),
   ),
 })
 

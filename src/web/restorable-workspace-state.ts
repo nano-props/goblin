@@ -7,10 +7,13 @@ import {
   persistedSelectedTerminalByWorktreeForSession,
   persistedPreferredWorkspacePaneTabByBranchByRepoForSession,
 } from '#/web/session-persistence-state.ts'
+import { persistedFiletreeViewStateByWorktreeByRepoForSession } from '#/web/filetree-session-state.ts'
+import type { FiletreeInteractionSnapshot } from '#/web/stores/repos/filetree-interaction-state.ts'
 
 export function workspaceSessionStateFromRestorableWorkspaceState(input: {
   repos: ReposStore['repos']
   restorableWorkspaceState: RestorableWorkspaceState
+  filetreeInteractionByScope?: Readonly<Record<string, FiletreeInteractionSnapshot>>
 }): WorkspaceSessionState {
   const { repos, restorableWorkspaceState } = input
   return {
@@ -27,6 +30,11 @@ export function workspaceSessionStateFromRestorableWorkspaceState(input: {
       restorableWorkspaceState.order,
     ),
     workspacePaneTabOrderByBranchByRepo: persistedWorkspacePaneTabOrderByBranchByRepoForSession(
+      repos,
+      restorableWorkspaceState.order,
+    ),
+    filetreeViewStateByWorktreeByRepo: persistedFiletreeViewStateByWorktreeByRepoForSession(
+      input.filetreeInteractionByScope ?? {},
       repos,
       restorableWorkspaceState.order,
     ),

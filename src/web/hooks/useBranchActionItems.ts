@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, Diff, GitBranch, History, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Diff, FolderTree, GitBranch, History, Trash2 } from 'lucide-react'
 import { createElement, type ReactNode } from 'react'
 import type { RepoBranchState } from '#/web/stores/repos/types.ts'
 import { useT } from '#/web/stores/i18n.ts'
@@ -117,6 +117,21 @@ export function useBranchActionItems(
       visible: !!branch.worktree?.path,
       icon: createElement(Diff),
       onSelect: () => openStaticWorkspacePaneTab('changes'),
+    },
+    {
+      id: 'files',
+      label: t('tab.files'),
+      disabled,
+      // Both `changes` and `files` are worktree-scoped tabs
+      // (see `WORKSPACE_PANE_STATIC_TAB_SCOPES`), so the menu item
+      // is hidden for branches that have no worktree -- mirroring
+      // the `changes` gate one entry above. The tab itself is
+      // always present on the workspace pane strip; this menu
+      // item is a discoverability shortcut for users who don't
+      // notice the tab.
+      visible: !!branch.worktree?.path,
+      icon: createElement(FolderTree),
+      onSelect: () => openStaticWorkspacePaneTab('files'),
     },
     {
       id: 'history',

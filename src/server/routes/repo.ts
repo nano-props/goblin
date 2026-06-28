@@ -10,6 +10,9 @@ import {
   getRepoWorktreeBootstrapPreview,
   probeRepo,
 } from '#/server/modules/repo-read-paths.ts'
+import { getRepositoryFileViewer } from '#/server/modules/repo-file-viewer.ts'
+import { getRepositoryTree } from '#/server/modules/repo-tree.ts'
+import { trashRepositoryFile } from '#/server/modules/repo-tree-trash.ts'
 import {
   abortCloneOperation,
   abortRepoOperation,
@@ -27,6 +30,7 @@ import {
   removeRepoWorktree,
 } from '#/server/modules/repo-write-paths.ts'
 import { getServerFetchIntervalSec } from '#/server/modules/settings-source.ts'
+import { publishRepoQueryInvalidation } from '#/server/modules/invalidation-broker.ts'
 import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'
 import { REPO_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 import type { RepoLogResponse } from '#/shared/api-types.ts'
@@ -93,6 +97,43 @@ export function createRepoRoutes() {
   app.post('/patch', async (c) => {
     const { cwd, worktreePath } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.patch, c)
     return c.json(await jsonOr(() => getRepoPatch(cwd, worktreePath, c.req.raw.signal), READ_REPO_ERROR, 'patch'))
+  })
+  app.post('/tree', async (c) => {
+    const { cwd, worktreePath, prefix, depth } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.tree, c)
+    return c.json(
+      await jsonOr(
+        // Do not pipe the HTTP request signal into the git tree read.
+        // In the Electron/Vite proxy path that signal can abort while
+        // React Query is still settling the tab render, and the tree read
+        // soft-fails to an empty result that the UI then displays as a real
+        // empty worktree.
+        () => getRepositoryTree(cwd, worktreePath, { prefix, depth }),
+        { nodes: [], truncated: false },
+        'tree',
+      ),
+    )
+  })
+  app.post('/file-viewer', async (c) => {
+    const { cwd, worktreePath } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.fileViewer, c)
+    return c.json(
+      await jsonOr(
+        () => getRepositoryFileViewer(cwd, worktreePath, c.req.raw.signal),
+        { viewer: 'cat', shell: 'posix' },
+        'file-viewer',
+      ),
+    )
+  })
+  app.post('/trash-file', async (c) => {
+    const { cwd, worktreePath, path } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.trashFile, c)
+    const result = await jsonOr(
+      () => trashRepositoryFile(cwd, worktreePath, path, c.req.raw.signal),
+      { ok: false as const, message: 'error.failed-trash-file' },
+      'trash-file',
+    )
+    if (result.ok || result.repoChanged === true) {
+      publishRepoQueryInvalidation({ repoId: cwd, query: 'repo-snapshot' })
+    }
+    return c.json(result)
   })
   app.post('/pull-requests', async (c) => {
     const { cwd, branches, mode } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.pullRequests, c)

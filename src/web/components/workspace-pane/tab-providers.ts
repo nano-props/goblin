@@ -1,4 +1,4 @@
-import { Diff, GitBranch, History, Terminal, type LucideIcon } from 'lucide-react'
+import { Diff, FolderTree, GitBranch, History, Terminal, type LucideIcon } from 'lucide-react'
 import type {
   WorkspacePaneStaticTabType,
   WorkspacePaneTabOrderEntry,
@@ -177,6 +177,23 @@ class HistoryWorkspacePaneTabProvider extends WorkspacePaneStaticTabProvider<'hi
   }
 }
 
+class FilesWorkspacePaneTabProvider extends WorkspacePaneStaticTabProvider<'files'> {
+  readonly refreshOnOpen = true
+
+  constructor() {
+    super({ type: 'files', icon: FolderTree })
+  }
+
+  label(input: WorkspacePaneStaticTabMetadataInput): string {
+    return input.t('tab.files')
+  }
+
+  tooltip(input: WorkspacePaneStaticTabMetadataInput): string {
+    if (!input.branchName) return input.t('tab.files')
+    return input.t('workspace-pane-tabs.files-tooltip', { branch: input.branchName })
+  }
+}
+
 export class TerminalWorkspacePaneTabProvider extends WorkspacePaneTabProvider<'terminal'> {
   readonly kind = 'runtime' as const
   readonly refreshOnOpen = false
@@ -251,6 +268,7 @@ function branchScopedTabTooltip(input: WorkspacePaneStaticTabMetadataInput & { k
 export const statusWorkspacePaneTabProvider = new StatusWorkspacePaneTabProvider()
 export const changesWorkspacePaneTabProvider = new ChangesWorkspacePaneTabProvider()
 export const historyWorkspacePaneTabProvider = new HistoryWorkspacePaneTabProvider()
+export const filesWorkspacePaneTabProvider = new FilesWorkspacePaneTabProvider()
 export const terminalWorkspacePaneTabProvider = new TerminalWorkspacePaneTabProvider()
 
 function isPlaceholderTerminalTitle(view: WorkspacePaneTabSummary): boolean {
@@ -261,12 +279,14 @@ const STATIC_WORKSPACE_PANE_TAB_PROVIDERS = [
   statusWorkspacePaneTabProvider,
   changesWorkspacePaneTabProvider,
   historyWorkspacePaneTabProvider,
+  filesWorkspacePaneTabProvider,
 ] as const
 
 const STATIC_WORKSPACE_PANE_TAB_PROVIDER_BY_TYPE: Record<WorkspacePaneStaticTabType, WorkspacePaneStaticTabProvider> = {
   status: statusWorkspacePaneTabProvider,
   changes: changesWorkspacePaneTabProvider,
   history: historyWorkspacePaneTabProvider,
+  files: filesWorkspacePaneTabProvider,
 }
 
 export const workspacePaneTabProviders = [

@@ -26,6 +26,9 @@ const mocks = vi.hoisted(() => ({
   getBackgroundSyncRepos: vi.fn(),
   getServerFetchIntervalSec: vi.fn(),
   abortRepoOperation: vi.fn(),
+  getRepositoryTree: vi.fn(),
+  getRepositoryFileViewer: vi.fn(),
+  trashRepositoryFile: vi.fn(),
 }))
 
 vi.mock('#/server/modules/background-sync.ts', () => ({
@@ -42,6 +45,15 @@ vi.mock('#/server/modules/repo-read-paths.ts', () => ({
   getRepoPullRequests: mocks.getRepoPullRequests,
   readRepoBulk: mocks.readRepoBulk,
   getRepoWorktreeBootstrapPreview: mocks.getRepoWorktreeBootstrapPreview,
+}))
+vi.mock('#/server/modules/repo-tree.ts', () => ({
+  getRepositoryTree: mocks.getRepositoryTree,
+}))
+vi.mock('#/server/modules/repo-file-viewer.ts', () => ({
+  getRepositoryFileViewer: mocks.getRepositoryFileViewer,
+}))
+vi.mock('#/server/modules/repo-tree-trash.ts', () => ({
+  trashRepositoryFile: mocks.trashRepositoryFile,
 }))
 vi.mock('#/server/modules/repo-write-paths.ts', () => ({
   cloneRepo: mocks.cloneRepo,
@@ -212,6 +224,148 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       skip: 0,
       signal: expect.any(AbortSignal),
     })
+  })
+
+  test('passes /tree requests through to the read layer', async () => {
+    mocks.getRepositoryTree.mockResolvedValueOnce({
+      nodes: [
+        { id: 'src', path: 'src', name: 'src', parentId: null, kind: 'directory', status: 'clean' },
+        { id: 'src/index.ts', path: 'src/index.ts', name: 'index.ts', parentId: 'src', kind: 'file', status: 'modified' },
+      ],
+      truncated: false,
+    })
+    const app = createRepoRoutes()
+    const response = await app.request(
+      new Request('http://localhost/tree', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: '/tmp/repo', worktreePath: '/tmp/repo/.worktrees/feature', depth: 3 }),
+      }),
+    )
+    expect(response.status).toBe(200)
+    const json = (await response.json()) as { nodes: Array<{ id: string }>; truncated: boolean }
+    expect(json.nodes.map((n) => n.id)).toEqual(['src', 'src/index.ts'])
+    expect(json.truncated).toBe(false)
+    expect(mocks.getRepositoryTree).toHaveBeenCalledWith(
+      '/tmp/repo',
+      '/tmp/repo/.worktrees/feature',
+      { depth: 3, prefix: undefined },
+    )
+  })
+
+  test('does not pass the HTTP request signal into /tree reads', async () => {
+    mocks.getRepositoryTree.mockResolvedValueOnce({ nodes: [], truncated: false })
+    const app = createRepoRoutes()
+    const response = await app.request(
+      new Request('http://localhost/tree', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: '/tmp/repo', worktreePath: '/tmp/repo/.worktrees/feature' }),
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    const options = mocks.getRepositoryTree.mock.calls[0]?.[2] as { signal?: AbortSignal } | undefined
+    expect(options).toEqual({ depth: undefined, prefix: undefined })
+    expect(options?.signal).toBeUndefined()
+  })
+
+  test('returns 400 when /tree depth is out of bounds', async () => {
+    const app = createRepoRoutes()
+    const response = await app.request(
+      new Request('http://localhost/tree', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: '/tmp/repo', worktreePath: '/tmp/repo', depth: 11 }),
+      }),
+    )
+    expect(response.status).toBe(400)
+    expect(mocks.getRepositoryTree).not.toHaveBeenCalled()
+  })
+
+  test('returns the soft-fail empty envelope when /tree read fails', async () => {
+    mocks.getRepositoryTree.mockRejectedValueOnce(new Error('boom'))
+    const app = createRepoRoutes()
+    const response = await app.request(
+      new Request('http://localhost/tree', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: '/tmp/repo', worktreePath: '/tmp/repo' }),
+      }),
+    )
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ nodes: [], truncated: false })
+  })
+
+  test('passes /file-viewer requests through to the read layer', async () => {
+    mocks.getRepositoryFileViewer.mockResolvedValueOnce({ viewer: 'bat', shell: 'posix' })
+    const app = createRepoRoutes()
+    const response = await app.request(
+      new Request('http://localhost/file-viewer', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: '/tmp/repo', worktreePath: '/tmp/repo/.worktrees/feature' }),
+      }),
+    )
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ viewer: 'bat', shell: 'posix' })
+    expect(mocks.getRepositoryFileViewer).toHaveBeenCalledWith(
+      '/tmp/repo',
+      '/tmp/repo/.worktrees/feature',
+      expect.any(AbortSignal),
+    )
+  })
+
+  test('returns the cat fallback when /file-viewer read fails', async () => {
+    mocks.getRepositoryFileViewer.mockRejectedValueOnce(new Error('boom'))
+    const app = createRepoRoutes()
+    const response = await app.request(
+      new Request('http://localhost/file-viewer', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: '/tmp/repo', worktreePath: '/tmp/repo/.worktrees/feature' }),
+      }),
+    )
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ viewer: 'cat', shell: 'posix' })
+  })
+
+  test('passes /trash-file requests through to the filetree write layer', async () => {
+    mocks.trashRepositoryFile.mockResolvedValueOnce({ ok: true, message: 'ok' })
+    const app = createRepoRoutes()
+    const response = await app.request(
+      new Request('http://localhost/trash-file', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          cwd: '/tmp/repo',
+          worktreePath: '/tmp/repo/.worktrees/feature',
+          path: 'src/index.ts',
+        }),
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ ok: true, message: 'ok' })
+    expect(mocks.trashRepositoryFile).toHaveBeenCalledWith(
+      '/tmp/repo',
+      '/tmp/repo/.worktrees/feature',
+      'src/index.ts',
+      expect.any(AbortSignal),
+    )
+  })
+
+  test('returns 400 when /trash-file path escapes the worktree', async () => {
+    const app = createRepoRoutes()
+    const response = await app.request(
+      new Request('http://localhost/trash-file', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: '/tmp/repo', worktreePath: '/tmp/repo', path: '../secret.txt' }),
+      }),
+    )
+    expect(response.status).toBe(400)
+    expect(mocks.trashRepositoryFile).not.toHaveBeenCalled()
   })
 
   test('returns 400 when count is below the minimum (1)', async () => {

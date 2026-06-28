@@ -1483,6 +1483,50 @@ describe('TerminalSession', () => {
     expect(notify).not.toHaveBeenCalled()
   })
 
+  test('queues external command input until the first PTY output arrives', async () => {
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session, { snapshot: '', snapshotSeq: 0 })
+
+    session.writeInput({ origin: 'user-intent', source: 'command', data: "bat '/worktree/file.ts'\r" })
+    await Promise.resolve()
+
+    expect(terminalCalls.write).not.toHaveBeenCalled()
+
+    session.handleOutput({ ptySessionId: 'pty_session_1_aaaaaaaaa', data: 'prompt', seq: 1, processName: 'zsh' })
+    await flushUntil(() => terminalCalls.write.mock.calls.length > 0)
+
+    expect(terminalCalls.write).toHaveBeenCalledTimes(1)
+    expect(terminalCalls.write).toHaveBeenCalledWith({
+      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      data: "bat '/worktree/file.ts'\r",
+    })
+  })
+
+  test('does not queue external command input after startup output has been observed', async () => {
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session, { snapshot: 'prompt', snapshotSeq: 1 })
+
+    session.writeInput({ origin: 'user-intent', source: 'command', data: "bat '/worktree/file.ts'\r" })
+    await flushUntil(() => terminalCalls.write.mock.calls.length > 0)
+
+    expect(terminalCalls.write).toHaveBeenCalledTimes(1)
+    expect(terminalCalls.write).toHaveBeenCalledWith({
+      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      data: "bat '/worktree/file.ts'\r",
+    })
+  })
+
+  test('does not queue keyboard input while waiting for startup output', async () => {
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session, { snapshot: '', snapshotSeq: 0 })
+
+    session.writeInput({ origin: 'user-intent', source: 'keyboard', data: 'l' })
+    await flushUntil(() => terminalCalls.write.mock.calls.length > 0)
+
+    expect(terminalCalls.write).toHaveBeenCalledTimes(1)
+    expect(terminalCalls.write).toHaveBeenCalledWith({ ptySessionId: 'pty_session_1_aaaaaaaaa', data: 'l' })
+  })
+
   test('tracks server title changes separately from process name', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)

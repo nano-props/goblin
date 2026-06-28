@@ -3,6 +3,7 @@ import type { SettingsSnapshot } from '#/shared/api-types.ts'
 import { normalizeWorkspaceSessionLayoutState } from '#/shared/workspace-layout.ts'
 import { bootstrapLog } from '#/web/logger.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { restoreFiletreeViewStateFromSession } from '#/web/filetree-session-state.ts'
 import { restoreRestorableWorkspaceStateFromSession } from '#/web/restorable-workspace-state.ts'
 import { getExternalAppsSnapshot, getSettingsSnapshot } from '#/web/settings-client.ts'
 import { externalAppsQueryKey, settingsSnapshotQueryKey } from '#/web/settings-queries.ts'
@@ -54,6 +55,7 @@ async function restoreBootSession(settingsSnapshot: Promise<SettingsSnapshot>): 
     // still waits for sessionReady, so this cannot overwrite the
     // persisted session with a partially hydrated one.
     const restoredWorkspaceState = restoreRestorableWorkspaceStateFromSession(session)
+    restoreFiletreeViewStateFromSession(session.filetreeViewStateByWorktreeByRepo)
     applySessionLayoutState(normalizedLayout)
     applySessionSelectedTerminalState(restoredWorkspaceState.selectedTerminalSessionByWorktree)
     await hydrateRepoSession(session.openRepoEntries, session.activeRepoId, {

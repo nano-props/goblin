@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from 'vitest'
 import {
   changesWorkspacePaneTabProvider,
+  filesWorkspacePaneTabProvider,
   historyWorkspacePaneTabProvider,
   statusWorkspacePaneTabProvider,
   terminalWorkspacePaneTabProvider,
@@ -44,6 +45,8 @@ describe('workspace pane tab providers', () => {
     expect(changesWorkspacePaneTabProvider.refreshOnOpen).toBe(true)
     expect(historyWorkspacePaneTabProvider.scope).toBe('branch')
     expect(historyWorkspacePaneTabProvider.refreshOnOpen).toBe(false)
+    expect(filesWorkspacePaneTabProvider.scope).toBe('worktree')
+    expect(filesWorkspacePaneTabProvider.refreshOnOpen).toBe(true)
   })
 
   test('derives provider scope from the shared workspace pane scope definitions', () => {
@@ -70,6 +73,7 @@ describe('workspace pane tab providers', () => {
     expect(workspacePaneTabProvider('status').canOpen({ hasWorktree: false })).toBe(true)
     expect(workspacePaneTabProvider('history').canOpen({ hasWorktree: false })).toBe(true)
     expect(workspacePaneTabProvider('changes').canOpen({ hasWorktree: false })).toBe(false)
+    expect(workspacePaneTabProvider('files').canOpen({ hasWorktree: false })).toBe(false)
     expect(workspacePaneTabProvider('terminal').canOpen({ hasWorktree: false })).toBe(false)
   })
 
@@ -130,6 +134,11 @@ describe('workspace pane tab providers', () => {
     expect(historyWorkspacePaneTabProvider.tooltip({ t, branchName: 'main', statusCount: 0 })).toBe(
       'workspace-pane-tabs.history-tooltip:{"branch":"main"}',
     )
+    expect(filesWorkspacePaneTabProvider.label({ t, branchName: 'main', statusCount: 0 })).toBe('tab.files')
+    expect(filesWorkspacePaneTabProvider.tooltip({ t, branchName: 'main', statusCount: 0 })).toBe(
+      'workspace-pane-tabs.files-tooltip:{"branch":"main"}',
+    )
+    expect(filesWorkspacePaneTabProvider.tooltip({ t, branchName: '', statusCount: 0 })).toBe('tab.files')
     expect(
       terminalWorkspacePaneTabProvider.tooltip({ t, branchName: 'main', statusCount: 0, view: terminalView }),
     ).toBe('Terminal 1 full')

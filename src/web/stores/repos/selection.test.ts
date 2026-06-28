@@ -354,6 +354,46 @@ describe('setWorkspacePaneTab', () => {
     expect(openTabsFor('main')).toEqual([])
   })
 
+  test('restores a session-preferred files tab when its static tab is open', () => {
+    seedRepo({
+      selectedBranch: 'main',
+      preferredWorkspacePaneTab: 'files',
+      workspacePaneStaticTabs: ['status', 'files'],
+    })
+
+    expect(preferredTabFor('main')).toBe('files')
+    expect(openTabsFor('main')).toEqual(['status', 'files'])
+  })
+
+  test('restores a files tab in workspace pane tab order during session restore', () => {
+    seedRepo({ selectedBranch: 'main', preferredWorkspacePaneTab: 'status', workspacePaneStaticTabs: ['status'] })
+
+    restoreWorkspacePaneState({
+      workspacePaneTabOrderByBranchByRepo: {
+        [REPO_ID]: { main: [workspacePaneStaticTabOrderEntry('status'), workspacePaneStaticTabOrderEntry('files')] },
+      },
+    })
+
+    expect(openTabsFor('main')).toEqual(['status', 'files'])
+    expect(tabOrderFor('main')).toEqual([
+      workspacePaneStaticTabOrderEntry('status'),
+      workspacePaneStaticTabOrderEntry('files'),
+    ])
+  })
+
+  test('does not restore files as preferred when the files tab is closed', () => {
+    seedRepo({ selectedBranch: 'main', preferredWorkspacePaneTab: 'status', workspacePaneStaticTabs: ['status'] })
+
+    restoreWorkspacePaneState({ preferredWorkspacePaneTabByBranchByRepo: { [REPO_ID]: { main: 'files' } } })
+
+    expect(preferredTabFor('main')).toBe('status')
+    expect(openTabsFor('main')).toEqual(['status'])
+  })
+
+  test('files is a worktree-scoped static tab and lives in the worktree-only bucket', () => {
+    expect(WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES).toContain('files')
+  })
+
   test('preserves restored workspace pane tab order before branch snapshot is loaded', () => {
     seedRepo({ selectedBranch: null, branches: [] })
 

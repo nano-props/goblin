@@ -1,0 +1,118 @@
+import { beforeEach, describe, expect, test, vi } from 'vitest'
+
+const mocks = vi.hoisted(() => ({
+  getWorktrees: vi.fn(),
+  userShellCommandExists: vi.fn(),
+  resolveRemoteRepoTarget: vi.fn(),
+  remoteCommandExists: vi.fn(),
+}))
+
+vi.mock('#/system/git/worktrees.ts', () => ({
+  getWorktrees: mocks.getWorktrees,
+}))
+
+vi.mock('#/system/user-shell.ts', () => ({
+  userShellCommandExists: mocks.userShellCommandExists,
+}))
+
+vi.mock('#/server/modules/repo-source.ts', () => ({
+  resolveRemoteRepoTarget: mocks.resolveRemoteRepoTarget,
+}))
+
+vi.mock('#/system/ssh/git.ts', () => ({
+  remoteCommandExists: mocks.remoteCommandExists,
+}))
+
+import { getRepositoryFileViewer } from '#/server/modules/repo-file-viewer.ts'
+import { normalizeRemoteRepoId } from '#/shared/remote-repo.ts'
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  mocks.getWorktrees.mockResolvedValue([
+    { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
+    { path: '/tmp/repo-feature', branch: 'feature', isBare: false, isPrimary: false },
+  ])
+})
+
+describe('repo file viewer read layer', () => {
+  test('uses bat for local worktrees when the user shell can resolve it', async () => {
+    const platformSpy = mockPlatform('linux')
+    mocks.userShellCommandExists.mockResolvedValueOnce(true)
+
+    try {
+      const result = await getRepositoryFileViewer('/tmp/repo', '/tmp/repo-feature')
+
+      expect(result).toEqual({ viewer: 'bat', shell: 'posix' })
+      expect(mocks.getWorktrees).toHaveBeenCalledWith('/tmp/repo', { includeStatus: false, signal: undefined })
+      expect(mocks.userShellCommandExists).toHaveBeenCalledWith('bat', '/tmp/repo-feature', undefined)
+    } finally {
+      platformSpy.mockRestore()
+    }
+  })
+
+  test('falls back to cat for local worktrees when bat is unavailable', async () => {
+    const platformSpy = mockPlatform('linux')
+    mocks.userShellCommandExists.mockResolvedValueOnce(false)
+
+    try {
+      await expect(getRepositoryFileViewer('/tmp/repo', '/tmp/repo-feature')).resolves.toEqual({
+        viewer: 'cat',
+        shell: 'posix',
+      })
+    } finally {
+      platformSpy.mockRestore()
+    }
+  })
+
+  test('falls back to cmd type for Windows local worktrees when bat is unavailable', async () => {
+    const platformSpy = mockPlatform('win32')
+    mocks.userShellCommandExists.mockResolvedValueOnce(false)
+
+    try {
+      await expect(getRepositoryFileViewer('/tmp/repo', '/tmp/repo-feature')).resolves.toEqual({
+        viewer: 'type',
+        shell: 'cmd',
+      })
+    } finally {
+      platformSpy.mockRestore()
+    }
+  })
+
+  test('does not probe the shell for unknown local worktrees', async () => {
+    const platformSpy = mockPlatform('linux')
+
+    try {
+      const result = await getRepositoryFileViewer('/tmp/repo', '/tmp/outside')
+
+      expect(result).toEqual({ viewer: 'cat', shell: 'posix' })
+      expect(mocks.userShellCommandExists).not.toHaveBeenCalled()
+    } finally {
+      platformSpy.mockRestore()
+    }
+  })
+
+  test('delegates remote repos to the SSH command resolver', async () => {
+    const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' })
+    const target = {
+      id: repoId,
+      alias: 'prod',
+      remotePath: '/srv/repo',
+      displayName: 'prod:repo',
+      host: 'example.com',
+      user: 'tester',
+      port: 22,
+    }
+    mocks.resolveRemoteRepoTarget.mockResolvedValueOnce(target)
+    mocks.remoteCommandExists.mockResolvedValueOnce(true)
+
+    const result = await getRepositoryFileViewer(repoId, '/srv/repo-feature')
+
+    expect(result).toEqual({ viewer: 'bat', shell: 'posix' })
+    expect(mocks.remoteCommandExists).toHaveBeenCalledWith(target, '/srv/repo-feature', 'bat', { signal: undefined })
+    expect(mocks.getWorktrees).not.toHaveBeenCalled()
+  })
+})
+
+function mockPlatform(platform: NodeJS.Platform) {
+  return vi.spyOn(process, 'platform', 'get').mockReturnValue(platform)
+}

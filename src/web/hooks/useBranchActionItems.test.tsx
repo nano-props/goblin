@@ -63,7 +63,7 @@ describe('useBranchActionItems', () => {
       actionIds = visibleBranchActionItems(actions).map((item) => item.id)
     })
 
-    expect(actionIds).toEqual(['pull', 'push', 'status', 'changes', 'history', 'removeWorktree', 'deleteBranch'])
+    expect(actionIds).toEqual(['pull', 'push', 'status', 'changes', 'files', 'history', 'removeWorktree', 'deleteBranch'])
   })
 
   test('exposes copy patch as a changes-tab action instead of a menu item', async () => {
@@ -78,7 +78,7 @@ describe('useBranchActionItems', () => {
     expect(visibleBranchActionItems(actions!).map((item) => item.id)).not.toContain('copyPatch')
   })
 
-  test('keeps branch-static tabs visible for a branch without a worktree but hides changes', async () => {
+  test('keeps branch-static tabs visible for a branch without a worktree but hides changes and files', async () => {
     let actionIds: string[] = []
 
     await renderHookHost(
@@ -90,7 +90,11 @@ describe('useBranchActionItems', () => {
 
     expect(actionIds).toContain('status')
     expect(actionIds).toContain('history')
+    // Both `changes` and `files` are worktree-scoped tabs
+    // (WORKSPACE_PANE_STATIC_TAB_SCOPES), so the menu items must
+    // hide together when there is no worktree to walk.
     expect(actionIds).not.toContain('changes')
+    expect(actionIds).not.toContain('files')
   })
 
   function renderHookHost(

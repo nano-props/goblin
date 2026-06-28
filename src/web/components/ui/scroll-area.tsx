@@ -1,4 +1,4 @@
-import { forwardRef, type ComponentPropsWithoutRef, type ComponentRef, type Ref } from 'react'
+import { forwardRef, type ComponentPropsWithoutRef, type ComponentRef, type Ref, type UIEventHandler } from 'react'
 import { ScrollArea as ScrollAreaPrimitive } from 'radix-ui'
 import { cn } from '#/web/lib/cn.ts'
 type Orientation = 'vertical' | 'horizontal' | 'both'
@@ -14,6 +14,7 @@ interface ScrollAreaProps extends ComponentPropsWithoutRef<typeof ScrollAreaPrim
   className?: string
   viewportClassName?: string
   viewportRef?: Ref<HTMLDivElement>
+  viewportOnScroll?: UIEventHandler<HTMLDivElement>
 }
 
 export const ScrollArea = forwardRef<ComponentRef<typeof ScrollAreaPrimitive.Root>, ScrollAreaProps>(
@@ -22,6 +23,7 @@ export const ScrollArea = forwardRef<ComponentRef<typeof ScrollAreaPrimitive.Roo
       className,
       viewportClassName,
       viewportRef,
+      viewportOnScroll,
       children,
       orientation = 'vertical',
       scrollbarMode = 'default',
@@ -42,6 +44,7 @@ export const ScrollArea = forwardRef<ComponentRef<typeof ScrollAreaPrimitive.Roo
       >
         <ScrollAreaPrimitive.Viewport
           ref={viewportRef}
+          onScroll={viewportOnScroll}
           className={cn(
             'flex-1 min-h-0 w-full',
             orientation !== 'horizontal' && '[&>div]:!block [&>div]:!min-w-0 [&>div]:!w-full',

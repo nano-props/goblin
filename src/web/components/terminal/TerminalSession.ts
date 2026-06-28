@@ -22,7 +22,11 @@ import {
 } from '#/web/components/terminal/terminal-session-projection.ts'
 import { TerminalSessionRuntime } from '#/web/components/terminal/terminal-session-runtime.ts'
 import { TerminalSessionView } from '#/web/components/terminal/terminal-session-view.ts'
-import { isTerminalEmulatorInput, type TerminalInput } from '#/web/components/terminal/terminal-input.ts'
+import {
+  isExternalCommandInput,
+  isTerminalEmulatorInput,
+  type TerminalInput,
+} from '#/web/components/terminal/terminal-input.ts'
 import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-bridge.ts'
 import {
   createXtermAuthorityGate,
@@ -67,6 +71,9 @@ export class TerminalSession {
   private pendingOutput: string[] = []
   private pendingWriteBuffer = ''
   private inputFlushScheduled = false
+  private externalCommandGatePtySessionId: string | null = null
+  private hasObservedOutputForExternalCommandGate = false
+  private queuedExternalCommandInput = ''
   // An empty snapshot string is the "no preload" sentinel — the hydration
   // input always carries the field, so the runtime type can stay
   // non-nullable and consumers branch on `.snapshot.length`.
@@ -184,6 +191,10 @@ export class TerminalSession {
     const ptySessionId = this.runtime.currentPtySessionId()
     if (!ptySessionId || !this.runtime.canSendInput()) return
     if (this.runtime.isReplaying() && isTerminalEmulatorInput(input)) return
+    if (this.shouldQueueExternalCommandInput(input, ptySessionId)) {
+      this.queueExternalCommandInput(input.data)
+      return
+    }
     this.pendingWriteBuffer += input.data
     this.scheduleInputFlush()
   }
@@ -377,6 +388,7 @@ export class TerminalSession {
       canonicalCols: input.canonicalCols,
       canonicalRows: input.canonicalRows,
     })
+    this.syncExternalCommandGate(input.ptySessionId, terminalSnapshotHasOutput(input.snapshot, input.snapshotSeq))
     // Keep the write-side authority cache aligned with hydration.
     if (changed) this.authority().setRole(input.role)
     if (changed && input.phase === 'open' && input.role === 'unowned' && this.view.isConnected()) {
@@ -389,7 +401,10 @@ export class TerminalSession {
   handleOutput(event: TerminalOutputEvent): void {
     const result = this.runtime.handleOutput(event)
     if (result.changed) this.notify('metadata')
-    if (result.output && this.runtime.isController()) this.queueOutput(result.output)
+    if (result.output && this.runtime.isController()) {
+      this.queueOutput(result.output)
+      this.markExternalCommandGateOutputObserved(event.ptySessionId)
+    }
   }
 
   handleIdentity(event: TerminalIdentityViewModel): void {
@@ -476,6 +491,7 @@ export class TerminalSession {
   handleExit(event: TerminalExitEvent): boolean {
     if (!this.runtime.handleExit(event)) return false
     this.flushOutput()
+    this.clearExternalCommandGate()
     this.clearTerminalFocusIfOwned()
     this.view.blurIfFocused()
     return true
@@ -673,6 +689,7 @@ export class TerminalSession {
     result: TerminalAttachResultWithController,
   ): Promise<boolean> {
     const changed = this.runtime.applyAttachResult(result, { cols: term.cols, rows: term.rows })
+    this.syncExternalCommandGate(result.ptySessionId, terminalSnapshotHasOutput(result.snapshot, result.snapshotSeq))
     // Sync the gate. Without this, a controller→unowned→recreate
     // cycle leaves the gate at 'viewer' even though the runtime
     // already reflects 'controller', and the next write would
@@ -874,6 +891,48 @@ export class TerminalSession {
     this.view.currentTerminal()?.write(output)
   }
 
+  private shouldQueueExternalCommandInput(input: TerminalInput, ptySessionId: string): boolean {
+    return (
+      isExternalCommandInput(input) &&
+      this.externalCommandGatePtySessionId === ptySessionId &&
+      !this.hasObservedOutputForExternalCommandGate
+    )
+  }
+
+  private queueExternalCommandInput(data: string): void {
+    if (!data) return
+    this.queuedExternalCommandInput += data
+  }
+
+  private syncExternalCommandGate(ptySessionId: string, hasObservedOutput: boolean): void {
+    if (this.externalCommandGatePtySessionId !== ptySessionId) {
+      this.clearExternalCommandGate()
+      this.externalCommandGatePtySessionId = ptySessionId
+    }
+    if (hasObservedOutput) this.markExternalCommandGateOutputObserved(ptySessionId)
+  }
+
+  private markExternalCommandGateOutputObserved(ptySessionId: string): void {
+    if (this.externalCommandGatePtySessionId !== ptySessionId) return
+    if (this.hasObservedOutputForExternalCommandGate) return
+    this.hasObservedOutputForExternalCommandGate = true
+    this.flushQueuedExternalCommandInput()
+  }
+
+  private flushQueuedExternalCommandInput(): void {
+    const data = this.queuedExternalCommandInput
+    this.queuedExternalCommandInput = ''
+    if (!data) return
+    this.pendingWriteBuffer += data
+    this.scheduleInputFlush()
+  }
+
+  private clearExternalCommandGate(): void {
+    this.externalCommandGatePtySessionId = null
+    this.hasObservedOutputForExternalCommandGate = false
+    this.queuedExternalCommandInput = ''
+  }
+
   private destroyActiveView(options?: { preserveTransientState?: boolean }): void {
     this.geometryAbortController?.abort()
     this.geometryAbortController = null
@@ -886,6 +945,7 @@ export class TerminalSession {
     this.pendingOutput = []
     this.pendingWriteBuffer = ''
     this.inputFlushScheduled = false
+    this.clearExternalCommandGate()
     this.startToken += 1
     if (!options?.preserveTransientState) this.runtime.resetTransientState()
     this.view.destroyTerminal()
@@ -961,6 +1021,10 @@ function termWrite(term: XTermTerminal, data: string): Promise<void> {
 function cancelScheduledAnimationFrame(frame: number): void {
   if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(frame)
   else clearTimeout(frame)
+}
+
+function terminalSnapshotHasOutput(snapshot: string, snapshotSeq: number): boolean {
+  return snapshot.length > 0 || snapshotSeq > 0
 }
 
 function isHttpExternalUrl(value: string): boolean {

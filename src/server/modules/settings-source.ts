@@ -2,7 +2,13 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { toSafeRepoLocator, toSafeSessionRepoEntry } from '#/shared/input-validation.ts'
 import { serverDataFile } from '#/shared/data-dir.ts'
-import type { LangPref, WorkspaceSessionState, UserSettings, ThemePref } from '#/shared/api-types.ts'
+import type {
+  FiletreeSessionViewState,
+  LangPref,
+  WorkspaceSessionState,
+  UserSettings,
+  ThemePref,
+} from '#/shared/api-types.ts'
 import { DEFAULT_ZEN_MODE, normalizeWorkspacePaneSize } from '#/shared/workspace-layout.ts'
 import { repoSessionEntryId, type RepoSessionEntry } from '#/shared/remote-repo.ts'
 import {
@@ -202,6 +208,67 @@ function normalizeWorkspacePaneTabOrderByBranchByRepo(
   return normalized
 }
 
+function normalizeFiletreeViewStateByWorktreeByRepo(
+  value: unknown,
+  openRepoEntries: RepoSessionEntry[],
+): Record<string, Record<string, FiletreeSessionViewState>> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+  const openRepoIds = new Set(openRepoEntries.map(repoSessionEntryId))
+  const normalized: Record<string, Record<string, FiletreeSessionViewState>> = {}
+  for (const [repoId, rawByWorktree] of Object.entries(value)) {
+    const safeRepoId = toSafeRepoLocator(repoId)
+    if (
+      !safeRepoId ||
+      !openRepoIds.has(safeRepoId) ||
+      !rawByWorktree ||
+      typeof rawByWorktree !== 'object' ||
+      Array.isArray(rawByWorktree)
+    )
+      continue
+    const byWorktree: Record<string, FiletreeSessionViewState> = {}
+    for (const [worktreePath, rawViewState] of Object.entries(rawByWorktree)) {
+      if (!worktreePath || worktreePath.includes('\0')) continue
+      const viewState = normalizeFiletreeViewState(rawViewState)
+      if (!viewState) continue
+      if (
+        viewState.selectedKeys.length === 0 &&
+        viewState.expandedKeys.length === 0 &&
+        viewState.topVisibleRowIndex === 0
+      )
+        continue
+      byWorktree[worktreePath] = viewState
+    }
+    if (Object.keys(byWorktree).length > 0) normalized[safeRepoId] = byWorktree
+  }
+  return normalized
+}
+
+function normalizeFiletreeViewState(value: unknown): FiletreeSessionViewState | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const raw = value as Partial<FiletreeSessionViewState>
+  return {
+    selectedKeys: normalizeFiletreeKeys(raw.selectedKeys),
+    expandedKeys: normalizeFiletreeKeys(raw.expandedKeys),
+    topVisibleRowIndex: normalizeFiletreeTopVisibleRowIndex(raw.topVisibleRowIndex),
+  }
+}
+
+function normalizeFiletreeKeys(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  const normalized: string[] = []
+  const seen = new Set<string>()
+  for (const key of value) {
+    if (typeof key !== 'string' || !key || key.includes('\0') || seen.has(key)) continue
+    seen.add(key)
+    normalized.push(key)
+  }
+  return normalized
+}
+
+function normalizeFiletreeTopVisibleRowIndex(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0
+}
+
 function normalizeSession(value: unknown): WorkspaceSessionState {
   if (!value || typeof value !== 'object') return defaultSession()
   const partial = value as Partial<WorkspaceSessionState>
@@ -232,6 +299,10 @@ function normalizeSession(value: unknown): WorkspaceSessionState {
       workspacePaneTabOrderByBranchByRepo,
     ),
     workspacePaneTabOrderByBranchByRepo,
+    filetreeViewStateByWorktreeByRepo: normalizeFiletreeViewStateByWorktreeByRepo(
+      partial.filetreeViewStateByWorktreeByRepo,
+      openRepoEntries,
+    ),
   }
 }
 

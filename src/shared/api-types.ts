@@ -90,6 +90,14 @@ export interface WorkspaceSessionState {
   preferredWorkspacePaneTabByBranchByRepo?: Record<string, Record<string, WorkspacePaneSessionTabType>>
   /** Per-repo, per-branch workspace pane tab strip order. Empty arrays are meaningful. */
   workspacePaneTabOrderByBranchByRepo: Record<string, Record<string, WorkspacePaneTabOrderEntry[]>>
+  /** Per-repo, per-worktree file tree view state. */
+  filetreeViewStateByWorktreeByRepo?: Record<string, Record<string, FiletreeSessionViewState>>
+}
+
+export interface FiletreeSessionViewState {
+  selectedKeys: string[]
+  expandedKeys: string[]
+  topVisibleRowIndex: number
 }
 
 export interface RuntimeSettingsSnapshot extends UserSettings {
@@ -168,6 +176,38 @@ export interface RepoSnapshot {
   remote?: RepoRemoteInfo
 }
 
+// Worktree-scoped file tree types — see docs/filetree.md. Wire and
+// domain shapes coincide in v1; if they diverge, move these into a
+// dedicated `src/shared/filetree.ts` and map at the hook boundary.
+
+export type RepoTreeNodeStatus = 'clean' | 'modified' | 'staged' | 'untracked' | 'ignored'
+
+export interface RepoTreeNode {
+  /** Stable id: relative POSIX path inside the worktree. */
+  readonly id: string
+  /** Relative POSIX path inside the worktree (matches id; named for readability). */
+  readonly path: string
+  /** Final path segment, used as the display name. */
+  readonly name: string
+  readonly parentId: string | null
+  readonly kind: 'directory' | 'file'
+  readonly status: RepoTreeNodeStatus
+}
+
+export interface RepoTreeResult {
+  readonly nodes: ReadonlyArray<RepoTreeNode>
+  /** True if the result was truncated by `depth` or a node-count cap. */
+  readonly truncated: boolean
+}
+
+export type RepoFileViewer = 'bat' | 'cat' | 'type'
+export type RepoFileViewerShell = 'posix' | 'cmd'
+
+export interface RepoFileViewerResult {
+  readonly viewer: RepoFileViewer
+  readonly shell: RepoFileViewerShell
+}
+
 export interface ProbeResult {
   ok: boolean
   root?: string
@@ -201,8 +241,7 @@ export interface IpcRequest {
 
 /** Response envelope for the native Electron bridge IPC layer. */
 export type IpcResponse =
-  | { ok: true; data: unknown }
-  | { ok: false; error: { message: string; code?: string; name?: string } }
+  { ok: true; data: unknown } | { ok: false; error: { message: string; code?: string; name?: string } }
 
 export type I18nChangedEvent = { type: 'i18n-changed'; snapshot: I18nSnapshot }
 
@@ -235,6 +274,7 @@ export interface AppIpcHandlers {
     }) => Promise<PullRequestEntry[] | null>
     status: (input: { cwd: string }) => Promise<WorktreeStatus[]>
     patch: (input: { cwd: string; worktreePath: string }) => Promise<ExecResult>
+    trashFile: (input: { cwd: string; worktreePath: string; path: string }) => Promise<ExecResult>
     deleteBranch: (input: {
       cwd: string
       branch: string

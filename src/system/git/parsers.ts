@@ -146,6 +146,89 @@ export function parseStatus(output: string): StatusEntry[] {
   return entries
 }
 
+/** Marker separating the worktree-list porcelain block from the
+ *  per-worktree NUL-batched status stream in
+ *  `gitWorktreeListAndStatus` output. The marker is emitted on its
+ *  own line by the remote script (`printf '\n%s\n' '...'`), and
+ *  `splitWorktreeStatusBatch` searches for it wrapped in surrounding
+ *  newlines. The literal text inside is unique enough that it
+ *  cannot collide with a `git worktree list --porcelain` line --
+ *  every line in that output is prefixed by a keyword (`worktree`,
+ *  `HEAD`, `branch`, `detached`, `bare`, or `locked`) so the bare
+ *  marker text is never produced as a standalone line. */
+export const WORKTREE_STATUS_BATCH_BOUNDARY = '__GOBLIN_WT_BATCH_BOUNDARY__'
+
+/**
+ * Split a `gitWorktreeListAndStatus` raw stdout into the worktree-list
+ * block and the per-worktree status stream. The two are separated by
+ * a literal newline + boundary marker + newline sequence. Returns
+ * `{ worktreeListOutput, statusStream }`; pass each through
+ * `parseWorktrees` and `parseWorktreeStatusBatch` respectively.
+ */
+export function splitWorktreeStatusBatch(output: string): {
+  readonly worktreeListOutput: string
+  readonly statusStream: string
+} {
+  const marker = `\n${WORKTREE_STATUS_BATCH_BOUNDARY}\n`
+  const idx = output.indexOf(marker)
+  if (idx < 0) {
+    // Defensive: if the remote shell could not produce the batch
+    // (e.g. a very old bash) we fall back to an empty status stream
+    // and treat the whole output as the worktree list, so the
+    // caller can still produce a worktree list from it.
+    return { worktreeListOutput: output, statusStream: '' }
+  }
+  return {
+    worktreeListOutput: output.slice(0, idx),
+    statusStream: output.slice(idx + marker.length),
+  }
+}
+
+/**
+ * Parse the per-worktree status stream of `gitWorktreeListAndStatus`.
+ * The stream is a sequence of NUL-separated records laid out as:
+ *
+ *   <path1>\0<status records>\0<path2>\0<status records>\0...
+ *
+ * Each section begins with a NUL-terminated worktree path (as emitted
+ * by `git rev-parse --show-toplevel` from the script) and ends with
+ * an empty NUL record. Walk NUL-split records: read a path, then
+ * collect status records until the next empty record. The empty
+ * record between sections is the worktree boundary.
+ *
+ * Returns a Map keyed by the worktree path. Empty status is encoded
+ * as a path mapped to an empty array (a clean worktree).
+ */
+export function parseWorktreeStatusBatch(stream: string): ReadonlyMap<string, ReadonlyArray<StatusEntry>> {
+  const result = new Map<string, ReadonlyArray<StatusEntry>>()
+  if (!stream) return result
+  const records = stream.split('\0')
+  let i = 0
+  while (i < records.length) {
+    const path = records[i] ?? ''
+    i++
+    if (path === '') break // trailing empty record (or end-of-stream)
+    const entries: StatusEntry[] = []
+    while (i < records.length) {
+      const rec = records[i] ?? ''
+      i++
+      if (rec === '') break // worktree boundary
+      if (rec.length < 3) continue
+      const x = rec[0] ?? ' '
+      const y = rec[1] ?? ' '
+      const filePath = rec.slice(3)
+      if (x === 'R' || x === 'C') {
+        // Skip the second NUL-terminated record holding the original
+        // path. We surface only the new path to match `parseStatus`.
+        i++
+      }
+      entries.push({ x, y, path: filePath })
+    }
+    result.set(path, entries)
+  }
+  return result
+}
+
 /**
  * Parse `git worktree list --porcelain`. Blocks are separated by a
  * blank line; each block contains `worktree <path>` and either a
