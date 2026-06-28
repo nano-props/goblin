@@ -17,6 +17,7 @@ The project runs in Node.js strip-only mode (no `tsc` emit). Do not use these un
 - For detailed testing conventions (helpers, library policy, anti-patterns), follow `docs/testing.md`.
 - Keep examples, tests, docs, and snapshots privacy-safe: use generic placeholders, not real users, paths, emails, tokens, or internal identifiers.
 - Keep i18n keys traceable: do not put conditionals, template strings, concatenation, or fallback expressions directly inside `t(...)`. Choose a named `*Key` variable first, or use a typed/static key map for dynamic states, then call `t(key)`.
+- Use the project's `ScrollArea` (`src/web/components/ui/scroll-area.tsx`) for any scrollable region by default. Only fall back to native `overflow` when there's a concrete reason (e.g. terminal scrollbars need native browser behavior).
 
 ## Git and safety
 
