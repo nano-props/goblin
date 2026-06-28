@@ -23,7 +23,6 @@ export function ToolbarTabStrip({ compact, compactContent, scrollContent, viewpo
     <div className="flex h-full min-w-0 flex-1 items-center">
       <ScrollArea
         orientation="horizontal"
-        scrollbarMode="compact"
         className="h-full min-w-0 max-w-full flex-none w-fit"
         viewportClassName="[&>div]:h-full"
         viewportRef={viewportRef}

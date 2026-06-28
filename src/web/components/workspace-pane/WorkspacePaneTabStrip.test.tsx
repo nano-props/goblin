@@ -541,6 +541,87 @@ describe('WorkspacePaneTabStrip', () => {
     expect(viewport.scrollLeft).toBe(1000)
   })
 
+  test('keeps the auto-scroll cleanup frame alive across same-length rerenders', () => {
+    const scheduledFrame: { id: number; callback: FrameRequestCallback; canceled: boolean } = {
+      id: 0,
+      callback: () => {},
+      canceled: false,
+    }
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback: FrameRequestCallback) => {
+      scheduledFrame.id = 1
+      scheduledFrame.callback = callback
+      scheduledFrame.canceled = false
+      return 1
+    })
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((id: number) => {
+      if (scheduledFrame.id === id) scheduledFrame.canceled = true
+    })
+
+    render(
+      <TestWorkspacePaneTabStrip
+        worktreeTerminalKey="/repo\0/repo/worktree"
+        workspacePaneId="workspace"
+        sessions={[session({ key: 't1', title: 'term-1' }), session({ key: 't2', title: 'term-2', selected: false })]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    )
+
+    const viewport = document.body.querySelector('[data-radix-scroll-area-viewport]')
+    if (!(viewport instanceof HTMLDivElement)) throw new Error('missing scroll viewport')
+
+    Object.defineProperty(viewport, 'scrollWidth', { value: 1000, writable: true, configurable: true })
+    Object.defineProperty(viewport, 'clientWidth', { value: 600, writable: true, configurable: true })
+    Object.defineProperty(viewport, 'scrollLeft', { value: 0, writable: true, configurable: true })
+
+    rerender(
+      <TestWorkspacePaneTabStrip
+        worktreeTerminalKey="/repo\0/repo/worktree"
+        workspacePaneId="workspace"
+        sessions={[
+          session({ key: 't1', title: 'term-1' }),
+          session({ key: 't2', title: 'term-2', selected: false }),
+          session({ key: 't3', title: 'term-3', selected: false }),
+        ]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    )
+
+    expect(viewport.style.scrollBehavior).toBe('smooth')
+    expect(scheduledFrame.canceled).toBe(false)
+
+    rerender(
+      <TestWorkspacePaneTabStrip
+        worktreeTerminalKey="/repo\0/repo/worktree"
+        workspacePaneId="workspace"
+        sessions={[
+          session({ key: 't1', title: 'term-1' }),
+          session({ key: 't2', title: 'term-2', selected: false }),
+          session({ key: 't3', title: 'term-3 updated', selected: false }),
+        ]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    )
+
+    expect(scheduledFrame.canceled).toBe(false)
+    act(() => {
+      scheduledFrame.callback(0)
+    })
+    expect(viewport.style.scrollBehavior).toBe('')
+    expect(viewport.scrollLeft).toBe(1000)
+  })
+
   test('does not scroll when a terminal session is removed', () => {
     render(
       <TestWorkspacePaneTabStrip
@@ -766,7 +847,7 @@ describe('WorkspacePaneTabStrip', () => {
     expect(pendingView?.className).toContain('min-w-0')
     expect(pendingView?.className).toContain('flex-1')
     expect(tablist?.className).toContain('flex-1')
-    expect(tab?.getAttribute('aria-busy')).toBe('true')
+    expect(tab?.getAttribute('aria-busy')).toBeNull()
     expect(pendingView?.textContent).not.toContain('terminal.opening')
     expect(document.body.querySelectorAll('[role="tab"]')).toHaveLength(1)
     expect(document.body.querySelector('button[aria-label="terminal.loading"]')).toBeNull()
@@ -797,7 +878,11 @@ describe('WorkspacePaneTabStrip', () => {
     expect(tabs).toHaveLength(2)
     expect(tabs.map((tab) => tab.getAttribute('aria-label'))).toEqual(['term-1', 'terminal.opening'])
     expect(pendingView?.textContent).not.toContain('terminal.opening')
-    expect(document.body.querySelector('button[aria-label="terminal.loading"]')).not.toBeNull()
+    const disabledNewButton = document.body.querySelector<HTMLButtonElement>('[data-workspace-pane-new-button]')
+    expect(disabledNewButton).not.toBeNull()
+    expect(disabledNewButton?.getAttribute('aria-label')).toBe('terminal.new')
+    expect(disabledNewButton?.disabled).toBe(true)
+    expect(disabledNewButton?.querySelector('.animate-spin')).toBeNull()
   })
 
   test('keeps placeholder terminal titles out of materialized tab text', () => {
