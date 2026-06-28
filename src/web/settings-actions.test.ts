@@ -3,12 +3,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { defaultSettingsSnapshot, defaultWorkspaceSessionState } from '#/shared/settings-defaults.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import {
-  externalAppsQueryKey,
-  githubCliQueryKey,
-  lanInfoQueryKey,
-  settingsSnapshotQueryKey,
-} from '#/web/settings-query-cache.ts'
+import { githubCliQueryKey, lanInfoQueryKey, settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { GitHubCliState } from '#/shared/api-types.ts'
 

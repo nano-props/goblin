@@ -1,6 +1,5 @@
 import { getServerExternalAppsSnapshot } from '#/server/modules/external-apps.ts'
 import { getServerGitHubCliState } from '#/server/modules/github-cli.ts'
-import { getServerI18nSnapshot } from '#/server/modules/i18n.ts'
 import { getSettingsSnapshot } from '#/server/modules/settings-snapshot.ts'
 import { getUserSettings } from '#/server/modules/settings-source.ts'
 import type { NativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'

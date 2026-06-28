@@ -393,7 +393,6 @@ export class TerminalSession {
   }
 
   handleIdentity(event: TerminalIdentityViewModel): void {
-    const applies = this.runtime.currentPtySessionId() === event.ptySessionId
     // Identity is the only signal the teardown decision uses. The
     // pre-event role (`wasRole`) is sampled before `handleIdentity`
     // mutates the state so a controller→viewer transition is

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { replaceRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { terminalLog } from '#/web/logger.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { markRepoOperationTargets, repoOperation } from '#/web/stores/repos/repo-operation-scheduler.ts'
+import { repoOperation } from '#/web/stores/repos/repo-operation-scheduler.ts'
 import { branch, REPO_ID, resetRefreshTest, ipcHandlers, seedRepo } from '#/web/stores/repos/refresh-test-utils.ts'
 import { seedRepoState } from '#/web/test-utils/bridge.ts'
 import { canStartRemoteFetch } from '#/web/stores/repos/sync-state.ts'
@@ -10,7 +10,7 @@ import {
   preferredWorkspacePaneTabForBranch,
   preferredWorkspacePaneTabByBranchRecordWith,
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
-import type { LogEntry, WorktreeStatus } from '#/web/types.ts'
+import type { WorktreeStatus } from '#/web/types.ts'
 beforeEach(resetRefreshTest)
 
 type TestRepo = NonNullable<ReturnType<typeof useReposStore.getState>['repos'][string]>
@@ -22,18 +22,6 @@ function updateRepoForTest(mutator: (repo: TestRepo) => void) {
     if (!repo) return s
     return { repos: { ...s.repos, [REPO_ID]: replaceRepo(repo, mutator) } }
   })
-}
-
-function logEntry(index: number): LogEntry {
-  const hash = `hash-${index}`
-  return {
-    hash,
-    shortHash: hash,
-    refs: '',
-    message: `commit ${index}`,
-    author: 'Alice',
-    date: '2026-01-01T00:00:00+08:00',
-  }
 }
 
 function createWorktreeAction(): TestCreateWorktreeAction {

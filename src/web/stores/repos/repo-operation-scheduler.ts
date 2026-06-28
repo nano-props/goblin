@@ -5,7 +5,6 @@ import {
   settleOperation,
   startOperation,
   type RepoOperationKey,
-  type RepoOperationReason,
   type RepoOperationState,
   type RepoOperationTarget,
 } from '#/web/stores/repos/operations.ts'
@@ -328,15 +327,6 @@ export function waitForRepoOperationsIdle(repoId: string, keys: string[], signal
     signal?.addEventListener('abort', abort, { once: true })
     check()
   })
-}
-
-export function pruneRepoBranchLogOperations(repoId: string, validBranches: Set<string>): void {
-  const operations = repoOperationSchedulers.get(repoId)?.operations
-  if (!operations) return
-  for (const key of Object.keys(operations) as RepoOperationKey[]) {
-    if (!key.startsWith('log:')) continue
-    if (!validBranches.has(key.slice('log:'.length))) delete operations[key]
-  }
 }
 
 export function pruneRepoBranchPullRequestOperations(repoId: string, validBranches: Set<string>): void {

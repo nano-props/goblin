@@ -1,12 +1,6 @@
 import { ipcMain } from 'electron'
 import { AsyncLocalStorage } from 'node:async_hooks'
-import {
-  IpcError,
-  createAppRouter,
-  type NativeHostIpcHandlers,
-  type IpcRequest,
-  type IpcResponse,
-} from '#/shared/api-types.ts'
+import { IpcError, createAppRouter, type IpcRequest, type IpcResponse } from '#/shared/api-types.ts'
 import { NATIVE_HOST_IPC_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 import { applyPrimaryWindowTitleBarTheme } from '#/main/window.ts'
 import { allRegisteredSurfacesWithCapability } from '#/main/client-surface-registry.ts'

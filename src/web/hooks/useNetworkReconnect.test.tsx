@@ -262,7 +262,7 @@ describe('useNetworkReconnect', () => {
   test('cleans up the window listener on unmount', async () => {
     const target = remoteTargetFixture()
     seedRepo(target.id, { kind: 'failed', reason: 'unreachable' })
-    const result = mountHook()
+    mountHook()
 
     // Unmount the hook host. After unmount, a second `online`
     // event should NOT trigger a re-probe.

@@ -24,7 +24,7 @@ describe('repo web transport helpers', () => {
   })
 
   test('copy-patch helper uses embedded server route in web host mode', async () => {
-    const fetchMock = mockFetch(async () => ({
+    mockFetch(async () => ({
       ok: true,
       json: async () => ({ ok: true, message: 'diff --git a/file b/file' }),
     }))
@@ -37,7 +37,7 @@ describe('repo web transport helpers', () => {
   })
 
   test('open remote opens browser with server-provided URL in web host mode', async () => {
-    const fetchMock = mockFetch(async () => ({
+    mockFetch(async () => ({
       ok: true,
       json: async () => ({ ok: true, message: 'https://example.com/repo/tree/feature/a' }),
     }))

@@ -26,7 +26,7 @@ import type { LangPref, ThemePref } from '#/shared/api-types.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import { focusedRegisteredSurface } from '#/main/client-surface-registry.ts'
-import { applyMenuRuntimeState, readMenuRuntimeState } from '#/main/menu-state.ts'
+import { readMenuRuntimeState } from '#/main/menu-state.ts'
 import {
   clientMenuCommandById,
   resolveClientMenuCommandAccelerator,

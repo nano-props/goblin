@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
 
-import type { ReactNode } from 'react'
 import { describe, expect, test } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { WorkspaceChrome, WorkspaceToolbar } from '#/web/components/workspace-toolbar-chrome.tsx'

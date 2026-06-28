@@ -40,7 +40,3 @@ export function selectedBranchForViewMode(repo: RepoState, viewMode: BranchViewM
     viewMode,
   })
 }
-
-function branchForVisibleLog(repo: RepoState): string | null {
-  return repo.ui.selectedBranch ?? (repo.ui.branchViewMode === 'all' ? repo.data.currentBranch : null)
-}

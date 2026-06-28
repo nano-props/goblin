@@ -2,7 +2,7 @@ import { produce, type Draft } from 'immer'
 import { emptyRepoOperations } from '#/web/stores/repos/operations.ts'
 import { emptyRepoDataLoadBundle } from '#/web/stores/repos/repo-data-load-state.ts'
 import type { ExecResult } from '#/web/types.ts'
-import type { RepoEvent, RepoResultEventOptions, RepoState, ReposSet, ReposStore } from '#/web/stores/repos/types.ts'
+import type { RepoEvent, RepoResultEventOptions, RepoState, ReposStore } from '#/web/stores/repos/types.ts'
 
 let nextInstanceToken = 1
 let nextEventId = 1

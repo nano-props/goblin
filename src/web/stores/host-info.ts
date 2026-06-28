@@ -84,16 +84,6 @@ export const useHostInfoStore = create<HostInfoState>((set) => ({
 }))
 
 /**
- * Read the cached host info synchronously. Returns `null` before
- * the hydrate completes; call sites that can't tolerate a
- * `null` snapshot should use `homeDirectory()` / `getPlatform()`
- * (which fall back to safe defaults) instead.
- */
-function getHostInfo(): HostInfoSnapshot | null {
-  return useHostInfoStore.getState().snapshot
-}
-
-/**
  * Absolute home-directory path, or `''` if the host info hasn't
  * been hydrated yet. The `''` fallback matches the pre-refactor
  * behaviour (the web runtime's bootstrap carried `homeDir: ''`).

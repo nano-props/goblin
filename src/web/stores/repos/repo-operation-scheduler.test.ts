@@ -3,7 +3,6 @@ import {
   disposeAllRepoOperationSchedulers,
   disposeRepoOperationScheduler,
   markRepoOperationTargets,
-  pruneRepoBranchLogOperations,
   pruneRepoBranchPullRequestOperations,
   repoOperation,
   repoOperationBusy,

@@ -5,7 +5,6 @@ import {
   deleteUpstreamBranch,
   getBranches,
   getCurrentBranch,
-  getDefaultBranch,
   getHeadHash,
   getLog as getBranchLog,
   getRepoName,

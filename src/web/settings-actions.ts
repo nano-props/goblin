@@ -18,7 +18,6 @@ import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import {
   externalAppsQueryKey,
   lanInfoQueryKey,
-  updateExternalAppsCache,
   updateGitHubCliCache,
   updateRestorableWorkspaceSessionStateCache,
   updateRuntimeRecentReposStateCache,

@@ -1,14 +1,10 @@
-import type { ClientBootstrapSnapshot, ClientNativeCapability } from '#/shared/bootstrap.ts'
+import type { ClientNativeCapability } from '#/shared/bootstrap.ts'
 import type { IpcEvent, IpcRequest } from '#/shared/api-types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { ClientHostBridge, ClientBridge, ClientTerminalBridge } from '#/web/client-bridge-types.ts'
 import { readNativeBridge } from '#/web/native-bridge.ts'
 import { createHttpClipboardBackend } from '#/web/clipboard/http-backend.ts'
-import {
-  emptyBootstrapSnapshot,
-  normalizeClientServerClientId,
-  readWebBootstrap,
-} from '#/web/client-bootstrap-bridge.ts'
+import { normalizeClientServerClientId, readWebBootstrap } from '#/web/client-bootstrap-bridge.ts'
 import {
   createServerTerminalBridge,
   readOrCreateWebTerminalClientId,
