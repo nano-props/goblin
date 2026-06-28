@@ -44,6 +44,7 @@ describe('ToolbarTabStrip', () => {
     expect(scrollRoot?.className).toContain('w-fit')
     expect(scrollRoot?.className).toContain('max-w-full')
     expect(scrollRoot?.className).toContain('title-bar-scroll-region')
+    expect((scrollRoot as HTMLElement | null)?.dataset.scrollbarMode).toBe('compact')
     expect(scrollRoot?.hasAttribute('data-interactive')).toBe(true)
     expect((scrollRoot as HTMLElement | null)?.dataset.titleBarChromeRegion).toBe('interactive')
     expect((scrollRoot as HTMLElement | null)?.hasAttribute('data-title-bar-scroll-region')).toBe(true)

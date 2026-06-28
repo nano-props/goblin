@@ -36,6 +36,17 @@ describe('ScrollArea', () => {
 
     expect(scrollBar).not.toBeNull()
     expect(scrollBar?.className).toContain('h-2')
+    expect((container?.firstElementChild as HTMLElement | null)?.dataset.scrollbarMode).toBe('default')
+  })
+
+  test('marks compact scrollbar mode on the scroll area root', () => {
+    render(
+      <ScrollArea orientation="horizontal" scrollbarMode="compact" type="always">
+        <div className="w-[1000px]">wide content</div>
+      </ScrollArea>,
+    )
+
+    expect((container?.firstElementChild as HTMLElement | null)?.dataset.scrollbarMode).toBe('compact')
   })
 })
 

@@ -27,6 +27,7 @@ export function ToolbarTabStrip({ compact, compactContent, scrollContent, viewpo
       <TitleBarScrollableInteractiveRegion asChild>
         <ScrollArea
           orientation="horizontal"
+          scrollbarMode="compact"
           className="h-full min-w-0 max-w-full flex-none w-fit"
           viewportClassName="[&>div]:h-full"
           viewportRef={viewportRef}
