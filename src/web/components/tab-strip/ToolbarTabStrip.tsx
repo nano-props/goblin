@@ -1,6 +1,9 @@
 import type { ComponentPropsWithoutRef, ReactNode, Ref } from 'react'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
-import { TitleBarDragRegion } from '#/web/components/title-bar-chrome-region.tsx'
+import {
+  TitleBarDragRegion,
+  TitleBarScrollableInteractiveRegion,
+} from '#/web/components/title-bar-chrome-region.tsx'
 import { cn } from '#/web/lib/cn.ts'
 
 interface ToolbarTabStripProps {
@@ -21,14 +24,16 @@ export function ToolbarTabStrip({ compact, compactContent, scrollContent, viewpo
 
   return (
     <div className="flex h-full min-w-0 flex-1 items-center">
-      <ScrollArea
-        orientation="horizontal"
-        className="h-full min-w-0 max-w-full flex-none w-fit"
-        viewportClassName="[&>div]:h-full"
-        viewportRef={viewportRef}
-      >
-        {scrollContent}
-      </ScrollArea>
+      <TitleBarScrollableInteractiveRegion asChild>
+        <ScrollArea
+          orientation="horizontal"
+          className="h-full min-w-0 max-w-full flex-none w-fit"
+          viewportClassName="[&>div]:h-full"
+          viewportRef={viewportRef}
+        >
+          {scrollContent}
+        </ScrollArea>
+      </TitleBarScrollableInteractiveRegion>
       <TitleBarDragRegion reserveWindowControls={false} className="min-w-0 flex-1 self-stretch" aria-hidden />
     </div>
   )

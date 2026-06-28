@@ -35,6 +35,22 @@ export const TitleBarInteractiveRegion = forwardRef<HTMLDivElement, TitleBarInte
   },
 )
 
+export const TitleBarScrollableInteractiveRegion = forwardRef<HTMLDivElement, TitleBarInteractiveRegionProps>(
+  function TitleBarScrollableInteractiveRegion({ asChild = false, className, ...props }, ref) {
+    const Comp = asChild ? Slot.Root : 'div'
+    return (
+      <Comp
+        ref={ref}
+        {...props}
+        data-interactive
+        data-title-bar-chrome-region="interactive"
+        data-title-bar-scroll-region=""
+        className={cn('title-bar-scroll-region', className)}
+      />
+    )
+  },
+)
+
 interface TitleBarNoDragRegionProps extends ComponentPropsWithoutRef<'div'> {
   asChild?: boolean
 }
