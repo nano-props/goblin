@@ -17,7 +17,7 @@ export async function movePathToTrash(path: string, signal?: AbortSignal): Promi
     try {
       await execa(command.command, command.args, {
         reject: true,
-        signal,
+        cancelSignal: signal,
       })
       return { ok: true, message: 'ok', repoChanged: true }
     } catch (err) {
