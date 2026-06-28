@@ -128,6 +128,15 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
     })
 
     expect(sortableOnPointerDown).toHaveBeenCalledTimes(1)
+
+    const closeButton = tabChrome.querySelector('button[aria-label="close term-1"]')
+    if (!(closeButton instanceof HTMLButtonElement)) throw new Error('missing close button')
+
+    act(() => {
+      closeButton.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    })
+
+    expect(sortableOnPointerDown).toHaveBeenCalledTimes(1)
   })
 })
 

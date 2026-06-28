@@ -68,15 +68,20 @@ export function ToolbarClosableTab({
         {children}
       </button>
       {closeProps.closeButton !== false && (
+        // Keep the visible close affordance at its original size while giving
+        // the action enough hit slop to match the parent tab hover area.
         <button
           type="button"
           tabIndex={-1}
           aria-label={closeProps.closeLabel}
           onPointerDown={(event) => event.stopPropagation()}
+          onMouseDown={(event) => event.stopPropagation()}
           onClick={closeProps.onClose}
           className={cn(
-            'cursor-pointer rounded border-0 bg-transparent p-0.5 text-muted-foreground transition-colors duration-100 hover:bg-accent hover:text-accent-foreground',
-            closeProps.closeVisible ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
+            'relative z-10 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0.5 text-muted-foreground transition-colors duration-100 before:absolute before:-inset-x-1.5 before:-inset-y-1 before:content-[""] hover:bg-accent hover:text-accent-foreground',
+            closeProps.closeVisible
+              ? 'pointer-events-auto opacity-100'
+              : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100',
           )}
           title={closeProps.closeLabel}
         >

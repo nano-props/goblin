@@ -208,6 +208,12 @@ describe('WorkspacePaneTabStrip', () => {
       ),
     ).toBe(true)
     expect(document.body.querySelectorAll('[role="tab"]').length).toBe(3)
+    const inactiveCloseButton = document.body.querySelector<HTMLButtonElement>('button[aria-label="close term-2"]')
+    expect(inactiveCloseButton?.className).toContain('shrink-0')
+    expect(inactiveCloseButton?.className).toContain('before:-inset-x-1.5')
+    expect(inactiveCloseButton?.className).toContain('before:-inset-y-1')
+    expect(inactiveCloseButton?.className).toContain('pointer-events-none')
+    expect(inactiveCloseButton?.className).toContain('group-hover:pointer-events-auto')
     const firstTab = document.body.querySelector('#workspace-workspace-pane-tab')
     expect(firstTab?.getAttribute('aria-posinset')).toBe('1')
     expect(firstTab?.getAttribute('aria-setsize')).toBe('3')
