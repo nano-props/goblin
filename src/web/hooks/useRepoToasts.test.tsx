@@ -1,4 +1,21 @@
 // @vitest-environment jsdom
+// Partial mock of `#/web/stores/i18n.ts`: delegates to the real
+// module so `i18next.use(initReactI18next).init({…})` still runs,
+// then overrides `useT` with a dictionary-based interpolator
+// (`i18nMocks.dict` + `i18nMocks.interpolate`) that the assertions
+// on toast summaries can match against. The simple `stubI18n`
+// helper only covers the `useT → raw key` case; richer overrides
+// write their own `vi.mock(import(...), importOriginal)` and
+// spread `actual` to keep the i18next init side effect live.
+vi.mock(import('#/web/stores/i18n.ts'), async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    useT: (() => (key: string, params?: Record<string, string | number>) =>
+      i18nMocks.interpolate(i18nMocks.dict[key] ?? key, params)) as typeof actual.useT,
+  }
+})
+
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
@@ -26,11 +43,6 @@ const i18nMocks = vi.hoisted(() => ({
 
 vi.mock('sonner', () => ({
   toast: toastMocks,
-}))
-
-vi.mock('#/web/stores/i18n.ts', () => ({
-  useT: () => (key: string, params?: Record<string, string | number>) =>
-    i18nMocks.interpolate(i18nMocks.dict[key] ?? key, params),
 }))
 
 const REPO_ID = '/tmp/repo-toasts-test'

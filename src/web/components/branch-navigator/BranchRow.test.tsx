@@ -1,4 +1,42 @@
 // @vitest-environment jsdom
+// Partial mock of `#/web/stores/i18n.ts`: delegates to the real
+// module so `i18next.use(initReactI18next).init({…})` still runs,
+// then overrides `useI18nStore` and `useT` for the Chinese-locale
+// row labels this file's assertions check. The simple
+// `stubI18n` helper only covers the `useT → raw key` case; richer
+// overrides write their own `vi.mock(import(...), importOriginal)`
+// and spread `actual` to keep the i18next init side effect live.
+vi.mock(import('#/web/stores/i18n.ts'), async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    useI18nStore: ((selector: (state: { lang: string }) => string) =>
+      selector({ lang: 'zh' })) as typeof actual.useI18nStore,
+    useT: (() => (key: string, params?: Record<string, string | number>) => {
+      switch (key) {
+        case 'branches.dirty':
+          return '有改动'
+        case 'branches.worktree':
+          return '工作树'
+        case 'branches.default':
+          return '默认'
+        case 'branches.gone':
+          return '已失联'
+        case 'terminal.bell-unread-count':
+          return `${params?.count ?? 0} 个未读终端提醒`
+        case 'branch-status.changes-count':
+          return `${params?.n ?? 0} 个改动`
+        case 'branch-status.sync.ahead':
+          return `领先 ${params?.n ?? 0}`
+        case 'branch-status.sync.behind':
+          return `落后 ${params?.n ?? 0}`
+        default:
+          return key
+      }
+    }) as unknown as typeof actual.useT,
+  }
+})
+
 
 import { createRef } from 'react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
@@ -6,32 +44,6 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { BranchRow } from '#/web/components/branch-navigator/BranchRow.tsx'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { createRepoBranch } from '#/web/test-utils/bridge.ts'
-
-vi.mock('#/web/stores/i18n.ts', () => ({
-  useI18nStore: (selector: (state: { lang: string }) => string) => selector({ lang: 'zh' }),
-  useT: () => (key: string, params?: Record<string, string | number>) => {
-    switch (key) {
-      case 'branches.dirty':
-        return '有改动'
-      case 'branches.worktree':
-        return '工作树'
-      case 'branches.default':
-        return '默认'
-      case 'branches.gone':
-        return '已失联'
-      case 'terminal.bell-unread-count':
-        return `${params?.count ?? 0} 个未读终端提醒`
-      case 'branch-status.changes-count':
-        return `${params?.n ?? 0} 个改动`
-      case 'branch-status.sync.ahead':
-        return `领先 ${params?.n ?? 0}`
-      case 'branch-status.sync.behind':
-        return `落后 ${params?.n ?? 0}`
-      default:
-        return key
-    }
-  },
-}))
 
 vi.mock('#/web/components/BranchActionsMenu.tsx', () => ({
   BranchActionsMenu: () => null,

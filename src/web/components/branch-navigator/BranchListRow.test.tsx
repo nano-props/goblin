@@ -7,10 +7,15 @@ import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { createRepoBranch } from '#/web/test-utils/bridge.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 
-vi.mock('#/web/stores/i18n.ts', () => ({
-  useI18nStore: (selector: (state: { lang: string }) => string) => selector({ lang: 'zh' }),
-  useT: () => (key: string) => key,
-}))
+// Side-effect import: registers a partial mock of `#/web/stores/i18n.ts`
+// that delegates to the real module so `i18next.use(initReactI18next).
+// init({…})` still runs (which is what wires the i18next singleton into
+// `react-i18next`'s module-scoped closure, the one `<Trans>` reads
+// from), and only overrides `useT` to return raw keys. See
+// `src/test-utils/i18n-mock.ts` for the rationale and the importOriginal
+// pattern that backs this side effect.
+import { stubI18n } from '#/test-utils/i18n-mock.ts'
+stubI18n()
 
 vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
   useIsCompactUi: () => false,
