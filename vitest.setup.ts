@@ -41,10 +41,10 @@
 //   `globalThis.IS_REACT_ACT_ENVIRONMENT = true`, which left the
 //   worker in the "act environment is on but no act is running" state
 //   that React 19's `warnIfUpdatesNotWrappedWithActDEV` flags on
-//   every post-mount commit. With `renderInJsdom` no longer
-//   permanently flipping that flag, React's check short-circuits to
-//   "not configured for act" and never warns, so the patch is no
-//   longer needed.
+//   every post-mount commit. `renderInJsdom` no longer permanently
+//   flips that flag. Tests that need an act boundary import `act` from
+//   `@testing-library/react`, whose wrapper enables the flag only for
+//   the callback and restores it afterwards.
 
 const originalEmit = process.emit.bind(process)
 process.emit = function patchedEmit(event, payload, ...rest) {

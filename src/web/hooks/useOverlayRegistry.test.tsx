@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act } from 'react'
+import { act } from '@testing-library/react'
 import { describe, expect, test } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useOverlayRegistry } from '#/web/hooks/useOverlayRegistry.ts'

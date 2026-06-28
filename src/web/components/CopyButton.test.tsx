@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act } from 'react'
+import { act } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { CopyButton } from '#/web/components/CopyButton.tsx'
 import { renderInJsdom } from '#/test-utils/render.tsx'
@@ -28,9 +28,7 @@ describe('CopyButton', () => {
       }),
     )
 
-    const { container, rerender } = renderInJsdom(
-      <CopyButton value="first" copyLabel="Copy" copiedLabel="Copied" />,
-    )
+    const { container, rerender } = renderInJsdom(<CopyButton value="first" copyLabel="Copy" copiedLabel="Copied" />)
     act(() => {
       container.querySelector<HTMLButtonElement>('button[aria-label="Copy"]')!.click()
     })

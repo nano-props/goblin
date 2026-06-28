@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
+import { act } from '@testing-library/react'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
-import { act } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { CloneRepositoryDialog } from '#/web/components/CloneRepositoryDialog.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'

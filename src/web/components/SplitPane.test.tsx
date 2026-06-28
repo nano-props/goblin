@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { act } from 'react'
 import type { ReactNode } from 'react'
+import { act } from '@testing-library/react'
 import type { RenderResult } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { SplitPane } from '#/web/components/SplitPane.tsx'
@@ -117,7 +117,9 @@ afterEach(() => {
 describe('SplitPane', () => {
   test('persists user layout changes while expanded', () => {
     const onAfterSizeChange = vi.fn()
-    const { container } = render(<SplitPane before={<div />} after={<div />} afterSize={62} onAfterSizeChange={onAfterSizeChange} />)
+    const { container } = render(
+      <SplitPane before={<div />} after={<div />} afterSize={62} onAfterSizeChange={onAfterSizeChange} />,
+    )
 
     expect(resizableMocks.setLayout).toHaveBeenLastCalledWith({ before: 38, after: 62 })
 

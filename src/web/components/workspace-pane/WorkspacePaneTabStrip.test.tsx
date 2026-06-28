@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 
-import { act, useState } from 'react'
+import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { act } from '@testing-library/react'
 import type { RenderResult } from '@testing-library/react'
 import {
   WorkspacePaneTabStrip,

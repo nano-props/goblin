@@ -8,7 +8,7 @@
 //     when used as React keys downstream — and drop non-string entries
 //   • surface request lifecycle so the input can render a loading hint
 
-import { act } from 'react'
+import { act } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useRemotePathSuggestions } from '#/web/hooks/useRemotePathSuggestions.ts'

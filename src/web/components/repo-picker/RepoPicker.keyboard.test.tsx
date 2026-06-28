@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act } from 'react'
+import { act } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { RepoPicker } from '#/web/components/repo-picker/RepoPicker.tsx'
 import type { RepoPickerRepo } from '#/web/components/repo-picker/types.ts'

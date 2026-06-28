@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
-import { act, type ComponentProps } from 'react'
+import { act } from '@testing-library/react'
+import type { ComponentProps } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { RepoWorkspaceToolbar } from '#/web/components/repo-workspace/RepoWorkspaceToolbar.tsx'

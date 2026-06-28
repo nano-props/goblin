@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 
-import { act } from 'react'
-import { cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { RepoWorkspace } from '#/web/components/RepoWorkspace.tsx'
 import {

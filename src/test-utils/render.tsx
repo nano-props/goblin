@@ -4,7 +4,8 @@
 // Why a helper rather than `@testing-library/react` directly:
 //   - RTL's `render` is synchronous and does not wrap the call in an
 //     `act()` boundary of its own; React 18+ trusts the test author to
-//     pass an `await act(async () => render(...))` wrapper. Most tests
+//     pass an `await act(async () => render(...))` wrapper when the test
+//     drives async updates, timers, or intermediate state. Most tests
 //     in this repo call `renderInJsdom(...)` without an explicit
 //     `act()` wrapper — they only need to verify final DOM state, not
 //     observe every intermediate commit. `renderInJsdom` mirrors
@@ -34,9 +35,12 @@
 //     `node_modules/@testing-library/react/dist/act-compat.js:39-77`).
 //     Tests that need an `act` boundary — typically those that drive
 //     fake timers, await async updates, or assert on intermediate
-//     state — should wrap their calls in `await act(async () => …)`
-//     themselves. `renderInJsdom` does not assume that need on the
-//     caller's behalf.
+//     state — should import `act` from `@testing-library/react` and
+//     wrap their calls in `await act(async () => …)` themselves.
+//     Importing `act` from `react` directly does not set the test
+//     environment flag and can emit "The current testing environment is
+//     not configured to support act(...)". `renderInJsdom` does not
+//     assume that need on the caller's behalf.
 
 import { afterEach } from 'vitest'
 import { cleanup, render, type RenderOptions, type RenderResult } from '@testing-library/react'

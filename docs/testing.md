@@ -38,20 +38,20 @@ those shims.
 
 Always reach for the library tool before writing one yourself:
 
-| Need                                                | Use                                                                                                                                                                                                                                                                                       |
-| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Render a React tree, query by accessible name       | `@testing-library/react` (`render`, `screen`)                                                                                                                                                                                                                                             |
-| Wrap a render in React's act environment            | `@testing-library/react` (`act`) — handles `IS_REACT_ACT_ENVIRONMENT` for the duration of the wrapped callback. `renderInJsdom` (§5) does **not** keep the flag on; tests that drive fake timers after render should wrap their call in `await act(async () => renderInJsdom(...))` themselves. |
-| Type, click, tab through, fire keyboard events      | `@testing-library/user-event` (`userEvent.setup()`)                                                                                                                                                                                                                                       |
-| Query a non-React DOM (portals, raw HTML)           | `@testing-library/dom` (`screen.getByRole`, etc.)                                                                                                                                                                                                                                         |
-| Mock a module export                                | `vi.mock('module', factory)` + `vi.hoisted`                                                                                                                                                                                                                                               |
-| Type-safe access to a mocked function's state       | `vi.mocked(fn)`                                                                                                                                                                                                                                                                           |
-| Spying on a method that does not belong to a module | `vi.spyOn(obj, 'method')`                                                                                                                                                                                                                                                                 |
-| Capture listener callbacks as typed mocks           | `MockInstance<T>` from `vitest`                                                                                                                                                                                                                                                           |
-| Fake timers                                         | `vi.useFakeTimers(...)` via `useFakeTimers()` in §7                                                                                                                                                                                                                                       |
-| Async waits                                         | `vi.waitFor`, RTL `waitFor`, `vi.advanceTimersByTimeAsync`                                                                                                                                                                                                                                |
-| Single canonical `WebSocket` mock                   | `installWebSocketMock({ autoOpen })` in §5. Do **not** write `class MockWebSocket` inside a test or helper — it has lived in three different shapes already; the helper is the only one reviewers should see.                                                                             |
-| Drive IPC request/response over the socket          | `installGoblinTestBridge(handlers)` in §5 — wires the shared `MockWebSocket.send` to a JSON router; tests only supply `handlers`.                                                                                                                                                         |
+| Need                                                | Use                                                                                                                                                                                                                                                                                                                                                                                                   |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Render a React tree, query by accessible name       | `@testing-library/react` (`render`, `screen`)                                                                                                                                                                                                                                                                                                                                                         |
+| Wrap a render in React's act environment            | `@testing-library/react` (`act`) — handles `IS_REACT_ACT_ENVIRONMENT` for the duration of the wrapped callback. Do not import `act` from `react` directly; React's raw `act` does not configure the test environment. `renderInJsdom` (§5) does **not** keep the flag on; tests that drive fake timers after render should wrap their call in `await act(async () => renderInJsdom(...))` themselves. |
+| Type, click, tab through, fire keyboard events      | `@testing-library/user-event` (`userEvent.setup()`)                                                                                                                                                                                                                                                                                                                                                   |
+| Query a non-React DOM (portals, raw HTML)           | `@testing-library/dom` (`screen.getByRole`, etc.)                                                                                                                                                                                                                                                                                                                                                     |
+| Mock a module export                                | `vi.mock('module', factory)` + `vi.hoisted`                                                                                                                                                                                                                                                                                                                                                           |
+| Type-safe access to a mocked function's state       | `vi.mocked(fn)`                                                                                                                                                                                                                                                                                                                                                                                       |
+| Spying on a method that does not belong to a module | `vi.spyOn(obj, 'method')`                                                                                                                                                                                                                                                                                                                                                                             |
+| Capture listener callbacks as typed mocks           | `MockInstance<T>` from `vitest`                                                                                                                                                                                                                                                                                                                                                                       |
+| Fake timers                                         | `vi.useFakeTimers(...)` via `useFakeTimers()` in §7                                                                                                                                                                                                                                                                                                                                                   |
+| Async waits                                         | `vi.waitFor`, RTL `waitFor`, `vi.advanceTimersByTimeAsync`                                                                                                                                                                                                                                                                                                                                            |
+| Single canonical `WebSocket` mock                   | `installWebSocketMock({ autoOpen })` in §5. Do **not** write `class MockWebSocket` inside a test or helper — it has lived in three different shapes already; the helper is the only one reviewers should see.                                                                                                                                                                                         |
+| Drive IPC request/response over the socket          | `installGoblinTestBridge(handlers)` in §5 — wires the shared `MockWebSocket.send` to a JSON router; tests only supply `handlers`.                                                                                                                                                                                                                                                                     |
 
 A hand-rolled helper is allowed only when none of the above fit. Put the
 helper in `src/test-utils/` (cross-cutting) or `src/web/test-utils/`
@@ -62,6 +62,9 @@ import a helper from inside another test file.
 
 - Hand-rolled `createRoot` + `container` + `act` rendering outside
   `src/test-utils/`.
+- Importing `act` from `react` in tests. Use `act` from
+  `@testing-library/react` so the act environment flag is scoped to the
+  callback.
 - Inline `class MockTerminal` / `class MockWebSocket` outside
   `src/web/test-utils/`.
 - Redefining `window.localStorage` or `window.sessionStorage` in any test
@@ -129,8 +132,8 @@ Exports:
 ### `src/web/test-utils/xterm-mock.ts`
 
 `@xterm/xterm` and the `@xterm/addon-*` packages ship no official test
-helper. The current terminal tests avoid the problem by *not instantiating
-xterm at all*: `TerminalSessionView.test.tsx` and
+helper. The current terminal tests avoid the problem by _not instantiating
+xterm at all_: `TerminalSessionView.test.tsx` and
 `TerminalSessionProvider.test.tsx` render
 `<TerminalSessionContext.Provider value={fakeContext}>` and feed a fake
 `worktreeSnapshot`, so the real `@xterm/*` modules are never imported and
@@ -248,16 +251,16 @@ longer needed because the actual root cause was in
 `globalThis.IS_REACT_ACT_ENVIRONMENT = true` permanently, which left
 the worker in the "act environment is on but no `act` is currently
 running" state that React 19's `warnIfUpdatesNotWrappedWithActDEV`
-flags on every post-mount commit. Once that assignment was removed
-(so the global stays at its default `undefined` / `false`), React's
-check short-circuits to "not configured for act" and never warns.
-Tests that genuinely need an `act` boundary — typically those that
-drive fake timers, await async updates, or assert on intermediate
-state — should wrap their `renderInJsdom(...)` calls in
-`await act(async () => renderInJsdom(...))` themselves. RTL's `act`
-(see `node_modules/@testing-library/react/dist/act-compat.js:39-77`)
-sets the flag only for the wrapped callback and restores it on the
-way out, which is the contract we now follow.
+flags on every post-mount commit. The global now stays at its default
+`undefined` / `false` outside explicit `act` calls. Tests that
+genuinely need an `act` boundary — typically those that drive fake
+timers, await async updates, or assert on intermediate state — should
+wrap their `renderInJsdom(...)` calls in
+`await act(async () => renderInJsdom(...))` themselves, with `act`
+imported from `@testing-library/react`. RTL's `act` (see
+`node_modules/@testing-library/react/dist/act-compat.js:39-77`) sets
+the flag only for the wrapped callback and restores it on the way out,
+which is the contract we now follow.
 
 ## 10. Verification gates
 
@@ -318,7 +321,7 @@ items:
    genuinely need an `act` boundary now wrap their own
    `renderInJsdom(...)` calls.
 3. **Extract `MockTerminal` / split `TerminalSession.test.ts`** —
-   Resolved by *avoiding the mock in the first place*. The terminal
+   Resolved by _avoiding the mock in the first place_. The terminal
    tests (`TerminalSessionView.test.tsx`,
    `TerminalSessionProvider.test.tsx`) render
    `<TerminalSessionContext.Provider value={fakeContext}>` and feed a

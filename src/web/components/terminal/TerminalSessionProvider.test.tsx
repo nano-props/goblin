@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
-import { act, useEffect, useRef } from 'react'
+import { act } from '@testing-library/react'
+import { useEffect, useRef } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
@@ -1606,7 +1607,7 @@ describe('TerminalSessionProvider', () => {
     listSessionsMock.mockResolvedValue([
       {
         ptySessionId: 'session_fail',
-        key: `${REPO_ID} ${WORKTREE_PATH} session-1`,
+        key: `${REPO_ID}\0${WORKTREE_PATH}\0session-1`,
         cwd: WORKTREE_PATH,
         controller: { clientId: 'client_remote', status: 'connected' },
         processName: 'bash',
@@ -1619,7 +1620,7 @@ describe('TerminalSessionProvider', () => {
       },
       {
         ptySessionId: 'session_ok',
-        key: `${REPO_ID} ${WORKTREE_PATH} session-2`,
+        key: `${REPO_ID}\0${WORKTREE_PATH}\0session-2`,
         cwd: WORKTREE_PATH,
         controller: { clientId: 'client_remote', status: 'connected' },
         processName: 'bash',
@@ -1709,7 +1710,7 @@ describe('TerminalSessionProvider', () => {
     createTerminalMock.mockResolvedValueOnce({
       ok: true as const,
       action: 'created' as const,
-      key: `${REPO_ID} ${WORKTREE_PATH} session-1`,
+      key: `${REPO_ID}\0${WORKTREE_PATH}\0session-1`,
       sessions: [],
       ptySessionId: 'session-1',
       snapshot: '',

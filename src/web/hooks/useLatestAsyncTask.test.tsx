@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
-import { act, type ReactNode } from 'react'
+import { act } from '@testing-library/react'
+import type { ReactNode } from 'react'
 import { describe, expect, test } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useLatestAsyncTask } from '#/web/hooks/useLatestAsyncTask.ts'
