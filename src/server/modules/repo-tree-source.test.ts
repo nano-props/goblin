@@ -6,11 +6,10 @@ import {
   MAX_REPO_TREE_DEPTH,
   MAX_REPO_TREE_NODES,
   type RepoTreeSourceOptions,
-  buildNodes,
-  buildStatusOverlay,
   getRepoTreeSourceLocal,
   getRepoTreeSourceRemote,
 } from '#/server/modules/repo-tree-source.ts'
+import { buildNodes, buildStatusOverlay } from '#/server/modules/repo-tree-source-pure.ts'
 import type { StatusEntry, WorktreeStatus } from '#/shared/git-types.ts'
 import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
 

@@ -312,7 +312,9 @@ export const en = {
   'status.copy-patch-success': 'Copied',
 
   // ---- Filetree -----------------------------------------------------------
+  'filetree.aria-label': 'File tree',
   'filetree.empty': 'No files to show.',
+  'filetree.loading': 'Loading file tree…',
   'filetree.no-worktree-title': 'No worktree for this branch',
   'filetree.no-worktree-body': 'Create a worktree for this branch to browse its files here.',
   'filetree.truncated': 'Tree truncated — refine the search to see more.',

@@ -341,4 +341,23 @@ describe('repo-tree — worktreePath validation (F2)', () => {
     expect(result).toEqual({ nodes: [], truncated: false })
     expect(mocks.getRepoTreeSourceLocal).not.toHaveBeenCalled()
   })
+
+  test('rejects a worktreePath containing a NUL byte without invoking the source', async () => {
+    // Defense-in-depth: even if a buggy client smuggles a NUL byte
+    // through the schema layer, the read layer must short-circuit
+    // before any FS / SSH command runs. NUL is the only character
+    // guaranteed to be unsafe in a path component on every
+    // supported OS.
+    const result = await getRepositoryTree('/tmp/repo', '/tmp/repo/.worktrees/feature\0/etc/passwd')
+    expect(result).toEqual({ nodes: [], truncated: false })
+    expect(mocks.runWithRepoSource).not.toHaveBeenCalled()
+    expect(mocks.getRepoTreeSourceLocal).not.toHaveBeenCalled()
+    expect(mocks.getRepoTreeSourceRemote).not.toHaveBeenCalled()
+  })
+
+  test('rejects an empty worktreePath without invoking the source', async () => {
+    const result = await getRepositoryTree('/tmp/repo', '')
+    expect(result).toEqual({ nodes: [], truncated: false })
+    expect(mocks.runWithRepoSource).not.toHaveBeenCalled()
+  })
 })

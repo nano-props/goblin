@@ -277,26 +277,34 @@ describe('splitWorktreeStatusBatch', () => {
     expect(statusStream).toBe('')
   })
 
-  test('returns an empty status stream when the boundary is malformed (no RS bytes, no newline)', () => {
-    // The marker is now wrapped in \x1e Record Separator bytes plus
-    // surrounding \n in the script. A malformed input that omits
-    // those -- as a defence-in-depth check that the parser does not
-    // crash -- falls back to treating the whole output as the
-    // worktree list with an empty status stream.
+  test('returns an empty status stream when the marker is not on its own line', () => {
+    // Defensive: the marker must be its own line, not embedded in a
+    // longer line (the parser searches for `\n<marker>\n`, so any
+    // marker surrounded by something other than `\n` on either side
+    // is treated as missing).
     const output = `worktree /repo${NUL}__GOBLIN_WT_BATCH_BOUNDARY__${NUL}`
     const { statusStream } = splitWorktreeStatusBatch(output)
     expect(typeof statusStream).toBe('string')
     expect(statusStream).toBe('')
   })
 
-  test('the marker includes RS bytes so it cannot collide with a legitimate worktree path', () => {
-    // Regression for F3: POSIX path components cannot contain \x1e,
-    // so the only place this byte sequence can appear on its own
-    // line is in the remote shell's `printf` invocation. A user who
-    // happens to name a worktree `__GOBLIN_WT_BATCH_BOUNDARY__`
-    // cannot make the parser mistake the path for the boundary.
-    expect(WORKTREE_STATUS_BATCH_BOUNDARY.startsWith('\x1e')).toBe(true)
-    expect(WORKTREE_STATUS_BATCH_BOUNDARY.endsWith('\x1e')).toBe(true)
+  test('the marker is plain ASCII text so it round-trips through single-quoted bash', () => {
+    // The remote script emits the marker via
+    //   printf '\n%s\n' '__GOBLIN_WT_BATCH_BOUNDARY__'
+    // so the marker constant must be exactly the printable ASCII the
+    // bash side will substitute into the format string -- no embedded
+    // control bytes or quoting hazards.
+    expect(WORKTREE_STATUS_BATCH_BOUNDARY).toBe('__GOBLIN_WT_BATCH_BOUNDARY__')
+    expect(WORKTREE_STATUS_BATCH_BOUNDARY).not.toMatch(/[\x00-\x1f]/)
+  })
+
+  test('the marker cannot be confused with a legitimate `git worktree list` line', () => {
+    // Regression: every line in `git worktree list --porcelain` is
+    // prefixed by a keyword (`worktree`, `HEAD`, `branch`, `detached`,
+    // `bare`, `locked`). The marker is just the bare text, so the
+    // marker search (`\n<marker>\n`) cannot match any real output.
+    const lines = ['worktree /repo', 'HEAD abc', 'branch refs/heads/main']
+    expect(lines.every((line) => line !== WORKTREE_STATUS_BATCH_BOUNDARY)).toBe(true)
   })
 })
 

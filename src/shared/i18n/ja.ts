@@ -310,7 +310,9 @@ export const ja: Record<DictKey, string> = {
   'status.copy-patch-success': 'コピーしました',
 
   // ---- Filetree -----------------------------------------------------------
+  'filetree.aria-label': 'ファイルツリー',
   'filetree.empty': '表示できるファイルがありません。',
+  'filetree.loading': 'ファイルツリーを読み込んでいます…',
   'filetree.no-worktree-title': 'このブランチのワークツリーはありません',
   'filetree.no-worktree-body': 'このブランチのワークツリーを作成すると、ここでファイルを閲覧できます。',
   'filetree.truncated': 'ファイルツリーが切り詰められました — 範囲を絞るとさらに表示されます。',

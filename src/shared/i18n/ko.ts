@@ -303,7 +303,9 @@ export const ko: Record<DictKey, string> = {
   'status.copy-patch-success': '복사됨',
 
   // ---- Filetree -----------------------------------------------------------
+  'filetree.aria-label': '파일 트리',
   'filetree.empty': '표시할 파일이 없습니다.',
+  'filetree.loading': '파일 트리를 불러오는 중…',
   'filetree.no-worktree-title': '이 브랜치의 워크트리가 없습니다',
   'filetree.no-worktree-body': '이 브랜치의 워크트리를 만들면 여기서 파일을 탐색할 수 있습니다.',
   'filetree.truncated': '파일 트리가 잘렸습니다 — 범위를 좁히면 더 표시됩니다.',

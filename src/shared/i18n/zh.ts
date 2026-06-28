@@ -295,7 +295,9 @@ export const zh: Record<DictKey, string> = {
   'status.copy-patch-success': '已复制',
 
   // ---- Filetree -----------------------------------------------------------
+  'filetree.aria-label': '文件树',
   'filetree.empty': '没有可显示的文件。',
+  'filetree.loading': '正在加载文件树…',
   'filetree.no-worktree-title': '此分支没有工作树',
   'filetree.no-worktree-body': '为此分支创建工作树后，可在此浏览其文件。',
   'filetree.truncated': '文件树已截断 — 缩小范围后可查看更多。',

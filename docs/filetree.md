@@ -192,8 +192,8 @@ One POST endpoint: `POST /api/repo/tree`. Body: `REPO_PROCEDURE_SCHEMAS.tree`. R
 // src/shared/procedure-schemas.ts
 tree: v.object({
   cwd: v.string(),                       // repo locator (matches other repo endpoints)
-  worktreePath: v.string(),              // absolute path of the tree root
-  prefix: v.optional(v.string()),        // for incremental loading
+  worktreePath: v.string(),              // absolute path of the tree root (validated against the worktree list in repo-tree.ts)
+  prefix: v.optional(RepoTreePrefixSchema),  // strictly relative POSIX path inside the worktree (no `..`, no `/`, no control chars)
   depth: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(10))),
 })
 

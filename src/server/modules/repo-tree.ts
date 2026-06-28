@@ -52,6 +52,15 @@ export async function getRepositoryTree(
   const signal = options.signal
   if (signal?.aborted) return { nodes: [], truncated: false }
 
+  // F2 (shape): reject obviously-malformed paths before any I/O. The
+  // perimeter schema (`REPO_PROCEDURE_SCHEMAS.tree`) already
+  // enforces this, but treating this as defense-in-depth means a
+  // future caller that bypasses the schema (composite reads, IPC
+  // bridges) still gets the same short-circuit.
+  if (!hasUsableWorktreePath(worktreePath)) {
+    return { nodes: [], truncated: false }
+  }
+
   // Dispatch based on the cwd's repo kind. SSH remotes go through
   // `getRepoTreeSourceRemote` (PR 5); local paths use the
   // tinyglobby-based local walker. The status fetch is always
@@ -93,13 +102,14 @@ export async function getRepositoryTree(
     worktrees = combined.worktrees
   }
 
-  // F2: validate that `worktreePath` is a known worktree of this repo
-  // before we hand it to the source layer. The remote source already
-  // validates via `resolveKnownRemoteWorktree` (and returns the empty
-  // envelope when the path is unknown); this read-layer guard closes
-  // the same gap on the local side, where tinyglobby would happily
-  // walk any directory the caller names -- including paths outside
-  // the repo, which a hostile or buggy client could exploit.
+  // F2 (membership): validate that `worktreePath` is a known worktree
+  // of this repo before we hand it to the source layer. The remote
+  // source already validates via `resolveKnownRemoteWorktree` (and
+  // returns the empty envelope when the path is unknown); this
+  // read-layer guard closes the same gap on the local side, where
+  // tinyglobby would happily walk any directory the caller names --
+  // including paths outside the repo, which a hostile or buggy
+  // client could exploit.
   //
   // Validation runs against whichever worktree data we have on hand
   // (freshly-fetched list, or the precomputed inputs). Bare worktrees
@@ -124,12 +134,25 @@ export async function getRepositoryTree(
   return { nodes: source.nodes, truncated: source.truncated }
 }
 
+/** Shape check for `worktreePath`. Empty strings and embedded NUL
+ *  bytes are the only two malformations we care about: the former
+ *  is meaningless as a directory argument, and the latter is the
+ *  one character that is unsafe in a path on every supported OS.
+ *  Anything more specific (length, leading slash, traversal) is
+ *  enforced by the perimeter schema -- keeping this predicate
+ *  tight means we do not duplicate schema policy here. */
+function hasUsableWorktreePath(worktreePath: string): boolean {
+  return worktreePath.length > 0 && !worktreePath.includes('\0')
+}
+
 /** Return true when `worktreePath` matches a known (non-bare) worktree
  *  in either the freshly-fetched list or the status report. Both
  *  sources carry the worktree's path; matching against both keeps the
  *  precomputedStatus-only code path honest. The comparison uses
  *  `path.resolve` so trailing slashes / `.` / `..` segments do not
- *  sneak past. */
+ *  sneak past. Shape validation (empty / NUL) is performed up
+ *  front in `getRepositoryTree` so this function only deals with
+ *  membership. */
 function matchesKnownWorktree(
   worktrees: ReadonlyArray<WorktreeInfo> | undefined,
   statuses: ReadonlyArray<WorktreeStatus>,

@@ -5,6 +5,7 @@ export type BranchActionItemId =
   | 'status'
   | 'history'
   | 'changes'
+  | 'files'
   | 'copyPatch'
   | 'pull'
   | 'push'

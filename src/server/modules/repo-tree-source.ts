@@ -15,14 +15,33 @@
 // SSH remote enumeration lives in the same module but in a separate
 // function (getRepoTreeSourceRemote); the read layer dispatches
 // based on the cwd's repo kind.
+//
+// Public surface (the only stable contract):
+//   - getRepoTreeSourceLocal / getRepoTreeSourceRemote -- the two
+//     fetchers the read layer calls.
+//   - MAX_REPO_TREE_NODES / MAX_REPO_TREE_DEPTH -- the bounds the
+//     wire schema enforces at the perimeter.
+//   - RepoTreeSourceOptions / RepoTreeSourceResult -- the option /
+//     result shapes.
+// Pure transforms behind the fetchers (buildNodes, buildStatusOverlay,
+// the NUL parser, the path-prefix stripper) live in
+// `repo-tree-source-pure.ts` and are NOT re-exported from here --
+// tests import them directly from the pure module. This keeps the
+// source layer's public surface narrow.
 
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import { glob } from 'tinyglobby'
-import type { RepoTreeNode, RepoTreeNodeStatus } from '#/shared/api-types.ts'
+import type { RepoTreeNode } from '#/shared/api-types.ts'
 import type { WorktreeInfo, WorktreeStatus } from '#/shared/git-types.ts'
 import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
 import { getRemoteTreeWalk } from '#/system/ssh/git.ts'
+import {
+  buildNodes,
+  buildStatusOverlay,
+  parseNullSeparatedPaths,
+  stripRemoteEntryPrefix,
+} from '#/server/modules/repo-tree-source-pure.ts'
 
 /** Hard cap on nodes emitted in a single response. Sized so a fully
  *  expanded tree of a normal-sized repo fits, but a pathological
@@ -33,12 +52,6 @@ export const MAX_REPO_TREE_NODES = 50_000
  *  this same bound at the perimeter -- duplicated here as a defensive
  *  upper bound for direct callers of the source layer. */
 export const MAX_REPO_TREE_DEPTH = 10
-
-/** NUL byte used as the record separator for `find -print0` output
- *  from the remote side. Declared as a constant so the source
- *  layer does not have to spell out the escape inline (which is
- *  fragile in some editors). */
-const NUL = String.fromCharCode(0)
 
 export interface RepoTreeSourceOptions {
   /** POSIX path relative to the worktree root. The result is rooted
@@ -206,129 +219,6 @@ export async function getRepoTreeSourceRemote(
   return { nodes, truncated }
 }
 
-function parseNullSeparatedPaths(input: string): string[] {
-  // `find -print0` emits NUL-separated records with no line terminator
-  // on the last entry, so the only legitimate "junk" between records is
-  // the empty trailing element from the trailing NUL. We deliberately
-  // do NOT strip leading/trailing newlines from individual parts -- a
-  // path can legitimately contain an embedded newline when git status -z
-  // quotes it, and `find -print0` would still hand us the line-boundary
-  // inside that quoted segment. Touching the bytes here would silently
-  // mangle valid Linux paths. See parsers.test.ts: 'handles paths with
-  // embedded newlines (quoted paths in git status -z)'.
-  if (input.length === 0) return []
-  return input.split(NUL).filter((part) => part.length > 0)
-}
-
-function stripRemoteEntryPrefix(entry: string, root: string): string | null {
-  if (entry === root) return ''
-  if (entry.startsWith(`${root}/`)) {
-    const relative = entry.slice(root.length + 1)
-    if (relative.startsWith('../') || relative === '..' || relative.includes(NUL)) return null
-    return relative
-  }
-  return null
-}
-
-export interface BuildNodesInput {
-  readonly worktreePath: string
-  readonly prefix: string
-  readonly depth: number
-  readonly entries: ReadonlyArray<string>
-}
-
-/** Convert a list of tinyglobby entries (relative POSIX paths) into
- *  a flat list of RepoTreeNodes with derived directory nodes.
- *  Exported for unit tests so the filesystem walker can be exercised
- *  with hand-crafted input. */
-export function buildNodes(input: BuildNodesInput): RepoTreeNode[] {
-  const { prefix, depth, entries } = input
-  const fileNodes: RepoTreeNode[] = []
-  const dirIds = new Set<string>()
-
-  for (const rawEntry of entries) {
-    const relative = rawEntry.split(path.sep).join('/')
-    // Reject anything that escapes the worktree root: top-level
-    // `..`, mid-path `..` (e.g. `foo/../../etc/passwd`), and
-    // absolute paths. The local walker never produces these --
-    // tinyglobby's `cwd` is the worktree root and it refuses to
-    // ascend -- but the remote side hands us whatever `find
-    // -print0` returned, and `find` will follow symlinks into a
-    // symlinked ancestor without complaint.
-    if (relative.startsWith('../') || relative === '..' || path.isAbsolute(relative)) continue
-    if (relative.split('/').includes('..')) continue
-    if (!isWithinDepth(relative, prefix, depth)) continue
-
-    const kind: RepoTreeNode['kind'] = relative.endsWith('/') ? 'directory' : 'file'
-    const id = stripTrailingSlash(relative)
-    const name = basename(id)
-    const parentId = parentDirectoryId(id, prefix)
-    fileNodes.push({ id, path: id, name, parentId, kind, status: 'clean' })
-
-    collectAncestorDirs(id, prefix, dirIds)
-  }
-
-  const dirNodes: RepoTreeNode[] = []
-  for (const dirId of dirIds) {
-    if (dirId === prefix) continue
-    const node: RepoTreeNode = {
-      id: dirId,
-      path: dirId,
-      name: basename(dirId),
-      parentId: parentDirectoryId(dirId, prefix),
-      kind: 'directory',
-      status: 'clean',
-    }
-    dirNodes.push(node)
-  }
-
-  // Sort directories first, then files, both alphabetical. Children
-  // of the same parent appear next to each other because we already
-  // walk in tree order via tinyglobby.
-  return [...dirNodes, ...fileNodes].sort(compareNodes)
-}
-
-function compareNodes(a: RepoTreeNode, b: RepoTreeNode): number {
-  if (a.parentId === b.parentId) {
-    if (a.kind !== b.kind) return a.kind === 'directory' ? -1 : 1
-    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0
-  }
-  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0
-}
-
-function collectAncestorDirs(id: string, prefix: string, out: Set<string>): void {
-  let cursor = parentDirectoryId(id, prefix)
-  while (cursor !== null && cursor !== prefix && !out.has(cursor)) {
-    out.add(cursor)
-    cursor = parentDirectoryId(cursor, prefix)
-  }
-}
-
-function parentDirectoryId(id: string, prefix: string): string | null {
-  const slash = id.lastIndexOf('/')
-  if (slash < 0) {
-    // File or directory at the worktree root.
-    return null
-  }
-  const parent = id.slice(0, slash)
-  return parent === prefix ? null : parent
-}
-
-function basename(id: string): string {
-  const slash = id.lastIndexOf('/')
-  return slash < 0 ? id : id.slice(slash + 1)
-}
-
-function stripTrailingSlash(id: string): string {
-  return id.endsWith('/') ? id.slice(0, -1) : id
-}
-
-function isWithinDepth(relative: string, prefix: string, depth: number): boolean {
-  const segments = relative.split('/').filter(Boolean).length
-  const prefixSegments = prefix ? prefix.split('/').filter(Boolean).length : 0
-  return segments + prefixSegments <= depth
-}
-
 function clampDepth(value: number): number {
   if (!Number.isFinite(value) || value <= 0) return MAX_REPO_TREE_DEPTH
   return Math.min(Math.floor(value), MAX_REPO_TREE_DEPTH)
@@ -384,28 +274,31 @@ async function loadIgnorePatterns(worktreePath: string, signal: AbortSignal | un
  *  tinyglobby patterns. We deliberately implement a *minimal*
  *  subset:
  *    - comments and blank lines are dropped;
- *    - negation (!) is dropped -- v1 ignores overrides so the
- *      default skip-everything rule of .gitignore is enough;
- *    - leading / anchors the pattern at the worktree root;
- *    - a bare name (node_modules) becomes a directory-anchored
- *      exclusion that also matches anywhere (slashslash-star name slashslash-star);
- *    - patterns ending in / (directory-only) become name-with-slashes;
- *    - everything else passes through with a slashslash-star prefix so it
+ *    - negation (e.g. `!foo`) is silently treated as if the `!`
+ *      were absent -- v1 does not implement gitignore re-include
+ *      semantics; the spec promises an overlay-dots UI, not the
+ *      precise semantics of multi-rule gitignore stacks;
+ *    - leading `/` anchors the pattern at the worktree root;
+ *    - a bare name (e.g. `node_modules`) becomes a directory-
+ *      anchored exclusion that also matches anywhere;
+ *    - patterns ending in `/` (directory-only) become
+ *      name-with-slashes;
+ *    - everything else passes through with a `**` prefix so it
  *      matches anywhere in the tree, matching git default.
  *
- *  v1 does not implement starstar semantics nuances, character classes,
- *  or escaped globs -- these are good follow-ups but the spec is
- *  explicit about a minimal reader. */
+ *  v1 does not implement double-star semantics nuances, character
+ *  classes, or escaped globs -- these are good follow-ups but the
+ *  spec is explicit about a minimal reader. */
 function translateGitignoreLine(raw: string): string[] {
   const line = raw.replace(/^\s+|\s+$/g, '')
   if (line === '' || line.startsWith('#')) return []
 
-  const negated = line.startsWith('!')
-  // v1 ignores overrides -- the spec promises an overlay-dots UI,
-  // not the precise semantics of multi-rule gitignore stacks.
-  void negated
-
-  let pattern = negated ? line.slice(1) : line
+  // Negation lines (e.g. "!foo") are intentionally a no-op in v1.
+  // The spec promises an overlay-dots UI, not the precise semantics
+  // of multi-rule gitignore stacks. Drop the leading bang and
+  // process the rest as a plain include rule -- this matches what
+  // users see in tools like rg's minimal reader.
+  let pattern = line.startsWith('!') ? line.slice(1) : line
 
   // Treat /-suffixed patterns as directory-only.
   let directoryOnly = false
@@ -435,37 +328,3 @@ function translateGitignoreLine(raw: string): string[] {
 }
 
 const GLOB_META_CHARS = ['*', '?', '[', ']', '{', '}']
-
-/** Map a worktree status report to a path -> status lookup, scoped
- *  to the requested worktree. The read layer supplies the full
- *  WorktreeStatus list; we pick out the worktree that matches the
- *  requested path and translate each entry x/y codes into a
- *  RepoTreeNodeStatus. */
-export function buildStatusOverlay(
-  precomputedStatus: ReadonlyArray<WorktreeStatus> | undefined,
-  worktreePath: string,
-): Map<string, RepoTreeNodeStatus> {
-  const out = new Map<string, RepoTreeNodeStatus>()
-  if (!precomputedStatus) return out
-
-  const matched = precomputedStatus.find((wt) => path.resolve(wt.path) === path.resolve(worktreePath))
-  if (!matched) return out
-
-  for (const entry of matched.entries) {
-    const status = translateStatusEntry(entry.x, entry.y)
-    if (status === 'clean') continue
-    out.set(entry.path, status)
-  }
-  return out
-}
-
-function translateStatusEntry(x: string, y: string): RepoTreeNodeStatus {
-  // git status --porcelain codes:
-  //   x = index (staged), y = worktree (unstaged)
-  //   ?? = untracked, !! = ignored
-  if (x === '?' && y === '?') return 'untracked'
-  if (x === '!' && y === '!') return 'ignored'
-  if (x !== ' ' && x !== '?') return 'staged'
-  if (y !== ' ' && y !== '?') return 'modified'
-  return 'clean'
-}

@@ -15,6 +15,7 @@ import {
   RemoteTargetSchema,
 } from '#/shared/api-types.ts'
 import { NativeHostProjectionSchema } from '#/shared/native-host-projection.ts'
+import { RepoTreePrefixSchema } from '#/shared/repo-tree-schema.ts'
 import { WORKTREE_BOOTSTRAP_CONFIG_HASH_RE } from '#/shared/repo-settings.ts'
 import { isRemoteRepoId, parseRemoteRepoId } from '#/shared/remote-repo.ts'
 
@@ -108,11 +109,16 @@ export const REPO_PROCEDURE_SCHEMAS = {
   patch: v.object({ cwd: v.string(), worktreePath: v.string() }),
   // Worktree-scoped file tree (docs/filetree.md). `prefix` enables
   // incremental loading for very deep trees; `depth` is bounded 1..10
-  // so a bad client cannot ask the server to walk forever.
+  // so a bad client cannot ask the server to walk forever. The
+  // perimeter rejects absolute paths, `..` segments, control
+  // characters and backslashes inside `prefix` so a hostile or
+  // buggy client cannot escape the worktree root. The read layer
+  // still verifies `worktreePath` against the worktree list as a
+  // defense-in-depth check.
   tree: v.object({
     cwd: v.string(),
     worktreePath: v.string(),
-    prefix: v.optional(v.string()),
+    prefix: v.optional(RepoTreePrefixSchema),
     depth: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(10))),
   }),
   pullRequests: v.object({

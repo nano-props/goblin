@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { userEvent } from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { FiletreeNoWorktreeView, FiletreeView } from '#/web/components/repo-workspace/FiletreeView.tsx'
 import type { RepoTreeNode, RepoTreeResult } from '#/shared/api-types.ts'
@@ -41,6 +42,12 @@ function renderView(props: React.ComponentProps<typeof FiletreeView>) {
 
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
+  const win = window as typeof window & { PointerEvent?: typeof PointerEvent }
+  win.PointerEvent ??= MouseEvent as unknown as typeof PointerEvent
+  globalThis.PointerEvent ??= win.PointerEvent
+  globalThis.CSS ??= { escape: (value: string) => value.replace(/["\\]/g, '\\$&') } as typeof CSS
+  globalThis.requestAnimationFrame ??= (callback: FrameRequestCallback) => window.setTimeout(callback, 0)
+  globalThis.cancelAnimationFrame ??= (id: number) => window.clearTimeout(id)
 })
 
 afterEach(() => {
@@ -53,23 +60,49 @@ afterEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
-async function flushMicrotasks() {
-  await act(async () => {
-    await Promise.resolve()
-  })
+function row(name: string): HTMLElement {
+  const element = rows().find((candidate) => candidate.getAttribute('aria-label') === name)
+  if (!element) throw new Error(`no row for ${name}`)
+  return element
+}
+
+function rows(): HTMLElement[] {
+  return Array.from(container?.querySelectorAll<HTMLElement>('[role="row"][aria-label]') ?? [])
+}
+
+function rowNames(): Array<string | null> {
+  return rows().map((element) => element.getAttribute('aria-label'))
+}
+
+function treegrid(): HTMLElement {
+  const element = container?.querySelector<HTMLElement>('[role="treegrid"]')
+  if (!element) throw new Error('no treegrid')
+  return element
+}
+
+function buildTree(): RepoTreeResult {
+  return {
+    nodes: [
+      dirNode('src'),
+      dirNode('src/util', 'src'),
+      fileNode('src/index.ts', 'src'),
+      fileNode('src/util/helper.ts', 'src/util'),
+      fileNode('README.md'),
+    ],
+    truncated: false,
+  }
 }
 
 describe('FiletreeView', () => {
   test('renders the empty state when the tree has no nodes', () => {
     const tree: RepoTreeResult = { nodes: [], truncated: false }
     renderView({ tree, loading: false, error: null, stale: false })
-    expect(container?.querySelector('[data-filetree=""]')).toBeNull()
+    expect(container?.querySelector('[data-filetree=""]')).not.toBeNull()
+    expect(container?.querySelectorAll('[role="row"]').length).toBe(0)
     expect(container?.textContent).toMatch(/filetree\.empty/)
   })
 
   test('renders the no-worktree placeholder via the dedicated helper', () => {
-    // No worktree case is the responsibility of the panel wrapper;
-    // the helper component renders the no-worktree empty state.
     container = document.createElement('div')
     document.body.append(container)
     root = createRoot(container)
@@ -85,6 +118,16 @@ describe('FiletreeView', () => {
     expect(container?.textContent).toMatch(/filetree\.error/)
   })
 
+  test('renders a React Aria treegrid labelled by i18n', () => {
+    renderView({
+      tree: { nodes: [fileNode('README.md')], truncated: false },
+      loading: false,
+      error: null,
+      stale: false,
+    })
+    expect(treegrid().getAttribute('aria-label')).toBe('filetree.aria-label')
+  })
+
   test('lists root-level files and directories, directories before files', () => {
     const tree: RepoTreeResult = {
       nodes: [
@@ -98,51 +141,69 @@ describe('FiletreeView', () => {
     }
     renderView({ tree, loading: false, error: null, stale: false })
 
-    const items = Array.from(container?.querySelectorAll('[role="treeitem"]') ?? []) as HTMLElement[]
-    // Only root-level rows are visible: README.md, src (in that
-    // order, directories first). All src/ children are hidden
-    // because src starts collapsed.
-    const visibleIds = items.map((item) => item.getAttribute('aria-level'))
-    expect(visibleIds).toEqual(['1', '1'])
-    // The directory comes before the file at the root. The
-    // aria-label lives on the inner clickable div, not the li.
-    const visibleNames = items.map((item) => {
-      const button = item.querySelector('[role="button"]')
-      return button?.getAttribute('aria-label') ?? null
-    })
-    expect(visibleNames).toEqual(['src', 'README.md'])
+    expect(rowNames()).toEqual(['src', 'README.md'])
+    expect(row('src').getAttribute('aria-level')).toBe('1')
+    expect(row('README.md').getAttribute('aria-level')).toBe('1')
   })
 
-  test('expands a directory on click and reveals its children', async () => {
+  test('toggles a directory by clicking the full row', async () => {
+    const user = userEvent.setup()
     const tree: RepoTreeResult = {
       nodes: [dirNode('src'), fileNode('src/index.ts', 'src')],
       truncated: false,
     }
     renderView({ tree, loading: false, error: null, stale: false })
 
-    const directoryLi = container?.querySelector('li[aria-expanded="false"]') as HTMLElement
-    expect(directoryLi).toBeTruthy()
-    const directoryButton = directoryLi.querySelector('[role="button"]') as HTMLElement
+    await user.click(row('src'))
 
-    await act(async () => {
-      directoryButton.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    })
-    const items = Array.from(container?.querySelectorAll('[role="treeitem"]') ?? []) as HTMLElement[]
-    expect(items.length).toBe(2)
-    expect(items[1]?.getAttribute('aria-level')).toBe('2')
+    expect(rowNames()).toEqual(['src', 'index.ts'])
+    expect(row('src').getAttribute('aria-expanded')).toBe('true')
+    expect(row('index.ts').getAttribute('aria-level')).toBe('2')
+
+    await user.click(row('src'))
+
+    expect(rowNames()).toEqual(['src'])
+    expect(row('src').getAttribute('aria-expanded')).toBe('false')
+  })
+
+  test('still expands a directory via the React Aria chevron slot', async () => {
+    const user = userEvent.setup()
+    const tree: RepoTreeResult = {
+      nodes: [dirNode('src'), fileNode('src/index.ts', 'src')],
+      truncated: false,
+    }
+    renderView({ tree, loading: false, error: null, stale: false })
+
+    await user.click(row('src').querySelector<HTMLButtonElement>('button[slot="chevron"]')!)
+
+    expect(rowNames()).toEqual(['src', 'index.ts'])
+    expect(row('src').getAttribute('aria-expanded')).toBe('true')
   })
 
   test('emits onSelect when a row is clicked', async () => {
+    const user = userEvent.setup()
     const onSelect = vi.fn()
     const tree: RepoTreeResult = { nodes: [fileNode('README.md')], truncated: false }
     renderView({ tree, loading: false, error: null, stale: false, onSelect })
 
-    const row = container?.querySelector('li [role="button"]') as HTMLElement
-    await act(async () => {
-      row.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    })
+    await user.click(row('README.md'))
+
     expect(onSelect).toHaveBeenCalledTimes(1)
     expect(onSelect.mock.calls[0]?.[0]?.id).toBe('README.md')
+    expect(row('README.md').getAttribute('aria-selected')).toBe('true')
+  })
+
+  test('emits onActivate on Enter key for files', async () => {
+    const user = userEvent.setup()
+    const onActivate = vi.fn()
+    const tree: RepoTreeResult = { nodes: [fileNode('README.md')], truncated: false }
+    renderView({ tree, loading: false, error: null, stale: false, onActivate })
+
+    row('README.md').focus()
+    await user.keyboard('{Enter}')
+
+    expect(onActivate).toHaveBeenCalledTimes(1)
+    expect(onActivate.mock.calls[0]?.[0]?.id).toBe('README.md')
   })
 
   test('shows the truncated footer when truncated is true', () => {
@@ -166,298 +227,32 @@ describe('FiletreeView', () => {
       truncated: false,
     }
     renderView({ tree, loading: false, error: null, stale: false })
-    // i18n is mocked to return the key verbatim, so the aria-label
-    // surfaces the i18n key path. The contract under test is "the
-    // status value reaches an aria-label via the i18n layer", not
-    // the translated string.
     const dot = container?.querySelector('[aria-label="filetree.status.modified"]') as HTMLElement
     expect(dot).toBeTruthy()
     expect(dot.style.background).toContain('--color-warning')
   })
 
-  test('emits onActivate on Enter key for files', async () => {
-    const onActivate = vi.fn()
-    const tree: RepoTreeResult = { nodes: [fileNode('README.md')], truncated: false }
-    renderView({ tree, loading: false, error: null, stale: false, onActivate })
-
-    const row = container?.querySelector('li [role="button"]') as HTMLElement
-    await act(async () => {
-      row.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
-    })
-    expect(onActivate).toHaveBeenCalledTimes(1)
-    expect(onActivate.mock.calls[0]?.[0]?.id).toBe('README.md')
-  })
-
-  test('ArrowRight expands a collapsed directory', async () => {
-    const tree: RepoTreeResult = {
-      nodes: [dirNode('src'), fileNode('src/index.ts', 'src')],
-      truncated: false,
-    }
-    renderView({ tree, loading: false, error: null, stale: false })
-
-    const directoryLi = container?.querySelector('li[aria-expanded="false"]') as HTMLElement
-    const row = directoryLi.querySelector('[role="button"]') as HTMLElement
-    await act(async () => {
-      row.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
-    })
-    const items = Array.from(container?.querySelectorAll('[role="treeitem"]') ?? []) as HTMLElement[]
-    expect(items.length).toBe(2)
-  })
-
-  test('ArrowLeft collapses an expanded directory', async () => {
-    const tree: RepoTreeResult = {
-      nodes: [dirNode('src'), fileNode('src/index.ts', 'src')],
-      truncated: false,
-    }
-    renderView({ tree, loading: false, error: null, stale: false })
-
-    const directoryLi = container?.querySelector('li[aria-expanded="false"]') as HTMLElement
-    const row = directoryLi.querySelector('[role="button"]') as HTMLElement
-    // Expand first.
-    await act(async () => {
-      row.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
-    })
-    const expandedLi = container?.querySelector('li[aria-expanded="true"]') as HTMLElement
-    expect(expandedLi).toBeTruthy()
-    const expandedButton = expandedLi.querySelector('[role="button"]') as HTMLElement
-    // Collapse.
-    await act(async () => {
-      expandedButton.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))
-    })
-    const items = Array.from(container?.querySelectorAll('[role="treeitem"]') ?? []) as HTMLElement[]
-    expect(items.length).toBe(1)
-  })
-
-  test('treats loading=true with no tree as a placeholder (no body rows)', () => {
+  test('treats loading=true with no tree as a placeholder and announces aria-busy', () => {
     renderView({ tree: null, loading: true, error: null, stale: false })
-    expect(container?.querySelectorAll('[role="treeitem"]').length).toBe(0)
+    expect(container?.querySelectorAll('[role="row"]').length).toBe(0)
+    expect(container?.textContent).toMatch(/filetree\.loading/)
+    expect(container?.textContent).not.toMatch(/filetree\.empty/)
+    expect(container?.querySelector('[data-filetree=""]')?.getAttribute('aria-busy')).toBe('true')
   })
 
-  test('refetches via the wiring: the panel wrapper calls useRepoTreeRefresh', async () => {
-    // The hook itself is the unit of behaviour; the panel is a
-    // thin wrapper. Detailed panel integration is covered by the
-    // hook test. This test ensures the import path resolves.
-    await flushMicrotasks()
-    expect(true).toBe(true)
-  })
-})
-
-describe('FiletreeView — keyboard navigation (F7)', () => {
-  // Helper: build a small three-level tree with two root entries and
-  // a fully-populated child branch, so navigation has somewhere to go.
-  function buildTree(): RepoTreeResult {
-    return {
-      nodes: [
-        dirNode('src'),
-        dirNode('src/util', 'src'),
-        fileNode('src/index.ts', 'src'),
-        fileNode('src/util/helper.ts', 'src/util'),
-        fileNode('README.md'),
-      ],
-      truncated: false,
-    }
-  }
-
-  // Helper: the `[role="button"]` rows rendered in DOM order. Each
-  // entry corresponds to one treeitem li.
-  function visibleRows(): HTMLElement[] {
-    return Array.from(
-      container?.querySelectorAll('li [role="button"]') ?? [],
-    ) as HTMLElement[]
-  }
-
-  // Helper: dispatch a keydown on the row whose data-filetree-row
-  // matches `id`.
-  function keyDown(id: string, key: string): void {
-    const row = container?.querySelector(
-      `[data-filetree-row="${id}"]`,
-    ) as HTMLElement | null
-    if (!row) throw new Error(`no row for id=${id}`)
-    act(() => {
-      row.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }))
-    })
-  }
-
-  function tabIndexedRows(): HTMLElement[] {
-    return visibleRows().filter((row) => row.tabIndex === 0)
-  }
-
-  test('initially places roving tabindex on the first visible row only', () => {
-    const tree: RepoTreeResult = { nodes: [dirNode('src'), fileNode('README.md')], truncated: false }
-    renderView({ tree, loading: false, error: null, stale: false })
-
-    const tabbables = tabIndexedRows()
-    expect(tabbables).toHaveLength(1)
-    // First visible row is "src" (directories render before files at
-    // the same depth).
-    expect(tabbables[0]?.getAttribute('data-filetree-row')).toBe('src')
-    // Every other row is tabIndex=-1.
-    const others = visibleRows().filter((row) => row.tabIndex === -1)
-    expect(others).toHaveLength(1)
-  })
-
-  test('ArrowDown moves focus to the next visible row and updates the roving tabindex', async () => {
-    const tree = buildTree()
-    renderView({ tree, loading: false, error: null, stale: false })
-
-    keyDown('src', 'ArrowDown')
-
-    const tabbables = tabIndexedRows()
-    expect(tabbables).toHaveLength(1)
-    expect(tabbables[0]?.getAttribute('data-filetree-row')).toBe('README.md')
-  })
-
-  test('ArrowUp on the second row moves focus back to the first', async () => {
-    const tree = buildTree()
-    renderView({ tree, loading: false, error: null, stale: false })
-
-    // Move down to README.md, then back up to src.
-    keyDown('src', 'ArrowDown')
-    keyDown('README.md', 'ArrowUp')
-
-    const tabbables = tabIndexedRows()
-    expect(tabbables).toHaveLength(1)
-    expect(tabbables[0]?.getAttribute('data-filetree-row')).toBe('src')
-  })
-
-  test('ArrowDown on the last visible row stays put (no wrap)', async () => {
-    const tree = buildTree()
-    renderView({ tree, loading: false, error: null, stale: false })
-
-    keyDown('src', 'ArrowDown') // → README.md (last visible row)
-    keyDown('README.md', 'ArrowDown') // → no movement
-
-    const tabbables = tabIndexedRows()
-    expect(tabbables).toHaveLength(1)
-    expect(tabbables[0]?.getAttribute('data-filetree-row')).toBe('README.md')
-  })
-
-  test('ArrowUp on the first visible row stays put (no wrap)', async () => {
-    const tree = buildTree()
-    renderView({ tree, loading: false, error: null, stale: false })
-
-    keyDown('src', 'ArrowUp') // → no movement
-
-    const tabbables = tabIndexedRows()
-    expect(tabbables).toHaveLength(1)
-    expect(tabbables[0]?.getAttribute('data-filetree-row')).toBe('src')
-  })
-
-  test('ArrowRight on a collapsed directory expands it and focus stays on the directory', async () => {
-    const tree = buildTree()
-    renderView({ tree, loading: false, error: null, stale: false })
-
-    keyDown('src', 'ArrowRight')
-
-    const expandedLi = container?.querySelector('li[aria-expanded="true"]') as HTMLElement
-    expect(expandedLi).toBeTruthy()
-    // Focus remains on the directory; ArrowRight alone does not
-    // descend (the WAI-ARIA pattern keeps focus on the parent until
-    // a second ArrowRight or a single ArrowRight on an already-
-    // expanded directory).
-    const tabbables = tabIndexedRows()
-    expect(tabbables).toHaveLength(1)
-    expect(tabbables[0]?.getAttribute('data-filetree-row')).toBe('src')
-  })
-
-  test('ArrowRight on an already-expanded directory moves focus to its first child', async () => {
-    const tree = buildTree()
-    renderView({ tree, loading: false, error: null, stale: false })
-
-    keyDown('src', 'ArrowRight') // expand
-    keyDown('src', 'ArrowRight') // descend into first child
-
-    const tabbables = tabIndexedRows()
-    expect(tabbables).toHaveLength(1)
-    // childrenByParent ordering: directories before files at the
-    // same depth → first child is "src/util".
-    expect(tabbables[0]?.getAttribute('data-filetree-row')).toBe('src/util')
-  })
-
-  test('ArrowLeft on an expanded directory collapses it; focus stays on the directory', async () => {
-    const tree = buildTree()
-    renderView({ tree, loading: false, error: null, stale: false })
-
-    keyDown('src', 'ArrowRight') // expand
-    keyDown('src', 'ArrowLeft') // collapse
-
-    const expandedLi = container?.querySelector('li[aria-expanded="true"]')
-    expect(expandedLi).toBeNull()
-    const tabbables = tabIndexedRows()
-    expect(tabbables).toHaveLength(1)
-    expect(tabbables[0]?.getAttribute('data-filetree-row')).toBe('src')
-  })
-
-  test('ArrowLeft on a leaf file moves focus to the parent directory', async () => {
-    const tree = buildTree()
-    renderView({ tree, loading: false, error: null, stale: false })
-
-    // Expand src so src/index.ts is visible.
-    keyDown('src', 'ArrowRight')
-    // Focus is on src/index.ts after the second ArrowRight? No —
-    // after `keyDown('src', 'ArrowRight')` src is expanded but focus
-    // remains on src. We need to navigate into a child first.
-    keyDown('src', 'ArrowRight') // → src/util (first child)
-    keyDown('src/util', 'ArrowLeft') // → src (parent)
-    // Now src/util is collapsed; navigate to src/index.ts via ArrowDown.
-    keyDown('src', 'ArrowDown') // → first visible child of src, which is src/util (dir first)
-    keyDown('src/util', 'ArrowDown') // → src/index.ts
-    keyDown('src/index.ts', 'ArrowLeft') // → src
-
-    const tabbables = tabIndexedRows()
-    expect(tabbables).toHaveLength(1)
-    expect(tabbables[0]?.getAttribute('data-filetree-row')).toBe('src')
-  })
-
-  test('Home jumps focus to the first visible row', async () => {
-    const tree = buildTree()
-    renderView({ tree, loading: false, error: null, stale: false })
-
-    keyDown('README.md', 'Home')
-
-    const tabbables = tabIndexedRows()
-    expect(tabbables).toHaveLength(1)
-    expect(tabbables[0]?.getAttribute('data-filetree-row')).toBe('src')
-  })
-
-  test('End jumps focus to the last visible row', async () => {
-    const tree = buildTree()
-    renderView({ tree, loading: false, error: null, stale: false })
-
-    keyDown('src', 'End')
-
-    const tabbables = tabIndexedRows()
-    expect(tabbables).toHaveLength(1)
-    expect(tabbables[0]?.getAttribute('data-filetree-row')).toBe('README.md')
-  })
-
-  test('when the focused row disappears from the visible set, focus falls back to the first visible row', async () => {
-    const tree = buildTree()
-    renderView({ tree, loading: false, error: null, stale: false })
-
-    // Expand src so src/util and src/index.ts become visible.
-    keyDown('src', 'ArrowRight')
-    // Descend into src/util.
-    keyDown('src', 'ArrowRight')
-    // Collapse src — src/util disappears from the visible set.
-    keyDown('src', 'ArrowLeft')
-
-    const tabbables = tabIndexedRows()
-    expect(tabbables).toHaveLength(1)
-    expect(tabbables[0]?.getAttribute('data-filetree-row')).toBe('src')
-  })
-
-  test('changing the tree prop resets focus to the first visible row', async () => {
+  test('resets selection and expansion when the tree identity changes', async () => {
+    const user = userEvent.setup()
     const treeA: RepoTreeResult = {
-      nodes: [dirNode('src'), fileNode('README.md')],
+      nodes: [dirNode('src'), fileNode('src/index.ts', 'src'), fileNode('README.md')],
       truncated: false,
     }
     renderView({ tree: treeA, loading: false, error: null, stale: false })
 
-    // Move focus away from the default.
-    keyDown('src', 'ArrowDown')
+    await user.click(row('src'))
+    await user.click(row('README.md'))
+    expect(rowNames()).toEqual(['src', 'index.ts', 'README.md'])
+    expect(row('README.md').getAttribute('aria-selected')).toBe('true')
 
-    // New tree with a different first row.
     const treeB: RepoTreeResult = {
       nodes: [fileNode('CHANGELOG.md'), dirNode('docs')],
       truncated: false,
@@ -466,9 +261,44 @@ describe('FiletreeView — keyboard navigation (F7)', () => {
       root?.render(<FiletreeView tree={treeB} loading={false} error={null} stale={false} />)
     })
 
-    const tabbables = tabIndexedRows()
-    expect(tabbables).toHaveLength(1)
-    // First visible row of treeB is the directory "docs".
-    expect(tabbables[0]?.getAttribute('data-filetree-row')).toBe('docs')
+    expect(rowNames()).toEqual(['docs', 'CHANGELOG.md'])
+    expect(row('CHANGELOG.md').getAttribute('aria-selected')).toBe('false')
+  })
+})
+
+describe('FiletreeView — React Aria keyboard integration', () => {
+  test('ArrowRight expands the focused directory', async () => {
+    const user = userEvent.setup()
+    renderView({ tree: buildTree(), loading: false, error: null, stale: false })
+
+    row('src').focus()
+    await user.keyboard('{ArrowRight}')
+
+    expect(row('src').getAttribute('aria-expanded')).toBe('true')
+    expect(rowNames()).toEqual(['src', 'util', 'index.ts', 'README.md'])
+  })
+
+  test('ArrowLeft collapses the focused expanded directory', async () => {
+    const user = userEvent.setup()
+    renderView({ tree: buildTree(), loading: false, error: null, stale: false })
+
+    row('src').focus()
+    await user.keyboard('{ArrowRight}')
+    await user.keyboard('{ArrowLeft}')
+
+    expect(row('src').getAttribute('aria-expanded')).toBe('false')
+    expect(rowNames()).toEqual(['src', 'README.md'])
+  })
+})
+
+describe('FiletreeView — locale-aware sorting', () => {
+  test('sorts child lists by locale-aware name compare, directories first', () => {
+    const tree: RepoTreeResult = {
+      nodes: [fileNode('10.txt'), dirNode('a'), fileNode('2.txt'), dirNode('A'), fileNode('b.txt'), fileNode('a.txt')],
+      truncated: false,
+    }
+    renderView({ tree, loading: false, error: null, stale: false })
+
+    expect(rowNames()).toEqual(['a', 'A', '2.txt', '10.txt', 'a.txt', 'b.txt'])
   })
 })

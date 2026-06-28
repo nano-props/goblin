@@ -300,12 +300,15 @@ describe('remote gitWorktreeListAndStatus script (F5 end-to-end)', () => {
 
     const result = await execa('bash', ['-lc', invocation.script])
 
-    // Boundary marker must appear on its own line. The script wraps
-    // the literal text in \x1e Record Separator bytes so a worktree
-    // path containing the marker text cannot collide -- see
-    // WORKTREE_STATUS_BATCH_BOUNDARY.
+    // Boundary marker must appear on its own line. The script emits
+    // it via `printf '\n%s\n' '<marker>'` so it is its own line in
+    // stdout -- the parser searches for `\n<marker>\n`. Every line
+    // in `git worktree list --porcelain` is prefixed by a keyword
+    // (`worktree`, `HEAD`, `branch`, `detached`, `bare`, `locked`),
+    // so the marker text can never be produced as a standalone
+    // legitimate line.
     const lines = result.stdout.split('\n')
-    const boundary = lines.indexOf('\x1e__GOBLIN_WT_BATCH_BOUNDARY__\x1e')
+    const boundary = lines.indexOf('__GOBLIN_WT_BATCH_BOUNDARY__')
     expect(boundary).toBeGreaterThan(0)
 
     // The worktree list block above the boundary must mention every
@@ -324,10 +327,19 @@ describe('remote gitWorktreeListAndStatus script (F5 end-to-end)', () => {
     expect(parsed.size).toBe(2)
   })
 
-  testPosix('runs per-worktree status work in parallel via xargs (F5 regression check)', async () => {
+  testPosix('runs per-worktree status work in parallel via bash background jobs (F5 regression check)', async () => {
     // The script source must contain the parallelisation primitives
     // we documented; a future refactor that re-serialises the loop
-    // will be caught here.
+    // will be caught here. We use bash background processes (`&` +
+    // `wait`) rather than `xargs -P` because:
+    //   - xargs `-I {}` collapses whitespace in the input line,
+    //     which would eat the TAB separator inside `<idx>\t<path>`
+    //     jobs.
+    //   - xargs `-n2` against a NUL stream silently drops the last
+    //     record on odd job counts under GNU xargs with `-x`.
+    // Background processes keep the whole line intact (`read` only
+    // splits on the IFS we configure) and the ordering comes from
+    // zero-padded `<idx>.out` filenames globbed in numeric order.
     const repoDir = await initRepoWithWorktrees([
       { branch: 'main', files: [] },
     ])
@@ -335,9 +347,15 @@ describe('remote gitWorktreeListAndStatus script (F5 end-to-end)', () => {
       type: 'gitWorktreeListAndStatus',
       path: repoDir,
     })
-    expect(invocation.script).toMatch(/xargs .*-P\s*8/)
+    // The script must launch background workers (`&` lines inside
+    // the while loop) and bound concurrency via a semaphore.
+    expect(invocation.script).toMatch(/&$/m)
+    expect(invocation.script).toMatch(/wait -n/)
+    expect(invocation.script).toMatch(/max_in_flight=8/)
     expect(invocation.script).toMatch(/mktemp -d/)
-    expect(invocation.script).not.toMatch(/while IFS= read -r wt/)
+    // The previous serial-loop shape must NOT have crept back in.
+    expect(invocation.script).not.toMatch(/while IFS= read -r wt;\s*do\s*$/m)
+    expect(invocation.script).not.toMatch(/xargs .*-P/)
   })
 
   testPosix('preserves the original worktree-list order across parallel workers', async () => {
