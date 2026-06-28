@@ -5,13 +5,13 @@ import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act } from '@testing-library/react'
 import type { RenderResult } from '@testing-library/react'
+import { WorkspacePaneTabStrip } from '#/web/components/workspace-pane/WorkspacePaneTabStrip.tsx'
 import {
-  WorkspacePaneTabStrip,
   createPendingWorkspacePaneTabItem,
   createTerminalWorkspacePaneTabItem,
   isTerminalWorkspacePaneTabItem,
   type WorkspacePaneTabItem,
-} from '#/web/components/workspace-pane/WorkspacePaneTabStrip.tsx'
+} from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
 import { terminalWorkspacePaneTabProvider } from '#/web/components/workspace-pane/tab-providers.ts'
 import type { WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
 import type { TerminalSessionSummary } from '#/web/components/terminal/types.ts'
