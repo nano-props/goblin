@@ -2,10 +2,10 @@
 
 import { act } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { WebSettings } from '#/web/components/settings/pages/WebSettings.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 
 const toastMocks = vi.hoisted(() => ({
   success: vi.fn(),
@@ -17,46 +17,25 @@ const testWindow = window as unknown as {
   __GOBLIN_BOOTSTRAP__?: unknown
 }
 
-const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
-let container: HTMLDivElement | null = null
-let root: Root | null = null
-let queryClient: QueryClient | null = null
-
 beforeEach(() => {
   setClientBridgeForTests(null)
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   toastMocks.success.mockClear()
   toastMocks.error.mockClear()
 })
 
 afterEach(() => {
-  act(() => {
-    root?.unmount()
-  })
-  container?.remove()
-  root = null
-  container = null
-  queryClient?.clear()
-  queryClient = null
   document.body.innerHTML = ''
   delete testWindow.goblinNative
   delete testWindow.__GOBLIN_BOOTSTRAP__
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
 async function renderPage() {
-  container = document.createElement('div')
-  document.body.appendChild(container)
-  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  root = createRoot(container)
-  await act(async () => {
-    root!.render(
-      <QueryClientProvider client={queryClient!}>
-        <WebSettings />
-      </QueryClientProvider>,
-    )
-    await Promise.resolve()
-  })
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return renderInJsdom(
+    <QueryClientProvider client={queryClient}>
+      <WebSettings />
+    </QueryClientProvider>,
+  )
 }
 
 function seedElectronBootstrap() {
@@ -201,9 +180,9 @@ function seedWebBootstrap() {
 describe('WebSettings runtime parity', () => {
   test('exposes the Rotate token button and LAN section in the Electron runtime', async () => {
     seedElectronBootstrap()
-    await renderPage()
+    const { container } = await renderPage()
 
-    const html = container!.innerHTML
+    const html = container.innerHTML
     expect(html).toContain('settings.web.token-rotate')
     expect(html).toContain('settings.lan.enabled')
   })
@@ -217,9 +196,9 @@ describe('WebSettings runtime parity', () => {
     // would no-op or surface a misleading error. The web
     // settings page is intentionally read-only on those axes.
     seedWebBootstrap()
-    await renderPage()
+    const { container } = await renderPage()
 
-    const html = container!.innerHTML
+    const html = container.innerHTML
     expect(html).not.toContain('settings.web.token-rotate')
     expect(html).not.toContain('settings.lan.enabled')
   })
@@ -231,23 +210,18 @@ describe('WebSettings runtime parity', () => {
     // auth gate. Regression guard for the cross-runtime split
     // accidentally dropping the shared chrome.
     seedElectronBootstrap()
-    await renderPage()
-    const electronHtml = container!.innerHTML
+    const { container: electronContainer, unmount: unmountElectron } = await renderPage()
+    const electronHtml = electronContainer.innerHTML
     expect(electronHtml).toContain('settings.web.url')
     expect(electronHtml).toContain('settings.web.token-copy')
 
     act(() => {
-      root?.unmount()
+      unmountElectron()
     })
-    container?.remove()
-    container = null
-    root = null
-    queryClient?.clear()
-    queryClient = null
 
     seedWebBootstrap()
-    await renderPage()
-    const webHtml = container!.innerHTML
+    const { container: webContainer } = await renderPage()
+    const webHtml = webContainer.innerHTML
     expect(webHtml).toContain('settings.web.url')
     expect(webHtml).toContain('settings.web.token-copy')
     // No toasts fired — both clients stay quiet when the page

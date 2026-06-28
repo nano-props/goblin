@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
 import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, describe, expect, test, vi } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 import { TerminalSessionView } from '#/web/components/terminal/TerminalSessionView.tsx'
 import {
   TerminalSessionContext,
@@ -15,9 +15,15 @@ import type {
   WorktreeTerminalSnapshot,
 } from '#/web/components/terminal/types.ts'
 
-vi.mock('#/web/stores/i18n.ts', () => ({
-  useT: () => (key: string) => key,
-}))
+// Side-effect import: registers a partial mock of `#/web/stores/i18n.ts`
+// that delegates to the real module so `i18next.use(initReactI18next).
+// init({…})` still runs (which is what wires the i18next singleton into
+// `react-i18next`'s module-scoped closure, the one `<Trans>` reads
+// from), and only overrides `useT` to return raw keys. See
+// `src/test-utils/i18n-mock.ts` for the rationale and the importOriginal
+// pattern that backs this side effect.
+import { stubI18n } from '#/test-utils/i18n-mock.ts'
+stubI18n()
 
 vi.mock('#/web/app-shell-client.ts', () => ({
   pathForDroppedFile: vi.fn(() => ''),
@@ -32,9 +38,8 @@ vi.mock('#/web/components/terminal/mobile-detection.ts', () => ({
   isMobileDevice: () => true,
 }))
 
-afterEach(() => {
-  document.body.innerHTML = ''
-})
+// `renderInJsdom` registers `cleanup` via `afterEach`, which
+// unmounts all rendered components and removes their containers.
 
 type TestTerminalSummary = Omit<TerminalSessionSummary, 'type' | 'id' | 'displayOrder'> &
   Partial<Pick<TerminalSessionSummary, 'type' | 'id' | 'displayOrder'>>
@@ -59,10 +64,6 @@ function completeWorktreeSnapshot(snapshot: TestWorktreeSnapshot): WorktreeTermi
 }
 
 async function renderTerminalSession() {
-  ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-  const container = document.createElement('div')
-  document.body.appendChild(container)
-  const root: Root = createRoot(container)
   const writeInput = vi.fn()
   const descriptor = {
     key: 'session-1',
@@ -132,22 +133,19 @@ async function renderTerminalSession() {
     subscribeSnapshot: () => () => {},
   }
 
-  await act(async () => {
-    root.render(
-      <TerminalSessionContext.Provider value={context}>
-        <TerminalSessionReadContext.Provider value={readContext}>
-          <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-        </TerminalSessionReadContext.Provider>
-      </TerminalSessionContext.Provider>,
-    )
-  })
+  const { container, unmount } = renderInJsdom(
+    <TerminalSessionContext.Provider value={context}>
+      <TerminalSessionReadContext.Provider value={readContext}>
+        <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+      </TerminalSessionReadContext.Provider>
+    </TerminalSessionContext.Provider>,
+  )
 
   return {
     sessionRoot: container.querySelector('.goblin-terminal-session') as HTMLElement,
     writeInput,
     async cleanup() {
-      await act(async () => root.unmount())
-      container.remove()
+      unmount()
     },
   }
 }
@@ -208,10 +206,6 @@ async function dispatchPasteWithText(sessionRoot: HTMLElement, text: string, fil
 
 describe('TerminalSessionView', () => {
   test('renders mirror attach banner and triggers takeover', async () => {
-    ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-    const container = document.createElement('div')
-    document.body.appendChild(container)
-    const root: Root = createRoot(container)
     const takeover = vi.fn().mockResolvedValue(true)
     const summaries = [
       {
@@ -282,15 +276,13 @@ describe('TerminalSessionView', () => {
       subscribeSnapshot: () => () => {},
     }
 
-    await act(async () => {
-      root.render(
-        <TerminalSessionContext.Provider value={context}>
-          <TerminalSessionReadContext.Provider value={readContext}>
-            <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-          </TerminalSessionReadContext.Provider>
-        </TerminalSessionContext.Provider>,
-      )
-    })
+    const { container, unmount } = renderInJsdom(
+      <TerminalSessionContext.Provider value={context}>
+        <TerminalSessionReadContext.Provider value={readContext}>
+          <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+        </TerminalSessionReadContext.Provider>
+      </TerminalSessionContext.Provider>,
+    )
 
     try {
       expect(container.textContent).toContain('terminal.mirror-controlled')
@@ -308,16 +300,11 @@ describe('TerminalSessionView', () => {
 
       expect(takeover).toHaveBeenCalledWith('session-1')
     } finally {
-      await act(async () => root.unmount())
-      container.remove()
+      unmount()
     }
   })
 
   test('does not automatically create a default terminal from render lifecycle', async () => {
-    ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-    const container = document.createElement('div')
-    document.body.appendChild(container)
-    const root: Root = createRoot(container)
     const emptyWorktreeSnapshot = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: null,
@@ -353,30 +340,21 @@ describe('TerminalSessionView', () => {
       subscribeSnapshot: () => () => {},
     }
 
-    await act(async () => {
-      root.render(
-        <TerminalSessionContext.Provider value={context}>
-          <TerminalSessionReadContext.Provider value={readContext}>
-            <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-          </TerminalSessionReadContext.Provider>
-        </TerminalSessionContext.Provider>,
-      )
-    })
+    const tree = (
+      <TerminalSessionContext.Provider value={context}>
+        <TerminalSessionReadContext.Provider value={readContext}>
+          <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+        </TerminalSessionReadContext.Provider>
+      </TerminalSessionContext.Provider>
+    )
+
+    const { container, rerender, unmount } = renderInJsdom(tree)
 
     try {
       expect(container.querySelector('.goblin-terminal-session__empty')).toBeNull()
-      await act(async () => {
-        root.render(
-          <TerminalSessionContext.Provider value={context}>
-            <TerminalSessionReadContext.Provider value={readContext}>
-              <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-            </TerminalSessionReadContext.Provider>
-          </TerminalSessionContext.Provider>,
-        )
-      })
+      rerender(tree)
     } finally {
-      await act(async () => root.unmount())
-      container.remove()
+      unmount()
     }
   })
 
@@ -385,10 +363,6 @@ describe('TerminalSessionView', () => {
     // error phase would see neither the viewer overlay (open-gated)
     // nor the correctly-gated error chip, leaving the dead restart
     // button visible.
-    ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-    const container = document.createElement('div')
-    document.body.appendChild(container)
-    const root: Root = createRoot(container)
     const takeover = vi.fn().mockResolvedValue(true)
     const restart = vi.fn()
     const descriptor = {
@@ -459,15 +433,13 @@ describe('TerminalSessionView', () => {
       subscribeSnapshot: () => () => {},
     }
 
-    await act(async () => {
-      root.render(
-        <TerminalSessionContext.Provider value={context}>
-          <TerminalSessionReadContext.Provider value={readContext}>
-            <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-          </TerminalSessionReadContext.Provider>
-        </TerminalSessionContext.Provider>,
-      )
-    })
+    const { container, unmount } = renderInJsdom(
+      <TerminalSessionContext.Provider value={context}>
+        <TerminalSessionReadContext.Provider value={readContext}>
+          <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+        </TerminalSessionReadContext.Provider>
+      </TerminalSessionContext.Provider>,
+    )
 
     try {
       // Viewer overlay is the primary affordance, with a takeover
@@ -492,8 +464,7 @@ describe('TerminalSessionView', () => {
       const host = container.querySelector('.goblin-terminal-session__host')
       expect(host?.getAttribute('aria-readonly')).toBe('true')
     } finally {
-      await act(async () => root.unmount())
-      container.remove()
+      unmount()
     }
   })
 
@@ -502,10 +473,6 @@ describe('TerminalSessionView', () => {
     // A viewer dropping a file would silently route input into the
     // controller's PTY; the isController gate added alongside paste
     // closes that hole.
-    ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-    const container = document.createElement('div')
-    document.body.appendChild(container)
-    const root: Root = createRoot(container)
     const writeInput = vi.fn()
     const descriptor = {
       key: 'session-1',
@@ -577,15 +544,13 @@ describe('TerminalSessionView', () => {
       subscribeSnapshot: () => () => {},
     }
 
-    await act(async () => {
-      root.render(
-        <TerminalSessionContext.Provider value={context}>
-          <TerminalSessionReadContext.Provider value={readContext}>
-            <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-          </TerminalSessionReadContext.Provider>
-        </TerminalSessionContext.Provider>,
-      )
-    })
+    const { container, unmount } = renderInJsdom(
+      <TerminalSessionContext.Provider value={context}>
+        <TerminalSessionReadContext.Provider value={readContext}>
+          <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+        </TerminalSessionReadContext.Provider>
+      </TerminalSessionContext.Provider>,
+    )
 
     try {
       const sessionRoot = container.querySelector('.goblin-terminal-session') as HTMLElement
@@ -609,8 +574,7 @@ describe('TerminalSessionView', () => {
       })
       expect(writeInput).not.toHaveBeenCalled()
     } finally {
-      await act(async () => root.unmount())
-      container.remove()
+      unmount()
     }
   })
 
@@ -623,10 +587,6 @@ describe('TerminalSessionView', () => {
     // resolver wiring inside TerminalSessionView only had negative
     // coverage — a regression that swapped the two paths or
     // dropped the controller gate would have slipped through.
-    ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-    const container = document.createElement('div')
-    document.body.appendChild(container)
-    const root: Root = createRoot(container)
     const writeInput = vi.fn()
     const descriptor = {
       key: 'session-1',
@@ -707,17 +667,15 @@ describe('TerminalSessionView', () => {
     vi.mocked(shellClient.pathForDroppedFile).mockImplementation((file: File) => `/resolved/${file.name}`)
     vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
 
-    try {
-      await act(async () => {
-        root.render(
-          <TerminalSessionContext.Provider value={context}>
-            <TerminalSessionReadContext.Provider value={readContext}>
-              <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-            </TerminalSessionReadContext.Provider>
-          </TerminalSessionContext.Provider>,
-        )
-      })
+    const { container, unmount } = renderInJsdom(
+      <TerminalSessionContext.Provider value={context}>
+        <TerminalSessionReadContext.Provider value={readContext}>
+          <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+        </TerminalSessionReadContext.Provider>
+      </TerminalSessionContext.Provider>,
+    )
 
+    try {
       const sessionRoot = container.querySelector('.goblin-terminal-session') as HTMLElement
       expect(sessionRoot).toBeTruthy()
       const file = new File([new Uint8Array([1, 2, 3])], 'shot with space.png', { type: 'image/png' })
@@ -746,8 +704,7 @@ describe('TerminalSessionView', () => {
       // was never consulted.
       expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
     } finally {
-      await act(async () => root.unmount())
-      container.remove()
+      unmount()
     }
   })
 
@@ -763,10 +720,6 @@ describe('TerminalSessionView', () => {
     // bubbling so it reaches the session's React listener. We only need
     // a `files`-like accessor for the paste handler's happy/early-exit
     // paths.
-    ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-    const container = document.createElement('div')
-    document.body.appendChild(container)
-    const root: Root = createRoot(container)
     const writeInput = vi.fn()
     const descriptor = {
       key: 'session-1',
@@ -836,16 +789,15 @@ describe('TerminalSessionView', () => {
       subscribeSnapshot: () => () => {},
     }
 
+    const { container, unmount } = renderInJsdom(
+      <TerminalSessionContext.Provider value={context}>
+        <TerminalSessionReadContext.Provider value={readContext}>
+          <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+        </TerminalSessionReadContext.Provider>
+      </TerminalSessionContext.Provider>,
+    )
+
     try {
-      await act(async () => {
-        root.render(
-          <TerminalSessionContext.Provider value={context}>
-            <TerminalSessionReadContext.Provider value={readContext}>
-              <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-            </TerminalSessionReadContext.Provider>
-          </TerminalSessionContext.Provider>,
-        )
-      })
       const sessionRoot = container.querySelector('.goblin-terminal-session') as HTMLElement
       const file = new File([new Uint8Array([1, 2, 3])], 'shot.png')
       const clipboardData = {
@@ -864,8 +816,7 @@ describe('TerminalSessionView', () => {
       })
       expect(writeInput).not.toHaveBeenCalled()
     } finally {
-      await act(async () => root.unmount())
-      container.remove()
+      unmount()
     }
   })
 
@@ -874,10 +825,6 @@ describe('TerminalSessionView', () => {
     // exercises the capture-phase handler on `clipboardData.files`.
     // The path-attempt tier returns a real path; the blob-save tier
     // is never reached; writeInput gets the shell-escaped path.
-    ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-    const container = document.createElement('div')
-    document.body.appendChild(container)
-    const root: Root = createRoot(container)
     const writeInput = vi.fn()
     const descriptor = {
       key: 'session-1',
@@ -951,17 +898,15 @@ describe('TerminalSessionView', () => {
     vi.mocked(shellClient.pathForDroppedFile).mockImplementation((file: File) => `/resolved/${file.name}`)
     vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
 
-    try {
-      await act(async () => {
-        root.render(
-          <TerminalSessionContext.Provider value={context}>
-            <TerminalSessionReadContext.Provider value={readContext}>
-              <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-            </TerminalSessionReadContext.Provider>
-          </TerminalSessionContext.Provider>,
-        )
-      })
+    const { container, unmount } = renderInJsdom(
+      <TerminalSessionContext.Provider value={context}>
+        <TerminalSessionReadContext.Provider value={readContext}>
+          <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+        </TerminalSessionReadContext.Provider>
+      </TerminalSessionContext.Provider>,
+    )
 
+    try {
       const sessionRoot = container.querySelector('.goblin-terminal-session') as HTMLElement
       const file = new File([new Uint8Array([1, 2, 3])], 'weird name & space.png')
       const clipboardData = {
@@ -987,8 +932,7 @@ describe('TerminalSessionView', () => {
       expect(writeInput).toHaveBeenCalledWith('session-1', "'/resolved/weird name & space.png'", 'paste')
       expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
     } finally {
-      await act(async () => root.unmount())
-      container.remove()
+      unmount()
     }
   })
 
@@ -998,10 +942,6 @@ describe('TerminalSessionView', () => {
     // the oversized clipboard data. We assert on `defaultPrevented`
     // after the synchronous dispatch (the capture handler's size
     // check runs before any async resolver work).
-    ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-    const container = document.createElement('div')
-    document.body.appendChild(container)
-    const root: Root = createRoot(container)
     const writeInput = vi.fn()
     const descriptor = {
       key: 'session-1',
@@ -1078,17 +1018,15 @@ describe('TerminalSessionView', () => {
     // in sync with the constant.
     expect(oversized.size).toBeGreaterThan(10 * 1024 * 1024)
 
-    try {
-      await act(async () => {
-        root.render(
-          <TerminalSessionContext.Provider value={context}>
-            <TerminalSessionReadContext.Provider value={readContext}>
-              <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-            </TerminalSessionReadContext.Provider>
-          </TerminalSessionContext.Provider>,
-        )
-      })
+    const { container, unmount } = renderInJsdom(
+      <TerminalSessionContext.Provider value={context}>
+        <TerminalSessionReadContext.Provider value={readContext}>
+          <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+        </TerminalSessionReadContext.Provider>
+      </TerminalSessionContext.Provider>,
+    )
 
+    try {
       const sessionRoot = container.querySelector('.goblin-terminal-session') as HTMLElement
       const clipboardData = {
         files: {
@@ -1111,8 +1049,7 @@ describe('TerminalSessionView', () => {
       expect(writeInput).not.toHaveBeenCalled()
       expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
     } finally {
-      await act(async () => root.unmount())
-      container.remove()
+      unmount()
     }
   })
 
@@ -1278,10 +1215,6 @@ describe('TerminalSessionView', () => {
     // resolver counts failed correctly (resolver.test.ts), but
     // without this integration test nothing pinned the session's
     // writeResolutionToPty wiring.
-    ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-    const container = document.createElement('div')
-    document.body.appendChild(container)
-    const root: Root = createRoot(container)
     const writeInput = vi.fn()
     const descriptor = {
       key: 'session-1',
@@ -1361,16 +1294,15 @@ describe('TerminalSessionView', () => {
     vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue(['/tmp/b.png'])
     const { toast } = await import('sonner')
 
+    const { container, unmount } = renderInJsdom(
+      <TerminalSessionContext.Provider value={context}>
+        <TerminalSessionReadContext.Provider value={readContext}>
+          <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+        </TerminalSessionReadContext.Provider>
+      </TerminalSessionContext.Provider>,
+    )
+
     try {
-      await act(async () => {
-        root.render(
-          <TerminalSessionContext.Provider value={context}>
-            <TerminalSessionReadContext.Provider value={readContext}>
-              <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-            </TerminalSessionReadContext.Provider>
-          </TerminalSessionContext.Provider>,
-        )
-      })
       vi.mocked(toast.error).mockClear()
 
       const sessionRoot = container.querySelector('.goblin-terminal-session') as HTMLElement
@@ -1399,8 +1331,7 @@ describe('TerminalSessionView', () => {
       expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-partial')
       expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('terminal.paste-file-failed')
     } finally {
-      await act(async () => root.unmount())
-      container.remove()
+      unmount()
     }
   })
 
@@ -1415,10 +1346,6 @@ describe('TerminalSessionView', () => {
     // The fix: capture `key` at handler invocation time, compare to
     // a `keyRef` updated by useEffect on every render, and bail if
     // they diverge.
-    ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-    const container = document.createElement('div')
-    document.body.appendChild(container)
-    const root: Root = createRoot(container)
     const writeInput = vi.fn()
     const descriptorA = {
       key: 'session-1',
@@ -1530,17 +1457,15 @@ describe('TerminalSessionView', () => {
         }),
     )
 
-    try {
-      await act(async () => {
-        root.render(
-          <TerminalSessionContext.Provider value={context}>
-            <TerminalSessionReadContext.Provider value={readContext}>
-              <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-            </TerminalSessionReadContext.Provider>
-          </TerminalSessionContext.Provider>,
-        )
-      })
+    const { container, rerender, unmount } = renderInJsdom(
+      <TerminalSessionContext.Provider value={context}>
+        <TerminalSessionReadContext.Provider value={readContext}>
+          <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+        </TerminalSessionReadContext.Provider>
+      </TerminalSessionContext.Provider>,
+    )
 
+    try {
       const sessionRoot = container.querySelector('.goblin-terminal-session') as HTMLElement
       const file = new File([new Uint8Array([1])], 'a.png')
       const dataTransfer = {
@@ -1562,15 +1487,13 @@ describe('TerminalSessionView', () => {
       // the new descriptor, which updates `keyRef.current` via the
       // useEffect on `key`.
       activeWorktreeSnapshot = worktreeSnapshotB
-      await act(async () => {
-        root.render(
-          <TerminalSessionContext.Provider value={context}>
-            <TerminalSessionReadContext.Provider value={readContext}>
-              <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree-other" />
-            </TerminalSessionReadContext.Provider>
-          </TerminalSessionContext.Provider>,
-        )
-      })
+      rerender(
+        <TerminalSessionContext.Provider value={context}>
+          <TerminalSessionReadContext.Provider value={readContext}>
+            <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree-other" />
+          </TerminalSessionReadContext.Provider>
+        </TerminalSessionContext.Provider>,
+      )
 
       // Now resolve the in-flight blob-save call. The post-resolve
       // guard must see the divergence and drop the write — neither
@@ -1586,8 +1509,7 @@ describe('TerminalSessionView', () => {
 
       expect(writeInput).not.toHaveBeenCalled()
     } finally {
-      await act(async () => root.unmount())
-      container.remove()
+      unmount()
     }
   })
 
@@ -1596,10 +1518,6 @@ describe('TerminalSessionView', () => {
     // a worktree has no sessions yet, the session renders a CTA so the
     // user doesn't see a featureless black box and can discover the
     // affordance without reaching for the per-worktree "+" tab.
-    ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-    const container = document.createElement('div')
-    document.body.appendChild(container)
-    const root: Root = createRoot(container)
     const createTerminal = vi.fn(async () => 'session-1')
     const emptyWorktreeSnapshot = {
       worktreeTerminalKey: '/repo\0/worktree',
@@ -1636,15 +1554,13 @@ describe('TerminalSessionView', () => {
       subscribeSnapshot: () => () => {},
     }
 
-    await act(async () => {
-      root.render(
-        <TerminalSessionContext.Provider value={context}>
-          <TerminalSessionReadContext.Provider value={readContext}>
-            <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-          </TerminalSessionReadContext.Provider>
-        </TerminalSessionContext.Provider>,
-      )
-    })
+    const { container, unmount } = renderInJsdom(
+      <TerminalSessionContext.Provider value={context}>
+        <TerminalSessionReadContext.Provider value={readContext}>
+          <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+        </TerminalSessionReadContext.Provider>
+      </TerminalSessionContext.Provider>,
+    )
 
     try {
       // The empty-state CTA is present, with the i18n key as its
@@ -1670,8 +1586,7 @@ describe('TerminalSessionView', () => {
         worktreePath: '/worktree',
       })
     } finally {
-      await act(async () => root.unmount())
-      container.remove()
+      unmount()
     }
   })
 
@@ -1680,10 +1595,6 @@ describe('TerminalSessionView', () => {
     // throws (e.g., server rejected with error.terminal-create-failed),
     // and the session surfaces that to the user via sonner.error so they
     // can retry instead of staring at a still-empty session.
-    ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-    const container = document.createElement('div')
-    document.body.appendChild(container)
-    const root: Root = createRoot(container)
     const createTerminal = vi.fn(async () => {
       throw new Error('error.terminal-create-failed')
     })
@@ -1723,15 +1634,13 @@ describe('TerminalSessionView', () => {
       subscribeSnapshot: () => () => {},
     }
 
-    await act(async () => {
-      root.render(
-        <TerminalSessionContext.Provider value={context}>
-          <TerminalSessionReadContext.Provider value={readContext}>
-            <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-          </TerminalSessionReadContext.Provider>
-        </TerminalSessionContext.Provider>,
-      )
-    })
+    const { container, unmount } = renderInJsdom(
+      <TerminalSessionContext.Provider value={context}>
+        <TerminalSessionReadContext.Provider value={readContext}>
+          <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+        </TerminalSessionReadContext.Provider>
+      </TerminalSessionContext.Provider>,
+    )
 
     try {
       vi.mocked(toast.error).mockClear()
@@ -1747,8 +1656,7 @@ describe('TerminalSessionView', () => {
         description: 'error.terminal-create-failed',
       })
     } finally {
-      await act(async () => root.unmount())
-      container.remove()
+      unmount()
     }
   })
 

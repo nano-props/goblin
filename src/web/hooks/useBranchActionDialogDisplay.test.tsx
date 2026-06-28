@@ -11,8 +11,8 @@
 // rendered for the duration of the close animation.
 
 import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, test } from 'vitest'
+import { beforeEach, describe, expect, test } from 'vitest'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useBranchActionDialogDisplay } from '#/web/hooks/useBranchActionDialogDisplay.ts'
 import {
   EMPTY_CHECKBOXES,
@@ -27,27 +27,9 @@ import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-uti
 const REPO_ID = '/tmp/gbl-dialog-display-test'
 const OTHER_REPO_ID = '/tmp/gbl-dialog-display-test-other'
 
-let container: HTMLDivElement | null = null
-let root: Root | null = null
-const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
-
 beforeEach(() => {
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   resetReposStore()
   resetBranchActionDialogsStore()
-  container = document.createElement('div')
-  document.body.append(container)
-  root = createRoot(container)
-})
-
-afterEach(() => {
-  act(() => {
-    root?.unmount()
-  })
-  container?.remove()
-  root = null
-  container = null
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
 interface HarnessHandle<P> {
@@ -69,13 +51,9 @@ function mountHarness<P>(initial: BranchActionDialogEntry<P> | null): HarnessHan
     handle.current = useBranchActionDialogDisplay(slot, repos)
     return null
   }
-  act(() => {
-    root!.render(<Harness slot={initial} />)
-  })
+  const result = renderInJsdom(<Harness slot={initial} />)
   handle.setSlot = (next) => {
-    act(() => {
-      root!.render(<Harness slot={next} />)
-    })
+    result.rerender(<Harness slot={next} />)
   }
   return handle
 }

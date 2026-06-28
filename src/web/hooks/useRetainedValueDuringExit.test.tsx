@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
 import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useRetainedValueDuringExit } from '#/web/hooks/useRetainedValueDuringExit.ts'
 
 const RETAIN_MS = 240
@@ -14,54 +14,34 @@ interface HarnessProps {
   onRender: (value: string | null) => void
 }
 
-let container: HTMLDivElement | null = null
-let root: Root | null = null
-const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
-
-beforeEach(() => {
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
-  container = document.createElement('div')
-  document.body.appendChild(container)
-  root = createRoot(container)
-})
-
-afterEach(() => {
-  act(() => {
-    root?.unmount()
-  })
-  container?.remove()
-  root = null
-  container = null
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
-})
-
 describe('useRetainedValueDuringExit', () => {
   test('keeps the last active value available on the first exiting render', () => {
     vi.useFakeTimers()
     try {
       const renders: Array<string | null> = []
+      const { container, rerender } = renderInJsdom(
+        <Harness value="feature/a" active onRender={(value) => renders.push(value)} />,
+      )
 
-      render(<Harness value="feature/a" active onRender={(value) => renders.push(value)} />)
-
-      expect(retainedValue()).toBe('feature/a')
+      expect(retainedValue(container)).toBe('feature/a')
       renders.length = 0
 
-      render(<Harness value={null} active={false} onRender={(value) => renders.push(value)} />)
+      rerender(<Harness value={null} active={false} onRender={(value) => renders.push(value)} />)
 
       expect(renders[0]).toBe('feature/a')
-      expect(retainedValue()).toBe('feature/a')
+      expect(retainedValue(container)).toBe('feature/a')
 
       act(() => {
         vi.advanceTimersByTime(RETAIN_MS - 1)
       })
 
-      expect(retainedValue()).toBe('feature/a')
+      expect(retainedValue(container)).toBe('feature/a')
 
       act(() => {
         vi.advanceTimersByTime(1)
       })
 
-      expect(retainedValue()).toBe('')
+      expect(retainedValue(container)).toBe('')
     } finally {
       vi.useRealTimers()
     }
@@ -71,16 +51,17 @@ describe('useRetainedValueDuringExit', () => {
     vi.useFakeTimers()
     try {
       const renders: Array<string | null> = []
+      const { container, rerender } = renderInJsdom(
+        <Harness value="feature/a" active resetKey="repo-a" onRender={(value) => renders.push(value)} />,
+      )
 
-      render(<Harness value="feature/a" active resetKey="repo-a" onRender={(value) => renders.push(value)} />)
-
-      expect(retainedValue()).toBe('feature/a')
+      expect(retainedValue(container)).toBe('feature/a')
       renders.length = 0
 
-      render(<Harness value={null} active={false} resetKey="repo-b" onRender={(value) => renders.push(value)} />)
+      rerender(<Harness value={null} active={false} resetKey="repo-b" onRender={(value) => renders.push(value)} />)
 
       expect(renders[0]).toBeNull()
-      expect(retainedValue()).toBe('')
+      expect(retainedValue(container)).toBe('')
     } finally {
       vi.useRealTimers()
     }
@@ -89,22 +70,22 @@ describe('useRetainedValueDuringExit', () => {
   test('keeps a re-entered value after an earlier exit timer settles', () => {
     vi.useFakeTimers()
     try {
-      render(<Harness value="feature/a" active onRender={() => {}} />)
+      const { container, rerender } = renderInJsdom(<Harness value="feature/a" active onRender={() => {}} />)
 
-      render(<Harness value={null} active={false} onRender={() => {}} />)
-      expect(retainedValue()).toBe('feature/a')
+      rerender(<Harness value={null} active={false} onRender={() => {}} />)
+      expect(retainedValue(container)).toBe('feature/a')
 
-      render(<Harness value="feature/b" active onRender={() => {}} />)
-      expect(retainedValue()).toBe('feature/b')
+      rerender(<Harness value="feature/b" active onRender={() => {}} />)
+      expect(retainedValue(container)).toBe('feature/b')
 
       act(() => {
         vi.advanceTimersByTime(RETAIN_MS)
       })
 
-      expect(retainedValue()).toBe('feature/b')
+      expect(retainedValue(container)).toBe('feature/b')
 
-      render(<Harness value={null} active={false} onRender={() => {}} />)
-      expect(retainedValue()).toBe('feature/b')
+      rerender(<Harness value={null} active={false} onRender={() => {}} />)
+      expect(retainedValue(container)).toBe('feature/b')
     } finally {
       vi.useRealTimers()
     }
@@ -117,12 +98,6 @@ function Harness({ value, active, resetKey, onRender }: HarnessProps) {
   return <div data-testid="retained-value" data-retained-value={retainedValue ?? ''} />
 }
 
-function render(element: React.ReactNode) {
-  act(() => {
-    root!.render(element)
-  })
-}
-
-function retainedValue(): string | undefined {
-  return container?.querySelector<HTMLElement>('[data-testid="retained-value"]')?.dataset.retainedValue
+function retainedValue(container: HTMLElement): string | undefined {
+  return container.querySelector<HTMLElement>('[data-testid="retained-value"]')?.dataset.retainedValue
 }

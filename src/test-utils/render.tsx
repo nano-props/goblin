@@ -2,13 +2,13 @@
 // hand-rolling `createRoot` + `container` + `act` boilerplate.
 //
 // Why a helper rather than `@testing-library/react` directly:
-//   - RTL's `act()` toggles `IS_REACT_ACT_ENVIRONMENT` only for the
-//     duration of the wrapped callback. Tests that drive fake timers
-//     after `render(...)` returns — which most jsdom tests in this
-//     repo do — would otherwise see React's act warning when their
-//     timer callbacks trigger updates. We set the flag once per test
-//     so the rest of the test body can use `vi.runAllTimersAsync`
-//     and `vi.advanceTimersByTimeAsync` without the warning.
+//   - RTL's `render` is synchronous and does not wrap the call in an
+//     `act()` boundary of its own; React 18+ trusts the test author to
+//     pass an `await act(async () => render(...))` wrapper. Most tests
+//     in this repo call `renderInJsdom(...)` without an explicit
+//     `act()` wrapper — they only need to verify final DOM state, not
+//     observe every intermediate commit. `renderInJsdom` mirrors
+//     RTL's behavior and does not impose an `act` boundary itself.
 //   - `cleanup` is registered with `afterEach` so callers don't repeat
 //     the import.
 //   - `flushAnimationFrames` and `flushMicrotasks` exist because
@@ -16,34 +16,40 @@
 //     without these, tests reach for ad-hoc
 //     `for (let i = 0; i < 5; i++) await Promise.resolve()` loops,
 //     which the testing spec forbids.
+//
+// Why `renderInJsdom` does NOT set `globalThis.IS_REACT_ACT_ENVIRONMENT =
+// true` permanently (an earlier revision of this file did):
+//
+//   React 19's `warnIfUpdatesNotWrappedWithActDEV` fires when
+//     `IS_REACT_ACT_ENVIRONMENT` is true AND no `act` is currently on
+//     the call stack. Permanently flipping the global to true, then
+//     letting `render(...)` return, leaves the worker in the "act
+//     environment is on but no act is running" state, which produces
+//     the "An update to <Component> inside a test was not wrapped in
+//     act(...)" warnings on every fire-and-forget Promise chain that
+//     schedules a setState after the initial mount.
+//
+//   RTL itself keeps `IS_REACT_ACT_ENVIRONMENT` set only for the
+//     duration of its own `act()` wrapper (see
+//     `node_modules/@testing-library/react/dist/act-compat.js:39-77`).
+//     Tests that need an `act` boundary — typically those that drive
+//     fake timers, await async updates, or assert on intermediate
+//     state — should wrap their calls in `await act(async () => …)`
+//     themselves. `renderInJsdom` does not assume that need on the
+//     caller's behalf.
 
 import { afterEach } from 'vitest'
 import { cleanup, render, type RenderOptions, type RenderResult } from '@testing-library/react'
 
-/**
- * Enable React's act environment for the rest of the worker. Setting
- * `IS_REACT_ACT_ENVIRONMENT = true` on `globalThis` is what RTL itself
- * does internally for `act()`; we just keep it on permanently so
- * timer-driven updates later in the test stay quiet.
- */
-function setReactActEnvironment(): void {
-  ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-}
-
-let afterEachRegistered = false
-function ensureAfterEachRegistered(): void {
-  if (afterEachRegistered) return
-  afterEach(() => {
-    cleanup()
-  })
-  afterEachRegistered = true
-}
+afterEach(() => {
+  cleanup()
+})
 
 /**
- * Render a React element under jsdom with React's act environment
- * enabled for the duration of the test. Replaces the 20-line
- * hand-rolled `createRoot` + `container` + `act` boilerplate used by
- * ~60 test files before this helper existed.
+ * Render a React element under jsdom without imposing an `act`
+ * boundary. Replaces the 20-line hand-rolled `createRoot` + container
+ * + `act` boilerplate used by ~60 test files before this helper
+ * existed.
  *
  * Returns the standard RTL result plus a `flushAnimationFrames`
  * helper for tests that drive `requestAnimationFrame` directly.
@@ -52,8 +58,6 @@ export function renderInJsdom(
   element: React.ReactNode,
   options?: RenderOptions,
 ): RenderResult & { flushAnimationFrames: (frames?: number) => Promise<void> } {
-  setReactActEnvironment()
-  ensureAfterEachRegistered()
   const result = render(element, options)
   return {
     ...result,

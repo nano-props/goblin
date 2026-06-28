@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
 import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useClientEffectIntentRouter } from '#/web/hooks/useClientEffectIntentRouter.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
@@ -25,11 +25,8 @@ vi.mock('#/web/settings-actions.ts', async () => {
   }
 })
 
-let container: HTMLDivElement | null = null
-let root: Root | null = null
 const ipcEventListeners = new Set<(event: { type: string; repoRoot?: string; key?: string }) => void>()
 const intentListeners = new Set<(event: any) => void>()
-const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 const closeAllOverlays = vi.fn()
 let overlayOpen = false
 let workspaceShortcutSuppressed = false
@@ -41,7 +38,6 @@ const showRepoBranchWorkspacePaneTabSpy = vi.fn()
 const consumeExternalOpenPathsSpy = vi.fn<() => Promise<string[]>>(async () => [])
 
 beforeEach(() => {
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   resetReposStore()
   setClientBridgeForTests(null)
   closeAllOverlays.mockClear()
@@ -125,16 +121,9 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  act(() => {
-    root?.unmount()
-  })
-  container?.remove()
-  root = null
-  container = null
   ipcEventListeners.clear()
   intentListeners.clear()
   setClientBridgeForTests(null)
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
 describe('useClientEffectIntentRouter', () => {
@@ -425,13 +414,7 @@ function preferredWorkspacePaneTab(repoId: string) {
 }
 
 async function renderHookHost() {
-  container = document.createElement('div')
-  document.body.append(container)
-  root = createRoot(container)
-  await act(async () => {
-    root!.render(<HookHost />)
-    await Promise.resolve()
-  })
+  renderInJsdom(<HookHost />)
 }
 
 function HookHost() {

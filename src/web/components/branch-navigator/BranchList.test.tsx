@@ -5,18 +5,21 @@
 // bubble events up". We stub BranchActionsMenu and the terminal bell
 // hook so the suite stays focused on the list.
 
-import { act } from 'react'
-import type { ReactNode } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 import { BranchList } from '#/web/components/branch-navigator/BranchList.tsx'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 import { createRepoBranch } from '#/web/test-utils/bridge.ts'
 
-vi.mock('#/web/stores/i18n.ts', () => ({
-  useI18nStore: (selector: (state: { lang: string }) => string) => selector({ lang: 'zh' }),
-  useT: () => (key: string) => key,
-}))
+// Side-effect import: registers a partial mock of `#/web/stores/i18n.ts`
+// that delegates to the real module so `i18next.use(initReactI18next).
+// init({…})` still runs (which is what wires the i18next singleton into
+// `react-i18next`'s module-scoped closure, the one `<Trans>` reads
+// from), and only overrides `useT` to return raw keys. See
+// `src/test-utils/i18n-mock.ts` for the rationale and the importOriginal
+// pattern that backs this side effect.
+import { stubI18n } from '#/test-utils/i18n-mock.ts'
+stubI18n()
 
 vi.mock('#/web/components/BranchActionsMenu.tsx', () => ({
   BranchActionsMenu: () => null,
@@ -26,27 +29,7 @@ vi.mock('#/web/components/terminal/terminal-session-store.ts', () => ({
   useWorktreeTerminalBellCount: () => 0,
 }))
 
-let container: HTMLDivElement | null = null
-let root: Root | null = null
-
-const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
-
-beforeEach(() => {
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
-  container = document.createElement('div')
-  document.body.appendChild(container)
-  root = createRoot(container)
-})
-
 afterEach(() => {
-  act(() => {
-    root?.unmount()
-  })
-  container?.remove()
-  root = null
-  container = null
-  document.body.innerHTML = ''
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
   vi.clearAllMocks()
 })
 
@@ -57,7 +40,7 @@ describe('BranchList', () => {
     const onSelect = vi.fn()
     const onOpenStatus = vi.fn()
 
-    render(
+    const { container } = renderInJsdom(
       <BranchList
         repo={repo}
         branches={branches}
@@ -68,17 +51,13 @@ describe('BranchList', () => {
       />,
     )
 
-    const items = Array.from(document.querySelectorAll('li'))
+    const items = Array.from(container.querySelectorAll('li'))
     expect(items).toHaveLength(3)
 
-    act(() => {
-      items[1]!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    })
+    items[1]!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     expect(onSelect).toHaveBeenCalledWith('feature/a')
 
-    act(() => {
-      items[2]!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
-    })
+    items[2]!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
     expect(onOpenStatus).toHaveBeenCalledWith('fix/b')
   })
 
@@ -86,7 +65,7 @@ describe('BranchList', () => {
     const repo = emptyRepo('/tmp/repo', 'repo')
     const onSelect = vi.fn()
 
-    render(
+    const { container } = renderInJsdom(
       <BranchList
         repo={repo}
         branches={[]}
@@ -97,8 +76,8 @@ describe('BranchList', () => {
       />,
     )
 
-    expect(document.querySelector('ul')).toBeNull()
-    expect(document.querySelector('[data-testid="empty"]')?.textContent).toBe('nothing here')
+    expect(container.querySelector('ul')).toBeNull()
+    expect(container.querySelector('[data-testid="empty"]')?.textContent).toBe('nothing here')
     expect(onSelect).not.toHaveBeenCalled()
   })
 
@@ -106,7 +85,7 @@ describe('BranchList', () => {
     // `branches` is non-empty so the `!repo` branch is the one that
     // short-circuits — passing `branches={[]}` would exercise the
     // empty-list early-return instead.
-    render(
+    const { container } = renderInJsdom(
       <BranchList
         repo={null}
         branches={[createRepoBranch('main')]}
@@ -117,15 +96,15 @@ describe('BranchList', () => {
       />,
     )
 
-    expect(document.querySelector('ul')).toBeNull()
-    expect(document.querySelector('[data-testid="empty"]')?.textContent).toBe('repo not loaded')
+    expect(container.querySelector('ul')).toBeNull()
+    expect(container.querySelector('[data-testid="empty"]')?.textContent).toBe('repo not loaded')
   })
 
   test('highlights the row whose name matches highlightedBranch', () => {
     const repo = emptyRepo('/tmp/repo', 'repo')
     const branches = [createRepoBranch('main'), createRepoBranch('feature/a'), createRepoBranch('fix/b')]
 
-    render(
+    const { container } = renderInJsdom(
       <BranchList
         repo={repo}
         branches={branches}
@@ -136,15 +115,9 @@ describe('BranchList', () => {
       />,
     )
 
-    const items = Array.from(document.querySelectorAll('li'))
+    const items = Array.from(container.querySelectorAll('li'))
     expect(items[2]?.className).toContain('bg-selected')
     expect(items[0]?.className).not.toContain('bg-selected')
     expect(items[1]?.className).not.toContain('bg-selected')
   })
 })
-
-function render(element: ReactNode) {
-  act(() => {
-    root!.render(element)
-  })
-}

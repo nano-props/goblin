@@ -9,8 +9,7 @@
 //     choice
 //   - one-dialog-at-a-time invariant across the `openXxx` actions
 
-import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import { act, cleanup } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { BranchActionDialogHost } from '#/web/components/BranchActionDialogHost.tsx'
 import {
@@ -20,6 +19,7 @@ import {
   type RemoveWorktreeDialogPayload,
 } from '#/web/stores/repos/branch-action-dialogs.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import { idleOperation } from '#/web/stores/repos/operations.ts'
@@ -30,9 +30,15 @@ vi.mock('#/web/hooks/branchActionDispatch.ts', () => ({
   dispatchRemoveWorktree: vi.fn(),
 }))
 
-vi.mock('#/web/stores/i18n.ts', () => ({
-  useT: () => (key: string) => key,
-}))
+// Side-effect import: registers a partial mock of `#/web/stores/i18n.ts`
+// that delegates to the real module so `i18next.use(initReactI18next).
+// init({…})` still runs (which is what wires the i18next singleton into
+// `react-i18next`'s module-scoped closure, the one `<Trans>` reads
+// from), and only overrides `useT` to return raw keys. See
+// `src/test-utils/i18n-mock.ts` for the rationale and the importOriginal
+// pattern that backs this side effect.
+import { stubI18n } from '#/test-utils/i18n-mock.ts'
+stubI18n()
 
 // Mock ConfirmDialog to record the `title` and `message` props on
 // every render, so the close-animation regression tests can observe
@@ -98,9 +104,6 @@ vi.mock('#/web/components/ConfirmDialog.tsx', () => ({
 }))
 
 const REPO_ID = '/tmp/gbl-dialog-host-test'
-let container: HTMLDivElement | null = null
-let root: Root | null = null
-const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 
 function setupRepo() {
   const worktreePath = '/tmp/dialog-host-worktree'
@@ -131,29 +134,19 @@ function buildRepo(repo: ReturnType<typeof seedRepoState>): BranchActionRepo {
 }
 
 beforeEach(() => {
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   resetReposStore()
   resetBranchActionDialogsStore()
-  container = document.createElement('div')
-  document.body.append(container)
-  root = createRoot(container)
 })
 
 afterEach(() => {
-  act(() => {
-    root?.unmount()
-  })
-  container?.remove()
-  root = null
-  container = null
-  document.body.innerHTML = ''
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
+  // `cleanup` is also wired by `renderInJsdom` between tests; this
+  // explicit call is here for tests that mount/unmount within a single
+  // test body.
+  cleanup()
 })
 
 function render(element: React.ReactNode) {
-  act(() => {
-    root!.render(element)
-  })
+  return renderInJsdom(element)
 }
 
 function findButtonByText(text: string): HTMLButtonElement | null {
@@ -182,9 +175,8 @@ describe('BranchActionDialogHost', () => {
 
     // (b) + (c) Unmount + remount — the popover went away and came back.
     act(() => {
-      root!.unmount()
+      cleanup()
     })
-    root = createRoot(container!)
     render(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branch.name} />)
 
     // (d) Dialog still rendered, store still holds the entry.
@@ -218,17 +210,13 @@ describe('BranchActionDialogHost', () => {
     })
 
     // Mount the host with active = repoA/feature/host. Dialog should render.
-    render(<BranchActionDialogHost activeRepoId={repoA.id} activeBranchName={branchA.name} />)
+    const { rerender } = render(<BranchActionDialogHost activeRepoId={repoA.id} activeBranchName={branchA.name} />)
     expect(document.body.textContent).toContain('action.confirm-remove-worktree-title')
 
     // Switch the active workspace to repoB. The host's
     // closeStaleDialogs effect fires, which closes the open dialog
     // because (repoA, feature/host) != (repoB, main).
-    act(() => {
-      root!.unmount()
-    })
-    root = createRoot(container!)
-    render(<BranchActionDialogHost activeRepoId={repoBId} activeBranchName="main" />)
+    rerender(<BranchActionDialogHost activeRepoId={repoBId} activeBranchName="main" />)
 
     expect(useBranchActionDialogsStore.getState().removeConfirm).toBeNull()
     expect(document.body.textContent).not.toContain('action.confirm-remove-worktree-title')
@@ -259,16 +247,12 @@ describe('BranchActionDialogHost', () => {
       )
     })
 
-    render(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branchX.name} />)
+    const { rerender } = render(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branchX.name} />)
     expect(document.body.textContent).toContain('action.confirm-remove-worktree-title')
 
     // Switch selected branch in the same repo. The dialog is for X
     // and the new active is Y; closeStaleDialogs should close it.
-    act(() => {
-      root!.unmount()
-    })
-    root = createRoot(container!)
-    render(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branchY.name} />)
+    rerender(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branchY.name} />)
 
     expect(useBranchActionDialogsStore.getState().removeConfirm).toBeNull()
   })

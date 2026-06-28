@@ -3,12 +3,12 @@ import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
 import { act } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { SettingsSurface } from '#/web/components/SettingsSurface.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import { resetReposStore } from '#/web/test-utils/bridge.ts'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 
 const toastMocks = vi.hoisted(() => ({
   success: vi.fn(),
@@ -74,9 +74,6 @@ vi.mock('sonner', () => ({
   },
 }))
 
-let container: HTMLDivElement | null = null
-let root: Root | null = null
-const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 const testWindow = window as unknown as { goblinNative?: unknown; __GOBLIN_BOOTSTRAP__?: unknown }
 const sendTestNotification = vi.fn(async () => true)
 const invokeIpc = vi.fn(async ({ path, input }: { path: string; input?: unknown }) => defaultIpcResult(path, input))
@@ -98,7 +95,6 @@ const fetchMock = mockFetch(async (input: RequestInfo | URL, init?: RequestInit)
 
 beforeEach(() => {
   setClientBridgeForTests(null)
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   resetReposStore()
   sendTestNotification.mockClear()
   toastMocks.success.mockClear()
@@ -157,36 +153,28 @@ beforeEach(() => {
 
 afterEach(() => {
   setClientBridgeForTests(null)
-  act(() => {
-    root?.unmount()
-  })
-  container?.remove()
-  root = null
-  container = null
-  document.body.innerHTML = ''
   delete testWindow.goblinNative
   delete testWindow.__GOBLIN_BOOTSTRAP__
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
 describe('SettingsSurface', () => {
   test('does not show the removed workspace layout selector on the general page', async () => {
-    await render(<SettingsSurface page="general" onPageChange={() => {}} />)
+    const { container } = render(<SettingsSurface page="general" onPageChange={() => {}} />)
 
-    expect(document.getElementById('settings-workspace-layout')).toBeNull()
-    expect(document.body.textContent).not.toContain('settings.workspace-layout')
-    expect(document.body.textContent).not.toContain('settings.workspace-layout-hint')
+    expect(container.querySelector('#settings-workspace-layout')).toBeNull()
+    expect(container.textContent).not.toContain('settings.workspace-layout')
+    expect(container.textContent).not.toContain('settings.workspace-layout-hint')
   })
 
   test('keeps settings navigation selected state and page changes wired', async () => {
     const onPageChange = vi.fn()
-    await render(<SettingsSurface page="general" onPageChange={onPageChange} autoFocusSelected={false} />)
+    const { container } = render(<SettingsSurface page="general" onPageChange={onPageChange} autoFocusSelected={false} />)
 
-    const general = document.body.querySelector('button[aria-label="settings.group.general"]')
+    const general = container.querySelector('button[aria-label="settings.group.general"]')
     if (!(general instanceof HTMLButtonElement)) throw new Error('missing general settings nav row')
     expect(general.getAttribute('aria-current')).toBe('page')
 
-    const shortcuts = document.body.querySelector('button[aria-label="settings.nav.shortcuts"]')
+    const shortcuts = container.querySelector('button[aria-label="settings.nav.shortcuts"]')
     if (!(shortcuts instanceof HTMLButtonElement)) throw new Error('missing shortcuts settings nav row')
     await act(async () => {
       shortcuts.click()
@@ -196,10 +184,10 @@ describe('SettingsSurface', () => {
   })
 
   test('can trigger a test terminal notification from settings', async () => {
-    await render(<SettingsSurface page="notifications" onPageChange={() => {}} />)
+    const { container } = render(<SettingsSurface page="notifications" onPageChange={() => {}} />)
 
     await act(async () => {
-      buttonByText('settings.terminal-notifications-test-button').click()
+      buttonByText(container, 'settings.terminal-notifications-test-button').click()
       await Promise.resolve()
     })
 
@@ -209,10 +197,10 @@ describe('SettingsSurface', () => {
 
   test('shows an error toast when the test notification is blocked', async () => {
     sendTestNotification.mockResolvedValueOnce(false)
-    await render(<SettingsSurface page="notifications" onPageChange={() => {}} />)
+    const { container } = render(<SettingsSurface page="notifications" onPageChange={() => {}} />)
 
     await act(async () => {
-      buttonByText('settings.terminal-notifications-test-button').click()
+      buttonByText(container, 'settings.terminal-notifications-test-button').click()
       await Promise.resolve()
     })
 
@@ -242,26 +230,26 @@ describe('SettingsSurface', () => {
         json: async () => result,
       }
     })
-    await render(<SettingsSurface page="notifications" onPageChange={() => {}} />)
+    const { container } = render(<SettingsSurface page="notifications" onPageChange={() => {}} />)
 
-    await waitForSwitchState('settings-terminal-notifications', 'true')
+    await waitForSwitchState(container, 'settings-terminal-notifications', 'true')
   })
 
   test('shows GitHub CLI availability and version', async () => {
-    await render(<SettingsSurface page="github" onPageChange={() => {}} />)
+    const { container } = render(<SettingsSurface page="github" onPageChange={() => {}} />)
 
-    await waitForText('settings.github.status-available')
-    expect(document.body.textContent).toContain('settings.github.status-available')
-    expect(document.body.textContent).toContain('gh version 2.93.0')
-    expect(document.body.textContent).toContain('github.example.com')
-    expect(document.body.textContent).toContain('settings.github.auth-signed-in')
+    await waitForText(container, 'settings.github.status-available')
+    expect(container.textContent).toContain('settings.github.status-available')
+    expect(container.textContent).toContain('gh version 2.93.0')
+    expect(container.textContent).toContain('github.example.com')
+    expect(container.textContent).toContain('settings.github.auth-signed-in')
   })
 
   test('refreshes GitHub CLI detection from settings', async () => {
-    await render(<SettingsSurface page="github" onPageChange={() => {}} />)
+    const { container } = render(<SettingsSurface page="github" onPageChange={() => {}} />)
 
     await act(async () => {
-      buttonByText('settings.github.refresh').click()
+      buttonByText(container, 'settings.github.refresh').click()
       await Promise.resolve()
     })
 
@@ -304,25 +292,22 @@ describe('SettingsSurface', () => {
         json: async () => result,
       }
     })
-    await render(<SettingsSurface page="github" onPageChange={() => {}} />)
+    const { container } = render(<SettingsSurface page="github" onPageChange={() => {}} />)
 
-    expect(document.body.textContent).toContain('settings.github.status-unavailable')
-    expect(document.body.textContent).toContain('settings.github.hint-missing')
+    expect(container.textContent).toContain('settings.github.status-unavailable')
+    expect(container.textContent).toContain('settings.github.hint-missing')
   })
 
   test('renders the SSH remotes settings page', async () => {
-    await render(<SettingsSurface page="ssh" onPageChange={() => {}} />)
+    const { container } = render(<SettingsSurface page="ssh" onPageChange={() => {}} />)
 
-    expect(document.body.textContent).toContain('settings.ssh.title')
-    expect(document.body.textContent).toContain('settings.ssh.body')
-    expect(document.body.textContent).toContain('settings.ssh.example')
+    expect(container.textContent).toContain('settings.ssh.title')
+    expect(container.textContent).toContain('settings.ssh.body')
+    expect(container.textContent).toContain('settings.ssh.example')
   })
 })
 
-async function render(element: React.ReactNode) {
-  container = document.createElement('div')
-  document.body.append(container)
-  root = createRoot(container)
+function render(element: React.ReactNode) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
@@ -331,16 +316,12 @@ async function render(element: React.ReactNode) {
       },
     },
   })
-  await act(async () => {
-    root!.render(<QueryClientProvider client={queryClient}>{element}</QueryClientProvider>)
-    await Promise.resolve()
-    await Promise.resolve()
-  })
+  return renderInJsdom(<QueryClientProvider client={queryClient}>{element}</QueryClientProvider>)
 }
 
-async function waitForText(text: string) {
+async function waitForText(container: HTMLElement, text: string) {
   for (let i = 0; i < 5; i += 1) {
-    if (document.body.textContent?.includes(text)) return
+    if (container.textContent?.includes(text)) return
     await act(async () => {
       await Promise.resolve()
       await new Promise((resolve) => setTimeout(resolve, 0))
@@ -349,22 +330,22 @@ async function waitForText(text: string) {
   throw new Error(`Missing text: ${text}`)
 }
 
-function buttonByText(text: string): HTMLButtonElement {
-  const buttons = Array.from(document.body.querySelectorAll('button'))
+function buttonByText(container: HTMLElement, text: string): HTMLButtonElement {
+  const buttons = Array.from(container.querySelectorAll('button'))
   const match = buttons.find((button) => button.textContent?.includes(text))
   if (!(match instanceof HTMLButtonElement)) throw new Error(`Missing button with text: ${text}`)
   return match
 }
 
-function switchById(id: string): HTMLButtonElement {
-  const match = document.getElementById(id)
+function switchById(container: HTMLElement, id: string): HTMLButtonElement {
+  const match = container.querySelector(`#${id}`)
   if (!(match instanceof HTMLButtonElement)) throw new Error(`Missing switch with id: ${id}`)
   return match
 }
 
-async function waitForSwitchState(id: string, checked: 'true' | 'false') {
+async function waitForSwitchState(container: HTMLElement, id: string, checked: 'true' | 'false') {
   for (let i = 0; i < 5; i += 1) {
-    if (switchById(id).getAttribute('aria-checked') === checked) return
+    if (switchById(container, id).getAttribute('aria-checked') === checked) return
     await act(async () => {
       await Promise.resolve()
       await new Promise((resolve) => setTimeout(resolve, 0))

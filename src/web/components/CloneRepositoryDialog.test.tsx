@@ -2,19 +2,15 @@
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
 import { act } from 'react'
-import type { ReactNode } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { CloneRepositoryDialog } from '#/web/components/CloneRepositoryDialog.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import type { CloneRepoResult } from '#/shared/api-types.ts'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 
-let container: HTMLDivElement | null = null
-let root: Root | null = null
 let ipcCalls: Array<{ path: string; input?: unknown }> = []
-const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 const testWindow = window as unknown as { goblinNative?: unknown; __GOBLIN_BOOTSTRAP__?: unknown }
 const fetchMock = mockFetch(async () => ({
   ok: true,
@@ -22,7 +18,6 @@ const fetchMock = mockFetch(async () => ({
 }))
 
 beforeEach(() => {
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   ipcCalls = []
   setClientBridgeForTests(null)
   fetchMock.mockClear()
@@ -70,22 +65,14 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  act(() => {
-    root?.unmount()
-  })
-  container?.remove()
-  root = null
-  container = null
-  document.body.innerHTML = ''
   delete testWindow.goblinNative
   delete testWindow.__GOBLIN_BOOTSTRAP__
   setClientBridgeForTests(null)
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
 describe('CloneRepositoryDialog', () => {
   test('keeps the inline status row mounted', () => {
-    render(
+    renderInJsdom(
       <CloneRepositoryDialog
         open
         onClose={vi.fn()}
@@ -97,7 +84,7 @@ describe('CloneRepositoryDialog', () => {
   })
 
   test('focuses the clone url input when opened', () => {
-    render(
+    renderInJsdom(
       <CloneRepositoryDialog
         open
         onClose={vi.fn()}
@@ -113,7 +100,7 @@ describe('CloneRepositoryDialog', () => {
     const onClose = vi.fn()
     const onClone = vi.fn(() => deferred.promise)
 
-    render(<CloneRepositoryDialog open onClose={onClose} onClone={onClone} />)
+    renderInJsdom(<CloneRepositoryDialog open onClose={onClose} onClone={onClone} />)
 
     setInputValue('#clone-url', 'https://example.com/repo.git')
     setInputValue('#clone-directory-name', 'repo')
@@ -139,7 +126,7 @@ describe('CloneRepositoryDialog', () => {
     const onClose = vi.fn()
     const onClone = vi.fn(async () => ({ ok: false, message: 'error.clone-failed' }))
 
-    render(<CloneRepositoryDialog open onClose={onClose} onClone={onClone} />)
+    renderInJsdom(<CloneRepositoryDialog open onClose={onClose} onClone={onClone} />)
 
     setInputValue('#clone-url', 'https://example.com/repo.git')
     setInputValue('#clone-directory-name', 'repo')
@@ -157,7 +144,7 @@ describe('CloneRepositoryDialog', () => {
     const onClose = vi.fn()
     const onClone = vi.fn(() => deferred.promise)
 
-    render(<CloneRepositoryDialog open onClose={onClose} onClone={onClone} />)
+    renderInJsdom(<CloneRepositoryDialog open onClose={onClose} onClone={onClone} />)
 
     setInputValue('#clone-url', 'https://example.com/repo.git')
     setInputValue('#clone-directory-name', 'repo')
@@ -183,20 +170,11 @@ describe('CloneRepositoryDialog', () => {
     const onClose = vi.fn()
     const onClone = vi.fn(async () => ({ ok: true, message: 'ok', path: '/Users/tester/Developer/repo' }))
 
-    render(<CloneRepositoryDialog open onClose={onClose} onClone={onClone} />)
+    renderInJsdom(<CloneRepositoryDialog open onClose={onClose} onClone={onClone} />)
 
     expect(queryButtonByText('repo-picker.clone-parent-choose')).toBeNull()
   })
 })
-
-function render(element: ReactNode) {
-  container = document.createElement('div')
-  document.body.append(container)
-  root = createRoot(container)
-  act(() => {
-    root!.render(element)
-  })
-}
 
 function input(selector: string): HTMLInputElement {
   const element = document.body.querySelector(selector)

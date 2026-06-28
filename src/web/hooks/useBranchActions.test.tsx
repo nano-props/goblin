@@ -2,8 +2,8 @@
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import React from 'react'
-import { createRoot, type Root } from 'react-dom/client'
 import { act } from 'react'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useBranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { openBranchExternalTarget } from '#/web/hooks/openBranchExternalTarget.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
@@ -39,10 +39,6 @@ vi.mock('#/web/remote-client.ts', () => ({
 const REPO_ID = '/tmp/gbl-use-branch-actions-test-repo'
 
 describe('useBranchActions', () => {
-  let container: HTMLDivElement
-  let root: Root | null = null
-  const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
-
   beforeEach(() => {
     resetReposStore()
     mocks.openExternalUrl.mockReset()
@@ -52,18 +48,6 @@ describe('useBranchActions', () => {
     mocks.openRepoTerminal.mockReset()
     mocks.openRemoteRepositoryEditor.mockReset()
     mocks.openRemoteRepositoryTerminal.mockReset()
-    reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
-    container = document.createElement('div')
-    document.body.appendChild(container)
-  })
-
-  afterEach(async () => {
-    await act(async () => {
-      root?.unmount()
-    })
-    container.remove()
-    reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
-    root = null
   })
 
   test('opens the existing pull request URL when present', async () => {
@@ -85,10 +69,7 @@ describe('useBranchActions', () => {
     mocks.openExternalUrl.mockResolvedValue({ ok: true, message: '' })
 
     let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
-    root = createRoot(container)
-    await act(async () => {
-      root!.render(<BranchActionsHarness repo={repo} onReady={(value) => (actions = value)} />)
-    })
+    renderInJsdom(<BranchActionsHarness repo={repo} onReady={(value) => (actions = value)} />)
 
     await act(async () => {
       await actions?.openRemote?.()
@@ -115,10 +96,7 @@ describe('useBranchActions', () => {
     mocks.openRepoRemote.mockResolvedValue({ ok: true, message: '' })
 
     let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
-    root = createRoot(container)
-    await act(async () => {
-      root!.render(<BranchActionsHarness repo={repo} onReady={(value) => (actions = value)} />)
-    })
+    renderInJsdom(<BranchActionsHarness repo={repo} onReady={(value) => (actions = value)} />)
 
     await act(async () => {
       await actions?.openRemote?.()
@@ -154,10 +132,7 @@ describe('useBranchActions', () => {
     mocks.openRemoteRepositoryTerminal.mockResolvedValue({ ok: true, message: '' })
 
     let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
-    root = createRoot(container)
-    await act(async () => {
-      root!.render(<BranchActionsHarness repo={repo} onReady={(value) => (actions = value)} />)
-    })
+    renderInJsdom(<BranchActionsHarness repo={repo} onReady={(value) => (actions = value)} />)
 
     await act(async () => {
       await actions?.openTerminal?.('ghostty')
@@ -193,10 +168,7 @@ describe('useBranchActions', () => {
     mocks.openRemoteRepositoryEditor.mockResolvedValue({ ok: true, message: '' })
 
     let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
-    root = createRoot(container)
-    await act(async () => {
-      root!.render(<BranchActionsHarness repo={repo} onReady={(value) => (actions = value)} />)
-    })
+    renderInJsdom(<BranchActionsHarness repo={repo} onReady={(value) => (actions = value)} />)
 
     await act(async () => {
       await actions?.openEditor?.('windsurf')
@@ -233,10 +205,7 @@ describe('useBranchActions', () => {
     mocks.openRemoteRepositoryEditor.mockResolvedValue({ ok: true, message: '' })
 
     let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
-    root = createRoot(container)
-    await act(async () => {
-      root!.render(<BranchActionsHarness repo={repo} onReady={(value) => (actions = value)} />)
-    })
+    renderInJsdom(<BranchActionsHarness repo={repo} onReady={(value) => (actions = value)} />)
 
     await act(async () => {
       await actions?.openTerminal?.('ghostty')
@@ -260,10 +229,7 @@ describe('useBranchActions', () => {
     mocks.openRepoTerminal.mockResolvedValue({ ok: true, message: '' })
 
     let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
-    root = createRoot(container)
-    await act(async () => {
-      root!.render(<BranchActionsHarness repo={repo} onReady={(value) => (actions = value)} />)
-    })
+    renderInJsdom(<BranchActionsHarness repo={repo} onReady={(value) => (actions = value)} />)
 
     await act(async () => {
       await actions?.openTerminal?.('ghostty')
@@ -282,10 +248,7 @@ describe('useBranchActions', () => {
     mocks.openRepoEditor.mockResolvedValue({ ok: true, message: '' })
 
     let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
-    root = createRoot(container)
-    await act(async () => {
-      root!.render(<BranchActionsHarness repo={repo} onReady={(value) => (actions = value)} />)
-    })
+    renderInJsdom(<BranchActionsHarness repo={repo} onReady={(value) => (actions = value)} />)
 
     await act(async () => {
       await actions?.openEditor?.('windsurf')
@@ -304,10 +267,7 @@ describe('useBranchActions', () => {
     mocks.openRepoInFinder.mockResolvedValue({ ok: true, message: '/tmp/local-feature' })
 
     let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
-    root = createRoot(container)
-    await act(async () => {
-      root!.render(<BranchActionsHarness repo={repo} onReady={(value) => (actions = value)} />)
-    })
+    renderInJsdom(<BranchActionsHarness repo={repo} onReady={(value) => (actions = value)} />)
 
     await act(async () => {
       await actions?.openFinder?.()

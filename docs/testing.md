@@ -41,7 +41,7 @@ Always reach for the library tool before writing one yourself:
 | Need                                                | Use                                                                                                                                                                                                                                                                                       |
 | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Render a React tree, query by accessible name       | `@testing-library/react` (`render`, `screen`)                                                                                                                                                                                                                                             |
-| Wrap a render in React's act environment            | `@testing-library/react` (`act`) — handles `IS_REACT_ACT_ENVIRONMENT` for the duration of the wrapped callback. For test bodies that drive fake timers after render, prefer `renderInJsdom` (§5), which keeps the flag on for the rest of the test so timer-triggered updates stay quiet. |
+| Wrap a render in React's act environment            | `@testing-library/react` (`act`) — handles `IS_REACT_ACT_ENVIRONMENT` for the duration of the wrapped callback. `renderInJsdom` (§5) does **not** keep the flag on; tests that drive fake timers after render should wrap their call in `await act(async () => renderInJsdom(...))` themselves. |
 | Type, click, tab through, fire keyboard events      | `@testing-library/user-event` (`userEvent.setup()`)                                                                                                                                                                                                                                       |
 | Query a non-React DOM (portals, raw HTML)           | `@testing-library/dom` (`screen.getByRole`, etc.)                                                                                                                                                                                                                                         |
 | Mock a module export                                | `vi.mock('module', factory)` + `vi.hoisted`                                                                                                                                                                                                                                               |
@@ -97,17 +97,22 @@ side-effects (`vi.mock(...)`, `globalThis` shims) needed by web tests.
 Exports:
 
 - `renderInJsdom(element, options?)` — wraps `@testing-library/react`'s
-  `render`. Sets `IS_REACT_ACT_ENVIRONMENT = true` for the duration of the
-  test (cleared in `afterEach` via `cleanup`). Returns the standard RTL
-  result plus a `flushAnimationFrames()` helper for tests that drive
-  `requestAnimationFrame`.
-- `cleanupAfterEach()` — registers an `afterEach(() => cleanup())`. Most
-  tests don't need to call this; `renderInJsdom` registers it
-  automatically.
+  `render`. Does **not** set `IS_REACT_ACT_ENVIRONMENT`; tests that need an
+  `act` boundary should wrap their call in `await act(async () => …)`
+  themselves (see §9 for why). Returns the standard RTL result plus a
+  `flushAnimationFrames()` helper for tests that drive
+  `requestAnimationFrame` directly.
 - `flushMicrotasks(ticks = 3)` — drain `ticks` microtask rounds. Prefer
   this over `for (let i = 0; i < 5; i++) await Promise.resolve()`.
 
-Tests call `renderInJsdom(<Foo />)` and never see a `createRoot`.
+Tests call `renderInJsdom(<Foo />)` and never see a `createRoot`. An
+`afterEach(cleanup)` is registered at module load so the RTL result is
+disposed automatically; tests do not need to call `cleanup` themselves.
+
+`src/test-utils/index.ts` re-exports `useFakeTimers` and
+`advanceTimersAndFlush` from `timers.ts` alongside the render helpers so
+tests can `import { renderInJsdom, useFakeTimers, advanceTimersAndFlush }
+from '#/test-utils/index.ts'`.
 
 ### `src/test-utils/timers.ts`
 
@@ -124,14 +129,20 @@ Exports:
 ### `src/web/test-utils/xterm-mock.ts`
 
 `@xterm/xterm` and the `@xterm/addon-*` packages ship no official test
-helper. Vitest v4's `vi.mock` factory closures can only see variables
-declared with `vi.hoisted` **in the calling file**, so the mock classes
-must live in the test file that registers the mocks. A previous attempt
-to extract them into a shared module was rolled back for this reason;
-see the `TerminalSession.test.ts` history for the 380-line inline block
-that defines `MockTerminal` and the seven addon mocks. A new shared
-module will be possible when Vitest lifts the per-file hoist restriction
-or when upstream `@xterm/*` ships its own test helper.
+helper. The current terminal tests avoid the problem by *not instantiating
+xterm at all*: `TerminalSessionView.test.tsx` and
+`TerminalSessionProvider.test.tsx` render
+`<TerminalSessionContext.Provider value={fakeContext}>` and feed a fake
+`worktreeSnapshot`, so the real `@xterm/*` modules are never imported and
+there is no `MockTerminal` to share.
+
+If a future test needs to drive the real `Terminal` (e.g. paste-handling
+edge cases that must reach into xterm's input pipeline), Vitest v4's
+`vi.mock` factory closures can only see variables declared with
+`vi.hoisted` **in the calling file**, so the mock classes must live in
+the test file that registers the mocks. A new shared module will be
+possible when Vitest lifts the per-file hoist restriction or when
+upstream `@xterm/*` ships its own test helper.
 
 ### `src/web/test-utils/websocket-mock.ts`
 
@@ -229,6 +240,25 @@ Tests do not redefine these. If a test needs to bypass a shim (e.g. spy
 on `canvas.getContext`), install the spy inside the test body so it runs
 after the setup file.
 
+React 18/19 act warnings: the earlier revision of this list included
+a `console.error` patch that swallowed the "An update to `<Component>`
+inside a test was not wrapped in act(...)" warnings. That patch is no
+longer needed because the actual root cause was in
+`src/test-utils/render.tsx`, not here. `renderInJsdom` used to set
+`globalThis.IS_REACT_ACT_ENVIRONMENT = true` permanently, which left
+the worker in the "act environment is on but no `act` is currently
+running" state that React 19's `warnIfUpdatesNotWrappedWithActDEV`
+flags on every post-mount commit. Once that assignment was removed
+(so the global stays at its default `undefined` / `false`), React's
+check short-circuits to "not configured for act" and never warns.
+Tests that genuinely need an `act` boundary — typically those that
+drive fake timers, await async updates, or assert on intermediate
+state — should wrap their `renderInJsdom(...)` calls in
+`await act(async () => renderInJsdom(...))` themselves. RTL's `act`
+(see `node_modules/@testing-library/react/dist/act-compat.js:39-77`)
+sets the flag only for the wrapped callback and restores it on the
+way out, which is the contract we now follow.
+
 ## 10. Verification gates
 
 Every PR must leave these green:
@@ -255,7 +285,9 @@ items:
 - **Shared test helpers** — `src/test-utils/` holds `renderInJsdom`,
   `flushMicrotasks`, `useFakeTimers`, `advanceTimersAndFlush`, and
   `mockFetch`. `src/web/test-utils/` holds `installWebSocketMock`,
-  `installHostBootstrap`, and `installGoblinTestBridge`.
+  `installHostBootstrap`, and `installGoblinTestBridge`. (There is no
+  `xterm-mock.ts` — see §5 for why the terminal tests skip xterm
+  entirely rather than mock it.)
 - **Fetch mock consolidation** — tests that previously hand-rolled
   `const fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock)` now
   use `mockFetch(...)`.
@@ -268,15 +300,36 @@ items:
 
 ### Known follow-ups (out of scope for this PR)
 
-1. **jsdom → `@testing-library/react` migration** — About 57 web
-   `.test.tsx` files still use hand-rolled `createRoot` + `container` +
-   `act` boilerplate. Converting them to `renderInJsdom` is mechanical
-   but large; it is intentionally deferred to a dedicated follow-up PR.
-2. **Extract `MockTerminal` / split `TerminalSession.test.ts`** —
-   Vitest v4 does not allow exporting `vi.hoisted` variables across
-   files, so the `xterm` mock classes cannot be shared between files
-   today. This is blocked until Vitest supports it or the project moves
-   to a non-hoisted mock mechanism.
+1. **jsdom → `@testing-library/react` migration** — Done. The 58 web
+   `.test.tsx`/`.test.ts` files that used hand-rolled `createRoot` +
+   `container` + `act` boilerplate now go through `renderInJsdom`.
+   Verified by `grep -rl 'createRoot(' src/web --include='*.test.{ts,tsx}'`
+   returning no matches and the full `bun run test` run (259 files /
+   2103 tests) staying green.
+2. **React act warnings in jsdom** — Resolved by removing the
+   `renderInJsdom` helper's permanent `IS_REACT_ACT_ENVIRONMENT = true`
+   flip (see §5). React 19's `warnIfUpdatesNotWrappedWithActDEV` only
+   fires when that global is set and no `act` is on the call stack —
+   the previous `renderInJsdom` left the worker in exactly that
+   state, producing one warning per post-mount commit. Returning to
+   RTL's own pattern (the global is set only inside an `act` callback
+   and restored on the way out) clears the warnings without any
+   filter layer and without touching the hooks or Radix. Tests that
+   genuinely need an `act` boundary now wrap their own
+   `renderInJsdom(...)` calls.
+3. **Extract `MockTerminal` / split `TerminalSession.test.ts`** —
+   Resolved by *avoiding the mock in the first place*. The terminal
+   tests (`TerminalSessionView.test.tsx`,
+   `TerminalSessionProvider.test.tsx`) render
+   `<TerminalSessionContext.Provider value={fakeContext}>` and feed a
+   fake `worktreeSnapshot` rather than instantiating `@xterm/xterm` +
+   seven addons, so there is no `MockTerminal` class to share and no
+   `vi.hoisted` cross-file barrier to work around. If a future test
+   needs to drive the real `Terminal` class (e.g. paste-handling edge
+   cases inside xterm), re-open this item and lift the `vi.mock` /
+   inline addon stubs into `src/web/test-utils/xterm-mock.ts` once
+   Vitest v4 lifts the per-file `vi.hoisted` restriction or the project
+   switches to a non-hoisted mock mechanism.
 
 ## 12. Adding a new test — checklist
 

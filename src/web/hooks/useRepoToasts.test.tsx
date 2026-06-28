@@ -1,8 +1,24 @@
 // @vitest-environment jsdom
+// Partial mock of `#/web/stores/i18n.ts`: delegates to the real
+// module so `i18next.use(initReactI18next).init({…})` still runs,
+// then overrides `useT` with a dictionary-based interpolator
+// (`i18nMocks.dict` + `i18nMocks.interpolate`) that the assertions
+// on toast summaries can match against. The simple `stubI18n`
+// helper only covers the `useT → raw key` case; richer overrides
+// write their own `vi.mock(import(...), importOriginal)` and
+// spread `actual` to keep the i18next init side effect live.
+vi.mock(import('#/web/stores/i18n.ts'), async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    useT: (() => (key: string, params?: Record<string, string | number>) =>
+      i18nMocks.interpolate(i18nMocks.dict[key] ?? key, params)) as typeof actual.useT,
+  }
+})
 
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+
+import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useRepoToasts } from '#/web/hooks/useRepoToasts.tsx'
 import { resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -29,32 +45,12 @@ vi.mock('sonner', () => ({
   toast: toastMocks,
 }))
 
-vi.mock('#/web/stores/i18n.ts', () => ({
-  useT: () => (key: string, params?: Record<string, string | number>) =>
-    i18nMocks.interpolate(i18nMocks.dict[key] ?? key, params),
-}))
-
 const REPO_ID = '/tmp/repo-toasts-test'
-
-let host: HTMLDivElement
-let root: Root
 
 beforeEach(() => {
   resetReposStore()
   toastMocks.success.mockClear()
   toastMocks.error.mockClear()
-  host = document.createElement('div')
-  document.body.appendChild(host)
-  root = createRoot(host)
-})
-
-afterEach(() => {
-  if (root) {
-    act(() => {
-      root.unmount()
-    })
-  }
-  host?.remove()
 })
 
 describe('useRepoToasts', () => {
@@ -77,9 +73,7 @@ describe('useRepoToasts', () => {
       { action: { kind: 'createWorktree', branch: 'feature/a', worktreePath: '/tmp/worktrees/feature-a' } },
     )
 
-    await act(async () => {
-      root.render(<Harness repoId={REPO_ID} />)
-    })
+    renderInJsdom(<Harness repoId={REPO_ID} />)
 
     expect(toastMocks.success).toHaveBeenCalledTimes(1)
     const [, options] = toastMocks.success.mock.calls[0]!

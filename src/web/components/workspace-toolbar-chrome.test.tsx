@@ -1,42 +1,20 @@
 // @vitest-environment jsdom
 
-import { act } from 'react'
 import type { ReactNode } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, test } from 'vitest'
+import { describe, expect, test } from 'vitest'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 import { WorkspaceChrome, WorkspaceToolbar } from '#/web/components/workspace-toolbar-chrome.tsx'
 import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
 
-let container: HTMLDivElement | null = null
-let root: Root | null = null
-const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
-
-beforeEach(() => {
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
-  container = document.createElement('div')
-  document.body.append(container)
-  root = createRoot(container)
-})
-
-afterEach(() => {
-  act(() => {
-    root?.unmount()
-  })
-  container?.remove()
-  root = null
-  container = null
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
-})
-
 describe('WorkspaceToolbar', () => {
   test('owns workspace chrome without inheriting a generic toolbar gap', () => {
-    render(
+    const { container } = renderInJsdom(
       <WorkspaceToolbar>
         <div data-testid="body" />
       </WorkspaceToolbar>,
     )
 
-    const toolbar = workspaceToolbar()
+    const toolbar = workspaceToolbar(container)
     expect(toolbar).not.toBeNull()
     expect(toolbar?.className).toContain('goblin-workspace-toolbar')
     expect(toolbar?.dataset.titleBarChromeRegion).toBe('drag')
@@ -46,17 +24,17 @@ describe('WorkspaceToolbar', () => {
     expect(toolbar?.className).not.toContain('gap-2')
     expect(toolbar?.className).not.toContain('goblin-workspace-toolbar--non-draggable')
     expect(toolbar?.style.height).toBe(`${TITLE_BAR_HEIGHT_PX}px`)
-    expect(container?.querySelector('[data-testid="body"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="body"]')).not.toBeNull()
   })
 
   test('keeps compact/non-draggable chrome padded without opting into window dragging', () => {
-    render(
+    renderInJsdom(
       <WorkspaceToolbar draggable={false}>
         <div />
       </WorkspaceToolbar>,
     )
 
-    const toolbar = workspaceToolbar()
+    const toolbar = workspaceToolbar(document.body)
     expect(toolbar?.className).toContain('goblin-workspace-toolbar--non-draggable')
     expect(toolbar?.dataset.titleBarChromeRegion).toBeUndefined()
     expect(toolbar?.className).not.toContain('app-drag-region')
@@ -64,11 +42,11 @@ describe('WorkspaceToolbar', () => {
   })
 
   test('reserves traffic-light chrome through WorkspaceChrome only when requested', () => {
-    render(<WorkspaceChrome trafficLightOffset />)
+    const { container } = renderInJsdom(<WorkspaceChrome trafficLightOffset />)
 
-    const toolbar = workspaceToolbar()
-    const spacer = container?.querySelector('[data-testid="workspace-toolbar-leading-spacer"]')
-    const noDrag = container?.querySelector<HTMLElement>('[data-testid="workspace-toolbar-leading-no-drag"]')
+    const toolbar = workspaceToolbar(container)
+    const spacer = container.querySelector('[data-testid="workspace-toolbar-leading-spacer"]')
+    const noDrag = container.querySelector<HTMLElement>('[data-testid="workspace-toolbar-leading-no-drag"]')
     expect(toolbar?.className).toContain('goblin-workspace-toolbar--traffic-offset')
     expect(toolbar?.dataset.titleBarChromeRegion).toBe('drag')
     expect(toolbar?.className).toContain('app-drag-region')
@@ -77,12 +55,6 @@ describe('WorkspaceToolbar', () => {
   })
 })
 
-function render(element: ReactNode) {
-  act(() => {
-    root!.render(element)
-  })
-}
-
-function workspaceToolbar(): HTMLElement | null {
+function workspaceToolbar(container: HTMLElement | null | undefined): HTMLElement | null {
   return container?.querySelector<HTMLElement>('.goblin-workspace-toolbar') ?? null
 }

@@ -2,14 +2,10 @@
 
 import { act } from 'react'
 import { useState } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, test } from 'vitest'
+import { beforeEach, describe, expect, test } from 'vitest'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useAppOverlays } from '#/web/hooks/useAppOverlays.ts'
 import { resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
-
-let container: HTMLDivElement | null = null
-let root: Root | null = null
-const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 
 function Harness() {
   const overlays = useAppOverlays()
@@ -62,73 +58,48 @@ function RoutedHarness() {
 }
 
 beforeEach(() => {
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   resetReposStore()
-})
-
-afterEach(() => {
-  act(() => {
-    root?.unmount()
-  })
-  container?.remove()
-  root = null
-  container = null
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
 describe('useAppOverlays', () => {
   test('tracks non-settings overlays centrally and resets all overlays together', () => {
-    container = document.createElement('div')
-    document.body.append(container)
-    root = createRoot(container)
-
     // Seed an active repo so the openCreateWorktree defensive
     // guard (in production) does not short-circuit the test.
-    act(() => {
-      seedRepoState({ id: '/tmp/gbl-overlay-test', branches: [] })
-    })
+    seedRepoState({ id: '/tmp/gbl-overlay-test', branches: [] })
 
-    act(() => {
-      root!.render(<Harness />)
-    })
+    const { container } = renderInJsdom(<Harness />)
 
-    click('#open-clone')
-    click('#open-repo')
-    click('#open-create-worktree')
-    expect(text('#clone-open')).toBe('open')
-    expect(text('#open-repo-open')).toBe('open')
-    expect(text('#create-worktree-open')).toBe('open')
-    expect(text('#any-open')).toBe('open')
+    click(container, '#open-clone')
+    click(container, '#open-repo')
+    click(container, '#open-create-worktree')
+    expect(text(container, '#clone-open')).toBe('open')
+    expect(text(container, '#open-repo-open')).toBe('open')
+    expect(text(container, '#create-worktree-open')).toBe('open')
+    expect(text(container, '#any-open')).toBe('open')
 
-    click('#close-all')
-    expect(text('#clone-open')).toBe('closed')
-    expect(text('#open-repo-open')).toBe('closed')
-    expect(text('#create-worktree-open')).toBe('closed')
-    expect(text('#any-open')).toBe('closed')
+    click(container, '#close-all')
+    expect(text(container, '#clone-open')).toBe('closed')
+    expect(text(container, '#open-repo-open')).toBe('closed')
+    expect(text(container, '#create-worktree-open')).toBe('closed')
+    expect(text(container, '#any-open')).toBe('closed')
   })
 
   test('can derive overlay state from a routed overlay source', () => {
-    container = document.createElement('div')
-    document.body.append(container)
-    root = createRoot(container)
+    const { container } = renderInJsdom(<RoutedHarness />)
 
-    act(() => {
-      root!.render(<RoutedHarness />)
-    })
+    click(container, '#open-clone')
+    expect(text(container, '#clone-open')).toBe('open')
+    expect(text(container, '#open-repo-open')).toBe('closed')
+    expect(text(container, '#any-open')).toBe('open')
 
-    click('#open-clone')
-    expect(text('#clone-open')).toBe('open')
-    expect(text('#open-repo-open')).toBe('closed')
-    expect(text('#any-open')).toBe('open')
+    click(container, '#open-repo')
+    expect(text(container, '#clone-open')).toBe('closed')
+    expect(text(container, '#open-repo-open')).toBe('open')
 
-    click('#open-repo')
-    expect(text('#clone-open')).toBe('closed')
-    expect(text('#open-repo-open')).toBe('open')
-
-    click('#close-all')
-    expect(text('#clone-open')).toBe('closed')
-    expect(text('#open-repo-open')).toBe('closed')
-    expect(text('#any-open')).toBe('closed')
+    click(container, '#close-all')
+    expect(text(container, '#clone-open')).toBe('closed')
+    expect(text(container, '#open-repo-open')).toBe('closed')
+    expect(text(container, '#any-open')).toBe('closed')
   })
 
   test('openCreateWorktree no-ops when no active repo (defensive guard)', () => {
@@ -139,38 +110,31 @@ describe('useAppOverlays', () => {
     // dialog visible, and a later `useEffect([activeId])` clears it
     // when a repo is finally activated. The guard short-circuits at
     // the action so the intent is never silently lost.
-    container = document.createElement('div')
-    document.body.append(container)
-    root = createRoot(container)
 
     // Active repo is null (resetReposStore in beforeEach).
-    act(() => {
-      root!.render(<Harness />)
-    })
+    const { container } = renderInJsdom(<Harness />)
 
-    click('#open-create-worktree')
-    expect(text('#create-worktree-open')).toBe('closed')
-    expect(text('#any-open')).toBe('closed')
+    click(container, '#open-create-worktree')
+    expect(text(container, '#create-worktree-open')).toBe('closed')
+    expect(text(container, '#any-open')).toBe('closed')
 
     // Now seed an active repo; opening should now work.
-    act(() => {
-      seedRepoState({ id: '/tmp/gbl-overlay-test', branches: [] })
-    })
-    click('#open-create-worktree')
-    expect(text('#create-worktree-open')).toBe('open')
+    seedRepoState({ id: '/tmp/gbl-overlay-test', branches: [] })
+    click(container, '#open-create-worktree')
+    expect(text(container, '#create-worktree-open')).toBe('open')
   })
 })
 
-function click(selector: string) {
-  const element = container?.querySelector(selector)
+function click(container: HTMLElement, selector: string) {
+  const element = container.querySelector(selector)
   if (!(element instanceof HTMLButtonElement)) throw new Error(`Missing button: ${selector}`)
   act(() => {
     element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
   })
 }
 
-function text(selector: string): string {
-  const element = container?.querySelector(selector)
+function text(container: HTMLElement, selector: string): string {
+  const element = container.querySelector(selector)
   if (!(element instanceof HTMLOutputElement)) throw new Error(`Missing output: ${selector}`)
   return element.textContent ?? ''
 }

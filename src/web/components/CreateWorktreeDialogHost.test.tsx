@@ -13,8 +13,8 @@ import { mockFetch } from '#/test-utils/fetch-mock.ts'
 // when the active repo changes.
 
 import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 import { CreateWorktreeDialogHost } from '#/web/components/CreateWorktreeDialogHost.tsx'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
@@ -23,12 +23,8 @@ import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-uti
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 
 const REPO_ID = '/tmp/gbl-create-host-test'
-let container: HTMLDivElement | null = null
-let root: Root | null = null
-const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 
 beforeEach(() => {
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   primaryWindowQueryClient.clear()
   globalThis.localStorage?.clear()
   resetReposStore()
@@ -36,9 +32,6 @@ beforeEach(() => {
     id: REPO_ID,
     branches: [createRepoBranch('main', { isCurrent: true, ahead: 0, behind: 0 })],
   })
-  container = document.createElement('div')
-  document.body.append(container)
-  root = createRoot(container)
   vi.stubGlobal(
     'fetch',
     vi.fn(async () => previewResponse({ hasOperations: false, configHash: null })),
@@ -46,24 +39,14 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  act(() => {
-    root?.unmount()
-  })
-  container?.remove()
-  root = null
-  container = null
-  document.body.innerHTML = ''
   primaryWindowQueryClient.clear()
   globalThis.localStorage?.clear()
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
 function renderHost(open: boolean, onOpenChange: (open: boolean) => void) {
-  act(() => {
-    root!.render(<CreateWorktreeDialogHost open={open} onOpenChange={onOpenChange} activeId={REPO_ID} />)
-  })
+  return renderInJsdom(<CreateWorktreeDialogHost open={open} onOpenChange={onOpenChange} activeId={REPO_ID} />)
 }
 
 describe('CreateWorktreeDialogHost', () => {
@@ -82,16 +65,14 @@ describe('CreateWorktreeDialogHost', () => {
     const onOpenChange = vi.fn()
 
     // (1) Initial mount: open=false (the host always starts closed).
-    renderHost(false, onOpenChange)
+    const { rerender } = renderHost(false, onOpenChange)
     expect(onOpenChange).not.toHaveBeenCalled()
 
     // (2) The user clicks the create-worktree button. Parent flips `open` to
     // true. The host re-renders; only `open` changed, not `activeId`.
     // The guarded effect must NOT call `onOpenChange(false)` — pre-fix
     // it did so in the same render.
-    act(() => {
-      root!.render(<CreateWorktreeDialogHost open={true} onOpenChange={onOpenChange} activeId={REPO_ID} />)
-    })
+    rerender(<CreateWorktreeDialogHost open={true} onOpenChange={onOpenChange} activeId={REPO_ID} />)
     expect(onOpenChange).not.toHaveBeenCalledWith(false)
   })
 
@@ -105,23 +86,19 @@ describe('CreateWorktreeDialogHost', () => {
 
   test('force-closes the dialog when the active repo changes (matches pre-PR behaviour)', () => {
     const onOpenChange = vi.fn()
-    renderHost(true, onOpenChange)
+    const { rerender } = renderHost(true, onOpenChange)
 
     // Simulate the user switching active repo. The host must call
     // `onOpenChange(false)` so the dialog doesn't leak across the
     // boundary. The `activeId` dep flips, so the effect fires.
-    act(() => {
-      root!.render(<CreateWorktreeDialogHost open={true} onOpenChange={onOpenChange} activeId="/tmp/other-repo" />)
-    })
+    rerender(<CreateWorktreeDialogHost open={true} onOpenChange={onOpenChange} activeId="/tmp/other-repo" />)
 
     expect(onOpenChange).toHaveBeenCalledWith(false)
   })
 
   test('renders nothing when no active repo', () => {
-    act(() => {
-      root!.render(<CreateWorktreeDialogHost open onOpenChange={vi.fn()} activeId={null} />)
-    })
-    expect(container?.textContent ?? '').toBe('')
+    const { container } = renderInJsdom(<CreateWorktreeDialogHost open onOpenChange={vi.fn()} activeId={null} />)
+    expect(container.textContent).toBe('')
   })
 
   test('forwards a remembered bootstrap decision from the create dialog checkbox', async () => {
@@ -437,14 +414,10 @@ describe('CreateWorktreeDialogHost', () => {
       return next.promise
     })
 
-    renderHost(true, vi.fn())
+    const { rerender } = renderHost(true, vi.fn())
     await flushReact()
-    act(() => {
-      root!.render(<CreateWorktreeDialogHost open={false} onOpenChange={vi.fn()} activeId={REPO_ID} />)
-    })
-    act(() => {
-      root!.render(<CreateWorktreeDialogHost open={true} onOpenChange={vi.fn()} activeId={REPO_ID} />)
-    })
+    rerender(<CreateWorktreeDialogHost open={false} onOpenChange={vi.fn()} activeId={REPO_ID} />)
+    rerender(<CreateWorktreeDialogHost open={true} onOpenChange={vi.fn()} activeId={REPO_ID} />)
     await flushReact()
 
     secondPreview.resolve(previewResponse({ hasOperations: true, configHash }))
@@ -507,7 +480,7 @@ async function flushReact(): Promise<void> {
 }
 
 function setInputValue(id: string, value: string): void {
-  const input = document.getElementById(id)
+  const input = document.body.querySelector(`#${id}`)
   if (!(input instanceof HTMLInputElement)) throw new Error(`missing input ${id}`)
   const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
   if (!valueSetter) throw new Error('missing input value setter')
@@ -519,7 +492,7 @@ function setInputValue(id: string, value: string): void {
 }
 
 async function clickButton(text: string): Promise<void> {
-  const button = Array.from(document.querySelectorAll('button')).find((candidate) => candidate.textContent === text)
+  const button = Array.from(document.body.querySelectorAll('button')).find((candidate) => candidate.textContent === text)
   if (!(button instanceof HTMLButtonElement)) throw new Error(`missing button ${text}`)
   await act(async () => {
     button.click()
@@ -529,7 +502,7 @@ async function clickButton(text: string): Promise<void> {
 }
 
 async function clickLabel(text: string): Promise<void> {
-  const label = Array.from(document.querySelectorAll('label')).find((candidate) => candidate.textContent === text)
+  const label = Array.from(document.body.querySelectorAll('label')).find((candidate) => candidate.textContent === text)
   if (!(label instanceof HTMLLabelElement)) throw new Error(`missing label ${text}`)
   await act(async () => {
     label.click()

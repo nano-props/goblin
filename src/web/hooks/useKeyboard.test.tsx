@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 
 import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { toast } from 'sonner'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useKeyboard } from '#/web/hooks/useKeyboard.ts'
 
 vi.mock('sonner', () => ({
@@ -19,9 +19,6 @@ import { setTerminalSessionCommandBridge } from '#/web/components/terminal/termi
 import type { WorktreeTerminalSnapshot } from '#/web/components/terminal/types.ts'
 import { workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
 
-let container: HTMLDivElement | null = null
-let root: Root | null = null
-const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 const testWindow = window as unknown as { goblinNative?: Window['goblinNative'] }
 const REPO_ID = '/tmp/keyboard-repo'
 const WORKTREE_PATH = '/tmp/keyboard-worktree'
@@ -37,20 +34,12 @@ interface HookHostOptions {
 }
 
 beforeEach(() => {
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   resetReposStore()
 })
 
 afterEach(() => {
-  act(() => {
-    root?.unmount()
-  })
   setTerminalSessionCommandBridge(null)
   delete testWindow.goblinNative
-  container?.remove()
-  root = null
-  container = null
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
 describe('useKeyboard', () => {
@@ -341,14 +330,8 @@ describe('useKeyboard', () => {
   })
 })
 
-async function renderHookHost(overrides: Partial<HookHostOptions> = {}) {
-  container = document.createElement('div')
-  document.body.append(container)
-  root = createRoot(container)
-  await act(async () => {
-    root!.render(<HookHost {...overrides} />)
-    await Promise.resolve()
-  })
+function renderHookHost(overrides: Partial<HookHostOptions> = {}) {
+  return renderInJsdom(<HookHost {...overrides} />)
 }
 
 function HookHost(overrides: Partial<HookHostOptions>) {

@@ -8,9 +8,9 @@
 //     when used as React keys downstream — and drop non-string entries
 //   • surface request lifecycle so the input can render a loading hint
 
-import { createRoot, type Root } from 'react-dom/client'
 import { act } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useRemotePathSuggestions } from '#/web/hooks/useRemotePathSuggestions.ts'
 
 vi.mock('#/web/remote-client.ts', () => ({
@@ -21,26 +21,13 @@ import { getRemotePathSuggestions } from '#/web/remote-client.ts'
 
 const mockedFetch = vi.mocked(getRemotePathSuggestions)
 
-let container: HTMLDivElement | null = null
-let root: Root | null = null
-const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
-
 beforeEach(() => {
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   // Default no-op so the debounced fetch in the hook settles without
   // hitting the network. Per-test mocks override this.
   mockedFetch.mockResolvedValue([])
 })
 
 afterEach(() => {
-  act(() => {
-    root?.unmount()
-  })
-  container?.remove()
-  root = null
-  container = null
-  document.body.innerHTML = ''
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
   mockedFetch.mockReset()
 })
 
@@ -167,9 +154,6 @@ describe('useRemotePathSuggestions', () => {
         }),
     )
 
-    container = document.createElement('div')
-    document.body.append(container)
-    root = createRoot(container)
     const snapshots: Array<{ suggestions: string[]; isLoading: boolean; hasFetched: boolean }> = []
 
     function Host({ prefix }: { prefix: string }) {
@@ -183,10 +167,9 @@ describe('useRemotePathSuggestions', () => {
       return null
     }
 
+    const { rerender } = renderInJsdom(<Host prefix="/srv/" />)
+
     try {
-      await act(async () => {
-        root!.render(<Host prefix="/srv/" />)
-      })
       await act(async () => {
         vi.advanceTimersByTime(400)
         await Promise.resolve()
@@ -198,9 +181,7 @@ describe('useRemotePathSuggestions', () => {
         hasFetched: false,
       })
 
-      await act(async () => {
-        root!.render(<Host prefix="/srv/r" />)
-      })
+      rerender(<Host prefix="/srv/r" />)
 
       expect(snapshots.at(-1)).toEqual({
         suggestions: [],
@@ -243,17 +224,12 @@ interface RenderInput {
 }
 
 async function renderHookAndWaitForFetch(input: RenderInput) {
-  container = document.createElement('div')
-  document.body.append(container)
-  root = createRoot(container)
   let captured = { suggestions: [] as string[], isLoading: false, hasFetched: false }
   function Host() {
     captured = useRemotePathSuggestions(input)
     return null
   }
-  await act(async () => {
-    root!.render(<Host />)
-  })
+  renderInJsdom(<Host />)
   // The hook debounces by 350ms before firing; advance past that and
   // let the queued microtasks settle so the state update lands.
   await act(async () => {
@@ -263,18 +239,13 @@ async function renderHookAndWaitForFetch(input: RenderInput) {
 }
 
 async function renderHookLifecycle(input: RenderInput) {
-  container = document.createElement('div')
-  document.body.append(container)
-  root = createRoot(container)
   const snapshots: Array<{ suggestions: string[]; isLoading: boolean; hasFetched: boolean }> = []
   function Host() {
     const state = useRemotePathSuggestions(input)
     snapshots.push(state)
     return null
   }
-  await act(async () => {
-    root!.render(<Host />)
-  })
+  renderInJsdom(<Host />)
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 400))
   })

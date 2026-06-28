@@ -1,40 +1,21 @@
 // @vitest-environment jsdom
 
 import { act } from 'react'
-import type { ReactNode } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, test } from 'vitest'
+import { beforeEach, describe, expect, test } from 'vitest'
 import { WorkspaceZenModeToggle } from '#/web/components/WorkspaceZenModeToggle.tsx'
 import { resetReposStore } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-
-let container: HTMLDivElement | null = null
-let root: Root | null = null
-const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+import { renderInJsdom } from '#/test-utils/render.tsx'
 
 beforeEach(() => {
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   resetReposStore()
-  container = document.createElement('div')
-  document.body.appendChild(container)
-  root = createRoot(container)
-})
-
-afterEach(() => {
-  act(() => {
-    root?.unmount()
-  })
-  container?.remove()
-  root = null
-  container = null
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
 describe('WorkspaceZenModeToggle', () => {
   test('keeps the same button node when zen mode changes', () => {
-    render(<WorkspaceZenModeToggle />)
+    const { container } = renderInJsdom(<WorkspaceZenModeToggle />)
 
-    const button = zenModeToggle()
+    const button = zenModeToggle(container)
     expect(button).not.toBeNull()
     expect(button?.getAttribute('aria-pressed')).toBe('false')
 
@@ -42,25 +23,25 @@ describe('WorkspaceZenModeToggle', () => {
       useReposStore.getState().setZenMode(true)
     })
 
-    expect(zenModeToggle()).toBe(button)
-    expect(zenModeToggle()?.getAttribute('aria-pressed')).toBe('true')
+    expect(zenModeToggle(container)).toBe(button)
+    expect(zenModeToggle(container)?.getAttribute('aria-pressed')).toBe('true')
   })
 
   test('toggles zen mode when clicked', () => {
-    render(<WorkspaceZenModeToggle />)
+    const { container } = renderInJsdom(<WorkspaceZenModeToggle />)
 
     expect(useReposStore.getState().zenMode).toBe(false)
 
     act(() => {
-      zenModeToggle()?.click()
+      zenModeToggle(container)?.click()
     })
 
     expect(useReposStore.getState().zenMode).toBe(true)
-    expect(zenModeToggle()?.getAttribute('aria-pressed')).toBe('true')
+    expect(zenModeToggle(container)?.getAttribute('aria-pressed')).toBe('true')
   })
 
   test('can own the title-bar-chrome interactive surface without changing visual size', () => {
-    render(
+    const { container } = renderInJsdom(
       <WorkspaceZenModeToggle
         data-interactive
         data-title-bar-chrome-region="interactive"
@@ -68,21 +49,15 @@ describe('WorkspaceZenModeToggle', () => {
       />,
     )
 
-    expect(zenModeToggle()?.dataset.titleBarChromeRegion).toBe('interactive')
-    expect(zenModeToggle()?.hasAttribute('data-interactive')).toBe(true)
-    expect(zenModeToggle()?.dataset.size).toBe('icon-lg')
-    expect(zenModeToggle()?.className).toContain('pointer-events-auto')
-    expect(zenModeToggle()?.className).toContain('size-8')
-    expect(zenModeToggle()?.className).not.toContain('size-10')
+    expect(zenModeToggle(container)?.dataset.titleBarChromeRegion).toBe('interactive')
+    expect(zenModeToggle(container)?.hasAttribute('data-interactive')).toBe(true)
+    expect(zenModeToggle(container)?.dataset.size).toBe('icon-lg')
+    expect(zenModeToggle(container)?.className).toContain('pointer-events-auto')
+    expect(zenModeToggle(container)?.className).toContain('size-8')
+    expect(zenModeToggle(container)?.className).not.toContain('size-10')
   })
 })
 
-function render(element: ReactNode) {
-  act(() => {
-    root!.render(element)
-  })
-}
-
-function zenModeToggle(): HTMLButtonElement | null {
-  return container?.querySelector<HTMLButtonElement>('button[aria-label="workspace.zen-mode-toggle-label"]') ?? null
+function zenModeToggle(container: HTMLElement): HTMLButtonElement | null {
+  return container.querySelector<HTMLButtonElement>('button[aria-label="workspace.zen-mode-toggle-label"]') ?? null
 }

@@ -2,7 +2,6 @@
 
 import { act } from 'react'
 import type { ReactNode } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { OpenRemoteRepositoryDialog } from '#/web/components/OpenRemoteRepositoryDialog.tsx'
 import {
@@ -13,10 +12,8 @@ import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { resetReposStore } from '#/web/test-utils/bridge.ts'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 
-let container: HTMLDivElement | null = null
-let root: Root | null = null
-const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 const testWindow = window as unknown as { goblinNative?: unknown; __GOBLIN_BOOTSTRAP__?: unknown }
 
 const target = {
@@ -30,7 +27,6 @@ const target = {
 } as const
 
 beforeEach(() => {
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   resetReposStore()
   setClientBridgeForTests(null)
   vi.stubGlobal(
@@ -82,16 +78,9 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  act(() => {
-    root?.unmount()
-  })
-  container?.remove()
-  root = null
-  container = null
   delete testWindow.goblinNative
   delete testWindow.__GOBLIN_BOOTSTRAP__
   setClientBridgeForTests(null)
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
 describe('OpenRemoteRepositoryDialog', () => {
@@ -512,12 +501,7 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): Pri
 }
 
 function render(element: ReactNode) {
-  container = document.createElement('div')
-  document.body.append(container)
-  root = createRoot(container)
-  act(() => {
-    root!.render(element)
-  })
+  return renderInJsdom(element)
 }
 
 function input(selector: string): HTMLInputElement {
