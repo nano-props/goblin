@@ -15,10 +15,12 @@
 
 import type { RepoTreeResult } from '#/shared/api-types.ts'
 import type { WorktreeStatus } from '#/shared/git-types.ts'
-import { runWithRepoSource } from '#/server/modules/repo-source.ts'
+import { isRemoteRepoId } from '#/shared/remote-repo.ts'
+import { runWithRepoSource, resolveRemoteRepoTarget } from '#/server/modules/repo-source.ts'
 import {
   type RepoTreeSourceOptions,
   getRepoTreeSourceLocal,
+  getRepoTreeSourceRemote,
 } from '#/server/modules/repo-tree-source.ts'
 
 export interface GetRepositoryTreeOptions extends RepoTreeSourceOptions {
@@ -42,11 +44,43 @@ export async function getRepositoryTree(
   const signal = options.signal
   if (signal?.aborted) return { nodes: [], truncated: false }
 
+  // Dispatch based on the cwd's repo kind. SSH remotes go through
+  // `getRepoTreeSourceRemote` (PR 5); local paths use the
+  // tinyglobby-based local walker. The status fetch is always
+  // routed through `runWithRepoSource` so the caller does not need
+  // to know the repo kind to read status — only to enumerate
+  // files.
+  const isRemote = isRemoteRepoId(cwd)
+
+  // When the cwd is remote, resolve the SSH target exactly once
+  // and reuse it for both the status fetch and the tree walk so we
+  // don't pay the SSH config lookup twice per request.
+  let remoteTarget: Awaited<ReturnType<typeof resolveRemoteRepoTarget>> | undefined
+  if (isRemote) {
+    try {
+      remoteTarget = await resolveRemoteRepoTarget(cwd)
+    } catch {
+      // The user-facing error code is intentionally the same as a
+      // soft-fail so the view does not flash an error banner on
+      // every poll when the SSH alias has been removed mid-session.
+      return { nodes: [], truncated: false }
+    }
+    if (signal?.aborted) return { nodes: [], truncated: false }
+  }
+
   const status =
     options.precomputedStatus ??
     (await runWithRepoSource(cwd, async (source) => await source.getStatus(signal)))
   if (signal?.aborted) return { nodes: [], truncated: false }
 
-  const source = await getRepoTreeSourceLocal(worktreePath, options, signal, status)
+  const source = isRemote
+    ? await getRepoTreeSourceRemote({
+        target: remoteTarget as Awaited<ReturnType<typeof resolveRemoteRepoTarget>>,
+        worktreePath,
+        options,
+        signal,
+        precomputedStatus: status,
+      })
+    : await getRepoTreeSourceLocal(worktreePath, options, signal, status)
   return { nodes: source.nodes, truncated: source.truncated }
 }

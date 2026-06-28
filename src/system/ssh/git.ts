@@ -137,6 +137,23 @@ export async function getRemoteLog(
   return parseLog(result.stdout)
 }
 
+export async function getRemoteTreeWalk(
+  target: RemoteRepoTarget,
+  worktreePath: string,
+  options: { signal?: AbortSignal; depth?: number; run?: RemoteGitRunner } = {},
+): Promise<ExecResult> {
+  const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
+  const depth = Math.max(1, Math.min(10, Math.floor(options.depth ?? 10)))
+  const known = await resolveKnownRemoteWorktree(target, worktreePath, { signal: options.signal, run })
+  if ('ok' in known) return known
+  const result = await run({ type: 'gitTreeWalk', path: known.path, depth }, target, {
+    signal: options.signal,
+  })
+  if (options.signal?.aborted) return { ok: false, message: 'cancelled' }
+  if (!result.ok) return remoteExecResult(result)
+  return { ok: true, message: result.stdout }
+}
+
 export async function getRemotePatch(
   target: RemoteRepoTarget,
   worktreePath: string,

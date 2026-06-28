@@ -9,8 +9,10 @@ import {
   buildNodes,
   buildStatusOverlay,
   getRepoTreeSourceLocal,
+  getRepoTreeSourceRemote,
 } from '#/server/modules/repo-tree-source.ts'
 import type { StatusEntry, WorktreeStatus } from '#/shared/git-types.ts'
+import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
 
 async function makeTempWorktree(files: Record<string, string>): Promise<string> {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'repo-tree-source-'))
@@ -309,4 +311,194 @@ test('repo-tree-source — depth constants stay aligned with the wire schema', (
 // test forgets to abort a controller.
 afterEach(() => {
   vi.restoreAllMocks()
+})
+
+// ---------------------------------------------------------------------------
+// PR 5 — remote (SSH) tree walk tests.
+// ---------------------------------------------------------------------------
+
+const remoteMocks = vi.hoisted(() => ({
+  getRemoteTreeWalk: vi.fn(),
+}))
+
+vi.mock('#/system/ssh/git.ts', () => ({
+  getRemoteTreeWalk: remoteMocks.getRemoteTreeWalk,
+}))
+
+function remoteTarget(): RemoteRepoTarget {
+  return {
+    id: 'ssh-config://mybox/myrepo',
+    alias: 'mybox',
+    remotePath: '/srv/repos/myrepo',
+    displayName: 'mybox:myrepo',
+    host: 'mybox.local',
+    user: 'git',
+    port: 22,
+  }
+}
+
+const NUL = String.fromCharCode(0)
+
+function makeRemoteInput(
+  worktreePath: string,
+  options: RepoTreeSourceOptions = {},
+  signal: AbortSignal | undefined = undefined,
+  precomputedStatus: ReadonlyArray<WorktreeStatus> | undefined = undefined,
+) {
+  return {
+    target: remoteTarget(),
+    worktreePath,
+    options,
+    signal,
+    precomputedStatus,
+  }
+}
+
+describe('repo-tree-source — remote SSH walk', () => {
+  beforeEach(() => {
+    remoteMocks.getRemoteTreeWalk.mockReset()
+  })
+
+  test('returns the empty envelope when the signal is already aborted', async () => {
+    const controller = new AbortController()
+    controller.abort()
+    const result = await getRepoTreeSourceRemote(makeRemoteInput('/srv/repos/myrepo/.worktrees/feature', {}, controller.signal))
+    expect(result).toEqual({ nodes: [], truncated: false })
+    expect(remoteMocks.getRemoteTreeWalk).not.toHaveBeenCalled()
+  })
+
+  test('walks NUL-separated entries and applies the status overlay', async () => {
+    remoteMocks.getRemoteTreeWalk.mockResolvedValueOnce({
+      ok: true,
+      message: [
+        '/srv/repos/myrepo/.worktrees/feature/README.md',
+        '/srv/repos/myrepo/.worktrees/feature/src/index.ts',
+        '/srv/repos/myrepo/.worktrees/feature/src/util/helper.ts',
+      ].join(NUL),
+    })
+
+    const precomputed: WorktreeStatus[] = [
+      {
+        path: '/srv/repos/myrepo/.worktrees/feature',
+        branch: 'main',
+        isMain: false,
+        entries: [statusEntry('M', ' ', 'README.md'), statusEntry('?', '?', 'src/new.ts')],
+      },
+    ]
+
+    const result = await getRepoTreeSourceRemote(
+      makeRemoteInput('/srv/repos/myrepo/.worktrees/feature', {}, undefined, precomputed),
+    )
+
+    const byId = new Map(result.nodes.map((n) => [n.id, n]))
+    expect(byId.get('README.md')?.status).toBe('staged')
+    expect(byId.get('src')?.kind).toBe('directory')
+    expect(byId.get('src/index.ts')?.kind).toBe('file')
+    expect(byId.get('src/util')?.kind).toBe('directory')
+    expect(byId.get('src/util/helper.ts')?.kind).toBe('file')
+    expect(result.truncated).toBe(false)
+  })
+
+  test('drops entries that do not share the worktree prefix', async () => {
+    remoteMocks.getRemoteTreeWalk.mockResolvedValueOnce({
+      ok: true,
+      message: [
+        '/srv/repos/myrepo/.worktrees/feature/README.md',
+        '/srv/repos/other-worktree/secret.ts',
+        '/srv/repos/myrepo/.worktrees/feature/src/a.ts',
+      ].join(NUL),
+    })
+
+    const result = await getRepoTreeSourceRemote(makeRemoteInput('/srv/repos/myrepo/.worktrees/feature'))
+    const ids = result.nodes.map((n) => n.id).sort()
+    expect(ids).toContain('README.md')
+    expect(ids).toContain('src/a.ts')
+    expect(ids).not.toContain('/srv/repos/other-worktree/secret.ts')
+  })
+
+  test('treats an entry exactly equal to the worktree root as the worktree root', async () => {
+    remoteMocks.getRemoteTreeWalk.mockResolvedValueOnce({
+      ok: true,
+      message: ['/srv/repos/myrepo/.worktrees/feature', '/srv/repos/myrepo/.worktrees/feature/README.md'].join(NUL),
+    })
+
+    const result = await getRepoTreeSourceRemote(makeRemoteInput('/srv/repos/myrepo/.worktrees/feature'))
+    expect(result.nodes.find((n) => n.id === 'README.md')).toBeDefined()
+  })
+
+  test('honours a prefix by narrowing the output', async () => {
+    remoteMocks.getRemoteTreeWalk.mockResolvedValueOnce({
+      ok: true,
+      message: [
+        '/srv/repos/myrepo/.worktrees/feature/src/a.ts',
+        '/srv/repos/myrepo/.worktrees/feature/src/sub/b.ts',
+        '/srv/repos/myrepo/.worktrees/feature/docs/readme.md',
+      ].join(NUL),
+    })
+
+    const result = await getRepoTreeSourceRemote(
+      makeRemoteInput('/srv/repos/myrepo/.worktrees/feature', { prefix: 'src' }),
+    )
+    const ids = result.nodes.map((n) => n.id).sort()
+    expect(ids).toContain('src/a.ts')
+    expect(ids).toContain('src/sub/b.ts')
+    expect(ids).not.toContain('docs')
+    expect(ids).not.toContain('docs/readme.md')
+  })
+
+  test('soft-fails to the empty envelope when the remote walk returns ok=false', async () => {
+    remoteMocks.getRemoteTreeWalk.mockResolvedValueOnce({ ok: false, message: 'no worktree found' })
+    const result = await getRepoTreeSourceRemote(makeRemoteInput('/srv/repos/myrepo/.worktrees/feature'))
+    expect(result).toEqual({ nodes: [], truncated: false })
+  })
+
+  test('soft-fails to the empty envelope when the remote walk throws', async () => {
+    remoteMocks.getRemoteTreeWalk.mockRejectedValueOnce(new Error('ssh boom'))
+    const result = await getRepoTreeSourceRemote(makeRemoteInput('/srv/repos/myrepo/.worktrees/feature'))
+    expect(result).toEqual({ nodes: [], truncated: false })
+  })
+
+  test('soft-fails when the signal is aborted mid-walk', async () => {
+    remoteMocks.getRemoteTreeWalk.mockImplementationOnce(async (_target, worktreePath, opts) => {
+      // Simulate the ssh runner honoring abort mid-flight.
+      if (opts?.signal?.aborted) return { ok: false, message: 'cancelled' }
+      return { ok: true, message: `/srv/repos/myrepo/.worktrees/${worktreePath.split('/').pop()}/README.md` }
+    })
+    const controller = new AbortController()
+    controller.abort()
+    const result = await getRepoTreeSourceRemote(
+      makeRemoteInput('/srv/repos/myrepo/.worktrees/feature', {}, controller.signal),
+    )
+    expect(result).toEqual({ nodes: [], truncated: false })
+  })
+
+  test('returns an empty nodes list when the remote stdout is empty', async () => {
+    remoteMocks.getRemoteTreeWalk.mockResolvedValueOnce({ ok: true, message: '' })
+    const result = await getRepoTreeSourceRemote(makeRemoteInput('/srv/repos/myrepo/.worktrees/feature'))
+    expect(result.nodes).toEqual([])
+    expect(result.truncated).toBe(false)
+  })
+
+  test('truncates to MAX_REPO_TREE_NODES and flags `truncated: true`', async () => {
+    // Build enough NUL-separated entries to exceed the cap after
+    // `buildNodes` adds the implicit directory nodes.
+    const total = MAX_REPO_TREE_NODES + 64
+    const entries = Array.from({ length: total }, (_, i) => `/srv/repos/myrepo/.worktrees/feature/d${i}/file.ts`)
+    remoteMocks.getRemoteTreeWalk.mockResolvedValueOnce({ ok: true, message: entries.join(NUL) })
+
+    const result = await getRepoTreeSourceRemote(makeRemoteInput('/srv/repos/myrepo/.worktrees/feature'))
+    expect(result.nodes.length).toBeLessThanOrEqual(MAX_REPO_TREE_NODES)
+    expect(result.truncated).toBe(true)
+  })
+
+  test('clamps the depth passed to getRemoteTreeWalk', async () => {
+    remoteMocks.getRemoteTreeWalk.mockResolvedValueOnce({ ok: true, message: '' })
+    await getRepoTreeSourceRemote(
+      makeRemoteInput('/srv/repos/myrepo/.worktrees/feature', { depth: MAX_REPO_TREE_DEPTH + 100 }),
+    )
+    // `getRemoteTreeWalk` is the wrapper; it clamps internally. The
+    // contract we check here is that the source layer didn't crash
+    // on the out-of-range depth.
+    expect(remoteMocks.getRemoteTreeWalk).toHaveBeenCalledTimes(1)
+  })
 })

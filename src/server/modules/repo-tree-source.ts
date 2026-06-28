@@ -21,6 +21,8 @@ import path from 'node:path'
 import { glob } from 'tinyglobby'
 import type { RepoTreeNode, RepoTreeNodeStatus } from '#/shared/api-types.ts'
 import type { WorktreeStatus } from '#/shared/git-types.ts'
+import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import { getRemoteTreeWalk } from '#/system/ssh/git.ts'
 
 /** Hard cap on nodes emitted in a single response. Sized so a fully
  *  expanded tree of a normal-sized repo fits, but a pathological
@@ -31,6 +33,12 @@ export const MAX_REPO_TREE_NODES = 50_000
  *  this same bound at the perimeter -- duplicated here as a defensive
  *  upper bound for direct callers of the source layer. */
 export const MAX_REPO_TREE_DEPTH = 10
+
+/** NUL byte used as the record separator for `find -print0` output
+ *  from the remote side. Declared as a constant so the source
+ *  layer does not have to spell out the escape inline (which is
+ *  fragile in some editors). */
+const NUL = String.fromCharCode(0)
 
 export interface RepoTreeSourceOptions {
   /** POSIX path relative to the worktree root. The result is rooted
@@ -104,6 +112,107 @@ export async function getRepoTreeSourceLocal(
   }))
 
   return { nodes, truncated }
+}
+
+export interface GetRepoTreeSourceRemoteInput {
+  readonly target: RemoteRepoTarget
+  readonly worktreePath: string
+  readonly options: RepoTreeSourceOptions
+  readonly signal: AbortSignal | undefined
+  readonly precomputedStatus: ReadonlyArray<WorktreeStatus> | undefined
+}
+
+/** SSH implementation of the source layer. The remote side runs a
+ *  bounded `find` over the worktree root (the same `.git` hard
+ *  filter as the local walker), returns NUL-separated absolute
+ *  POSIX paths, and the local process builds the same node shape
+ *  via `buildNodes` so the view and status overlay are unchanged.
+ *
+ *  v1 deliberately does not apply a `.gitignore` filter on the
+ *  remote. The gitignore parsing lives in `translateGitignoreLine`
+ *  on the local side; piping every pattern to `find -not -path`
+ *  would make the command long, error-prone, and easy to break
+ *  with embedded characters. The local walker remains the source
+ *  of truth for gitignore semantics. */
+export async function getRepoTreeSourceRemote(
+  input: GetRepoTreeSourceRemoteInput,
+): Promise<RepoTreeSourceResult> {
+  const { target, worktreePath, options, signal, precomputedStatus } = input
+  if (signal?.aborted) return { nodes: [], truncated: false }
+
+  const depth = clampDepth(options.depth ?? MAX_REPO_TREE_DEPTH)
+  const prefix = normalizePrefix(options.prefix)
+
+  let remoteResult
+  try {
+    remoteResult = await getRemoteTreeWalk(target, worktreePath, { signal, depth })
+  } catch (err) {
+    if (signal?.aborted) return { nodes: [], truncated: false }
+    // Surface as an empty result so the read layer does not 500.
+    void err
+    return { nodes: [], truncated: false }
+  }
+  if (signal?.aborted) return { nodes: [], truncated: false }
+  if (!remoteResult.ok) return { nodes: [], truncated: false }
+
+  const rawEntries = parseNullSeparatedPaths(remoteResult.message)
+  if (signal?.aborted) return { nodes: [], truncated: false }
+
+  // The remote find returns absolute paths rooted at the worktree
+  // path. Strip the worktree prefix so the rest of the source
+  // layer can treat them like the local walker output. We also
+  // narrow to the requested prefix here -- the remote side cannot
+  // express a glob cleanly, so we filter post-hoc. Anything that
+  // doesn't fall under `prefix` (or under the worktree root when
+  // no prefix is set) is dropped before we even feed buildNodes.
+  const root = worktreePath.replace(/\/+$/u, '')
+  const prefixWithSep = prefix ? `${prefix}/` : ''
+  const entries = rawEntries
+    .map((entry) => stripRemoteEntryPrefix(entry, root))
+    .filter((entry): entry is string => {
+      if (entry === null) return false
+      if (prefix === '') return true
+      // Allow entries that match exactly the prefix (a directory
+      // the walker will need to show as a tree top) and any entry
+      // strictly below it.
+      return entry === prefix || entry.startsWith(prefixWithSep)
+    })
+
+  const allNodes = buildNodes({
+    worktreePath,
+    prefix,
+    depth,
+    entries,
+  })
+
+  const truncated = allNodes.length > MAX_REPO_TREE_NODES
+  const sliced = truncated ? allNodes.slice(0, MAX_REPO_TREE_NODES) : allNodes
+
+  const overlay = buildStatusOverlay(precomputedStatus, worktreePath)
+  const nodes: RepoTreeNode[] = sliced.map((node) => ({
+    ...node,
+    status: overlay.get(node.id) ?? 'clean',
+  }))
+
+  return { nodes, truncated }
+}
+
+function parseNullSeparatedPaths(input: string): string[] {
+  if (input.length === 0) return []
+  return input
+    .split(NUL)
+    .map((part) => part.replace(/\r?\n$/u, '').replace(/^\r?\n/u, ''))
+    .filter((part) => part.length > 0)
+}
+
+function stripRemoteEntryPrefix(entry: string, root: string): string | null {
+  if (entry === root) return ''
+  if (entry.startsWith(`${root}/`)) {
+    const relative = entry.slice(root.length + 1)
+    if (relative.startsWith('../') || relative === '..' || relative.includes(NUL)) return null
+    return relative
+  }
+  return null
 }
 
 export interface BuildNodesInput {

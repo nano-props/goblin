@@ -58,6 +58,7 @@ export type RemoteCommandKind =
   | { type: 'checkGit' }
   | { type: 'testDirectory'; path: string }
   | { type: 'listDirectories'; path: string; limit?: number }
+  | { type: 'gitTreeWalk'; path: string; depth: number }
   | { type: 'revParseTopLevel'; path: string }
   | { type: 'gitSnapshot'; path: string }
   | { type: 'gitPatch'; path: string }
@@ -208,6 +209,24 @@ function scriptForCommand(command: RemoteCommandKind): string {
       return `find ${shellQuote(
         command.path,
       )} -mindepth 1 -maxdepth 1 -type d -print 2>/dev/null | LC_ALL=C sort | head -n ${limit}`
+    }
+    case 'gitTreeWalk': {
+      const depth = Math.max(1, Math.min(10, Math.floor(command.depth)))
+      // NUL-separated, excludes .git by default, traverses to the
+      // requested depth. We deliberately do not apply a .gitignore
+      // filter on the remote -- the local source layer is in
+      // charge of the gitignore overlay (see docs/filetree.md).
+      return [
+        'find',
+        shellQuote(command.path),
+        '-mindepth 1',
+        `-maxdepth ${depth}`,
+        '-not -path */.git*',
+        '-not -name .git',
+        '-not -name .gitignore',
+        '-print0',
+        '2>/dev/null',
+      ].join(' ')
     }
     case 'revParseTopLevel':
       return `git -C ${shellQuote(command.path)} rev-parse --show-toplevel`
