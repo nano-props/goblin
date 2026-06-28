@@ -14,7 +14,7 @@ import { PENDING_TERMINAL_WORKSPACE_PANE_TAB_IDENTITY } from '#/web/components/w
 
 type TerminalWorkspacePaneTabSummary = Extract<WorkspacePaneTabSummary, { type: 'terminal' }>
 
-export type WorkspacePaneTabKind = 'static' | 'terminal' | 'pending'
+type WorkspacePaneTabKind = 'static' | 'terminal' | 'pending'
 
 interface WorkspacePaneTabItemBase {
   identity: string
@@ -45,7 +45,7 @@ export interface WorkspacePaneTerminalTabItem extends WorkspacePaneSortableTabIt
   orderEntry: Extract<WorkspacePaneTabOrderEntry, { type: 'terminal' }>
 }
 
-export interface WorkspacePanePendingTabItem extends WorkspacePaneTabItemBase {
+interface WorkspacePanePendingTabItem extends WorkspacePaneTabItemBase {
   kind: 'pending'
   busy: true
 }
