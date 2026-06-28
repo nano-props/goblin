@@ -7,6 +7,8 @@ import { useTerminalSessionContext } from '#/web/components/terminal/terminal-se
 import {
   WorkspacePaneTabStrip,
   EMPTY_WORKSPACE_PANE_TAB_FOCUS_KEY,
+} from '#/web/components/workspace-pane/WorkspacePaneTabStrip.tsx'
+import {
   createPendingWorkspacePaneTabItem,
   createStaticWorkspacePaneTabItem,
   createTerminalWorkspacePaneTabItem,
@@ -14,7 +16,7 @@ import {
   isStaticWorkspacePaneTabItem,
   isTerminalWorkspacePaneTabItem,
   type WorkspacePaneTabItem,
-} from '#/web/components/workspace-pane/WorkspacePaneTabStrip.tsx'
+} from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import type { WorkspacePaneStaticTabType, WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
 import type { TerminalSessionBase } from '#/web/components/terminal/types.ts'

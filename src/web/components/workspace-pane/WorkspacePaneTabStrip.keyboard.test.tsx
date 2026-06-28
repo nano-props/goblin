@@ -3,6 +3,10 @@
 import { act } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { terminalWorkspacePaneTabProvider } from '#/web/components/workspace-pane/tab-providers.ts'
+import {
+  createTerminalWorkspacePaneTabItem,
+  isTerminalWorkspacePaneTabItem,
+} from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
 import type { WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
 import type { TerminalSessionSummary } from '#/web/components/terminal/types.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
@@ -143,8 +147,7 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
 function makeWorkspacePaneTabStrip(
   workspacePaneTabStripModule: typeof import('#/web/components/workspace-pane/WorkspacePaneTabStrip.tsx'),
 ) {
-  const { WorkspacePaneTabStrip, createTerminalWorkspacePaneTabItem, isTerminalWorkspacePaneTabItem } =
-    workspacePaneTabStripModule
+  const { WorkspacePaneTabStrip } = workspacePaneTabStripModule
   return function TestWorkspacePaneTabStrip(props: {
     worktreeTerminalKey: string
     sessions: TerminalSessionSummary[]

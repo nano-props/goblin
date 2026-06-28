@@ -1,5 +1,5 @@
 import { cn } from '#/web/lib/cn.ts'
-import { isPendingWorkspacePaneTabItem, type WorkspacePaneTabItem } from './WorkspacePaneTabStrip.tsx'
+import { isPendingWorkspacePaneTabItem, type WorkspacePaneTabItem } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
 
 // Non-breaking space: keeps the title slot a stable size during the busy/pending
 // phase so the icon and close button don't shift when the title fades in.
