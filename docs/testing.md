@@ -165,10 +165,8 @@ upstream `@xterm/*` ships its own test helper.
   IPC pathnames (e.g. `'repo.probe'`) and server routes (e.g.
   `'repo.snapshot'`) to their test handlers.
 - `resetReposStore()`, `seedRepoState({...})`, `createBranchSnapshot(...)`,
-  `createRepoBranch(...)`, `createPullRequest(...)` — moved here from
-  `src/web/stores/repos/test-utils.ts` so non-repo tests can use them
-  without dragging in the repo store. The old path keeps a one-line
-  re-export for this PR and is marked `@deprecated`.
+  `createRepoBranch(...)`, `createPullRequest(...)` — co-located here
+  so non-repo tests can use them without dragging in the repo store.
 
 ### `src/web/test-utils/host-bootstrap.ts`
 

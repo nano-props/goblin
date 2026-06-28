@@ -1,15 +1,10 @@
 // Web IPC bridge helpers used by tests that need to simulate the
-// Goblin client's interaction with the embedded server.
+// Goblin client's interaction with the embedded server. They live
+// here so non-repo tests (e.g. workspace, settings, branch actions)
+// can depend on the same IPC + bridge plumbing without pulling in
+// the repo store.
 //
-// The previous home for these helpers was
-// `src/web/stores/repos/test-utils.ts`. They moved here so non-repo
-// tests (e.g. workspace, settings, branch actions) can depend on the
-// same IPC + bridge plumbing without pulling in the repo store. The
-// old module still re-exports everything for backward compatibility
-// and is marked `@deprecated` — it will be removed in the next
-// testing-refactor PR after consumers update their imports.
-//
-// Design choices preserved from the original module:
+// Design choices:
 //   - `handlers` is a `Record<string, IpcTestHandler>` keyed by IPC
 //     pathname (`'repo.probe'`, `'repo.snapshot'`, etc.) and server
 //     route (`'/api/repo/probe'`, etc.). `installGoblinTestBridge`
