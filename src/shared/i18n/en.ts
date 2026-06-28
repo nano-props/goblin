@@ -209,6 +209,7 @@ export const en = {
   'tab.changes': 'Changes',
   'tab.changes-with-count': 'Changes · {count}',
   'tab.log': 'Log',
+  'tab.files': 'Files',
   'tab.terminal': 'Terminal',
   'tab.fetching': 'fetch',
   'tab.fetching-title': 'Background fetch in progress',
@@ -226,6 +227,7 @@ export const en = {
   'workspace-pane-tabs.changes-tooltip': '{count} file changes',
   'workspace-pane-tabs.status-tooltip': 'Status · {branch}',
   'workspace-pane-tabs.history-tooltip': 'History · {branch}',
+  'workspace-pane-tabs.files-tooltip': 'Files · {branch}',
   'tab.local-only': 'local only',
   'tab.local-only-title': 'This repository has no remotes; remote sync and PR checks are skipped.',
   'tab.fetch-failed': 'fetch failed',
@@ -308,6 +310,13 @@ export const en = {
   'status.copy-patch-ok': 'Patch copied to clipboard',
   'status.copy-patch-empty': 'Nothing to copy — worktree is clean',
   'status.copy-patch-success': 'Copied',
+
+  // ---- Filetree -----------------------------------------------------------
+  'filetree.empty': 'No files to show.',
+  'filetree.no-worktree-title': 'No worktree for this branch',
+  'filetree.no-worktree-body': 'Create a worktree for this branch to browse its files here.',
+  'filetree.truncated': 'Tree truncated — refine the search to see more.',
+  'filetree.error': 'Could not read the file tree.',
 
   // ---- Terminal -----------------------------------------------------------
   'terminal.opening': 'Opening terminal…',

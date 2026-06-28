@@ -207,6 +207,7 @@ export const ja: Record<DictKey, string> = {
   'tab.changes': '変更',
   'tab.changes-with-count': '変更 · {count}件',
   'tab.log': 'ログ',
+  'tab.files': 'ファイル',
   'tab.terminal': 'ターミナル',
   'tab.fetching': 'fetch 中',
   'tab.fetching-title': 'バックグラウンドの fetch 実行中',
@@ -224,6 +225,7 @@ export const ja: Record<DictKey, string> = {
   'workspace-pane-tabs.changes-tooltip': '{count} 件のファイル変更',
   'workspace-pane-tabs.status-tooltip': 'ステータス · {branch}',
   'workspace-pane-tabs.history-tooltip': '履歴 · {branch}',
+  'workspace-pane-tabs.files-tooltip': 'ファイル · {branch}',
   'tab.local-only': 'ローカルのみ',
   'tab.local-only-title': 'このリポジトリにはリモートがありません。リモート同期と PR チェックをスキップします。',
   'tab.fetch-failed': 'fetch 失敗',
@@ -306,6 +308,13 @@ export const ja: Record<DictKey, string> = {
   'status.copy-patch-ok': 'パッチをクリップボードにコピーしました',
   'status.copy-patch-empty': 'コピー対象なし — ワークツリーはクリーンです',
   'status.copy-patch-success': 'コピーしました',
+
+  // ---- Filetree -----------------------------------------------------------
+  'filetree.empty': '表示できるファイルがありません。',
+  'filetree.no-worktree-title': 'このブランチのワークツリーはありません',
+  'filetree.no-worktree-body': 'このブランチのワークツリーを作成すると、ここでファイルを閲覧できます。',
+  'filetree.truncated': 'ファイルツリーが切り詰められました — 範囲を絞るとさらに表示されます。',
+  'filetree.error': 'ファイルツリーを読み込めませんでした。',
 
   // ---- Terminal ----------------------------------------------------------
   'terminal.opening': 'ターミナルを開いています…',

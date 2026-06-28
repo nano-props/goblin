@@ -200,6 +200,7 @@ export const ko: Record<DictKey, string> = {
   'tab.changes': '변경',
   'tab.changes-with-count': '변경 · {count}개',
   'tab.log': '로그',
+  'tab.files': '파일',
   'tab.terminal': '터미널',
   'tab.fetching': '동기화',
   'tab.fetching-title': '백그라운드에서 fetch 진행 중',
@@ -217,6 +218,7 @@ export const ko: Record<DictKey, string> = {
   'workspace-pane-tabs.changes-tooltip': '파일 변경 {count}개',
   'workspace-pane-tabs.status-tooltip': '상태 · {branch}',
   'workspace-pane-tabs.history-tooltip': '기록 · {branch}',
+  'workspace-pane-tabs.files-tooltip': '파일 · {branch}',
   'tab.local-only': '로컬 전용',
   'tab.local-only-title': '이 리포지토리에는 원격이 없습니다. 원격 동기화와 PR 확인을 건너뜁니다.',
   'tab.fetch-failed': '동기화 실패',
@@ -299,6 +301,13 @@ export const ko: Record<DictKey, string> = {
   'status.copy-patch-ok': '패치를 클립보드에 복사했습니다',
   'status.copy-patch-empty': '복사할 내용 없음 — 워크트리가 깨끗합니다',
   'status.copy-patch-success': '복사됨',
+
+  // ---- Filetree -----------------------------------------------------------
+  'filetree.empty': '표시할 파일이 없습니다.',
+  'filetree.no-worktree-title': '이 브랜치의 워크트리가 없습니다',
+  'filetree.no-worktree-body': '이 브랜치의 워크트리를 만들면 여기서 파일을 탐색할 수 있습니다.',
+  'filetree.truncated': '파일 트리가 잘렸습니다 — 범위를 좁히면 더 표시됩니다.',
+  'filetree.error': '파일 트리를 읽을 수 없습니다.',
 
   // ---- Terminal ----------------------------------------------------------
   'terminal.opening': '터미널 여는 중…',

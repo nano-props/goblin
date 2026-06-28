@@ -7,6 +7,8 @@ import { StatusList } from '#/web/components/StatusList.tsx'
 import { getRepoLog } from '#/web/repo-client.ts'
 import type { LogEntry } from '#/web/types.ts'
 import { BranchStatus } from '#/web/components/repo-workspace/BranchStatus.tsx'
+import { FiletreeNoWorktreeView, FiletreeView } from '#/web/components/repo-workspace/FiletreeView.tsx'
+import { useRepoTreeRefresh } from '#/web/hooks/useRepoTreeRefresh.ts'
 import { TerminalSessionView } from '#/web/components/terminal/TerminalSessionView.tsx'
 import type { TerminalSessionBase } from '#/web/components/terminal/types.ts'
 import type { RepoWorkspaceRepo, SelectedRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
@@ -42,15 +44,17 @@ interface TabPanelProps {
 type RepoWorkspaceBranch = NonNullable<SelectedRepoWorkspacePresentation['branch']>
 type WorkspacePanePanelComponent = (props: WorkspacePanePanelProps) => ReactNode
 
-const REPO_WORKSPACE_PANE_PANEL_BY_TYPE = {
+const REPO_WORKSPACE_PANE_PANEL_BY_TYPE: Partial<Record<WorkspacePaneTabType, WorkspacePanePanelComponent>> = {
   status: StatusWorkspacePanePanel,
   changes: ChangesWorkspacePanePanel,
   history: HistoryWorkspacePanePanel,
+  files: FilesWorkspacePanePanel,
   terminal: TerminalWorkspacePanePanel,
-} satisfies Record<WorkspacePaneTabType, WorkspacePanePanelComponent>
+}
 
 export function renderRepoWorkspacePanePanel(input: WorkspacePanePanelRenderInput): ReactNode {
   const Panel = REPO_WORKSPACE_PANE_PANEL_BY_TYPE[input.type]
+  if (!Panel) return null
   return <Panel {...input} />
 }
 
@@ -110,6 +114,35 @@ function TerminalWorkspacePanePanel({
       repoId={repo.id}
       terminalSyncReady={terminalSyncReady}
       branch={branch}
+    />
+  )
+}
+
+function FilesWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel }: WorkspacePanePanelProps) {
+  const branch = detail.branch
+  const worktreePath = branch?.worktree?.path
+  if (!worktreePath) {
+    return (
+      <BranchTabPanel id={`${workspacePaneId}-files-panel`} {...panelLabel}>
+        <FiletreeNoWorktreeView />
+      </BranchTabPanel>
+    )
+  }
+  return (
+    <BranchTabPanel id={`${workspacePaneId}-files-panel`} {...panelLabel}>
+      <FiletreeTab repoId={repo.id} worktreePath={worktreePath} />
+    </BranchTabPanel>
+  )
+}
+
+function FiletreeTab({ repoId, worktreePath }: { repoId: string; worktreePath: string }) {
+  const result = useRepoTreeRefresh({ repoId, worktreePath })
+  return (
+    <FiletreeView
+      tree={result.tree}
+      loading={result.loading}
+      error={result.error}
+      stale={result.stale}
     />
   )
 }

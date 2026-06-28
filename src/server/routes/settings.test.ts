@@ -103,6 +103,36 @@ describe('settings routes', () => {
     expect(mocks.handleSetSession).toHaveBeenCalledWith({ session })
   })
 
+  test('accepts a session state with files in preferred tab and tab order picklist', async () => {
+    const session = {
+      openRepoEntries: [],
+      activeRepoId: null,
+      zenMode: true,
+      workspacePaneSize: 50,
+      selectedTerminalSessionByWorktree: {},
+      preferredWorkspacePaneTabByBranchByRepo: { '/tmp/repo': { 'feature/worktree': 'files' } },
+      workspacePaneTabOrderByBranchByRepo: {
+        '/tmp/repo': {
+          'feature/worktree': [{ type: 'status', id: 'status' }, { type: 'files', id: 'files' }],
+        },
+      },
+    } as const
+    mocks.handleSetSession.mockResolvedValue({ ok: true, session })
+
+    const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
+    const app = createSettingsRoutes(createNativeShortcutRegistrationState())
+    const response = await app.request(
+      new Request('http://127.0.0.1:32100/session', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ session }),
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    expect(mocks.handleSetSession).toHaveBeenCalledWith({ session })
+  })
+
   test('delegates recent-repo writes to the settings command handler layer', async () => {
     const repo = { kind: 'local', id: '/tmp/repo-a' } as const
     mocks.handleAddRecentRepo.mockResolvedValue({ ok: true, recentRepos: [repo], addedRepo: repo })
