@@ -25,7 +25,7 @@ import { getRepoPullRequests, getRepoSnapshot, getRepoStatus, readRepoBulk } fro
 import type { RepoSnapshot } from '#/shared/api-types.ts'
 import type { RepoPullRequestReason } from '#/web/stores/repos/operations.ts'
 import type { RepoState, ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
-import type { ExecResult, PullRequestFetchMode, PullRequestInfo } from '#/web/types.ts'
+import type { PullRequestFetchMode, PullRequestInfo } from '#/web/types.ts'
 
 function resolvePullRequestRefreshRequest(
   repo: Pick<RepoState, 'id' | 'availability' | 'data' | 'remote'>,

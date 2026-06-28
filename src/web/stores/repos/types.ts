@@ -17,7 +17,7 @@ import type {
 } from '#/shared/workspace-pane.ts'
 import type { RepoBranchAction, RunBranchActionOptions } from '#/web/stores/repos/branch-action-types.ts'
 import type { RepoOperationsState } from '#/web/stores/repos/operations.ts'
-import type { RepoDataLoadBundle, RepoDataLoadState } from '#/web/stores/repos/repo-data-load-state.ts'
+import type { RepoDataLoadBundle } from '#/web/stores/repos/repo-data-load-state.ts'
 export type BranchViewMode = 'all' | 'worktrees'
 type RepoDataSource = 'cache' | 'fresh'
 // Client branches keep only the worktree reference; metadata lives in worktreesByPath.

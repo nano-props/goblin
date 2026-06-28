@@ -9,7 +9,6 @@ import {
 } from '@tanstack/react-router'
 import { App } from '#/web/App.tsx'
 import { Layout } from '#/web/Layout.tsx'
-import { getInitialBootstrap } from '#/web/bootstrap.ts'
 import { isSettingsPage } from '#/shared/settings-pages.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 

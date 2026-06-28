@@ -16,7 +16,6 @@ import {
 } from '#/shared/api-types.ts'
 import { NativeHostProjectionSchema } from '#/shared/native-host-projection.ts'
 import { WORKTREE_BOOTSTRAP_CONFIG_HASH_RE } from '#/shared/repo-settings.ts'
-import { isRemoteRepoId, parseRemoteRepoId } from '#/shared/remote-repo.ts'
 
 const SourceToken = v.optional(v.string())
 const StringArray = v.array(v.string())

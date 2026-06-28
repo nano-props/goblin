@@ -21,7 +21,7 @@
 // commits one and continues typing from the committed path.
 
 import { forwardRef, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { ReactNode, Ref, RefObject } from 'react'
+import type { ReactNode, RefObject } from 'react'
 import { CheckIcon, ChevronDownIcon, Loader2Icon } from 'lucide-react'
 import { Input } from '#/web/components/ui/input.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'

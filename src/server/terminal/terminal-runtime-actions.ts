@@ -16,7 +16,6 @@ import type {
   TerminalWriteInput,
 } from '#/shared/terminal-types.ts'
 import { isValidTerminalPtySessionId, isValidTerminalSize } from '#/shared/terminal-validators.ts'
-import { isValidTerminalClientId } from '#/server/terminal/terminal-session-ids.ts'
 import type { TerminalRealtimeBroker } from '#/server/terminal/terminal-realtime-broker.ts'
 import { isValidTerminalWriteData, type TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
 

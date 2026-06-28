@@ -5,7 +5,6 @@ import {
   settleOperation,
   startOperation,
   type RepoOperationKey,
-  type RepoOperationReason,
   type RepoOperationState,
   type RepoOperationTarget,
 } from '#/web/stores/repos/operations.ts'

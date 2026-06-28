@@ -141,17 +141,6 @@ export function sendToRegisteredWindow(
   }
 }
 
-function broadcastToRegisteredWindows(
-  channel: string,
-  args: unknown[] = [],
-  options?: { excludeWindow?: BrowserWindowType | null | undefined },
-): void {
-  for (const win of allRegisteredWindows()) {
-    if (options?.excludeWindow && options.excludeWindow === win) continue
-    sendToRegisteredWindow(win, channel, args)
-  }
-}
-
 function sendToRegisteredSurface(
   surface: RegisteredClientSurfaceHandle | null | undefined,
   channel: string,

@@ -1,9 +1,7 @@
 import crypto from 'node:crypto'
-import { resolveLocalShell } from '#/server/terminal/terminal-local-shell.ts'
 import { spawnTerminalPtyRuntime, type TerminalPtyRuntime } from '#/server/terminal/terminal-pty-runtime.ts'
 import {
   createPtyHandle,
-  type PtyHandle,
   type PtySpawnInput,
   type PtySpawnResult,
   type PtySupervisor,

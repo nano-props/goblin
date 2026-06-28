@@ -35,8 +35,6 @@ import {
   type TerminalUserInputSource,
 } from '#/web/components/terminal/terminal-input.ts'
 import { terminalLog } from '#/web/logger.ts'
-const DEFAULT_PARKING_WIDTH = 800
-const DEFAULT_PARKING_HEIGHT = 400
 const RESIZE_DEBOUNCE_MS = 80
 const FONT_REMEASURE_DEBOUNCE_MS = 80
 

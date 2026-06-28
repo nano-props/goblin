@@ -1,5 +1,5 @@
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { externalAppsQueryKey, settingsSnapshotQueryKey, useSettingsSnapshotQuery } from '#/web/settings-queries.ts'
+import { settingsSnapshotQueryKey, useSettingsSnapshotQuery } from '#/web/settings-queries.ts'
 import type {
   ExternalAppsSnapshot,
   RuntimeRecentReposState,
@@ -45,10 +45,6 @@ function useRuntimeRecentReposState(): RuntimeRecentReposState | undefined {
   return runtimeRecentReposStateOrUndefined(data)
 }
 
-function currentExternalAppsSnapshot(): ExternalAppsSnapshot | undefined {
-  return primaryWindowQueryClient.getQueryData<ExternalAppsSnapshot>(externalAppsQueryKey())
-}
-
 export function readRuntimeShortcutSettings(data: RuntimeSettingsSnapshot | undefined) {
   return {
     shortcutsDisabled: data?.shortcutsDisabled ?? false,
@@ -82,10 +78,6 @@ export function readRuntimeLanSettings(data: RuntimeSettingsSnapshot | undefined
   return {
     lanEnabled: data?.lanEnabled ?? false,
   }
-}
-
-function getRuntimeRecentRepos() {
-  return currentRuntimeRecentReposState()?.recentRepos ?? []
 }
 
 export function useRuntimeRecentRepos() {
