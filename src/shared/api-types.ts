@@ -168,6 +168,30 @@ export interface RepoSnapshot {
   remote?: RepoRemoteInfo
 }
 
+// Worktree-scoped file tree types — see docs/filetree.md. Wire and
+// domain shapes coincide in v1; if they diverge, move these into a
+// dedicated `src/shared/filetree.ts` and map at the hook boundary.
+
+export type RepoTreeNodeStatus = 'clean' | 'modified' | 'staged' | 'untracked' | 'ignored'
+
+export interface RepoTreeNode {
+  /** Stable id: relative POSIX path inside the worktree. */
+  readonly id: string
+  /** Relative POSIX path inside the worktree (matches id; named for readability). */
+  readonly path: string
+  /** Final path segment, used as the display name. */
+  readonly name: string
+  readonly parentId: string | null
+  readonly kind: 'directory' | 'file'
+  readonly status: RepoTreeNodeStatus
+}
+
+export interface RepoTreeResult {
+  readonly nodes: ReadonlyArray<RepoTreeNode>
+  /** True if the result was truncated by `depth` or a node-count cap. */
+  readonly truncated: boolean
+}
+
 export interface ProbeResult {
   ok: boolean
   root?: string

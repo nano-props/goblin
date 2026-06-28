@@ -106,6 +106,15 @@ export const REPO_PROCEDURE_SCHEMAS = {
     skip: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(100_000))),
   }),
   patch: v.object({ cwd: v.string(), worktreePath: v.string() }),
+  // Worktree-scoped file tree (docs/filetree.md). `prefix` enables
+  // incremental loading for very deep trees; `depth` is bounded 1..10
+  // so a bad client cannot ask the server to walk forever.
+  tree: v.object({
+    cwd: v.string(),
+    worktreePath: v.string(),
+    prefix: v.optional(v.string()),
+    depth: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(10))),
+  }),
   pullRequests: v.object({
     cwd: v.string(),
     branches: v.optional(StringArray),
@@ -150,6 +159,7 @@ const WorkspacePaneStaticTabOrderEntrySchema = v.variant('type', [
   v.object({ type: v.literal('status'), id: v.literal('status') }),
   v.object({ type: v.literal('changes'), id: v.literal('changes') }),
   v.object({ type: v.literal('history'), id: v.literal('history') }),
+  v.object({ type: v.literal('files'), id: v.literal('files') }),
 ])
 const WorkspacePaneTerminalTabOrderEntrySchema = v.object({
   type: v.literal('terminal'),
@@ -162,7 +172,7 @@ const WorkspaceSessionStateSchema = v.object({
   workspacePaneSize: v.number(),
   selectedTerminalSessionByWorktree: v.optional(v.record(v.string(), v.string())),
   preferredWorkspacePaneTabByBranchByRepo: v.optional(
-    v.record(v.string(), v.record(v.string(), v.picklist(['status', 'changes', 'history', 'terminal']))),
+    v.record(v.string(), v.record(v.string(), v.picklist(['status', 'changes', 'history', 'files', 'terminal']))),
   ),
   workspacePaneTabOrderByBranchByRepo: v.record(
     v.string(),

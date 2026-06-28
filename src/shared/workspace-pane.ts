@@ -1,4 +1,4 @@
-export const WORKSPACE_PANE_STATIC_TAB_TYPES = ['status', 'changes', 'history'] as const
+export const WORKSPACE_PANE_STATIC_TAB_TYPES = ['status', 'changes', 'history', 'files'] as const
 export const WORKSPACE_PANE_TAB_TYPES = [...WORKSPACE_PANE_STATIC_TAB_TYPES, 'terminal'] as const
 
 export type WorkspacePaneStaticTabType = (typeof WORKSPACE_PANE_STATIC_TAB_TYPES)[number]
@@ -8,6 +8,7 @@ export const WORKSPACE_PANE_STATIC_TAB_SCOPES = {
   status: 'branch',
   changes: 'worktree',
   history: 'branch',
+  files: 'worktree',
 } as const satisfies Record<WorkspacePaneStaticTabType, WorkspacePaneTabScope>
 type WorkspacePaneStaticTabTypeWithScope<TScope extends WorkspacePaneTabScope> = {
   [TType in WorkspacePaneStaticTabType]: (typeof WORKSPACE_PANE_STATIC_TAB_SCOPES)[TType] extends TScope ? TType : never
