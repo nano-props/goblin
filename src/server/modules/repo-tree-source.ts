@@ -83,9 +83,11 @@ export async function getRepoTreeSourceLocal(
   const ignore = await loadIgnorePatterns(worktreePath, signal)
   if (signal?.aborted) return { nodes: [], truncated: false }
 
-  // tinyglobby defaults to files only; we drive both files and
-  // derived directories up to depth. The walk is rooted at the
-  // worktree path; with a prefix we narrow via the pattern.
+  // Keep the source stream file-only and derive directories from file
+  // paths in buildNodes. Neither tinyglobby nor remote find preserve
+  // enough type information in the string path alone to distinguish an
+  // empty directory from a file without extra stat calls, and v1 does
+  // not need to surface empty directories.
   const walkPattern = prefix ? `${escapePattern(prefix)}/**` : '**'
 
   let entries: string[]
@@ -94,7 +96,7 @@ export async function getRepoTreeSourceLocal(
       cwd: worktreePath,
       deep: depth,
       dot: false,
-      onlyFiles: false,
+      onlyFiles: true,
       expandDirectories: false,
       ignore,
       signal,
@@ -152,9 +154,7 @@ export interface GetRepoTreeSourceRemoteInput {
  *  would make the command long, error-prone, and easy to break
  *  with embedded characters. The local walker remains the source
  *  of truth for gitignore semantics. */
-export async function getRepoTreeSourceRemote(
-  input: GetRepoTreeSourceRemoteInput,
-): Promise<RepoTreeSourceResult> {
+export async function getRepoTreeSourceRemote(input: GetRepoTreeSourceRemoteInput): Promise<RepoTreeSourceResult> {
   const { target, worktreePath, options, signal, precomputedStatus, knownWorktrees } = input
   if (signal?.aborted) return { nodes: [], truncated: false }
 
@@ -226,7 +226,11 @@ function clampDepth(value: number): number {
 
 function normalizePrefix(prefix: string | undefined): string {
   if (!prefix) return ''
-  const trimmed = prefix.split(path.sep).join('/').replace(/^\.\/+/, '').replace(/\/+$/, '')
+  const trimmed = prefix
+    .split(path.sep)
+    .join('/')
+    .replace(/^\.\/+/, '')
+    .replace(/\/+$/, '')
   if (trimmed === '.' || trimmed === '') return ''
   // POSIX style: relative to root, no leading slash.
   return trimmed.replace(/^\/+/, '')

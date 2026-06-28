@@ -243,6 +243,18 @@ describe('repo-tree-source — buildNodes pure helper', () => {
     expect(dirIdx).toBeLessThan(readmeIdx)
   })
 
+  test('does not emit duplicate file nodes for directory entries with children', () => {
+    const nodes = buildNodes({
+      worktreePath: '/x',
+      prefix: '',
+      depth: 5,
+      entries: ['src', 'src/a.ts'],
+    })
+    const srcNodes = nodes.filter((n) => n.id === 'src')
+    expect(srcNodes).toHaveLength(1)
+    expect(srcNodes[0]?.kind).toBe('directory')
+  })
+
   test('strips absolute paths and parent traversals', () => {
     const nodes = buildNodes({
       worktreePath: '/x',
@@ -378,7 +390,9 @@ describe('repo-tree-source — remote SSH walk', () => {
   test('returns the empty envelope when the signal is already aborted', async () => {
     const controller = new AbortController()
     controller.abort()
-    const result = await getRepoTreeSourceRemote(makeRemoteInput('/srv/repos/myrepo/.worktrees/feature', {}, controller.signal))
+    const result = await getRepoTreeSourceRemote(
+      makeRemoteInput('/srv/repos/myrepo/.worktrees/feature', {}, controller.signal),
+    )
     expect(result).toEqual({ nodes: [], truncated: false })
     expect(remoteMocks.getRemoteTreeWalk).not.toHaveBeenCalled()
   })

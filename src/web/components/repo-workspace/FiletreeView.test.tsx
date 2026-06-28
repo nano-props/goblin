@@ -128,6 +128,16 @@ describe('FiletreeView', () => {
     expect(treegrid().getAttribute('aria-label')).toBe('filetree.aria-label')
   })
 
+  test('does not add an extra panel border around the tree body', () => {
+    renderView({
+      tree: { nodes: [fileNode('README.md')], truncated: false },
+      loading: false,
+      error: null,
+      stale: false,
+    })
+    expect(treegrid().className).not.toContain('border-l')
+  })
+
   test('lists root-level files and directories, directories before files', () => {
     const tree: RepoTreeResult = {
       nodes: [

@@ -6,7 +6,7 @@ Use this doc for the worktree-scoped file tree view.
 
 A read-only, VSCode-style file tree rooted at the current worktree. Treated as a self-contained vertical feature slice parallel to `repos`, `settings`, `terminal`, `remote` per `docs/layering.md`. Server owns the tree shape and the git-status overlay; client owns expand/collapse and selection.
 
-v1 makes no promises about file actions, search, or cross-worktree diff.
+v1 makes no promises about file actions, search, empty directories, or cross-worktree diff.
 
 ## Non-goals (v1)
 
@@ -14,6 +14,7 @@ v1 makes no promises about file actions, search, or cross-worktree diff.
 - No editor / Finder / terminal actions from the tree.
 - No drag/drop, multi-select, rename, delete, stage, or copy.
 - No in-tree search or fuzzy finder.
+- No empty directories; source walkers stream file paths and derive visible directories from those files.
 - No persisted expand state across launches.
 - No virtualized rendering.
 - No cross-worktree diff.
@@ -36,22 +37,23 @@ The slice is identified by its files, its stable public surface, and a one-way d
 
 `+` marks files that are new in this slice; unmarked files are existing and modified.
 
-| File | Role |
-| --- | --- |
-| `src/shared/procedure-schemas.ts` | `+ REPO_PROCEDURE_SCHEMAS.tree` (one entry); extend `SessionStateSchema` and `WorkspacePaneStaticTabOrderEntrySchema` picklists (see "Workspace pane integration") |
-| `src/shared/api-types.ts` | `+ RepoTreeNode`, `+ RepoTreeResult`, `+ RepoTreeNodeStatus` (additive) |
-| `src/shared/workspace-pane.ts` | extend `WORKSPACE_PANE_STATIC_VIEW_TYPES` and `WORKSPACE_PANE_STATIC_VIEW_SCOPES` with `'files'` |
-| `src/shared/i18n/{en,zh,ja,ko}.ts` | new keys: `tab.files`, `workspace-pane-views.files-tooltip`, `filetree.*` (see "i18n") |
-| `+ src/server/modules/repo-tree-source.ts` | Source layer: walks FS / invokes SSH; returns `RepoTreeNode[]` (no wire envelope) |
-| `+ src/server/modules/repo-tree.ts` | Read layer: `getRepositoryTree`; composes source + git-status overlay into `RepoTreeResult` |
-| `src/server/modules/repo-backend.ts` | `+ RepoBackend.getTree` (one method); adapter dispatching local/remote source |
-| `src/server/routes/repo.ts` | `+ app.post('/tree', ...)` |
-| `src/server/routes/repo-view.ts` | unchanged in v1 (`g` command does not include `'files'`) |
-| `+ src/web/filetree-client.ts` | Boundary: `getRepositoryTree(cwd, worktreePath, options?)` |
-| `+ src/web/hooks/useRepoTreeRefresh.ts` | Read orchestration + invalidation subscription |
-| `+ src/web/components/branch-workspace/FiletreeView.tsx` | Pure view |
-| `src/web/components/branch-workspace/workspace-pane-panels.tsx` | `+ files` entry in `BRANCH_WORKSPACE_PANE_PANEL_BY_TYPE`; `+ FilesWorkspacePanePanel` |
-| `src/web/workspace-pane/workspace-pane-tab-providers.ts` | `+ FilesWorkspacePaneTabProvider` (icon `FolderTree`); register in `STATIC_WORKSPACE_PANE_TAB_PROVIDERS` and `STATIC_WORKSPACE_PANE_TAB_PROVIDER_BY_TYPE` |
+| File                                                   | Role                                                                                                                                                               |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/shared/procedure-schemas.ts`                      | `+ REPO_PROCEDURE_SCHEMAS.tree` (one entry); extend `SessionStateSchema` and `WorkspacePaneStaticTabOrderEntrySchema` picklists (see "Workspace pane integration") |
+| `src/shared/api-types.ts`                              | `+ RepoTreeNode`, `+ RepoTreeResult`, `+ RepoTreeNodeStatus` (additive)                                                                                            |
+| `src/shared/workspace-pane.ts`                         | extend `WORKSPACE_PANE_STATIC_VIEW_TYPES` and `WORKSPACE_PANE_STATIC_VIEW_SCOPES` with `'files'`                                                                   |
+| `src/shared/i18n/{en,zh,ja,ko}.ts`                     | new keys: `tab.files`, `workspace-pane-views.files-tooltip`, `filetree.*` (see "i18n")                                                                             |
+| `+ src/server/modules/repo-tree-source.ts`             | Source layer: walks FS / invokes SSH; returns `RepoTreeNode[]` (no wire envelope)                                                                                  |
+| `+ src/server/modules/repo-tree-source-pure.ts`        | Pure transforms: path parsing, node derivation, status overlay                                                                                                     |
+| `+ src/server/modules/repo-tree.ts`                    | Read layer: `getRepositoryTree`; composes source + git-status overlay into `RepoTreeResult`                                                                        |
+| `src/server/modules/repo-source.ts`                    | existing source dispatch used by `repo-tree.ts` to fetch status/worktrees                                                                                          |
+| `src/server/routes/repo.ts`                            | `+ app.post('/tree', ...)`                                                                                                                                         |
+| `src/server/routes/repo-view.ts`                       | unchanged in v1 (`g` command does not include `'files'`)                                                                                                           |
+| `+ src/web/filetree-client.ts`                         | Boundary: `getRepositoryTree(cwd, worktreePath, options?)`                                                                                                         |
+| `+ src/web/hooks/useRepoTreeRefresh.ts`                | Read orchestration + invalidation subscription                                                                                                                     |
+| `+ src/web/components/repo-workspace/FiletreeView.tsx` | Pure view                                                                                                                                                          |
+| `src/web/components/repo-workspace/panels.tsx`         | `+ files` entry in `REPO_WORKSPACE_PANE_PANEL_BY_TYPE`; `+ FilesWorkspacePanePanel`                                                                                |
+| `src/web/components/workspace-pane/tab-providers.ts`   | `+ FilesWorkspacePaneTabProvider` (icon `FolderTree`); register in `STATIC_WORKSPACE_PANE_TAB_PROVIDERS` and `STATIC_WORKSPACE_PANE_TAB_PROVIDER_BY_TYPE`          |
 
 `src/shared/filetree.ts` is intentionally absent: wire shape and domain shape coincide in v1, so the types live in `api-types.ts`. If they diverge, the file is introduced then — not as a stub. Adding any new shared file (`shared/filetree-helpers.ts`, etc.) or splitting `FiletreeView.tsx` requires updating the table above in the same PR — the table is the source of truth for what belongs to this slice.
 
@@ -68,7 +70,12 @@ The slice is identified by its files, its stable public surface, and a one-way d
 // src/shared/procedure-schemas.ts (additive)
 export const REPO_PROCEDURE_SCHEMAS: {
   // ...existing entries...
-  readonly tree: v.BaseSchema<unknown, unknown, { readonly cwd: string; readonly worktreePath: string; readonly prefix?: string; readonly depth?: number }, never>
+  readonly tree: v.BaseSchema<
+    unknown,
+    unknown,
+    { readonly cwd: string; readonly worktreePath: string; readonly prefix?: string; readonly depth?: number },
+    never
+  >
 }
 
 // src/shared/api-types.ts (additive)
@@ -92,18 +99,21 @@ export interface RepoTreeResult {
   readonly truncated: boolean
 }
 
-// src/server/modules/repo-backend.ts (additive method on existing interface)
-export interface RepoBackend {
-  // ...existing methods...
-  getTree(worktreePath: string, options?: RepoBackendGetTreeOptions): Promise<RepoTreeResult>
-}
+// src/server/modules/repo-tree.ts
+export function getRepositoryTree(
+  cwd: string,
+  worktreePath: string,
+  options?: GetRepositoryTreeOptions,
+): Promise<RepoTreeResult>
 
-export interface RepoBackendGetTreeOptions {
+export interface GetRepositoryTreeOptions {
   readonly prefix?: string
   readonly depth?: number
   readonly signal?: AbortSignal
   /** When provided, skip the internal status fetch and use this instead. */
   readonly precomputedStatus?: ReadonlyArray<WorktreeStatus>
+  /** When provided with precomputedStatus, skip the remote worktree-list lookup. */
+  readonly precomputedWorktrees?: ReadonlyArray<WorktreeInfo>
 }
 
 // src/web/filetree-client.ts
@@ -129,7 +139,7 @@ export interface UseRepoTreeRefreshResult {
 
 export function useRepoTreeRefresh(input: UseRepoTreeRefreshInput): UseRepoTreeRefreshResult
 
-// src/web/components/branch-workspace/FiletreeView.tsx
+// src/web/components/repo-workspace/FiletreeView.tsx
 export interface FiletreeViewProps {
   readonly tree: RepoTreeResult | null
   readonly loading: boolean
@@ -150,17 +160,16 @@ Anything not on this list is internal and may change without notice.
 
 ### Layer rules inside the slice
 
-| Layer | File | Input | Output | Forbidden |
-| --- | --- | --- | --- | --- |
-| Source | `repo-tree-source.ts` | `worktreePath`, options, `AbortSignal`, optional `WorktreeStatus[]` | `{ nodes: RepoTreeNode[]; truncated: boolean }` (no wire envelope) | UI types, locale keys, HTTP, route parsing |
-| Read | `repo-tree.ts` | `cwd`, `worktreePath`, options | `RepoTreeResult` | direct fs/SSH (must go through source), UI, HTTP |
-| Adapter | `repo-backend.ts` (`RepoBackend.getTree`) | `runWithRepoBackend(cwd)` resolution to local or remote backend | `RepoTreeResult` | new policy / IO logic (must live in source layer) |
-| Server boundary | `routes/repo.ts` `/tree` only | Hono context | wire JSON | anything beyond `parseHttpBody` → `getRepositoryTree` → `jsonOr` |
-| Client boundary | `web/filetree-client.ts` | `cwd`, `worktreePath`, options | `RepoTreeResult` | state, hooks, retry, caching, derivation |
-| Hook | `web/hooks/useRepoTreeRefresh.ts` | `filetree-client`, invalidation events | `UseRepoTreeRefreshResult` | `useReposStore`, terminal hooks, settings, route paths |
-| View | `FiletreeView.tsx` | hook output + i18n keys | JSX + optional callbacks | fetch calls, server modules, store mutations |
+| Layer           | File                              | Input                                                               | Output                                                             | Forbidden                                                        |
+| --------------- | --------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------------- |
+| Source          | `repo-tree-source.ts`             | `worktreePath`, options, `AbortSignal`, optional `WorktreeStatus[]` | `{ nodes: RepoTreeNode[]; truncated: boolean }` (no wire envelope) | UI types, locale keys, HTTP, route parsing                       |
+| Read            | `repo-tree.ts`                    | `cwd`, `worktreePath`, options                                      | `RepoTreeResult`                                                   | direct fs/SSH (must go through source), UI, HTTP                 |
+| Server boundary | `routes/repo.ts` `/tree` only     | Hono context                                                        | wire JSON                                                          | anything beyond `parseHttpBody` → `getRepositoryTree` → `jsonOr` |
+| Client boundary | `web/filetree-client.ts`          | `cwd`, `worktreePath`, options                                      | `RepoTreeResult`                                                   | state, hooks, retry, caching, derivation                         |
+| Hook            | `web/hooks/useRepoTreeRefresh.ts` | `filetree-client`, invalidation events                              | `UseRepoTreeRefreshResult`                                         | `useReposStore`, terminal hooks, settings, route paths           |
+| View            | `FiletreeView.tsx`                | hook output + i18n keys                                             | JSX + optional callbacks                                           | fetch calls, server modules, store mutations                     |
 
-The source layer is split from the read layer on purpose: FS walking and SSH command invocation are different policies, and the git-status overlay crosses the `WorktreeStatus` boundary. Keeping them apart lets `repo-tree.ts` stay a thin orchestrator that tests without touching the filesystem. The adapter layer (`RepoBackend.getTree`) is existing infra and adds one method; it is not a new layer.
+The source layer is split from the read layer on purpose: FS walking and SSH command invocation are different policies, and the git-status overlay crosses the `WorktreeStatus` boundary. Keeping them apart lets `repo-tree.ts` stay a thin orchestrator that tests without touching the filesystem.
 
 ### Enforcement
 
@@ -191,9 +200,9 @@ One POST endpoint: `POST /api/repo/tree`. Body: `REPO_PROCEDURE_SCHEMAS.tree`. R
 ```ts
 // src/shared/procedure-schemas.ts
 tree: v.object({
-  cwd: v.string(),                       // repo locator (matches other repo endpoints)
-  worktreePath: v.string(),              // absolute path of the tree root (validated against the worktree list in repo-tree.ts)
-  prefix: v.optional(RepoTreePrefixSchema),  // strictly relative POSIX path inside the worktree (no `..`, no `/`, no control chars)
+  cwd: v.string(), // repo locator (matches other repo endpoints)
+  worktreePath: v.string(), // absolute path of the tree root (validated against the worktree list in repo-tree.ts)
+  prefix: v.optional(RepoTreePrefixSchema), // strictly relative POSIX path inside the worktree (no `..`, no `/`, no control chars)
   depth: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(10))),
 })
 
@@ -223,7 +232,7 @@ Refresh triggering: v1 hooks into the existing `repo-query-invalidated` event wi
 
 ## Design principles
 
-- **Server-first tree truth.** The server uses `tinyglobby` + a minimal `.gitignore` reader locally, and a `find`-based command for SSH remote (per `docs/ssh-remote.md`'s `local-decision, remote-execution`). The client never enumerates directories or runs `git status`.
+- **Server-first tree truth.** The server uses `tinyglobby` + a minimal `.gitignore` reader locally, and a `find`-based file-path command for SSH remote (per `docs/ssh-remote.md`'s `local-decision, remote-execution`). The client never enumerates directories or runs `git status`.
 - **Reuse the workspace pane.** New static view, `scope = 'worktree'` (matches `changes`). Plugs into `WorkspacePaneStaticTabProvider`: tab ordering, dnd-kit reorder, keyboard nav, close affordance, tooltip layer, compact popover all come for free. Gated by `hasWorktree` like `changes`.
 - **Read-only in v1.** The component exposes optional `onSelect` / `onActivate` callbacks so future wiring does not require a breaking prop change; selection (single-click highlight) is the only visible interaction.
 - **Status-only overlay.** Dirty files get a small dot before the name in `--color-success` / `--color-warning` / `--color-danger` / `--color-muted-foreground`. Clean files have no marker. This avoids visual collision with `StatusList`'s `M A` two-character codes.
@@ -256,7 +265,7 @@ Per `docs/ui-conventions.md`:
 - Tab label uses sentence case (`Files`); status chips use lowercase.
 - The tree body uses the existing `--color-*` tokens (no new colors introduced).
 - Container borders (workspace toolbar, sidebar, list dividers) stay on Tailwind border utilities — they belong to the surrounding container's box, not a separate child element.
-- Inline vertical seams inside toolbar siblings use `<Separator orientation="vertical" />`, not hand-rolled `bg-separator w-px` or `border-l border-separator`. The tree's indent guides are container-level chrome (left border on the tree body), so they use Tailwind border utilities.
+- Inline vertical seams inside toolbar siblings use `<Separator orientation="vertical" />`, not hand-rolled `bg-separator w-px` or `border-l border-separator`. The file tree body should not add its own panel border; it relies on the surrounding workspace chrome.
 - Focus rings use `focusRingInset` from `src/web/components/ui/focus.ts`. Tree rows sit inside scroll containers, which is exactly the case the doc calls out for inset focus rings.
 - Keyboard navigation (`ArrowUp` / `ArrowDown` / `ArrowLeft` / `ArrowRight` / `Enter`) is wired through the existing `src/web/keyboard/` system. `ArrowLeft` collapses a focused directory, `ArrowRight` expands or moves into the first child, `Enter` is reserved for the future `onActivate`.
 
@@ -285,17 +294,17 @@ const FILE_TREE_I18N_KEYS = {
 
 ## State lifecycle summary
 
-| State class | Example | Where it lives | Survives launch? |
-| --- | --- | --- | --- |
-| Local | expanded directory ids, focused row id, scroll position | `useState` / ref in `FiletreeView` | No |
-| Runtime-coherent | tree shape, git-status overlay | server, refreshed via invalidation | server-owned |
-| Restorable | preferred view per branch (`'files'`) | session state, existing path | Yes |
-| Restorable | tab strip order | existing tab order persistence | Yes |
+| State class      | Example                                                 | Where it lives                     | Survives launch? |
+| ---------------- | ------------------------------------------------------- | ---------------------------------- | ---------------- |
+| Local            | expanded directory ids, focused row id, scroll position | `useState` / ref in `FiletreeView` | No               |
+| Runtime-coherent | tree shape, git-status overlay                          | server, refreshed via invalidation | server-owned     |
+| Restorable       | preferred view per branch (`'files'`)                   | session state, existing path       | Yes              |
+| Restorable       | tab strip order                                         | existing tab order persistence     | Yes              |
 
 ## Testing
 
 - `src/server/modules/repo-tree-source.test.ts` (or `repo-tree.test.ts`): local FS walk, `.gitignore` filter, `depth` truncation, `.git` hard filter, signal abort.
-- `src/web/components/branch-workspace/FiletreeView.test.tsx`: render a fixed tree, verify expand/collapse, status dot, empty/error states.
+- `src/web/components/repo-workspace/FiletreeView.test.tsx`: render a fixed tree, verify expand/collapse, status dot, empty/error states.
 - `src/web/hooks/useRepoTreeRefresh.test.ts`: invalidation triggers refetch; abort signal cancels in-flight fetch (the hook must hold an `AbortController` and cancel the previous request when inputs change).
 - Route test: `POST /api/repo/tree` parses correctly; backend failure returns empty result.
 

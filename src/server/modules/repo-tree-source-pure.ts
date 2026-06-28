@@ -67,10 +67,12 @@ export function buildNodes(input: BuildNodesInput): RepoTreeNode[] {
     dirNodes.push(node)
   }
 
+  const visibleFileNodes = fileNodes.filter((node) => !dirIds.has(node.id))
+
   // Sort directories first, then files, both alphabetical. Children
   // of the same parent appear next to each other because we already
   // walk in tree order via tinyglobby.
-  return [...dirNodes, ...fileNodes].sort(compareNodes)
+  return [...dirNodes, ...visibleFileNodes].sort(compareNodes)
 }
 
 function compareNodes(a: RepoTreeNode, b: RepoTreeNode): number {

@@ -170,10 +170,7 @@ export function FiletreeView({ tree, loading, error, stale, onSelect, onActivate
         onSelectionChange={handleSelectionChange}
         expandedKeys={expandedKeys}
         onExpandedChange={setExpandedKeys}
-        className={cn(
-          'min-h-0 flex-1 overflow-auto border-l border-border pl-3 py-1.5 font-mono text-sm',
-          focusRingInset,
-        )}
+        className={cn('min-h-0 flex-1 overflow-auto py-1.5 font-mono text-sm', focusRingInset)}
       >
         {(item) => <FiletreeTreeItem item={item} onPressItem={handlePressItem} onActivate={onActivate} />}
       </Tree>

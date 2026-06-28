@@ -1,4 +1,13 @@
-import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { execa } from 'execa'
@@ -60,6 +69,17 @@ describe('remote ssh command builders', () => {
     const invocation = buildRemoteTerminalInvocation(target(), '/srv/repo', { cols: 80, rows: 24 })
 
     expect(invocation.command).toBe('ssh')
+  })
+
+  test('remote tree walk returns file paths only so directories are derived by the source layer', () => {
+    const invocation = buildRemoteCommandInvocation(target(), {
+      type: 'gitTreeWalk',
+      path: '/srv/repo worktree',
+      depth: 4,
+    })
+
+    expect(invocation.script).toContain('-type f')
+    expect(invocation.script).toContain('-print0')
   })
 
   test('remote bootstrap script handles space paths and excludes copied tree children', async () => {
@@ -282,9 +302,9 @@ describe('remote ssh command builders', () => {
 describe('remote gitWorktreeListAndStatus script (F5 end-to-end)', () => {
   // F5: the previous sequential `while read -r wt; do ...; done`
   // serialised per-worktree git status. The fix parallelises with
-  // xargs -P8 into indexed tmp files then concatenates in order.
-  // These tests run the real bash script against a local git repo
-  // (the script is portable shell; it does not touch the network)
+  // indexed tmp files then concatenates in order.
+  // These tests run the real POSIX shell script against a local git repo
+  // (the script does not touch the network)
   // and verify the output is parseable by the existing parsers.
 
   testPosix('emits the worktree list above the boundary and NUL-batched status below', async () => {
@@ -298,7 +318,7 @@ describe('remote gitWorktreeListAndStatus script (F5 end-to-end)', () => {
       path: repoDir,
     })
 
-    const result = await execa('bash', ['-lc', invocation.script])
+    const result = await execa('sh', ['-lc', invocation.script])
 
     // Boundary marker must appear on its own line. The script emits
     // it via `printf '\n%s\n' '<marker>'` so it is its own line in
@@ -327,22 +347,19 @@ describe('remote gitWorktreeListAndStatus script (F5 end-to-end)', () => {
     expect(parsed.size).toBe(2)
   })
 
-  testPosix('runs per-worktree status work in parallel via bash background jobs (F5 regression check)', async () => {
+  testPosix('runs per-worktree status work in parallel via POSIX background jobs (F5 regression check)', async () => {
     // The script source must contain the parallelisation primitives
     // we documented; a future refactor that re-serialises the loop
-    // will be caught here. We use bash background processes (`&` +
+    // will be caught here. We use POSIX background processes (`&` +
     // `wait`) rather than `xargs -P` because:
     //   - xargs `-I {}` collapses whitespace in the input line,
     //     which would eat the TAB separator inside `<idx>\t<path>`
     //     jobs.
     //   - xargs `-n2` against a NUL stream silently drops the last
     //     record on odd job counts under GNU xargs with `-x`.
-    // Background processes keep the whole line intact (`read` only
-    // splits on the IFS we configure) and the ordering comes from
+    // Background processes keep the whole line intact and the ordering comes from
     // zero-padded `<idx>.out` filenames globbed in numeric order.
-    const repoDir = await initRepoWithWorktrees([
-      { branch: 'main', files: [] },
-    ])
+    const repoDir = await initRepoWithWorktrees([{ branch: 'main', files: [] }])
     const invocation = buildRemoteCommandInvocation(targetWithPath(repoDir), {
       type: 'gitWorktreeListAndStatus',
       path: repoDir,
@@ -350,9 +367,11 @@ describe('remote gitWorktreeListAndStatus script (F5 end-to-end)', () => {
     // The script must launch background workers (`&` lines inside
     // the while loop) and bound concurrency via a semaphore.
     expect(invocation.script).toMatch(/&$/m)
-    expect(invocation.script).toMatch(/wait -n/)
+    expect(invocation.script).toMatch(/wait "\$first_pid"/)
     expect(invocation.script).toMatch(/max_in_flight=8/)
     expect(invocation.script).toMatch(/mktemp -d/)
+    expect(invocation.script).not.toMatch(/wait -n/)
+    expect(invocation.script).not.toMatch(/\$'\\t'/)
     // The previous serial-loop shape must NOT have crept back in.
     expect(invocation.script).not.toMatch(/while IFS= read -r wt;\s*do\s*$/m)
     expect(invocation.script).not.toMatch(/xargs .*-P/)
@@ -405,7 +424,7 @@ describe('remote gitWorktreeListAndStatus script (F5 end-to-end)', () => {
       path: repoDir,
     })
 
-    const result = await execa('bash', ['-lc', invocation.script])
+    const result = await execa('sh', ['-lc', invocation.script])
 
     const { splitWorktreeStatusBatch, parseWorktreeStatusBatch } = await import('#/system/git/parsers.ts')
     const { worktreeListOutput, statusStream } = splitWorktreeStatusBatch(result.stdout)

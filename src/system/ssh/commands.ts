@@ -213,10 +213,12 @@ function scriptForCommand(command: RemoteCommandKind): string {
     }
     case 'gitTreeWalk': {
       const depth = Math.max(1, Math.min(10, Math.floor(command.depth)))
-      // NUL-separated, excludes .git by default, traverses to the
-      // requested depth. We deliberately do not apply a .gitignore
-      // filter on the remote -- the local source layer is in
-      // charge of the gitignore overlay (see docs/filetree.md).
+      // NUL-separated file paths, excludes .git by default, traverses
+      // to the requested depth. Directories are derived from file paths
+      // by the source layer so empty directories are not shown in v1.
+      // We deliberately do not apply a .gitignore filter on the remote
+      // -- the local source layer is in charge of the gitignore overlay
+      // (see docs/filetree.md).
       //
       // We intentionally omit `2>/dev/null`: a permission-denied on
       // a subdirectory should propagate up so the read layer can
@@ -232,6 +234,7 @@ function scriptForCommand(command: RemoteCommandKind): string {
         shellQuote(command.path),
         '-mindepth 1',
         `-maxdepth ${depth}`,
+        '-type f',
         // The local walker hides every `.gitignore` regardless of
         // directory (tinyglobby's `**/.gitignore` pattern). Match
         // that here by combining basename (for the root-level file)
@@ -338,8 +341,9 @@ function scriptForCommand(command: RemoteCommandKind): string {
         // between idx and path with `xargs -n2`, which silently
         // dropped the trailing single record on odd job counts
         // under GNU xargs with `-x` (G1). Switching to a TAB-
-        // separated line keeps the protocol line-based, and bash
-        // `read` can split idx from path with `IFS=$'\t'`.
+        // separated line keeps the protocol line-based. idx is always
+        // five digits, so the worker can split the line with POSIX
+        // parameter expansion instead of shell-specific TAB escapes.
         //
         // idx is a zero-padded integer (printf %05d -- five chars
         // wide so plain glob order is also numeric order up to
@@ -365,7 +369,7 @@ function scriptForCommand(command: RemoteCommandKind): string {
         `    p = substr($0, RSTART + RLENGTH); sub(/\\n.*/, "", p);`,
         `    if (p != "") { idx++; printf "%05d\\t%s\\n", idx, p }`,
         `  }' > "$WT_TMPDIR/jobs"`,
-        // Fan out workers as bash background processes (F5). The
+        // Fan out workers as POSIX shell background processes (F5). The
         // previous `xargs -I {} -P 8` shape worked under GNU xargs
         // but broke in two ways:
         //   - `xargs -I {}` collapses runs of whitespace in the
@@ -376,27 +380,35 @@ function scriptForCommand(command: RemoteCommandKind): string {
         //   - `xargs -n2` against a NUL-delimited stream silently
         //     drops the trailing single record on odd job counts
         //     under GNU xargs with `-x` (G1).
-        // Background processes avoid both traps: `read` in bash
-        // consumes the whole line (delimited by `\n`) and then
-        // splits on `IFS=$'\t'`; the parallelism is bounded by a
-        // simple semaphore instead of an external tool. We also get
+        // Background processes avoid both traps: `read` consumes the
+        // whole line and POSIX parameter expansion separates the fixed
+        // width idx from the path. Parallelism is bounded by a simple
+        // FIFO pid queue instead of an external tool. We also get
         // ordered output for free by writing each section to its
-        // `<idx>.out` file -- the final concat loop reads in glob
-        // order, which is numeric order thanks to zero-padding.
+        // `<idx>.out` file -- the final concat loop reads in glob order,
+        // which is numeric order thanks to zero-padding.
         //
-        // Semaphore: cap the in-flight count at 8 by waiting until
-        // `jobs -p | wc -l` drops below the limit. This is portable
-        // POSIX shell -- no `wait -n`, no `xargs`, no GNU deps.
+        // Semaphore: cap the in-flight count at 8 by waiting for the
+        // oldest tracked pid before launching another worker. This
+        // keeps the script compatible with the `sh -lc` invocation:
+        // no Bash-only `$'...'`, no Bash 4.3+ `wait -n`, no GNU xargs.
         `pending=0`,
         `max_in_flight=8`,
-        `while IFS=$'\\t' read -r idx wt; do`,
-        // Wait until at least one slot frees up. `jobs -p` lists
-        // the PIDs of background processes; we count them and
-        // `wait -n` (Bash 4.3+) blocks until any one of them exits.
-        // `wait -n` is preferable to `sleep` here because it wakes
-        // immediately on completion rather than polling.
+        `pids=`,
+        `while IFS= read -r job; do`,
+        `  idx=\${job%%	*}`,
+        `  wt=\${job#*	}`,
+        // Wait for the oldest tracked worker when the queue reaches the
+        // concurrency cap. We intentionally wait by pid instead of using
+        // `wait -n` so the script runs under POSIX `sh`.
         `  while [ "$pending" -ge "$max_in_flight" ]; do`,
-        `    wait -n 2>/dev/null || true`,
+        `    first_pid=\${pids%% *}`,
+        `    if [ "$first_pid" = "$pids" ]; then`,
+        `      pids=`,
+        `    else`,
+        `      pids=\${pids#* }`,
+        `    fi`,
+        `    wait "$first_pid" 2>/dev/null || true`,
         `    pending=$((pending - 1))`,
         `  done`,
         `  (`,
@@ -411,9 +423,17 @@ function scriptForCommand(command: RemoteCommandKind): string {
         `    git -C "$abs" status --porcelain -z -uall 2>/dev/null >> "$out" || true`,
         `    printf "\\0" >> "$out"`,
         `  ) &`,
+        `  pid=$!`,
+        `  if [ -n "$pids" ]; then`,
+        `    pids="$pids $pid"`,
+        `  else`,
+        `    pids="$pid"`,
+        `  fi`,
         `  pending=$((pending + 1))`,
         `done < "$WT_TMPDIR/jobs"`,
-        `wait`,
+        `for pid in $pids; do`,
+        `  wait "$pid" 2>/dev/null || true`,
+        `done`,
         // Concatenate in index order. If a worker skipped its
         // worktree (cd/rev-parse failure) no .out file is written;
         // the parser will simply not see a section for it.
