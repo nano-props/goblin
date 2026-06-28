@@ -20,9 +20,9 @@ import { useTerminalSessionContext } from '#/web/components/terminal/terminal-se
 import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
 import type { WorkspacePanePanelLabel } from '#/web/components/workspace-pane/tab-providers.ts'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
-import { shellEscapePath } from '#/web/clipboard/terminal-path-write.ts'
 import { useFiletreeActionDialogsStore } from '#/web/stores/repos/filetree-action-dialogs.ts'
 import { getRepositoryFileViewer } from '#/web/filetree-client.ts'
+import { absoluteFilePathForTerminal, fileReadCommand } from '#/web/components/repo-workspace/file-read-command.ts'
 
 const DEFAULT_BRANCH_HISTORY_ERROR_KEY = 'error.failed-read-repo'
 
@@ -161,7 +161,7 @@ function FiletreeTab({
       if (node.kind !== 'file') return
       navigation.showRepoWorkspacePaneTab(repoId, 'terminal')
       const [viewerResult, terminalResult] = await Promise.all([
-        getRepositoryFileViewer(repoId, worktreePath).catch(() => ({ viewer: 'cat' as const })),
+        getRepositoryFileViewer(repoId, worktreePath).catch(() => ({ viewer: 'cat' as const, shell: 'posix' as const })),
         runCreateTerminalTabCommand({
           base: { repoRoot: repoId, branch: branchName, worktreePath },
           createTerminal,
@@ -172,7 +172,7 @@ function FiletreeTab({
       if (!terminalResult.ok) return
       writeInput(
         terminalResult.key,
-        fileReadCommand(viewerResult.viewer, absoluteFilePathForTerminal(worktreePath, node.path)),
+        fileReadCommand(viewerResult, absoluteFilePathForTerminal(worktreePath, node.path)),
       )
     },
     [branchName, createTerminal, navigation, repoId, t, worktreePath, writeInput],
@@ -199,19 +199,6 @@ function FiletreeTab({
       onRequestTrashFile={requestTrashFile}
     />
   )
-}
-
-function absoluteFilePathForTerminal(worktreePath: string, filePath: string): string {
-  const normalizedRoot = worktreePath.replace(/[\\/]+$/u, '')
-  if (/^[A-Za-z]:[\\/]/u.test(worktreePath) || worktreePath.includes('\\')) {
-    return `${normalizedRoot}\\${filePath.split('/').join('\\')}`
-  }
-  return `${normalizedRoot}/${filePath}`
-}
-
-function fileReadCommand(viewer: 'bat' | 'cat', filePath: string): string {
-  const quotedPath = shellEscapePath(filePath)
-  return `${viewer} ${quotedPath}\r`
 }
 
 function BranchTabPanel({ id, labelledById, label, busy = false, children }: TabPanelProps) {

@@ -298,7 +298,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
   })
 
   test('passes /file-viewer requests through to the read layer', async () => {
-    mocks.getRepositoryFileViewer.mockResolvedValueOnce({ viewer: 'bat' })
+    mocks.getRepositoryFileViewer.mockResolvedValueOnce({ viewer: 'bat', shell: 'posix' })
     const app = createRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/file-viewer', {
@@ -308,7 +308,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       }),
     )
     expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ viewer: 'bat' })
+    expect(await response.json()).toEqual({ viewer: 'bat', shell: 'posix' })
     expect(mocks.getRepositoryFileViewer).toHaveBeenCalledWith(
       '/tmp/repo',
       '/tmp/repo/.worktrees/feature',
@@ -327,7 +327,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       }),
     )
     expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ viewer: 'cat' })
+    expect(await response.json()).toEqual({ viewer: 'cat', shell: 'posix' })
   })
 
   test('passes /trash-file requests through to the filetree write layer', async () => {

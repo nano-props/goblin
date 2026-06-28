@@ -118,7 +118,7 @@ export function createRepoRoutes() {
     return c.json(
       await jsonOr(
         () => getRepositoryFileViewer(cwd, worktreePath, c.req.raw.signal),
-        { viewer: 'cat' },
+        { viewer: 'cat', shell: 'posix' },
         'file-viewer',
       ),
     )

@@ -36,26 +36,59 @@ beforeEach(() => {
 
 describe('repo file viewer read layer', () => {
   test('uses bat for local worktrees when the user shell can resolve it', async () => {
+    const platformSpy = mockPlatform('linux')
     mocks.userShellCommandExists.mockResolvedValueOnce(true)
 
-    const result = await getRepositoryFileViewer('/tmp/repo', '/tmp/repo-feature')
+    try {
+      const result = await getRepositoryFileViewer('/tmp/repo', '/tmp/repo-feature')
 
-    expect(result).toEqual({ viewer: 'bat' })
-    expect(mocks.getWorktrees).toHaveBeenCalledWith('/tmp/repo', { includeStatus: false, signal: undefined })
-    expect(mocks.userShellCommandExists).toHaveBeenCalledWith('bat', '/tmp/repo-feature', undefined)
+      expect(result).toEqual({ viewer: 'bat', shell: 'posix' })
+      expect(mocks.getWorktrees).toHaveBeenCalledWith('/tmp/repo', { includeStatus: false, signal: undefined })
+      expect(mocks.userShellCommandExists).toHaveBeenCalledWith('bat', '/tmp/repo-feature', undefined)
+    } finally {
+      platformSpy.mockRestore()
+    }
   })
 
   test('falls back to cat for local worktrees when bat is unavailable', async () => {
+    const platformSpy = mockPlatform('linux')
     mocks.userShellCommandExists.mockResolvedValueOnce(false)
 
-    await expect(getRepositoryFileViewer('/tmp/repo', '/tmp/repo-feature')).resolves.toEqual({ viewer: 'cat' })
+    try {
+      await expect(getRepositoryFileViewer('/tmp/repo', '/tmp/repo-feature')).resolves.toEqual({
+        viewer: 'cat',
+        shell: 'posix',
+      })
+    } finally {
+      platformSpy.mockRestore()
+    }
+  })
+
+  test('falls back to cmd type for Windows local worktrees when bat is unavailable', async () => {
+    const platformSpy = mockPlatform('win32')
+    mocks.userShellCommandExists.mockResolvedValueOnce(false)
+
+    try {
+      await expect(getRepositoryFileViewer('/tmp/repo', '/tmp/repo-feature')).resolves.toEqual({
+        viewer: 'type',
+        shell: 'cmd',
+      })
+    } finally {
+      platformSpy.mockRestore()
+    }
   })
 
   test('does not probe the shell for unknown local worktrees', async () => {
-    const result = await getRepositoryFileViewer('/tmp/repo', '/tmp/outside')
+    const platformSpy = mockPlatform('linux')
 
-    expect(result).toEqual({ viewer: 'cat' })
-    expect(mocks.userShellCommandExists).not.toHaveBeenCalled()
+    try {
+      const result = await getRepositoryFileViewer('/tmp/repo', '/tmp/outside')
+
+      expect(result).toEqual({ viewer: 'cat', shell: 'posix' })
+      expect(mocks.userShellCommandExists).not.toHaveBeenCalled()
+    } finally {
+      platformSpy.mockRestore()
+    }
   })
 
   test('delegates remote repos to the SSH command resolver', async () => {
@@ -74,8 +107,12 @@ describe('repo file viewer read layer', () => {
 
     const result = await getRepositoryFileViewer(repoId, '/srv/repo-feature')
 
-    expect(result).toEqual({ viewer: 'bat' })
+    expect(result).toEqual({ viewer: 'bat', shell: 'posix' })
     expect(mocks.remoteCommandExists).toHaveBeenCalledWith(target, '/srv/repo-feature', 'bat', { signal: undefined })
     expect(mocks.getWorktrees).not.toHaveBeenCalled()
   })
 })
+
+function mockPlatform(platform: NodeJS.Platform) {
+  return vi.spyOn(process, 'platform', 'get').mockReturnValue(platform)
+}

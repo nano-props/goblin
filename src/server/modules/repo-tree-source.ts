@@ -114,10 +114,9 @@ export interface GetRepoTreeSourceRemoteInput {
   readonly worktreePath: string
   readonly options: RepoTreeSourceOptions
   readonly signal: AbortSignal | undefined
-  /** Worktree list from `getRemoteStatusAndWorktrees`. When supplied
-   *  the underlying `getRemoteTreeWalk` skips its own
-   *  `gitWorktreeList` round trip -- the second SSH call on the
-   *  remote `/tree` read path becomes the only one. */
+  /** Optional trusted worktree list from the caller. When supplied the
+   *  underlying `getRemoteTreeWalk` skips its own `gitWorktreeList`
+   *  round trip and validates the requested path against this list. */
   readonly knownWorktrees?: ReadonlyArray<WorktreeInfo>
 }
 

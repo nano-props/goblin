@@ -192,10 +192,12 @@ export interface RepoTreeResult {
   readonly truncated: boolean
 }
 
-export type RepoFileViewer = 'bat' | 'cat'
+export type RepoFileViewer = 'bat' | 'cat' | 'type'
+export type RepoFileViewerShell = 'posix' | 'cmd'
 
 export interface RepoFileViewerResult {
   readonly viewer: RepoFileViewer
+  readonly shell: RepoFileViewerShell
 }
 
 export interface ProbeResult {

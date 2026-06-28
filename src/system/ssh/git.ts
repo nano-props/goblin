@@ -188,11 +188,11 @@ export async function getRemoteTreeWalk(
     signal?: AbortSignal
     depth?: number
     run?: RemoteGitRunner
-    /** Pre-fetched worktree list from `getRemoteStatusAndWorktrees`.
-     *  When supplied, the resolver skips its own `gitWorktreeList`
-     *  round trip and looks the requested path up in the list. The
-     *  caller is responsible for the worktree list being fresh
-     *  enough to validate against. */
+    /** Optional trusted worktree list from the caller. When supplied,
+     *  the resolver skips its own `gitWorktreeList` round trip and
+     *  looks the requested path up in the list. The caller is
+     *  responsible for the worktree list being fresh enough to
+     *  validate against. */
     knownWorktrees?: ReadonlyArray<WorktreeInfo>
   } = {},
 ): Promise<ExecResult> {
