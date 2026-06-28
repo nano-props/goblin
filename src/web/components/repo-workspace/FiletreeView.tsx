@@ -6,8 +6,16 @@
 // (keyboard navigation, typeahead, roving focus, expansion and
 // selection) to React Aria Components.
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Button as AriaButton, Tree, TreeItem, TreeItemContent, type Key, type Selection } from 'react-aria-components'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import {
+  Button as AriaButton,
+  Tree,
+  TreeItem,
+  TreeItemContent,
+  type Key,
+  type Selection,
+  type TreeItemProps,
+} from 'react-aria-components'
 import { ChevronRight, File, Folder, FolderTree } from 'lucide-react'
 import type { RepoTreeNode, RepoTreeNodeStatus, RepoTreeResult } from '#/shared/api-types.ts'
 import { useT } from '#/web/stores/i18n.ts'
@@ -56,6 +64,8 @@ interface FiletreeCollection {
   readonly byId: ReadonlyMap<string, FiletreeItem>
 }
 
+type TreeItemPressEvent = Parameters<NonNullable<TreeItemProps['onPress']>>[0]
+
 function buildCollection(result: RepoTreeResult | null): FiletreeCollection {
   const byId = new Map<string, FiletreeItem>()
   const childrenByParent = new Map<string | null, RepoTreeNode[]>()
@@ -97,19 +107,15 @@ export function FiletreeView({ tree, loading, error, onSelect, onActivate }: Fil
   const collection = useMemo(() => buildCollection(tree), [tree])
   const [expandedKeys, setExpandedKeys] = useState<Set<Key>>(() => new Set())
   const [selectedKeys, setSelectedKeys] = useState<Set<Key>>(() => new Set())
-  const selectedKeysRef = useRef<Set<Key>>(selectedKeys)
 
   useEffect(() => {
     setExpandedKeys(new Set())
-    const next = new Set<Key>()
-    selectedKeysRef.current = next
-    setSelectedKeys(next)
+    setSelectedKeys(new Set())
   }, [tree])
 
   const handleSelectionChange = useCallback(
     (selection: Selection) => {
       const next = selection === 'all' ? new Set<Key>() : new Set(selection)
-      selectedKeysRef.current = next
       setSelectedKeys(next)
       const first = next.values().next().value
       if (typeof first !== 'string') return
@@ -129,12 +135,14 @@ export function FiletreeView({ tree, loading, error, onSelect, onActivate }: Fil
   }, [])
 
   const handlePressItem = useCallback(
-    (node: RepoTreeNode) => {
-      const alreadySelected = selectedKeysRef.current.has(node.id)
-      const nextSelectedKeys = new Set<Key>([node.id])
-      selectedKeysRef.current = nextSelectedKeys
-      setSelectedKeys(nextSelectedKeys)
-      if (node.kind === 'directory' && alreadySelected) toggleExpandedKey(node.id)
+    (node: RepoTreeNode, event: TreeItemPressEvent) => {
+      const row = event.target.closest('[role="row"]')
+      const wasSelected = row?.getAttribute('aria-selected') === 'true' || row?.hasAttribute('data-selected') === true
+      const pressedChevron = event.target.closest('button[slot="chevron"]') !== null
+      setSelectedKeys(new Set<Key>([node.id]))
+      if (node.kind === 'directory' && event.pointerType !== 'keyboard' && wasSelected && !pressedChevron) {
+        toggleExpandedKey(node.id)
+      }
       onSelect?.(node)
     },
     [onSelect, toggleExpandedKey],
@@ -204,7 +212,7 @@ function FiletreeTreeItem({
   onActivate,
 }: {
   readonly item: FiletreeItem
-  readonly onPressItem: (node: RepoTreeNode) => void
+  readonly onPressItem: (node: RepoTreeNode, event: TreeItemPressEvent) => void
   readonly onActivate?: (node: RepoTreeNode) => void
 }) {
   const { node, children } = item
@@ -216,8 +224,10 @@ function FiletreeTreeItem({
       textValue={node.name}
       aria-label={node.name}
       hasChildItems={isDirectory}
-      onPress={() => onPressItem(node)}
-      onAction={() => onActivate?.(node)}
+      onPress={(event) => onPressItem(node, event)}
+      onAction={() => {
+        if (!isDirectory) onActivate?.(node)
+      }}
       className={({ isSelected, isFocused, isFocusVisible, isHovered, isPressed }) =>
         cn(
           'group/filetree-row cursor-pointer rounded-sm text-foreground outline-none transition-colors duration-100',
