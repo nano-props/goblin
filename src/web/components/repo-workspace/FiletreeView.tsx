@@ -92,7 +92,7 @@ function compareNodesForRender(a: RepoTreeNode, b: RepoTreeNode): number {
   return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
 }
 
-export function FiletreeView({ tree, loading, error, stale, onSelect, onActivate }: FiletreeViewProps) {
+export function FiletreeView({ tree, loading, error, onSelect, onActivate }: FiletreeViewProps) {
   const t = useT()
   const collection = useMemo(() => buildCollection(tree), [tree])
   const [expandedKeys, setExpandedKeys] = useState<Set<Key>>(() => new Set())
@@ -181,11 +181,6 @@ export function FiletreeView({ tree, loading, error, stale, onSelect, onActivate
       >
         {(item) => <FiletreeTreeItem item={item} onPressItem={handlePressItem} onActivate={onActivate} />}
       </Tree>
-      {stale ? (
-        <div className="border-t border-warning-border bg-warning-surface px-4 py-1 text-xs text-warning">
-          {t('status.stale-title')}
-        </div>
-      ) : null}
       {tree.truncated ? (
         <div className="border-t border-border bg-muted px-4 py-1 text-xs text-muted-foreground">
           {t(FILE_TREE_I18N_KEYS.truncated)}

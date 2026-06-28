@@ -231,10 +231,10 @@ describe('FiletreeView', () => {
     expect(container?.textContent).toMatch(/filetree\.truncated/)
   })
 
-  test('shows the stale banner when stale is true', () => {
+  test('does not flash a visible stale footer during background refresh', () => {
     const tree: RepoTreeResult = { nodes: [fileNode('README.md')], truncated: false }
     renderView({ tree, loading: false, error: null, stale: true })
-    expect(container?.textContent).toMatch(/status\.stale-title/)
+    expect(container?.textContent).not.toMatch(/status\.stale-title/)
   })
 
   test('marks a dirty file with a status dot', () => {
