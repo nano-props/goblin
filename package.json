@@ -81,7 +81,6 @@
     "hono": "4.12.27",
     "i18next": "26.3.3",
     "immer": "11.1.8",
-    "lowdb": "7.0.1",
     "lru-cache": "11.5.1",
     "lucide-react": "1.21.0",
     "node-pty": "1.1.0",
