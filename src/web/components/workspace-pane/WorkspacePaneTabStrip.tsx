@@ -48,6 +48,7 @@ import {
   workspacePaneStaticTabProvider,
   workspacePaneTabProvider,
 } from '#/web/components/workspace-pane/tab-providers.ts'
+import { WorkspacePaneTabTitle } from '#/web/components/workspace-pane/WorkspacePaneTabTitle.tsx'
 
 type TerminalWorkspacePaneTabSummary = Extract<WorkspacePaneTabSummary, { type: 'terminal' }>
 type WorkspacePaneT = (key: string, params?: Record<string, string | number>) => string
@@ -1004,9 +1005,7 @@ function WorkspacePaneTabChrome({
       {...closeProps}
     >
       <WorkspacePaneTabIcon item={item} active={isActive} compact={compact} />
-      {isPendingWorkspacePaneTabItem(item) && item.busy ? null : item.label ? (
-        <span className="truncate">{item.label}</span>
-      ) : null}
+      <WorkspacePaneTabTitle item={item} />
       {isTerminalWorkspacePaneTabItem(item) && item.view.hasBell && (
         <>
           <span className="relative flex h-2 w-2 shrink-0">
