@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test } from 'vitest'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
 

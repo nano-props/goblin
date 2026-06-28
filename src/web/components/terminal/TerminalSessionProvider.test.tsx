@@ -288,13 +288,6 @@ async function emitSessionsChanged(repoRoot = REPO_ID): Promise<void> {
   })
 }
 
-async function emitWorkspacePaneChanged(repoRoot = REPO_ID): Promise<void> {
-  await act(async () => {
-    workspacePaneChangedHandler?.(repoRoot)
-    await waitForScheduledServerSync()
-  })
-}
-
 async function waitForScheduledServerSync(): Promise<void> {
   await new Promise<void>((resolve) => window.setTimeout(resolve, 0))
 }
@@ -764,7 +757,7 @@ describe('TerminalSessionProvider', () => {
       preferredWorkspacePaneTab: 'terminal',
     })
     const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
-    const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
+    const { getContext, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
 
     try {
       const base = { repoRoot: REPO_ID, branch: 'feature/worktree', worktreePath: WORKTREE_PATH }
@@ -915,7 +908,7 @@ describe('TerminalSessionProvider', () => {
       snapshotSeq: 5,
     })
     const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
-    const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
+    const { getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
 
     try {
       await emitSessionsChanged()
@@ -1494,7 +1487,7 @@ describe('TerminalSessionProvider', () => {
       snapshotSeq: 7,
     })
     const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
-    const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
+    const { getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
 
     try {
       await emitSessionsChanged()

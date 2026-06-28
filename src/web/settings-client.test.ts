@@ -41,25 +41,6 @@ function installWebBootstrap(bootstrap: ClientBootstrapSnapshot): void {
   })
 }
 
-function testBridge(overrides: Partial<ClientBridge> = {}): ClientBridge {
-  return {
-    kind: () => 'web',
-    hasCapability: () => false,
-    getBootstrap: () => electronBootstrap(),
-    invokeIpc: vi.fn(),
-    abortIpc: vi.fn(async () => false),
-    onIpcEvent: () => () => {},
-    onEffectIntent: () => () => {},
-    pathForFile: () => '',
-    saveClipboardFiles: () => Promise.resolve([]),
-    host: () => null,
-    terminal: (() => {
-      throw new Error('unused terminal bridge')
-    }) as never,
-    ...overrides,
-  }
-}
-
 describe('settings-client', () => {
   beforeEach(() => {
     vi.resetModules()
@@ -409,7 +390,7 @@ describe('settings-client', () => {
         matchMedia: vi.fn(() => ({ matches: true })),
       },
     })
-    const fetchMock = mockFetch(async () => ({
+    mockFetch(async () => ({
       ok: true,
       json: async () => ({
         ok: true,

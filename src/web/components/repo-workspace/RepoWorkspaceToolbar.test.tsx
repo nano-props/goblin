@@ -552,7 +552,7 @@ describe('RepoWorkspaceToolbar', () => {
   })
 
   test('closes a static tab without routing through runtime close', async () => {
-    const { container: c, mocks } = renderToolbar({
+    const { container: c } = renderToolbar({
       terminalCount: 0,
       preferredWorkspacePaneTab: 'history',
       workspacePaneStaticTabs: ['history', 'status'],
@@ -1249,11 +1249,6 @@ function renderToolbar(options: {
       showRepoWorkspacePaneTab,
     },
   }
-}
-
-function ToolbarHost(props: Omit<Parameters<typeof RepoWorkspaceToolbar>[0], 'branchActions'>) {
-  const branchActions = useBranchActions(props.repo, props.detail.branch!)
-  return <RepoWorkspaceToolbar {...props} branchActions={branchActions} />
 }
 
 function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): PrimaryWindowNavigationActions {

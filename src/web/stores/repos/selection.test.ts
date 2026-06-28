@@ -1,5 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { replaceRepo } from '#/web/stores/repos/repo-state-factory.ts'
+import { beforeEach, describe, expect, test } from 'vitest'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { RepoState, SessionWorkspacePaneRestoreState } from '#/web/stores/repos/types.ts'
 import type {
@@ -59,14 +58,6 @@ function seedRepo(options: {
       remoteProviders: { origin: 'github' },
       hasGitHubRemote: true,
     },
-  })
-}
-
-function updateRepoForTest(mutator: (repo: RepoState) => void) {
-  useReposStore.setState((s) => {
-    const repo = s.repos[REPO_ID]
-    if (!repo) return s
-    return { repos: { ...s.repos, [REPO_ID]: replaceRepo(repo, mutator) } }
   })
 }
 

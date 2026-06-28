@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { backgroundSyncRepoIdsFromStore } from '#/web/hooks/useBackgroundFetch.ts'
-import type { RepoState, ReposStore } from '#/web/stores/repos/types.ts'
+import type { RepoState } from '#/web/stores/repos/types.ts'
 
 describe('backgroundSyncRepoIdsFromStore', () => {
   test('keeps the active remotely backed repo registered while local refresh data loads are busy', () => {

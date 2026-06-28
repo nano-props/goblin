@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from 'vitest'
+import { describe, expect, test } from 'vitest'
 import { createAuthRoutes } from '#/server/routes/auth.ts'
 import { ACCESS_TOKEN_COOKIE } from '#/shared/access-token.ts'
 

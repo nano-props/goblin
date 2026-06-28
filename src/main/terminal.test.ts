@@ -1,5 +1,4 @@
 import { beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
-import { ipcMain } from 'electron'
 import { wireTerminalIpc } from '#/main/terminal.ts'
 import { registerTrustedAppUrl, registerTrustedWebContents } from '#/main/ipc/trusted-webcontents.ts'
 import {

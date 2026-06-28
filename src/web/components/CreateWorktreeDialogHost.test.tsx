@@ -404,7 +404,7 @@ describe('CreateWorktreeDialogHost', () => {
     const firstPreview = deferred<Response>()
     const secondPreview = deferred<Response>()
     const previewResponses = [firstPreview, secondPreview]
-    const fetchMock = mockFetch((input: RequestInfo | URL) => {
+    mockFetch((input: RequestInfo | URL) => {
       const url = new URL(String(input))
       if (url.pathname !== '/api/repo/worktree-bootstrap-preview') {
         throw new Error(`unexpected request ${url.pathname}`)

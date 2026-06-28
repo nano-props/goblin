@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { describe, expect, test, vi } from 'vitest'
+import { describe, expect, test } from 'vitest'
 import {
   SafariShiftKeyResolver,
   isMacNavigatorPlatform,

@@ -41,7 +41,7 @@ describe('remote client web helpers', () => {
   })
 
   test('tests remote repository through embedded server in web host mode', async () => {
-    const fetchMock = mockFetch(async () => ({
+    mockFetch(async () => ({
       ok: true,
       json: async () => ({
         ok: true,
