@@ -5,7 +5,14 @@ import {
   worktreeBootstrapConfigHash,
   type WorktreeBootstrapConfig,
 } from '#/system/git/worktree-bootstrap.ts'
-import { parseBranches, parseLog, parseStatus, parseWorktrees } from '#/system/git/parsers.ts'
+import {
+  parseBranches,
+  parseLog,
+  parseStatus,
+  parseWorktreeStatusBatch,
+  parseWorktrees,
+  splitWorktreeStatusBatch,
+} from '#/system/git/parsers.ts'
 import { markDefaultBranch, prioritizeDefaultBranch } from '#/system/git/branches.ts'
 import {
   getBranchUrlForRemotes,
@@ -97,27 +104,63 @@ export async function getRemoteStatus(
   target: RemoteRepoTarget,
   options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
 ): Promise<WorktreeStatus[]> {
+  // Thin wrapper over the batched path. The single SSH call behind
+  // `getRemoteStatusAndWorktrees` returns both the worktree list and
+  // the per-worktree status, so callers that only need the statuses
+  // pay the same wire cost as callers that need both.
+  const { statuses } = await getRemoteStatusAndWorktrees(target, options)
+  return statuses
+}
+
+/**
+ * Fetch the remote repo's worktree list and per-worktree porcelain
+ * status in a single SSH round trip. The remote side runs
+ * `git worktree list --porcelain` and then, for every non-bare
+ * worktree, `git status --porcelain -z -uall`, batching the result
+ * with a marker-separated NUL stream (see the `gitWorktreeListAndStatus`
+ * command).
+ *
+ * Returning both shapes lets the caller thread the worktree list into
+ * `getRemoteTreeWalk` / `getRemotePatch` so neither pays a second
+ * `gitWorktreeList` round trip. That collapses the remote `/tree`
+ * read path from (1 worktree-list + N statuses + 1 redundant
+ * worktree-list + 1 walk) to (1 batched call + 1 walk) = 2 calls.
+ */
+export async function getRemoteStatusAndWorktrees(
+  target: RemoteRepoTarget,
+  options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
+): Promise<{ statuses: WorktreeStatus[]; worktrees: WorktreeInfo[] }> {
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
-  const result = await run({ type: 'gitWorktreeList', path: target.remotePath }, target, { signal: options.signal })
-  if (!result.ok || options.signal?.aborted) return []
-  const worktrees = parseWorktrees(result.stdout).filter((worktree) => !worktree.isBare)
-  const statuses = await mapWithConcurrency(
-    worktrees,
-    REMOTE_WORKTREE_STATUS_CONCURRENCY,
-    async (worktree): Promise<WorktreeStatus | null> => {
-      const status = await run({ type: 'gitStatus', path: worktree.path }, target, { signal: options.signal })
-      if (options.signal?.aborted) return null
-      if (!status.ok) return null
-      return {
-        path: worktree.path,
-        branch: worktree.branch,
-        isMain: worktree.isPrimary,
-        entries: parseStatus(status.stdout),
-      }
-    },
-    options.signal,
+  const result = await run(
+    { type: 'gitWorktreeListAndStatus', path: target.remotePath },
+    target,
+    { signal: options.signal },
   )
-  return statuses.filter((status): status is WorktreeStatus => status !== null)
+  if (options.signal?.aborted) return { statuses: [], worktrees: [] }
+  if (!result.ok) return { statuses: [], worktrees: [] }
+
+  const { worktreeListOutput, statusStream } = splitWorktreeStatusBatch(result.stdout)
+  const worktrees = parseWorktrees(worktreeListOutput)
+  if (options.signal?.aborted) return { statuses: [], worktrees }
+  const statusByPath = parseWorktreeStatusBatch(statusStream)
+
+  const statuses: WorktreeStatus[] = []
+  for (const worktree of worktrees) {
+    if (worktree.isBare) continue
+    const entries = statusByPath.get(worktree.path)
+    // A worktree that the remote script could not enter (cd failed
+    // or rev-parse failed) is absent from the status stream. Treat
+    // it as clean rather than dropping the worktree silently -- the
+    // Status tab will still show the worktree, just without changes.
+    const safeEntries = entries ? [...entries] : []
+    statuses.push({
+      path: worktree.path,
+      branch: worktree.branch,
+      isMain: worktree.isPrimary,
+      entries: safeEntries,
+    })
+  }
+  return { statuses, worktrees }
 }
 
 export async function getRemoteLog(
@@ -140,11 +183,25 @@ export async function getRemoteLog(
 export async function getRemoteTreeWalk(
   target: RemoteRepoTarget,
   worktreePath: string,
-  options: { signal?: AbortSignal; depth?: number; run?: RemoteGitRunner } = {},
+  options: {
+    signal?: AbortSignal
+    depth?: number
+    run?: RemoteGitRunner
+    /** Pre-fetched worktree list from `getRemoteStatusAndWorktrees`.
+     *  When supplied, the resolver skips its own `gitWorktreeList`
+     *  round trip and looks the requested path up in the list. The
+     *  caller is responsible for the worktree list being fresh
+     *  enough to validate against. */
+    knownWorktrees?: ReadonlyArray<WorktreeInfo>
+  } = {},
 ): Promise<ExecResult> {
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
   const depth = Math.max(1, Math.min(10, Math.floor(options.depth ?? 10)))
-  const known = await resolveKnownRemoteWorktree(target, worktreePath, { signal: options.signal, run })
+  const known = await resolveKnownRemoteWorktree(target, worktreePath, {
+    signal: options.signal,
+    run,
+    knownWorktrees: options.knownWorktrees,
+  })
   if ('ok' in known) return known
   const result = await run({ type: 'gitTreeWalk', path: known.path, depth }, target, {
     signal: options.signal,
@@ -157,10 +214,19 @@ export async function getRemoteTreeWalk(
 export async function getRemotePatch(
   target: RemoteRepoTarget,
   worktreePath: string,
-  options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
+  options: {
+    signal?: AbortSignal
+    run?: RemoteGitRunner
+    /** See `getRemoteTreeWalk`. */
+    knownWorktrees?: ReadonlyArray<WorktreeInfo>
+  } = {},
 ): Promise<ExecResult> {
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
-  const known = await resolveKnownRemoteWorktree(target, worktreePath, { signal: options.signal, run })
+  const known = await resolveKnownRemoteWorktree(target, worktreePath, {
+    signal: options.signal,
+    run,
+    knownWorktrees: options.knownWorktrees,
+  })
   if ('ok' in known) return known
   const tracked = await run({ type: 'gitPatch', path: known.path }, target, {
     signal: options.signal,
@@ -666,14 +732,26 @@ function firstLine(lines: string[]): string {
 async function resolveKnownRemoteWorktree(
   target: RemoteRepoTarget,
   worktreePath: string,
-  options: { signal?: AbortSignal; run: RemoteGitRunner },
+  options: {
+    signal?: AbortSignal
+    run: RemoteGitRunner
+    /** Pre-fetched worktree list; when supplied we skip the
+     *  `gitWorktreeList` round trip. */
+    knownWorktrees?: ReadonlyArray<WorktreeInfo>
+  },
 ): Promise<WorktreeInfo | ExecResult> {
-  const result = await options.run({ type: 'gitWorktreeList', path: target.remotePath }, target, {
-    signal: options.signal,
-  })
-  if (options.signal?.aborted) return { ok: false, message: 'cancelled' }
-  if (!result.ok) return remoteExecResult(result)
-  const worktree = parseWorktrees(result.stdout).find((item) => item.path === worktreePath && !item.isBare)
+  let worktrees: ReadonlyArray<WorktreeInfo>
+  if (options.knownWorktrees) {
+    worktrees = options.knownWorktrees
+  } else {
+    const result = await options.run({ type: 'gitWorktreeList', path: target.remotePath }, target, {
+      signal: options.signal,
+    })
+    if (options.signal?.aborted) return { ok: false, message: 'cancelled' }
+    if (!result.ok) return remoteExecResult(result)
+    worktrees = parseWorktrees(result.stdout)
+  }
+  const worktree = worktrees.find((item) => item.path === worktreePath && !item.isBare)
   if (!worktree) return { ok: false, message: 'error.worktree-not-found' }
   return worktree
 }

@@ -6,7 +6,9 @@ import {
   getRemoteBrowserUrl,
   getRemoteLog,
   getRemoteSnapshot,
+  getRemoteStatusAndWorktrees,
   getRemoteTrackingBranches,
+  getRemoteTreeWalk,
   getRemoteWorktreeBootstrapPreview,
   pullRemoteBranch,
   fetchRemoteRepo,
@@ -14,6 +16,7 @@ import {
   remoteExecResult,
   removeRemoteWorktree,
 } from '#/system/ssh/git.ts'
+import type { WorktreeInfo } from '#/shared/git-types.ts'
 import type { RemoteCommandResult } from '#/system/ssh/commands.ts'
 import { worktreeBootstrapConfigHash } from '#/system/git/worktree-bootstrap.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
@@ -703,6 +706,150 @@ describe('remote git helpers', () => {
     const result = await deleteRemoteBranch(TARGET, { branch: '../feature', run: run as any })
 
     expect(result).toEqual({ ok: false, message: 'error.invalid-arguments' })
+    expect(run).not.toHaveBeenCalled()
+  })
+})
+
+describe('getRemoteStatusAndWorktrees', () => {
+  const NUL = String.fromCharCode(0)
+
+  function buildBatchedOutput(worktreeListOutput: string, statusStream: string): string {
+    return `${worktreeListOutput}\n__GOBLIN_WT_BATCH_BOUNDARY__\n${statusStream}`
+  }
+
+  test('parses the batched command output into statuses + worktrees in one SSH call', async () => {
+    const worktreeListOutput = [
+      'worktree /srv/repo',
+      'HEAD f00ba4',
+      'branch refs/heads/main',
+      '',
+      'worktree /srv/repo-feature',
+      'HEAD ba5eba1',
+      'branch refs/heads/feature/test',
+    ].join('\n')
+    const statusStream = [
+      `/srv/repo${NUL}M  README.md${NUL}${NUL}`,
+      `/srv/repo-feature${NUL}?? new.ts${NUL}${NUL}`,
+    ].join('')
+    const run = vi.fn(async () => okRemoteResult(buildBatchedOutput(worktreeListOutput, statusStream)))
+
+    const result = await getRemoteStatusAndWorktrees(TARGET, { run: run as any })
+
+    expect(run).toHaveBeenCalledTimes(1)
+    expect(run).toHaveBeenCalledWith(
+      { type: 'gitWorktreeListAndStatus', path: '/srv/repo' },
+      TARGET,
+      { signal: undefined },
+    )
+    expect(result.worktrees).toHaveLength(2)
+    expect(result.worktrees[0]).toMatchObject({ path: '/srv/repo', branch: 'main', isPrimary: true, isBare: false })
+    expect(result.worktrees[1]).toMatchObject({ path: '/srv/repo-feature', branch: 'feature/test', isPrimary: false })
+    expect(result.statuses).toHaveLength(2)
+    expect(result.statuses[0]).toMatchObject({
+      path: '/srv/repo',
+      branch: 'main',
+      isMain: true,
+    })
+    expect(result.statuses[0]?.entries).toEqual([{ x: 'M', y: ' ', path: 'README.md' }])
+    expect(result.statuses[1]?.entries).toEqual([{ x: '?', y: '?', path: 'new.ts' }])
+  })
+
+  test('treats bare worktrees as absent from statuses but keeps them in the worktree list', async () => {
+    const worktreeListOutput = [
+      'worktree /srv/repo',
+      'bare',
+      '',
+      'worktree /srv/repo-feature',
+      'HEAD ba5eba1',
+      'branch refs/heads/feature/test',
+    ].join('\n')
+    const statusStream = `/srv/repo-feature${NUL}${NUL}`
+    const run = vi.fn(async () => okRemoteResult(buildBatchedOutput(worktreeListOutput, statusStream)))
+
+    const result = await getRemoteStatusAndWorktrees(TARGET, { run: run as any })
+
+    // worktrees still includes the bare entry (callers may need it)
+    expect(result.worktrees).toHaveLength(2)
+    expect(result.worktrees[0]?.isBare).toBe(true)
+    // statuses excludes the bare entry
+    expect(result.statuses).toHaveLength(1)
+    expect(result.statuses[0]?.path).toBe('/srv/repo-feature')
+  })
+
+  test('soft-fails when the remote command fails', async () => {
+    const run = vi.fn(async () => failRemoteResult('boom'))
+    const result = await getRemoteStatusAndWorktrees(TARGET, { run: run as any })
+    expect(result).toEqual({ statuses: [], worktrees: [] })
+  })
+})
+
+describe('getRemoteTreeWalk knownWorktrees path', () => {
+  test('skips gitWorktreeList when knownWorktrees is supplied', async () => {
+    // Regression for the B4 round-trip optimisation: when the caller
+    // already has a worktree list (because `getRemoteStatusAndWorktrees`
+    // returned one in the same request), the walk path must NOT pay
+    // a second `gitWorktreeList` SSH call.
+    const knownWorktrees: WorktreeInfo[] = [
+      { path: '/srv/repo-feature', branch: 'feature/test', isBare: false, isPrimary: false },
+    ]
+    const run = vi.fn(async (command: { type: string }) => {
+      const NUL = String.fromCharCode(0)
+      switch (command.type) {
+        case 'gitTreeWalk':
+          return okRemoteResult(`/srv/repo-feature/README.md${NUL}/srv/repo-feature/src/foo.ts`)
+        default:
+          return failRemoteResult('should not be called')
+      }
+    })
+
+    const result = await getRemoteTreeWalk(TARGET, '/srv/repo-feature', {
+      depth: 3,
+      run: run as any,
+      knownWorktrees,
+    })
+
+    expect(result).toMatchObject({ ok: true })
+    const treeWalkCall = run.mock.calls.find(([command]) => command.type === 'gitTreeWalk')
+    expect(treeWalkCall).toBeDefined()
+    expect(run).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'gitWorktreeList' }),
+      expect.anything(),
+      expect.anything(),
+    )
+  })
+
+  test('still falls back to gitWorktreeList when knownWorktrees is omitted', async () => {
+    const run = vi.fn(async (command: { type: string }) => {
+      switch (command.type) {
+        case 'gitWorktreeList':
+          return okRemoteResult(['worktree /srv/repo-feature', 'HEAD a', 'branch refs/heads/feat'].join('\n'))
+        case 'gitTreeWalk':
+          return okRemoteResult('')
+        default:
+          return failRemoteResult('unexpected')
+      }
+    })
+
+    const result = await getRemoteTreeWalk(TARGET, '/srv/repo-feature', { run: run as any })
+
+    expect(result).toMatchObject({ ok: true })
+    expect(run).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'gitWorktreeList' }),
+      expect.anything(),
+      expect.anything(),
+    )
+  })
+
+  test('rejects a request for an unknown worktree path even when knownWorktrees is supplied', async () => {
+    const knownWorktrees: WorktreeInfo[] = [
+      { path: '/srv/repo', branch: 'main', isBare: false, isPrimary: true },
+    ]
+    const run = vi.fn()
+    const result = await getRemoteTreeWalk(TARGET, '/srv/repo-missing', {
+      run: run as any,
+      knownWorktrees,
+    })
+    expect(result).toEqual({ ok: false, message: 'error.worktree-not-found' })
     expect(run).not.toHaveBeenCalled()
   })
 })

@@ -63,6 +63,7 @@ export type RemoteCommandKind =
   | { type: 'gitSnapshot'; path: string }
   | { type: 'gitPatch'; path: string }
   | { type: 'gitWorktreeList'; path: string }
+  | { type: 'gitWorktreeListAndStatus'; path: string }
   | { type: 'gitStatus'; path: string }
   | { type: 'gitLog'; path: string; branch: string; count?: number; skip?: number }
   | { type: 'gitFetchAll'; path: string }
@@ -271,6 +272,57 @@ function scriptForCommand(command: RemoteCommandKind): string {
       ].join('; ')
     case 'gitWorktreeList':
       return `git -C ${shellQuote(command.path)} worktree list --porcelain`
+    case 'gitWorktreeListAndStatus': {
+      // One SSH call that returns BOTH:
+      //   (a) the worktree list, parsable by parseWorktrees; and
+      //   (b) per-worktree status output, NUL-batched below the
+      //       boundary marker.
+      //
+      // Output shape (separator = literal newlines except where noted):
+      //   <git worktree list --porcelain, blocks separated by blank lines>
+      //   \n__GOBLIN_WT_BATCH_BOUNDARY__\n
+      //   <wt1_path>\0<status records, NUL-separated>\0
+      //   <wt2_path>\0<status records>\0
+      //   ...
+      //
+      // Each per-worktree section begins with a NUL-terminated path
+      // and ends with an extra NUL (an empty NUL record), so the
+      // parser can walk NUL-split records without needing line
+      // boundaries -- important because `git status -z` paths can
+      // contain literal newlines when paths with newlines are quoted.
+      //
+      // Bare worktrees (the bare flag in their porcelain block) are
+      // skipped in the status stream so the parser does not have to
+      // deal with `git status` failing in a bare repo. The full list
+      // above the boundary still includes bare entries, which the
+      // caller needs for `parseWorktrees` (it sets `isBare`).
+      const repo = shellQuote(command.path)
+      return [
+        `git -C ${repo} worktree list --porcelain`,
+        `printf '\\n__GOBLIN_WT_BATCH_BOUNDARY__\\n'`,
+        // Iterate non-bare worktrees in the same order as the list
+        // above. The awk extracts path lines from non-bare blocks
+        // (blocks containing the literal `bare` line on its own are
+        // skipped via paragraph-mode record matching).
+        `git -C ${repo} worktree list --porcelain | awk -v RS= 'BEGIN { ORS = "" }`,
+        `  /(^|\\n)bare(\\n|$)/ { next }`,
+        `  match($0, /^worktree[ \\t]+/) {`,
+        `    p = substr($0, RSTART + RLENGTH); sub(/\\n.*/, "", p);`,
+        `    if (p != "") print p "\\n"`,
+        `  }' | while IFS= read -r wt; do`,
+        `  if [ -z "$wt" ]; then continue; fi`,
+        // The list output may contain non-absolute paths if the
+        // user registered them with relative arguments; resolve via
+        // `git rev-parse --show-toplevel` so the parser can match
+        // them against the absolute paths the caller already has.
+        `  if ! cd "$wt" >/dev/null 2>&1; then continue; fi`,
+        `  abs=$(git rev-parse --show-toplevel 2>/dev/null) || continue`,
+        `  printf '%s\\0' "$abs"`,
+        `  git -C "$abs" status --porcelain -z -uall 2>/dev/null || true`,
+        `  printf '\\0'`,
+        `done`,
+      ].join('\n')
+    }
     case 'gitStatus':
       return `git -C ${shellQuote(command.path)} status --porcelain -z`
     case 'gitLog': {

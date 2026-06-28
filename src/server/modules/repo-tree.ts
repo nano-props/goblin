@@ -14,7 +14,7 @@
 //   - Do not import UI types.
 
 import type { RepoTreeResult } from '#/shared/api-types.ts'
-import type { WorktreeStatus } from '#/shared/git-types.ts'
+import type { WorktreeInfo, WorktreeStatus } from '#/shared/git-types.ts'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 import { runWithRepoSource, resolveRemoteRepoTarget } from '#/server/modules/repo-source.ts'
 import {
@@ -30,6 +30,13 @@ export interface GetRepositoryTreeOptions extends RepoTreeSourceOptions {
    *  pass it through; we never call `getRepoStatus` ourselves when
    *  this is provided. */
   readonly precomputedStatus?: ReadonlyArray<WorktreeStatus>
+  /** Same skip pattern as `precomputedStatus` but for the worktree
+   *  list. When the caller already has a `WorktreeInfo[]` (e.g. a
+   *  composite read), the remote tree walk can skip its own
+   *  `gitWorktreeList` round trip and look the requested path up
+   *  in this list instead. Local path ignores the field — the
+   *  walker already validates against the filesystem directly. */
+  readonly precomputedWorktrees?: ReadonlyArray<WorktreeInfo>
 }
 
 /** Read the file tree rooted at `worktreePath`, with a git-status
@@ -68,10 +75,22 @@ export async function getRepositoryTree(
     if (signal?.aborted) return { nodes: [], truncated: false }
   }
 
-  const status =
-    options.precomputedStatus ??
-    (await runWithRepoSource(cwd, async (source) => await source.getStatus(signal)))
-  if (signal?.aborted) return { nodes: [], truncated: false }
+  let status: ReadonlyArray<WorktreeStatus>
+  let worktrees: ReadonlyArray<WorktreeInfo> | undefined
+  if (options.precomputedStatus) {
+    status = options.precomputedStatus
+    worktrees = options.precomputedWorktrees
+  } else {
+    // Combined fetch: statuses + worktree list in one call.
+    // Remote: 1 SSH (the `gitWorktreeListAndStatus` batch).
+    // Local: parallel `getWorkingStatus` + `getWorktrees`.
+    const combined = await runWithRepoSource(cwd, async (source) =>
+      source.getStatusAndWorktrees(signal),
+    )
+    if (signal?.aborted) return { nodes: [], truncated: false }
+    status = combined.statuses
+    worktrees = combined.worktrees
+  }
 
   const source = isRemote
     ? await getRepoTreeSourceRemote({
@@ -80,6 +99,7 @@ export async function getRepositoryTree(
         options,
         signal,
         precomputedStatus: status,
+        ...(worktrees ? { knownWorktrees: worktrees } : {}),
       })
     : await getRepoTreeSourceLocal(worktreePath, options, signal, status)
   return { nodes: source.nodes, truncated: source.truncated }

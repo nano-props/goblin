@@ -81,7 +81,10 @@ describe('repo-tree — read layer (local cwd)', () => {
     const freshStatus = [
       { path: '/tmp/repo/.worktrees/feature', branch: 'main', isMain: false, entries: [] },
     ]
-    const fakeSource = { getStatus: vi.fn().mockResolvedValue(freshStatus) }
+    const fakeSource = {
+      getStatus: vi.fn().mockResolvedValue(freshStatus),
+      getStatusAndWorktrees: vi.fn().mockResolvedValue({ statuses: freshStatus, worktrees: [] }),
+    }
     mocks.runWithRepoSource.mockImplementationOnce(async (_cwd, task) => await task(fakeSource))
     mocks.getRepoTreeSourceLocal.mockResolvedValueOnce({
       nodes: [{ id: 'src', path: 'src', name: 'src', parentId: null, kind: 'directory', status: 'clean' }],
@@ -90,7 +93,7 @@ describe('repo-tree — read layer (local cwd)', () => {
 
     const result = await getRepositoryTree('/tmp/repo', '/tmp/repo/.worktrees/feature')
 
-    expect(fakeSource.getStatus).toHaveBeenCalledWith(undefined)
+    expect(fakeSource.getStatusAndWorktrees).toHaveBeenCalledWith(undefined)
     expect(mocks.getRepoTreeSourceRemote).not.toHaveBeenCalled()
     expect(mocks.getRepoTreeSourceLocal).toHaveBeenCalledWith(
       '/tmp/repo/.worktrees/feature',
@@ -102,7 +105,10 @@ describe('repo-tree — read layer (local cwd)', () => {
   })
 
   test('soft-fails to the empty envelope when the local source layer throws', async () => {
-    const fakeSource = { getStatus: vi.fn().mockResolvedValue([]) }
+    const fakeSource = {
+      getStatus: vi.fn().mockResolvedValue([]),
+      getStatusAndWorktrees: vi.fn().mockResolvedValue({ statuses: [], worktrees: [] }),
+    }
     mocks.runWithRepoSource.mockImplementationOnce(async (_cwd, task) => await task(fakeSource))
     mocks.getRepoTreeSourceLocal.mockRejectedValueOnce(new Error('boom'))
 
@@ -116,7 +122,10 @@ describe('repo-tree — read layer (remote cwd, PR 5)', () => {
     const freshStatus = [
       { path: '/srv/repos/myrepo/.worktrees/feature', branch: 'main', isMain: false, entries: [] },
     ]
-    const fakeSource = { getStatus: vi.fn().mockResolvedValue(freshStatus) }
+    const fakeSource = {
+      getStatus: vi.fn().mockResolvedValue(freshStatus),
+      getStatusAndWorktrees: vi.fn().mockResolvedValue({ statuses: freshStatus, worktrees: [] }),
+    }
     mocks.runWithRepoSource.mockImplementationOnce(async (_cwd, task) => await task(fakeSource))
     mocks.getRepoTreeSourceRemote.mockResolvedValueOnce({
       nodes: [{ id: 'README.md', path: 'README.md', name: 'README.md', parentId: null, kind: 'file', status: 'clean' }],
@@ -127,7 +136,7 @@ describe('repo-tree — read layer (remote cwd, PR 5)', () => {
 
     expect(mocks.resolveRemoteRepoTarget).toHaveBeenCalledWith(remoteRepoId)
     expect(mocks.getRepoTreeSourceLocal).not.toHaveBeenCalled()
-    expect(fakeSource.getStatus).toHaveBeenCalledWith(undefined)
+    expect(fakeSource.getStatusAndWorktrees).toHaveBeenCalledWith(undefined)
     expect(mocks.getRepoTreeSourceRemote).toHaveBeenCalledWith(
       expect.objectContaining({
         target: remoteTarget,
@@ -181,12 +190,53 @@ describe('repo-tree — read layer (remote cwd, PR 5)', () => {
 
   test('does not invoke the local source for remote cwd', async () => {
     mocks.resolveRemoteRepoTarget.mockResolvedValueOnce(remoteTarget)
-    const fakeSource = { getStatus: vi.fn().mockResolvedValue([]) }
+    const fakeSource = {
+      getStatus: vi.fn().mockResolvedValue([]),
+      getStatusAndWorktrees: vi.fn().mockResolvedValue({ statuses: [], worktrees: [] }),
+    }
     mocks.runWithRepoSource.mockImplementationOnce(async (_cwd, task) => await task(fakeSource))
     mocks.getRepoTreeSourceRemote.mockResolvedValueOnce({ nodes: [], truncated: false })
 
     await getRepositoryTree(remoteRepoId, '/srv/repos/myrepo/.worktrees/feature')
 
     expect(mocks.getRepoTreeSourceLocal).not.toHaveBeenCalled()
+  })
+
+  test('threads knownWorktrees into the remote source so the walk skips gitWorktreeList', async () => {
+    // Regression for the B4 remote round-trip optimisation: when
+    // the caller already has a fresh worktree list (the read layer
+    // does -- it just fetched it via the batched status call),
+    // `getRepoTreeSourceRemote` must forward it to `getRemoteTreeWalk`
+    // so the second `gitWorktreeList` SSH call disappears.
+    mocks.resolveRemoteRepoTarget.mockResolvedValueOnce(remoteTarget)
+    const freshStatus = [
+      { path: '/srv/repos/myrepo/.worktrees/feature', branch: 'feature', isMain: false, entries: [] },
+    ]
+    const knownWorktrees = [
+      {
+        path: '/srv/repos/myrepo',
+        branch: 'main',
+        isBare: false,
+        isPrimary: true,
+      },
+      {
+        path: '/srv/repos/myrepo/.worktrees/feature',
+        branch: 'feature',
+        isBare: false,
+        isPrimary: false,
+      },
+    ]
+    const fakeSource = {
+      getStatus: vi.fn(),
+      getStatusAndWorktrees: vi.fn().mockResolvedValue({ statuses: freshStatus, worktrees: knownWorktrees }),
+    }
+    mocks.runWithRepoSource.mockImplementationOnce(async (_cwd, task) => await task(fakeSource))
+    mocks.getRepoTreeSourceRemote.mockResolvedValueOnce({ nodes: [], truncated: false })
+
+    await getRepositoryTree(remoteRepoId, '/srv/repos/myrepo/.worktrees/feature')
+
+    expect(mocks.getRepoTreeSourceRemote).toHaveBeenCalledWith(
+      expect.objectContaining({ knownWorktrees }),
+    )
   })
 })

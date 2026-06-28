@@ -6,9 +6,19 @@
 // from each git command.
 
 import { describe, expect, test } from 'vitest'
-import { FIELD_SEP, parseBranches, parseLog, parseStatus, parseWorktrees } from '#/system/git/parsers.ts'
+import {
+  FIELD_SEP,
+  parseBranches,
+  parseLog,
+  parseStatus,
+  parseWorktreeStatusBatch,
+  parseWorktrees,
+  splitWorktreeStatusBatch,
+  WORKTREE_STATUS_BATCH_BOUNDARY,
+} from '#/system/git/parsers.ts'
 
 const SEP = FIELD_SEP
+const NUL = String.fromCharCode(0)
 
 describe('parseBranches', () => {
   test('returns empty array for empty input', () => {
@@ -243,5 +253,104 @@ describe('parseWorktrees', () => {
   test('strips refs/heads/ prefix from branch ref', () => {
     const out = ['worktree /repo', 'HEAD a', 'branch refs/heads/feature/nested/name'].join('\n')
     expect(parseWorktrees(out)[0]?.branch).toBe('feature/nested/name')
+  })
+})
+
+describe('splitWorktreeStatusBatch', () => {
+  test('returns the worktree list and status stream on either side of the marker', () => {
+    const worktreeList = ['worktree /repo', 'HEAD abc', 'branch refs/heads/main'].join('\n')
+    const stream = `/repo${NUL}M README.md${NUL}? new.ts${NUL}`
+    const output = `${worktreeList}\n${WORKTREE_STATUS_BATCH_BOUNDARY}\n${stream}`
+
+    const { worktreeListOutput, statusStream } = splitWorktreeStatusBatch(output)
+    expect(worktreeListOutput).toBe(worktreeList)
+    expect(statusStream).toBe(stream)
+    // The worktree list is still parseable by the existing helper.
+    expect(parseWorktrees(worktreeListOutput)).toHaveLength(1)
+  })
+
+  test('falls back to treating the whole output as the worktree list when the marker is missing', () => {
+    const { worktreeListOutput, statusStream } = splitWorktreeStatusBatch(
+      'worktree /repo\nHEAD a\nbranch refs/heads/main',
+    )
+    expect(worktreeListOutput).toBe('worktree /repo\nHEAD a\nbranch refs/heads/main')
+    expect(statusStream).toBe('')
+  })
+
+  test('returns an empty status stream when the boundary is the very last token', () => {
+    const output = `worktree /repo${NUL}__GOBLIN_WT_BATCH_BOUNDARY__${NUL}`
+    // Boundary marker is preceded by a newline in the script. A
+    // malformed input with no newline at all should still not throw.
+    const { statusStream } = splitWorktreeStatusBatch(output)
+    expect(typeof statusStream).toBe('string')
+  })
+})
+
+describe('parseWorktreeStatusBatch', () => {
+  test('returns an empty map for an empty stream', () => {
+    expect(parseWorktreeStatusBatch('').size).toBe(0)
+  })
+
+  test('parses one clean worktree (empty status) as an empty entries array', () => {
+    const stream = `/repo${NUL}${NUL}`
+    const result = parseWorktreeStatusBatch(stream)
+    expect(result.size).toBe(1)
+    expect(result.get('/repo')).toEqual([])
+  })
+
+  test('parses one dirty worktree with multiple status entries', () => {
+    const stream = [`/repo`, NUL, `M  README.md`, NUL, `?? new.ts`, NUL, `M  src/foo.ts`, NUL].join('')
+    const result = parseWorktreeStatusBatch(stream)
+    const entries = result.get('/repo')
+    expect(entries).toHaveLength(3)
+    expect(entries?.[0]).toEqual({ x: 'M', y: ' ', path: 'README.md' })
+    expect(entries?.[1]).toEqual({ x: '?', y: '?', path: 'new.ts' })
+    expect(entries?.[2]).toEqual({ x: 'M', y: ' ', path: 'src/foo.ts' })
+  })
+
+  test('segments multiple worktrees via the empty-record boundary', () => {
+    const stream = [
+      `/wt1${NUL}M  a.ts${NUL}${NUL}`,
+      `/wt2${NUL}?? new.txt${NUL}${NUL}`,
+      `/wt3${NUL}${NUL}`,
+    ].join('')
+    const result = parseWorktreeStatusBatch(stream)
+    expect(result.size).toBe(3)
+    expect(result.get('/wt1')?.map((e) => e.path)).toEqual(['a.ts'])
+    expect(result.get('/wt2')?.map((e) => e.path)).toEqual(['new.txt'])
+    expect(result.get('/wt3')).toEqual([])
+  })
+
+  test('surfaces only the new path for rename entries (skips the original-path record)', () => {
+    // `git status -z` emits the new path then the original path as
+    // two consecutive NUL-separated records for R/C entries. Our
+    // parser drops the original, mirroring parseStatus.
+    const stream = [`/repo`, NUL, `R  newname.ts`, NUL, `oldname.ts`, NUL].join('')
+    const result = parseWorktreeStatusBatch(stream)
+    expect(result.get('/repo')).toEqual([{ x: 'R', y: ' ', path: 'newname.ts' }])
+  })
+
+  test('handles paths with embedded newlines (quoted paths in git status -z)', () => {
+    // git status -z can include literal newlines inside quoted paths.
+    // We must not split on newline; the boundary is the empty NUL
+    // record only. Porcelain format is "XY <path>" where X and Y
+    // are each one byte -- so `?? "weird\nname.ts"` is 21 chars
+    // forming one NUL-terminated record.
+    const stream = [`/repo`, NUL, `?? "weird`, `\n`, `name.ts"`, NUL, `${NUL}`].join('')
+    const result = parseWorktreeStatusBatch(stream)
+    const entries = result.get('/repo')
+    expect(entries).toHaveLength(1)
+    expect(entries?.[0]?.x).toBe('?')
+    expect(entries?.[0]?.y).toBe('?')
+    // The path part is the byte slice after the 2-char XY + space,
+    // which for a quoted path includes the literal newline.
+    expect(entries?.[0]?.path).toContain('weird')
+    expect(entries?.[0]?.path).toContain('name.ts')
+  })
+
+  test('an unterminated stream does not throw and reports the last section cleanly', () => {
+    const stream = `/repo${NUL}M  a.ts${NUL}` // no trailing boundary NUL
+    const result = parseWorktreeStatusBatch(stream)
+    expect(result.get('/repo')?.map((e) => e.path)).toEqual(['a.ts'])
   })
 })

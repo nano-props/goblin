@@ -55,6 +55,7 @@ import {
   getRemotePatch,
   getRemoteSnapshot,
   getRemoteStatus,
+  getRemoteStatusAndWorktrees,
   getRemoteWorktreeBootstrapPreview,
   getRemoteTrackingBranches as getSshRemoteTrackingBranches,
   pullRemoteBranch,
@@ -90,6 +91,16 @@ export interface RepoSource {
   probe(): Promise<ProbeResult>
   getSnapshot(signal?: AbortSignal): Promise<RepoSnapshot | null>
   getStatus(signal?: AbortSignal): Promise<WorktreeStatus[]>
+  /** Combined fetch used by the read layer for `/tree`. Returns both
+   *  the per-worktree status (the same shape `getStatus` returns)
+   *  and the worktree list. Remote implementations back this with
+   *  a single SSH round trip via `gitWorktreeListAndStatus`; the
+   *  worktrees are then threaded into the tree walk so the walk
+   *  path does not pay its own `gitWorktreeList` call. */
+  getStatusAndWorktrees(signal?: AbortSignal): Promise<{
+    statuses: WorktreeStatus[]
+    worktrees: WorktreeInfo[]
+  }>
   getPullRequests(
     branches?: string[],
     options?: { mode?: PullRequestFetchMode; signal?: AbortSignal },
@@ -282,6 +293,16 @@ function createLocalRepoSource(repoId: string): RepoSource {
       const status = await getWorkingStatus(repoId, { signal })
       return signal?.aborted ? [] : status
     },
+    async getStatusAndWorktrees(signal) {
+      if (!isValidCwd(repoId)) return { statuses: [], worktrees: [] }
+      const available = await probeGitRepo(repoId)
+      if (!available.ok) throw new Error(available.message)
+      const [worktrees, statuses] = await Promise.all([
+        getWorktrees(repoId, { includeStatus: false, signal }),
+        getWorkingStatus(repoId, { signal }),
+      ])
+      return signal?.aborted ? { statuses: [], worktrees: [] } : { statuses, worktrees }
+    },
     async getPullRequests(branches, options) {
       if (!isValidCwd(repoId)) return null
       const branchSet = normalizeRequestedBranches(branches)
@@ -412,6 +433,10 @@ async function createRemoteRepoSource(repoId: string): Promise<RepoSource> {
     async getStatus(signal) {
       const status = await getRemoteStatus(target, { signal })
       return signal?.aborted ? [] : status
+    },
+    async getStatusAndWorktrees(signal) {
+      const result = await getRemoteStatusAndWorktrees(target, { signal })
+      return signal?.aborted ? { statuses: [], worktrees: [] } : result
     },
     async getPullRequests(branches, options) {
       const branchSet = normalizeRequestedBranches(branches)

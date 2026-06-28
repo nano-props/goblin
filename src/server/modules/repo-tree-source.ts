@@ -20,7 +20,7 @@ import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import { glob } from 'tinyglobby'
 import type { RepoTreeNode, RepoTreeNodeStatus } from '#/shared/api-types.ts'
-import type { WorktreeStatus } from '#/shared/git-types.ts'
+import type { WorktreeInfo, WorktreeStatus } from '#/shared/git-types.ts'
 import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
 import { getRemoteTreeWalk } from '#/system/ssh/git.ts'
 
@@ -120,6 +120,11 @@ export interface GetRepoTreeSourceRemoteInput {
   readonly options: RepoTreeSourceOptions
   readonly signal: AbortSignal | undefined
   readonly precomputedStatus: ReadonlyArray<WorktreeStatus> | undefined
+  /** Worktree list from `getRemoteStatusAndWorktrees`. When supplied
+   *  the underlying `getRemoteTreeWalk` skips its own
+   *  `gitWorktreeList` round trip -- the second SSH call on the
+   *  remote `/tree` read path becomes the only one. */
+  readonly knownWorktrees?: ReadonlyArray<WorktreeInfo>
 }
 
 /** SSH implementation of the source layer. The remote side runs a
@@ -137,7 +142,7 @@ export interface GetRepoTreeSourceRemoteInput {
 export async function getRepoTreeSourceRemote(
   input: GetRepoTreeSourceRemoteInput,
 ): Promise<RepoTreeSourceResult> {
-  const { target, worktreePath, options, signal, precomputedStatus } = input
+  const { target, worktreePath, options, signal, precomputedStatus, knownWorktrees } = input
   if (signal?.aborted) return { nodes: [], truncated: false }
 
   const depth = clampDepth(options.depth ?? MAX_REPO_TREE_DEPTH)
@@ -145,7 +150,11 @@ export async function getRepoTreeSourceRemote(
 
   let remoteResult
   try {
-    remoteResult = await getRemoteTreeWalk(target, worktreePath, { signal, depth })
+    remoteResult = await getRemoteTreeWalk(target, worktreePath, {
+      signal,
+      depth,
+      ...(knownWorktrees ? { knownWorktrees } : {}),
+    })
   } catch (err) {
     if (signal?.aborted) return { nodes: [], truncated: false }
     // Surface as an empty result so the read layer does not 500.
