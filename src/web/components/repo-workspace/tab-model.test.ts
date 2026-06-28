@@ -23,7 +23,6 @@ describe('repo workspace pane tab model', () => {
       terminalSessionCount: 1,
       terminalSyncReady: true,
       selectedTerminalKey: null,
-      lastClosedTabContext: null,
     })
 
     expect(model.worktreeTerminalKey).toBe(WORKTREE_KEY)
@@ -49,7 +48,6 @@ describe('repo workspace pane tab model', () => {
       terminalSessionCount: 2,
       terminalSyncReady: true,
       selectedTerminalKey: 'session-2',
-      lastClosedTabContext: null,
     })
 
     expect(model.renderedTab).toBe('terminal')
@@ -70,7 +68,6 @@ describe('repo workspace pane tab model', () => {
       terminalCreatePending: true,
       terminalSyncReady: true,
       selectedTerminalKey: null,
-      lastClosedTabContext: null,
     })
 
     expect(model.renderedTab).toBe('terminal')
@@ -94,7 +91,6 @@ describe('repo workspace pane tab model', () => {
       terminalCreatePending: false,
       terminalSyncReady: false,
       selectedTerminalKey: null,
-      lastClosedTabContext: null,
     })
 
     expect(model.renderedTab).toBe('terminal')
@@ -114,7 +110,6 @@ describe('repo workspace pane tab model', () => {
       terminalSessionCount: 0,
       terminalSyncReady: true,
       selectedTerminalKey: null,
-      lastClosedTabContext: null,
     })
 
     // The user's preferred tab (changes) was closed; the model surfaces
@@ -142,7 +137,6 @@ describe('repo workspace pane tab model', () => {
       terminalSessionCount: 1,
       terminalSyncReady: true,
       selectedTerminalKey: null,
-      lastClosedTabContext: null,
     })
 
     // The user's preferred tab (history) has no materialized tab; the
@@ -169,7 +163,6 @@ describe('repo workspace pane tab model', () => {
       terminalSessionCount: 1,
       terminalSyncReady: true,
       selectedTerminalKey: null,
-      lastClosedTabContext: null,
     })
 
     expect(model.terminalViews).toEqual([])
@@ -194,7 +187,6 @@ describe('repo workspace pane tab model', () => {
       terminalSessionCount: 0,
       terminalSyncReady: true,
       selectedTerminalKey: null,
-      lastClosedTabContext: null,
     })
 
     expect(model.selection).toEqual({
@@ -223,7 +215,6 @@ describe('repo workspace pane tab model', () => {
       terminalSessionCount: 1,
       terminalSyncReady: true,
       selectedTerminalKey: 'session-2',
-      lastClosedTabContext: null,
     })
 
     expect(model.selection).toMatchObject({
@@ -251,7 +242,6 @@ describe('repo workspace pane tab model', () => {
       terminalCreatePending: true,
       terminalSyncReady: true,
       selectedTerminalKey: null,
-      lastClosedTabContext: null,
     })
 
     expect(model.selection).toEqual({ kind: 'terminal-host', tab: 'terminal', materializedTab: null })
@@ -260,10 +250,9 @@ describe('repo workspace pane tab model', () => {
   })
 
   test('keeps terminal-host while create is pending after the last tab was closed', () => {
-    // Regression: closing every workspace tab leaves a close context behind.
-    // Creating a terminal from that empty strip must still mount the
-    // terminal host; otherwise the projection waits for host geometry until it
-    // times out with error.terminal-host-not-measurable.
+    // Creating a terminal from an empty strip must still mount the terminal
+    // host; otherwise the projection waits for host geometry until it times
+    // out with error.terminal-host-not-measurable.
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
       branchName: 'feature/model',
@@ -275,10 +264,6 @@ describe('repo workspace pane tab model', () => {
       terminalCreatePending: true,
       terminalSyncReady: true,
       selectedTerminalKey: null,
-      lastClosedTabContext: {
-        closingIdentity: 'status:status',
-        previousTabIdentities: ['status:status'],
-      },
     })
 
     expect(model.selection).toEqual({ kind: 'terminal-host', tab: 'terminal', materializedTab: null })
@@ -303,7 +288,6 @@ describe('repo workspace pane tab model', () => {
       terminalCreatePending: false,
       terminalSyncReady: false,
       selectedTerminalKey: null,
-      lastClosedTabContext: null,
     })
 
     expect(model.selection).toEqual({ kind: 'terminal-host', tab: 'terminal', materializedTab: null })
@@ -322,7 +306,6 @@ describe('repo workspace pane tab model', () => {
       terminalSessionCount: 0,
       terminalSyncReady: true,
       selectedTerminalKey: null,
-      lastClosedTabContext: null,
     })
 
     // No branch, no materialized tabs, no fallback — UI shows the empty
@@ -333,92 +316,9 @@ describe('repo workspace pane tab model', () => {
     expect(model.activeTab).toBeNull()
   })
 
-  test('lands on the spatial neighbor via lastClosedTabContext when the only terminal in a mixed strip is closed', () => {
-    // Regression: preferred=terminal + tabOrder=[status, session-1, changes] +
-    // the last terminal exits. The store records closingIdentity=session-1
-    // with the pre-close tab identities; the model uses it to surface changes
-    // (the spatial neighbor of session-1) instead of status (tabs[0]).
-    const model = createRepoWorkspaceTabModel({
-      repoId: REPO_ID,
-      branchName: 'feature/model',
-      worktreePath: WORKTREE_PATH,
-      preferredTab: 'terminal',
-      tabOrder: [staticEntry('status'), staticEntry('changes')],
-      runtimeTerminalViews: [],
-      terminalSessionCount: 0,
-      terminalSyncReady: true,
-      selectedTerminalKey: null,
-      lastClosedTabContext: {
-        closingIdentity: 'terminal:session-1',
-        previousTabIdentities: ['status:status', 'terminal:session-1', 'changes:changes'],
-      },
-    })
-
-    expect(model.selection).toEqual({
-      kind: 'materialized-tab',
-      tab: 'changes',
-      materializedTab: { identity: 'changes:changes', kind: 'static', type: 'changes', view: null },
-    })
-    expect(model.renderedTab).toBe('changes')
-    expect(model.activeTab?.identity).toBe('changes:changes')
-  })
-
-  test('falls back to tabs[0] when lastClosedTabContext has no neighbor (single tab closed)', () => {
-    // Closing the only tab in a [status] strip: pre-close has only status,
-    // so there is no neighbor to surface. The model falls back to its
-    // generic tabs[0] lookup, which is also null here, and returns no
-    // selection.
-    const model = createRepoWorkspaceTabModel({
-      repoId: REPO_ID,
-      branchName: 'feature/model',
-      worktreePath: WORKTREE_PATH,
-      preferredTab: 'changes',
-      tabOrder: [],
-      runtimeTerminalViews: [],
-      terminalSessionCount: 0,
-      terminalSyncReady: true,
-      selectedTerminalKey: null,
-      lastClosedTabContext: {
-        closingIdentity: 'status:status',
-        previousTabIdentities: ['status:status'],
-      },
-    })
-
-    expect(model.selection).toBeNull()
-    expect(model.renderedTab).toBeNull()
-  })
-
-  test('ignores lastClosedTabContext when the preferred tab is renderable', () => {
-    // If the user closes a tab but their preferred tab is still open, the
-    // model picks the preferred tab directly — lastClosedTabContext only
-    // applies when the preferred tab became unrenderable.
-    const model = createRepoWorkspaceTabModel({
-      repoId: REPO_ID,
-      branchName: 'feature/model',
-      worktreePath: WORKTREE_PATH,
-      preferredTab: 'status',
-      tabOrder: [staticEntry('status'), staticEntry('changes')],
-      runtimeTerminalViews: [],
-      terminalSessionCount: 0,
-      terminalSyncReady: true,
-      selectedTerminalKey: null,
-      lastClosedTabContext: {
-        closingIdentity: 'changes:changes',
-        previousTabIdentities: ['status:status', 'changes:changes'],
-      },
-    })
-
-    expect(model.selection).toEqual({
-      kind: 'materialized-tab',
-      tab: 'status',
-      materializedTab: { identity: 'status:status', kind: 'static', type: 'status', view: null },
-    })
-  })
-
-  test('falls back to tabs[0] for server-side exits with no lastClosedTabContext', () => {
+  test('falls back to tabs[0] for server-side exits', () => {
     // The last terminal exits externally (registry onTerminalSessionRemoved),
-    // no user-initiated close recorded. The model has no adjacency hint, so
-    // it uses the generic tabs[0] fallback.
+    // so the model uses the generic tabs[0] fallback.
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
       branchName: 'feature/model',
@@ -429,7 +329,6 @@ describe('repo workspace pane tab model', () => {
       terminalSessionCount: 0,
       terminalSyncReady: true,
       selectedTerminalKey: null,
-      lastClosedTabContext: null,
     })
 
     expect(model.selection).toEqual({
@@ -450,7 +349,6 @@ describe('repo workspace pane tab model', () => {
       terminalSessionCount: 1,
       terminalSyncReady: true,
       selectedTerminalKey: 'session-1',
-      lastClosedTabContext: null,
     })
 
     expect(nextRepoWorkspaceTabAfterClose(model.tabs, 'status:status')?.identity).toBe('terminal:session-1')
@@ -470,7 +368,6 @@ describe('repo workspace pane tab model', () => {
       terminalCreatePending: true,
       terminalSyncReady: true,
       selectedTerminalKey: null,
-      lastClosedTabContext: null,
     })
 
     expect(nextRepoWorkspaceTabAfterClose(model.tabs, 'status:status')).toBeNull()
@@ -487,7 +384,6 @@ describe('repo workspace pane tab model', () => {
       terminalSessionCount: 2,
       terminalSyncReady: true,
       selectedTerminalKey: 'session-2',
-      lastClosedTabContext: null,
     })
 
     expect(adjacentRepoWorkspaceTab(model.tabs, model.activeTab?.identity, 1)?.identity).toBe('changes:changes')
@@ -496,11 +392,7 @@ describe('repo workspace pane tab model', () => {
     expect(adjacentRepoWorkspaceTab(model.tabs, 'missing:missing', 1)).toBeNull()
   })
 
-  test('prefers the spatial neighbor when the active terminal is closed and another terminal remains', () => {
-    // Regression: with preferred=terminal and a mixed strip, closing the active
-    // rightmost terminal must land on the adjacent tab in strip order (the
-    // static tab in the middle), not jump to the leftmost remaining terminal
-    // just because the terminal tab is still renderable.
+  test('keeps the current terminal selection when another terminal remains selected', () => {
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
       branchName: 'feature/model',
@@ -511,40 +403,6 @@ describe('repo workspace pane tab model', () => {
       terminalSessionCount: 2,
       terminalSyncReady: true,
       selectedTerminalKey: 'session-2',
-      lastClosedTabContext: {
-        closingIdentity: 'terminal:session-2',
-        previousTabIdentities: ['terminal:session-1', 'status:status', 'terminal:session-2'],
-        wasActive: true,
-      },
-    })
-
-    expect(model.selection).toEqual({
-      kind: 'materialized-tab',
-      tab: 'status',
-      materializedTab: { identity: 'status:status', kind: 'static', type: 'status', view: null },
-    })
-    expect(model.renderedTab).toBe('status')
-    expect(model.activeTab?.identity).toBe('status:status')
-  })
-
-  test('keeps the current terminal selection when a background terminal is closed', () => {
-    // Closing a non-active terminal must not hijack the active selection via
-    // the spatial neighbor logic.
-    const model = createRepoWorkspaceTabModel({
-      repoId: REPO_ID,
-      branchName: 'feature/model',
-      worktreePath: WORKTREE_PATH,
-      preferredTab: 'terminal',
-      tabOrder: [terminalEntry('session-1'), staticEntry('status'), terminalEntry('session-2')],
-      runtimeTerminalViews: [terminalView('session-1', 1, false), terminalView('session-2', 2, false)],
-      terminalSessionCount: 2,
-      terminalSyncReady: true,
-      selectedTerminalKey: 'session-2',
-      lastClosedTabContext: {
-        closingIdentity: 'terminal:session-1',
-        previousTabIdentities: ['terminal:session-1', 'status:status', 'terminal:session-2'],
-        wasActive: false,
-      },
     })
 
     expect(model.selection).toMatchObject({ kind: 'materialized-tab', tab: 'terminal' })

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { readFileSync } from 'node:fs'
 import { describe, expect, test } from 'vitest'
 import { ToolbarTabList, ToolbarTabStrip, ToolbarTabStripBody } from '#/web/components/tab-strip/ToolbarTabStrip.tsx'
 import { renderInJsdom } from '#/test-utils/render.tsx'
@@ -42,14 +43,27 @@ describe('ToolbarTabStrip', () => {
     expect(host?.hasAttribute('data-interactive')).toBe(false)
     expect(scrollRoot?.className).toContain('w-fit')
     expect(scrollRoot?.className).toContain('max-w-full')
-    expect(scrollRoot?.hasAttribute('data-interactive')).toBe(false)
-    expect((scrollRoot as HTMLElement | null)?.dataset.titleBarChromeRegion).toBeUndefined()
+    expect(scrollRoot?.className).toContain('title-bar-scroll-region')
+    expect((scrollRoot as HTMLElement | null)?.dataset.scrollbarMode).toBe('compact')
+    expect(scrollRoot?.hasAttribute('data-interactive')).toBe(true)
+    expect((scrollRoot as HTMLElement | null)?.dataset.titleBarChromeRegion).toBe('interactive')
+    expect((scrollRoot as HTMLElement | null)?.hasAttribute('data-title-bar-scroll-region')).toBe(true)
+    expect(container.querySelector('button')?.dataset.titleBarChromeRegion).toBeUndefined()
     expect(dragRemainder?.getAttribute('aria-hidden')).toBe('true')
     expect((dragRemainder as HTMLElement | null)?.dataset.titleBarChromeRegion).toBe('drag')
     expect(dragRemainder?.className).toContain('flex-1')
     expect(container.querySelector('[data-testid="scroll-marker"]')).not.toBeNull()
     expect(container.querySelector('button')?.textContent).toBe('Tab')
     expect(container.querySelector('[data-testid="compact-marker"]')).toBeNull()
+  })
+
+  test('scopes app-region no-drag to the visible scroll root', () => {
+    const styles = readFileSync('src/web/styles.css', 'utf8')
+
+    expect(styles).toContain('.title-bar-scroll-region {')
+    expect(styles).toContain('-webkit-app-region: no-drag;')
+    expect(styles).toContain('.title-bar-scroll-region button')
+    expect(styles).toContain("-webkit-app-region: initial;")
   })
 })
 

@@ -75,35 +75,6 @@ export interface RepoUiState {
   /** Branch-scoped selected workspace pane tab. Branch switches read this
    *  first so selecting a tab on one branch does not select it on another. */
   preferredWorkspacePaneTabByBranch: Record<string, WorkspacePaneTabType>
-  /**
-   * Per-branch hint about the most recent user-initiated workspace pane tab
-   * close. Set by `setLastClosedTabContext` after `runCloseWorkspacePaneTabCommand`
-   * commits. Read by `createRepoWorkspaceTabModel` to prefer the spatial
-   * neighbor of the closed tab over the generic tabs[0] fallback when the
-   * preferred tab becomes unrenderable, and also when the closed tab was the
-   * active tab so the workspace pane does not jump to a different remaining
-   * terminal instead of the adjacent tab. Overwritten by the next close on the
-   * same branch.
-   *
-   * Runtime-coherent only: not persisted to WorkspaceSessionState and not restored on
-   * relaunch. A fresh session starts with an empty record; the first user
-   * close populates it for that branch. Context is cleared by explicit
-   * selection/tab-order changes so a stale close hint cannot override later
-   * user intent.
-   */
-  lastClosedTabContextByBranch: Record<
-    string,
-    {
-      closingIdentity: string
-      /** Pre-close tab identities in tab order. Sufficient for the model
-       *  to compute adjacency without storing the full tab model. */
-      previousTabIdentities: readonly string[]
-      /** True when the closed tab was the active tab at the moment of close.
-       *  The model uses this to prefer the spatial neighbor even if the user's
-       *  preferred tab (e.g. terminal) remains renderable via another tab. */
-      wasActive?: boolean
-    } | null
-  >
 }
 
 interface RepoProjectionMeta {
@@ -246,17 +217,6 @@ interface RuntimeCoherentRepoProjectionActions {
   addAndFocusWorkspacePaneTerminalTab: (id: string, terminalKey: string, branchName?: string) => void
   removeWorkspacePaneTerminalTab: (id: string, terminalKey: string, branchName?: string) => void
   reorderWorkspacePaneTabs: (id: string, orderedTabs: WorkspacePaneTabOrderEntry[], branchName?: string) => void
-  /** Records the most recent user-initiated close on a branch so the
-   *  workspace pane tab model can prefer the spatial neighbor of the
-   *  closed tab when the preferred tab becomes unrenderable or when the
-   *  closed tab was the active tab. The pre-close tab identities carry
-   *  enough information for the model to compute the neighbor without the
-   *  command imperatively re-selecting anything. */
-  setLastClosedTabContext: (
-    id: string,
-    branchName: string,
-    context: { closingIdentity: string; previousTabIdentities: readonly string[]; wasActive?: boolean },
-  ) => void
   setBranchViewMode: (id: string, viewMode: BranchViewMode) => void
   selectBranch: (id: string, branch: string) => void
   clearSelectedBranch: (id: string) => void

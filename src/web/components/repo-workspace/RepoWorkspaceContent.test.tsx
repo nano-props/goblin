@@ -503,10 +503,6 @@ describe('RepoWorkspaceContent', () => {
       workspacePaneTabOrderByBranch: { [branchName]: [] },
     })
     useRepoSyncStore.getState().markReady(REPO_ID, seededRepo.instanceToken)
-    useReposStore.getState().setLastClosedTabContext(REPO_ID, branchName, {
-      closingIdentity: 'status:status',
-      previousTabIdentities: ['status:status'],
-    })
     const repo = useReposStore.getState().repos[REPO_ID]!
     const detail = getSelectedRepoWorkspacePresentation(repo)
     const registerHost = vi.fn()

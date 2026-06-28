@@ -36,6 +36,7 @@ export const ScrollArea = forwardRef<ComponentRef<typeof ScrollAreaPrimitive.Roo
         ref={ref}
         type={type}
         scrollHideDelay={scrollHideDelay}
+        data-scrollbar-mode={scrollbarMode}
         className={cn('relative overflow-hidden flex flex-col', className)}
         {...props}
       >

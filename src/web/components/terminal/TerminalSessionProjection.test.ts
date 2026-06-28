@@ -448,11 +448,98 @@ describe('TerminalSessionProjection', () => {
       await Promise.resolve()
 
       expect(projection.isKnownSession(key)).toBe(true)
+      expect(projection.worktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+      expect(projection.worktreeSnapshot(WORKTREE_KEY).selectedDescriptor).toBeNull()
       expect(settled).toBe(false)
 
       resolveClose()
       await expect(closePromise).resolves.toBe(true)
       expect(settled).toBe(true)
+      expect(projection.isKnownSession(key)).toBe(false)
+    })
+
+    test('closeTerminalByDescriptor selects an adjacent terminal before server close settles', async () => {
+      projection.setRepoIndex(makeRepoIndex())
+      projection.reconcileServerSessions(
+        REPO_ROOT,
+        [
+          makeServerSession('pty_session_1_aaaaaaaaa', 'session-1', { displayOrder: 0 }),
+          makeServerSession('pty_session_2_aaaaaaaaa', 'session-2', { displayOrder: 1 }),
+          makeServerSession('pty_session_3_aaaaaaaaa', 'session-3', { displayOrder: 2 }),
+        ],
+        'client_local',
+        new Map(),
+      )
+
+      const activeKey = projection
+        .worktreeSnapshot(WORKTREE_KEY)
+        .sessions.find((session) => session.sessionId === 'session-2')?.key
+      if (!activeKey) throw new Error('missing session-2')
+      projection.selectTerminal(WORKTREE_KEY, activeKey)
+      const session = (projection as any).sessions.get(activeKey)
+      let resolveClose!: () => void
+      vi.spyOn(session, 'closeServerResourcesAndWait').mockImplementation(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveClose = resolve
+          }),
+      )
+
+      const closePromise = projection.closeTerminalByDescriptor(activeKey, {
+        repoRoot: REPO_ROOT,
+        branch: BRANCH,
+        worktreePath: WORKTREE_PATH,
+      })
+      await Promise.resolve()
+
+      const closingSnapshot = projection.worktreeSnapshot(WORKTREE_KEY)
+      expect(closingSnapshot.sessions.map((item) => item.sessionId)).toEqual(['session-1', 'session-3'])
+      expect(closingSnapshot.selectedDescriptor?.sessionId).toBe('session-3')
+
+      resolveClose()
+      await expect(closePromise).resolves.toBe(true)
+      expect(projection.worktreeSnapshot(WORKTREE_KEY).sessions.map((item) => item.sessionId)).toEqual([
+        'session-1',
+        'session-3',
+      ])
+    })
+
+    test('closeTerminalByDescriptor deduplicates repeated closes for the same terminal key', async () => {
+      projection.setRepoIndex(makeRepoIndex())
+      projection.reconcileServerSessions(
+        REPO_ROOT,
+        [makeServerSession('pty_session_1_aaaaaaaaa', 'session-1')],
+        'client_local',
+        new Map(),
+      )
+      const key = projection.worktreeSnapshot(WORKTREE_KEY).sessions[0]!.key
+      const session = (projection as any).sessions.get(key)
+      let resolveClose!: () => void
+      const closeServerResourcesAndWait = vi.spyOn(session, 'closeServerResourcesAndWait').mockImplementation(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveClose = resolve
+          }),
+      )
+
+      const firstClose = projection.closeTerminalByDescriptor(key, {
+        repoRoot: REPO_ROOT,
+        branch: BRANCH,
+        worktreePath: WORKTREE_PATH,
+      })
+      const secondClose = projection.closeTerminalByDescriptor(key, {
+        repoRoot: REPO_ROOT,
+        branch: BRANCH,
+        worktreePath: WORKTREE_PATH,
+      })
+      await Promise.resolve()
+
+      expect(closeServerResourcesAndWait).toHaveBeenCalledTimes(1)
+      expect(projection.worktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+
+      resolveClose()
+      await expect(firstClose).resolves.toBe(true)
+      await expect(secondClose).resolves.toBe(true)
       expect(projection.isKnownSession(key)).toBe(false)
     })
 
@@ -466,18 +553,31 @@ describe('TerminalSessionProjection', () => {
       )
       const key = projection.worktreeSnapshot(WORKTREE_KEY).sessions[0]!.key
       const session = (projection as any).sessions.get(key)
-      vi.spyOn(session, 'closeServerResourcesAndWait').mockRejectedValue(new Error('close failed'))
+      let rejectClose!: (error: Error) => void
+      vi.spyOn(session, 'closeServerResourcesAndWait').mockImplementation(
+        () =>
+          new Promise<void>((_, reject) => {
+            rejectClose = reject
+          }),
+      )
       const dispose = vi.spyOn(session, 'dispose')
 
-      await expect(
-        projection.closeTerminalByDescriptor(key, {
-          repoRoot: REPO_ROOT,
-          branch: BRANCH,
-          worktreePath: WORKTREE_PATH,
-        }),
-      ).resolves.toBe(false)
+      const closePromise = projection.closeTerminalByDescriptor(key, {
+        repoRoot: REPO_ROOT,
+        branch: BRANCH,
+        worktreePath: WORKTREE_PATH,
+      })
+      await Promise.resolve()
+
+      expect(projection.worktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+
+      const expectation = expect(closePromise).resolves.toBe(false)
+      rejectClose(new Error('close failed'))
+      await expectation
 
       expect(projection.isKnownSession(key)).toBe(true)
+      expect(projection.worktreeSnapshot(WORKTREE_KEY).count).toBe(1)
+      expect(projection.worktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.sessionId).toBe('session-1')
       expect(dispose).not.toHaveBeenCalled()
     })
 

@@ -91,6 +91,21 @@ button,
   -webkit-app-region: drag;
 }
 
+/* Native app-region does not reliably clip descendant no-drag rectangles to
+ * scroll viewports. Keep scrollable title-bar controls interactive by carving
+ * out only the visible scroll root, then neutralize descendant controls so
+ * offscreen tabs cannot suppress dragging in neighboring title-bar panes. */
+.title-bar-scroll-region {
+  -webkit-app-region: no-drag;
+}
+
+.title-bar-scroll-region button,
+.title-bar-scroll-region [data-interactive],
+.title-bar-scroll-region [data-title-bar-chrome-region='interactive'],
+.title-bar-scroll-region [data-title-bar-chrome-region='no-drag'] {
+  -webkit-app-region: initial;
+}
+
 /* Zen-mode overlay is only a layout/hit-test surface. The underlying
  * workspace toolbar or revealed sidebar owns blank-space dragging; the child
  * trigger opts out through an interactive chrome region. */

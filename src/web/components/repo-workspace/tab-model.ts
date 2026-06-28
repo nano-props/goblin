@@ -99,21 +99,6 @@ export interface RepoWorkspaceTabModelInput {
   terminalCreatePending?: boolean
   terminalSyncReady: boolean
   /**
-   * Set by `runCloseWorkspacePaneTabCommand` after a successful user-initiated
-   * close. The model uses `closingIdentity` to compute the spatial neighbor
-   * from `previousTabIdentities` (pre-close tab order), then looks the
-   * neighbor up in the current materialized tabs. Falls back to the generic
-   * tabs[0] fallback if no neighbor exists or the neighbor is no longer in
-   * the strip. Server-side terminal exits leave this null and use the
-   * generic fallback. Callers must pass `null` explicitly when they have no
-   * context to signal (e.g., the model is recomputed outside a close path).
-   */
-  lastClosedTabContext: {
-    closingIdentity: string
-    previousTabIdentities: readonly string[]
-    wasActive?: boolean
-  } | null
-  /**
    * Selected terminal session key for the current worktree from the repos store.
    * The model uses this as the canonical source for which terminal tab is
    * active, making the workspace pane tab model the single authority for
@@ -139,12 +124,7 @@ export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): 
   const materializedActiveTab = candidateTab
     ? activeRepoWorkspaceTab(materializedTabs, candidateTab, input.selectedTerminalKey)
     : null
-  const selection = workspacePaneSelection(
-    candidateTab,
-    materializedActiveTab,
-    materializedTabs,
-    input.lastClosedTabContext,
-  )
+  const selection = workspacePaneSelection(candidateTab, materializedActiveTab, materializedTabs)
   const pendingTab =
     selection?.kind === 'terminal-host' && input.terminalCreatePending ? pendingTerminalWorkspacePaneTab() : null
   const tabs = pendingTab ? [...materializedTabs, pendingTab] : materializedTabs
@@ -276,68 +256,18 @@ function workspacePaneSelection(
   renderableTab: WorkspacePaneTabType | null,
   activeTab: RepoWorkspaceMaterializedTab | null,
   materializedTabs: readonly RepoWorkspaceMaterializedTab[],
-  lastClosedTabContext: {
-    closingIdentity: string
-    previousTabIdentities: readonly string[]
-    wasActive?: boolean
-  } | null,
 ): RepoWorkspaceSelection | null {
-  // User-initiated close of the active tab: prefer the spatial neighbor in the
-  // tab strip even if the user's preferred tab is still renderable through
-  // another tab. Without this, closing the rightmost terminal when another
-  // terminal exists would let the terminal runtime's selection jump over
-  // intervening static tabs to a different terminal.
-  if (lastClosedTabContext?.wasActive) {
-    const neighborIdentity = adjacentIdentityAfterClose(
-      lastClosedTabContext.previousTabIdentities,
-      lastClosedTabContext.closingIdentity,
-    )
-    if (neighborIdentity) {
-      const neighbor = materializedTabs.find((tab) => tab.identity === neighborIdentity)
-      if (neighbor) return { kind: 'materialized-tab', tab: neighbor.type, materializedTab: neighbor }
-    }
-  }
   if (activeTab) return { kind: 'materialized-tab', tab: activeTab.type, materializedTab: activeTab }
-  // Terminal-host is reserved for the "actively waiting" states — the user
-  // wants the terminal tab but no terminal session exists yet, so we keep
-  // the new-terminal affordance reachable. A retained close context is only
-  // useful once the preferred tab is unrenderable; it must not hide the host
-  // that pending terminal creation needs for geometry.
+  // Terminal-host is reserved for the "actively waiting" states: the user
+  // wants the terminal tab but no terminal session exists yet, so the new
+  // terminal affordance and geometry host remain mounted.
   if (renderableTab === 'terminal') {
     return { kind: 'terminal-host', tab: 'terminal', materializedTab: null }
   }
-  // User-initiated close of a background tab, or the preferred tab became
-  // unrenderable as a result of the close: prefer the spatial neighbor from
-  // the pre-close tab order. Falls back to the generic tabs[0] lookup below
-  // if no neighbor exists or the neighbor was removed by a subsequent action.
-  if (lastClosedTabContext) {
-    const neighborIdentity = adjacentIdentityAfterClose(
-      lastClosedTabContext.previousTabIdentities,
-      lastClosedTabContext.closingIdentity,
-    )
-    if (neighborIdentity) {
-      const neighbor = materializedTabs.find((tab) => tab.identity === neighborIdentity)
-      if (neighbor) return { kind: 'materialized-tab', tab: neighbor.type, materializedTab: neighbor }
-    }
-  }
   // Generic fallback: the preferred tab is unrenderable (no backing tab)
-  // and either no user-initiated close was recorded, or the neighbor lookup
-  // failed. Surface the first materialized tab so the user does not land on
-  // the empty pane.
+  // so surface the first materialized tab instead of landing on an empty pane.
   const firstTab = materializedTabs[0]
   if (firstTab) return { kind: 'materialized-tab', tab: firstTab.type, materializedTab: firstTab }
-  return null
-}
-
-function adjacentIdentityAfterClose(identities: readonly string[], closingIdentity: string): string | null {
-  const closingIndex = identities.indexOf(closingIdentity)
-  if (closingIndex === -1) return null
-  for (let offset = 1; offset < identities.length; offset += 1) {
-    const forward = identities[closingIndex + offset]
-    if (forward !== undefined && forward !== closingIdentity) return forward
-    const backward = identities[closingIndex - offset]
-    if (backward !== undefined && backward !== closingIdentity) return backward
-  }
   return null
 }
 

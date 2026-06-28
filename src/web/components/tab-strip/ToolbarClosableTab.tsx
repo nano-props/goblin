@@ -1,5 +1,11 @@
 import { X } from 'lucide-react'
-import type { ComponentPropsWithoutRef, ReactNode, Ref } from 'react'
+import type {
+  ComponentPropsWithoutRef,
+  MouseEvent as ReactMouseEvent,
+  PointerEvent as ReactPointerEvent,
+  ReactNode,
+  Ref,
+} from 'react'
 import { cn } from '#/web/lib/cn.ts'
 
 type DataAttributes = {
@@ -9,6 +15,7 @@ type DataAttributes = {
 type ToolbarClosableTabContainerProps = Omit<ComponentPropsWithoutRef<'div'>, 'children' | 'className'> & DataAttributes
 type ToolbarClosableTabButtonProps = Omit<ComponentPropsWithoutRef<'button'>, 'children' | 'className' | 'ref'> &
   DataAttributes
+type ToolbarTabCloseEvent = ReactMouseEvent<HTMLButtonElement>
 
 interface ToolbarClosableTabBaseProps {
   containerRef?: Ref<HTMLDivElement>
@@ -27,7 +34,7 @@ type ToolbarClosableTabProps = ToolbarClosableTabBaseProps &
         closeLabel: string
         closeVisible: boolean
         closeButton?: true
-        onClose: (event: React.MouseEvent<HTMLButtonElement>) => void
+        onClose: (event: ToolbarTabCloseEvent) => void
       }
     | {
         closeButton: false
@@ -68,21 +75,50 @@ export function ToolbarClosableTab({
         {children}
       </button>
       {closeProps.closeButton !== false && (
-        <button
-          type="button"
-          tabIndex={-1}
-          aria-label={closeProps.closeLabel}
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={closeProps.onClose}
-          className={cn(
-            'cursor-pointer rounded border-0 bg-transparent p-0.5 text-muted-foreground transition-colors duration-100 hover:bg-accent hover:text-accent-foreground',
-            closeProps.closeVisible ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
-          )}
-          title={closeProps.closeLabel}
-        >
-          <X size={14} />
-        </button>
+        <ToolbarTabCloseAction
+          label={closeProps.closeLabel}
+          visible={closeProps.closeVisible}
+          onClose={closeProps.onClose}
+        />
       )}
     </div>
+  )
+}
+
+interface ToolbarTabCloseActionProps {
+  label: string
+  visible: boolean
+  onClose: (event: ToolbarTabCloseEvent) => void
+}
+
+const TOOLBAR_TAB_CLOSE_BASE_CLASS =
+  'relative z-10 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0.5 text-muted-foreground transition-colors duration-100 before:absolute before:-inset-x-1.5 before:-inset-y-1 before:content-[""] hover:bg-accent hover:text-accent-foreground'
+
+function toolbarTabCloseVisibilityClassName(visible: boolean): string {
+  return visible
+    ? 'pointer-events-auto opacity-100'
+    : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100'
+}
+
+function stopToolbarTabCloseDragStart(event: ReactPointerEvent<HTMLButtonElement> | ReactMouseEvent<HTMLButtonElement>) {
+  event.stopPropagation()
+}
+
+function ToolbarTabCloseAction({ label, visible, onClose }: ToolbarTabCloseActionProps) {
+  return (
+    // Keep the visible close affordance at its original size while giving
+    // the action enough hit slop to match the parent tab hover area.
+    <button
+      type="button"
+      tabIndex={-1}
+      aria-label={label}
+      onPointerDown={stopToolbarTabCloseDragStart}
+      onMouseDown={stopToolbarTabCloseDragStart}
+      onClick={onClose}
+      className={cn(TOOLBAR_TAB_CLOSE_BASE_CLASS, toolbarTabCloseVisibilityClassName(visible))}
+      title={label}
+    >
+      <X size={14} />
+    </button>
   )
 }
