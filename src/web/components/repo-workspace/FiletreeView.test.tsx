@@ -241,3 +241,234 @@ describe('FiletreeView', () => {
     expect(true).toBe(true)
   })
 })
+
+describe('FiletreeView — keyboard navigation (F7)', () => {
+  // Helper: build a small three-level tree with two root entries and
+  // a fully-populated child branch, so navigation has somewhere to go.
+  function buildTree(): RepoTreeResult {
+    return {
+      nodes: [
+        dirNode('src'),
+        dirNode('src/util', 'src'),
+        fileNode('src/index.ts', 'src'),
+        fileNode('src/util/helper.ts', 'src/util'),
+        fileNode('README.md'),
+      ],
+      truncated: false,
+    }
+  }
+
+  // Helper: the `[role="button"]` rows rendered in DOM order. Each
+  // entry corresponds to one treeitem li.
+  function visibleRows(): HTMLElement[] {
+    return Array.from(
+      container?.querySelectorAll('li [role="button"]') ?? [],
+    ) as HTMLElement[]
+  }
+
+  // Helper: dispatch a keydown on the row whose data-filetree-row
+  // matches `id`.
+  function keyDown(id: string, key: string): void {
+    const row = container?.querySelector(
+      `[data-filetree-row="${id}"]`,
+    ) as HTMLElement | null
+    if (!row) throw new Error(`no row for id=${id}`)
+    act(() => {
+      row.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }))
+    })
+  }
+
+  function tabIndexedRows(): HTMLElement[] {
+    return visibleRows().filter((row) => row.tabIndex === 0)
+  }
+
+  test('initially places roving tabindex on the first visible row only', () => {
+    const tree: RepoTreeResult = { nodes: [dirNode('src'), fileNode('README.md')], truncated: false }
+    renderView({ tree, loading: false, error: null, stale: false })
+
+    const tabbables = tabIndexedRows()
+    expect(tabbables).toHaveLength(1)
+    // First visible row is "src" (directories render before files at
+    // the same depth).
+    expect(tabbables[0]?.getAttribute('data-filetree-row')).toBe('src')
+    // Every other row is tabIndex=-1.
+    const others = visibleRows().filter((row) => row.tabIndex === -1)
+    expect(others).toHaveLength(1)
+  })
+
+  test('ArrowDown moves focus to the next visible row and updates the roving tabindex', async () => {
+    const tree = buildTree()
+    renderView({ tree, loading: false, error: null, stale: false })
+
+    keyDown('src', 'ArrowDown')
+
+    const tabbables = tabIndexedRows()
+    expect(tabbables).toHaveLength(1)
+    expect(tabbables[0]?.getAttribute('data-filetree-row')).toBe('README.md')
+  })
+
+  test('ArrowUp on the second row moves focus back to the first', async () => {
+    const tree = buildTree()
+    renderView({ tree, loading: false, error: null, stale: false })
+
+    // Move down to README.md, then back up to src.
+    keyDown('src', 'ArrowDown')
+    keyDown('README.md', 'ArrowUp')
+
+    const tabbables = tabIndexedRows()
+    expect(tabbables).toHaveLength(1)
+    expect(tabbables[0]?.getAttribute('data-filetree-row')).toBe('src')
+  })
+
+  test('ArrowDown on the last visible row stays put (no wrap)', async () => {
+    const tree = buildTree()
+    renderView({ tree, loading: false, error: null, stale: false })
+
+    keyDown('src', 'ArrowDown') // → README.md (last visible row)
+    keyDown('README.md', 'ArrowDown') // → no movement
+
+    const tabbables = tabIndexedRows()
+    expect(tabbables).toHaveLength(1)
+    expect(tabbables[0]?.getAttribute('data-filetree-row')).toBe('README.md')
+  })
+
+  test('ArrowUp on the first visible row stays put (no wrap)', async () => {
+    const tree = buildTree()
+    renderView({ tree, loading: false, error: null, stale: false })
+
+    keyDown('src', 'ArrowUp') // → no movement
+
+    const tabbables = tabIndexedRows()
+    expect(tabbables).toHaveLength(1)
+    expect(tabbables[0]?.getAttribute('data-filetree-row')).toBe('src')
+  })
+
+  test('ArrowRight on a collapsed directory expands it and focus stays on the directory', async () => {
+    const tree = buildTree()
+    renderView({ tree, loading: false, error: null, stale: false })
+
+    keyDown('src', 'ArrowRight')
+
+    const expandedLi = container?.querySelector('li[aria-expanded="true"]') as HTMLElement
+    expect(expandedLi).toBeTruthy()
+    // Focus remains on the directory; ArrowRight alone does not
+    // descend (the WAI-ARIA pattern keeps focus on the parent until
+    // a second ArrowRight or a single ArrowRight on an already-
+    // expanded directory).
+    const tabbables = tabIndexedRows()
+    expect(tabbables).toHaveLength(1)
+    expect(tabbables[0]?.getAttribute('data-filetree-row')).toBe('src')
+  })
+
+  test('ArrowRight on an already-expanded directory moves focus to its first child', async () => {
+    const tree = buildTree()
+    renderView({ tree, loading: false, error: null, stale: false })
+
+    keyDown('src', 'ArrowRight') // expand
+    keyDown('src', 'ArrowRight') // descend into first child
+
+    const tabbables = tabIndexedRows()
+    expect(tabbables).toHaveLength(1)
+    // childrenByParent ordering: directories before files at the
+    // same depth → first child is "src/util".
+    expect(tabbables[0]?.getAttribute('data-filetree-row')).toBe('src/util')
+  })
+
+  test('ArrowLeft on an expanded directory collapses it; focus stays on the directory', async () => {
+    const tree = buildTree()
+    renderView({ tree, loading: false, error: null, stale: false })
+
+    keyDown('src', 'ArrowRight') // expand
+    keyDown('src', 'ArrowLeft') // collapse
+
+    const expandedLi = container?.querySelector('li[aria-expanded="true"]')
+    expect(expandedLi).toBeNull()
+    const tabbables = tabIndexedRows()
+    expect(tabbables).toHaveLength(1)
+    expect(tabbables[0]?.getAttribute('data-filetree-row')).toBe('src')
+  })
+
+  test('ArrowLeft on a leaf file moves focus to the parent directory', async () => {
+    const tree = buildTree()
+    renderView({ tree, loading: false, error: null, stale: false })
+
+    // Expand src so src/index.ts is visible.
+    keyDown('src', 'ArrowRight')
+    // Focus is on src/index.ts after the second ArrowRight? No —
+    // after `keyDown('src', 'ArrowRight')` src is expanded but focus
+    // remains on src. We need to navigate into a child first.
+    keyDown('src', 'ArrowRight') // → src/util (first child)
+    keyDown('src/util', 'ArrowLeft') // → src (parent)
+    // Now src/util is collapsed; navigate to src/index.ts via ArrowDown.
+    keyDown('src', 'ArrowDown') // → first visible child of src, which is src/util (dir first)
+    keyDown('src/util', 'ArrowDown') // → src/index.ts
+    keyDown('src/index.ts', 'ArrowLeft') // → src
+
+    const tabbables = tabIndexedRows()
+    expect(tabbables).toHaveLength(1)
+    expect(tabbables[0]?.getAttribute('data-filetree-row')).toBe('src')
+  })
+
+  test('Home jumps focus to the first visible row', async () => {
+    const tree = buildTree()
+    renderView({ tree, loading: false, error: null, stale: false })
+
+    keyDown('README.md', 'Home')
+
+    const tabbables = tabIndexedRows()
+    expect(tabbables).toHaveLength(1)
+    expect(tabbables[0]?.getAttribute('data-filetree-row')).toBe('src')
+  })
+
+  test('End jumps focus to the last visible row', async () => {
+    const tree = buildTree()
+    renderView({ tree, loading: false, error: null, stale: false })
+
+    keyDown('src', 'End')
+
+    const tabbables = tabIndexedRows()
+    expect(tabbables).toHaveLength(1)
+    expect(tabbables[0]?.getAttribute('data-filetree-row')).toBe('README.md')
+  })
+
+  test('when the focused row disappears from the visible set, focus falls back to the first visible row', async () => {
+    const tree = buildTree()
+    renderView({ tree, loading: false, error: null, stale: false })
+
+    // Expand src so src/util and src/index.ts become visible.
+    keyDown('src', 'ArrowRight')
+    // Descend into src/util.
+    keyDown('src', 'ArrowRight')
+    // Collapse src — src/util disappears from the visible set.
+    keyDown('src', 'ArrowLeft')
+
+    const tabbables = tabIndexedRows()
+    expect(tabbables).toHaveLength(1)
+    expect(tabbables[0]?.getAttribute('data-filetree-row')).toBe('src')
+  })
+
+  test('changing the tree prop resets focus to the first visible row', async () => {
+    const treeA: RepoTreeResult = {
+      nodes: [dirNode('src'), fileNode('README.md')],
+      truncated: false,
+    }
+    renderView({ tree: treeA, loading: false, error: null, stale: false })
+
+    // Move focus away from the default.
+    keyDown('src', 'ArrowDown')
+
+    // New tree with a different first row.
+    const treeB: RepoTreeResult = {
+      nodes: [fileNode('CHANGELOG.md'), dirNode('docs')],
+      truncated: false,
+    }
+    await act(async () => {
+      root?.render(<FiletreeView tree={treeB} loading={false} error={null} stale={false} />)
+    })
+
+    const tabbables = tabIndexedRows()
+    expect(tabbables).toHaveLength(1)
+    // First visible row of treeB is the directory "docs".
+    expect(tabbables[0]?.getAttribute('data-filetree-row')).toBe('docs')
+  })
+})

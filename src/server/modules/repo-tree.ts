@@ -13,6 +13,7 @@
 //   - Do not call HTTP / route utilities here.
 //   - Do not import UI types.
 
+import path from 'node:path'
 import type { RepoTreeResult } from '#/shared/api-types.ts'
 import type { WorktreeInfo, WorktreeStatus } from '#/shared/git-types.ts'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
@@ -92,6 +93,24 @@ export async function getRepositoryTree(
     worktrees = combined.worktrees
   }
 
+  // F2: validate that `worktreePath` is a known worktree of this repo
+  // before we hand it to the source layer. The remote source already
+  // validates via `resolveKnownRemoteWorktree` (and returns the empty
+  // envelope when the path is unknown); this read-layer guard closes
+  // the same gap on the local side, where tinyglobby would happily
+  // walk any directory the caller names -- including paths outside
+  // the repo, which a hostile or buggy client could exploit.
+  //
+  // Validation runs against whichever worktree data we have on hand
+  // (freshly-fetched list, or the precomputed inputs). Bare worktrees
+  // are excluded because they have no working tree to walk. If we
+  // have no data at all (caller passed an empty `precomputedStatus`
+  // without `precomputedWorktrees`) we fall through and let the
+  // source layer's own error path produce the empty envelope.
+  if (!matchesKnownWorktree(worktrees, status, worktreePath)) {
+    return { nodes: [], truncated: false }
+  }
+
   const source = isRemote
     ? await getRepoTreeSourceRemote({
         target: remoteTarget as Awaited<ReturnType<typeof resolveRemoteRepoTarget>>,
@@ -103,4 +122,28 @@ export async function getRepositoryTree(
       })
     : await getRepoTreeSourceLocal(worktreePath, options, signal, status)
   return { nodes: source.nodes, truncated: source.truncated }
+}
+
+/** Return true when `worktreePath` matches a known (non-bare) worktree
+ *  in either the freshly-fetched list or the status report. Both
+ *  sources carry the worktree's path; matching against both keeps the
+ *  precomputedStatus-only code path honest. The comparison uses
+ *  `path.resolve` so trailing slashes / `.` / `..` segments do not
+ *  sneak past. */
+function matchesKnownWorktree(
+  worktrees: ReadonlyArray<WorktreeInfo> | undefined,
+  statuses: ReadonlyArray<WorktreeStatus>,
+  worktreePath: string,
+): boolean {
+  const resolved = path.resolve(worktreePath)
+  if (worktrees) {
+    for (const wt of worktrees) {
+      if (wt.isBare) continue
+      if (path.resolve(wt.path) === resolved) return true
+    }
+  }
+  for (const status of statuses) {
+    if (path.resolve(status.path) === resolved) return true
+  }
+  return false
 }

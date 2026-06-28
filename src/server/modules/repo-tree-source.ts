@@ -207,11 +207,17 @@ export async function getRepoTreeSourceRemote(
 }
 
 function parseNullSeparatedPaths(input: string): string[] {
+  // `find -print0` emits NUL-separated records with no line terminator
+  // on the last entry, so the only legitimate "junk" between records is
+  // the empty trailing element from the trailing NUL. We deliberately
+  // do NOT strip leading/trailing newlines from individual parts -- a
+  // path can legitimately contain an embedded newline when git status -z
+  // quotes it, and `find -print0` would still hand us the line-boundary
+  // inside that quoted segment. Touching the bytes here would silently
+  // mangle valid Linux paths. See parsers.test.ts: 'handles paths with
+  // embedded newlines (quoted paths in git status -z)'.
   if (input.length === 0) return []
-  return input
-    .split(NUL)
-    .map((part) => part.replace(/\r?\n$/u, '').replace(/^\r?\n/u, ''))
-    .filter((part) => part.length > 0)
+  return input.split(NUL).filter((part) => part.length > 0)
 }
 
 function stripRemoteEntryPrefix(entry: string, root: string): string | null {

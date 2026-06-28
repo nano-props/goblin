@@ -20,6 +20,7 @@ import type { WorktreeInfo } from '#/shared/git-types.ts'
 import type { RemoteCommandResult } from '#/system/ssh/commands.ts'
 import { worktreeBootstrapConfigHash } from '#/system/git/worktree-bootstrap.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
+import { WORKTREE_STATUS_BATCH_BOUNDARY } from '#/system/git/parsers.ts'
 
 const TARGET = normalizeRemoteTarget({
   alias: 'prod',
@@ -714,7 +715,7 @@ describe('getRemoteStatusAndWorktrees', () => {
   const NUL = String.fromCharCode(0)
 
   function buildBatchedOutput(worktreeListOutput: string, statusStream: string): string {
-    return `${worktreeListOutput}\n__GOBLIN_WT_BATCH_BOUNDARY__\n${statusStream}`
+    return `${worktreeListOutput}\n${WORKTREE_STATUS_BATCH_BOUNDARY}\n${statusStream}`
   }
 
   test('parses the batched command output into statuses + worktrees in one SSH call', async () => {

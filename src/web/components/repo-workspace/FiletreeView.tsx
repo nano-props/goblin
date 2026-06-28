@@ -7,12 +7,19 @@
 // the only visible interaction in v1; the future onActivate handler
 // is reserved as an optional prop.
 //
+// Keyboard navigation (F7) follows the WAI-ARIA tree pattern with
+// roving tabindex: only the focused row has tabIndex=0; the rest
+// are tabIndex=-1. ArrowDown / ArrowUp move focus between visible
+// rows; ArrowRight expands a collapsed directory OR moves into the
+// first child of an expanded one; ArrowLeft collapses an expanded
+// directory OR moves to the parent; Enter / Space activates.
+//
 // Anti-coupling rules (enforced by review):
 //   - No fetches, no server modules, no store mutations.
 //   - No imports from useReposStore, terminal hooks, or settings.
 //   - All copy comes from the i18n layer; keys are static.
 
-import { useCallback, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ChevronRight, File, Folder, FolderTree } from 'lucide-react'
 import type { RepoTreeNode, RepoTreeNodeStatus, RepoTreeResult } from '#/shared/api-types.ts'
 import { useT } from '#/web/stores/i18n.ts'
@@ -127,6 +134,11 @@ export function FiletreeView({
 }: FiletreeViewProps) {
   const t = useT()
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set<string>())
+  // F7: focused row id, drives roving tabindex and ArrowUp/Down
+  // navigation. Initialised lazily to the first visible row once a
+  // tree is rendered.
+  const [focusedId, setFocusedId] = useState<string | null>(null)
+  const containerRef = useRef<HTMLUListElement>(null)
 
   const index = useMemo(() => buildIndex(tree), [tree])
 
@@ -147,6 +159,44 @@ export function FiletreeView({
     })
   }, [index, expanded, loading, error, tree])
 
+  const visibleIds = useMemo<ReadonlyArray<string>>(
+    () => visible.map((entry) => entry.node.id),
+    [visible],
+  )
+
+  // Reset focus when the tree prop changes (new snapshot, no carry
+  // over from the previous worktree). Pick the first visible row so
+  // the user lands somewhere sensible when the keyboard lands them
+  // back in the panel.
+  useEffect(() => {
+    setFocusedId(visibleIds[0] ?? null)
+  }, [tree, visibleIds])
+
+  // If the focused row is no longer visible (its parent collapsed,
+  // or the tree dropped it), drop focus to the first visible row.
+  useEffect(() => {
+    if (focusedId === null) return
+    if (!visibleIds.includes(focusedId)) {
+      setFocusedId(visibleIds[0] ?? null)
+    }
+  }, [focusedId, visibleIds])
+
+  // Move the DOM focus to whichever row now owns the roving tabindex.
+  // We only act when the tree itself reports `document.activeElement`
+  // inside the tree (i.e. keyboard focus is already in this widget),
+  // so a stray state update doesn't yank focus away from the user's
+  // click target elsewhere on the page.
+  useEffect(() => {
+    if (!focusedId) return
+    const container = containerRef.current
+    if (!container) return
+    const active = document.activeElement
+    if (active && container.contains(active)) {
+      const next = container.querySelector<HTMLElement>(`[data-filetree-row="${CSS.escape(focusedId)}"]`)
+      if (next && active !== next) next.focus()
+    }
+  }, [focusedId, visibleIds])
+
   const toggle = useCallback((id: string) => {
     setExpanded((prev) => {
       const next = new Set(prev)
@@ -155,6 +205,89 @@ export function FiletreeView({
       return next
     })
   }, [])
+
+  const moveFocusBy = useCallback(
+    (delta: number) => {
+      setFocusedId((current) => {
+        if (visibleIds.length === 0) return null
+        const start = current ? visibleIds.indexOf(current) : -1
+        if (start < 0) return visibleIds[0] ?? null
+        const next = Math.max(0, Math.min(visibleIds.length - 1, start + delta))
+        return visibleIds[next] ?? null
+      })
+    },
+    [visibleIds],
+  )
+
+  const focusParent = useCallback(() => {
+    if (!focusedId) return
+    const node = index.byId.get(focusedId)
+    if (!node || node.parentId === null) return
+    // If the parent is collapsed, expand it so the user lands on a
+    // visible ancestor. The first moveFocusBy(-1) lands on the
+    // previous visible row, which is the parent's previous sibling;
+    // explicitly target the parent for predictability.
+    setFocusedId(node.parentId)
+  }, [focusedId, index])
+
+  const focusFirstChild = useCallback(() => {
+    if (!focusedId) return
+    const children = index.childrenByParent.get(focusedId)
+    if (!children || children.length === 0) return
+    const first = children[0]
+    if (first) setFocusedId(first.id)
+  }, [focusedId, index])
+
+  const handleRowKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>, row: FiletreeRowKeyContext) => {
+      switch (event.key) {
+        case 'ArrowDown':
+          event.preventDefault()
+          moveFocusBy(1)
+          return
+        case 'ArrowUp':
+          event.preventDefault()
+          moveFocusBy(-1)
+          return
+        case 'Home':
+          event.preventDefault()
+          setFocusedId(visibleIds[0] ?? null)
+          return
+        case 'End':
+          event.preventDefault()
+          setFocusedId(visibleIds[visibleIds.length - 1] ?? null)
+          return
+        case 'ArrowRight':
+          if (row.isDirectory) {
+            event.preventDefault()
+            if (row.expanded) {
+              focusFirstChild()
+            } else {
+              toggle(row.id)
+            }
+          }
+          return
+        case 'ArrowLeft':
+          if (row.isDirectory && row.expanded) {
+            event.preventDefault()
+            toggle(row.id)
+          } else {
+            event.preventDefault()
+            focusParent()
+          }
+          return
+        case 'Enter':
+        case ' ':
+          event.preventDefault()
+          if (row.isDirectory) toggle(row.id)
+          onActivate?.(row.node)
+          return
+        default:
+          return
+      }
+    },
+    [focusFirstChild, focusParent, moveFocusBy, onActivate, toggle, visibleIds],
+  )
 
   if (error) {
     return <EmptyState icon={<FolderTree size={16} />} title={t(FILE_TREE_I18N_KEYS.error)} />
@@ -179,15 +312,18 @@ export function FiletreeView({
         role="tree"
         aria-label="File tree"
       >
-        <ul className="py-1.5 font-mono text-sm">
+        <ul ref={containerRef} className="py-1.5 font-mono text-sm">
           {visible.map((entry) => (
             <FiletreeRow
               key={entry.node.id}
               entry={entry}
               expanded={expanded.has(entry.node.id)}
+              focused={entry.node.id === focusedId}
               onToggle={toggle}
               onSelect={onSelect}
               onActivate={onActivate}
+              onKeyDown={handleRowKeyDown}
+              onFocusRow={setFocusedId}
             />
           ))}
         </ul>
@@ -206,15 +342,34 @@ export function FiletreeView({
   )
 }
 
+interface FiletreeRowKeyContext {
+  readonly id: string
+  readonly node: RepoTreeNode
+  readonly isDirectory: boolean
+  readonly expanded: boolean
+}
+
 interface FiletreeRowProps {
   readonly entry: IndexedNode
   readonly expanded: boolean
+  readonly focused: boolean
   readonly onToggle: (id: string) => void
   readonly onSelect?: (node: RepoTreeNode) => void
   readonly onActivate?: (node: RepoTreeNode) => void
+  readonly onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>, ctx: FiletreeRowKeyContext) => void
+  readonly onFocusRow: (id: string) => void
 }
 
-function FiletreeRow({ entry, expanded, onToggle, onSelect, onActivate }: FiletreeRowProps) {
+function FiletreeRow({
+  entry,
+  expanded,
+  focused,
+  onToggle,
+  onSelect,
+  onActivate,
+  onKeyDown,
+  onFocusRow,
+}: FiletreeRowProps) {
   const { node, depth } = entry
   const isDirectory = node.kind === 'directory'
 
@@ -223,28 +378,17 @@ function FiletreeRow({ entry, expanded, onToggle, onSelect, onActivate }: Filetr
     onSelect?.(node)
   }
 
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault()
-      if (isDirectory) onToggle(node.id)
-      onActivate?.(node)
-    } else if (isDirectory && event.key === 'ArrowRight' && !expanded) {
-      event.preventDefault()
-      onToggle(node.id)
-    } else if (isDirectory && event.key === 'ArrowLeft' && expanded) {
-      event.preventDefault()
-      onToggle(node.id)
-    }
-  }
-
   return (
     <li role="treeitem" aria-expanded={isDirectory ? expanded : undefined} aria-level={depth + 1}>
       <div
         role="button"
-        tabIndex={0}
+        tabIndex={focused ? 0 : -1}
+        data-filetree-row={node.id}
         aria-label={node.name}
+        aria-selected={focused || undefined}
         onClick={handleClick}
-        onKeyDown={handleKeyDown}
+        onFocus={() => onFocusRow(node.id)}
+        onKeyDown={(event) => onKeyDown(event, { id: node.id, node, isDirectory, expanded })}
         className={cn(
           'flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-muted',
           focusRingInset,

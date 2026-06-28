@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { execa } from 'execa'
@@ -278,6 +278,200 @@ describe('remote ssh command builders', () => {
     }
   })
 })
+
+describe('remote gitWorktreeListAndStatus script (F5 end-to-end)', () => {
+  // F5: the previous sequential `while read -r wt; do ...; done`
+  // serialised per-worktree git status. The fix parallelises with
+  // xargs -P8 into indexed tmp files then concatenates in order.
+  // These tests run the real bash script against a local git repo
+  // (the script is portable shell; it does not touch the network)
+  // and verify the output is parseable by the existing parsers.
+
+  testPosix('emits the worktree list above the boundary and NUL-batched status below', async () => {
+    const repoDir = await initRepoWithWorktrees([
+      { branch: 'main', files: [['README.md', 'root readme\n']] },
+      { branch: 'feature', files: [['src/index.ts', 'export {}\n']] },
+    ])
+
+    const invocation = buildRemoteCommandInvocation(targetWithPath(repoDir), {
+      type: 'gitWorktreeListAndStatus',
+      path: repoDir,
+    })
+
+    const result = await execa('bash', ['-lc', invocation.script])
+
+    // Boundary marker must appear on its own line. The script wraps
+    // the literal text in \x1e Record Separator bytes so a worktree
+    // path containing the marker text cannot collide -- see
+    // WORKTREE_STATUS_BATCH_BOUNDARY.
+    const lines = result.stdout.split('\n')
+    const boundary = lines.indexOf('\x1e__GOBLIN_WT_BATCH_BOUNDARY__\x1e')
+    expect(boundary).toBeGreaterThan(0)
+
+    // The worktree list block above the boundary must mention every
+    // worktree; the section below must include one NUL-terminated
+    // path per non-bare worktree followed by its status records.
+    const listBlock = lines.slice(0, boundary).join('\n')
+    expect(listBlock).toContain('worktree ')
+
+    // Round-trip the result through the parser pipeline. The script's
+    // output must satisfy the same shape the production code
+    // expects.
+    const { splitWorktreeStatusBatch } = await import('#/system/git/parsers.ts')
+    const { statusStream } = splitWorktreeStatusBatch(result.stdout)
+    const { parseWorktreeStatusBatch } = await import('#/system/git/parsers.ts')
+    const parsed = parseWorktreeStatusBatch(statusStream)
+    expect(parsed.size).toBe(2)
+  })
+
+  testPosix('runs per-worktree status work in parallel via xargs (F5 regression check)', async () => {
+    // The script source must contain the parallelisation primitives
+    // we documented; a future refactor that re-serialises the loop
+    // will be caught here.
+    const repoDir = await initRepoWithWorktrees([
+      { branch: 'main', files: [] },
+    ])
+    const invocation = buildRemoteCommandInvocation(targetWithPath(repoDir), {
+      type: 'gitWorktreeListAndStatus',
+      path: repoDir,
+    })
+    expect(invocation.script).toMatch(/xargs .*-P\s*8/)
+    expect(invocation.script).toMatch(/mktemp -d/)
+    expect(invocation.script).not.toMatch(/while IFS= read -r wt/)
+  })
+
+  testPosix('preserves the original worktree-list order across parallel workers', async () => {
+    // The script writes each per-worktree section to <tmpdir>/<idx>.out
+    // and concatenates files in index order. If that step regresses
+    // (e.g. someone removes the ordered concat loop), the parser
+    // would mis-align sections with worktrees. We confirm the order
+    // by leaving a unique untracked file in each worktree and
+    // checking the parsed result keeps the same ordering as the
+    // worktree list. Untracked files are easier to reason about
+    // than tracked ones because each worktree sees only its own.
+    const repoDir = await initRepoWithWorktrees([
+      { branch: 'main', files: [] },
+      { branch: 'feature-a', files: [] },
+      { branch: 'feature-b', files: [] },
+      { branch: 'feature-c', files: [] },
+    ])
+
+    // The worktrees themselves live under .worktrees/, which is
+    // untracked from the primary worktree's point of view. Add a
+    // .gitignore so the primary worktree's status is otherwise
+    // empty -- otherwise the script's status stream gets cluttered
+    // with paths that aren't part of the test's signal.
+    writeFileSync(path.join(repoDir, '.gitignore'), '.worktrees\n')
+
+    // Drop a unique untracked marker file in each worktree. The
+    // primary worktree's marker goes at the root; the others live
+    // inside their respective worktree directories. We resolve the
+    // primary repo path via realpath because macOS aliases /var to
+    // /private/var and `mktemp` returns the un-resolved path --
+    // the parsed worktree list will use the canonical path.
+    const canonicalRepoDir = realpathSync(repoDir)
+    const markers: Array<[string, string]> = [
+      [canonicalRepoDir, 'marker-main.txt'],
+      [path.join(canonicalRepoDir, '.worktrees', 'feature-a'), 'marker-a.txt'],
+      [path.join(canonicalRepoDir, '.worktrees', 'feature-b'), 'marker-b.txt'],
+      [path.join(canonicalRepoDir, '.worktrees', 'feature-c'), 'marker-c.txt'],
+    ]
+    const expectedByWorktree = new Map<string, string>()
+    for (const [wtPath, name] of markers) {
+      writeFileSync(path.join(wtPath, name), `${name}\n`)
+      expectedByWorktree.set(wtPath, name)
+    }
+
+    const invocation = buildRemoteCommandInvocation(targetWithPath(repoDir), {
+      type: 'gitWorktreeListAndStatus',
+      path: repoDir,
+    })
+
+    const result = await execa('bash', ['-lc', invocation.script])
+
+    const { splitWorktreeStatusBatch, parseWorktreeStatusBatch } = await import('#/system/git/parsers.ts')
+    const { worktreeListOutput, statusStream } = splitWorktreeStatusBatch(result.stdout)
+    const { parseWorktrees } = await import('#/system/git/parsers.ts')
+    const list = parseWorktrees(worktreeListOutput)
+    const statuses = parseWorktreeStatusBatch(statusStream)
+
+    // Each worktree in the list must have its marker file's status
+    // entry in its status section. If sections were misaligned the
+    // mapping would either miss or return the wrong worktree.
+    for (const wt of list) {
+      if (wt.isBare) continue
+      const expected = expectedByWorktree.get(wt.path)
+      expect(expected, `test fixture missing a marker for ${wt.path}`).toBeTruthy()
+      const entries = statuses.get(wt.path) ?? []
+      const found = entries.find((entry) => entry.path === expected)
+      expect(
+        found,
+        `expected marker ${expected} in ${wt.path}, got ${JSON.stringify(entries.map((e) => e.path))}`,
+      ).toBeTruthy()
+    }
+  })
+})
+
+async function initRepoWithWorktrees(
+  specs: Array<{ branch: string; files: Array<[string, string]> }>,
+): Promise<string> {
+  const dir = path.join(os.tmpdir(), `goblin-wt-batch-${Date.now()}-${process.pid}`)
+  tempDirs.push(dir)
+  mkdirSync(dir, { recursive: true })
+
+  const runGit = async (...args: string[]): Promise<void> => {
+    await execa('git', ['-C', dir, ...args])
+  }
+
+  await runGit('init', '-q', '--initial-branch=main')
+  await runGit('config', 'user.email', 'test@goblin.local')
+  await runGit('config', 'user.name', 'Goblin Test')
+
+  // The primary worktree IS dir itself; no separate create needed.
+  for (const [name, contents] of specs[0]?.files ?? []) {
+    const filePath = path.join(dir, name)
+    mkdirSync(path.dirname(filePath), { recursive: true })
+    writeFileSync(filePath, contents)
+  }
+  // `git add` with the empty allow-empty / always-create flag is
+  // not what we want; this is the standard "stage and commit"
+  // pair. The first commit must have content, otherwise `git status`
+  // will report "nothing to commit" against the primary worktree
+  // and the script has no records to emit.
+  await runGit('add', '-A')
+  if (specs[0]?.files?.length) {
+    await runGit('commit', '-q', '-m', 'initial')
+  }
+
+  // Create additional worktrees for each subsequent spec.
+  for (let i = 1; i < specs.length; i++) {
+    const spec = specs[i]!
+    const wtPath = path.join(dir, '.worktrees', spec.branch)
+    await runGit('worktree', 'add', '-b', spec.branch, wtPath)
+    if (spec.files.length === 0) continue
+    for (const [name, contents] of spec.files) {
+      const filePath = path.join(wtPath, name)
+      mkdirSync(path.dirname(filePath), { recursive: true })
+      writeFileSync(filePath, contents)
+    }
+    await execa('git', ['-C', wtPath, 'add', '-A'])
+    await execa('git', ['-C', wtPath, 'commit', '-q', '-m', spec.branch])
+  }
+
+  return dir
+}
+
+function targetWithPath(repoPath: string): RemoteRepoTarget {
+  return {
+    id: `ssh-config://prod${repoPath}`,
+    alias: 'prod',
+    host: 'example.test',
+    user: 'deploy',
+    port: 22,
+    remotePath: repoPath,
+    displayName: `prod:${path.basename(repoPath)}`,
+  }
+}
 
 function target(): RemoteRepoTarget {
   return {

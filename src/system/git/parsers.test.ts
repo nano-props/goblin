@@ -277,12 +277,26 @@ describe('splitWorktreeStatusBatch', () => {
     expect(statusStream).toBe('')
   })
 
-  test('returns an empty status stream when the boundary is the very last token', () => {
+  test('returns an empty status stream when the boundary is malformed (no RS bytes, no newline)', () => {
+    // The marker is now wrapped in \x1e Record Separator bytes plus
+    // surrounding \n in the script. A malformed input that omits
+    // those -- as a defence-in-depth check that the parser does not
+    // crash -- falls back to treating the whole output as the
+    // worktree list with an empty status stream.
     const output = `worktree /repo${NUL}__GOBLIN_WT_BATCH_BOUNDARY__${NUL}`
-    // Boundary marker is preceded by a newline in the script. A
-    // malformed input with no newline at all should still not throw.
     const { statusStream } = splitWorktreeStatusBatch(output)
     expect(typeof statusStream).toBe('string')
+    expect(statusStream).toBe('')
+  })
+
+  test('the marker includes RS bytes so it cannot collide with a legitimate worktree path', () => {
+    // Regression for F3: POSIX path components cannot contain \x1e,
+    // so the only place this byte sequence can appear on its own
+    // line is in the remote shell's `printf` invocation. A user who
+    // happens to name a worktree `__GOBLIN_WT_BATCH_BOUNDARY__`
+    // cannot make the parser mistake the path for the boundary.
+    expect(WORKTREE_STATUS_BATCH_BOUNDARY.startsWith('\x1e')).toBe(true)
+    expect(WORKTREE_STATUS_BATCH_BOUNDARY.endsWith('\x1e')).toBe(true)
   })
 })
 

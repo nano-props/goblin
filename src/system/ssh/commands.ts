@@ -280,7 +280,7 @@ function scriptForCommand(command: RemoteCommandKind): string {
       //
       // Output shape (separator = literal newlines except where noted):
       //   <git worktree list --porcelain, blocks separated by blank lines>
-      //   \n__GOBLIN_WT_BATCH_BOUNDARY__\n
+      //   \n\x1e__GOBLIN_WT_BATCH_BOUNDARY__\x1e\n
       //   <wt1_path>\0<status records, NUL-separated>\0
       //   <wt2_path>\0<status records>\0
       //   ...
@@ -290,6 +290,8 @@ function scriptForCommand(command: RemoteCommandKind): string {
       // parser can walk NUL-split records without needing line
       // boundaries -- important because `git status -z` paths can
       // contain literal newlines when paths with newlines are quoted.
+      // The \x1e wrapping guards the marker against collision with a
+      // legitimate worktree path; see WORKTREE_STATUS_BATCH_BOUNDARY.
       //
       // Bare worktrees (the bare flag in their porcelain block) are
       // skipped in the status stream so the parser does not have to
@@ -299,27 +301,67 @@ function scriptForCommand(command: RemoteCommandKind): string {
       const repo = shellQuote(command.path)
       return [
         `git -C ${repo} worktree list --porcelain`,
-        `printf '\\n__GOBLIN_WT_BATCH_BOUNDARY__\\n'`,
-        // Iterate non-bare worktrees in the same order as the list
-        // above. The awk extracts path lines from non-bare blocks
-        // (blocks containing the literal `bare` line on its own are
-        // skipped via paragraph-mode record matching).
-        `git -C ${repo} worktree list --porcelain | awk -v RS= 'BEGIN { ORS = "" }`,
+        `printf '\\n\\x1e__GOBLIN_WT_BATCH_BOUNDARY__\\x1e\\n'`,
+        // Parallel per-worktree `git status`, fanned out via
+        // xargs -P8. Each worker writes its NUL section to an
+        // indexed file in a per-session tmpdir; the final loop
+        // concatenates files in the original worktree-list order
+        // so the parser walks sections deterministically. Index
+        // names are zero-padded so plain glob order is also
+        // numeric order.
+        //
+        // The previous sequential `while read -r wt; do ...; done`
+        // was a perf regression (F5): wall time scaled as N *
+        // per-status-time instead of ceil(N/8) * per-status-time.
+        // On a repo with 12 worktrees that is a ~6x slowdown.
+        `WT_TMPDIR=$(mktemp -d)`,
+        `export WT_TMPDIR`,
+        `trap 'rm -rf "$WT_TMPDIR"' EXIT`,
+        // Build a jobs file of "<idx>\0<path>\0" pairs. The awk
+        // splits the porcelain output on blank-line blocks (RS="")
+        // so we can inspect each worktree block as a single
+        // record and skip blocks containing a bare marker. Paths
+        // registered with relative arguments are passed through
+        // verbatim; the worker resolves them via
+        // `git rev-parse --show-toplevel`.
+        //
+        // We emit NUL bytes via `%c` with the literal 0 -- some awk
+        // builds (notably BSD awk 20200816 on macOS) do not honour
+        // `\0` in a printf format string, so the jobs file would
+        // otherwise lose its record separator and xargs would see
+        // the whole stream as a single record.
+        `git -C ${repo} worktree list --porcelain | awk -v RS= 'BEGIN { idx = 0 }`,
         `  /(^|\\n)bare(\\n|$)/ { next }`,
         `  match($0, /^worktree[ \\t]+/) {`,
         `    p = substr($0, RSTART + RLENGTH); sub(/\\n.*/, "", p);`,
-        `    if (p != "") print p "\\n"`,
-        `  }' | while IFS= read -r wt; do`,
-        `  if [ -z "$wt" ]; then continue; fi`,
-        // The list output may contain non-absolute paths if the
-        // user registered them with relative arguments; resolve via
-        // `git rev-parse --show-toplevel` so the parser can match
-        // them against the absolute paths the caller already has.
-        `  if ! cd "$wt" >/dev/null 2>&1; then continue; fi`,
-        `  abs=$(git rev-parse --show-toplevel 2>/dev/null) || continue`,
-        `  printf '%s\\0' "$abs"`,
-        `  git -C "$abs" status --porcelain -z -uall 2>/dev/null || true`,
-        `  printf '\\0'`,
+        `    if (p != "") { idx++; printf "%04d%c%s%c", idx, 0, p, 0 }`,
+        `  }' > "$WT_TMPDIR/jobs"`,
+        // Fan out workers. `xargs -0 -n2 -P8` reads 2 NUL-terminated
+        // records per invocation and caps in-flight workers at 8.
+        // We redirect the jobs file via `<` rather than `-a` because
+        // BSD xargs (macOS) does not support the GNU `-a file`
+        // option. WT_TMPDIR is exported above so workers inherit it.
+        `xargs -0 -n2 -P8 bash -c '`,
+        `  idx="$1"; wt="$2"`,
+        // The leading `\$` is a JS template-literal escape so the
+        // generated shell script contains the literal text `${idx}`
+        // (the JS-side `idx` is undefined here).
+        `  out="$WT_TMPDIR/\${idx}.out"`,
+        // `cd` may fail for a worktree the script cannot enter;
+        // treat that as a no-op (no file written) instead of letting
+        // the worker exit non-zero (xargs would then report failure
+        // for the whole batch).
+        `  if ! cd "$wt" 2>/dev/null; then exit 0; fi`,
+        `  abs=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0`,
+        `  printf "%s\\0" "$abs" > "$out"`,
+        `  git -C "$abs" status --porcelain -z -uall 2>/dev/null >> "$out" || true`,
+        `  printf "\\0" >> "$out"`,
+        `' _ < "$WT_TMPDIR/jobs"`,
+        // Concatenate in index order. If a worker skipped its
+        // worktree (cd/rev-parse failure) no .out file is written;
+        // the parser will simply not see a section for it.
+        `for f in "$WT_TMPDIR"/*.out; do`,
+        `  [ -f "$f" ] && cat "$f"`,
         `done`,
       ].join('\n')
     }

@@ -148,8 +148,16 @@ export function parseStatus(output: string): StatusEntry[] {
 
 /** Marker separating the worktree-list porcelain block from the
  *  per-worktree NUL-batched status stream in
- *  `gitWorktreeListAndStatus` output. Stable across runs. */
-export const WORKTREE_STATUS_BATCH_BOUNDARY = '__GOBLIN_WT_BATCH_BOUNDARY__'
+ *  `gitWorktreeListAndStatus` output. Stable across runs.
+ *
+ *  Wrapped in ASCII Record Separator (\x1e) bytes so the literal
+ *  text inside can never collide with a legitimate worktree path:
+ *  POSIX path components cannot contain \x1e (or any control char
+ *  below \x20), so the only way the marker can appear on its own
+ *  line is if the remote shell emitted it. The surrounding newlines
+ *  in `splitWorktreeStatusBatch` already disambiguate lines; the
+ *  Record Separator is defence in depth. */
+export const WORKTREE_STATUS_BATCH_BOUNDARY = '\x1e__GOBLIN_WT_BATCH_BOUNDARY__\x1e'
 
 /**
  * Split a `gitWorktreeListAndStatus` raw stdout into the worktree-list

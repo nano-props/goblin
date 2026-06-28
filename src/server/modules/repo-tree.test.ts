@@ -107,7 +107,15 @@ describe('repo-tree — read layer (local cwd)', () => {
   test('soft-fails to the empty envelope when the local source layer throws', async () => {
     const fakeSource = {
       getStatus: vi.fn().mockResolvedValue([]),
-      getStatusAndWorktrees: vi.fn().mockResolvedValue({ statuses: [], worktrees: [] }),
+      // The read layer now validates worktreePath against the worktree
+      // list before invoking the source (F2). Provide a matching
+      // entry so this test exercises the source-throws branch.
+      getStatusAndWorktrees: vi.fn().mockResolvedValue({
+        statuses: [],
+        worktrees: [
+          { path: '/tmp/repo/.worktrees/feature', branch: 'feature', isBare: false, isPrimary: false },
+        ],
+      }),
     }
     mocks.runWithRepoSource.mockImplementationOnce(async (_cwd, task) => await task(fakeSource))
     mocks.getRepoTreeSourceLocal.mockRejectedValueOnce(new Error('boom'))
@@ -238,5 +246,99 @@ describe('repo-tree — read layer (remote cwd, PR 5)', () => {
     expect(mocks.getRepoTreeSourceRemote).toHaveBeenCalledWith(
       expect.objectContaining({ knownWorktrees }),
     )
+  })
+})
+
+describe('repo-tree — worktreePath validation (F2)', () => {
+  test('returns the empty envelope and never invokes the local source for an unknown local worktree path', async () => {
+    // F2: a hostile or buggy client must not be able to walk a path
+    // outside the repo just because the local walker (tinyglobby)
+    // would happily enumerate any directory it is handed. The read
+    // layer must reject the request once the worktree list is in
+    // hand.
+    const freshStatus = [
+      { path: '/tmp/repo/.worktrees/feature', branch: 'main', isMain: false, entries: [] },
+    ]
+    const fakeSource = {
+      getStatus: vi.fn(),
+      getStatusAndWorktrees: vi.fn().mockResolvedValue({
+        statuses: freshStatus,
+        worktrees: [
+          { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
+          { path: '/tmp/repo/.worktrees/feature', branch: 'feature', isBare: false, isPrimary: false },
+        ],
+      }),
+    }
+    mocks.runWithRepoSource.mockImplementationOnce(async (_cwd, task) => await task(fakeSource))
+
+    const result = await getRepositoryTree('/tmp/repo', '/etc/passwd')
+
+    expect(result).toEqual({ nodes: [], truncated: false })
+    expect(mocks.getRepoTreeSourceLocal).not.toHaveBeenCalled()
+  })
+
+  test('returns the empty envelope and never invokes the remote source for an unknown remote worktree path', async () => {
+    mocks.resolveRemoteRepoTarget.mockResolvedValueOnce(remoteTarget)
+    const fakeSource = {
+      getStatus: vi.fn(),
+      getStatusAndWorktrees: vi.fn().mockResolvedValue({
+        statuses: [{ path: '/srv/repos/myrepo/.worktrees/feature', branch: 'feature', isMain: false, entries: [] }],
+        worktrees: [
+          { path: '/srv/repos/myrepo', branch: 'main', isBare: false, isPrimary: true },
+          { path: '/srv/repos/myrepo/.worktrees/feature', branch: 'feature', isBare: false, isPrimary: false },
+        ],
+      }),
+    }
+    mocks.runWithRepoSource.mockImplementationOnce(async (_cwd, task) => await task(fakeSource))
+
+    const result = await getRepositoryTree(remoteRepoId, '/srv/repos/myrepo/.worktrees/does-not-exist')
+
+    expect(result).toEqual({ nodes: [], truncated: false })
+    expect(mocks.getRepoTreeSourceRemote).not.toHaveBeenCalled()
+  })
+
+  test('falls back to validating against status paths when only precomputedStatus is supplied', async () => {
+    // Composite-read callers may pass precomputedStatus without
+    // precomputedWorktrees. Validation must still succeed when the
+    // status report contains the matching path -- otherwise every
+    // composite read would need to also pass the worktree list.
+    const precomputed = [
+      {
+        path: '/tmp/repo/.worktrees/feature',
+        branch: 'main',
+        isMain: false,
+        entries: [{ x: ' ', y: 'M', path: 'src/index.ts' }],
+      },
+    ]
+    mocks.getRepoTreeSourceLocal.mockResolvedValueOnce({ nodes: [], truncated: false })
+
+    await getRepositoryTree('/tmp/repo', '/tmp/repo/.worktrees/feature', {
+      precomputedStatus: precomputed,
+    })
+
+    expect(mocks.runWithRepoSource).not.toHaveBeenCalled()
+    expect(mocks.getRepoTreeSourceLocal).toHaveBeenCalledWith(
+      '/tmp/repo/.worktrees/feature',
+      expect.objectContaining({}),
+      undefined,
+      precomputed,
+    )
+  })
+
+  test('rejects an unknown precomputedStatus path even when the schema accepted it', async () => {
+    const precomputed = [
+      {
+        path: '/tmp/repo/.worktrees/feature',
+        branch: 'main',
+        isMain: false,
+        entries: [],
+      },
+    ]
+    mocks.runWithRepoSource.mockResolvedValue(undefined)
+
+    const result = await getRepositoryTree('/tmp/repo', '/tmp/somewhere-else', { precomputedStatus: precomputed })
+
+    expect(result).toEqual({ nodes: [], truncated: false })
+    expect(mocks.getRepoTreeSourceLocal).not.toHaveBeenCalled()
   })
 })
