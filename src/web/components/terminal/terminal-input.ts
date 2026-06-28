@@ -24,3 +24,7 @@ export function terminalEmulatorInput(data: string, source: TerminalEmulatorInpu
 export function isTerminalEmulatorInput(input: TerminalInput): boolean {
   return input.origin === 'terminal-emulator'
 }
+
+export function isExternalCommandInput(input: TerminalInput): boolean {
+  return input.origin === 'user-intent' && input.source === 'command'
+}

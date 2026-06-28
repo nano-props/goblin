@@ -47,8 +47,12 @@ direction, not for facts.
 
 - Tracked files only. The list respects the repository's ignore rules, so
   what the user sees matches what they would `git ls-files`.
-- Each visible file carries a coarse status hint (clean / modified / staged /
-  untracked / ignored) so the user can scan the tree without leaving it.
+- The wire shape carries a `status` field per node, but v1's source layer
+  hardcodes `clean` on every node — there is no `git status --porcelain`
+  overlay yet. The broader `RepoTreeNodeStatus` union stays in the wire
+  shape so a real overlay can land later without a breaking change. The
+  remote walker uses `find`, so `.gitignore` filtering only applies on
+  local worktrees.
 - Empty directories are not represented; the tree is derived from the file
   list, not from a directory walk.
 - Results are bounded. A very large or very deep worktree is allowed to return

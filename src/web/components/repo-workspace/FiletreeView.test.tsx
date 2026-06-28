@@ -315,15 +315,17 @@ describe('FiletreeView', () => {
     expect(container?.textContent).toMatch(/filetree\.truncated/)
   })
 
-  test('marks a dirty file with a status dot', () => {
+  test('does not render a status dot in v1 (git-status overlay deferred)', () => {
     const tree: RepoTreeResult = {
       nodes: [fileNode('README.md', null, 'modified')],
       truncated: false,
     }
     renderView({ tree, loading: false, error: null })
-    const dot = container?.querySelector('[aria-label="filetree.status.modified"]') as HTMLElement
-    expect(dot).toBeTruthy()
-    expect(dot.style.background).toContain('--color-warning')
+    // The wire union still allows non-clean status values, but v1
+    // hardcodes every node to 'clean' (docs/filetree.md) so the view
+    // must not emit a status aria-label. When a real overlay lands the
+    // assertion flips: assert each status renders its own dot.
+    expect(container?.querySelector('[aria-label^="filetree.status."]')).toBeNull()
   })
 
   test('keeps the initial loading state visually quiet and announces aria-busy', () => {
@@ -334,7 +336,33 @@ describe('FiletreeView', () => {
     expect(container?.querySelector('[data-filetree=""]')?.getAttribute('aria-busy')).toBe('true')
   })
 
-  test('resets selection and expansion when the tree identity changes', async () => {
+  test('preserves selection and expansion when the tree refreshes with the same keys', async () => {
+    const user = userEvent.setup()
+    const treeA: RepoTreeResult = {
+      nodes: [dirNode('src'), fileNode('src/index.ts', 'src'), fileNode('README.md')],
+      truncated: false,
+    }
+    renderView({ tree: treeA, loading: false, error: null })
+
+    await user.click(row('src'))
+    await user.click(row('README.md'))
+    expect(rowNames()).toEqual(['src', 'index.ts', 'README.md'])
+    expect(row('README.md').getAttribute('aria-selected')).toBe('true')
+
+    const treeB: RepoTreeResult = {
+      nodes: [dirNode('src'), fileNode('src/index.ts', 'src'), fileNode('README.md')],
+      truncated: false,
+    }
+    await act(async () => {
+      root?.render(<FiletreeView tree={treeB} loading={false} error={null} />)
+    })
+
+    expect(rowNames()).toEqual(['src', 'index.ts', 'README.md'])
+    expect(row('src').getAttribute('aria-expanded')).toBe('true')
+    expect(row('README.md').getAttribute('aria-selected')).toBe('true')
+  })
+
+  test('prunes selection and expansion when refreshed nodes disappear', async () => {
     const user = userEvent.setup()
     const treeA: RepoTreeResult = {
       nodes: [dirNode('src'), fileNode('src/index.ts', 'src'), fileNode('README.md')],
@@ -356,6 +384,7 @@ describe('FiletreeView', () => {
     })
 
     expect(rowNames()).toEqual(['docs', 'CHANGELOG.md'])
+    expect(row('docs').getAttribute('aria-selected')).toBe('false')
     expect(row('CHANGELOG.md').getAttribute('aria-selected')).toBe('false')
   })
 })

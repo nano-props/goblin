@@ -25,7 +25,7 @@ import {
   type TreeItemProps,
 } from 'react-aria-components'
 import { ChevronRight, File, Folder, FolderTree, Trash2 } from 'lucide-react'
-import type { RepoTreeNode, RepoTreeNodeStatus, RepoTreeResult } from '#/shared/api-types.ts'
+import type { RepoTreeNode, RepoTreeResult } from '#/shared/api-types.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { EmptyState } from '#/web/components/Layout.tsx'
 import { ActionPopover, ActionPopoverItem } from '#/web/components/ActionPopover.tsx'
@@ -42,6 +42,11 @@ export interface FiletreeViewProps {
   readonly onRequestTrashFile?: (node: RepoTreeNode) => void
 }
 
+// `status` is part of the wire shape (`RepoTreeNodeStatus`) but v1's
+// source layer hardcodes every node to `'clean'` (docs/filetree.md).
+// We still consume the full union so the wire schema can grow a real
+// `git status --porcelain` overlay later without a breaking type
+// change, but the view does not render non-clean states today.
 const FILE_TREE_I18N_KEYS = {
   ariaLabel: 'filetree.aria-label',
   empty: 'filetree.empty',
@@ -50,21 +55,10 @@ const FILE_TREE_I18N_KEYS = {
   noWorktreeBody: 'filetree.no-worktree-body',
   truncated: 'filetree.truncated',
   error: 'filetree.error',
-  statusModified: 'filetree.status.modified',
-  statusStaged: 'filetree.status.staged',
-  statusUntracked: 'filetree.status.untracked',
-  statusIgnored: 'filetree.status.ignored',
   open: 'app-chrome.open',
   delete: 'menu.edit.delete',
   actionMenu: 'action.menu',
 } as const satisfies Record<string, string>
-
-const STATUS_LABEL_KEYS: Record<Exclude<RepoTreeNodeStatus, 'clean'>, string> = {
-  modified: FILE_TREE_I18N_KEYS.statusModified,
-  staged: FILE_TREE_I18N_KEYS.statusStaged,
-  untracked: FILE_TREE_I18N_KEYS.statusUntracked,
-  ignored: FILE_TREE_I18N_KEYS.statusIgnored,
-}
 
 interface FiletreeItem {
   readonly id: string
@@ -85,7 +79,7 @@ interface FiletreeInteractionState {
 }
 
 type FiletreeInteractionAction =
-  | { readonly type: 'reset' }
+  | { readonly type: 'prune-keys'; readonly validKeys: ReadonlySet<string> }
   | { readonly type: 'set-selected-keys'; readonly keys: Set<Key> }
   | { readonly type: 'set-expanded-keys'; readonly keys: Set<Key> }
   | { readonly type: 'press-row'; readonly node: RepoTreeNode }
@@ -102,8 +96,8 @@ function filetreeInteractionReducer(
   action: FiletreeInteractionAction,
 ): FiletreeInteractionState {
   switch (action.type) {
-    case 'reset':
-      return initialFiletreeInteractionState()
+    case 'prune-keys':
+      return pruneInteractionKeys(state, action.validKeys)
     case 'set-selected-keys':
       return { ...state, selectedKeys: action.keys }
     case 'set-expanded-keys':
@@ -118,6 +112,29 @@ function filetreeInteractionReducer(
       return { selectedKeys, expandedKeys }
     }
   }
+}
+
+function pruneInteractionKeys(
+  state: FiletreeInteractionState,
+  validKeys: ReadonlySet<string>,
+): FiletreeInteractionState {
+  const selectedKeys = filterValidKeys(state.selectedKeys, validKeys)
+  const expandedKeys = filterValidKeys(state.expandedKeys, validKeys)
+  if (selectedKeys === state.selectedKeys && expandedKeys === state.expandedKeys) return state
+  return { selectedKeys, expandedKeys }
+}
+
+function filterValidKeys(keys: Set<Key>, validKeys: ReadonlySet<string>): Set<Key> {
+  let changed = false
+  const next = new Set<Key>()
+  for (const key of keys) {
+    if (typeof key === 'string' && validKeys.has(key)) {
+      next.add(key)
+    } else {
+      changed = true
+    }
+  }
+  return changed ? next : keys
 }
 
 function buildCollection(result: RepoTreeResult | null): FiletreeCollection {
@@ -174,8 +191,8 @@ export function FiletreeView({
   )
 
   useEffect(() => {
-    dispatchInteraction({ type: 'reset' })
-  }, [tree])
+    dispatchInteraction({ type: 'prune-keys', validKeys: new Set(collection.byId.keys()) })
+  }, [collection])
 
   const handleSelectionChange = useCallback(
     (selection: Selection) => {
@@ -341,7 +358,6 @@ function FiletreeTreeItem({
             <span className="flex w-3.5 shrink-0 items-center justify-center text-muted-foreground">
               {isDirectory ? <Folder size={12} aria-hidden /> : <File size={12} aria-hidden />}
             </span>
-            <StatusDot status={node.status} />
             <span className="min-w-0 flex-1 truncate text-current">{node.name}</span>
             {!isDirectory ? (
               <FiletreeActionMenu
@@ -431,24 +447,6 @@ function FiletreeActionMenu({
         </div>
       )}
     </ActionPopover>
-  )
-}
-
-function StatusDot({ status }: { status: RepoTreeNodeStatus }) {
-  if (status === 'clean') return <span className="w-1.5 shrink-0" aria-hidden />
-  const t = useT()
-  const color =
-    status === 'modified' || status === 'untracked'
-      ? 'var(--color-warning)'
-      : status === 'staged'
-        ? 'var(--color-success)'
-        : 'var(--color-muted-foreground)'
-  return (
-    <span
-      className="h-1.5 w-1.5 shrink-0 rounded-full"
-      style={{ background: color }}
-      aria-label={t(STATUS_LABEL_KEYS[status])}
-    />
   )
 }
 

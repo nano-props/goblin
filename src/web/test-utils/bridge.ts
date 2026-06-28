@@ -420,7 +420,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         if (url.pathname === '/api/repo/remote-branches') return call('repo.remoteBranches', body)
         if (url.pathname === '/api/repo/pull-requests') return call('repo.pullRequests', body)
         if (url.pathname === '/api/repo/patch') return call('repo.patch', body)
-        if (url.pathname === '/api/repo/trash-file') return call('repo.trashFile', body)
         if (url.pathname === '/api/repo/composite') return call('repo.composite', body)
         if (url.pathname === '/api/repo/fetch') return call('repo.fetch', body)
         if (url.pathname === '/api/repo/clone') return call('repo.clone', body)
