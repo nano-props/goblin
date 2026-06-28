@@ -331,12 +331,10 @@ export class TerminalSessionProjection {
     controllerKeyByWorktree: Map<string, string>
     touchedWorktrees: Set<string>
     displayOrderChangedWorktrees: Set<string>
-    missingLocalCount: number
   } {
     const controllerKeyByWorktree = new Map<string, string>()
     const touchedWorktrees = new Set<string>()
     const displayOrderChangedWorktrees = new Set<string>()
-    let missingLocalCount = 0
 
     for (const serverSession of serverSessions) {
       const projected = projectServerTerminalSession({
@@ -350,10 +348,7 @@ export class TerminalSessionProjection {
       if (!projected) continue
       touchedWorktrees.add(projected.worktreeTerminalKey)
       const { descriptor } = projected
-      if (!this.sessions.has(descriptor.key)) {
-        missingLocalCount += 1
-        this.ensureSession(descriptor)
-      }
+      if (!this.sessions.has(descriptor.key)) this.ensureSession(descriptor)
       this.sessions.get(descriptor.key)?.hydrate(projected.hydrateInput)
       this.syncPtySessionIdIndex(descriptor.key, projected.hydrateInput.ptySessionId)
       if (projected.controlsTerminal) controllerKeyByWorktree.set(projected.worktreeTerminalKey, descriptor.key)
@@ -364,7 +359,7 @@ export class TerminalSessionProjection {
       }
     }
 
-    return { controllerKeyByWorktree, touchedWorktrees, displayOrderChangedWorktrees, missingLocalCount }
+    return { controllerKeyByWorktree, touchedWorktrees, displayOrderChangedWorktrees }
   }
 
   // Phase 2: drop local sessions that have a serverId but no longer
