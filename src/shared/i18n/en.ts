@@ -317,6 +317,10 @@ export const en = {
   'filetree.no-worktree-body': 'Create a worktree for this branch to browse its files here.',
   'filetree.truncated': 'Tree truncated — refine the search to see more.',
   'filetree.error': 'Could not read the file tree.',
+  'filetree.status.modified': 'Modified',
+  'filetree.status.staged': 'Staged',
+  'filetree.status.untracked': 'Untracked',
+  'filetree.status.ignored': 'Ignored',
 
   // ---- Terminal -----------------------------------------------------------
   'terminal.opening': 'Opening terminal…',

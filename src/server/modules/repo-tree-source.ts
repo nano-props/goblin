@@ -233,7 +233,15 @@ export function buildNodes(input: BuildNodesInput): RepoTreeNode[] {
 
   for (const rawEntry of entries) {
     const relative = rawEntry.split(path.sep).join('/')
+    // Reject anything that escapes the worktree root: top-level
+    // `..`, mid-path `..` (e.g. `foo/../../etc/passwd`), and
+    // absolute paths. The local walker never produces these --
+    // tinyglobby's `cwd` is the worktree root and it refuses to
+    // ascend -- but the remote side hands us whatever `find
+    // -print0` returned, and `find` will follow symlinks into a
+    // symlinked ancestor without complaint.
     if (relative.startsWith('../') || relative === '..' || path.isAbsolute(relative)) continue
+    if (relative.split('/').includes('..')) continue
     if (!isWithinDepth(relative, prefix, depth)) continue
 
     const kind: RepoTreeNode['kind'] = relative.endsWith('/') ? 'directory' : 'file'

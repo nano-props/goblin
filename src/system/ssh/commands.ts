@@ -216,8 +216,18 @@ function scriptForCommand(command: RemoteCommandKind): string {
       // requested depth. We deliberately do not apply a .gitignore
       // filter on the remote -- the local source layer is in
       // charge of the gitignore overlay (see docs/filetree.md).
+      //
+      // We intentionally omit `2>/dev/null`: a permission-denied on
+      // a subdirectory should propagate up so the read layer can
+      // surface a soft-fail envelope instead of silently reporting
+      // a partial walk as complete. The `--` separator is
+      // defence-in-depth so a path that resolves to a literal
+      // starting with `-` cannot be interpreted by `find` as a
+      // predicate even though `resolveKnownRemoteWorktree` already
+      // constrains the path to one returned by `git worktree list`.
       return [
         'find',
+        '--',
         shellQuote(command.path),
         '-mindepth 1',
         `-maxdepth ${depth}`,
@@ -225,7 +235,6 @@ function scriptForCommand(command: RemoteCommandKind): string {
         '-not -name .git',
         '-not -name .gitignore',
         '-print0',
-        '2>/dev/null',
       ].join(' ')
     }
     case 'revParseTopLevel':

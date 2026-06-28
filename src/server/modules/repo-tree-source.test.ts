@@ -257,6 +257,23 @@ describe('repo-tree-source — buildNodes pure helper', () => {
     expect(ids).not.toContain('/abs/file.ts')
   })
 
+  test('rejects mid-path `..` traversal that escapes the worktree root', () => {
+    // Defense-in-depth: a remote-side find that follows a symlink
+    // could surface paths like `foo/../../etc/passwd` whose
+    // segment set contains `..`. They must not become tree nodes.
+    const nodes = buildNodes({
+      worktreePath: '/x',
+      prefix: '',
+      depth: 5,
+      entries: ['foo/../../etc/passwd', 'foo/../bar.ts', 'good/foo/../bar.ts', 'good/bar.ts'],
+    })
+    const ids = nodes.map((n) => n.id)
+    expect(ids).toContain('good/bar.ts')
+    expect(ids).not.toContain('foo/../../etc/passwd')
+    expect(ids).not.toContain('foo/../bar.ts')
+    expect(ids).not.toContain('good/foo/../bar.ts')
+  })
+
   test('records the matching parentId for files at the worktree root', () => {
     const nodes = buildNodes({
       worktreePath: '/x',

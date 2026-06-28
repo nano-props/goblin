@@ -35,7 +35,18 @@ const FILE_TREE_I18N_KEYS = {
   noWorktreeBody: 'filetree.no-worktree-body',
   truncated: 'filetree.truncated',
   error: 'filetree.error',
+  statusModified: 'filetree.status.modified',
+  statusStaged: 'filetree.status.staged',
+  statusUntracked: 'filetree.status.untracked',
+  statusIgnored: 'filetree.status.ignored',
 } as const satisfies Record<string, string>
+
+const STATUS_LABEL_KEYS: Record<Exclude<RepoTreeNodeStatus, 'clean'>, string> = {
+  modified: FILE_TREE_I18N_KEYS.statusModified,
+  staged: FILE_TREE_I18N_KEYS.statusStaged,
+  untracked: FILE_TREE_I18N_KEYS.statusUntracked,
+  ignored: FILE_TREE_I18N_KEYS.statusIgnored,
+}
 
 interface IndexedNode {
   readonly node: RepoTreeNode
@@ -261,19 +272,18 @@ function FiletreeRow({ entry, expanded, onToggle, onSelect, onActivate }: Filetr
 
 function StatusDot({ status }: { status: RepoTreeNodeStatus }) {
   if (status === 'clean') return <span className="w-1.5 shrink-0" aria-hidden />
+  const t = useT()
   const color =
     status === 'modified' || status === 'untracked'
       ? 'var(--color-warning)'
       : status === 'staged'
         ? 'var(--color-success)'
-        : status === 'ignored'
-          ? 'var(--color-muted-foreground)'
-          : 'var(--color-danger)'
+        : 'var(--color-muted-foreground)'
   return (
     <span
       className="h-1.5 w-1.5 shrink-0 rounded-full"
       style={{ background: color }}
-      aria-label={status}
+      aria-label={t(STATUS_LABEL_KEYS[status])}
     />
   )
 }

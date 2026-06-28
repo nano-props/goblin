@@ -308,6 +308,10 @@ export const ko: Record<DictKey, string> = {
   'filetree.no-worktree-body': '이 브랜치의 워크트리를 만들면 여기서 파일을 탐색할 수 있습니다.',
   'filetree.truncated': '파일 트리가 잘렸습니다 — 범위를 좁히면 더 표시됩니다.',
   'filetree.error': '파일 트리를 읽을 수 없습니다.',
+  'filetree.status.modified': '수정됨',
+  'filetree.status.staged': '스테이지됨',
+  'filetree.status.untracked': '추적 안 됨',
+  'filetree.status.ignored': '무시됨',
 
   // ---- Terminal ----------------------------------------------------------
   'terminal.opening': '터미널 여는 중…',

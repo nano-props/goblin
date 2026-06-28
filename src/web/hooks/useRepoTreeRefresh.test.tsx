@@ -365,4 +365,149 @@ describe('useRepoTreeRefresh', () => {
     expect(lastSnapshot?.stale).toBe(false)
     expect(lastSnapshot?.loading).toBe(false)
   })
+
+  test('two rapid invalidations: stale flag resets between fetches and prior request is aborted', async () => {
+    // Regression for the stale-flag bleed across worktree switches
+    // (and across rapid same-input invalidations). The flag must be
+    // cleared at fetch entry, not just on resolution, so the second
+    // refetch does not inherit "stale" from the first.
+    const first = makeDeferred<RepoTreeResult>()
+    const second = makeDeferred<RepoTreeResult>()
+    const third = makeDeferred<RepoTreeResult>()
+    mocks.getRepositoryTree
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+      .mockReturnValueOnce(third.promise)
+
+    await render({
+      repoId: '/repo-a',
+      worktreePath: '/repo-a/main',
+      onSnapshot: (snapshot) => {
+        lastSnapshot = snapshot
+      },
+    })
+
+    // Resolve the mount fetch to land the hook in a known good state.
+    await act(async () => {
+      first.resolve({
+        nodes: [
+          { id: 'first.ts', path: 'first.ts', name: 'first.ts', parentId: null, kind: 'file', status: 'clean' },
+        ],
+        truncated: false,
+      })
+      await Promise.resolve()
+    })
+    expect(lastSnapshot?.stale).toBe(false)
+    expect(lastSnapshot?.loading).toBe(false)
+
+    const firstSignal = mocks.getRepositoryTree.mock.calls[0]?.[2]?.signal as AbortSignal
+
+    // First invalidation kicks a refetch; stale should become true
+    // until the second fetch resolves.
+    await act(async () => {
+      for (const listener of listeners) {
+        listener({ type: 'repo-query-invalidated', repoId: '/repo-a', query: 'repo-snapshot' })
+      }
+      await Promise.resolve()
+    })
+    expect(lastSnapshot?.stale).toBe(true)
+    expect(lastSnapshot?.loading).toBe(true)
+
+    const secondSignal = mocks.getRepositoryTree.mock.calls[1]?.[2]?.signal as AbortSignal
+    expect(secondSignal).not.toBe(firstSignal)
+    expect(secondSignal.aborted).toBe(false)
+
+    // Second invalidation fires while the first refetch is still
+    // pending. The hook must abort the in-flight second request and
+    // start a third one. Inputs did not change, so the input-change
+    // effect does not re-fire — the stale flag, last set true by
+    // the first invalidation, stays true until the third fetch
+    // resolves.
+    await act(async () => {
+      for (const listener of listeners) {
+        listener({ type: 'repo-query-invalidated', repoId: '/repo-a', query: 'repo-snapshot' })
+      }
+      await Promise.resolve()
+    })
+
+    expect(secondSignal.aborted).toBe(true)
+    expect(mocks.getRepositoryTree).toHaveBeenCalledTimes(3)
+    expect(lastSnapshot?.loading).toBe(true)
+    expect(lastSnapshot?.stale).toBe(true)
+
+    // Resolving the orphaned second request must not clobber state.
+    await act(async () => {
+      second.resolve({ nodes: [], truncated: false })
+      await Promise.resolve()
+    })
+    expect(lastSnapshot?.loading).toBe(true)
+
+    // Resolving the third request lands the final tree.
+    await act(async () => {
+      third.resolve({
+        nodes: [
+          { id: 'third.ts', path: 'third.ts', name: 'third.ts', parentId: null, kind: 'file', status: 'clean' },
+        ],
+        truncated: false,
+      })
+      await Promise.resolve()
+    })
+    expect(lastSnapshot?.stale).toBe(false)
+    expect(lastSnapshot?.loading).toBe(false)
+    expect(lastSnapshot?.tree?.nodes[0]?.id).toBe('third.ts')
+  })
+
+  test('manual refresh() while a request is in flight aborts the prior request', async () => {
+    // Regression: refresh() must abort any in-flight request, so the
+    // consumer never sees stale data applied on top of a newer one.
+    const first = makeDeferred<RepoTreeResult>()
+    const second = makeDeferred<RepoTreeResult>()
+    mocks.getRepositoryTree.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+
+    await render({
+      repoId: '/repo-a',
+      worktreePath: '/repo-a/main',
+      onSnapshot: (snapshot) => {
+        lastSnapshot = snapshot
+      },
+    })
+
+    const firstSignal = mocks.getRepositoryTree.mock.calls[0]?.[2]?.signal as AbortSignal
+    expect(firstSignal.aborted).toBe(false)
+
+    await act(async () => {
+      lastSnapshot?.refresh()
+      await Promise.resolve()
+    })
+
+    const secondSignal = mocks.getRepositoryTree.mock.calls[1]?.[2]?.signal as AbortSignal
+    expect(firstSignal.aborted).toBe(true)
+    expect(secondSignal.aborted).toBe(false)
+    expect(mocks.getRepositoryTree).toHaveBeenCalledTimes(2)
+
+    // The orphaned first resolution must not change state.
+    await act(async () => {
+      first.resolve({
+        nodes: [
+          {
+            id: 'first.ts',
+            path: 'first.ts',
+            name: 'first.ts',
+            parentId: null,
+            kind: 'file',
+            status: 'clean',
+          },
+        ],
+        truncated: false,
+      })
+      await Promise.resolve()
+    })
+    expect(lastSnapshot?.tree).toBeNull()
+
+    await act(async () => {
+      second.resolve({ nodes: [], truncated: false })
+      await Promise.resolve()
+    })
+    expect(lastSnapshot?.tree).toEqual({ nodes: [], truncated: false })
+  })
 })

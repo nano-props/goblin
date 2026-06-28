@@ -300,6 +300,10 @@ export const zh: Record<DictKey, string> = {
   'filetree.no-worktree-body': '为此分支创建工作树后，可在此浏览其文件。',
   'filetree.truncated': '文件树已截断 — 缩小范围后可查看更多。',
   'filetree.error': '无法读取文件树。',
+  'filetree.status.modified': '已修改',
+  'filetree.status.staged': '已暂存',
+  'filetree.status.untracked': '未跟踪',
+  'filetree.status.ignored': '已忽略',
 
   // ---- Terminal ----------------------------------------------------------
   'terminal.opening': '正在打开终端…',

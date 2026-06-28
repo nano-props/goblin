@@ -315,6 +315,10 @@ export const ja: Record<DictKey, string> = {
   'filetree.no-worktree-body': 'このブランチのワークツリーを作成すると、ここでファイルを閲覧できます。',
   'filetree.truncated': 'ファイルツリーが切り詰められました — 範囲を絞るとさらに表示されます。',
   'filetree.error': 'ファイルツリーを読み込めませんでした。',
+  'filetree.status.modified': '変更あり',
+  'filetree.status.staged': 'ステージ済み',
+  'filetree.status.untracked': '未追跡',
+  'filetree.status.ignored': '無視',
 
   // ---- Terminal ----------------------------------------------------------
   'terminal.opening': 'ターミナルを開いています…',

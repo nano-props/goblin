@@ -68,10 +68,14 @@ export function useRepoTreeRefresh(input: UseRepoTreeRefreshInput): UseRepoTreeR
   // routes the result back into local state if the consumer is
   // still interested in this (repoId, worktreePath) pair.
   //
-  // Note: this routine never touches `stale` itself. The flag is
-  // owned by the invalidation listener (set on entry, cleared on
-  // resolution below). Doing it any other way races the listener's
-  // setStale(true) and ends up batching stale=false back in.
+  // `stale` is intentionally NOT reset here -- the invalidation
+  // listener owns that flag for the *current* worktree, and resetting
+  // at fetch entry would clobber a setStale(true) that landed
+  // synchronously alongside the fetch (the React batching would
+  // collapse both into the last write). Stale is reset only when
+  // (repoId, worktreePath) changes (see the input-change effect
+  // below), so a freshly-mounted worktree never inherits "stale"
+  // from the prior one.
   const fetchTree = useCallback(() => {
     if (!repoId || !worktreePath) {
       setTree(null)
@@ -121,8 +125,14 @@ export function useRepoTreeRefresh(input: UseRepoTreeRefreshInput): UseRepoTreeR
       })
   }, [repoId, worktreePath])
 
-  // Refetch on input change.
+  // Refetch on input change. The `stale` flag is reset here, on the
+  // (repoId, worktreePath) boundary, so a new worktree never inherits
+  // "stale" from the prior one. The invalidation listener also calls
+  // fetchTree directly, but its effect does not re-fire on those calls
+  // (fetchTree's identity is stable for the same input pair), so the
+  // reset only happens on real input changes.
   useEffect(() => {
+    setStale(false)
     fetchTree()
     return () => {
       // Cancel any in-flight request when inputs change or the

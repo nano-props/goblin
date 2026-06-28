@@ -166,7 +166,11 @@ describe('FiletreeView', () => {
       truncated: false,
     }
     renderView({ tree, loading: false, error: null, stale: false })
-    const dot = container?.querySelector('[aria-label="modified"]') as HTMLElement
+    // i18n is mocked to return the key verbatim, so the aria-label
+    // surfaces the i18n key path. The contract under test is "the
+    // status value reaches an aria-label via the i18n layer", not
+    // the translated string.
+    const dot = container?.querySelector('[aria-label="filetree.status.modified"]') as HTMLElement
     expect(dot).toBeTruthy()
     expect(dot.style.background).toContain('--color-warning')
   })
