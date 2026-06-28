@@ -1,4 +1,4 @@
-import { Check, ChevronDown, Loader2, Plus, X, type LucideIcon } from 'lucide-react'
+import { Check, ChevronDown, Plus, X, type LucideIcon } from 'lucide-react'
 import {
   useCallback,
   useLayoutEffect,
@@ -7,6 +7,7 @@ import {
   useState,
   forwardRef,
   type ComponentPropsWithoutRef,
+  type RefObject,
 } from 'react'
 import { Button } from '#/web/components/ui/button.tsx'
 import { cn } from '#/web/lib/cn.ts'
@@ -49,6 +50,7 @@ import {
 } from '#/web/components/workspace-pane/tab-providers.ts'
 
 type TerminalWorkspacePaneTabSummary = Extract<WorkspacePaneTabSummary, { type: 'terminal' }>
+type WorkspacePaneT = (key: string, params?: Record<string, string | number>) => string
 
 interface WorkspacePaneTabStripProps {
   worktreeTerminalKey: string | null
@@ -198,6 +200,127 @@ function shouldShowWorkspacePaneTabSeparator({
   return !!rightId && leftId !== activeId && rightId !== activeId && leftId !== hoveredId && rightId !== hoveredId
 }
 
+function useScrollNewWorkspacePaneTabIntoView({
+  items,
+  viewportRef,
+}: {
+  items: readonly WorkspacePaneTabItem[]
+  viewportRef: RefObject<HTMLDivElement | null>
+}) {
+  const latestItemsRef = useRef(items)
+  const prevTabCountRef = useRef(items.length)
+  latestItemsRef.current = items
+
+  useLayoutEffect(() => {
+    const tabCount = latestItemsRef.current.length
+    const prevTabCount = prevTabCountRef.current
+    if (tabCount <= prevTabCount) {
+      prevTabCountRef.current = tabCount
+      return
+    }
+    prevTabCountRef.current = tabCount
+    const newItem = latestItemsRef.current[tabCount - 1]
+    if (newItem && isPendingWorkspacePaneTabItem(newItem)) return
+    const viewport = viewportRef.current
+    if (!viewport) return
+    if (viewport.scrollWidth <= viewport.clientWidth) return
+    viewport.style.scrollBehavior = 'smooth'
+    viewport.scrollLeft = viewport.scrollWidth
+    // Reset scroll-behavior on the next frame so subsequent user-driven scrolls
+    // (e.g. dragging the scrollbar) are not animated, while the in-flight scroll
+    // initiated above still benefits from the smooth behavior.
+    const frame = requestAnimationFrame(() => {
+      viewport.style.scrollBehavior = ''
+    })
+    return () => {
+      cancelAnimationFrame(frame)
+      if (viewport.style.scrollBehavior === 'smooth') {
+        viewport.style.scrollBehavior = ''
+      }
+    }
+  }, [items.length, viewportRef])
+}
+
+function useDeferredWorkspacePaneTabFocus({
+  items,
+  focusRegistry,
+}: {
+  items: readonly WorkspacePaneTabItem[]
+  focusRegistry: FocusRegistry<string, HTMLButtonElement>
+}) {
+  const pendingFocusIdentityRef = useRef<string | null>(null)
+  const [focusRequestVersion, setFocusRequestVersion] = useState(0)
+
+  useLayoutEffect(() => {
+    const pendingFocusIdentity = pendingFocusIdentityRef.current
+    if (!pendingFocusIdentity) return
+    if (!items.some((item) => item.identity === pendingFocusIdentity)) {
+      pendingFocusIdentityRef.current = null
+      return
+    }
+    focusRegistry.focus(pendingFocusIdentity)
+    pendingFocusIdentityRef.current = null
+  }, [focusRegistry, focusRequestVersion, items])
+
+  return useCallback((identity: string) => {
+    pendingFocusIdentityRef.current = identity
+    setFocusRequestVersion((version) => version + 1)
+  }, [])
+}
+
+function useWorkspacePaneTabDnd({
+  sortableItems,
+  newButtonRef,
+  onReorder,
+}: {
+  sortableItems: readonly (WorkspacePaneStaticTabItem | WorkspacePaneTerminalTabItem)[]
+  newButtonRef: RefObject<HTMLButtonElement | null>
+  onReorder: (orderedTabs: WorkspacePaneTabOrderEntry[]) => void
+}) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+  const restrictToVisibleTabStrip = useMemo(
+    () => createRestrictToTabStripBounds({ rightBoundaryRef: newButtonRef }),
+    [newButtonRef],
+  )
+  // Must be called unconditionally so the hook order stays stable across renders
+  // (e.g. when worktree items go from 0 -> 1 or back).
+  const sortableIds = useMemo(() => sortableItems.map((item) => item.sortableId), [sortableItems])
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event
+      if (!over) return
+      const activeId = String(active.id)
+      const overId = String(over.id)
+      if (activeId === overId) return
+      const oldIndex = sortableItems.findIndex((item) => item.sortableId === activeId)
+      const newIndex = sortableItems.findIndex((item) => item.sortableId === overId)
+      if (oldIndex === -1 || newIndex === -1) return
+      const activeItem = sortableItems[oldIndex]
+      const overItem = sortableItems[newIndex]
+      if (!activeItem || !overItem) return
+      onReorder(
+        arrayMove(
+          sortableItems.map((item) => item.orderEntry),
+          oldIndex,
+          newIndex,
+        ),
+      )
+    },
+    [onReorder, sortableItems],
+  )
+
+  return {
+    sensors,
+    restrictToVisibleTabStrip,
+    sortableIds,
+    handleDragEnd,
+  }
+}
+
 interface WorkspacePaneTabSwitcherPopoverProps {
   items: WorkspacePaneTabItem[]
   activeTabIdentity: string | null
@@ -207,7 +330,7 @@ interface WorkspacePaneTabSwitcherPopoverProps {
   onNew: () => void
   onSelect: (identity: string) => void
   onClose: (event: React.MouseEvent, identity: string) => void
-  t: (key: string, params?: Record<string, string | number>) => string
+  t: WorkspacePaneT
 }
 
 function WorkspacePaneTabSwitcherPopover({
@@ -273,9 +396,7 @@ function WorkspacePaneTabSwitcherPopover({
                     aria-current={selected ? 'true' : undefined}
                   >
                     <span className="flex size-3.5 shrink-0 items-center justify-center">
-                      {pending && item.busy ? (
-                        <Loader2 size={13} className="animate-spin text-muted-foreground" aria-hidden />
-                      ) : selected ? (
+                      {selected ? (
                         <Check size={13} aria-hidden />
                       ) : (
                         <WorkspacePaneTabIcon item={item} active={false} />
@@ -362,59 +483,16 @@ export function WorkspacePaneTabStrip({
   const internalFocusRegistry = useFocusRegistry<string, HTMLButtonElement>()
   const focusRegistry = externalFocusRegistry ?? internalFocusRegistry
   const viewportRef = useRef<HTMLDivElement>(null)
-  const prevTabCountRef = useRef(items.length)
   const newButtonRef = useRef<HTMLButtonElement>(null)
-  const pendingFocusIdentityRef = useRef<string | null>(null)
   const [hoveredTabIdentity, setHoveredTabIdentity] = useState<string | null>(null)
-  const [focusRequestVersion, setFocusRequestVersion] = useState(0)
+  const requestFocusAfterRender = useDeferredWorkspacePaneTabFocus({ items, focusRegistry })
+  const tabDnd = useWorkspacePaneTabDnd({
+    sortableItems,
+    newButtonRef,
+    onReorder,
+  })
 
-  useLayoutEffect(() => {
-    const prevTabCount = prevTabCountRef.current
-    if (items.length <= prevTabCount) {
-      prevTabCountRef.current = items.length
-      return
-    }
-    prevTabCountRef.current = items.length
-    const newItem = items[items.length - 1]
-    if (newItem && isPendingWorkspacePaneTabItem(newItem)) return
-    const viewport = viewportRef.current
-    if (!viewport) return
-    if (viewport.scrollWidth <= viewport.clientWidth) return
-    viewport.style.scrollBehavior = 'smooth'
-    viewport.scrollLeft = viewport.scrollWidth
-    // Reset scroll-behavior on the next frame so subsequent user-driven scrolls
-    // (e.g. dragging the scrollbar) are not animated, while the in-flight scroll
-    // initiated above still benefits from the smooth behavior.
-    const frame = requestAnimationFrame(() => {
-      viewport.style.scrollBehavior = ''
-    })
-    return () => cancelAnimationFrame(frame)
-  }, [items.length])
-
-  useLayoutEffect(() => {
-    const pendingFocusIdentity = pendingFocusIdentityRef.current
-    if (!pendingFocusIdentity) return
-    if (!items.some((item) => item.identity === pendingFocusIdentity)) {
-      pendingFocusIdentityRef.current = null
-      return
-    }
-    focusRegistry.focus(pendingFocusIdentity)
-    pendingFocusIdentityRef.current = null
-  }, [focusRegistry, focusRequestVersion, items])
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  )
-  const restrictToVisibleTabStrip = useMemo(
-    () => createRestrictToTabStripBounds({ rightBoundaryRef: newButtonRef }),
-    [],
-  )
-
-  // Must be called unconditionally so the hook order stays stable across renders
-  // (e.g. when worktree items go from 0 → 1 or back, which would otherwise bypass the
-  // helper below and trigger React's "Rendered more hooks than during the previous render").
-  const sortableIds = useMemo(() => sortableItems.map((item) => item.sortableId), [sortableItems])
+  useScrollNewWorkspacePaneTabIntoView({ items, viewportRef })
 
   const handleSelect = useCallback(
     (identity: string) => {
@@ -450,14 +528,10 @@ export function WorkspacePaneTabStrip({
       const nextKey = nextItem?.identity ?? null
 
       setHoveredTabIdentity(null)
-      if (isActive && nextKey) pendingFocusIdentityRef.current = nextKey
+      if (isActive && nextKey) requestFocusAfterRender(nextKey)
       onClose(item)
-
-      if (isActive && nextKey) {
-        setFocusRequestVersion((version) => version + 1)
-      }
     },
-    [activeTabIdentity, items, onClose],
+    [activeTabIdentity, items, onClose, requestFocusAfterRender],
   )
 
   const tabIdForItem = useCallback(
@@ -529,29 +603,19 @@ export function WorkspacePaneTabStrip({
     [activateKeyboardNavigationTarget, collapseToSelectedTab, focusRegistry, items, onNavigateOut],
   )
 
-  const handleDragEnd = useCallback(
-    (event: DragEndEvent) => {
-      const { active, over } = event
-      if (!over) return
-      const activeId = String(active.id)
-      const overId = String(over.id)
-      if (activeId === overId) return
-      const oldIndex = sortableItems.findIndex((item) => item.sortableId === activeId)
-      const newIndex = sortableItems.findIndex((item) => item.sortableId === overId)
-      if (oldIndex === -1 || newIndex === -1) return
-      const activeItem = sortableItems[oldIndex]
-      const overItem = sortableItems[newIndex]
-      if (!activeItem || !overItem) return
-      onReorder(
-        arrayMove(
-          sortableItems.map((item) => item.orderEntry),
-          oldIndex,
-          newIndex,
-        ),
-      )
-    },
-    [onReorder, sortableItems],
-  )
+  const tabBodyContext: WorkspacePaneTabBodyContext = {
+    activeTabIdentity,
+    panelActive,
+    focusableTabIdentity,
+    focusRegistry,
+    hoveredTabIdentity,
+    tabIdForItem,
+    onHoverChange: setHoveredTabIdentity,
+    onSelect: handleSelect,
+    onClose: handleClose,
+    onKeyDown: handleTabKeyDown,
+    t,
+  }
 
   if (items.length === 0) {
     if (!canCreateNew) return null
@@ -566,131 +630,225 @@ export function WorkspacePaneTabStrip({
     )
   }
 
-  function renderCompactTabsBody() {
-    const compactItem = selectedItem
-    const newTerminalLabelKey = newTerminalBusy ? 'terminal.loading' : 'terminal.new'
-    // Compact tabs intentionally use muted chrome even when selected, so
-    // selection should not suppress separators; hover still does.
-    const compactActiveVisualIdentity = null
-
-    return (
-      <ToolbarTabStripBody className="flex-1">
-        <WorkspacePaneTabTooltipLayer
-          items={items}
-          role="tablist"
-          aria-label={t('workspace-pane-tabs.tabs')}
-          className="flex-1"
-        >
-          {compactItem ? (
-            <WorkspacePaneTab
-              item={compactItem}
-              isActive={!!panelActive && compactItem.identity === activeTabIdentity}
-              isSelected={compactItem.identity === activeTabIdentity}
-              isFocusable={compactItem.identity === focusableTabIdentity}
-              tabId={
-                isStaticWorkspacePaneTabItem(compactItem) || isPendingWorkspacePaneTabItem(compactItem)
-                  ? tabIdForItem(compactItem)
-                  : terminalWorkspacePaneTabProvider.buttonId(workspacePaneId, 0)
-              }
-              focusRegistry={focusRegistry}
-              onSelect={handleSelect}
-              onClose={handleClose}
-              onKeyDown={handleTabKeyDown}
-              t={t}
-              compact={collapseToSelectedTab}
-              showSeparator={shouldShowWorkspacePaneTabSeparator({
-                leftId: compactItem.identity,
-                rightId: WORKSPACE_PANE_COMPACT_TRAILING_ACTION_ID,
-                activeId: compactActiveVisualIdentity,
-                hoveredId: hoveredTabIdentity,
-              })}
-              onHoverChange={setHoveredTabIdentity}
-            />
-          ) : null}
-        </WorkspacePaneTabTooltipLayer>
-        <WorkspacePaneTabSwitcherPopover
-          items={items}
-          activeTabIdentity={activeTabIdentity}
-          label={t('workspace-pane-tabs.tabs')}
-          newLabel={t(newTerminalLabelKey)}
-          canCreateNew={canCreateNew && !newTerminalBusy}
-          onNew={onNew}
-          onSelect={handleSelect}
-          onClose={handleClose}
-          t={t}
-        />
-      </ToolbarTabStripBody>
-    )
-  }
-
-  function renderScrollableTabsBody() {
-    const activeVisualIdentity = panelActive ? activeTabIdentity : null
-
-    return (
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        modifiers={[restrictToVisibleTabStrip]}
-        onDragEnd={handleDragEnd}
-      >
-        <ToolbarTabStripBody scroll>
-          <SortableContext items={sortableIds} strategy={horizontalListSortingStrategy}>
-            <WorkspacePaneTabTooltipLayer items={items} role="tablist" aria-label={t('workspace-pane-tabs.tabs')}>
-              {items.map((item, index) => {
-                const nextItem = items[index + 1]
-                const rightId = nextItem ? nextItem.identity : WORKSPACE_PANE_NEW_ACTION_ID
-                const commonProps = {
-                  item,
-                  isActive: !!panelActive && item.identity === activeTabIdentity,
-                  isSelected: item.identity === activeTabIdentity,
-                  isFocusable: item.identity === focusableTabIdentity,
-                  index,
-                  total: items.length,
-                  tabId: tabIdForItem(item),
-                  focusRegistry,
-                  showSeparator: shouldShowWorkspacePaneTabSeparator({
-                    leftId: item.identity,
-                    rightId,
-                    activeId: activeVisualIdentity,
-                    hoveredId: hoveredTabIdentity,
-                  }),
-                  onHoverChange: setHoveredTabIdentity,
-                  onSelect: handleSelect,
-                  onClose: handleClose,
-                  onKeyDown: handleTabKeyDown,
-                  t,
-                  compact: false,
-                }
-                if (!isSortableWorkspacePaneTabItem(item)) {
-                  return <WorkspacePaneTab key={item.identity} {...commonProps} />
-                }
-                return (
-                  <SortableWorkspacePaneTab key={item.identity} {...commonProps} sortableIdentity={item.sortableId} />
-                )
-              })}
-            </WorkspacePaneTabTooltipLayer>
-          </SortableContext>
-          {canCreateNew ? (
-            <WorkspacePaneNewButton
-              ref={newButtonRef}
-              id={items.length === 0 ? `${workspacePaneId}-workspace-pane-tab-empty` : undefined}
-              onClick={onNew}
-              busy={newTerminalBusy}
-              t={t}
-            />
-          ) : null}
-        </ToolbarTabStripBody>
-      </DndContext>
-    )
-  }
-
   return (
     <ToolbarTabStrip
       compact={collapseToSelectedTab}
-      compactContent={renderCompactTabsBody()}
-      scrollContent={renderScrollableTabsBody()}
+      compactContent={
+        <WorkspacePaneCompactTabsBody
+          items={items}
+          compactItem={selectedItem}
+          workspacePaneId={workspacePaneId}
+          context={tabBodyContext}
+          canCreateNew={canCreateNew && !newTerminalBusy}
+          onNew={onNew}
+        />
+      }
+      scrollContent={
+        <WorkspacePaneScrollableTabsBody
+          items={items}
+          context={tabBodyContext}
+          canCreateNew={canCreateNew}
+          onNew={onNew}
+          newTerminalBusy={newTerminalBusy}
+          newButtonRef={newButtonRef}
+          workspacePaneId={workspacePaneId}
+          dnd={tabDnd}
+        />
+      }
       viewportRef={viewportRef}
     />
+  )
+}
+
+interface WorkspacePaneTabBodyContext {
+  activeTabIdentity: string | null
+  panelActive?: boolean
+  focusableTabIdentity: string | null
+  focusRegistry: FocusRegistry<string, HTMLButtonElement>
+  hoveredTabIdentity: string | null
+  tabIdForItem: (item: WorkspacePaneTabItem) => string
+  onHoverChange: (identity: string | null) => void
+  onSelect: (identity: string) => void
+  onClose: (event: React.MouseEvent, identity: string) => void
+  onKeyDown: (e: React.KeyboardEvent<HTMLButtonElement>, identity: string) => void
+  t: WorkspacePaneT
+}
+
+interface WorkspacePaneTabBodyCommonProps {
+  items: WorkspacePaneTabItem[]
+  context: WorkspacePaneTabBodyContext
+}
+
+interface WorkspacePaneCompactTabsBodyProps extends WorkspacePaneTabBodyCommonProps {
+  compactItem: WorkspacePaneTabItem | null
+  workspacePaneId: string
+  canCreateNew: boolean
+  onNew: () => void
+}
+
+function WorkspacePaneCompactTabsBody({
+  items,
+  compactItem,
+  workspacePaneId,
+  context,
+  canCreateNew,
+  onNew,
+}: WorkspacePaneCompactTabsBodyProps) {
+  const {
+    activeTabIdentity,
+    panelActive,
+    focusableTabIdentity,
+    focusRegistry,
+    hoveredTabIdentity,
+    tabIdForItem,
+    onHoverChange,
+    onSelect,
+    onClose,
+    onKeyDown,
+    t,
+  } = context
+  // Compact tabs intentionally use muted chrome even when selected, so
+  // selection should not suppress separators; hover still does.
+  const compactActiveVisualIdentity = null
+
+  return (
+    <ToolbarTabStripBody className="flex-1">
+      <WorkspacePaneTabTooltipLayer
+        items={items}
+        role="tablist"
+        aria-label={t('workspace-pane-tabs.tabs')}
+        className="flex-1"
+      >
+        {compactItem ? (
+          <WorkspacePaneTab
+            item={compactItem}
+            isActive={!!panelActive && compactItem.identity === activeTabIdentity}
+            isSelected={compactItem.identity === activeTabIdentity}
+            isFocusable={compactItem.identity === focusableTabIdentity}
+            tabId={
+              isStaticWorkspacePaneTabItem(compactItem) || isPendingWorkspacePaneTabItem(compactItem)
+                ? tabIdForItem(compactItem)
+                : terminalWorkspacePaneTabProvider.buttonId(workspacePaneId, 0)
+            }
+            focusRegistry={focusRegistry}
+            onSelect={onSelect}
+            onClose={onClose}
+            onKeyDown={onKeyDown}
+            t={t}
+            compact
+            showSeparator={shouldShowWorkspacePaneTabSeparator({
+              leftId: compactItem.identity,
+              rightId: WORKSPACE_PANE_COMPACT_TRAILING_ACTION_ID,
+              activeId: compactActiveVisualIdentity,
+              hoveredId: hoveredTabIdentity,
+            })}
+            onHoverChange={onHoverChange}
+          />
+        ) : null}
+      </WorkspacePaneTabTooltipLayer>
+      <WorkspacePaneTabSwitcherPopover
+        items={items}
+        activeTabIdentity={activeTabIdentity}
+        label={t('workspace-pane-tabs.tabs')}
+        newLabel={t('terminal.new')}
+        canCreateNew={canCreateNew}
+        onNew={onNew}
+        onSelect={onSelect}
+        onClose={onClose}
+        t={t}
+      />
+    </ToolbarTabStripBody>
+  )
+}
+
+interface WorkspacePaneScrollableTabsBodyProps extends WorkspacePaneTabBodyCommonProps {
+  canCreateNew: boolean
+  onNew: () => void
+  newTerminalBusy: boolean
+  newButtonRef: RefObject<HTMLButtonElement | null>
+  workspacePaneId: string
+  dnd: ReturnType<typeof useWorkspacePaneTabDnd>
+}
+
+function WorkspacePaneScrollableTabsBody({
+  items,
+  context,
+  canCreateNew,
+  onNew,
+  newTerminalBusy,
+  newButtonRef,
+  workspacePaneId,
+  dnd,
+}: WorkspacePaneScrollableTabsBodyProps) {
+  const {
+    activeTabIdentity,
+    panelActive,
+    focusableTabIdentity,
+    focusRegistry,
+    hoveredTabIdentity,
+    tabIdForItem,
+    onHoverChange,
+    onSelect,
+    onClose,
+    onKeyDown,
+    t,
+  } = context
+  const { sensors, restrictToVisibleTabStrip, sortableIds, handleDragEnd } = dnd
+  const activeVisualIdentity = panelActive ? activeTabIdentity : null
+
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      modifiers={[restrictToVisibleTabStrip]}
+      onDragEnd={handleDragEnd}
+    >
+      <ToolbarTabStripBody scroll>
+        <SortableContext items={sortableIds} strategy={horizontalListSortingStrategy}>
+          <WorkspacePaneTabTooltipLayer items={items} role="tablist" aria-label={t('workspace-pane-tabs.tabs')}>
+            {items.map((item, index) => {
+              const nextItem = items[index + 1]
+              const rightId = nextItem ? nextItem.identity : WORKSPACE_PANE_NEW_ACTION_ID
+              const commonProps = {
+                item,
+                isActive: !!panelActive && item.identity === activeTabIdentity,
+                isSelected: item.identity === activeTabIdentity,
+                isFocusable: item.identity === focusableTabIdentity,
+                index,
+                total: items.length,
+                tabId: tabIdForItem(item),
+                focusRegistry,
+                showSeparator: shouldShowWorkspacePaneTabSeparator({
+                  leftId: item.identity,
+                  rightId,
+                  activeId: activeVisualIdentity,
+                  hoveredId: hoveredTabIdentity,
+                }),
+                onHoverChange,
+                onSelect,
+                onClose,
+                onKeyDown,
+                t,
+                compact: false,
+              }
+              if (!isSortableWorkspacePaneTabItem(item)) {
+                return <WorkspacePaneTab key={item.identity} {...commonProps} />
+              }
+              return <SortableWorkspacePaneTab key={item.identity} {...commonProps} sortableIdentity={item.sortableId} />
+            })}
+          </WorkspacePaneTabTooltipLayer>
+        </SortableContext>
+        {canCreateNew ? (
+          <WorkspacePaneNewButton
+            ref={newButtonRef}
+            id={items.length === 0 ? `${workspacePaneId}-workspace-pane-tab-empty` : undefined}
+            onClick={onNew}
+            busy={newTerminalBusy}
+            t={t}
+          />
+        ) : null}
+      </ToolbarTabStripBody>
+    </DndContext>
   )
 }
 
@@ -706,7 +864,7 @@ interface WorkspacePaneTabProps {
   onSelect: (identity: string) => void
   onClose: (event: React.MouseEvent, identity: string) => void
   onKeyDown: (e: React.KeyboardEvent<HTMLButtonElement>, identity: string) => void
-  t: (key: string, params?: Record<string, string | number>) => string
+  t: WorkspacePaneT
   compact?: boolean
   showSeparator?: boolean
   onHoverChange?: (identity: string | null) => void
@@ -719,11 +877,10 @@ const WorkspacePaneNewButton = forwardRef<
     onClick: () => void
     busy?: boolean
     compact?: boolean
-    t: (key: string, params?: Record<string, string | number>) => string
+    t: WorkspacePaneT
   }
 >(function WorkspacePaneNewButton({ id, onClick, busy = false, compact = false, t }, ref) {
-  const labelKey = busy ? 'terminal.loading' : 'terminal.new'
-  const label = t(labelKey)
+  const label = t('terminal.new')
   return (
     <Button
       ref={ref}
@@ -736,10 +893,9 @@ const WorkspacePaneNewButton = forwardRef<
       disabled={busy}
       aria-label={label}
       title={label}
-      aria-busy={busy || undefined}
       data-workspace-pane-new-button=""
     >
-      {busy ? <Loader2 size={14} className="animate-spin shrink-0" /> : <Plus size={14} />}
+      <Plus size={14} />
     </Button>
   )
 })
@@ -759,7 +915,7 @@ interface WorkspacePaneTabChromeProps {
   onSelect: (identity: string) => void
   onClose: (event: React.MouseEvent, identity: string) => void
   onKeyDown: (e: React.KeyboardEvent<HTMLButtonElement>, identity: string) => void
-  t: (key: string, params?: Record<string, string | number>) => string
+  t: WorkspacePaneT
   compact?: boolean
   showSeparator?: boolean
   onHoverChange?: (identity: string | null) => void
@@ -839,7 +995,6 @@ function WorkspacePaneTabChrome({
         'aria-selected': isSelected,
         'aria-label': ariaLabel,
         'aria-controls': item.panelId,
-        'aria-busy': isPendingWorkspacePaneTabItem(item) && item.busy ? true : undefined,
         ...collectionAria,
         tabIndex: isFocusable ? 0 : -1,
         onClick: () => onSelect(item.identity),
@@ -848,11 +1003,7 @@ function WorkspacePaneTabChrome({
       buttonClassName={toolbarTabButtonClassName('workspace')}
       {...closeProps}
     >
-      {isPendingWorkspacePaneTabItem(item) && item.busy ? (
-        <Loader2 size={13} className="shrink-0 animate-spin text-muted-foreground" />
-      ) : (
-        <WorkspacePaneTabIcon item={item} active={isActive} compact={compact} />
-      )}
+      <WorkspacePaneTabIcon item={item} active={isActive} compact={compact} />
       {isPendingWorkspacePaneTabItem(item) && item.busy ? null : item.label ? (
         <span className="truncate">{item.label}</span>
       ) : null}

@@ -72,6 +72,7 @@ const ScrollBar = forwardRef<ComponentRef<typeof ScrollAreaPrimitive.ScrollAreaS
       <ScrollAreaPrimitive.Scrollbar
         ref={ref}
         orientation={orientation}
+        data-title-bar-chrome-region="no-drag"
         className={cn(
           'flex touch-none select-none p-0.5 opacity-0 transition-opacity duration-200 ease-out data-[state=visible]:opacity-100',
           orientation === 'vertical' && 'h-full w-2 border-l border-l-transparent',

@@ -754,7 +754,7 @@ describe('RepoWorkspaceToolbar', () => {
     expect(pendingView).not.toBeNull()
     expect(pendingView?.className).toContain('flex-1')
     expect(pendingView?.textContent).not.toContain('terminal.opening')
-    expect(tab?.getAttribute('aria-busy')).toBe('true')
+    expect(tab?.getAttribute('aria-busy')).toBeNull()
     expect(c.querySelector('button[aria-label="terminal.loading"]')).toBeNull()
     expect(c.querySelector('button[aria-label="workspace-pane-tabs.tabs"]')).not.toBeNull()
   })
@@ -773,8 +773,12 @@ describe('RepoWorkspaceToolbar', () => {
     expect(pendingView).not.toBeNull()
     expect(pendingView?.textContent).not.toContain('terminal.opening')
     expect(tabs.map((tab) => tab.getAttribute('aria-label'))).toEqual(['tab.status', 'terminal.opening'])
-    expect(c.querySelector('[role="tab"][aria-label="terminal.opening"]')?.getAttribute('aria-busy')).toBe('true')
-    expect(c.querySelector('button[aria-label="terminal.loading"]')).not.toBeNull()
+    expect(c.querySelector('[role="tab"][aria-label="terminal.opening"]')?.getAttribute('aria-busy')).toBeNull()
+    const disabledNewButton = c.querySelector<HTMLButtonElement>('[data-workspace-pane-new-button]')
+    expect(disabledNewButton).not.toBeNull()
+    expect(disabledNewButton?.getAttribute('aria-label')).toBe('terminal.new')
+    expect(disabledNewButton?.disabled).toBe(true)
+    expect(disabledNewButton?.querySelector('.animate-spin')).toBeNull()
   })
 
   test('clicking the new-terminal button navigates and creates a terminal', async () => {
@@ -1018,7 +1022,7 @@ describe('RepoWorkspaceToolbar', () => {
     })
   })
 
-  test('T6.1: renders a busy new-terminal button while the initial session sync is in flight', async () => {
+  test('T6.1: disables the new-terminal button while the initial session sync is in flight', async () => {
     const { container: c } = renderToolbar({
       terminalCount: 0,
       navigation: navigationWith({}),
@@ -1026,21 +1030,22 @@ describe('RepoWorkspaceToolbar', () => {
     })
 
     expect(c.querySelector('#workspace-status-tab')).not.toBeNull()
-    const busyNewButton = c.querySelector<HTMLButtonElement>('button[aria-label="terminal.loading"]')
+    const busyNewButton = c.querySelector<HTMLButtonElement>('[data-workspace-pane-new-button]')
     expect(busyNewButton).not.toBeNull()
-    expect(busyNewButton?.getAttribute('aria-busy')).toBe('true')
+    expect(busyNewButton?.getAttribute('aria-label')).toBe('terminal.new')
+    expect(busyNewButton?.getAttribute('aria-busy')).toBeNull()
     expect(busyNewButton?.disabled).toBe(true)
+    expect(busyNewButton?.querySelector('.animate-spin')).toBeNull()
 
     // Once the provider calls markReady() (which the real Provider
     // does at the end of syncServerSessions' finally block), the
     // busy state clears and the real button appears.
     useRepoSyncStore.getState().markReady(REPO_ID, 0)
     await flush()
-    expect(c.querySelector('button[aria-label="terminal.loading"]')).toBeNull()
     expect(c.querySelector('button[aria-label="terminal.new"]')).not.toBeNull()
   })
 
-  test('renders terminal creation loading on the new-terminal button', () => {
+  test('disables the new-terminal button during terminal creation', () => {
     const { container: c } = renderToolbar({
       terminalCount: 0,
       navigation: navigationWith({}),
@@ -1048,12 +1053,14 @@ describe('RepoWorkspaceToolbar', () => {
     })
 
     expect(c.querySelector('[data-workspace-pane-skeleton-chip=""]')).toBeNull()
-    const busyNewButton = c.querySelector<HTMLButtonElement>('button[aria-label="terminal.loading"]')
+    const busyNewButton = c.querySelector<HTMLButtonElement>('[data-workspace-pane-new-button]')
     expect(busyNewButton).not.toBeNull()
+    expect(busyNewButton?.getAttribute('aria-label')).toBe('terminal.new')
     expect(busyNewButton?.disabled).toBe(true)
+    expect(busyNewButton?.querySelector('.animate-spin')).toBeNull()
   })
 
-  test('renders terminal creation loading on the new-terminal button when a terminal is already open', () => {
+  test('disables the new-terminal button during terminal creation when a terminal is already open', () => {
     const { container: c, mocks } = renderToolbar({
       terminalCount: 1,
       navigation: navigationWith({}),
@@ -1061,11 +1068,12 @@ describe('RepoWorkspaceToolbar', () => {
     })
 
     expect(c.querySelector('[data-workspace-pane-tab-tooltip-id="terminal:t1"]')).not.toBeNull()
-    expect(c.querySelector('button[aria-label="terminal.new"]')).toBeNull()
-    const busyNewButton = c.querySelector<HTMLButtonElement>('button[aria-label="terminal.loading"]')
+    const busyNewButton = c.querySelector<HTMLButtonElement>('[data-workspace-pane-new-button]')
     expect(busyNewButton).not.toBeNull()
-    expect(busyNewButton?.getAttribute('aria-busy')).toBe('true')
+    expect(busyNewButton?.getAttribute('aria-label')).toBe('terminal.new')
+    expect(busyNewButton?.getAttribute('aria-busy')).toBeNull()
     expect(busyNewButton?.disabled).toBe(true)
+    expect(busyNewButton?.querySelector('.animate-spin')).toBeNull()
 
     busyNewButton?.click()
     expect(mocks.createTerminal).not.toHaveBeenCalled()
