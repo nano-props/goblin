@@ -245,12 +245,17 @@ describe('wireClipboardIpc', () => {
   })
 
   test('handler swallows write errors to []', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const { wireClipboardIpc } = await import('#/main/clipboard-ipc.ts')
     wireClipboardIpc()
     const handler = ipcHandlers.get('goblin:clipboard-save-files')!
     const oversized = new ArrayBuffer(PASTE_FILE_MAX_BYTES + 1)
     const result = await handler({}, [{ name: 'big.bin', bytes: oversized }])
     expect(result).toEqual([])
+    expect(warn).toHaveBeenCalledWith(
+      '[clipboard-ipc] goblin:clipboard-save-files failed',
+      expect.objectContaining({ message: `Clipboard payload exceeds ${PASTE_FILE_MAX_BYTES} bytes` }),
+    )
   })
 
   test('clears any prior periodic-prune interval on re-entry', async () => {

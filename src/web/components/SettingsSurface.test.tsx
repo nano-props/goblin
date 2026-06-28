@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
+import { act } from '@testing-library/react'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
-import { act } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { SettingsSurface } from '#/web/components/SettingsSurface.tsx'
@@ -168,7 +168,9 @@ describe('SettingsSurface', () => {
 
   test('keeps settings navigation selected state and page changes wired', async () => {
     const onPageChange = vi.fn()
-    const { container } = render(<SettingsSurface page="general" onPageChange={onPageChange} autoFocusSelected={false} />)
+    const { container } = render(
+      <SettingsSurface page="general" onPageChange={onPageChange} autoFocusSelected={false} />,
+    )
 
     const general = container.querySelector('button[aria-label="settings.group.general"]')
     if (!(general instanceof HTMLButtonElement)) throw new Error('missing general settings nav row')

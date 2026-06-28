@@ -10,7 +10,7 @@
 // title, message, checkbox state, protected-branch hint — stays
 // rendered for the duration of the close animation.
 
-import { act } from 'react'
+import { act } from '@testing-library/react'
 import { beforeEach, describe, expect, test } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useBranchActionDialogDisplay } from '#/web/hooks/useBranchActionDialogDisplay.ts'

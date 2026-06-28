@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { act } from '@testing-library/react'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
 // Regression test for the create-worktree dialog host. The original
@@ -12,7 +13,6 @@ import { mockFetch } from '#/test-utils/fetch-mock.ts'
 // on its own false→true transition. The host should only force-close
 // when the active repo changes.
 
-import { act } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { CreateWorktreeDialogHost } from '#/web/components/CreateWorktreeDialogHost.tsx'
@@ -492,7 +492,9 @@ function setInputValue(id: string, value: string): void {
 }
 
 async function clickButton(text: string): Promise<void> {
-  const button = Array.from(document.body.querySelectorAll('button')).find((candidate) => candidate.textContent === text)
+  const button = Array.from(document.body.querySelectorAll('button')).find(
+    (candidate) => candidate.textContent === text,
+  )
   if (!(button instanceof HTMLButtonElement)) throw new Error(`missing button ${text}`)
   await act(async () => {
     button.click()

@@ -12,7 +12,8 @@
 //     component applies no client-side filter, so the dropdown mirrors
 //     whatever the host (i.e. the server, after debounce) supplies.
 
-import { act, useState } from 'react'
+import { act } from '@testing-library/react'
+import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { describe, expect, test, vi } from 'vitest'
 import { RemotePathSuggestions } from '#/web/components/ui/remote-path-suggestions.tsx'

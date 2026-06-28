@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
+import { act } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import React from 'react'
-import { act } from 'react'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useBranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { openBranchExternalTarget } from '#/web/hooks/openBranchExternalTarget.ts'

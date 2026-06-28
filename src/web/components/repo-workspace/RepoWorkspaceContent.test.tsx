@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { act, type ComponentProps } from 'react'
-import { screen } from '@testing-library/react'
+import type { ComponentProps } from 'react'
+import { act, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { RepoWorkspaceContent } from '#/web/components/repo-workspace/RepoWorkspaceContent.tsx'
 import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/branch-action-surface-context.ts'

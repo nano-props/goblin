@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act } from 'react'
+import { act } from '@testing-library/react'
 import { describe, expect, test } from 'vitest'
 
 import { SecretInput } from '#/web/components/ui/secret-input.tsx'
@@ -8,9 +8,7 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 
 describe('SecretInput', () => {
   test('does not render the visibility toggle when empty', () => {
-    const { container } = renderInJsdom(
-      <SecretInput value="" onChange={() => {}} showLabel="show" hideLabel="hide" />,
-    )
+    const { container } = renderInJsdom(<SecretInput value="" onChange={() => {}} showLabel="show" hideLabel="hide" />)
 
     expect(container.querySelector('button[aria-label="show"]')).toBeNull()
   })

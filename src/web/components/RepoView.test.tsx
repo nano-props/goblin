@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
 
-import { act } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { cleanup } from '@testing-library/react'
+import { act, cleanup } from '@testing-library/react'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { RepoView } from '#/web/components/RepoView.tsx'
 import { resetReposStore, seedRepoState, createRepoBranch } from '#/web/test-utils/bridge.ts'
