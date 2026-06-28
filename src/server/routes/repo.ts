@@ -10,6 +10,7 @@ import {
   getRepoWorktreeBootstrapPreview,
   probeRepo,
 } from '#/server/modules/repo-read-paths.ts'
+import { getRepositoryTree } from '#/server/modules/repo-tree.ts'
 import {
   abortCloneOperation,
   abortRepoOperation,
@@ -93,6 +94,16 @@ export function createRepoRoutes() {
   app.post('/patch', async (c) => {
     const { cwd, worktreePath } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.patch, c)
     return c.json(await jsonOr(() => getRepoPatch(cwd, worktreePath, c.req.raw.signal), READ_REPO_ERROR, 'patch'))
+  })
+  app.post('/tree', async (c) => {
+    const { cwd, worktreePath, prefix, depth } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.tree, c)
+    return c.json(
+      await jsonOr(
+        () => getRepositoryTree(cwd, worktreePath, { prefix, depth, signal: c.req.raw.signal }),
+        { nodes: [], truncated: false },
+        'tree',
+      ),
+    )
   })
   app.post('/pull-requests', async (c) => {
     const { cwd, branches, mode } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.pullRequests, c)
