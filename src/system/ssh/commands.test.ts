@@ -80,6 +80,7 @@ describe('remote ssh command builders', () => {
 
     expect(invocation.script).toContain('-type f')
     expect(invocation.script).toContain('-print0')
+    expect(invocation.script).not.toMatch(/\bfind\s+--\b/)
   })
 
   test('remote bootstrap script handles space paths and excludes copied tree children', async () => {
