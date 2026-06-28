@@ -90,6 +90,14 @@ export interface WorkspaceSessionState {
   preferredWorkspacePaneTabByBranchByRepo?: Record<string, Record<string, WorkspacePaneSessionTabType>>
   /** Per-repo, per-branch workspace pane tab strip order. Empty arrays are meaningful. */
   workspacePaneTabOrderByBranchByRepo: Record<string, Record<string, WorkspacePaneTabOrderEntry[]>>
+  /** Per-repo, per-worktree file tree view state. */
+  filetreeViewStateByWorktreeByRepo?: Record<string, Record<string, FiletreeSessionViewState>>
+}
+
+export interface FiletreeSessionViewState {
+  selectedKeys: string[]
+  expandedKeys: string[]
+  topVisibleRowIndex: number
 }
 
 export interface RuntimeSettingsSnapshot extends UserSettings {
@@ -233,8 +241,7 @@ export interface IpcRequest {
 
 /** Response envelope for the native Electron bridge IPC layer. */
 export type IpcResponse =
-  | { ok: true; data: unknown }
-  | { ok: false; error: { message: string; code?: string; name?: string } }
+  { ok: true; data: unknown } | { ok: false; error: { message: string; code?: string; name?: string } }
 
 export type I18nChangedEvent = { type: 'i18n-changed'; snapshot: I18nSnapshot }
 

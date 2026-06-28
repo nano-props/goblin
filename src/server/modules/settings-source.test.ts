@@ -248,3 +248,58 @@ test('normalizes workspace pane tab order in server sessions', async () => {
     },
   })
 })
+
+test('normalizes file tree view state in server sessions', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+
+  const mod = await import('#/server/modules/settings-source.ts')
+  await mod.setServerSessionState({
+    ...defaultWorkspaceSessionState(),
+    openRepoEntries: [
+      { kind: 'local', id: '/repo-b' },
+      { kind: 'local', id: '/repo-array' },
+    ],
+    activeRepoId: '/repo-b',
+    filetreeViewStateByWorktreeByRepo: {
+      '/repo-b': {
+        '/worktree': {
+          selectedKeys: ['src/index.ts', 'src/index.ts', '', 'bad\0key'],
+          expandedKeys: ['src', 'docs'],
+          topVisibleRowIndex: -20,
+        },
+        empty: {
+          selectedKeys: [],
+          expandedKeys: [],
+          topVisibleRowIndex: 0,
+        },
+        'bad\0worktree': {
+          selectedKeys: ['README.md'],
+          expandedKeys: [],
+          topVisibleRowIndex: 0,
+        },
+      },
+      '/repo-c': {
+        '/worktree': {
+          selectedKeys: ['README.md'],
+          expandedKeys: [],
+          topVisibleRowIndex: 0,
+        },
+      },
+      '/repo-array': [] as never,
+    },
+  })
+
+  expect(await mod.getServerSessionState()).toMatchObject({
+    filetreeViewStateByWorktreeByRepo: {
+      '/repo-b': {
+        '/worktree': {
+          selectedKeys: ['src/index.ts'],
+          expandedKeys: ['src', 'docs'],
+          topVisibleRowIndex: 0,
+        },
+      },
+    },
+  })
+})

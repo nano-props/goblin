@@ -6,6 +6,11 @@ import { useSessionPersistence } from '#/web/hooks/useSessionPersistence.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
+import {
+  filetreeInteractionScopeKey,
+  resetFiletreeInteractionStore,
+  useFiletreeInteractionStore,
+} from '#/web/stores/repos/filetree-interaction-state.ts'
 
 const persistWorkspaceSessionStateMock = vi.fn(async (_session: unknown) => {})
 
@@ -15,6 +20,7 @@ vi.mock('#/web/settings-actions.ts', () => ({
 
 beforeEach(() => {
   resetReposStore()
+  resetFiletreeInteractionStore()
   persistWorkspaceSessionStateMock.mockReset()
 })
 
@@ -70,6 +76,44 @@ describe('useSessionPersistence', () => {
         workspacePaneTabOrderByBranchByRepo: {
           '/tmp/repo': {
             'feature/worktree': [],
+          },
+        },
+      }),
+    )
+  })
+
+  test('persists file tree selected, expanded, and scroll state into settings session state', () => {
+    const repo = seedRepoState({
+      id: '/tmp/repo',
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
+      selectedBranch: 'feature/worktree',
+    })
+    const scopeKey = filetreeInteractionScopeKey(repo.id, '/tmp/worktree')
+    useReposStore.setState({
+      repos: { [repo.id]: repo },
+      order: [repo.id],
+      activeId: repo.id,
+      sessionReady: true,
+    })
+    useFiletreeInteractionStore.getState().restoreViewState({
+      [scopeKey]: {
+        selectedKeys: ['src/index.ts'],
+        expandedKeys: ['src'],
+        topVisibleRowIndex: 320,
+      },
+    })
+
+    renderInJsdom(<Harness />)
+
+    expect(persistWorkspaceSessionStateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filetreeViewStateByWorktreeByRepo: {
+          '/tmp/repo': {
+            '/tmp/worktree': {
+              selectedKeys: ['src/index.ts'],
+              expandedKeys: ['src'],
+              topVisibleRowIndex: 320,
+            },
           },
         },
       }),

@@ -41,6 +41,7 @@ describe('restorable-workspace-state', () => {
       workspacePaneTabOrderByBranchByRepo: {
         '/tmp/repo': { 'feature/worktree': [workspacePaneStaticTabOrderEntry('status')] },
       },
+      filetreeViewStateByWorktreeByRepo: {},
     })
   })
 
@@ -164,10 +165,7 @@ describe('restorable-workspace-state', () => {
       preferredWorkspacePaneTabByBranchByRepo: { '/tmp/repo': { 'feature/worktree': 'files' } },
       workspacePaneTabOrderByBranchByRepo: {
         '/tmp/repo': {
-          'feature/worktree': [
-            workspacePaneStaticTabOrderEntry('status'),
-            workspacePaneStaticTabOrderEntry('files'),
-          ],
+          'feature/worktree': [workspacePaneStaticTabOrderEntry('status'), workspacePaneStaticTabOrderEntry('files')],
         },
       },
     })
@@ -202,6 +200,44 @@ describe('restorable-workspace-state', () => {
     })
     expect(restored.preferredWorkspacePaneTabByBranchByRepo).toEqual({
       '/tmp/repo': { 'feature/worktree': 'files' },
+    })
+  })
+
+  test('persists file tree view state into session state', () => {
+    const repo = seedRepoState({
+      id: '/tmp/repo',
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
+      selectedBranch: 'feature/worktree',
+    })
+
+    expect(
+      workspaceSessionStateFromRestorableWorkspaceState({
+        repos: { [repo.id]: repo },
+        restorableWorkspaceState: {
+          order: [repo.id],
+          activeId: repo.id,
+          zenMode: false,
+          workspacePaneSize: 55,
+          selectedTerminalSessionByWorktree: {},
+        },
+        filetreeInteractionByScope: {
+          '/tmp/repo\0/tmp/worktree': {
+            selectedKeys: ['src/index.ts'],
+            expandedKeys: ['src'],
+            topVisibleRowIndex: 180,
+          },
+        },
+      }),
+    ).toMatchObject({
+      filetreeViewStateByWorktreeByRepo: {
+        '/tmp/repo': {
+          '/tmp/worktree': {
+            selectedKeys: ['src/index.ts'],
+            expandedKeys: ['src'],
+            topVisibleRowIndex: 180,
+          },
+        },
+      },
     })
   })
 })

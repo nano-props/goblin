@@ -1,5 +1,6 @@
 import { FolderTree } from 'lucide-react'
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import type { Key } from 'react-aria-components'
 import { toast } from 'sonner'
 import { useT } from '#/web/stores/i18n.ts'
 import { EmptyState, ScrollPane } from '#/web/components/Layout.tsx'
@@ -21,6 +22,11 @@ import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-comm
 import type { WorkspacePanePanelLabel } from '#/web/components/workspace-pane/tab-providers.ts'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { useFiletreeActionDialogsStore } from '#/web/stores/repos/filetree-action-dialogs.ts'
+import {
+  emptyFiletreeInteractionSnapshot,
+  filetreeInteractionScopeKey,
+  useFiletreeInteractionStore,
+} from '#/web/stores/repos/filetree-interaction-state.ts'
 import { getRepositoryFileViewer } from '#/web/filetree-client.ts'
 import { absoluteFilePathForTerminal, fileReadCommand } from '#/web/components/repo-workspace/file-read-command.ts'
 
@@ -155,13 +161,64 @@ function FiletreeTab({
   const navigation = usePrimaryWindowNavigation()
   const { createTerminal, writeInput } = useTerminalSessionContext()
   const openTrashFileConfirm = useFiletreeActionDialogsStore((s) => s.openTrashFileConfirm)
+  const interactionScopeKey = useMemo(() => filetreeInteractionScopeKey(repoId, worktreePath), [repoId, worktreePath])
+  const selectedKeyList = useFiletreeInteractionStore(
+    (s) => s.interactionByScope[interactionScopeKey]?.selectedKeys ?? emptyFiletreeInteractionSnapshot().selectedKeys,
+  )
+  const expandedKeyList = useFiletreeInteractionStore(
+    (s) => s.interactionByScope[interactionScopeKey]?.expandedKeys ?? emptyFiletreeInteractionSnapshot().expandedKeys,
+  )
+  const setSelectedKeys = useFiletreeInteractionStore((s) => s.setSelectedKeys)
+  const setExpandedKeys = useFiletreeInteractionStore((s) => s.setExpandedKeys)
+  const setExpandedKey = useFiletreeInteractionStore((s) => s.setExpandedKey)
+  const setTopVisibleRowIndex = useFiletreeInteractionStore((s) => s.setTopVisibleRowIndex)
+  const pruneKeys = useFiletreeInteractionStore((s) => s.pruneKeys)
+  const initialTopVisibleRowIndex = useMemo(
+    () => useFiletreeInteractionStore.getState().interactionByScope[interactionScopeKey]?.topVisibleRowIndex ?? 0,
+    [interactionScopeKey],
+  )
+  const selectedKeys = useMemo(() => new Set<Key>(selectedKeyList), [selectedKeyList])
+  const expandedKeys = useMemo(() => new Set<Key>(expandedKeyList), [expandedKeyList])
+  const handleSelectedKeysChange = useCallback(
+    (keys: Set<Key>) => {
+      setSelectedKeys(interactionScopeKey, stringKeysFromReactAriaKeys(keys))
+    },
+    [interactionScopeKey, setSelectedKeys],
+  )
+  const handleExpandedKeysChange = useCallback(
+    (keys: Set<Key>) => {
+      setExpandedKeys(interactionScopeKey, stringKeysFromReactAriaKeys(keys))
+    },
+    [interactionScopeKey, setExpandedKeys],
+  )
+  const handleDirectoryRowToggle = useCallback(
+    (key: string, expanded: boolean) => {
+      setExpandedKey(interactionScopeKey, key, expanded)
+    },
+    [interactionScopeKey, setExpandedKey],
+  )
+  const handlePruneKeys = useCallback(
+    (validKeys: ReadonlySet<string>) => {
+      pruneKeys(interactionScopeKey, validKeys)
+    },
+    [interactionScopeKey, pruneKeys],
+  )
+  const handleTopVisibleRowIndexChange = useCallback(
+    (topVisibleRowIndex: number) => {
+      setTopVisibleRowIndex(interactionScopeKey, topVisibleRowIndex)
+    },
+    [interactionScopeKey, setTopVisibleRowIndex],
+  )
 
   const openFileInTerminal = useCallback(
     async (node: RepoTreeNode) => {
       if (node.kind !== 'file') return
       navigation.showRepoWorkspacePaneTab(repoId, 'terminal')
       const [viewerResult, terminalResult] = await Promise.all([
-        getRepositoryFileViewer(repoId, worktreePath).catch(() => ({ viewer: 'cat' as const, shell: 'posix' as const })),
+        getRepositoryFileViewer(repoId, worktreePath).catch(() => ({
+          viewer: 'cat' as const,
+          shell: 'posix' as const,
+        })),
         runCreateTerminalTabCommand({
           base: { repoRoot: repoId, branch: branchName, worktreePath },
           createTerminal,
@@ -191,6 +248,15 @@ function FiletreeTab({
       tree={result.tree}
       loading={result.loading}
       error={result.error}
+      selectedKeys={selectedKeys}
+      expandedKeys={expandedKeys}
+      onSelectedKeysChange={handleSelectedKeysChange}
+      onExpandedKeysChange={handleExpandedKeysChange}
+      onDirectoryRowToggle={handleDirectoryRowToggle}
+      onPruneKeys={handlePruneKeys}
+      initialTopVisibleRowIndex={initialTopVisibleRowIndex}
+      scrollRestoreKey={interactionScopeKey}
+      onTopVisibleRowIndexChange={handleTopVisibleRowIndexChange}
       onOpenFile={(node) => {
         void openFileInTerminal(node).catch((err) => {
           toast.error(t(err instanceof Error ? err.message : 'error.terminal-create-failed'))
@@ -199,6 +265,10 @@ function FiletreeTab({
       onRequestTrashFile={requestTrashFile}
     />
   )
+}
+
+function stringKeysFromReactAriaKeys(keys: ReadonlySet<Key>): string[] {
+  return Array.from(keys).filter((key): key is string => typeof key === 'string')
 }
 
 function BranchTabPanel({ id, labelledById, label, busy = false, children }: TabPanelProps) {

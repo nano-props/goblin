@@ -84,6 +84,15 @@ describe('settings snapshot partitions', () => {
             main: [],
           },
         },
+        filetreeViewStateByWorktreeByRepo: {
+          '/tmp/repo-b': {
+            '/tmp/repo-b': {
+              selectedKeys: ['README.md'],
+              expandedKeys: ['src'],
+              topVisibleRowIndex: 24,
+            },
+          },
+        },
       },
     })
 
@@ -102,6 +111,15 @@ describe('settings snapshot partitions', () => {
       workspacePaneTabOrderByBranchByRepo: {
         '/tmp/repo-b': {
           main: [],
+        },
+      },
+      filetreeViewStateByWorktreeByRepo: {
+        '/tmp/repo-b': {
+          '/tmp/repo-b': {
+            selectedKeys: ['README.md'],
+            expandedKeys: ['src'],
+            topVisibleRowIndex: 24,
+          },
         },
       },
     })

@@ -180,6 +180,11 @@ const WorkspacePaneTerminalTabOrderEntrySchema = v.object({
   type: v.literal('terminal'),
   id: v.pipe(v.string(), v.minLength(1)),
 })
+const FiletreeSessionViewStateSchema = v.object({
+  selectedKeys: v.array(v.string()),
+  expandedKeys: v.array(v.string()),
+  topVisibleRowIndex: v.number(),
+})
 const WorkspaceSessionStateSchema = v.object({
   openRepoEntries: v.array(RepoSessionEntrySchema),
   activeRepoId: v.nullable(v.string()),
@@ -195,6 +200,9 @@ const WorkspaceSessionStateSchema = v.object({
       v.string(),
       v.array(v.union([WorkspacePaneStaticTabOrderEntrySchema, WorkspacePaneTerminalTabOrderEntrySchema])),
     ),
+  ),
+  filetreeViewStateByWorktreeByRepo: v.optional(
+    v.record(v.string(), v.record(v.string(), FiletreeSessionViewStateSchema)),
   ),
 })
 

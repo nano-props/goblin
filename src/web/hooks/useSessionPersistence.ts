@@ -4,6 +4,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { restorableWorkspaceStateFromStore } from '#/web/stores/repos/selector-state.ts'
 import { workspaceSessionStateFromRestorableWorkspaceState } from '#/web/restorable-workspace-state.ts'
 import { sessionLog } from '#/web/logger.ts'
+import { useFiletreeInteractionStore } from '#/web/stores/repos/filetree-interaction-state.ts'
 const SESSION_SAVE_DEBOUNCE_MS = 200
 
 export function useSessionPersistence() {
@@ -14,6 +15,7 @@ export function useSessionPersistence() {
   const selectedTerminalSessionByWorktree = useReposStore((s) => s.selectedTerminalSessionByWorktree)
   const sessionReady = useReposStore((s) => s.sessionReady)
   const repos = useReposStore((s) => s.repos)
+  const filetreeInteractionByScope = useFiletreeInteractionStore((s) => s.interactionByScope)
   const lastSavedRef = useRef<string | null>(null)
   const lastImmediateKeyRef = useRef<string | null>(null)
 
@@ -31,6 +33,7 @@ export function useSessionPersistence() {
         workspacePaneSize,
         selectedTerminalSessionByWorktree,
       }),
+      filetreeInteractionByScope,
     })
     const serialized = JSON.stringify(session)
     const immediateKey = JSON.stringify({
@@ -58,5 +61,14 @@ export function useSessionPersistence() {
     }
     const timeout = window.setTimeout(save, SESSION_SAVE_DEBOUNCE_MS)
     return () => window.clearTimeout(timeout)
-  }, [sessionReady, order, activeId, workspacePaneSize, zenMode, selectedTerminalSessionByWorktree, repos])
+  }, [
+    sessionReady,
+    order,
+    activeId,
+    workspacePaneSize,
+    zenMode,
+    selectedTerminalSessionByWorktree,
+    repos,
+    filetreeInteractionByScope,
+  ])
 }

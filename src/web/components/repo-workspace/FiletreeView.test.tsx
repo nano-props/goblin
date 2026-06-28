@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
-import { act } from 'react'
+import { act, useCallback, useState, type ComponentProps } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { userEvent } from '@testing-library/user-event'
+import type { Key } from 'react-aria-components'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { FiletreeNoWorktreeView, FiletreeView } from '#/web/components/repo-workspace/FiletreeView.tsx'
 import type { RepoTreeNode, RepoTreeResult } from '#/shared/api-types.ts'
@@ -21,6 +22,23 @@ let container: HTMLDivElement | null = null
 let root: Root | null = null
 const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 
+type FiletreeViewHarnessProps = Omit<
+  ComponentProps<typeof FiletreeView>,
+  | 'selectedKeys'
+  | 'expandedKeys'
+  | 'onSelectedKeysChange'
+  | 'onExpandedKeysChange'
+  | 'onDirectoryRowToggle'
+  | 'onPruneKeys'
+  | 'initialTopVisibleRowIndex'
+  | 'scrollRestoreKey'
+  | 'onTopVisibleRowIndexChange'
+> & {
+  readonly initialTopVisibleRowIndex?: number
+  readonly scrollRestoreKey?: string
+  readonly onTopVisibleRowIndexChange?: (topVisibleRowIndex: number) => void
+}
+
 function fileNode(id: string, parentId: string | null = null, status: RepoTreeNode['status'] = 'clean'): RepoTreeNode {
   const name = id.includes('/') ? id.slice(id.lastIndexOf('/') + 1) : id
   return { id, path: id, name, parentId, kind: 'file', status }
@@ -31,13 +49,67 @@ function dirNode(id: string, parentId: string | null = null): RepoTreeNode {
   return { id, path: id, name, parentId, kind: 'directory', status: 'clean' }
 }
 
-function renderView(props: React.ComponentProps<typeof FiletreeView>) {
+function FiletreeViewHarness({
+  initialTopVisibleRowIndex = 0,
+  scrollRestoreKey = 'test-worktree',
+  onTopVisibleRowIndexChange = () => {},
+  ...props
+}: FiletreeViewHarnessProps) {
+  const [selectedKeys, setSelectedKeys] = useState<ReadonlySet<Key>>(new Set())
+  const [expandedKeys, setExpandedKeys] = useState<ReadonlySet<Key>>(new Set())
+  const pruneKeys = useCallback((validKeys: ReadonlySet<string>) => {
+    setSelectedKeys((current) => filterValidKeys(current, validKeys))
+    setExpandedKeys((current) => filterValidKeys(current, validKeys))
+  }, [])
+  const toggleDirectoryRow = useCallback((key: string, expanded: boolean) => {
+    setExpandedKeys((current) => {
+      const next = new Set(current)
+      if (expanded) next.add(key)
+      else next.delete(key)
+      return next
+    })
+  }, [])
+
+  return (
+    <FiletreeView
+      {...props}
+      selectedKeys={selectedKeys}
+      expandedKeys={expandedKeys}
+      onSelectedKeysChange={setSelectedKeys}
+      onExpandedKeysChange={setExpandedKeys}
+      onDirectoryRowToggle={toggleDirectoryRow}
+      onPruneKeys={pruneKeys}
+      initialTopVisibleRowIndex={initialTopVisibleRowIndex}
+      scrollRestoreKey={scrollRestoreKey}
+      onTopVisibleRowIndexChange={onTopVisibleRowIndexChange}
+    />
+  )
+}
+
+function filterValidKeys(keys: ReadonlySet<Key>, validKeys: ReadonlySet<string>): ReadonlySet<Key> {
+  let changed = false
+  const next = new Set<Key>()
+  for (const key of keys) {
+    if (typeof key === 'string' && validKeys.has(key)) {
+      next.add(key)
+    } else {
+      changed = true
+    }
+  }
+  return changed ? next : keys
+}
+
+function renderView(props: FiletreeViewHarnessProps) {
   container = document.createElement('div')
   document.body.append(container)
   root = createRoot(container)
   act(() => {
-    root!.render(<FiletreeView {...props} />)
+    root!.render(<FiletreeViewHarness {...props} />)
   })
+}
+
+function rerenderView(props: FiletreeViewHarnessProps) {
+  root?.render(<FiletreeViewHarness {...props} />)
 }
 
 beforeEach(() => {
@@ -77,6 +149,12 @@ function rowNames(): Array<string | null> {
 function treegrid(): HTMLElement {
   const element = container?.querySelector<HTMLElement>('[role="treegrid"]')
   if (!element) throw new Error('no treegrid')
+  return element
+}
+
+function scrollViewport(): HTMLDivElement {
+  const element = container?.querySelector<HTMLDivElement>('[data-radix-scroll-area-viewport]')
+  if (!element) throw new Error('no scroll viewport')
   return element
 }
 
@@ -208,6 +286,24 @@ describe('FiletreeView', () => {
     expect(row('src').getAttribute('aria-expanded')).toBe('true')
   })
 
+  test('clicking a nested file does not toggle or select its parent directory', async () => {
+    const user = userEvent.setup()
+    const tree: RepoTreeResult = {
+      nodes: [dirNode('src'), fileNode('src/index.ts', 'src')],
+      truncated: false,
+    }
+    renderView({ tree, loading: false, error: null })
+
+    await user.click(row('src'))
+    expect(row('src').getAttribute('aria-expanded')).toBe('true')
+
+    await user.click(row('index.ts'))
+
+    expect(row('src').getAttribute('aria-expanded')).toBe('true')
+    expect(row('src').getAttribute('aria-selected')).toBe('false')
+    expect(row('index.ts').getAttribute('aria-selected')).toBe('true')
+  })
+
   test('shows a file action menu with open and delete items without selecting the row', async () => {
     const user = userEvent.setup()
     const onOpenFile = vi.fn()
@@ -336,6 +432,54 @@ describe('FiletreeView', () => {
     expect(container?.querySelector('[data-filetree=""]')?.getAttribute('aria-busy')).toBe('true')
   })
 
+  test('waits for a scroll range before marking row restoration complete', () => {
+    let resizeCallback: ResizeObserverCallback | null = null
+    const originalResizeObserver = globalThis.ResizeObserver
+    globalThis.ResizeObserver = class ResizeObserver {
+      constructor(callback: ResizeObserverCallback) {
+        resizeCallback = callback
+      }
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    } as typeof ResizeObserver
+    const scrollHeightSpy = vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(200)
+    const clientHeightSpy = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(200)
+    const offsetHeightSpy = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(20)
+
+    renderView({ tree: buildTree(), loading: false, error: null, initialTopVisibleRowIndex: 6 })
+    const viewport = scrollViewport()
+    expect(viewport.scrollTop).toBe(0)
+
+    scrollHeightSpy.mockReturnValue(1000)
+    act(() => {
+      resizeCallback?.([], {} as ResizeObserver)
+    })
+
+    expect(viewport.scrollTop).toBe(120)
+
+    scrollHeightSpy.mockRestore()
+    clientHeightSpy.mockRestore()
+    offsetHeightSpy.mockRestore()
+    globalThis.ResizeObserver = originalResizeObserver
+  })
+
+  test('reports the top visible row index instead of the raw scroll offset', () => {
+    const onTopVisibleRowIndexChange = vi.fn()
+    const offsetHeightSpy = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(20)
+
+    renderView({ tree: buildTree(), loading: false, error: null, onTopVisibleRowIndexChange })
+    const viewport = scrollViewport()
+    viewport.scrollTop = 125
+    act(() => {
+      viewport.dispatchEvent(new Event('scroll', { bubbles: true }))
+    })
+
+    expect(onTopVisibleRowIndexChange).toHaveBeenCalledWith(6)
+
+    offsetHeightSpy.mockRestore()
+  })
+
   test('preserves selection and expansion when the tree refreshes with the same keys', async () => {
     const user = userEvent.setup()
     const treeA: RepoTreeResult = {
@@ -354,7 +498,7 @@ describe('FiletreeView', () => {
       truncated: false,
     }
     await act(async () => {
-      root?.render(<FiletreeView tree={treeB} loading={false} error={null} />)
+      rerenderView({ tree: treeB, loading: false, error: null })
     })
 
     expect(rowNames()).toEqual(['src', 'index.ts', 'README.md'])
@@ -380,7 +524,7 @@ describe('FiletreeView', () => {
       truncated: false,
     }
     await act(async () => {
-      root?.render(<FiletreeView tree={treeB} loading={false} error={null} />)
+      rerenderView({ tree: treeB, loading: false, error: null })
     })
 
     expect(rowNames()).toEqual(['docs', 'CHANGELOG.md'])

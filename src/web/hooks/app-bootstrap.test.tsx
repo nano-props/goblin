@@ -9,6 +9,11 @@ import { getSettingsSnapshot } from '#/web/settings-client.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
+import {
+  filetreeInteractionScopeKey,
+  resetFiletreeInteractionStore,
+  useFiletreeInteractionStore,
+} from '#/web/stores/repos/filetree-interaction-state.ts'
 import { useSessionRestoreStore } from '#/web/stores/session-restore.ts'
 import { resetReposStore } from '#/web/test-utils/bridge.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
@@ -25,6 +30,7 @@ const mockedGetSettingsSnapshot = vi.mocked(getSettingsSnapshot)
 
 beforeEach(() => {
   resetReposStore()
+  resetFiletreeInteractionStore()
   vi.restoreAllMocks()
   mockedGetSettingsSnapshot.mockReset()
   mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())
@@ -67,6 +73,15 @@ describe('app bootstrap hooks', () => {
           main: [],
         },
       },
+      filetreeViewStateByWorktreeByRepo: {
+        '/tmp/repo': {
+          '/tmp/worktree': {
+            selectedKeys: ['src/index.ts'],
+            expandedKeys: ['src'],
+            topVisibleRowIndex: 140,
+          },
+        },
+      },
     }
     const settings = defaultSettingsSnapshot({ session })
     mockedGetSettingsSnapshot.mockResolvedValue(settings)
@@ -83,6 +98,13 @@ describe('app bootstrap hooks', () => {
     expect(state.workspacePaneSize).toBe(45)
     expect(state.selectedTerminalSessionByWorktree).toEqual({
       '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0session-2',
+    })
+    expect(useFiletreeInteractionStore.getState().interactionByScope).toMatchObject({
+      [filetreeInteractionScopeKey('/tmp/repo', '/tmp/worktree')]: {
+        selectedKeys: ['src/index.ts'],
+        expandedKeys: ['src'],
+        topVisibleRowIndex: 140,
+      },
     })
     expect(hydrateRepoSession).toHaveBeenCalledWith([{ kind: 'local', id: '/tmp/repo' }], '/tmp/repo', {
       workspacePaneRestoreState: {

@@ -3,7 +3,7 @@
 import { act } from 'react'
 import type { ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, test } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 
 let container: HTMLDivElement | null = null
@@ -47,6 +47,24 @@ describe('ScrollArea', () => {
     )
 
     expect((container?.firstElementChild as HTMLElement | null)?.dataset.scrollbarMode).toBe('compact')
+  })
+
+  test('attaches viewportOnScroll to the scrollable viewport', () => {
+    const onScroll = vi.fn()
+    render(
+      <ScrollArea viewportOnScroll={onScroll}>
+        <div>content</div>
+      </ScrollArea>,
+    )
+
+    const viewport = container?.querySelector<HTMLDivElement>('[data-radix-scroll-area-viewport]')
+    expect(viewport).not.toBeNull()
+
+    act(() => {
+      viewport?.dispatchEvent(new Event('scroll', { bubbles: false }))
+    })
+
+    expect(onScroll).toHaveBeenCalledTimes(1)
   })
 })
 

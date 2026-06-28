@@ -20,6 +20,7 @@ export function defaultWorkspaceSessionState(): WorkspaceSessionState {
     workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
     selectedTerminalSessionByWorktree: {},
     workspacePaneTabOrderByBranchByRepo: {},
+    filetreeViewStateByWorktreeByRepo: {},
   }
 }
 
