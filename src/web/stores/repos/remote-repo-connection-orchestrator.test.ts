@@ -101,7 +101,6 @@ describe('runRemoteRepoConnection', () => {
           branchViewMode: 'all',
           workspacePaneTabOrderByBranch: {},
           preferredWorkspacePaneTabByBranch: {},
-          lastClosedTabContextByBranch: {},
         },
         projection: { source: 'fresh', savedAt: null },
         remote: {
@@ -149,7 +148,6 @@ describe('runRemoteRepoConnection', () => {
           branchViewMode: 'all',
           workspacePaneTabOrderByBranch: {},
           preferredWorkspacePaneTabByBranch: {},
-          lastClosedTabContextByBranch: {},
         },
         projection: { source: 'fresh', savedAt: null },
         remote: {
@@ -197,7 +195,6 @@ describe('runRemoteRepoConnection', () => {
           branchViewMode: 'all',
           workspacePaneTabOrderByBranch: {},
           preferredWorkspacePaneTabByBranch: {},
-          lastClosedTabContextByBranch: {},
         },
         projection: { source: 'fresh', savedAt: null },
         remote: {
@@ -245,7 +242,6 @@ describe('runRemoteRepoConnection', () => {
           branchViewMode: 'all',
           workspacePaneTabOrderByBranch: {},
           preferredWorkspacePaneTabByBranch: {},
-          lastClosedTabContextByBranch: {},
         },
         projection: { source: 'fresh', savedAt: null },
         remote: {
@@ -326,7 +322,6 @@ describe('runRemoteRepoConnection', () => {
           branchViewMode: 'all',
           workspacePaneTabOrderByBranch: {},
           preferredWorkspacePaneTabByBranch: {},
-          lastClosedTabContextByBranch: {},
         },
         projection: { source: 'fresh', savedAt: null },
         remote: {
@@ -394,7 +389,6 @@ describe('runRemoteRepoConnection', () => {
             branchViewMode: 'all',
             workspacePaneTabOrderByBranch: {},
             preferredWorkspacePaneTabByBranch: {},
-            lastClosedTabContextByBranch: {},
           },
           projection: { source: 'fresh', savedAt: null },
           remote: {

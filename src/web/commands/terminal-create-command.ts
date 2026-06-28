@@ -5,7 +5,7 @@ import {
   terminalCreateErrorKey,
   type TerminalCreateTranslator,
 } from '#/web/components/terminal/terminal-create-feedback.ts'
-import { createWorkspacePaneTerminalTab } from '#/web/stores/repos/workspace-pane-terminal-write-paths.ts'
+import { createWorkspacePaneTerminalTab } from '#/web/workspace-pane/workspace-pane-terminal-create.ts'
 
 export type TerminalCreateCommandResult = { ok: true; key: string } | { ok: false; error: unknown; messageKey: string }
 

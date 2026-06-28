@@ -532,7 +532,7 @@ describe('RepoWorkspaceToolbar', () => {
     expect(openTabsFor('feature/worktree')).toEqual([])
   })
 
-  test('records the closing context for spatial adjacency after closing the active status tab', async () => {
+  test('lands on the adjacent terminal after closing the active status tab', async () => {
     const showRepoWorkspacePaneTab = vi.fn()
     const { container: c } = renderToolbar({
       terminalCount: 1,
@@ -548,15 +548,7 @@ describe('RepoWorkspaceToolbar', () => {
     await flush()
 
     expect(openTabsFor('feature/worktree')).toEqual([])
-    // The X-click records the closing context for the workspace pane tab
-    // model. The model itself decides where to land — the close command does
-    // not imperatively navigate, so navigation is untouched here.
-    expect(showRepoWorkspacePaneTab).not.toHaveBeenCalled()
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.lastClosedTabContextByBranch['feature/worktree']).toEqual({
-      closingIdentity: 'status:status',
-      previousTabIdentities: ['status:status', 'terminal:t1'],
-      wasActive: true,
-    })
+    expect(showRepoWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'terminal')
   })
 
   test('closes a static tab without routing through runtime close', async () => {
@@ -967,7 +959,7 @@ describe('RepoWorkspaceToolbar', () => {
     expect(document.activeElement).toBe(statusTab)
   })
 
-  test('records the closing context for spatial adjacency after closing the active terminal tab', async () => {
+  test('lands on the spatial neighbor after closing the active terminal tab', async () => {
     const showRepoWorkspacePaneTab = vi.fn()
     const { container: c, mocks } = renderToolbar({
       terminalCount: 1,
@@ -989,15 +981,7 @@ describe('RepoWorkspaceToolbar', () => {
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     })
-    // The X-click records the closing context so the workspace pane tab model
-    // can land on changes (the spatial neighbor) at read time. Navigation is
-    // untouched here — the model is the single source of truth.
-    expect(showRepoWorkspacePaneTab).not.toHaveBeenCalled()
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.lastClosedTabContextByBranch['feature/worktree']).toEqual({
-      closingIdentity: 'terminal:t1',
-      previousTabIdentities: ['status:status', 'terminal:t1', 'changes:changes'],
-      wasActive: true,
-    })
+    expect(showRepoWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'changes')
   })
 
   test('T6.1: disables the new-terminal button while the initial session sync is in flight', async () => {

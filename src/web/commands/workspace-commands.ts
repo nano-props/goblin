@@ -2,11 +2,13 @@ import { worktreeTerminalKey } from '#/web/components/terminal/terminal-workspac
 import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { openWorkspacePaneTab } from '#/web/components/repo-workspace/open-workspace-pane-tab.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
+import { gblLog } from '#/web/logger.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import type { TerminalSessionBase } from '#/web/components/terminal/types.ts'
 import {
   adjacentRepoWorkspaceTab,
+  nextRepoWorkspaceTabAfterClose,
   type RepoWorkspaceTab,
   type RepoWorkspaceTabModel,
 } from '#/web/components/repo-workspace/tab-model.ts'
@@ -16,10 +18,9 @@ import {
   isWorkspacePaneStaticTabProvider,
   workspacePaneTabProvider,
 } from '#/web/components/workspace-pane/tab-providers.ts'
-import {
-  closeWorkspacePaneTab,
-  workspacePaneTabTargetForBranch,
-} from '#/web/workspace-pane/workspace-pane-tab-close.ts'
+import { beginWorkspacePaneTabClose } from '#/web/workspace-pane/workspace-pane-tab-close.ts'
+import { runWorkspacePaneTabUiCommand } from '#/web/workspace-pane/workspace-pane-tab-command-queue.ts'
+import { workspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 
 interface ShowWorkspacePaneTabCommandOptions {
   repoId: string | null
@@ -66,6 +67,14 @@ export async function runShowWorkspacePaneTabCommand({
   tab,
   navigation,
 }: ShowWorkspacePaneTabCommandOptions): Promise<boolean> {
+  return await runWorkspacePaneTabUiCommand(() => showWorkspacePaneTabCommand({ repoId, tab, navigation }))
+}
+
+function showWorkspacePaneTabCommand({
+  repoId,
+  tab,
+  navigation,
+}: ShowWorkspacePaneTabCommandOptions): boolean {
   if (!repoId) return false
   const provider = workspacePaneTabProvider(tab)
   if (isWorkspacePaneStaticTabProvider(provider)) {
@@ -135,9 +144,17 @@ export async function runNewTerminalTabCommand({
 
 export async function runCloseWorkspacePaneTabCommand({
   repoId,
-  navigation: _navigation,
+  navigation,
   targetIdentity,
 }: CloseWorkspacePaneTabCommandOptions): Promise<boolean> {
+  return await runWorkspacePaneTabUiCommand(() => closeWorkspacePaneTabCommand({ repoId, navigation, targetIdentity }))
+}
+
+function closeWorkspacePaneTabCommand({
+  repoId,
+  navigation,
+  targetIdentity,
+}: CloseWorkspacePaneTabCommandOptions): boolean {
   const target = repoId ? workspacePaneCommandTarget(repoId) : null
   if (!target) return false
   if (!targetIdentity && target.selection?.kind === 'terminal-host') return true
@@ -146,28 +163,15 @@ export async function runCloseWorkspacePaneTabCommand({
     : (target?.activeTab ?? null)
   if (!tab) return false
 
-  // Capture pre-close state for the workspace pane tab model. The model uses
-  // `lastClosedTabContext` to prefer the spatial neighbor of the closed tab
-  // over its generic tabs[0] fallback when the preferred tab becomes
-  // unrenderable — preserving spatial locality without this command
-  // imperatively re-selecting anything. When the closed tab was the active
-  // tab, `wasActive` tells the model to apply the same neighbor preference
-  // even if another tab of the preferred tab (e.g. another terminal) is
-  // still available, so the tab strip order is respected.
-  const previousTabIdentities = target.tabs.map((t) => t.identity)
   const closingIdentity = tab.identity
   const wasActive = target.activeTab?.identity === closingIdentity
+  const nextTab = wasActive ? nextRepoWorkspaceTabAfterClose(target.tabs, closingIdentity) : null
 
-  const handled = await closeWorkspacePaneTab(target, tab)
-  if (!handled) return false
+  const close = beginWorkspacePaneTabClose(target, tab)
+  if (!close.accepted) return false
+  observeWorkspacePaneTabClose(close.completion, closingIdentity)
 
-  if (target.branchName) {
-    useReposStore.getState().setLastClosedTabContext(target.repoId, target.branchName, {
-      closingIdentity,
-      previousTabIdentities,
-      wasActive,
-    })
-  }
+  if (nextTab) showWorkspacePaneCommandTab(target, nextTab, navigation)
   return true
 }
 
@@ -241,4 +245,15 @@ function workspacePaneCommandTarget(repoId: string): RepoWorkspaceTabModel | nul
   const repo = state.repos[repoId]
   if (!repo?.ui.selectedBranch) return null
   return workspacePaneTabTargetForBranch(repoId, repo.ui.selectedBranch)
+}
+
+function observeWorkspacePaneTabClose(completion: Promise<boolean>, identity: string): void {
+  void completion.then(
+    (ok) => {
+      if (!ok) gblLog.warn('workspace pane tab close did not complete', { identity })
+    },
+    (err) => {
+      gblLog.warn('workspace pane tab close failed', { identity, err })
+    },
+  )
 }
