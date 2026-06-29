@@ -213,6 +213,17 @@ describe('FiletreeView', () => {
     expect(tree().getAttribute('aria-label')).toBe('filetree.aria-label')
   })
 
+  test('keeps file action triggers clear of the overlay scrollbar', () => {
+    renderView({
+      tree: { nodes: [fileNode('README.md')], truncated: false },
+      loading: false,
+      error: null,
+    })
+
+    expect(scrollViewport().parentElement?.getAttribute('data-scrollbar-mode')).toBe('compact')
+    expect(row('README.md').firstElementChild?.className).toContain('pr-3')
+  })
+
   test('does not add an extra panel border around the tree body', () => {
     renderView({
       tree: { nodes: [fileNode('README.md')], truncated: false },

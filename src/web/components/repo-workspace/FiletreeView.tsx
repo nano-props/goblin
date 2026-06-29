@@ -262,6 +262,7 @@ export function FiletreeView({
     <FiletreeShell loading={loading}>
       <ScrollArea
         className="min-h-0 flex-1"
+        scrollbarMode="compact"
         viewportRef={scrollViewportRef}
         viewportClassName={focusRingInset}
         viewportOnScroll={handleScroll}
@@ -375,7 +376,7 @@ function FiletreeTreeRow({
       onKeyDown={(event) => onKeyDown(node, event)}
     >
       <div
-        className="flex w-full min-w-0 items-center gap-1 px-1.5 py-0.5"
+        className="flex w-full min-w-0 items-center gap-1 py-0.5 pl-1.5 pr-3"
         style={{ paddingLeft: `${(level - 1) * 12 + 6}px` }}
       >
         <span className="flex w-3 shrink-0 items-center justify-center text-muted-foreground">
