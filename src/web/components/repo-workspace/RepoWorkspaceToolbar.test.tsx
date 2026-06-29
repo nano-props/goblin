@@ -459,9 +459,16 @@ describe('RepoWorkspaceToolbar', () => {
     const branchActions = menuBranchActions()
 
     const { container, rerender } = renderInJsdom(
-      <QueryClientProvider client={seededQueryClientWithRepoSettings([
-        { repoId: REPO_ID, workspaceExternalAppRecent: { byWorktree: { [WORKTREE_PATH]: 'finder', [nextWorktreePath]: 'editor:vscode' } } },
-      ])}>
+      <QueryClientProvider
+        client={seededQueryClientWithRepoSettings([
+          {
+            repoId: REPO_ID,
+            workspaceExternalAppRecent: {
+              byWorktree: { [WORKTREE_PATH]: 'finder', [nextWorktreePath]: 'editor:vscode' },
+            },
+          },
+        ])}
+      >
         <WorkspaceOpenExternallyMenu
           repo={repo}
           branch={createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })}
@@ -473,9 +480,16 @@ describe('RepoWorkspaceToolbar', () => {
     expect(container.querySelector<HTMLButtonElement>('button[aria-label="worktrees.reveal-title"]')).not.toBeNull()
 
     rerender(
-      <QueryClientProvider client={seededQueryClientWithRepoSettings([
-        { repoId: REPO_ID, workspaceExternalAppRecent: { byWorktree: { [WORKTREE_PATH]: 'finder', [nextWorktreePath]: 'editor:vscode' } } },
-      ])}>
+      <QueryClientProvider
+        client={seededQueryClientWithRepoSettings([
+          {
+            repoId: REPO_ID,
+            workspaceExternalAppRecent: {
+              byWorktree: { [WORKTREE_PATH]: 'finder', [nextWorktreePath]: 'editor:vscode' },
+            },
+          },
+        ])}
+      >
         <WorkspaceOpenExternallyMenu
           repo={repo}
           branch={createRepoBranch('feature/worktree', { worktree: { path: nextWorktreePath } })}
@@ -1235,6 +1249,8 @@ function renderToolbar(options: {
   const readContext: TerminalSessionReadContextValue = {
     worktreeSnapshot: () => worktreeSnapshot,
     subscribeWorktree: () => () => {},
+    repoBellCount: () => 0,
+    subscribeRepoBellCount: () => () => {},
     snapshot: () => terminalSnapshot,
     subscribeSnapshot: () => () => {},
   }
@@ -1367,7 +1383,10 @@ function terminalEntry(id: string): WorkspacePaneTabOrderEntry {
  * has `staleTime: 0`, so background refetches would otherwise throw.
  * Other URLs throw to surface unexpected traffic.
  */
-function mockRecentAppPostFetch(initialSnapshot: object, options: { failPost?: boolean } = {}): ReturnType<typeof vi.fn> {
+function mockRecentAppPostFetch(
+  initialSnapshot: object,
+  options: { failPost?: boolean } = {},
+): ReturnType<typeof vi.fn> {
   let currentSnapshot = initialSnapshot
   const fetchSpy = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url

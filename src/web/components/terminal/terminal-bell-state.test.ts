@@ -142,7 +142,7 @@ describe('terminal bell state', () => {
     hasFocus.mockRestore()
   })
 
-  test('debounces repeated system notifications for the same terminal', async () => {
+  test('throttles repeated system notifications for the same terminal', async () => {
     const notify = vi.fn()
     const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
     const now = vi.spyOn(Date, 'now')

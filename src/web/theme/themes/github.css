@@ -42,7 +42,7 @@ html[data-color-theme='github'][data-theme='light'] {
   --goblin-status-danger-rgb: 207 34 46;
   --goblin-status-danger-surface: #ffebe9;
   --goblin-status-danger-border: #ff8182;
-  --goblin-status-notification: #cf222e;
+  --goblin-status-notification: #9a6700;
   --goblin-status-notification-foreground: #ffffff;
 
   --color-overlay-scrim: rgb(31 35 40 / 0.4);
@@ -123,7 +123,7 @@ html[data-color-theme='github'][data-theme='dark'] {
   --goblin-status-danger-rgb: 255 123 114;
   --goblin-status-danger-surface: rgb(var(--goblin-status-danger-rgb) / 0.12);
   --goblin-status-danger-border: #da3633;
-  --goblin-status-notification: #f85149;
+  --goblin-status-notification: #d29922;
   --goblin-status-notification-foreground: #0d1117;
 
   --color-overlay-scrim: rgb(1 4 9 / 0.55);

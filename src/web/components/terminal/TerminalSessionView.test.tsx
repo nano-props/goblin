@@ -131,6 +131,8 @@ async function renderTerminalSession() {
   const readContext: TerminalSessionReadContextValue = {
     worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
     subscribeWorktree: () => () => {},
+    repoBellCount: () => 0,
+    subscribeRepoBellCount: () => () => {},
     snapshot: () => snapshot,
     subscribeSnapshot: () => () => {},
   }
@@ -275,6 +277,8 @@ describe('TerminalSessionView', () => {
     const readContext: TerminalSessionReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
+      repoBellCount: () => 0,
+      subscribeRepoBellCount: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -340,6 +344,8 @@ describe('TerminalSessionView', () => {
     const readContext: TerminalSessionReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(emptyWorktreeSnapshot),
       subscribeWorktree: () => () => {},
+      repoBellCount: () => 0,
+      subscribeRepoBellCount: () => () => {},
       snapshot: () => emptySnapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -415,6 +421,8 @@ describe('TerminalSessionView', () => {
     const readContext: TerminalSessionReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
+      repoBellCount: () => 0,
+      subscribeRepoBellCount: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -507,6 +515,8 @@ describe('TerminalSessionView', () => {
     const readContext: TerminalSessionReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
+      repoBellCount: () => 0,
+      subscribeRepoBellCount: () => () => {},
       snapshot: () => activeSnapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -611,6 +621,8 @@ describe('TerminalSessionView', () => {
     const readContext: TerminalSessionReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
+      repoBellCount: () => 0,
+      subscribeRepoBellCount: () => () => {},
       snapshot: () => activeSnapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -720,6 +732,8 @@ describe('TerminalSessionView', () => {
     const readContext: TerminalSessionReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
+      repoBellCount: () => 0,
+      subscribeRepoBellCount: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -832,6 +846,8 @@ describe('TerminalSessionView', () => {
     const readContext: TerminalSessionReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
+      repoBellCount: () => 0,
+      subscribeRepoBellCount: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -947,6 +963,8 @@ describe('TerminalSessionView', () => {
     const readContext: TerminalSessionReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
+      repoBellCount: () => 0,
+      subscribeRepoBellCount: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -1079,6 +1097,8 @@ describe('TerminalSessionView', () => {
     const readContext: TerminalSessionReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
+      repoBellCount: () => 0,
+      subscribeRepoBellCount: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -1185,6 +1205,8 @@ describe('TerminalSessionView', () => {
     const readContext: TerminalSessionReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
+      repoBellCount: () => 0,
+      subscribeRepoBellCount: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -1303,6 +1325,8 @@ describe('TerminalSessionView', () => {
     const readContext: TerminalSessionReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
+      repoBellCount: () => 0,
+      subscribeRepoBellCount: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -1577,6 +1601,8 @@ describe('TerminalSessionView', () => {
     const readContext: TerminalSessionReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
+      repoBellCount: () => 0,
+      subscribeRepoBellCount: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -1737,6 +1763,8 @@ describe('TerminalSessionView', () => {
     const readContext: TerminalSessionReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(activeWorktreeSnapshot),
       subscribeWorktree: () => () => {},
+      repoBellCount: () => 0,
+      subscribeRepoBellCount: () => () => {},
       snapshot: () => snapshotOpen,
       subscribeSnapshot: () => () => {},
     }
@@ -1849,6 +1877,8 @@ describe('TerminalSessionView', () => {
     const readContext: TerminalSessionReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(emptyWorktreeSnapshot),
       subscribeWorktree: () => () => {},
+      repoBellCount: () => 0,
+      subscribeRepoBellCount: () => () => {},
       snapshot: () => emptySnapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -1930,6 +1960,8 @@ describe('TerminalSessionView', () => {
     const readContext: TerminalSessionReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(emptyWorktreeSnapshot),
       subscribeWorktree: () => () => {},
+      repoBellCount: () => 0,
+      subscribeRepoBellCount: () => () => {},
       snapshot: () => emptySnapshot,
       subscribeSnapshot: () => () => {},
     }

@@ -118,6 +118,31 @@ describe('repoPickerReposEqual', () => {
     expect(repoPickerReposEqual(left, right)).toBe(false)
   })
 
+  test('treats terminal bell count changes as unequal', () => {
+    const left: RepoPickerRepo[] = [
+      {
+        id: '/tmp/repo',
+        name: 'repo',
+        remoteDetails: [],
+        lastSyncedAt: null,
+        terminalBellCount: 1,
+        lifecycle: null,
+      },
+    ]
+    const right: RepoPickerRepo[] = [
+      {
+        id: '/tmp/repo',
+        name: 'repo',
+        remoteDetails: [],
+        lastSyncedAt: null,
+        terminalBellCount: 2,
+        lifecycle: null,
+      },
+    ]
+
+    expect(repoPickerReposEqual(left, right)).toBe(false)
+  })
+
   test('does not treat warm cache snapshot time as a sync time', () => {
     const repo = emptyRepo('/tmp/repo', 'repo')
     repo.projection = { source: 'cache', savedAt: 2_000 }

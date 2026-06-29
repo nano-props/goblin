@@ -8,6 +8,7 @@ import { useT } from '#/web/stores/i18n.ts'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 import { cn } from '#/web/lib/cn.ts'
 import { SidebarRowButton } from '#/web/components/ui/sidebar-row-button.tsx'
+import { TerminalBellBadge } from '#/web/components/terminal/TerminalBellBadge.tsx'
 
 const CURRENT_REPO_ICON_CLASS = 'flex size-3.5 shrink-0 items-center justify-center'
 
@@ -16,6 +17,7 @@ interface CurrentRepoButtonBaseProps {
   focusRegistry?: FocusRegistry<string, HTMLButtonElement>
   onKeyboardNavigate: (id: string, direction: 'prev' | 'next' | 'first' | 'last') => void
   unavailableLabel: string
+  terminalBellCount?: number
   fill?: boolean
 }
 
@@ -34,9 +36,12 @@ export function CurrentRepoToolbarButton({
   onActivate,
   onKeyboardNavigate,
   unavailableLabel,
+  terminalBellCount = 0,
   fill = false,
 }: CurrentRepoToolbarButtonProps) {
-  const state = currentRepoButtonState(repo, unavailableLabel)
+  const t = useT()
+  const unreadBellLabel = terminalBellCount > 0 ? t('terminal.bell-unread-count', { count: terminalBellCount }) : null
+  const state = currentRepoButtonState(repo, unavailableLabel, unreadBellLabel)
 
   return (
     <ToolbarClosableTab
@@ -77,17 +82,32 @@ export function CurrentRepoToolbarButton({
        * signal matches the standard HTML <select> / macOS popup
        * button pattern. Decorative — the button's aria-label already
        * names the repo, so screen readers don't need the chevron. */}
-      <ChevronDown size={13} className="shrink-0 text-muted-foreground/70" aria-hidden />
+      <span className="flex shrink-0 items-center gap-1.5">
+        <TerminalBellBadge count={terminalBellCount} />
+        <ChevronDown size={13} className="shrink-0 text-muted-foreground/70" aria-hidden />
+      </span>
     </ToolbarClosableTab>
   )
 }
 
 export const CurrentRepoSidebarButton = forwardRef<HTMLButtonElement, CurrentRepoSidebarButtonProps>(
   function CurrentRepoSidebarButton(
-    { repo, focusRegistry, onKeyboardNavigate, unavailableLabel, fill = false, className, onKeyDown, ...buttonProps },
+    {
+      repo,
+      focusRegistry,
+      onKeyboardNavigate,
+      unavailableLabel,
+      terminalBellCount = 0,
+      fill = false,
+      className,
+      onKeyDown,
+      ...buttonProps
+    },
     forwardedRef,
   ) {
-    const state = currentRepoButtonState(repo, unavailableLabel)
+    const t = useT()
+    const unreadBellLabel = terminalBellCount > 0 ? t('terminal.bell-unread-count', { count: terminalBellCount }) : null
+    const state = currentRepoButtonState(repo, unavailableLabel, unreadBellLabel)
     const registryRef = focusRegistry?.setRef(repo.id)
 
     return (
@@ -105,7 +125,12 @@ export const CurrentRepoSidebarButton = forwardRef<HTMLButtonElement, CurrentRep
         aria-label={state.repoLabel}
         fill={fill}
         leading={<CurrentRepoButtonIcon repo={repo} size={16} />}
-        trailing={<ChevronDown size={14} aria-hidden />}
+        trailing={
+          <span className="flex items-center gap-1.5">
+            <TerminalBellBadge count={terminalBellCount} />
+            <ChevronDown size={14} aria-hidden />
+          </span>
+        }
         contentClassName="flex min-w-0 flex-1 items-center gap-2"
         onKeyDown={(event) => {
           onKeyDown?.(event)
@@ -118,13 +143,14 @@ export const CurrentRepoSidebarButton = forwardRef<HTMLButtonElement, CurrentRep
   },
 )
 
-function currentRepoButtonState(repo: RepoPickerRepo, unavailableLabel: string) {
+function currentRepoButtonState(repo: RepoPickerRepo, unavailableLabel: string, unreadBellLabel: string | null = null) {
   const showConnecting = repo.lifecycle?.kind === 'connecting'
   const showFailed = repo.lifecycle?.kind === 'failed'
+  const baseLabel = showFailed ? `${repo.name} — ${unavailableLabel}` : repo.name
   return {
     showConnecting,
     showFailed,
-    repoLabel: showFailed ? `${repo.name} — ${unavailableLabel}` : repo.name,
+    repoLabel: unreadBellLabel ? `${baseLabel} — ${unreadBellLabel}` : baseLabel,
   }
 }
 

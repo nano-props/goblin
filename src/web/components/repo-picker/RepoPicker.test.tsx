@@ -152,6 +152,45 @@ describe('RepoPicker', () => {
     expect(selectedItem?.className).toContain('bg-selected')
   })
 
+  test('shows unread terminal bell badges on the trigger and matching repo rows', async () => {
+    render(
+      <RepoPicker
+        repos={[
+          repo('repo-a', '/tmp/repo-a'),
+          repo('repo-b', '/tmp/repo-b', { terminalBellCount: 2 }),
+          repo('repo-c', '/tmp/repo-c', { terminalBellCount: 1 }),
+        ]}
+        activeId="/tmp/repo-a"
+        labels={labels}
+        onActivate={() => {}}
+        onClose={() => {}}
+        onOpenLocal={() => {}}
+        onOpenRemote={() => {}}
+        onClone={() => {}}
+      />,
+    )
+
+    const trigger = document.body.querySelector('[data-current-repo-id="/tmp/repo-a"]')
+    if (!(trigger instanceof HTMLButtonElement)) throw new Error('missing current repo button')
+    const triggerBadge = trigger.querySelector('.bg-notification')
+    expect(triggerBadge?.textContent).toBe('3')
+
+    await act(async () => {
+      trigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+      trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
+      await Promise.resolve()
+    })
+
+    const repoBRow = [...document.body.querySelectorAll('button')].find((button) =>
+      button.textContent?.includes('repo-b'),
+    )
+    const repoCRow = [...document.body.querySelectorAll('button')].find((button) =>
+      button.textContent?.includes('repo-c'),
+    )
+    expect(repoBRow?.querySelector('.bg-notification')?.textContent).toBe('2')
+    expect(repoCRow?.querySelector('.bg-notification')?.textContent).toBe('1')
+  })
+
   test('renders only the active repo button when multiple repos are open, with the rest in the popover', () => {
     vi.stubGlobal('matchMedia', createMatchMedia(false))
 
@@ -322,8 +361,8 @@ function render(element: React.ReactNode) {
   return renderInJsdom(element)
 }
 
-function repo(name: string, id: string): RepoPickerRepo {
-  return { id, name, remoteDetails: [], lastSyncedAt: null, lifecycle: null }
+function repo(name: string, id: string, overrides: Partial<RepoPickerRepo> = {}): RepoPickerRepo {
+  return { id, name, remoteDetails: [], lastSyncedAt: null, lifecycle: null, ...overrides }
 }
 
 const labels = {

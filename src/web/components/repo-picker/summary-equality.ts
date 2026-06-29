@@ -48,7 +48,13 @@ export function repoPickerReposEqual(a: RepoPickerRepo[], b: RepoPickerRepo[]): 
   for (let i = 0; i < a.length; i++) {
     const x = a[i]!
     const y = b[i]!
-    if (x.id !== y.id || x.name !== y.name || x.lastSyncedAt !== y.lastSyncedAt) return false
+    if (
+      x.id !== y.id ||
+      x.name !== y.name ||
+      x.lastSyncedAt !== y.lastSyncedAt ||
+      (x.terminalBellCount ?? 0) !== (y.terminalBellCount ?? 0)
+    )
+      return false
     if (!lifecycleEqual(x.lifecycle, y.lifecycle)) return false
     if (x.remoteDetails.length !== y.remoteDetails.length) return false
     for (let j = 0; j < x.remoteDetails.length; j++) {
