@@ -13,9 +13,18 @@ export const TERMINAL_FONT_FAMILY = "'Goblin Mono', monospace"
 export const TERMINAL_LINE_HEIGHT = 1
 export const TERMINAL_SCROLLBACK_ROWS = 10_000
 
-const ESTIMATED_TERMINAL_CELL_WIDTH = TERMINAL_FONT_SIZE * 0.62
-const ESTIMATED_TERMINAL_CELL_HEIGHT = TERMINAL_FONT_SIZE * TERMINAL_LINE_HEIGHT
+const FALLBACK_TERMINAL_CELL_WIDTH = TERMINAL_FONT_SIZE * 0.62
+const FALLBACK_TERMINAL_CELL_HEIGHT = TERMINAL_FONT_SIZE * TERMINAL_LINE_HEIGHT
 const MANAGED_TERMINAL_FRAME_PADDING_PX = 6
+const MIN_INITIAL_TERMINAL_COLS = 2
+const MIN_INITIAL_TERMINAL_ROWS = 1
+
+/**
+ * Process-wide cache of measured cell dimensions. Populated on the first
+ * successful DOM probe and reused for the rest of the page lifetime. The
+ * invariant is that the font family and size above do not change at runtime.
+ */
+let cachedTerminalCellMetrics: { cellWidth: number; cellHeight: number } | null = null
 
 export function createTerminalSizingOptions(
   geometry: { cols: number; rows: number } = { cols: DEFAULT_TERMINAL_COLS, rows: DEFAULT_TERMINAL_ROWS },
@@ -57,8 +66,39 @@ export function estimateManagedTerminalGeometry(host: HTMLElement): { cols: numb
 
 function estimateTerminalGeometryFromSize(width: number, height: number): { cols: number; rows: number } | null {
   if (width <= 0 || height <= 0) return null
-  return {
-    cols: Math.max(2, Math.floor(width / ESTIMATED_TERMINAL_CELL_WIDTH)),
-    rows: Math.max(1, Math.floor(height / ESTIMATED_TERMINAL_CELL_HEIGHT)),
+  const metrics = measureTerminalCell() ?? {
+    cellWidth: FALLBACK_TERMINAL_CELL_WIDTH,
+    cellHeight: FALLBACK_TERMINAL_CELL_HEIGHT,
   }
+  return {
+    cols: Math.max(MIN_INITIAL_TERMINAL_COLS, Math.floor(width / metrics.cellWidth)),
+    rows: Math.max(MIN_INITIAL_TERMINAL_ROWS, Math.floor(height / metrics.cellHeight)),
+  }
+}
+
+function measureTerminalCell(): { cellWidth: number; cellHeight: number } | null {
+  if (cachedTerminalCellMetrics) return cachedTerminalCellMetrics
+  if (!document.body) return null
+  const probe = document.createElement('span')
+  probe.textContent = 'M'.repeat(100)
+  probe.style.cssText = [
+    'position:absolute',
+    'top:-9999px',
+    'left:-9999px',
+    'visibility:hidden',
+    'pointer-events:none',
+    'white-space:pre',
+    'letter-spacing:0',
+    'font-variant-ligatures:none',
+    `font-family:${TERMINAL_FONT_FAMILY}`,
+    `font-size:${TERMINAL_FONT_SIZE}px`,
+    `line-height:${TERMINAL_LINE_HEIGHT}`,
+  ].join(';')
+  document.body.appendChild(probe)
+  const width = probe.offsetWidth
+  const height = probe.offsetHeight
+  probe.remove()
+  if (width <= 0 || height <= 0) return null
+  cachedTerminalCellMetrics = { cellWidth: width / 100, cellHeight: height }
+  return cachedTerminalCellMetrics
 }
