@@ -16,6 +16,7 @@ import {
 } from '#/shared/api-types.ts'
 import { NativeHostProjectionSchema } from '#/shared/native-host-projection.ts'
 import { RepoTreePrefixSchema } from '#/shared/repo-tree-schema.ts'
+import { GIT_HASH_RE } from '#/shared/git-types.ts'
 import { WORKTREE_BOOTSTRAP_CONFIG_HASH_RE } from '#/shared/repo-settings.ts'
 
 const SourceToken = v.optional(v.string())
@@ -23,6 +24,11 @@ const StringArray = v.array(v.string())
 const TerminalAppSchema = v.picklist(['ghostty', 'terminal', 'windowsTerminal'])
 const EditorAppSchema = v.picklist(['vscode', 'cursor', 'windsurf'])
 const WorktreeBootstrapConfigHashSchema = v.pipe(v.string(), v.regex(WORKTREE_BOOTSTRAP_CONFIG_HASH_RE))
+const RepoUrlTargetSchema = v.variant('type', [
+  v.object({ type: v.literal('root') }),
+  v.object({ type: v.literal('branch'), branch: v.string() }),
+  v.object({ type: v.literal('commit'), hash: v.pipe(v.string(), v.regex(GIT_HASH_RE)) }),
+])
 const WorktreeBootstrapDecisionSchema = v.variant('kind', [
   v.object({ kind: v.literal('skip') }),
   v.object({ kind: v.literal('run'), configHash: WorktreeBootstrapConfigHashSchema, rememberTrust: v.boolean() }),
@@ -90,7 +96,7 @@ export const REPO_PROCEDURE_SCHEMAS = {
     alsoDeleteUpstream: v.optional(v.boolean()),
     sourceToken: SourceToken,
   }),
-  openRemote: v.object({ cwd: v.string(), branch: v.optional(v.string()) }),
+  openUrl: v.object({ cwd: v.string(), target: RepoUrlTargetSchema }),
   openTerminal: v.object({ path: v.string(), app: TerminalAppSchema }),
   openEditor: v.object({ path: v.string(), app: EditorAppSchema }),
   openInFinder: v.object({ path: v.string() }),

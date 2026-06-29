@@ -67,7 +67,7 @@ describe('repo-client', () => {
     setClientBridgeForTests(null)
   })
 
-  test('opens repository remote through the native host bridge when available', async () => {
+  test('opens repository branch URLs through the native host bridge when available', async () => {
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
     window.open = vi.fn(() => null)
     const bridgeModule = await import('#/web/client-bridge.ts')
@@ -90,21 +90,57 @@ describe('repo-client', () => {
       ok: true,
       json: async () => ({ ok: true, message: 'https://github.com/acme/repo/tree/feature/test' }),
     }))
-    const { openRepoRemote } = await import('#/web/repo-client.ts')
-    await expect(openRepoRemote('/tmp/repo', 'feature/test')).resolves.toEqual({ ok: true, message: '' })
+    const { openRepoUrl } = await import('#/web/repo-client.ts')
+    await expect(openRepoUrl('/tmp/repo', { type: 'branch', branch: 'feature/test' })).resolves.toEqual({ ok: true, message: '' })
     expect(openExternalUrl).toHaveBeenCalledWith({
       url: 'https://github.com/acme/repo/tree/feature/test',
       allowHttp: true,
     })
     expect(window.open).not.toHaveBeenCalled()
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://127.0.0.1:32100/api/repo/open-remote',
+      'http://127.0.0.1:32100/api/repo/open-url',
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
-        body: JSON.stringify({ cwd: '/tmp/repo', branch: 'feature/test' }),
+        body: JSON.stringify({ cwd: '/tmp/repo', target: { type: 'branch', branch: 'feature/test' } }),
       }),
     )
+  })
+
+  test('opens repository commit URLs through the native host bridge when available', async () => {
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
+    const bridgeModule = await import('#/web/client-bridge.ts')
+    const openExternalUrl = vi.fn(async () => ({ ok: true, message: 'https://github.com/acme/repo/commit/abcdef1' }))
+    bridgeModule.setClientBridgeForTests(
+      testBridge({
+        getBootstrap: () => ({
+          ...webBootstrap(),
+          initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
+        }),
+        host: () => ({
+          openSettingsWindow: vi.fn(),
+          openExternalUrl,
+          openDirectoryDialog: vi.fn(),
+          consumeExternalOpenPaths: vi.fn(),
+        }),
+      }),
+    )
+    const fetchMock = mockFetch(async () => ({
+      ok: true,
+      json: async () => ({ ok: true, message: 'https://github.com/acme/repo/commit/abcdef1' }),
+    }))
+    const { openRepoUrl } = await import('#/web/repo-client.ts')
+
+    await expect(openRepoUrl('/tmp/repo', { type: 'commit', hash: 'abcdef1' })).resolves.toEqual({ ok: true, message: '' })
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:32100/api/repo/open-url',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
+        body: JSON.stringify({ cwd: '/tmp/repo', target: { type: 'commit', hash: 'abcdef1' } }),
+      }),
+    )
+    expect(openExternalUrl).toHaveBeenCalledWith({ url: 'https://github.com/acme/repo/commit/abcdef1', allowHttp: true })
   })
 
   test('clones repositories through the embedded server when no Electron bridge exists', async () => {

@@ -15,8 +15,7 @@ import {
 } from '#/system/git/parsers.ts'
 import { markDefaultBranch, prioritizeDefaultBranch } from '#/system/git/branches.ts'
 import {
-  getBranchUrlForRemotes,
-  getBrowserRemoteUrlForRemotes,
+  getRepoUrlForRemotes,
   parseRemoteVerbose,
   repoRemoteInfoForRemotes,
   resolveFetchRemoteForRemotes,
@@ -32,11 +31,13 @@ import {
   type RemoteCommandResult,
 } from '#/system/ssh/commands.ts'
 import {
+  GIT_HASH_RE,
   type BranchSnapshotInfo,
   type ExecResult,
   type GitRemoteInfo,
   type LogEntry,
   type RepoRemoteInfo,
+  type RepoUrlTarget,
   type WorktreeInfo,
   type WorktreeStatus,
 } from '#/shared/git-types.ts'
@@ -689,19 +690,19 @@ export async function deleteRemoteBranch(
 
 export async function getRemoteBrowserUrl(
   target: RemoteRepoTarget,
-  branch?: string,
+  urlTarget: RepoUrlTarget,
   options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
 ): Promise<string | null> {
-  if (branch && !isSafeBranchName(branch)) return null
+  if (urlTarget.type === 'branch' && !isSafeBranchName(urlTarget.branch)) return null
+  if (urlTarget.type === 'commit' && !GIT_HASH_RE.test(urlTarget.hash)) return null
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
+  const branch = urlTarget.type === 'branch' ? urlTarget.branch : undefined
   const [remoteInfo, upstream] = await Promise.all([
     getRemoteRepoInfo(target, { signal: options.signal, run }),
     branch ? getRemoteUpstreamParts(target, branch, { signal: options.signal, run }) : Promise.resolve(null),
   ])
   if (options.signal?.aborted) return null
-  return branch
-    ? getBranchUrlForRemotes(remoteInfo.remotes, branch, upstream)
-    : getBrowserRemoteUrlForRemotes(remoteInfo.remotes, upstream)
+  return getRepoUrlForRemotes(remoteInfo.remotes, urlTarget, upstream)
 }
 
 export function parseRemoteSnapshot(output: string, worktrees: WorktreeInfo[] = []): RemoteRepoSnapshot | null {

@@ -29,6 +29,10 @@ import {
 } from '#/web/stores/repos/filetree-interaction-state.ts'
 import { getRepositoryFileViewer } from '#/web/filetree-client.ts'
 import { absoluteFilePathForTerminal, fileReadCommand } from '#/web/components/repo-workspace/file-read-command.ts'
+import {
+  HistoryCommitGraph,
+  HistoryCommitGraphSkeleton,
+} from '#/web/components/repo-workspace/HistoryCommitGraph.tsx'
 
 const DEFAULT_BRANCH_HISTORY_ERROR_KEY = 'error.failed-read-repo'
 
@@ -331,88 +335,18 @@ function BranchHistoryTab({
   return (
     <BranchTabPanel id={`${workspacePaneId}-history-panel`} {...panelLabel} busy={state.phase === 'loading'}>
       {state.phase === 'loading' ? (
-        <StatusListSkeleton rows={8} />
+        <HistoryCommitGraphSkeleton rows={8} />
       ) : state.phase === 'error' ? (
         <EmptyState title={t(errorTitleKey)} />
       ) : state.entries.length === 0 ? (
         <EmptyState title={t('log.empty-for-branch', { branch: branchName })} />
       ) : (
         <ScrollPane>
-          <ul className="py-1.5 tracking-wider" style={{ fontFamily: 'var(--font-mono)' }}>
-            {state.entries.map((entry) => (
-              <BranchHistoryRow key={entry.hash || entry.shortHash} entry={entry} />
-            ))}
-          </ul>
+          <HistoryCommitGraph repoId={repoId} entries={state.entries} />
         </ScrollPane>
       )}
     </BranchTabPanel>
   )
-}
-
-function BranchHistoryRow({ entry }: { entry: LogEntry }) {
-  const hash = entry.shortHash || entry.hash
-  const refs = entry.refs.trim()
-  const line = historyLogLine(entry)
-  return (
-    <li className="min-w-0 px-1.5 font-mono text-sm text-foreground" title={line}>
-      <span className="block w-full min-w-0 truncate">
-        <span data-history-log-hash="" style={{ color: 'var(--color-terminal-ansi-yellow)' }}>
-          {hash}
-        </span>
-        {refs ? (
-          <>
-            {' '}
-            <span>(</span>
-            <BranchHistoryRefs refs={refs} />
-            <span>)</span>
-          </>
-        ) : null}
-        {entry.message ? (
-          <>
-            {' '}
-            <span data-history-log-message="">{entry.message}</span>
-          </>
-        ) : null}
-      </span>
-    </li>
-  )
-}
-
-function BranchHistoryRefs({ refs }: { refs: string }) {
-  return (
-    <>
-      {refs
-        .split(/(,\s*|\s+|->)/g)
-        .filter(Boolean)
-        .map((part, index) => {
-          const color = historyRefTokenColor(part)
-          return (
-            <span
-              key={`${part}-${index}`}
-              data-history-log-ref-token={part.trim() || undefined}
-              style={color ? { color } : undefined}
-            >
-              {part}
-            </span>
-          )
-        })}
-    </>
-  )
-}
-
-function historyRefTokenColor(token: string): string | null {
-  const text = token.trim()
-  if (!text || text.startsWith(',')) return null
-  if (text === 'HEAD' || text === '->') return 'var(--color-terminal-ansi-blue)'
-  if (text === 'tag:') return 'var(--color-terminal-ansi-magenta)'
-  if (/^(origin|upstream|fork)\//.test(text)) return 'var(--color-terminal-ansi-red)'
-  return 'var(--color-terminal-ansi-green)'
-}
-
-function historyLogLine(entry: LogEntry): string {
-  const hash = entry.shortHash || entry.hash
-  const refs = entry.refs.trim()
-  return [hash, refs ? `(${refs})` : '', entry.message].filter(Boolean).join(' ')
 }
 
 function BranchTerminalTab({

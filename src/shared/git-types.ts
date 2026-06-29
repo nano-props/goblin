@@ -116,6 +116,11 @@ export interface GitRemoteInfo {
   pushUrl: string
 }
 
+export type RepoUrlTarget =
+  | { type: 'root' }
+  | { type: 'branch'; branch: string }
+  | { type: 'commit'; hash: string }
+
 export type BrowserRemoteProvider = 'github' | 'gitlab' | 'external'
 
 export interface RepoRemoteInfo {

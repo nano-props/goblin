@@ -1,5 +1,12 @@
 import { git, gitResultWithOptions, NETWORK_TIMEOUT_MS } from '#/system/git/git-exec.ts'
-import type { BrowserRemoteProvider, ExecResult, GitRemoteInfo, RepoRemoteInfo } from '#/shared/git-types.ts'
+import {
+  GIT_HASH_RE,
+  type BrowserRemoteProvider,
+  type ExecResult,
+  type GitRemoteInfo,
+  type RepoRemoteInfo,
+  type RepoUrlTarget,
+} from '#/shared/git-types.ts'
 import { getCurrentBranch } from '#/system/git/branches.ts'
 import { isGitHubHost, isGitLabHost, parseGitRemoteUrl, remoteUrlToHttps } from '#/system/git/remote-url.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
@@ -20,12 +27,16 @@ export interface BrowserRemote {
   provider: BrowserRemoteProvider
 }
 
-export async function getBrowserRemoteUrl(
+export async function getBrowserRepoUrl(
   cwd: string,
-  options?: { branch?: string; signal?: AbortSignal },
+  target: RepoUrlTarget,
+  options?: { signal?: AbortSignal },
 ): Promise<string | null> {
-  const remote = await getBrowserRemote(cwd, options)
-  return options?.branch ? branchUrlForBrowserRemote(remote, options.branch) : (remote?.url ?? null)
+  if (target.type === 'branch' && !isSafeBranchName(target.branch)) return null
+  if (target.type === 'commit' && !GIT_HASH_RE.test(target.hash)) return null
+  const branch = target.type === 'branch' ? target.branch : undefined
+  const remote = await getBrowserRemote(cwd, { branch, signal: options?.signal })
+  return repoUrlForBrowserRemote(remote, target)
 }
 
 async function hasRemote(cwd: string, remote: string, signal?: AbortSignal): Promise<boolean> {
@@ -143,20 +154,19 @@ export function repoRemoteInfoForRemotes(remotes: GitRemoteInfo[]): RepoRemoteIn
   }
 }
 
-export function getBrowserRemoteUrlForRemotes(
-  remotes: GitRemoteInfo[],
-  upstream?: UpstreamParts | null,
-): string | null {
-  return pickBrowserRemote(remotes, upstream)?.url ?? null
-}
-
 export function resolveFetchRemoteForRemotes(remotes: GitRemoteInfo[], upstream?: UpstreamParts | null): string | null {
   return pickPreferredRemote(remotes, upstream)?.name ?? null
 }
 
-// Constructs the web URL for a branch on GitHub or GitLab. Returns null for
-// unsupported providers so the caller can surface an error rather than emit
-// a guessed URL that would 404.
+// Constructs web URLs for supported browser remotes. Returns null for
+// unsupported targets/providers so callers don't emit guessed URLs that 404.
+export function repoUrlForBrowserRemote(remote: BrowserRemote | null, target: RepoUrlTarget): string | null {
+  if (!remote) return null
+  if (target.type === 'root') return remote.url
+  if (target.type === 'branch') return branchUrlForBrowserRemote(remote, target.branch)
+  return commitUrlForBrowserRemote(remote, target.hash)
+}
+
 export function branchUrlForBrowserRemote(remote: BrowserRemote | null, branch: string): string | null {
   if (!remote) return null
   const encoded = branch.split('/').map(encodeURIComponent).join('/')
@@ -165,12 +175,19 @@ export function branchUrlForBrowserRemote(remote: BrowserRemote | null, branch: 
   return null
 }
 
-export function getBranchUrlForRemotes(
+export function commitUrlForBrowserRemote(remote: BrowserRemote | null, hash: string): string | null {
+  if (!remote || !GIT_HASH_RE.test(hash)) return null
+  if (remote.provider === 'github') return `${remote.url}/commit/${hash}`
+  if (remote.provider === 'gitlab') return `${remote.url}/-/commit/${hash}`
+  return null
+}
+
+export function getRepoUrlForRemotes(
   remotes: GitRemoteInfo[],
-  branch: string,
+  target: RepoUrlTarget,
   upstream?: UpstreamParts | null,
 ): string | null {
-  return branchUrlForBrowserRemote(pickBrowserRemote(remotes, upstream), branch)
+  return repoUrlForBrowserRemote(pickBrowserRemote(remotes, upstream), target)
 }
 
 export async function getUpstreamParts(

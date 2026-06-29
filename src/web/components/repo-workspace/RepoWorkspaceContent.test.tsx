@@ -32,20 +32,20 @@ import {
 
 const repoClientMocks = vi.hoisted(() => ({
   getRepoLog: vi.fn(),
+  openRepoUrl: vi.fn(),
 }))
 const filetreeClientMocks = vi.hoisted(() => ({
   getRepositoryTree: vi.fn(),
   getRepositoryFileViewer: vi.fn(),
 }))
-
 vi.mock('#/web/repo-client.ts', () => ({
   getRepoLog: repoClientMocks.getRepoLog,
+  openRepoUrl: repoClientMocks.openRepoUrl,
 }))
 vi.mock('#/web/filetree-client.ts', () => ({
   getRepositoryTree: filetreeClientMocks.getRepositoryTree,
   getRepositoryFileViewer: filetreeClientMocks.getRepositoryFileViewer,
 }))
-
 const REPO_ID = '/tmp/gbl-repo-workspace-content-repo'
 
 type RepoWorkspaceContentHarnessProps = Omit<ComponentProps<typeof RepoWorkspaceContent>, 'workspacePaneTabModel'>
@@ -59,6 +59,7 @@ beforeEach(() => {
   resetReposStore()
   useRepoSyncStore.setState({ ready: new Map(), timestamps: new Map() })
   repoClientMocks.getRepoLog.mockResolvedValue([])
+  repoClientMocks.openRepoUrl.mockResolvedValue({ ok: true, message: '' })
   filetreeClientMocks.getRepositoryTree.mockResolvedValue({ nodes: [], truncated: false })
   filetreeClientMocks.getRepositoryFileViewer.mockResolvedValue({ viewer: 'bat', shell: 'posix' })
 })
@@ -717,7 +718,7 @@ describe('RepoWorkspaceContent', () => {
     expect(repoClientMocks.getRepoLog).not.toHaveBeenCalled()
   })
 
-  test('renders branch history as one-line short-hash log entries', async () => {
+  test('renders branch history as a linear commit graph', async () => {
     repoClientMocks.getRepoLog.mockResolvedValue([
       {
         hash: '78c150a000000000000000000000000000000000',
@@ -726,6 +727,14 @@ describe('RepoWorkspaceContent', () => {
         message: 'Fix branch navigator name truncation',
         author: 'Example Author',
         date: '2026-06-21T00:00:00.000Z',
+      },
+      {
+        hash: '1111111000000000000000000000000000000000',
+        shortHash: '1111111',
+        refs: '',
+        message: 'Start history graph',
+        author: 'Example Author',
+        date: '2026-06-20T00:00:00.000Z',
       },
     ])
     const repo = seedRepoState({
@@ -743,40 +752,35 @@ describe('RepoWorkspaceContent', () => {
       </TerminalSessionReadContext.Provider>,
     )
     await flushAsyncWork()
+    await flushAsyncWork()
 
     expect(repoClientMocks.getRepoLog).toHaveBeenCalledWith(
       REPO_ID,
       'feature/history',
       expect.objectContaining({ count: 50 }),
     )
-    const row = container.querySelector(
-      'li[title="78c150a (HEAD -> fix/w-tab, origin/main, origin/fix/w-tab, origin/HEAD, main) Fix branch navigator name truncation"]',
-    )
-    expect(row).not.toBeNull()
-    expect(row?.className).not.toContain('grid')
-    expect(row?.className).toContain('font-mono')
-    expect(row?.className).toContain('text-sm')
-    expect(row?.className).not.toContain('h-7')
-    expect(row?.className).toContain('px-1.5')
-    expect(row?.textContent).toContain('78c150a')
-    expect(row?.textContent).toContain('(HEAD -> fix/w-tab, origin/main, origin/fix/w-tab, origin/HEAD, main)')
-    expect(row?.textContent).toContain('Fix branch navigator name truncation')
-    expect(row?.querySelector('span.block')?.className).toContain('truncate')
-    expect(row?.querySelector('[data-history-log-hash=""]')?.getAttribute('style')).toContain(
-      '--color-terminal-ansi-yellow',
-    )
-    expect(row?.querySelector('[data-history-log-ref-token="HEAD"]')?.getAttribute('style')).toContain(
-      '--color-terminal-ansi-blue',
-    )
-    expect(row?.querySelector('[data-history-log-ref-token="fix/w-tab"]')?.getAttribute('style')).toContain(
-      '--color-terminal-ansi-green',
-    )
-    expect(row?.querySelector('[data-history-log-ref-token="origin/main"]')?.getAttribute('style')).toContain(
-      '--color-terminal-ansi-red',
-    )
-    expect(row?.querySelector('[data-history-log-message=""]')?.textContent).toBe(
-      'Fix branch navigator name truncation',
-    )
+    const graph = container.querySelector('[data-history-commit-graph=""]')
+    expect(graph).not.toBeNull()
+    const rows = Array.from(container.querySelectorAll('[data-history-commit-row=""]'))
+    expect(rows).toHaveLength(2)
+    expect(rows[0]?.textContent).toContain('78c150a')
+    expect(rows[0]?.textContent).toContain('Fix branch navigator name truncation')
+    const headRef = rows[0]?.querySelector('[data-history-log-ref-token="HEAD -> fix/w-tab"]')
+    expect(headRef).not.toBeNull()
+    expect(headRef?.getAttribute('data-history-log-ref-remotes')).toBe('origin')
+    const mainRef = rows[0]?.querySelector('[data-history-log-ref-token="main"]')
+    expect(mainRef).not.toBeNull()
+    expect(mainRef?.getAttribute('data-history-log-ref-remotes')).toBe('origin')
+    const hashButton = rows[0]?.querySelector('[data-history-log-hash=""]') as HTMLButtonElement | null
+    await act(async () => {
+      hashButton?.click()
+    })
+    expect(repoClientMocks.openRepoUrl).toHaveBeenCalledWith(REPO_ID, {
+      type: 'commit',
+      hash: '78c150a000000000000000000000000000000000',
+    })
+    expect(rows[1]?.textContent).toContain('1111111')
+    expect(rows[1]?.textContent).toContain('Start history graph')
   })
 
   test('labels worktree history panels with the branch-owned tab id', async () => {

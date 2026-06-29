@@ -2,7 +2,7 @@ import { openExternalUrl } from '#/web/app-shell-client.ts'
 import { postServerJson } from '#/web/lib/server-fetch.ts'
 import type { CloneRepoResult, PullRequestEntry, RepoSnapshot, RepoLogResponse } from '#/shared/api-types.ts'
 import type { EditorApp, TerminalApp } from '#/shared/api-types.ts'
-import type { ExecResult, LogEntry, PullRequestFetchMode, WorktreeStatus } from '#/shared/git-types.ts'
+import type { ExecResult, LogEntry, PullRequestFetchMode, RepoUrlTarget, WorktreeStatus } from '#/shared/git-types.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import type { ProbeResult } from '#/shared/api-types.ts'
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
@@ -182,11 +182,11 @@ export async function readRepoBulk(
   )
 }
 
-export async function openRepoRemote(cwd: string, branch?: string): Promise<ExecResult> {
-  const result = await postServerJson<{ cwd: string; branch?: string }, ExecResult>(
-    '/api/repo/open-remote',
-    branch ? { cwd, branch } : { cwd },
-  )
+export async function openRepoUrl(cwd: string, target: RepoUrlTarget): Promise<ExecResult> {
+  const result = await postServerJson<{ cwd: string; target: RepoUrlTarget }, ExecResult>('/api/repo/open-url', {
+    cwd,
+    target,
+  })
   if (!result.ok || !result.message) return result
   const opened = await openExternalUrl(result.message)
   return opened.ok ? { ok: true, message: '' } : opened
