@@ -275,15 +275,10 @@ describe('TerminalSessionProjection create flow', () => {
     expect(projection.worktreeSnapshot(WORKTREE_KEY).count).toBe(0)
   })
 
-  test('waits for host registration before creating when no geometry is available yet', async () => {
+  test('creates with default startup geometry when no host geometry is available yet', async () => {
     const pending = projection.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
 
     expect(projection.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(true)
-    expect(mocks.createMock).not.toHaveBeenCalled()
-
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    projection.registerHost(WORKTREE_KEY, host)
 
     await expect(pending).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0session-1`)
     expect(mocks.createMock).toHaveBeenCalledTimes(1)
@@ -292,21 +287,20 @@ describe('TerminalSessionProjection create flow', () => {
       branch: BRANCH,
       worktreePath: WORKTREE_PATH,
       kind: 'primary',
-      cols: 101,
-      rows: 31,
+      cols: 80,
+      rows: 24,
       clientId: 'client_local',
     })
   })
 
-  test('pending create rejected on destroy while waiting for host registration', async () => {
+  test('pending create rejected on destroy while server create is in flight', async () => {
+    const { promise } = Promise.withResolvers<ReturnType<typeof makeCreateResult>>()
+    mocks.createMock.mockReturnValueOnce(promise)
     const pending = projection.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
 
     expect(projection.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(true)
     expect((projection as any).pendingCreateByWorktree.size).toBe(1)
-    // The waiter is registered only after the flush reaches
-    // `waitForHostRegistration` — that's several await boundaries past
-    // the synchronous `enqueuePendingCreate`, so we must wait for it.
-    await vi.waitFor(() => expect((projection as any).hostWaitersByWorktree.size).toBe(1))
+    await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
 
     // Attach the rejection handler before destroy() so the rejected
     // promise is not flagged as unhandled between the synchronous
@@ -314,27 +308,30 @@ describe('TerminalSessionProjection create flow', () => {
     const expectation = expect(pending).rejects.toThrow('terminal session projection destroyed')
     projection.destroy()
     await expectation
-    expect((projection as any).hostWaitersByWorktree.size).toBe(0)
     expect((projection as any).pendingCreateByWorktree.size).toBe(0)
     expect(projection.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
   })
 
-  test('closeTerminalsForWorktree cancels a pending create before deleting a worktree', async () => {
+  test('closeTerminalsForWorktree waits for an in-flight create before closing it', async () => {
+    const { promise, resolve } = Promise.withResolvers<ReturnType<typeof makeCreateResult>>()
+    mocks.createMock.mockReturnValueOnce(promise)
     const pending = projection.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
 
     expect(projection.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(true)
-    await vi.waitFor(() => expect((projection as any).hostWaitersByWorktree.size).toBe(1))
+    await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
 
-    const expectation = expect(pending).rejects.toThrow('terminal create request canceled')
-    await expect(
-      projection.closeTerminalsForWorktree({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH }),
-    ).resolves.toBe(true)
-    await expectation
+    const closePromise = projection.closeTerminalsForWorktree({
+      repoRoot: REPO_ROOT,
+      branch: BRANCH,
+      worktreePath: WORKTREE_PATH,
+    })
+    resolve(makeCreateResult())
 
-    expect(mocks.createMock).not.toHaveBeenCalled()
-    expect((projection as any).hostWaitersByWorktree.size).toBe(0)
+    await expect(pending).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0session-1`)
+    await expect(closePromise).resolves.toBe(true)
     expect((projection as any).pendingCreateByWorktree.size).toBe(0)
     expect(projection.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
+    expect(projection.worktreeSnapshot(WORKTREE_KEY).count).toBe(0)
   })
 
   test('closeTerminalsForWorktree returns true when no terminal sessions exist', async () => {
@@ -347,7 +344,7 @@ describe('TerminalSessionProjection create flow', () => {
     expect(mocks.closeMock).not.toHaveBeenCalled()
   })
 
-  test('retries creating until host geometry becomes measurable', async () => {
+  test('falls back to default startup geometry when registered host geometry is unavailable', async () => {
     mocks.estimateManagedTerminalGeometryMock.mockReturnValue(null)
 
     const host = document.createElement('div')
@@ -356,20 +353,21 @@ describe('TerminalSessionProjection create flow', () => {
 
     const pending = projection.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
 
-    await vi.waitFor(() => expect(MockResizeObserver.instances).toHaveLength(1))
-    const observer = MockResizeObserver.instances[0]!
-    observer.trigger()
-    expect(mocks.createMock).not.toHaveBeenCalled()
-
-    mocks.estimateManagedTerminalGeometryMock.mockReturnValue({ cols: 101, rows: 31 })
-    observer.trigger()
-
     await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
+    expect(mocks.createMock).toHaveBeenCalledWith({
+      repoRoot: REPO_ROOT,
+      branch: BRANCH,
+      worktreePath: WORKTREE_PATH,
+      kind: 'primary',
+      cols: 80,
+      rows: 24,
+      clientId: 'client_local',
+    })
     expect(projection.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
     await expect(pending).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0session-1`)
   })
 
-  test('fails create when terminal host is permanently unmeasurable', async () => {
+  test('creates with default startup geometry when terminal host is permanently unmeasurable', async () => {
     mocks.estimateManagedTerminalGeometryMock.mockReturnValue(null)
 
     const container = document.createElement('div')
@@ -381,9 +379,17 @@ describe('TerminalSessionProjection create flow', () => {
 
     const pending = projection.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
 
-    await expect(pending).rejects.toThrow('host is inside a display:none subtree')
+    await expect(pending).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0session-1`)
     expect(projection.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
-    expect(mocks.createMock).not.toHaveBeenCalled()
+    expect(mocks.createMock).toHaveBeenCalledWith({
+      repoRoot: REPO_ROOT,
+      branch: BRANCH,
+      worktreePath: WORKTREE_PATH,
+      kind: 'primary',
+      cols: 80,
+      rows: 24,
+      clientId: 'client_local',
+    })
   })
 
   test('durable close: awaits an in-flight close for the same worktree before creating', async () => {

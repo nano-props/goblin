@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   captureTerminalHostGeometry,
-  resolveTerminalCreateGeometry,
+  resolveTerminalStartupGeometryHint,
   TerminalHostNotMeasurableError,
   waitForMeasurableHost,
 } from '#/web/components/terminal/terminal-session-geometry.ts'
@@ -62,23 +62,23 @@ describe('terminal session geometry helpers', () => {
 
   test('captures geometry from a connected host and caches it', async () => {
     const host = makeHost()
-    const geometryByWorktree = new Map<string, { cols: number; rows: number }>()
+    const startupGeometryHintByWorktree = new Map<string, { cols: number; rows: number }>()
 
-    const geometry = await captureTerminalHostGeometry({
+    const geometry = captureTerminalHostGeometry({
       worktreeTerminalKey: '/repo\0/repo',
       hostByWorktree: new Map([['/repo\0/repo', host]]),
-      geometryByWorktree,
+      startupGeometryHintByWorktree,
     })
 
     expect(geometry).toEqual({ cols: 120, rows: 40 })
-    expect(geometryByWorktree.get('/repo\0/repo')).toEqual({ cols: 120, rows: 40 })
+    expect(startupGeometryHintByWorktree.get('/repo\0/repo')).toEqual({ cols: 120, rows: 40 })
   })
 
   test('falls back to selected attachment canonical size or cached geometry', async () => {
-    const geometry = await resolveTerminalCreateGeometry({
+    const geometry = resolveTerminalStartupGeometryHint({
       worktreeTerminalKey: '/repo\0/repo',
       hostByWorktree: new Map(),
-      geometryByWorktree: new Map(),
+      startupGeometryHintByWorktree: new Map(),
       selectedDescriptor: descriptor(),
       getAttachmentSnapshot: () => ({
         role: 'controller',
@@ -92,10 +92,10 @@ describe('terminal session geometry helpers', () => {
     })
     expect(geometry).toEqual({ cols: 90, rows: 30 })
 
-    const cached = await resolveTerminalCreateGeometry({
+    const cached = resolveTerminalStartupGeometryHint({
       worktreeTerminalKey: '/repo\0/repo',
       hostByWorktree: new Map(),
-      geometryByWorktree: new Map([['/repo\0/repo', { cols: 70, rows: 20 }]]),
+      startupGeometryHintByWorktree: new Map([['/repo\0/repo', { cols: 70, rows: 20 }]]),
       selectedDescriptor: null,
       getAttachmentSnapshot: () => null,
     })

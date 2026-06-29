@@ -4,48 +4,49 @@ import {
 } from '#/web/components/terminal/terminal-geometry.ts'
 import type { TerminalClientSnapshot, TerminalDescriptor } from '#/web/components/terminal/types.ts'
 
-export async function captureTerminalHostGeometry(input: {
+export function captureTerminalHostGeometry(input: {
   worktreeTerminalKey: string
   hostByWorktree: ReadonlyMap<string, HTMLElement>
-  geometryByWorktree: Map<string, { cols: number; rows: number }>
-}): Promise<{ cols: number; rows: number } | null> {
+  startupGeometryHintByWorktree: Map<string, { cols: number; rows: number }>
+}): { cols: number; rows: number } | null {
   const host = input.hostByWorktree.get(input.worktreeTerminalKey)
   if (!host?.isConnected) return null
   const geometry = estimateManagedTerminalGeometry(host)
   if (!geometry) return null
-  input.geometryByWorktree.set(input.worktreeTerminalKey, geometry)
+  input.startupGeometryHintByWorktree.set(input.worktreeTerminalKey, geometry)
   return geometry
 }
 
-export async function resolveTerminalCreateGeometry(input: {
+/**
+ * Non-blocking startup hint for terminal creation. This helper never waits for
+ * host registration or ResizeObserver callbacks: if a measured host or cached
+ * canonical size is already available, use it; otherwise let the caller choose
+ * a default. The live xterm view becomes geometry authority after attach.
+ */
+export function resolveTerminalStartupGeometryHint(input: {
   worktreeTerminalKey: string
   hostByWorktree: ReadonlyMap<string, HTMLElement>
-  geometryByWorktree: Map<string, { cols: number; rows: number }>
+  startupGeometryHintByWorktree: Map<string, { cols: number; rows: number }>
   selectedDescriptor: TerminalDescriptor | null
   getAttachmentSnapshot: (key: string) => TerminalClientSnapshot | null | undefined
-}): Promise<{ cols: number; rows: number } | null> {
-  const measured = await captureTerminalHostGeometry(input)
+}): { cols: number; rows: number } | null {
+  const measured = captureTerminalHostGeometry(input)
   if (measured) return measured
   if (input.selectedDescriptor) {
     const attachment = input.getAttachmentSnapshot(input.selectedDescriptor.key)
     if (attachment?.canonicalCols && attachment.canonicalRows) {
       const geometry = { cols: attachment.canonicalCols, rows: attachment.canonicalRows }
-      input.geometryByWorktree.set(input.worktreeTerminalKey, geometry)
+      input.startupGeometryHintByWorktree.set(input.worktreeTerminalKey, geometry)
       return geometry
     }
   }
-  return input.geometryByWorktree.get(input.worktreeTerminalKey) ?? null
+  return input.startupGeometryHintByWorktree.get(input.worktreeTerminalKey) ?? null
 }
 
 /**
- * Resolves with the first startup geometry the host reports, instead of
- * forcing the caller to fall back to a default like 80x24 when the host is
- * briefly unmeasurable on attach (e.g. a split pane that is still animating
- * to its final width).
- *
- * This is only a startup hint. The opened xterm is the client-side source for
- * fitted view geometry; the server accepts that geometry through the controller
- * resize path and publishes it back as canonical session geometry.
+ * Resolves with the first real view geometry the host reports during attach,
+ * instead of falling back to a default while the xterm host is briefly
+ * unmeasurable.
  *
  * The wait is driven by `ResizeObserver` callbacks and is cancelable. If the
  * host is in a `display:none` subtree (and therefore cannot ever produce a
@@ -55,7 +56,8 @@ export async function resolveTerminalCreateGeometry(input: {
  *
  * `measure` is dependency-injected so tests can drive the host without
  * relying on jsdom layout. In production it defaults to a lightweight host-box
- * estimate; the mounted xterm remains the source for fitted view geometry.
+ * estimate for generic hosts; `TerminalSession` passes the xterm openability
+ * predicate for the real attach path.
  */
 export function waitForMeasurableHost(
   host: HTMLElement,
@@ -109,17 +111,6 @@ export function waitForMeasurableHost(
       )
     }
   })
-}
-
-export function waitForMeasurableManagedHost(
-  host: HTMLElement,
-  options: {
-    signal?: AbortSignal
-    measure?: (host: HTMLElement) => { cols: number; rows: number } | null
-    timeoutMs?: number
-  } = {},
-): Promise<{ cols: number; rows: number }> {
-  return waitForMeasurableHost(host, { ...options, measure: options.measure ?? estimateManagedTerminalGeometry })
 }
 
 export class TerminalHostNotMeasurableError extends Error {
