@@ -11,7 +11,7 @@ import { createPullRequest, createRepoBranch, resetReposStore, seedRepoState } f
 
 const mocks = vi.hoisted(() => ({
   openExternalUrl: vi.fn(),
-  openRepoRemote: vi.fn(),
+  openRepoUrl: vi.fn(),
   openRepoEditor: vi.fn(),
   openRepoInFinder: vi.fn(),
   openRepoTerminal: vi.fn(),
@@ -27,7 +27,7 @@ vi.mock('#/web/repo-client.ts', () => ({
   getRepoPatch: vi.fn(),
   openRepoEditor: mocks.openRepoEditor,
   openRepoInFinder: mocks.openRepoInFinder,
-  openRepoRemote: mocks.openRepoRemote,
+  openRepoUrl: mocks.openRepoUrl,
   openRepoTerminal: mocks.openRepoTerminal,
 }))
 
@@ -42,7 +42,7 @@ describe('useBranchActions', () => {
   beforeEach(() => {
     resetReposStore()
     mocks.openExternalUrl.mockReset()
-    mocks.openRepoRemote.mockReset()
+    mocks.openRepoUrl.mockReset()
     mocks.openRepoEditor.mockReset()
     mocks.openRepoInFinder.mockReset()
     mocks.openRepoTerminal.mockReset()
@@ -76,7 +76,7 @@ describe('useBranchActions', () => {
     })
 
     expect(mocks.openExternalUrl).toHaveBeenCalledWith('https://github.com/acme/repo/pull/28689')
-    expect(mocks.openRepoRemote).not.toHaveBeenCalled()
+    expect(mocks.openRepoUrl).not.toHaveBeenCalled()
   })
 
   test('falls back to the branch remote URL when no pull request exists', async () => {
@@ -93,7 +93,7 @@ describe('useBranchActions', () => {
         hasGitHubRemote: true,
       },
     })
-    mocks.openRepoRemote.mockResolvedValue({ ok: true, message: '' })
+    mocks.openRepoUrl.mockResolvedValue({ ok: true, message: '' })
 
     let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
     renderInJsdom(<BranchActionsHarness repo={repo} onReady={(value) => (actions = value)} />)
@@ -102,7 +102,7 @@ describe('useBranchActions', () => {
       await actions?.openRemote?.()
     })
 
-    expect(mocks.openRepoRemote).toHaveBeenCalledWith(REPO_ID, 'feature/no-pr')
+    expect(mocks.openRepoUrl).toHaveBeenCalledWith(REPO_ID, { type: 'branch', branch: 'feature/no-pr' })
     expect(mocks.openExternalUrl).not.toHaveBeenCalled()
   })
 
@@ -280,7 +280,7 @@ describe('useBranchActions', () => {
 describe('openBranchExternalTarget', () => {
   beforeEach(() => {
     mocks.openExternalUrl.mockReset()
-    mocks.openRepoRemote.mockReset()
+    mocks.openRepoUrl.mockReset()
   })
 
   test('prefers the existing pull request URL', async () => {
@@ -292,18 +292,18 @@ describe('openBranchExternalTarget', () => {
     })
 
     expect(mocks.openExternalUrl).toHaveBeenCalledWith('https://github.com/acme/repo/pull/28689')
-    expect(mocks.openRepoRemote).not.toHaveBeenCalled()
+    expect(mocks.openRepoUrl).not.toHaveBeenCalled()
   })
 
   test('falls back to the branch remote target when no pull request exists', async () => {
-    mocks.openRepoRemote.mockResolvedValue({ ok: true, message: '' })
+    mocks.openRepoUrl.mockResolvedValue({ ok: true, message: '' })
 
     await openBranchExternalTarget(REPO_ID, {
       name: 'feature/no-pr',
       pullRequest: undefined,
     })
 
-    expect(mocks.openRepoRemote).toHaveBeenCalledWith(REPO_ID, 'feature/no-pr')
+    expect(mocks.openRepoUrl).toHaveBeenCalledWith(REPO_ID, { type: 'branch', branch: 'feature/no-pr' })
     expect(mocks.openExternalUrl).not.toHaveBeenCalled()
   })
 })

@@ -11,7 +11,7 @@ import { cloneRepo as cloneGitRepo } from '#/system/git/clone.ts'
 import { openInPreferredEditor } from '#/system/editors.ts'
 import { openInPreferredTerminal } from '#/system/terminals.ts'
 import { openInFinder } from '#/system/finder.ts'
-import { type ExecResult } from '#/shared/git-types.ts'
+import { type ExecResult, type RepoUrlTarget } from '#/shared/git-types.ts'
 import { type NetworkOpKind } from '#/shared/api-types.ts'
 import type { EditorApp, TerminalApp } from '#/shared/api-types.ts'
 import { checkGitAvailable } from '#/system/git/git-exec.ts'
@@ -360,8 +360,8 @@ export async function removeRepoWorktree(
   })
 }
 
-export async function openRepoRemote(cwd: string, branch?: string, signal?: AbortSignal): Promise<ExecResult> {
-  const url = await runWithRepoSource(cwd, async (source) => await source.getBrowserRemoteUrl(branch, signal))
+export async function openRepoUrl(cwd: string, target: RepoUrlTarget, signal?: AbortSignal): Promise<ExecResult> {
+  const url = await runWithRepoSource(cwd, async (source) => await source.getBrowserRepoUrl(target, signal))
   return url ? { ok: true, message: url } : { ok: false, message: 'error.no-remote-url' }
 }
 

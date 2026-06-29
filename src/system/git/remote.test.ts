@@ -1,8 +1,9 @@
 import { describe, expect, test, vi } from 'vitest'
 import {
   branchUrlForBrowserRemote,
-  getBranchUrlForRemotes,
-  getBrowserRemoteUrl,
+  commitUrlForBrowserRemote,
+  getBrowserRepoUrl,
+  getRepoUrlForRemotes,
   resolveFetchRemoteForRemotes,
   resolvePushTargetForRemotes,
 } from '#/system/git/remote.ts'
@@ -26,7 +27,7 @@ function browserRemote(url: string, provider: BrowserRemoteProvider) {
   return { url, provider }
 }
 
-describe('getBrowserRemoteUrl', () => {
+describe('getBrowserRepoUrl', () => {
   test('returns the branch URL on the remote when a branch is provided', async () => {
     gitMock.mockImplementation(async (_cwd: string, args: string[]) => {
       if (args[0] === 'remote' && args[1] === '-v') {
@@ -39,7 +40,7 @@ describe('getBrowserRemoteUrl', () => {
       throw new Error(`Unexpected git call: ${args.join(' ')}`)
     })
 
-    await expect(getBrowserRemoteUrl('/tmp/repo', { branch: 'feature/test' })).resolves.toBe(
+    await expect(getBrowserRepoUrl('/tmp/repo', { type: 'branch', branch: 'feature/test' })).resolves.toBe(
       'https://github.com/acme/project/tree/feature/test',
     )
   })
@@ -52,7 +53,20 @@ describe('getBrowserRemoteUrl', () => {
       throw new Error(`Unexpected git call: ${args.join(' ')}`)
     })
 
-    await expect(getBrowserRemoteUrl('/tmp/repo')).resolves.toBe('https://github.com/acme/project')
+    await expect(getBrowserRepoUrl('/tmp/repo', { type: 'root' })).resolves.toBe('https://github.com/acme/project')
+  })
+
+  test('returns the commit URL when a commit target is provided', async () => {
+    gitMock.mockImplementation(async (_cwd: string, args: string[]) => {
+      if (args[0] === 'remote' && args[1] === '-v') {
+        return 'origin\tgit@github.com:acme/project.git (fetch)\norigin\tgit@github.com:acme/project.git (push)'
+      }
+      throw new Error(`Unexpected git call: ${args.join(' ')}`)
+    })
+
+    await expect(getBrowserRepoUrl('/tmp/repo', { type: 'commit', hash: 'abcdef1' })).resolves.toBe(
+      'https://github.com/acme/project/commit/abcdef1',
+    )
   })
 
   test('returns the GitLab branch URL when the remote is GitLab', async () => {
@@ -67,9 +81,25 @@ describe('getBrowserRemoteUrl', () => {
       throw new Error(`Unexpected git call: ${args.join(' ')}`)
     })
 
-    await expect(getBrowserRemoteUrl('/tmp/repo', { branch: 'feature/test' })).resolves.toBe(
+    await expect(getBrowserRepoUrl('/tmp/repo', { type: 'branch', branch: 'feature/test' })).resolves.toBe(
       'https://gitlab.com/acme/project/-/tree/feature/test',
     )
+  })
+})
+
+describe('commitUrlForBrowserRemote', () => {
+  test('returns GitHub and GitLab commit URLs', () => {
+    expect(commitUrlForBrowserRemote(browserRemote('https://github.com/acme/project', 'github'), 'abcdef1')).toBe(
+      'https://github.com/acme/project/commit/abcdef1',
+    )
+    expect(commitUrlForBrowserRemote(browserRemote('https://gitlab.com/acme/project', 'gitlab'), 'abcdef1')).toBe(
+      'https://gitlab.com/acme/project/-/commit/abcdef1',
+    )
+  })
+
+  test('returns null for unsupported providers and invalid hashes', () => {
+    expect(commitUrlForBrowserRemote(browserRemote('https://example.com/acme/project', 'external'), 'abcdef1')).toBeNull()
+    expect(commitUrlForBrowserRemote(browserRemote('https://github.com/acme/project', 'github'), 'not-a-hash')).toBeNull()
   })
 })
 
@@ -103,25 +133,28 @@ describe('branchUrlForBrowserRemote', () => {
   })
 })
 
-describe('getBranchUrlForRemotes', () => {
+describe('getRepoUrlForRemotes', () => {
   test('returns the branch URL for the preferred remote', () => {
-    expect(getBranchUrlForRemotes([remote('origin', 'git@github.com:acme/project.git')], 'feature/test')).toBe(
-      'https://github.com/acme/project/tree/feature/test',
-    )
+    expect(
+      getRepoUrlForRemotes([remote('origin', 'git@github.com:acme/project.git')], {
+        type: 'branch',
+        branch: 'feature/test',
+      }),
+    ).toBe('https://github.com/acme/project/tree/feature/test')
   })
 
   test('prefers the configured upstream remote when present', () => {
     expect(
-      getBranchUrlForRemotes(
+      getRepoUrlForRemotes(
         [remote('origin', 'git@github.com:acme/origin.git'), remote('fork', 'git@github.com:acme/fork.git')],
-        'topic',
+        { type: 'branch', branch: 'topic' },
         { remote: 'fork', branch: 'topic' },
       ),
     ).toBe('https://github.com/acme/fork/tree/topic')
   })
 
   test('returns null when no remotes are configured', () => {
-    expect(getBranchUrlForRemotes([], 'main')).toBeNull()
+    expect(getRepoUrlForRemotes([], { type: 'branch', branch: 'main' })).toBeNull()
   })
 })
 

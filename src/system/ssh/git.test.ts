@@ -53,18 +53,26 @@ describe('remote git helpers', () => {
       }
     }
 
-    await expect(getRemoteBrowserUrl(TARGET, undefined, { run: run as any })).resolves.toBe(
+    await expect(getRemoteBrowserUrl(TARGET, { type: 'root' }, { run: run as any })).resolves.toBe(
       'https://github.com/acme/project',
     )
-    await expect(getRemoteBrowserUrl(TARGET, 'feature/test', { run: run as any })).resolves.toBe(
-      'https://github.com/acme/project/tree/feature/test',
+    await expect(
+      getRemoteBrowserUrl(TARGET, { type: 'branch', branch: 'feature/test' }, { run: run as any }),
+    ).resolves.toBe('https://github.com/acme/project/tree/feature/test')
+    await expect(getRemoteBrowserUrl(TARGET, { type: 'commit', hash: 'abcdef1' }, { run: run as any })).resolves.toBe(
+      'https://github.com/acme/project/commit/abcdef1',
     )
   })
 
-  test('getRemoteBrowserUrl rejects unsafe branch names before running remote commands', async () => {
+  test('getRemoteBrowserUrl rejects unsafe URL targets before running remote commands', async () => {
     const run = vi.fn(async () => okRemoteResult(''))
 
-    await expect(getRemoteBrowserUrl(TARGET, 'feature/test;echo bad', { run: run as any })).resolves.toBeNull()
+    await expect(
+      getRemoteBrowserUrl(TARGET, { type: 'branch', branch: 'feature/test;echo bad' }, { run: run as any }),
+    ).resolves.toBeNull()
+    await expect(
+      getRemoteBrowserUrl(TARGET, { type: 'commit', hash: 'not-a-hash' }, { run: run as any }),
+    ).resolves.toBeNull()
 
     expect(run).not.toHaveBeenCalled()
   })

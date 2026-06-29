@@ -16,7 +16,7 @@ export const EMBEDDED_SERVER_IPC_ROUTES = {
   'repo.push': { route: '/api/repo/push', method: 'POST' },
   'repo.fetch': { route: '/api/repo/fetch', method: 'POST' },
   'repo.abort': { route: '/api/repo/abort', method: 'POST' },
-  'repo.openRemote': { route: '/api/repo/open-remote', method: 'POST' },
+  'repo.openUrl': { route: '/api/repo/open-url', method: 'POST' },
   'remote.listSshHosts': { route: '/api/remote/ssh-hosts', method: 'GET' },
   'remote.resolveTarget': { route: '/api/remote/resolve-target', method: 'POST' },
   'remote.listPathSuggestions': { route: '/api/remote/path-suggestions', method: 'POST' },

@@ -425,7 +425,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         if (url.pathname === '/api/repo/worktree-bootstrap-preview') return call('repo.worktreeBootstrapPreview', body)
         if (url.pathname === '/api/repo/delete-branch') return call('repo.deleteBranch', body)
         if (url.pathname === '/api/repo/remove-worktree') return call('repo.removeWorktree', body)
-        if (url.pathname === '/api/repo/open-remote') return call('repo.openRemote', body)
+        if (url.pathname === '/api/repo/open-url') return call('repo.openUrl', body)
         if (url.pathname === '/api/repo/open-terminal') return call('repo.openTerminal', body)
         if (url.pathname === '/api/repo/open-editor') return call('repo.openEditor', body)
         if (url.pathname === '/api/repo/background-sync-repos') return call('repo.backgroundSyncRepos', body)

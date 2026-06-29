@@ -18,8 +18,8 @@ const mocks = vi.hoisted(() => ({
   getRepoWorktreeBootstrapPreview: vi.fn(),
   deleteRepoBranch: vi.fn(),
   removeRepoWorktree: vi.fn(),
-  openRepoRemote: vi.fn(),
   openRepoTerminal: vi.fn(),
+  openRepoUrl: vi.fn(),
   openRepoEditor: vi.fn(),
   openRepoInFinder: vi.fn(),
   setBackgroundSyncRepos: vi.fn(),
@@ -65,8 +65,8 @@ vi.mock('#/server/modules/repo-write-paths.ts', () => ({
   removeRepoWorktree: mocks.removeRepoWorktree,
   fetchRepo: mocks.fetchRepo,
   abortRepoOperation: mocks.abortRepoOperation,
-  openRepoRemote: mocks.openRepoRemote,
   openRepoTerminal: mocks.openRepoTerminal,
+  openRepoUrl: mocks.openRepoUrl,
   openRepoEditor: mocks.openRepoEditor,
   openRepoInFinder: mocks.openRepoInFinder,
 }))
@@ -594,6 +594,21 @@ describe('repo routes — POST body validation (action endpoints)', () => {
     )
     expect(response.status).toBe(200)
     expect(mocks.cloneRepo).toHaveBeenCalledWith('op_1', 'https://example.com/r.git', '/tmp', 'r')
+  })
+
+  test('open-url route forwards repo URL targets', async () => {
+    mocks.openRepoUrl.mockResolvedValue({ ok: true, message: 'https://github.com/acme/repo/commit/abcdef1' })
+    const app = createRepoRoutes()
+    const response = await app.request(
+      new Request('http://localhost/open-url', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: '/tmp/repo', target: { type: 'commit', hash: 'abcdef1' } }),
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    expect(mocks.openRepoUrl).toHaveBeenCalledWith('/tmp/repo', { type: 'commit', hash: 'abcdef1' }, expect.any(AbortSignal))
   })
 
   test('forwards external workspace app open routes', async () => {

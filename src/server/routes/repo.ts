@@ -23,8 +23,8 @@ import {
   getRepoRemoteBranches,
   openRepoEditor,
   openRepoInFinder,
-  openRepoRemote,
   openRepoTerminal,
+  openRepoUrl,
   pullRepoBranch,
   pushRepoBranch,
   removeRepoWorktree,
@@ -238,9 +238,9 @@ export function createRepoRoutes() {
       ),
     )
   })
-  app.post('/open-remote', async (c) => {
-    const { cwd, branch } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openRemote, c)
-    return c.json(await jsonOr(() => openRepoRemote(cwd, branch, c.req.raw.signal), READ_REPO_ERROR, 'open-remote'))
+  app.post('/open-url', async (c) => {
+    const { cwd, target } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openUrl, c)
+    return c.json(await jsonOr(() => openRepoUrl(cwd, target, c.req.raw.signal), READ_REPO_ERROR, 'open-url'))
   })
   app.post('/open-terminal', async (c) => {
     const { path, app } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openTerminal, c)

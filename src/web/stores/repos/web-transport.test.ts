@@ -36,14 +36,14 @@ describe('repo web transport helpers', () => {
     })
   })
 
-  test('open remote opens browser with server-provided URL in web host mode', async () => {
+  test('open repo URL opens browser with server-provided URL in web host mode', async () => {
     mockFetch(async () => ({
       ok: true,
       json: async () => ({ ok: true, message: 'https://example.com/repo/tree/feature/a' }),
     }))
-    const { openRepoRemote } = await import('#/web/repo-client.ts')
+    const { openRepoUrl } = await import('#/web/repo-client.ts')
 
-    await expect(openRepoRemote('/tmp/repo', 'feature/a')).resolves.toEqual({ ok: true, message: '' })
+    await expect(openRepoUrl('/tmp/repo', { type: 'branch', branch: 'feature/a' })).resolves.toEqual({ ok: true, message: '' })
     expect(window.open).toHaveBeenCalledWith('https://example.com/repo/tree/feature/a', '_blank', 'noopener,noreferrer')
   })
 

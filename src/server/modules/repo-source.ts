@@ -15,7 +15,7 @@ import {
 } from '#/system/git/branches.ts'
 import {
   fetchAll,
-  getBrowserRemoteUrl,
+  getBrowserRepoUrl,
   getRemoteInfo,
   pickPreferredRemote,
   pullBranch,
@@ -34,6 +34,7 @@ import {
   type LogEntry,
   type PullRequestFetchMode,
   type PullRequestInfo,
+  type RepoUrlTarget,
   type WorktreeInfo,
   type WorktreeStatus,
 } from '#/shared/git-types.ts'
@@ -120,7 +121,7 @@ export interface RepoSource {
     signal?: AbortSignal,
   ): Promise<RepoMutationResult>
   getPatch(worktreePath: string, signal?: AbortSignal): Promise<ExecResult>
-  getBrowserRemoteUrl(branch?: string, signal?: AbortSignal): Promise<string | null>
+  getBrowserRepoUrl(target: RepoUrlTarget, signal?: AbortSignal): Promise<string | null>
 }
 
 interface RepoSourceCapabilities {
@@ -386,8 +387,8 @@ function createLocalRepoSource(repoId: string): RepoSource {
         return { ok: false, message: err instanceof Error ? err.message : String(err) }
       }
     },
-    async getBrowserRemoteUrl(branch, signal) {
-      return await getBrowserRemoteUrl(repoId, { branch, signal })
+    async getBrowserRepoUrl(target, signal) {
+      return await getBrowserRepoUrl(repoId, target, { signal })
     },
   }
 }
@@ -471,8 +472,8 @@ async function createRemoteRepoSource(repoId: string): Promise<RepoSource> {
     async getPatch(worktreePath, signal) {
       return await getRemotePatch(target, worktreePath, { signal })
     },
-    async getBrowserRemoteUrl(branch, signal) {
-      return await getRemoteBrowserUrl(target, branch, { signal })
+    async getBrowserRepoUrl(urlTarget, signal) {
+      return await getRemoteBrowserUrl(target, urlTarget, { signal })
     },
   }
 }
