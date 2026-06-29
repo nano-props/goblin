@@ -19,7 +19,7 @@ import { terminalSessionDisplayOrder } from '#/web/components/terminal/terminal-
 import {
   captureTerminalHostGeometry,
   resolveTerminalCreateGeometry,
-  waitForMeasurableHost,
+  waitForMeasurableManagedHost,
 } from '#/web/components/terminal/terminal-session-geometry.ts'
 import {
   countOrphanedTerminalSessionKeys,
@@ -540,7 +540,7 @@ export class TerminalSessionProjection {
       if (!host) {
         throw new Error('terminal create host unavailable')
       }
-      const geometry = await waitForMeasurableHost(host, {
+      const geometry = await waitForMeasurableManagedHost(host, {
         signal: geometryAbortController.signal,
       })
       this.geometryByWorktree.set(worktreeTerminalKey, geometry)

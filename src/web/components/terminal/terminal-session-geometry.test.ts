@@ -12,11 +12,13 @@ import type { TerminalDescriptor } from '#/web/components/terminal/types.ts'
 const geometryMocks = vi.hoisted(() => ({
   preloadTerminalFont: vi.fn(async () => {}),
   proposeTerminalGeometry: vi.fn(() => ({ cols: 120, rows: 40 })),
+  proposeManagedTerminalGeometry: vi.fn(() => ({ cols: 120, rows: 40 })),
 }))
 
 vi.mock('#/web/components/terminal/terminal-geometry.ts', () => ({
   preloadTerminalFont: geometryMocks.preloadTerminalFont,
   proposeTerminalGeometry: geometryMocks.proposeTerminalGeometry,
+  proposeManagedTerminalGeometry: geometryMocks.proposeManagedTerminalGeometry,
 }))
 
 type ObserverCallback = () => void
@@ -58,6 +60,7 @@ describe('terminal session geometry helpers', () => {
   beforeEach(() => {
     geometryMocks.preloadTerminalFont.mockClear()
     geometryMocks.proposeTerminalGeometry.mockClear()
+    geometryMocks.proposeManagedTerminalGeometry.mockClear()
   })
 
   test('captures geometry from a connected host and caches it', async () => {
