@@ -25,6 +25,7 @@ function makeSession(
     attach: vi.fn(),
     detach: vi.fn(),
     restart: vi.fn(),
+    focus: vi.fn(),
     dispose: vi.fn(),
     disposeAndWait: vi.fn(async () => {}),
     snapshot: snapshotSpy,

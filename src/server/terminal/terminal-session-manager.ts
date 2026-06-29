@@ -67,6 +67,7 @@ export interface TerminalEnsureSessionInput<TUser extends string | number> {
   forceNew?: boolean
   command?: string
   args?: string[]
+  startupShellCommand?: string
   env?: Record<string, string>
 }
 
@@ -79,6 +80,7 @@ interface TerminalSessionView<TUser extends string | number> {
   cwd: string
   command?: string
   args?: string[]
+  startupShellCommand?: string
   env?: Record<string, string>
   cols: number
   rows: number
@@ -172,6 +174,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       cwd,
       command: input.command,
       args: input.args,
+      startupShellCommand: input.startupShellCommand,
       env: input.env,
       cols: size.cols,
       rows: size.rows,
@@ -598,6 +601,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       resolved = await this.ptySupervisor.spawn({
         command: session.command,
         args: session.args,
+        startupShellCommand: session.startupShellCommand,
         cwd: session.cwd,
         cols: session.cols,
         rows: session.rows,

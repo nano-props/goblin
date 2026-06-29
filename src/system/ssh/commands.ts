@@ -144,8 +144,12 @@ export function buildRemoteTerminalInvocation(
   target: RemoteRepoTarget,
   remotePath: string,
   _size: { cols: number; rows: number },
+  options: { startupShellCommand?: string } = {},
 ): RemoteCommandInvocation {
-  const script = `cd ${shellQuote(remotePath)} && exec "\${SHELL:-/bin/sh}" -l`
+  const startupShellCommand = normalizeTerminalStartupShellCommand(options.startupShellCommand)
+  const script = startupShellCommand
+    ? `cd ${shellQuote(remotePath)} && exec "\${SHELL:-/bin/sh}" -ilc ${shellQuote(`${startupShellCommand}\nexec "\${SHELL:-/bin/sh}" -l`)}`
+    : `cd ${shellQuote(remotePath)} && exec "\${SHELL:-/bin/sh}" -l`
   const args = [
     '-tt',
     '-o',
@@ -162,6 +166,11 @@ export function buildRemoteTerminalInvocation(
   const destination = target.alias
   args.push('--', destination, `sh -lc ${shellQuote(script)}`)
   return { command: findExecutableOnPath('ssh') ?? 'ssh', args, script }
+}
+
+function normalizeTerminalStartupShellCommand(command: string | undefined): string {
+  const withoutTrailingNewline = (command ?? '').replace(/[\r\n]+$/u, '')
+  return withoutTrailingNewline.trim().length === 0 ? '' : withoutTrailingNewline
 }
 
 export async function runRemoteCommand(

@@ -23,7 +23,6 @@ describe('TerminalSessionRuntime', () => {
       },
       { cols: 100, rows: 30 },
     )
-    runtime.markAttached()
 
     expect(runtime.currentPtySessionId()).toBe('pty_session_1_aaaaaaaaa')
     expect(runtime.snapshot().attachment).toMatchObject({ active: true, canTakeover: false })
@@ -57,7 +56,6 @@ describe('TerminalSessionRuntime', () => {
       },
       { cols: 100, rows: 30 },
     )
-    runtime.markAttached()
 
     expect(runtime.snapshot().attachment).toMatchObject({ active: false, canTakeover: true })
 
@@ -104,7 +102,6 @@ describe('TerminalSessionRuntime', () => {
       },
       { cols: 100, rows: 30 },
     )
-    runtime.markAttached()
 
     runtime.beginReplay(2)
     runtime.handleOutput({ ptySessionId: 'pty_session_1_aaaaaaaaa', data: 'new', seq: 3, processName: 'bash' })
@@ -141,7 +138,6 @@ describe('TerminalSessionRuntime', () => {
       },
       { cols: 100, rows: 30 },
     )
-    runtime.markAttached()
 
     // Preload window: events arrive during the cached-snapshot write.
     // The boundary is the cached snapshot's seq.
@@ -182,7 +178,6 @@ describe('TerminalSessionRuntime', () => {
       },
       { cols: 100, rows: 30 },
     )
-    runtime.markAttached()
 
     expect(runtime.snapshot()).toMatchObject({
       phase: 'open',

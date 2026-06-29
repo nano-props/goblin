@@ -30,6 +30,7 @@ import { resolveSelectedTerminalKey } from '#/web/components/terminal/terminal-s
 import { buildWorktreeTerminalSnapshot } from '#/web/components/terminal/terminal-session-worktree-snapshot.ts'
 import type {
   TerminalDescriptor,
+  TerminalCreateOptions,
   TerminalIdentityViewModel,
   TerminalLifecycleViewModel,
   TerminalRepoIndex,
@@ -79,6 +80,7 @@ export class TerminalSessionProjection {
     string,
     {
       base: TerminalSessionBase
+      options: TerminalCreateOptions
       promise: Promise<string>
       resolve: (key: string) => void
       reject: (error: unknown) => void
@@ -94,10 +96,9 @@ export class TerminalSessionProjection {
   // the orphan and printed the previous shell's `Restored session: …`
   // line a second time.
   //
-  // The queue mirrors the `pendingCreateByWorktree` triple: enqueue
-  // stores a promise, the background close settles it, and the next
-  // `performCreateTerminal` for the same worktree `await`s the queue
-  // so the orphan is dead before the catalog can reattach to it.
+  // Enqueue stores a promise, the background close settles it, and
+  // `flushPendingCreate` awaits closes for the same worktree before
+  // creating so the catalog cannot reattach to an orphan.
   // Failures are logged (the old path swallowed them silently) so any
   // future regression is visible in `terminalLog` rather than invisible
   // shell ghosts in the buffer.
@@ -401,8 +402,8 @@ export class TerminalSessionProjection {
     }
   }
 
-  createTerminal = (base: TerminalSessionBase): Promise<string> =>
-    this.enqueuePendingCreate(base, worktreeTerminalKey(base.repoRoot, base.worktreePath))
+  createTerminal = (base: TerminalSessionBase, options: TerminalCreateOptions = {}): Promise<string> =>
+    this.enqueuePendingCreate(base, worktreeTerminalKey(base.repoRoot, base.worktreePath), options)
 
   registerHost = (worktreeTerminalKey: string, host: HTMLElement): void => {
     this.hostByWorktree.set(worktreeTerminalKey, host)
@@ -421,14 +422,21 @@ export class TerminalSessionProjection {
   private async performCreateTerminal(
     base: TerminalSessionBase,
     geometry: { cols: number; rows: number },
+    options: TerminalCreateOptions,
   ): Promise<string> {
     const clientId = readOrCreateWebTerminalClientId()
     const terminalWorktreeKey = worktreeTerminalKey(base.repoRoot, base.worktreePath)
+    const createKind = options.startupShellCommand
+      ? 'additional'
+      : this.visibleSessionsForWorktree(terminalWorktreeKey).length === 0
+        ? 'primary'
+        : 'additional'
     const result = await terminalBridge.create({
       repoRoot: base.repoRoot,
       branch: base.branch,
       worktreePath: base.worktreePath,
-      kind: this.visibleSessionsForWorktree(terminalWorktreeKey).length === 0 ? 'primary' : 'additional',
+      kind: createKind,
+      ...(options.startupShellCommand ? { startupShellCommand: options.startupShellCommand } : {}),
       cols: geometry.cols,
       rows: geometry.rows,
       clientId,
@@ -475,9 +483,18 @@ export class TerminalSessionProjection {
     )
   }
 
-  private enqueuePendingCreate(base: TerminalSessionBase, worktreeTerminalKey: string): Promise<string> {
+  private enqueuePendingCreate(
+    base: TerminalSessionBase,
+    worktreeTerminalKey: string,
+    options: TerminalCreateOptions,
+  ): Promise<string> {
     const existing = this.pendingCreateByWorktree.get(worktreeTerminalKey)
-    if (existing) return existing.promise
+    if (existing) {
+      if (existing.options.startupShellCommand === options.startupShellCommand) return existing.promise
+      return existing.promise
+        .catch(() => undefined)
+        .then(() => this.enqueuePendingCreate(base, worktreeTerminalKey, options))
+    }
     let resolve!: (key: string) => void
     let reject!: (error: unknown) => void
     const promise = new Promise<string>((innerResolve, innerReject) => {
@@ -486,6 +503,7 @@ export class TerminalSessionProjection {
     })
     this.pendingCreateByWorktree.set(worktreeTerminalKey, {
       base,
+      options,
       promise,
       resolve,
       reject,
@@ -518,7 +536,7 @@ export class TerminalSessionProjection {
         throw new Error('terminal create request canceled')
       }
       pending.creating = true
-      pending.resolve(await this.performCreateTerminal(pending.base, geometry))
+      pending.resolve(await this.performCreateTerminal(pending.base, geometry, pending.options))
     } catch (error) {
       pending.reject(error)
     } finally {
@@ -735,6 +753,10 @@ export class TerminalSessionProjection {
 
   restart = (key: string): void => {
     this.sessions.get(key)?.restart()
+  }
+
+  focusTerminal = (key: string): void => {
+    this.sessions.get(key)?.focus()
   }
 
   snapshot = (key: string): TerminalSnapshot => {

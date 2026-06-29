@@ -1,5 +1,5 @@
 import * as pty from 'node-pty'
-import { resolveLocalShell } from '#/server/terminal/terminal-local-shell.ts'
+import { resolveLocalShell, resolveLocalShellWithStartupShellCommand } from '#/server/terminal/terminal-local-shell.ts'
 
 export interface TerminalPtyRuntime {
   write(data: string): void
@@ -13,6 +13,7 @@ export interface TerminalPtyRuntime {
 export interface SpawnTerminalPtyRuntimeInput {
   command?: string
   args?: string[]
+  startupShellCommand?: string
   cwd: string
   cols: number
   rows: number
@@ -23,7 +24,12 @@ export type SpawnTerminalPtyRuntimeResult = { ok: true; runtime: TerminalPtyRunt
 
 export function spawnTerminalPtyRuntime(input: SpawnTerminalPtyRuntimeInput): SpawnTerminalPtyRuntimeResult {
   try {
-    const shell = resolveLocalShell(input)
+    if (input.startupShellCommand && (input.command?.trim() || (input.args?.length ?? 0) > 0)) {
+      return { ok: false, message: 'startupShellCommand cannot be combined with command or args' }
+    }
+    const shell = input.startupShellCommand
+      ? resolveLocalShellWithStartupShellCommand(input.startupShellCommand)
+      : resolveLocalShell(input)
     const env = { ...process.env, ...input.env, TERM: 'xterm-256color' }
     const term = pty.spawn(shell.command, shell.args, {
       name: 'xterm-256color',

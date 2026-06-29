@@ -1,6 +1,6 @@
 import { userInfo } from 'node:os'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { resolveLocalShell } from '#/server/terminal/terminal-local-shell.ts'
+import { resolveLocalShell, resolveLocalShellWithStartupShellCommand } from '#/server/terminal/terminal-local-shell.ts'
 import { spawnTerminalPtyRuntime } from '#/server/terminal/terminal-pty-runtime.ts'
 
 const { spawnMock } = vi.hoisted(() => ({
@@ -153,6 +153,40 @@ describe('spawnTerminalPtyRuntime', () => {
     // Explicit env.SHELL must win — passwd fallback is only consulted when
     // the inherited env is silent (CI / devcontainer scenarios).
     expect(userInfo).not.toHaveBeenCalled()
+  })
+
+  test('runs a startup shell command through the login shell and returns to an interactive shell', () => {
+    vi.mocked(userInfo).mockReturnValue({ shell: '/bin/zsh' } as ReturnType<typeof userInfo>)
+
+    const resolved = resolveLocalShellWithStartupShellCommand("  bat '/repo/README.md'\r", { SHELL: '/bin/zsh' })
+
+    expect(resolved).toEqual({
+      command: '/bin/zsh',
+      args: ['-ilc', "  bat '/repo/README.md'\nexec '/bin/zsh' -l"],
+    })
+    expect(userInfo).not.toHaveBeenCalled()
+  })
+
+  test('startup shell command resolution falls back to normal shell resolution for blank commands', () => {
+    vi.mocked(userInfo).mockReturnValue({ shell: '/bin/zsh' } as ReturnType<typeof userInfo>)
+
+    expect(resolveLocalShellWithStartupShellCommand(' \r\n ', { SHELL: '/bin/zsh' })).toEqual({
+      command: '/bin/zsh',
+      args: ['-l'],
+    })
+  })
+
+  test('rejects mixing startup shell command with explicit process command', () => {
+    const result = spawnTerminalPtyRuntime({
+      command: '/bin/zsh',
+      startupShellCommand: "bat '/repo/README.md'",
+      cwd: '/repo',
+      cols: 80,
+      rows: 24,
+    })
+
+    expect(result).toEqual({ ok: false, message: 'startupShellCommand cannot be combined with command or args' })
+    expect(spawnMock).not.toHaveBeenCalled()
   })
 
   test('merges caller env into the spawned PTY environment while keeping terminal TERM', () => {

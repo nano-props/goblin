@@ -32,6 +32,8 @@ export interface TerminalCreateInput {
   branch: string
   worktreePath: string
   kind: 'primary' | 'additional'
+  /** Shell text to run as the terminal starts, before returning to an interactive shell. */
+  startupShellCommand?: string
   cols?: number
   rows?: number
   clientId?: string

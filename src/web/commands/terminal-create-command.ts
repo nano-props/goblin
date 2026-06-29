@@ -1,5 +1,5 @@
 import { terminalLog } from '#/web/logger.ts'
-import type { TerminalSessionBase } from '#/web/components/terminal/types.ts'
+import type { TerminalCreateOptions, TerminalSessionBase } from '#/web/components/terminal/types.ts'
 import {
   showTerminalCreateErrorToast,
   terminalCreateErrorKey,
@@ -11,7 +11,8 @@ export type TerminalCreateCommandResult = { ok: true; key: string } | { ok: fals
 
 export async function runCreateTerminalTabCommand(input: {
   base: TerminalSessionBase
-  createTerminal: (base: TerminalSessionBase) => Promise<string>
+  createTerminal: (base: TerminalSessionBase, options?: TerminalCreateOptions) => Promise<string>
+  options?: TerminalCreateOptions
   t?: TerminalCreateTranslator
   logMessage?: string
 }): Promise<TerminalCreateCommandResult> {
@@ -19,6 +20,7 @@ export async function runCreateTerminalTabCommand(input: {
     const key = await createWorkspacePaneTerminalTab({
       base: input.base,
       createTerminal: input.createTerminal,
+      options: input.options,
     })
     return { ok: true, key }
   } catch (error) {

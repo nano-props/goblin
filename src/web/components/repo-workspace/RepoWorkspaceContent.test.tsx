@@ -2,6 +2,7 @@
 
 import type { ComponentProps } from 'react'
 import { act, screen } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { RepoWorkspaceContent } from '#/web/components/repo-workspace/RepoWorkspaceContent.tsx'
 import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
@@ -24,13 +25,25 @@ import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import { workspacePaneStaticTabOrderEntry, workspacePaneTerminalTabOrderEntry } from '#/shared/workspace-pane.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import {
+  PrimaryWindowNavigationProvider,
+  type PrimaryWindowNavigationActions,
+} from '#/web/primary-window-navigation.tsx'
 
 const repoClientMocks = vi.hoisted(() => ({
   getRepoLog: vi.fn(),
 }))
+const filetreeClientMocks = vi.hoisted(() => ({
+  getRepositoryTree: vi.fn(),
+  getRepositoryFileViewer: vi.fn(),
+}))
 
 vi.mock('#/web/repo-client.ts', () => ({
   getRepoLog: repoClientMocks.getRepoLog,
+}))
+vi.mock('#/web/filetree-client.ts', () => ({
+  getRepositoryTree: filetreeClientMocks.getRepositoryTree,
+  getRepositoryFileViewer: filetreeClientMocks.getRepositoryFileViewer,
 }))
 
 const REPO_ID = '/tmp/gbl-repo-workspace-content-repo'
@@ -46,6 +59,8 @@ beforeEach(() => {
   resetReposStore()
   useRepoSyncStore.setState({ ready: new Map(), timestamps: new Map() })
   repoClientMocks.getRepoLog.mockResolvedValue([])
+  filetreeClientMocks.getRepositoryTree.mockResolvedValue({ nodes: [], truncated: false })
+  filetreeClientMocks.getRepositoryFileViewer.mockResolvedValue({ viewer: 'bat', shell: 'posix' })
 })
 
 describe('RepoWorkspaceContent', () => {
@@ -611,6 +626,64 @@ describe('RepoWorkspaceContent', () => {
     expect(registerHost).toHaveBeenCalledWith(worktreeKey, expect.any(HTMLDivElement))
   })
 
+  test('opens a file by creating a terminal with a startup shell command instead of writing to an opening PTY', async () => {
+    const worktreePath = '/tmp/filetree-open-worktree'
+    const branchName = 'feature/filetree-open'
+    filetreeClientMocks.getRepositoryTree.mockResolvedValueOnce({
+      nodes: [
+        {
+          id: 'README.md',
+          path: 'README.md',
+          name: 'README.md',
+          parentId: null,
+          kind: 'file',
+          status: 'clean',
+        },
+      ],
+      truncated: false,
+    })
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch(branchName, { worktree: { path: worktreePath } })],
+      selectedBranch: branchName,
+      preferredWorkspacePaneTab: 'files',
+      workspacePaneTabOrderByBranch: { [branchName]: [staticEntry('files')] },
+    })
+    useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceToken)
+    const detail = getSelectedRepoWorkspacePresentation(repo)
+    const createTerminal = vi.fn(async () => 'session-1')
+    const writeInput = vi.fn()
+    const showRepoWorkspacePaneTab = vi.fn()
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
+    renderInJsdom(
+      <QueryClientProvider client={queryClient}>
+        <PrimaryWindowNavigationProvider value={navigationWith({ showRepoWorkspacePaneTab })}>
+          <TerminalSessionContext.Provider value={terminalCommandContextWith({ createTerminal, writeInput })}>
+            <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
+              <BranchActionSurfaceContext.Provider value={defaultBranchActionSurface()}>
+                <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+              </BranchActionSurfaceContext.Provider>
+            </TerminalSessionReadContext.Provider>
+          </TerminalSessionContext.Provider>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+
+    const row = await screen.findByRole('row', { name: 'README.md' })
+    await act(async () => {
+      row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    expect(showRepoWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'terminal')
+    expect(createTerminal).toHaveBeenCalledWith(
+      { repoRoot: REPO_ID, branch: branchName, worktreePath },
+      { startupShellCommand: "bat '/tmp/filetree-open-worktree/README.md'\r" },
+    )
+    expect(writeInput).not.toHaveBeenCalled()
+  })
+
   test('falls back to status when a branch preference names a closed tab', async () => {
     const repo = seedRepoState({
       id: REPO_ID,
@@ -786,6 +859,7 @@ function terminalCommandContextWith(overrides: Partial<TerminalSessionContextVal
     clearSearch: vi.fn(),
     writeInput: vi.fn(),
     takeover: vi.fn(async () => true),
+    focusTerminal: vi.fn(),
     serialize: vi.fn(() => ''),
     ...overrides,
   }
@@ -803,6 +877,19 @@ function staticEntry(type: WorkspacePaneStaticTabType) {
 
 function terminalEntry(id: string) {
   return workspacePaneTerminalTabOrderEntry(id)
+}
+
+function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): PrimaryWindowNavigationActions {
+  return {
+    activateRepo: () => {},
+    closeRepo: () => {},
+    cycleRepo: () => {},
+    selectRepoBranch: () => {},
+    showRepoWorkspacePaneTab: () => {},
+    showRepoBranchWorkspacePaneTab: () => {},
+    openSettings: () => {},
+    ...overrides,
+  }
 }
 
 function terminalSession(

@@ -71,6 +71,20 @@ describe('remote ssh command builders', () => {
     expect(invocation.command).toBe('ssh')
   })
 
+  test('remote terminal startup shell command runs before returning to an interactive shell', () => {
+    const invocation = buildRemoteTerminalInvocation(
+      target(),
+      '/srv/repo worktree',
+      { cols: 80, rows: 24 },
+      { startupShellCommand: "  bat '/srv/repo worktree/README.md'\r" },
+    )
+
+    expect(invocation.script).toContain(
+      `cd '/srv/repo worktree' && exec "\${SHELL:-/bin/sh}" -ilc '  bat '\\''/srv/repo worktree/README.md'\\''`,
+    )
+    expect(invocation.script).toContain('exec "${SHELL:-/bin/sh}" -l')
+  })
+
   test('remote tree walk returns file paths only so directories are derived by the source layer', () => {
     const invocation = buildRemoteCommandInvocation(target(), {
       type: 'gitTreeWalk',

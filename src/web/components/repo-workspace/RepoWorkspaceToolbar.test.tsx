@@ -1261,6 +1261,7 @@ function renderToolbar(options: {
     clearSearch: vi.fn(),
     writeInput: vi.fn(),
     takeover: vi.fn(),
+    focusTerminal: vi.fn(),
     serialize: vi.fn(() => ''),
   }
   setTerminalSessionCommandBridge({

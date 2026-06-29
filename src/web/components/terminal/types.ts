@@ -103,6 +103,11 @@ export interface TerminalSessionBase {
   worktreePath: string
 }
 
+export interface TerminalCreateOptions {
+  /** Shell text to run as the terminal starts, before returning to an interactive shell. */
+  startupShellCommand?: string
+}
+
 export interface TerminalRepoSnapshot {
   instanceToken: number
   branchByWorktreePath: Record<string, string>
@@ -138,7 +143,7 @@ export interface WorktreeTerminalSnapshot {
 }
 
 export interface TerminalSessionContextValue {
-  createTerminal: (base: TerminalSessionBase) => Promise<string>
+  createTerminal: (base: TerminalSessionBase, options?: TerminalCreateOptions) => Promise<string>
   registerHost: (worktreeTerminalKey: string, host: HTMLElement) => void
   unregisterHost: (worktreeTerminalKey: string, host: HTMLElement) => void
   selectTerminal: (worktreeTerminalKey: string, key: string) => void
@@ -149,6 +154,7 @@ export interface TerminalSessionContextValue {
   attach: (descriptor: TerminalDescriptor, host: HTMLElement) => void
   detach: (key: string, host: HTMLElement) => void
   restart: (key: string) => void
+  focusTerminal: (key: string) => void
   isTerminalFocusTarget: (key: string, target: EventTarget | null) => boolean
   findNext: (key: string, term: string, incremental?: boolean) => TerminalSearchResult
   findPrevious: (key: string, term: string) => TerminalSearchResult
@@ -172,6 +178,7 @@ export interface TerminalSessionLike {
   attach: (host: HTMLElement) => void
   detach: (host: HTMLElement, parkingRoot: HTMLElement) => void
   restart: () => void
+  focus: () => void
   dispose: (options?: { closeSession?: boolean }) => void
   disposeAndWait: (options?: { closeSession?: boolean }) => Promise<void>
   snapshot: () => TerminalSnapshot

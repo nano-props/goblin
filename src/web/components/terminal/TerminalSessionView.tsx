@@ -70,6 +70,7 @@ export function TerminalSessionView({
     writeInput,
     takeover,
     restart,
+    focusTerminal,
     createTerminal,
   } = context
   const terminalWorktreeKey = worktreeTerminalKey(repoRoot, worktreePath)
@@ -256,6 +257,17 @@ export function TerminalSessionView({
   const readonlyBadge = attachment?.role === 'viewer' ? t('terminal.mirror-controlled') : t('terminal.unowned')
   const progressVariant =
     progress?.state === 2 ? 'error' : progress?.state === 4 ? 'warning' : progress?.state === 3 ? 'indeterminate' : ''
+  const readyFocusedKeyRef = useRef<string | null>(null)
+  useLayoutEffect(() => {
+    const ready = key !== null && sessionPhase === 'open-controller'
+    if (!ready || !key) {
+      if (readyFocusedKeyRef.current === key) readyFocusedKeyRef.current = null
+      return
+    }
+    if (searchOpen || readyFocusedKeyRef.current === key) return
+    focusTerminal(key)
+    readyFocusedKeyRef.current = key
+  }, [focusTerminal, key, searchOpen, sessionPhase])
   const handleDragEnter = useCallback((event: DragEvent<HTMLDivElement>) => {
     if (!event.dataTransfer.types.includes('Files')) return
     event.preventDefault()

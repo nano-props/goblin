@@ -139,6 +139,8 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
 
     restart() {}
 
+    focus() {}
+
     dispose() {}
 
     snapshot(): TerminalSnapshot {

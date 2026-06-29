@@ -125,7 +125,11 @@ export class TerminalSession {
         this.start()
       }
     }
-    if (this.runtime.phase() === 'open' && this.runtime.isController() && this.view.isVisible()) this.view.focus()
+  }
+
+  focus(): void {
+    if (this.disposed) return
+    this.view.focus()
   }
 
   private shouldStartAttachedSession(): boolean {
@@ -447,7 +451,6 @@ export class TerminalSession {
         // view, so any role-driven render diff lands on the next
         // paint via the metadata notify below.
         if (this.view.isConnected()) this.start()
-        if (this.view.isVisible()) this.view.focus()
       } else if (wasRole === 'viewer' && newRole === 'unowned' && this.view.isConnected()) {
         // A mounted viewer session became unowned: the previous PTY
         // controller released the session. Auto-attach as the new
@@ -475,9 +478,9 @@ export class TerminalSession {
     // is rendered into the snapshot (and only the snapshot) so
     // the user sees the new phase banner without losing the
     // existing xterm.
-    if (this.runtime.handleLifecycle(event)) {
-      this.notify('metadata')
-    }
+    const changed = this.runtime.handleLifecycle(event)
+    if (!changed) return
+    this.notify('metadata')
   }
 
   handleServerTitle(canonicalTitle: string | null): void {
@@ -541,7 +544,6 @@ export class TerminalSession {
   private ensureControllerViewStarted(): void {
     if (!this.runtime.isController()) return
     if (this.view.isConnected()) this.start()
-    if (this.view.isVisible()) this.view.focus()
   }
 
   private start(): void {
@@ -710,9 +712,7 @@ export class TerminalSession {
 
   private finalizePhase(token: number, term: XTermTerminal, metadataChanged: boolean): void {
     this.guardStart(token, term)
-    const changed = this.runtime.markAttached() || metadataChanged
-    if (changed) this.notify('metadata')
-    if (this.view.isVisible()) term.focus()
+    if (metadataChanged) this.notify('metadata')
   }
 
   private guardStart(token: number, term: XTermTerminal): void {

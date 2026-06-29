@@ -159,7 +159,7 @@ function FiletreeTab({
   const t = useT()
   const result = useRepoTreeRefresh({ repoId, worktreePath })
   const navigation = usePrimaryWindowNavigation()
-  const { createTerminal, writeInput } = useTerminalSessionContext()
+  const { createTerminal } = useTerminalSessionContext()
   const openTrashFileConfirm = useFiletreeActionDialogsStore((s) => s.openTrashFileConfirm)
   const interactionScopeKey = useMemo(() => filetreeInteractionScopeKey(repoId, worktreePath), [repoId, worktreePath])
   const selectedKeyList = useFiletreeInteractionStore(
@@ -214,25 +214,22 @@ function FiletreeTab({
     async (node: RepoTreeNode) => {
       if (node.kind !== 'file') return
       navigation.showRepoWorkspacePaneTab(repoId, 'terminal')
-      const [viewerResult, terminalResult] = await Promise.all([
-        getRepositoryFileViewer(repoId, worktreePath).catch(() => ({
-          viewer: 'cat' as const,
-          shell: 'posix' as const,
-        })),
-        runCreateTerminalTabCommand({
-          base: { repoRoot: repoId, branch: branchName, worktreePath },
-          createTerminal,
-          t,
-          logMessage: 'filetree open file terminal create failed',
-        }),
-      ])
+      const viewerResult = await getRepositoryFileViewer(repoId, worktreePath).catch(() => ({
+        viewer: 'cat' as const,
+        shell: 'posix' as const,
+      }))
+      const terminalResult = await runCreateTerminalTabCommand({
+        base: { repoRoot: repoId, branch: branchName, worktreePath },
+        createTerminal,
+        options: {
+          startupShellCommand: fileReadCommand(viewerResult, absoluteFilePathForTerminal(worktreePath, node.path)),
+        },
+        t,
+        logMessage: 'filetree open file terminal create failed',
+      })
       if (!terminalResult.ok) return
-      writeInput(
-        terminalResult.key,
-        fileReadCommand(viewerResult, absoluteFilePathForTerminal(worktreePath, node.path)),
-      )
     },
-    [branchName, createTerminal, navigation, repoId, t, worktreePath, writeInput],
+    [branchName, createTerminal, navigation, repoId, t, worktreePath],
   )
 
   const requestTrashFile = useCallback(

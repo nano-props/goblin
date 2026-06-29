@@ -133,10 +133,6 @@ export class TerminalSessionState {
     return this.setPhaseAndMessage('restarting', null)
   }
 
-  setOpen(): boolean {
-    return this.setPhaseAndMessage('open', null)
-  }
-
   setError(message: string | null): boolean {
     return this.setPhaseAndMessage('error', message)
   }

@@ -81,6 +81,37 @@ describe('shared terminal validators', () => {
     ).toBeNull()
   })
 
+  test('rejects NUL bytes in terminal write data', () => {
+    expect(
+      normalizeTerminalClientMessage({
+        type: 'request',
+        requestId: 'request_123',
+        action: 'write',
+        input: {
+          ptySessionId: 'pty_session_123456',
+          data: 'echo\0bad',
+        },
+      }),
+    ).toBeNull()
+  })
+
+  test('rejects NUL bytes in startup shell commands', () => {
+    expect(
+      normalizeTerminalClientMessage({
+        type: 'request',
+        requestId: 'request_123',
+        action: 'create',
+        input: {
+          repoRoot: '/repo',
+          branch: 'main',
+          worktreePath: '/repo',
+          kind: 'additional',
+          startupShellCommand: 'cat\0bad',
+        },
+      }),
+    ).toBeNull()
+  })
+
   test('normalizes valid terminal socket server messages', () => {
     expect(
       normalizeTerminalSocketServerMessage({

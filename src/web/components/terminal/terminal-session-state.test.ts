@@ -31,7 +31,7 @@ describe('TerminalSessionState', () => {
       }),
     ).toBe(true)
     // The default phase is 'open' for a first-frame payload.
-    expect(state.setOpen()).toBe(false)
+    expect(state.snapshot(null).phase).toBe('open')
     // The attachment carries identity fields only — no phase.
     expect(state.snapshot('pty_session_1_aaaaaaaaa')).toEqual({
       phase: 'open',
@@ -223,7 +223,6 @@ describe('TerminalSessionState', () => {
       canonicalCols: 120,
       canonicalRows: 40,
     })
-    state.setOpen()
     state.beginReplay(1)
     state.captureReplayOutput({ ptySessionId: 'pty_session_1_aaaaaaaaa', data: 'live', seq: 2, processName: 'zsh' })
     state.setSearchResult({ resultIndex: 0, resultCount: 1, found: true })

@@ -277,6 +277,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       attach: projection.attach,
       detach: projection.detach,
       restart: projection.restart,
+      focusTerminal: projection.focusTerminal,
       isTerminalFocusTarget: projection.isTerminalFocusTarget,
       findNext: projection.findNext,
       findPrevious: projection.findPrevious,

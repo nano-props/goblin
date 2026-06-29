@@ -47,6 +47,11 @@ const TerminalClientIdSchema = v.pipe(v.string(), v.regex(TERMINAL_CLIENT_ID_RE)
 const TerminalRequestIdSchema = v.pipe(v.string(), v.regex(TERMINAL_REQUEST_ID_RE))
 const TerminalColsSchema = v.pipe(v.number(), v.integer(), v.minValue(MIN_TERMINAL_COLS), v.maxValue(MAX_TERMINAL_COLS))
 const TerminalRowsSchema = v.pipe(v.number(), v.integer(), v.minValue(MIN_TERMINAL_ROWS), v.maxValue(MAX_TERMINAL_ROWS))
+const TerminalWriteDataSchema = v.pipe(
+  v.string(),
+  v.maxLength(MAX_TERMINAL_WRITE_CHARS),
+  v.check((value) => !value.includes('\0'), 'Invalid terminal input'),
+)
 const TerminalOptionalClientIdSchema = v.optional(TerminalClientIdSchema)
 const TerminalControllerSchema = v.object({
   clientId: v.string(),
@@ -61,7 +66,7 @@ const TerminalAttachInputSchema = v.object({
 const TerminalRestartInputSchema = TerminalAttachInputSchema
 const TerminalWriteInputSchema = v.object({
   ptySessionId: TerminalPtySessionIdSchema,
-  data: v.pipe(v.string(), v.maxLength(MAX_TERMINAL_WRITE_CHARS)),
+  data: TerminalWriteDataSchema,
   clientId: TerminalOptionalClientIdSchema,
 })
 const TerminalResizeInputSchema = TerminalAttachInputSchema
@@ -76,6 +81,7 @@ const TerminalCreateInputSchema = v.object({
   branch: v.string(),
   worktreePath: v.string(),
   kind: v.picklist(['primary', 'additional']),
+  startupShellCommand: v.optional(TerminalWriteDataSchema),
   cols: v.optional(TerminalColsSchema),
   rows: v.optional(TerminalRowsSchema),
   clientId: TerminalOptionalClientIdSchema,

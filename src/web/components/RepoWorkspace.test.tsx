@@ -55,6 +55,7 @@ const terminalCommandContext: TerminalSessionContextValue = {
   clearSearch: vi.fn(),
   writeInput: vi.fn(),
   takeover: vi.fn(async () => true),
+  focusTerminal: vi.fn(),
   serialize: vi.fn(() => ''),
 }
 

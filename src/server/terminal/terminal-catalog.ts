@@ -28,6 +28,7 @@ interface EnsureTerminalCatalogInput {
   branch: string
   worktreePath: string
   sessionId?: string
+  startupShellCommand?: string
   cols?: number
   rows?: number
   clientId?: string
@@ -67,6 +68,7 @@ interface TerminalCatalogEnsureSessionInput {
   forceNew?: boolean
   command?: string
   args?: string[]
+  startupShellCommand?: string
   env?: Record<string, string>
 }
 
@@ -230,10 +232,15 @@ class TerminalCatalog {
     } catch (error) {
       return { ok: false, message: error instanceof Error ? error.message : 'error.ssh-config-changed' }
     }
-    const invocation = buildRemoteTerminalInvocation(resolved.target, input.worktreePath, {
-      cols: context.cols,
-      rows: context.rows,
-    })
+    const invocation = buildRemoteTerminalInvocation(
+      resolved.target,
+      input.worktreePath,
+      {
+        cols: context.cols,
+        rows: context.rows,
+      },
+      { startupShellCommand: input.startupShellCommand },
+    )
     const result = await this.options.manager.ensureSession({
       userId,
       scope: input.repoRoot,
@@ -285,6 +292,7 @@ class TerminalCatalog {
       clientId: input.clientId,
       clientConnected: this.options.isClientConnected(userId, input.clientId),
       forceNew: context.action === 'created',
+      startupShellCommand: input.startupShellCommand,
       env,
     })
     if (!result.ok) return { ok: false, message: result.message }

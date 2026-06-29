@@ -17,6 +17,7 @@ export interface PtyHandle {
 export interface PtySpawnInput {
   command?: string
   args?: string[]
+  startupShellCommand?: string
   cwd: string
   cols: number
   rows: number

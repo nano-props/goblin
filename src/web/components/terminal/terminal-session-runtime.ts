@@ -134,10 +134,6 @@ export class TerminalSessionRuntime {
     return sessionChanged || stateChanged
   }
 
-  markAttached(): boolean {
-    return this.state.setOpen()
-  }
-
   failAttachAttempt(message: string): boolean {
     return this.state.setError(message)
   }

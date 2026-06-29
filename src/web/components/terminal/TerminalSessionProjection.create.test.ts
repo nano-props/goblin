@@ -54,6 +54,7 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
     attach(): void {}
     detach(): void {}
     restart(): void {}
+    focus(): void {}
     dispose(): void {}
     closeServerResourcesAndWait(): Promise<void> {
       return Promise.resolve()
@@ -235,6 +236,94 @@ describe('TerminalSessionProjection create flow', () => {
       kind: 'primary',
       cols: 101,
       rows: 31,
+      clientId: 'client_local',
+    })
+  })
+
+  test('passes a startup shell command through terminal create', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    projection.registerHost(WORKTREE_KEY, host)
+
+    await projection.createTerminal(
+      { repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH },
+      { startupShellCommand: "bat '/repo/README.md'\r" },
+    )
+
+    expect(mocks.createMock).toHaveBeenCalledWith({
+      repoRoot: REPO_ROOT,
+      branch: BRANCH,
+      worktreePath: WORKTREE_PATH,
+      kind: 'additional',
+      startupShellCommand: "bat '/repo/README.md'\r",
+      cols: 101,
+      rows: 31,
+      clientId: 'client_local',
+    })
+  })
+
+  test('queues a different startup shell command behind an in-flight create for the same worktree', async () => {
+    const first = Promise.withResolvers<ReturnType<typeof makeCreateResult>>()
+    const secondResult = makeCreateResult({
+      key: `${REPO_ROOT}\0${WORKTREE_PATH}\0session-2`,
+      ptySessionId: 'pty_session_2_aaaaaaaaa',
+      sessions: [
+        {
+          ptySessionId: 'pty_session_1_aaaaaaaaa',
+          key: `${REPO_ROOT}\0${WORKTREE_PATH}\0session-1`,
+          cwd: WORKTREE_PATH,
+          controller: { clientId: 'client_local', status: 'connected' as const },
+          processName: 'zsh',
+          canonicalTitle: null,
+          phase: 'open' as const,
+          message: null,
+          cols: 101,
+          rows: 31,
+          displayOrder: 0,
+        },
+        {
+          ptySessionId: 'pty_session_2_aaaaaaaaa',
+          key: `${REPO_ROOT}\0${WORKTREE_PATH}\0session-2`,
+          cwd: WORKTREE_PATH,
+          controller: { clientId: 'client_local', status: 'connected' as const },
+          processName: 'zsh',
+          canonicalTitle: null,
+          phase: 'open' as const,
+          message: null,
+          cols: 101,
+          rows: 31,
+          displayOrder: 1,
+        },
+      ],
+    })
+    mocks.createMock.mockReset()
+    mocks.createMock.mockReturnValueOnce(first.promise).mockResolvedValueOnce(secondResult)
+
+    const firstCreate = projection.createTerminal(
+      { repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH },
+      { startupShellCommand: "bat '/repo/a.ts'\r" },
+    )
+    await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
+
+    const secondCreate = projection.createTerminal(
+      { repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH },
+      { startupShellCommand: "bat '/repo/b.ts'\r" },
+    )
+    await Promise.resolve()
+    expect(mocks.createMock).toHaveBeenCalledTimes(1)
+
+    first.resolve(makeCreateResult())
+    await expect(firstCreate).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0session-1`)
+    await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(2))
+    await expect(secondCreate).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0session-2`)
+    expect(mocks.createMock).toHaveBeenLastCalledWith({
+      repoRoot: REPO_ROOT,
+      branch: BRANCH,
+      worktreePath: WORKTREE_PATH,
+      kind: 'additional',
+      startupShellCommand: "bat '/repo/b.ts'\r",
+      cols: 80,
+      rows: 24,
       clientId: 'client_local',
     })
   })

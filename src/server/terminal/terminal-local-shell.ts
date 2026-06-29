@@ -43,6 +43,26 @@ export function resolveLocalShell(
   return { command: '/bin/sh', args: input.args ?? ['-l'] }
 }
 
+export function resolveLocalShellWithStartupShellCommand(
+  startupShellCommand: string | undefined,
+  env: NodeJS.ProcessEnv = process.env,
+): ResolvedLocalShell {
+  const commandLine = normalizeStartupShellCommand(startupShellCommand)
+  if (!commandLine) return resolveLocalShell({}, env)
+  if (process.platform === 'win32') return { command: env.COMSPEC?.trim() || 'cmd.exe', args: ['/K', commandLine] }
+  const shell = resolveLocalShell({}, env).command
+  return { command: shell, args: ['-ilc', `${commandLine}\nexec ${quotePosixShellArg(shell)} -l`] }
+}
+
+function normalizeStartupShellCommand(command: string | undefined): string {
+  const withoutTrailingNewline = (command ?? '').replace(/[\r\n]+$/u, '')
+  return withoutTrailingNewline.trim().length === 0 ? '' : withoutTrailingNewline
+}
+
+function quotePosixShellArg(value: string): string {
+  return `'${value.replace(/'/gu, `'\\''`)}'`
+}
+
 function readUserLoginShell(): string | null {
   try {
     const shell = userInfo().shell

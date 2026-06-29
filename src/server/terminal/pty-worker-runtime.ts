@@ -8,9 +8,7 @@
 // of the foreground process — even after a child exits without
 // emitting a title-OSC.
 
-import * as pty from 'node-pty'
-import { resolveLocalShell } from '#/server/terminal/terminal-local-shell.ts'
-import { type TerminalPtyRuntime } from '#/server/terminal/terminal-pty-runtime.ts'
+import { spawnTerminalPtyRuntime, type TerminalPtyRuntime } from '#/server/terminal/terminal-pty-runtime.ts'
 import type { PtySpawnInput } from '#/server/terminal/pty-supervisor.ts'
 import type {
   PtyWorkerMessage,
@@ -136,24 +134,7 @@ function createPtySessionId(): string {
 }
 
 function defaultSpawnPty(input: PtySpawnInput): PtySpawnOutcome {
-  try {
-    const shell = resolveLocalShell(input)
-    const env = { ...process.env, ...input.env, TERM: 'xterm-256color' }
-    // node-pty's own spawn handles failures synchronously by throwing;
-    // resolveLocalShell does too. The try/catch here means the worker
-    // surfaces a structured pty-spawn-result on every failure path
-    // rather than dying.
-    const term = pty.spawn(shell.command, shell.args, {
-      name: 'xterm-256color',
-      cols: input.cols,
-      rows: input.rows,
-      cwd: input.cwd,
-      env,
-    })
-    return { ok: true, runtime: new NodePtyTerminalRuntime(term) }
-  } catch (error) {
-    return { ok: false, message: error instanceof Error ? error.message : 'error.unknown' }
-  }
+  return spawnTerminalPtyRuntime(input)
 }
 
 function classifyPtySpawnFailure(message: string): { code: PtyWorkerSpawnFailureCode; recoverable: boolean } {
@@ -165,41 +146,8 @@ function classifyPtySpawnFailure(message: string): { code: PtyWorkerSpawnFailure
 
 function safeProcessName(runtime: TerminalPtyRuntime): string {
   try {
-    const value = (runtime as unknown as { process?: unknown }).process
-    if (typeof value !== 'string') return 'terminal'
-    return value.trim() || 'terminal'
+    return runtime.processName()
   } catch {
     return 'terminal'
-  }
-}
-
-class NodePtyTerminalRuntime implements TerminalPtyRuntime {
-  private readonly term: pty.IPty
-
-  constructor(term: import('node-pty').IPty) {
-    this.term = term
-  }
-
-  write(data: string): void {
-    this.term.write(data)
-  }
-  resize(cols: number, rows: number): void {
-    this.term.resize(cols, rows)
-  }
-  kill(): void {
-    this.term.kill()
-  }
-  onData(listener: (data: string) => void): { dispose(): void } {
-    return this.term.onData(listener)
-  }
-  onExit(listener: () => void): { dispose(): void } {
-    return this.term.onExit(listener)
-  }
-  processName(): string {
-    return safeProcessName(this)
-  }
-  // Used by safeProcessName above.
-  get process(): string {
-    return this.term.process
   }
 }
