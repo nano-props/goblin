@@ -45,7 +45,13 @@ export type PtyWorkerSpawnFailure = {
   requestId: string
   ok: false
   error: string
+  failure: {
+    code: PtyWorkerSpawnFailureCode
+    recoverable: boolean
+  }
 }
+
+export type PtyWorkerSpawnFailureCode = 'native-pty-spawn-failed' | 'unknown'
 
 export type PtyWorkerMessage =
   | PtyWorkerSpawnSuccess
@@ -75,6 +81,10 @@ const PtySpawnResultFailureSchema = v.object({
   requestId: PtySessionIdStringSchema,
   ok: v.literal(false),
   error: v.string(),
+  failure: v.object({
+    code: v.union([v.literal('native-pty-spawn-failed'), v.literal('unknown')]),
+    recoverable: v.boolean(),
+  }),
 })
 const PtyDataMessageSchema = v.object({
   type: v.literal('pty-data'),

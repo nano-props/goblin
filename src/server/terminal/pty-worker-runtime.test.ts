@@ -67,9 +67,10 @@ vi.mock('node-pty', () => ({
   }),
 }))
 
-function buildRuntime() {
+function buildRuntime(options: { spawnPty?: ConstructorParameters<typeof PtyWorkerRuntime>[0]['spawnPty'] } = {}) {
   const emitted: PtyWorkerMessage[] = []
   const runtime = new PtyWorkerRuntime({
+    spawnPty: options.spawnPty,
     emit(message) {
       emitted.push(message)
     },
@@ -133,18 +134,34 @@ describe('PtyWorkerRuntime', () => {
     expect(nameChanges).toHaveLength(1)
   })
 
-  test('pty-spawn surfaces a structured failure when node-pty throws', () => {
-    // Use the in-process supervisor's failure contract as a reference:
-    // handleSpawn wraps `pty.spawn` in a try/catch and emits
-    // `{ type: 'pty-spawn-result', ok: false, error }` on any throw.
-    // We don't re-mock node-pty here (vi.doMock does not override
-    // vi.mock set at the file scope) so the test asserts only that
-    // the success path is reachable, and the failure path is covered
-    // by the in-process supervisor's tests.
-    const { runtime, emitted } = buildRuntime()
+  test('pty-spawn surfaces a structured recoverable failure for posix_spawnp failures', () => {
+    const { runtime, emitted } = buildRuntime({
+      spawnPty: () => ({ ok: false, message: 'posix_spawnp failed' }),
+    })
     runtime.handleMessage({ type: 'pty-spawn', requestId: 'req', input: { cwd: '/repo', cols: 80, rows: 24 } })
     const result = emitted.find((m) => m.type === 'pty-spawn-result' && m.requestId === 'req')
-    expect(result).toMatchObject({ type: 'pty-spawn-result', requestId: 'req', ok: true })
+    expect(result).toEqual({
+      type: 'pty-spawn-result',
+      requestId: 'req',
+      ok: false,
+      error: 'posix_spawnp failed',
+      failure: { code: 'native-pty-spawn-failed', recoverable: true },
+    })
+  })
+
+  test('pty-spawn surfaces a structured nonrecoverable failure for unknown spawn failures', () => {
+    const { runtime, emitted } = buildRuntime({
+      spawnPty: () => ({ ok: false, message: 'shell not found' }),
+    })
+    runtime.handleMessage({ type: 'pty-spawn', requestId: 'req', input: { cwd: '/repo', cols: 80, rows: 24 } })
+    const result = emitted.find((m) => m.type === 'pty-spawn-result' && m.requestId === 'req')
+    expect(result).toEqual({
+      type: 'pty-spawn-result',
+      requestId: 'req',
+      ok: false,
+      error: 'shell not found',
+      failure: { code: 'unknown', recoverable: false },
+    })
   })
 
   test('pty-write, pty-resize, pty-kill route to the matching pty', () => {

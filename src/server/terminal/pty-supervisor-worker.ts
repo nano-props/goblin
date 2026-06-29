@@ -29,6 +29,8 @@ type WorkerTimerHandle = ReturnType<typeof setTimeout> | number
 type TerminalWorkerChildProcess = ChildProcess
 
 interface PendingSpawn {
+  input: PtySpawnInput
+  retryCount: number
   resolve(value: PtySpawnResult): void
 }
 
@@ -70,16 +72,11 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
   }
 
   async spawn(input: PtySpawnInput): Promise<PtySpawnResult> {
-    const worker = this.ensureWorker()
     const requestId = createRequestId()
     return await new Promise<PtySpawnResult>((resolve) => {
-      this.pendingSpawns.set(requestId, { resolve })
-      const sent = worker.send({ type: 'pty-spawn', requestId, input })
-      if (!sent) {
-        this.pendingSpawns.delete(requestId)
-        this.recordFailure('send-failed', `action=pty-spawn`)
-        resolve({ ok: false, message: this.unavailableMessage() })
-      }
+      const pending: PendingSpawn = { input, retryCount: 0, resolve }
+      this.pendingSpawns.set(requestId, pending)
+      this.sendSpawnRequest(requestId, pending)
     })
   }
 
@@ -193,6 +190,7 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
       'spawned PTY worker',
     )
     worker.on('message', (raw) => {
+      if (this.worker !== worker) return
       const message = normalizePtyWorkerMessage(raw)
       if (!message) {
         ptyWorkerLogger.warn({ raw: typeof raw }, 'dropped malformed PTY worker message')
@@ -201,7 +199,8 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
       this.handleWorkerMessage(message)
     })
     worker.once('exit', (code, signal) => {
-      if (this.worker === worker) this.worker = null
+      if (this.worker !== worker) return
+      this.worker = null
       // Capture "did we have any active sessions" before the listener-fanout
       // step clears them. If we had live PTYs when the worker died, the
       // native host likely still needs the worker back to serve them.
@@ -230,9 +229,10 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
       if (!this.shuttingDown && hadSessions) this.scheduleRestart()
     })
     worker.once('error', (error) => {
+      if (this.worker !== worker) return
       this.recordFailure('error', error instanceof Error ? error.message : String(error))
       ptyWorkerLogger.error({ err: error, pid: worker.pid, sessions: this.sessions.size }, 'PTY worker process error')
-      if (this.worker === worker) this.worker = null
+      this.worker = null
       const hadSessions = this.sessions.size > 0
       this.failPendingSpawns(error instanceof Error ? error : new Error(String(error)))
       this.failSessionListenersOnWorkerExit()
@@ -255,6 +255,7 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
         session.processName = message.processName
         pending.resolve({ ok: true, handle, processName: message.processName })
       } else {
+        if (this.retryPendingSpawnsAfterRecoverableFailure(message.error, message.failure.recoverable, pending)) return
         pending.resolve({ ok: false, message: message.error })
       }
       return
@@ -285,6 +286,57 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
       pending.resolve({ ok: false, message })
     }
     this.pendingSpawns.clear()
+  }
+
+  private sendSpawnRequest(requestId: string, pending: PendingSpawn): void {
+    const worker = this.ensureWorker()
+    const sent = worker.send({ type: 'pty-spawn', requestId, input: pending.input })
+    if (!sent) {
+      this.pendingSpawns.delete(requestId)
+      this.recordFailure('send-failed', `action=pty-spawn`)
+      pending.resolve({ ok: false, message: this.unavailableMessage() })
+    }
+  }
+
+  private retryPendingSpawnsAfterRecoverableFailure(
+    error: string,
+    recoverable: boolean,
+    failedPending: PendingSpawn,
+  ): boolean {
+    if (!recoverable) return false
+    if (failedPending.retryCount >= 1) return false
+    if (this.sessions.size > 0) return false
+    const pendingToRetry = [failedPending, ...Array.from(this.pendingSpawns.values())]
+    this.pendingSpawns.clear()
+    for (const pending of pendingToRetry) pending.retryCount += 1
+    this.recordFailure('spawn-failed', error)
+    ptyWorkerLogger.warn(
+      { err: error, pendingRequests: pendingToRetry.length },
+      'restarting idle PTY worker after recoverable spawn failure',
+    )
+    this.recycleIdleWorker()
+    for (const pending of pendingToRetry) {
+      const requestId = createRequestId()
+      this.pendingSpawns.set(requestId, pending)
+      this.sendSpawnRequest(requestId, pending)
+    }
+    return true
+  }
+
+  private recycleIdleWorker(): void {
+    if (this.sessions.size > 0) return
+    const worker = this.worker
+    this.worker = null
+    if (!worker) return
+    try {
+      worker.send({ type: 'shutdown' })
+    } catch {}
+    try {
+      worker.disconnect?.()
+    } catch {}
+    try {
+      worker.kill()
+    } catch {}
   }
 
   private failSessionListenersOnWorkerExit(): void {
