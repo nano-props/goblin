@@ -292,6 +292,8 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     () => ({
       worktreeSnapshot: projection.worktreeSnapshot,
       subscribeWorktree: projection.subscribeWorktree,
+      repoBellCount: projection.repoBellCount,
+      subscribeRepoBellCount: projection.subscribeRepoBellCount,
       snapshot: projection.snapshot,
       subscribeSnapshot: projection.subscribeSnapshot,
     }),

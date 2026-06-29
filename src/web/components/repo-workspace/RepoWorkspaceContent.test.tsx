@@ -840,6 +840,8 @@ const emptyWorktreeSnapshot: WorktreeTerminalSnapshot = {
 const emptyTerminalReadContext: TerminalSessionReadContextValue = {
   worktreeSnapshot: () => emptyWorktreeSnapshot,
   subscribeWorktree: () => () => {},
+  repoBellCount: () => 0,
+  subscribeRepoBellCount: () => () => {},
   snapshot: () => ({ phase: 'opening', message: null, processName: 'terminal' }),
   subscribeSnapshot: () => () => {},
 }

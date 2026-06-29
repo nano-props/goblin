@@ -2,7 +2,7 @@ import { setTerminalFocused } from '#/web/terminal-focus.ts'
 import { terminalSessionProviderLog } from '#/web/logger.ts'
 import { TerminalSession } from '#/web/components/terminal/TerminalSession.ts'
 import { createTerminalBellState } from '#/web/components/terminal/terminal-bell-state.ts'
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
+import { parseWorktreeKey, worktreeTerminalKey } from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
 import { terminalBridge } from '#/web/terminal.ts'
 import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-bridge.ts'
 import type {
@@ -136,6 +136,12 @@ export class TerminalSessionProjection {
   private readonly reattachSnapshotCache = new Map<string, ReattachSnapshotCacheEntry>()
   private readonly worktreeSnapshotCache = new Map<string, WorktreeTerminalSnapshot>()
   private readonly worktreeListeners = new Map<string, Set<() => void>>()
+  private readonly repoBellCountListeners = new Map<string, Set<() => void>>()
+  // Selector publication cache only. The unread bell source of truth
+  // stays in `bellState`; this stores the last count delivered to
+  // repo-level subscribers so unrelated worktree events do not wake
+  // the repo picker.
+  private readonly lastPublishedRepoBellCountByRepo = new Map<string, number>()
   private readonly snapshotListeners = new Map<string, Set<() => void>>()
   private readonly displayOrderByKey = new Map<string, number>()
   private readonly bellState = createTerminalBellState(
@@ -146,6 +152,7 @@ export class TerminalSessionProjection {
         return
       }
       this.notifyAllWorktrees()
+      this.notifyAllRepoBellCounts()
     },
     (count) => terminalBridge.setBadge(count),
   )
@@ -210,6 +217,8 @@ export class TerminalSessionProjection {
     this.reattachSnapshotCache.clear()
     this.worktreeSnapshotCache.clear()
     this.worktreeListeners.clear()
+    this.repoBellCountListeners.clear()
+    this.lastPublishedRepoBellCountByRepo.clear()
     this.snapshotListeners.clear()
     this.bellState.reset()
     if (projectionInstance === this) projectionInstance = null
@@ -688,6 +697,30 @@ export class TerminalSessionProjection {
     return this.subscribeToKeyedListeners(this.worktreeListeners, worktreeTerminalKey, listener)
   }
 
+  repoBellCount = (repoRoot: string): number => {
+    let count = 0
+    for (const session of this.sessions.values()) {
+      const key = session.descriptor.key
+      if (
+        session.descriptor.repoRoot === repoRoot &&
+        !this.hiddenClosingSessionKeys.has(key) &&
+        this.bellState.hasBell(key)
+      )
+        count++
+    }
+    return count
+  }
+
+  subscribeRepoBellCount = (repoRoot: string, listener: () => void): (() => void) => {
+    if (!this.repoBellCountListeners.has(repoRoot))
+      this.lastPublishedRepoBellCountByRepo.set(repoRoot, this.repoBellCount(repoRoot))
+    const unsubscribe = this.subscribeToKeyedListeners(this.repoBellCountListeners, repoRoot, listener)
+    return () => {
+      unsubscribe()
+      if (!this.repoBellCountListeners.has(repoRoot)) this.lastPublishedRepoBellCountByRepo.delete(repoRoot)
+    }
+  }
+
   selectTerminal = (worktreeTerminalKey: string, key: string): void => {
     const session = this.sessions.get(key)
     if (
@@ -810,14 +843,17 @@ export class TerminalSessionProjection {
   private notifyWorktree(worktreeTerminalKey: string): void {
     this.worktreeSnapshotCache.delete(worktreeTerminalKey)
     const listeners = this.worktreeListeners.get(worktreeTerminalKey)
-    if (!listeners) return
-    for (const listener of Array.from(listeners)) {
-      try {
-        listener()
-      } catch (err) {
-        terminalSessionProviderLog.warn('worktree listener threw', { worktreeTerminalKey, err })
+    if (listeners) {
+      for (const listener of Array.from(listeners)) {
+        try {
+          listener()
+        } catch (err) {
+          terminalSessionProviderLog.warn('worktree listener threw', { worktreeTerminalKey, err })
+        }
       }
     }
+    const repoRoot = parseWorktreeKey(worktreeTerminalKey)?.repoRoot
+    if (repoRoot) this.notifyRepoBellCountIfChanged(repoRoot)
   }
 
   private notifySnapshot(key: string): void {
@@ -835,6 +871,31 @@ export class TerminalSessionProjection {
   private notifyAllWorktrees(): void {
     for (const worktreeTerminalKey of Array.from(this.worktreeListeners.keys()))
       this.notifyWorktree(worktreeTerminalKey)
+  }
+
+  private notifyRepoBellCountIfChanged(repoRoot: string): void {
+    if (!this.repoBellCountListeners.has(repoRoot)) return
+    const previous = this.lastPublishedRepoBellCountByRepo.get(repoRoot) ?? 0
+    const next = this.repoBellCount(repoRoot)
+    if (previous === next) return
+    this.lastPublishedRepoBellCountByRepo.set(repoRoot, next)
+    this.notifyRepoBellCount(repoRoot)
+  }
+
+  private notifyRepoBellCount(repoRoot: string): void {
+    const listeners = this.repoBellCountListeners.get(repoRoot)
+    if (!listeners) return
+    for (const listener of Array.from(listeners)) {
+      try {
+        listener()
+      } catch (err) {
+        terminalSessionProviderLog.warn('repo bell count listener threw', { repoRoot, err })
+      }
+    }
+  }
+
+  private notifyAllRepoBellCounts(): void {
+    for (const repoRoot of Array.from(this.repoBellCountListeners.keys())) this.notifyRepoBellCountIfChanged(repoRoot)
   }
 
   private subscribeToKeyedListeners(

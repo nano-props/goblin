@@ -13,6 +13,8 @@ import { openRepoFromDialog } from '#/web/lib/open-repo-dialog.ts'
 import { useShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
 import { repoPickerStoreActionsFromStore } from '#/web/stores/repos/selector-actions.ts'
 import { latestRepoSyncTime } from '#/web/stores/repos/sync-time.ts'
+import { useMemo } from 'react'
+import { useRepoTerminalBellCounts } from '#/web/components/terminal/terminal-session-store.ts'
 
 interface RepoPickerHostProps {
   currentRepoId: string | null
@@ -56,6 +58,12 @@ export function RepoPickerHost({
         .filter((x): x is RepoPickerRepo => x !== null),
     repoPickerReposEqual,
   )
+  const repoIds = useMemo(() => summaries.map((repo) => repo.id), [summaries])
+  const terminalBellCounts = useRepoTerminalBellCounts(repoIds)
+  const summariesWithTerminalBells = useMemo(
+    () => summaries.map((repo) => ({ ...repo, terminalBellCount: terminalBellCounts[repo.id] ?? 0 })),
+    [summaries, terminalBellCounts],
+  )
   const navigation = usePrimaryWindowNavigation()
   const { ensureWorkspaceOpen } = useReposStore(useShallow(repoPickerStoreActionsFromStore))
 
@@ -70,7 +78,7 @@ export function RepoPickerHost({
 
   return (
     <RepoPicker
-      repos={summaries}
+      repos={summariesWithTerminalBells}
       activeId={currentRepoId}
       labels={{
         repositories: t('repo-picker.repos'),

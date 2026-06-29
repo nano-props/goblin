@@ -12,6 +12,7 @@ import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts
 import type { RepoPickerLabels, RepoPickerRepo, RepoPickerSurface } from '#/web/components/repo-picker/types.ts'
 import { isRemoteRepoId, remoteRepoConnectionTarget } from '#/shared/remote-repo.ts'
 import { formatRepoLocator } from '#/web/lib/paths.ts'
+import { TerminalBellBadge } from '#/web/components/terminal/TerminalBellBadge.tsx'
 
 function navigatedRepoId(
   repos: RepoPickerRepo[],
@@ -131,6 +132,11 @@ function RepoMenuContent({
                         )
                       }
                       contentClassName="whitespace-normal"
+                      trailing={
+                        (repo.terminalBellCount ?? 0) > 0 ? (
+                          <TerminalBellBadge count={repo.terminalBellCount ?? 0} />
+                        ) : null
+                      }
                     >
                       <div className="truncate font-medium leading-5">{repo.name}</div>
                       <div className="truncate font-mono text-xs leading-4 text-muted-foreground">
@@ -239,6 +245,7 @@ export function RepoPicker({
   }
 
   const currentRepo = repos.find((r) => r.id === activeId) ?? repos[0] ?? null
+  const totalTerminalBellCount = repos.reduce((count, repo) => count + (repo.terminalBellCount ?? 0), 0)
 
   return (
     <nav className="flex h-full min-w-0 flex-1 items-center" aria-label={labels.repositories}>
@@ -251,6 +258,7 @@ export function RepoPicker({
                 focusRegistry={focusRegistry}
                 onKeyboardNavigate={handleKeyboardNavigate}
                 unavailableLabel={labels.unavailable}
+                terminalBellCount={totalTerminalBellCount}
                 fill
               />
             </PopoverTrigger>
@@ -265,6 +273,7 @@ export function RepoPicker({
                     onActivate={onActivate}
                     onKeyboardNavigate={handleKeyboardNavigate}
                     unavailableLabel={labels.unavailable}
+                    terminalBellCount={totalTerminalBellCount}
                     fill
                   />
                 </ToolbarTabList>

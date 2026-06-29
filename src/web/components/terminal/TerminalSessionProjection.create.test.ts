@@ -183,6 +183,21 @@ function makeCreateResult(overrides: Partial<Record<string, unknown>> = {}) {
   }
 }
 
+function emitBellForKey(projection: TerminalSessionProjection, key: string): void {
+  ;(projection as any).bellState.handleBell(
+    {
+      key,
+      worktreeTerminalKey: WORKTREE_KEY,
+      sessionId: 'session-1',
+      index: 1,
+      repoRoot: REPO_ROOT,
+      branch: BRANCH,
+      worktreePath: WORKTREE_PATH,
+    },
+    { processName: 'zsh', visible: false },
+  )
+}
+
 describe('TerminalSessionProjection create flow', () => {
   let projection: TerminalSessionProjection
 
@@ -644,6 +659,61 @@ describe('TerminalSessionProjection create flow', () => {
 
     expect(projection.worktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(0)
     expect(mocks.setBadgeMock).toHaveBeenLastCalledWith(0)
+  })
+
+  test('publishes repo bell counts through repo listeners', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    projection.registerHost(WORKTREE_KEY, host)
+    const listener = vi.fn()
+    const unsubscribe = projection.subscribeRepoBellCount(REPO_ROOT, listener)
+
+    try {
+      const key = await projection.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
+      expect(projection.repoBellCount(REPO_ROOT)).toBe(0)
+      expect(listener).not.toHaveBeenCalled()
+
+      emitBellForKey(projection, key)
+
+      expect(projection.repoBellCount(REPO_ROOT)).toBe(1)
+      expect(listener).toHaveBeenCalledTimes(1)
+
+      listener.mockClear()
+      projection.scrollToBottom(key)
+
+      expect(projection.repoBellCount(REPO_ROOT)).toBe(1)
+      expect(listener).not.toHaveBeenCalled()
+
+      listener.mockClear()
+      projection.clearBell(key)
+
+      expect(projection.repoBellCount(REPO_ROOT)).toBe(0)
+      expect(listener).toHaveBeenCalledTimes(1)
+    } finally {
+      unsubscribe()
+    }
+  })
+
+  test('publishes repo bell count changes when a bell session is removed', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    projection.registerHost(WORKTREE_KEY, host)
+    const key = await projection.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
+    emitBellForKey(projection, key)
+
+    const listener = vi.fn()
+    const unsubscribe = projection.subscribeRepoBellCount(REPO_ROOT, listener)
+
+    try {
+      expect(projection.repoBellCount(REPO_ROOT)).toBe(1)
+
+      projection.handleSessionClosed('pty_session_1_aaaaaaaaa')
+
+      expect(projection.repoBellCount(REPO_ROOT)).toBe(0)
+      expect(listener).toHaveBeenCalledTimes(1)
+    } finally {
+      unsubscribe()
+    }
   })
 
   test('does not prune sessions when the repo still exists but branch metadata is temporarily missing', async () => {

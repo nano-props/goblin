@@ -9,6 +9,8 @@ export interface RepoPickerRepo {
    * Null until snapshot/fetch data loads have completed at least once.
    */
   lastSyncedAt: number | null
+  /** Unread terminal bell count across this repo's terminal sessions. */
+  terminalBellCount?: number
   /**
    * Single source-of-truth lifecycle for a remote repo. `null`
    * for local repos. The picker reads `lifecycle.kind` directly

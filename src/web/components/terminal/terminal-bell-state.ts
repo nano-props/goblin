@@ -2,7 +2,7 @@ import { lastPathSegment } from '#/web/lib/paths.ts'
 import { terminalBridge } from '#/web/terminal.ts'
 import type { TerminalBellEvent, TerminalDescriptor } from '#/web/components/terminal/types.ts'
 import { getRuntimeFetchSettings } from '#/web/runtime-settings-fetch.ts'
-const BELL_NOTIFICATION_DEBOUNCE_MS = 5000
+const BELL_NOTIFICATION_THROTTLE_MS = 5000
 
 export interface TerminalBellState {
   hasBell: (key: string) => boolean
@@ -17,7 +17,7 @@ export function createTerminalBellState(
   onBadgeChange: (count: number) => void,
 ): TerminalBellState {
   const unreadKeys = new Set<string>()
-  const lastNotificationAt = new Map<string, number>()
+  const lastSystemNotificationAtByKey = new Map<string, number>()
 
   onBadgeChange(unreadKeys.size)
 
@@ -38,13 +38,13 @@ export function createTerminalBellState(
     remove(key) {
       const had = unreadKeys.has(key)
       unreadKeys.delete(key)
-      lastNotificationAt.delete(key)
+      lastSystemNotificationAtByKey.delete(key)
       if (had) notifyAndBadge(key)
     },
     reset() {
       const had = unreadKeys.size > 0
       unreadKeys.clear()
-      lastNotificationAt.clear()
+      lastSystemNotificationAtByKey.clear()
       if (had) notifyAndBadge()
     },
     handleBell(descriptor, event) {
@@ -55,9 +55,11 @@ export function createTerminalBellState(
       if (changed) notifyAndBadge(descriptor.key)
       if (!getRuntimeFetchSettings().terminalNotificationsEnabled) return
       const now = Date.now()
-      const lastNotifiedAt = lastNotificationAt.get(descriptor.key) ?? 0
-      if (now - lastNotifiedAt < BELL_NOTIFICATION_DEBOUNCE_MS) return
-      lastNotificationAt.set(descriptor.key, now)
+      const lastNotifiedAt = lastSystemNotificationAtByKey.get(descriptor.key) ?? 0
+      // Leading-edge throttle for native/system notifications only.
+      // The in-app unread state above is published immediately.
+      if (now - lastNotifiedAt < BELL_NOTIFICATION_THROTTLE_MS) return
+      lastSystemNotificationAtByKey.set(descriptor.key, now)
       const repoName = lastPathSegment(descriptor.repoRoot)
       const bodyParts = [descriptor.branch]
       const canonicalTitle = typeof event.canonicalTitle === 'string' ? event.canonicalTitle.trim() : ''
