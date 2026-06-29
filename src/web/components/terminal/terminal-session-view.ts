@@ -123,10 +123,10 @@ export class TerminalSessionView {
   }
 
   /**
-   * Exposes the xterm DOM host so the orchestrator can drive geometry
-   * measurement (see `waitForMeasurableHost` in
-   * `terminal-session-geometry.ts`). The view itself never falls back to
-   * a default geometry — it is given one by the orchestrator and trusts it.
+   * Exposes the xterm DOM host so the orchestrator can wait until a real
+   * view box exists. Startup geometry before open is only a hint; after
+   * open, this mounted xterm and its FitAddon are the client-side authority
+   * for fitted view geometry.
    */
   measurableHost(): HTMLElement {
     return this.xtermHost
@@ -210,9 +210,7 @@ export class TerminalSessionView {
   }
 
   fitSoon(): void {
-    if (!this.term || !this.fitAddon || !hasMeasurableBox(this.xtermHost)) return
-    const dimensions = this.fitAddon.proposeDimensions()
-    if (!dimensions || (dimensions.cols === this.term.cols && dimensions.rows === this.term.rows)) return
+    if (!this.needsRefit()) return
     this.cancelFitFlush()
     this.fitFlushTimer = window.setTimeout(() => {
       this.fitFlushTimer = null
@@ -223,6 +221,12 @@ export class TerminalSessionView {
   fitNow(): void {
     if (!this.term || !this.fitAddon || !hasMeasurableBox(this.xtermHost)) return
     this.fitAddon.fit()
+  }
+
+  private needsRefit(): boolean {
+    if (!this.term || !this.fitAddon || !hasMeasurableBox(this.xtermHost)) return false
+    const dimensions = this.fitAddon.proposeDimensions()
+    return !!dimensions && (dimensions.cols !== this.term.cols || dimensions.rows !== this.term.rows)
   }
 
   destroyTerminal(): void {

@@ -8,7 +8,7 @@ Use this doc for the terminal system design.
 - Keep terminal sessions long-lived and reconnectable instead of tying them to one visible view.
 - Separate business lifecycle from PTY execution details.
 - Make terminal control, mirroring, and takeover explicit parts of the model.
-- Preserve fast interactive behavior while keeping the server as the runtime-coherent source of truth.
+- Preserve fast interactive behavior while keeping the server as the runtime-coherent source of truth for sessions.
 
 ## Core model
 
@@ -33,6 +33,15 @@ Only one attachment may control the session at a time.
 - The server owns runtime-coherent terminal truth.
 - Clients are projections of server state plus local interaction state.
 - Terminal behavior should be described in client and attachment terms, not in window terms.
+
+### Authority boundaries
+
+The terminal has two different authority domains that should stay separate:
+
+- **Session authority** lives on the server. The server owns session lifecycle, controller/viewer state, PTY binding, canonical geometry, and the headless xterm render state used for snapshots.
+- **View authority** lives in the currently mounted client xterm. The live xterm instance owns local rendering behavior and is the only component that should report the active controller view's fitted `cols`/`rows`.
+
+Create may send a lightweight startup geometry hint before a real view exists. After a view is mounted, the client sends live xterm geometry to the server through attach, resize, restart, and takeover operations. The server validates controller authority, updates the PTY and headless render state, then broadcasts the resulting canonical geometry. This keeps the server model authoritative without asking the server, a temporary xterm, or an ad hoc DOM probe to predict client rendering details.
 
 ### Stable business boundary over PTY boundary
 
@@ -62,7 +71,8 @@ Only one attachment may control the session at a time.
 
 - Terminal size is not a cosmetic concern.
 - Session creation, attach, resize, replay, and takeover all depend on coherent geometry.
-- The system should prefer real measured geometry at creation time and keep PTY geometry close to the active view geometry.
+- Startup geometry should be a best-effort hint until a live xterm view exists.
+- Once a controller view is mounted, PTY geometry should closely follow that view's fitted xterm geometry.
 
 ## Layering
 
@@ -185,22 +195,23 @@ Geometry should be treated as part of terminal correctness.
 
 ### Principles
 
-- Session creation should use measured host geometry whenever available.
-- The client and server should use a coherent geometry model, not unrelated guesses.
-- PTY resize should closely follow the active controller view geometry.
+- Session creation may use a lightweight host-box estimate as a startup hint.
+- The live controller xterm is the source for fitted view geometry.
+- The server remains the source of truth for canonical PTY geometry after it accepts a controller resize.
 - Geometry should flow through create, attach, resize, restart, and takeover consistently.
 
 ### Implications
 
-- Creating a PTY with a fallback size and fixing it later is not equivalent to creating it with the right size.
+- Creating a PTY with a fallback size and fixing it later is still not equivalent to starting close to the visible host size.
+- Startup estimates must stay lightweight and must not duplicate xterm internals.
 - Narrow layouts are especially sensitive because shell prompt rendering reacts immediately to initial columns.
 - Extra defensive redraws are not a substitute for correct geometry flow.
 
 ### Unmeasurable hosts at attach time
 
-When a terminal is first opened into a host whose box is not yet measurable (e.g. a split pane that is still animating to its final width), the orchestrator must wait for the host to become measurable rather than fall back to a historical default. Spawning a PTY at the wrong column count and resizing later is **not** equivalent to spawning it at the correct width — the shell may lay out its prompt against the wrong `$COLUMNS` before the resize settles.
+When a terminal is first opened into a host whose box is not yet measurable (e.g. a split pane that is still animating to its final width), the orchestrator must wait for the host to become measurable rather than fall back to a historical default. Spawning a PTY at a wildly wrong column count and resizing later is still observable because the shell may lay out its prompt against the initial `$COLUMNS` before the resize settles.
 
-The acquisition of geometry belongs to the orchestrator, not the view: the view accepts the measured geometry as a parameter, never reaches into layout, and never soft-fails to a default. A stuck host surfaces as a fatal attach failure the user can retry by re-selecting the terminal.
+Before the xterm view exists, geometry is only a startup hint derived from the host box or cached canonical state. After the view opens, `FitAddon.fit()` on the real xterm instance is the authoritative client-side measurement; controller attach/resize/restart/takeover sends those fitted dimensions to the server, and the accepted server value becomes canonical session geometry.
 
 ### Narrow-host multi-line prompt wrap
 

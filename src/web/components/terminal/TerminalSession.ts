@@ -11,7 +11,11 @@ import type {
 import { terminalBridge } from '#/web/terminal.ts'
 import { setTerminalFocused } from '#/web/terminal-focus.ts'
 import { openExternalUrl } from '#/web/app-shell-client.ts'
-import { preloadTerminalFont, proposeTerminalGeometry } from '#/web/components/terminal/terminal-geometry.ts'
+import {
+  DEFAULT_TERMINAL_COLS,
+  DEFAULT_TERMINAL_ROWS,
+  preloadTerminalFont,
+} from '#/web/components/terminal/terminal-geometry.ts'
 import {
   TerminalHostNotMeasurableError,
   waitForMeasurableHost,
@@ -348,18 +352,10 @@ export class TerminalSession {
           // resizes the PTY to match the new controller's geometry.
           const term = this.view.currentTerminal()
           if (term) return { cols: term.cols, rows: term.rows }
-          // Pre-view fallback: measure the host. The same probe the
-          // `start()` path uses for the initial attach, so a takeover
-          // fired before the view is mounted lands on a sane size
-          // instead of the canonical 80x24.
-          const fallback = this.runtime.currentCanonicalSize()
-          if (!this.view.isConnected()) return fallback
-          try {
-            await preloadTerminalFont()
-            return proposeTerminalGeometry(this.view.measurableHost()) ?? fallback
-          } catch {
-            return fallback
-          }
+          // Before the real xterm view exists, the server's canonical
+          // size is the only stable source. Once the view is open,
+          // xterm's own cols/rows above become authoritative.
+          return this.runtime.currentCanonicalSize()
         },
         isSessionAlive: (ptySessionId) => !this.disposed && this.runtime.currentPtySessionId() === ptySessionId,
         onPromoted: (result) => {
@@ -612,10 +608,10 @@ export class TerminalSession {
       const geometryAbortController = new AbortController()
       this.geometryAbortController?.abort()
       this.geometryAbortController = geometryAbortController
-      let geometry: { cols: number; rows: number }
       try {
-        geometry = await waitForMeasurableHost(this.view.measurableHost(), {
+        await waitForMeasurableHost(this.view.measurableHost(), {
           signal: geometryAbortController.signal,
+          measure: measureHostAsOpenable,
         })
       } catch (err) {
         if (err instanceof TerminalHostNotMeasurableError || geometryAbortController.signal.aborted) {
@@ -633,11 +629,14 @@ export class TerminalSession {
         throw err
       }
       if (this.geometryAbortController === geometryAbortController) this.geometryAbortController = null
-      const term = this.view.openTerminal(geometry, (input) => this.writeInput(input))
-      preloadReplayGeneration = await this.preloadHydratedSnapshot(token, term)
+      const term = this.view.openTerminal(
+        { cols: DEFAULT_TERMINAL_COLS, rows: DEFAULT_TERMINAL_ROWS },
+        (input) => this.writeInput(input),
+      )
       await waitForTerminalLayout()
       this.guardStart(token, term)
       this.view.fitNow()
+      preloadReplayGeneration = await this.preloadHydratedSnapshot(token, term)
       // The post-fitNow rAF barrier is intentionally concurrent with the
       // subsequent ipcPhase.attach: view.fitNow() is synchronous, so
       // term.cols/term.rows are correct the moment we return from openPhase,
@@ -1010,6 +1009,12 @@ export class TerminalSession {
 
 function waitForTerminalLayout(): Promise<void> {
   return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+}
+
+function measureHostAsOpenable(host: HTMLElement): { cols: number; rows: number } | null {
+  const rect = host.getBoundingClientRect()
+  if (rect.width <= 0 || rect.height <= 0) return null
+  return { cols: DEFAULT_TERMINAL_COLS, rows: DEFAULT_TERMINAL_ROWS }
 }
 
 function termWrite(term: XTermTerminal, data: string): Promise<void> {

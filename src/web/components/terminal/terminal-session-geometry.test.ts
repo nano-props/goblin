@@ -10,15 +10,13 @@ import {
 import type { TerminalDescriptor } from '#/web/components/terminal/types.ts'
 
 const geometryMocks = vi.hoisted(() => ({
-  preloadTerminalFont: vi.fn(async () => {}),
-  proposeTerminalGeometry: vi.fn(() => ({ cols: 120, rows: 40 })),
-  proposeManagedTerminalGeometry: vi.fn(() => ({ cols: 120, rows: 40 })),
+  estimateTerminalGeometry: vi.fn(() => ({ cols: 120, rows: 40 })),
+  estimateManagedTerminalGeometry: vi.fn(() => ({ cols: 120, rows: 40 })),
 }))
 
 vi.mock('#/web/components/terminal/terminal-geometry.ts', () => ({
-  preloadTerminalFont: geometryMocks.preloadTerminalFont,
-  proposeTerminalGeometry: geometryMocks.proposeTerminalGeometry,
-  proposeManagedTerminalGeometry: geometryMocks.proposeManagedTerminalGeometry,
+  estimateTerminalGeometry: geometryMocks.estimateTerminalGeometry,
+  estimateManagedTerminalGeometry: geometryMocks.estimateManagedTerminalGeometry,
 }))
 
 type ObserverCallback = () => void
@@ -58,9 +56,8 @@ function makeHost(): HTMLDivElement {
 
 describe('terminal session geometry helpers', () => {
   beforeEach(() => {
-    geometryMocks.preloadTerminalFont.mockClear()
-    geometryMocks.proposeTerminalGeometry.mockClear()
-    geometryMocks.proposeManagedTerminalGeometry.mockClear()
+    geometryMocks.estimateTerminalGeometry.mockClear()
+    geometryMocks.estimateManagedTerminalGeometry.mockClear()
   })
 
   test('captures geometry from a connected host and caches it', async () => {

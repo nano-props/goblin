@@ -228,7 +228,8 @@ const xtermMocks = vi.hoisted(() => {
     }
 
     fit = vi.fn(() => {
-      this.term?.resize(100, 30)
+      const dimensions = this.proposeDimensions()
+      if (dimensions) this.term?.resize(dimensions.cols, dimensions.rows)
     })
   }
 
@@ -387,12 +388,9 @@ vi.mock('@xterm/addon-serialize', () => ({ SerializeAddon: xtermMocks.MockSerial
 vi.mock('@xterm/addon-unicode11', () => ({ Unicode11Addon: xtermMocks.MockUnicode11Addon }))
 vi.mock('@xterm/addon-web-links', () => ({ WebLinksAddon: xtermMocks.MockWebLinksAddon }))
 
-// jsdom does not lay out, so proposeTerminalGeometry would return null. The
-// orchestrator now waits for a measurable host via waitForMeasurableHost;
-// mock the geometry module so the synchronous happy path resolves.
+// jsdom does not lay out; mock font preload so the synchronous happy path resolves.
 const geometryMocks = vi.hoisted(() => ({
   preloadTerminalFont: vi.fn(async () => {}),
-  proposeTerminalGeometry: vi.fn<() => { cols: number; rows: number } | null>(() => ({ cols: 80, rows: 24 })),
 }))
 
 vi.mock('#/web/components/terminal/terminal-geometry.ts', async () => {
@@ -403,7 +401,6 @@ vi.mock('#/web/components/terminal/terminal-geometry.ts', async () => {
   return {
     ...actual,
     preloadTerminalFont: geometryMocks.preloadTerminalFont,
-    proposeTerminalGeometry: geometryMocks.proposeTerminalGeometry,
   }
 })
 
@@ -1690,8 +1687,8 @@ describe('TerminalSession', () => {
 
     expect(terminalCalls.takeover).toHaveBeenCalledWith({
       ptySessionId: 'pty_session_1_aaaaaaaaa',
-      cols: 80,
-      rows: 24,
+      cols: 120,
+      rows: 40,
       clientId: 'client_local',
     })
     expect(terminalCalls.attach).toHaveBeenCalledWith({
@@ -1803,7 +1800,6 @@ describe('TerminalSession', () => {
         canonicalRows: 40,
       }),
     )
-    geometryMocks.proposeTerminalGeometry.mockReturnValueOnce(null)
     const host = document.createElement('div')
     document.body.appendChild(host)
     const session = new TerminalSession(descriptor, vi.fn())

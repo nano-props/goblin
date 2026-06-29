@@ -61,8 +61,8 @@ const mockSessions = vi.hoisted(
 
 const geometryMocks = vi.hoisted(() => ({
   preloadTerminalFont: vi.fn(async () => {}),
-  proposeTerminalGeometry: vi.fn(() => ({ cols: 100, rows: 30 })),
-  proposeManagedTerminalGeometry: vi.fn(() => ({ cols: 100, rows: 30 })),
+  estimateTerminalGeometry: vi.fn(() => ({ cols: 100, rows: 30 })),
+  estimateManagedTerminalGeometry: vi.fn(() => ({ cols: 100, rows: 30 })),
 }))
 
 vi.mock('#/web/components/terminal/terminal-geometry.ts', async () => {
@@ -73,8 +73,8 @@ vi.mock('#/web/components/terminal/terminal-geometry.ts', async () => {
   return {
     ...actual,
     preloadTerminalFont: geometryMocks.preloadTerminalFont,
-    proposeTerminalGeometry: geometryMocks.proposeTerminalGeometry,
-    proposeManagedTerminalGeometry: geometryMocks.proposeManagedTerminalGeometry,
+    estimateTerminalGeometry: geometryMocks.estimateTerminalGeometry,
+    estimateManagedTerminalGeometry: geometryMocks.estimateManagedTerminalGeometry,
   }
 })
 
