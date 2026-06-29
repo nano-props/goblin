@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { describe, expect, test } from 'vitest'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 import {
   createTerminalSizingOptions,
   estimateManagedTerminalGeometry,
@@ -11,6 +11,15 @@ import {
   TERMINAL_LINE_HEIGHT,
   TERMINAL_SCROLLBACK_ROWS,
 } from '#/web/components/terminal/terminal-geometry.ts'
+
+const originalFonts = document.fonts
+
+afterEach(() => {
+  Object.defineProperty(document, 'fonts', {
+    configurable: true,
+    value: originalFonts,
+  })
+})
 
 describe('terminal-geometry', () => {
   test('exports the page-lifetime font constants', () => {
@@ -49,5 +58,35 @@ describe('terminal-geometry', () => {
     // jsdom does not implement document.fonts.check / .load, so the
     // function should resolve immediately.
     await expect(preloadTerminalFont()).resolves.toBeUndefined()
+  })
+
+  test('does not cache cell metrics measured before the terminal font is loaded', () => {
+    Object.defineProperty(document, 'fonts', {
+      configurable: true,
+      value: {
+        check: vi.fn(() => false),
+        load: vi.fn(() => Promise.resolve([])),
+      },
+    })
+    const host = document.createElement('div')
+    host.getBoundingClientRect = () =>
+      ({
+        width: 124,
+        height: 40,
+      }) as DOMRect
+    let probeWidth = 100
+    const originalAppendChild = document.body.appendChild.bind(document.body)
+    const appendSpy = vi.spyOn(document.body, 'appendChild').mockImplementation((node: Node) => {
+      if (node instanceof HTMLElement) {
+        Object.defineProperty(node, 'offsetWidth', { configurable: true, get: () => probeWidth })
+        Object.defineProperty(node, 'offsetHeight', { configurable: true, get: () => 10 })
+      }
+      return originalAppendChild(node)
+    })
+
+    expect(estimateTerminalGeometry(host)).toEqual({ cols: 124, rows: 4 })
+    probeWidth = 200
+    expect(estimateTerminalGeometry(host)).toEqual({ cols: 62, rows: 4 })
+    expect(appendSpy).toHaveBeenCalledTimes(2)
   })
 })

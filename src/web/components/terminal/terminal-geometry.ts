@@ -47,7 +47,9 @@ export function preloadTerminalFont(): Promise<void> {
   if (document.fonts.check(spec)) return Promise.resolve()
   return document.fonts
     .load(spec)
-    .then(() => {})
+    .then(() => {
+      cachedTerminalCellMetrics = null
+    })
     .catch(() => {})
 }
 
@@ -79,6 +81,7 @@ function estimateTerminalGeometryFromSize(width: number, height: number): { cols
 function measureTerminalCell(): { cellWidth: number; cellHeight: number } | null {
   if (cachedTerminalCellMetrics) return cachedTerminalCellMetrics
   if (!document.body) return null
+  const canCache = isTerminalFontLoaded()
   const probe = document.createElement('span')
   probe.textContent = 'M'.repeat(100)
   probe.style.cssText = [
@@ -99,6 +102,12 @@ function measureTerminalCell(): { cellWidth: number; cellHeight: number } | null
   const height = probe.offsetHeight
   probe.remove()
   if (width <= 0 || height <= 0) return null
-  cachedTerminalCellMetrics = { cellWidth: width / 100, cellHeight: height }
-  return cachedTerminalCellMetrics
+  const metrics = { cellWidth: width / 100, cellHeight: height }
+  if (canCache) cachedTerminalCellMetrics = metrics
+  return metrics
+}
+
+function isTerminalFontLoaded(): boolean {
+  if (!document.fonts) return true
+  return document.fonts.check(`${TERMINAL_FONT_SIZE}px ${TERMINAL_FONT_FAMILY}`)
 }
