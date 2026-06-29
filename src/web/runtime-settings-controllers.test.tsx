@@ -9,7 +9,10 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 const settingsActionsMocks = vi.hoisted(() => ({
   runSettingsAction: vi.fn(async (_label: string, task: () => Promise<unknown>) => await task()),
   setFetchInterval: vi.fn(async () => 120),
+  setGlobalShortcut: vi.fn(async (accelerator: string) => ({ accelerator, registered: true })),
+  setGlobalShortcutDisabled: vi.fn(async () => {}),
   setLanEnabled: vi.fn(async () => {}),
+  setShortcutsDisabled: vi.fn(async () => {}),
   setTerminalNotificationsEnabled: vi.fn(async () => {}),
 }))
 
@@ -21,8 +24,14 @@ beforeEach(() => {
   settingsActionsMocks.runSettingsAction.mockImplementation(async (_label, task) => await task())
   settingsActionsMocks.setFetchInterval.mockClear()
   settingsActionsMocks.setFetchInterval.mockResolvedValue(120)
+  settingsActionsMocks.setGlobalShortcut.mockClear()
+  settingsActionsMocks.setGlobalShortcut.mockImplementation(async (accelerator) => ({ accelerator, registered: true }))
+  settingsActionsMocks.setGlobalShortcutDisabled.mockClear()
+  settingsActionsMocks.setGlobalShortcutDisabled.mockResolvedValue(undefined)
   settingsActionsMocks.setLanEnabled.mockClear()
   settingsActionsMocks.setLanEnabled.mockResolvedValue(undefined)
+  settingsActionsMocks.setShortcutsDisabled.mockClear()
+  settingsActionsMocks.setShortcutsDisabled.mockResolvedValue(undefined)
   settingsActionsMocks.setTerminalNotificationsEnabled.mockClear()
   settingsActionsMocks.setTerminalNotificationsEnabled.mockResolvedValue(undefined)
 })
@@ -70,6 +79,36 @@ describe('runtime settings controllers', () => {
 
     expect(settingsActionsMocks.runSettingsAction).toHaveBeenCalledWith('lanEnabled update', expect.any(Function))
     expect(settingsActionsMocks.setLanEnabled).toHaveBeenCalledWith(true)
+  })
+
+  test('runs shortcut settings writes through settings mutations', async () => {
+    const { useShortcutSettingsController } = await import('#/web/runtime-settings-shortcuts.ts')
+    let controller: ReturnType<typeof useShortcutSettingsController> | undefined
+
+    function HookHost() {
+      controller = useShortcutSettingsController()
+      return null
+    }
+
+    renderWithPrimaryWindowQueryClient(<HookHost />)
+
+    let globalShortcutResult: Awaited<ReturnType<NonNullable<typeof controller>['setGlobalShortcut']>> | undefined
+    await act(async () => {
+      await controller?.setShortcutsDisabled(true)
+      await controller?.setGlobalShortcutDisabled(true)
+      globalShortcutResult = await controller?.setGlobalShortcut('CommandOrControl+Shift+K')
+    })
+
+    expect(settingsActionsMocks.runSettingsAction).toHaveBeenCalledWith('shortcuts update', expect.any(Function))
+    expect(settingsActionsMocks.runSettingsAction).toHaveBeenCalledWith(
+      'global shortcut disabled update',
+      expect.any(Function),
+    )
+    expect(settingsActionsMocks.runSettingsAction).toHaveBeenCalledWith('global shortcut update', expect.any(Function))
+    expect(settingsActionsMocks.setShortcutsDisabled).toHaveBeenCalledWith(true)
+    expect(settingsActionsMocks.setGlobalShortcutDisabled).toHaveBeenCalledWith(true)
+    expect(settingsActionsMocks.setGlobalShortcut).toHaveBeenCalledWith('CommandOrControl+Shift+K')
+    expect(globalShortcutResult).toEqual({ accelerator: 'CommandOrControl+Shift+K', registered: true })
   })
 })
 
