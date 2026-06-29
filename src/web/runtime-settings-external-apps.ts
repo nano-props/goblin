@@ -9,9 +9,13 @@ export function useExternalAppSettings() {
 }
 
 export function useExternalAppSettingsController() {
-  const refreshMutation = useSettingsMutation('external app refresh', async () => {
-    await refreshExternalAppsDetection()
-  })
+  const refreshMutation = useSettingsMutation(
+    'external app refresh',
+    async () => {
+      await refreshExternalAppsDetection()
+    },
+    { singleFlight: true },
+  )
   return {
     refreshing: refreshMutation.isPending,
     async refreshExternalApps(): Promise<void> {

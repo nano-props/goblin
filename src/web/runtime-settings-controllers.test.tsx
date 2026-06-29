@@ -4,7 +4,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { act } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { renderInJsdom } from '#/test-utils/render.tsx'
+import { flushMicrotasks, renderInJsdom } from '#/test-utils/render.tsx'
 
 const settingsActionsMocks = vi.hoisted(() => ({
   refreshExternalAppsDetection: vi.fn(async () => {}),
@@ -136,6 +136,37 @@ describe('runtime settings controllers', () => {
     expect(settingsActionsMocks.refreshExternalAppsDetection).toHaveBeenCalledTimes(1)
   })
 
+  test('coalesces concurrent external app refreshes', async () => {
+    const { useExternalAppSettingsController } = await import('#/web/runtime-settings-external-apps.ts')
+    const refresh = createDeferredVoid()
+    settingsActionsMocks.refreshExternalAppsDetection.mockImplementation(async () => await refresh.promise)
+    let controller: ReturnType<typeof useExternalAppSettingsController> | undefined
+
+    function HookHost() {
+      controller = useExternalAppSettingsController()
+      return null
+    }
+
+    renderWithPrimaryWindowQueryClient(<HookHost />)
+    if (!controller) throw new Error('controller not mounted')
+
+    let firstRefresh: Promise<void> | undefined
+    let secondRefresh: Promise<void> | undefined
+    await act(async () => {
+      firstRefresh = controller?.refreshExternalApps()
+      secondRefresh = controller?.refreshExternalApps()
+      await flushMicrotasks()
+    })
+
+    expect(settingsActionsMocks.runSettingsAction).toHaveBeenCalledTimes(1)
+    expect(settingsActionsMocks.refreshExternalAppsDetection).toHaveBeenCalledTimes(1)
+
+    refresh.resolve()
+    await act(async () => {
+      await Promise.all([firstRefresh, secondRefresh])
+    })
+  })
+
   test('runs GitHub CLI refresh through settings mutations', async () => {
     const { useGitHubSettingsController } = await import('#/web/runtime-settings-github.ts')
     let controller: ReturnType<typeof useGitHubSettingsController> | undefined
@@ -154,8 +185,47 @@ describe('runtime settings controllers', () => {
     expect(settingsActionsMocks.runSettingsAction).toHaveBeenCalledWith('GitHub CLI refresh', expect.any(Function))
     expect(settingsActionsMocks.refreshGitHubCliDetection).toHaveBeenCalledTimes(1)
   })
+
+  test('coalesces concurrent GitHub CLI refreshes', async () => {
+    const { useGitHubSettingsController } = await import('#/web/runtime-settings-github.ts')
+    const refresh = createDeferredVoid()
+    settingsActionsMocks.refreshGitHubCliDetection.mockImplementation(async () => await refresh.promise)
+    let controller: ReturnType<typeof useGitHubSettingsController> | undefined
+
+    function HookHost() {
+      controller = useGitHubSettingsController()
+      return null
+    }
+
+    renderWithPrimaryWindowQueryClient(<HookHost />)
+    if (!controller) throw new Error('controller not mounted')
+
+    let firstRefresh: Promise<void> | undefined
+    let secondRefresh: Promise<void> | undefined
+    await act(async () => {
+      firstRefresh = controller?.refreshGitHubCli()
+      secondRefresh = controller?.refreshGitHubCli()
+      await flushMicrotasks()
+    })
+
+    expect(settingsActionsMocks.runSettingsAction).toHaveBeenCalledTimes(1)
+    expect(settingsActionsMocks.refreshGitHubCliDetection).toHaveBeenCalledTimes(1)
+
+    refresh.resolve()
+    await act(async () => {
+      await Promise.all([firstRefresh, secondRefresh])
+    })
+  })
 })
 
 function renderWithPrimaryWindowQueryClient(element: React.ReactElement) {
   return renderInJsdom(<QueryClientProvider client={primaryWindowQueryClient}>{element}</QueryClientProvider>)
+}
+
+function createDeferredVoid(): { promise: Promise<void>; resolve: () => void } {
+  let resolve = () => {}
+  const promise = new Promise<void>((nextResolve) => {
+    resolve = nextResolve
+  })
+  return { promise, resolve }
 }
