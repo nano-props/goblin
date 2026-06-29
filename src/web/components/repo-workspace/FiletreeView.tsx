@@ -24,6 +24,7 @@ import { ActionPopover, ActionPopoverItem } from '#/web/components/ActionPopover
 import { focusRingInset } from '#/web/components/ui/focus.ts'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { useRestoreTopVisibleRowIndex } from '#/web/hooks/useRestoreTopVisibleRowIndex.ts'
+import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { cn } from '#/web/lib/cn.ts'
 
 export interface FiletreeViewProps {
@@ -389,6 +390,9 @@ function FiletreeActionMenu({
 }) {
   const t = useT()
   const [open, setOpen] = useState(false)
+  // Compact UI has no hover affordance, so pin the trigger visible.
+  // While the popover is open, keep the trigger visible above it.
+  const alwaysVisible = useIsCompactUi() || open
 
   return (
     <ActionPopover
@@ -396,9 +400,9 @@ function FiletreeActionMenu({
       open={open}
       onOpenChange={setOpen}
       triggerClassName={cn(
-        'ml-auto size-5 shrink-0 p-0 opacity-0 transition-opacity duration-100',
-        'group-hover/filetree-row:opacity-100',
-        open && 'opacity-100',
+        'ml-auto size-5 shrink-0 p-0 transition-opacity duration-100',
+        alwaysVisible && 'opacity-100',
+        !alwaysVisible && 'opacity-0 group-hover/filetree-row:opacity-100',
       )}
       contentClassName="min-w-32 max-w-56"
     >
