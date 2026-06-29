@@ -18,6 +18,11 @@ vi.mock('#/web/stores/i18n.ts', () => ({
   },
 }))
 
+let compactUi = false
+vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
+  useIsCompactUi: () => compactUi,
+}))
+
 let container: HTMLDivElement | null = null
 let root: Root | null = null
 const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -114,6 +119,7 @@ function rerenderView(props: FiletreeViewHarnessProps) {
 
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
+  compactUi = false
   const win = window as typeof window & { PointerEvent?: typeof PointerEvent }
   win.PointerEvent ??= MouseEvent as unknown as typeof PointerEvent
   globalThis.PointerEvent ??= win.PointerEvent
@@ -336,6 +342,19 @@ describe('FiletreeView', () => {
     expect(onRequestTrashFile).toHaveBeenCalledTimes(1)
     expect(onRequestTrashFile.mock.calls[0]?.[0]?.path).toBe('README.md')
     expect(onOpenFile).not.toHaveBeenCalled()
+  })
+
+  test('keeps the file action menu trigger visible in compact mode', () => {
+    compactUi = true
+    const tree: RepoTreeResult = { nodes: [fileNode('README.md')], truncated: false }
+    renderView({ tree, loading: false, error: null })
+
+    const actionButton = row('README.md').querySelector<HTMLButtonElement>('[data-action-popover-trigger]')
+    expect(actionButton).toBeTruthy()
+    // Compact mode skips the group-hover reveal and keeps the action icon
+    // visible at all times so the touch/compact UI keeps the menu reachable.
+    expect(actionButton?.className).toContain('opacity-100')
+    expect(actionButton?.className).not.toContain('group-hover/filetree-row:opacity-100')
   })
 
   test('opens a file on double click', async () => {

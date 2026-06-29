@@ -32,3 +32,23 @@ Use this doc for UI language and presentation rules.
   container's box, not a separate child element. All separators read
   their color from `--color-separator` (= `--goblin-border-subtle`,
   one notch weaker than `--color-border`).
+- Hover-revealed action triggers (e.g. row action menus with
+  `opacity-0 group-hover/...:opacity-100`) must also stay visible in
+  compact UI — there is no hover affordance — and while the popover
+  is open — otherwise the trigger disappears under it. Collapse the
+  show-conditions into a single boolean, then render the two branches
+  side by side:
+
+  ```tsx
+  const alwaysVisible = useIsCompactUi() || open
+
+  triggerClassName={cn(
+    'ml-auto size-5 shrink-0 p-0 transition-opacity duration-100',
+    alwaysVisible && 'opacity-100',
+    !alwaysVisible && 'opacity-0 group-hover/filetree-row:opacity-100',
+  )}
+  ```
+
+  Do **not** add a third `cond && '…'` clause to an existing
+  `cn(...)` — that patches the same class name twice and buries the
+  visibility policy. Add the new condition to the boolean instead.
