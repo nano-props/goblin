@@ -228,7 +228,8 @@ const xtermMocks = vi.hoisted(() => {
     }
 
     fit = vi.fn(() => {
-      this.term?.resize(100, 30)
+      const dimensions = this.proposeDimensions()
+      if (dimensions) this.term?.resize(dimensions.cols, dimensions.rows)
     })
   }
 
@@ -1483,6 +1484,28 @@ describe('TerminalSession', () => {
 
     expect(terminalCalls.write).toHaveBeenCalledWith({ ptySessionId: 'pty_session_1_aaaaaaaaa', data: 'hello' })
     expect(notify).not.toHaveBeenCalled()
+  })
+
+  test('refits after output when xterm geometry drifts without a resize observer event', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session)
+    session.attach(host)
+    await flushTerminalStart()
+    await flushUntil(() => session.snapshot().phase === 'open')
+    terminalCalls.resize.mockClear()
+    xtermMocks.fitAddons[0]!.proposeDimensions.mockReturnValue({ cols: 120, rows: 30 })
+
+    session.handleOutput({ ptySessionId: 'pty_session_1_aaaaaaaaa', data: 'codex repaint', seq: 1, processName: 'codex' })
+    await flushUntil(() => terminalCalls.resize.mock.calls.length > 0)
+
+    expect(xtermMocks.fitAddons[0]!.fit).toHaveBeenCalled()
+    expect(terminalCalls.resize).toHaveBeenCalledWith({
+      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      cols: 120,
+      rows: 30,
+    })
   })
 
   test('queues external command input until the first PTY output arrives', async () => {

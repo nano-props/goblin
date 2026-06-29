@@ -210,9 +210,7 @@ export class TerminalSessionView {
   }
 
   fitSoon(): void {
-    if (!this.term || !this.fitAddon || !hasMeasurableBox(this.xtermHost)) return
-    const dimensions = this.fitAddon.proposeDimensions()
-    if (!dimensions || (dimensions.cols === this.term.cols && dimensions.rows === this.term.rows)) return
+    if (!this.needsRefit()) return
     this.cancelFitFlush()
     this.fitFlushTimer = window.setTimeout(() => {
       this.fitFlushTimer = null
@@ -223,6 +221,18 @@ export class TerminalSessionView {
   fitNow(): void {
     if (!this.term || !this.fitAddon || !hasMeasurableBox(this.xtermHost)) return
     this.fitAddon.fit()
+  }
+
+  refitIfNeeded(): boolean {
+    if (!this.needsRefit()) return false
+    this.fitNow()
+    return true
+  }
+
+  private needsRefit(): boolean {
+    if (!this.term || !this.fitAddon || !hasMeasurableBox(this.xtermHost)) return false
+    const dimensions = this.fitAddon.proposeDimensions()
+    return !!dimensions && (dimensions.cols !== this.term.cols || dimensions.rows !== this.term.rows)
   }
 
   destroyTerminal(): void {

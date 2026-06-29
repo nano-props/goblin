@@ -634,10 +634,10 @@ export class TerminalSession {
       }
       if (this.geometryAbortController === geometryAbortController) this.geometryAbortController = null
       const term = this.view.openTerminal(geometry, (input) => this.writeInput(input))
-      preloadReplayGeneration = await this.preloadHydratedSnapshot(token, term)
       await waitForTerminalLayout()
       this.guardStart(token, term)
       this.view.fitNow()
+      preloadReplayGeneration = await this.preloadHydratedSnapshot(token, term)
       // The post-fitNow rAF barrier is intentionally concurrent with the
       // subsequent ipcPhase.attach: view.fitNow() is synchronous, so
       // term.cols/term.rows are correct the moment we return from openPhase,
@@ -889,6 +889,7 @@ export class TerminalSession {
     const output = this.pendingOutput.join('')
     this.pendingOutput = []
     this.view.currentTerminal()?.write(output)
+    this.view.refitIfNeeded()
   }
 
   private shouldQueueExternalCommandInput(input: TerminalInput, ptySessionId: string): boolean {
