@@ -12,7 +12,11 @@ import * as pty from 'node-pty'
 import { resolveLocalShell } from '#/server/terminal/terminal-local-shell.ts'
 import { type TerminalPtyRuntime } from '#/server/terminal/terminal-pty-runtime.ts'
 import type { PtySpawnInput } from '#/server/terminal/pty-supervisor.ts'
-import type { PtyWorkerMessage, PtyWorkerRequest } from '#/server/terminal/pty-worker-protocol.ts'
+import type {
+  PtyWorkerMessage,
+  PtyWorkerRequest,
+  PtyWorkerSpawnFailureCode,
+} from '#/server/terminal/pty-worker-protocol.ts'
 
 /** The return shape from a PtySupervisor-style spawn call. The worker
  *  runtime's spawnPty fn returns this same shape so the failure path
@@ -71,7 +75,13 @@ export class PtyWorkerRuntime {
   private handleSpawn(requestId: string, input: PtySpawnInput): void {
     const result = this.spawnPty(input)
     if (!result.ok) {
-      this.options.emit({ type: 'pty-spawn-result', requestId, ok: false, error: result.message })
+      this.options.emit({
+        type: 'pty-spawn-result',
+        requestId,
+        ok: false,
+        error: result.message,
+        failure: classifyPtySpawnFailure(result.message),
+      })
       return
     }
     const ptySessionId = createPtySessionId()
@@ -144,6 +154,13 @@ function defaultSpawnPty(input: PtySpawnInput): PtySpawnOutcome {
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : 'error.unknown' }
   }
+}
+
+function classifyPtySpawnFailure(message: string): { code: PtyWorkerSpawnFailureCode; recoverable: boolean } {
+  if (message.toLowerCase().includes('posix_spawnp failed')) {
+    return { code: 'native-pty-spawn-failed', recoverable: true }
+  }
+  return { code: 'unknown', recoverable: false }
 }
 
 function safeProcessName(runtime: TerminalPtyRuntime): string {

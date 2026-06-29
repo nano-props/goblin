@@ -33,7 +33,7 @@ export type PtySupervisorMode = 'in-process' | 'worker-backed'
 export type PtySupervisorState = 'idle' | 'running' | 'restarting' | 'shutting-down'
 
 export interface PtySupervisorFailureDiagnostics {
-  kind: 'exit' | 'error' | 'send-failed'
+  kind: 'exit' | 'error' | 'send-failed' | 'spawn-failed'
   at: number
   detail: string
 }
