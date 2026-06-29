@@ -62,7 +62,7 @@ export type {
   NativeSettingsProjectionState,
   NativeHostProjection,
 } from '#/shared/native-host-projection.ts'
-export type { RepoSettingsEntry, WorktreeBootstrapTrust } from '#/shared/repo-settings.ts'
+export type { RepoSettingsEntry, WorktreeBootstrapTrust, WorkspaceExternalAppRecent } from '#/shared/repo-settings.ts'
 
 export interface LanInfo {
   host: string

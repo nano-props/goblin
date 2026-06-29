@@ -2,7 +2,11 @@ import path from 'node:path'
 import { runServerCancellable, abortServerNetworkOp } from '#/server/common/network-ops.ts'
 import { publishRepoQueryInvalidation, publishSettingsInvalidation } from '#/server/modules/invalidation-broker.ts'
 import { resolveRepoSource, runWithRepoSource, type RepoMutationResult } from '#/server/modules/repo-source.ts'
-import { getServerRepoSettings, trustServerRepoWorktreeBootstrapConfig } from '#/server/modules/settings-source.ts'
+import {
+  getServerRepoSettings,
+  pruneServerRepoSettingsForRemovedWorktree,
+  trustServerRepoWorktreeBootstrapConfig,
+} from '#/server/modules/settings-source.ts'
 import { cloneRepo as cloneGitRepo } from '#/system/git/clone.ts'
 import { openInPreferredEditor } from '#/system/editors.ts'
 import { openInPreferredTerminal } from '#/system/terminals.ts'
@@ -337,7 +341,22 @@ export async function removeRepoWorktree(
   sourceToken?: string,
 ): Promise<ExecResult> {
   return await runWithRepoSource(cwd, async (source) => {
-    return await publishSnapshotInvalidationAfterMutation(cwd, await source.removeWorktree(input, signal), sourceToken)
+    const result = await publishSnapshotInvalidationAfterMutation(
+      cwd,
+      await source.removeWorktree(input, signal),
+      sourceToken,
+    )
+    if (!result.ok) return result
+    try {
+      const changed = await pruneServerRepoSettingsForRemovedWorktree({
+        repoId: cwd,
+        worktreePath: input.worktreePath,
+      })
+      if (changed) publishSettingsInvalidation(['settings-snapshot'])
+      return result
+    } catch {
+      return { ...result, ok: false, message: 'error.settings-write-title', repoChanged: true }
+    }
   })
 }
 

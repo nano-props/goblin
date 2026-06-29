@@ -37,15 +37,14 @@ import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import {
-  WORKSPACE_EXTERNAL_APP_RECENT_STORAGE_KEY,
-  workspaceExternalAppRecentScope,
-} from '#/web/workspace-external-apps-recent.ts'
-import {
   workspacePaneStaticTabsForBranch,
   workspacePaneTabOrderForBranch,
 } from '#/web/stores/repos/workspace-pane-tabs.ts'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
+import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
+import type { RepoSettingsEntry } from '#/shared/repo-settings.ts'
 
 let compactUi = false
 const runtimeExternalAppSettings = vi.hoisted(() => ({
@@ -132,7 +131,6 @@ beforeEach(() => {
     snapshot: { homeDir: '/Users/tester', platform: 'darwin', hostname: 'test-host', pid: 1 },
     hydrated: true,
   })
-  window.localStorage.clear()
   resetReposStore()
   setClientBridgeForTests(null)
   // T6.1: the toolbar reads `isInitialSyncInFlight` from
@@ -147,7 +145,6 @@ afterEach(() => {
   appShellMocks.openExternalUrl.mockReset()
   repoClientMocks.openRepoInFinder.mockReset()
   useHostInfoStore.setState({ snapshot: null, hydrated: false })
-  window.localStorage.clear()
   setClientBridgeForTests(null)
   setTerminalSessionCommandBridge(null)
 })
@@ -356,6 +353,72 @@ describe('RepoWorkspaceToolbar', () => {
   })
 
   test('uses the scoped recent external app as the split-button primary action', async () => {
+    const initialSnapshot = defaultSettingsSnapshot({ repoSettings: [] })
+    const fetchSpy = mockRecentAppPostFetch(initialSnapshot)
+    const { container: c, queryClient } = renderToolbar({
+      terminalCount: 0,
+      navigation: navigationWith({}),
+    })
+
+    const trigger = c.querySelector<HTMLButtonElement>('[data-testid="workspace-open-externally-menu-trigger"]')
+    expect(trigger).not.toBeNull()
+
+    await act(async () => {
+      trigger?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+      trigger?.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
+      await Promise.resolve()
+    })
+
+    const finderItem = Array.from(document.body.querySelectorAll<HTMLButtonElement>('button')).find(
+      (button) => button.textContent === 'worktrees.reveal-title',
+    )
+    expect(finderItem).not.toBeNull()
+
+    await act(async () => {
+      finderItem?.click()
+      await flush()
+    })
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      expect.stringContaining('/api/settings/repo-external-app-recent'),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ repoId: REPO_ID, worktreePath: WORKTREE_PATH, itemId: 'finder' }),
+      }),
+    )
+    expect(repoClientMocks.openRepoInFinder).toHaveBeenCalledWith(WORKTREE_PATH)
+
+    // Simulate the server-driven settings-snapshot invalidation that
+    // `publishSettingsInvalidation(['settings-snapshot'])` would push to
+    // the client in production. The refetch then picks up the new recent
+    // written by the mock.
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: settingsSnapshotQueryKey(), exact: true })
+      await flush()
+    })
+
+    const primary = c.querySelector<HTMLButtonElement>('button[aria-label="worktrees.reveal-title"]')
+    expect(primary).not.toBeNull()
+
+    await act(async () => {
+      primary?.click()
+      await flush()
+    })
+
+    // Clicking the same recent item is a no-op — the menu skips the
+    // server write. Only the first click should have hit the POST
+    // endpoint; the second click is purely a local open.
+    const postCalls = fetchSpy.mock.calls.filter(([input]) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+      return url.endsWith('/api/settings/repo-external-app-recent')
+    })
+    expect(postCalls).toHaveLength(1)
+    expect(repoClientMocks.openRepoInFinder).toHaveBeenCalledTimes(2)
+  })
+
+  test('shows an error toast when storing the recent external app fails', async () => {
+    const initialSnapshot = defaultSettingsSnapshot({ repoSettings: [] })
+    mockRecentAppPostFetch(initialSnapshot, { failPost: true })
     const { container: c } = renderToolbar({
       terminalCount: 0,
       navigation: navigationWith({}),
@@ -377,37 +440,18 @@ describe('RepoWorkspaceToolbar', () => {
 
     await act(async () => {
       finderItem?.click()
-      await Promise.resolve()
+      await flush()
     })
 
-    expect(
-      window.localStorage.getItem(
-        `${WORKSPACE_EXTERNAL_APP_RECENT_STORAGE_KEY}:${workspaceExternalAppRecentScope(REPO_ID, WORKTREE_PATH)}`,
-      ),
-    ).toBe('finder')
+    expect(toastMocks.error).toHaveBeenCalledWith('action.result-error', {
+      description: 'Server request failed (HTTP 500)',
+    })
     expect(repoClientMocks.openRepoInFinder).toHaveBeenCalledWith(WORKTREE_PATH)
-
-    const primary = c.querySelector<HTMLButtonElement>('button[aria-label="worktrees.reveal-title"]')
-    expect(primary).not.toBeNull()
-
-    await act(async () => {
-      primary?.click()
-      await Promise.resolve()
-    })
-
-    expect(repoClientMocks.openRepoInFinder).toHaveBeenCalledTimes(2)
+    expect(c.querySelector<HTMLButtonElement>('button[aria-label="settings.terminal.ghostty"]')).not.toBeNull()
   })
 
   test('reloads the scoped recent external app when the worktree path changes', async () => {
     const nextWorktreePath = '/tmp/gbl-repo-workspace-toolbar-worktree-next'
-    window.localStorage.setItem(
-      `${WORKSPACE_EXTERNAL_APP_RECENT_STORAGE_KEY}:${workspaceExternalAppRecentScope(REPO_ID, WORKTREE_PATH)}`,
-      'finder',
-    )
-    window.localStorage.setItem(
-      `${WORKSPACE_EXTERNAL_APP_RECENT_STORAGE_KEY}:${workspaceExternalAppRecentScope(REPO_ID, nextWorktreePath)}`,
-      'editor:vscode',
-    )
     const repo = seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -415,21 +459,29 @@ describe('RepoWorkspaceToolbar', () => {
     const branchActions = menuBranchActions()
 
     const { container, rerender } = renderInJsdom(
-      <WorkspaceOpenExternallyMenu
-        repo={repo}
-        branch={createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })}
-        branchActions={branchActions}
-      />,
+      <QueryClientProvider client={seededQueryClientWithRepoSettings([
+        { repoId: REPO_ID, workspaceExternalAppRecent: { byWorktree: { [WORKTREE_PATH]: 'finder', [nextWorktreePath]: 'editor:vscode' } } },
+      ])}>
+        <WorkspaceOpenExternallyMenu
+          repo={repo}
+          branch={createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })}
+          branchActions={branchActions}
+        />
+      </QueryClientProvider>,
     )
 
     expect(container.querySelector<HTMLButtonElement>('button[aria-label="worktrees.reveal-title"]')).not.toBeNull()
 
     rerender(
-      <WorkspaceOpenExternallyMenu
-        repo={repo}
-        branch={createRepoBranch('feature/worktree', { worktree: { path: nextWorktreePath } })}
-        branchActions={branchActions}
-      />,
+      <QueryClientProvider client={seededQueryClientWithRepoSettings([
+        { repoId: REPO_ID, workspaceExternalAppRecent: { byWorktree: { [WORKTREE_PATH]: 'finder', [nextWorktreePath]: 'editor:vscode' } } },
+      ])}>
+        <WorkspaceOpenExternallyMenu
+          repo={repo}
+          branch={createRepoBranch('feature/worktree', { worktree: { path: nextWorktreePath } })}
+          branchActions={branchActions}
+        />
+      </QueryClientProvider>,
     )
 
     expect(container.querySelector<HTMLButtonElement>('button[aria-label="settings.editor.vscode"]')).not.toBeNull()
@@ -1089,10 +1141,17 @@ function renderToolbar(options: {
    * New Terminal button in a busy state.
    */
   loading?: boolean
+  /**
+   * Pre-seed the settings snapshot's `repoSettings` field so the
+   * workspace external app menu reads from server-backed state
+   * without an HTTP round trip. Defaults to an empty array.
+   */
+  seedRepoSettings?: RepoSettingsEntry[]
 }): {
   container: HTMLElement
   terminalTab: HTMLButtonElement
   rerender: ReturnType<typeof renderInJsdom>['rerender']
+  queryClient: QueryClient
   mocks: {
     createTerminal: ReturnType<typeof vi.fn>
     selectTerminal: ReturnType<typeof vi.fn>
@@ -1212,6 +1271,10 @@ function renderToolbar(options: {
   })
 
   const queryClient = new QueryClient()
+  queryClient.setQueryData(
+    settingsSnapshotQueryKey(),
+    defaultSettingsSnapshot({ repoSettings: options.seedRepoSettings ?? [] }),
+  )
   const { container, rerender } = renderInJsdom(
     <QueryClientProvider client={queryClient}>
       <PrimaryWindowNavigationProvider value={options.navigation}>
@@ -1241,6 +1304,7 @@ function renderToolbar(options: {
     container,
     terminalTab: tab as HTMLButtonElement,
     rerender,
+    queryClient,
     mocks: {
       createTerminal,
       selectTerminal,
@@ -1294,4 +1358,64 @@ function staticEntry(type: WorkspacePaneStaticTabType): WorkspacePaneTabOrderEnt
 
 function terminalEntry(id: string): WorkspacePaneTabOrderEntry {
   return { type: 'terminal', id }
+}
+
+/**
+ * Stub `globalThis.fetch` so the menu's `setRecentWorkspaceExternalApp`
+ * call resolves cleanly. Also serves the snapshot GET — `useSettingsSnapshotQuery`
+ * has `staleTime: 0`, so background refetches would otherwise throw.
+ * Other URLs throw to surface unexpected traffic.
+ */
+function mockRecentAppPostFetch(initialSnapshot: object, options: { failPost?: boolean } = {}): ReturnType<typeof vi.fn> {
+  let currentSnapshot = initialSnapshot
+  const fetchSpy = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+    if (url.endsWith('/api/settings/repo-external-app-recent')) {
+      if (options.failPost) {
+        return new Response(JSON.stringify({ ok: false }), {
+          status: 500,
+          headers: { 'content-type': 'application/json' },
+        })
+      }
+      const body = init?.body
+        ? (JSON.parse(init.body as string) as { itemId: string; worktreePath: string | null; repoId: string })
+        : null
+      if (body) {
+        currentSnapshot = {
+          ...(currentSnapshot as Record<string, unknown>),
+          repoSettings: [
+            {
+              repoId: body.repoId,
+              workspaceExternalAppRecent: { byWorktree: { [body.worktreePath ?? '']: body.itemId } },
+            },
+          ],
+        }
+      }
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    }
+    if (url.endsWith('/api/settings') && (!init?.method || init.method === 'GET')) {
+      return new Response(JSON.stringify(currentSnapshot), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    }
+    throw new Error(`unexpected fetch in test: ${url}`)
+  })
+  vi.stubGlobal('fetch', fetchSpy)
+  return fetchSpy
+}
+
+/**
+ * Build a fresh `QueryClient` whose settings snapshot cache already
+ * contains the given `repoSettings`. Used by the worktree-scope test
+ * which renders `WorkspaceOpenExternallyMenu` directly (it doesn't go
+ * through `renderToolbar`).
+ */
+function seededQueryClientWithRepoSettings(repoSettings: RepoSettingsEntry[]): QueryClient {
+  const queryClient = new QueryClient()
+  queryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot({ repoSettings }))
+  return queryClient
 }

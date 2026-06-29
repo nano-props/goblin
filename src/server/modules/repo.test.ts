@@ -37,6 +37,7 @@ const mocks = vi.hoisted(() => ({
   getWorktreeBootstrapPreview: vi.fn(),
   getRemoteWorktreeBootstrapPreview: vi.fn(),
   getServerRepoSettings: vi.fn(),
+  pruneServerRepoSettingsForRemovedWorktree: vi.fn(),
   resolveRemoteTarget: vi.fn(),
   trustServerRepoWorktreeBootstrapConfig: vi.fn(),
 }))
@@ -104,6 +105,7 @@ vi.mock('#/shared/input-validation.ts', () => ({
 
 vi.mock('#/server/modules/settings-source.ts', () => ({
   getServerRepoSettings: mocks.getServerRepoSettings,
+  pruneServerRepoSettingsForRemovedWorktree: mocks.pruneServerRepoSettingsForRemovedWorktree,
   trustServerRepoWorktreeBootstrapConfig: mocks.trustServerRepoWorktreeBootstrapConfig,
 }))
 
@@ -190,6 +192,7 @@ beforeEach(() => {
     },
   })
   mocks.getServerRepoSettings.mockResolvedValue([])
+  mocks.pruneServerRepoSettingsForRemovedWorktree.mockResolvedValue(false)
   mocks.resolveRemoteTarget.mockResolvedValue({
     target: {
       id: normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' }),
@@ -982,6 +985,41 @@ describe('repo mutation invalidation publishing', () => {
       query: 'repo-snapshot',
     })
     expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledTimes(2)
+    expect(mocks.pruneServerRepoSettingsForRemovedWorktree).toHaveBeenCalledWith({
+      repoId: '/tmp/repo-linked',
+      worktreePath: '/tmp/repo-linked',
+    })
+    expect(mocks.publishSettingsInvalidation).not.toHaveBeenCalled()
+  })
+
+  test('removeRepoWorktree publishes settings invalidation when worktree-scoped settings are pruned', async () => {
+    const worktrees = [
+      { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true, isDirty: false },
+      {
+        path: '/tmp/repo-worktree',
+        branch: 'feature/a',
+        isBare: false,
+        isPrimary: false,
+        isDirty: false,
+        changeCount: 0,
+      },
+    ]
+    mocks.getWorktrees.mockResolvedValueOnce(worktrees).mockResolvedValueOnce(worktrees)
+    mocks.pruneServerRepoSettingsForRemovedWorktree.mockResolvedValueOnce(true)
+    const { removeRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+
+    const result = await removeRepoWorktree('/tmp/repo', {
+      branch: 'feature/a',
+      worktreePath: '/tmp/repo-worktree',
+      alsoDeleteBranch: false,
+    })
+
+    expect(result).toEqual({ ok: true, message: 'ok' })
+    expect(mocks.pruneServerRepoSettingsForRemovedWorktree).toHaveBeenCalledWith({
+      repoId: '/tmp/repo',
+      worktreePath: '/tmp/repo-worktree',
+    })
+    expect(mocks.publishSettingsInvalidation).toHaveBeenCalledWith(['settings-snapshot'])
   })
 
   test('removeRepoWorktree refuses before removing when branch deletion would fail', async () => {

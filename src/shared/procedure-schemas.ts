@@ -216,6 +216,15 @@ export const SETTINGS_PROCEDURE_SCHEMAS = {
   fetchInterval: v.object({ sec: v.number() }),
   globalShortcutState: v.object({ registered: v.boolean() }),
   recentReposAdd: v.object({ repo: RepoSessionEntrySchema }),
+  // Body for `POST /api/settings/repo-external-app-recent`. The
+  // server-side mutator still re-validates repoId, worktreePath and
+  // itemId, including path and NUL checks, before touching disk; this
+  // schema only enforces the basic wire shape.
+  repoExternalAppRecentSet: v.object({
+    repoId: v.pipe(v.string(), v.minLength(1)),
+    worktreePath: v.nullable(v.pipe(v.string(), v.minLength(1))),
+    itemId: v.pipe(v.string(), v.minLength(1), v.maxLength(64)),
+  }),
   githubCli: GITHUB_CLI_REFRESH_SCHEMA,
 } as const
 

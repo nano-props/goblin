@@ -1,5 +1,6 @@
 import { ChevronDown, Loader2 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { toast } from 'sonner'
 import type { RepoBranchState } from '#/web/stores/repos/types.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { focusRing } from '#/web/components/ui/focus.ts'
@@ -16,11 +17,9 @@ import {
   workspaceExternalAppAvailable,
   type WorkspaceExternalAppItem,
 } from '#/web/external-workspace-apps.tsx'
-import {
-  readRecentWorkspaceExternalAppId,
-  workspaceExternalAppRecentScope,
-  writeRecentWorkspaceExternalAppId,
-} from '#/web/workspace-external-apps-recent.ts'
+import { getRecentWorkspaceExternalAppId } from '#/shared/repo-settings.ts'
+import { useSettingsSnapshotQuery } from '#/web/settings-queries.ts'
+import { setRecentWorkspaceExternalApp } from '#/web/settings-client.ts'
 import { cn } from '#/web/lib/cn.ts'
 
 interface Props {
@@ -40,12 +39,20 @@ export function WorkspaceOpenExternallyMenu({ repo, branch, branchActions }: Pro
   const isRemoteRepo = remoteRepoTarget(repo.id, repo.remote.lifecycle) !== null
   const finderAvailable = capabilities.canOpenFinder && hostPlatform === 'darwin'
   const remoteOpenAction = useRemoteOpenAction(repo, branch, branchActions)
-  const recentScope = workspaceExternalAppRecentScope(repo.id, branch.worktree?.path)
-  const [recentItemId, setRecentItemId] = useState<string | null>(() => readRecentWorkspaceExternalAppId(recentScope))
-
+  const { data: settingsSnapshot } = useSettingsSnapshotQuery()
+  const repoSettings = settingsSnapshot?.repoSettings
+  const serverRecentItemId = useMemo(
+    () => getRecentWorkspaceExternalAppId(repoSettings ?? [], repo.id, branch.worktree?.path),
+    [repoSettings, repo.id, branch.worktree?.path],
+  )
+  // Mirror the server-derived recent in local state so the split-button
+  // primary icon swaps instantly on click, then re-syncs once the
+  // server's `settings-snapshot` invalidation lands. The server is the
+  // source of truth — the mirror only bridges the async round-trip.
+  const [recentItemId, setRecentItemId] = useState<string | null>(serverRecentItemId)
   useEffect(() => {
-    setRecentItemId(readRecentWorkspaceExternalAppId(recentScope))
-  }, [recentScope])
+    setRecentItemId(serverRecentItemId)
+  }, [serverRecentItemId])
 
   const localItems = useMemo(
     () =>
@@ -73,9 +80,26 @@ export function WorkspaceOpenExternallyMenu({ repo, branch, branchActions }: Pro
   function runLocalItem(item: WorkspaceExternalAppItem) {
     if (busy) return
     setOpen(false)
-    setRecentItemId(item.id)
-    writeRecentWorkspaceExternalAppId(item.id, recentScope)
-    void run(item.id, () => {
+    const previousRecentItemId = recentItemId
+    const shouldWriteRecent = item.id !== recentItemId
+    if (shouldWriteRecent) {
+      setRecentItemId(item.id)
+    }
+    void run(item.id, async () => {
+      if (shouldWriteRecent) {
+        try {
+          await setRecentWorkspaceExternalApp({
+            repoId: repo.id,
+            worktreePath: branch.worktree?.path ?? null,
+            itemId: item.id,
+          })
+        } catch (err) {
+          setRecentItemId(previousRecentItemId)
+          toast.error(t('action.result-error'), {
+            description: err instanceof Error ? err.message : String(err),
+          })
+        }
+      }
       if (item.kind === 'terminal') return actions.openTerminal(item.app)
       if (item.kind === 'editor') return actions.openEditor(item.app)
       return actions.openFinder()

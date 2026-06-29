@@ -255,6 +255,7 @@ test('normalizes file tree view state in server sessions', async () => {
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
 
   const mod = await import('#/server/modules/settings-source.ts')
+
   await mod.setServerSessionState({
     ...defaultWorkspaceSessionState(),
     openRepoEntries: [
@@ -302,4 +303,257 @@ test('normalizes file tree view state in server sessions', async () => {
       },
     },
   })
+})
+
+test('records the most recent workspace external app per (repo, worktree)', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+
+  const mod = await import('#/server/modules/settings-source.ts')
+
+  await mod.setServerRepoWorkspaceExternalAppRecent({
+    repoId: '/repo-a',
+    worktreePath: '/repo-a/worktree-x',
+    itemId: 'editor:vscode',
+  })
+  await mod.setServerRepoWorkspaceExternalAppRecent({
+    repoId: '/repo-a',
+    worktreePath: '/repo-a/worktree-y',
+    itemId: 'terminal:ghostty',
+  })
+  await mod.setServerRepoWorkspaceExternalAppRecent({
+    repoId: '/repo-a',
+    worktreePath: null,
+    itemId: 'finder',
+  })
+
+  expect(await mod.getServerRepoSettings()).toEqual([
+    {
+      repoId: '/repo-a',
+      workspaceExternalAppRecent: {
+        byWorktree: {
+          '/repo-a/worktree-x': 'editor:vscode',
+          '/repo-a/worktree-y': 'terminal:ghostty',
+          '': 'finder',
+        },
+      },
+    },
+  ])
+
+  mod.resetServerSettingsSourceForTests()
+  vi.resetModules()
+  const reloaded = await import('#/server/modules/settings-source.ts')
+  expect(await reloaded.getServerRepoSettings()).toEqual([
+    {
+      repoId: '/repo-a',
+      workspaceExternalAppRecent: {
+        byWorktree: {
+          '/repo-a/worktree-x': 'editor:vscode',
+          '/repo-a/worktree-y': 'terminal:ghostty',
+          '': 'finder',
+        },
+      },
+    },
+  ])
+})
+
+test('overwrites an existing workspace external app recent on the same worktree key', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+
+  const mod = await import('#/server/modules/settings-source.ts')
+
+  await mod.setServerRepoWorkspaceExternalAppRecent({
+    repoId: '/repo-a',
+    worktreePath: '/repo-a/worktree-x',
+    itemId: 'editor:vscode',
+  })
+  await mod.setServerRepoWorkspaceExternalAppRecent({
+    repoId: '/repo-a',
+    worktreePath: '/repo-a/worktree-x',
+    itemId: 'editor:cursor',
+  })
+
+  expect(await mod.getServerRepoSettings()).toEqual([
+    {
+      repoId: '/repo-a',
+      workspaceExternalAppRecent: {
+        byWorktree: {
+          '/repo-a/worktree-x': 'editor:cursor',
+        },
+      },
+    },
+  ])
+})
+
+test('skips the file rewrite when the workspace external app recent is already current', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+
+  const mod = await import('#/server/modules/settings-source.ts')
+  const fs = await import('node:fs/promises')
+  const dataFile = `${tmp}/user-settings.json`
+
+  await mod.setServerRepoWorkspaceExternalAppRecent({
+    repoId: '/repo-a',
+    worktreePath: '/repo-a/worktree-x',
+    itemId: 'editor:vscode',
+  })
+  const mtimeBefore = (await fs.stat(dataFile)).mtimeMs
+
+  // Sleep so the mtime can change if the file is rewritten.
+  await new Promise((resolve) => setTimeout(resolve, 5))
+
+  await mod.setServerRepoWorkspaceExternalAppRecent({
+    repoId: '/repo-a',
+    worktreePath: '/repo-a/worktree-x',
+    itemId: 'editor:vscode',
+  })
+
+  const mtimeAfter = (await fs.stat(dataFile)).mtimeMs
+  expect(mtimeAfter).toBe(mtimeBefore)
+})
+
+test('rejects invalid workspace external app recent input without touching disk', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+
+  const mod = await import('#/server/modules/settings-source.ts')
+
+  await mod.setServerRepoWorkspaceExternalAppRecent({
+    repoId: '',
+    worktreePath: '/repo-a',
+    itemId: 'editor:vscode',
+  })
+  await mod.setServerRepoWorkspaceExternalAppRecent({
+    repoId: '/repo-a',
+    worktreePath: 'relative/path',
+    itemId: 'editor:vscode',
+  })
+  await mod.setServerRepoWorkspaceExternalAppRecent({
+    repoId: '/repo-a',
+    worktreePath: '/repo-a',
+    itemId: '',
+  })
+  await mod.setServerRepoWorkspaceExternalAppRecent({
+    repoId: '/repo-a',
+    worktreePath: '/repo-a',
+    itemId: 'editor:vscode\0with-nul',
+  })
+
+  expect(await mod.getServerRepoSettings()).toEqual([])
+})
+
+test('normalizer drops malformed workspace external app recent entries on load', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+
+  const fs = await import('node:fs/promises')
+  await fs.writeFile(
+    `${tmp}/user-settings.json`,
+    JSON.stringify({
+      repoSettings: [
+        {
+          repoId: '/repo-a',
+          workspaceExternalAppRecent: {
+            byWorktree: {
+              '/repo-a/worktree-x': 'editor:vscode',
+              'relative/path': 'editor:cursor',
+              '/repo-a/nul\0key': 'editor:windsurf',
+              '': 'finder',
+            },
+          },
+        },
+      ],
+    }),
+    'utf-8',
+  )
+
+  const mod = await import('#/server/modules/settings-source.ts')
+
+  expect(await mod.getServerRepoSettings()).toEqual([
+    {
+      repoId: '/repo-a',
+      workspaceExternalAppRecent: {
+        byWorktree: {
+          '/repo-a/worktree-x': 'editor:vscode',
+          '': 'finder',
+        },
+      },
+    },
+  ])
+})
+
+test('prunes removed-worktree settings without dropping repo-level trust', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+
+  const mod = await import('#/server/modules/settings-source.ts')
+  const configHash = `sha256:${'a'.repeat(64)}`
+
+  await mod.trustServerRepoWorktreeBootstrapConfig({
+    repoId: '/repo-a',
+    configHash,
+  })
+  await mod.setServerRepoWorkspaceExternalAppRecent({
+    repoId: '/repo-a',
+    worktreePath: '/repo-a/worktree-x',
+    itemId: 'editor:vscode',
+  })
+  await mod.setServerRepoWorkspaceExternalAppRecent({
+    repoId: '/repo-a',
+    worktreePath: '/repo-a/worktree-y',
+    itemId: 'terminal:ghostty',
+  })
+
+  await expect(
+    mod.pruneServerRepoSettingsForRemovedWorktree({
+      repoId: '/repo-a',
+      worktreePath: '/repo-a/worktree-x',
+    }),
+  ).resolves.toBe(true)
+
+  expect(await mod.getServerRepoSettings()).toEqual([
+    {
+      repoId: '/repo-a',
+      worktreeBootstrapTrust: {
+        configHash,
+        trustedAt: expect.any(String),
+      },
+      workspaceExternalAppRecent: {
+        byWorktree: {
+          '/repo-a/worktree-y': 'terminal:ghostty',
+        },
+      },
+    },
+  ])
+})
+
+test('prunes empty repo settings entries after removed-worktree cleanup', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+
+  const mod = await import('#/server/modules/settings-source.ts')
+
+  await mod.setServerRepoWorkspaceExternalAppRecent({
+    repoId: '/repo-a',
+    worktreePath: '/repo-a/worktree-x',
+    itemId: 'editor:vscode',
+  })
+
+  await expect(
+    mod.pruneServerRepoSettingsForRemovedWorktree({
+      repoId: '/repo-a',
+      worktreePath: '/repo-a/worktree-x',
+    }),
+  ).resolves.toBe(true)
+
+  expect(await mod.getServerRepoSettings()).toEqual([])
 })

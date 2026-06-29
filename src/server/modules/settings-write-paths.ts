@@ -3,6 +3,7 @@ import {
   addServerRecentRepo,
   clearServerRecentRepos,
   setServerFetchIntervalSec,
+  setServerRepoWorkspaceExternalAppRecent,
   setServerSessionState,
   updateUserSettings,
 } from '#/server/modules/settings-source.ts'
@@ -37,6 +38,11 @@ export interface SetSessionInput {
 }
 export interface AddRecentRepoInput {
   repo: RepoSessionEntry
+}
+export interface SetRepoWorkspaceExternalAppRecentInput {
+  repoId: string
+  worktreePath: string | null
+  itemId: string
 }
 
 export async function handleSetFetchInterval(
@@ -93,6 +99,14 @@ export async function handleAddRecentRepo(
 
 export async function handleClearRecentRepos(): Promise<{ ok: true }> {
   await clearServerRecentRepos()
+  publishSettingsInvalidation(['settings-snapshot'])
+  return { ok: true }
+}
+
+export async function handleSetRepoWorkspaceExternalAppRecent(
+  input: SetRepoWorkspaceExternalAppRecentInput,
+): Promise<{ ok: true }> {
+  await setServerRepoWorkspaceExternalAppRecent(input)
   publishSettingsInvalidation(['settings-snapshot'])
   return { ok: true }
 }

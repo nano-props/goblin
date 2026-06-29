@@ -8,6 +8,7 @@ import {
   handleSetGlobalShortcutRegistered,
   handleAddRecentRepo,
   handleClearRecentRepos,
+  handleSetRepoWorkspaceExternalAppRecent,
   handleSetSession,
   handleUpdateUserSettings,
 } from '#/server/modules/settings-write-paths.ts'
@@ -69,5 +70,12 @@ export function createSettingsRoutes(settingsState: NativeShortcutRegistrationSt
     return c.json(await handleAddRecentRepo({ repo }))
   })
   app.post('/recent-repos/clear', async (c) => c.json(await handleClearRecentRepos()))
+  app.post('/repo-external-app-recent', async (c) => {
+    const { repoId, worktreePath, itemId } = await parseHttpBody(
+      SETTINGS_PROCEDURE_SCHEMAS.repoExternalAppRecentSet,
+      c,
+    )
+    return c.json(await handleSetRepoWorkspaceExternalAppRecent({ repoId, worktreePath, itemId }))
+  })
   return app
 }

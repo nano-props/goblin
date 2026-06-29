@@ -172,6 +172,23 @@ export async function clearRecentRepos(): Promise<void> {
   }
 }
 
+/**
+ * Record the most recently chosen workspace external app id for a
+ * (repo, worktree) scope. Callers may update optimistic UI before
+ * awaiting this write, but should surface failures and reconcile from
+ * the server-driven `settings-snapshot` invalidation on success.
+ */
+export async function setRecentWorkspaceExternalApp(input: {
+  repoId: string
+  worktreePath: string | null
+  itemId: string
+}): Promise<void> {
+  await postServerJson<
+    { repoId: string; worktreePath: string | null; itemId: string },
+    { ok: true }
+  >('/api/settings/repo-external-app-recent', input)
+}
+
 export async function saveSession(session: WorkspaceSessionState): Promise<WorkspaceSessionState> {
   const result = await postServerJson<
     { session: WorkspaceSessionState },

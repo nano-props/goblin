@@ -1,6 +1,11 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { toSafeRepoLocator, toSafeSessionRepoEntry } from '#/shared/input-validation.ts'
+import {
+  MAX_IPC_PATH_LENGTH,
+  toSafeRepoLocator,
+  toSafeSessionPath,
+  toSafeSessionRepoEntry,
+} from '#/shared/input-validation.ts'
 import { serverDataFile } from '#/shared/data-dir.ts'
 import type {
   FiletreeSessionViewState,
@@ -14,7 +19,9 @@ import { repoSessionEntryId, type RepoSessionEntry } from '#/shared/remote-repo.
 import {
   isWorktreeBootstrapConfigHash,
   type RepoSettingsEntry,
+  type WorkspaceExternalAppRecent,
   type WorktreeBootstrapTrust,
+  workspaceExternalAppRecentKey,
 } from '#/shared/repo-settings.ts'
 import {
   isWorkspacePaneSessionTabType,
@@ -328,6 +335,27 @@ function normalizeWorktreeBootstrapTrust(value: unknown): WorktreeBootstrapTrust
   }
 }
 
+function isSafeExternalAppRecentItemId(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0 && value.length <= 64 && !value.includes('\0')
+}
+
+function normalizeWorkspaceExternalAppRecent(value: unknown): WorkspaceExternalAppRecent | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const raw = value as Partial<WorkspaceExternalAppRecent>
+  if (!raw.byWorktree || typeof raw.byWorktree !== 'object' || Array.isArray(raw.byWorktree)) return undefined
+  const byWorktree: Record<string, string> = {}
+  for (const [worktreePath, itemId] of Object.entries(raw.byWorktree)) {
+    if (typeof worktreePath !== 'string' || worktreePath.includes('\0')) continue
+    // Empty string is the reserved key for "no worktree" (bare repo);
+    // any other key must be an absolute path with no NULs.
+    if (worktreePath !== '' && (!path.isAbsolute(worktreePath) || worktreePath.length > MAX_IPC_PATH_LENGTH)) continue
+    if (!isSafeExternalAppRecentItemId(itemId)) continue
+    byWorktree[worktreePath] = itemId
+  }
+  if (Object.keys(byWorktree).length === 0) return undefined
+  return { byWorktree }
+}
+
 function normalizeRepoSettings(value: unknown): RepoSettingsEntry[] {
   if (!Array.isArray(value)) return []
   const seen = new Set<string>()
@@ -341,6 +369,8 @@ function normalizeRepoSettings(value: unknown): RepoSettingsEntry[] {
     const entry: RepoSettingsEntry = { repoId }
     const worktreeBootstrapTrust = normalizeWorktreeBootstrapTrust(raw.worktreeBootstrapTrust)
     if (worktreeBootstrapTrust) entry.worktreeBootstrapTrust = worktreeBootstrapTrust
+    const workspaceExternalAppRecent = normalizeWorkspaceExternalAppRecent(raw.workspaceExternalAppRecent)
+    if (workspaceExternalAppRecent) entry.workspaceExternalAppRecent = workspaceExternalAppRecent
     normalized.push(entry)
   }
   return normalized
@@ -356,6 +386,9 @@ function cloneRepoSettings(repoSettings: readonly RepoSettingsEntry[]): RepoSett
             trustedAt: entry.worktreeBootstrapTrust.trustedAt,
           },
         }
+      : {}),
+    ...(entry.workspaceExternalAppRecent
+      ? { workspaceExternalAppRecent: { byWorktree: { ...entry.workspaceExternalAppRecent.byWorktree } } }
       : {}),
   }))
 }
@@ -403,6 +436,30 @@ async function loadUserSettings(): Promise<UserSettingsData> {
     return data
   })()
   return await settingsPromise
+}
+
+/**
+ * Apply a patch to the `RepoSettingsEntry` matching `repoId`, creating the
+ * entry if it doesn't exist. The patch receives the current entry (or
+ * `undefined`) and returns the new entry, or `null` to skip the update
+ * entirely (used by callers that want to no-op on unchanged values).
+ * Returns `true` when `data.repoSettings` was modified.
+ */
+function updateRepoSettingsEntry(
+  data: UserSettingsData,
+  repoId: string,
+  patch: (existing: RepoSettingsEntry | undefined) => RepoSettingsEntry | null,
+): boolean {
+  const existingIndex = data.repoSettings.findIndex((entry) => entry.repoId === repoId)
+  const existing = existingIndex >= 0 ? data.repoSettings[existingIndex] : undefined
+  const next = patch(existing)
+  if (next === null) return false
+  if (existingIndex >= 0) {
+    data.repoSettings = data.repoSettings.map((entry, index) => (index === existingIndex ? next : entry))
+  } else {
+    data.repoSettings = [...data.repoSettings, next]
+  }
+  return true
 }
 
 export async function getServerFetchIntervalSec(): Promise<number> {
@@ -509,16 +566,93 @@ export async function trustServerRepoWorktreeBootstrapConfig(input: {
     configHash: input.configHash,
     trustedAt: new Date().toISOString(),
   }
+  if (
+    updateRepoSettingsEntry(data, repoId, (existing) => ({
+      repoId,
+      ...existing,
+      worktreeBootstrapTrust,
+    }))
+  ) {
+    await writeUserSettingsFile(data)
+  }
+  return cloneRepoSettings(data.repoSettings)
+}
+
+/**
+ * Record the most recently chosen workspace external app id for a
+ * (repo, worktree) scope. The split-button primary in the workspace
+ * toolbar reads this on mount. No-op when the value is already current
+ * — callers can fire on every selection without coordinating with the
+ * server.
+ */
+export async function setServerRepoWorkspaceExternalAppRecent(input: {
+  repoId: string
+  worktreePath: string | null
+  itemId: string
+}): Promise<RepoSettingsEntry[]> {
+  const data = await loadUserSettings()
+  const repoId = toSafeRepoLocator(input.repoId)
+  // Validate the worktree key: `null`/`undefined` collapses to "" (bare
+  // repo); otherwise the path must be a normalized absolute path with
+  // no NULs. `toSafeSessionPath` encodes the same validation used
+  // elsewhere in the codebase, so the rules can't drift.
+  const isBareRepoScope = input.worktreePath === null || input.worktreePath === undefined
+  const safeWorktreePath = isBareRepoScope ? null : toSafeSessionPath(input.worktreePath)
+  if (!repoId || (!isBareRepoScope && safeWorktreePath === null) || !isSafeExternalAppRecentItemId(input.itemId)) {
+    return cloneRepoSettings(data.repoSettings)
+  }
+  const worktreeKey = workspaceExternalAppRecentKey(safeWorktreePath)
+  // No-op when the value hasn't changed — keeps a no-op click from
+  // triggering a full user-settings.json rewrite.
+  const updated = updateRepoSettingsEntry(data, repoId, (existing) => {
+    const existingByWorktree = existing?.workspaceExternalAppRecent?.byWorktree ?? {}
+    if (existingByWorktree[worktreeKey] === input.itemId) return null
+    return {
+      repoId,
+      ...existing,
+      workspaceExternalAppRecent: { byWorktree: { ...existingByWorktree, [worktreeKey]: input.itemId } },
+    }
+  })
+  if (updated) await writeUserSettingsFile(data)
+  return cloneRepoSettings(data.repoSettings)
+}
+
+/**
+ * Prune repo settings that are scoped to a worktree path after that worktree
+ * has been removed. Repo-level settings, such as bootstrap trust, stay intact.
+ * Returns true when the settings file changed.
+ */
+export async function pruneServerRepoSettingsForRemovedWorktree(input: {
+  repoId: string
+  worktreePath: string
+}): Promise<boolean> {
+  const data = await loadUserSettings()
+  const repoId = toSafeRepoLocator(input.repoId)
+  const safeWorktreePath = toSafeSessionPath(input.worktreePath)
+  if (!repoId || safeWorktreePath === null) return false
+  const worktreeKey = workspaceExternalAppRecentKey(safeWorktreePath)
   const existingIndex = data.repoSettings.findIndex((entry) => entry.repoId === repoId)
-  if (existingIndex >= 0) {
-    data.repoSettings = data.repoSettings.map((entry, index) =>
-      index === existingIndex ? { ...entry, worktreeBootstrapTrust } : entry,
-    )
+  if (existingIndex < 0) return false
+  const existing = data.repoSettings[existingIndex]
+  const existingByWorktree = existing.workspaceExternalAppRecent?.byWorktree
+  if (!existingByWorktree || !(worktreeKey in existingByWorktree)) return false
+
+  const nextByWorktree = { ...existingByWorktree }
+  delete nextByWorktree[worktreeKey]
+  const nextEntry: RepoSettingsEntry = { ...existing }
+  if (Object.keys(nextByWorktree).length > 0) {
+    nextEntry.workspaceExternalAppRecent = { byWorktree: nextByWorktree }
   } else {
-    data.repoSettings = [...data.repoSettings, { repoId, worktreeBootstrapTrust }]
+    delete nextEntry.workspaceExternalAppRecent
+  }
+
+  if (nextEntry.worktreeBootstrapTrust || nextEntry.workspaceExternalAppRecent) {
+    data.repoSettings = data.repoSettings.map((entry, index) => (index === existingIndex ? nextEntry : entry))
+  } else {
+    data.repoSettings = data.repoSettings.filter((_, index) => index !== existingIndex)
   }
   await writeUserSettingsFile(data)
-  return cloneRepoSettings(data.repoSettings)
+  return true
 }
 
 export async function addServerRecentRepo(repo: RepoSessionEntry): Promise<RepoSessionEntry[]> {
