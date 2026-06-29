@@ -1,4 +1,5 @@
 import { useContext } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { FolderPlus } from 'lucide-react'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -26,16 +27,14 @@ export function BranchFilterAction({ repoId }: Props) {
 
 function WorktreeFilterToggle({ repoId }: Props) {
   const setBranchViewMode = useReposStore((s) => s.setBranchViewMode)
-  const { branchCount, branchViewMode } = useStoreWithEqualityFn(
-    useReposStore,
-    (s) => {
+  const { branchCount, branchViewMode } = useReposStore(
+    useShallow((s) => {
       const repo = s.repos[repoId]
       return {
         branchCount: repo?.data.branches.length ?? 0,
         branchViewMode: repo?.ui.branchViewMode ?? 'all',
       }
-    },
-    (a, b) => a.branchCount === b.branchCount && a.branchViewMode === b.branchViewMode,
+    }),
   )
   return (
     <BranchViewModeControl
