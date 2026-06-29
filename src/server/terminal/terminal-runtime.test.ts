@@ -143,10 +143,22 @@ describe('server terminal runtime', () => {
       expect.objectContaining({
         key: result.key,
         controller: { clientId: 'client_a', status: 'connected' },
-        phase: 'open',
+        phase: 'opening',
         message: null,
         cols: 80,
         rows: 24,
+      }),
+    ])
+    const ptySessionId = result.sessions[0]?.ptySessionId
+    if (!ptySessionId) throw new Error('expected session id')
+
+    mockPtys[0]?.emitData('ready')
+
+    await expect(host.listSessions('client_a', USER_1, '/repo')).resolves.toEqual([
+      expect.objectContaining({
+        ptySessionId,
+        phase: 'open',
+        message: null,
       }),
     ])
 
@@ -334,7 +346,7 @@ describe('server terminal runtime', () => {
       payload: {
         ok: true,
         ptySessionId,
-        phase: 'open',
+        phase: 'opening',
         message: null,
         canonicalCols: 101,
         canonicalRows: 31,
@@ -753,7 +765,7 @@ describe('server terminal runtime', () => {
       controller: { clientId: 'client_b', status: 'connected' },
       canonicalCols: 120,
       canonicalRows: 40,
-      phase: 'open',
+      phase: 'opening',
     })
     expect(mockPtys[0]?.resize).toHaveBeenLastCalledWith(120, 40)
 
@@ -953,7 +965,6 @@ describe('server terminal runtime', () => {
     // attaches. The previous revision refused the auto-claim because
     // the controller role was still in the 30s grace sub-state. The current
     // model clears the controller role on disconnect, so B's attach auto-claims.
-    vi.useFakeTimers()
     const { host, shutdown } = buildRuntime()
     const socketA = { send: vi.fn(), close: vi.fn() }
     const socketB = { send: vi.fn(), close: vi.fn() }
@@ -1011,7 +1022,6 @@ describe('server terminal runtime', () => {
     // round-trip (asserted in the authority-gate tests). This
     // runtime test pins down the server-side state after the
     // reconnect so the contract is explicit.
-    vi.useFakeTimers()
     const { host, shutdown } = buildRuntime()
     const socketA = { send: vi.fn(), close: vi.fn() }
     const socketB = { send: vi.fn(), close: vi.fn() }
@@ -1030,6 +1040,7 @@ describe('server terminal runtime', () => {
     if (!created.ok) return
     const ptySessionId = created.sessions[0]?.ptySessionId
     if (!ptySessionId) throw new Error('expected session id')
+    mockPtys[0]?.emitData('ready')
 
     // A disconnects; B attaches and claims the now-empty controller role.
     host.unregisterSocket('client_a', USER_1, socketA)
@@ -1079,6 +1090,7 @@ describe('server terminal runtime', () => {
       clientId: 'client_b',
     })
     expect(bWrite).toBe(true)
+    await new Promise<void>((resolve) => queueMicrotask(resolve))
 
     // listSessions confirms the global view: B is the controller,
     // canonical geometry follows B (the most recent writer).
@@ -1157,6 +1169,7 @@ describe('server terminal runtime', () => {
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
     const ptySessionId = await createTerminalSession(host, 'client_1')
+    mockPtys[0]?.emitData('ready')
 
     const attach = await host.attach('client_a', USER_1, {
       ptySessionId,

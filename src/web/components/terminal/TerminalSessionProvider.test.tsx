@@ -2072,6 +2072,7 @@ async function renderProviderWithHost(): Promise<{
       <RegisterHost worktreeTerminalKey={worktreeTerminalKey(REPO_ID, WORKTREE_PATH)} />
     </TerminalSessionProvider>,
   )
+  await act(async () => {})
 
   return {
     getContext: () => {
@@ -2122,6 +2123,7 @@ async function renderProviderWithProbe(worktreeTerminalKey: string): Promise<{
       <CaptureGroupProbe worktreeTerminalKey={worktreeTerminalKey} onProbe={(value) => (probe = value)} />
     </TerminalSessionProvider>,
   )
+  await act(async () => {})
 
   return {
     getContext: () => {

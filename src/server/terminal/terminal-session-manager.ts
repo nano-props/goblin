@@ -237,6 +237,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     if (!isValidTerminalPtySessionId(ptySessionId) || !isValidTerminalWriteData(data)) return false
     const session = this.getSession(userId, ptySessionId)
     if (!session?.pty) return false
+    if (session.phase !== 'open') return false
     // Register the attachment first so a brand-new socket can satisfy
     // the unknown-attachment gate, then defer to the shared
     // authority helper so write/resize/restart stay in lockstep.
@@ -609,13 +610,13 @@ export class TerminalSessionManager<TUser extends string | number> {
       return resolved
     }
     session.pty = resolved.handle
-    if (markTerminalSessionOpen(session)) this.emitLifecycle(session)
     const handle = resolved.handle
     const supervisor = this.ptySupervisor
     let lastBroadcastTitle: string | null = session.render.title
     let lastProcessName: string = supervisor.processName(handle)
     session.disposables.push(
       supervisor.onData(handle, (data) => {
+        if (markTerminalSessionOpen(session)) this.emitLifecycle(session)
         const titleBeforeData = session.render.title
         const processNameBeforeData = lastProcessName
 
