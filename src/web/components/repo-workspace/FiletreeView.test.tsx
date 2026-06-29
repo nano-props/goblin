@@ -36,10 +36,12 @@ type FiletreeViewHarnessProps = Omit<
   | 'onPruneKeys'
   | 'initialTopVisibleRowIndex'
   | 'scrollRestoreKey'
+  | 'scrollRestoreReady'
   | 'onTopVisibleRowIndexChange'
 > & {
   readonly initialTopVisibleRowIndex?: number
   readonly scrollRestoreKey?: string
+  readonly scrollRestoreReady?: boolean
   readonly onTopVisibleRowIndexChange?: (topVisibleRowIndex: number) => void
 }
 
@@ -56,6 +58,7 @@ function dirNode(id: string, parentId: string | null = null): RepoTreeNode {
 function FiletreeViewHarness({
   initialTopVisibleRowIndex = 0,
   scrollRestoreKey = 'test-worktree',
+  scrollRestoreReady = true,
   onTopVisibleRowIndexChange = () => {},
   ...props
 }: FiletreeViewHarnessProps) {
@@ -84,6 +87,7 @@ function FiletreeViewHarness({
       onPruneKeys={pruneKeys}
       initialTopVisibleRowIndex={initialTopVisibleRowIndex}
       scrollRestoreKey={scrollRestoreKey}
+      scrollRestoreReady={scrollRestoreReady}
       onTopVisibleRowIndexChange={onTopVisibleRowIndexChange}
     />
   )
@@ -451,52 +455,16 @@ describe('FiletreeView', () => {
     expect(container?.querySelector('[data-filetree=""]')?.getAttribute('aria-busy')).toBe('true')
   })
 
-  test('waits for a scroll range before marking row restoration complete', () => {
-    let resizeCallback: ResizeObserverCallback | null = null
-    const originalResizeObserver = globalThis.ResizeObserver
-    globalThis.ResizeObserver = class ResizeObserver {
-      constructor(callback: ResizeObserverCallback) {
-        resizeCallback = callback
-      }
-      observe() {}
-      unobserve() {}
-      disconnect() {}
-    } as typeof ResizeObserver
-    const scrollHeightSpy = vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(200)
-    const clientHeightSpy = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(200)
-    const offsetHeightSpy = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(20)
-
-    renderView({ tree: buildTree(), loading: false, error: null, initialTopVisibleRowIndex: 6 })
-    const viewport = scrollViewport()
-    expect(viewport.scrollTop).toBe(0)
-
-    scrollHeightSpy.mockReturnValue(1000)
-    act(() => {
-      resizeCallback?.([], {} as ResizeObserver)
-    })
-
-    expect(viewport.scrollTop).toBe(120)
-
-    scrollHeightSpy.mockRestore()
-    clientHeightSpy.mockRestore()
-    offsetHeightSpy.mockRestore()
-    globalThis.ResizeObserver = originalResizeObserver
-  })
-
   test('reports the top visible row index instead of the raw scroll offset', () => {
     const onTopVisibleRowIndexChange = vi.fn()
-    const offsetHeightSpy = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(20)
-
     renderView({ tree: buildTree(), loading: false, error: null, onTopVisibleRowIndexChange })
     const viewport = scrollViewport()
-    viewport.scrollTop = 125
+    viewport.scrollTop = 145
     act(() => {
       viewport.dispatchEvent(new Event('scroll', { bubbles: true }))
     })
 
     expect(onTopVisibleRowIndexChange).toHaveBeenCalledWith(6)
-
-    offsetHeightSpy.mockRestore()
   })
 
   test('preserves selection and expansion when the tree refreshes with the same keys', async () => {

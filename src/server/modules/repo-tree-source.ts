@@ -95,9 +95,11 @@ async function getRepoTreeDirectoryChildrenLocal(
     .filter((dirent) => dirent.name !== '.git')
     .map((dirent) => {
       const relative = prefix ? `${prefix}/${dirent.name}` : dirent.name
+      const isDirectory = dirent.isDirectory()
       return {
         checkPath: relative,
-        treeEntry: dirent.isDirectory() ? `${relative}/` : relative,
+        treeEntry: isDirectory ? `${relative}/` : relative,
+        isDirectory,
       }
     })
 
@@ -113,6 +115,7 @@ async function getRepoTreeDirectoryChildrenLocal(
 interface DirectoryEntryCandidate {
   readonly checkPath: string
   readonly treeEntry: string
+  readonly isDirectory: boolean
 }
 
 async function visibleGitDirectoryEntries(
@@ -125,7 +128,7 @@ async function visibleGitDirectoryEntries(
   const ignoredEntries = entries.filter((entry) => ignored.has(entry.checkPath))
   const trackedIgnored = await trackedGitPathSet(
     worktreePath,
-    ignoredEntries.map((entry) => entry.checkPath),
+    ignoredEntries,
     signal,
   )
   return entries.filter((entry) => !ignored.has(entry.checkPath) || trackedIgnored.has(entry.checkPath))
@@ -134,7 +137,7 @@ async function visibleGitDirectoryEntries(
 function nodesFromDirectoryEntries(prefix: string, entries: ReadonlyArray<string>): RepoTreeSourceResult {
   const limitedEntries = entries.slice(0, MAX_REPO_TREE_NODES + 1)
   const allNodes = buildChildNodes({ prefix, entries: limitedEntries })
-  const truncated = entries.length > MAX_REPO_TREE_NODES || allNodes.length > MAX_REPO_TREE_NODES
+  const truncated = entries.length > MAX_REPO_TREE_NODES
   const sliced = truncated ? allNodes.slice(0, MAX_REPO_TREE_NODES) : allNodes
   const nodes: RepoTreeNode[] = sliced.map((node) => ({ ...node, status: 'clean' }))
   return { nodes, truncated }
@@ -149,6 +152,7 @@ async function ignoredGitPathSet(
   try {
     const nul = String.fromCharCode(0)
     const result = await execa('git', ['-C', worktreePath, 'check-ignore', '--stdin', '-z'], {
+      // Keep the stdin stream NUL-terminated for paths containing whitespace or newlines.
       input: `${paths.join(nul)}${nul}`,
       reject: false,
       signal,
@@ -162,9 +166,10 @@ async function ignoredGitPathSet(
 
 async function trackedGitPathSet(
   worktreePath: string,
-  paths: ReadonlyArray<string>,
+  entries: ReadonlyArray<DirectoryEntryCandidate>,
   signal: AbortSignal | undefined,
 ): Promise<ReadonlySet<string>> {
+  const paths = entries.map((entry) => entry.checkPath)
   if (paths.length === 0) return new Set()
   try {
     const nul = String.fromCharCode(0)
@@ -172,17 +177,25 @@ async function trackedGitPathSet(
       'git',
       ['-C', worktreePath, 'ls-files', '-z', '--pathspec-from-file=-', '--pathspec-file-nul'],
       {
+        // `--pathspec-file-nul` consumes a NUL-terminated pathspec stream.
         input: `${paths.join(nul)}${nul}`,
         reject: false,
         signal,
       },
     )
     if (result.exitCode !== 0) return new Set()
-    const trackedEntries = parseNullSeparatedPaths(result.stdout)
+    const trackedEntries = new Set(parseNullSeparatedPaths(result.stdout))
     return new Set(
-      paths.filter((candidate) =>
-        trackedEntries.some((entry) => entry === candidate || entry.startsWith(`${candidate}/`)),
-      ),
+      entries
+        .filter((candidate) => {
+          if (trackedEntries.has(candidate.checkPath)) return true
+          if (!candidate.isDirectory) return false
+          for (const trackedEntry of trackedEntries) {
+            if (trackedEntry.startsWith(`${candidate.checkPath}/`)) return true
+          }
+          return false
+        })
+        .map((candidate) => candidate.checkPath),
     )
   } catch {
     return new Set()

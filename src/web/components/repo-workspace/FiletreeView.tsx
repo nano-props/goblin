@@ -15,7 +15,8 @@ import {
 import { type Key } from 'react-aria-components'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { ChevronRight, File, Folder, FolderTree, Loader2, Trash2 } from 'lucide-react'
-import type { RepoTreeNode, RepoTreeResult } from '#/shared/api-types.ts'
+import type { RepoTreeNode } from '#/shared/api-types.ts'
+import type { LazyRepoTreeAggregate } from '#/web/filetree-lazy-state.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { EmptyState } from '#/web/components/Layout.tsx'
 import { ActionPopover, ActionPopoverItem } from '#/web/components/ActionPopover.tsx'
@@ -27,7 +28,7 @@ import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { cn } from '#/web/lib/cn.ts'
 
 export interface FiletreeViewProps {
-  readonly tree: RepoTreeResult | null
+  readonly tree: LazyRepoTreeAggregate | null
   readonly loading: boolean
   readonly loadingKeys?: ReadonlySet<string>
   readonly error: string | null
@@ -42,6 +43,7 @@ export interface FiletreeViewProps {
   readonly onPruneKeys: (validKeys: ReadonlySet<string>) => void
   readonly initialTopVisibleRowIndex: number
   readonly scrollRestoreKey: string
+  readonly scrollRestoreReady: boolean
   readonly onTopVisibleRowIndexChange: (topVisibleRowIndex: number) => void
 }
 
@@ -57,6 +59,8 @@ const FILE_TREE_I18N_KEYS = {
   delete: 'menu.edit.delete',
   actionMenu: 'action.menu',
 } as const satisfies Record<string, string>
+
+const FILETREE_ROW_HEIGHT = 24
 
 function firstStringKey(keys: ReadonlySet<Key>): string | null {
   for (const key of keys) {
@@ -109,6 +113,7 @@ export function FiletreeView({
   onPruneKeys,
   initialTopVisibleRowIndex,
   scrollRestoreKey,
+  scrollRestoreReady,
   onTopVisibleRowIndexChange,
 }: FiletreeViewProps) {
   const t = useT()
@@ -117,7 +122,7 @@ export function FiletreeView({
   const rowVirtualizer = useVirtualizer({
     count: collection.rows.length,
     getScrollElement: () => scrollViewportRef.current,
-    estimateSize: () => 24,
+    estimateSize: () => FILETREE_ROW_HEIGHT,
     overscan: 12,
     getItemKey: (index) => collection.rows[index]?.id ?? index,
     initialRect: { width: 800, height: 100_000 },
@@ -126,7 +131,7 @@ export function FiletreeView({
   const renderedRows =
     virtualRows.length > 0
       ? virtualRows
-      : collection.rows.map((row, index) => ({ key: row.id, index, start: index * 24 }))
+      : collection.rows.map((row, index) => ({ key: row.id, index, start: index * FILETREE_ROW_HEIGHT }))
   const selectedKey = firstStringKey(selectedKeys)
   const selectedIndex = selectedKey ? collection.rows.findIndex((row) => row.id === selectedKey) : -1
   const tabbableIndex = selectedIndex >= 0 ? selectedIndex : 0
@@ -137,11 +142,12 @@ export function FiletreeView({
   }, [collection, onPruneKeys, tree])
 
   useRestoreTopVisibleRowIndex({
-    viewportRef: scrollViewportRef,
     restoreKey: scrollRestoreKey,
     topVisibleRowIndex: initialTopVisibleRowIndex,
     enabled: tree !== null,
-    retrySignal: expandedKeys,
+    ready: scrollRestoreReady,
+    rowCount: collection.rows.length,
+    virtualizer: rowVirtualizer,
   })
 
   const selectNode = useCallback(
@@ -501,10 +507,7 @@ function FiletreeActionMenu({
 }
 
 function topVisibleRowIndexFromViewport(viewport: HTMLElement): number {
-  const row = viewport.querySelector<HTMLElement>('[data-filetree-row]')
-  const rowHeight = row?.offsetHeight ?? 0
-  if (rowHeight <= 0) return 0
-  return Math.max(0, Math.floor(viewport.scrollTop / rowHeight))
+  return Math.max(0, Math.floor(viewport.scrollTop / FILETREE_ROW_HEIGHT))
 }
 
 // Render an empty body with no worktree via a dedicated helper so

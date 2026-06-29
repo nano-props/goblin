@@ -1,5 +1,10 @@
 import type { RepoTreeNode, RepoTreeResult } from '#/shared/api-types.ts'
 
+export interface LazyRepoTreeAggregate {
+  readonly nodes: ReadonlyArray<RepoTreeNode>
+  readonly truncated: boolean
+}
+
 export interface LazyRepoTreeState {
   readonly nodesById: ReadonlyMap<string, RepoTreeNode>
   readonly childIdsByParentId: ReadonlyMap<string | null, readonly string[]>
@@ -8,11 +13,11 @@ export interface LazyRepoTreeState {
   readonly loadingPrefixes: ReadonlySet<string>
   readonly errorPrefixes: ReadonlySet<string>
   readonly reloadEpoch: number
-  readonly result: RepoTreeResult
+  readonly result: LazyRepoTreeAggregate
 }
 
 export type LazyRepoTreeAction =
-  | { readonly type: 'reset' }
+  | { readonly type: 'replace'; readonly state: LazyRepoTreeState }
   | { readonly type: 'markForReload' }
   | { readonly type: 'childrenLoading'; readonly prefix: string }
   | { readonly type: 'childrenLoaded'; readonly prefix: string; readonly result: RepoTreeResult }
@@ -34,8 +39,8 @@ export function emptyLazyRepoTreeState(): LazyRepoTreeState {
 
 export function lazyRepoTreeReducer(state: LazyRepoTreeState, action: LazyRepoTreeAction): LazyRepoTreeState {
   switch (action.type) {
-    case 'reset':
-      return emptyLazyRepoTreeState()
+    case 'replace':
+      return action.state
     case 'markForReload':
       return {
         ...state,

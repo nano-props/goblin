@@ -118,6 +118,70 @@ async function flush() {
 }
 
 describe('useLazyRepoTree', () => {
+  test('hydrates the initial aggregate from cached root data without an empty-tree flash', async () => {
+    const snapshots: HarnessSnapshot[] = []
+    queryClient.setQueryData<RepoTreeResult>(['repo-tree-children', '/repo-a', '/repo-a/main', ''], {
+      nodes: [{ id: 'README.md', path: 'README.md', name: 'README.md', parentId: null, kind: 'file', status: 'clean' }],
+      truncated: false,
+    })
+    mocks.getRepositoryTree.mockResolvedValue({ nodes: [], truncated: false })
+
+    await render({
+      repoId: '/repo-a',
+      worktreePath: '/repo-a/main',
+      onSnapshot: (snapshot) => {
+        snapshots.push(snapshot)
+        lastSnapshot = snapshot
+      },
+    })
+
+    expect(snapshots[0]?.tree?.nodes.map((node) => node.id)).toEqual(['README.md'])
+  })
+
+  test('hydrates cached restored children and ancestors into the initial aggregate', async () => {
+    const snapshots: HarnessSnapshot[] = []
+    queryClient.setQueryData<RepoTreeResult>(['repo-tree-children', '/repo-a', '/repo-a/main', ''], {
+      nodes: [{ id: 'src', path: 'src', name: 'src', parentId: null, kind: 'directory', status: 'clean' }],
+      truncated: false,
+    })
+    queryClient.setQueryData<RepoTreeResult>(['repo-tree-children', '/repo-a', '/repo-a/main', 'src'], {
+      nodes: [
+        { id: 'src/web', path: 'src/web', name: 'web', parentId: 'src', kind: 'directory', status: 'clean' },
+      ],
+      truncated: false,
+    })
+    queryClient.setQueryData<RepoTreeResult>(['repo-tree-children', '/repo-a', '/repo-a/main', 'src/web'], {
+      nodes: [
+        {
+          id: 'src/web/FiletreeView.tsx',
+          path: 'src/web/FiletreeView.tsx',
+          name: 'FiletreeView.tsx',
+          parentId: 'src/web',
+          kind: 'file',
+          status: 'clean',
+        },
+      ],
+      truncated: false,
+    })
+    mocks.getRepositoryTree.mockResolvedValue({ nodes: [], truncated: false })
+
+    await render({
+      repoId: '/repo-a',
+      worktreePath: '/repo-a/main',
+      expandedKeys: ['src/web'],
+      onSnapshot: (snapshot) => {
+        snapshots.push(snapshot)
+        lastSnapshot = snapshot
+      },
+    })
+
+    expect(snapshots[0]?.tree?.nodes.map((node) => node.id).sort()).toEqual([
+      'src',
+      'src/web',
+      'src/web/FiletreeView.tsx',
+    ])
+  })
+
   test('kicks an initial fetch on mount and exposes loading=true', async () => {
     const deferred = makeDeferred<RepoTreeResult>()
     mocks.getRepositoryTree.mockReturnValueOnce(deferred.promise)
@@ -391,6 +455,56 @@ describe('useLazyRepoTree', () => {
       '/repo-a/main',
       expect.objectContaining({ prefix: 'src', signal: expect.any(AbortSignal) }),
     )
+    expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/index.ts'])
+  })
+
+  test('keeps child loading state when expanded keys hydrate cached prefixes', async () => {
+    const child = makeDeferred<RepoTreeResult>()
+    mocks.getRepositoryTree
+      .mockResolvedValueOnce({
+        nodes: [{ id: 'src', path: 'src', name: 'src', parentId: null, kind: 'directory', status: 'clean' }],
+        truncated: false,
+      })
+      .mockReturnValueOnce(child.promise)
+
+    await render({
+      repoId: '/repo-a',
+      worktreePath: '/repo-a/main',
+      onSnapshot: (snapshot) => {
+        lastSnapshot = snapshot
+      },
+    })
+    await flush()
+
+    let childLoad: Promise<void> | undefined
+    await act(async () => {
+      childLoad = lastSnapshot?.loadChildren('src')
+      await Promise.resolve()
+    })
+    expect(lastSnapshot?.loadingKeys.has('src')).toBe(true)
+
+    await setProps({
+      repoId: '/repo-a',
+      worktreePath: '/repo-a/main',
+      expandedKeys: ['src'],
+      onSnapshot: (snapshot) => {
+        lastSnapshot = snapshot
+      },
+    })
+    await flush()
+    expect(lastSnapshot?.loadingKeys.has('src')).toBe(true)
+
+    await act(async () => {
+      child.resolve({
+        nodes: [
+          { id: 'src/index.ts', path: 'src/index.ts', name: 'index.ts', parentId: 'src', kind: 'file', status: 'clean' },
+        ],
+        truncated: false,
+      })
+      await childLoad
+    })
+    await flush()
+    expect(lastSnapshot?.loadingKeys.has('src')).toBe(false)
     expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/index.ts'])
   })
 

@@ -1,5 +1,6 @@
 import { type Key } from 'react-aria-components'
-import type { RepoTreeNode, RepoTreeResult } from '#/shared/api-types.ts'
+import type { RepoTreeNode } from '#/shared/api-types.ts'
+import type { LazyRepoTreeAggregate } from '#/web/filetree-lazy-state.ts'
 
 export interface FiletreeRow {
   readonly id: string
@@ -16,7 +17,7 @@ export interface FiletreeCollection {
 }
 
 export function buildFiletreeCollection(
-  result: RepoTreeResult | null,
+  result: LazyRepoTreeAggregate | null,
   expandedKeys: ReadonlySet<Key>,
 ): FiletreeCollection {
   const byId = new Map<string, RepoTreeNode>()

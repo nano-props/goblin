@@ -4,11 +4,16 @@
 // invalidation, and restored expanded-directory loading. Persisted UI
 // interaction state stays in the filetree interaction store.
 
-import { useCallback, useEffect, useMemo, useReducer } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react'
+import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { getRepositoryTree } from '#/web/filetree-client.ts'
 import { subscribeRepoQueryInvalidation } from '#/web/repo-query-invalidation-ingress.ts'
-import { emptyLazyRepoTreeState, lazyRepoTreeReducer } from '#/web/filetree-lazy-state.ts'
+import {
+  emptyLazyRepoTreeState,
+  lazyRepoTreeReducer,
+  type LazyRepoTreeAggregate,
+  type LazyRepoTreeState,
+} from '#/web/filetree-lazy-state.ts'
 import type { RepoTreeResult } from '#/shared/api-types.ts'
 
 export interface UseLazyRepoTreeInput {
@@ -18,7 +23,7 @@ export interface UseLazyRepoTreeInput {
 }
 
 export interface UseLazyRepoTreeResult {
-  readonly tree: RepoTreeResult | null
+  readonly tree: LazyRepoTreeAggregate | null
   readonly loading: boolean
   readonly error: string | null
   readonly loadingKeys: ReadonlySet<string>
@@ -30,16 +35,34 @@ export interface UseLazyRepoTreeResult {
 
 type ChildLoadMode = 'manual' | 'restore'
 
+const EMPTY_EXPANDED_KEYS: readonly string[] = []
+
+interface CachedLazyRepoTreeStateInput {
+  readonly queryClient: QueryClient
+  readonly repoId: string
+  readonly worktreePath: string
+  readonly expandedKeys: readonly string[]
+}
+
 function repoTreeChildrenQueryKey(repoId: string, worktreePath: string, prefix: string) {
   return ['repo-tree-children', repoId, worktreePath, prefix] as const
 }
 
 export function useLazyRepoTree(input: UseLazyRepoTreeInput): UseLazyRepoTreeResult {
-  const { repoId, worktreePath, expandedKeys = [] } = input
+  const { repoId, worktreePath } = input
+  const expandedKeys = input.expandedKeys ?? EMPTY_EXPANDED_KEYS
   const queryClient = useQueryClient()
   const enabled = repoId.length > 0 && worktreePath.length > 0
   const rootQueryKey = useMemo(() => repoTreeChildrenQueryKey(repoId, worktreePath, ''), [repoId, worktreePath])
-  const [treeState, dispatchTreeState] = useReducer(lazyRepoTreeReducer, undefined, emptyLazyRepoTreeState)
+  const expandedKeysCacheSignal = useMemo(() => expandedKeys.map(normalizePrefix).join('\0'), [expandedKeys])
+  const cachedExpandedPrefixes = useMemo(() => cachedPrefixesForExpandedKeys(expandedKeys), [expandedKeysCacheSignal])
+  const [treeState, dispatchTreeState] = useReducer(
+    lazyRepoTreeReducer,
+    { queryClient, repoId, worktreePath, expandedKeys },
+    cachedLazyRepoTreeState,
+  )
+  const expandedKeysRef = useRef(expandedKeys)
+  const readChildrenRef = useRef<(prefix: string, mode: ChildLoadMode) => Promise<void>>(async () => {})
 
   const rootQuery = useQuery({
     queryKey: rootQueryKey,
@@ -50,8 +73,24 @@ export function useLazyRepoTree(input: UseLazyRepoTreeInput): UseLazyRepoTreeRes
   const { data: rootData, error: rootError, isPending, refetch } = rootQuery
 
   useEffect(() => {
-    dispatchTreeState({ type: 'reset' })
-  }, [repoId, worktreePath])
+    expandedKeysRef.current = expandedKeys
+  }, [expandedKeysCacheSignal, expandedKeys])
+
+  useEffect(() => {
+    dispatchTreeState({
+      type: 'replace',
+      state: cachedLazyRepoTreeState({ queryClient, repoId, worktreePath, expandedKeys: expandedKeysRef.current }),
+    })
+  }, [queryClient, repoId, worktreePath])
+
+  useEffect(() => {
+    if (!enabled) return
+    for (const prefix of cachedExpandedPrefixes) {
+      const result = queryClient.getQueryData<RepoTreeResult>(repoTreeChildrenQueryKey(repoId, worktreePath, prefix))
+      if (!result) continue
+      dispatchTreeState({ type: 'childrenLoaded', prefix, result })
+    }
+  }, [cachedExpandedPrefixes, enabled, queryClient, repoId, worktreePath])
 
   useEffect(() => {
     if (!rootData) return
@@ -101,6 +140,10 @@ export function useLazyRepoTree(input: UseLazyRepoTreeInput): UseLazyRepoTreeRes
   )
 
   useEffect(() => {
+    readChildrenRef.current = readChildren
+  }, [readChildren])
+
+  useEffect(() => {
     return subscribeRepoQueryInvalidation((event) => {
       if (event.query !== 'repo-snapshot') return
       if (event.repoId !== repoId) return
@@ -111,8 +154,8 @@ export function useLazyRepoTree(input: UseLazyRepoTreeInput): UseLazyRepoTreeRes
 
   useEffect(() => {
     if (!rootData) return
-    for (const key of expandedKeys) void readChildren(key, 'restore').catch(() => {})
-  }, [expandedKeys, readChildren, rootData, treeState.reloadEpoch])
+    for (const key of expandedKeys) void readChildrenRef.current(key, 'restore').catch(() => {})
+  }, [expandedKeysCacheSignal, rootData, treeState.reloadEpoch])
 
   const refresh = useCallback(() => {
     if (!enabled) return
@@ -134,4 +177,39 @@ export function useLazyRepoTree(input: UseLazyRepoTreeInput): UseLazyRepoTreeRes
 
 function normalizePrefix(prefix: string): string {
   return prefix.replace(/^\.\/+/, '').replace(/\/+$/u, '')
+}
+
+function cachedLazyRepoTreeState({
+  queryClient,
+  repoId,
+  worktreePath,
+  expandedKeys,
+}: CachedLazyRepoTreeStateInput): LazyRepoTreeState {
+  if (!repoId || !worktreePath) return emptyLazyRepoTreeState()
+  let state = emptyLazyRepoTreeState()
+  for (const prefix of cachedPrefixesForExpandedKeys(expandedKeys)) {
+    const result = queryClient.getQueryData<RepoTreeResult>(repoTreeChildrenQueryKey(repoId, worktreePath, prefix))
+    if (!result) continue
+    state = lazyRepoTreeReducer(state, { type: 'childrenLoaded', prefix, result })
+  }
+  return state
+}
+
+function cachedPrefixesForExpandedKeys(expandedKeys: readonly string[]): readonly string[] {
+  const prefixes = new Set<string>([''])
+  for (const key of expandedKeys) {
+    const normalizedKey = normalizePrefix(key)
+    if (!normalizedKey) continue
+    for (const prefix of ancestorAndSelfPrefixes(normalizedKey)) prefixes.add(prefix)
+  }
+  return Array.from(prefixes).sort((a, b) => prefixDepth(a) - prefixDepth(b) || a.localeCompare(b))
+}
+
+function ancestorAndSelfPrefixes(key: string): readonly string[] {
+  const parts = key.split('/').filter(Boolean)
+  return parts.map((_, index) => parts.slice(0, index + 1).join('/'))
+}
+
+function prefixDepth(prefix: string): number {
+  return prefix === '' ? 0 : prefix.split('/').length
 }
