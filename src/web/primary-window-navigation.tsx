@@ -1,14 +1,12 @@
 import { createContext, useContext, useMemo } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import {
   createPrimaryWindowNavigationActions,
   type PrimaryWindowNavigationActions,
 } from '#/web/primary-window-navigation-actions.ts'
-import {
-  primaryWindowNavigationStoreActionsEqual,
-  primaryWindowNavigationStoreActionsFromStore,
-} from '#/web/stores/repos/selector-actions.ts'
+import { primaryWindowNavigationStoreActionsFromStore } from '#/web/stores/repos/selector-actions.ts'
 import { navigationWorkspaceStateEqual, navigationWorkspaceStateFromStore } from '#/web/stores/repos/selector-state.ts'
 export type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation-actions.ts'
 
@@ -23,10 +21,8 @@ export function usePrimaryWindowNavigation(): PrimaryWindowNavigationActions {
     navigationWorkspaceStateFromStore,
     navigationWorkspaceStateEqual,
   )
-  const { setActive, closeRepo, cycleActive, selectBranch, setWorkspacePaneTab } = useStoreWithEqualityFn(
-    useReposStore,
-    primaryWindowNavigationStoreActionsFromStore,
-    primaryWindowNavigationStoreActionsEqual,
+  const { setActive, closeRepo, cycleActive, selectBranch, setWorkspacePaneTab } = useReposStore(
+    useShallow(primaryWindowNavigationStoreActionsFromStore),
   )
   const fallbackNavigation = useMemo(
     () =>

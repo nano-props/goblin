@@ -2,11 +2,9 @@ import { RotateCw } from 'lucide-react'
 import { Badge } from '#/web/components/ui/badge.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
 import { SettingsGroup, SettingsList, SettingsRow } from '#/web/components/settings/SettingsPrimitives.tsx'
-import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
 import { useGitHubCliQuery } from '#/web/settings-queries.ts'
-import { refreshGitHubCliDetection } from '#/web/settings-actions.ts'
+import { useGitHubSettingsController } from '#/web/runtime-settings-github.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import { settingsLog } from '#/web/logger.ts'
 import { cn } from '#/web/lib/cn.ts'
 
 function hostLoginCommand(host: string): string {
@@ -16,7 +14,7 @@ function hostLoginCommand(host: string): string {
 export function GitHubSettings() {
   const t = useT()
   const { data } = useGitHubCliQuery()
-  const { isPending: refreshingGitHubCli, run } = useAsyncPending<'refresh'>()
+  const { refreshingGitHubCli, refreshGitHubCli } = useGitHubSettingsController()
   if (!data) return null
   const githubCliAvailable = data.available
   const githubCliVersion = data.version
@@ -28,16 +26,6 @@ export function GitHubSettings() {
   const githubCliHint = githubCliAvailable
     ? (githubCliVersion ?? t('settings.github.hint-installed'))
     : t('settings.github.hint-missing')
-
-  async function refreshGitHubCli() {
-    await run('refresh', async () => {
-      try {
-        await refreshGitHubCliDetection()
-      } catch (err) {
-        settingsLog.warn('GitHub CLI refresh failed', { err })
-      }
-    })
-  }
 
   return (
     <SettingsGroup label={t('settings.github.title')} hint={t('settings.github.body')}>

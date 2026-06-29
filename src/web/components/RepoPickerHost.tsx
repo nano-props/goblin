@@ -2,6 +2,7 @@
 // toolbar/sidebar presentation; this host only supplies repo summaries,
 // labels, and open/switch actions.
 import { useStoreWithEqualityFn } from 'zustand/traditional'
+import { useShallow } from 'zustand/react/shallow'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { RepoPicker } from '#/web/components/repo-picker/RepoPicker.tsx'
@@ -10,7 +11,7 @@ import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import type { RepoPickerRepo, RepoPickerSurface } from '#/web/components/repo-picker/types.ts'
 import { openRepoFromDialog } from '#/web/lib/open-repo-dialog.ts'
 import { useShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
-import { repoPickerStoreActionsEqual, repoPickerStoreActionsFromStore } from '#/web/stores/repos/selector-actions.ts'
+import { repoPickerStoreActionsFromStore } from '#/web/stores/repos/selector-actions.ts'
 import { latestRepoSyncTime } from '#/web/stores/repos/sync-time.ts'
 
 interface RepoPickerHostProps {
@@ -56,11 +57,7 @@ export function RepoPickerHost({
     repoPickerReposEqual,
   )
   const navigation = usePrimaryWindowNavigation()
-  const { ensureWorkspaceOpen } = useStoreWithEqualityFn(
-    useReposStore,
-    repoPickerStoreActionsFromStore,
-    repoPickerStoreActionsEqual,
-  )
+  const { ensureWorkspaceOpen } = useReposStore(useShallow(repoPickerStoreActionsFromStore))
 
   async function handleOpenLocal() {
     await openRepoFromDialog({

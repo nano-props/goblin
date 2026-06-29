@@ -1,5 +1,5 @@
 import { useEffect, type ReactNode } from 'react'
-import { useStoreWithEqualityFn } from 'zustand/traditional'
+import { useShallow } from 'zustand/react/shallow'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { isRepoUnavailable } from '#/web/stores/repos/repo-guards.ts'
 import { RepoWorkspace } from '#/web/components/RepoWorkspace.tsx'
@@ -28,9 +28,8 @@ interface Props {
 export function RepoView({ repoId, onOpenSettings }: Props) {
   const uiMode = useResponsiveUiMode()
   const compact = uiMode === 'compact'
-  const view = useStoreWithEqualityFn(
-    useReposStore,
-    (s) => {
+  const view = useReposStore(
+    useShallow((s) => {
       const repo = s.repos[repoId]
       const presentation = getRepoWorkspacePresentation(repo)
       return {
@@ -39,12 +38,7 @@ export function RepoView({ repoId, onOpenSettings }: Props) {
         zenMode: s.zenMode,
         workspacePaneSize: s.workspacePaneSize,
       }
-    },
-    (a, b) =>
-      a.exists === b.exists &&
-      a.initialLoading === b.initialLoading &&
-      a.zenMode === b.zenMode &&
-      a.workspacePaneSize === b.workspacePaneSize,
+    }),
   )
   const setWorkspacePaneSize = useReposStore((s) => s.setWorkspacePaneSize)
   const repo = useReposStore((s) => s.repos[repoId])

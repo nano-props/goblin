@@ -3,7 +3,8 @@ import {
   readRuntimeFetchSettings,
   useRuntimeSettingsSnapshot,
 } from '#/web/settings-read-projection.ts'
-import { runSettingsAction, setFetchInterval, setTerminalNotificationsEnabled } from '#/web/settings-actions.ts'
+import { setFetchInterval, setTerminalNotificationsEnabled } from '#/web/settings-actions.ts'
+import { useSettingsMutation } from '#/web/settings-mutations.ts'
 
 export function getRuntimeFetchSettings() {
   return readRuntimeFetchSettings(currentRuntimeSettingsSnapshot())
@@ -14,16 +15,21 @@ export function useFetchSettings() {
 }
 
 export function useFetchSettingsController() {
+  const fetchIntervalMutation = useSettingsMutation('fetch interval update', async (sec: number) => {
+    await setFetchInterval(sec)
+  })
+  const terminalNotificationsMutation = useSettingsMutation(
+    'terminal notifications update',
+    async (enabled: boolean) => {
+      await setTerminalNotificationsEnabled(enabled)
+    },
+  )
   return {
     async setFetchInterval(sec: number): Promise<void> {
-      await runSettingsAction('fetch interval update', async () => {
-        await setFetchInterval(sec)
-      })
+      await fetchIntervalMutation.mutateAsync(sec)
     },
     async setTerminalNotificationsEnabled(enabled: boolean): Promise<void> {
-      await runSettingsAction('terminal notifications update', async () => {
-        await setTerminalNotificationsEnabled(enabled)
-      })
+      await terminalNotificationsMutation.mutateAsync(enabled)
     },
   }
 }
