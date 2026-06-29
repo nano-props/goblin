@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, useRef, type ReactNode } from 'react'
+import { act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { useRestoreTopVisibleRowIndex } from '#/web/hooks/useRestoreTopVisibleRowIndex.ts'
@@ -24,68 +24,98 @@ afterEach(() => {
 })
 
 describe('useRestoreTopVisibleRowIndex', () => {
-  test('restores immediately from row index when the viewport has a scroll range', () => {
-    const scrollHeightSpy = vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(1000)
-    const clientHeightSpy = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(200)
-    const offsetHeightSpy = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(20)
+  test('restores the saved row index through the virtualizer when ready', () => {
+    const scrollToIndex = vi.fn()
 
-    render(<ScrollRestoreHarness topVisibleRowIndex={6} restoreKey="scope-a" enabled />)
+    render(
+      <ScrollRestoreHarness
+        topVisibleRowIndex={6}
+        restoreKey="scope-a"
+        enabled
+        ready
+        rowCount={20}
+        scrollToIndex={scrollToIndex}
+      />,
+    )
 
-    expect(viewport().scrollTop).toBe(120)
-
-    scrollHeightSpy.mockRestore()
-    clientHeightSpy.mockRestore()
-    offsetHeightSpy.mockRestore()
+    expect(scrollToIndex).toHaveBeenCalledWith(6, { align: 'start' })
   })
 
-  test('waits for resize when the viewport is not scrollable yet', () => {
-    let resizeCallback: ResizeObserverCallback | null = null
-    const originalResizeObserver = globalThis.ResizeObserver
-    globalThis.ResizeObserver = class ResizeObserver {
-      constructor(callback: ResizeObserverCallback) {
-        resizeCallback = callback
-      }
-      observe() {}
-      unobserve() {}
-      disconnect() {}
-    } as typeof ResizeObserver
-    const scrollHeightSpy = vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(200)
-    const clientHeightSpy = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(200)
-    const offsetHeightSpy = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(20)
+  test('waits until lazy file tree restore is ready', () => {
+    const scrollToIndex = vi.fn()
 
-    render(<ScrollRestoreHarness topVisibleRowIndex={6} restoreKey="scope-a" enabled />)
-    expect(viewport().scrollTop).toBe(0)
+    render(
+      <ScrollRestoreHarness
+        topVisibleRowIndex={6}
+        restoreKey="scope-a"
+        enabled
+        ready={false}
+        rowCount={20}
+        scrollToIndex={scrollToIndex}
+      />,
+    )
+    expect(scrollToIndex).not.toHaveBeenCalled()
 
-    scrollHeightSpy.mockReturnValue(1000)
     act(() => {
-      resizeCallback?.([], {} as ResizeObserver)
+      root?.render(
+        <ScrollRestoreHarness
+          topVisibleRowIndex={6}
+          restoreKey="scope-a"
+          enabled
+          ready
+          rowCount={20}
+          scrollToIndex={scrollToIndex}
+        />,
+      )
     })
 
-    expect(viewport().scrollTop).toBe(120)
-
-    scrollHeightSpy.mockRestore()
-    clientHeightSpy.mockRestore()
-    offsetHeightSpy.mockRestore()
-    globalThis.ResizeObserver = originalResizeObserver
+    expect(scrollToIndex).toHaveBeenCalledWith(6, { align: 'start' })
   })
 
-  test('does not restore until enabled', () => {
-    const scrollHeightSpy = vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(1000)
-    const clientHeightSpy = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(200)
-    const offsetHeightSpy = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(20)
+  test('clamps to the last available row after restore is ready', () => {
+    const scrollToIndex = vi.fn()
 
-    render(<ScrollRestoreHarness topVisibleRowIndex={6} restoreKey="scope-a" enabled={false} />)
-    expect(viewport().scrollTop).toBe(0)
+    render(
+      <ScrollRestoreHarness
+        topVisibleRowIndex={20}
+        restoreKey="scope-a"
+        enabled
+        ready
+        rowCount={5}
+        scrollToIndex={scrollToIndex}
+      />,
+    )
 
+    expect(scrollToIndex).toHaveBeenCalledWith(4, { align: 'start' })
+  })
+
+  test('restores only once for the same restore key', () => {
+    const scrollToIndex = vi.fn()
+
+    render(
+      <ScrollRestoreHarness
+        topVisibleRowIndex={6}
+        restoreKey="scope-a"
+        enabled
+        ready
+        rowCount={20}
+        scrollToIndex={scrollToIndex}
+      />,
+    )
     act(() => {
-      root?.render(<ScrollRestoreHarness topVisibleRowIndex={6} restoreKey="scope-a" enabled />)
+      root?.render(
+        <ScrollRestoreHarness
+          topVisibleRowIndex={6}
+          restoreKey="scope-a"
+          enabled
+          ready
+          rowCount={25}
+          scrollToIndex={scrollToIndex}
+        />,
+      )
     })
 
-    expect(viewport().scrollTop).toBe(120)
-
-    scrollHeightSpy.mockRestore()
-    clientHeightSpy.mockRestore()
-    offsetHeightSpy.mockRestore()
+    expect(scrollToIndex).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -93,20 +123,26 @@ function ScrollRestoreHarness({
   topVisibleRowIndex,
   restoreKey,
   enabled,
-  retrySignal,
+  ready,
+  rowCount,
+  scrollToIndex,
 }: {
   readonly topVisibleRowIndex: number
   readonly restoreKey: string
   readonly enabled: boolean
-  readonly retrySignal?: unknown
+  readonly ready: boolean
+  readonly rowCount: number
+  readonly scrollToIndex: (index: number, options?: { align?: 'start' | 'center' | 'end' | 'auto' }) => void
 }) {
-  const viewportRef = useRef<HTMLDivElement | null>(null)
-  useRestoreTopVisibleRowIndex({ viewportRef, restoreKey, topVisibleRowIndex, enabled, retrySignal })
-  return (
-    <div ref={viewportRef} data-scroll-viewport="">
-      <div data-filetree-row="">row</div>
-    </div>
-  )
+  useRestoreTopVisibleRowIndex({
+    restoreKey,
+    topVisibleRowIndex,
+    enabled,
+    ready,
+    rowCount,
+    virtualizer: { scrollToIndex },
+  })
+  return null
 }
 
 function render(element: ReactNode) {
@@ -116,10 +152,4 @@ function render(element: ReactNode) {
   act(() => {
     root!.render(element)
   })
-}
-
-function viewport(): HTMLDivElement {
-  const element = container?.querySelector<HTMLDivElement>('[data-scroll-viewport]')
-  if (!element) throw new Error('no viewport')
-  return element
 }

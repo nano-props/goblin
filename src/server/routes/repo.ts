@@ -99,7 +99,7 @@ export function createRepoRoutes() {
     return c.json(await jsonOr(() => getRepoPatch(cwd, worktreePath, c.req.raw.signal), READ_REPO_ERROR, 'patch'))
   })
   app.post('/tree', async (c) => {
-    const { cwd, worktreePath, prefix, depth } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.tree, c)
+    const { cwd, worktreePath, prefix } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.tree, c)
     return c.json(
       await jsonOr(
         // Do not pipe the HTTP request signal into the git tree read.
@@ -107,7 +107,7 @@ export function createRepoRoutes() {
         // React Query is still settling the tab render, and the tree read
         // soft-fails to an empty result that the UI then displays as a real
         // empty worktree.
-        () => getRepositoryTree(cwd, worktreePath, { prefix, depth }),
+        () => getRepositoryTree(cwd, worktreePath, { prefix }),
         { nodes: [], truncated: false },
         'tree',
       ),

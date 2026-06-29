@@ -58,7 +58,7 @@ export type RemoteCommandKind =
   | { type: 'checkGit' }
   | { type: 'testDirectory'; path: string }
   | { type: 'listDirectories'; path: string; limit?: number }
-  | { type: 'gitTreeWalk'; path: string; depth: number }
+  | { type: 'gitTreeWalk'; path: string; prefix?: string }
   | { type: 'revParseTopLevel'; path: string }
   | { type: 'gitSnapshot'; path: string }
   | { type: 'gitPatch'; path: string }
@@ -223,13 +223,7 @@ function scriptForCommand(command: RemoteCommandKind): string {
       )} -mindepth 1 -maxdepth 1 -type d -print 2>/dev/null | LC_ALL=C sort | head -n ${limit}`
     }
     case 'gitTreeWalk': {
-      void command.depth
-      // NUL-separated relative file paths. Git owns the visibility
-      // semantics here: tracked + untracked files, excluding ignored
-      // files via the repo's standard exclude stack. Directories are
-      // derived from file paths by the source layer, so empty
-      // directories are not shown in v1.
-      return `git -C ${shellQuote(command.path)} ls-files -co --exclude-standard -z`
+      return remoteTreeChildrenScript(command.path, command.prefix)
     }
     case 'revParseTopLevel':
       return `git -C ${shellQuote(command.path)} rev-parse --show-toplevel`
@@ -512,6 +506,32 @@ function remoteTrashFileScript(worktreePath: string, filePath: string): string {
     `if command -v kioclient5 >/dev/null 2>&1; then exec kioclient5 move ${file} trash:/; fi`,
     `printf '%s\\n' 'error.trash-unavailable' >&2`,
     `exit 64`,
+  ].join('\n')
+}
+
+function remoteTreeChildrenScript(rootPath: string, prefix: string | undefined): string {
+  const root = shellQuote(rootPath)
+  const normalizedPrefix = (prefix ?? '').replace(/^\.\/+/, '').replace(/^\/+/, '').replace(/\/+$/u, '')
+  const dir = normalizedPrefix ? `${root}/${shellQuote(normalizedPrefix)}` : root
+  return [
+    `root=${root}`,
+    `dir=${dir}`,
+    'test -d "$dir" || exit 0',
+    "find \"$dir\" -mindepth 1 -maxdepth 1 ! -name .git -exec sh -c '",
+    'root=$1',
+    'shift',
+    'for entry do',
+    '  rel=${entry#"$root"/}',
+    '  if git -C "$root" check-ignore -q -- "$rel"; then',
+    '    git -C "$root" ls-files -- "$rel" | IFS= read -r _tracked || continue',
+    '  fi',
+    '  if [ -d "$entry" ]; then',
+    '    printf "%s/\\0" "$rel"',
+    '  else',
+    '    printf "%s\\0" "$rel"',
+    '  fi',
+    'done',
+    "' sh \"$root\" {} +",
   ].join('\n')
 }
 

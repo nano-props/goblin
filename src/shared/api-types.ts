@@ -192,11 +192,13 @@ export interface RepoTreeNode {
   readonly parentId: string | null
   readonly kind: 'directory' | 'file'
   readonly status: RepoTreeNodeStatus
+  /** Present for lazily-loaded directory rows when the server knows the directory has children. */
+  readonly hasChildren?: boolean
 }
 
 export interface RepoTreeResult {
   readonly nodes: ReadonlyArray<RepoTreeNode>
-  /** True if the result was truncated by `depth` or a node-count cap. */
+  /** True if the direct-children result was truncated by the node-count cap. */
   readonly truncated: boolean
 }
 

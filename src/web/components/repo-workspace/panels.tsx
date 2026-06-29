@@ -10,7 +10,7 @@ import { getRepoLog } from '#/web/repo-client.ts'
 import type { LogEntry } from '#/web/types.ts'
 import { BranchStatus } from '#/web/components/repo-workspace/BranchStatus.tsx'
 import { FiletreeNoWorktreeView, FiletreeView } from '#/web/components/repo-workspace/FiletreeView.tsx'
-import { useRepoTreeRefresh } from '#/web/hooks/useRepoTreeRefresh.ts'
+import { useLazyRepoTree } from '#/web/hooks/useLazyRepoTree.ts'
 import { TerminalSessionView } from '#/web/components/terminal/TerminalSessionView.tsx'
 import type { TerminalSessionBase } from '#/web/components/terminal/types.ts'
 import type { RepoTreeNode } from '#/shared/api-types.ts'
@@ -157,7 +157,6 @@ function FiletreeTab({
   worktreePath: string
 }) {
   const t = useT()
-  const result = useRepoTreeRefresh({ repoId, worktreePath })
   const navigation = usePrimaryWindowNavigation()
   const { createTerminal } = useTerminalSessionContext()
   const openTrashFileConfirm = useFiletreeActionDialogsStore((s) => s.openTrashFileConfirm)
@@ -168,8 +167,8 @@ function FiletreeTab({
   const expandedKeyList = useFiletreeInteractionStore(
     (s) => s.interactionByScope[interactionScopeKey]?.expandedKeys ?? emptyFiletreeInteractionSnapshot().expandedKeys,
   )
+  const result = useLazyRepoTree({ repoId, worktreePath, expandedKeys: expandedKeyList })
   const setSelectedKeys = useFiletreeInteractionStore((s) => s.setSelectedKeys)
-  const setExpandedKeys = useFiletreeInteractionStore((s) => s.setExpandedKeys)
   const setExpandedKey = useFiletreeInteractionStore((s) => s.setExpandedKey)
   const setTopVisibleRowIndex = useFiletreeInteractionStore((s) => s.setTopVisibleRowIndex)
   const pruneKeys = useFiletreeInteractionStore((s) => s.pruneKeys)
@@ -179,29 +178,32 @@ function FiletreeTab({
   )
   const selectedKeys = useMemo(() => new Set<Key>(selectedKeyList), [selectedKeyList])
   const expandedKeys = useMemo(() => new Set<Key>(expandedKeyList), [expandedKeyList])
+  const scrollRestoreReady = useMemo(
+    () => expandedKeyList.every((key) => result.loadedPrefixes.has(key) || result.errorKeys.has(key)),
+    [expandedKeyList, result.errorKeys, result.loadedPrefixes],
+  )
   const handleSelectedKeysChange = useCallback(
     (keys: Set<Key>) => {
       setSelectedKeys(interactionScopeKey, stringKeysFromReactAriaKeys(keys))
     },
     [interactionScopeKey, setSelectedKeys],
   )
-  const handleExpandedKeysChange = useCallback(
-    (keys: Set<Key>) => {
-      setExpandedKeys(interactionScopeKey, stringKeysFromReactAriaKeys(keys))
-    },
-    [interactionScopeKey, setExpandedKeys],
-  )
   const handleDirectoryRowToggle = useCallback(
     (key: string, expanded: boolean) => {
       setExpandedKey(interactionScopeKey, key, expanded)
+      if (expanded) {
+        void result.loadChildren(key).catch((err) => {
+          toast.error(t(err instanceof Error ? err.message : 'error.failed-read-repo'))
+        })
+      }
     },
-    [interactionScopeKey, setExpandedKey],
+    [interactionScopeKey, result.loadChildren, setExpandedKey, t],
   )
   const handlePruneKeys = useCallback(
     (validKeys: ReadonlySet<string>) => {
-      pruneKeys(interactionScopeKey, validKeys)
+      pruneKeys(interactionScopeKey, validKeys, result.loadedPrefixes)
     },
-    [interactionScopeKey, pruneKeys],
+    [interactionScopeKey, pruneKeys, result.loadedPrefixes],
   )
   const handleTopVisibleRowIndexChange = useCallback(
     (topVisibleRowIndex: number) => {
@@ -244,15 +246,16 @@ function FiletreeTab({
     <FiletreeView
       tree={result.tree}
       loading={result.loading}
+      loadingKeys={result.loadingKeys}
       error={result.error}
       selectedKeys={selectedKeys}
       expandedKeys={expandedKeys}
       onSelectedKeysChange={handleSelectedKeysChange}
-      onExpandedKeysChange={handleExpandedKeysChange}
       onDirectoryRowToggle={handleDirectoryRowToggle}
       onPruneKeys={handlePruneKeys}
       initialTopVisibleRowIndex={initialTopVisibleRowIndex}
       scrollRestoreKey={interactionScopeKey}
+      scrollRestoreReady={scrollRestoreReady}
       onTopVisibleRowIndexChange={handleTopVisibleRowIndexChange}
       onOpenFile={(node) => {
         void openFileInTerminal(node).catch((err) => {

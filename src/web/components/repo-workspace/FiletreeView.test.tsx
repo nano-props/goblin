@@ -32,15 +32,16 @@ type FiletreeViewHarnessProps = Omit<
   | 'selectedKeys'
   | 'expandedKeys'
   | 'onSelectedKeysChange'
-  | 'onExpandedKeysChange'
   | 'onDirectoryRowToggle'
   | 'onPruneKeys'
   | 'initialTopVisibleRowIndex'
   | 'scrollRestoreKey'
+  | 'scrollRestoreReady'
   | 'onTopVisibleRowIndexChange'
 > & {
   readonly initialTopVisibleRowIndex?: number
   readonly scrollRestoreKey?: string
+  readonly scrollRestoreReady?: boolean
   readonly onTopVisibleRowIndexChange?: (topVisibleRowIndex: number) => void
 }
 
@@ -57,6 +58,7 @@ function dirNode(id: string, parentId: string | null = null): RepoTreeNode {
 function FiletreeViewHarness({
   initialTopVisibleRowIndex = 0,
   scrollRestoreKey = 'test-worktree',
+  scrollRestoreReady = true,
   onTopVisibleRowIndexChange = () => {},
   ...props
 }: FiletreeViewHarnessProps) {
@@ -81,11 +83,11 @@ function FiletreeViewHarness({
       selectedKeys={selectedKeys}
       expandedKeys={expandedKeys}
       onSelectedKeysChange={setSelectedKeys}
-      onExpandedKeysChange={setExpandedKeys}
       onDirectoryRowToggle={toggleDirectoryRow}
       onPruneKeys={pruneKeys}
       initialTopVisibleRowIndex={initialTopVisibleRowIndex}
       scrollRestoreKey={scrollRestoreKey}
+      scrollRestoreReady={scrollRestoreReady}
       onTopVisibleRowIndexChange={onTopVisibleRowIndexChange}
     />
   )
@@ -145,16 +147,16 @@ function row(name: string): HTMLElement {
 }
 
 function rows(): HTMLElement[] {
-  return Array.from(container?.querySelectorAll<HTMLElement>('[role="row"][aria-label]') ?? [])
+  return Array.from(container?.querySelectorAll<HTMLElement>('[role="treeitem"][aria-label]') ?? [])
 }
 
 function rowNames(): Array<string | null> {
   return rows().map((element) => element.getAttribute('aria-label'))
 }
 
-function treegrid(): HTMLElement {
-  const element = container?.querySelector<HTMLElement>('[role="treegrid"]')
-  if (!element) throw new Error('no treegrid')
+function tree(): HTMLElement {
+  const element = container?.querySelector<HTMLElement>('[role="tree"]')
+  if (!element) throw new Error('no tree')
   return element
 }
 
@@ -182,7 +184,7 @@ describe('FiletreeView', () => {
     const tree: RepoTreeResult = { nodes: [], truncated: false }
     renderView({ tree, loading: false, error: null })
     expect(container?.querySelector('[data-filetree=""]')).not.toBeNull()
-    expect(container?.querySelectorAll('[role="row"]').length).toBe(0)
+    expect(container?.querySelectorAll('[role="treeitem"]').length).toBe(0)
     expect(container?.textContent).toMatch(/filetree\.empty/)
   })
 
@@ -202,13 +204,13 @@ describe('FiletreeView', () => {
     expect(container?.textContent).toMatch(/filetree\.error/)
   })
 
-  test('renders a React Aria treegrid labelled by i18n', () => {
+  test('renders a virtualized tree labelled by i18n', () => {
     renderView({
       tree: { nodes: [fileNode('README.md')], truncated: false },
       loading: false,
       error: null,
     })
-    expect(treegrid().getAttribute('aria-label')).toBe('filetree.aria-label')
+    expect(tree().getAttribute('aria-label')).toBe('filetree.aria-label')
   })
 
   test('does not add an extra panel border around the tree body', () => {
@@ -217,7 +219,7 @@ describe('FiletreeView', () => {
       loading: false,
       error: null,
     })
-    expect(treegrid().className).not.toContain('border-l')
+    expect(tree().className).not.toContain('border-l')
   })
 
   test('uses the app sans font for explorer file names', () => {
@@ -226,8 +228,8 @@ describe('FiletreeView', () => {
       loading: false,
       error: null,
     })
-    expect(treegrid().className).toContain('font-sans')
-    expect(treegrid().className).not.toContain('font-mono')
+    expect(tree().className).toContain('font-sans')
+    expect(tree().className).not.toContain('font-mono')
   })
 
   test('lists root-level files and directories, directories before files', () => {
@@ -245,6 +247,8 @@ describe('FiletreeView', () => {
 
     expect(rowNames()).toEqual(['src', 'README.md'])
     expect(row('src').getAttribute('aria-level')).toBe('1')
+    expect(row('src').getAttribute('aria-posinset')).toBe('1')
+    expect(row('src').getAttribute('aria-setsize')).toBe('2')
     expect(row('README.md').getAttribute('aria-level')).toBe('1')
   })
 
@@ -380,7 +384,7 @@ describe('FiletreeView', () => {
     expect(row('README.md').className).not.toMatch(/\brounded-/)
   })
 
-  test('still expands a directory via the React Aria chevron slot', async () => {
+  test('still expands a directory via the chevron control', async () => {
     const user = userEvent.setup()
     const tree: RepoTreeResult = {
       nodes: [dirNode('src'), fileNode('src/index.ts', 'src')],
@@ -445,58 +449,22 @@ describe('FiletreeView', () => {
 
   test('keeps the initial loading state visually quiet and announces aria-busy', () => {
     renderView({ tree: null, loading: true, error: null })
-    expect(container?.querySelectorAll('[role="row"]').length).toBe(0)
+    expect(container?.querySelectorAll('[role="treeitem"]').length).toBe(0)
     expect(container?.textContent).not.toMatch(/filetree\.loading/)
     expect(container?.textContent).not.toMatch(/filetree\.empty/)
     expect(container?.querySelector('[data-filetree=""]')?.getAttribute('aria-busy')).toBe('true')
   })
 
-  test('waits for a scroll range before marking row restoration complete', () => {
-    let resizeCallback: ResizeObserverCallback | null = null
-    const originalResizeObserver = globalThis.ResizeObserver
-    globalThis.ResizeObserver = class ResizeObserver {
-      constructor(callback: ResizeObserverCallback) {
-        resizeCallback = callback
-      }
-      observe() {}
-      unobserve() {}
-      disconnect() {}
-    } as typeof ResizeObserver
-    const scrollHeightSpy = vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(200)
-    const clientHeightSpy = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(200)
-    const offsetHeightSpy = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(20)
-
-    renderView({ tree: buildTree(), loading: false, error: null, initialTopVisibleRowIndex: 6 })
-    const viewport = scrollViewport()
-    expect(viewport.scrollTop).toBe(0)
-
-    scrollHeightSpy.mockReturnValue(1000)
-    act(() => {
-      resizeCallback?.([], {} as ResizeObserver)
-    })
-
-    expect(viewport.scrollTop).toBe(120)
-
-    scrollHeightSpy.mockRestore()
-    clientHeightSpy.mockRestore()
-    offsetHeightSpy.mockRestore()
-    globalThis.ResizeObserver = originalResizeObserver
-  })
-
   test('reports the top visible row index instead of the raw scroll offset', () => {
     const onTopVisibleRowIndexChange = vi.fn()
-    const offsetHeightSpy = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(20)
-
     renderView({ tree: buildTree(), loading: false, error: null, onTopVisibleRowIndexChange })
     const viewport = scrollViewport()
-    viewport.scrollTop = 125
+    viewport.scrollTop = 145
     act(() => {
       viewport.dispatchEvent(new Event('scroll', { bubbles: true }))
     })
 
     expect(onTopVisibleRowIndexChange).toHaveBeenCalledWith(6)
-
-    offsetHeightSpy.mockRestore()
   })
 
   test('preserves selection and expansion when the tree refreshes with the same keys', async () => {
@@ -553,6 +521,24 @@ describe('FiletreeView', () => {
 })
 
 describe('FiletreeView — React Aria keyboard integration', () => {
+  test('ArrowDown and ArrowUp move focus through visible rows', async () => {
+    const user = userEvent.setup()
+    renderView({ tree: buildTree(), loading: false, error: null })
+
+    row('src').focus()
+    await user.keyboard('{ArrowDown}')
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(document.activeElement).toBe(row('README.md'))
+
+    await user.keyboard('{ArrowUp}')
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(document.activeElement).toBe(row('src'))
+  })
+
   test('ArrowRight expands the focused directory', async () => {
     const user = userEvent.setup()
     renderView({ tree: buildTree(), loading: false, error: null })

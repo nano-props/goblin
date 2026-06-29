@@ -106,19 +106,15 @@ export const REPO_PROCEDURE_SCHEMAS = {
     skip: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(100_000))),
   }),
   patch: v.object({ cwd: v.string(), worktreePath: v.string() }),
-  // Worktree-scoped file tree (docs/filetree.md). `prefix` enables
-  // incremental loading for very deep trees; `depth` is bounded 1..10
-  // so a bad client cannot ask the server to walk forever. The
-  // perimeter rejects absolute paths, `..` segments, control
-  // characters and backslashes inside `prefix` so a hostile or
-  // buggy client cannot escape the worktree root. The read layer
-  // still verifies `worktreePath` against the worktree list as a
-  // defense-in-depth check.
+  // Worktree-scoped file tree (docs/filetree.md). The route returns
+  // direct children of `prefix`; omitted prefix means the worktree root.
+  // The perimeter rejects absolute paths, `..` segments, control
+  // characters and backslashes inside `prefix`, and the read layer
+  // still verifies `worktreePath` against the worktree list.
   tree: v.object({
     cwd: v.string(),
     worktreePath: v.string(),
     prefix: v.optional(RepoTreePrefixSchema),
-    depth: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(10))),
   }),
   trashFile: v.object({
     cwd: v.string(),

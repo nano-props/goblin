@@ -239,7 +239,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/tree', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', worktreePath: '/tmp/repo/.worktrees/feature', depth: 3 }),
+        body: JSON.stringify({ cwd: '/tmp/repo', worktreePath: '/tmp/repo/.worktrees/feature', prefix: 'src' }),
       }),
     )
     expect(response.status).toBe(200)
@@ -249,7 +249,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     expect(mocks.getRepositoryTree).toHaveBeenCalledWith(
       '/tmp/repo',
       '/tmp/repo/.worktrees/feature',
-      { depth: 3, prefix: undefined },
+      { prefix: 'src' },
     )
   })
 
@@ -266,17 +266,17 @@ describe('repo routes — POST body validation (read endpoints)', () => {
 
     expect(response.status).toBe(200)
     const options = mocks.getRepositoryTree.mock.calls[0]?.[2] as { signal?: AbortSignal } | undefined
-    expect(options).toEqual({ depth: undefined, prefix: undefined })
+    expect(options).toEqual({ prefix: undefined })
     expect(options?.signal).toBeUndefined()
   })
 
-  test('returns 400 when /tree depth is out of bounds', async () => {
+  test('returns 400 when /tree prefix is invalid', async () => {
     const app = createRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/tree', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', worktreePath: '/tmp/repo', depth: 11 }),
+        body: JSON.stringify({ cwd: '/tmp/repo', worktreePath: '/tmp/repo', prefix: '../secret' }),
       }),
     )
     expect(response.status).toBe(400)

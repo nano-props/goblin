@@ -85,16 +85,17 @@ describe('remote ssh command builders', () => {
     expect(invocation.script).toContain('exec "${SHELL:-/bin/sh}" -l')
   })
 
-  test('remote tree walk returns file paths only so directories are derived by the source layer', () => {
+  test('remote tree walk uses directory listing for direct children', () => {
     const invocation = buildRemoteCommandInvocation(target(), {
       type: 'gitTreeWalk',
       path: '/srv/repo worktree',
-      depth: 4,
+      prefix: 'src/app',
     })
 
-    expect(invocation.script).toContain('git -C')
-    expect(invocation.script).toContain('ls-files -co --exclude-standard -z')
-    expect(invocation.script).not.toMatch(/\bfind\s+--\b/)
+    expect(invocation.script).toContain('find "$dir" -mindepth 1 -maxdepth 1')
+    expect(invocation.script).toContain('check-ignore')
+    expect(invocation.script).toContain('ls-files -- "$rel"')
+    expect(invocation.script).not.toContain('ls-files -co --exclude-standard -z')
   })
 
   test('remote commandExists checks the command in the remote login shell', () => {

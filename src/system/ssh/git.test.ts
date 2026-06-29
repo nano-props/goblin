@@ -805,7 +805,6 @@ describe('getRemoteTreeWalk knownWorktrees path', () => {
     })
 
     const result = await getRemoteTreeWalk(TARGET, '/srv/repo-feature', {
-      depth: 3,
       run: run as any,
       knownWorktrees,
     })
