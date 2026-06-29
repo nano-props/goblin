@@ -13,11 +13,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links'
 import type { ILinkHandler, ITheme } from '@xterm/xterm'
 import type { Terminal as XTermTerminal } from '@xterm/xterm'
 import { Terminal } from '@xterm/xterm'
-import {
-  TERMINAL_FONT_FAMILY,
-  TERMINAL_FONT_SIZE,
-  TERMINAL_LINE_HEIGHT,
-} from '#/web/components/terminal/terminal-geometry.ts'
+import { createTerminalSizingOptions } from '#/web/components/terminal/terminal-geometry.ts'
 import {
   observeTerminalTheme,
   terminalSearchDecorationsForCurrentDocument,
@@ -142,19 +138,12 @@ export class TerminalSessionView {
   ): XTermTerminal {
     const theme = terminalThemeForCurrentDocument()
     const term = new Terminal({
-      allowProposedApi: true,
-      cols: geometry.cols,
-      rows: geometry.rows,
+      ...createTerminalSizingOptions(geometry),
       cursorBlink: true,
       cursorStyle: 'bar',
-      fontFamily: TERMINAL_FONT_FAMILY,
-      fontSize: TERMINAL_FONT_SIZE,
-      lineHeight: TERMINAL_LINE_HEIGHT,
       minimumContrastRatio: 4.5,
-      scrollback: 10_000,
       linkHandler: this.createLinkHandler(),
       macOptionIsMeta: true,
-      rescaleOverlappingGlyphs: true,
       scrollOnUserInput: true,
       theme,
     })

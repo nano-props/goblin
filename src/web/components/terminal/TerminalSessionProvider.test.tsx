@@ -62,14 +62,21 @@ const mockSessions = vi.hoisted(
 const geometryMocks = vi.hoisted(() => ({
   preloadTerminalFont: vi.fn(async () => {}),
   proposeTerminalGeometry: vi.fn(() => ({ cols: 100, rows: 30 })),
+  proposeManagedTerminalGeometry: vi.fn(() => ({ cols: 100, rows: 30 })),
 }))
 
-vi.mock('#/web/components/terminal/terminal-geometry.ts', () => ({
-  DEFAULT_TERMINAL_COLS: 80,
-  DEFAULT_TERMINAL_ROWS: 24,
-  preloadTerminalFont: geometryMocks.preloadTerminalFont,
-  proposeTerminalGeometry: geometryMocks.proposeTerminalGeometry,
-}))
+vi.mock('#/web/components/terminal/terminal-geometry.ts', async () => {
+  const actual =
+    await vi.importActual<typeof import('#/web/components/terminal/terminal-geometry.ts')>(
+      '#/web/components/terminal/terminal-geometry.ts',
+    )
+  return {
+    ...actual,
+    preloadTerminalFont: geometryMocks.preloadTerminalFont,
+    proposeTerminalGeometry: geometryMocks.proposeTerminalGeometry,
+    proposeManagedTerminalGeometry: geometryMocks.proposeManagedTerminalGeometry,
+  }
+})
 
 function selectedWorkspacePaneTab(repoId: string) {
   const repo = useReposStore.getState().repos[repoId]

@@ -395,15 +395,17 @@ const geometryMocks = vi.hoisted(() => ({
   proposeTerminalGeometry: vi.fn<() => { cols: number; rows: number } | null>(() => ({ cols: 80, rows: 24 })),
 }))
 
-vi.mock('#/web/components/terminal/terminal-geometry.ts', () => ({
-  preloadTerminalFont: geometryMocks.preloadTerminalFont,
-  proposeTerminalGeometry: geometryMocks.proposeTerminalGeometry,
-  TERMINAL_FONT_FAMILY: "'Goblin Mono', monospace",
-  TERMINAL_FONT_SIZE: 14,
-  TERMINAL_LINE_HEIGHT: 1,
-  DEFAULT_TERMINAL_COLS: 80,
-  DEFAULT_TERMINAL_ROWS: 24,
-}))
+vi.mock('#/web/components/terminal/terminal-geometry.ts', async () => {
+  const actual =
+    await vi.importActual<typeof import('#/web/components/terminal/terminal-geometry.ts')>(
+      '#/web/components/terminal/terminal-geometry.ts',
+    )
+  return {
+    ...actual,
+    preloadTerminalFont: geometryMocks.preloadTerminalFont,
+    proposeTerminalGeometry: geometryMocks.proposeTerminalGeometry,
+  }
+})
 
 class MockResizeObserver {
   static instances: MockResizeObserver[] = []

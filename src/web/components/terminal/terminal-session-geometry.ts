@@ -1,4 +1,8 @@
-import { preloadTerminalFont, proposeTerminalGeometry } from '#/web/components/terminal/terminal-geometry.ts'
+import {
+  preloadTerminalFont,
+  proposeManagedTerminalGeometry,
+  proposeTerminalGeometry,
+} from '#/web/components/terminal/terminal-geometry.ts'
 import type { TerminalClientSnapshot, TerminalDescriptor } from '#/web/components/terminal/types.ts'
 
 export async function captureTerminalHostGeometry(input: {
@@ -9,7 +13,7 @@ export async function captureTerminalHostGeometry(input: {
   const host = input.hostByWorktree.get(input.worktreeTerminalKey)
   if (!host?.isConnected) return null
   await preloadTerminalFont()
-  const geometry = proposeTerminalGeometry(host)
+  const geometry = proposeManagedTerminalGeometry(host)
   if (!geometry) return null
   input.geometryByWorktree.set(input.worktreeTerminalKey, geometry)
   return geometry
@@ -53,7 +57,8 @@ export async function resolveTerminalCreateGeometry(input: {
  * projection teardown), so neither attach nor resize-driven waits leak subscriptions.
  *
  * `measure` is dependency-injected so tests can drive the host without
- * relying on jsdom layout. In production it defaults to `proposeTerminalGeometry`.
+ * relying on jsdom layout. In production it defaults to `proposeTerminalGeometry`,
+ * which delegates sizing to xterm's FitAddon.
  */
 export function waitForMeasurableHost(
   host: HTMLElement,
@@ -107,6 +112,17 @@ export function waitForMeasurableHost(
       )
     }
   })
+}
+
+export function waitForMeasurableManagedHost(
+  host: HTMLElement,
+  options: {
+    signal?: AbortSignal
+    measure?: (host: HTMLElement) => { cols: number; rows: number } | null
+    timeoutMs?: number
+  } = {},
+): Promise<{ cols: number; rows: number }> {
+  return waitForMeasurableHost(host, { ...options, measure: options.measure ?? proposeManagedTerminalGeometry })
 }
 
 export class TerminalHostNotMeasurableError extends Error {

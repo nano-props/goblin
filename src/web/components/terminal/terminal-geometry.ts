@@ -1,34 +1,34 @@
-/**
- * Test-only fixtures: historical fallback geometry used by tests that mock
- * the terminal-geometry module. Production code MUST go through
- * `waitForMeasurableHost` (in terminal-session-geometry.ts) instead of
- * falling back to these — see docs/terminal.md "Geometry and layout model".
- */
+import { FitAddon } from '@xterm/addon-fit'
+import type { ITerminalInitOnlyOptions, ITerminalOptions } from '@xterm/xterm'
+import { Terminal } from '@xterm/xterm'
+
 export const DEFAULT_TERMINAL_COLS = 80
 export const DEFAULT_TERMINAL_ROWS = 24
 
 /**
- * Page-lifetime constants. The cell-metrics cache below assumes these
- * do not change for the page's lifetime; if any of them ever becomes
- * user-configurable at runtime, the cache must be invalidated on
- * change.
+ * Page-lifetime terminal font constants. If any of these ever becomes
+ * user-configurable at runtime, xterm instances and pre-create geometry
+ * measurement must be rebuilt against the new values.
  */
 export const TERMINAL_FONT_SIZE = 14
 export const TERMINAL_FONT_FAMILY = "'Goblin Mono', monospace"
 export const TERMINAL_LINE_HEIGHT = 1
+export const TERMINAL_SCROLLBACK_ROWS = 10_000
 
-const MIN_INITIAL_TERMINAL_COLS = 2
-const MIN_INITIAL_TERMINAL_ROWS = 1
-const TERMINAL_SCROLLBAR_WIDTH = 14
-
-/**
- * Process-wide cache of measured cell dimensions. Populated on the
- * first successful `measureTerminalCell()` call and reused for the
- * rest of the page lifetime. The invariant is that the font family
- * and size above never change at runtime; if they ever do, the cache
- * must be invalidated. There is no automatic invalidation by design.
- */
-let cachedTerminalCellMetrics: { cellWidth: number; cellHeight: number } | null = null
+export function createTerminalSizingOptions(
+  geometry: { cols: number; rows: number } = { cols: DEFAULT_TERMINAL_COLS, rows: DEFAULT_TERMINAL_ROWS },
+): ITerminalOptions & ITerminalInitOnlyOptions {
+  return {
+    allowProposedApi: true,
+    cols: geometry.cols,
+    rows: geometry.rows,
+    fontFamily: TERMINAL_FONT_FAMILY,
+    fontSize: TERMINAL_FONT_SIZE,
+    lineHeight: TERMINAL_LINE_HEIGHT,
+    rescaleOverlappingGlyphs: true,
+    scrollback: TERMINAL_SCROLLBACK_ROWS,
+  }
+}
 
 export function preloadTerminalFont(): Promise<void> {
   if (!document.fonts) return Promise.resolve()
@@ -42,41 +42,36 @@ export function preloadTerminalFont(): Promise<void> {
 
 export function proposeTerminalGeometry(host: HTMLElement): { cols: number; rows: number } | null {
   if (!hasMeasurableBox(host)) return null
-  const metrics = measureTerminalCell()
-  if (!metrics) return null
-  const rect = host.getBoundingClientRect()
-  const availableWidth = Math.max(0, rect.width - TERMINAL_SCROLLBAR_WIDTH)
-  return {
-    cols: Math.max(MIN_INITIAL_TERMINAL_COLS, Math.floor(availableWidth / metrics.cellWidth)),
-    rows: Math.max(MIN_INITIAL_TERMINAL_ROWS, Math.floor(rect.height / metrics.cellHeight)),
+  const term = new Terminal(createTerminalSizingOptions())
+  const fitAddon = new FitAddon()
+  try {
+    term.loadAddon(fitAddon)
+    term.open(host)
+    const geometry = fitAddon.proposeDimensions()
+    return geometry ? { cols: geometry.cols, rows: geometry.rows } : null
+  } finally {
+    term.dispose()
   }
 }
 
-function measureTerminalCell(): { cellWidth: number; cellHeight: number } | null {
-  if (cachedTerminalCellMetrics) return cachedTerminalCellMetrics
-  if (!document.body) return null
-  const probe = document.createElement('span')
-  probe.textContent = 'M'.repeat(100)
-  probe.style.cssText = [
-    'position:absolute',
-    'top:-9999px',
-    'left:-9999px',
-    'visibility:hidden',
-    'pointer-events:none',
-    'white-space:pre',
-    'letter-spacing:0',
-    'font-variant-ligatures:none',
-    `font-family:${TERMINAL_FONT_FAMILY}`,
-    `font-size:${TERMINAL_FONT_SIZE}px`,
-    `line-height:${TERMINAL_LINE_HEIGHT}`,
-  ].join(';')
-  document.body.appendChild(probe)
-  const width = probe.offsetWidth
-  const height = probe.offsetHeight
-  probe.remove()
-  if (width <= 0 || height <= 0) return null
-  cachedTerminalCellMetrics = { cellWidth: width / 100, cellHeight: height }
-  return cachedTerminalCellMetrics
+export function proposeManagedTerminalGeometry(host: HTMLElement): { cols: number; rows: number } | null {
+  if (!hasMeasurableBox(host)) return null
+  const frame = document.createElement('div')
+  frame.className = 'goblin-managed-terminal-frame'
+  frame.style.position = 'absolute'
+  frame.style.inset = '0'
+  frame.style.visibility = 'hidden'
+  frame.style.pointerEvents = 'none'
+
+  const xtermHost = document.createElement('div')
+  xtermHost.className = 'goblin-managed-terminal-host'
+  frame.appendChild(xtermHost)
+  host.appendChild(frame)
+  try {
+    return proposeTerminalGeometry(xtermHost)
+  } finally {
+    frame.remove()
+  }
 }
 
 function hasMeasurableBox(element: HTMLElement): boolean {
