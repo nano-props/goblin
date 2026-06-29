@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { useStoreWithEqualityFn } from 'zustand/traditional'
+import { useShallow } from 'zustand/react/shallow'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { onClientLocalEventType } from '#/web/local-events.ts'
 import { subscribeClientEffectIntent } from '#/web/client-ingress.ts'
@@ -15,10 +15,7 @@ import {
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
-import {
-  clientEffectIntentStoreActionsEqual,
-  clientEffectIntentStoreActionsFromStore,
-} from '#/web/stores/repos/selector-actions.ts'
+import { clientEffectIntentStoreActionsFromStore } from '#/web/stores/repos/selector-actions.ts'
 
 interface ClientEffectIntentRouterOptions {
   navigation: PrimaryWindowNavigationActions
@@ -46,10 +43,8 @@ export function useClientEffectIntentRouter({
   // This hook is the single client-side subscription point for native effect
   // intents. Routing stays centralized here; intent-specific behavior lives in
   // the handler/plan helpers so components do not subscribe independently.
-  const { ensureWorkspaceOpen, setSelectedTerminal, resetLayout, toggleZenMode } = useStoreWithEqualityFn(
-    useReposStore,
-    clientEffectIntentStoreActionsFromStore,
-    clientEffectIntentStoreActionsEqual,
+  const { ensureWorkspaceOpen, setSelectedTerminal, resetLayout, toggleZenMode } = useReposStore(
+    useShallow(clientEffectIntentStoreActionsFromStore),
   )
   const t = useT()
   const navigationRef = useRef(navigation)

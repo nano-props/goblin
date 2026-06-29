@@ -11,11 +11,8 @@ import {
   runtimeCoherentRepoProjectionStateFromStore,
 } from '#/web/stores/repos/selector-state.ts'
 import {
-  primaryWindowNavigationStoreActionsEqual,
   primaryWindowNavigationStoreActionsFromStore,
-  clientEffectIntentStoreActionsEqual,
   clientEffectIntentStoreActionsFromStore,
-  repoPickerStoreActionsEqual,
   repoPickerStoreActionsFromStore,
   restorableWorkspaceLayoutPreferenceStoreActionsFromStore,
   restorableWorkspaceLayoutStoreActionsFromStore,
@@ -204,49 +201,40 @@ describe('repo selectors', () => {
       setWorkspacePaneTab: fnA,
     })
     expect(
-      primaryWindowNavigationStoreActionsEqual(
-        primaryWindowNavigationStoreActionsFromStore({
-          setActive: fnA,
-          closeRepo: fnA,
-          cycleActive: fnA,
-          selectBranch: fnA,
-          setWorkspacePaneTab: fnA,
-        }),
-        primaryWindowNavigationStoreActionsFromStore({
-          setActive: fnA,
-          closeRepo: fnA,
-          cycleActive: fnA,
-          selectBranch: fnA,
-          setWorkspacePaneTab: fnA,
-        }),
-      ),
-    ).toBe(true)
+      primaryWindowNavigationStoreActionsFromStore({
+        setActive: fnA,
+        closeRepo: fnA,
+        cycleActive: fnA,
+        selectBranch: fnA,
+        setWorkspacePaneTab: fnA,
+      }),
+    ).toEqual({
+      setActive: fnA,
+      closeRepo: fnA,
+      cycleActive: fnA,
+      selectBranch: fnA,
+      setWorkspacePaneTab: fnA,
+    })
     expect(
-      repoPickerStoreActionsEqual(
-        repoPickerStoreActionsFromStore({
-          ensureWorkspaceOpen: fnA as never,
-        }),
-        repoPickerStoreActionsFromStore({
-          ensureWorkspaceOpen: fnB as never,
-        }),
-      ),
-    ).toBe(false)
+      repoPickerStoreActionsFromStore({
+        ensureWorkspaceOpen: fnA as never,
+      }),
+    ).toEqual({
+      ensureWorkspaceOpen: fnA,
+    })
     expect(
-      clientEffectIntentStoreActionsEqual(
-        clientEffectIntentStoreActionsFromStore({
-          ensureWorkspaceOpen: fnA as never,
-          setSelectedTerminal: fnA as never,
-          resetLayout: fnA as never,
-          toggleZenMode: fnA as never,
-        }),
-        clientEffectIntentStoreActionsFromStore({
-          ensureWorkspaceOpen: fnA as never,
-          setSelectedTerminal: fnA as never,
-          resetLayout: fnB as never,
-          toggleZenMode: fnA as never,
-        }),
-      ),
-    ).toBe(false)
+      clientEffectIntentStoreActionsFromStore({
+        ensureWorkspaceOpen: fnA as never,
+        setSelectedTerminal: fnA as never,
+        resetLayout: fnA as never,
+        toggleZenMode: fnA as never,
+      }),
+    ).toEqual({
+      ensureWorkspaceOpen: fnA,
+      setSelectedTerminal: fnA,
+      resetLayout: fnA,
+      toggleZenMode: fnA,
+    })
   })
 
   test('builds keyboard runtime state from the current repo selection', () => {

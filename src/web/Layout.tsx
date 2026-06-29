@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
-import { useStoreWithEqualityFn } from 'zustand/traditional'
+import { useShallow } from 'zustand/react/shallow'
 import { ErrorBoundary } from '#/web/components/ErrorBoundary.tsx'
 import { TerminalSessionProvider } from '#/web/components/terminal/TerminalSessionProvider.tsx'
 import { TokenGate } from '#/web/components/TokenGate.tsx'
@@ -30,10 +30,7 @@ import { createPrimaryWindowNavigationActions } from '#/web/primary-window-navig
 import { PrimaryWindowNavigationProvider } from '#/web/primary-window-navigation.tsx'
 import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import {
-  primaryWindowNavigationStoreActionsEqual,
-  primaryWindowNavigationStoreActionsFromStore,
-} from '#/web/stores/repos/selector-actions.ts'
+import { primaryWindowNavigationStoreActionsFromStore } from '#/web/stores/repos/selector-actions.ts'
 
 export function Layout() {
   const navigate = useNavigate()
@@ -49,10 +46,8 @@ export function Layout() {
   const activeId = useReposStore((s) => s.activeId)
   const activeBranchName = useReposStore((s) => (s.activeId ? (s.repos[s.activeId]?.ui.selectedBranch ?? null) : null))
   const order = useReposStore((s) => s.order)
-  const { setActive, closeRepo, cycleActive, selectBranch, setWorkspacePaneTab } = useStoreWithEqualityFn(
-    useReposStore,
-    primaryWindowNavigationStoreActionsFromStore,
-    primaryWindowNavigationStoreActionsEqual,
+  const { setActive, closeRepo, cycleActive, selectBranch, setWorkspacePaneTab } = useReposStore(
+    useShallow(primaryWindowNavigationStoreActionsFromStore),
   )
   const navigation = useMemo(
     () =>

@@ -145,32 +145,3 @@ export function clientEffectIntentStoreActionsFromStore(
     toggleZenMode: state.toggleZenMode,
   }
 }
-
-export function primaryWindowNavigationStoreActionsEqual(
-  a: PrimaryWindowNavigationStoreActions,
-  b: PrimaryWindowNavigationStoreActions,
-): boolean {
-  return (
-    a.setActive === b.setActive &&
-    a.closeRepo === b.closeRepo &&
-    a.cycleActive === b.cycleActive &&
-    a.selectBranch === b.selectBranch &&
-    a.setWorkspacePaneTab === b.setWorkspacePaneTab
-  )
-}
-
-export function repoPickerStoreActionsEqual(a: RepoPickerStoreActions, b: RepoPickerStoreActions): boolean {
-  return a.ensureWorkspaceOpen === b.ensureWorkspaceOpen
-}
-
-export function clientEffectIntentStoreActionsEqual(
-  a: ClientEffectIntentStoreActions,
-  b: ClientEffectIntentStoreActions,
-): boolean {
-  return (
-    a.ensureWorkspaceOpen === b.ensureWorkspaceOpen &&
-    a.setSelectedTerminal === b.setSelectedTerminal &&
-    a.resetLayout === b.resetLayout &&
-    a.toggleZenMode === b.toggleZenMode
-  )
-}
