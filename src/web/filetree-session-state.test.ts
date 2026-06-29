@@ -23,7 +23,7 @@ describe('filetree-session-state', () => {
       {
         [scopeKey]: {
           selectedKeys: ['src/index.ts'],
-          expandedKeys: ['src'],
+          expandedKeys: ['src', 'src/web'],
           topVisibleRowIndex: 120,
         },
         [staleScopeKey]: {
@@ -51,7 +51,7 @@ describe('filetree-session-state', () => {
       '/tmp/repo': {
         '/tmp/worktree': {
           selectedKeys: ['src/index.ts'],
-          expandedKeys: ['src'],
+          expandedKeys: ['src', 'src/web'],
           topVisibleRowIndex: 120,
         },
       },
@@ -62,10 +62,10 @@ describe('filetree-session-state', () => {
     restoreFiletreeViewStateFromSession({
       '/tmp/repo': {
         '/tmp/worktree': {
-          selectedKeys: ['src/index.ts'],
-          expandedKeys: ['src'],
-          topVisibleRowIndex: 120,
-        },
+        selectedKeys: ['src/index.ts'],
+        expandedKeys: ['src', 'src/web'],
+        topVisibleRowIndex: 120,
+      },
       },
     })
 
@@ -75,7 +75,7 @@ describe('filetree-session-state', () => {
       ],
     ).toEqual({
       selectedKeys: ['src/index.ts'],
-      expandedKeys: ['src'],
+      expandedKeys: ['src', 'src/web'],
       topVisibleRowIndex: 120,
     })
   })

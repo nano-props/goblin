@@ -3,7 +3,7 @@ import { StrictMode, act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { useRepoTreeRefresh } from '#/web/hooks/useRepoTreeRefresh.ts'
+import { useLazyRepoTree } from '#/web/hooks/useLazyRepoTree.ts'
 import type { RepoTreeResult } from '#/shared/api-types.ts'
 
 const mocks = vi.hoisted(() => ({
@@ -27,17 +27,21 @@ type HarnessSnapshot = {
   tree: RepoTreeResult | null
   loading: boolean
   error: string | null
+  loadingKeys: ReadonlySet<string>
+  errorKeys: ReadonlySet<string>
+  loadChildren: (prefix: string) => Promise<void>
   refresh: () => void
 }
 
 interface HarnessProps {
   readonly repoId: string
   readonly worktreePath: string
+  readonly expandedKeys?: readonly string[]
   readonly onSnapshot: (snapshot: HarnessSnapshot) => void
 }
 
-function Harness({ repoId, worktreePath, onSnapshot }: HarnessProps) {
-  const result = useRepoTreeRefresh({ repoId, worktreePath })
+function Harness({ repoId, worktreePath, expandedKeys, onSnapshot }: HarnessProps) {
+  const result = useLazyRepoTree({ repoId, worktreePath, expandedKeys })
   onSnapshot(result)
   return null
 }
@@ -113,7 +117,7 @@ async function flush() {
   })
 }
 
-describe('useRepoTreeRefresh', () => {
+describe('useLazyRepoTree', () => {
   test('kicks an initial fetch on mount and exposes loading=true', async () => {
     const deferred = makeDeferred<RepoTreeResult>()
     mocks.getRepositoryTree.mockReturnValueOnce(deferred.promise)
@@ -355,6 +359,96 @@ describe('useRepoTreeRefresh', () => {
     expect(mocks.getRepositoryTree).toHaveBeenCalledTimes(2)
   })
 
+  test('loads and merges direct children for an expanded directory', async () => {
+    mocks.getRepositoryTree
+      .mockResolvedValueOnce({
+        nodes: [{ id: 'src', path: 'src', name: 'src', parentId: null, kind: 'directory', status: 'clean' }],
+        truncated: false,
+      })
+      .mockResolvedValueOnce({
+        nodes: [
+          { id: 'src/index.ts', path: 'src/index.ts', name: 'index.ts', parentId: 'src', kind: 'file', status: 'clean' },
+        ],
+        truncated: false,
+      })
+
+    await render({
+      repoId: '/repo-a',
+      worktreePath: '/repo-a/main',
+      onSnapshot: (snapshot) => {
+        lastSnapshot = snapshot
+      },
+    })
+    await flush()
+
+    await act(async () => {
+      await lastSnapshot?.loadChildren('src')
+    })
+    await flush()
+
+    expect(mocks.getRepositoryTree).toHaveBeenLastCalledWith(
+      '/repo-a',
+      '/repo-a/main',
+      expect.objectContaining({ prefix: 'src', signal: expect.any(AbortSignal) }),
+    )
+    expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/index.ts'])
+  })
+
+  test('auto-loads restored expanded directory keys after the root read', async () => {
+    mocks.getRepositoryTree
+      .mockResolvedValueOnce({
+        nodes: [{ id: 'src', path: 'src', name: 'src', parentId: null, kind: 'directory', status: 'clean' }],
+        truncated: false,
+      })
+      .mockResolvedValueOnce({
+        nodes: [
+          { id: 'src/index.ts', path: 'src/index.ts', name: 'index.ts', parentId: 'src', kind: 'file', status: 'clean' },
+        ],
+        truncated: false,
+      })
+
+    await render({
+      repoId: '/repo-a',
+      worktreePath: '/repo-a/main',
+      expandedKeys: ['src'],
+      onSnapshot: (snapshot) => {
+        lastSnapshot = snapshot
+      },
+    })
+    await flush()
+
+    expect(mocks.getRepositoryTree).toHaveBeenCalledTimes(2)
+    expect(mocks.getRepositoryTree.mock.calls[1]?.[2]).toEqual(
+      expect.objectContaining({ prefix: 'src', signal: expect.any(AbortSignal) }),
+    )
+    expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/index.ts'])
+  })
+
+  test('records restored expanded directory load failures without replacing the root tree error', async () => {
+    mocks.getRepositoryTree
+      .mockResolvedValueOnce({
+        nodes: [{ id: 'src', path: 'src', name: 'src', parentId: null, kind: 'directory', status: 'clean' }],
+        truncated: false,
+      })
+      .mockRejectedValueOnce(new Error('child boom'))
+
+    await render({
+      repoId: '/repo-a',
+      worktreePath: '/repo-a/main',
+      expandedKeys: ['src'],
+      onSnapshot: (snapshot) => {
+        lastSnapshot = snapshot
+      },
+    })
+    await flush()
+
+    expect(mocks.getRepositoryTree).toHaveBeenCalledTimes(2)
+    expect(lastSnapshot?.error).toBeNull()
+    expect(lastSnapshot?.errorKeys.has('src')).toBe(true)
+    expect(lastSnapshot?.loadingKeys.has('src')).toBe(false)
+    expect(lastSnapshot?.tree?.nodes.map((node) => node.id)).toEqual(['src'])
+  })
+
   test('invalidating after a successful read refreshes the cached tree', async () => {
     mocks.getRepositoryTree
       .mockResolvedValueOnce({
@@ -391,6 +485,52 @@ describe('useRepoTreeRefresh', () => {
     expect(mocks.getRepositoryTree).toHaveBeenCalledTimes(2)
     expect(lastSnapshot?.loading).toBe(false)
     expect(lastSnapshot?.tree?.nodes[0]?.id).toBe('second.ts')
+  })
+
+  test('invalidating keeps the current tree visible and reloads restored expanded children', async () => {
+    mocks.getRepositoryTree
+      .mockResolvedValueOnce({
+        nodes: [{ id: 'src', path: 'src', name: 'src', parentId: null, kind: 'directory', status: 'clean' }],
+        truncated: false,
+      })
+      .mockResolvedValueOnce({
+        nodes: [
+          { id: 'src/old.ts', path: 'src/old.ts', name: 'old.ts', parentId: 'src', kind: 'file', status: 'clean' },
+        ],
+        truncated: false,
+      })
+      .mockResolvedValueOnce({
+        nodes: [{ id: 'src', path: 'src', name: 'src', parentId: null, kind: 'directory', status: 'clean' }],
+        truncated: false,
+      })
+      .mockResolvedValueOnce({
+        nodes: [
+          { id: 'src/new.ts', path: 'src/new.ts', name: 'new.ts', parentId: 'src', kind: 'file', status: 'clean' },
+        ],
+        truncated: false,
+      })
+
+    await render({
+      repoId: '/repo-a',
+      worktreePath: '/repo-a/main',
+      expandedKeys: ['src'],
+      onSnapshot: (snapshot) => {
+        lastSnapshot = snapshot
+      },
+    })
+    await flush()
+    expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/old.ts'])
+
+    await act(async () => {
+      for (const listener of listeners) {
+        listener({ type: 'repo-query-invalidated', repoId: '/repo-a', query: 'repo-snapshot' })
+      }
+      expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/old.ts'])
+    })
+    await flush()
+
+    expect(mocks.getRepositoryTree).toHaveBeenCalledTimes(4)
+    expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/new.ts'])
   })
 
   test('manual refresh() while a request is in flight reuses the in-flight query', async () => {

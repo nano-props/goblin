@@ -54,14 +54,14 @@ describe('repo-tree — read layer', () => {
       truncated: false,
     })
 
-    const result = await getRepositoryTree('/tmp/repo', '/tmp/repo/.worktrees/feature', { depth: 3 })
+    const result = await getRepositoryTree('/tmp/repo', '/tmp/repo/.worktrees/feature', { prefix: 'src' })
 
     expect(mocks.getWorktrees).toHaveBeenCalledWith('/tmp/repo', {
       includeStatus: false,
     })
     expect(mocks.getRepoTreeSourceLocal).toHaveBeenCalledWith(
       '/tmp/repo/.worktrees/feature',
-      expect.objectContaining({ depth: 3 }),
+      expect.objectContaining({ prefix: 'src' }),
       undefined,
     )
     expect(result.nodes).toHaveLength(1)
@@ -114,7 +114,7 @@ describe('repo-tree — read layer', () => {
       truncated: false,
     })
 
-    const result = await getRepositoryTree(remoteRepoId, '/srv/repos/myrepo/.worktrees/feature', { depth: 4 })
+    const result = await getRepositoryTree(remoteRepoId, '/srv/repos/myrepo/.worktrees/feature', { prefix: 'src' })
 
     expect(mocks.getWorktrees).not.toHaveBeenCalled()
     expect(mocks.resolveRemoteRepoTarget).toHaveBeenCalledWith(remoteRepoId)
@@ -122,7 +122,7 @@ describe('repo-tree — read layer', () => {
       expect.objectContaining({
         target: remoteTarget,
         worktreePath: '/srv/repos/myrepo/.worktrees/feature',
-        options: expect.objectContaining({ depth: 4 }),
+        options: expect.objectContaining({ prefix: 'src' }),
       }),
     )
     expect(result.nodes).toHaveLength(1)

@@ -186,7 +186,7 @@ export async function getRemoteTreeWalk(
   worktreePath: string,
   options: {
     signal?: AbortSignal
-    depth?: number
+    prefix?: string
     run?: RemoteGitRunner
     /** Optional trusted worktree list from the caller. When supplied,
      *  the resolver skips its own `gitWorktreeList` round trip and
@@ -197,14 +197,13 @@ export async function getRemoteTreeWalk(
   } = {},
 ): Promise<ExecResult> {
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
-  const depth = Math.max(1, Math.min(10, Math.floor(options.depth ?? 10)))
   const known = await resolveKnownRemoteWorktree(target, worktreePath, {
     signal: options.signal,
     run,
     knownWorktrees: options.knownWorktrees,
   })
   if ('ok' in known) return known
-  const result = await run({ type: 'gitTreeWalk', path: known.path, depth }, target, {
+  const result = await run({ type: 'gitTreeWalk', path: known.path, prefix: options.prefix }, target, {
     signal: options.signal,
   })
   if (options.signal?.aborted) return { ok: false, message: 'cancelled' }

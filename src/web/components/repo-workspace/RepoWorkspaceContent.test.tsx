@@ -670,7 +670,7 @@ describe('RepoWorkspaceContent', () => {
       </QueryClientProvider>,
     )
 
-    const row = await screen.findByRole('row', { name: 'README.md' })
+    const row = await screen.findByRole('treeitem', { name: 'README.md' })
     await act(async () => {
       row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
       await Promise.resolve()

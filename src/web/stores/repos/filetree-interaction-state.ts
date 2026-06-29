@@ -16,7 +16,11 @@ interface FiletreeInteractionActions {
   readonly setExpandedKey: (scopeKey: string, key: string, expanded: boolean) => void
   readonly setTopVisibleRowIndex: (scopeKey: string, topVisibleRowIndex: number) => void
   readonly restoreViewState: (interactionByScope: Readonly<Record<string, FiletreeInteractionSnapshot>>) => void
-  readonly pruneKeys: (scopeKey: string, validKeys: ReadonlySet<string>) => void
+  readonly pruneKeys: (
+    scopeKey: string,
+    validKeys: ReadonlySet<string>,
+    loadedPrefixes?: ReadonlySet<string>,
+  ) => void
 }
 
 type FiletreeInteractionStore = FiletreeInteractionState & FiletreeInteractionActions
@@ -72,12 +76,12 @@ export const useFiletreeInteractionStore = create<FiletreeInteractionStore>()((s
     set({
       interactionByScope: normalizedInteractionByScope(interactionByScope),
     }),
-  pruneKeys: (scopeKey, validKeys) =>
+  pruneKeys: (scopeKey, validKeys, loadedPrefixes) =>
     set((state) => {
       const current = state.interactionByScope[scopeKey]
       if (!current) return state
-      const selectedKeys = filterValidStringKeys(current.selectedKeys, validKeys)
-      const expandedKeys = filterValidStringKeys(current.expandedKeys, validKeys)
+      const selectedKeys = filterValidStringKeys(current.selectedKeys, validKeys, loadedPrefixes)
+      const expandedKeys = filterValidStringKeys(current.expandedKeys, validKeys, loadedPrefixes)
       if (selectedKeys === current.selectedKeys && expandedKeys === current.expandedKeys) return state
       return updateInteractionSnapshot(state, scopeKey, { selectedKeys, expandedKeys })
     }),
@@ -132,17 +136,58 @@ function normalizeTopVisibleRowIndex(topVisibleRowIndex: number): number {
   return Number.isFinite(topVisibleRowIndex) ? Math.max(0, Math.floor(topVisibleRowIndex)) : 0
 }
 
-function filterValidStringKeys(keys: readonly string[], validKeys: ReadonlySet<string>): readonly string[] {
+function filterValidStringKeys(
+  keys: readonly string[],
+  validKeys: ReadonlySet<string>,
+  loadedPrefixes: ReadonlySet<string> | undefined,
+): readonly string[] {
   let changed = false
   const next: string[] = []
   for (const key of keys) {
-    if (validKeys.has(key)) {
+    if (validKeys.has(key) || isStillPossibleLazyKey(key, validKeys, loadedPrefixes)) {
       next.push(key)
     } else {
       changed = true
     }
   }
   return changed ? next : keys
+}
+
+function isStillPossibleLazyKey(
+  key: string,
+  validKeys: ReadonlySet<string>,
+  loadedPrefixes: ReadonlySet<string> | undefined,
+): boolean {
+  if (!loadedPrefixes) return false
+  for (const ancestorPrefix of ancestorPrefixesForKey(key)) {
+    if (!loadedPrefixes.has(ancestorPrefix)) continue
+    return validKeys.has(directChildUnderPrefix(key, ancestorPrefix))
+  }
+  return true
+}
+
+function ancestorPrefixesForKey(key: string): string[] {
+  const prefixes: string[] = []
+  let cursor = key
+  while (true) {
+    const slash = cursor.lastIndexOf('/')
+    if (slash < 0) {
+      prefixes.push('')
+      return prefixes
+    }
+    cursor = cursor.slice(0, slash)
+    prefixes.push(cursor)
+  }
+}
+
+function directChildUnderPrefix(key: string, prefix: string): string {
+  if (prefix === '') {
+    const slash = key.indexOf('/')
+    return slash < 0 ? key : key.slice(0, slash)
+  }
+  const rest = key.slice(prefix.length + 1)
+  const slash = rest.indexOf('/')
+  return slash < 0 ? key : `${prefix}/${rest.slice(0, slash)}`
 }
 
 function arraysEqual(a: readonly string[], b: readonly string[]): boolean {

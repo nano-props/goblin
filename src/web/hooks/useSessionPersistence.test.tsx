@@ -97,8 +97,8 @@ describe('useSessionPersistence', () => {
     })
     useFiletreeInteractionStore.getState().restoreViewState({
       [scopeKey]: {
-        selectedKeys: ['src/index.ts'],
-        expandedKeys: ['src'],
+        selectedKeys: ['src/web/index.ts'],
+        expandedKeys: ['src', 'src/web'],
         topVisibleRowIndex: 320,
       },
     })
@@ -110,8 +110,8 @@ describe('useSessionPersistence', () => {
         filetreeViewStateByWorktreeByRepo: {
           '/tmp/repo': {
             '/tmp/worktree': {
-              selectedKeys: ['src/index.ts'],
-              expandedKeys: ['src'],
+              selectedKeys: ['src/web/index.ts'],
+              expandedKeys: ['src', 'src/web'],
               topVisibleRowIndex: 320,
             },
           },

@@ -20,7 +20,6 @@ import type { ExecResult } from '#/shared/git-types.ts'
 
 export interface GetRepositoryTreeClientOptions {
   readonly prefix?: string
-  readonly depth?: number
   readonly signal?: AbortSignal
 }
 
@@ -35,7 +34,6 @@ export async function getRepositoryTree(
       cwd,
       worktreePath,
       ...(options.prefix !== undefined ? { prefix: options.prefix } : {}),
-      ...(options.depth !== undefined ? { depth: options.depth } : {}),
     },
     { signal: options.signal },
   )

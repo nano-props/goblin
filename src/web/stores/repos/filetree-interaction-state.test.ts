@@ -44,6 +44,28 @@ describe('useFiletreeInteractionStore', () => {
     })
   })
 
+  test('keeps remembered lazy descendants until a loaded ancestor disproves them', () => {
+    const scopeKey = filetreeInteractionScopeKey('repo-a', '/worktree/a')
+    useFiletreeInteractionStore.getState().setSelectedKeys(scopeKey, ['src/web/index.ts'])
+    useFiletreeInteractionStore.getState().setExpandedKeys(scopeKey, ['src', 'src/web'])
+
+    useFiletreeInteractionStore.getState().pruneKeys(scopeKey, new Set(['src']), new Set(['']))
+
+    expect(useFiletreeInteractionStore.getState().interactionByScope[scopeKey]).toEqual({
+      selectedKeys: ['src/web/index.ts'],
+      expandedKeys: ['src', 'src/web'],
+      topVisibleRowIndex: 0,
+    })
+
+    useFiletreeInteractionStore.getState().pruneKeys(scopeKey, new Set(['src', 'src/app']), new Set(['', 'src']))
+
+    expect(useFiletreeInteractionStore.getState().interactionByScope[scopeKey]).toEqual({
+      selectedKeys: [],
+      expandedKeys: ['src'],
+      topVisibleRowIndex: 0,
+    })
+  })
+
   test('updates one expanded key without replacing sibling expansion state', () => {
     const scopeKey = filetreeInteractionScopeKey('repo-a', '/worktree/a')
     useFiletreeInteractionStore.getState().setExpandedKeys(scopeKey, ['src'])
