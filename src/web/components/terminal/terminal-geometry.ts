@@ -1,6 +1,4 @@
-import { FitAddon } from '@xterm/addon-fit'
 import type { ITerminalInitOnlyOptions, ITerminalOptions } from '@xterm/xterm'
-import { Terminal } from '@xterm/xterm'
 
 export const DEFAULT_TERMINAL_COLS = 80
 export const DEFAULT_TERMINAL_ROWS = 24
@@ -14,6 +12,10 @@ export const TERMINAL_FONT_SIZE = 14
 export const TERMINAL_FONT_FAMILY = "'Goblin Mono', monospace"
 export const TERMINAL_LINE_HEIGHT = 1
 export const TERMINAL_SCROLLBACK_ROWS = 10_000
+
+const ESTIMATED_TERMINAL_CELL_WIDTH = TERMINAL_FONT_SIZE * 0.62
+const ESTIMATED_TERMINAL_CELL_HEIGHT = TERMINAL_FONT_SIZE * TERMINAL_LINE_HEIGHT
+const MANAGED_TERMINAL_FRAME_PADDING_PX = 6
 
 export function createTerminalSizingOptions(
   geometry: { cols: number; rows: number } = { cols: DEFAULT_TERMINAL_COLS, rows: DEFAULT_TERMINAL_ROWS },
@@ -40,41 +42,23 @@ export function preloadTerminalFont(): Promise<void> {
     .catch(() => {})
 }
 
-export function proposeTerminalGeometry(host: HTMLElement): { cols: number; rows: number } | null {
-  if (!hasMeasurableBox(host)) return null
-  const term = new Terminal(createTerminalSizingOptions())
-  const fitAddon = new FitAddon()
-  try {
-    term.loadAddon(fitAddon)
-    term.open(host)
-    const geometry = fitAddon.proposeDimensions()
-    return geometry ? { cols: geometry.cols, rows: geometry.rows } : null
-  } finally {
-    term.dispose()
-  }
+export function estimateTerminalGeometry(host: HTMLElement): { cols: number; rows: number } | null {
+  const rect = host.getBoundingClientRect()
+  return estimateTerminalGeometryFromSize(rect.width, rect.height)
 }
 
-export function proposeManagedTerminalGeometry(host: HTMLElement): { cols: number; rows: number } | null {
-  if (!hasMeasurableBox(host)) return null
-  const frame = document.createElement('div')
-  frame.className = 'goblin-managed-terminal-frame'
-  frame.style.position = 'absolute'
-  frame.style.inset = '0'
-  frame.style.visibility = 'hidden'
-  frame.style.pointerEvents = 'none'
-
-  const xtermHost = document.createElement('div')
-  xtermHost.className = 'goblin-managed-terminal-host'
-  frame.appendChild(xtermHost)
-  host.appendChild(frame)
-  try {
-    return proposeTerminalGeometry(xtermHost)
-  } finally {
-    frame.remove()
-  }
+export function estimateManagedTerminalGeometry(host: HTMLElement): { cols: number; rows: number } | null {
+  const rect = host.getBoundingClientRect()
+  return estimateTerminalGeometryFromSize(
+    rect.width - MANAGED_TERMINAL_FRAME_PADDING_PX * 2,
+    rect.height - MANAGED_TERMINAL_FRAME_PADDING_PX * 2,
+  )
 }
 
-function hasMeasurableBox(element: HTMLElement): boolean {
-  const rect = element.getBoundingClientRect()
-  return rect.width > 0 && rect.height > 0
+function estimateTerminalGeometryFromSize(width: number, height: number): { cols: number; rows: number } | null {
+  if (width <= 0 || height <= 0) return null
+  return {
+    cols: Math.max(2, Math.floor(width / ESTIMATED_TERMINAL_CELL_WIDTH)),
+    rows: Math.max(1, Math.floor(height / ESTIMATED_TERMINAL_CELL_HEIGHT)),
+  }
 }

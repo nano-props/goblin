@@ -3,6 +3,8 @@
 import { describe, expect, test } from 'vitest'
 import {
   createTerminalSizingOptions,
+  estimateManagedTerminalGeometry,
+  estimateTerminalGeometry,
   preloadTerminalFont,
   TERMINAL_FONT_FAMILY,
   TERMINAL_FONT_SIZE,
@@ -29,6 +31,18 @@ describe('terminal-geometry', () => {
       rescaleOverlappingGlyphs: true,
       scrollback: 10_000,
     })
+  })
+
+  test('estimates startup geometry from host box size without opening xterm', () => {
+    const host = document.createElement('div')
+    host.getBoundingClientRect = () =>
+      ({
+        width: 868,
+        height: 280,
+      }) as DOMRect
+
+    expect(estimateTerminalGeometry(host)).toEqual({ cols: 100, rows: 20 })
+    expect(estimateManagedTerminalGeometry(host)).toEqual({ cols: 98, rows: 19 })
   })
 
   test('preloadTerminalFont is a no-op when document.fonts.check is unavailable', async () => {

@@ -223,12 +223,6 @@ export class TerminalSessionView {
     this.fitAddon.fit()
   }
 
-  refitIfNeeded(): boolean {
-    if (!this.needsRefit()) return false
-    this.fitNow()
-    return true
-  }
-
   private needsRefit(): boolean {
     if (!this.term || !this.fitAddon || !hasMeasurableBox(this.xtermHost)) return false
     const dimensions = this.fitAddon.proposeDimensions()

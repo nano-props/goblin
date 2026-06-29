@@ -6,15 +6,14 @@ const mocks = vi.hoisted(() => ({
   createMock: vi.fn(),
   closeMock: vi.fn(),
   setBadgeMock: vi.fn(),
-  proposeTerminalGeometryMock: vi.fn<() => { cols: number; rows: number } | null>(() => ({
+  estimateTerminalGeometryMock: vi.fn<() => { cols: number; rows: number } | null>(() => ({
     cols: 101,
     rows: 31,
   })),
-  proposeManagedTerminalGeometryMock: vi.fn<() => { cols: number; rows: number } | null>(() => ({
+  estimateManagedTerminalGeometryMock: vi.fn<() => { cols: number; rows: number } | null>(() => ({
     cols: 101,
     rows: 31,
   })),
-  preloadTerminalFontMock: vi.fn(async () => {}),
   clientIdMock: vi.fn(() => 'client_local'),
 }))
 
@@ -33,9 +32,8 @@ vi.mock('#/web/client-terminal-bridge.ts', () => ({
 vi.mock('#/web/components/terminal/terminal-geometry.ts', () => ({
   DEFAULT_TERMINAL_COLS: 80,
   DEFAULT_TERMINAL_ROWS: 24,
-  preloadTerminalFont: mocks.preloadTerminalFontMock,
-  proposeTerminalGeometry: mocks.proposeTerminalGeometryMock,
-  proposeManagedTerminalGeometry: mocks.proposeManagedTerminalGeometryMock,
+  estimateTerminalGeometry: mocks.estimateTerminalGeometryMock,
+  estimateManagedTerminalGeometry: mocks.estimateManagedTerminalGeometryMock,
 }))
 
 vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
@@ -193,9 +191,8 @@ describe('TerminalSessionProjection create flow', () => {
     mocks.closeMock.mockReset()
     mocks.closeMock.mockResolvedValue(true)
     mocks.setBadgeMock.mockReset()
-    mocks.proposeTerminalGeometryMock.mockClear()
-    mocks.proposeManagedTerminalGeometryMock.mockClear()
-    mocks.preloadTerminalFontMock.mockClear()
+    mocks.estimateTerminalGeometryMock.mockClear()
+    mocks.estimateManagedTerminalGeometryMock.mockClear()
     mocks.clientIdMock.mockClear()
     projection = new TerminalSessionProjection()
     projection.setRepoIndex(makeRepoIndex())
@@ -230,8 +227,7 @@ describe('TerminalSessionProjection create flow', () => {
 
     await projection.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
 
-    expect(mocks.preloadTerminalFontMock).toHaveBeenCalled()
-    expect(mocks.proposeManagedTerminalGeometryMock).toHaveBeenCalledWith(host)
+    expect(mocks.estimateManagedTerminalGeometryMock).toHaveBeenCalledWith(host)
     expect(mocks.createMock).toHaveBeenCalledWith({
       repoRoot: REPO_ROOT,
       branch: BRANCH,
@@ -352,7 +348,7 @@ describe('TerminalSessionProjection create flow', () => {
   })
 
   test('retries creating until host geometry becomes measurable', async () => {
-    mocks.proposeManagedTerminalGeometryMock.mockReturnValue(null)
+    mocks.estimateManagedTerminalGeometryMock.mockReturnValue(null)
 
     const host = document.createElement('div')
     document.body.appendChild(host)
@@ -365,7 +361,7 @@ describe('TerminalSessionProjection create flow', () => {
     observer.trigger()
     expect(mocks.createMock).not.toHaveBeenCalled()
 
-    mocks.proposeManagedTerminalGeometryMock.mockReturnValue({ cols: 101, rows: 31 })
+    mocks.estimateManagedTerminalGeometryMock.mockReturnValue({ cols: 101, rows: 31 })
     observer.trigger()
 
     await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
@@ -374,7 +370,7 @@ describe('TerminalSessionProjection create flow', () => {
   })
 
   test('fails create when terminal host is permanently unmeasurable', async () => {
-    mocks.proposeManagedTerminalGeometryMock.mockReturnValue(null)
+    mocks.estimateManagedTerminalGeometryMock.mockReturnValue(null)
 
     const container = document.createElement('div')
     container.style.display = 'none'

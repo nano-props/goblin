@@ -388,12 +388,9 @@ vi.mock('@xterm/addon-serialize', () => ({ SerializeAddon: xtermMocks.MockSerial
 vi.mock('@xterm/addon-unicode11', () => ({ Unicode11Addon: xtermMocks.MockUnicode11Addon }))
 vi.mock('@xterm/addon-web-links', () => ({ WebLinksAddon: xtermMocks.MockWebLinksAddon }))
 
-// jsdom does not lay out, so proposeTerminalGeometry would return null. The
-// orchestrator now waits for a measurable host via waitForMeasurableHost;
-// mock the geometry module so the synchronous happy path resolves.
+// jsdom does not lay out; mock font preload so the synchronous happy path resolves.
 const geometryMocks = vi.hoisted(() => ({
   preloadTerminalFont: vi.fn(async () => {}),
-  proposeTerminalGeometry: vi.fn<() => { cols: number; rows: number } | null>(() => ({ cols: 80, rows: 24 })),
 }))
 
 vi.mock('#/web/components/terminal/terminal-geometry.ts', async () => {
@@ -404,7 +401,6 @@ vi.mock('#/web/components/terminal/terminal-geometry.ts', async () => {
   return {
     ...actual,
     preloadTerminalFont: geometryMocks.preloadTerminalFont,
-    proposeTerminalGeometry: geometryMocks.proposeTerminalGeometry,
   }
 })
 
@@ -1486,28 +1482,6 @@ describe('TerminalSession', () => {
     expect(notify).not.toHaveBeenCalled()
   })
 
-  test('refits after output when xterm geometry drifts without a resize observer event', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session)
-    session.attach(host)
-    await flushTerminalStart()
-    await flushUntil(() => session.snapshot().phase === 'open')
-    terminalCalls.resize.mockClear()
-    xtermMocks.fitAddons[0]!.proposeDimensions.mockReturnValue({ cols: 120, rows: 30 })
-
-    session.handleOutput({ ptySessionId: 'pty_session_1_aaaaaaaaa', data: 'codex repaint', seq: 1, processName: 'codex' })
-    await flushUntil(() => terminalCalls.resize.mock.calls.length > 0)
-
-    expect(xtermMocks.fitAddons[0]!.fit).toHaveBeenCalled()
-    expect(terminalCalls.resize).toHaveBeenCalledWith({
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
-      cols: 120,
-      rows: 30,
-    })
-  })
-
   test('queues external command input until the first PTY output arrives', async () => {
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session, { snapshot: '', snapshotSeq: 0 })
@@ -1713,8 +1687,8 @@ describe('TerminalSession', () => {
 
     expect(terminalCalls.takeover).toHaveBeenCalledWith({
       ptySessionId: 'pty_session_1_aaaaaaaaa',
-      cols: 80,
-      rows: 24,
+      cols: 120,
+      rows: 40,
       clientId: 'client_local',
     })
     expect(terminalCalls.attach).toHaveBeenCalledWith({
@@ -1826,7 +1800,6 @@ describe('TerminalSession', () => {
         canonicalRows: 40,
       }),
     )
-    geometryMocks.proposeTerminalGeometry.mockReturnValueOnce(null)
     const host = document.createElement('div')
     document.body.appendChild(host)
     const session = new TerminalSession(descriptor, vi.fn())

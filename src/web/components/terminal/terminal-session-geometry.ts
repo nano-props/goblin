@@ -1,7 +1,6 @@
 import {
-  preloadTerminalFont,
-  proposeManagedTerminalGeometry,
-  proposeTerminalGeometry,
+  estimateManagedTerminalGeometry,
+  estimateTerminalGeometry,
 } from '#/web/components/terminal/terminal-geometry.ts'
 import type { TerminalClientSnapshot, TerminalDescriptor } from '#/web/components/terminal/types.ts'
 
@@ -12,8 +11,7 @@ export async function captureTerminalHostGeometry(input: {
 }): Promise<{ cols: number; rows: number } | null> {
   const host = input.hostByWorktree.get(input.worktreeTerminalKey)
   if (!host?.isConnected) return null
-  await preloadTerminalFont()
-  const geometry = proposeManagedTerminalGeometry(host)
+  const geometry = estimateManagedTerminalGeometry(host)
   if (!geometry) return null
   input.geometryByWorktree.set(input.worktreeTerminalKey, geometry)
   return geometry
@@ -40,15 +38,13 @@ export async function resolveTerminalCreateGeometry(input: {
 }
 
 /**
- * Resolves with the first measured geometry the host reports, instead of
+ * Resolves with the first startup geometry the host reports, instead of
  * forcing the caller to fall back to a default like 80x24 when the host is
  * briefly unmeasurable on attach (e.g. a split pane that is still animating
  * to its final width).
  *
- * Spawning a PTY at the wrong column count and resizing later is not
- * equivalent to spawning it at the correct width — shells like zsh compute
- * their prompt layout from `$COLUMNS` at prompt-render time and many
- * configurations do not redraw the visible prompt on SIGWINCH.
+ * This is only a startup hint. The opened xterm is the source of truth and
+ * resizes the PTY with its real fit result once it exists.
  *
  * The wait is driven by `ResizeObserver` callbacks and is cancelable. If the
  * host is in a `display:none` subtree (and therefore cannot ever produce a
@@ -57,8 +53,9 @@ export async function resolveTerminalCreateGeometry(input: {
  * projection teardown), so neither attach nor resize-driven waits leak subscriptions.
  *
  * `measure` is dependency-injected so tests can drive the host without
- * relying on jsdom layout. In production it defaults to `proposeTerminalGeometry`,
- * which delegates sizing to xterm's FitAddon.
+ * relying on jsdom layout. In production it defaults to a lightweight host-box
+ * estimate; the opened xterm remains the source of truth and resizes the PTY
+ * with its real fit result.
  */
 export function waitForMeasurableHost(
   host: HTMLElement,
@@ -73,7 +70,7 @@ export function waitForMeasurableHost(
   if (options.signal?.aborted) {
     return Promise.reject(options.signal.reason ?? new Error('aborted'))
   }
-  const measure = options.measure ?? proposeTerminalGeometry
+  const measure = options.measure ?? estimateTerminalGeometry
   const immediate = measure(host)
   if (immediate) return Promise.resolve(immediate)
   if (isHostInDisplayNoneSubtree(host)) {
@@ -122,7 +119,7 @@ export function waitForMeasurableManagedHost(
     timeoutMs?: number
   } = {},
 ): Promise<{ cols: number; rows: number }> {
-  return waitForMeasurableHost(host, { ...options, measure: options.measure ?? proposeManagedTerminalGeometry })
+  return waitForMeasurableHost(host, { ...options, measure: options.measure ?? estimateManagedTerminalGeometry })
 }
 
 export class TerminalHostNotMeasurableError extends Error {
