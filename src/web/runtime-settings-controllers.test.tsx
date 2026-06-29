@@ -7,6 +7,8 @@ import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 
 const settingsActionsMocks = vi.hoisted(() => ({
+  refreshExternalAppsDetection: vi.fn(async () => {}),
+  refreshGitHubCliDetection: vi.fn(async () => {}),
   runSettingsAction: vi.fn(async (_label: string, task: () => Promise<unknown>) => await task()),
   setFetchInterval: vi.fn(async () => 120),
   setGlobalShortcut: vi.fn(async (accelerator: string) => ({ accelerator, registered: true })),
@@ -20,6 +22,10 @@ vi.mock('#/web/settings-actions.ts', () => settingsActionsMocks)
 
 beforeEach(() => {
   primaryWindowQueryClient.clear()
+  settingsActionsMocks.refreshExternalAppsDetection.mockClear()
+  settingsActionsMocks.refreshExternalAppsDetection.mockResolvedValue(undefined)
+  settingsActionsMocks.refreshGitHubCliDetection.mockClear()
+  settingsActionsMocks.refreshGitHubCliDetection.mockResolvedValue(undefined)
   settingsActionsMocks.runSettingsAction.mockClear()
   settingsActionsMocks.runSettingsAction.mockImplementation(async (_label, task) => await task())
   settingsActionsMocks.setFetchInterval.mockClear()
@@ -109,6 +115,44 @@ describe('runtime settings controllers', () => {
     expect(settingsActionsMocks.setGlobalShortcutDisabled).toHaveBeenCalledWith(true)
     expect(settingsActionsMocks.setGlobalShortcut).toHaveBeenCalledWith('CommandOrControl+Shift+K')
     expect(globalShortcutResult).toEqual({ accelerator: 'CommandOrControl+Shift+K', registered: true })
+  })
+
+  test('runs external app refresh through settings mutations', async () => {
+    const { useExternalAppSettingsController } = await import('#/web/runtime-settings-external-apps.ts')
+    let controller: ReturnType<typeof useExternalAppSettingsController> | undefined
+
+    function HookHost() {
+      controller = useExternalAppSettingsController()
+      return null
+    }
+
+    renderWithPrimaryWindowQueryClient(<HookHost />)
+
+    await act(async () => {
+      await controller?.refreshExternalApps()
+    })
+
+    expect(settingsActionsMocks.runSettingsAction).toHaveBeenCalledWith('external app refresh', expect.any(Function))
+    expect(settingsActionsMocks.refreshExternalAppsDetection).toHaveBeenCalledTimes(1)
+  })
+
+  test('runs GitHub CLI refresh through settings mutations', async () => {
+    const { useGitHubSettingsController } = await import('#/web/runtime-settings-github.ts')
+    let controller: ReturnType<typeof useGitHubSettingsController> | undefined
+
+    function HookHost() {
+      controller = useGitHubSettingsController()
+      return null
+    }
+
+    renderWithPrimaryWindowQueryClient(<HookHost />)
+
+    await act(async () => {
+      await controller?.refreshGitHubCli()
+    })
+
+    expect(settingsActionsMocks.runSettingsAction).toHaveBeenCalledWith('GitHub CLI refresh', expect.any(Function))
+    expect(settingsActionsMocks.refreshGitHubCliDetection).toHaveBeenCalledTimes(1)
   })
 })
 

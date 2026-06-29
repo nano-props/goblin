@@ -1,7 +1,7 @@
 import { useExternalAppsQuery } from '#/web/settings-queries.ts'
 import { readRuntimeExternalAppSettings } from '#/web/settings-read-projection.ts'
-import { runSettingsAction, refreshExternalAppsDetection } from '#/web/settings-actions.ts'
-import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
+import { refreshExternalAppsDetection } from '#/web/settings-actions.ts'
+import { useSettingsMutation } from '#/web/settings-mutations.ts'
 
 export function useExternalAppSettings() {
   const { data } = useExternalAppsQuery()
@@ -9,15 +9,13 @@ export function useExternalAppSettings() {
 }
 
 export function useExternalAppSettingsController() {
-  const { isPending: refreshing, run } = useAsyncPending<'refresh'>()
+  const refreshMutation = useSettingsMutation('external app refresh', async () => {
+    await refreshExternalAppsDetection()
+  })
   return {
-    refreshing,
+    refreshing: refreshMutation.isPending,
     async refreshExternalApps(): Promise<void> {
-      await run('refresh', async () => {
-        await runSettingsAction('external app refresh', async () => {
-          await refreshExternalAppsDetection()
-        })
-      })
+      await refreshMutation.mutateAsync(undefined)
     },
   }
 }
