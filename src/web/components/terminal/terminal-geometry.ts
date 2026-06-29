@@ -5,8 +5,8 @@ export const DEFAULT_TERMINAL_ROWS = 24
 
 /**
  * Page-lifetime terminal font constants. If any of these ever becomes
- * user-configurable at runtime, xterm instances and pre-create geometry
- * measurement must be rebuilt against the new values.
+ * user-configurable at runtime, xterm instances and startup geometry
+ * estimates must be rebuilt against the new values.
  */
 export const TERMINAL_FONT_SIZE = 14
 export const TERMINAL_FONT_FAMILY = "'Goblin Mono', monospace"

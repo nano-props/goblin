@@ -43,8 +43,9 @@ export async function resolveTerminalCreateGeometry(input: {
  * briefly unmeasurable on attach (e.g. a split pane that is still animating
  * to its final width).
  *
- * This is only a startup hint. The opened xterm is the source of truth and
- * resizes the PTY with its real fit result once it exists.
+ * This is only a startup hint. The opened xterm is the client-side source for
+ * fitted view geometry; the server accepts that geometry through the controller
+ * resize path and publishes it back as canonical session geometry.
  *
  * The wait is driven by `ResizeObserver` callbacks and is cancelable. If the
  * host is in a `display:none` subtree (and therefore cannot ever produce a
@@ -54,8 +55,7 @@ export async function resolveTerminalCreateGeometry(input: {
  *
  * `measure` is dependency-injected so tests can drive the host without
  * relying on jsdom layout. In production it defaults to a lightweight host-box
- * estimate; the opened xterm remains the source of truth and resizes the PTY
- * with its real fit result.
+ * estimate; the mounted xterm remains the source for fitted view geometry.
  */
 export function waitForMeasurableHost(
   host: HTMLElement,

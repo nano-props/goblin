@@ -473,6 +473,8 @@ export class TerminalSessionManager<TUser extends string | number> {
   // arrives through the regular `onData` path, but snapshots taken during
   // the transition are serialized from a screen model with the canonical
   // dimensions instead of replaying raw historical bytes into the client.
+  // The client reports fitted xterm geometry, but this accepted resize is
+  // where that view measurement becomes server-owned canonical geometry.
   private resizeSessionPty(session: TerminalSessionView<TUser>, cols: number, rows: number): boolean {
     if (!session.pty) return false
     if (session.cols === cols && session.rows === rows) return true

@@ -8,6 +8,7 @@ Use this doc for the target terminal session and control model.
 - Make attachment control explicit.
 - Keep the server as the source of truth for terminal business state.
 - Keep client behavior as a projection of that model.
+- Keep local xterm rendering authority separate from server session authority.
 
 ## Why this model is needed
 
@@ -39,6 +40,11 @@ It owns:
 
 A session is not the same thing as a client view.
 
+The server-owned session is authoritative for lifecycle, controller state,
+canonical PTY geometry, and the headless render state used to produce replay
+snapshots. It should not try to predict browser font metrics or local xterm
+layout details before a real view exists.
+
 ### Attachment
 
 An attachment represents one client attachment to a session.
@@ -65,7 +71,11 @@ Controller state should be derived from:
 
 A view is client-local xterm state.
 
-Views should never be treated as authoritative session or control state.
+Views should never be treated as authoritative session or control state. A live
+controller view is, however, authoritative for its own fitted xterm geometry and
+local rendering behavior. The client reports that geometry to the server; the
+server accepts it only through the normal controller authority path and then
+publishes the resulting canonical geometry.
 
 ## Target server session shape
 
@@ -181,7 +191,12 @@ This allows the system to reason about:
 - whether a control transition requires a resize
 - whether reconnecting control should restore the attachment's geometry
 
-Geometry acquisition belongs to the orchestrator, not the view. The view accepts a measured geometry as a parameter and never reaches into layout.
+Geometry acquisition has two phases:
+
+- Before a view exists, the client may use a lightweight host-box estimate or cached canonical geometry as a startup hint.
+- After the view exists, the live xterm instance is the only source for fitted client geometry.
+
+Temporary xterm instances and hand-rolled font probes should not be part of the model. They create a third authority that can drift from both the server headless state and the mounted client xterm. The server should stay authoritative for canonical geometry and snapshots; the mounted xterm should stay authoritative for local rendering and fitted view dimensions.
 
 ## Restart semantics in the target model
 

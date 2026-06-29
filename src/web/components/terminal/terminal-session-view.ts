@@ -123,10 +123,10 @@ export class TerminalSessionView {
   }
 
   /**
-   * Exposes the xterm DOM host so the orchestrator can drive geometry
-   * measurement (see `waitForMeasurableHost` in
-   * `terminal-session-geometry.ts`). The view itself never falls back to
-   * a default geometry — it is given one by the orchestrator and trusts it.
+   * Exposes the xterm DOM host so the orchestrator can wait until a real
+   * view box exists. Startup geometry before open is only a hint; after
+   * open, this mounted xterm and its FitAddon are the client-side authority
+   * for fitted view geometry.
    */
   measurableHost(): HTMLElement {
     return this.xtermHost
