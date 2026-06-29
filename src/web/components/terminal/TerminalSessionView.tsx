@@ -248,6 +248,8 @@ export function TerminalSessionView({
   // instead.
   const isController = sessionPhase === 'open-controller'
   const isReadonly = sessionPhase === 'open-viewer' || sessionPhase === 'error-viewer'
+  const isAttaching = sessionPhase === 'opening' || sessionPhase === 'restarting'
+  const hideTerminalHost = isReadonly || (hasSessions && isAttaching)
   const showViewerOverlay = isReadonly
   const showErrorChip = sessionPhase === 'error-controller'
   const terminalErrorMessageKey = snapshot.message ?? DEFAULT_TERMINAL_ERROR_MESSAGE_KEY
@@ -419,7 +421,7 @@ export function TerminalSessionView({
       )}
       <div
         ref={hostRef}
-        className={cn('goblin-terminal-session__host', isReadonly && 'goblin-terminal-session__host--hidden')}
+        className={cn('goblin-terminal-session__host', hideTerminalHost && 'goblin-terminal-session__host--hidden')}
         aria-readonly={(!isController && hasSessions) || undefined}
       />
       {searchOpen && (

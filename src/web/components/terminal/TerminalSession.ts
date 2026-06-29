@@ -547,7 +547,7 @@ export class TerminalSession {
   private start(): void {
     if (this.disposed || this.view.currentTerminal() || !this.view.isConnected()) return
     const token = (this.startToken += 1)
-    if (!this.runtime.currentPtySessionId() && this.runtime.startAttaching()) this.notify('metadata')
+    if (this.runtime.phase() !== 'restarting' && this.runtime.startAttaching()) this.notify('metadata')
     void this.startAsync(token)
   }
 

@@ -680,6 +680,30 @@ describe('TerminalSession', () => {
     expect(session.snapshot().phase).toBe('open')
   })
 
+  test('marks an already-open server session as opening while the local xterm attach is pending', async () => {
+    const attach = deferred<TerminalAttachResult>()
+    terminalCalls.attach.mockReturnValueOnce(attach.promise)
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session)
+
+    expect(session.snapshot().phase).toBe('open')
+
+    session.attach(host)
+    await flushTerminalStart()
+
+    expect(session.snapshot().phase).toBe('opening')
+    xtermMocks.terminals[0]!.emitData('typed-before-attach')
+    await flushTerminalStart()
+    expect(terminalCalls.write).not.toHaveBeenCalled()
+
+    attach.resolve(attachResult('pty_session_1_aaaaaaaaa'))
+    await flushUntil(() => session.snapshot().phase === 'open')
+
+    expect(session.snapshot().phase).toBe('open')
+  })
+
   test('dispose during font preload aborts before waitForMeasurableHost runs', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
@@ -1919,13 +1943,8 @@ describe('TerminalSession', () => {
       canonicalRows: 40,
     })
 
-    expect(session.snapshot().attachment).toMatchObject({
-      role: 'unowned',
-      controllerStatus: 'none',
-      canTakeover: true,
-      canonicalCols: 120,
-      canonicalRows: 40,
-    })
+    expect(session.snapshot().phase).toBe('opening')
+    expect(session.snapshot().attachment).toBeUndefined()
   })
 
   test('mounted viewer auto-attaches when realtime identity flips to unowned', async () => {

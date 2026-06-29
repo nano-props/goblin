@@ -358,6 +358,81 @@ describe('TerminalSessionView', () => {
     }
   })
 
+  test('hides the xterm host while an existing session is still attaching locally', async () => {
+    const descriptor = {
+      key: 'session-1',
+      worktreeTerminalKey: '/repo\0/worktree',
+      sessionId: 'session-1',
+      index: 1,
+      repoRoot: '/repo',
+      branch: 'feature',
+      worktreePath: '/worktree',
+    }
+    const worktreeSnapshot = {
+      worktreeTerminalKey: '/repo\0/worktree',
+      selectedDescriptor: descriptor,
+      sessions: [
+        {
+          key: 'session-1',
+          worktreeTerminalKey: '/repo\0/worktree',
+          sessionId: 'session-1',
+          index: 1,
+          title: 'zsh',
+          phase: 'open' as const,
+          selected: true,
+          hasBell: false,
+        },
+      ],
+      count: 1,
+      pendingCreate: false,
+    }
+    const snapshot = { phase: 'opening' as const, message: null, processName: 'zsh' }
+    const context: TerminalSessionContextValue = {
+      createTerminal: async () => 'session-1',
+      registerHost: vi.fn(),
+      unregisterHost: vi.fn(),
+      selectTerminal: vi.fn(),
+      scrollToBottom: vi.fn(),
+      scrollLines: vi.fn(),
+      clearBell: vi.fn(() => false),
+      closeTerminalByDescriptor: vi.fn(async () => true),
+      attach: vi.fn(),
+      detach: vi.fn(),
+      restart: vi.fn(),
+      isTerminalFocusTarget: vi.fn(() => false),
+      findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+      findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+      clearSearch: vi.fn(),
+      writeInput: vi.fn(),
+      takeover: vi.fn(),
+      serialize: vi.fn(() => ''),
+    }
+    const readContext: TerminalSessionReadContextValue = {
+      worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
+      subscribeWorktree: () => () => {},
+      snapshot: () => snapshot,
+      subscribeSnapshot: () => () => {},
+    }
+
+    const { container, unmount } = renderInJsdom(
+      <TerminalSessionContext.Provider value={context}>
+        <TerminalSessionReadContext.Provider value={readContext}>
+          <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+        </TerminalSessionReadContext.Provider>
+      </TerminalSessionContext.Provider>,
+    )
+
+    try {
+      const host = container.querySelector('.goblin-terminal-session__host')
+      expect(host?.classList.contains('goblin-terminal-session__host--hidden')).toBe(true)
+      expect(host?.getAttribute('aria-readonly')).toBe('true')
+      expect(container.querySelector('.goblin-terminal-session__viewer-overlay')).toBeNull()
+      expect(container.textContent).toContain('terminal.opening')
+    } finally {
+      unmount()
+    }
+  })
+
   test('error phase as a viewer shows the takeover path, not the restart button', async () => {
     // Regression for the previous two-flag gating where a viewer in
     // error phase would see neither the viewer overlay (open-gated)
