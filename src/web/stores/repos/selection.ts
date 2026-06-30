@@ -13,7 +13,6 @@ import {
   type WorkspacePaneTabType,
   workspacePaneTabEntryIdentity,
 } from '#/shared/workspace-pane.ts'
-import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
 import {
   normalizeWorkspacePaneTabs,
@@ -21,7 +20,6 @@ import {
   workspacePaneTabsForBranch,
   workspacePaneTabsRecordWith,
   workspacePaneTabsWithStaticTab,
-  workspacePaneTabsWithEnsuredTerminal,
   workspacePaneTabsWithoutStaticTab,
 } from '#/web/stores/repos/workspace-pane-tabs.ts'
 import {
@@ -48,8 +46,6 @@ type RuntimeCoherentSelectionActions = Pick<
   | 'setWorkspacePaneTab'
   | 'openWorkspacePaneStaticTab'
   | 'closeWorkspacePaneStaticTab'
-  | 'ensureWorkspacePaneTerminalTab'
-  | 'ensureAndFocusWorkspacePaneTerminalTab'
   | 'replaceWorkspacePaneTabs'
   | 'selectBranch'
   | 'clearSelectedBranch'
@@ -95,8 +91,7 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
         if (
           currentEntries.length === nextEntries.length &&
           nextEntries.every(
-            ([terminalWorktreeKey, terminalSessionId]) =>
-              current[terminalWorktreeKey] === terminalSessionId,
+            ([terminalWorktreeKey, terminalSessionId]) => current[terminalWorktreeKey] === terminalSessionId,
           )
         ) {
           return s
@@ -195,75 +190,6 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
         return replaceRepoState(s, repo, (r) => {
           r.ui.workspacePaneTabsByBranch = workspacePaneTabsRecordWith(r.ui, branch, next)
         })
-      })
-    },
-
-    ensureWorkspacePaneTerminalTab(id: string, terminalSessionId: string, branchName?: string) {
-      set((s) => {
-        const repo = s.repos[id]
-        const branch = branchName ?? repo?.ui.selectedBranch
-        if (!repo || !branch) return s
-        const current = workspacePaneTabsForBranch(repo.ui, branch)
-        const next = workspacePaneTabsWithEnsuredTerminal(current, terminalSessionId)
-        if (workspacePaneTabsEqual(current, next)) return s
-        return replaceRepoState(s, repo, (r) => {
-          r.ui.workspacePaneTabsByBranch = workspacePaneTabsRecordWith(r.ui, branch, next)
-        })
-      })
-    },
-
-    ensureAndFocusWorkspacePaneTerminalTab(id: string, terminalSessionId: string, branchName?: string) {
-      let token: number | undefined
-      let viewChanged = false
-      set((s) => {
-        const repo = s.repos[id]
-        const branch = branchName ?? repo?.ui.selectedBranch
-        if (!repo || !branch) return s
-        const branchState = repo.data.branches.find((candidate) => candidate.name === branch)
-        const worktreePath = branchState?.worktree?.path
-        if (!worktreePath) return s
-        const currentTabs = workspacePaneTabsForBranch(repo.ui, branch)
-        const nextTabs = workspacePaneTabsWithEnsuredTerminal(currentTabs, terminalSessionId)
-        const currentView = preferredWorkspacePaneTabForBranch(repo.ui, branch)
-        const terminalWorktreeKey = formatTerminalWorktreeKey(id, worktreePath)
-        const currentSelected = s.selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]
-        const tabsChanged = !workspacePaneTabsEqual(currentTabs, nextTabs)
-        viewChanged = currentView !== 'terminal'
-        const selectionChanged = currentSelected !== terminalSessionId
-        if (!tabsChanged && !viewChanged && !selectionChanged) return s
-        token = repo.instanceToken
-        const repoPatch = replaceRepoState(s, repo, (r) => {
-          if (tabsChanged) {
-            r.ui.workspacePaneTabsByBranch = workspacePaneTabsRecordWith(r.ui, branch, nextTabs)
-          }
-          if (viewChanged) {
-            r.ui.preferredWorkspacePaneTabByBranch = preferredWorkspacePaneTabByBranchRecordWith(
-              r.ui,
-              branch,
-              'terminal',
-            )
-          }
-        })
-        if (!selectionChanged) return repoPatch
-        return {
-          ...repoPatch,
-          selectedTerminalSessionIdByTerminalWorktree: {
-            ...s.selectedTerminalSessionIdByTerminalWorktree,
-            [terminalWorktreeKey]: terminalSessionId,
-          },
-        }
-      })
-      if (!viewChanged || token === undefined) return
-      const repo = get().repos[id]
-      persistRepoSnapshotCacheEntry(set, repo, token)
-      void runRepoRefreshIntent(get, {
-        kind: 'visible-pull-request-changed',
-        id,
-        token,
-        branch:
-          repo && preferredWorkspacePaneTabForBranch(repo.ui, repo.ui.selectedBranch) === 'status'
-            ? repo.ui.selectedBranch
-            : null,
       })
     },
 
@@ -377,10 +303,7 @@ export function createSelectionActions(set: ReposSet, get: ReposGet) {
   }
 }
 
-function workspacePaneTabsEqual(
-  a: readonly WorkspacePaneTabEntry[],
-  b: readonly WorkspacePaneTabEntry[],
-): boolean {
+function workspacePaneTabsEqual(a: readonly WorkspacePaneTabEntry[], b: readonly WorkspacePaneTabEntry[]): boolean {
   return (
     a.length === b.length &&
     b.every((entry, index) => {

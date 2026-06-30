@@ -37,6 +37,7 @@ export type TerminalRealtimeMessage =
   | { type: 'identity'; event: TerminalIdentityEvent }
   | { type: 'lifecycle'; event: TerminalLifecycleEvent }
   | { type: 'sessions-changed'; repoRoot: string }
+  | { type: 'workspace-tabs-changed'; repoRoot: string }
   // Targeted per-session close. Emitted by the server after a
   // successful `close` request, alongside the existing
   // `sessions-changed` global broadcast. Multi-window clients use
@@ -115,7 +116,8 @@ export type TerminalSocketResponseMessage =
 
 export type TerminalHealthPongMessage = { type: 'pong'; requestId: string }
 
-export type TerminalSocketServerMessage = TerminalRealtimeMessage | TerminalSocketResponseMessage | TerminalHealthPongMessage
+export type TerminalSocketServerMessage =
+  TerminalRealtimeMessage | TerminalSocketResponseMessage | TerminalHealthPongMessage
 /**
  * Heartbeat envelope. Sent client→server every
  * `HEARTBEAT_INTERVAL_MS` while the realtime socket is `OPEN`. Carries

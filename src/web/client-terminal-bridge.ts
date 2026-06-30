@@ -36,6 +36,7 @@ export function createServerTerminalBridge(options: {
   const identitySubscribers = new Set<(event: TerminalIdentityViewModel) => void>()
   const lifecycleSubscribers = new Set<(event: TerminalLifecycleViewModel) => void>()
   const sessionsChangedSubscribers = new Set<(repoRoot: string) => void>()
+  const workspaceTabsChangedSubscribers = new Set<(repoRoot: string) => void>()
   const sessionClosedSubscribers = new Set<
     (event: { ptySessionId: string; repoRoot: string; worktreePath: string; tabs: WorkspacePaneTabEntry[] }) => void
   >()
@@ -156,6 +157,14 @@ export function createServerTerminalBridge(options: {
         connection.closeSocketIfIdle()
       }
     },
+    onWorkspaceTabsChanged(cb) {
+      workspaceTabsChangedSubscribers.add(cb)
+      connection.openForRealtime()
+      return () => {
+        workspaceTabsChangedSubscribers.delete(cb)
+        connection.closeSocketIfIdle()
+      }
+    },
     onSessionClosed(cb) {
       sessionClosedSubscribers.add(cb)
       connection.openForRealtime()
@@ -177,6 +186,7 @@ export function createServerTerminalBridge(options: {
       identitySubscribers.size > 0 ||
       lifecycleSubscribers.size > 0 ||
       sessionsChangedSubscribers.size > 0 ||
+      workspaceTabsChangedSubscribers.size > 0 ||
       sessionClosedSubscribers.size > 0
     )
   }
@@ -194,6 +204,9 @@ export function createServerTerminalBridge(options: {
         return
       case 'sessions-changed':
         for (const subscriber of sessionsChangedSubscribers) subscriber(message.repoRoot)
+        return
+      case 'workspace-tabs-changed':
+        for (const subscriber of workspaceTabsChangedSubscribers) subscriber(message.repoRoot)
         return
       case 'session-closed':
         for (const subscriber of sessionClosedSubscribers)

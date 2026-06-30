@@ -165,8 +165,8 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     takeover(clientId, userId, input) {
       return actions.takeover(clientId, userId, input)
     },
-    close(clientId, userId, input) {
-      return actions.close(clientId, userId, input)
+    async close(clientId, userId, input) {
+      return await actions.close(clientId, userId, input)
     },
     async listSessions(clientId, userId, repoRoot) {
       return await actions.listSessions(clientId, userId, repoRoot)
@@ -177,8 +177,8 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     async create(clientId, userId, input) {
       return await actions.create(clientId, userId, input)
     },
-    replaceTabs(clientId, userId, input) {
-      return actions.replaceTabs(clientId, userId, input)
+    async replaceTabs(clientId, userId, input) {
+      return await actions.replaceTabs(clientId, userId, input)
     },
     async prune(clientId, userId, repoRoot) {
       return await actions.prune(clientId, userId, repoRoot)

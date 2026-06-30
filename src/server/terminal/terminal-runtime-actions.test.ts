@@ -61,8 +61,8 @@ function makeActions(
     prune: vi.fn(),
     listSessions: vi.fn(),
     listWorkspaceTabs: vi.fn(async () => []),
-    replaceTabs: vi.fn(() => []),
-    removeTerminalTab: vi.fn(() => []),
+    replaceTabs: vi.fn(async () => []),
+    removeTerminalTab: vi.fn(async () => []),
   }
   const isValidTerminalClientId =
     options.isValidTerminalClientId ?? ((value: unknown): value is string => value === CLIENT_ID)
@@ -90,16 +90,20 @@ describe('terminal-runtime-actions close broadcast', () => {
       getSlotScope: () => '/repo',
     })
 
-    const closed = actions.close(CLIENT_ID, USER_ID, { ptySessionId: PTY_SESSION_ID })
+    const closed = await actions.close(CLIENT_ID, USER_ID, { ptySessionId: PTY_SESSION_ID })
 
     expect(closed).toBe(true)
     expect(close).toHaveBeenCalledWith(USER_ID, PTY_SESSION_ID)
-    expect(broadcasts).toHaveBeenCalledTimes(2)
+    expect(broadcasts).toHaveBeenCalledTimes(3)
     expect(broadcasts).toHaveBeenNthCalledWith(1, USER_ID, {
       type: 'sessions-changed',
       repoRoot: '/repo',
     })
     expect(broadcasts).toHaveBeenNthCalledWith(2, USER_ID, {
+      type: 'workspace-tabs-changed',
+      repoRoot: '/repo',
+    })
+    expect(broadcasts).toHaveBeenNthCalledWith(3, USER_ID, {
       type: 'session-closed',
       ptySessionId: PTY_SESSION_ID,
       repoRoot: '/repo',
@@ -116,7 +120,7 @@ describe('terminal-runtime-actions close broadcast', () => {
       getSlotScope: () => '/repo',
     })
 
-    const closed = actions.close(CLIENT_ID, USER_ID, { ptySessionId: PTY_SESSION_ID })
+    const closed = await actions.close(CLIENT_ID, USER_ID, { ptySessionId: PTY_SESSION_ID })
 
     expect(closed).toBe(false)
     expect(broadcasts).not.toHaveBeenCalled()
@@ -131,7 +135,7 @@ describe('terminal-runtime-actions close broadcast', () => {
       getSlotScope: () => undefined,
     })
 
-    const closed = actions.close(CLIENT_ID, USER_ID, { ptySessionId: PTY_SESSION_ID })
+    const closed = await actions.close(CLIENT_ID, USER_ID, { ptySessionId: PTY_SESSION_ID })
 
     expect(closed).toBe(true)
     expect(broadcasts).not.toHaveBeenCalled()
@@ -145,7 +149,7 @@ describe('terminal-runtime-actions close broadcast', () => {
       closeSessionForUser: () => true,
     })
 
-    const closed = actions.close(CLIENT_ID, USER_ID, { ptySessionId: '' })
+    const closed = await actions.close(CLIENT_ID, USER_ID, { ptySessionId: '' })
 
     expect(closed).toBe(false)
     expect(broadcasts).not.toHaveBeenCalled()
@@ -162,10 +166,44 @@ describe('terminal-runtime-actions close broadcast', () => {
       getSlotScope: () => '/repo',
     })
 
-    const closed = actions.close('not_a_client', USER_ID, { ptySessionId: PTY_SESSION_ID })
+    const closed = await actions.close('not_a_client', USER_ID, { ptySessionId: PTY_SESSION_ID })
 
     expect(closed).toBe(false)
     expect(close).not.toHaveBeenCalled()
+    expect(broadcasts).not.toHaveBeenCalled()
+  })
+})
+
+describe('terminal-runtime-actions workspace tabs broadcast', () => {
+  test('emits a workspace tabs invalidation after replaceTabs succeeds', async () => {
+    const { actions, broadcasts } = makeActions({ closeSessionForUser: () => false })
+
+    await expect(
+      actions.replaceTabs(CLIENT_ID, USER_ID, {
+        repoRoot: '/repo',
+        worktreePath: '/repo',
+        tabs: [{ type: 'status', tabId: 'workspace-pane:status' }],
+      }),
+    ).resolves.toEqual([])
+
+    expect(broadcasts).toHaveBeenCalledTimes(1)
+    expect(broadcasts).toHaveBeenCalledWith(USER_ID, {
+      type: 'workspace-tabs-changed',
+      repoRoot: '/repo',
+    })
+  })
+
+  test('rejects invalid replaceTabs input without emitting', async () => {
+    const { actions, broadcasts } = makeActions({ closeSessionForUser: () => false })
+
+    await expect(
+      actions.replaceTabs(CLIENT_ID, USER_ID, {
+        repoRoot: '',
+        worktreePath: '/repo',
+        tabs: [{ type: 'status', tabId: 'workspace-pane:status' }],
+      }),
+    ).resolves.toEqual([])
+
     expect(broadcasts).not.toHaveBeenCalled()
   })
 })

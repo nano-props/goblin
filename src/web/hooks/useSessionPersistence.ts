@@ -12,18 +12,21 @@ export function useSessionPersistence() {
   const order = useReposStore((s) => s.order)
   const zenMode = useReposStore((s) => s.zenMode)
   const workspacePaneSize = useReposStore((s) => s.workspacePaneSize)
-  const selectedTerminalSessionIdByTerminalWorktree = useReposStore((s) => s.selectedTerminalSessionIdByTerminalWorktree)
+  const selectedTerminalSessionIdByTerminalWorktree = useReposStore(
+    (s) => s.selectedTerminalSessionIdByTerminalWorktree,
+  )
   const sessionReady = useReposStore((s) => s.sessionReady)
+  const sessionPersistenceReady = useReposStore((s) => s.sessionPersistenceReady)
   const repos = useReposStore((s) => s.repos)
   const filetreeInteractionByScope = useFiletreeInteractionStore((s) => s.interactionByScope)
   const lastSavedRef = useRef<string | null>(null)
   const lastImmediateKeyRef = useRef<string | null>(null)
 
   useEffect(() => {
-    // Client -> persistence only. Boot restore runs elsewhere first, and
-    // sessionReady gates this effect so we never overwrite restorable session
-    // state with an empty pre-bootstrap workspace.
-    if (!sessionReady) return
+    // Client -> persistence only. Boot restore runs elsewhere first. sessionReady
+    // gates the UI skeleton; sessionPersistenceReady waits for boot-restored
+    // server-owned workspace tabs to converge back into the client store.
+    if (!sessionReady || !sessionPersistenceReady) return
     const session = workspaceSessionStateFromRestorableWorkspaceState({
       repos,
       restorableWorkspaceState: restorableWorkspaceStateFromStore({
@@ -63,6 +66,7 @@ export function useSessionPersistence() {
     return () => window.clearTimeout(timeout)
   }, [
     sessionReady,
+    sessionPersistenceReady,
     order,
     activeId,
     workspacePaneSize,

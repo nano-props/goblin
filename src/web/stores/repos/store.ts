@@ -107,6 +107,7 @@ export const useReposStore = create<ReposStore>()(
 
       // Local client-only state.
       sessionReady: false,
+      sessionPersistenceReady: false,
 
       ...createRepoSessionActions(set, get),
       ...createSelectionActions(set, get),

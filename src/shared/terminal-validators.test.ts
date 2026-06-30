@@ -164,4 +164,16 @@ describe('shared terminal validators', () => {
       tabs: [{ type: 'status', tabId: 'workspace-pane:status' }],
     })
   })
+
+  test('normalizes workspace tabs changed realtime messages', () => {
+    expect(
+      normalizeTerminalSocketServerMessage({
+        type: 'workspace-tabs-changed',
+        repoRoot: '/repo',
+      }),
+    ).toEqual({
+      type: 'workspace-tabs-changed',
+      repoRoot: '/repo',
+    })
+  })
 })

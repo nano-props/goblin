@@ -118,6 +118,7 @@ describe('app bootstrap hooks', () => {
     })
     expect(hydrateTheme).toHaveBeenCalledWith(settings)
     expect(mockedGetSettingsSnapshot).toHaveBeenCalledTimes(1)
+    expect(state.sessionPersistenceReady).toBe(true)
   })
 
   test('restores the boot session when non-critical authenticated hydrates fail', async () => {
@@ -145,7 +146,18 @@ describe('app bootstrap hooks', () => {
       },
     })
     expect(useReposStore.getState().workspacePaneSize).toBe(55)
+    expect(useReposStore.getState().sessionPersistenceReady).toBe(true)
     expect(mockedGetSettingsSnapshot).toHaveBeenCalledTimes(1)
+  })
+
+  test('opens the persistence gate even when boot session restore fails', async () => {
+    mockedGetSettingsSnapshot.mockRejectedValue(new Error('settings unavailable'))
+
+    renderInJsdom(<Harness />)
+    await flushMicrotasks(3)
+
+    expect(useReposStore.getState().sessionReady).toBe(true)
+    expect(useReposStore.getState().sessionPersistenceReady).toBe(true)
   })
 })
 

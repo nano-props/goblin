@@ -178,6 +178,9 @@ interface LocalWorkspaceState {
   /** Hydration flag — true once boot session is restored, so we don't
    *  overwrite the saved session with an empty one before restore. */
   sessionReady: boolean
+  /** Persistence gate — true only after all boot-restored state that can
+   *  affect WorkspaceSessionState has converged back into the client store. */
+  sessionPersistenceReady: boolean
 }
 
 interface RestorableWorkspaceActions {
@@ -213,8 +216,6 @@ interface RuntimeCoherentRepoProjectionActions {
   setWorkspacePaneTab: (id: string, tab: WorkspacePaneTabType) => void
   openWorkspacePaneStaticTab: (id: string, tab: WorkspacePaneStaticTabType, branchName?: string) => void
   closeWorkspacePaneStaticTab: (id: string, tab: WorkspacePaneStaticTabType, branchName?: string) => void
-  ensureWorkspacePaneTerminalTab: (id: string, terminalSessionId: string, branchName?: string) => void
-  ensureAndFocusWorkspacePaneTerminalTab: (id: string, terminalSessionId: string, branchName?: string) => void
   replaceWorkspacePaneTabs: (id: string, tabs: WorkspacePaneTabEntry[], branchName?: string) => void
   setBranchViewMode: (id: string, viewMode: BranchViewMode) => void
   selectBranch: (id: string, branch: string) => void

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { act } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useSessionPersistence } from '#/web/hooks/useSessionPersistence.ts'
@@ -37,6 +38,7 @@ describe('useSessionPersistence', () => {
       order: [repo.id],
       activeId: repo.id,
       sessionReady: true,
+      sessionPersistenceReady: true,
       selectedTerminalSessionIdByTerminalWorktree: {
         '/tmp/repo\0/tmp/worktree': 'session-2',
       },
@@ -94,6 +96,7 @@ describe('useSessionPersistence', () => {
       order: [repo.id],
       activeId: repo.id,
       sessionReady: true,
+      sessionPersistenceReady: true,
     })
     useFiletreeInteractionStore.getState().restoreViewState({
       [scopeKey]: {
@@ -118,6 +121,36 @@ describe('useSessionPersistence', () => {
         },
       }),
     )
+  })
+
+  test('does not persist until boot-restored workspace tabs have converged', () => {
+    const repo = seedRepoState({
+      id: '/tmp/repo',
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
+      selectedBranch: 'feature/worktree',
+    })
+    useReposStore.setState({
+      repos: { [repo.id]: repo },
+      order: [repo.id],
+      activeId: repo.id,
+      sessionReady: true,
+      sessionPersistenceReady: false,
+    })
+
+    const result = renderInJsdom(<Harness />)
+
+    expect(persistWorkspaceSessionStateMock).not.toHaveBeenCalled()
+
+    act(() => {
+      useReposStore.setState({ sessionPersistenceReady: true })
+    })
+
+    expect(persistWorkspaceSessionStateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        openRepoEntries: [{ kind: 'local', id: '/tmp/repo' }],
+      }),
+    )
+    result.unmount()
   })
 })
 

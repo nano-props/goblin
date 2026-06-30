@@ -267,7 +267,7 @@ let titleHandler: ((event: TerminalTitleEvent) => void) | null = null
 let identityHandler: ((event: TerminalIdentityViewModel) => void) | null = null
 let lifecycleHandler: ((event: TerminalLifecycleViewModel) => void) | null = null
 let sessionsChangedHandler: ((repoRoot: string) => void) | null = null
-let workspacePaneChangedHandler: ((repoRoot: string) => void) | null = null
+let workspaceTabsChangedHandler: ((repoRoot: string) => void) | null = null
 let sessionClosedHandler:
   | ((event: { ptySessionId: string; repoRoot: string; worktreePath: string; tabs: WorkspacePaneTabEntry[] }) => void)
   | null = null
@@ -345,7 +345,7 @@ beforeEach(() => {
   titleHandler = null
   identityHandler = null
   sessionsChangedHandler = null
-  workspacePaneChangedHandler = null
+  workspaceTabsChangedHandler = null
   sessionClosedHandler = null
   mockSessions.length = 0
   serverSessions = []
@@ -371,7 +371,10 @@ beforeEach(() => {
             }, 0) + 1
           }`
     const terminalSessionId = allocatedSessionId
-    if (input.kind === 'primary' && currentSessions.some((session) => session.terminalSessionId === terminalSessionId)) {
+    if (
+      input.kind === 'primary' &&
+      currentSessions.some((session) => session.terminalSessionId === terminalSessionId)
+    ) {
       serverSessions = currentSessions
       const reused = currentSessions.find((session) => session.terminalSessionId === terminalSessionId)
       // Reused session also has to supply first-frame hydration
@@ -533,10 +536,10 @@ beforeEach(() => {
             if (sessionsChangedHandler === cb) sessionsChangedHandler = null
           }
         }),
-        onWorkspacePaneChanged: vi.fn((cb: (repoRoot: string) => void) => {
-          workspacePaneChangedHandler = cb
+        onWorkspaceTabsChanged: vi.fn((cb: (repoRoot: string) => void) => {
+          workspaceTabsChangedHandler = cb
           return () => {
-            if (workspacePaneChangedHandler === cb) workspacePaneChangedHandler = null
+            if (workspaceTabsChangedHandler === cb) workspaceTabsChangedHandler = null
           }
         }),
       },
@@ -635,18 +638,25 @@ beforeEach(() => {
           if (sessionsChangedHandler === cb) sessionsChangedHandler = null
         }
       }),
-      onWorkspacePaneChanged: vi.fn((cb: (repoRoot: string) => void) => {
-        workspacePaneChangedHandler = cb
+      onWorkspaceTabsChanged: vi.fn((cb: (repoRoot: string) => void) => {
+        workspaceTabsChangedHandler = cb
         return () => {
-          if (workspacePaneChangedHandler === cb) workspacePaneChangedHandler = null
+          if (workspaceTabsChangedHandler === cb) workspaceTabsChangedHandler = null
         }
       }),
       onSessionClosed: vi.fn(
-        (cb: (event: { ptySessionId: string; repoRoot: string; worktreePath: string; tabs: WorkspacePaneTabEntry[] }) => void) => {
-        sessionClosedHandler = cb
-        return () => {
-          if (sessionClosedHandler === cb) sessionClosedHandler = null
-        }
+        (
+          cb: (event: {
+            ptySessionId: string
+            repoRoot: string
+            worktreePath: string
+            tabs: WorkspacePaneTabEntry[]
+          }) => void,
+        ) => {
+          sessionClosedHandler = cb
+          return () => {
+            if (sessionClosedHandler === cb) sessionClosedHandler = null
+          }
         },
       ),
     }),
@@ -694,7 +704,9 @@ describe('TerminalSessionProvider', () => {
         cols: 100,
         rows: 30,
       })
-      expect(getProbe().summaries.map((session) => [session.terminalSessionId, session.selected, session.hasBell])).toEqual([
+      expect(
+        getProbe().summaries.map((session) => [session.terminalSessionId, session.selected, session.hasBell]),
+      ).toEqual([
         ['session-1', false, false],
         ['session-2', true, false],
       ])
@@ -705,9 +717,9 @@ describe('TerminalSessionProvider', () => {
 
       expect(closeMock).not.toHaveBeenCalled()
       expect(selectedWorkspacePaneTab(REPO_ID)).toBe('terminal')
-      expect(getProbe().summaries.map((session) => [session.terminalSessionId, session.selected, session.hasBell])).toEqual([
-        ['session-1', true, false],
-      ])
+      expect(
+        getProbe().summaries.map((session) => [session.terminalSessionId, session.selected, session.hasBell]),
+      ).toEqual([['session-1', true, false]])
 
       // With the derived-value pattern, the store never re-projects the
       // preferred tab when terminal sessions go to zero. The user's intent
@@ -760,7 +772,9 @@ describe('TerminalSessionProvider', () => {
         })
       })
 
-      expect(getProbe().summaries.map((session) => [session.terminalSessionId, session.selected, session.hasBell])).toEqual([
+      expect(
+        getProbe().summaries.map((session) => [session.terminalSessionId, session.selected, session.hasBell]),
+      ).toEqual([
         ['session-1', false, true],
         ['session-2', true, false],
       ])
@@ -778,7 +792,9 @@ describe('TerminalSessionProvider', () => {
         getContext().selectTerminal(terminalWorktreeKey, firstTerminalSessionId)
       })
 
-      expect(getProbe().summaries.map((session) => [session.terminalSessionId, session.selected, session.hasBell])).toEqual([
+      expect(
+        getProbe().summaries.map((session) => [session.terminalSessionId, session.selected, session.hasBell]),
+      ).toEqual([
         ['session-1', true, false],
         ['session-2', false, false],
       ])
@@ -1037,7 +1053,52 @@ describe('TerminalSessionProvider', () => {
     }
   })
 
-  test('coalesces compatibility session and workspace pane change broadcasts', async () => {
+  test('applies canonical workspace tabs from workspace-tabs-changed broadcasts', async () => {
+    seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      selectedBranch: 'feature/worktree',
+      preferredWorkspacePaneTab: 'terminal',
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [workspacePaneStaticTabEntry('status')],
+      },
+    })
+    listWorkspaceTabsMock.mockResolvedValue([
+      {
+        repoRoot: REPO_ID,
+        worktreePath: WORKTREE_PATH,
+        tabs: [workspacePaneStaticTabEntry('status')],
+      },
+    ])
+    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH)
+    const { unmount } = await renderProviderWithProbe(terminalWorktreeKey)
+
+    try {
+      await vi.waitFor(() => expect(listWorkspaceTabsMock).toHaveBeenCalled())
+      listWorkspaceTabsMock.mockClear()
+      listWorkspaceTabsMock.mockResolvedValue([
+        {
+          repoRoot: REPO_ID,
+          worktreePath: WORKTREE_PATH,
+          tabs: [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-1')],
+        },
+      ])
+      await act(async () => {
+        workspaceTabsChangedHandler?.(REPO_ID)
+        await waitForScheduledServerSync()
+      })
+
+      expect(listWorkspaceTabsMock).toHaveBeenCalledWith({ repoRoot: REPO_ID })
+      expect(tabsFor(REPO_ID, 'feature/worktree')).toEqual([
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneTerminalTabEntry('session-1'),
+      ])
+    } finally {
+      await unmount()
+    }
+  })
+
+  test('coalesces session and workspace tabs change broadcasts', async () => {
     seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -1053,7 +1114,7 @@ describe('TerminalSessionProvider', () => {
 
       await act(async () => {
         sessionsChangedHandler?.(REPO_ID)
-        workspacePaneChangedHandler?.(REPO_ID)
+        workspaceTabsChangedHandler?.(REPO_ID)
         await waitForScheduledServerSync()
       })
 
@@ -1902,7 +1963,7 @@ describe('TerminalSessionProvider', () => {
         onIdentity: () => () => {},
         onLifecycle: () => () => {},
         onSessionsChanged: () => () => {},
-        onWorkspacePaneChanged: () => () => {},
+        onWorkspaceTabsChanged: () => () => {},
         onSessionClosed: () => () => {},
       }),
     })
@@ -2000,7 +2061,7 @@ describe('TerminalSessionProvider', () => {
         onIdentity: () => () => {},
         onLifecycle: () => () => {},
         onSessionsChanged: () => () => {},
-        onWorkspacePaneChanged: () => () => {},
+        onWorkspaceTabsChanged: () => () => {},
         onSessionClosed: () => () => {},
       }),
     })

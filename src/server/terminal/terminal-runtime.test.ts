@@ -968,7 +968,7 @@ describe('server terminal runtime', () => {
     await expect(
       host.getSessionSnapshot('client_shared', USER_2, { ptySessionId: userASession.ptySessionId }),
     ).resolves.toBeNull()
-    expect(host.close('client_shared', USER_2, { ptySessionId: userASession.ptySessionId })).toBe(false)
+    await expect(host.close('client_shared', USER_2, { ptySessionId: userASession.ptySessionId })).resolves.toBe(false)
     expect(
       userBSocket.send.mock.calls.some(([payload]) => {
         const parsed = JSON.parse(String(payload))

@@ -71,6 +71,7 @@ export interface ClientTerminalBridge {
   onIdentity: (cb: (event: TerminalIdentityViewModel) => void) => () => void
   onLifecycle: (cb: (event: TerminalLifecycleViewModel) => void) => () => void
   onSessionsChanged: (cb: (repoRoot: string) => void) => () => void
+  onWorkspaceTabsChanged: (cb: (repoRoot: string) => void) => () => void
   /**
    * Subscribe to per-session close broadcasts from the server. Emitted
    * after a successful `close` IPC alongside the broader
@@ -81,7 +82,12 @@ export interface ClientTerminalBridge {
    * bug, where a lost close request left the server PTY alive.
    */
   onSessionClosed: (
-    cb: (event: { ptySessionId: string; repoRoot: string; worktreePath: string; tabs: WorkspacePaneTabEntry[] }) => void,
+    cb: (event: {
+      ptySessionId: string
+      repoRoot: string
+      worktreePath: string
+      tabs: WorkspacePaneTabEntry[]
+    }) => void,
   ) => () => void
 }
 

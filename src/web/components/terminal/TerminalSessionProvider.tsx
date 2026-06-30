@@ -39,7 +39,9 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   // xterm views alive across settings → workspace round-trips.
   const currentRepoId = useReposStore((s) => s.activeId)
   const currentRepoInstanceToken = currentRepoId ? (repoIndex[currentRepoId]?.instanceToken ?? null) : null
-  const selectedTerminalSessionIdByTerminalWorktree = useReposStore((s) => s.selectedTerminalSessionIdByTerminalWorktree)
+  const selectedTerminalSessionIdByTerminalWorktree = useReposStore(
+    (s) => s.selectedTerminalSessionIdByTerminalWorktree,
+  )
   const setSelectedTerminal = useReposStore((s) => s.setSelectedTerminal)
   const parkingRootRef = useRef<HTMLDivElement | null>(null)
   const repoIndexRef = useRef(repoIndex)
@@ -259,12 +261,14 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       }, 0)
     }
     const offSessionsChanged = terminalBridge.onSessionsChanged(scheduleServerSync)
+    const offWorkspaceTabsChanged = terminalBridge.onWorkspaceTabsChanged(scheduleServerSync)
 
     return () => {
       disposed = true
       if (syncTimer !== null) window.clearTimeout(syncTimer)
       window.removeEventListener('focus', handleFocus)
       offSessionsChanged()
+      offWorkspaceTabsChanged()
     }
   }, [currentRepoId, currentRepoInstanceToken, syncServerSessions])
 
@@ -334,7 +338,8 @@ function applyWorkspaceTabsForWorktree(
   const storeRepoRoot =
     repoIndex[repoRoot] !== undefined
       ? repoRoot
-      : (Object.keys(repoIndex).find((candidate) => repoIndex[candidate]?.branchByWorktreePath[worktreePath]) ?? repoRoot)
+      : (Object.keys(repoIndex).find((candidate) => repoIndex[candidate]?.branchByWorktreePath[worktreePath]) ??
+        repoRoot)
   const branch = repoIndex[storeRepoRoot]?.branchByWorktreePath[worktreePath]
   if (!branch) return
   useReposStore.getState().replaceWorkspacePaneTabs(storeRepoRoot, [...tabs], branch)

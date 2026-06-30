@@ -612,6 +612,7 @@ describe('terminal web host bridge', () => {
     const onIdentity = vi.fn()
     const onLifecycle = vi.fn()
     const onSessionsChanged = vi.fn()
+    const onWorkspaceTabsChanged = vi.fn()
 
     const disposeOutput = terminalBridge.onOutput(onOutput)
     const disposeTitle = terminalBridge.onTitle(onTitle)
@@ -619,6 +620,7 @@ describe('terminal web host bridge', () => {
     const disposeIdentity = terminalBridge.onIdentity(onIdentity)
     const disposeLifecycle = terminalBridge.onLifecycle(onLifecycle)
     const disposeSessionsChanged = terminalBridge.onSessionsChanged(onSessionsChanged)
+    const disposeWorkspaceTabsChanged = terminalBridge.onWorkspaceTabsChanged(onWorkspaceTabsChanged)
     const socket = wsMock.instances[0]
     if (!socket) throw new Error('missing web terminal socket')
 
@@ -658,6 +660,12 @@ describe('terminal web host bridge', () => {
         repoRoot: '/tmp/repo',
       }),
     )
+    socket.emitMessage(
+      JSON.stringify({
+        type: 'workspace-tabs-changed',
+        repoRoot: '/tmp/repo',
+      }),
+    )
 
     expect(onOutput).toHaveBeenCalledWith({ ptySessionId: 'pty_1', data: 'hello', seq: 1, processName: 'zsh' })
     expect(onTitle).toHaveBeenCalledWith({ ptySessionId: 'pty_1', canonicalTitle: '~/Developer/goblin — npm run dev' })
@@ -676,6 +684,7 @@ describe('terminal web host bridge', () => {
       takeoverPending: false,
     })
     expect(onSessionsChanged).toHaveBeenCalledWith('/tmp/repo')
+    expect(onWorkspaceTabsChanged).toHaveBeenCalledWith('/tmp/repo')
 
     disposeOutput()
     disposeTitle()
@@ -683,6 +692,7 @@ describe('terminal web host bridge', () => {
     disposeIdentity()
     disposeLifecycle()
     disposeSessionsChanged()
+    disposeWorkspaceTabsChanged()
   })
 
   test('kickReconnect health-probes an open terminal socket and keeps it when pong arrives', async () => {
@@ -893,7 +903,12 @@ describe('terminal web host bridge', () => {
     const terminalSessionId = 'session-2'
 
     await expect(
-      terminalBridge.notifyBell({ title: 'repo', body: 'feature/test\\nzsh', terminalSessionId, repoRoot: '/tmp/repo' }),
+      terminalBridge.notifyBell({
+        title: 'repo',
+        body: 'feature/test\\nzsh',
+        terminalSessionId,
+        repoRoot: '/tmp/repo',
+      }),
     ).resolves.toBe(true)
     wsMock.notificationInstances[0]?.onclick?.()
 

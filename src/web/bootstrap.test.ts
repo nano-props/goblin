@@ -219,6 +219,7 @@ describe('client bootstrap', () => {
         onIdentity: () => () => {},
         onLifecycle: () => () => {},
         onSessionsChanged: () => () => {},
+        onWorkspaceTabsChanged: () => () => {},
         onSessionClosed: () => () => {},
       }),
     })

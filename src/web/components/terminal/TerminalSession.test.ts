@@ -579,6 +579,7 @@ beforeEach(() => {
         onIdentity: vi.fn(),
         onLifecycle: vi.fn(),
         onSessionsChanged: vi.fn(),
+        onWorkspaceTabsChanged: vi.fn(),
         onSessionClosed: vi.fn(),
       },
     },
@@ -650,6 +651,7 @@ beforeEach(() => {
       onIdentity: vi.fn(() => () => {}),
       onLifecycle: vi.fn(() => () => {}),
       onSessionsChanged: vi.fn(() => () => {}),
+      onWorkspaceTabsChanged: vi.fn(() => () => {}),
       onSessionClosed: vi.fn(() => () => {}),
     }),
   })

@@ -16,7 +16,11 @@ import {
   type TerminalSessionSummary,
   type TerminalWorkspaceTabsEntry,
 } from '#/shared/terminal-types.ts'
-import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+import {
+  type WorkspacePaneTabEntry,
+  workspacePaneTabEntryIdentity,
+  workspacePaneTerminalTabEntry,
+} from '#/shared/workspace-pane.ts'
 import { isValidTerminalClientId, isValidTerminalSize } from '#/shared/terminal-validators.ts'
 import { createTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
 import { terminalSessionScope } from '#/server/terminal/terminal-session-scope.ts'
@@ -120,7 +124,8 @@ class TerminalSessionService {
     const terminalSessionId = input.terminalSessionId ?? createTerminalSessionId()
     const cols = input.cols ?? 80
     const rows = input.rows ?? 24
-    if (!this.options.isValidTerminalSessionId(terminalSessionId)) return { ok: false, message: 'error.invalid-arguments' }
+    if (!this.options.isValidTerminalSessionId(terminalSessionId))
+      return { ok: false, message: 'error.invalid-arguments' }
     if (!isValidTerminalSize(cols, rows)) return { ok: false, message: 'error.invalid-arguments' }
 
     const sessionScope = terminalSessionScope(input.repoRoot)
@@ -166,10 +171,20 @@ class TerminalSessionService {
       const sessions = await this.listSessions(userId, input.repoRoot)
       const createdSession = sessions.find((session) => session.terminalSessionId === createResult.terminalSessionId)
       const tabs = createdSession
-        ? this.options.workspaceTabs.ensureTerminalTab(
-            { userId, scope: createdSession.repoRoot, worktreePath: createdSession.worktreePath },
-            createResult.terminalSessionId,
-          )
+        ? this.options.workspaceTabs.replaceTabs({
+            userId,
+            scope: createdSession.repoRoot,
+            worktreePath: createdSession.worktreePath,
+            tabs: workspaceTabsWithLiveTerminalSessions(
+              this.options.workspaceTabs.ensureTerminalTab(
+                { userId, scope: createdSession.repoRoot, worktreePath: createdSession.worktreePath },
+                createResult.terminalSessionId,
+              ),
+              sessions
+                .filter((session) => session.worktreePath === createdSession.worktreePath)
+                .map((session) => session.terminalSessionId),
+            ),
+          })
         : []
       return {
         ok: true,
@@ -191,36 +206,66 @@ class TerminalSessionService {
     })
   }
 
-  replaceTabs(
+  async replaceTabs(
     userId: string,
     input: { repoRoot: string; worktreePath: string; tabs: readonly WorkspacePaneTabEntry[] },
-  ): WorkspacePaneTabEntry[] {
+  ): Promise<WorkspacePaneTabEntry[]> {
     if (!isValidRepoLocator(input.repoRoot)) return []
     if (!isValidCwd(input.worktreePath)) return []
+    const scope = terminalSessionScope(input.repoRoot)
+    const worktreePath = terminalWorktreePath(input.repoRoot, input.worktreePath)
+    const liveTerminalSessionIds = await this.liveTerminalSessionIdsForWorktree(userId, scope, worktreePath)
     return this.options.workspaceTabs.replaceTabs({
       userId,
-      scope: terminalSessionScope(input.repoRoot),
-      worktreePath: terminalWorktreePath(input.repoRoot, input.worktreePath),
-      tabs: input.tabs,
+      scope,
+      worktreePath,
+      tabs: workspaceTabsWithLiveTerminalSessions(input.tabs, liveTerminalSessionIds),
     })
   }
 
-  removeTerminalTab(userId: string, session: TerminalSessionSummary): WorkspacePaneTabEntry[] {
-    return this.options.workspaceTabs.removeTerminalTab(
+  async removeTerminalTab(userId: string, session: TerminalSessionSummary): Promise<WorkspacePaneTabEntry[]> {
+    const currentTabs = this.options.workspaceTabs.removeTerminalTab(
       { userId, scope: session.repoRoot, worktreePath: session.worktreePath },
       session.terminalSessionId,
     )
+    const liveTerminalSessionIds = await this.liveTerminalSessionIdsForWorktree(
+      userId,
+      session.repoRoot,
+      session.worktreePath,
+    )
+    return this.options.workspaceTabs.replaceTabs({
+      userId,
+      scope: session.repoRoot,
+      worktreePath: session.worktreePath,
+      tabs: workspaceTabsWithLiveTerminalSessions(currentTabs, liveTerminalSessionIds),
+    })
   }
 
   async listWorkspaceTabs(userId: string, repoRoot: string): Promise<TerminalWorkspaceTabsEntry[]> {
     if (!isValidRepoLocator(repoRoot)) return []
     const scope = terminalSessionScope(repoRoot)
     const sessions = await this.options.manager.listSessionsForUser(userId, scope)
+    const liveTerminalSessionIdsByWorktree = new Map<string, string[]>()
     for (const session of sessions) {
-      this.options.workspaceTabs.ensureTerminalTab(
-        { userId, scope, worktreePath: session.worktreePath },
-        session.terminalSessionId,
-      )
+      const ids = liveTerminalSessionIdsByWorktree.get(session.worktreePath) ?? []
+      ids.push(session.terminalSessionId)
+      liveTerminalSessionIdsByWorktree.set(session.worktreePath, ids)
+    }
+    const worktreePaths = new Set([
+      ...this.options.workspaceTabs.tabsForScope({ userId, scope }).map((entry) => entry.worktreePath),
+      ...liveTerminalSessionIdsByWorktree.keys(),
+    ])
+    for (const worktreePath of worktreePaths) {
+      const currentTabs = this.options.workspaceTabs.tabs({ userId, scope, worktreePath })
+      this.options.workspaceTabs.replaceTabs({
+        userId,
+        scope,
+        worktreePath,
+        tabs: workspaceTabsWithLiveTerminalSessions(
+          currentTabs,
+          liveTerminalSessionIdsByWorktree.get(worktreePath) ?? [],
+        ),
+      })
     }
     return this.options.workspaceTabs.tabsForScope({ userId, scope }).map((entry) => ({
       repoRoot,
@@ -288,6 +333,17 @@ class TerminalSessionService {
     return { pruned, remaining }
   }
 
+  private async liveTerminalSessionIdsForWorktree(
+    userId: string,
+    scope: string,
+    worktreePath: string,
+  ): Promise<string[]> {
+    const sessions = await this.options.manager.listSessionsForUser(userId, scope)
+    return sessions
+      .filter((session) => session.worktreePath === worktreePath)
+      .map((session) => session.terminalSessionId)
+  }
+
   private async allocateSessionIdForCreate(
     userId: string,
     input: TerminalCreateInput,
@@ -302,8 +358,12 @@ class TerminalSessionService {
       return { terminalSessionId: existingSessionIds[0], reservationKey: null }
     }
     const reservationKey = terminalSessionIdReservationKey(userId, scope, worktreePath)
-    const reservedTerminalSessionId = this.reservedTerminalSessionIdsByWorktree.get(reservationKey)?.values().next().value
-    if (input.kind === 'primary' && reservedTerminalSessionId) return { terminalSessionId: reservedTerminalSessionId, reservationKey: null }
+    const reservedTerminalSessionId = this.reservedTerminalSessionIdsByWorktree
+      .get(reservationKey)
+      ?.values()
+      .next().value
+    if (input.kind === 'primary' && reservedTerminalSessionId)
+      return { terminalSessionId: reservedTerminalSessionId, reservationKey: null }
     return { terminalSessionId: this.reserveNewSessionId(reservationKey, new Set(existingSessionIds)), reservationKey }
   }
 
@@ -459,4 +519,36 @@ function terminalSessionIdReservationKey(userId: string, scope: string, worktree
 
 function terminalUserWorktreeKey(userId: string, scope: string, worktreePath: string): string {
   return `${userId}\0${formatTerminalWorktreeKey(scope, worktreePath)}`
+}
+
+function workspaceTabsWithLiveTerminalSessions(
+  tabs: readonly WorkspacePaneTabEntry[],
+  liveTerminalSessionIds: readonly string[],
+): WorkspacePaneTabEntry[] {
+  const liveTerminalSessionIdsSet = new Set(
+    liveTerminalSessionIds.filter((terminalSessionId) => terminalSessionId.length > 0),
+  )
+  const representedTerminalSessionIds = new Set<string>()
+  const seen = new Set<string>()
+  const next: WorkspacePaneTabEntry[] = []
+  for (const entry of tabs) {
+    if (entry.type === 'terminal') {
+      if (!liveTerminalSessionIdsSet.has(entry.terminalSessionId)) continue
+      representedTerminalSessionIds.add(entry.terminalSessionId)
+    }
+    const identity = workspacePaneTabEntryIdentity(entry)
+    if (seen.has(identity)) continue
+    seen.add(identity)
+    next.push(entry)
+  }
+  for (const terminalSessionId of liveTerminalSessionIds) {
+    if (!liveTerminalSessionIdsSet.has(terminalSessionId)) continue
+    if (representedTerminalSessionIds.has(terminalSessionId)) continue
+    const entry = workspacePaneTerminalTabEntry(terminalSessionId)
+    const identity = workspacePaneTabEntryIdentity(entry)
+    if (seen.has(identity)) continue
+    seen.add(identity)
+    next.push(entry)
+  }
+  return next
 }

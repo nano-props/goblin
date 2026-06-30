@@ -38,5 +38,6 @@ export const terminalBridge: ClientTerminalBridge = {
   onIdentity: bindTerminalMethod('onIdentity'),
   onLifecycle: bindTerminalMethod('onLifecycle'),
   onSessionsChanged: bindTerminalMethod('onSessionsChanged'),
+  onWorkspaceTabsChanged: bindTerminalMethod('onWorkspaceTabsChanged'),
   onSessionClosed: bindTerminalMethod('onSessionClosed'),
 }

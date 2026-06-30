@@ -17,10 +17,7 @@ import {
   resetReposStore,
   seedRepoState,
 } from '#/web/test-utils/bridge.ts'
-import {
-  workspacePaneStaticTabsForBranch,
-  workspacePaneTabsForBranch,
-} from '#/web/stores/repos/workspace-pane-tabs.ts'
+import { workspacePaneStaticTabsForBranch, workspacePaneTabsForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
 import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { restoreSessionWorkspacePaneStateInRepos } from '#/web/stores/repos/workspace-pane-session-restore.ts'
 import type { BranchSnapshotInfo } from '#/web/types.ts'
@@ -50,8 +47,7 @@ function seedRepo(options: {
     workspacePaneTabsByBranch:
       selectedBranch && (options.workspacePaneTabs ?? options.workspacePaneStaticTabs)
         ? {
-            [selectedBranch]:
-              options.workspacePaneTabs ?? staticTabs(...(options.workspacePaneStaticTabs ?? [])),
+            [selectedBranch]: options.workspacePaneTabs ?? staticTabs(...(options.workspacePaneStaticTabs ?? [])),
           }
         : undefined,
     remote: {
@@ -340,7 +336,11 @@ describe('setWorkspacePaneTab', () => {
   })
 
   test('restores a non-worktree workspace pane tab list during session restore', () => {
-    seedRepo({ selectedBranch: 'feature/plain', preferredWorkspacePaneTab: 'status', workspacePaneStaticTabs: ['status'] })
+    seedRepo({
+      selectedBranch: 'feature/plain',
+      preferredWorkspacePaneTab: 'status',
+      workspacePaneStaticTabs: ['status'],
+    })
 
     restoreWorkspacePaneState({
       workspacePaneTabsByBranchByRepo: { [REPO_ID]: { 'feature/plain': staticTabs('history') } },
@@ -351,7 +351,11 @@ describe('setWorkspacePaneTab', () => {
   })
 
   test('restores an explicitly empty non-worktree workspace pane tab list during session restore', () => {
-    seedRepo({ selectedBranch: 'feature/plain', preferredWorkspacePaneTab: 'status', workspacePaneStaticTabs: ['status'] })
+    seedRepo({
+      selectedBranch: 'feature/plain',
+      preferredWorkspacePaneTab: 'status',
+      workspacePaneStaticTabs: ['status'],
+    })
 
     restoreWorkspacePaneState({ workspacePaneTabsByBranchByRepo: { [REPO_ID]: { 'feature/plain': [] } } })
 
@@ -459,60 +463,8 @@ describe('setWorkspacePaneTab', () => {
       .replaceWorkspacePaneTabs(REPO_ID, [
         workspacePaneStaticTabEntry('history'),
         workspacePaneStaticTabEntry('history'),
-    ])
+      ])
     expect(useReposStore.getState().repos[REPO_ID]).toBe(before)
-  })
-
-  test('ensures an existing terminal tab without moving it', () => {
-    seedRepo({
-      selectedBranch: 'main',
-      workspacePaneTabs: [terminalEntry('session-1'), workspacePaneStaticTabEntry('status')],
-    })
-
-    useReposStore.getState().ensureWorkspacePaneTerminalTab(REPO_ID, 'session-1')
-
-    expect(tabsFor('main')).toEqual([terminalEntry('session-1'), workspacePaneStaticTabEntry('status')])
-  })
-
-  test('ensureAndFocus adds the tab, switches to terminal view, and selects the new terminal', () => {
-    seedRepo({ selectedBranch: 'feature/worktree', preferredWorkspacePaneTab: 'status' })
-
-    useReposStore.getState().ensureAndFocusWorkspacePaneTerminalTab(REPO_ID, 'session-1')
-
-    expect(tabsFor('feature/worktree')).toEqual([
-      workspacePaneStaticTabEntry('status'),
-      terminalEntry('session-1'),
-    ])
-    expect(preferredTabFor('feature/worktree')).toBe('terminal')
-    expect(useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[`${REPO_ID}\0/tmp/feature-worktree`]).toBe(
-      'session-1',
-    )
-  })
-
-  test('ensureAndFocus is a no-op when everything is already focused', () => {
-    seedRepo({
-      selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneTab: 'terminal',
-      workspacePaneTabs: [terminalEntry('session-1')],
-    })
-    useReposStore.setState({
-      selectedTerminalSessionIdByTerminalWorktree: { [`${REPO_ID}\0/tmp/feature-worktree`]: 'session-1' },
-    })
-
-    const before = useReposStore.getState().repos[REPO_ID]
-    useReposStore.getState().ensureAndFocusWorkspacePaneTerminalTab(REPO_ID, 'session-1')
-
-    expect(useReposStore.getState().repos[REPO_ID]).toBe(before)
-  })
-
-  test('ensureAndFocus does nothing for a branch without a worktree', () => {
-    seedRepo({ selectedBranch: 'feature/plain', preferredWorkspacePaneTab: 'status' })
-
-    const before = useReposStore.getState().repos[REPO_ID]
-    useReposStore.getState().ensureAndFocusWorkspacePaneTerminalTab(REPO_ID, 'session-1')
-
-    expect(useReposStore.getState().repos[REPO_ID]).toBe(before)
-    expect(preferredTabFor('feature/plain')).toBe('status')
   })
 
   test('replaces hidden worktree-scoped static tabs from the canonical list', () => {
@@ -533,7 +485,10 @@ describe('setWorkspacePaneTab', () => {
         workspacePaneStaticTabEntry('status'),
       ])
 
-    expect(tabsFor('feature/plain')).toEqual([workspacePaneStaticTabEntry('history'), workspacePaneStaticTabEntry('status')])
+    expect(tabsFor('feature/plain')).toEqual([
+      workspacePaneStaticTabEntry('history'),
+      workspacePaneStaticTabEntry('status'),
+    ])
   })
 
   test('keeps static workspace pane tabs isolated by branch', () => {

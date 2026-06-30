@@ -181,6 +181,7 @@ const TerminalRealtimeMessageVariants = [
   v.object({ type: v.literal('identity'), event: TerminalIdentityEventSchema }),
   v.object({ type: v.literal('lifecycle'), event: TerminalLifecycleEventSchema }),
   v.object({ type: v.literal('sessions-changed'), repoRoot: v.string() }),
+  v.object({ type: v.literal('workspace-tabs-changed'), repoRoot: v.string() }),
   TerminalSessionClosedEventSchema,
 ] as const
 const TerminalRealtimeMessageSchema = v.variant('type', TerminalRealtimeMessageVariants)
@@ -352,7 +353,8 @@ export function isValidTerminalNotifyBellInput(value: unknown): value is Termina
     body.length <= 500 &&
     !Object.prototype.hasOwnProperty.call(value, 'key') &&
     (terminalSessionId === undefined || (typeof terminalSessionId === 'string' && terminalSessionId.length > 0)) &&
-    (terminalWorktreeKey === undefined || (typeof terminalWorktreeKey === 'string' && terminalWorktreeKey.length > 0)) &&
+    (terminalWorktreeKey === undefined ||
+      (typeof terminalWorktreeKey === 'string' && terminalWorktreeKey.length > 0)) &&
     typeof repoRoot === 'string' &&
     repoRoot.length > 0
   )

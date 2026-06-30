@@ -120,11 +120,13 @@ export function createPullRequest(number: number, options: Partial<PullRequestIn
   }
 }
 
-export function installWorkspacePaneTabsTestBridge(options: {
-  replaceWorkspaceTabs?: (
-    input: TerminalReplaceWorkspaceTabsInput,
-  ) => WorkspacePaneTabEntry[] | Promise<WorkspacePaneTabEntry[]>
-} = {}): void {
+export function installWorkspacePaneTabsTestBridge(
+  options: {
+    replaceWorkspaceTabs?: (
+      input: TerminalReplaceWorkspaceTabsInput,
+    ) => WorkspacePaneTabEntry[] | Promise<WorkspacePaneTabEntry[]>
+  } = {},
+): void {
   setClientBridgeForTests({
     kind: () => 'web',
     hasCapability: () => false,
@@ -199,6 +201,7 @@ export function installWorkspacePaneTabsTestBridge(options: {
       onIdentity: () => () => {},
       onLifecycle: () => () => {},
       onSessionsChanged: () => () => {},
+      onWorkspaceTabsChanged: () => () => {},
       onSessionClosed: () => () => {},
     }),
   } satisfies ClientBridge)
@@ -213,6 +216,7 @@ export function resetReposStore(): void {
     order: [],
     activeId: null,
     sessionReady: false,
+    sessionPersistenceReady: false,
     zenMode: DEFAULT_ZEN_MODE,
     workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
     selectedTerminalSessionIdByTerminalWorktree: {},
@@ -485,6 +489,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       onIdentity: () => () => {},
       onLifecycle: () => () => {},
       onSessionsChanged: () => () => {},
+      onWorkspaceTabsChanged: () => () => {},
       onSessionClosed: () => () => {},
     }),
   })
@@ -640,6 +645,7 @@ export function seedRepoState(options: {
     order: [options.id],
     activeId: options.id,
     sessionReady: true,
+    sessionPersistenceReady: true,
     zenMode: DEFAULT_ZEN_MODE,
     workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
   })

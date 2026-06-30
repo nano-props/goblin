@@ -3,7 +3,6 @@ import type { WorkspacePaneStaticTabType, WorkspacePaneTabEntry } from '#/shared
 import {
   workspacePaneTabEntryFromUnknown,
   workspacePaneStaticTabEntry,
-  workspacePaneTerminalTabEntry,
   workspacePaneTabEntryIdentity,
 } from '#/shared/workspace-pane.ts'
 
@@ -50,32 +49,18 @@ export function workspacePaneTabsWithoutStaticTab(
   return normalizeWorkspacePaneTabs(current.filter((entry) => entry.type !== tab))
 }
 
-export function workspacePaneTabsWithEnsuredTerminal(
-  current: readonly WorkspacePaneTabEntry[],
-  terminalSessionId: string,
-): WorkspacePaneTabEntry[] {
-  const normalized = normalizeWorkspacePaneTabs(current)
-  if (terminalSessionId.length === 0) return normalized
-  if (normalized.some((entry) => entry.type === 'terminal' && entry.terminalSessionId === terminalSessionId)) return normalized
-  return normalizeWorkspacePaneTabs([...normalized, workspacePaneTerminalTabEntry(terminalSessionId)])
-}
-
 export function normalizeWorkspacePaneTabsRecord(
   value: Record<string, readonly WorkspacePaneTabEntry[]>,
   branchNames: readonly string[],
 ): Record<string, WorkspacePaneTabEntry[]> {
   const next: Record<string, WorkspacePaneTabEntry[]> = {}
   for (const branch of branchNames) {
-    const current = Object.prototype.hasOwnProperty.call(value, branch)
-      ? value[branch]
-      : DEFAULT_WORKSPACE_PANE_TABS
+    const current = Object.prototype.hasOwnProperty.call(value, branch) ? value[branch] : DEFAULT_WORKSPACE_PANE_TABS
     next[branch] = normalizeWorkspacePaneTabs(current)
   }
   return next
 }
-export function normalizeWorkspacePaneTabs(
-  tabs: readonly WorkspacePaneTabEntry[],
-): WorkspacePaneTabEntry[] {
+export function normalizeWorkspacePaneTabs(tabs: readonly WorkspacePaneTabEntry[]): WorkspacePaneTabEntry[] {
   const next: WorkspacePaneTabEntry[] = []
   const seen = new Set<string>()
   for (const raw of tabs) {

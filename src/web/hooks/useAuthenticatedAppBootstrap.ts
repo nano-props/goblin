@@ -47,6 +47,7 @@ async function hydrateNonCriticalAuthenticatedState(settingsSnapshot: Promise<Se
 
 async function restoreBootSession(settingsSnapshot: Promise<SettingsSnapshot>): Promise<void> {
   try {
+    useReposStore.setState({ sessionPersistenceReady: false })
     useSessionRestoreStore.getState().hydrateFromSettingsSnapshot(await settingsSnapshot)
     const session = useSessionRestoreStore.getState().consumeBootSessionSnapshot()
     const normalizedLayout = normalizeWorkspaceSessionLayoutState(session)
@@ -66,9 +67,10 @@ async function restoreBootSession(settingsSnapshot: Promise<SettingsSnapshot>): 
       },
     })
     await restoreServerWorkspacePaneTabsFromSession(restoredWorkspaceState.workspacePaneTabsByBranchByRepo)
+    useReposStore.setState({ sessionPersistenceReady: true })
   } catch (err) {
     bootstrapLog.warn('session restore failed', { err })
-    useReposStore.setState({ sessionReady: true })
+    useReposStore.setState({ sessionReady: true, sessionPersistenceReady: true })
   }
 }
 
