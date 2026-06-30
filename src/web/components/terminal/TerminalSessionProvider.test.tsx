@@ -651,14 +651,14 @@ describe('TerminalSessionProvider', () => {
       expect(createTerminalMock).toHaveBeenNthCalledWith(1, {
         ...base,
         kind: 'primary',
-        clientId: 'client_local',
+        clientId: 'client_sharedterminal',
         cols: 100,
         rows: 30,
       })
       expect(createTerminalMock).toHaveBeenNthCalledWith(2, {
         ...base,
         kind: 'additional',
-        clientId: 'client_local',
+        clientId: 'client_sharedterminal',
         cols: 100,
         rows: 30,
       })

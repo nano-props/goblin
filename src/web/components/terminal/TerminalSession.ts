@@ -31,7 +31,7 @@ import {
   isTerminalEmulatorInput,
   type TerminalInput,
 } from '#/web/components/terminal/terminal-input.ts'
-import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-bridge.ts'
+import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
 import {
   createXtermAuthorityGate,
   type AuthorizationDenialReason,

@@ -1,4 +1,4 @@
-import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-bridge.ts'
+import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
 import { terminalLog } from '#/web/logger.ts'
 import type { ClientTerminalBridge } from '#/web/client-bridge-types.ts'
 import type { TerminalTakeoverResult } from '#/shared/terminal-types.ts'

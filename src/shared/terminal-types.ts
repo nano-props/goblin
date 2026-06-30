@@ -1,10 +1,10 @@
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 
 /**
- * `controllerStatus === 'connected'` while the controller's client has
- * a live socket. The server clears the controller role on disconnect
- * (no grace), so the only transient state the client needs to render is
- * `connected` vs `none`.
+ * `controllerStatus === 'connected'` while the broker reports the
+ * controller client online. Disconnects and missed heartbeats make the
+ * effective controller `none`; server-side controller intent is tracked
+ * separately from this wire-facing status.
  */
 export type TerminalControllerStatus = 'connected' | 'none'
 export type TerminalClientRole = 'controller' | 'viewer' | 'unowned'

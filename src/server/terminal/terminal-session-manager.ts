@@ -12,7 +12,6 @@ import {
   type TerminalSessionSummary,
   type TerminalTakeoverResult,
 } from '#/shared/terminal-types.ts'
-import { cloneTerminalController } from '#/shared/terminal-controller.ts'
 import { isShellProcessName } from '#/shared/terminal-process-name.ts'
 import { isValidTerminalPtySessionId, normalizeTerminalSize } from '#/shared/terminal-validators.ts'
 import { parseTerminalWorkspaceSlotKey } from '#/shared/terminal-workspace-slot-key.ts'
@@ -21,12 +20,13 @@ import type { TerminalSessionOrderRuntime } from '#/server/terminal/terminal-ses
 import {
   attachTerminalClient,
   claimTerminalClientControl,
+  effectiveTerminalController,
   explainAuthority,
   isAuthoritative,
   registerTerminalClient,
   restartTerminalClientControl,
+  terminalIdentityChanged,
   type TerminalClientControllerState,
-  updateTerminalClientConnection,
 } from '#/server/terminal/terminal-controller.ts'
 import {
   appendOutput,
@@ -63,7 +63,6 @@ export interface TerminalEnsureSessionInput<TUser extends string | number> {
   cols: number
   rows: number
   clientId?: string
-  clientConnected?: boolean
   forceNew?: boolean
   command?: string
   args?: string[]
@@ -88,7 +87,7 @@ interface TerminalSessionView<TUser extends string | number> {
   disposables: Array<{ dispose(): void }>
   render: TerminalRenderState
   attachments: Map<string, TerminalClientControllerState>
-  controller: TerminalController | null
+  controllerClientId: string | null
   /**
    * Sticky user-level claim. Once any attachment from this session's
    * user has successfully attached or taken over, this stays set
@@ -127,15 +126,18 @@ export class TerminalSessionManager<TUser extends string | number> {
   private readonly sink: TerminalEventSink<TUser>
   private readonly ptySupervisor: PtySupervisor
   private readonly terminalSessionOrder: TerminalSessionOrderRuntimeLike<TUser>
+  private readonly isClientOnline: (userId: TUser, clientId: string) => boolean
 
   constructor(
     ptySupervisor: PtySupervisor,
     sink: TerminalEventSink<TUser>,
     terminalSessionOrder: TerminalSessionOrderRuntimeLike<TUser>,
+    isClientOnline: (userId: TUser, clientId: string) => boolean,
   ) {
     this.ptySupervisor = ptySupervisor
     this.sink = sink
     this.terminalSessionOrder = terminalSessionOrder
+    this.isClientOnline = isClientOnline
   }
 
   async ensureSession(input: TerminalEnsureSessionInput<TUser>): Promise<TerminalAttachResult> {
@@ -157,8 +159,8 @@ export class TerminalSessionManager<TUser extends string | number> {
         id: existing.key,
       })
       if (input.clientId) {
-        registerTerminalClient(existing, input.clientId, size.cols, size.rows, input.clientConnected)
-        this.applyIdentityEffect(existing, attachTerminalClient(existing, input.clientId))
+        registerTerminalClient(existing, input.clientId, size.cols, size.rows)
+        this.applyIdentityEffect(existing, attachTerminalClient(existing, input.clientId, this.sessionPresence(existing)))
       }
       return await this.attachResult(existing)
     }
@@ -182,7 +184,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       disposables: [],
       render: createEmptyTerminalRenderState(size.cols, size.rows),
       attachments: new Map(),
-      controller: null,
+      controllerClientId: null,
       userSticky: false,
       phase: 'opening',
       message: null,
@@ -202,25 +204,8 @@ export class TerminalSessionManager<TUser extends string | number> {
       id: input.key,
     })
     if (input.clientId) {
-      // The new-session path defaults `clientConnected` to `true`
-      // when undefined, while the existing-session path (line 148)
-      // lets it fall through to `registerTerminalClient`'s own
-      // fallback (which resolves to the existing session's stored
-      // value, defaulting to `false` if unknown). For a brand-new
-      // session there is no existing value to consult, so the `?? true`
-      // here reflects "no prior liveness info; treat as live" — the
-      // same optimistic default the broker uses for the first
-      // `registerSocket`. The asymmetry is intentional, not a bug.
-      registerTerminalClient(session, input.clientId, size.cols, size.rows, input.clientConnected ?? true)
-      // Mirror the existing-session path: route the `attach` through
-      // `applyIdentityEffect` so the returned `emitIdentity` flag
-      // (true for the auto-claim case where the new clientId picks
-      // up a session with no controller) actually broadcasts the realtime
-      // `identity` event to siblings. Without this the session's
-      // controller and `userSticky` flags are set correctly but
-      // sibling windows only learn about the new controller via the
-      // next `sessions-changed` list-rescan.
-      this.applyIdentityEffect(session, attachTerminalClient(session, input.clientId))
+      registerTerminalClient(session, input.clientId, size.cols, size.rows)
+      this.applyIdentityEffect(session, attachTerminalClient(session, input.clientId, this.sessionPresence(session)))
     }
     const result = await this.spawnSessionPty(session)
     if (!result.ok) {
@@ -244,8 +229,8 @@ export class TerminalSessionManager<TUser extends string | number> {
     // Register the attachment first so a brand-new socket can satisfy
     // the unknown-attachment gate, then defer to the shared
     // authority helper so write/resize/restart stay in lockstep.
-    registerTerminalClient(session, clientId, session.cols, session.rows, undefined)
-    if (!isAuthoritative(session, clientId, 'write')) return false
+    registerTerminalClient(session, clientId, session.cols, session.rows)
+    if (!isAuthoritative(session, clientId, 'write', this.sessionPresence(session))) return false
     session.inputQueue.push(data)
     this.scheduleInputFlush(session)
     return true
@@ -257,68 +242,40 @@ export class TerminalSessionManager<TUser extends string | number> {
     cols: number,
     rows: number,
     clientId: string,
-    clientConnected?: boolean,
   ): Promise<TerminalAttachResult> {
     if (!isValidTerminalPtySessionId(ptySessionId)) return { ok: false, message: 'error.invalid-arguments' }
     const size = normalizeTerminalSize(cols, rows)
     if (!size) return { ok: false, message: 'error.invalid-arguments' }
     const session = this.getSession(userId, ptySessionId)
     if (!session) return { ok: false, message: 'error.invalid-arguments' }
-    registerTerminalClient(session, clientId, size.cols, size.rows, clientConnected)
-    this.applyIdentityEffect(session, attachTerminalClient(session, clientId))
+    registerTerminalClient(session, clientId, size.cols, size.rows)
+    this.applyIdentityEffect(session, attachTerminalClient(session, clientId, this.sessionPresence(session)))
     return await this.attachResult(session)
   }
 
-  resizeSession(
-    userId: TUser,
-    ptySessionId: string,
-    cols: number,
-    rows: number,
-    clientId: string,
-    clientConnected?: boolean,
-  ): boolean {
+  resizeSession(userId: TUser, ptySessionId: string, cols: number, rows: number, clientId: string): boolean {
     if (!isValidTerminalPtySessionId(ptySessionId)) return false
     const size = normalizeTerminalSize(cols, rows)
     if (!size) return false
     const session = this.getSession(userId, ptySessionId)
     if (!session) return false
-    registerTerminalClient(session, clientId, size.cols, size.rows, clientConnected)
-    if (!isAuthoritative(session, clientId, 'resize')) return false
+    registerTerminalClient(session, clientId, size.cols, size.rows)
+    if (!isAuthoritative(session, clientId, 'resize', this.sessionPresence(session))) return false
     return this.resizeSessionPty(session, size.cols, size.rows)
   }
 
-  takeoverSession(
-    userId: TUser,
-    ptySessionId: string,
-    cols: number,
-    rows: number,
-    clientId: string,
-    clientConnected?: boolean,
-  ): TerminalTakeoverResult {
+  takeoverSession(userId: TUser, ptySessionId: string, cols: number, rows: number, clientId: string): TerminalTakeoverResult {
     if (!isValidTerminalPtySessionId(ptySessionId)) return { ok: false, message: 'error.invalid-arguments' }
     const size = normalizeTerminalSize(cols, rows)
     if (!size) return { ok: false, message: 'error.invalid-arguments' }
     const session = this.getSession(userId, ptySessionId)
     if (!session) return { ok: false, message: 'error.invalid-arguments' }
-    // Takeover is the only path that may preempt, but it still
-    // requires the caller to be a known attachment. Use the same
-    // authority gate as the other actions for consistency.
-    registerTerminalClient(session, clientId, size.cols, size.rows, clientConnected)
-    if (!isAuthoritative(session, clientId, 'takeover')) {
+    registerTerminalClient(session, clientId, size.cols, size.rows)
+    if (!isAuthoritative(session, clientId, 'takeover', this.sessionPresence(session))) {
       return { ok: false, message: 'error.invalid-arguments' }
     }
-    const effect = claimTerminalClientControl(session, clientId)
+    const effect = claimTerminalClientControl(session, clientId, this.sessionPresence(session))
     this.applyIdentityEffect(session, effect)
-    // Bug D: when the attachment isn't `connected`, the effect
-    // is empty (no resize, no identity event) — the caller is
-    // known but not authoritative yet (the WS hasn't been
-    // observed as alive for this attachment). Surfacing `ok:
-    // true` here would tell the client it became controller
-    // when nothing actually changed; the existing
-    // `takeoverResult()` would still hardcode
-    // `role: 'controller'` and `controllerStatus: 'connected'`,
-    // masking the no-op. Reject with the same key the client
-    // maps to "session lost" so the user can retry.
     if (!effect.emitIdentity && !effect.resizeTo) {
       return { ok: false, message: 'error.unavailable' }
     }
@@ -331,22 +288,19 @@ export class TerminalSessionManager<TUser extends string | number> {
     cols: number,
     rows: number,
     clientId: string,
-    clientConnected?: boolean,
   ): Promise<TerminalAttachResult> {
     if (!isValidTerminalPtySessionId(ptySessionId)) return { ok: false, message: 'error.invalid-arguments' }
     const size = normalizeTerminalSize(cols, rows)
     if (!size) return { ok: false, message: 'error.invalid-arguments' }
     const session = this.getSession(userId, ptySessionId)
     if (!session) return { ok: false, message: 'error.invalid-arguments' }
-    registerTerminalClient(session, clientId, size.cols, size.rows, clientConnected)
-    const denyReason = explainAuthority(session, clientId, 'restart')
+    registerTerminalClient(session, clientId, size.cols, size.rows)
+    const denyReason = explainAuthority(session, clientId, 'restart', this.sessionPresence(session))
     if (denyReason !== null) {
       return { ok: false, message: authorityReasonToMessage(denyReason) }
     }
-    restartTerminalClientControl(session, clientId)
+    restartTerminalClientControl(session, clientId, this.sessionPresence(session))
     this.resetSessionState(session, size.cols, size.rows, 'restarting')
-    // `resetSessionState` itself just called
-    // `markTerminalSessionRestarting` and broadcast the lifecycle event.
     const result = await this.spawnSessionPty(session)
     if (!result.ok) {
       if (markTerminalSessionError(session, result.message)) this.emitLifecycle(session)
@@ -383,10 +337,12 @@ export class TerminalSessionManager<TUser extends string | number> {
     }
   }
 
-  setClientConnected(userId: TUser, clientId: string, connected: boolean): void {
+  handleClientPresenceChanged(userId: TUser, clientId: string, previousOnline: boolean): void {
     for (const session of Array.from(this.sessionsByPtySessionId.values())) {
       if (session.userId !== userId) continue
-      this.applyIdentityEffect(session, updateTerminalClientConnection(session, clientId, connected))
+      if (!session.attachments.has(clientId) && session.controllerClientId !== clientId) continue
+      const previousController = this.effectiveControllerWithOverride(session, clientId, previousOnline)
+      if (terminalIdentityChanged(session, previousController, this.sessionPresence(session))) this.emitIdentity(session)
     }
   }
 
@@ -412,7 +368,7 @@ export class TerminalSessionManager<TUser extends string | number> {
           viewType: 'terminal',
           viewId: session.key,
           cwd: session.cwd,
-          controller: cloneTerminalController(session.controller),
+          controller: this.effectiveController(session),
           processName: session.pty ? this.ptySupervisor.processName(session.pty) : 'terminal',
           canonicalTitle: session.render.title,
           phase: session.phase,
@@ -509,7 +465,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       ptySessionId: session.id,
       role: 'controller',
       controllerStatus: 'connected',
-      controller: cloneTerminalController(session.controller),
+      controller: this.effectiveController(session),
       canonicalCols: session.cols,
       canonicalRows: session.rows,
       phase: session.phase,
@@ -528,7 +484,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       canonicalTitle: session.render.title,
       phase: session.phase,
       message: session.message,
-      controller: cloneTerminalController(session.controller),
+      controller: this.effectiveController(session),
       canonicalCols: session.cols,
       canonicalRows: session.rows,
     }
@@ -538,10 +494,28 @@ export class TerminalSessionManager<TUser extends string | number> {
     return `${String(userId)}\0${key}`
   }
 
+  private sessionPresence(session: TerminalSessionView<TUser>): (clientId: string) => boolean {
+    return (clientId) => this.isClientOnline(session.userId, clientId)
+  }
+
+  private effectiveController(session: TerminalSessionView<TUser>): TerminalController | null {
+    return effectiveTerminalController(session, this.sessionPresence(session))
+  }
+
+  private effectiveControllerWithOverride(
+    session: TerminalSessionView<TUser>,
+    changedClientId: string,
+    changedClientOnline: boolean,
+  ): TerminalController | null {
+    return effectiveTerminalController(session, (clientId) =>
+      clientId === changedClientId ? changedClientOnline : this.isClientOnline(session.userId, clientId),
+    )
+  }
+
   private emitIdentity(session: TerminalSessionView<TUser>): void {
     this.sink.onIdentity?.(session.userId, {
       ptySessionId: session.id,
-      controller: cloneTerminalController(session.controller),
+      controller: this.effectiveController(session),
       canonicalCols: session.cols,
       canonicalRows: session.rows,
     })
@@ -731,9 +705,9 @@ function authorityReasonToMessage(reason: 'not-controller' | 'session-unowned' |
       return 'error.not-controller'
     case 'session-unowned':
       // Unowned sessions must be explicitly taken over before they
-      // can be restarted. The same error key is appropriate: a
-      // different session already "owns" the recovery, even if the
-      // controller role is currently empty.
+      // can be restarted. The same error key is appropriate because
+      // takeover is required before recovery, even if there is
+      // currently no effective controller.
       return 'error.not-controller'
     case 'unknown-client':
       return 'error.invalid-arguments'

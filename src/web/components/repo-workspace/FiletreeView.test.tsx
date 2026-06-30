@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
-import { act, useCallback, useState, type ComponentProps } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import { useCallback, useState, type ComponentProps } from 'react'
+import { act, type RenderResult } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 import type { Key } from 'react-aria-components'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { FiletreeNoWorktreeView, FiletreeView } from '#/web/components/repo-workspace/FiletreeView.tsx'
@@ -23,9 +24,8 @@ vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
   useIsCompactUi: () => compactUi,
 }))
 
-let container: HTMLDivElement | null = null
-let root: Root | null = null
-const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+let container: HTMLElement | null = null
+let renderResult: RenderResult | null = null
 
 type FiletreeViewHarnessProps = Omit<
   ComponentProps<typeof FiletreeView>,
@@ -107,20 +107,15 @@ function filterValidKeys(keys: ReadonlySet<Key>, validKeys: ReadonlySet<string>)
 }
 
 function renderView(props: FiletreeViewHarnessProps) {
-  container = document.createElement('div')
-  document.body.append(container)
-  root = createRoot(container)
-  act(() => {
-    root!.render(<FiletreeViewHarness {...props} />)
-  })
+  renderResult = renderInJsdom(<FiletreeViewHarness {...props} />)
+  container = renderResult.container
 }
 
 function rerenderView(props: FiletreeViewHarnessProps) {
-  root?.render(<FiletreeViewHarness {...props} />)
+  renderResult?.rerender(<FiletreeViewHarness {...props} />)
 }
 
 beforeEach(() => {
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   compactUi = false
   const win = window as typeof window & { PointerEvent?: typeof PointerEvent }
   win.PointerEvent ??= MouseEvent as unknown as typeof PointerEvent
@@ -131,13 +126,8 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  act(() => {
-    root?.unmount()
-  })
-  container?.remove()
-  root = null
+  renderResult = null
   container = null
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
 function row(name: string): HTMLElement {
@@ -189,13 +179,9 @@ describe('FiletreeView', () => {
   })
 
   test('renders the no-worktree placeholder via the dedicated helper', () => {
-    container = document.createElement('div')
-    document.body.append(container)
-    root = createRoot(container)
-    act(() => {
-      root!.render(<FiletreeNoWorktreeView />)
-    })
-    expect(container?.textContent).toMatch(/filetree\.no-worktree/)
+    renderResult = renderInJsdom(<FiletreeNoWorktreeView />)
+    container = renderResult.container
+    expect(container.textContent).toMatch(/filetree\.no-worktree/)
   })
 
   test('renders error state when error is set', () => {

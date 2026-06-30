@@ -30,7 +30,6 @@ interface TerminalRuntimeActionDependencies {
   broker: Pick<TerminalRealtimeBroker, 'broadcastToUser'>
   catalog: TerminalCatalogLike
   isValidTerminalClientId(value: unknown): value is string
-  resolveClientConnected(userId: string, clientId?: string): boolean | undefined
 }
 
 // Manager, broker, and catalog all use `userId` as the terminal
@@ -38,7 +37,7 @@ interface TerminalRuntimeActionDependencies {
 // identifier, but it must not decide session visibility or lifecycle
 // fanout.
 export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependencies) {
-  const { manager, broker, catalog, isValidTerminalClientId, resolveClientConnected } = deps
+  const { manager, broker, catalog, isValidTerminalClientId } = deps
 
   return {
     async attach(clientId: string, userId: string, input: TerminalAttachInput): Promise<TerminalAttachResult> {
@@ -50,14 +49,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         return { ok: false, message: 'error.invalid-arguments' }
       }
       const terminalClientId = input.clientId ?? clientId
-      const result = await manager.attachSession(
-        userId,
-        input.ptySessionId,
-        input.cols,
-        input.rows,
-        terminalClientId,
-        resolveClientConnected(userId, terminalClientId),
-      )
+      const result = await manager.attachSession(userId, input.ptySessionId, input.cols, input.rows, terminalClientId)
       return result
     },
 
@@ -71,14 +63,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         return { ok: false, message: 'error.invalid-arguments' }
       }
       const terminalClientId = input.clientId ?? clientId
-      const result = await manager.restartSession(
-        userId,
-        input.ptySessionId,
-        input.cols,
-        input.rows,
-        terminalClientId,
-        resolveClientConnected(userId, terminalClientId),
-      )
+      const result = await manager.restartSession(userId, input.ptySessionId, input.cols, input.rows, terminalClientId)
       if (repoRoot) broadcastRepoSessionsChanged(userId, repoRoot)
       return result
     },
@@ -106,14 +91,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         return false
       }
       const terminalClientId = input.clientId ?? clientId
-      return manager.resizeSession(
-        userId,
-        input.ptySessionId,
-        input.cols,
-        input.rows,
-        terminalClientId,
-        resolveClientConnected(userId, terminalClientId),
-      )
+      return manager.resizeSession(userId, input.ptySessionId, input.cols, input.rows, terminalClientId)
     },
 
     close(clientId: string, userId: string, input: TerminalSessionInput): TerminalMutationResult {
@@ -151,14 +129,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         return { ok: false, message: 'error.invalid-arguments' }
       }
       const terminalClientId = input.clientId ?? clientId
-      return manager.takeoverSession(
-        userId,
-        input.ptySessionId,
-        input.cols,
-        input.rows,
-        terminalClientId,
-        resolveClientConnected(userId, terminalClientId),
-      )
+      return manager.takeoverSession(userId, input.ptySessionId, input.cols, input.rows, terminalClientId)
     },
 
     async listSessions(clientId: string, userId: string, repoRoot: string): Promise<TerminalSessionSummary[]> {

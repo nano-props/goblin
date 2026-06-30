@@ -145,9 +145,9 @@ export const REPO_PROCEDURE_SCHEMAS = {
     include: v.optional(v.array(v.picklist(['snapshot', 'status', 'pullRequests']))),
     branches: v.optional(StringArray),
     mode: v.optional(v.picklist(['summary', 'full'])),
-    // Per-section timeout in ms; non-integer / non-finite / negative
-    // values are clamped on the server side, so the perimeter only
-    // has to reject non-numbers.
+    // Per-section timeout in ms. The perimeter rejects non-numbers,
+    // non-integers, negative values, and values above 600000; accepted
+    // values are already safe for server-side timeout handling.
     timeoutMs: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(600_000))),
   }),
 } as const

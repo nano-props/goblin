@@ -11,7 +11,7 @@ export interface TerminalRuntimeCoordinatorOptions {
 
 export interface TerminalRuntimeCoordinator {
   broker: TerminalRealtimeBroker
-  connectionState: TerminalDetachedUserTimer
+  shutdown(): void
 }
 
 export function createTerminalRuntimeCoordinator(
@@ -19,10 +19,10 @@ export function createTerminalRuntimeCoordinator(
 ): TerminalRuntimeCoordinator {
   const { manager, terminalSessionOrder, detachedTtlMs } = options
 
-  // The connection-state timers key by userId, not clientId. clientId
-  // is only the per-tab routing id; terminal lifetime is owned by
-  // the access-token-derived userId.
-  const connectionState = new TerminalDetachedUserTimer({
+  // Detached-user timers key by userId, not clientId. clientId is only
+  // the per-tab routing id; terminal lifetime is owned by the
+  // access-token-derived userId.
+  const detachedUsers = new TerminalDetachedUserTimer({
     detachedTtlMs,
     onUserExpired(userId) {
       manager.closeSessionsForUser(userId)
@@ -31,23 +31,26 @@ export function createTerminalRuntimeCoordinator(
   })
 
   const broker = new TerminalRealtimeBroker({
-    onClientConnected(clientId, userId) {
-      connectionState.clearUserDisconnect(userId)
-      manager.setClientConnected(userId, clientId, true)
+    onClientPresenceChanged(event) {
+      if (event.online) detachedUsers.clearUserDetachedTimer(event.userId)
+      else detachedUsers.scheduleUserDetachedTimer(event.userId, () => broker.hasOnlineUserClients(event.userId))
+      manager.handleClientPresenceChanged(event.userId, event.clientId, event.previousOnline)
     },
-    onClientDisconnected(clientId, userId) {
-      // Disconnect is immediate: the controller role clears on
-      // disconnect and the next attach from any sibling attachment
-      // auto-claims (see `terminal-controller.ts`). The detached TTL
-      // is the only timer we still schedule on disconnect — it
-      // covers the "all sockets gone, drop the catalog" path.
-      manager.setClientConnected(userId, clientId, false)
-      connectionState.scheduleUserDisconnect(userId, () => broker.hasUserSockets(userId))
-    },
-    onUserDisconnected(userId) {
-      connectionState.scheduleUserDisconnect(userId, () => broker.hasUserSockets(userId))
+    onUserSocketsDrained(userId) {
+      if (!detachedUsers.hasUserDetachedTimer(userId)) {
+        detachedUsers.scheduleUserDetachedTimer(userId, () => broker.hasOnlineUserClients(userId))
+      }
     },
   })
 
-  return { broker, connectionState }
+  return {
+    broker,
+    shutdown() {
+      // Draining broker sockets can synchronously unregister buffered sockets
+      // and schedule detached-user timers. Stop those timers after the broker
+      // drain so runtime shutdown cannot leave a 24h cleanup timeout behind.
+      broker.disconnectAll()
+      detachedUsers.shutdown()
+    },
+  }
 }

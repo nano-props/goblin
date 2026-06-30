@@ -173,6 +173,10 @@ const TerminalSocketServerMessageSchema = v.variant('type', [
     action: v.picklist(TERMINAL_SOCKET_ACTIONS),
     error: v.string(),
   }),
+  v.object({
+    type: v.literal('pong'),
+    requestId: TerminalRequestIdSchema,
+  }),
 ])
 const TerminalClientMessageSchema = v.variant('type', [
   v.object({
@@ -237,7 +241,10 @@ const TerminalClientMessageSchema = v.variant('type', [
   }),
   v.object({
     type: v.literal('heartbeat'),
-    at: v.number(),
+  }),
+  v.object({
+    type: v.literal('ping'),
+    requestId: TerminalRequestIdSchema,
   }),
 ])
 

@@ -52,20 +52,19 @@ An attachment represents one client attachment to a session.
 It owns:
 
 - attachment identity (`clientId` in the current wire model)
-- connection state
 - last reported geometry
-- recency information needed for reconnect and release policy
+- recency information needed for reconnect and control policy
+
+Online/offline presence remains broker-owned and is queried via `isClientOnline`.
 
 An attachment is not the same thing as the controller.
 
 ### Controller
 
-The controller is the attachment that currently owns write and resize authority.
-
-Controller state should be derived from:
-
-- which attachment currently controls the session
-- whether that attachment is connected (a disconnected controller clears the controller role immediately; the model carries no "grace" sub-state)
+The effective controller is the online attachment that currently owns
+write and resize authority. It is derived from stored controller intent
+plus broker-owned presence. If the intended controller is offline, there
+is no effective controller; the model carries no grace sub-state.
 
 ### View
 
@@ -123,21 +122,15 @@ That leads to ambiguity during restart failure, reconnect races, and delayed cle
 
 ## Target attachment model
 
-The target model should store attachments as a set or map keyed by `clientId`.
+The server stores attachments as a map keyed by `clientId`.
 
-Each attachment should track:
+Each attachment tracks stable metadata such as recent geometry and
+control eligibility. It does not copy online/offline state. Broker
+presence is the single source of truth, and effective control is the
+projection of stored controller intent through that presence.
 
-- connected or disconnected state
-- most recent geometry
-- whether it is eligible for implicit or explicit control transitions
-
-This allows the server to reason about:
-
-- controller attachment
-- viewer attachments
-- reconnect of the same attachment
-- takeover by a different attachment
-- release on disconnect (the controller role clears immediately; control survives via the per-session `userSticky` flag, not via a per-attachment grace timer)
+This lets the server reason about reconnects, takeovers, viewers, and
+offline transitions without a per-attachment grace timer.
 
 ## Control roles as client projection
 
@@ -166,11 +159,14 @@ That keeps the UI simple while keeping the business model accurate.
 - attach may create a viewer
 - attach should not silently override an unrelated active controller
 
-### Disconnect behavior
+### Presence-offline behavior
 
-- disconnect should clear the controller role immediately, not preserve it
-- a subsequent attach from the same user (any attachment) auto-claims when no controller is present, because `userSticky` is sticky per session
-- releasing control should not require the client to guess what happened
+- offline presence should make stored controller intent project to no
+  effective controller immediately, not preserve effective control
+- a subsequent attach from the same user (any attachment) auto-claims when
+  no effective controller is present, because `userSticky` is sticky per
+  session
+- releasing effective control should not require the client to guess what happened
 
 ### Takeover behavior
 

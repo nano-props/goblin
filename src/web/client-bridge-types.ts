@@ -50,8 +50,9 @@ export interface ClientTerminalBridge {
    * T5.1: force-reconnect if the socket is in a non-OPEN state.
    * Used as a recovery hook on `visibilitychange:visible` and
    * `pageshow` (bfcache) so a backgrounded mobile tab reconnects
-   * without waiting for the 300ms backoff. No-op if the socket is
-   * already healthy. Never force-closes a working socket.
+   * without waiting for the 300ms backoff. OPEN sockets are probed
+   * with protocol-level ping/pong and only reconnected if the probe
+   * fails or times out.
    */
   kickReconnect: () => void
   getSessionSnapshot: (input: TerminalSessionSnapshotInput) => Promise<TerminalSessionSnapshot | null>

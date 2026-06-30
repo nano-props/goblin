@@ -172,7 +172,9 @@ Control is a business concept, not just a transport detail.
 
 - Only the controller may drive PTY writes and PTY resize.
 - Attach may result in controller, viewer, or unowned state.
-- On disconnect, the controller role clears immediately; the per-session `userSticky` flag stays set so a subsequent attach from any of the user's attachments auto-claims when no controller is present.
+- Broker presence is the source of attachment online/offline state. An
+  offline controller intent projects to no effective controller, while
+  `userSticky` lets the user's next attachment auto-claim.
 - Takeover should be explicit and confirmed by server-owned control state. See `terminal-takeover.md` for the model.
 
 ### Why this matters
@@ -319,7 +321,7 @@ The terminal system should optimize for continuity, but it still needs clear fai
 ### Expected failures
 
 - PTY spawn failure
-- attachment disconnect
+- attachment presence going offline
 - client teardown while a session remains alive
 - resize or write rejection due to lost control
 - session exit during reconnect or replay
@@ -327,7 +329,11 @@ The terminal system should optimize for continuity, but it still needs clear fai
 ### Design expectations
 
 - Failed create or restart must not leave zombie sessions presented as healthy terminals.
-- Disconnect should not destroy the session itself: a 24h detached TTL keeps the catalog alive so a later attach from the same user can re-enter via auto-claim. The controller role, however, clears on disconnect so siblings can claim it without waiting.
+- Offline presence should not destroy the session itself: a 24h detached
+  TTL keeps the catalog alive so a later attach from the same user can
+  re-enter via auto-claim. The broker may close stale realtime sockets
+  when presence times out, but offline controller intent still projects
+  to no effective controller so siblings can claim without waiting.
 - View destruction should clean up local resources without corrupting session state.
 - Server shutdown should end the runtime cleanly and stop further dispatch.
 

@@ -21,6 +21,9 @@ import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 // derivation helper.
 const USER_1 = 'user_terminal_runtime'
 const USER_2 = 'user_terminal_runtime_second'
+const TEST_NOW = new Date('2026-06-24T00:00:00Z')
+const DETACHED_TTL_MS = 24 * 60 * 60 * 1000
+const HEARTBEAT_SILENCE_MS = HEARTBEAT_DEADLINE_MS + HEARTBEAT_INTERVAL_MS
 
 vi.mock('#/system/git/worktrees.ts', () => ({
   getWorktrees: vi.fn(async () => [{ path: '/repo-linked', branch: 'feature', isBare: false, isPrimary: false }]),
@@ -88,7 +91,7 @@ vi.mock('node-pty', () => ({
 interface RuntimeHandle {
   host: ServerTerminalHost
   shutdown: () => void
-  isClientConnected: (clientId: string) => boolean
+  isClientOnline: (clientId: string) => boolean
 }
 
 function buildRuntime(): RuntimeHandle {
@@ -96,7 +99,7 @@ function buildRuntime(): RuntimeHandle {
   return {
     host: runtime.host,
     shutdown: () => runtime.shutdown(),
-    isClientConnected: (clientId: string) => runtime.host.isClientConnected(USER_1, clientId),
+    isClientOnline: (clientId: string) => runtime.host.isClientOnline(USER_1, clientId),
   }
 }
 
@@ -241,13 +244,12 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
-  test('reattaching after a disconnect auto-reclaims control and canonical geometry', async () => {
+  test('reattaching after presence goes offline auto-reclaims control and canonical geometry', async () => {
     // The previous revision had a 30s grace sub-state that kept the
-    // controller role occupied between disconnect and reconnect. The
-    // current model clears the controller role on disconnect (no grace) and
-    // treats a reconnect as a fresh attach — for a session that has
-    // already been claimed by the user (userSticky=true), the
-    // reattach auto-claims.
+    // controller role occupied between offline and online transitions. The
+    // current model keeps controller intent but derives the effective
+    // controller from broker presence, so a reattach can reclaim with
+    // fresh geometry when no effective controller is present.
     const { host, shutdown } = buildRuntime()
     const socketA = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socketA)
@@ -390,6 +392,22 @@ describe('server terminal runtime', () => {
     expect(host.getDiagnostics().pty.state).toBe('idle')
 
     host.unregisterSocket('client_a', USER_1, socket)
+    shutdown()
+  })
+
+  test('unregisters a buffered socket when raw send fails during broadcast', async () => {
+    const { host, shutdown, isClientOnline } = buildRuntime()
+    const socket = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_a', USER_1, socket)
+    await createTerminalSession(host, 'client_a')
+    socket.send.mockImplementation(() => {
+      throw new Error('socket closed')
+    })
+
+    mockPtys[0]?.emitData('hello')
+
+    expect(host.getDiagnostics().registeredSockets).toBe(0)
+    expect(isClientOnline('client_a')).toBe(false)
     shutdown()
   })
 
@@ -604,9 +622,9 @@ describe('server terminal runtime', () => {
     if (!restarted.ok) return
     expect(restarted.message).toBe('error.not-controller')
 
-    // The session is still owned by attachment_a; a subsequent restart
-    // from the real controller must succeed (here it would fail at
-    // spawn, but only after passing the authority check).
+    // Stored controller intent still points at `client_a`, and `client_a`
+    // is the effective controller; a subsequent restart from that client
+    // must pass the authority check (here it fails later at spawn).
     const { spawn } = await import('node-pty')
     vi.mocked(spawn).mockImplementationOnce(() => {
       throw new Error('pty restart failed')
@@ -921,7 +939,7 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
-  test('cleans up disconnected sessions after the reconnect grace period elapses', async () => {
+  test('cleans up detached user sessions after the detached TTL elapses', async () => {
     vi.useFakeTimers()
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
@@ -938,7 +956,7 @@ describe('server terminal runtime', () => {
     expect(mockPtys).toHaveLength(1)
 
     host.unregisterSocket('client_a', USER_1, socket)
-    await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1000 + 1)
+    await vi.advanceTimersByTimeAsync(DETACHED_TTL_MS + 1)
     await vi.runOnlyPendingTimersAsync()
     await Promise.resolve()
 
@@ -959,12 +977,11 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
-  test('after the controller disconnects, a sibling attachment auto-claims on attach (single-user)', async () => {
-    // Device-switch scenario in the new model: A was the controller
-    // (from create); A's socket closes; B (a different clientId)
-    // attaches. The previous revision refused the auto-claim because
-    // the controller role was still in the 30s grace sub-state. The current
-    // model clears the controller role on disconnect, so B's attach auto-claims.
+  test('after the controller goes offline, a sibling attachment auto-claims on attach (single-user)', async () => {
+    // Device-switch scenario: A was the controller intent (from
+    // create); A's socket closes, so A is no longer the effective
+    // controller. B then attaches and auto-claims without explicit
+    // takeover because no effective controller is present.
     const { host, shutdown } = buildRuntime()
     const socketA = { send: vi.fn(), close: vi.fn() }
     const socketB = { send: vi.fn(), close: vi.fn() }
@@ -986,7 +1003,7 @@ describe('server terminal runtime', () => {
     host.unregisterSocket('client_a', USER_1, socketA)
 
     // B comes online and attaches — no explicit takeover needed
-    // because the controller role was cleared on A's disconnect.
+    // because A is no longer the effective controller.
     host.registerSocket('client_b', USER_1, socketB)
     const viewerAttach = await host.attach('client_a', USER_1, {
       ptySessionId,
@@ -1007,13 +1024,13 @@ describe('server terminal runtime', () => {
   })
 
   test('a late-returning original controller stays a viewer once a sibling has claimed control (no grace restore)', async () => {
-    // The new user-sticky model clears the controller role on
-    // disconnect with no grace period. If a sibling attachment
-    // attaches in the window before the original controller
-    // reconnects, the sibling claims control. When the original
+    // The user-sticky model keeps controller intent but derives
+    // effective control from presence. If a sibling attachment
+    // attaches while the original controller is offline, the sibling
+    // claims control. When the original
     // controller eventually reconnects, it is a viewer — the
     // previous design's grace restore ("same clientId keeps
-    // control after a brief disconnect") does not apply. The
+    // control after briefly going offline") does not apply. The
     // design-doc rule that wins here is "most recent write intent
     // wins" — the sibling's attach is the more recent intent.
     //
@@ -1042,7 +1059,7 @@ describe('server terminal runtime', () => {
     if (!ptySessionId) throw new Error('expected session id')
     mockPtys[0]?.emitData('ready')
 
-    // A disconnects; B attaches and claims the now-empty controller role.
+    // A goes offline; B attaches and claims because no effective controller remains.
     host.unregisterSocket('client_a', USER_1, socketA)
     host.registerSocket('client_b', USER_1, socketB)
     const bAttach = await host.attach('client_a', USER_1, {
@@ -1109,12 +1126,12 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
-  test('disconnecting a viewer leaves the current controller unchanged', async () => {
+  test('viewer presence going offline leaves the current controller unchanged', async () => {
     // The previous revision had a grace sub-state that, on expiry,
-    // would remove the disconnected viewer via `expireAttachment`.
+    // would remove the offline viewer via `expireAttachment`.
     // The current model has no per-attachment grace — only the
     // detached TTL fires (after 24h), which is far longer than the
-    // test. The relevant invariant is that disconnecting a viewer
+    // test. The relevant invariant is that an offline viewer
     // doesn't disturb the controller.
     vi.useFakeTimers()
     const { host, shutdown } = buildRuntime()
@@ -1146,7 +1163,7 @@ describe('server terminal runtime', () => {
 
     host.unregisterSocket('client_b', USER_1, socketB)
     // The detached TTL is 24h — far longer than any grace we used
-    // to have. Run a small tick to flush the socket-disconnect
+    // to have. Run a small tick to flush the socket-offline
     // microtask without firing any timer.
     await Promise.resolve()
 
@@ -1201,6 +1218,21 @@ describe('server terminal runtime', () => {
     expect(host.getDiagnostics().shuttingDown).toBe(false)
     shutdown()
     expect(host.getDiagnostics().shuttingDown).toBe(true)
+  })
+
+  test('shutdown does not leave detached-user timers after closing registered sockets', () => {
+    vi.useFakeTimers()
+    try {
+      const { host, shutdown } = buildRuntime()
+      const socket = { send: vi.fn(), close: vi.fn() }
+      host.registerSocket('client_shutdown', USER_1, socket)
+
+      shutdown()
+
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   test('emits an identity change when a takeover succeeds', async () => {
@@ -1281,84 +1313,230 @@ describe('server terminal runtime', () => {
     }
   })
 
-  test('runtime routes a heartbeat envelope to the broker with the right (userId, clientId, at) triple', async () => {
+  test('runtime routes a heartbeat envelope to the broker with the right (userId, clientId) pair', async () => {
     // Regression guard for the
-    // `broker.recordHeartbeat(clientId, userId, at)` arg-order bug
+    // `broker.recordHeartbeat(clientId, userId)` arg-order bug
     // that the original implementation shipped. The broker keys
     // on `userClientKey(userId, clientId)`, so a swapped call
     // silently misses every live heartbeat — the deadline scan
-    // then prematurely fires `onClientDisconnected` for healthy
+    // then prematurely flips presence offline for healthy
     // controllers. The broker unit tests passed because they
     // call the broker directly with the right order; this test
     // covers the wiring through the runtime's `handleRealtimeMessage`.
     //
     // The assertion is end-to-end: after a real heartbeat has been
     // routed through the runtime, advancing the fake clock past
-    // the original deadline must NOT clear the registered socket
-    // — only a heartbeat routed with the correct (userId, clientId)
-    // order resets the broker's deadline clock.
-    const { host, shutdown, isClientConnected } = buildRuntime()
+    // the original deadline must NOT flip broker presence offline.
+    // The raw socket would remain registered either way; this assertion
+    // is about `isClientOnline`.
+    const { host, shutdown, isClientOnline } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
 
     vi.useFakeTimers()
     try {
-      vi.setSystemTime(new Date('2026-06-24T00:00:00Z'))
+      vi.setSystemTime(TEST_NOW)
 
       // First heartbeat at t=0.
-      host.handleRealtimeMessage('client_a', USER_1, socket, JSON.stringify({ type: 'heartbeat', at: Date.now() }))
+      host.handleRealtimeMessage('client_a', USER_1, socket, JSON.stringify({ type: 'heartbeat' }))
       // Advance just shy of the original deadline.
       vi.advanceTimersByTime(HEARTBEAT_DEADLINE_MS - 1_000)
-      // Heartbeat again — this MUST use the right (userId, clientId, at)
+      // Heartbeat again — this MUST use the right (userId, clientId)
       // order, otherwise the broker's clock never updates and the
-      // very next scan would synthesize a disconnect.
-      host.handleRealtimeMessage('client_a', USER_1, socket, JSON.stringify({ type: 'heartbeat', at: Date.now() }))
+      // very next scan would flip presence offline.
+      host.handleRealtimeMessage('client_a', USER_1, socket, JSON.stringify({ type: 'heartbeat' }))
       // Advance past the original 90 s deadline. A correctly routed
       // heartbeat (a real client sending every 30 s) means the
-      // broker clock is fresh, so the synthetic disconnect must NOT
-      // fire and the registered socket must still be connected.
+      // broker clock is fresh, so presence must remain online.
       vi.advanceTimersByTime(HEARTBEAT_INTERVAL_MS)
-      expect(isClientConnected('client_a')).toBe(true)
+      expect(isClientOnline('client_a')).toBe(true)
     } finally {
       vi.useRealTimers()
       shutdown()
     }
   })
 
-  test('runtime: a silent client (no heartbeats) is synthetically disconnected past the deadline', async () => {
-    // Companion to the previous test: the previous one asserts a
-    // chatty client survives the deadline; this one asserts a
-    // silent client is dropped. End-to-end through the runtime:
-    // `registerSocket` only, no `handleRealtimeMessage` calls,
-    // advance past `HEARTBEAT_DEADLINE_MS + HEARTBEAT_INTERVAL_MS`,
-    // and assert `host.isClientConnected` flips to `false`.
-    //
-    // The fake timers must be installed BEFORE `buildRuntime()`,
-    // because the broker's `setInterval` is created in its
-    // constructor; a real setInterval created before
-    // `vi.useFakeTimers()` is not driven by fake time.
+  test('runtime answers terminal socket health pings with pong', () => {
+    const { host, shutdown } = buildRuntime()
+    const socket = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_a', USER_1, socket)
+
+    host.handleRealtimeMessage('client_a', USER_1, socket, JSON.stringify({ type: 'ping', requestId: 'health_1' }))
+
+    expect(socket.send).toHaveBeenCalledWith(JSON.stringify({ type: 'pong', requestId: 'health_1' }))
+    shutdown()
+  })
+
+  test('runtime health ping refreshes broker presence before the next heartbeat scan', () => {
     vi.useFakeTimers()
-    let host: ReturnType<typeof buildRuntime>['host'] | undefined
     let shutdownFn: (() => void) | undefined
     try {
-      vi.setSystemTime(new Date('2026-06-24T00:00:00Z'))
+      vi.setSystemTime(TEST_NOW)
       const handle = buildRuntime()
-      host = handle.host
+      const { host } = handle
+      shutdownFn = handle.shutdown
+      const socket = { send: vi.fn(), close: vi.fn() }
+      host.registerSocket('client_a', USER_1, socket)
+
+      vi.advanceTimersByTime(1)
+      host.handleRealtimeMessage('client_a', USER_1, socket, JSON.stringify({ type: 'heartbeat' }))
+      vi.advanceTimersByTime(99_999)
+      expect(handle.isClientOnline('client_a')).toBe(true)
+
+      host.handleRealtimeMessage('client_a', USER_1, socket, JSON.stringify({ type: 'ping', requestId: 'health_1' }))
+      vi.advanceTimersByTime(HEARTBEAT_INTERVAL_MS)
+
+      expect(handle.isClientOnline('client_a')).toBe(true)
+      expect(socket.close).not.toHaveBeenCalledWith(1001, 'terminal heartbeat timeout')
+      expect(socket.send).toHaveBeenCalledWith(JSON.stringify({ type: 'pong', requestId: 'health_1' }))
+    } finally {
+      vi.useRealTimers()
+      shutdownFn?.()
+    }
+  })
+
+  test('runtime: controller projection recovers when a long-idle client reconnects', async () => {
+    vi.useFakeTimers()
+    let shutdownFn: (() => void) | undefined
+    try {
+      vi.setSystemTime(TEST_NOW)
+      const handle = buildRuntime()
+      const { host } = handle
+      shutdownFn = handle.shutdown
+      const socket = { send: vi.fn(), close: vi.fn() }
+      host.registerSocket('client_idle', USER_1, socket)
+      const ptySessionId = await createTerminalSession(host, 'client_idle')
+
+      expect(await host.listSessions('client_idle', USER_1, '/repo')).toEqual([
+        expect.objectContaining({
+          ptySessionId,
+          controller: { clientId: 'client_idle', status: 'connected' },
+        }),
+      ])
+
+      vi.advanceTimersByTime(HEARTBEAT_SILENCE_MS)
+      expect(handle.isClientOnline('client_idle')).toBe(false)
+      expect(await host.listSessions('client_idle', USER_1, '/repo')).toEqual([
+        expect.objectContaining({
+          ptySessionId,
+          controller: null,
+        }),
+      ])
+
+      const reconnectedSocket = { send: vi.fn(), close: vi.fn() }
+      host.registerSocket('client_idle', USER_1, reconnectedSocket)
+      expect(handle.isClientOnline('client_idle')).toBe(true)
+      expect(await host.listSessions('client_idle', USER_1, '/repo')).toEqual([
+        expect.objectContaining({
+          ptySessionId,
+          controller: { clientId: 'client_idle', status: 'connected' },
+        }),
+      ])
+    } finally {
+      vi.useRealTimers()
+      shutdownFn?.()
+    }
+  })
+
+  test('runtime: recovered heartbeat cancels detached cleanup after a heartbeat timeout', async () => {
+    vi.useFakeTimers()
+    let shutdownFn: (() => void) | undefined
+    try {
+      vi.setSystemTime(TEST_NOW)
+      const handle = buildRuntime()
+      const { host } = handle
+      shutdownFn = handle.shutdown
+      const socket = { send: vi.fn(), close: vi.fn() }
+      host.registerSocket('client_recovered', USER_1, socket)
+      await createTerminalSession(host, 'client_recovered')
+
+      vi.advanceTimersByTime(HEARTBEAT_SILENCE_MS)
+      expect(handle.isClientOnline('client_recovered')).toBe(false)
+
+      const reconnectedSocket = { send: vi.fn(), close: vi.fn() }
+      host.registerSocket('client_recovered', USER_1, reconnectedSocket)
+      expect(handle.isClientOnline('client_recovered')).toBe(true)
+
+      for (let elapsed = 0; elapsed < DETACHED_TTL_MS + 1; elapsed += HEARTBEAT_INTERVAL_MS) {
+        await vi.advanceTimersByTimeAsync(HEARTBEAT_INTERVAL_MS)
+        host.handleRealtimeMessage('client_recovered', USER_1, reconnectedSocket, JSON.stringify({ type: 'heartbeat' }))
+      }
+      await vi.runOnlyPendingTimersAsync()
+      await expect(host.listSessions('client_recovered', USER_1, '/repo')).resolves.toHaveLength(1)
+    } finally {
+      vi.useRealTimers()
+      shutdownFn?.()
+    }
+  })
+
+  test('runtime: detached TTL cleans up when heartbeat timeout leaves only half-open sockets', async () => {
+    vi.useFakeTimers()
+    let shutdownFn: (() => void) | undefined
+    try {
+      vi.setSystemTime(TEST_NOW)
+      const handle = buildRuntime()
+      const { host } = handle
+      shutdownFn = handle.shutdown
+      const socket = { send: vi.fn(), close: vi.fn() }
+      host.registerSocket('client_half_open', USER_1, socket)
+      await createTerminalSession(host, 'client_half_open')
+
+      vi.advanceTimersByTime(HEARTBEAT_SILENCE_MS)
+      expect(host.getDiagnostics().registeredSockets).toBe(0)
+      expect(handle.isClientOnline('client_half_open')).toBe(false)
+
+      await vi.advanceTimersByTimeAsync(DETACHED_TTL_MS + 1)
+      await vi.runOnlyPendingTimersAsync()
+
+      expect(host.getDiagnostics().liveSessionCount).toBe(0)
+      await expect(host.listSessions('client_half_open', USER_1, '/repo')).resolves.toEqual([])
+    } finally {
+      vi.useRealTimers()
+      shutdownFn?.()
+    }
+  })
+
+  test('runtime: late socket drain does not extend detached TTL after heartbeat timeout', async () => {
+    vi.useFakeTimers()
+    let shutdownFn: (() => void) | undefined
+    try {
+      vi.setSystemTime(TEST_NOW)
+      const handle = buildRuntime()
+      const { host } = handle
+      shutdownFn = handle.shutdown
+      const socket = { send: vi.fn(), close: vi.fn() }
+      host.registerSocket('client_late_drain', USER_1, socket)
+      await createTerminalSession(host, 'client_late_drain')
+
+      vi.advanceTimersByTime(HEARTBEAT_SILENCE_MS)
+      expect(handle.isClientOnline('client_late_drain')).toBe(false)
+
+      await vi.advanceTimersByTimeAsync(DETACHED_TTL_MS - 1_000)
+      host.unregisterSocket('client_late_drain', USER_1, socket)
+      await vi.advanceTimersByTimeAsync(1_001)
+      await vi.runOnlyPendingTimersAsync()
+
+      expect(host.getDiagnostics().liveSessionCount).toBe(0)
+      await expect(host.listSessions('client_late_drain', USER_1, '/repo')).resolves.toEqual([])
+    } finally {
+      vi.useRealTimers()
+      shutdownFn?.()
+    }
+  })
+
+  test('runtime: a silent client (no heartbeats) is marked offline past the deadline', async () => {
+    vi.useFakeTimers()
+    let shutdownFn: (() => void) | undefined
+    try {
+      vi.setSystemTime(TEST_NOW)
+      const handle = buildRuntime()
+      const { host } = handle
       shutdownFn = handle.shutdown
       const socket = { send: vi.fn(), close: vi.fn() }
       host.registerSocket('client_silent', USER_1, socket)
 
-      // `registerSocket` seeds the heartbeat clock to `Date.now()`
-      // (t=0). The broker's own `setInterval` fires every
-      // `HEARTBEAT_INTERVAL_MS` (30 s); the scan at t=120 s sees
-      // the client as stale and fires the synthetic disconnect.
-      vi.advanceTimersByTime(HEARTBEAT_DEADLINE_MS + HEARTBEAT_INTERVAL_MS)
-
-      // The socket is still registered (the OS hasn't closed it),
-      // but the broker clock has aged out, so the host reports
-      // disconnected. This is the new `isClientConnected`
-      // semantics — see `terminal-realtime-broker.ts:143-160`.
-      expect(handle.isClientConnected('client_silent')).toBe(false)
+      vi.advanceTimersByTime(HEARTBEAT_SILENCE_MS)
+      expect(handle.isClientOnline('client_silent')).toBe(false)
     } finally {
       vi.useRealTimers()
       shutdownFn?.()

@@ -1,19 +1,24 @@
 import { describe, expect, test } from 'vitest'
 import type { TerminalControllerState } from '#/server/terminal/terminal-controller.ts'
 import {
-  registerTerminalClient,
   attachTerminalClient,
   claimTerminalClientControl,
-  restartTerminalClientControl,
-  updateTerminalClientConnection,
-  isAuthoritative,
+  effectiveTerminalController,
   explainAuthority,
+  isAuthoritative,
+  registerTerminalClient,
+  restartTerminalClientControl,
+  terminalIdentityChanged,
 } from '#/server/terminal/terminal-controller.ts'
+
+const online = () => true
+const offline = () => false
+const onlineExcept = (offlineClientId: string) => (clientId: string) => clientId !== offlineClientId
 
 function createState(overrides?: Partial<TerminalControllerState>): TerminalControllerState {
   return {
     attachments: new Map(),
-    controller: null,
+    controllerClientId: null,
     userSticky: false,
     cols: 80,
     rows: 24,
@@ -22,360 +27,177 @@ function createState(overrides?: Partial<TerminalControllerState>): TerminalCont
 }
 
 describe('registerTerminalClient', () => {
-  test('registers a new attachment with defaults', () => {
+  test('stores attachment metadata without copying online state', () => {
     const state = createState()
     registerTerminalClient(state, 'a1', 100, 30)
-    expect(state.attachments.get('a1')).toEqual({ cols: 100, rows: 30, connected: false })
-  })
-
-  test('preserves existing connected flag when omitted', () => {
-    const state = createState({ attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]) })
-    registerTerminalClient(state, 'a1', 100, 30)
-    expect(state.attachments.get('a1')?.connected).toBe(true)
-  })
-
-  test('overrides existing connected flag when provided', () => {
-    const state = createState({ attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]) })
-    registerTerminalClient(state, 'a1', 100, 30, false)
-    expect(state.attachments.get('a1')?.connected).toBe(false)
+    expect(state.attachments.get('a1')).toEqual({ cols: 100, rows: 30 })
   })
 
   test('keeps multiple attachments instead of replacing the previous one', () => {
     const state = createState()
-    registerTerminalClient(state, 'a1', 80, 24, true)
-    registerTerminalClient(state, 'a2', 100, 30, false)
-    expect(state.attachments.get('a1')).toEqual({ cols: 80, rows: 24, connected: true })
-    expect(state.attachments.get('a2')).toEqual({ cols: 100, rows: 30, connected: false })
+    registerTerminalClient(state, 'a1', 80, 24)
+    registerTerminalClient(state, 'a2', 100, 30)
+    expect(state.attachments.get('a1')).toEqual({ cols: 80, rows: 24 })
+    expect(state.attachments.get('a2')).toEqual({ cols: 100, rows: 30 })
   })
 })
 
-describe('attachTerminalClient (single-user model)', () => {
-  test('first attach auto-claims and sets userSticky', () => {
-    const state = createState({ attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]) })
-    const effect = attachTerminalClient(state, 'a1')
+describe('effectiveTerminalController', () => {
+  test('projects controller intent only when the controller client is online', () => {
+    const state = createState({
+      attachments: new Map([['a1', { cols: 80, rows: 24 }]]),
+      controllerClientId: 'a1',
+    })
+    expect(effectiveTerminalController(state, online)).toEqual({ clientId: 'a1', status: 'connected' })
+    expect(effectiveTerminalController(state, offline)).toBeNull()
+  })
+
+  test('does not clear controller intent when presence is offline', () => {
+    const state = createState({
+      attachments: new Map([['a1', { cols: 80, rows: 24 }]]),
+      controllerClientId: 'a1',
+    })
+    expect(effectiveTerminalController(state, offline)).toBeNull()
+    expect(state.controllerClientId).toBe('a1')
+  })
+})
+
+describe('attachTerminalClient', () => {
+  test('first online attach auto-claims and sets userSticky', () => {
+    const state = createState({ attachments: new Map([['a1', { cols: 80, rows: 24 }]]) })
+    const effect = attachTerminalClient(state, 'a1', online)
     expect(effect.emitIdentity).toBe(true)
-    expect(state.controller).toEqual({ clientId: 'a1', status: 'connected' })
+    expect(state.controllerClientId).toBe('a1')
     expect(state.userSticky).toBe(true)
   })
 
-  test('rejects when controller already exists on a different attachment', () => {
+  test('rejects when attachment is offline according to presence', () => {
+    const state = createState({ attachments: new Map([['a1', { cols: 80, rows: 24 }]]) })
+    const effect = attachTerminalClient(state, 'a1', offline)
+    expect(effect.emitIdentity).toBe(false)
+    expect(state.controllerClientId).toBeNull()
+  })
+
+  test('online sibling auto-claims when current controller is not effective', () => {
     const state = createState({
       attachments: new Map([
-        ['a1', { cols: 80, rows: 24, connected: true }],
-        ['a2', { cols: 100, rows: 30, connected: true }],
+        ['a1', { cols: 80, rows: 24 }],
+        ['a2', { cols: 100, rows: 30 }],
       ]),
-      controller: { clientId: 'a1', status: 'connected' },
+      controllerClientId: 'a1',
       userSticky: true,
     })
-    const effect = attachTerminalClient(state, 'a2')
+    const effect = attachTerminalClient(state, 'a2', onlineExcept('a1'))
     expect(effect.emitIdentity).toBe(false)
-    expect(state.controller).toEqual({ clientId: 'a1', status: 'connected' })
+    expect(effect.resizeTo).toEqual({ cols: 100, rows: 30 })
+    expect(state.controllerClientId).toBe('a2')
   })
 
-  test('second attach from a different window auto-claims when no controller (device switch)', () => {
+  test('does not preempt an effective different controller', () => {
     const state = createState({
       attachments: new Map([
-        ['a1', { cols: 80, rows: 24, connected: false }],
-        ['a2', { cols: 100, rows: 30, connected: true }],
+        ['a1', { cols: 80, rows: 24 }],
+        ['a2', { cols: 100, rows: 30 }],
       ]),
-      controller: null,
+      controllerClientId: 'a1',
       userSticky: true,
     })
-    const effect = attachTerminalClient(state, 'a2')
-    // The new attachment reports a different geometry, so the
-    // claim goes out as a resize instead of a plain identity emit.
+    const effect = attachTerminalClient(state, 'a2', online)
     expect(effect.emitIdentity).toBe(false)
-    expect(effect.resizeTo).toEqual({ cols: 100, rows: 30 })
-    expect(state.controller).toEqual({ clientId: 'a2', status: 'connected' })
-  })
-
-  test('rejects when attachment is not connected', () => {
-    const state = createState({ attachments: new Map([['a1', { cols: 80, rows: 24, connected: false }]]) })
-    const effect = attachTerminalClient(state, 'a1')
-    expect(effect.emitIdentity).toBe(false)
-    expect(state.controller).toBeNull()
-  })
-
-  test('same attachment that was controller reattaching auto-claims when controller role cleared', () => {
-    // The previous design kept the controller in a 'grace' sub-state
-    // for 30 s so a reattach could restore it without an explicit
-    // takeover. The new design clears the controller role on disconnect
-    // (see updateTerminalClientConnection), so reattaching is
-    // functionally the same as a fresh attach.
-    const state = createState({
-      attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]),
-      controller: null,
-      userSticky: true,
-    })
-    const effect = attachTerminalClient(state, 'a1')
-    expect(effect.emitIdentity).toBe(true)
-    expect(state.controller).toEqual({ clientId: 'a1', status: 'connected' })
-  })
-
-  test('requests resize when reattaching with new geometry', () => {
-    const state = createState({
-      attachments: new Map([['a1', { cols: 100, rows: 30, connected: true }]]),
-      controller: null,
-      userSticky: true,
-      cols: 80,
-      rows: 24,
-    })
-    const effect = attachTerminalClient(state, 'a1')
-    expect(effect.resizeTo).toEqual({ cols: 100, rows: 30 })
-    expect(state.controller).toEqual({ clientId: 'a1', status: 'connected' })
+    expect(state.controllerClientId).toBe('a1')
   })
 })
 
 describe('claimTerminalClientControl', () => {
   test('claims control and emits identity when size matches', () => {
-    const state = createState({ attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]) })
-    const effect = claimTerminalClientControl(state, 'a1')
+    const state = createState({ attachments: new Map([['a1', { cols: 80, rows: 24 }]]) })
+    const effect = claimTerminalClientControl(state, 'a1', online)
     expect(effect.emitIdentity).toBe(true)
-    expect(state.controller).toEqual({ clientId: 'a1', status: 'connected' })
+    expect(state.controllerClientId).toBe('a1')
     expect(state.userSticky).toBe(true)
   })
 
-  test('claims control and requests resize when size differs', () => {
-    const state = createState({ attachments: new Map([['a1', { cols: 100, rows: 30, connected: true }]]) })
-    const effect = claimTerminalClientControl(state, 'a1')
+  test('rejects when presence says the attachment is offline', () => {
+    const state = createState({ attachments: new Map([['a1', { cols: 80, rows: 24 }]]) })
+    const effect = claimTerminalClientControl(state, 'a1', offline)
     expect(effect.emitIdentity).toBe(false)
-    expect(effect.resizeTo).toEqual({ cols: 100, rows: 30 })
-  })
-
-  test('rejects when not connected but preserves attachment record', () => {
-    const state = createState({ attachments: new Map([['a1', { cols: 80, rows: 24, connected: false }]]) })
-    const effect = claimTerminalClientControl(state, 'a1')
-    expect(effect.emitIdentity).toBe(false)
-    expect(state.controller).toBeNull()
-    expect(state.attachments.get('a1')).toEqual({ cols: 80, rows: 24, connected: false })
-  })
-
-  test('rejects when attachment is missing', () => {
-    const state = createState()
-    const effect = claimTerminalClientControl(state, 'a1')
-    expect(effect.emitIdentity).toBe(false)
+    expect(state.controllerClientId).toBeNull()
   })
 })
 
 describe('restartTerminalClientControl', () => {
-  test('restores controller for matching connected attachment', () => {
-    const state = createState({ attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]) })
-    restartTerminalClientControl(state, 'a1')
-    expect(state.controller).toEqual({ clientId: 'a1', status: 'connected' })
+  test('restores controller for matching online attachment', () => {
+    const state = createState({ attachments: new Map([['a1', { cols: 80, rows: 24 }]]) })
+    restartTerminalClientControl(state, 'a1', online)
+    expect(state.controllerClientId).toBe('a1')
     expect(state.userSticky).toBe(true)
   })
 
-  test('clears controller when clientId does not match', () => {
+  test('clears controller intent when attachment is not online', () => {
     const state = createState({
-      attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]),
-      controller: { clientId: 'a1', status: 'connected' },
+      attachments: new Map([['a1', { cols: 80, rows: 24 }]]),
+      controllerClientId: 'a1',
     })
-    restartTerminalClientControl(state, 'a2')
-    expect(state.controller).toBeNull()
-  })
-
-  test('clears controller when attachment is disconnected', () => {
-    const state = createState({
-      attachments: new Map([['a1', { cols: 80, rows: 24, connected: false }]]),
-      controller: { clientId: 'a1', status: 'connected' },
-    })
-    restartTerminalClientControl(state, 'a1')
-    expect(state.controller).toBeNull()
+    restartTerminalClientControl(state, 'a1', offline)
+    expect(state.controllerClientId).toBeNull()
   })
 })
 
-describe('updateTerminalClientConnection', () => {
-  test('no-op when connected state unchanged and controller matches', () => {
+describe('terminalIdentityChanged', () => {
+  test('detects effective controller changes across presence transitions', () => {
     const state = createState({
-      attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]),
-      controller: { clientId: 'a1', status: 'connected' },
+      attachments: new Map([['a1', { cols: 80, rows: 24 }]]),
+      controllerClientId: 'a1',
     })
-    const effect = updateTerminalClientConnection(state, 'a1', true)
-    expect(effect.emitIdentity).toBe(false)
-  })
-
-  test('clears the controller role immediately on disconnect (no grace)', () => {
-    const state = createState({
-      attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]),
-      controller: { clientId: 'a1', status: 'connected' },
-    })
-    const effect = updateTerminalClientConnection(state, 'a1', false)
-    expect(effect.emitIdentity).toBe(true)
-    expect(state.controller).toBeNull()
-    expect(state.attachments.get('a1')?.connected).toBe(false)
-  })
-
-  test('reconnect of a freshly-disconnected controller restores the controller role', () => {
-    const state = createState({
-      attachments: new Map([['a1', { cols: 80, rows: 24, connected: false }]]),
-      controller: null,
-      userSticky: true,
-    })
-    const effect = updateTerminalClientConnection(state, 'a1', true)
-    expect(effect.emitIdentity).toBe(true)
-    expect(state.controller).toEqual({ clientId: 'a1', status: 'connected' })
-  })
-
-  test('auto-claims when a viewer reconnects and no controller is present', () => {
-    const state = createState({
-      attachments: new Map([['a1', { cols: 80, rows: 24, connected: false }]]),
-      controller: null,
-      userSticky: true,
-    })
-    const effect = updateTerminalClientConnection(state, 'a1', true)
-    expect(effect.emitIdentity).toBe(true)
-    expect(state.controller).toEqual({ clientId: 'a1', status: 'connected' })
-  })
-
-  test('does not auto-claim a viewer reconnect when the session has never been claimed', () => {
-    const state = createState({
-      attachments: new Map([['a1', { cols: 80, rows: 24, connected: false }]]),
-      controller: null,
-      userSticky: false,
-    })
-    const effect = updateTerminalClientConnection(state, 'a1', true)
-    expect(effect.emitIdentity).toBe(false)
-    expect(state.controller).toBeNull()
-  })
-
-  test('preserves disconnected viewer attachment state', () => {
-    const state = createState({
-      attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]),
-      controller: null,
-      userSticky: false,
-    })
-    const effect = updateTerminalClientConnection(state, 'a1', false)
-    expect(effect.emitIdentity).toBe(false)
-    expect(state.attachments.get('a1')).toEqual({ cols: 80, rows: 24, connected: false })
-  })
-
-  test('ignores update for non-matching clientId', () => {
-    const state = createState({ attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]) })
-    const effect = updateTerminalClientConnection(state, 'a2', false)
-    expect(effect.emitIdentity).toBe(false)
-    expect(state.attachments.get('a1')?.connected).toBe(true)
-  })
-
-  test('disconnecting a viewer does not disturb a different controller', () => {
-    const state = createState({
-      attachments: new Map([
-        ['a1', { cols: 80, rows: 24, connected: true }],
-        ['a2', { cols: 100, rows: 30, connected: true }],
-      ]),
-      controller: { clientId: 'a1', status: 'connected' },
-    })
-    const effect = updateTerminalClientConnection(state, 'a2', false)
-    expect(effect.emitIdentity).toBe(false)
-    expect(state.controller).toEqual({ clientId: 'a1', status: 'connected' })
-    expect(state.attachments.get('a2')).toEqual({ cols: 100, rows: 30, connected: false })
-  })
-
-  test('disconnecting the controller hands control to a reconnecting sibling', () => {
-    // Device-switch simulation: A controls; A disconnects; B
-    // reconnects (or first connects) and becomes the new controller.
-    const state = createState({
-      attachments: new Map([
-        ['a1', { cols: 80, rows: 24, connected: true }],
-        ['a2', { cols: 100, rows: 30, connected: false }],
-      ]),
-      controller: { clientId: 'a1', status: 'connected' },
-      userSticky: true,
-    })
-    updateTerminalClientConnection(state, 'a1', false)
-    expect(state.controller).toBeNull()
-    const effect = updateTerminalClientConnection(state, 'a2', true)
-    // B reports a different geometry, so the claim goes out as a
-    // resize instead of a plain identity emit.
-    expect(effect.emitIdentity).toBe(false)
-    expect(effect.resizeTo).toEqual({ cols: 100, rows: 30 })
-    expect(state.controller).toEqual({ clientId: 'a2', status: 'connected' })
+    expect(terminalIdentityChanged(state, null, online)).toBe(true)
+    expect(terminalIdentityChanged(state, { clientId: 'a1', status: 'connected' }, online)).toBe(false)
+    expect(terminalIdentityChanged(state, { clientId: 'a1', status: 'connected' }, offline)).toBe(true)
   })
 })
 
 describe('isAuthoritative', () => {
-  test('allows the controller to write, resize, and restart', () => {
+  test('allows the effective controller to write, resize, and restart', () => {
     const state = createState({
-      attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]),
-      controller: { clientId: 'a1', status: 'connected' },
+      attachments: new Map([['a1', { cols: 80, rows: 24 }]]),
+      controllerClientId: 'a1',
     })
-    expect(isAuthoritative(state, 'a1', 'write')).toBe(true)
-    expect(isAuthoritative(state, 'a1', 'resize')).toBe(true)
-    expect(isAuthoritative(state, 'a1', 'restart')).toBe(true)
+    expect(isAuthoritative(state, 'a1', 'write', online)).toBe(true)
+    expect(isAuthoritative(state, 'a1', 'resize', online)).toBe(true)
+    expect(isAuthoritative(state, 'a1', 'restart', online)).toBe(true)
   })
 
-  test('allows takeover for any registered attachment, even a non-controller', () => {
+  test('denies write when controller intent is offline', () => {
     const state = createState({
-      attachments: new Map([
-        ['a1', { cols: 80, rows: 24, connected: true }],
-        ['a2', { cols: 80, rows: 24, connected: true }],
-      ]),
-      controller: { clientId: 'a1', status: 'connected' },
+      attachments: new Map([['a1', { cols: 80, rows: 24 }]]),
+      controllerClientId: 'a1',
     })
-    expect(isAuthoritative(state, 'a2', 'takeover')).toBe(true)
+    expect(isAuthoritative(state, 'a1', 'write', offline)).toBe(false)
   })
 
-  test('denies write / resize / restart from a non-controller viewer', () => {
-    const state = createState({
-      attachments: new Map([
-        ['a1', { cols: 80, rows: 24, connected: true }],
-        ['a2', { cols: 80, rows: 24, connected: true }],
-      ]),
-      controller: { clientId: 'a1', status: 'connected' },
-    })
-    expect(isAuthoritative(state, 'a2', 'write')).toBe(false)
-    expect(isAuthoritative(state, 'a2', 'resize')).toBe(false)
-    expect(isAuthoritative(state, 'a2', 'restart')).toBe(false)
-  })
-
-  test('denies write / resize / restart when the session is unowned', () => {
-    const state = createState({
-      attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]),
-    })
-    expect(isAuthoritative(state, 'a1', 'write')).toBe(false)
-    expect(isAuthoritative(state, 'a1', 'resize')).toBe(false)
-    expect(isAuthoritative(state, 'a1', 'restart')).toBe(false)
-  })
-
-  test('denies all actions for an unknown attachment', () => {
-    const state = createState({
-      attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]),
-      controller: { clientId: 'a1', status: 'connected' },
-    })
-    expect(isAuthoritative(state, 'a-unknown', 'write')).toBe(false)
-    expect(isAuthoritative(state, 'a-unknown', 'resize')).toBe(false)
-    expect(isAuthoritative(state, 'a-unknown', 'restart')).toBe(false)
-    expect(isAuthoritative(state, 'a-unknown', 'takeover')).toBe(false)
+  test('allows takeover for any registered attachment', () => {
+    const state = createState({ attachments: new Map([['a1', { cols: 80, rows: 24 }]]) })
+    expect(isAuthoritative(state, 'a1', 'takeover', offline)).toBe(true)
   })
 })
 
 describe('explainAuthority', () => {
-  test('returns null when the action is allowed', () => {
-    const state = createState({
-      attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]),
-      controller: { clientId: 'a1', status: 'connected' },
-    })
-    expect(explainAuthority(state, 'a1', 'write')).toBeNull()
-  })
-
-  test('returns the deny reason for diagnostic consumers', () => {
+  test('returns deny reasons for diagnostic consumers', () => {
     const viewerState = createState({
       attachments: new Map([
-        ['a1', { cols: 80, rows: 24, connected: true }],
-        ['a2', { cols: 80, rows: 24, connected: true }],
+        ['a1', { cols: 80, rows: 24 }],
+        ['a2', { cols: 80, rows: 24 }],
       ]),
-      controller: { clientId: 'a1', status: 'connected' },
+      controllerClientId: 'a1',
     })
-    expect(explainAuthority(viewerState, 'a2', 'write')).toBe('not-controller')
+    expect(explainAuthority(viewerState, 'a2', 'write', online)).toBe('not-controller')
 
-    const unownedState = createState({
-      attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]),
-    })
-    expect(explainAuthority(unownedState, 'a1', 'write')).toBe('session-unowned')
+    const unownedState = createState({ attachments: new Map([['a1', { cols: 80, rows: 24 }]]) })
+    expect(explainAuthority(unownedState, 'a1', 'write', online)).toBe('session-unowned')
 
     const unknownState = createState({
-      attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]),
-      controller: { clientId: 'a1', status: 'connected' },
+      attachments: new Map([['a1', { cols: 80, rows: 24 }]]),
+      controllerClientId: 'a1',
     })
-    expect(explainAuthority(unknownState, 'a-unknown', 'write')).toBe('unknown-client')
+    expect(explainAuthority(unknownState, 'a-unknown', 'write', online)).toBe('unknown-client')
   })
 })

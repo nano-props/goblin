@@ -99,7 +99,9 @@ export type TerminalSocketResponseMessage =
       }
     }[TerminalSocketRequestAction]
 
-export type TerminalSocketServerMessage = TerminalRealtimeMessage | TerminalSocketResponseMessage
+export type TerminalHealthPongMessage = { type: 'pong'; requestId: string }
+
+export type TerminalSocketServerMessage = TerminalRealtimeMessage | TerminalSocketResponseMessage | TerminalHealthPongMessage
 /**
  * Heartbeat envelope. Sent client→server every
  * `HEARTBEAT_INTERVAL_MS` while the realtime socket is `OPEN`. Carries
@@ -108,12 +110,12 @@ export type TerminalSocketServerMessage = TerminalRealtimeMessage | TerminalSock
  * the existing `normalizeTerminalClientMessage` path rejects anything
  * malformed at the WS layer. The server uses the receipt time to drive
  * the broker's per-`clientId` liveness timer; a missed beat
- * (longer than `HEARTBEAT_DEADLINE_MS`) fires a synthetic
- * `onClientDisconnected` so the next `attach` can auto-claim instead
- * of being stranded in viewer mode.
+ * (longer than `HEARTBEAT_DEADLINE_MS`) flips broker presence
+ * offline so the next `attach` can auto-claim instead of being
+ * stranded in viewer mode.
  */
 export interface TerminalHeartbeatMessage {
   type: 'heartbeat'
-  at: number
 }
-export type TerminalClientMessage = TerminalSocketRequestMessage | TerminalHeartbeatMessage
+export type TerminalHealthPingMessage = { type: 'ping'; requestId: string }
+export type TerminalClientMessage = TerminalSocketRequestMessage | TerminalHeartbeatMessage | TerminalHealthPingMessage

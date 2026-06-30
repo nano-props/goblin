@@ -5,7 +5,7 @@ import { createTerminalBellState } from '#/web/components/terminal/terminal-bell
 import { createTerminalActivityState } from '#/web/components/terminal/terminal-activity-state.ts'
 import { parseWorktreeKey, worktreeTerminalKey } from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
 import { terminalBridge } from '#/web/terminal.ts'
-import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-bridge.ts'
+import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
 import type {
   TerminalSessionSnapshot,
   TerminalSessionSummary as ServerTerminalSessionSummary,

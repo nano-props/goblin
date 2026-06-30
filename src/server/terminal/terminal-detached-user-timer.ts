@@ -1,6 +1,6 @@
 interface TerminalDetachedUserTimerOptions {
   /**
-   * Time after the user's last socket disconnects before the
+   * Time after the user has no online terminal clients before the
    * server-side sessions owned by that user are torn down entirely
    * (PTY exit, view-order purge). This is unrelated to terminal
    * controller grace — by the time it fires the controller is presumed to
@@ -21,40 +21,44 @@ interface UserTimerEntry {
 /**
  * Tracks the per-user detached TTL. The previous revision also
  * managed a per-attachment controller grace timer (30 s after a
- * controller's socket dropped) — that timer has been removed: the
- * server now clears the controller role on disconnect and the next
- * attach auto-claims (see `terminal-controller.ts`).
+ * controller's socket dropped) — that timer has been removed:
+ * broker presence now determines whether a stored controller intent
+ * is effective, and the next attach can auto-claim when none is.
  */
 export class TerminalDetachedUserTimer {
   private readonly options: TerminalDetachedUserTimerOptions
-  private readonly disconnectTimerByUserId = new Map<string, UserTimerEntry>()
+  private readonly detachedTimerByUserId = new Map<string, UserTimerEntry>()
 
   constructor(options: TerminalDetachedUserTimerOptions) {
     this.options = options
   }
 
-  clearUserDisconnect(userId: string): void {
-    const entry = this.disconnectTimerByUserId.get(userId)
+  clearUserDetachedTimer(userId: string): void {
+    const entry = this.detachedTimerByUserId.get(userId)
     if (!entry) return
     clearTimeout(entry.timer)
-    this.disconnectTimerByUserId.delete(userId)
+    this.detachedTimerByUserId.delete(userId)
   }
 
-  scheduleUserDisconnect(userId: string, hasSockets: () => boolean): void {
-    this.clearUserDisconnect(userId)
+  hasUserDetachedTimer(userId: string): boolean {
+    return this.detachedTimerByUserId.has(userId)
+  }
+
+  scheduleUserDetachedTimer(userId: string, hasOnlineClients: () => boolean): void {
+    this.clearUserDetachedTimer(userId)
     const entry: UserTimerEntry = {
       userId,
       timer: setTimeout(() => {
-        this.disconnectTimerByUserId.delete(userId)
-        if (hasSockets()) return
+        this.detachedTimerByUserId.delete(userId)
+        if (hasOnlineClients()) return
         this.options.onUserExpired(userId)
       }, this.options.detachedTtlMs),
     }
-    this.disconnectTimerByUserId.set(userId, entry)
+    this.detachedTimerByUserId.set(userId, entry)
   }
 
   shutdown(): void {
-    for (const entry of this.disconnectTimerByUserId.values()) clearTimeout(entry.timer)
-    this.disconnectTimerByUserId.clear()
+    for (const entry of this.detachedTimerByUserId.values()) clearTimeout(entry.timer)
+    this.detachedTimerByUserId.clear()
   }
 }

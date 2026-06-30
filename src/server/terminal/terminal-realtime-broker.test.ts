@@ -3,18 +3,28 @@ import {
   HEARTBEAT_DEADLINE_MS,
   HEARTBEAT_INTERVAL_MS,
   TerminalRealtimeBroker,
+  type TerminalClientPresenceChange,
 } from '#/server/terminal/terminal-realtime-broker.ts'
+import { BufferedTerminalSocket } from '#/server/terminal/buffered-terminal-socket.ts'
 
 const USER_A = 'user_a'
 const USER_B = 'user_b'
+const TEST_NOW = new Date('2026-06-24T00:00:00Z')
+const HEARTBEAT_SILENCE_MS = HEARTBEAT_DEADLINE_MS + HEARTBEAT_INTERVAL_MS
+
+function createBroker(options: {
+  onClientPresenceChanged?: (event: TerminalClientPresenceChange) => void
+  onUserSocketsDrained?: (userId: string) => void
+} = {}): TerminalRealtimeBroker {
+  return new TerminalRealtimeBroker({
+    onClientPresenceChanged: options.onClientPresenceChanged ?? vi.fn(),
+    onUserSocketsDrained: options.onUserSocketsDrained ?? vi.fn(),
+  })
+}
 
 describe('terminal realtime broker', () => {
-  test('disconnectAll closes registered sockets and clears connection state', () => {
-    const broker = new TerminalRealtimeBroker({
-      onClientConnected: vi.fn(),
-      onClientDisconnected: vi.fn(),
-      onUserDisconnected: vi.fn(),
-    })
+  test('disconnectAll closes registered sockets and clears presence state', () => {
+    const broker = createBroker()
     const first = { send: vi.fn(), close: vi.fn() }
     const second = { send: vi.fn(), close: vi.fn() }
 
@@ -25,21 +35,27 @@ describe('terminal realtime broker', () => {
     expect(first.close).toHaveBeenCalledWith(1001, 'server shutting down')
     expect(second.close).toHaveBeenCalledWith(1001, 'server shutting down')
     expect(broker.hasUserSockets(USER_A)).toBe(false)
-    expect(broker.isClientConnected(USER_A, 'client_a')).toBe(false)
-    expect(broker.isClientConnected(USER_A, 'client_b')).toBe(false)
+    expect(broker.isClientOnline(USER_A, 'client_1_a')).toBe(false)
+    expect(broker.isClientOnline(USER_A, 'client_1_b')).toBe(false)
+  })
+
+  test('disconnectAll force-closes paused buffered sockets', () => {
+    const broker = createBroker()
+    const rawSocket = { send: vi.fn(), close: vi.fn() }
+    const bufferedSocket = new BufferedTerminalSocket(rawSocket)
+    bufferedSocket.pause()
+    broker.registerSocket('client_1_a', USER_A, bufferedSocket)
+
+    broker.disconnectAll()
+
+    expect(rawSocket.close).toHaveBeenCalledWith(1001, 'server shutting down')
+    expect(broker.hasUserSockets(USER_A)).toBe(false)
   })
 
   test('broadcastToUser fans out to every clientId sharing the same userId', () => {
-    const broker = new TerminalRealtimeBroker({
-      onClientConnected: vi.fn(),
-      onClientDisconnected: vi.fn(),
-      onUserDisconnected: vi.fn(),
-    })
+    const broker = createBroker()
     const electronSocket = { send: vi.fn(), close: vi.fn() }
     const chromeSocket = { send: vi.fn(), close: vi.fn() }
-    // Two clientIds (Electron and Chrome on the same host share the
-    // same access token → same userId) registered as separate WS
-    // sockets.
     broker.registerSocket('client_electron_a', USER_A, electronSocket)
     broker.registerSocket('client_chrome_b', USER_A, chromeSocket)
 
@@ -48,30 +64,18 @@ describe('terminal realtime broker', () => {
       event: { ptySessionId: 's_1', data: 'hi', seq: 1, processName: 'zsh' },
     })
 
-    // Both sockets receive the same payload — that is the
-    // cross-browser identity fix: Chrome sees the live output
-    // produced by the Electron-attached PTY without an attach
-    // roundtrip.
     expect(electronSocket.send).toHaveBeenCalledTimes(1)
     expect(chromeSocket.send).toHaveBeenCalledTimes(1)
-    const electronPayload = String(electronSocket.send.mock.calls[0]?.[0])
-    const chromePayload = String(chromeSocket.send.mock.calls[0]?.[0])
-    expect(electronPayload).toBe(chromePayload)
-    expect(JSON.parse(electronPayload)).toMatchObject({
+    const payload = String(electronSocket.send.mock.calls[0]?.[0])
+    expect(String(chromeSocket.send.mock.calls[0]?.[0])).toBe(payload)
+    expect(JSON.parse(payload)).toMatchObject({
       type: 'output',
-      event: { data: 'hi', seq: 1 },
+      event: { ptySessionId: 's_1', data: 'hi', seq: 1, processName: 'zsh' },
     })
   })
 
   test('broadcastToUser does not leak across userIds', () => {
-    // Two different access tokens must never see each other's
-    // fanout. Socket storage is user-keyed; cross-user messages
-    // stay isolated.
-    const broker = new TerminalRealtimeBroker({
-      onClientConnected: vi.fn(),
-      onClientDisconnected: vi.fn(),
-      onUserDisconnected: vi.fn(),
-    })
+    const broker = createBroker()
     const userASocket = { send: vi.fn(), close: vi.fn() }
     const userBSocket = { send: vi.fn(), close: vi.fn() }
     broker.registerSocket('client_a_a', USER_A, userASocket)
@@ -87,15 +91,11 @@ describe('terminal realtime broker', () => {
   })
 
   test('broadcastToUser isolates users even when clientId is reused', () => {
-    const broker = new TerminalRealtimeBroker({
-      onClientConnected: vi.fn(),
-      onClientDisconnected: vi.fn(),
-      onUserDisconnected: vi.fn(),
-    })
+    const broker = createBroker()
     const userASocket = { send: vi.fn(), close: vi.fn() }
     const userBSocket = { send: vi.fn(), close: vi.fn() }
-    broker.registerSocket('client_shared_a', USER_A, userASocket)
-    broker.registerSocket('client_shared_b', USER_B, userBSocket)
+    broker.registerSocket('client_shared', USER_A, userASocket)
+    broker.registerSocket('client_shared', USER_B, userBSocket)
 
     broker.broadcastToUser(USER_A, {
       type: 'output',
@@ -104,26 +104,16 @@ describe('terminal realtime broker', () => {
 
     expect(userASocket.send).toHaveBeenCalledTimes(1)
     expect(userBSocket.send).not.toHaveBeenCalled()
-    expect(broker.isClientConnected(USER_A, 'client_shared_a')).toBe(true)
-    expect(broker.isClientConnected(USER_B, 'client_shared_b')).toBe(true)
-    expect(broker.isClientConnected(USER_A, 'client_shared_b')).toBe(false)
+    expect(broker.isClientOnline(USER_A, 'client_shared')).toBe(true)
+    expect(broker.isClientOnline(USER_B, 'client_shared')).toBe(true)
   })
 
   test('unregisterSocket removes the socket from user fanout', () => {
-    const broker = new TerminalRealtimeBroker({
-      onClientConnected: vi.fn(),
-      onClientDisconnected: vi.fn(),
-      onUserDisconnected: vi.fn(),
-    })
+    const broker = createBroker()
     const socket = { send: vi.fn(), close: vi.fn() }
     broker.registerSocket('client_1_a', USER_A, socket)
     broker.unregisterSocket(socket)
 
-    // After the last socket for `client_1` is gone, a
-    // `broadcastToUser` for USER_A must not attempt to send to
-    // the now-empty user set. We assert the side effect by
-    // checking the WS was not closed and the broadcast is a no-op.
-    expect(socket.close).not.toHaveBeenCalled()
     broker.broadcastToUser(USER_A, {
       type: 'output',
       event: { ptySessionId: 's_1', data: 'a', seq: 1, processName: 'zsh' },
@@ -132,154 +122,178 @@ describe('terminal realtime broker', () => {
   })
 
   test('registerSocket replaces stale metadata when the same socket is registered again', () => {
-    const broker = new TerminalRealtimeBroker({
-      onClientConnected: vi.fn(),
-      onClientDisconnected: vi.fn(),
-      onUserDisconnected: vi.fn(),
-    })
+    const broker = createBroker()
     const socket = { send: vi.fn(), close: vi.fn() }
     broker.registerSocket('client_a_a', USER_A, socket)
     broker.registerSocket('client_b_b', USER_B, socket)
 
-    expect(broker.isClientConnected(USER_A, 'client_a_a')).toBe(false)
-    expect(broker.isClientConnected(USER_B, 'client_b_b')).toBe(true)
+    expect(broker.isClientOnline(USER_A, 'client_a_a')).toBe(false)
+    expect(broker.isClientOnline(USER_B, 'client_b_b')).toBe(true)
+  })
 
-    broker.broadcastToUser(USER_A, {
-      type: 'output',
-      event: { ptySessionId: 's_1', data: 'a', seq: 1, processName: 'zsh' },
-    })
-    broker.broadcastToUser(USER_B, {
-      type: 'output',
-      event: { ptySessionId: 's_1', data: 'b', seq: 2, processName: 'zsh' },
-    })
+  test('multiple sockets for the same clientId share one presence record', () => {
+    const onClientPresenceChanged = vi.fn()
+    const broker = createBroker({ onClientPresenceChanged })
+    const first = { send: vi.fn(), close: vi.fn() }
+    const second = { send: vi.fn(), close: vi.fn() }
 
-    expect(socket.send).toHaveBeenCalledTimes(1)
-    expect(JSON.parse(String(socket.send.mock.calls[0]?.[0]))).toMatchObject({
-      event: { data: 'b', seq: 2 },
+    broker.registerSocket('client_1_a', USER_A, first)
+    broker.registerSocket('client_1_a', USER_A, second)
+    broker.unregisterSocket(first)
+
+    expect(broker.isClientOnline(USER_A, 'client_1_a')).toBe(true)
+    expect(onClientPresenceChanged).toHaveBeenCalledTimes(1)
+
+    broker.unregisterSocket(second)
+
+    expect(broker.isClientOnline(USER_A, 'client_1_a')).toBe(false)
+    expect(onClientPresenceChanged).toHaveBeenNthCalledWith(2, {
+      clientId: 'client_1_a',
+      userId: USER_A,
+      previousOnline: true,
+      online: false,
     })
   })
 
-  test('onClientConnected receives the userId from registerSocket', () => {
-    const onClientConnected = vi.fn()
-    const broker = new TerminalRealtimeBroker({
-      onClientConnected,
-      onClientDisconnected: vi.fn(),
-      onUserDisconnected: vi.fn(),
-    })
+  test('register and unregister emit presence transitions', () => {
+    const onClientPresenceChanged = vi.fn()
+    const broker = createBroker({ onClientPresenceChanged })
     const socket = { send: vi.fn(), close: vi.fn() }
+
     broker.registerSocket('client_1_a', USER_A, socket)
-    expect(onClientConnected).toHaveBeenCalledWith('client_1_a', USER_A)
+    broker.unregisterSocket(socket)
+
+    expect(onClientPresenceChanged).toHaveBeenNthCalledWith(1, {
+      clientId: 'client_1_a',
+      userId: USER_A,
+      previousOnline: false,
+      online: true,
+    })
+    expect(onClientPresenceChanged).toHaveBeenNthCalledWith(2, {
+      clientId: 'client_1_a',
+      userId: USER_A,
+      previousOnline: true,
+      online: false,
+    })
   })
 
-  test('onUserDisconnected waits for the last socket under that user', () => {
-    const onUserDisconnected = vi.fn()
-    const broker = new TerminalRealtimeBroker({
-      onClientConnected: vi.fn(),
-      onClientDisconnected: vi.fn(),
-      onUserDisconnected,
-    })
+  test('onUserSocketsDrained waits for the last socket under that user', () => {
+    const onUserSocketsDrained = vi.fn()
+    const broker = createBroker({ onUserSocketsDrained })
     const first = { send: vi.fn(), close: vi.fn() }
     const second = { send: vi.fn(), close: vi.fn() }
     broker.registerSocket('client_1_a', USER_A, first)
     broker.registerSocket('client_2_b', USER_A, second)
 
     broker.unregisterSocket(first)
-    expect(onUserDisconnected).not.toHaveBeenCalled()
+    expect(onUserSocketsDrained).not.toHaveBeenCalled()
 
     broker.unregisterSocket(second)
-    expect(onUserDisconnected).toHaveBeenCalledWith(USER_A)
+    expect(onUserSocketsDrained).toHaveBeenCalledWith(USER_A)
   })
 })
 
-describe('terminal realtime broker heartbeat', () => {
+describe('terminal realtime broker heartbeat presence', () => {
   beforeEach(() => {
     vi.useFakeTimers()
-    // Pin the wall clock so `recordHeartbeat`'s `at` and the
-    // deadline scan's `Date.now()` agree. Without this, a heartbeat
-    // recorded at the boundary between two real `Date.now()` ticks
-    // could land on the wrong side of the deadline assertion.
-    vi.setSystemTime(new Date('2026-06-24T00:00:00Z'))
+    vi.setSystemTime(TEST_NOW)
   })
   afterEach(() => {
     vi.useRealTimers()
   })
 
-  test('fired deadline fires synthetic onClientDisconnected for silent (userId, clientId)', () => {
-    const onClientDisconnected = vi.fn()
-    const broker = new TerminalRealtimeBroker({
-      onClientConnected: vi.fn(),
-      onClientDisconnected,
-      onUserDisconnected: vi.fn(),
-    })
+  test('heartbeat deadline closes and unregisters a silent client socket', () => {
+    const onClientPresenceChanged = vi.fn()
+    const broker = createBroker({ onClientPresenceChanged })
     const socket = { send: vi.fn(), close: vi.fn() }
     broker.registerSocket('client_a_1', USER_A, socket)
 
-    // Advance past the deadline without a heartbeat in between.
-    vi.advanceTimersByTime(HEARTBEAT_DEADLINE_MS + HEARTBEAT_INTERVAL_MS)
+    vi.advanceTimersByTime(HEARTBEAT_SILENCE_MS)
 
-    expect(onClientDisconnected).toHaveBeenCalledWith('client_a_1', USER_A)
+    expect(socket.close).toHaveBeenCalledWith(1001, 'terminal heartbeat timeout')
+    expect(broker.hasUserSockets(USER_A)).toBe(false)
+    expect(broker.isClientOnline(USER_A, 'client_a_1')).toBe(false)
+    expect(onClientPresenceChanged).toHaveBeenLastCalledWith({
+      clientId: 'client_a_1',
+      userId: USER_A,
+      previousOnline: true,
+      online: false,
+    })
     broker.disconnectAll()
   })
 
-  test('recordHeartbeat resets the deadline so a chatty client is never disconnected', () => {
-    const onClientDisconnected = vi.fn()
-    const broker = new TerminalRealtimeBroker({
-      onClientConnected: vi.fn(),
-      onClientDisconnected,
-      onUserDisconnected: vi.fn(),
+  test('registering after heartbeat eviction recovers presence for the same clientId', () => {
+    const onClientPresenceChanged = vi.fn()
+    const broker = createBroker({ onClientPresenceChanged })
+    const staleSocket = { send: vi.fn(), close: vi.fn() }
+    const freshSocket = { send: vi.fn(), close: vi.fn() }
+    broker.registerSocket('client_a_1', USER_A, staleSocket)
+    vi.advanceTimersByTime(HEARTBEAT_SILENCE_MS)
+    onClientPresenceChanged.mockClear()
+
+    broker.registerSocket('client_a_1', USER_A, freshSocket)
+
+    expect(broker.isClientOnline(USER_A, 'client_a_1')).toBe(true)
+    expect(onClientPresenceChanged).toHaveBeenCalledWith({
+      clientId: 'client_a_1',
+      userId: USER_A,
+      previousOnline: false,
+      online: true,
     })
+    broker.disconnectAll()
+  })
+
+  test('heartbeat deadline force-closes a paused buffered socket', () => {
+    const broker = createBroker()
+    const rawSocket = { send: vi.fn(), close: vi.fn() }
+    const bufferedSocket = new BufferedTerminalSocket(rawSocket)
+    bufferedSocket.pause()
+    broker.registerSocket('client_a_1', USER_A, bufferedSocket)
+
+    vi.advanceTimersByTime(HEARTBEAT_SILENCE_MS)
+
+    expect(rawSocket.close).toHaveBeenCalledWith(1001, 'terminal heartbeat timeout')
+    expect(broker.hasUserSockets(USER_A)).toBe(false)
+    broker.disconnectAll()
+  })
+
+  test('recordHeartbeat resets the deadline so a chatty client stays online', () => {
+    const onClientPresenceChanged = vi.fn()
+    const broker = createBroker({ onClientPresenceChanged })
     const socket = { send: vi.fn(), close: vi.fn() }
     broker.registerSocket('client_a_1', USER_A, socket)
+    onClientPresenceChanged.mockClear()
 
-    // 3 intervals of heartbeats keep the deadline at bay.
     for (let i = 0; i < 3; i += 1) {
       vi.advanceTimersByTime(HEARTBEAT_INTERVAL_MS)
-      broker.recordHeartbeat(USER_A, 'client_a_1', Date.now())
+      broker.recordHeartbeat(USER_A, 'client_a_1')
     }
-    // Total wall clock: 90 s; without the recordHeartbeat
-    // calls that would already be past the 90 s deadline.
-    expect(onClientDisconnected).not.toHaveBeenCalled()
 
+    expect(broker.isClientOnline(USER_A, 'client_a_1')).toBe(true)
+    expect(onClientPresenceChanged).not.toHaveBeenCalled()
     broker.disconnectAll()
   })
 
-  test('recordHeartbeat for an unknown (userId, clientId) is a no-op', () => {
-    const onClientDisconnected = vi.fn()
-    const broker = new TerminalRealtimeBroker({
-      onClientConnected: vi.fn(),
-      onClientDisconnected,
-      onUserDisconnected: vi.fn(),
-    })
-    // No registerSocket — the (userId, clientId) is unknown.
-    broker.recordHeartbeat(USER_A, 'never_connected', Date.now())
-    // Advance past the deadline: nothing should fire because the
-    // broker never had any sockets for this pair.
-    vi.advanceTimersByTime(HEARTBEAT_DEADLINE_MS + HEARTBEAT_INTERVAL_MS)
-    expect(onClientDisconnected).not.toHaveBeenCalled()
+  test('recordHeartbeat for an unknown client is a no-op', () => {
+    const onClientPresenceChanged = vi.fn()
+    const broker = createBroker({ onClientPresenceChanged })
+    broker.recordHeartbeat(USER_A, 'never_online')
+    vi.advanceTimersByTime(HEARTBEAT_SILENCE_MS)
+    expect(onClientPresenceChanged).not.toHaveBeenCalled()
     broker.disconnectAll()
   })
 
-  test('unregisterSocket clears the heartbeat clock for the closing (userId, clientId)', () => {
-    const onClientDisconnected = vi.fn()
-    const broker = new TerminalRealtimeBroker({
-      onClientConnected: vi.fn(),
-      onClientDisconnected,
-      onUserDisconnected: vi.fn(),
-    })
+  test('unregisterSocket after heartbeat timeout does not emit duplicate offline presence', () => {
+    const onClientPresenceChanged = vi.fn()
+    const broker = createBroker({ onClientPresenceChanged })
     const socket = { send: vi.fn(), close: vi.fn() }
     broker.registerSocket('client_a_1', USER_A, socket)
+    vi.advanceTimersByTime(HEARTBEAT_SILENCE_MS)
+    onClientPresenceChanged.mockClear()
+
     broker.unregisterSocket(socket)
-    // The unregister path itself fires `onClientDisconnected` exactly
-    // once. Clear the mock so the post-deadline assertion only
-    // observes the synthetic deadline-driven call (if any).
-    onClientDisconnected.mockClear()
 
-    // Past the deadline — the synthetic disconnect path should NOT
-    // fire because the (userId, clientId) was already fully
-    // unregistered (no live sockets remain).
-    vi.advanceTimersByTime(HEARTBEAT_DEADLINE_MS + HEARTBEAT_INTERVAL_MS)
-    expect(onClientDisconnected).not.toHaveBeenCalled()
-
+    expect(onClientPresenceChanged).not.toHaveBeenCalled()
     broker.disconnectAll()
   })
 })

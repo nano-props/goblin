@@ -11,7 +11,7 @@ import {
   TerminalSessionContext,
   TerminalSessionReadContext,
 } from '#/web/components/terminal/terminal-session-context.ts'
-import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-bridge.ts'
+import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
 import { preloadTerminalFont } from '#/web/components/terminal/terminal-geometry.ts'
 import { loadTerminalSessions } from '#/web/terminal-session-queries.ts'
 import {

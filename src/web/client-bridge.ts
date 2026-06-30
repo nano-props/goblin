@@ -5,11 +5,8 @@ import type { ClientHostBridge, ClientBridge, ClientTerminalBridge } from '#/web
 import { readNativeBridge } from '#/web/native-bridge.ts'
 import { createHttpClipboardBackend } from '#/web/clipboard/http-backend.ts'
 import { normalizeClientServerClientId, readWebBootstrap } from '#/web/client-bootstrap-bridge.ts'
-import {
-  createServerTerminalBridge,
-  readOrCreateWebTerminalClientId,
-  type ClientServerTerminalConfig,
-} from '#/web/client-terminal-bridge.ts'
+import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
+import { createServerTerminalBridge, type ClientServerTerminalConfig } from '#/web/client-terminal-bridge.ts'
 import { createTerminalNotificationProvider } from '#/web/terminal-notification-provider.ts'
 
 /**
@@ -64,8 +61,9 @@ function readServerTerminalConfig(): ClientServerTerminalConfig | null {
   // `plantEmbedAuthCookie` (embedded main, before loadURL) or
   // `POST /api/login` (web). The WS upgrade sends the cookie
   // automatically. We derive the URL from `window.location.origin`
-  // and use an empty `accessToken` — the WebSocket URL has no
-  // `?t=` query in that case.
+  // and use an empty `accessToken`; the WebSocket helper still
+  // serializes that as `?t=`, but the server checks cookie before
+  // query token so cookie auth remains the effective channel.
   const fromBootstrap = readWebBootstrap(readOrCreateWebTerminalClientId).initialServer
   if (fromBootstrap?.url) {
     const clientId = normalizeClientServerClientId(fromBootstrap.clientId) ?? readOrCreateWebTerminalClientId()
@@ -92,7 +90,6 @@ let memoizedTerminalBridge: ClientTerminalBridge | null = null
 function getOrCreateTerminalBridge(): ClientTerminalBridge {
   if (memoizedTerminalBridge) return memoizedTerminalBridge
   memoizedTerminalBridge = createServerTerminalBridge({
-    getClientId: readOrCreateWebTerminalClientId,
     getServerConfig() {
       const server = readServerTerminalConfig()
       if (!server) throw new Error('Client terminal bridge is unavailable')
