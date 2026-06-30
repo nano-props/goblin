@@ -6,12 +6,17 @@
 // Form state lives inside `CreateWorktreeDialog` itself and is
 // therefore preserved across settings navigation — the user can
 // type a branch name, click "Settings", read a config, come back,
-// and the typed name is still there. Active repo switches still
-// close the dialog to match the previous per-repo trigger behaviour.
+// and the typed name is still there. The overlay state captures the
+// repo id when the dialog opens so this host is bound to one dialog
+// session rather than the live active repo. The session retains the
+// last live repo snapshot for closed-state rendering only; submission
+// and preflight still require a live repo in `useReposStore`.
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { CreateWorktreeDialog } from '#/web/components/create-worktree-dialog/CreateWorktreeDialog.tsx'
 import type { CreateWorktreeRequest } from '#/web/components/create-worktree-dialog/create-worktree-dialog.logic.ts'
+import { DialogHostMount } from '#/web/components/ui/dialog-host-mount.tsx'
+import { useLastNonNull } from '#/web/hooks/useLastNonNull.ts'
 import { getRepoWorktreeBootstrapPreview } from '#/web/repo-client.ts'
 import { currentSettingsSnapshot } from '#/web/settings-read-projection.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
@@ -23,30 +28,27 @@ import type { WorktreeBootstrapDecision, WorktreeBootstrapPreview } from '#/shar
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
-  activeId: string | null
+  repoId: string | null
 }
 
-export function CreateWorktreeDialogHost({ open, onOpenChange, activeId }: Props) {
-  const previousActiveIdRef = useRef(activeId)
-
-  // Force-close when the active repo changes. Without this a
-  // half-typed branch name from repo A could leak into a submission
-  // against repo B. Same contract as the previous per-repo trigger.
-  useEffect(() => {
-    const previousActiveId = previousActiveIdRef.current
-    previousActiveIdRef.current = activeId
-    if (previousActiveId !== activeId) {
-      if (open) onOpenChange(false)
-    }
-  }, [activeId, onOpenChange, open])
-
-  if (!open || !activeId) return null
-
-  return <CreateWorktreeDialogSession key={activeId} open={open} onOpenChange={onOpenChange} activeId={activeId} />
+export function CreateWorktreeDialogHost({ open, onOpenChange, repoId }: Props) {
+  return (
+    <DialogHostMount target={repoId}>
+      {(mountedRepoId) => (
+        <CreateWorktreeDialogSession
+          key={mountedRepoId}
+          open={open}
+          onOpenChange={onOpenChange}
+          repoId={mountedRepoId}
+        />
+      )}
+    </DialogHostMount>
+  )
 }
 
-function CreateWorktreeDialogSession({ open, onOpenChange, activeId }: Props) {
-  const repo = useReposStore((s) => (activeId ? s.repos[activeId] : undefined))
+function CreateWorktreeDialogSession({ open, onOpenChange, repoId: sessionRepoId }: Props) {
+  const liveRepo = useReposStore((s) => (sessionRepoId ? s.repos[sessionRepoId] : undefined))
+  const displayRepo = useLastNonNull(liveRepo ?? null)
   const submitBranchAction = useReposStore((s) => s.submitBranchAction)
   const [bootstrapPreview, setBootstrapPreview] = useState<WorktreeBootstrapPreview | null>(null)
   const [bootstrapPreviewError, setBootstrapPreviewError] = useState(false)
@@ -61,8 +63,8 @@ function CreateWorktreeDialogSession({ open, onOpenChange, activeId }: Props) {
     setRememberBootstrapTrust(false)
   }
 
-  const repoId = repo?.id ?? null
-  const repoToken = repo?.instanceToken ?? null
+  const repoId = liveRepo?.id ?? null
+  const repoToken = liveRepo?.instanceToken ?? null
 
   useEffect(() => {
     if (!open || !repoId || repoToken === null) {
@@ -98,7 +100,7 @@ function CreateWorktreeDialogSession({ open, onOpenChange, activeId }: Props) {
     }
   }, [open, repoId, repoToken])
 
-  if (!repo) return null
+  if (!displayRepo) return null
 
   function submitCreateWorktree(
     repoId: string,
@@ -118,13 +120,10 @@ function CreateWorktreeDialogSession({ open, onOpenChange, activeId }: Props) {
   }
 
   function handleCreateWorktree(request: CreateWorktreeRequest): boolean {
-    // TypeScript narrows `repo` to non-null in the render body, but not inside
-    // a nested function. The early return is a no-op at runtime because the
-    // host already bails out above; it just satisfies the type checker.
-    if (!repo) return false
-    if (repo.operations.branchAction.phase !== 'idle' || bootstrapPreviewLoading) return false
-    const repoId = repo.id
-    const token = repo.instanceToken
+    if (!liveRepo) return false
+    if (liveRepo.operations.branchAction.phase !== 'idle' || bootstrapPreviewLoading) return false
+    const repoId = liveRepo.id
+    const token = liveRepo.instanceToken
 
     const worktreeBootstrap = resolveWorktreeBootstrapDecision(repoId)
     return submitCreateWorktree(repoId, token, request, worktreeBootstrap)
@@ -142,12 +141,12 @@ function CreateWorktreeDialogSession({ open, onOpenChange, activeId }: Props) {
   }
 
   const bootstrapConfigHash = bootstrapPreview?.configHash ?? null
-  const bootstrapTrusted = isCurrentBootstrapConfigTrusted(repo.id, bootstrapConfigHash)
+  const bootstrapTrusted = isCurrentBootstrapConfigTrusted(displayRepo.id, bootstrapConfigHash)
 
   return (
     <CreateWorktreeDialog
       open={open}
-      repo={repo}
+      repo={displayRepo}
       worktreeBootstrap={{
         loading: bootstrapPreviewLoading,
         preview: bootstrapPreview,

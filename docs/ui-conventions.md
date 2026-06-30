@@ -9,6 +9,14 @@ Use this doc for UI language and presentation rules.
 - Preserve raw git and status data such as `M`, `A`, `??`, branch names, and paths.
 - Prefer shadcn/ui primitives in `src/web/components/ui/`.
 - Reuse shared field primitives for forms.
+- Layout-level dialog hosts must separate mount context from dialog open
+  state. A missing target, such as no active repo, may unmount the host; a
+  closed dialog must still render the Radix root with `open={false}` so exit
+  motion can run. Use `DialogHostMount` from
+  `src/web/components/ui/dialog-host-mount.tsx` for repo-scoped hosts instead
+  of writing `if (!open) return null`. If the dialog is scoped to a repo,
+  capture that repo id in overlay state when opening the dialog rather than
+  reading the live active repo inside the host.
 - Show home-relative paths with `~` via existing `tildify` helpers.
 - Focus rings on shadcn primitives use `focusRingInset` / `focusRingVisibleInset`
   from `src/web/components/ui/focus.ts`. These draw the ring _inside_ the

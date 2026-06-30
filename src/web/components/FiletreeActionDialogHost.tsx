@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '#/web/components/ConfirmDialog.tsx'
 import { trashRepositoryFile } from '#/web/filetree-client.ts'
+import { useLastNonNull } from '#/web/hooks/useLastNonNull.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { useFiletreeActionDialogsStore } from '#/web/stores/repos/filetree-action-dialogs.ts'
 
@@ -14,6 +15,7 @@ export function FiletreeActionDialogHost({ activeRepoId }: Props) {
   const trashFileConfirm = useFiletreeActionDialogsStore((s) => s.trashFileConfirm)
   const closeTrashFileConfirm = useFiletreeActionDialogsStore((s) => s.closeTrashFileConfirm)
   const closeStaleDialogs = useFiletreeActionDialogsStore((s) => s.closeStaleDialogs)
+  const displayTrashFileConfirm = useLastNonNull(trashFileConfirm)
 
   useEffect(() => {
     closeStaleDialogs(activeRepoId ?? '')
@@ -24,8 +26,8 @@ export function FiletreeActionDialogHost({ activeRepoId }: Props) {
       open={trashFileConfirm !== null}
       title={t('filetree.confirm-trash-title')}
       message={
-        trashFileConfirm ? (
-          <FiletreeTrashConfirmBody body={t('filetree.confirm-trash-body')} path={trashFileConfirm.path} />
+        displayTrashFileConfirm ? (
+          <FiletreeTrashConfirmBody body={t('filetree.confirm-trash-body')} path={displayTrashFileConfirm.path} />
         ) : (
           ''
         )

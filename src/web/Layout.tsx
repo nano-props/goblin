@@ -150,7 +150,7 @@ function PrimaryWindowOverlays({ overlays, repoDrop, navigation, activeId, activ
       <CreateWorktreeDialogHost
         open={overlays.state.createWorktree.open}
         onOpenChange={overlays.setCreateWorktreeOpen}
-        activeId={activeId}
+        repoId={overlays.state.createWorktree.repoId}
       />
       <BranchActionDialogHost activeRepoId={activeId} activeBranchName={activeBranchName} />
       <FiletreeActionDialogHost activeRepoId={activeId} />
