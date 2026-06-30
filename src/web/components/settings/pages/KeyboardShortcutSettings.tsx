@@ -1,32 +1,25 @@
 import { ShortcutSettings } from '#/web/components/settings/ShortcutSettings.tsx'
+import { InlineShortcut } from '#/web/components/InlineShortcut.tsx'
 import { SettingsCard, SettingsGroup, SettingsListItem } from '#/web/components/settings/SettingsPrimitives.tsx'
 import { useShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { helpShortcutSections, type HelpShortcutRow, type HelpShortcutSection } from '#/web/keyboard/help-shortcuts.ts'
-function KeyCombo({ keys }: { keys: string[] }) {
+
+function ShortcutCombos({ combos }: { combos: string[][] }) {
   return (
-    <span className="inline-flex items-center gap-0.5">
-      {keys.map((k, i) => (
-        <span key={i} className="inline-flex items-center gap-0.5">
-          {i > 0 && <span className="text-[10px] text-muted-foreground/60">+</span>}
-          <span className="kbd">{k}</span>
+    <span className="ml-auto flex min-w-6 shrink-0 flex-wrap justify-end gap-x-1.5 gap-y-0.5 pl-8">
+      {combos.map((combo, i) => (
+        <span key={`${combo.join('+')}:${i}`} className="inline-flex items-center gap-1">
+          {i > 0 && <span className="text-[11px] text-muted-foreground/60">/</span>}
+          <InlineShortcut shortcut={formatShortcutCombo(combo)} className="ml-0 pl-0" />
         </span>
       ))}
     </span>
   )
 }
 
-function KeyCombos({ combos }: { combos: string[][] }) {
-  return (
-    <span className="flex shrink-0 flex-wrap justify-end gap-x-1 gap-y-0.5">
-      {combos.map((combo, i) => (
-        <span key={`${combo.join('+')}:${i}`} className="inline-flex items-center gap-1">
-          {i > 0 && <span className="text-[11px] text-muted-foreground/60">/</span>}
-          <KeyCombo keys={combo} />
-        </span>
-      ))}
-    </span>
-  )
+function formatShortcutCombo(combo: string[]): string {
+  return combo.join('')
 }
 
 function ShortcutRow({ row }: { row: HelpShortcutRow }) {
@@ -34,7 +27,7 @@ function ShortcutRow({ row }: { row: HelpShortcutRow }) {
   return (
     <SettingsListItem as="li" size="sm" className="border-t border-separator" separated={false}>
       <span className="min-w-0 pr-2 text-[13px] leading-snug text-foreground">{t(row.labelKey, row.labelParams)}</span>
-      <KeyCombos combos={row.combos} />
+      <ShortcutCombos combos={row.combos} />
     </SettingsListItem>
   )
 }

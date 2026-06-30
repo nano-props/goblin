@@ -3,7 +3,7 @@
 // element that needs a hover label; Radix renders into a portal and
 // survives `position: fixed` ancestors. Use this instead of the
 // native `title=` attribute for any tooltip we want to style or
-// compose with kbd chips.
+// compose with inline affordances.
 
 import { useState, type ComponentProps, type ReactNode } from 'react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '#/web/components/ui/tooltip.tsx'
