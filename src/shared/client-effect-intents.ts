@@ -24,7 +24,7 @@ export type ClientEffectIntent =
   | { type: 'lang-pref-set-requested'; pref: LangPref }
   | { type: 'clear-recent-repos-requested' }
   | { type: 'open-recent-repo-requested'; entry: RepoSessionEntry }
-  | { type: 'terminal-bell-click'; repoRoot: string; terminalKey?: string }
+  | { type: 'terminal-bell-click'; repoRoot: string; terminalSessionId?: string; terminalWorktreeKey?: string }
   | { type: 'external-open-enqueued' }
 
 export type ClientEffectIntentType = ClientEffectIntent['type']
@@ -63,9 +63,10 @@ export function isClientEffectIntent(event: unknown): event is ClientEffectInten
     case 'terminal-bell-click':
       return (
         typeof event.repoRoot === 'string' &&
-        // Temporary guard for the terminalKey rename; remove once the new intent shape has stabilized.
+        // Temporary guard for the terminalSessionId rename; remove once the new intent shape has stabilized.
         !Object.prototype.hasOwnProperty.call(event, 'key') &&
-        (event.terminalKey === undefined || typeof event.terminalKey === 'string')
+        (event.terminalSessionId === undefined || typeof event.terminalSessionId === 'string') &&
+        (event.terminalWorktreeKey === undefined || typeof event.terminalWorktreeKey === 'string')
       )
     default:
       return false

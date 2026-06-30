@@ -76,7 +76,7 @@ describe('settings command handlers', () => {
       activeRepoId: null,
       zenMode: true,
       workspacePaneSize: 50,
-      selectedTerminalKeyByTerminalWorktree: {},
+      selectedTerminalSessionIdByTerminalWorktree: {},
       workspacePaneTabOrderByBranchByRepo: {},
     }
     mocks.setServerSessionState.mockResolvedValue(session)
@@ -186,7 +186,7 @@ describe('settings command handlers', () => {
           ...session,
           workspacePaneTabOrderByBranchByRepo: {
             '/tmp/repo': {
-              main: [{ type: 'terminal', terminalKey: '' }],
+              main: [{ type: 'terminal', terminalSessionId: '' }],
             },
           },
         },

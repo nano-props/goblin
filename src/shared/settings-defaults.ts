@@ -18,7 +18,7 @@ export function defaultWorkspaceSessionState(): WorkspaceSessionState {
     activeRepoId: null,
     zenMode: DEFAULT_ZEN_MODE,
     workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
-    selectedTerminalKeyByTerminalWorktree: {},
+    selectedTerminalSessionIdByTerminalWorktree: {},
     workspacePaneTabOrderByBranchByRepo: {},
     filetreeViewStateByWorktreeByRepo: {},
   }

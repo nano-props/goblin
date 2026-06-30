@@ -52,10 +52,10 @@ export interface WorkspacePanePanelLabel {
 export interface WorkspacePaneTabCloseInput {
   repoId: string
   branchName: string | null
-  terminalKey?: string
+  terminalSessionId?: string
   terminalBase?: TerminalSessionBase | null
   closeStaticTab?: (repoId: string, type: WorkspacePaneStaticTabType, branchName: string) => void
-  closeTerminalByDescriptor?: (terminalKey: string, base: TerminalSessionBase) => Promise<boolean>
+  closeTerminalByDescriptor?: (terminalSessionId: string, base: TerminalSessionBase) => Promise<boolean>
   closeTerminalsForWorktree?: (base: TerminalSessionBase) => Promise<boolean>
 }
 
@@ -208,8 +208,8 @@ export class TerminalWorkspacePaneTabProvider extends WorkspacePaneTabProvider<'
     super({ type: 'terminal', icon: Terminal })
   }
 
-  orderEntry(terminalKey: string): Extract<WorkspacePaneTabOrderEntry, { type: 'terminal' }> {
-    return workspacePaneTerminalTabOrderEntry(terminalKey)
+  orderEntry(terminalSessionId: string): Extract<WorkspacePaneTabOrderEntry, { type: 'terminal' }> {
+    return workspacePaneTerminalTabOrderEntry(terminalSessionId)
   }
 
   buttonId(workspacePaneId: string, index: number): string {
@@ -249,8 +249,8 @@ export class TerminalWorkspacePaneTabProvider extends WorkspacePaneTabProvider<'
   }
 
   async close(input: WorkspacePaneTabCloseInput): Promise<boolean> {
-    if (!input.terminalKey || !input.terminalBase || !input.closeTerminalByDescriptor) return false
-    return await input.closeTerminalByDescriptor(input.terminalKey, input.terminalBase)
+    if (!input.terminalSessionId || !input.terminalBase || !input.closeTerminalByDescriptor) return false
+    return await input.closeTerminalByDescriptor(input.terminalSessionId, input.terminalBase)
   }
 
   override async closeWorktree(input: WorkspacePaneTabCloseInput): Promise<boolean> {

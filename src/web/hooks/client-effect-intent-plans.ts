@@ -1,4 +1,4 @@
-import { formatTerminalWorktreeKey, parseTerminalWorkspaceSlotKey } from '#/shared/terminal-workspace-slot-key.ts'
+import { parseTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
@@ -30,7 +30,7 @@ export type TerminalBellIntentPlan =
       kind: 'show-worktree-terminal'
       repoId: string
       branch: string
-      terminalKey: string
+      terminalSessionId: string
       terminalWorktreeKey: string
     }
 
@@ -79,16 +79,16 @@ export function createTerminalBellIntentPlan(
   event: Extract<ClientEffectIntent, { type: 'terminal-bell-click' }>,
 ): TerminalBellIntentPlan {
   if (!repo) return { kind: 'noop' }
-  const parsedKey = event.terminalKey ? parseTerminalWorkspaceSlotKey(event.terminalKey) : null
-  if (parsedKey && parsedKey.repoRoot === repo.id && event.terminalKey) {
+  const parsedKey = event.terminalWorktreeKey ? parseTerminalWorktreeKey(event.terminalWorktreeKey) : null
+  if (parsedKey && parsedKey.repoRoot === repo.id && event.terminalSessionId) {
     const branch = repo.data.branches.find((candidate) => candidate.worktree?.path === parsedKey.worktreePath)
     if (branch) {
       return {
         kind: 'show-worktree-terminal',
         repoId: repo.id,
         branch: branch.name,
-        terminalKey: event.terminalKey,
-        terminalWorktreeKey: formatTerminalWorktreeKey(parsedKey.repoRoot, parsedKey.worktreePath),
+        terminalSessionId: event.terminalSessionId,
+        terminalWorktreeKey: event.terminalWorktreeKey!,
       }
     }
   }

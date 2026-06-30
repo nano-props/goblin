@@ -282,9 +282,8 @@ describe('workspace commands', () => {
         sessions: [
           {
             type: 'terminal',
-            terminalKey: 'session-1',
+            terminalSessionId: 'session-1',
             terminalWorktreeKey: WORKTREE_KEY,
-            sessionId: 'session-1',
             index: 1,
             title: 'terminal 1',
             phase: 'open',
@@ -294,9 +293,8 @@ describe('workspace commands', () => {
           },
           {
             type: 'terminal',
-            terminalKey: 'session-2',
+            terminalSessionId: 'session-2',
             terminalWorktreeKey: WORKTREE_KEY,
-            sessionId: 'session-2',
             index: 2,
             title: 'terminal 2',
             phase: 'open',
@@ -340,7 +338,7 @@ describe('workspace commands', () => {
     await runNewTerminalTabCommand({ repoId: REPO_ID, navigation })
 
     expect(preferredWorkspacePaneTab()).toBe('terminal')
-    expect(useReposStore.getState().selectedTerminalKeyByTerminalWorktree[WORKTREE_KEY]).toBe('session-2')
+    expect(useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[WORKTREE_KEY]).toBe('session-2')
     expect(createTerminal).toHaveBeenCalledWith({
       repoRoot: REPO_ID,
       branch: 'feature/worktree',
@@ -437,7 +435,7 @@ describe('workspace commands', () => {
       terminalEntry('session-2'),
     ])
     expect(preferredWorkspacePaneTab()).toBe('status')
-    expect(useReposStore.getState().selectedTerminalKeyByTerminalWorktree[WORKTREE_KEY]).toBeUndefined()
+    expect(useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[WORKTREE_KEY]).toBeUndefined()
   })
 
   test('close workspace tab command closes the selected terminal when terminal is active', async () => {
@@ -576,7 +574,7 @@ describe('workspace commands', () => {
     expect(payload).toMatchObject({
       repoId: REPO_ID,
       targetIdentity: 'terminal:session-1',
-      terminalKey: 'session-1',
+      terminalSessionId: 'session-1',
       terminalBase: {
         repoRoot: REPO_ID,
         branch: 'feature/worktree',
@@ -592,7 +590,7 @@ describe('workspace commands', () => {
         navigation: navigationWith(),
         targetIdentity: payload.targetIdentity,
         confirmedTerminal: {
-          terminalKey: payload.terminalKey,
+          terminalSessionId: payload.terminalSessionId,
           base: payload.terminalBase,
         },
       }),
@@ -674,7 +672,7 @@ describe('workspace commands', () => {
     let visibleSessionIds = ['session-1', 'session-2']
     const closeResolvers: Array<(value: boolean) => void> = []
     const closeTerminalByDescriptor = vi.fn((key: string) => {
-      visibleSessionIds = visibleSessionIds.filter((sessionId) => sessionId !== key)
+      visibleSessionIds = visibleSessionIds.filter((terminalSessionId) => terminalSessionId !== key)
       useReposStore.getState().setSelectedTerminal(WORKTREE_KEY, visibleSessionIds[0] ?? null)
       return new Promise<boolean>((resolve) => {
         closeResolvers.push(resolve)
@@ -1154,9 +1152,8 @@ function worktreeSnapshotWithTerminal(options: { processName?: string } = {}): T
   return {
     terminalWorktreeKey: WORKTREE_KEY,
     selectedDescriptor: {
-      terminalKey: 'session-1',
+      terminalSessionId: 'session-1',
       terminalWorktreeKey: WORKTREE_KEY,
-      sessionId: 'session-1',
       index: 1,
       repoRoot: REPO_ID,
       branch: 'feature/worktree',
@@ -1165,9 +1162,8 @@ function worktreeSnapshotWithTerminal(options: { processName?: string } = {}): T
     sessions: [
       {
         type: 'terminal',
-        terminalKey: 'session-1',
+        terminalSessionId: 'session-1',
         terminalWorktreeKey: WORKTREE_KEY,
-        sessionId: 'session-1',
         index: 1,
         title: 'terminal 1',
         fullTitle: 'terminal 1',
@@ -1197,28 +1193,26 @@ function emptyWorktreeSnapshot(): TerminalWorktreeSnapshot {
   }
 }
 
-function worktreeSnapshotForSessions(sessionIds: string[]): TerminalWorktreeSnapshot {
-  const selectedKey = useReposStore.getState().selectedTerminalKeyByTerminalWorktree[WORKTREE_KEY] ?? null
-  const sessions = sessionIds.map((sessionId, index) => ({
+function worktreeSnapshotForSessions(terminalSessionIds: string[]): TerminalWorktreeSnapshot {
+  const selectedKey = useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[WORKTREE_KEY] ?? null
+  const sessions = terminalSessionIds.map((terminalSessionId, index) => ({
     type: 'terminal' as const,
-    terminalKey: sessionId,
+    terminalSessionId: terminalSessionId,
     terminalWorktreeKey: WORKTREE_KEY,
-    sessionId,
     index: index + 1,
     title: `terminal ${index + 1}`,
     phase: 'open' as const,
-    selected: sessionId === selectedKey,
+    selected: terminalSessionId === selectedKey,
     hasBell: false,
     recentlyActive: false,
   }))
-  const selectedSession = sessions.find((session) => session.terminalKey === selectedKey) ?? null
+  const selectedSession = sessions.find((session) => session.terminalSessionId === selectedKey) ?? null
   return {
     terminalWorktreeKey: WORKTREE_KEY,
     selectedDescriptor: selectedSession
       ? {
-          terminalKey: selectedSession.terminalKey,
+          terminalSessionId: selectedSession.terminalSessionId,
           terminalWorktreeKey: WORKTREE_KEY,
-          sessionId: selectedSession.sessionId,
           index: selectedSession.index,
           repoRoot: REPO_ID,
           branch: 'feature/worktree',
@@ -1237,9 +1231,8 @@ function worktreeSnapshotWithSecondTerminalSelected(): TerminalWorktreeSnapshot 
   return {
     terminalWorktreeKey: WORKTREE_KEY,
     selectedDescriptor: {
-      terminalKey: 'session-2',
+      terminalSessionId: 'session-2',
       terminalWorktreeKey: WORKTREE_KEY,
-      sessionId: 'session-2',
       index: 2,
       repoRoot: REPO_ID,
       branch: 'feature/worktree',
@@ -1248,9 +1241,8 @@ function worktreeSnapshotWithSecondTerminalSelected(): TerminalWorktreeSnapshot 
     sessions: [
       {
         type: 'terminal',
-        terminalKey: 'session-1',
+        terminalSessionId: 'session-1',
         terminalWorktreeKey: WORKTREE_KEY,
-        sessionId: 'session-1',
         index: 1,
         title: 'terminal 1',
         phase: 'open',
@@ -1260,9 +1252,8 @@ function worktreeSnapshotWithSecondTerminalSelected(): TerminalWorktreeSnapshot 
       },
       {
         type: 'terminal',
-        terminalKey: 'session-2',
+        terminalSessionId: 'session-2',
         terminalWorktreeKey: WORKTREE_KEY,
-        sessionId: 'session-2',
         index: 2,
         title: 'terminal 2',
         phase: 'open',

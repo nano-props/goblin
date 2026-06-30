@@ -1,12 +1,12 @@
 import { describe, expect, test } from 'vitest'
 import {
-  countOrphanedTerminalSessionKeys,
+  countOrphanedTerminalSessionIds,
   resolveAdjacentTerminalSelectionAfterRemoval,
 } from '#/web/components/terminal/terminal-session-eviction.ts'
 
 describe('terminal session eviction helpers', () => {
   test('finds orphaned local sessions that no longer exist on the server', () => {
-    const orphaned = countOrphanedTerminalSessionKeys({
+    const orphaned = countOrphanedTerminalSessionIds({
       repoRoot: '/repo',
       localSessionKeys: ['a', 'b', 'c'],
       getRepoRootForKey: (key) => (key === 'c' ? '/other' : '/repo'),
@@ -15,7 +15,7 @@ describe('terminal session eviction helpers', () => {
     })
     expect(orphaned).toEqual([])
 
-    const orphaned2 = countOrphanedTerminalSessionKeys({
+    const orphaned2 = countOrphanedTerminalSessionIds({
       repoRoot: '/repo',
       localSessionKeys: ['a', 'b', 'c'],
       getRepoRootForKey: (key) => (key === 'c' ? '/other' : '/repo'),

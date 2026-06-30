@@ -153,7 +153,7 @@ function makeCreateResult(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     ok: true as const,
     action: 'created' as const,
-    terminalKey: `${REPO_ROOT}\0${WORKTREE_PATH}\0session-1`,
+    terminalSessionId: 'session-1',
     ptySessionId: 'pty_session_1_aaaaaaaaa',
     processName: 'zsh',
     canonicalTitle: null,
@@ -167,7 +167,9 @@ function makeCreateResult(overrides: Partial<Record<string, unknown>> = {}) {
     sessions: [
       {
         ptySessionId: 'pty_session_1_aaaaaaaaa',
-        terminalKey: `${REPO_ROOT}\0${WORKTREE_PATH}\0session-1`,
+        terminalSessionId: 'session-1',
+        repoRoot: REPO_ROOT,
+        worktreePath: WORKTREE_PATH,
         cwd: WORKTREE_PATH,
         controller: { clientId: 'client_local', status: 'connected' as const },
         processName: 'zsh',
@@ -182,12 +184,11 @@ function makeCreateResult(overrides: Partial<Record<string, unknown>> = {}) {
   }
 }
 
-function emitBellForKey(projection: TerminalSessionProjection, terminalKey: string): void {
+function emitBellForKey(projection: TerminalSessionProjection, terminalSessionId: string): void {
   ;(projection as any).bellState.handleBell(
     {
-      terminalKey,
+      terminalSessionId,
       terminalWorktreeKey: WORKTREE_KEY,
-      sessionId: 'session-1',
       index: 1,
       repoRoot: REPO_ROOT,
       branch: BRANCH,
@@ -279,12 +280,14 @@ describe('TerminalSessionProjection create flow', () => {
   test('queues a different startup shell command behind an in-flight create for the same worktree', async () => {
     const first = Promise.withResolvers<ReturnType<typeof makeCreateResult>>()
     const secondResult = makeCreateResult({
-      terminalKey: `${REPO_ROOT}\0${WORKTREE_PATH}\0session-2`,
+      terminalSessionId: 'session-2',
       ptySessionId: 'pty_session_2_aaaaaaaaa',
       sessions: [
         {
           ptySessionId: 'pty_session_1_aaaaaaaaa',
-          terminalKey: `${REPO_ROOT}\0${WORKTREE_PATH}\0session-1`,
+          terminalSessionId: 'session-1',
+          repoRoot: REPO_ROOT,
+          worktreePath: WORKTREE_PATH,
           cwd: WORKTREE_PATH,
           controller: { clientId: 'client_local', status: 'connected' as const },
           processName: 'zsh',
@@ -296,7 +299,9 @@ describe('TerminalSessionProjection create flow', () => {
         },
         {
           ptySessionId: 'pty_session_2_aaaaaaaaa',
-          terminalKey: `${REPO_ROOT}\0${WORKTREE_PATH}\0session-2`,
+          terminalSessionId: 'session-2',
+          repoRoot: REPO_ROOT,
+          worktreePath: WORKTREE_PATH,
           cwd: WORKTREE_PATH,
           controller: { clientId: 'client_local', status: 'connected' as const },
           processName: 'zsh',
@@ -325,9 +330,9 @@ describe('TerminalSessionProjection create flow', () => {
     expect(mocks.createMock).toHaveBeenCalledTimes(1)
 
     first.resolve(makeCreateResult())
-    await expect(firstCreate).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0session-1`)
+    await expect(firstCreate).resolves.toBe('session-1')
     await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(2))
-    await expect(secondCreate).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0session-2`)
+    await expect(secondCreate).resolves.toBe('session-2')
     expect(mocks.createMock).toHaveBeenLastCalledWith({
       repoRoot: REPO_ROOT,
       branch: BRANCH,
@@ -358,7 +363,7 @@ describe('TerminalSessionProjection create flow', () => {
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
 
     resolve(makeCreateResult())
-    await expect(pending).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0session-1`)
+    await expect(pending).resolves.toBe('session-1')
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
   })
@@ -381,7 +386,7 @@ describe('TerminalSessionProjection create flow', () => {
 
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(true)
 
-    await expect(pending).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0session-1`)
+    await expect(pending).resolves.toBe('session-1')
     expect(mocks.createMock).toHaveBeenCalledTimes(1)
     expect(mocks.createMock).toHaveBeenCalledWith({
       repoRoot: REPO_ROOT,
@@ -428,7 +433,7 @@ describe('TerminalSessionProjection create flow', () => {
     })
     resolve(makeCreateResult())
 
-    await expect(pending).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0session-1`)
+    await expect(pending).resolves.toBe('session-1')
     await expect(closePromise).resolves.toBe(true)
     expect((projection as any).pendingCreateByWorktree.size).toBe(0)
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
@@ -465,7 +470,7 @@ describe('TerminalSessionProjection create flow', () => {
       clientId: 'client_local',
     })
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
-    await expect(pending).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0session-1`)
+    await expect(pending).resolves.toBe('session-1')
   })
 
   test('creates with default startup geometry when terminal host is permanently unmeasurable', async () => {
@@ -480,7 +485,7 @@ describe('TerminalSessionProjection create flow', () => {
 
     const pending = projection.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
 
-    await expect(pending).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0session-1`)
+    await expect(pending).resolves.toBe('session-1')
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
     expect(mocks.createMock).toHaveBeenCalledWith({
       repoRoot: REPO_ROOT,
@@ -531,7 +536,7 @@ describe('TerminalSessionProjection create flow', () => {
 
     // Both promises settle eventually.
     await expect(closePromise).resolves.toBeUndefined()
-    await expect(createPromise).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0session-1`)
+    await expect(createPromise).resolves.toBe('session-1')
 
     // Close is awaited before create. Without the durable-close
     // guard, create would resolve first because the close promise
@@ -563,7 +568,7 @@ describe('TerminalSessionProjection create flow', () => {
     // The next create proceeds normally.
     await expect(
       projection.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH }),
-    ).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0session-1`)
+    ).resolves.toBe('session-1')
     expect(mocks.createMock).toHaveBeenCalledTimes(1)
   })
 
@@ -636,7 +641,7 @@ describe('TerminalSessionProjection create flow', () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
     projection.registerHost(WORKTREE_KEY, host)
-    const terminalKey = await projection.createTerminal({
+    const terminalSessionId = await projection.createTerminal({
       repoRoot: REPO_ROOT,
       branch: BRANCH,
       worktreePath: WORKTREE_PATH,
@@ -644,9 +649,8 @@ describe('TerminalSessionProjection create flow', () => {
     mocks.setBadgeMock.mockClear()
     ;(projection as any).bellState.handleBell(
       {
-        terminalKey,
+        terminalSessionId,
         terminalWorktreeKey: WORKTREE_KEY,
-        sessionId: 'session-1',
         index: 1,
         repoRoot: REPO_ROOT,
         branch: BRANCH,
@@ -670,7 +674,7 @@ describe('TerminalSessionProjection create flow', () => {
     const unsubscribe = projection.subscribeRepoBellCount(REPO_ROOT, listener)
 
     try {
-      const terminalKey = await projection.createTerminal({
+      const terminalSessionId = await projection.createTerminal({
         repoRoot: REPO_ROOT,
         branch: BRANCH,
         worktreePath: WORKTREE_PATH,
@@ -678,19 +682,19 @@ describe('TerminalSessionProjection create flow', () => {
       expect(projection.repoBellCount(REPO_ROOT)).toBe(0)
       expect(listener).not.toHaveBeenCalled()
 
-      emitBellForKey(projection, terminalKey)
+      emitBellForKey(projection, terminalSessionId)
 
       expect(projection.repoBellCount(REPO_ROOT)).toBe(1)
       expect(listener).toHaveBeenCalledTimes(1)
 
       listener.mockClear()
-      projection.scrollToBottom(terminalKey)
+      projection.scrollToBottom(terminalSessionId)
 
       expect(projection.repoBellCount(REPO_ROOT)).toBe(1)
       expect(listener).not.toHaveBeenCalled()
 
       listener.mockClear()
-      projection.clearBell(terminalKey)
+      projection.clearBell(terminalSessionId)
 
       expect(projection.repoBellCount(REPO_ROOT)).toBe(0)
       expect(listener).toHaveBeenCalledTimes(1)
@@ -703,12 +707,12 @@ describe('TerminalSessionProjection create flow', () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
     projection.registerHost(WORKTREE_KEY, host)
-    const terminalKey = await projection.createTerminal({
+    const terminalSessionId = await projection.createTerminal({
       repoRoot: REPO_ROOT,
       branch: BRANCH,
       worktreePath: WORKTREE_PATH,
     })
-    emitBellForKey(projection, terminalKey)
+    emitBellForKey(projection, terminalSessionId)
 
     const listener = vi.fn()
     const unsubscribe = projection.subscribeRepoBellCount(REPO_ROOT, listener)

@@ -31,7 +31,7 @@ describe('branch action dispatch', () => {
       workspacePaneTabOrderByBranch: {
         'feature/worktree': [
           workspacePaneStaticTabOrderEntry('status'),
-          { type: 'terminal', terminalKey: 'session-1' },
+          { type: 'terminal', terminalSessionId: 'session-1' },
         ],
       },
     })
@@ -99,7 +99,7 @@ describe('branch action dispatch', () => {
       workspacePaneTabOrderByBranch: {
         'feature/worktree': [
           workspacePaneStaticTabOrderEntry('status'),
-          { type: 'terminal', terminalKey: 'session-1' },
+          { type: 'terminal', terminalSessionId: 'session-1' },
         ],
       },
     })
@@ -177,7 +177,7 @@ describe('branch action dispatch', () => {
       workspacePaneTabOrderByBranch: {
         'feature/worktree': [
           workspacePaneStaticTabOrderEntry('status'),
-          { type: 'terminal', terminalKey: 'session-1' },
+          { type: 'terminal', terminalSessionId: 'session-1' },
         ],
       },
       worktreesByPath: {
@@ -231,9 +231,8 @@ function worktreeSnapshotWithTerminal(): TerminalWorktreeSnapshot {
   return {
     terminalWorktreeKey: WORKTREE_KEY,
     selectedDescriptor: {
-      terminalKey: 'session-1',
+      terminalSessionId: 'session-1',
       terminalWorktreeKey: WORKTREE_KEY,
-      sessionId: 'session-1',
       index: 1,
       repoRoot: REPO_ID,
       branch: 'feature/worktree',
@@ -242,9 +241,8 @@ function worktreeSnapshotWithTerminal(): TerminalWorktreeSnapshot {
     sessions: [
       {
         type: 'terminal',
-        terminalKey: 'session-1',
+        terminalSessionId: 'session-1',
         terminalWorktreeKey: WORKTREE_KEY,
-        sessionId: 'session-1',
         index: 1,
         title: 'terminal 1',
         phase: 'open',

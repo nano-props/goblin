@@ -4,7 +4,7 @@ import { persistedOpenWorkspaceEntries } from '#/web/open-workspace-state.ts'
 import {
   persistedActiveRepoIdForSession,
   persistedWorkspacePaneTabOrderByBranchByRepoForSession,
-  persistedSelectedTerminalKeyByTerminalWorktreeForSession,
+  persistedSelectedTerminalSessionIdByTerminalWorktreeForSession,
   persistedPreferredWorkspacePaneTabByBranchByRepoForSession,
 } from '#/web/session-persistence-state.ts'
 import { persistedFiletreeViewStateByWorktreeByRepoForSession } from '#/web/filetree-session-state.ts'
@@ -21,8 +21,8 @@ export function workspaceSessionStateFromRestorableWorkspaceState(input: {
     activeRepoId: persistedActiveRepoIdForSession(restorableWorkspaceState.activeId),
     zenMode: restorableWorkspaceState.zenMode,
     workspacePaneSize: restorableWorkspaceState.workspacePaneSize,
-    selectedTerminalKeyByTerminalWorktree: persistedSelectedTerminalKeyByTerminalWorktreeForSession(
-      restorableWorkspaceState.selectedTerminalKeyByTerminalWorktree,
+    selectedTerminalSessionIdByTerminalWorktree: persistedSelectedTerminalSessionIdByTerminalWorktreeForSession(
+      restorableWorkspaceState.selectedTerminalSessionIdByTerminalWorktree,
       repos,
     ),
     preferredWorkspacePaneTabByBranchByRepo: persistedPreferredWorkspacePaneTabByBranchByRepoForSession(
@@ -46,7 +46,7 @@ export function workspaceSessionStateFromRestorableWorkspaceState(input: {
  *  subsequent updates flow through useSessionPersistence. */
 interface RestoredWorkspaceStateFromSession extends Pick<
   RestorableWorkspaceState,
-  'activeId' | 'zenMode' | 'workspacePaneSize' | 'selectedTerminalKeyByTerminalWorktree'
+  'activeId' | 'zenMode' | 'workspacePaneSize' | 'selectedTerminalSessionIdByTerminalWorktree'
 > {
   preferredWorkspacePaneTabByBranchByRepo: NonNullable<WorkspaceSessionState['preferredWorkspacePaneTabByBranchByRepo']>
   workspacePaneTabOrderByBranchByRepo: WorkspaceSessionState['workspacePaneTabOrderByBranchByRepo']
@@ -60,7 +60,7 @@ export function restoreRestorableWorkspaceStateFromSession(
     activeId,
     zenMode: session.zenMode,
     workspacePaneSize: session.workspacePaneSize,
-    selectedTerminalKeyByTerminalWorktree: session.selectedTerminalKeyByTerminalWorktree ?? {},
+    selectedTerminalSessionIdByTerminalWorktree: session.selectedTerminalSessionIdByTerminalWorktree ?? {},
     preferredWorkspacePaneTabByBranchByRepo: session.preferredWorkspacePaneTabByBranchByRepo ?? {},
     workspacePaneTabOrderByBranchByRepo: session.workspacePaneTabOrderByBranchByRepo ?? {},
   }

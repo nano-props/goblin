@@ -5,61 +5,61 @@ import { getRuntimeFetchSettings } from '#/web/runtime-settings-fetch.ts'
 const BELL_NOTIFICATION_THROTTLE_MS = 5000
 
 export interface TerminalBellState {
-  hasBell: (terminalKey: string) => boolean
-  clear: (terminalKey: string) => boolean
-  remove: (terminalKey: string) => void
+  hasBell: (terminalSessionId: string) => boolean
+  clear: (terminalSessionId: string) => boolean
+  remove: (terminalSessionId: string) => void
   reset: () => void
   handleBell: (descriptor: TerminalDescriptor, event: TerminalBellEvent) => void
 }
 
 export function createTerminalBellState(
-  notify: (terminalKey?: string) => void,
+  notify: (terminalSessionId?: string) => void,
   onBadgeChange: (count: number) => void,
 ): TerminalBellState {
-  const unreadTerminalKeys = new Set<string>()
-  const lastSystemNotificationAtByTerminalKey = new Map<string, number>()
+  const unreadSessionIds = new Set<string>()
+  const lastSystemNotificationAtByTerminalSessionId = new Map<string, number>()
 
-  onBadgeChange(unreadTerminalKeys.size)
+  onBadgeChange(unreadSessionIds.size)
 
-  function notifyAndBadge(terminalKey?: string) {
-    notify(terminalKey)
-    onBadgeChange(unreadTerminalKeys.size)
+  function notifyAndBadge(terminalSessionId?: string) {
+    notify(terminalSessionId)
+    onBadgeChange(unreadSessionIds.size)
   }
 
   return {
-    hasBell(terminalKey) {
-      return unreadTerminalKeys.has(terminalKey)
+    hasBell(terminalSessionId) {
+      return unreadSessionIds.has(terminalSessionId)
     },
-    clear(terminalKey) {
-      const changed = unreadTerminalKeys.delete(terminalKey)
-      if (changed) notifyAndBadge(terminalKey)
+    clear(terminalSessionId) {
+      const changed = unreadSessionIds.delete(terminalSessionId)
+      if (changed) notifyAndBadge(terminalSessionId)
       return changed
     },
-    remove(terminalKey) {
-      const had = unreadTerminalKeys.has(terminalKey)
-      unreadTerminalKeys.delete(terminalKey)
-      lastSystemNotificationAtByTerminalKey.delete(terminalKey)
-      if (had) notifyAndBadge(terminalKey)
+    remove(terminalSessionId) {
+      const had = unreadSessionIds.has(terminalSessionId)
+      unreadSessionIds.delete(terminalSessionId)
+      lastSystemNotificationAtByTerminalSessionId.delete(terminalSessionId)
+      if (had) notifyAndBadge(terminalSessionId)
     },
     reset() {
-      const had = unreadTerminalKeys.size > 0
-      unreadTerminalKeys.clear()
-      lastSystemNotificationAtByTerminalKey.clear()
+      const had = unreadSessionIds.size > 0
+      unreadSessionIds.clear()
+      lastSystemNotificationAtByTerminalSessionId.clear()
       if (had) notifyAndBadge()
     },
     handleBell(descriptor, event) {
       const windowFocused = typeof document !== 'undefined' ? document.hasFocus() : true
       if (event.visible && windowFocused) return
-      const changed = !unreadTerminalKeys.has(descriptor.terminalKey)
-      unreadTerminalKeys.add(descriptor.terminalKey)
-      if (changed) notifyAndBadge(descriptor.terminalKey)
+      const changed = !unreadSessionIds.has(descriptor.terminalSessionId)
+      unreadSessionIds.add(descriptor.terminalSessionId)
+      if (changed) notifyAndBadge(descriptor.terminalSessionId)
       if (!getRuntimeFetchSettings().terminalNotificationsEnabled) return
       const now = Date.now()
-      const lastNotifiedAt = lastSystemNotificationAtByTerminalKey.get(descriptor.terminalKey) ?? 0
+      const lastNotifiedAt = lastSystemNotificationAtByTerminalSessionId.get(descriptor.terminalSessionId) ?? 0
       // Leading-edge throttle for native/system notifications only.
       // The in-app unread state above is published immediately.
       if (now - lastNotifiedAt < BELL_NOTIFICATION_THROTTLE_MS) return
-      lastSystemNotificationAtByTerminalKey.set(descriptor.terminalKey, now)
+      lastSystemNotificationAtByTerminalSessionId.set(descriptor.terminalSessionId, now)
       const repoName = lastPathSegment(descriptor.repoRoot)
       const bodyParts = [descriptor.branch]
       const canonicalTitle = typeof event.canonicalTitle === 'string' ? event.canonicalTitle.trim() : ''
@@ -69,7 +69,8 @@ export function createTerminalBellState(
         .notifyBell({
           title: repoName,
           body: bodyParts.join('\n'),
-          terminalKey: descriptor.terminalKey,
+          terminalSessionId: descriptor.terminalSessionId,
+          terminalWorktreeKey: descriptor.terminalWorktreeKey,
           repoRoot: descriptor.repoRoot,
         })
         .catch(() => {})

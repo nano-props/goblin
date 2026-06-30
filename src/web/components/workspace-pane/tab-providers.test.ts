@@ -26,9 +26,8 @@ const t = (key: string, params?: Record<string, string | number>) => (params ? `
 
 const terminalView: WorkspacePaneTabSummary = {
   type: 'terminal',
-  terminalKey: 'session-1',
+  terminalSessionId: 'session-1',
   terminalWorktreeKey: 'repo\0worktree',
-  sessionId: 'session-1',
   index: 1,
   title: 'Terminal 1',
   fullTitle: 'Terminal 1 full',
@@ -200,7 +199,7 @@ describe('workspace pane tab providers', () => {
       terminalWorkspacePaneTabProvider.close({
         repoId: '/repo',
         branchName: 'main',
-        terminalKey: 'session-1',
+        terminalSessionId: 'session-1',
         terminalBase,
         closeTerminalByDescriptor,
       }),

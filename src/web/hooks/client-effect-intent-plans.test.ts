@@ -23,14 +23,15 @@ describe('client effect intent plans', () => {
     const plan = createTerminalBellIntentPlan(repo, {
       type: 'terminal-bell-click',
       repoRoot: repo.id,
-      terminalKey: '/tmp/repo\0/tmp/repo-feature\0session-2',
+      terminalSessionId: 'session-2',
+      terminalWorktreeKey: '/tmp/repo\0/tmp/repo-feature',
     })
 
     expect(plan).toEqual({
       kind: 'show-worktree-terminal',
       repoId: repo.id,
       branch: 'feature/test',
-      terminalKey: '/tmp/repo\0/tmp/repo-feature\0session-2',
+      terminalSessionId: 'session-2',
       terminalWorktreeKey: '/tmp/repo\0/tmp/repo-feature',
     })
   })

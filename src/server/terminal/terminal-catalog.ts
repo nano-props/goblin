@@ -14,9 +14,8 @@ import {
   type TerminalSessionPhase,
   type TerminalSessionSummary,
 } from '#/shared/terminal-types.ts'
-import { formatTerminalSessionId, parseTerminalSessionIdIndex } from '#/shared/terminal-session-id-format.ts'
 import { isValidTerminalClientId, isValidTerminalSize } from '#/shared/terminal-validators.ts'
-import { formatTerminalWorkspaceSlotKey, parseTerminalWorkspaceSlotKey } from '#/shared/terminal-workspace-slot-key.ts'
+import { createTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
 import { terminalSessionScope } from '#/server/terminal/terminal-session-scope.ts'
 import {
   buildGoblinTerminalCommandEnvironment,
@@ -27,7 +26,7 @@ interface EnsureTerminalCatalogInput {
   repoRoot: string
   branch: string
   worktreePath: string
-  sessionId?: string
+  terminalSessionId?: string
   startupShellCommand?: string
   cols?: number
   rows?: number
@@ -42,7 +41,7 @@ type EnsureTerminalCatalogResult =
   | {
       ok: true
       ptySessionId: string
-      terminalKey: string
+      terminalSessionId: string
       action: TerminalCatalogAction
       processName: string
       canonicalTitle: string | null
@@ -59,7 +58,8 @@ type EnsureTerminalCatalogResult =
 interface TerminalCatalogEnsureSessionInput {
   userId: string
   scope: string
-  terminalKey: string
+  terminalSessionId: string
+  worktreePath: string
   cwd: string
   cols: number
   rows: number
@@ -85,8 +85,14 @@ interface TerminalCatalogOptions {
   gCommand?: GoblinTerminalCommandRuntime
 }
 
+interface TerminalSessionIdAllocation {
+  terminalSessionId: string
+  reservationKey: string | null
+}
+
 class TerminalCatalog {
   private readonly options: TerminalCatalogOptions
+  private readonly reservedTerminalSessionIdsByWorktree = new Map<string, Set<string>>()
 
   constructor(options: TerminalCatalogOptions) {
     this.options = options
@@ -102,24 +108,18 @@ class TerminalCatalog {
     if (!isValidBranch(input.branch)) return { ok: false, message: 'error.invalid-arguments' }
     if (!isValidCwd(input.worktreePath)) return { ok: false, message: 'error.invalid-arguments' }
 
-    const sessionId = input.sessionId ?? formatTerminalSessionId(1)
+    const terminalSessionId = input.terminalSessionId ?? createTerminalSessionId()
     const cols = input.cols ?? 80
     const rows = input.rows ?? 24
-    if (!this.options.isValidTerminalSessionId(sessionId)) return { ok: false, message: 'error.invalid-arguments' }
+    if (!this.options.isValidTerminalSessionId(terminalSessionId)) return { ok: false, message: 'error.invalid-arguments' }
     if (!isValidTerminalSize(cols, rows)) return { ok: false, message: 'error.invalid-arguments' }
 
     const sessionScope = terminalSessionScope(input.repoRoot)
+    const scopedWorktreePath = terminalWorktreePath(input.repoRoot, input.worktreePath)
     const existingSessions = await this.options.manager.listSessionsForUser(userId, sessionScope)
-    // Build the target session key from the same form the manager uses
-    // to scope user-scoped session lists — see the comment on
-    // `terminalSessionScope` in server/terminal/terminal-session-scope.ts
-    // for the normalization rationale.
-    const targetTerminalKey = formatTerminalWorkspaceSlotKey(
-      sessionScope,
-      isRemoteRepoId(input.repoRoot) ? input.worktreePath : path.resolve(input.worktreePath),
-      sessionId,
+    const existingSession = existingSessions.find(
+      (session) => session.terminalSessionId === terminalSessionId && session.worktreePath === scopedWorktreePath,
     )
-    const existingSession = existingSessions.find((session) => session.terminalKey === targetTerminalKey)
     const action: TerminalCatalogAction = existingSession
       ? existingSession.controller
         ? 'restored'
@@ -128,14 +128,14 @@ class TerminalCatalog {
 
     if (isRemoteRepoId(input.repoRoot)) {
       return await this.ensureRemote(userId, input, {
-        sessionId,
+        terminalSessionId,
         cols,
         rows,
-        targetTerminalKey: targetTerminalKey,
+        scopedWorktreePath,
         action,
       })
     }
-    return await this.ensureLocal(userId, input, { cols, rows, targetTerminalKey: targetTerminalKey, action })
+    return await this.ensureLocal(userId, input, { terminalSessionId, cols, rows, scopedWorktreePath, action })
   }
 
   async create(clientId: string, userId: string, input: TerminalCreateInput): Promise<TerminalCatalogMutationResult> {
@@ -144,17 +144,17 @@ class TerminalCatalog {
     const terminalClientId = input.clientId ?? clientId
     if (!isValidTerminalClientId(terminalClientId)) return { ok: false, message: 'error.invalid-arguments' }
 
+    const allocation = await this.allocateSessionIdForCreate(userId, input)
     const createResult = await this.ensureOrRestore(clientId, userId, {
       ...input,
       clientId: terminalClientId,
-      sessionId:
-        input.kind === 'primary' ? 'session-1' : await this.nextSessionId(userId, input.repoRoot, input.worktreePath),
-    })
+      terminalSessionId: allocation.terminalSessionId,
+    }).finally(() => this.releaseSessionIdReservation(allocation))
     if (!createResult.ok) return { ok: false, message: createResult.message }
     return {
       ok: true,
       action: createResult.action,
-      terminalKey: createResult.terminalKey,
+      terminalSessionId: createResult.terminalSessionId,
       ptySessionId: createResult.ptySessionId,
       processName: createResult.processName,
       canonicalTitle: createResult.canonicalTitle,
@@ -186,10 +186,8 @@ class TerminalCatalog {
     const liveWorktreePaths = new Set(worktrees.map((worktree) => path.resolve(worktree.path)))
     let pruned = 0
     for (const session of allSessions) {
-      const parsed = parseTerminalWorkspaceSlotKey(session.terminalKey)
-      if (!parsed) continue
-      if (path.resolve(parsed.repoRoot) !== path.resolve(repoRoot)) continue
-      if (liveWorktreePaths.has(path.resolve(parsed.worktreePath))) continue
+      if (path.resolve(session.repoRoot) !== path.resolve(repoRoot)) continue
+      if (liveWorktreePaths.has(path.resolve(session.worktreePath))) continue
       this.options.manager.closeSession(session.ptySessionId)
       pruned += 1
     }
@@ -200,31 +198,56 @@ class TerminalCatalog {
     return { pruned, remaining }
   }
 
-  async nextSessionId(userId: string, repoRoot: string, worktreePath: string): Promise<string> {
-    // Compare against the canonical form so a forward-slash Windows path
-    // matches the resolved back-slash form used as the session key prefix.
-    const scopedRepoRoot = terminalSessionScope(repoRoot)
-    const scopedWorktreePath = isRemoteRepoId(repoRoot) ? worktreePath : path.resolve(worktreePath)
-    const sessions = await this.options.manager.listSessionsForUser(userId, scopedRepoRoot)
-    let maxIndex = 0
-    for (const session of sessions) {
-      const parsed = parseTerminalWorkspaceSlotKey(session.terminalKey)
-      if (!parsed || parsed.repoRoot !== scopedRepoRoot || parsed.worktreePath !== scopedWorktreePath) continue
-      const index = parseTerminalSessionIdIndex(parsed.sessionId)
-      if (index === null) continue
-      if (index > maxIndex) maxIndex = index
+  private async allocateSessionIdForCreate(
+    userId: string,
+    input: TerminalCreateInput,
+  ): Promise<TerminalSessionIdAllocation> {
+    const scope = terminalSessionScope(input.repoRoot)
+    const worktreePath = terminalWorktreePath(input.repoRoot, input.worktreePath)
+    const sessions = await this.options.manager.listSessionsForUser(userId, scope)
+    const existingSessionIds = sessions
+      .filter((session) => session.worktreePath === worktreePath)
+      .map((session) => session.terminalSessionId)
+    if (input.kind === 'primary' && existingSessionIds[0]) {
+      return { terminalSessionId: existingSessionIds[0], reservationKey: null }
     }
-    return formatTerminalSessionId(maxIndex + 1)
+    const reservationKey = terminalSessionIdReservationKey(userId, scope, worktreePath)
+    const reservedTerminalSessionId = this.reservedTerminalSessionIdsByWorktree.get(reservationKey)?.values().next().value
+    if (input.kind === 'primary' && reservedTerminalSessionId) return { terminalSessionId: reservedTerminalSessionId, reservationKey: null }
+    return { terminalSessionId: this.reserveNewSessionId(reservationKey, new Set(existingSessionIds)), reservationKey }
+  }
+
+  private reserveNewSessionId(reservationKey: string, existingSessionIds: ReadonlySet<string>): string {
+    let reserved = this.reservedTerminalSessionIdsByWorktree.get(reservationKey)
+    if (!reserved) {
+      reserved = new Set()
+      this.reservedTerminalSessionIdsByWorktree.set(reservationKey, reserved)
+    }
+    for (let attempt = 0; attempt < 100; attempt++) {
+      const terminalSessionId = createTerminalSessionId()
+      if (existingSessionIds.has(terminalSessionId) || reserved.has(terminalSessionId)) continue
+      reserved.add(terminalSessionId)
+      return terminalSessionId
+    }
+    throw new Error('Unable to allocate terminal session id')
+  }
+
+  private releaseSessionIdReservation(allocation: TerminalSessionIdAllocation): void {
+    if (!allocation.reservationKey) return
+    const reserved = this.reservedTerminalSessionIdsByWorktree.get(allocation.reservationKey)
+    if (!reserved) return
+    reserved.delete(allocation.terminalSessionId)
+    if (reserved.size === 0) this.reservedTerminalSessionIdsByWorktree.delete(allocation.reservationKey)
   }
 
   private async ensureRemote(
     userId: string,
     input: EnsureTerminalCatalogInput,
     context: {
-      sessionId: string
+      terminalSessionId: string
       cols: number
       rows: number
-      targetTerminalKey: string
+      scopedWorktreePath: string
       action: TerminalCatalogAction
     },
   ): Promise<EnsureTerminalCatalogResult> {
@@ -248,7 +271,8 @@ class TerminalCatalog {
     const result = await this.options.manager.ensureSession({
       userId,
       scope: input.repoRoot,
-      terminalKey: context.targetTerminalKey,
+      terminalSessionId: context.terminalSessionId,
+      worktreePath: context.scopedWorktreePath,
       cwd: process.cwd(),
       cols: context.cols,
       rows: context.rows,
@@ -259,16 +283,17 @@ class TerminalCatalog {
     })
     if (!result.ok) return { ok: false, message: result.message }
     this.options.broadcastSessionsChanged(userId, input.repoRoot)
-    return toEnsureResult(context.targetTerminalKey, context.action, result)
+    return toEnsureResult(context.terminalSessionId, context.action, result)
   }
 
   private async ensureLocal(
     userId: string,
     input: EnsureTerminalCatalogInput,
     context: {
+      terminalSessionId: string
       cols: number
       rows: number
-      targetTerminalKey: string
+      scopedWorktreePath: string
       action: TerminalCatalogAction
     },
   ): Promise<EnsureTerminalCatalogResult> {
@@ -288,7 +313,8 @@ class TerminalCatalog {
     const result = await this.options.manager.ensureSession({
       userId,
       scope: repoRoot,
-      terminalKey: context.targetTerminalKey,
+      terminalSessionId: context.terminalSessionId,
+      worktreePath: worktreePath,
       cwd: worktreePath,
       cols: context.cols,
       rows: context.rows,
@@ -299,19 +325,19 @@ class TerminalCatalog {
     })
     if (!result.ok) return { ok: false, message: result.message }
     this.options.broadcastSessionsChanged(userId, input.repoRoot)
-    return toEnsureResult(context.targetTerminalKey, context.action, result)
+    return toEnsureResult(context.terminalSessionId, context.action, result)
   }
 }
 
 function toEnsureResult(
-  terminalKey: string,
+  terminalSessionId: string,
   action: TerminalCatalogAction,
   snapshotResult: Extract<TerminalAttachResult, { ok: true }>,
 ): EnsureTerminalCatalogResult {
   return {
     ok: true,
     ptySessionId: snapshotResult.ptySessionId,
-    terminalKey,
+    terminalSessionId,
     action,
     processName: snapshotResult.processName,
     canonicalTitle: snapshotResult.canonicalTitle,
@@ -327,4 +353,12 @@ function toEnsureResult(
 
 export function createTerminalCatalog(options: TerminalCatalogOptions): TerminalCatalog {
   return new TerminalCatalog(options)
+}
+
+function terminalWorktreePath(repoRoot: string, worktreePath: string): string {
+  return isRemoteRepoId(repoRoot) ? worktreePath : path.resolve(worktreePath)
+}
+
+function terminalSessionIdReservationKey(userId: string, scope: string, worktreePath: string): string {
+  return `${userId}\0${scope}\0${worktreePath}`
 }

@@ -11,11 +11,11 @@ export function buildTerminalWorktreeSnapshot(input: {
   selectedDescriptor: TerminalWorktreeSnapshot['selectedDescriptor']
   pendingCreate: boolean
   sessions: TerminalSessionLike[]
-  selectedTerminalKey: string | null
-  getCachedSnapshot: (terminalKey: string) => TerminalSnapshot | null
-  cacheSnapshot: (terminalKey: string, snapshot: TerminalSnapshot) => void
-  hasBell: (terminalKey: string) => boolean
-  hasRecentActivity: (terminalKey: string) => boolean
+  selectedTerminalSessionId: string | null
+  getCachedSnapshot: (terminalSessionId: string) => TerminalSnapshot | null
+  cacheSnapshot: (terminalSessionId: string, snapshot: TerminalSnapshot) => void
+  hasBell: (terminalSessionId: string) => boolean
+  hasRecentActivity: (terminalSessionId: string) => boolean
 }): TerminalWorktreeSnapshot {
   const sessions = buildTerminalSessionSummaries(input)
   const bellCount = sessions.reduce((count, session) => count + (session.hasBell ? 1 : 0), 0)
@@ -34,30 +34,29 @@ export function buildTerminalWorktreeSnapshot(input: {
 function buildTerminalSessionSummaries(input: {
   terminalWorktreeKey: string
   sessions: TerminalSessionLike[]
-  selectedTerminalKey: string | null
-  getCachedSnapshot: (terminalKey: string) => TerminalSnapshot | null
-  cacheSnapshot: (terminalKey: string, snapshot: TerminalSnapshot) => void
-  hasBell: (terminalKey: string) => boolean
-  hasRecentActivity: (terminalKey: string) => boolean
+  selectedTerminalSessionId: string | null
+  getCachedSnapshot: (terminalSessionId: string) => TerminalSnapshot | null
+  cacheSnapshot: (terminalSessionId: string, snapshot: TerminalSnapshot) => void
+  hasBell: (terminalSessionId: string) => boolean
+  hasRecentActivity: (terminalSessionId: string) => boolean
 }): TerminalSessionSummary[] {
   return input.sessions.map((session) => {
-    const cached = input.getCachedSnapshot(session.descriptor.terminalKey)
+    const cached = input.getCachedSnapshot(session.descriptor.terminalSessionId)
     const snapshot = cached ?? session.snapshot()
-    if (!cached) input.cacheSnapshot(session.descriptor.terminalKey, snapshot)
+    if (!cached) input.cacheSnapshot(session.descriptor.terminalSessionId, snapshot)
     return {
       type: 'terminal',
-      terminalKey: session.descriptor.terminalKey,
+      terminalSessionId: session.descriptor.terminalSessionId,
       terminalWorktreeKey: input.terminalWorktreeKey,
-      sessionId: session.descriptor.sessionId,
       index: session.descriptor.index,
       title: summarizeTerminalTitle(snapshot, session.descriptor.index),
       fullTitle: fullTerminalTitle(snapshot, session.descriptor.index),
       originalTitle: terminalOriginalTitle(snapshot),
       processName: snapshot.processName,
       phase: snapshot.phase,
-      selected: session.descriptor.terminalKey === input.selectedTerminalKey,
-      hasBell: input.hasBell(session.descriptor.terminalKey),
-      recentlyActive: input.hasRecentActivity(session.descriptor.terminalKey),
+      selected: session.descriptor.terminalSessionId === input.selectedTerminalSessionId,
+      hasBell: input.hasBell(session.descriptor.terminalSessionId),
+      recentlyActive: input.hasRecentActivity(session.descriptor.terminalSessionId),
     }
   })
 }

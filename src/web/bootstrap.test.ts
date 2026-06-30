@@ -172,7 +172,7 @@ describe('client bootstrap', () => {
             ? {
                 ok: true as const,
                 action: 'reused' as const,
-                terminalKey: 'repo\0worktree\0session-1',
+                terminalSessionId: 'session-1',
                 ptySessionId: 'pty_session_1_aaaaaaaaa',
                 processName: 'zsh',
                 canonicalTitle: null,
@@ -188,7 +188,7 @@ describe('client bootstrap', () => {
             : {
                 ok: true as const,
                 action: 'created' as const,
-                terminalKey: 'repo\0worktree\0session-2',
+                terminalSessionId: 'session-2',
                 ptySessionId: 'pty_session_2_aaaaaaaaa',
                 processName: 'zsh',
                 canonicalTitle: null,

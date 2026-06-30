@@ -33,7 +33,7 @@ export function beginWorkspacePaneTabClose(
     completion: provider.close({
       repoId: target.repoId,
       branchName: target.branchName,
-      terminalKey: tab.kind === 'terminal' ? tab.terminalKey : undefined,
+      terminalSessionId: tab.kind === 'terminal' ? tab.terminalSessionId : undefined,
       terminalBase: target.terminalBase,
       closeStaticTab: useReposStore.getState().closeWorkspacePaneStaticTab,
       closeTerminalByDescriptor: bridge?.closeTerminalByDescriptor,

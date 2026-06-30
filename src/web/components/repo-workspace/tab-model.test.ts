@@ -23,7 +23,7 @@ describe('repo workspace pane tab model', () => {
       runtimeTerminalViews: [terminalView('session-1', 1, true)],
       terminalSessionCount: 1,
       terminalSyncReady: true,
-      selectedTerminalKey: null,
+      selectedTerminalSessionId: null,
     })
 
     expect(model.terminalWorktreeKey).toBe(WORKTREE_KEY)
@@ -48,13 +48,13 @@ describe('repo workspace pane tab model', () => {
       runtimeTerminalViews: [terminalView('session-1', 1, false), terminalView('session-2', 2, false)],
       terminalSessionCount: 2,
       terminalSyncReady: true,
-      selectedTerminalKey: 'session-2',
+      selectedTerminalSessionId: 'session-2',
     })
 
     expect(model.renderedTab).toBe('terminal')
     expect(model.selection).toMatchObject({ kind: 'materialized-tab', tab: 'terminal' })
     expect(model.activeTab?.identity).toBe('terminal:session-2')
-    expect(model.activeTab?.kind === 'terminal' ? model.activeTab.terminalKey : null).toBe('session-2')
+    expect(model.activeTab?.kind === 'terminal' ? model.activeTab.terminalSessionId : null).toBe('session-2')
   })
 
   test('keeps runtime-only terminals before a newly recorded terminal that follows them', () => {
@@ -67,7 +67,7 @@ describe('repo workspace pane tab model', () => {
       runtimeTerminalViews: [terminalView('session-1', 1, false), terminalView('session-2', 2, true)],
       terminalSessionCount: 2,
       terminalSyncReady: true,
-      selectedTerminalKey: 'session-2',
+      selectedTerminalSessionId: 'session-2',
     })
 
     expect(model.tabs.map((tab) => tab.identity)).toEqual([
@@ -88,7 +88,7 @@ describe('repo workspace pane tab model', () => {
       runtimeTerminalViews: [terminalView('session-1', 1, false), terminalView('session-2', 2, true)],
       terminalSessionCount: 2,
       terminalSyncReady: true,
-      selectedTerminalKey: 'session-2',
+      selectedTerminalSessionId: 'session-2',
     })
 
     expect(model.tabs.map((tab) => tab.identity)).toEqual([
@@ -110,7 +110,7 @@ describe('repo workspace pane tab model', () => {
       terminalSessionCount: 0,
       terminalCreatePending: true,
       terminalSyncReady: true,
-      selectedTerminalKey: null,
+      selectedTerminalSessionId: null,
     })
 
     expect(model.renderedTab).toBe('terminal')
@@ -133,7 +133,7 @@ describe('repo workspace pane tab model', () => {
       terminalSessionCount: 0,
       terminalCreatePending: false,
       terminalSyncReady: false,
-      selectedTerminalKey: null,
+      selectedTerminalSessionId: null,
     })
 
     expect(model.renderedTab).toBe('terminal')
@@ -152,7 +152,7 @@ describe('repo workspace pane tab model', () => {
       runtimeTerminalViews: [],
       terminalSessionCount: 0,
       terminalSyncReady: true,
-      selectedTerminalKey: null,
+      selectedTerminalSessionId: null,
     })
 
     // The user's preferred tab (changes) was closed; the model surfaces
@@ -179,7 +179,7 @@ describe('repo workspace pane tab model', () => {
       runtimeTerminalViews: [terminalView('session-1', 1, true)],
       terminalSessionCount: 1,
       terminalSyncReady: true,
-      selectedTerminalKey: null,
+      selectedTerminalSessionId: null,
     })
 
     // The user's preferred tab (history) has no materialized tab; the
@@ -205,7 +205,7 @@ describe('repo workspace pane tab model', () => {
       runtimeTerminalViews: [terminalView('ignored', 1, true)],
       terminalSessionCount: 1,
       terminalSyncReady: true,
-      selectedTerminalKey: null,
+      selectedTerminalSessionId: null,
     })
 
     expect(model.terminalViews).toEqual([])
@@ -229,7 +229,7 @@ describe('repo workspace pane tab model', () => {
       runtimeTerminalViews: [],
       terminalSessionCount: 0,
       terminalSyncReady: true,
-      selectedTerminalKey: null,
+      selectedTerminalSessionId: null,
     })
 
     expect(model.selection).toEqual({
@@ -257,7 +257,7 @@ describe('repo workspace pane tab model', () => {
       runtimeTerminalViews: [terminalView('session-2', 2, true)],
       terminalSessionCount: 1,
       terminalSyncReady: true,
-      selectedTerminalKey: 'session-2',
+      selectedTerminalSessionId: 'session-2',
     })
 
     expect(model.selection).toMatchObject({
@@ -265,7 +265,7 @@ describe('repo workspace pane tab model', () => {
       tab: 'terminal',
     })
     expect(model.renderedTab).toBe('terminal')
-    expect(model.activeTab?.kind === 'terminal' ? model.activeTab.terminalKey : null).toBe('session-2')
+    expect(model.activeTab?.kind === 'terminal' ? model.activeTab.terminalSessionId : null).toBe('session-2')
   })
 
   test('keeps the terminal-host view while a terminal create is pending', () => {
@@ -284,7 +284,7 @@ describe('repo workspace pane tab model', () => {
       terminalSessionCount: 0,
       terminalCreatePending: true,
       terminalSyncReady: true,
-      selectedTerminalKey: null,
+      selectedTerminalSessionId: null,
     })
 
     expect(model.selection).toEqual({ kind: 'terminal-host', tab: 'terminal', materializedTab: null })
@@ -306,7 +306,7 @@ describe('repo workspace pane tab model', () => {
       terminalSessionCount: 0,
       terminalCreatePending: true,
       terminalSyncReady: true,
-      selectedTerminalKey: null,
+      selectedTerminalSessionId: null,
     })
 
     expect(model.selection).toEqual({ kind: 'terminal-host', tab: 'terminal', materializedTab: null })
@@ -330,7 +330,7 @@ describe('repo workspace pane tab model', () => {
       terminalSessionCount: 0,
       terminalCreatePending: false,
       terminalSyncReady: false,
-      selectedTerminalKey: null,
+      selectedTerminalSessionId: null,
     })
 
     expect(model.selection).toEqual({ kind: 'terminal-host', tab: 'terminal', materializedTab: null })
@@ -348,7 +348,7 @@ describe('repo workspace pane tab model', () => {
       runtimeTerminalViews: [],
       terminalSessionCount: 0,
       terminalSyncReady: true,
-      selectedTerminalKey: null,
+      selectedTerminalSessionId: null,
     })
 
     // No branch, no materialized tabs, no fallback — UI shows the empty
@@ -371,7 +371,7 @@ describe('repo workspace pane tab model', () => {
       runtimeTerminalViews: [],
       terminalSessionCount: 0,
       terminalSyncReady: true,
-      selectedTerminalKey: null,
+      selectedTerminalSessionId: null,
     })
 
     expect(model.selection).toEqual({
@@ -391,7 +391,7 @@ describe('repo workspace pane tab model', () => {
       runtimeTerminalViews: [terminalView('session-1', 1, true)],
       terminalSessionCount: 1,
       terminalSyncReady: true,
-      selectedTerminalKey: 'session-1',
+      selectedTerminalSessionId: 'session-1',
     })
 
     expect(nextRepoWorkspaceTabAfterClose(model.tabs, 'workspace-pane:status')?.identity).toBe('terminal:session-1')
@@ -410,7 +410,7 @@ describe('repo workspace pane tab model', () => {
       terminalSessionCount: 0,
       terminalCreatePending: true,
       terminalSyncReady: true,
-      selectedTerminalKey: null,
+      selectedTerminalSessionId: null,
     })
 
     expect(nextRepoWorkspaceTabAfterClose(model.tabs, 'workspace-pane:status')).toBeNull()
@@ -426,7 +426,7 @@ describe('repo workspace pane tab model', () => {
       runtimeTerminalViews: [terminalView('session-1', 1, false), terminalView('session-2', 2, false)],
       terminalSessionCount: 2,
       terminalSyncReady: true,
-      selectedTerminalKey: 'session-2',
+      selectedTerminalSessionId: 'session-2',
     })
 
     expect(adjacentRepoWorkspaceTab(model.tabs, model.activeTab?.identity, 1)?.identity).toBe('workspace-pane:changes')
@@ -445,7 +445,7 @@ describe('repo workspace pane tab model', () => {
       runtimeTerminalViews: [terminalView('session-1', 1, false), terminalView('session-2', 2, false)],
       terminalSessionCount: 2,
       terminalSyncReady: true,
-      selectedTerminalKey: 'session-2',
+      selectedTerminalSessionId: 'session-2',
     })
 
     expect(model.selection).toMatchObject({ kind: 'materialized-tab', tab: 'terminal' })
@@ -461,14 +461,13 @@ function terminalEntry(id: string): WorkspacePaneTabOrderEntry {
   return workspacePaneTerminalTabOrderEntry(id)
 }
 
-function terminalView(terminalKey: string, index: number, selected: boolean): WorkspacePaneTabSummary {
+function terminalView(terminalSessionId: string, index: number, selected: boolean): WorkspacePaneTabSummary {
   return {
     type: 'terminal',
-    terminalKey,
+    terminalSessionId,
     terminalWorktreeKey: WORKTREE_KEY,
-    sessionId: terminalKey,
     index,
-    title: terminalKey,
+    title: terminalSessionId,
     phase: 'open',
     selected,
     hasBell: false,

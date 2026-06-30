@@ -143,7 +143,7 @@ export type TerminalCatalogMutationResult =
   | ({
       ok: true
       action: TerminalCatalogAction
-      terminalKey: string
+      terminalSessionId: string
       sessions: TerminalSessionSummary[]
     } & TerminalFirstFrame)
   | { ok: false; message: string }
@@ -170,7 +170,8 @@ export interface TerminalSessionInput {
 export interface TerminalNotifyBellInput {
   title: string
   body: string
-  terminalKey?: string
+  terminalSessionId?: string
+  terminalWorktreeKey?: string
   repoRoot: string
 }
 
@@ -185,7 +186,9 @@ export interface TerminalListSessionsInput {
 
 export interface TerminalSessionSummary {
   ptySessionId: string
-  terminalKey: string
+  terminalSessionId: string
+  repoRoot: string
+  worktreePath: string
   cwd: string
   controller: TerminalController | null
   processName: string

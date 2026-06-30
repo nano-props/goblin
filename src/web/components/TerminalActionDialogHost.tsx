@@ -49,7 +49,7 @@ export function TerminalActionDialogHost({ activeRepoId, navigation }: Props) {
           navigation,
           targetIdentity: payload.targetIdentity,
           confirmedTerminal: {
-            terminalKey: payload.terminalKey,
+            terminalSessionId: payload.terminalSessionId,
             base: payload.terminalBase,
           },
         })

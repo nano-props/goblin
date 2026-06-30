@@ -182,7 +182,7 @@ const WorkspacePaneStaticTabOrderEntrySchema = v.variant('type', [
 ])
 const WorkspacePaneTerminalTabOrderEntrySchema = v.object({
   type: v.literal('terminal'),
-  terminalKey: v.pipe(v.string(), v.minLength(1)),
+  terminalSessionId: v.pipe(v.string(), v.minLength(1)),
 })
 const FiletreeSessionViewStateSchema = v.object({
   selectedKeys: v.array(v.string()),
@@ -194,7 +194,7 @@ const WorkspaceSessionStateSchema = v.object({
   activeRepoId: v.nullable(v.string()),
   zenMode: v.boolean(),
   workspacePaneSize: v.number(),
-  selectedTerminalKeyByTerminalWorktree: v.optional(v.record(v.string(), v.string())),
+  selectedTerminalSessionIdByTerminalWorktree: v.optional(v.record(v.string(), v.string())),
   preferredWorkspacePaneTabByBranchByRepo: v.optional(
     v.record(v.string(), v.record(v.string(), v.picklist(['status', 'changes', 'history', 'files', 'terminal']))),
   ),

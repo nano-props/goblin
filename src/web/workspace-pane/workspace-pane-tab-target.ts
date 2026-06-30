@@ -1,4 +1,4 @@
-import { formatTerminalWorktreeKey } from '#/shared/terminal-workspace-slot-key.ts'
+import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { createRepoWorkspaceTabModel, type RepoWorkspaceTabModel } from '#/web/components/repo-workspace/tab-model.ts'
 import { workspacePaneTabOrderForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
@@ -28,8 +28,8 @@ export function workspacePaneTabTargetForBranch(repoId: string, branchName: stri
     terminalSessionCount: snapshot?.count ?? 0,
     terminalCreatePending: snapshot?.pendingCreate ?? false,
     terminalSyncReady,
-    selectedTerminalKey: terminalWorktreeKey
-      ? (state.selectedTerminalKeyByTerminalWorktree[terminalWorktreeKey] ?? null)
+    selectedTerminalSessionId: terminalWorktreeKey
+      ? (state.selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey] ?? null)
       : null,
   })
 }

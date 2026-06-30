@@ -59,7 +59,12 @@ function createBrowserTerminalNotificationProvider(): MaybeTerminalNotificationP
   return {
     notifyBell(input) {
       return showBrowserNotification(input.title, input.body, () => {
-        emitClientLocalEvent({ type: 'terminal-bell-click', repoRoot: input.repoRoot, terminalKey: input.terminalKey })
+        emitClientLocalEvent({
+          type: 'terminal-bell-click',
+          repoRoot: input.repoRoot,
+          terminalSessionId: input.terminalSessionId,
+          terminalWorktreeKey: input.terminalWorktreeKey,
+        })
       })
     },
     sendTestNotification(input) {

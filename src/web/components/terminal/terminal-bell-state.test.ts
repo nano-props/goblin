@@ -8,9 +8,8 @@ import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-queries.ts'
 
 const descriptor: TerminalDescriptor = {
-  terminalKey: 'terminal-key',
+  terminalSessionId: 'session-1',
   terminalWorktreeKey: 'worktree-key',
-  sessionId: 'session-1',
   index: 1,
   repoRoot: '/tmp/repo',
   branch: 'feature/test',
@@ -66,12 +65,13 @@ describe('terminal bell state', () => {
     controller.handleBell(descriptor, { processName: 'zsh', visible: false })
     await Promise.resolve()
 
-    expect(controller.hasBell(descriptor.terminalKey)).toBe(true)
+    expect(controller.hasBell(descriptor.terminalSessionId)).toBe(true)
     expect(notify).toHaveBeenCalledTimes(1)
     expect(window.goblinNative.terminal.notifyBell).toHaveBeenCalledWith({
       title: 'repo',
       body: 'feature/test\nzsh',
-      terminalKey: 'terminal-key',
+      terminalSessionId: 'session-1',
+      terminalWorktreeKey: 'worktree-key',
       repoRoot: '/tmp/repo',
     })
 
@@ -97,7 +97,8 @@ describe('terminal bell state', () => {
     expect(window.goblinNative.terminal.notifyBell).toHaveBeenCalledWith({
       title: 'repo',
       body: 'feature/test\n~/Developer/goblin — npm run dev',
-      terminalKey: 'terminal-key',
+      terminalSessionId: 'session-1',
+      terminalWorktreeKey: 'worktree-key',
       repoRoot: '/tmp/repo',
     })
 
@@ -116,7 +117,7 @@ describe('terminal bell state', () => {
     controller.handleBell(descriptor, { processName: 'zsh', visible: false })
     await Promise.resolve()
 
-    expect(controller.hasBell(descriptor.terminalKey)).toBe(true)
+    expect(controller.hasBell(descriptor.terminalSessionId)).toBe(true)
     expect(notify).toHaveBeenCalledTimes(1)
     expect(window.goblinNative.terminal.notifyBell).not.toHaveBeenCalled()
 
@@ -135,7 +136,7 @@ describe('terminal bell state', () => {
     controller.handleBell(descriptor, { processName: 'zsh', visible: true })
     await Promise.resolve()
 
-    expect(controller.hasBell(descriptor.terminalKey)).toBe(false)
+    expect(controller.hasBell(descriptor.terminalSessionId)).toBe(false)
     expect(notify).not.toHaveBeenCalled()
     expect(window.goblinNative.terminal.notifyBell).not.toHaveBeenCalled()
 
@@ -175,14 +176,14 @@ describe('terminal bell state', () => {
     const controller = createTerminalBellState(vi.fn(), vi.fn())
 
     controller.handleBell(descriptor, { processName: 'zsh', visible: false })
-    expect(controller.hasBell(descriptor.terminalKey)).toBe(true)
-    expect(controller.clear(descriptor.terminalKey)).toBe(true)
-    expect(controller.hasBell(descriptor.terminalKey)).toBe(false)
+    expect(controller.hasBell(descriptor.terminalSessionId)).toBe(true)
+    expect(controller.clear(descriptor.terminalSessionId)).toBe(true)
+    expect(controller.hasBell(descriptor.terminalSessionId)).toBe(false)
 
     controller.handleBell(descriptor, { processName: 'zsh', visible: false })
-    expect(controller.hasBell(descriptor.terminalKey)).toBe(true)
-    controller.remove(descriptor.terminalKey)
-    expect(controller.hasBell(descriptor.terminalKey)).toBe(false)
+    expect(controller.hasBell(descriptor.terminalSessionId)).toBe(true)
+    controller.remove(descriptor.terminalSessionId)
+    expect(controller.hasBell(descriptor.terminalSessionId)).toBe(false)
   })
 
   test('reset clears unread and notification debounce state', async () => {
@@ -199,7 +200,7 @@ describe('terminal bell state', () => {
     await Promise.resolve()
 
     controller.reset()
-    expect(controller.hasBell(descriptor.terminalKey)).toBe(false)
+    expect(controller.hasBell(descriptor.terminalSessionId)).toBe(false)
 
     now.mockReturnValueOnce(21_000)
     controller.handleBell(descriptor, { processName: 'zsh', visible: false })

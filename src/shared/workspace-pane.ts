@@ -43,7 +43,7 @@ export interface WorkspacePaneStaticTabOrderEntry {
 
 export interface WorkspacePaneTerminalTabOrderEntry {
   type: 'terminal'
-  terminalKey: string
+  terminalSessionId: string
 }
 
 export type WorkspacePaneTabOrderEntry = WorkspacePaneStaticTabOrderEntry | WorkspacePaneTerminalTabOrderEntry
@@ -88,11 +88,11 @@ export function isWorkspacePaneTabOrderEntry(value: unknown): value is Workspace
 
 export function workspacePaneTabOrderEntryFromUnknown(value: unknown): WorkspacePaneTabOrderEntry | null {
   if (!value || typeof value !== 'object') return null
-  const entry = value as { type?: unknown; tabId?: unknown; terminalKey?: unknown }
+  const entry = value as { type?: unknown; tabId?: unknown; terminalSessionId?: unknown }
   const type = typeof entry.type === 'string' ? entry.type : null
   if (type === 'terminal') {
-    return typeof entry.terminalKey === 'string' && entry.terminalKey.length > 0
-      ? workspacePaneTerminalTabOrderEntry(entry.terminalKey)
+    return typeof entry.terminalSessionId === 'string' && entry.terminalSessionId.length > 0
+      ? workspacePaneTerminalTabOrderEntry(entry.terminalSessionId)
       : null
   }
   if (!isWorkspacePaneStaticTabType(type)) return null
@@ -105,12 +105,12 @@ export function workspacePaneStaticTabOrderEntry(type: WorkspacePaneStaticTabTyp
   return { type, tabId: workspacePaneStaticTabId(type) }
 }
 
-export function workspacePaneTerminalTabOrderEntry(terminalKey: string): WorkspacePaneTerminalTabOrderEntry {
-  return { type: 'terminal', terminalKey }
+export function workspacePaneTerminalTabOrderEntry(terminalSessionId: string): WorkspacePaneTerminalTabOrderEntry {
+  return { type: 'terminal', terminalSessionId }
 }
 
 export function workspacePaneTabOrderEntryIdentity(entry: WorkspacePaneTabOrderEntry): string {
-  return entry.type === 'terminal' ? `terminal:${entry.terminalKey}` : entry.tabId
+  return entry.type === 'terminal' ? `terminal:${entry.terminalSessionId}` : entry.tabId
 }
 
 export function workspacePaneStaticTabId(type: WorkspacePaneStaticTabType): WorkspacePaneStaticTabId {

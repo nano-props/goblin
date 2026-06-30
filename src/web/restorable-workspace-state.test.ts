@@ -24,8 +24,8 @@ describe('restorable-workspace-state', () => {
           activeId: repo.id,
           zenMode: false,
           workspacePaneSize: 55,
-          selectedTerminalKeyByTerminalWorktree: {
-            '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0session-2',
+          selectedTerminalSessionIdByTerminalWorktree: {
+            '/tmp/repo\0/tmp/worktree': 'session-2',
           },
         },
       }),
@@ -34,8 +34,8 @@ describe('restorable-workspace-state', () => {
       activeRepoId: '/tmp/repo',
       zenMode: false,
       workspacePaneSize: 55,
-      selectedTerminalKeyByTerminalWorktree: {
-        '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0session-2',
+      selectedTerminalSessionIdByTerminalWorktree: {
+        '/tmp/repo\0/tmp/worktree': 'session-2',
       },
       preferredWorkspacePaneTabByBranchByRepo: { '/tmp/repo': { 'feature/worktree': 'terminal' } },
       workspacePaneTabOrderByBranchByRepo: {
@@ -64,7 +64,7 @@ describe('restorable-workspace-state', () => {
           activeId: repo.id,
           zenMode: false,
           workspacePaneSize: 55,
-          selectedTerminalKeyByTerminalWorktree: {},
+          selectedTerminalSessionIdByTerminalWorktree: {},
         },
       }),
     ).toMatchObject({
@@ -96,7 +96,7 @@ describe('restorable-workspace-state', () => {
           activeId: repo.id,
           zenMode: false,
           workspacePaneSize: 55,
-          selectedTerminalKeyByTerminalWorktree: {},
+          selectedTerminalSessionIdByTerminalWorktree: {},
         },
       }),
     ).toMatchObject({
@@ -114,8 +114,8 @@ describe('restorable-workspace-state', () => {
         activeRepoId: '/tmp/repo',
         zenMode: false,
         workspacePaneSize: 40,
-        selectedTerminalKeyByTerminalWorktree: {
-          '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0session-1',
+        selectedTerminalSessionIdByTerminalWorktree: {
+          '/tmp/repo\0/tmp/worktree': 'session-1',
         },
         workspacePaneTabOrderByBranchByRepo: {
           '/tmp/repo': {
@@ -127,8 +127,8 @@ describe('restorable-workspace-state', () => {
       activeId: '/tmp/repo',
       zenMode: false,
       workspacePaneSize: 40,
-      selectedTerminalKeyByTerminalWorktree: {
-        '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0session-1',
+      selectedTerminalSessionIdByTerminalWorktree: {
+        '/tmp/repo\0/tmp/worktree': 'session-1',
       },
       preferredWorkspacePaneTabByBranchByRepo: {},
       workspacePaneTabOrderByBranchByRepo: {
@@ -158,7 +158,7 @@ describe('restorable-workspace-state', () => {
           activeId: repo.id,
           zenMode: false,
           workspacePaneSize: 55,
-          selectedTerminalKeyByTerminalWorktree: {},
+          selectedTerminalSessionIdByTerminalWorktree: {},
         },
       }),
     ).toMatchObject({
@@ -189,7 +189,7 @@ describe('restorable-workspace-state', () => {
         activeId: repo.id,
         zenMode: false,
         workspacePaneSize: 55,
-        selectedTerminalKeyByTerminalWorktree: {},
+        selectedTerminalSessionIdByTerminalWorktree: {},
       },
     })
     const restored = restoreRestorableWorkspaceStateFromSession(sessionState)
@@ -218,7 +218,7 @@ describe('restorable-workspace-state', () => {
           activeId: repo.id,
           zenMode: false,
           workspacePaneSize: 55,
-          selectedTerminalKeyByTerminalWorktree: {},
+          selectedTerminalSessionIdByTerminalWorktree: {},
         },
         filetreeInteractionByScope: {
           '/tmp/repo\0/tmp/worktree': {

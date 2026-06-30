@@ -38,9 +38,8 @@ class MockResizeObserver {
 
 function descriptor(): TerminalDescriptor {
   return {
-    terminalKey: '/repo\0/repo\0session-1',
+    terminalSessionId: 'session-1',
     terminalWorktreeKey: '/repo\0/repo',
-    sessionId: 'session-1',
     index: 1,
     repoRoot: '/repo',
     branch: 'main',

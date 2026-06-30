@@ -478,9 +478,8 @@ const hostOpenExternalUrl = vi.fn<NonNullable<Window['goblinNative']['host']>['o
 const mockFonts = new MockFontFaceSet()
 
 const descriptor = {
-  terminalKey: '/repo\0/worktree',
+  terminalSessionId: 'session-1',
   terminalWorktreeKey: '/repo\0/worktree',
-  sessionId: 'session-1',
   index: 1,
   repoRoot: '/repo',
   branch: 'feature',
@@ -620,14 +619,14 @@ beforeEach(() => {
         input?.kind === 'primary'
           ? {
               action: 'reused' as const,
-              terminalKey: 'repo\0worktree\0session-1',
+              terminalSessionId: 'session-1',
               sessions: [],
               ...createFirstFrame('session-1'),
               ok: true as const,
             }
           : {
               action: 'created' as const,
-              terminalKey: 'repo\0worktree\0session-2',
+              terminalSessionId: 'session-2',
               sessions: [],
               ...createFirstFrame('session-2'),
               ok: true as const,

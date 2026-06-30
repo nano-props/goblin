@@ -903,18 +903,17 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): Pri
 }
 
 function terminalSession(
-  terminalKey: string,
+  terminalSessionId: string,
   index: number,
   selected: boolean,
   terminalWorktreeKey: string,
 ): TerminalSessionSummary {
   return {
     type: 'terminal',
-    terminalKey,
+    terminalSessionId,
     terminalWorktreeKey,
-    sessionId: terminalKey,
     index,
-    title: terminalKey,
+    title: terminalSessionId,
     phase: 'open',
     selected,
     hasBell: false,

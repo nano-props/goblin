@@ -21,11 +21,11 @@ describe('isClientEffectIntent', () => {
     expect(isClientEffectIntent({ type: 'theme-pref-set-requested', pref: 'sepia' })).toBe(false)
     expect(isClientEffectIntent({ type: 'lang-pref-set-requested', pref: 'zh' })).toBe(true)
     expect(isClientEffectIntent({ type: 'lang-pref-set-requested', pref: 'fr' })).toBe(false)
-    expect(isClientEffectIntent({ type: 'terminal-bell-click', repoRoot: '/tmp/repo', terminalKey: 'session-1' })).toBe(
+    expect(isClientEffectIntent({ type: 'terminal-bell-click', repoRoot: '/tmp/repo', terminalSessionId: 'session-1' })).toBe(
       true,
     )
     expect(isClientEffectIntent({ type: 'terminal-bell-click', repoRoot: '/tmp/repo', key: 'session-1' })).toBe(false)
-    expect(isClientEffectIntent({ type: 'terminal-bell-click', repoRoot: '/tmp/repo', terminalKey: 1 })).toBe(false)
+    expect(isClientEffectIntent({ type: 'terminal-bell-click', repoRoot: '/tmp/repo', terminalSessionId: 1 })).toBe(false)
   })
 
   test('accepts only valid recent repo entries', () => {

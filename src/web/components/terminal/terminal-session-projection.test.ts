@@ -23,9 +23,12 @@ describe('terminal session projection helpers', () => {
       repoIndex: makeRepoIndex(),
       repoRoot: REPO_ROOT,
       clientId: 'client_a',
+      index: 2,
       serverSession: {
         ptySessionId: 'pty_session_123_aaaaaaaaa',
-        terminalKey: `${REPO_ROOT}\0${WORKTREE_PATH}\0session-2`,
+        terminalSessionId: 'session-2',
+        repoRoot: REPO_ROOT,
+        worktreePath: WORKTREE_PATH,
         cwd: WORKTREE_PATH,
         controller: { clientId: 'client_a', status: 'connected' },
         processName: 'zsh',
@@ -40,9 +43,8 @@ describe('terminal session projection helpers', () => {
 
     expect(projected).toEqual({
       descriptor: {
-        terminalKey: `${REPO_ROOT}\0${WORKTREE_PATH}\0session-2`,
+        terminalSessionId: 'session-2',
         terminalWorktreeKey: `${REPO_ROOT}\0${WORKTREE_PATH}`,
-        sessionId: 'session-2',
         index: 2,
         repoRoot: REPO_ROOT,
         branch: 'main',
@@ -71,9 +73,12 @@ describe('terminal session projection helpers', () => {
       repoIndex: makeRepoIndex(),
       repoRoot: REPO_ROOT,
       clientId: 'client_b',
+      index: 1,
       serverSession: {
         ptySessionId: 'pty_session_123_aaaaaaaaa',
-        terminalKey: `${REPO_ROOT}\0${WORKTREE_PATH}\0session-1`,
+        terminalSessionId: 'session-1',
+        repoRoot: REPO_ROOT,
+        worktreePath: WORKTREE_PATH,
         cwd: WORKTREE_PATH,
         controller: { clientId: 'client_a', status: 'connected' },
         processName: 'bash',

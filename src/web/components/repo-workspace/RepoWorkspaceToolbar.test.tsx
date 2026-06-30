@@ -1214,9 +1214,8 @@ function renderToolbar(options: {
   const detail = getSelectedRepoWorkspacePresentation(repo)
   const sessions: TerminalSessionSummary[] = Array.from({ length: options.terminalCount }, (_, index) => ({
     type: 'terminal',
-    terminalKey: `t${index + 1}`,
+    terminalSessionId: `t${index + 1}`,
     terminalWorktreeKey: `${REPO_ID}\0${WORKTREE_PATH}`,
-    sessionId: `t${index + 1}`,
     index: index + 1,
     title: `term-${index + 1}`,
     fullTitle: `full-term-${index + 1}`,
@@ -1227,9 +1226,8 @@ function renderToolbar(options: {
   }))
   const selectedDescriptor: TerminalDescriptor | null = sessions[0]
     ? {
-        terminalKey: sessions[0].terminalKey,
+        terminalSessionId: sessions[0].terminalSessionId,
         terminalWorktreeKey: sessions[0].terminalWorktreeKey,
-        sessionId: sessions[0].sessionId,
         index: sessions[0].index,
         repoRoot: REPO_ID,
         branch: branchName,

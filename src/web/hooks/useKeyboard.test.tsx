@@ -376,9 +376,8 @@ function terminalWorktreeSnapshot(): TerminalWorktreeSnapshot {
   return {
     terminalWorktreeKey: WORKTREE_KEY,
     selectedDescriptor: {
-      terminalKey: 'session-1',
+      terminalSessionId: 'session-1',
       terminalWorktreeKey: WORKTREE_KEY,
-      sessionId: 'session-1',
       index: 1,
       repoRoot: REPO_ID,
       branch: 'feature/worktree',
@@ -387,9 +386,8 @@ function terminalWorktreeSnapshot(): TerminalWorktreeSnapshot {
     sessions: [
       {
         type: 'terminal',
-        terminalKey: 'session-1',
+        terminalSessionId: 'session-1',
         terminalWorktreeKey: WORKTREE_KEY,
-        sessionId: 'session-1',
         index: 1,
         title: 'terminal 1',
         phase: 'open',

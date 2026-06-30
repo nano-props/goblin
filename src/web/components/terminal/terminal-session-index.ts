@@ -1,21 +1,21 @@
 export function syncTerminalPtySessionIdIndex(input: {
-  terminalKey: string
+  terminalSessionId: string
   ptySessionId: string | null
-  ptySessionIdByTerminalKey: Map<string, string>
-  terminalKeyByPtySessionId: Map<string, string>
+  ptySessionIdByTerminalSessionId: Map<string, string>
+  terminalSessionIdByPtySessionId: Map<string, string>
 }): void {
-  const previousPtySessionId = input.ptySessionIdByTerminalKey.get(input.terminalKey)
+  const previousPtySessionId = input.ptySessionIdByTerminalSessionId.get(input.terminalSessionId)
   if (
     previousPtySessionId &&
     previousPtySessionId !== input.ptySessionId &&
-    input.terminalKeyByPtySessionId.get(previousPtySessionId) === input.terminalKey
+    input.terminalSessionIdByPtySessionId.get(previousPtySessionId) === input.terminalSessionId
   ) {
-    input.terminalKeyByPtySessionId.delete(previousPtySessionId)
+    input.terminalSessionIdByPtySessionId.delete(previousPtySessionId)
   }
   if (!input.ptySessionId) {
-    input.ptySessionIdByTerminalKey.delete(input.terminalKey)
+    input.ptySessionIdByTerminalSessionId.delete(input.terminalSessionId)
     return
   }
-  input.ptySessionIdByTerminalKey.set(input.terminalKey, input.ptySessionId)
-  input.terminalKeyByPtySessionId.set(input.ptySessionId, input.terminalKey)
+  input.ptySessionIdByTerminalSessionId.set(input.terminalSessionId, input.ptySessionId)
+  input.terminalSessionIdByPtySessionId.set(input.ptySessionId, input.terminalSessionId)
 }

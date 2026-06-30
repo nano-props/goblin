@@ -28,7 +28,7 @@ export function runtimeCoherentRepoProjectionStateFromStore(
 export function restorableWorkspaceStateFromStore(
   state: Pick<
     ReposStore,
-    'order' | 'activeId' | 'zenMode' | 'workspacePaneSize' | 'selectedTerminalKeyByTerminalWorktree'
+    'order' | 'activeId' | 'zenMode' | 'workspacePaneSize' | 'selectedTerminalSessionIdByTerminalWorktree'
   >,
 ): RestorableWorkspaceState {
   return {
@@ -36,7 +36,7 @@ export function restorableWorkspaceStateFromStore(
     activeId: state.activeId,
     zenMode: state.zenMode,
     workspacePaneSize: state.workspacePaneSize,
-    selectedTerminalKeyByTerminalWorktree: state.selectedTerminalKeyByTerminalWorktree,
+    selectedTerminalSessionIdByTerminalWorktree: state.selectedTerminalSessionIdByTerminalWorktree,
   }
 }
 

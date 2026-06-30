@@ -2,11 +2,10 @@ import { describe, expect, test, vi } from 'vitest'
 import { buildTerminalWorktreeSnapshot } from '#/web/components/terminal/terminal-session-worktree-snapshot.ts'
 import type { TerminalSessionLike, TerminalDescriptor, TerminalSnapshot } from '#/web/components/terminal/types.ts'
 
-function makeDescriptor(sessionId: string, index: number): TerminalDescriptor {
+function makeDescriptor(terminalSessionId: string, index: number): TerminalDescriptor {
   return {
-    terminalKey: `/repo\0/repo\0${sessionId}`,
+    terminalSessionId: `/repo\0/repo\0${terminalSessionId}`,
     terminalWorktreeKey: '/repo\0/repo',
-    sessionId,
     index,
     repoRoot: '/repo',
     branch: 'main',
@@ -63,9 +62,9 @@ describe('terminal session worktree snapshot helper', () => {
       selectedDescriptor: descriptor,
       pendingCreate: false,
       sessions: [session],
-      selectedTerminalKey: descriptor.terminalKey,
-      getCachedSnapshot: (terminalKey) => cache.get(terminalKey) ?? null,
-      cacheSnapshot: (terminalKey, value) => cache.set(terminalKey, value),
+      selectedTerminalSessionId: descriptor.terminalSessionId,
+      getCachedSnapshot: (terminalSessionId) => cache.get(terminalSessionId) ?? null,
+      cacheSnapshot: (terminalSessionId, value) => cache.set(terminalSessionId, value),
       hasBell: () => true,
       hasRecentActivity: () => true,
     })
@@ -76,8 +75,7 @@ describe('terminal session worktree snapshot helper', () => {
       sessions: [
         expect.objectContaining({
           type: 'terminal',
-          terminalKey: descriptor.terminalKey,
-          sessionId: 'session-1',
+          terminalSessionId: descriptor.terminalSessionId,
           selected: true,
           hasBell: true,
           recentlyActive: true,
@@ -97,9 +95,9 @@ describe('terminal session worktree snapshot helper', () => {
       selectedDescriptor: descriptor,
       pendingCreate: false,
       sessions: [session],
-      selectedTerminalKey: descriptor.terminalKey,
-      getCachedSnapshot: (terminalKey) => cache.get(terminalKey) ?? null,
-      cacheSnapshot: (terminalKey, value) => cache.set(terminalKey, value),
+      selectedTerminalSessionId: descriptor.terminalSessionId,
+      getCachedSnapshot: (terminalSessionId) => cache.get(terminalSessionId) ?? null,
+      cacheSnapshot: (terminalSessionId, value) => cache.set(terminalSessionId, value),
       hasBell: () => false,
       hasRecentActivity: () => false,
     })

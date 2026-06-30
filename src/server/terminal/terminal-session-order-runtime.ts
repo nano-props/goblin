@@ -6,26 +6,26 @@ export interface TerminalSessionOrderWorktreeInput<TUser extends string | number
 
 export interface TerminalSessionOrderReplaceInput<TUser extends string | number>
   extends TerminalSessionOrderWorktreeInput<TUser> {
-  terminalKeys: readonly string[]
+  terminalSessionIds: readonly string[]
 }
 
 export class TerminalSessionOrderRuntime<TUser extends string | number> {
-  private readonly terminalKeysByWorktree = new Map<string, string[]>()
+  private readonly terminalSessionIdsByWorktree = new Map<string, string[]>()
 
   replaceTerminalSessionOrder(input: TerminalSessionOrderReplaceInput<TUser>): void {
     const worktreeKey = this.worktreeKey(input)
-    const terminalKeys = uniqueNonEmptyStrings(input.terminalKeys)
-    if (terminalKeys.length === 0) this.terminalKeysByWorktree.delete(worktreeKey)
-    else this.terminalKeysByWorktree.set(worktreeKey, terminalKeys)
+    const terminalSessionIds = uniqueNonEmptyStrings(input.terminalSessionIds)
+    if (terminalSessionIds.length === 0) this.terminalSessionIdsByWorktree.delete(worktreeKey)
+    else this.terminalSessionIdsByWorktree.set(worktreeKey, terminalSessionIds)
   }
 
-  orderedTerminalKeys(input: TerminalSessionOrderWorktreeInput<TUser>): string[] {
-    return [...(this.terminalKeysByWorktree.get(this.worktreeKey(input)) ?? [])]
+  orderedTerminalSessionIds(input: TerminalSessionOrderWorktreeInput<TUser>): string[] {
+    return [...(this.terminalSessionIdsByWorktree.get(this.worktreeKey(input)) ?? [])]
   }
 
   closeSessionsForUser(userId: TUser): void {
-    for (const key of Array.from(this.terminalKeysByWorktree.keys())) {
-      if (key.startsWith(`${String(userId)}\0`)) this.terminalKeysByWorktree.delete(key)
+    for (const key of Array.from(this.terminalSessionIdsByWorktree.keys())) {
+      if (key.startsWith(`${String(userId)}\0`)) this.terminalSessionIdsByWorktree.delete(key)
     }
   }
 

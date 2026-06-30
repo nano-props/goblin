@@ -72,7 +72,7 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
         terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         panelActive
-        sessions={[session({ terminalKey: 't1', selected: true })]}
+        sessions={[session({ terminalSessionId: 't1', selected: true })]}
         onNew={() => {}}
         onSelect={() => {}}
         onScrollToBottom={() => {}}
@@ -97,8 +97,8 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
         terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
-          session({ terminalKey: 't1', selected: true }),
-          session({ terminalKey: 't2', selected: false, sessionId: 'session-2', index: 2 }),
+          session({ terminalSessionId: 't1', selected: true }),
+          session({ terminalSessionId: 'session-2', selected: false, index: 2 }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -173,7 +173,7 @@ function makeWorkspacePaneTabStrip(
       <WorkspacePaneTabStrip
         {...workspacePaneProps}
         items={items}
-        activeTabIdentity={selected ? terminalWorkspacePaneTabProvider.identity(selected.terminalKey) : null}
+        activeTabIdentity={selected ? terminalWorkspacePaneTabProvider.identity(selected.terminalSessionId) : null}
         onSelect={(item) => {
           if (isTerminalWorkspacePaneTabItem(item)) props.onSelect(props.terminalWorktreeKey, item.view)
         }}
@@ -186,13 +186,12 @@ function makeWorkspacePaneTabStrip(
 }
 
 function session(overrides: Partial<TerminalSessionSummary> = {}): TerminalSessionSummary {
-  const terminalKey = overrides.terminalKey ?? 't1'
+  const terminalSessionId = overrides.terminalSessionId ?? 't1'
   const title = overrides.title ?? 'term-1'
   return {
     type: 'terminal',
-    terminalKey,
+    terminalSessionId,
     terminalWorktreeKey: overrides.terminalWorktreeKey ?? '/repo\0/repo/worktree',
-    sessionId: overrides.sessionId ?? 'session-1',
     index: overrides.index ?? 1,
     title,
     fullTitle: overrides.fullTitle ?? title,

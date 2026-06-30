@@ -34,7 +34,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   // xterm views alive across settings → workspace round-trips.
   const currentRepoId = useReposStore((s) => s.activeId)
   const currentRepoInstanceToken = currentRepoId ? (repoIndex[currentRepoId]?.instanceToken ?? null) : null
-  const selectedTerminalKeyByTerminalWorktree = useReposStore((s) => s.selectedTerminalKeyByTerminalWorktree)
+  const selectedTerminalSessionIdByTerminalWorktree = useReposStore((s) => s.selectedTerminalSessionIdByTerminalWorktree)
   const setSelectedTerminal = useReposStore((s) => s.setSelectedTerminal)
   const parkingRootRef = useRef<HTMLDivElement | null>(null)
   const repoIndexRef = useRef(repoIndex)
@@ -77,11 +77,11 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       // at read time when the active tab disappears, so this callback only
       // needs to drop the tab from the branch-scoped tab order — no
       // navigation or view-switch call required.
-      onTerminalSessionRemoved: (terminalKey, base) => {
-        useReposStore.getState().removeWorkspacePaneTerminalTab(base.repoRoot, terminalKey, base.branch)
+      onTerminalSessionRemoved: (terminalSessionId, base) => {
+        useReposStore.getState().removeWorkspacePaneTerminalTab(base.repoRoot, terminalSessionId, base.branch)
       },
-      onTerminalSessionsMaterialized: (base, terminalKeys) => {
-        useReposStore.getState().ensureWorkspacePaneTerminalTabs(base.repoRoot, base.branch, terminalKeys)
+      onTerminalSessionsMaterialized: (base, terminalSessionIds) => {
+        useReposStore.getState().ensureWorkspacePaneTerminalTabs(base.repoRoot, base.branch, terminalSessionIds)
       },
     })
   }
@@ -142,8 +142,8 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   // Projection state sync
   useEffect(() => {
     projection.setRepoIndex(repoIndex)
-    projection.setPreferredSelectedTerminalKeys(selectedTerminalKeyByTerminalWorktree)
-  }, [projection, repoIndex, selectedTerminalKeyByTerminalWorktree])
+    projection.setPreferredSelectedTerminalSessionIds(selectedTerminalSessionIdByTerminalWorktree)
+  }, [projection, repoIndex, selectedTerminalSessionIdByTerminalWorktree])
 
   // Parking DOM
   useEffect(() => {

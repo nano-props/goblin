@@ -4,7 +4,7 @@ import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 export interface TerminalCloseConfirmPayload {
   readonly repoId: string
   readonly targetIdentity: string
-  readonly terminalKey: string
+  readonly terminalSessionId: string
   readonly terminalBase: TerminalSessionBase
   readonly processName: string
 }

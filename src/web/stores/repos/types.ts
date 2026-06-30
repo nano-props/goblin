@@ -158,8 +158,8 @@ export interface RestorableWorkspaceState {
   /** Large-screen Zen Mode restored from WorkspaceSessionState. Compact UI is stronger and always shows one pane at a time. */
   zenMode: boolean
   workspacePaneSize: number
-  /** Per worktree terminal selection restored from WorkspaceSessionState.selectedTerminalKeyByTerminalWorktree. */
-  selectedTerminalKeyByTerminalWorktree: Record<string, string>
+  /** Per worktree terminal selection restored from WorkspaceSessionState.selectedTerminalSessionIdByTerminalWorktree. */
+  selectedTerminalSessionIdByTerminalWorktree: Record<string, string>
 }
 
 export interface SessionWorkspacePaneRestoreState {
@@ -183,7 +183,7 @@ interface LocalWorkspaceState {
 interface RestorableWorkspaceActions {
   setActive: (id: string) => void
   applySessionLayoutState: (layout: Pick<WorkspaceSessionState, 'zenMode' | 'workspacePaneSize'>) => void
-  applySessionSelectedTerminalState: (selectedTerminalKeyByTerminalWorktree: Record<string, string>) => void
+  applySessionSelectedTerminalState: (selectedTerminalSessionIdByTerminalWorktree: Record<string, string>) => void
   setZenMode: (enabled: boolean) => void
   toggleZenMode: () => void
   setWorkspacePaneSize: (size: number) => void
@@ -213,10 +213,10 @@ interface RuntimeCoherentRepoProjectionActions {
   setWorkspacePaneTab: (id: string, tab: WorkspacePaneTabType) => void
   openWorkspacePaneStaticTab: (id: string, tab: WorkspacePaneStaticTabType, branchName?: string) => void
   closeWorkspacePaneStaticTab: (id: string, tab: WorkspacePaneStaticTabType, branchName?: string) => void
-  ensureWorkspacePaneTerminalTab: (id: string, terminalKey: string, branchName?: string) => void
-  ensureAndFocusWorkspacePaneTerminalTab: (id: string, terminalKey: string, branchName?: string) => void
-  ensureWorkspacePaneTerminalTabs: (id: string, branchName: string, terminalKeys: readonly string[]) => void
-  removeWorkspacePaneTerminalTab: (id: string, terminalKey: string, branchName?: string) => void
+  ensureWorkspacePaneTerminalTab: (id: string, terminalSessionId: string, branchName?: string) => void
+  ensureAndFocusWorkspacePaneTerminalTab: (id: string, terminalSessionId: string, branchName?: string) => void
+  ensureWorkspacePaneTerminalTabs: (id: string, branchName: string, terminalSessionIds: readonly string[]) => void
+  removeWorkspacePaneTerminalTab: (id: string, terminalSessionId: string, branchName?: string) => void
   reorderWorkspacePaneTabs: (id: string, orderedTabs: WorkspacePaneTabOrderEntry[], branchName?: string) => void
   setBranchViewMode: (id: string, viewMode: BranchViewMode) => void
   selectBranch: (id: string, branch: string) => void

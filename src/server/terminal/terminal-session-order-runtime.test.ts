@@ -9,19 +9,19 @@ describe('terminal session order runtime', () => {
       userId: 'user-a',
       scope: '/repo',
       worktreePath: '/repo-linked',
-      terminalKeys: ['session-1', 'session-2'],
+      terminalSessionIds: ['session-1', 'session-2'],
     })
 
-    expect(runtime.orderedTerminalKeys(worktree())).toEqual(['session-1', 'session-2'])
+    expect(runtime.orderedTerminalSessionIds(worktree())).toEqual(['session-1', 'session-2'])
 
     runtime.replaceTerminalSessionOrder({
       userId: 'user-a',
       scope: '/repo',
       worktreePath: '/repo-linked',
-      terminalKeys: ['session-2', 'session-1'],
+      terminalSessionIds: ['session-2', 'session-1'],
     })
 
-    expect(runtime.orderedTerminalKeys(worktree())).toEqual(['session-2', 'session-1'])
+    expect(runtime.orderedTerminalSessionIds(worktree())).toEqual(['session-2', 'session-1'])
   })
 
   test('isolates identical terminal identities by user', () => {
@@ -31,17 +31,17 @@ describe('terminal session order runtime', () => {
       userId: 'user-a',
       scope: '/repo',
       worktreePath: '/repo-linked',
-      terminalKeys: ['session-1'],
+      terminalSessionIds: ['session-1'],
     })
     runtime.replaceTerminalSessionOrder({
       userId: 'user-b',
       scope: '/repo',
       worktreePath: '/repo-linked',
-      terminalKeys: ['session-1'],
+      terminalSessionIds: ['session-1'],
     })
 
-    expect(runtime.orderedTerminalKeys(worktree())).toEqual(['session-1'])
-    expect(runtime.orderedTerminalKeys({ ...worktree(), userId: 'user-b' })).toEqual(['session-1'])
+    expect(runtime.orderedTerminalSessionIds(worktree())).toEqual(['session-1'])
+    expect(runtime.orderedTerminalSessionIds({ ...worktree(), userId: 'user-b' })).toEqual(['session-1'])
   })
 
   test('removes terminal views by user', () => {
@@ -51,19 +51,19 @@ describe('terminal session order runtime', () => {
       userId: 'user-a',
       scope: '/repo',
       worktreePath: '/repo-linked',
-      terminalKeys: ['session-1'],
+      terminalSessionIds: ['session-1'],
     })
     runtime.replaceTerminalSessionOrder({
       userId: 'user-b',
       scope: '/repo',
       worktreePath: '/repo-linked',
-      terminalKeys: ['session-1'],
+      terminalSessionIds: ['session-1'],
     })
 
     runtime.closeSessionsForUser('user-a')
 
-    expect(runtime.orderedTerminalKeys(worktree())).toEqual([])
-    expect(runtime.orderedTerminalKeys({ ...worktree(), userId: 'user-b' })).toEqual(['session-1'])
+    expect(runtime.orderedTerminalSessionIds(worktree())).toEqual([])
+    expect(runtime.orderedTerminalSessionIds({ ...worktree(), userId: 'user-b' })).toEqual(['session-1'])
   })
 })
 

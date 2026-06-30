@@ -54,65 +54,65 @@ export function workspacePaneTabOrderWithoutStaticTab(
 
 export function workspacePaneTabOrderWithEnsuredTerminal(
   current: readonly WorkspacePaneTabOrderEntry[],
-  terminalKey: string,
+  terminalSessionId: string,
 ): WorkspacePaneTabOrderEntry[] {
   const normalized = normalizeWorkspacePaneTabOrder(current)
-  if (terminalKey.length === 0) return normalized
-  if (normalized.some((entry) => entry.type === 'terminal' && entry.terminalKey === terminalKey)) return normalized
-  return normalizeWorkspacePaneTabOrder([...normalized, workspacePaneTerminalTabOrderEntry(terminalKey)])
+  if (terminalSessionId.length === 0) return normalized
+  if (normalized.some((entry) => entry.type === 'terminal' && entry.terminalSessionId === terminalSessionId)) return normalized
+  return normalizeWorkspacePaneTabOrder([...normalized, workspacePaneTerminalTabOrderEntry(terminalSessionId)])
 }
 
 export function workspacePaneTabOrderWithMaterializedTerminals(
   current: readonly WorkspacePaneTabOrderEntry[],
-  terminalKeys: readonly string[],
+  terminalSessionIds: readonly string[],
 ): WorkspacePaneTabOrderEntry[] {
   const normalized = normalizeWorkspacePaneTabOrder(current)
-  const runtimeTerminalKeys = uniqueNonEmptyStrings(terminalKeys)
-  if (runtimeTerminalKeys.length === 0) return normalized
+  const runtimeTerminalSessionIds = uniqueNonEmptyStrings(terminalSessionIds)
+  if (runtimeTerminalSessionIds.length === 0) return normalized
 
-  const orderedTerminalKeys = normalized.flatMap((entry) => (entry.type === 'terminal' ? [entry.terminalKey] : []))
-  const orderedTerminalKeySet = new Set(orderedTerminalKeys)
-  const missingTerminalKeys = runtimeTerminalKeys.filter((terminalKey) => !orderedTerminalKeySet.has(terminalKey))
-  if (missingTerminalKeys.length === 0) return normalized
+  const orderedTerminalSessionIds = normalized.flatMap((entry) => (entry.type === 'terminal' ? [entry.terminalSessionId] : []))
+  const orderedTerminalSessionIdSet = new Set(orderedTerminalSessionIds)
+  const missingTerminalSessionIds = runtimeTerminalSessionIds.filter((terminalSessionId) => !orderedTerminalSessionIdSet.has(terminalSessionId))
+  if (missingTerminalSessionIds.length === 0) return normalized
 
-  const beforeByTerminalKey = new Map<string, string[]>()
-  const afterByTerminalKey = new Map<string, string[]>()
-  const appendTerminalKeys: string[] = []
-  for (const terminalKey of missingTerminalKeys) {
-    const runtimeIndex = runtimeTerminalKeys.indexOf(terminalKey)
-    const nextAnchor = runtimeTerminalKeys
+  const beforeByTerminalSessionId = new Map<string, string[]>()
+  const afterByTerminalSessionId = new Map<string, string[]>()
+  const appendTerminalSessionIds: string[] = []
+  for (const terminalSessionId of missingTerminalSessionIds) {
+    const runtimeIndex = runtimeTerminalSessionIds.indexOf(terminalSessionId)
+    const nextAnchor = runtimeTerminalSessionIds
       .slice(runtimeIndex + 1)
-      .find((candidate) => orderedTerminalKeySet.has(candidate))
+      .find((candidate) => orderedTerminalSessionIdSet.has(candidate))
     if (nextAnchor) {
-      pushMapList(beforeByTerminalKey, nextAnchor, terminalKey)
+      pushMapList(beforeByTerminalSessionId, nextAnchor, terminalSessionId)
       continue
     }
-    const previousAnchor = runtimeTerminalKeys
+    const previousAnchor = runtimeTerminalSessionIds
       .slice(0, runtimeIndex)
       .reverse()
-      .find((candidate) => orderedTerminalKeySet.has(candidate))
+      .find((candidate) => orderedTerminalSessionIdSet.has(candidate))
     if (previousAnchor) {
-      pushMapList(afterByTerminalKey, previousAnchor, terminalKey)
+      pushMapList(afterByTerminalSessionId, previousAnchor, terminalSessionId)
       continue
     }
-    appendTerminalKeys.push(terminalKey)
+    appendTerminalSessionIds.push(terminalSessionId)
   }
 
   const next: WorkspacePaneTabOrderEntry[] = []
   for (const entry of normalized) {
     if (entry.type === 'terminal') {
-      for (const terminalKey of beforeByTerminalKey.get(entry.terminalKey) ?? []) {
-        next.push(workspacePaneTerminalTabOrderEntry(terminalKey))
+      for (const terminalSessionId of beforeByTerminalSessionId.get(entry.terminalSessionId) ?? []) {
+        next.push(workspacePaneTerminalTabOrderEntry(terminalSessionId))
       }
       next.push(entry)
-      for (const terminalKey of afterByTerminalKey.get(entry.terminalKey) ?? []) {
-        next.push(workspacePaneTerminalTabOrderEntry(terminalKey))
+      for (const terminalSessionId of afterByTerminalSessionId.get(entry.terminalSessionId) ?? []) {
+        next.push(workspacePaneTerminalTabOrderEntry(terminalSessionId))
       }
       continue
     }
     next.push(entry)
   }
-  for (const terminalKey of appendTerminalKeys) next.push(workspacePaneTerminalTabOrderEntry(terminalKey))
+  for (const terminalSessionId of appendTerminalSessionIds) next.push(workspacePaneTerminalTabOrderEntry(terminalSessionId))
   return normalizeWorkspacePaneTabOrder(next)
 }
 
@@ -135,10 +135,10 @@ function pushMapList(map: Map<string, string[]>, key: string, value: string): vo
 
 export function workspacePaneTabOrderWithoutTerminal(
   current: readonly WorkspacePaneTabOrderEntry[],
-  terminalKey: string,
+  terminalSessionId: string,
 ): WorkspacePaneTabOrderEntry[] {
   return normalizeWorkspacePaneTabOrder(
-    current.filter((entry) => entry.type !== 'terminal' || entry.terminalKey !== terminalKey),
+    current.filter((entry) => entry.type !== 'terminal' || entry.terminalSessionId !== terminalSessionId),
   )
 }
 

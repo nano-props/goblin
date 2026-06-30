@@ -10,7 +10,7 @@ import {
   PENDING_TERMINAL_WORKSPACE_PANE_TAB_IDENTITY,
   isTerminalWorkspacePaneTab,
 } from '#/web/components/workspace-pane/workspace-pane-tab-summary.ts'
-import { formatTerminalWorktreeKey } from '#/shared/terminal-workspace-slot-key.ts'
+import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { normalizeWorkspacePaneTabOrder } from '#/web/stores/repos/workspace-pane-tabs.ts'
 import {
   terminalWorkspacePaneTabProvider,
@@ -38,7 +38,7 @@ export interface RepoWorkspaceTerminalTab extends RepoWorkspaceTabBase {
   type: 'terminal'
   kind: 'terminal'
   view: TerminalWorkspacePaneTabView
-  terminalKey: string
+  terminalSessionId: string
 }
 
 export interface RepoWorkspacePendingTab extends RepoWorkspaceTabBase {
@@ -100,13 +100,13 @@ export interface RepoWorkspaceTabModelInput {
   terminalCreatePending?: boolean
   terminalSyncReady: boolean
   /**
-   * Selected terminal session key for the current worktree from the repos store.
+   * Selected terminal session id for the current worktree from the repos store.
    * The model uses this as the canonical source for which terminal tab is
    * active, making the workspace pane tab model the single authority for
    * workspace tab selection. When null (no worktree or no explicit selection),
    * the model falls back to the first available terminal tab.
    */
-  selectedTerminalKey: string | null
+  selectedTerminalSessionId: string | null
 }
 
 export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): RepoWorkspaceTabModel {
@@ -127,7 +127,7 @@ export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): 
     terminalSyncReady: input.terminalSyncReady,
   })
   const materializedActiveTab = candidateTab
-    ? activeRepoWorkspaceTab(materializedTabs, candidateTab, input.selectedTerminalKey)
+    ? activeRepoWorkspaceTab(materializedTabs, candidateTab, input.selectedTerminalSessionId)
     : null
   const selection = workspacePaneSelection(candidateTab, materializedActiveTab, materializedTabs)
   const pendingTab =
@@ -191,11 +191,11 @@ function staticWorkspacePaneTab(type: WorkspacePaneStaticTabType): RepoWorkspace
 
 function terminalWorkspacePaneTab(view: TerminalWorkspacePaneTabView): RepoWorkspaceTerminalTab {
   return {
-    identity: terminalWorkspacePaneTabProvider.identity(view.terminalKey),
+    identity: terminalWorkspacePaneTabProvider.identity(view.terminalSessionId),
     type: 'terminal',
     kind: 'terminal',
     view,
-    terminalKey: view.terminalKey,
+    terminalSessionId: view.terminalSessionId,
   }
 }
 
@@ -232,22 +232,22 @@ function materializedWorkspacePaneTabs(input: {
   terminalViews: readonly TerminalWorkspacePaneTabView[]
   hasWorktree: boolean
 }): RepoWorkspaceMaterializedTab[] {
-  const terminalByKey = new Map(input.terminalViews.map((view) => [view.terminalKey, view]))
-  const orderedTerminalKeys = new Set(
-    input.tabOrder.flatMap((entry) => (entry.type === 'terminal' ? [entry.terminalKey] : [])),
+  const terminalViewByTerminalSessionId = new Map(input.terminalViews.map((view) => [view.terminalSessionId, view]))
+  const orderedTerminalSessionIds = new Set(
+    input.tabOrder.flatMap((entry) => (entry.type === 'terminal' ? [entry.terminalSessionId] : [])),
   )
   const seenTerminals = new Set<string>()
   const tabs: RepoWorkspaceMaterializedTab[] = []
   let nextRuntimeTerminalIndex = 0
-  const pushRuntimeTerminalsBefore = (terminalId: string | null) => {
+  const pushRuntimeTerminalsBefore = (terminalSessionId: string | null) => {
     if (!terminalWorkspacePaneTabProvider.canOpen({ hasWorktree: input.hasWorktree })) return
     while (nextRuntimeTerminalIndex < input.terminalViews.length) {
       const terminal = input.terminalViews[nextRuntimeTerminalIndex]
       if (!terminal) break
-      if (terminalId && terminal.terminalKey === terminalId) break
+      if (terminalSessionId && terminal.terminalSessionId === terminalSessionId) break
       nextRuntimeTerminalIndex += 1
-      if (seenTerminals.has(terminal.terminalKey) || orderedTerminalKeys.has(terminal.terminalKey)) continue
-      seenTerminals.add(terminal.terminalKey)
+      if (seenTerminals.has(terminal.terminalSessionId) || orderedTerminalSessionIds.has(terminal.terminalSessionId)) continue
+      seenTerminals.add(terminal.terminalSessionId)
       tabs.push(terminalWorkspacePaneTab(terminal))
     }
   }
@@ -259,11 +259,11 @@ function materializedWorkspacePaneTabs(input: {
       continue
     }
     if (!terminalWorkspacePaneTabProvider.canOpen({ hasWorktree: input.hasWorktree })) continue
-    const terminal = terminalByKey.get(entry.terminalKey)
-    if (!terminal || seenTerminals.has(entry.terminalKey)) continue
-    pushRuntimeTerminalsBefore(entry.terminalKey)
-    if (input.terminalViews[nextRuntimeTerminalIndex]?.terminalKey === entry.terminalKey) nextRuntimeTerminalIndex += 1
-    seenTerminals.add(entry.terminalKey)
+    const terminal = terminalViewByTerminalSessionId.get(entry.terminalSessionId)
+    if (!terminal || seenTerminals.has(entry.terminalSessionId)) continue
+    pushRuntimeTerminalsBefore(entry.terminalSessionId)
+    if (input.terminalViews[nextRuntimeTerminalIndex]?.terminalSessionId === entry.terminalSessionId) nextRuntimeTerminalIndex += 1
+    seenTerminals.add(entry.terminalSessionId)
     tabs.push(terminalWorkspacePaneTab(terminal))
   }
 
@@ -294,11 +294,11 @@ function workspacePaneSelection(
 function activeRepoWorkspaceTab(
   tabs: readonly RepoWorkspaceMaterializedTab[],
   renderableTab: WorkspacePaneTabType,
-  selectedTerminalKey: string | null,
+  selectedTerminalSessionId: string | null,
 ): RepoWorkspaceMaterializedTab | null {
   if (renderableTab === 'terminal') {
-    if (selectedTerminalKey) {
-      const selected = tabs.find((tab) => tab.kind === 'terminal' && tab.terminalKey === selectedTerminalKey)
+    if (selectedTerminalSessionId) {
+      const selected = tabs.find((tab) => tab.kind === 'terminal' && tab.terminalSessionId === selectedTerminalSessionId)
       if (selected) return selected
     }
     return tabs.find((tab) => tab.kind === 'terminal') ?? null

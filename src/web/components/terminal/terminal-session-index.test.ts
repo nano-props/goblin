@@ -3,33 +3,33 @@ import { syncTerminalPtySessionIdIndex } from '#/web/components/terminal/termina
 
 describe('terminal session index helper', () => {
   test('updates both key->session and session->key maps coherently', () => {
-    const ptySessionIdByTerminalKey = new Map<string, string>()
-    const terminalKeyByPtySessionId = new Map<string, string>()
+    const ptySessionIdByTerminalSessionId = new Map<string, string>()
+    const terminalSessionIdByPtySessionId = new Map<string, string>()
 
     syncTerminalPtySessionIdIndex({
-      terminalKey: 'session-1',
+      terminalSessionId: 'session-1',
       ptySessionId: 'pty_session_a_aaaaaaaaa',
-      ptySessionIdByTerminalKey,
-      terminalKeyByPtySessionId,
+      ptySessionIdByTerminalSessionId,
+      terminalSessionIdByPtySessionId,
     })
-    expect(ptySessionIdByTerminalKey.get('session-1')).toBe('pty_session_a_aaaaaaaaa')
-    expect(terminalKeyByPtySessionId.get('pty_session_a_aaaaaaaaa')).toBe('session-1')
+    expect(ptySessionIdByTerminalSessionId.get('session-1')).toBe('pty_session_a_aaaaaaaaa')
+    expect(terminalSessionIdByPtySessionId.get('pty_session_a_aaaaaaaaa')).toBe('session-1')
 
     syncTerminalPtySessionIdIndex({
-      terminalKey: 'session-1',
+      terminalSessionId: 'session-1',
       ptySessionId: 'pty_session_b_aaaaaaaaa',
-      ptySessionIdByTerminalKey,
-      terminalKeyByPtySessionId,
+      ptySessionIdByTerminalSessionId,
+      terminalSessionIdByPtySessionId,
     })
-    expect(terminalKeyByPtySessionId.has('pty_session_a_aaaaaaaaa')).toBe(false)
-    expect(terminalKeyByPtySessionId.get('pty_session_b_aaaaaaaaa')).toBe('session-1')
+    expect(terminalSessionIdByPtySessionId.has('pty_session_a_aaaaaaaaa')).toBe(false)
+    expect(terminalSessionIdByPtySessionId.get('pty_session_b_aaaaaaaaa')).toBe('session-1')
 
     syncTerminalPtySessionIdIndex({
-      terminalKey: 'session-1',
+      terminalSessionId: 'session-1',
       ptySessionId: null,
-      ptySessionIdByTerminalKey,
-      terminalKeyByPtySessionId,
+      ptySessionIdByTerminalSessionId,
+      terminalSessionIdByPtySessionId,
     })
-    expect(ptySessionIdByTerminalKey.has('session-1')).toBe(false)
+    expect(ptySessionIdByTerminalSessionId.has('session-1')).toBe(false)
   })
 })

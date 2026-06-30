@@ -389,17 +389,17 @@ export function createRuntimeRepoSessionActions(
       set((s) => {
         if (!s.repos[id]) return s
         const repos = { ...s.repos }
-        const selectedTerminalKeyByTerminalWorktree = { ...s.selectedTerminalKeyByTerminalWorktree }
+        const selectedTerminalSessionIdByTerminalWorktree = { ...s.selectedTerminalSessionIdByTerminalWorktree }
         delete repos[id]
-        for (const terminalWorktreeKey of Object.keys(selectedTerminalKeyByTerminalWorktree)) {
+        for (const terminalWorktreeKey of Object.keys(selectedTerminalSessionIdByTerminalWorktree)) {
           if (terminalWorktreeKey.startsWith(`${id}\0`))
-            delete selectedTerminalKeyByTerminalWorktree[terminalWorktreeKey]
+            delete selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]
         }
         const order = s.order.filter((x) => x !== id)
         const activeId = nextActiveRepoIdAfterWorkspaceClose(s.order, s.activeId, id)
         return {
           repos,
-          selectedTerminalKeyByTerminalWorktree,
+          selectedTerminalSessionIdByTerminalWorktree,
           order,
           activeId,
         }

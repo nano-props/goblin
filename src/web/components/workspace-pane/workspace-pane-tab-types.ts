@@ -84,7 +84,7 @@ export function createTerminalWorkspacePaneTabItem(input: {
   panelId?: string
 }): WorkspacePaneTerminalTabItem {
   return {
-    identity: terminalWorkspacePaneTabProvider.identity(input.view.terminalKey),
+    identity: terminalWorkspacePaneTabProvider.identity(input.view.terminalSessionId),
     type: input.view.type,
     kind: 'terminal',
     view: input.view,
@@ -93,8 +93,8 @@ export function createTerminalWorkspacePaneTabItem(input: {
     closeLabel: input.closeLabel,
     icon: terminalWorkspacePaneTabProvider.icon,
     panelId: input.panelId,
-    sortableId: terminalWorkspacePaneTabProvider.identity(input.view.terminalKey),
-    orderEntry: terminalWorkspacePaneTabProvider.orderEntry(input.view.terminalKey),
+    sortableId: terminalWorkspacePaneTabProvider.identity(input.view.terminalSessionId),
+    orderEntry: terminalWorkspacePaneTabProvider.orderEntry(input.view.terminalSessionId),
   }
 }
 

@@ -215,7 +215,7 @@ describe('terminal web host bridge', () => {
         payload: {
           ok: true,
           action: 'created',
-          terminalKey: '/tmp/repo\u0000/tmp/repo\u0000session-1',
+          terminalSessionId: 'session-1',
           sessions: [],
         },
       }),
@@ -255,7 +255,7 @@ describe('terminal web host bridge', () => {
         requestId: request?.requestId,
         ok: true,
         action: 'list-sessions',
-        payload: [{ ptySessionId: 'pty_1', terminalKey: 123 }],
+        payload: [{ ptySessionId: 'pty_1', terminalSessionId: 123 }],
       }),
     )
 
@@ -596,10 +596,10 @@ describe('terminal web host bridge', () => {
         requestId: createRequest?.requestId,
         ok: true,
         action: 'create',
-        payload: { ok: true, action: 'created', terminalKey: 'key_1', sessions: [] },
+        payload: { ok: true, action: 'created', terminalSessionId: 'session-1', sessions: [] },
       }),
     )
-    await expect(createPromise).resolves.toMatchObject({ ok: true, terminalKey: 'key_1' })
+    await expect(createPromise).resolves.toMatchObject({ ok: true, terminalSessionId: 'session-1' })
     expect(fetchMock).not.toHaveBeenCalled()
     dispose()
   })
@@ -827,11 +827,11 @@ describe('terminal web host bridge', () => {
         requestId: request?.requestId,
         ok: true,
         action: 'create',
-        payload: { ok: true, action: 'created', terminalKey: 'key_1', sessions: [] },
+        payload: { ok: true, action: 'created', terminalSessionId: 'session-1', sessions: [] },
       }),
     )
 
-    await expect(createPromise).resolves.toMatchObject({ ok: true, terminalKey: 'key_1' })
+    await expect(createPromise).resolves.toMatchObject({ ok: true, terminalSessionId: 'session-1' })
     expect(socket.readyState).toBe(wsMock.CLOSED)
   })
 
@@ -890,14 +890,14 @@ describe('terminal web host bridge', () => {
     const { onClientLocalEventType, resetClientLocalEventsForTests } = await import('#/web/local-events.ts')
     const bellClick = vi.fn()
     const dispose = onClientLocalEventType('terminal-bell-click', bellClick)
-    const terminalKey = '/tmp/repo\0/tmp/repo\0session-2'
+    const terminalSessionId = 'session-2'
 
     await expect(
-      terminalBridge.notifyBell({ title: 'repo', body: 'feature/test\\nzsh', terminalKey, repoRoot: '/tmp/repo' }),
+      terminalBridge.notifyBell({ title: 'repo', body: 'feature/test\\nzsh', terminalSessionId, repoRoot: '/tmp/repo' }),
     ).resolves.toBe(true)
     wsMock.notificationInstances[0]?.onclick?.()
 
-    expect(bellClick).toHaveBeenCalledWith({ type: 'terminal-bell-click', repoRoot: '/tmp/repo', terminalKey })
+    expect(bellClick).toHaveBeenCalledWith({ type: 'terminal-bell-click', repoRoot: '/tmp/repo', terminalSessionId })
     dispose()
     resetClientLocalEventsForTests()
   })

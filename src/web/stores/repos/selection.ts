@@ -14,7 +14,7 @@ import {
   type WorkspacePaneTabType,
   workspacePaneTabOrderEntryIdentity,
 } from '#/shared/workspace-pane.ts'
-import { formatTerminalWorktreeKey } from '#/shared/terminal-workspace-slot-key.ts'
+import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
 import {
   normalizeWorkspacePaneTabOrder,
@@ -90,20 +90,20 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
       })
     },
 
-    applySessionSelectedTerminalState(selectedTerminalKeyByTerminalWorktree: Record<string, string>) {
+    applySessionSelectedTerminalState(selectedTerminalSessionIdByTerminalWorktree: Record<string, string>) {
       // One-shot boot/session restore of per-worktree terminal selection. This
       // seeds client state; later selection changes remain client-owned.
       set((s) => {
-        const current = s.selectedTerminalKeyByTerminalWorktree
+        const current = s.selectedTerminalSessionIdByTerminalWorktree
         const currentEntries = Object.entries(current)
-        const nextEntries = Object.entries(selectedTerminalKeyByTerminalWorktree)
+        const nextEntries = Object.entries(selectedTerminalSessionIdByTerminalWorktree)
         if (
           currentEntries.length === nextEntries.length &&
           nextEntries.every(([terminalWorktreeKey, key]) => current[terminalWorktreeKey] === key)
         ) {
           return s
         }
-        return { selectedTerminalKeyByTerminalWorktree: { ...selectedTerminalKeyByTerminalWorktree } }
+        return { selectedTerminalSessionIdByTerminalWorktree: { ...selectedTerminalSessionIdByTerminalWorktree } }
       })
     },
 
@@ -136,20 +136,20 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
 
     setSelectedTerminal(terminalWorktreeKey: string, key: string | null) {
       set((s) => {
-        const current = s.selectedTerminalKeyByTerminalWorktree[terminalWorktreeKey]
+        const current = s.selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]
         if (key) {
           if (current === key) return s
           return {
-            selectedTerminalKeyByTerminalWorktree: {
-              ...s.selectedTerminalKeyByTerminalWorktree,
+            selectedTerminalSessionIdByTerminalWorktree: {
+              ...s.selectedTerminalSessionIdByTerminalWorktree,
               [terminalWorktreeKey]: key,
             },
           }
         }
         if (current === undefined) return s
-        const selectedTerminalKeyByTerminalWorktree = { ...s.selectedTerminalKeyByTerminalWorktree }
-        delete selectedTerminalKeyByTerminalWorktree[terminalWorktreeKey]
-        return { selectedTerminalKeyByTerminalWorktree }
+        const selectedTerminalSessionIdByTerminalWorktree = { ...s.selectedTerminalSessionIdByTerminalWorktree }
+        delete selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]
+        return { selectedTerminalSessionIdByTerminalWorktree }
       })
     },
   }
@@ -200,13 +200,13 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
       })
     },
 
-    ensureWorkspacePaneTerminalTab(id: string, terminalKey: string, branchName?: string) {
+    ensureWorkspacePaneTerminalTab(id: string, terminalSessionId: string, branchName?: string) {
       set((s) => {
         const repo = s.repos[id]
         const branch = branchName ?? repo?.ui.selectedBranch
         if (!repo || !branch) return s
         const current = workspacePaneTabOrderForBranch(repo.ui, branch)
-        const next = workspacePaneTabOrderWithEnsuredTerminal(current, terminalKey)
+        const next = workspacePaneTabOrderWithEnsuredTerminal(current, terminalSessionId)
         if (workspacePaneTabOrdersEqual(current, next)) return s
         return replaceRepoState(s, repo, (r) => {
           r.ui.workspacePaneTabOrderByBranch = workspacePaneTabOrderRecordWith(r.ui, branch, next)
@@ -214,7 +214,7 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
       })
     },
 
-    ensureAndFocusWorkspacePaneTerminalTab(id: string, terminalKey: string, branchName?: string) {
+    ensureAndFocusWorkspacePaneTerminalTab(id: string, terminalSessionId: string, branchName?: string) {
       let token: number | undefined
       let viewChanged = false
       set((s) => {
@@ -225,13 +225,13 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
         const worktreePath = branchState?.worktree?.path
         if (!worktreePath) return s
         const currentOrder = workspacePaneTabOrderForBranch(repo.ui, branch)
-        const nextOrder = workspacePaneTabOrderWithEnsuredTerminal(currentOrder, terminalKey)
+        const nextOrder = workspacePaneTabOrderWithEnsuredTerminal(currentOrder, terminalSessionId)
         const currentView = preferredWorkspacePaneTabForBranch(repo.ui, branch)
         const terminalWorktreeKey = formatTerminalWorktreeKey(id, worktreePath)
-        const currentSelected = s.selectedTerminalKeyByTerminalWorktree[terminalWorktreeKey]
+        const currentSelected = s.selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]
         const orderChanged = !workspacePaneTabOrdersEqual(currentOrder, nextOrder)
         viewChanged = currentView !== 'terminal'
-        const selectionChanged = currentSelected !== terminalKey
+        const selectionChanged = currentSelected !== terminalSessionId
         if (!orderChanged && !viewChanged && !selectionChanged) return s
         token = repo.instanceToken
         const repoPatch = replaceRepoState(s, repo, (r) => {
@@ -249,9 +249,9 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
         if (!selectionChanged) return repoPatch
         return {
           ...repoPatch,
-          selectedTerminalKeyByTerminalWorktree: {
-            ...s.selectedTerminalKeyByTerminalWorktree,
-            [terminalWorktreeKey]: terminalKey,
+          selectedTerminalSessionIdByTerminalWorktree: {
+            ...s.selectedTerminalSessionIdByTerminalWorktree,
+            [terminalWorktreeKey]: terminalSessionId,
           },
         }
       })
@@ -269,12 +269,12 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
       })
     },
 
-    ensureWorkspacePaneTerminalTabs(id: string, branchName: string, terminalKeys: readonly string[]) {
+    ensureWorkspacePaneTerminalTabs(id: string, branchName: string, terminalSessionIds: readonly string[]) {
       set((s) => {
         const repo = s.repos[id]
         if (!repo) return s
         const current = workspacePaneTabOrderForBranch(repo.ui, branchName)
-        const next = workspacePaneTabOrderWithMaterializedTerminals(current, terminalKeys)
+        const next = workspacePaneTabOrderWithMaterializedTerminals(current, terminalSessionIds)
         if (workspacePaneTabOrdersEqual(current, next)) return s
         return replaceRepoState(s, repo, (r) => {
           r.ui.workspacePaneTabOrderByBranch = workspacePaneTabOrderRecordWith(r.ui, branchName, next)
@@ -282,13 +282,13 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
       })
     },
 
-    removeWorkspacePaneTerminalTab(id: string, terminalKey: string, branchName?: string) {
+    removeWorkspacePaneTerminalTab(id: string, terminalSessionId: string, branchName?: string) {
       set((s) => {
         const repo = s.repos[id]
         const branch = branchName ?? repo?.ui.selectedBranch
         if (!repo || !branch) return s
         const current = workspacePaneTabOrderForBranch(repo.ui, branch)
-        const next = workspacePaneTabOrderWithoutTerminal(current, terminalKey)
+        const next = workspacePaneTabOrderWithoutTerminal(current, terminalSessionId)
         if (workspacePaneTabOrdersEqual(current, next)) return s
         return replaceRepoState(s, repo, (r) => {
           r.ui.workspacePaneTabOrderByBranch = workspacePaneTabOrderRecordWith(r.ui, branch, next)

@@ -76,7 +76,7 @@ function seedElectronBootstrap() {
       create: vi.fn(async () => ({
         ok: true as const,
         action: 'created' as const,
-        terminalKey: 'k',
+        terminalSessionId: 'k',
         sessions: [],
         ptySessionId: 'pty_session_1_aaaaaaaaa',
         snapshot: '',
@@ -145,7 +145,7 @@ function seedWebBootstrap() {
       create: vi.fn(async () => ({
         ok: true as const,
         action: 'created' as const,
-        terminalKey: 'k',
+        terminalSessionId: 'k',
         sessions: [],
         ptySessionId: 'pty_session_1_aaaaaaaaa',
         snapshot: '',

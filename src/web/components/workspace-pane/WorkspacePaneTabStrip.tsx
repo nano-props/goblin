@@ -392,7 +392,7 @@ export function WorkspacePaneTabStrip({
       if (!item) return
       if (isPendingWorkspacePaneTabItem(item)) return
       if (isTerminalWorkspacePaneTabItem(item) && item.identity === activeTabIdentity && panelActive) {
-        onScrollToBottom(item.view.terminalKey)
+        onScrollToBottom(item.view.terminalSessionId)
       } else {
         onSelect(item)
       }

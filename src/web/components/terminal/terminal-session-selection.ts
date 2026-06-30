@@ -1,26 +1,26 @@
 import type { TerminalDescriptor } from '#/web/components/terminal/types.ts'
 
-export function resolveSelectedTerminalKey(input: {
+export function resolveSelectedTerminalSessionId(input: {
   terminalWorktreeKey: string
-  preferredTerminalKey: string | null
-  currentTerminalKey: string | null
-  controllerTerminalKey: string | null
+  preferredSessionId: string | null
+  currentSessionId: string | null
+  controllerSessionId: string | null
   sortedDescriptors: TerminalDescriptor[]
-  isSelectedTerminalKeyValid: (terminalWorktreeKey: string, terminalKey: string) => boolean
+  isSelectedTerminalSessionIdValid: (terminalWorktreeKey: string, terminalSessionId: string) => boolean
 }): string | null {
   const {
     terminalWorktreeKey,
-    preferredTerminalKey,
-    currentTerminalKey,
-    controllerTerminalKey,
+    preferredSessionId,
+    currentSessionId,
+    controllerSessionId,
     sortedDescriptors,
-    isSelectedTerminalKeyValid,
+    isSelectedTerminalSessionIdValid,
   } = input
-  if (preferredTerminalKey && isSelectedTerminalKeyValid(terminalWorktreeKey, preferredTerminalKey))
-    return preferredTerminalKey
-  if (currentTerminalKey && isSelectedTerminalKeyValid(terminalWorktreeKey, currentTerminalKey))
-    return currentTerminalKey
-  if (controllerTerminalKey && isSelectedTerminalKeyValid(terminalWorktreeKey, controllerTerminalKey))
-    return controllerTerminalKey
-  return sortedDescriptors[0]?.terminalKey ?? null
+  if (preferredSessionId && isSelectedTerminalSessionIdValid(terminalWorktreeKey, preferredSessionId))
+    return preferredSessionId
+  if (currentSessionId && isSelectedTerminalSessionIdValid(terminalWorktreeKey, currentSessionId))
+    return currentSessionId
+  if (controllerSessionId && isSelectedTerminalSessionIdValid(terminalWorktreeKey, controllerSessionId))
+    return controllerSessionId
+  return sortedDescriptors[0]?.terminalSessionId ?? null
 }
