@@ -126,6 +126,7 @@ export interface TerminalSessionSummary {
   title: string
   fullTitle?: string
   originalTitle?: string | null
+  processName?: string
   phase: TerminalSessionPhase
   selected: boolean
   hasBell: boolean

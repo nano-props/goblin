@@ -53,6 +53,7 @@ function buildTerminalSessionSummaries(input: {
       title: summarizeTerminalTitle(snapshot, session.descriptor.index),
       fullTitle: fullTerminalTitle(snapshot, session.descriptor.index),
       originalTitle: terminalOriginalTitle(snapshot),
+      processName: snapshot.processName,
       phase: snapshot.phase,
       selected: session.descriptor.key === input.selectedKey,
       hasBell: input.hasBell(session.descriptor.key),
