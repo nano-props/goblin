@@ -66,7 +66,7 @@ export function helpShortcutSections(globalShortcut: string, isMac = inferIsMacP
 function workspaceTabShortcutRow(isMac: boolean): HelpShortcutRow {
   const modifier = isMac ? '⌘' : '⌃'
   return {
-    combos: Array.from({ length: 9 }, (_, index) => [modifier, String(index + 1)]),
+    combos: [[modifier, '1-9']],
     labelKey: 'help.row.select-workspace-tab',
   }
 }

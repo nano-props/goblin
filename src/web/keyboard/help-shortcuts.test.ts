@@ -8,7 +8,7 @@ describe('helpShortcutSections', () => {
     const view = sections[2]?.rows
     const app = sections[3]?.rows
     expect(nav?.find((row) => row.labelKey === 'help.row.next-repo')?.combos).toEqual([['⌘', ']']])
-    expect(view?.find((row) => row.labelKey === 'help.row.select-workspace-tab')?.combos[0]).toEqual(['⌘', '1'])
+    expect(view?.find((row) => row.labelKey === 'help.row.select-workspace-tab')?.combos).toEqual([['⌘', '1-9']])
     expect(app?.find((row) => row.labelKey === 'help.row.new-terminal')?.combos).toEqual([['⌘', 'T']])
     expect(app?.find((row) => row.labelKey === 'help.row.create-worktree')?.combos).toEqual([['⌘', 'N']])
     expect(view?.find((row) => row.labelKey === 'workspace.zen-mode-toggle-label')?.combos).toEqual([['⌘', 'B']])
@@ -21,7 +21,7 @@ describe('helpShortcutSections', () => {
     const view = sections[2]?.rows
     const app = sections[3]?.rows
     expect(nav?.find((row) => row.labelKey === 'help.row.prev-repo')?.combos).toEqual([['⌃', '[']])
-    expect(view?.find((row) => row.labelKey === 'help.row.select-workspace-tab')?.combos[8]).toEqual(['⌃', '9'])
+    expect(view?.find((row) => row.labelKey === 'help.row.select-workspace-tab')?.combos).toEqual([['⌃', '1-9']])
     expect(view?.find((row) => row.labelKey === 'workspace.zen-mode-toggle-label')?.combos).toEqual([['⌃', 'B']])
     expect(app?.find((row) => row.labelKey === 'help.row.close-workspace-tab-or-window')?.combos).toEqual([['⌃', 'W']])
     expect(app?.find((row) => row.labelKey === 'help.row.close-repo')?.combos).toEqual([['⌃', '⇧', 'W']])
