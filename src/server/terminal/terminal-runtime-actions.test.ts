@@ -52,7 +52,6 @@ function makeActions(
       broker,
       catalog,
       isValidTerminalClientId,
-      resolveClientConnected: () => undefined,
     }),
     broadcasts,
     manager,
@@ -181,9 +180,9 @@ describe('terminal-runtime-actions clientId gate', () => {
     // Each call crossed the gate and reached the manager, passing
     // the outer CLIENT_ID as the session-level clientId.
     expect(manager.writeSession).toHaveBeenCalledWith(USER_ID, SESSION_ID, 'x', CLIENT_ID)
-    expect(manager.resizeSession).toHaveBeenCalledWith(USER_ID, SESSION_ID, 80, 24, CLIENT_ID, undefined)
-    expect(manager.takeoverSession).toHaveBeenCalledWith(USER_ID, SESSION_ID, 80, 24, CLIENT_ID, undefined)
-    expect(manager.restartSession).toHaveBeenCalledWith(USER_ID, SESSION_ID, 80, 24, CLIENT_ID, undefined)
-    expect(manager.attachSession).toHaveBeenCalledWith(USER_ID, SESSION_ID, 80, 24, CLIENT_ID, undefined)
+    expect(manager.resizeSession).toHaveBeenCalledWith(USER_ID, SESSION_ID, 80, 24, CLIENT_ID)
+    expect(manager.takeoverSession).toHaveBeenCalledWith(USER_ID, SESSION_ID, 80, 24, CLIENT_ID)
+    expect(manager.restartSession).toHaveBeenCalledWith(USER_ID, SESSION_ID, 80, 24, CLIENT_ID)
+    expect(manager.attachSession).toHaveBeenCalledWith(USER_ID, SESSION_ID, 80, 24, CLIENT_ID)
   })
 })

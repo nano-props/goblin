@@ -33,11 +33,14 @@ Today, several important terminal states are represented implicitly through comb
 
 The next stage should make terminal lifecycle states explicit so create, restart, reconnect, and failure behavior become easier to reason about.
 
-### 2. Upgrade control from a single-attachment model to a multi-attachment model
+### 2. Harden the multi-attachment control model
 
-The current design already talks in client and attachment terms, but the server-side control model is still narrower than the product model it wants to support.
+The current design now models multiple attachments per session directly:
+attachments store metadata, sessions store controller intent, and broker
+presence determines the effective controller projection.
 
-The next stage should model multiple attachments per session directly.
+The next stage should keep tightening edge-case contracts around presence,
+reattach, takeover, and lifecycle transitions.
 
 ### 3. Tighten the contract between runtime semantics and UI projection
 
@@ -55,8 +58,8 @@ The terminal feature now has enough structure that contract tests become more va
 ### Outcome
 
 - explicit session lifecycle phases on the server
-- explicit multi-attachment control state
-- clearer restart and reconnect semantics
+- stronger multi-attachment control contracts
+- clearer restart, reconnect, and presence-transition semantics
 
 ### Why
 
@@ -71,9 +74,9 @@ This is the highest-leverage work because it affects:
 ### Deliverables
 
 - session phase model
-- multi-attachment control model
+- multi-attachment control contract tests
 - control transition rules
-- clarified attach, takeover, resize, release, and reconnect semantics
+- clarified attach, takeover, resize, presence-offline, and reconnect semantics
 
 ## P1: Clarify restart failure semantics
 

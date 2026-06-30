@@ -5,11 +5,8 @@ import type { ClientHostBridge, ClientBridge, ClientTerminalBridge } from '#/web
 import { readNativeBridge } from '#/web/native-bridge.ts'
 import { createHttpClipboardBackend } from '#/web/clipboard/http-backend.ts'
 import { normalizeClientServerClientId, readWebBootstrap } from '#/web/client-bootstrap-bridge.ts'
-import {
-  createServerTerminalBridge,
-  readOrCreateWebTerminalClientId,
-  type ClientServerTerminalConfig,
-} from '#/web/client-terminal-bridge.ts'
+import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
+import { createServerTerminalBridge, type ClientServerTerminalConfig } from '#/web/client-terminal-bridge.ts'
 import { createTerminalNotificationProvider } from '#/web/terminal-notification-provider.ts'
 
 /**
@@ -92,7 +89,6 @@ let memoizedTerminalBridge: ClientTerminalBridge | null = null
 function getOrCreateTerminalBridge(): ClientTerminalBridge {
   if (memoizedTerminalBridge) return memoizedTerminalBridge
   memoizedTerminalBridge = createServerTerminalBridge({
-    getClientId: readOrCreateWebTerminalClientId,
     getServerConfig() {
       const server = readServerTerminalConfig()
       if (!server) throw new Error('Client terminal bridge is unavailable')

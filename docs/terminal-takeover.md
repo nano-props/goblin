@@ -35,19 +35,20 @@ intent to win**, without ceremony.
 
 ## What "control" means
 
-A terminal session in Goblin has one writer at a time. Exactly one
-window is _the controller_ — the one whose keystrokes reach the
-shell. All other windows are _viewers_: they see the same screen,
-they read the same output, but their input is dropped at the
-boundary.
+A terminal session in Goblin has at most one effective controller
+attachment at a time — the online `clientId` whose keystrokes reach
+the shell. If stored controller intent is absent or offline, the
+effective controller is `null` and clients project the role as
+`unowned`. All other windows are _viewers_: they see the same screen,
+they read the same output, but their input is dropped at the boundary.
 
 This isn't a security boundary; it's a coordination boundary. If
 two windows typed at once, the user's mental model of the shell
 would shatter: which cursor is the shell listening to? whose
 keystrokes are echoed back? where does my Ctrl+C go?
 
-So the design is: **at any instant, exactly one window is the
-controller.**
+So the design is: **at any instant, at most one attachment is the
+effective controller.**
 
 ## The principle: intent-recent, user-scoped
 
@@ -77,17 +78,11 @@ user can see the terminal but cannot, for whatever reason, issue
 a normal keystroke (e.g. a frozen tab they want to revive without
 reloading).
 
-The main path is:
-
-1. User opens a terminal in a fresh window.
-2. Window attaches; the server recognizes that this user has
-   touched the session before and grants control.
-3. Window is now the controller.
-4. User types. Keystrokes flow through the local gate.
-5. If the window is a _viewer_ (some sibling window is currently
-   the controller), the gate promotes it before the keystroke
-   reaches the server. The user sees no interruption — they
-   typed, the keystroke arrived.
+The main path is simple: a window attaches, the server projects the
+current effective controller, and the next write intent either flows
+through or promotes that attachment first. The user sees the same rule
+everywhere: type where you are, and that window becomes the writer when
+it is safe to do so.
 
 The button is no longer load-bearing. It exists for accessibility
 and for the rare "I want control without typing" case.
@@ -98,10 +93,11 @@ The server remembers, for the lifetime of a session, that **this
 user has touched this session**. That single bit of sticky
 memory is what makes the roam scenarios work:
 
-- User closes the controller window. The controller role is
-  cleared at once.
+- User closes the controller attachment/socket. Broker presence marks
+  that `(userId, clientId)` offline, so the stored controller intent
+  projects to no effective controller at once.
 - User opens a new window elsewhere, attached to the same session.
-- The server sees: "user has been here before, no live
+- The server sees: "user has been here before, no effective
   controller, new attachment wants in" → grants control.
 
 This is why "I closed Electron, then opened a new Electron window,
@@ -125,10 +121,10 @@ impose a richer contract than the OS provides.
 ## Why a same-window reconnect is non-disruptive
 
 When a window's network briefly drops and comes back to the same
-attachment, the user perceives no interruption: the new attach is
-recognized as a continuation of the same window, the controller role is
-cleared on disconnect, and the reattach re-claims through the
-user-sticky path. Because the reconnect and the reclaim happen
+attachment, the user perceives no interruption: broker presence marks
+the attachment offline, its stored controller intent temporarily
+projects to no effective controller, and the reattach re-claims through
+the user-sticky path. Because the reconnect and the reclaim happen
 back-to-back, the user sees their next keystroke flow as expected.
 
 This works because **window identity is per-sessionStorage, which
@@ -142,15 +138,16 @@ network issue" apart from "different window, deliberate switch".
 The same-window reconnect is the friendly case. The less-friendly
 case is a small but real race:
 
-1. Window A is the controller.
-2. A's network drops. The server clears the controller role on
-   the same event (no grace period).
+1. Window A is the effective controller.
+2. A's network drops. Broker presence marks A offline, so A's
+   stored controller intent no longer projects to an effective
+   controller (no grace period).
 3. Window B — a sibling tab, an Electron window on another
    machine, anything the user opened while A was away — attaches
-   first. B auto-claims because no controller is present and the user
-   has touched this session before.
-4. A's network comes back. A reconnects, but the controller role is held by
-   B. A is now a viewer.
+   first. B auto-claims because no effective controller is present
+   and the user has touched this session before.
+4. A's network comes back. A reconnects, but the effective controller is B.
+   A is now a viewer.
 
 This is intentional. The "most recent write intent wins" rule
 is the only rule the system can apply without keeping a grace
@@ -162,7 +159,7 @@ The user perceives the same "I typed and it worked" experience
 they get in the friendly case — the only difference is one
 extra round-trip on the first keystroke after A returns.
 
-In practice the window between A's disconnect and B's attach is
+In practice the window between A going offline and B's attach is
 much smaller than the time it takes a human to switch windows
 and reattach, so this case is rare. When it does bite, the
 recovery path is the same as the friendly case: type, get
@@ -173,74 +170,29 @@ control.
 A controller's process can die (laptop sleep, OS kill, NIC
 stuck) while the OS keeps the underlying TCP socket in
 `ESTABLISHED` for minutes or hours. Without intervention the
-server would still believe that `(userId, clientId)` is
-connected, the controller role's controller would stay pinned to the
-dead client, and every sibling viewer would be stranded in
-viewer mode with no path to auto-claim.
+server would still believe that `(userId, clientId)` is online,
+the effective controller would stay pinned to the dead client,
+and every sibling viewer would be stranded in viewer mode with
+no path to auto-claim.
 
-A per-`clientId` heartbeat closes this gap:
-
-- The client emits `{ type: 'heartbeat', at: <ms> }` on the
-  realtime socket every `HEARTBEAT_INTERVAL_MS` (30 s) while
-  the socket is `OPEN`. The envelope is small (a few bytes),
-  has no request id, and does not generate a response.
-- The server's `TerminalRealtimeBroker` records
-  `lastHeartbeatAtByClientKey` on every receipt and scans it
-  every `HEARTBEAT_INTERVAL_MS`. A `(userId, clientId)` whose
-  last beat is older than `HEARTBEAT_DEADLINE_MS` (90 s, i.e.
-  3 missed beats) gets a synthetic `onClientDisconnected`,
-  which clears the controller role's controller role and emits
-  `controller: null` to every sibling.
-- The next `attach` from any sibling (or from a freshly
-  reconnected A) takes the auto-claim path — same as the
-  friendly-reconnect case above — and the user perceives
-  no difference from a clean disconnect.
-
-The `HEARTBEAT_INTERVAL_MS` / `HEARTBEAT_DEADLINE_MS` constants
-are exported from
-`src/server/terminal/terminal-realtime-broker.ts` so the
-client (in `src/web/client-terminal-bridge.ts`) and the
-broker cannot drift out of sync.
+A per-`clientId` heartbeat closes this gap. The client emits a small
+heartbeat while its realtime socket is open; the broker treats the
+server receipt time as the presence clock. If that clock goes stale,
+the broker closes the stale sockets and marks the attachment offline.
+Stored controller intent is not erased, but it no longer projects to an
+effective controller, so the next attach can auto-claim the session.
 
 ## Known behavior: self-reconnect mid-flight
 
-The friendly reconnect case has one observable wrinkle. When A's
-socket drops, the server clears the controller role and emits a
-`controller: null` event. When A's socket comes back, the
-server re-emits `controller: A` after the auto-claim. Between
-those two events — typically a few milliseconds — A's client
-sees its cached role transition from `controller` to `unowned`
-(per the realtime `identity` event carrying `controller: null`)
-and back to `controller`.
+A reconnecting controller can briefly project as `unowned`: the old
+presence has gone offline, and the replacement attach has not yet
+re-established an effective controller. The client treats that window
+as a closed authority boundary rather than guessing. In the common case
+it is too short to notice; if a keystroke lands exactly there, it may be
+dropped and the next keystroke succeeds after the reattach completes.
 
-A's `TerminalSession` reacts to the `unowned` event in
-`handleIdentity` by calling `start()` immediately if the view
-is connected, so the next identity event (carrying `controller:
-A`) lands while the auto-attach round-trip is already in
-flight. The `unowned` window in the runtime / gate is therefore
-very short — a few hundred microseconds at most, bounded by
-the microtask queue rather than the round-trip.
-
-If the user types **during** the `unowned` window, the gate's
-`authorize('write')` returns `{ kind: 'denied', reason:
-'session-closed' }` — the gate deliberately distinguishes `unowned`
-from `viewer` so it does not auto-promote a write against a session
-whose controller role the server has just cleared. The keystroke is dropped at the
-gate. (Pre-PR, the gate collapsed `unowned` to `viewer` and
-auto-promoted, which caused the spurious takeover round-trip
-this PR's identity/lifecycle split fixes.) Once the second
-identity event lands and the role flips back to `controller`,
-the next keystroke goes through without any extra round-trip.
-
-This is not a bug; it is the cost of a model that has no grace
-timer. A client-side coalescing window (e.g. "wait 100ms
-after a self-reconnect before firing takeover on write") would
-hide the dropped keystroke but would re-introduce a small grace
-period on the client, which is exactly what the server-side
-no-grace design exists to avoid. The right answer is to accept
-the rare dropped keystroke (it is recoverable — the next
-keystroke always works) and document the behavior so it
-doesn't surprise future contributors.
+This is an intentional consequence of having no controller grace timer.
+The server never pretends an offline attachment can still write.
 
 ## Boundaries this model respects
 
@@ -277,7 +229,7 @@ protects the user's mental model, not their secrets.
   takeover", the answer is almost always no. The user typed;
   honor it.
 - If a design decision is "should a new window auto-claim", the
-  answer is: only when there is no live controller. If there is
+  answer is: only when there is no effective controller. If there is
   one, the new window is a viewer until the user types (or until
   they take over via the button).
 - If a design decision is "should the user see a 'takeover

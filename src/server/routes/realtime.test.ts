@@ -8,7 +8,7 @@ function makeTerminalHost(overrides: Partial<ServerTerminalHost> = {}): ServerTe
   const isValidClientId = ((value: unknown): value is string => typeof value === 'string') as never
   return {
     isValidClientId,
-    isClientConnected: (_userId: string, _clientId: string): boolean => true,
+    isClientOnline: (_userId: string, _clientId: string): boolean => true,
     getDiagnostics: vi.fn(() => ({}) as never),
     registerSocket: vi.fn(),
     unregisterSocket: vi.fn(),

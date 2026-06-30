@@ -1,10 +1,10 @@
-import { resolveWebSocketProtocol } from '#/web/lib/websocket-url.ts'
-import { ACCESS_TOKEN_QUERY } from '#/shared/access-token.ts'
 import {
-  normalizeTerminalSocketServerMessage,
-  normalizeTerminalSessionSnapshot,
-  normalizeTerminalSessionSummaryList,
-} from '#/shared/terminal-validators.ts'
+  createSocketRequestId,
+  createTerminalWebSocketUrl,
+  encodeClientMessage,
+  parseTerminalSocketServerMessage,
+} from '#/web/client-terminal-socket-utils.ts'
+import { normalizeTerminalSessionSnapshot, normalizeTerminalSessionSummaryList } from '#/shared/terminal-validators.ts'
 import { resolveTerminalController } from '#/shared/terminal-controller.ts'
 import type {
   TerminalClientMessage,
@@ -49,10 +49,10 @@ export interface ClientServerTerminalConfig {
 const WEB_TERMINAL_CLIENT_ID_STORAGE_KEY = 'goblin:terminal-client-id'
 const TERMINAL_SOCKET_OPEN_TIMEOUT_MS = 10_000
 const TERMINAL_REQUEST_TIMEOUT_MS = 30_000
+const TERMINAL_HEALTH_PROBE_TIMEOUT_MS = 5_000
 
 export function createServerTerminalBridge(options: {
   getServerConfig: () => ClientServerTerminalConfig
-  getClientId: () => string
   notificationProvider: TerminalNotificationProvider
   setBadge?: (count: number) => void
 }): ClientTerminalBridge {
@@ -62,6 +62,7 @@ export function createServerTerminalBridge(options: {
     reject: (reason?: unknown) => void
     timeout: ReturnType<typeof setTimeout>
   }
+  type SocketConnectionConfig = { url: string; clientId: string }
   const outputSubscribers = new Set<(event: TerminalOutputEvent) => void>()
   const titleSubscribers = new Set<(event: TerminalTitleEvent) => void>()
   const exitSubscribers = new Set<(event: TerminalExitEvent) => void>()
@@ -69,7 +70,6 @@ export function createServerTerminalBridge(options: {
   const lifecycleSubscribers = new Set<(event: TerminalLifecycleViewModel) => void>()
   const sessionsChangedSubscribers = new Set<(repoRoot: string) => void>()
   const sessionClosedSubscribers = new Set<(event: { ptySessionId: string; repoRoot: string }) => void>()
-  const clientId = options.getClientId()
   let socket: WebSocket | null = null
   let reconnectTimer: number | null = null
   // Client→server liveness heartbeat. Sent while the socket is
@@ -82,6 +82,10 @@ export function createServerTerminalBridge(options: {
   let quitting = isAppQuitting()
   let pendingSocketOpenRequests = 0
   const pendingSocketRequests = new Map<string, PendingSocketRequest>()
+  const pendingHealthProbes = new Map<
+    string,
+    { socket: WebSocket; generation: number; timeout: ReturnType<typeof setTimeout> }
+  >()
 
   function hasRealtimeSubscribers(): boolean {
     return (
@@ -118,6 +122,18 @@ export function createServerTerminalBridge(options: {
     pendingSocketRequests.clear()
   }
 
+  function clearPendingHealthProbes() {
+    for (const pending of pendingHealthProbes.values()) clearTimeout(pending.timeout)
+    pendingHealthProbes.clear()
+  }
+
+  function hasPendingHealthProbe(currentSocket: WebSocket, generation: number): boolean {
+    for (const pending of pendingHealthProbes.values()) {
+      if (pending.socket === currentSocket && pending.generation === generation) return true
+    }
+    return false
+  }
+
   function scheduleReconnect() {
     if (reconnectTimer !== null || !hasRealtimeSubscribers() || quitting) {
       return
@@ -135,11 +151,10 @@ export function createServerTerminalBridge(options: {
   // but the 300ms backoff adds latency the user feels on the first
   // visible-tab interaction. kickReconnect() short-circuits that
   // backoff: if the socket is null or fully CLOSED, we open
-  // immediately. If it's OPEN, we do nothing — the socket is
-  // healthy and a gratuitous cycle would just burn a handshake. If
-  // it's CONNECTING or CLOSING, ensureSocket's internal guard makes
-  // the call a no-op; the in-flight transition's close handler will
-  // route through scheduleReconnect on its own if it fails.
+  // immediately. If it's OPEN, we send a protocol-level health probe
+  // and reconnect only if the server does not answer. If it's
+  // CONNECTING or CLOSING, the in-flight transition's close handler
+  // will route through scheduleReconnect on its own if it fails.
   function kickReconnect() {
     if (quitting) return
     if (!hasRealtimeSubscribers()) return
@@ -149,21 +164,30 @@ export function createServerTerminalBridge(options: {
       // ensureSocket is a no-op if `socket` is already non-null and
       // OPEN, so this is safe in any state.
       ensureSocket()
+      return
+    }
+    if (currentSocket.readyState === WebSocket.OPEN) startHealthProbe(currentSocket, socketGeneration)
+  }
+
+  function resolveSocketConnectionConfig(): SocketConnectionConfig | null {
+    try {
+      const server = options.getServerConfig()
+      return {
+        url: createTerminalWebSocketUrl(server.url, server.accessToken, server.clientId),
+        clientId: server.clientId,
+      }
+    } catch {
+      return null
     }
   }
 
   function ensureSocket() {
     if (socket || typeof WebSocket === 'undefined' || quitting) return
-    let socketUrl: string
-    try {
-      const server = options.getServerConfig()
-      socketUrl = createTerminalWebSocketUrl(server.url, server.accessToken, server.clientId)
-    } catch {
-      return
-    }
+    const connection = resolveSocketConnectionConfig()
+    if (!connection) return
     manualSocketClose = false
     const generation = (socketGeneration += 1)
-    const currentSocket = new WebSocket(socketUrl)
+    const currentSocket = new WebSocket(connection.url)
     socket = currentSocket
     currentSocket.addEventListener('open', () => {
       if (!isActiveSocket(currentSocket, generation)) return
@@ -178,35 +202,7 @@ export function createServerTerminalBridge(options: {
     currentSocket.addEventListener('message', (event) => {
       if (!isActiveSocket(currentSocket, generation)) return
       const message = parseTerminalSocketServerMessage(event.data)
-      if (!message) return
-      if (message.type === 'response') {
-        settleSocketRequest(message)
-        return
-      }
-      if (message.type === 'output') {
-        for (const subscriber of outputSubscribers) subscriber(message.event)
-      } else if (message.type === 'title') {
-        for (const subscriber of titleSubscribers) subscriber(message.event)
-      } else if (message.type === 'exit') {
-        for (const subscriber of exitSubscribers) subscriber(message.event)
-      } else if (message.type === 'sessions-changed') {
-        for (const subscriber of sessionsChangedSubscribers) subscriber(message.repoRoot)
-      } else if (message.type === 'session-closed') {
-        for (const subscriber of sessionClosedSubscribers)
-          subscriber({ ptySessionId: message.ptySessionId, repoRoot: message.repoRoot })
-      } else if (message.type === 'identity') {
-        const identityEvent = {
-          ptySessionId: message.event.ptySessionId,
-          ...resolveTerminalController(message.event.controller, clientId),
-          canonicalCols: message.event.canonicalCols,
-          canonicalRows: message.event.canonicalRows,
-        }
-        for (const subscriber of identitySubscribers) subscriber(identityEvent)
-      } else if (message.type === 'lifecycle') {
-        for (const subscriber of lifecycleSubscribers) subscriber(message.event)
-      } else {
-        // Unknown realtime message — ignore.
-      }
+      if (message) handleSocketMessage(message, connection.clientId)
     })
     currentSocket.addEventListener('close', () => {
       if (!isActiveSocket(currentSocket, generation)) return
@@ -220,13 +216,56 @@ export function createServerTerminalBridge(options: {
     })
   }
 
+  function handleSocketMessage(message: TerminalSocketServerMessage, currentClientId: string): void {
+    switch (message.type) {
+      case 'response':
+        settleSocketRequest(message)
+        return
+      case 'pong':
+        settleHealthProbe(message)
+        return
+      case 'output':
+        for (const subscriber of outputSubscribers) subscriber(message.event)
+        return
+      case 'title':
+        for (const subscriber of titleSubscribers) subscriber(message.event)
+        return
+      case 'exit':
+        for (const subscriber of exitSubscribers) subscriber(message.event)
+        return
+      case 'sessions-changed':
+        for (const subscriber of sessionsChangedSubscribers) subscriber(message.repoRoot)
+        return
+      case 'session-closed':
+        for (const subscriber of sessionClosedSubscribers)
+          subscriber({ ptySessionId: message.ptySessionId, repoRoot: message.repoRoot })
+        return
+      case 'identity': {
+        const identityEvent = {
+          ptySessionId: message.event.ptySessionId,
+          ...resolveTerminalController(message.event.controller, currentClientId),
+          canonicalCols: message.event.canonicalCols,
+          canonicalRows: message.event.canonicalRows,
+        }
+        for (const subscriber of identitySubscribers) subscriber(identityEvent)
+        return
+      }
+      case 'lifecycle':
+        for (const subscriber of lifecycleSubscribers) subscriber(message.event)
+        return
+      default:
+        // Unknown realtime message — ignore.
+        return
+    }
+  }
+
   function startHeartbeat(currentSocket: WebSocket, generation: number): void {
     stopHeartbeat()
     // The 30 s cadence matches `HEARTBEAT_INTERVAL_MS` on the server
     // broker (`src/server/terminal/terminal-realtime-broker.ts`).
-    // The 90 s deadline (3 missed beats) is what fires a synthetic
-    // `onClientDisconnected`, which in turn lets the next `attach`
-    // auto-claim control under the new user-sticky model.
+    // The 90 s deadline (3 missed beats) is what flips broker
+    // presence offline, which in turn lets the next `attach`
+    // auto-claim when no effective controller remains.
     // Use `globalThis.setInterval` (not `window.setInterval`) so the
     // node-env test suite — which mocks `WebSocket` but does not
     // install `window` — does not crash on this line when the
@@ -243,7 +282,7 @@ export function createServerTerminalBridge(options: {
         return
       }
       try {
-        currentSocket.send(JSON.stringify({ type: 'heartbeat', at: Date.now() }))
+        currentSocket.send(JSON.stringify({ type: 'heartbeat' }))
       } catch {
         // Send failure is a signal that the socket is half-broken
         // — the `error` event *should* fire, but on some browser
@@ -254,8 +293,7 @@ export function createServerTerminalBridge(options: {
         // existing reconnect backoff instead of a TCP timeout
         // (which can be hours on a healthy-looking half-open
         // connection).
-        stopHeartbeat()
-        handleSocketDisconnection('Terminal heartbeat send failed')
+        forceSocketReconnect('Terminal heartbeat send failed', currentSocket)
       }
     }, TERMINAL_CLIENT_HEARTBEAT_INTERVAL_MS)
   }
@@ -266,8 +304,49 @@ export function createServerTerminalBridge(options: {
     heartbeatTimer = null
   }
 
+  function startHealthProbe(currentSocket: WebSocket, generation: number): void {
+    if (!isActiveSocket(currentSocket, generation) || currentSocket.readyState !== WebSocket.OPEN) return
+    if (hasPendingHealthProbe(currentSocket, generation)) return
+    const requestId = createSocketRequestId()
+    const timeout = setTimeout(() => {
+      const pending = pendingHealthProbes.get(requestId)
+      if (!pending) return
+      pendingHealthProbes.delete(requestId)
+      if (!isActiveSocket(pending.socket, pending.generation)) return
+      forceSocketReconnect('Terminal health probe timed out', pending.socket)
+    }, TERMINAL_HEALTH_PROBE_TIMEOUT_MS)
+    pendingHealthProbes.set(requestId, { socket: currentSocket, generation, timeout })
+    try {
+      currentSocket.send(encodeClientMessage({ type: 'ping', requestId }))
+    } catch {
+      clearTimeout(timeout)
+      pendingHealthProbes.delete(requestId)
+      forceSocketReconnect('Terminal health probe send failed', currentSocket)
+    }
+  }
+
+  function settleHealthProbe(message: Extract<TerminalSocketServerMessage, { type: 'pong' }>): void {
+    const pending = pendingHealthProbes.get(message.requestId)
+    if (!pending) return
+    pendingHealthProbes.delete(message.requestId)
+    clearTimeout(pending.timeout)
+  }
+
+  function forceSocketReconnect(reason: string, currentSocket: WebSocket | null = socket): void {
+    if (!currentSocket) return
+    if (socket === currentSocket) {
+      stopHeartbeat()
+      clearPendingHealthProbes()
+      handleSocketDisconnection(reason)
+    }
+    try {
+      currentSocket.close()
+    } catch {}
+  }
+
   function handleSocketDisconnection(reason: string) {
     const wasManual = manualSocketClose
+    clearPendingHealthProbes()
     rejectPendingSocketRequests(reason)
     socket = null
     manualSocketClose = false
@@ -292,6 +371,7 @@ export function createServerTerminalBridge(options: {
     quitting = true
     manualSocketClose = true
     clearReconnectTimer()
+    clearPendingHealthProbes()
     rejectPendingSocketRequests('Terminal socket closed')
     const currentSocket = socket
     socket = null
@@ -491,7 +571,7 @@ export function createServerTerminalBridge(options: {
         if (!pending) return
         pendingSocketRequests.delete(requestId)
         clearTimeout(pending.timeout)
-        closeSocketIfIdle()
+        forceSocketReconnect('Terminal request timed out', ws)
         reject(new Error('Terminal request timed out'))
       }, TERMINAL_REQUEST_TIMEOUT_MS)
       pendingSocketRequests.set(requestId, {
@@ -510,7 +590,7 @@ export function createServerTerminalBridge(options: {
       } catch (error) {
         clearTimeout(timeout)
         pendingSocketRequests.delete(requestId)
-        closeSocketIfIdle()
+        forceSocketReconnect('Terminal request send failed', ws)
         reject(error)
       }
     })
@@ -562,54 +642,5 @@ export function createServerTerminalBridge(options: {
       currentSocket.addEventListener('close', handleClose)
       currentSocket.addEventListener('error', handleError)
     })
-  }
-}
-
-function createTerminalWebSocketUrl(baseUrl: string, accessToken: string, clientId: string): string {
-  const httpUrl = new URL('/ws/terminal', baseUrl)
-  httpUrl.protocol = resolveWebSocketProtocol()
-  // `?t=` is the WebSocket auth channel for the access token. The
-  // browser path also sends the cookie (auto-attached on the WS
-  // upgrade), but `?t=` works for both browser and Electron — and
-  // it's the only way to authenticate a non-browser WS client (LAN
-  // CLI). The server middleware accepts all three channels
-  // (cookie / header / `?t=`).
-  httpUrl.searchParams.set(ACCESS_TOKEN_QUERY, accessToken)
-  httpUrl.searchParams.set('clientId', clientId)
-  return httpUrl.toString()
-}
-
-function parseTerminalSocketServerMessage(data: unknown): TerminalSocketServerMessage | null {
-  if (typeof data !== 'string') return null
-  try {
-    return normalizeTerminalSocketServerMessage(JSON.parse(data))
-  } catch {}
-  return null
-}
-
-function encodeClientMessage(message: TerminalClientMessage): string {
-  return JSON.stringify(message)
-}
-
-function createSocketRequestId(): string {
-  return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-    ? crypto.randomUUID()
-    : `request_${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`
-}
-
-export function readOrCreateWebTerminalClientId(): string {
-  const fallback = `client_${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`
-  try {
-    const storage = window.sessionStorage
-    const existing = storage?.getItem(WEB_TERMINAL_CLIENT_ID_STORAGE_KEY)?.trim()
-    if (existing) return existing
-    const created =
-      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-        ? `client_${crypto.randomUUID().replace(/-/g, '')}`
-        : fallback
-    storage?.setItem(WEB_TERMINAL_CLIENT_ID_STORAGE_KEY, created)
-    return created
-  } catch {
-    return fallback
   }
 }

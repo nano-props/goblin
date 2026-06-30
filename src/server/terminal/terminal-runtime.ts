@@ -15,7 +15,7 @@ import { normalizeTerminalClientMessage } from '#/shared/terminal-validators.ts'
 import { serverLogger } from '#/server/logger.ts'
 import { createTerminalCatalog } from '#/server/terminal/terminal-catalog.ts'
 import { createTerminalSessionOrderRuntime } from '#/server/terminal/terminal-session-order-runtime.ts'
-import type { TerminalRealtimeSocket } from '#/server/terminal/terminal-realtime-broker.ts'
+import type { TerminalRealtimeBroker, TerminalRealtimeSocket } from '#/server/terminal/terminal-realtime-broker.ts'
 import { createTerminalRuntimeActions } from '#/server/terminal/terminal-runtime-actions.ts'
 import { createTerminalRuntimeCoordinator } from '#/server/terminal/terminal-runtime-coordinator.ts'
 import {
@@ -33,8 +33,8 @@ import type { GoblinTerminalCommandRuntime } from '#/server/terminal/g-command.t
 // the background so users can leave builds or long-running tasks unattended.
 // 24 hours gives a full day for the user to reconnect before sessions are
 // forcibly cleaned up. (The previous revision also kept a 30s controller grace
-// timer here; it has been removed — see `terminal-controller.ts` for
-// the new disconnect-clears-controller semantics.)
+// timer here; it has been removed — controller effectiveness now derives from
+// broker presence.)
 const TERMINAL_DETACHED_TTL_MS = 24 * 60 * 60 * 1000
 const terminalRuntimeLogger = serverLogger.child({ module: 'terminal-runtime' })
 
@@ -58,6 +58,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   // live output event reaches a sibling tab (different `clientId`,
   // same `userId`) without an extra attach roundtrip. See
   // `identity.ts` for the model.
+  let broker: TerminalRealtimeBroker
   const manager = new TerminalSessionManager<string>(
     ptySupervisor,
     {
@@ -80,19 +81,19 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       },
     },
     terminalSessionOrder,
+    (userId, clientId) => broker.isClientOnline(userId, clientId),
   )
-  const { broker, connectionState } = createTerminalRuntimeCoordinator({
+  const coordinator = createTerminalRuntimeCoordinator({
     manager,
     terminalSessionOrder,
     detachedTtlMs: TERMINAL_DETACHED_TTL_MS,
   })
+  broker = coordinator.broker
+  const { detachedUsers } = coordinator
   const catalog = createTerminalCatalog({
     isValidClientId: isValidTerminalClientId,
     isValidTerminalSessionId,
     manager,
-    isClientConnected(userId, clientId) {
-      return broker.isClientConnected(userId, clientId)
-    },
     broadcastSessionsChanged(userId, repoRoot) {
       broadcastRepoSessionsChanged(userId, repoRoot)
     },
@@ -106,25 +107,14 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     broker,
     catalog,
     isValidTerminalClientId,
-    // The previous stub returned `true` whenever an clientId
-    // was present (see `resolveClientConnected` before this
-    // plan), which made the takeover path "work" for the first
-    // browser tab but masked the fact that we never asked the
-    // broker. Replacing with the broker check ensures a takeover
-    // request from a brand-new tab (the cross-browser scenario)
-    // only counts the attachment as connected if the WS is
-    // actually alive for the (userId, clientId) pair.
-    resolveClientConnected(userId, clientId) {
-      return broker.isClientConnected(userId, clientId) ?? false
-    },
   })
 
   const host: ServerTerminalHost = {
     isValidClientId(value) {
       return isValidTerminalClientId(value)
     },
-    isClientConnected(userId, clientId) {
-      return broker.isClientConnected(userId, clientId) ?? false
+    isClientOnline(userId, clientId) {
+      return broker.isClientOnline(userId, clientId)
     },
     getDiagnostics() {
       const bufferStats = manager.getSessionBufferStats()
@@ -140,12 +130,17 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       }
     },
     registerSocket(clientId, userId, socket) {
-      if (!isValidTerminalClientId(clientId) || !userId) {
+      if (typeof clientId !== 'string' || !isValidTerminalClientId(clientId) || !userId) {
         socket.close(1008, 'invalid client id')
         return
       }
-      const buffered = new BufferedTerminalSocket(socket as TerminalRealtimeSocket)
-      bufferedSocketByRawSocket.set(socket as TerminalRealtimeSocket, buffered)
+      const rawSocket = socket as TerminalRealtimeSocket
+      let buffered: BufferedTerminalSocket
+      buffered = new BufferedTerminalSocket(rawSocket, () => {
+        broker.unregisterSocket(buffered)
+        bufferedSocketByRawSocket.delete(rawSocket)
+      })
+      bufferedSocketByRawSocket.set(rawSocket, buffered)
       broker.registerSocket(clientId, userId, buffered)
     },
     unregisterSocket(clientId, userId, socket) {
@@ -191,7 +186,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       // missed) is observable in production logs. We still
       // return early without rejecting the WS — the message is
       // just unprocessable for this socket.
-      if (!isValidTerminalClientId(clientId)) {
+      if (typeof clientId !== 'string' || !isValidTerminalClientId(clientId)) {
         terminalRuntimeLogger.warn({ clientId }, 'invalid realtime message: missing/invalid identifiers')
         return
       }
@@ -215,12 +210,17 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
         // liveness signal that feeds the broker's deadline scan.
         // Resolving here means the rest of the realtime pipeline
         // (buffered socket, handler table) stays untouched.
-        // `recordHeartbeat`'s signature is `(userId, clientId, at)` —
-        // reverse the order and the broker's `userClientKey` lookup
-        // misses on every live heartbeat, the deadline scan
-        // prematurely fires, and the entire feature silently does
-        // nothing.
-        broker.recordHeartbeat(userId, clientId, message.at)
+        broker.recordHeartbeat(userId, clientId)
+        return
+      }
+      if (message.type === 'ping') {
+        broker.recordHeartbeat(userId, clientId)
+        const rawSocket = socket as TerminalRealtimeSocket
+        try {
+          rawSocket.send(JSON.stringify({ type: 'pong', requestId: message.requestId }))
+        } catch {
+          bufferedSocketByRawSocket.get(rawSocket)?.deactivate()
+        }
         return
       }
       const bufferedSocket = bufferedSocketByRawSocket.get(socket as TerminalRealtimeSocket)
@@ -237,7 +237,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     shutdown() {
       if (shuttingDown) return
       shuttingDown = true
-      connectionState.shutdown()
+      detachedUsers.shutdown()
       broker.disconnectAll()
       manager.closeAll()
       ptySupervisor.shutdown()

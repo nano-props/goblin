@@ -113,6 +113,39 @@ describe('terminal web host bridge', () => {
     dispose()
   })
 
+  test('uses the websocket client id when resolving identity role', async () => {
+    window.localStorage.setItem('goblin:terminal-client-id', 'web_oldpersistedclient')
+    window.sessionStorage.setItem('goblin:terminal-client-id', 'web_oldsessionclient')
+    const { terminalBridge } = await import('#/web/terminal.ts')
+    const onIdentity = vi.fn()
+    const dispose = terminalBridge.onIdentity(onIdentity)
+    const socket = wsMock.instances[0]
+    if (!socket) throw new Error('missing web terminal socket')
+    socket.emitOpen()
+
+    socket.emitMessage(
+      JSON.stringify({
+        type: 'identity',
+        event: {
+          ptySessionId: 'pty_1',
+          controller: { clientId: 'client_sharedterminal', status: 'connected' },
+          canonicalCols: 100,
+          canonicalRows: 30,
+        },
+      }),
+    )
+
+    expect(socket.url).toContain('clientId=client_sharedterminal')
+    expect(onIdentity).toHaveBeenCalledWith({
+      ptySessionId: 'pty_1',
+      role: 'controller',
+      controllerStatus: 'connected',
+      canonicalCols: 100,
+      canonicalRows: 30,
+    })
+    dispose()
+  })
+
   test('does not fall back to http when attach websocket cannot open', async () => {
     const fetchMock = mockFetch()
     const { terminalBridge } = await import('#/web/terminal.ts')
@@ -465,6 +498,82 @@ describe('terminal web host bridge', () => {
     }
   })
 
+  test('sends terminal heartbeat messages while the realtime socket is open', async () => {
+    vi.useFakeTimers()
+    try {
+      const { terminalBridge } = await import('#/web/terminal.ts')
+      const dispose = terminalBridge.onOutput(() => {})
+      const socket = wsMock.instances[0]
+      if (!socket) throw new Error('missing web terminal socket')
+      socket.emitOpen()
+
+      await vi.advanceTimersByTimeAsync(30_000)
+
+      expect(socket.sent.map((payload) => JSON.parse(payload))).toContainEqual({ type: 'heartbeat' })
+      dispose()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  test('heartbeat send failure closes and reconnects an unhealthy realtime socket', async () => {
+    vi.useFakeTimers()
+    try {
+      const { terminalBridge } = await import('#/web/terminal.ts')
+      const dispose = terminalBridge.onOutput(() => {})
+      const socket = wsMock.instances[0]
+      if (!socket) throw new Error('missing web terminal socket')
+      socket.emitOpen()
+      await vi.advanceTimersByTimeAsync(1_000)
+      const prunePromise = terminalBridge.pruneTerminals('/tmp/repo')
+      await Promise.resolve()
+      const request = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'prune')
+      expect(request).toMatchObject({ type: 'request', action: 'prune' })
+      socket.send = vi.fn(() => {
+        throw new Error('send failed')
+      })
+      const expectation = expect(prunePromise).rejects.toThrow('Terminal heartbeat send failed')
+
+      await vi.advanceTimersByTimeAsync(29_000)
+
+      await expectation
+      expect(socket.readyState).toBe(wsMock.CLOSED)
+      await vi.advanceTimersByTimeAsync(300)
+      expect(wsMock.instances).toHaveLength(2)
+      dispose()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  test('request timeout closes an unhealthy socket even while subscribers keep realtime open', async () => {
+    vi.useFakeTimers()
+    try {
+      const { terminalBridge } = await import('#/web/terminal.ts')
+      const dispose = terminalBridge.onOutput(() => {})
+      const socket = wsMock.instances[0]
+      if (!socket) throw new Error('missing web terminal socket')
+      socket.emitOpen()
+      await Promise.resolve()
+
+      const prunePromise = terminalBridge.pruneTerminals('/tmp/repo')
+      await Promise.resolve()
+      const request = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'prune')
+      expect(request).toMatchObject({ type: 'request', action: 'prune' })
+      const expectation = expect(prunePromise).rejects.toThrow('Terminal request timed out')
+
+      await vi.advanceTimersByTimeAsync(30_000)
+      await expectation
+      expect(socket.readyState).toBe(wsMock.CLOSED)
+
+      await vi.advanceTimersByTimeAsync(300)
+      expect(wsMock.instances).toHaveLength(2)
+      dispose()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   test('does not fall back to http when create/list/snapshot/prune websocket payloads resolve successfully', async () => {
     const fetchMock = mockFetch()
     const { terminalBridge } = await import('#/web/terminal.ts')
@@ -574,6 +683,96 @@ describe('terminal web host bridge', () => {
     disposeIdentity()
     disposeLifecycle()
     disposeSessionsChanged()
+  })
+
+  test('kickReconnect health-probes an open terminal socket and keeps it when pong arrives', async () => {
+    vi.useFakeTimers()
+    try {
+      const { terminalBridge } = await import('#/web/terminal.ts')
+      const dispose = terminalBridge.onOutput(() => {})
+      const socket = wsMock.instances[0]
+      if (!socket) throw new Error('missing web terminal socket')
+      socket.emitOpen()
+
+      terminalBridge.kickReconnect()
+      const ping = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.type === 'ping')
+      expect(ping).toMatchObject({ type: 'ping' })
+      socket.emitMessage(JSON.stringify({ type: 'pong', requestId: ping.requestId }))
+      await vi.advanceTimersByTimeAsync(5_000)
+
+      expect(socket.readyState).toBe(wsMock.OPEN)
+      expect(wsMock.instances).toHaveLength(1)
+      dispose()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  test('kickReconnect does not stack duplicate health probes for the same open socket', async () => {
+    vi.useFakeTimers()
+    try {
+      const { terminalBridge } = await import('#/web/terminal.ts')
+      const dispose = terminalBridge.onOutput(() => {})
+      const socket = wsMock.instances[0]
+      if (!socket) throw new Error('missing web terminal socket')
+      socket.emitOpen()
+
+      terminalBridge.kickReconnect()
+      terminalBridge.kickReconnect()
+
+      expect(socket.sent.map((payload) => JSON.parse(payload)).filter((message) => message.type === 'ping')).toHaveLength(
+        1,
+      )
+      dispose()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  test('kickReconnect reconnects an open terminal socket when health probe send fails', async () => {
+    vi.useFakeTimers()
+    try {
+      const { terminalBridge } = await import('#/web/terminal.ts')
+      const dispose = terminalBridge.onOutput(() => {})
+      const socket = wsMock.instances[0]
+      if (!socket) throw new Error('missing web terminal socket')
+      socket.emitOpen()
+      socket.send = vi.fn(() => {
+        throw new Error('send failed')
+      })
+
+      terminalBridge.kickReconnect()
+
+      expect(socket.readyState).toBe(wsMock.CLOSED)
+      await vi.advanceTimersByTimeAsync(300)
+      expect(wsMock.instances).toHaveLength(2)
+      dispose()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  test('kickReconnect reconnects an open terminal socket when health probe times out', async () => {
+    vi.useFakeTimers()
+    try {
+      const { terminalBridge } = await import('#/web/terminal.ts')
+      const dispose = terminalBridge.onOutput(() => {})
+      const socket = wsMock.instances[0]
+      if (!socket) throw new Error('missing web terminal socket')
+      socket.emitOpen()
+
+      terminalBridge.kickReconnect()
+      const ping = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.type === 'ping')
+      expect(ping).toMatchObject({ type: 'ping' })
+      await vi.advanceTimersByTimeAsync(5_000)
+      expect(socket.readyState).toBe(wsMock.CLOSED)
+
+      await vi.advanceTimersByTimeAsync(300)
+      expect(wsMock.instances).toHaveLength(2)
+      dispose()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   test('reuses a connecting terminal socket when subscribers briefly drop to zero', async () => {

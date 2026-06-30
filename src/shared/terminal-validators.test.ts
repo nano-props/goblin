@@ -75,6 +75,11 @@ describe('shared terminal validators', () => {
       input: { ptySessionId: 'pty_1234567890abcdef', cols: 80, rows: 24, clientId: 'client_a' },
     })
 
+    expect(normalizeTerminalClientMessage({ type: 'ping', requestId: 'health_1' })).toEqual({
+      type: 'ping',
+      requestId: 'health_1',
+    })
+
     expect(
       normalizeTerminalClientMessage({
         type: 'request',
@@ -125,6 +130,11 @@ describe('shared terminal validators', () => {
     ).toEqual({
       type: 'output',
       event: { ptySessionId: 'pty_1234567890abcdef', data: 'hi', seq: 1, processName: 'zsh' },
+    })
+
+    expect(normalizeTerminalSocketServerMessage({ type: 'pong', requestId: 'health_1' })).toEqual({
+      type: 'pong',
+      requestId: 'health_1',
     })
 
     expect(

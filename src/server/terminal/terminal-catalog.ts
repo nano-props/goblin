@@ -64,7 +64,6 @@ interface TerminalCatalogEnsureSessionInput {
   cols: number
   rows: number
   clientId?: string
-  clientConnected?: boolean
   forceNew?: boolean
   command?: string
   args?: string[]
@@ -82,7 +81,6 @@ interface TerminalCatalogOptions {
   isValidClientId(value: unknown): value is string
   isValidTerminalSessionId(value: unknown): value is string
   manager: TerminalCatalogManager
-  isClientConnected(userId: string, clientId?: string): boolean | undefined
   broadcastSessionsChanged(userId: string, repoRoot: string): void
   gCommand?: GoblinTerminalCommandRuntime
 }
@@ -249,7 +247,6 @@ class TerminalCatalog {
       cols: context.cols,
       rows: context.rows,
       clientId: input.clientId,
-      clientConnected: this.options.isClientConnected(userId, input.clientId),
       forceNew: context.action === 'created',
       command: invocation.command,
       args: invocation.args,
@@ -290,7 +287,6 @@ class TerminalCatalog {
       cols: context.cols,
       rows: context.rows,
       clientId: input.clientId,
-      clientConnected: this.options.isClientConnected(userId, input.clientId),
       forceNew: context.action === 'created',
       startupShellCommand: input.startupShellCommand,
       env,

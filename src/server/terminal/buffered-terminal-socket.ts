@@ -24,9 +24,11 @@ export class BufferedTerminalSocket implements TerminalRealtimeSocket {
   private active = true
   private readonly buffer: BufferedEntry[] = []
   private readonly socket: TerminalRealtimeSocket
+  private readonly onDeactivate?: () => void
 
-  constructor(socket: TerminalRealtimeSocket) {
+  constructor(socket: TerminalRealtimeSocket, onDeactivate?: () => void) {
     this.socket = socket
+    this.onDeactivate = onDeactivate
   }
 
   send(payload: string): void {
@@ -47,6 +49,12 @@ export class BufferedTerminalSocket implements TerminalRealtimeSocket {
     this.closeNow(code, reason)
   }
 
+  forceClose(code?: number, reason?: string): void {
+    if (!this.active) return
+    this.closeNow(code, reason)
+    this.onDeactivate?.()
+  }
+
   pause(): void {
     if (!this.active) return
     this.paused += 1
@@ -60,9 +68,11 @@ export class BufferedTerminalSocket implements TerminalRealtimeSocket {
   }
 
   deactivate(): void {
+    if (!this.active) return
     this.active = false
     this.paused = 0
     this.buffer.length = 0
+    this.onDeactivate?.()
   }
 
   private sendNow(payload: string): void {
