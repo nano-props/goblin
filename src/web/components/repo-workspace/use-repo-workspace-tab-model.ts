@@ -5,10 +5,10 @@ import {
   type RepoWorkspaceTabModel,
   type RepoWorkspaceTabModelInput,
 } from '#/web/components/repo-workspace/tab-model.ts'
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
+import { formatTerminalWorktreeKey } from '#/shared/terminal-workspace-slot-key.ts'
 import {
   useTerminalRepoSyncReady,
-  useWorktreeTerminalSnapshot,
+  useTerminalWorktreeSnapshot,
 } from '#/web/components/terminal/terminal-session-store.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
@@ -41,12 +41,12 @@ export function useRepoWorkspaceTabModelInput(
   const { branch } = detail
   const branchName = branch?.name ?? null
   const worktreePath = branch?.worktree?.path ?? null
-  const terminalWorktreeKey = worktreePath ? worktreeTerminalKey(repo.id, worktreePath) : null
+  const terminalWorktreeKey = worktreePath ? formatTerminalWorktreeKey(repo.id, worktreePath) : null
 
-  const worktreeSnapshot = useWorktreeTerminalSnapshot(terminalWorktreeKey)
+  const terminalWorktreeSnapshot = useTerminalWorktreeSnapshot(terminalWorktreeKey)
   const terminalSyncReady = useTerminalRepoSyncReady(repo.id)
   const selectedTerminalKey = useReposStore((s) =>
-    terminalWorktreeKey ? s.selectedTerminalKeyByWorktree[terminalWorktreeKey] : undefined,
+    terminalWorktreeKey ? s.selectedTerminalKeyByTerminalWorktree[terminalWorktreeKey] : undefined,
   )
 
   const workspacePaneTabOrder = useMemo(
@@ -68,9 +68,9 @@ export function useRepoWorkspaceTabModelInput(
       worktreePath,
       preferredTab,
       tabOrder: workspacePaneTabOrder,
-      runtimeTerminalViews: worktreeSnapshot.sessions,
-      terminalSessionCount: worktreeSnapshot.count,
-      terminalCreatePending: worktreeSnapshot.pendingCreate,
+      runtimeTerminalViews: terminalWorktreeSnapshot.sessions,
+      terminalSessionCount: terminalWorktreeSnapshot.count,
+      terminalCreatePending: terminalWorktreeSnapshot.pendingCreate,
       terminalSyncReady,
       selectedTerminalKey: modelSelectedTerminalKey,
     }),
@@ -80,9 +80,9 @@ export function useRepoWorkspaceTabModelInput(
       worktreePath,
       preferredTab,
       workspacePaneTabOrder,
-      worktreeSnapshot.sessions,
-      worktreeSnapshot.count,
-      worktreeSnapshot.pendingCreate,
+      terminalWorktreeSnapshot.sessions,
+      terminalWorktreeSnapshot.count,
+      terminalWorktreeSnapshot.pendingCreate,
       terminalSyncReady,
       modelSelectedTerminalKey,
     ],
@@ -97,15 +97,15 @@ export function useRepoWorkspaceTabModelInput(
  * the tab-model hook explicit.
  */
 export function useSyncRepoWorkspaceTerminalSelection(
-  model: Pick<RepoWorkspaceTabModel, 'activeTab' | 'worktreeTerminalKey'>,
+  model: Pick<RepoWorkspaceTabModel, 'activeTab' | 'terminalWorktreeKey'>,
   selectedTerminalKey: string | undefined,
 ): void {
   const setSelectedTerminal = useReposStore((s) => s.setSelectedTerminal)
   const activeTerminalKey = model.activeTab?.kind === 'terminal' ? model.activeTab.terminalKey : null
 
   useEffect(() => {
-    if (!model.worktreeTerminalKey || !activeTerminalKey) return
+    if (!model.terminalWorktreeKey || !activeTerminalKey) return
     if (activeTerminalKey === selectedTerminalKey) return
-    setSelectedTerminal(model.worktreeTerminalKey, activeTerminalKey)
-  }, [activeTerminalKey, model.worktreeTerminalKey, selectedTerminalKey, setSelectedTerminal])
+    setSelectedTerminal(model.terminalWorktreeKey, activeTerminalKey)
+  }, [activeTerminalKey, model.terminalWorktreeKey, selectedTerminalKey, setSelectedTerminal])
 }

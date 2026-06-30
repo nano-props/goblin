@@ -26,7 +26,7 @@ describe('repo workspace pane tab model', () => {
       selectedTerminalKey: null,
     })
 
-    expect(model.worktreeTerminalKey).toBe(WORKTREE_KEY)
+    expect(model.terminalWorktreeKey).toBe(WORKTREE_KEY)
     expect(model.terminalViews.map((view) => view.type)).toEqual(['terminal'])
     expect(model.staticTabs).toEqual(['status', 'changes', 'history'])
     expect(model.tabs.map((tab) => [tab.identity, tab.kind])).toEqual([
@@ -465,7 +465,7 @@ function terminalView(terminalKey: string, displayOrder: number, selected: boole
   return {
     type: 'terminal',
     terminalKey,
-    worktreeTerminalKey: WORKTREE_KEY,
+    terminalWorktreeKey: WORKTREE_KEY,
     sessionId: terminalKey,
     index: displayOrder,
     displayOrder,

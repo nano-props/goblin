@@ -30,7 +30,7 @@ import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 interface TerminalBellIntentDeps {
   navigation: PrimaryWindowNavigationActions
   closeAllOverlays: () => void
-  setSelectedTerminal: (worktreeKey: string, key: string) => void
+  setSelectedTerminal: (terminalWorktreeKey: string, key: string) => void
 }
 
 interface SharedClientIntentDeps {
@@ -44,7 +44,7 @@ interface SharedClientIntentDeps {
   isOverlayOpen: () => boolean
   isWorkspaceShortcutSuppressed: () => boolean
   ensureWorkspaceOpen: (input: string | RepoSessionEntry) => Promise<OpenRepoResult>
-  setSelectedTerminal: (worktreeKey: string, key: string) => void
+  setSelectedTerminal: (terminalWorktreeKey: string, key: string) => void
   resetLayout: () => void
   toggleZenMode: () => void
   t: (key: string) => string
@@ -65,7 +65,7 @@ export function handleTerminalBellClickIntent(
   deps.closeAllOverlays()
   switch (plan.kind) {
     case 'show-worktree-terminal':
-      deps.setSelectedTerminal(plan.worktreeTerminalKey, plan.terminalKey)
+      deps.setSelectedTerminal(plan.terminalWorktreeKey, plan.terminalKey)
       deps.navigation.showRepoBranchWorkspacePaneTab(plan.repoId, plan.branch, 'terminal')
       return
     case 'show-repo-terminal':

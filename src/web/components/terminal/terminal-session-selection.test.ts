@@ -5,7 +5,7 @@ import type { TerminalDescriptor } from '#/web/components/terminal/types.ts'
 function descriptor(terminalKey: string): TerminalDescriptor {
   return {
     terminalKey,
-    worktreeTerminalKey: 'repo\0wt',
+    terminalWorktreeKey: 'repo\0wt',
     sessionId: terminalKey,
     index: 1,
     repoRoot: '/repo',
@@ -21,7 +21,7 @@ describe('terminal session selection helper', () => {
 
     expect(
       resolveSelectedTerminalKey({
-        worktreeTerminalKey: 'repo\0wt',
+        terminalWorktreeKey: 'repo\0wt',
         preferredTerminalKey: 'session-3',
         currentTerminalKey: 'session-2',
         controllerTerminalKey: 'session-1',
@@ -32,7 +32,7 @@ describe('terminal session selection helper', () => {
 
     expect(
       resolveSelectedTerminalKey({
-        worktreeTerminalKey: 'repo\0wt',
+        terminalWorktreeKey: 'repo\0wt',
         preferredTerminalKey: 'missing',
         currentTerminalKey: 'session-2',
         controllerTerminalKey: 'session-1',
@@ -43,7 +43,7 @@ describe('terminal session selection helper', () => {
 
     expect(
       resolveSelectedTerminalKey({
-        worktreeTerminalKey: 'repo\0wt',
+        terminalWorktreeKey: 'repo\0wt',
         preferredTerminalKey: null,
         currentTerminalKey: null,
         controllerTerminalKey: 'session-1',
@@ -54,7 +54,7 @@ describe('terminal session selection helper', () => {
 
     expect(
       resolveSelectedTerminalKey({
-        worktreeTerminalKey: 'repo\0wt',
+        terminalWorktreeKey: 'repo\0wt',
         preferredTerminalKey: null,
         currentTerminalKey: null,
         controllerTerminalKey: null,

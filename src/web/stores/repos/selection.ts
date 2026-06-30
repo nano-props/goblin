@@ -14,7 +14,7 @@ import {
   type WorkspacePaneTabType,
   workspacePaneTabOrderEntryIdentity,
 } from '#/shared/workspace-pane.ts'
-import { formatWorktreeKey } from '#/shared/terminal-workspace-slot-key.ts'
+import { formatTerminalWorktreeKey } from '#/shared/terminal-workspace-slot-key.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
 import {
   normalizeWorkspacePaneTabOrder,
@@ -90,20 +90,20 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
       })
     },
 
-    applySessionSelectedTerminalState(selectedTerminalKeyByWorktree: Record<string, string>) {
+    applySessionSelectedTerminalState(selectedTerminalKeyByTerminalWorktree: Record<string, string>) {
       // One-shot boot/session restore of per-worktree terminal selection. This
       // seeds client state; later selection changes remain client-owned.
       set((s) => {
-        const current = s.selectedTerminalKeyByWorktree
+        const current = s.selectedTerminalKeyByTerminalWorktree
         const currentEntries = Object.entries(current)
-        const nextEntries = Object.entries(selectedTerminalKeyByWorktree)
+        const nextEntries = Object.entries(selectedTerminalKeyByTerminalWorktree)
         if (
           currentEntries.length === nextEntries.length &&
-          nextEntries.every(([worktreeKey, key]) => current[worktreeKey] === key)
+          nextEntries.every(([terminalWorktreeKey, key]) => current[terminalWorktreeKey] === key)
         ) {
           return s
         }
-        return { selectedTerminalKeyByWorktree: { ...selectedTerminalKeyByWorktree } }
+        return { selectedTerminalKeyByTerminalWorktree: { ...selectedTerminalKeyByTerminalWorktree } }
       })
     },
 
@@ -134,19 +134,22 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
       })
     },
 
-    setSelectedTerminal(worktreeTerminalKey: string, key: string | null) {
+    setSelectedTerminal(terminalWorktreeKey: string, key: string | null) {
       set((s) => {
-        const current = s.selectedTerminalKeyByWorktree[worktreeTerminalKey]
+        const current = s.selectedTerminalKeyByTerminalWorktree[terminalWorktreeKey]
         if (key) {
           if (current === key) return s
           return {
-            selectedTerminalKeyByWorktree: { ...s.selectedTerminalKeyByWorktree, [worktreeTerminalKey]: key },
+            selectedTerminalKeyByTerminalWorktree: {
+              ...s.selectedTerminalKeyByTerminalWorktree,
+              [terminalWorktreeKey]: key,
+            },
           }
         }
         if (current === undefined) return s
-        const selectedTerminalKeyByWorktree = { ...s.selectedTerminalKeyByWorktree }
-        delete selectedTerminalKeyByWorktree[worktreeTerminalKey]
-        return { selectedTerminalKeyByWorktree }
+        const selectedTerminalKeyByTerminalWorktree = { ...s.selectedTerminalKeyByTerminalWorktree }
+        delete selectedTerminalKeyByTerminalWorktree[terminalWorktreeKey]
+        return { selectedTerminalKeyByTerminalWorktree }
       })
     },
   }
@@ -224,8 +227,8 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
         const currentOrder = workspacePaneTabOrderForBranch(repo.ui, branch)
         const nextOrder = workspacePaneTabOrderWithTerminal(currentOrder, terminalKey)
         const currentView = preferredWorkspacePaneTabForBranch(repo.ui, branch)
-        const wtKey = formatWorktreeKey(id, worktreePath)
-        const currentSelected = s.selectedTerminalKeyByWorktree[wtKey]
+        const terminalWorktreeKey = formatTerminalWorktreeKey(id, worktreePath)
+        const currentSelected = s.selectedTerminalKeyByTerminalWorktree[terminalWorktreeKey]
         const orderChanged = !workspacePaneTabOrdersEqual(currentOrder, nextOrder)
         viewChanged = currentView !== 'terminal'
         const selectionChanged = currentSelected !== terminalKey
@@ -246,7 +249,10 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
         if (!selectionChanged) return repoPatch
         return {
           ...repoPatch,
-          selectedTerminalKeyByWorktree: { ...s.selectedTerminalKeyByWorktree, [wtKey]: terminalKey },
+          selectedTerminalKeyByTerminalWorktree: {
+            ...s.selectedTerminalKeyByTerminalWorktree,
+            [terminalWorktreeKey]: terminalKey,
+          },
         }
       })
       if (!viewChanged || token === undefined) return

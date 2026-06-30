@@ -37,7 +37,7 @@ describe('useSessionPersistence', () => {
       order: [repo.id],
       activeId: repo.id,
       sessionReady: true,
-      selectedTerminalKeyByWorktree: {
+      selectedTerminalKeyByTerminalWorktree: {
         '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0session-2',
       },
     })
@@ -48,7 +48,7 @@ describe('useSessionPersistence', () => {
       expect.objectContaining({
         openRepoEntries: [{ kind: 'local', id: '/tmp/repo' }],
         activeRepoId: '/tmp/repo',
-        selectedTerminalKeyByWorktree: {
+        selectedTerminalKeyByTerminalWorktree: {
           '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0session-2',
         },
         workspacePaneTabOrderByBranchByRepo: {

@@ -2,7 +2,7 @@ interface TerminalSessionOrderRecord<TUser extends string | number> {
   userId: TUser
   scope: string
   worktreePath: string
-  id: string
+  terminalKey: string
   displayOrder: number
 }
 
@@ -15,7 +15,7 @@ export interface TerminalSessionOrderWorktreeInput<TUser extends string | number
 export interface TerminalSessionOrderInput<
   TUser extends string | number,
 > extends TerminalSessionOrderWorktreeInput<TUser> {
-  id: string
+  terminalKey: string
 }
 
 export class TerminalSessionOrderRuntime<TUser extends string | number> {
@@ -24,15 +24,15 @@ export class TerminalSessionOrderRuntime<TUser extends string | number> {
   registerTerminalSessionOrder(input: TerminalSessionOrderInput<TUser>): void {
     const worktreeKey = this.worktreeKey(input)
     const views = this.sessionsByWorktree.get(worktreeKey) ?? new Map()
-    if (views.has(input.id)) {
+    if (views.has(input.terminalKey)) {
       this.sessionsByWorktree.set(worktreeKey, views)
       return
     }
-    views.set(input.id, {
+    views.set(input.terminalKey, {
       userId: input.userId,
       scope: input.scope,
       worktreePath: input.worktreePath,
-      id: input.id,
+      terminalKey: input.terminalKey,
       displayOrder: nextDisplayOrder(views),
     })
     this.sessionsByWorktree.set(worktreeKey, views)
@@ -42,12 +42,12 @@ export class TerminalSessionOrderRuntime<TUser extends string | number> {
     const worktreeKey = this.worktreeKey(input)
     const views = this.sessionsByWorktree.get(worktreeKey)
     if (!views) return
-    views.delete(input.id)
+    views.delete(input.terminalKey)
     if (views.size === 0) this.sessionsByWorktree.delete(worktreeKey)
   }
 
   sessionDisplayOrder(input: TerminalSessionOrderInput<TUser>): number | null {
-    return this.sessionsByWorktree.get(this.worktreeKey(input))?.get(input.id)?.displayOrder ?? null
+    return this.sessionsByWorktree.get(this.worktreeKey(input))?.get(input.terminalKey)?.displayOrder ?? null
   }
 
   closeSessionsForUser(userId: TUser): void {

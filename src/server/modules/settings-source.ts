@@ -128,15 +128,15 @@ function defaultSession(): WorkspaceSessionState {
   return defaultWorkspaceSessionState()
 }
 
-function normalizeSelectedTerminalKeyByWorktree(value: unknown): Record<string, string> {
+function normalizeSelectedTerminalKeyByTerminalWorktree(value: unknown): Record<string, string> {
   if (!value || typeof value !== 'object') return {}
   const normalized: Record<string, string> = {}
-  for (const [worktreeKey, key] of Object.entries(value)) {
-    if (typeof worktreeKey !== 'string' || typeof key !== 'string') continue
-    const parts = worktreeKey.split('\0')
+  for (const [terminalWorktreeKey, key] of Object.entries(value)) {
+    if (typeof terminalWorktreeKey !== 'string' || typeof key !== 'string') continue
+    const parts = terminalWorktreeKey.split('\0')
     if (parts.length !== 2 || !parts[0] || !parts[1]) continue
-    if (!key.startsWith(`${worktreeKey}\0`)) continue
-    normalized[worktreeKey] = key
+    if (!key.startsWith(`${terminalWorktreeKey}\0`)) continue
+    normalized[terminalWorktreeKey] = key
   }
   return normalized
 }
@@ -294,7 +294,9 @@ function normalizeSession(value: unknown): WorkspaceSessionState {
       activeRepoId && openRepoEntries.some((entry) => repoSessionEntryId(entry) === activeRepoId) ? activeRepoId : null,
     zenMode: typeof partial.zenMode === 'boolean' ? partial.zenMode : DEFAULT_ZEN_MODE,
     workspacePaneSize: normalizeWorkspacePaneSize(partial.workspacePaneSize),
-    selectedTerminalKeyByWorktree: normalizeSelectedTerminalKeyByWorktree(partial.selectedTerminalKeyByWorktree),
+    selectedTerminalKeyByTerminalWorktree: normalizeSelectedTerminalKeyByTerminalWorktree(
+      partial.selectedTerminalKeyByTerminalWorktree,
+    ),
     preferredWorkspacePaneTabByBranchByRepo: normalizePreferredWorkspacePaneTabByBranchByRepo(
       partial.preferredWorkspacePaneTabByBranchByRepo,
       openRepoEntries,

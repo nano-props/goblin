@@ -42,14 +42,14 @@ describe('terminal session projection helpers', () => {
     expect(projected).toEqual({
       descriptor: {
         terminalKey: `${REPO_ROOT}\0${WORKTREE_PATH}\0session-2`,
-        worktreeTerminalKey: `${REPO_ROOT}\0${WORKTREE_PATH}`,
+        terminalWorktreeKey: `${REPO_ROOT}\0${WORKTREE_PATH}`,
         sessionId: 'session-2',
         index: 2,
         repoRoot: REPO_ROOT,
         branch: 'main',
         worktreePath: WORKTREE_PATH,
       },
-      worktreeTerminalKey: `${REPO_ROOT}\0${WORKTREE_PATH}`,
+      terminalWorktreeKey: `${REPO_ROOT}\0${WORKTREE_PATH}`,
       hydrateInput: {
         ptySessionId: 'pty_session_123_aaaaaaaaa',
         processName: 'zsh',

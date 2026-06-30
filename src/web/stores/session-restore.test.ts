@@ -29,7 +29,7 @@ function installBridge(sessionOverrides: Record<string, unknown> = {}) {
               activeRepoId: null,
               zenMode: true,
               workspacePaneSize: 0.5,
-              selectedTerminalKeyByWorktree: {},
+              selectedTerminalKeyByTerminalWorktree: {},
               workspacePaneTabOrderByBranchByRepo: {},
               ...sessionOverrides,
             },

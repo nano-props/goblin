@@ -130,7 +130,7 @@ export class TerminalSessionManager<TUser extends string | number> {
         userId,
         scope: existing.scope,
         worktreePath: existing.worktreePath,
-        id: existing.terminalKey,
+        terminalKey: existing.terminalKey,
       })
       if (input.clientId) {
         registerTerminalClient(existing, input.clientId, size.cols, size.rows)
@@ -171,7 +171,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       userId,
       scope: input.scope,
       worktreePath,
-      id: input.terminalKey,
+      terminalKey: input.terminalKey,
     })
     if (input.clientId) {
       registerTerminalClient(session, input.clientId, size.cols, size.rows)
@@ -306,7 +306,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       userId: session.userId,
       scope: session.scope,
       worktreePath: session.worktreePath,
-      id: session.terminalKey,
+      terminalKey: session.terminalKey,
     })
     session.ptyBinding.dispose(session)
   }
@@ -396,7 +396,7 @@ export class TerminalSessionManager<TUser extends string | number> {
         userId: session.userId,
         scope: session.scope,
         worktreePath: session.worktreePath,
-        id: session.terminalKey,
+        terminalKey: session.terminalKey,
       }) ?? Number.MAX_SAFE_INTEGER
     )
   }

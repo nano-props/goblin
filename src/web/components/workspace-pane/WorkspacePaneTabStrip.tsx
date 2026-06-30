@@ -54,7 +54,7 @@ import { WorkspacePaneTabTitle } from '#/web/components/workspace-pane/Workspace
 type WorkspacePaneT = (key: string, params?: Record<string, string | number>) => string
 
 interface WorkspacePaneTabStripProps {
-  worktreeTerminalKey: string | null
+  terminalWorktreeKey: string | null
   items: WorkspacePaneTabItem[]
   workspacePaneId: string
   responsiveCompact?: boolean
@@ -341,7 +341,7 @@ function WorkspacePaneTabSwitcherPopover({
 }
 
 export function WorkspacePaneTabStrip({
-  worktreeTerminalKey,
+  terminalWorktreeKey,
   items,
   workspacePaneId,
   activeTabIdentity,
@@ -361,7 +361,7 @@ export function WorkspacePaneTabStrip({
   const t = useT()
   const terminalItems = useMemo(() => items.filter(isTerminalWorkspacePaneTabItem), [items])
   const sortableItems = useMemo(() => items.filter(isSortableWorkspacePaneTabItem), [items])
-  const canCreateNew = worktreeTerminalKey !== null
+  const canCreateNew = terminalWorktreeKey !== null
   const showCollapsedTabs = !!responsiveCompact
   const activeItem = activeTabIdentity ? (items.find((item) => item.identity === activeTabIdentity) ?? null) : null
   const compactPendingItem = showCollapsedTabs ? (items.find(isPendingWorkspacePaneTabItem) ?? null) : null

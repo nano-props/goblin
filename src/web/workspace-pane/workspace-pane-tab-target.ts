@@ -1,4 +1,4 @@
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
+import { formatTerminalWorktreeKey } from '#/shared/terminal-workspace-slot-key.ts'
 import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { createRepoWorkspaceTabModel, type RepoWorkspaceTabModel } from '#/web/components/repo-workspace/tab-model.ts'
 import { workspacePaneTabOrderForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
@@ -14,8 +14,10 @@ export function workspacePaneTabTargetForBranch(repoId: string, branchName: stri
   if (!branch) return null
   const worktreePath = branch.worktree?.path
   const terminalSyncReady = useRepoSyncStore.getState().ready.get(repoId) === repo.instanceToken
-  const worktreeKey = worktreePath ? worktreeTerminalKey(repo.id, worktreePath) : null
-  const snapshot = worktreeKey ? (readTerminalSessionCommandBridge()?.worktreeSnapshot(worktreeKey) ?? null) : null
+  const terminalWorktreeKey = worktreePath ? formatTerminalWorktreeKey(repo.id, worktreePath) : null
+  const snapshot = terminalWorktreeKey
+    ? (readTerminalSessionCommandBridge()?.terminalWorktreeSnapshot(terminalWorktreeKey) ?? null)
+    : null
   return createRepoWorkspaceTabModel({
     repoId,
     branchName,
@@ -26,6 +28,8 @@ export function workspacePaneTabTargetForBranch(repoId: string, branchName: stri
     terminalSessionCount: snapshot?.count ?? 0,
     terminalCreatePending: snapshot?.pendingCreate ?? false,
     terminalSyncReady,
-    selectedTerminalKey: worktreeKey ? (state.selectedTerminalKeyByWorktree[worktreeKey] ?? null) : null,
+    selectedTerminalKey: terminalWorktreeKey
+      ? (state.selectedTerminalKeyByTerminalWorktree[terminalWorktreeKey] ?? null)
+      : null,
   })
 }

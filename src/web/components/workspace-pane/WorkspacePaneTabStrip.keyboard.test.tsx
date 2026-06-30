@@ -69,7 +69,7 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
 
     renderInJsdom(
       <TestWorkspacePaneTabStrip
-        worktreeTerminalKey="/repo\0/repo/worktree"
+        terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         panelActive
         sessions={[session({ terminalKey: 't1', selected: true })]}
@@ -94,7 +94,7 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
 
     renderInJsdom(
       <TestWorkspacePaneTabStrip
-        worktreeTerminalKey="/repo\0/repo/worktree"
+        terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
           session({ terminalKey: 't1', selected: true }),
@@ -149,12 +149,12 @@ function makeWorkspacePaneTabStrip(
 ) {
   const { WorkspacePaneTabStrip } = workspacePaneTabStripModule
   return function TestWorkspacePaneTabStrip(props: {
-    worktreeTerminalKey: string
+    terminalWorktreeKey: string
     sessions: TerminalSessionSummary[]
     workspacePaneId: string
     panelActive?: boolean
     onNew: () => void
-    onSelect: (worktreeTerminalKey: string, tab: TerminalSessionSummary) => void
+    onSelect: (terminalWorktreeKey: string, tab: TerminalSessionSummary) => void
     onScrollToBottom: (key: string) => void
     onClose: (tab: TerminalSessionSummary) => void
     onReorder: (orderedTabs: WorkspacePaneTabOrderEntry[]) => void
@@ -175,7 +175,7 @@ function makeWorkspacePaneTabStrip(
         items={items}
         activeTabIdentity={selected ? terminalWorkspacePaneTabProvider.identity(selected.terminalKey) : null}
         onSelect={(item) => {
-          if (isTerminalWorkspacePaneTabItem(item)) props.onSelect(props.worktreeTerminalKey, item.view)
+          if (isTerminalWorkspacePaneTabItem(item)) props.onSelect(props.terminalWorktreeKey, item.view)
         }}
         onClose={(item) => {
           if (isTerminalWorkspacePaneTabItem(item)) props.onClose(item.view)
@@ -191,7 +191,7 @@ function session(overrides: Partial<TerminalSessionSummary> = {}): TerminalSessi
   return {
     type: 'terminal',
     terminalKey,
-    worktreeTerminalKey: overrides.worktreeTerminalKey ?? '/repo\0/repo/worktree',
+    terminalWorktreeKey: overrides.terminalWorktreeKey ?? '/repo\0/repo/worktree',
     sessionId: overrides.sessionId ?? 'session-1',
     index: overrides.index ?? 1,
     displayOrder: overrides.displayOrder ?? 1,

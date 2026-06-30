@@ -45,7 +45,7 @@ describe('app bootstrap hooks', () => {
       activeRepoId: '/tmp/repo',
       zenMode: true,
       workspacePaneSize: 50,
-      selectedTerminalKeyByWorktree: {},
+      selectedTerminalKeyByTerminalWorktree: {},
       workspacePaneTabOrderByBranchByRepo: {},
     })
     const hydrateI18n = vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
@@ -67,7 +67,7 @@ describe('app bootstrap hooks', () => {
       activeRepoId: '/tmp/repo',
       zenMode: false,
       workspacePaneSize: 45,
-      selectedTerminalKeyByWorktree: { '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0session-2' },
+      selectedTerminalKeyByTerminalWorktree: { '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0session-2' },
       workspacePaneTabOrderByBranchByRepo: {
         '/tmp/repo': {
           main: [],
@@ -96,7 +96,7 @@ describe('app bootstrap hooks', () => {
     const state = useReposStore.getState()
     expect(state.zenMode).toBe(false)
     expect(state.workspacePaneSize).toBe(45)
-    expect(state.selectedTerminalKeyByWorktree).toEqual({
+    expect(state.selectedTerminalKeyByTerminalWorktree).toEqual({
       '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0session-2',
     })
     expect(useFiletreeInteractionStore.getState().interactionByScope).toMatchObject({
@@ -126,7 +126,7 @@ describe('app bootstrap hooks', () => {
       activeRepoId: '/tmp/repo',
       zenMode: true,
       workspacePaneSize: 55,
-      selectedTerminalKeyByWorktree: {},
+      selectedTerminalKeyByTerminalWorktree: {},
       workspacePaneTabOrderByBranchByRepo: {},
     }
     mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot({ session }))

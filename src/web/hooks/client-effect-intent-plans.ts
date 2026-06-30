@@ -1,7 +1,4 @@
-import {
-  parseTerminalWorkspaceSlotKey,
-  worktreeTerminalKey,
-} from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
+import { formatTerminalWorktreeKey, parseTerminalWorkspaceSlotKey } from '#/shared/terminal-workspace-slot-key.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
@@ -34,7 +31,7 @@ export type TerminalBellIntentPlan =
       repoId: string
       branch: string
       terminalKey: string
-      worktreeTerminalKey: string
+      terminalWorktreeKey: string
     }
 
 export type AppLevelIntentPlan =
@@ -91,7 +88,7 @@ export function createTerminalBellIntentPlan(
         repoId: repo.id,
         branch: branch.name,
         terminalKey: event.terminalKey,
-        worktreeTerminalKey: worktreeTerminalKey(parsedKey.repoRoot, parsedKey.worktreePath),
+        terminalWorktreeKey: formatTerminalWorktreeKey(parsedKey.repoRoot, parsedKey.worktreePath),
       }
     }
   }

@@ -115,7 +115,7 @@ export function RepoWorkspaceToolbar({
       }
       if (isTerminalWorkspacePaneTabItem(item)) {
         enterTerminalTab()
-        selectTerminal(item.view.worktreeTerminalKey, item.view.terminalKey)
+        selectTerminal(item.view.terminalWorktreeKey, item.view.terminalKey)
         return
       }
     },
@@ -254,7 +254,7 @@ export function RepoWorkspaceToolbar({
           {compact && repoWorkspaceBackAction}
           {showBranchLevelTabs && (
             <WorkspacePaneTabStrip
-              worktreeTerminalKey={workspacePaneTabModel.worktreeTerminalKey}
+              terminalWorktreeKey={workspacePaneTabModel.terminalWorktreeKey}
               items={workspacePaneTabItems}
               workspacePaneId={workspacePaneId}
               activeTabIdentity={activeTabIdentity}

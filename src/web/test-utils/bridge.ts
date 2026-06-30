@@ -122,7 +122,7 @@ export function resetReposStore(): void {
     sessionReady: false,
     zenMode: DEFAULT_ZEN_MODE,
     workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
-    selectedTerminalKeyByWorktree: {},
+    selectedTerminalKeyByTerminalWorktree: {},
   })
 }
 

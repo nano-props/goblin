@@ -24,7 +24,7 @@ import type {
   TerminalSessionReadContextValue,
   TerminalSessionSummary,
   TerminalDescriptor,
-  WorktreeTerminalSnapshot,
+  TerminalWorktreeSnapshot,
 } from '#/web/components/terminal/types.ts'
 import {
   PrimaryWindowNavigationProvider,
@@ -1215,7 +1215,7 @@ function renderToolbar(options: {
   const sessions: TerminalSessionSummary[] = Array.from({ length: options.terminalCount }, (_, index) => ({
     type: 'terminal',
     terminalKey: `t${index + 1}`,
-    worktreeTerminalKey: `${REPO_ID}\0${WORKTREE_PATH}`,
+    terminalWorktreeKey: `${REPO_ID}\0${WORKTREE_PATH}`,
     sessionId: `t${index + 1}`,
     index: index + 1,
     displayOrder: index + 1,
@@ -1229,7 +1229,7 @@ function renderToolbar(options: {
   const selectedDescriptor: TerminalDescriptor | null = sessions[0]
     ? {
         terminalKey: sessions[0].terminalKey,
-        worktreeTerminalKey: sessions[0].worktreeTerminalKey,
+        terminalWorktreeKey: sessions[0].terminalWorktreeKey,
         sessionId: sessions[0].sessionId,
         index: sessions[0].index,
         repoRoot: REPO_ID,
@@ -1237,8 +1237,8 @@ function renderToolbar(options: {
         worktreePath: WORKTREE_PATH,
       }
     : null
-  const worktreeSnapshot: WorktreeTerminalSnapshot = {
-    worktreeTerminalKey: `${REPO_ID}\0${WORKTREE_PATH}`,
+  const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
+    terminalWorktreeKey: `${REPO_ID}\0${WORKTREE_PATH}`,
     selectedDescriptor,
     sessions,
     count: options.terminalCount,
@@ -1248,8 +1248,8 @@ function renderToolbar(options: {
   }
   const terminalSnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
   const readContext: TerminalSessionReadContextValue = {
-    worktreeSnapshot: () => worktreeSnapshot,
-    subscribeWorktree: () => () => {},
+    terminalWorktreeSnapshot: () => terminalWorktreeSnapshot,
+    subscribeTerminalWorktree: () => () => {},
     repoBellCount: () => 0,
     subscribeRepoBellCount: () => () => {},
     snapshot: () => terminalSnapshot,
@@ -1282,7 +1282,7 @@ function renderToolbar(options: {
     serialize: vi.fn(() => ''),
   }
   setTerminalSessionCommandBridge({
-    worktreeSnapshot: readContext.worktreeSnapshot,
+    terminalWorktreeSnapshot: readContext.terminalWorktreeSnapshot,
     createTerminal,
     selectTerminal,
     closeTerminalByDescriptor,

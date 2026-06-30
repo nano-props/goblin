@@ -5,13 +5,13 @@ type ActivityTimer = ReturnType<typeof setTimeout>
 
 export interface TerminalActivityState {
   hasRecentActivity: (terminalKey: string) => boolean
-  markActivity: (terminalKey: string, worktreeTerminalKey: string) => void
+  markActivity: (terminalKey: string, terminalWorktreeKey: string) => void
   remove: (terminalKey: string) => void
   reset: () => void
 }
 
 interface ActivityRecord {
-  worktreeTerminalKey: string
+  terminalWorktreeKey: string
   lastActivityAt: number
   pendingSince: number | null
   activeSince: number | null
@@ -20,7 +20,7 @@ interface ActivityRecord {
 }
 
 export function createTerminalActivityState(
-  notifyWorktree: (worktreeTerminalKey: string) => void,
+  notifyWorktree: (terminalWorktreeKey: string) => void,
   now: () => number = () => Date.now(),
   setTimer: (handler: () => void, timeout: number) => ActivityTimer = (handler, timeout) =>
     setTimeout(handler, timeout),
@@ -46,7 +46,7 @@ export function createTerminalActivityState(
     record.pendingSince = null
     record.activeSince = now()
     scheduleIdleExpiry(terminalKey)
-    notifyWorktree(record.worktreeTerminalKey)
+    notifyWorktree(record.terminalWorktreeKey)
   }
 
   function activityExpiresAt(record: ActivityRecord): number {
@@ -78,7 +78,7 @@ export function createTerminalActivityState(
     }
     const wasActive = record.activeSince !== null
     deleteRecord(terminalKey, record)
-    if (wasActive) notifyWorktree(record.worktreeTerminalKey)
+    if (wasActive) notifyWorktree(record.terminalWorktreeKey)
   }
 
   function scheduleConfirmation(terminalKey: string): void {
@@ -102,15 +102,15 @@ export function createTerminalActivityState(
 
   return {
     hasRecentActivity,
-    markActivity(terminalKey, worktreeTerminalKey) {
+    markActivity(terminalKey, terminalWorktreeKey) {
       const current = now()
       const record = records.get(terminalKey)
       if (record) {
         record.lastActivityAt = current
-        record.worktreeTerminalKey = worktreeTerminalKey
+        record.terminalWorktreeKey = terminalWorktreeKey
       } else {
         records.set(terminalKey, {
-          worktreeTerminalKey,
+          terminalWorktreeKey,
           lastActivityAt: current,
           pendingSince: current,
           activeSince: null,

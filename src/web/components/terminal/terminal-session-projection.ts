@@ -8,7 +8,7 @@ import type {
 } from '#/shared/terminal-types.ts'
 import { terminalDescriptor } from '#/web/components/terminal/terminal-descriptor.ts'
 import { branchForTerminalWorktree } from '#/web/components/terminal/terminal-repo-index.ts'
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
+import { formatTerminalWorktreeKey } from '#/shared/terminal-workspace-slot-key.ts'
 import type {
   TerminalDescriptor,
   TerminalRepoIndex,
@@ -29,7 +29,7 @@ export type TerminalAttachResultWithController = Extract<TerminalAttachResult, {
 
 export interface ProjectedServerTerminalSession {
   descriptor: TerminalDescriptor
-  worktreeTerminalKey: string
+  terminalWorktreeKey: string
   hydrateInput: TerminalSessionHydrationInput
   controlsTerminal: boolean
   displayOrder: number
@@ -62,12 +62,12 @@ export function projectServerTerminalSession(input: {
     parsed.sessionId,
     parseTerminalSessionIdIndex(parsed.sessionId) ?? 1,
   )
-  const terminalWorktree = worktreeTerminalKey(parsed.repoRoot, parsed.worktreePath)
+  const terminalWorktree = formatTerminalWorktreeKey(parsed.repoRoot, parsed.worktreePath)
   const controller = resolveTerminalController(input.serverSession.controller, input.clientId)
   const isReattachMatch = input.reattachSnapshot?.ptySessionId === input.serverSession.ptySessionId
   return {
     descriptor,
-    worktreeTerminalKey: terminalWorktree,
+    terminalWorktreeKey: terminalWorktree,
     hydrateInput: {
       ptySessionId: input.serverSession.ptySessionId,
       processName: input.serverSession.processName,

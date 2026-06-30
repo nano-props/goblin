@@ -31,7 +31,7 @@ describe('client effect intent plans', () => {
       repoId: repo.id,
       branch: 'feature/test',
       terminalKey: '/tmp/repo\0/tmp/repo-feature\0session-2',
-      worktreeTerminalKey: '/tmp/repo\0/tmp/repo-feature',
+      terminalWorktreeKey: '/tmp/repo\0/tmp/repo-feature',
     })
   })
 

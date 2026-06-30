@@ -24,7 +24,7 @@ describe('restorable-workspace-state', () => {
           activeId: repo.id,
           zenMode: false,
           workspacePaneSize: 55,
-          selectedTerminalKeyByWorktree: {
+          selectedTerminalKeyByTerminalWorktree: {
             '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0session-2',
           },
         },
@@ -34,7 +34,7 @@ describe('restorable-workspace-state', () => {
       activeRepoId: '/tmp/repo',
       zenMode: false,
       workspacePaneSize: 55,
-      selectedTerminalKeyByWorktree: {
+      selectedTerminalKeyByTerminalWorktree: {
         '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0session-2',
       },
       preferredWorkspacePaneTabByBranchByRepo: { '/tmp/repo': { 'feature/worktree': 'terminal' } },
@@ -64,7 +64,7 @@ describe('restorable-workspace-state', () => {
           activeId: repo.id,
           zenMode: false,
           workspacePaneSize: 55,
-          selectedTerminalKeyByWorktree: {},
+          selectedTerminalKeyByTerminalWorktree: {},
         },
       }),
     ).toMatchObject({
@@ -96,7 +96,7 @@ describe('restorable-workspace-state', () => {
           activeId: repo.id,
           zenMode: false,
           workspacePaneSize: 55,
-          selectedTerminalKeyByWorktree: {},
+          selectedTerminalKeyByTerminalWorktree: {},
         },
       }),
     ).toMatchObject({
@@ -114,7 +114,7 @@ describe('restorable-workspace-state', () => {
         activeRepoId: '/tmp/repo',
         zenMode: false,
         workspacePaneSize: 40,
-        selectedTerminalKeyByWorktree: {
+        selectedTerminalKeyByTerminalWorktree: {
           '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0session-1',
         },
         workspacePaneTabOrderByBranchByRepo: {
@@ -127,7 +127,7 @@ describe('restorable-workspace-state', () => {
       activeId: '/tmp/repo',
       zenMode: false,
       workspacePaneSize: 40,
-      selectedTerminalKeyByWorktree: {
+      selectedTerminalKeyByTerminalWorktree: {
         '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0session-1',
       },
       preferredWorkspacePaneTabByBranchByRepo: {},
@@ -158,7 +158,7 @@ describe('restorable-workspace-state', () => {
           activeId: repo.id,
           zenMode: false,
           workspacePaneSize: 55,
-          selectedTerminalKeyByWorktree: {},
+          selectedTerminalKeyByTerminalWorktree: {},
         },
       }),
     ).toMatchObject({
@@ -189,7 +189,7 @@ describe('restorable-workspace-state', () => {
         activeId: repo.id,
         zenMode: false,
         workspacePaneSize: 55,
-        selectedTerminalKeyByWorktree: {},
+        selectedTerminalKeyByTerminalWorktree: {},
       },
     })
     const restored = restoreRestorableWorkspaceStateFromSession(sessionState)
@@ -218,7 +218,7 @@ describe('restorable-workspace-state', () => {
           activeId: repo.id,
           zenMode: false,
           workspacePaneSize: 55,
-          selectedTerminalKeyByWorktree: {},
+          selectedTerminalKeyByTerminalWorktree: {},
         },
         filetreeInteractionByScope: {
           '/tmp/repo\0/tmp/worktree': {

@@ -194,7 +194,7 @@ const WorkspaceSessionStateSchema = v.object({
   activeRepoId: v.nullable(v.string()),
   zenMode: v.boolean(),
   workspacePaneSize: v.number(),
-  selectedTerminalKeyByWorktree: v.optional(v.record(v.string(), v.string())),
+  selectedTerminalKeyByTerminalWorktree: v.optional(v.record(v.string(), v.string())),
   preferredWorkspacePaneTabByBranchByRepo: v.optional(
     v.record(v.string(), v.record(v.string(), v.picklist(['status', 'changes', 'history', 'files', 'terminal']))),
   ),

@@ -496,7 +496,7 @@ describe('setWorkspacePaneTab', () => {
       workspacePaneStaticTabOrderEntry('history'),
     ])
     expect(preferredTabFor('main')).toBe('status')
-    expect(useReposStore.getState().selectedTerminalKeyByWorktree).toEqual({})
+    expect(useReposStore.getState().selectedTerminalKeyByTerminalWorktree).toEqual({})
   })
 
   test('addAndFocus adds the tab, switches to terminal view, and selects the new terminal', () => {
@@ -509,7 +509,7 @@ describe('setWorkspacePaneTab', () => {
       terminalEntry('session-1'),
     ])
     expect(preferredTabFor('feature/worktree')).toBe('terminal')
-    expect(useReposStore.getState().selectedTerminalKeyByWorktree[`${REPO_ID}\0/tmp/feature-worktree`]).toBe(
+    expect(useReposStore.getState().selectedTerminalKeyByTerminalWorktree[`${REPO_ID}\0/tmp/feature-worktree`]).toBe(
       'session-1',
     )
   })
@@ -521,7 +521,7 @@ describe('setWorkspacePaneTab', () => {
       workspacePaneTabOrder: [terminalEntry('session-1')],
     })
     useReposStore.setState({
-      selectedTerminalKeyByWorktree: { [`${REPO_ID}\0/tmp/feature-worktree`]: 'session-1' },
+      selectedTerminalKeyByTerminalWorktree: { [`${REPO_ID}\0/tmp/feature-worktree`]: 'session-1' },
     })
 
     const before = useReposStore.getState().repos[REPO_ID]

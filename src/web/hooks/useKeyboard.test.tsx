@@ -16,7 +16,7 @@ import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-uti
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
-import type { WorktreeTerminalSnapshot } from '#/web/components/terminal/types.ts'
+import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
 import { workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
 
 const testWindow = window as unknown as { goblinNative?: Window['goblinNative'] }
@@ -69,7 +69,7 @@ describe('useKeyboard', () => {
     const selectTerminal = vi.fn()
     const showRepoWorkspacePaneTab = vi.fn()
     setTerminalSessionCommandBridge({
-      worktreeSnapshot: () => worktreeSnapshot(),
+      terminalWorktreeSnapshot: () => terminalWorktreeSnapshot(),
       createTerminal: vi.fn(async () => 'session-1'),
       selectTerminal,
     })
@@ -128,7 +128,7 @@ describe('useKeyboard', () => {
     const selectTerminal = vi.fn()
     const showRepoWorkspacePaneTab = vi.fn()
     setTerminalSessionCommandBridge({
-      worktreeSnapshot: () => worktreeSnapshot(),
+      terminalWorktreeSnapshot: () => terminalWorktreeSnapshot(),
       createTerminal: vi.fn(async () => 'session-1'),
       selectTerminal,
     })
@@ -162,7 +162,7 @@ describe('useKeyboard', () => {
     })
     const createTerminal = vi.fn(async () => 'session-2')
     setTerminalSessionCommandBridge({
-      worktreeSnapshot: () => worktreeSnapshot(),
+      terminalWorktreeSnapshot: () => terminalWorktreeSnapshot(),
       createTerminal,
       selectTerminal: vi.fn(),
     })
@@ -280,7 +280,7 @@ describe('useKeyboard', () => {
     const closeTerminalByDescriptor = vi.fn(async () => true)
     const openCreateWorktree = vi.fn()
     setTerminalSessionCommandBridge({
-      worktreeSnapshot: () => worktreeSnapshot(),
+      terminalWorktreeSnapshot: () => terminalWorktreeSnapshot(),
       createTerminal,
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor,
@@ -310,7 +310,7 @@ describe('useKeyboard', () => {
     })
     const closeTerminalByDescriptor = vi.fn(async () => true)
     setTerminalSessionCommandBridge({
-      worktreeSnapshot: () => worktreeSnapshot(),
+      terminalWorktreeSnapshot: () => terminalWorktreeSnapshot(),
       createTerminal: vi.fn(async () => 'session-1'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor,
@@ -372,12 +372,12 @@ function installNativeBridgeStub() {
   }
 }
 
-function worktreeSnapshot(): WorktreeTerminalSnapshot {
+function terminalWorktreeSnapshot(): TerminalWorktreeSnapshot {
   return {
-    worktreeTerminalKey: WORKTREE_KEY,
+    terminalWorktreeKey: WORKTREE_KEY,
     selectedDescriptor: {
       terminalKey: 'session-1',
-      worktreeTerminalKey: WORKTREE_KEY,
+      terminalWorktreeKey: WORKTREE_KEY,
       sessionId: 'session-1',
       index: 1,
       repoRoot: REPO_ID,
@@ -388,7 +388,7 @@ function worktreeSnapshot(): WorktreeTerminalSnapshot {
       {
         type: 'terminal',
         terminalKey: 'session-1',
-        worktreeTerminalKey: WORKTREE_KEY,
+        terminalWorktreeKey: WORKTREE_KEY,
         sessionId: 'session-1',
         index: 1,
         displayOrder: 1,

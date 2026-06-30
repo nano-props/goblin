@@ -10,7 +10,7 @@ import type { TerminalInput, TerminalUserInputSource } from '#/web/components/te
 
 export interface TerminalDescriptor {
   terminalKey: string
-  worktreeTerminalKey: string
+  terminalWorktreeKey: string
   sessionId: string
   index: number
   repoRoot: string
@@ -117,7 +117,7 @@ export type TerminalRepoIndex = Record<string, TerminalRepoSnapshot>
 export interface TerminalSessionSummary {
   type: 'terminal'
   terminalKey: string
-  worktreeTerminalKey: string
+  terminalWorktreeKey: string
   sessionId: string
   index: number
   displayOrder: number
@@ -133,8 +133,8 @@ export interface TerminalSessionSummary {
 
 export type WorkspacePaneTabSummary = TerminalSessionSummary
 
-export interface WorktreeTerminalSnapshot {
-  worktreeTerminalKey: string
+export interface TerminalWorktreeSnapshot {
+  terminalWorktreeKey: string
   selectedDescriptor: TerminalDescriptor | null
   sessions: TerminalSessionSummary[]
   count: number
@@ -145,9 +145,9 @@ export interface WorktreeTerminalSnapshot {
 
 export interface TerminalSessionContextValue {
   createTerminal: (base: TerminalSessionBase, options?: TerminalCreateOptions) => Promise<string>
-  registerHost: (worktreeTerminalKey: string, host: HTMLElement) => void
-  unregisterHost: (worktreeTerminalKey: string, host: HTMLElement) => void
-  selectTerminal: (worktreeTerminalKey: string, terminalKey: string) => void
+  registerHost: (terminalWorktreeKey: string, host: HTMLElement) => void
+  unregisterHost: (terminalWorktreeKey: string, host: HTMLElement) => void
+  selectTerminal: (terminalWorktreeKey: string, terminalKey: string) => void
   scrollToBottom: (terminalKey: string) => void
   scrollLines: (terminalKey: string, amount: number) => void
   clearBell: (terminalKey: string) => boolean
@@ -167,8 +167,8 @@ export interface TerminalSessionContextValue {
 }
 
 export interface TerminalSessionReadContextValue {
-  worktreeSnapshot: (worktreeTerminalKey: string) => WorktreeTerminalSnapshot
-  subscribeWorktree: (worktreeTerminalKey: string, listener: () => void) => () => void
+  terminalWorktreeSnapshot: (terminalWorktreeKey: string) => TerminalWorktreeSnapshot
+  subscribeTerminalWorktree: (terminalWorktreeKey: string, listener: () => void) => () => void
   repoBellCount: (repoRoot: string) => number
   subscribeRepoBellCount: (repoRoot: string, listener: () => void) => () => void
   snapshot: (terminalKey: string) => TerminalSnapshot

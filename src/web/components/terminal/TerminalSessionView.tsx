@@ -20,12 +20,12 @@ import { planTerminalPathWrite } from '#/web/clipboard/terminal-path-write.ts'
 import type { PasteResolution } from '#/web/clipboard/resolver.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { terminalLog } from '#/web/logger.ts'
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
+import { formatTerminalWorktreeKey } from '#/shared/terminal-workspace-slot-key.ts'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import {
-  useWorktreeTerminalSelectedDescriptor,
-  useWorktreeTerminalCount,
-  useWorktreeTerminalPendingCreate,
+  useTerminalWorktreeSelectedDescriptor,
+  useTerminalWorktreeCount,
+  useTerminalWorktreePendingCreate,
   useTerminalSnapshot,
 } from '#/web/components/terminal/terminal-session-store.ts'
 import { MobileTerminalToolbar } from '#/web/components/terminal/mobile-terminal-toolbar.tsx'
@@ -73,7 +73,7 @@ export function TerminalSessionView({
     focusTerminal,
     createTerminal,
   } = context
-  const terminalWorktreeKey = worktreeTerminalKey(repoRoot, worktreePath)
+  const terminalWorktreeKey = formatTerminalWorktreeKey(repoRoot, worktreePath)
   useLayoutEffect(() => {
     const host = hostRef.current
     if (!host) return
@@ -89,7 +89,7 @@ export function TerminalSessionView({
     return () => observer.disconnect()
   }, [registerHost, terminalWorktreeKey])
 
-  const descriptor = useWorktreeTerminalSelectedDescriptor(terminalWorktreeKey)
+  const descriptor = useTerminalWorktreeSelectedDescriptor(terminalWorktreeKey)
   const terminalKey = descriptor?.terminalKey ?? null
   // `terminalKey` can change when the user switches worktrees mid-flight. The
   // paste/drop handlers capture it at invocation time; a ref tracks
@@ -102,8 +102,8 @@ export function TerminalSessionView({
     terminalKeyRef.current = terminalKey
   }, [terminalKey])
   const snapshot = useTerminalSnapshot(terminalKey)
-  const hasSessions = useWorktreeTerminalCount(terminalWorktreeKey) > 0
-  const pendingCreate = useWorktreeTerminalPendingCreate(terminalWorktreeKey)
+  const hasSessions = useTerminalWorktreeCount(terminalWorktreeKey) > 0
+  const pendingCreate = useTerminalWorktreePendingCreate(terminalWorktreeKey)
 
   useLayoutEffect(() => {
     const host = hostRef.current

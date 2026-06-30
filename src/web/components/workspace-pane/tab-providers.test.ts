@@ -27,7 +27,7 @@ const t = (key: string, params?: Record<string, string | number>) => (params ? `
 const terminalView: WorkspacePaneTabSummary = {
   type: 'terminal',
   terminalKey: 'session-1',
-  worktreeTerminalKey: 'repo\0worktree',
+  terminalWorktreeKey: 'repo\0worktree',
   sessionId: 'session-1',
   index: 1,
   displayOrder: 1,

@@ -479,7 +479,7 @@ const mockFonts = new MockFontFaceSet()
 
 const descriptor = {
   terminalKey: '/repo\0/worktree',
-  worktreeTerminalKey: '/repo\0/worktree',
+  terminalWorktreeKey: '/repo\0/worktree',
   sessionId: 'session-1',
   index: 1,
   repoRoot: '/repo',

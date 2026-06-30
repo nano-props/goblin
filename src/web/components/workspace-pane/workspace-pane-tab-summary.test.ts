@@ -8,7 +8,7 @@ import type { WorkspacePaneTabSummary } from '#/web/components/terminal/types.ts
 const terminalView: WorkspacePaneTabSummary = {
   type: 'terminal',
   terminalKey: 'session-1',
-  worktreeTerminalKey: 'repo\0worktree',
+  terminalWorktreeKey: 'repo\0worktree',
   sessionId: 'session-1',
   index: 1,
   displayOrder: 1,

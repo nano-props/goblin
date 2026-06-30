@@ -6,7 +6,7 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useClientEffectIntentRouter } from '#/web/hooks/useClientEffectIntentRouter.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
+import { formatTerminalWorktreeKey } from '#/shared/terminal-workspace-slot-key.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
@@ -168,8 +168,7 @@ describe('useClientEffectIntentRouter', () => {
     await renderHookHost()
 
     await act(async () => {
-      for (const listener of intentListeners)
-        listener({ type: 'terminal-bell-click', repoRoot: repo.id, terminalKey })
+      for (const listener of intentListeners) listener({ type: 'terminal-bell-click', repoRoot: repo.id, terminalKey })
       await Promise.resolve()
     })
 
@@ -177,8 +176,8 @@ describe('useClientEffectIntentRouter', () => {
     expect(showRepoBranchWorkspacePaneTabSpy).toHaveBeenCalledWith(repo.id, 'feature/test', 'terminal')
     expect(state.repos[repo.id]?.ui.selectedBranch).toBe('feature/test')
     expect(preferredWorkspacePaneTab(repo.id)).toBe('terminal')
-    expect(state.selectedTerminalKeyByWorktree).toMatchObject({
-      [worktreeTerminalKey(repo.id, '/tmp/repo-feature')]: terminalKey,
+    expect(state.selectedTerminalKeyByTerminalWorktree).toMatchObject({
+      [formatTerminalWorktreeKey(repo.id, '/tmp/repo-feature')]: terminalKey,
     })
   })
 
@@ -208,8 +207,7 @@ describe('useClientEffectIntentRouter', () => {
     await renderHookHost()
 
     await act(async () => {
-      for (const listener of intentListeners)
-        listener({ type: 'terminal-bell-click', repoRoot: repo.id, terminalKey })
+      for (const listener of intentListeners) listener({ type: 'terminal-bell-click', repoRoot: repo.id, terminalKey })
       await Promise.resolve()
     })
 

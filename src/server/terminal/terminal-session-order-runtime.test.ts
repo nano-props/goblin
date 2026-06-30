@@ -9,13 +9,13 @@ describe('terminal session order runtime', () => {
       userId: 'user-a',
       scope: '/repo',
       worktreePath: '/repo-linked',
-      id: 'session-1',
+      terminalKey: 'session-1',
     })
     runtime.registerTerminalSessionOrder({
       userId: 'user-a',
       scope: '/repo',
       worktreePath: '/repo-linked',
-      id: 'session-2',
+      terminalKey: 'session-2',
     })
 
     expect(runtime.sessionDisplayOrder(view('session-1'))).toBe(0)
@@ -29,13 +29,13 @@ describe('terminal session order runtime', () => {
       userId: 'user-a',
       scope: '/repo',
       worktreePath: '/repo-linked',
-      id: 'session-1',
+      terminalKey: 'session-1',
     })
     runtime.registerTerminalSessionOrder({
       userId: 'user-b',
       scope: '/repo',
       worktreePath: '/repo-linked',
-      id: 'session-1',
+      terminalKey: 'session-1',
     })
 
     expect(runtime.sessionDisplayOrder(view('session-1'))).toBe(0)
@@ -49,13 +49,13 @@ describe('terminal session order runtime', () => {
       userId: 'user-a',
       scope: '/repo',
       worktreePath: '/repo-linked',
-      id: 'session-1',
+      terminalKey: 'session-1',
     })
     runtime.registerTerminalSessionOrder({
       userId: 'user-b',
       scope: '/repo',
       worktreePath: '/repo-linked',
-      id: 'session-1',
+      terminalKey: 'session-1',
     })
 
     runtime.closeSessionsForUser('user-a')
@@ -65,16 +65,16 @@ describe('terminal session order runtime', () => {
   })
 })
 
-function view(id: string): {
+function view(terminalKey: string): {
   userId: string
   scope: string
   worktreePath: string
-  id: string
+  terminalKey: string
 } {
   return {
     userId: 'user-a',
     scope: '/repo',
     worktreePath: '/repo-linked',
-    id,
+    terminalKey,
   }
 }

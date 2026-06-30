@@ -12,7 +12,7 @@ describe('terminal session display order helpers', () => {
       terminalSessionDisplayOrder(
         {
           terminalKey: 'session-2',
-          worktreeTerminalKey: 'repo\0wt',
+          terminalWorktreeKey: 'repo\0wt',
           sessionId: 'session-2',
           index: 2,
           repoRoot: '/repo',
@@ -26,7 +26,7 @@ describe('terminal session display order helpers', () => {
       terminalSessionDisplayOrder(
         {
           terminalKey: 'session-3',
-          worktreeTerminalKey: 'repo\0wt',
+          terminalWorktreeKey: 'repo\0wt',
           sessionId: 'session-3',
           index: 3,
           repoRoot: '/repo',

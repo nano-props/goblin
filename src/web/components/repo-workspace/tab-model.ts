@@ -10,7 +10,7 @@ import {
   PENDING_TERMINAL_WORKSPACE_PANE_TAB_IDENTITY,
   isTerminalWorkspacePaneTab,
 } from '#/web/components/workspace-pane/workspace-pane-tab-summary.ts'
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
+import { formatTerminalWorktreeKey } from '#/shared/terminal-workspace-slot-key.ts'
 import { normalizeWorkspacePaneTabOrder } from '#/web/stores/repos/workspace-pane-tabs.ts'
 import {
   terminalWorkspacePaneTabProvider,
@@ -70,7 +70,7 @@ export interface RepoWorkspaceTabModel {
   repoId: string
   branchName: string | null
   worktreePath: string | null
-  worktreeTerminalKey: string | null
+  terminalWorktreeKey: string | null
   terminalBase: TerminalSessionBase | null
   terminalCreatePending: boolean
   terminalSyncReady: boolean
@@ -112,12 +112,16 @@ export interface RepoWorkspaceTabModelInput {
 export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): RepoWorkspaceTabModel {
   const tabOrder = input.branchName ? normalizeWorkspacePaneTabOrder(input.tabOrder) : []
   const worktreePath = input.branchName ? input.worktreePath : null
-  const worktreeKey = worktreePath ? worktreeTerminalKey(input.repoId, worktreePath) : null
-  const terminalViews = worktreeKey ? input.runtimeTerminalViews.filter(isTerminalWorkspacePaneTab) : []
-  const materializedTabs = materializedWorkspacePaneTabs({ tabOrder, terminalViews, hasWorktree: !!worktreeKey })
+  const terminalWorktreeKey = worktreePath ? formatTerminalWorktreeKey(input.repoId, worktreePath) : null
+  const terminalViews = terminalWorktreeKey ? input.runtimeTerminalViews.filter(isTerminalWorkspacePaneTab) : []
+  const materializedTabs = materializedWorkspacePaneTabs({
+    tabOrder,
+    terminalViews,
+    hasWorktree: !!terminalWorktreeKey,
+  })
   const staticTabs = materializedTabs.flatMap((tab) => (tab.kind === 'static' ? [tab.type] : []))
   const candidateTab = resolveRenderableWorkspacePaneTab(input.preferredTab, {
-    hasWorktree: !!worktreeKey,
+    hasWorktree: !!terminalWorktreeKey,
     terminalSessionCount: input.terminalSessionCount,
     terminalCreatePending: input.terminalCreatePending,
     terminalSyncReady: input.terminalSyncReady,
@@ -134,7 +138,7 @@ export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): 
     repoId: input.repoId,
     branchName: input.branchName,
     worktreePath,
-    worktreeTerminalKey: worktreeKey,
+    terminalWorktreeKey,
     terminalBase:
       input.branchName && worktreePath ? { repoRoot: input.repoId, branch: input.branchName, worktreePath } : null,
     terminalCreatePending: input.terminalCreatePending ?? false,

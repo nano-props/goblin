@@ -34,7 +34,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   // xterm views alive across settings → workspace round-trips.
   const currentRepoId = useReposStore((s) => s.activeId)
   const currentRepoInstanceToken = currentRepoId ? (repoIndex[currentRepoId]?.instanceToken ?? null) : null
-  const selectedTerminalKeyByWorktree = useReposStore((s) => s.selectedTerminalKeyByWorktree)
+  const selectedTerminalKeyByTerminalWorktree = useReposStore((s) => s.selectedTerminalKeyByTerminalWorktree)
   const setSelectedTerminal = useReposStore((s) => s.setSelectedTerminal)
   const parkingRootRef = useRef<HTMLDivElement | null>(null)
   const repoIndexRef = useRef(repoIndex)
@@ -52,7 +52,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
 
   // T1.2: pay the WebSocket handshake cost when the user enters a repo,
   // before they click a terminal view. The bridge maintains a single
-  // shared socket, so watching currentRepoId (not worktreeTerminalKey)
+  // shared socket, so watching currentRepoId (not terminalWorktreeKey)
   // is the right granularity: one handshake per repo visit, not one per
   // worktree tab. The prewarm is fire-and-forget — failures are
   // swallowed inside the bridge; the next real IPC will surface a real
@@ -142,8 +142,8 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   // Projection state sync
   useEffect(() => {
     projection.setRepoIndex(repoIndex)
-    projection.setPreferredSelectedTerminalKeys(selectedTerminalKeyByWorktree)
-  }, [projection, repoIndex, selectedTerminalKeyByWorktree])
+    projection.setPreferredSelectedTerminalKeys(selectedTerminalKeyByTerminalWorktree)
+  }, [projection, repoIndex, selectedTerminalKeyByTerminalWorktree])
 
   // Parking DOM
   useEffect(() => {
@@ -212,7 +212,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     })
 
     setTerminalSessionCommandBridge({
-      worktreeSnapshot: projection.worktreeSnapshot,
+      terminalWorktreeSnapshot: projection.terminalWorktreeSnapshot,
       createTerminal: projection.createTerminal,
       selectTerminal: projection.selectTerminal,
       closeTerminalByDescriptor: projection.closeTerminalByDescriptor,
@@ -293,8 +293,8 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   )
   const readValue = useMemo<TerminalSessionReadContextValue>(
     () => ({
-      worktreeSnapshot: projection.worktreeSnapshot,
-      subscribeWorktree: projection.subscribeWorktree,
+      terminalWorktreeSnapshot: projection.terminalWorktreeSnapshot,
+      subscribeTerminalWorktree: projection.subscribeTerminalWorktree,
       repoBellCount: projection.repoBellCount,
       subscribeRepoBellCount: projection.subscribeRepoBellCount,
       snapshot: projection.snapshot,

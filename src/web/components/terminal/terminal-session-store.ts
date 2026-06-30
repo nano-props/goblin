@@ -3,14 +3,14 @@ import { useTerminalSessionReadContext } from '#/web/components/terminal/termina
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type {
-  WorktreeTerminalSnapshot,
+  TerminalWorktreeSnapshot,
   TerminalSnapshot,
   TerminalDescriptor,
   TerminalSessionSummary,
 } from '#/web/components/terminal/types.ts'
 
-const EMPTY_WORKTREE_TERMINAL_SNAPSHOT: WorktreeTerminalSnapshot = {
-  worktreeTerminalKey: '',
+const EMPTY_WORKTREE_TERMINAL_SNAPSHOT: TerminalWorktreeSnapshot = {
+  terminalWorktreeKey: '',
   selectedDescriptor: null,
   sessions: [],
   count: 0,
@@ -21,54 +21,58 @@ const EMPTY_WORKTREE_TERMINAL_SNAPSHOT: WorktreeTerminalSnapshot = {
 
 const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = { phase: 'opening', message: null, processName: 'terminal' }
 
-export function useWorktreeTerminalSnapshot(worktreeTerminalKey: string | null): WorktreeTerminalSnapshot {
-  const { worktreeSnapshot, subscribeWorktree } = useTerminalSessionReadContext()
+export function useTerminalWorktreeSnapshot(terminalWorktreeKey: string | null): TerminalWorktreeSnapshot {
+  const { terminalWorktreeSnapshot, subscribeTerminalWorktree } = useTerminalSessionReadContext()
   const subscribe = useCallback(
-    (listener: () => void) => (worktreeTerminalKey ? subscribeWorktree(worktreeTerminalKey, listener) : () => {}),
-    [worktreeTerminalKey, subscribeWorktree],
+    (listener: () => void) =>
+      terminalWorktreeKey ? subscribeTerminalWorktree(terminalWorktreeKey, listener) : () => {},
+    [terminalWorktreeKey, subscribeTerminalWorktree],
   )
   const getSnapshot = useCallback(
-    () => (worktreeTerminalKey ? worktreeSnapshot(worktreeTerminalKey) : EMPTY_WORKTREE_TERMINAL_SNAPSHOT),
-    [worktreeTerminalKey, worktreeSnapshot],
+    () => (terminalWorktreeKey ? terminalWorktreeSnapshot(terminalWorktreeKey) : EMPTY_WORKTREE_TERMINAL_SNAPSHOT),
+    [terminalWorktreeKey, terminalWorktreeSnapshot],
   )
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 }
 
-export function useWorktreeTerminalCount(worktreeTerminalKey: string | null): number {
-  const { worktreeSnapshot, subscribeWorktree } = useTerminalSessionReadContext()
+export function useTerminalWorktreeCount(terminalWorktreeKey: string | null): number {
+  const { terminalWorktreeSnapshot, subscribeTerminalWorktree } = useTerminalSessionReadContext()
   const subscribe = useCallback(
-    (listener: () => void) => (worktreeTerminalKey ? subscribeWorktree(worktreeTerminalKey, listener) : () => {}),
-    [worktreeTerminalKey, subscribeWorktree],
+    (listener: () => void) =>
+      terminalWorktreeKey ? subscribeTerminalWorktree(terminalWorktreeKey, listener) : () => {},
+    [terminalWorktreeKey, subscribeTerminalWorktree],
   )
   const getSnapshot = useCallback(
-    () => (worktreeTerminalKey ? worktreeSnapshot(worktreeTerminalKey).count : 0),
-    [worktreeTerminalKey, worktreeSnapshot],
+    () => (terminalWorktreeKey ? terminalWorktreeSnapshot(terminalWorktreeKey).count : 0),
+    [terminalWorktreeKey, terminalWorktreeSnapshot],
   )
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 }
 
-export function useWorktreeTerminalPendingCreate(worktreeTerminalKey: string | null): boolean {
-  const { worktreeSnapshot, subscribeWorktree } = useTerminalSessionReadContext()
+export function useTerminalWorktreePendingCreate(terminalWorktreeKey: string | null): boolean {
+  const { terminalWorktreeSnapshot, subscribeTerminalWorktree } = useTerminalSessionReadContext()
   const subscribe = useCallback(
-    (listener: () => void) => (worktreeTerminalKey ? subscribeWorktree(worktreeTerminalKey, listener) : () => {}),
-    [worktreeTerminalKey, subscribeWorktree],
+    (listener: () => void) =>
+      terminalWorktreeKey ? subscribeTerminalWorktree(terminalWorktreeKey, listener) : () => {},
+    [terminalWorktreeKey, subscribeTerminalWorktree],
   )
   const getSnapshot = useCallback(
-    () => (worktreeTerminalKey ? worktreeSnapshot(worktreeTerminalKey).pendingCreate : false),
-    [worktreeTerminalKey, worktreeSnapshot],
+    () => (terminalWorktreeKey ? terminalWorktreeSnapshot(terminalWorktreeKey).pendingCreate : false),
+    [terminalWorktreeKey, terminalWorktreeSnapshot],
   )
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 }
 
-export function useWorktreeTerminalBellCount(worktreeTerminalKey: string | null): number {
-  const { worktreeSnapshot, subscribeWorktree } = useTerminalSessionReadContext()
+export function useTerminalWorktreeBellCount(terminalWorktreeKey: string | null): number {
+  const { terminalWorktreeSnapshot, subscribeTerminalWorktree } = useTerminalSessionReadContext()
   const subscribe = useCallback(
-    (listener: () => void) => (worktreeTerminalKey ? subscribeWorktree(worktreeTerminalKey, listener) : () => {}),
-    [worktreeTerminalKey, subscribeWorktree],
+    (listener: () => void) =>
+      terminalWorktreeKey ? subscribeTerminalWorktree(terminalWorktreeKey, listener) : () => {},
+    [terminalWorktreeKey, subscribeTerminalWorktree],
   )
   const getSnapshot = useCallback(
-    () => (worktreeTerminalKey ? worktreeSnapshot(worktreeTerminalKey).bellCount : 0),
-    [worktreeTerminalKey, worktreeSnapshot],
+    () => (terminalWorktreeKey ? terminalWorktreeSnapshot(terminalWorktreeKey).bellCount : 0),
+    [terminalWorktreeKey, terminalWorktreeSnapshot],
   )
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 }
@@ -96,41 +100,44 @@ export function useRepoTerminalBellCounts(repoIds: readonly string[]): Record<st
   }, [snapshot])
 }
 
-export function useWorktreeTerminalActive(worktreeTerminalKey: string | null): boolean {
-  const { worktreeSnapshot, subscribeWorktree } = useTerminalSessionReadContext()
+export function useTerminalWorktreeActive(terminalWorktreeKey: string | null): boolean {
+  const { terminalWorktreeSnapshot, subscribeTerminalWorktree } = useTerminalSessionReadContext()
   const subscribe = useCallback(
-    (listener: () => void) => (worktreeTerminalKey ? subscribeWorktree(worktreeTerminalKey, listener) : () => {}),
-    [worktreeTerminalKey, subscribeWorktree],
+    (listener: () => void) =>
+      terminalWorktreeKey ? subscribeTerminalWorktree(terminalWorktreeKey, listener) : () => {},
+    [terminalWorktreeKey, subscribeTerminalWorktree],
   )
   const getSnapshot = useCallback(
-    () => (worktreeTerminalKey ? worktreeSnapshot(worktreeTerminalKey).activeCount > 0 : false),
-    [worktreeTerminalKey, worktreeSnapshot],
+    () => (terminalWorktreeKey ? terminalWorktreeSnapshot(terminalWorktreeKey).activeCount > 0 : false),
+    [terminalWorktreeKey, terminalWorktreeSnapshot],
   )
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 }
 
-export function useWorktreeTerminalSelectedDescriptor(worktreeTerminalKey: string | null): TerminalDescriptor | null {
-  const { worktreeSnapshot, subscribeWorktree } = useTerminalSessionReadContext()
+export function useTerminalWorktreeSelectedDescriptor(terminalWorktreeKey: string | null): TerminalDescriptor | null {
+  const { terminalWorktreeSnapshot, subscribeTerminalWorktree } = useTerminalSessionReadContext()
   const subscribe = useCallback(
-    (listener: () => void) => (worktreeTerminalKey ? subscribeWorktree(worktreeTerminalKey, listener) : () => {}),
-    [worktreeTerminalKey, subscribeWorktree],
+    (listener: () => void) =>
+      terminalWorktreeKey ? subscribeTerminalWorktree(terminalWorktreeKey, listener) : () => {},
+    [terminalWorktreeKey, subscribeTerminalWorktree],
   )
   const getSnapshot = useCallback(
-    () => (worktreeTerminalKey ? worktreeSnapshot(worktreeTerminalKey).selectedDescriptor : null),
-    [worktreeTerminalKey, worktreeSnapshot],
+    () => (terminalWorktreeKey ? terminalWorktreeSnapshot(terminalWorktreeKey).selectedDescriptor : null),
+    [terminalWorktreeKey, terminalWorktreeSnapshot],
   )
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 }
 
-export function useTerminalSessionSummaries(worktreeTerminalKey: string | null): TerminalSessionSummary[] {
-  const { worktreeSnapshot, subscribeWorktree } = useTerminalSessionReadContext()
+export function useTerminalSessionSummaries(terminalWorktreeKey: string | null): TerminalSessionSummary[] {
+  const { terminalWorktreeSnapshot, subscribeTerminalWorktree } = useTerminalSessionReadContext()
   const subscribe = useCallback(
-    (listener: () => void) => (worktreeTerminalKey ? subscribeWorktree(worktreeTerminalKey, listener) : () => {}),
-    [worktreeTerminalKey, subscribeWorktree],
+    (listener: () => void) =>
+      terminalWorktreeKey ? subscribeTerminalWorktree(terminalWorktreeKey, listener) : () => {},
+    [terminalWorktreeKey, subscribeTerminalWorktree],
   )
   const getSnapshot = useCallback(
-    () => (worktreeTerminalKey ? worktreeSnapshot(worktreeTerminalKey).sessions : []),
-    [worktreeTerminalKey, worktreeSnapshot],
+    () => (terminalWorktreeKey ? terminalWorktreeSnapshot(terminalWorktreeKey).sessions : []),
+    [terminalWorktreeKey, terminalWorktreeSnapshot],
   )
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 }

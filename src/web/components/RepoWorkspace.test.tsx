@@ -10,7 +10,7 @@ import {
 import type {
   TerminalSessionContextValue,
   TerminalSessionReadContextValue,
-  WorktreeTerminalSnapshot,
+  TerminalWorktreeSnapshot,
 } from '#/web/components/terminal/types.ts'
 import {
   PrimaryWindowNavigationProvider,
@@ -21,19 +21,19 @@ import { resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 
 const REPO_ID = '/tmp/repo-workspace-container-repo'
 
-const emptyWorktreeSnapshot: WorktreeTerminalSnapshot = {
-  worktreeTerminalKey: '',
+const emptyWorktreeSnapshot: TerminalWorktreeSnapshot = {
+  terminalWorktreeKey: '',
   selectedDescriptor: null,
   sessions: [],
   count: 0,
   bellCount: 0,
-        activeCount: 0,
+  activeCount: 0,
   pendingCreate: false,
 }
 
 const terminalReadContext: TerminalSessionReadContextValue = {
-  worktreeSnapshot: () => emptyWorktreeSnapshot,
-  subscribeWorktree: () => () => {},
+  terminalWorktreeSnapshot: () => emptyWorktreeSnapshot,
+  subscribeTerminalWorktree: () => () => {},
   repoBellCount: () => 0,
   subscribeRepoBellCount: () => () => {},
   snapshot: () => ({ phase: 'opening', message: null, processName: 'terminal' }),

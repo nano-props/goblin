@@ -76,7 +76,7 @@ describe('settings command handlers', () => {
       activeRepoId: null,
       zenMode: true,
       workspacePaneSize: 50,
-      selectedTerminalKeyByWorktree: {},
+      selectedTerminalKeyByTerminalWorktree: {},
       workspacePaneTabOrderByBranchByRepo: {},
     }
     mocks.setServerSessionState.mockResolvedValue(session)

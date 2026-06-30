@@ -12,7 +12,7 @@ export function useSessionPersistence() {
   const order = useReposStore((s) => s.order)
   const zenMode = useReposStore((s) => s.zenMode)
   const workspacePaneSize = useReposStore((s) => s.workspacePaneSize)
-  const selectedTerminalKeyByWorktree = useReposStore((s) => s.selectedTerminalKeyByWorktree)
+  const selectedTerminalKeyByTerminalWorktree = useReposStore((s) => s.selectedTerminalKeyByTerminalWorktree)
   const sessionReady = useReposStore((s) => s.sessionReady)
   const repos = useReposStore((s) => s.repos)
   const filetreeInteractionByScope = useFiletreeInteractionStore((s) => s.interactionByScope)
@@ -31,7 +31,7 @@ export function useSessionPersistence() {
         activeId,
         zenMode,
         workspacePaneSize,
-        selectedTerminalKeyByWorktree,
+        selectedTerminalKeyByTerminalWorktree,
       }),
       filetreeInteractionByScope,
     })
@@ -41,7 +41,7 @@ export function useSessionPersistence() {
       activeRepoId: session.activeRepoId,
       zenMode: session.zenMode,
       workspacePaneSize: session.workspacePaneSize,
-      selectedTerminalKeyByWorktree: session.selectedTerminalKeyByWorktree,
+      selectedTerminalKeyByTerminalWorktree: session.selectedTerminalKeyByTerminalWorktree,
       preferredWorkspacePaneTabByBranchByRepo: session.preferredWorkspacePaneTabByBranchByRepo,
       workspacePaneTabOrderByBranchByRepo: session.workspacePaneTabOrderByBranchByRepo,
     })
@@ -67,7 +67,7 @@ export function useSessionPersistence() {
     activeId,
     workspacePaneSize,
     zenMode,
-    selectedTerminalKeyByWorktree,
+    selectedTerminalKeyByTerminalWorktree,
     repos,
     filetreeInteractionByScope,
   ])

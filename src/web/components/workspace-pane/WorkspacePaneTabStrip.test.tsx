@@ -56,7 +56,7 @@ describe('WorkspacePaneTabStrip', () => {
   test('shows terminal tooltip content with only the original title', async () => {
     render(
       <TestWorkspacePaneTabStrip
-        worktreeTerminalKey="/repo\0/repo/worktree"
+        terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         panelActive
         sessions={[
@@ -103,7 +103,7 @@ describe('WorkspacePaneTabStrip', () => {
   test('keeps the selected terminal in the collapsed popover list and still offers new terminal', async () => {
     render(
       <TestWorkspacePaneTabStrip
-        worktreeTerminalKey="/repo\0/repo/worktree"
+        terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         responsiveCompact
         sessions={[
@@ -144,7 +144,7 @@ describe('WorkspacePaneTabStrip', () => {
     const onNavigateOut = vi.fn()
     render(
       <TestWorkspacePaneTabStrip
-        worktreeTerminalKey="/repo\0/repo/worktree"
+        terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         responsiveCompact
         sessions={[
@@ -180,7 +180,7 @@ describe('WorkspacePaneTabStrip', () => {
   test('keeps all terminal tabs visible in a horizontal scroll area when not in compact mode', () => {
     render(
       <TestWorkspacePaneTabStrip
-        worktreeTerminalKey="/repo\0/repo/worktree"
+        terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
           session({ terminalKey: 't1', title: 'term-1' }),
@@ -222,7 +222,7 @@ describe('WorkspacePaneTabStrip', () => {
   test('uses the last tab separator for the new terminal boundary while hovering new terminal', () => {
     render(
       <TestWorkspacePaneTabStrip
-        worktreeTerminalKey="/repo\0/repo/worktree"
+        terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         panelActive
         sessions={[
@@ -254,7 +254,7 @@ describe('WorkspacePaneTabStrip', () => {
   test('uses the full terminal title and unread state in the tab aria-label', () => {
     render(
       <TestWorkspacePaneTabStrip
-        worktreeTerminalKey="/repo\0/repo/worktree"
+        terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         panelActive
         sessions={[
@@ -290,7 +290,7 @@ describe('WorkspacePaneTabStrip', () => {
 
     render(
       <TestWorkspacePaneTabStrip
-        worktreeTerminalKey="/repo\0/repo/worktree"
+        terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
           session({ terminalKey: 't1', title: 'term-1' }),
@@ -346,7 +346,7 @@ describe('WorkspacePaneTabStrip', () => {
   test('keeps the selected terminal tab semantically selected even when the panel is inactive', () => {
     render(
       <TestWorkspacePaneTabStrip
-        worktreeTerminalKey="/repo\0/repo/worktree"
+        terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
           session({ terminalKey: 't1', title: 'term-1', selected: true }),
@@ -375,7 +375,7 @@ describe('WorkspacePaneTabStrip', () => {
   test('scrolls the tab strip to the far right when a new terminal session is added', () => {
     render(
       <TestWorkspacePaneTabStrip
-        worktreeTerminalKey="/repo\0/repo/worktree"
+        terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
           session({ terminalKey: 't1', title: 'term-1' }),
@@ -397,7 +397,7 @@ describe('WorkspacePaneTabStrip', () => {
 
     rerender(
       <TestWorkspacePaneTabStrip
-        worktreeTerminalKey="/repo\0/repo/worktree"
+        terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
           session({ terminalKey: 't1', title: 'term-1' }),
@@ -418,7 +418,7 @@ describe('WorkspacePaneTabStrip', () => {
   test('does not scroll on initial mount', () => {
     render(
       <TestWorkspacePaneTabStrip
-        worktreeTerminalKey="/repo\0/repo/worktree"
+        terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
           session({ terminalKey: 't1', title: 'term-1' }),
@@ -442,7 +442,7 @@ describe('WorkspacePaneTabStrip', () => {
     // Trigger a re-render with the same sessions to confirm the effect does not scroll.
     rerender(
       <TestWorkspacePaneTabStrip
-        worktreeTerminalKey="/repo\0/repo/worktree"
+        terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
           session({ terminalKey: 't1', title: 'term-1' }),
@@ -463,7 +463,7 @@ describe('WorkspacePaneTabStrip', () => {
   test('does not scroll when the tab strip does not overflow horizontally', () => {
     render(
       <TestWorkspacePaneTabStrip
-        worktreeTerminalKey="/repo\0/repo/worktree"
+        terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
           session({ terminalKey: 't1', title: 'term-1' }),
@@ -487,7 +487,7 @@ describe('WorkspacePaneTabStrip', () => {
 
     rerender(
       <TestWorkspacePaneTabStrip
-        worktreeTerminalKey="/repo\0/repo/worktree"
+        terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
           session({ terminalKey: 't1', title: 'term-1' }),
@@ -513,7 +513,7 @@ describe('WorkspacePaneTabStrip', () => {
 
     render(
       <TestWorkspacePaneTabStrip
-        worktreeTerminalKey="/repo\0/repo/worktree"
+        terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
           session({ terminalKey: 't1', title: 'term-1' }),
@@ -536,7 +536,7 @@ describe('WorkspacePaneTabStrip', () => {
 
     rerender(
       <TestWorkspacePaneTabStrip
-        worktreeTerminalKey="/repo\0/repo/worktree"
+        terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
           session({ terminalKey: 't1', title: 'term-1' }),
@@ -575,7 +575,7 @@ describe('WorkspacePaneTabStrip', () => {
 
     render(
       <TestWorkspacePaneTabStrip
-        worktreeTerminalKey="/repo\0/repo/worktree"
+        terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
           session({ terminalKey: 't1', title: 'term-1' }),
@@ -598,7 +598,7 @@ describe('WorkspacePaneTabStrip', () => {
 
     rerender(
       <TestWorkspacePaneTabStrip
-        worktreeTerminalKey="/repo\0/repo/worktree"
+        terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
           session({ terminalKey: 't1', title: 'term-1' }),
@@ -618,7 +618,7 @@ describe('WorkspacePaneTabStrip', () => {
 
     rerender(
       <TestWorkspacePaneTabStrip
-        worktreeTerminalKey="/repo\0/repo/worktree"
+        terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
           session({ terminalKey: 't1', title: 'term-1' }),
@@ -644,7 +644,7 @@ describe('WorkspacePaneTabStrip', () => {
   test('does not scroll when a terminal session is removed', () => {
     render(
       <TestWorkspacePaneTabStrip
-        worktreeTerminalKey="/repo\0/repo/worktree"
+        terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
           session({ terminalKey: 't1', title: 'term-1' }),
@@ -667,7 +667,7 @@ describe('WorkspacePaneTabStrip', () => {
 
     rerender(
       <TestWorkspacePaneTabStrip
-        worktreeTerminalKey="/repo\0/repo/worktree"
+        terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
           session({ terminalKey: 't1', title: 'term-1' }),
@@ -687,7 +687,7 @@ describe('WorkspacePaneTabStrip', () => {
   test('restores the full tab strip after leaving compact mode', () => {
     rerender(
       <TestWorkspacePaneTabStrip
-        worktreeTerminalKey="/repo\0/repo/worktree"
+        terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         responsiveCompact
         sessions={[
@@ -724,7 +724,7 @@ describe('WorkspacePaneTabStrip', () => {
 
     rerender(
       <TestWorkspacePaneTabStrip
-        worktreeTerminalKey="/repo\0/repo/worktree"
+        terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
           session({ terminalKey: 't1', title: 'term-1' }),
@@ -745,7 +745,7 @@ describe('WorkspacePaneTabStrip', () => {
   test('keeps the compact tab visually unselected even when its panel is active', () => {
     render(
       <TestWorkspacePaneTabStrip
-        worktreeTerminalKey="/repo\0/repo/worktree"
+        terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         responsiveCompact
         panelActive
@@ -779,7 +779,7 @@ describe('WorkspacePaneTabStrip', () => {
 
       return (
         <TestWorkspacePaneTabStrip
-          worktreeTerminalKey="/repo\0/repo/worktree"
+          terminalWorktreeKey="/repo\0/repo/worktree"
           workspacePaneId="workspace"
           responsiveCompact
           panelActive
@@ -818,7 +818,7 @@ describe('WorkspacePaneTabStrip', () => {
   test('compact mode renders an empty tab area but keeps the popover switcher reachable when no tab is active', () => {
     render(
       <TestWorkspacePaneTabStrip
-        worktreeTerminalKey="/repo\0/repo/worktree"
+        terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         responsiveCompact
         panelActive
@@ -855,7 +855,7 @@ describe('WorkspacePaneTabStrip', () => {
   test('renders a compact pending item across the available tab row', () => {
     render(
       <TestWorkspacePaneTabStrip
-        worktreeTerminalKey="/repo\0/repo/worktree"
+        terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         responsiveCompact
         panelActive
@@ -888,7 +888,7 @@ describe('WorkspacePaneTabStrip', () => {
   test('renders the same pending item as a busy tab in expanded mode', () => {
     render(
       <TestWorkspacePaneTabStrip
-        worktreeTerminalKey="/repo\0/repo/worktree"
+        terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         panelActive
         sessions={[session({ terminalKey: 't1', title: 'term-1', selected: false })]}
@@ -931,7 +931,7 @@ describe('WorkspacePaneTabStrip', () => {
 
     render(
       <WorkspacePaneTabStrip
-        worktreeTerminalKey="/repo\0/repo/worktree"
+        terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         panelActive
         items={[item]}
@@ -954,7 +954,7 @@ describe('WorkspacePaneTabStrip', () => {
 })
 
 function TestWorkspacePaneTabStrip(props: {
-  worktreeTerminalKey: string
+  terminalWorktreeKey: string
   sessions: TerminalSessionSummary[]
   workspacePaneId: string
   pendingTerminal?: boolean
@@ -962,7 +962,7 @@ function TestWorkspacePaneTabStrip(props: {
   panelActive?: boolean
   newTerminalBusy?: boolean
   onNew: () => void
-  onSelect: (worktreeTerminalKey: string, tab: TerminalSessionSummary) => void
+  onSelect: (terminalWorktreeKey: string, tab: TerminalSessionSummary) => void
   onScrollToBottom: (key: string) => void
   onClose: (tab: TerminalSessionSummary) => void
   onReorder: (orderedTabs: WorkspacePaneTabOrderEntry[]) => void
@@ -993,7 +993,7 @@ function TestWorkspacePaneTabStrip(props: {
       items={items}
       activeTabIdentity={selected ? terminalWorkspacePaneTabProvider.identity(selected.terminalKey) : null}
       onSelect={(item) => {
-        if (isTerminalWorkspacePaneTabItem(item)) props.onSelect(props.worktreeTerminalKey, item.view)
+        if (isTerminalWorkspacePaneTabItem(item)) props.onSelect(props.terminalWorktreeKey, item.view)
       }}
       onClose={(item) => {
         if (isTerminalWorkspacePaneTabItem(item)) props.onClose(item.view)
@@ -1021,7 +1021,7 @@ function session(overrides: Partial<TerminalSessionSummary> = {}): TerminalSessi
   return {
     type: 'terminal',
     terminalKey,
-    worktreeTerminalKey: overrides.worktreeTerminalKey ?? '/repo\0/repo/worktree',
+    terminalWorktreeKey: overrides.terminalWorktreeKey ?? '/repo\0/repo/worktree',
     sessionId: overrides.sessionId ?? 'session-1',
     index: overrides.index ?? 1,
     displayOrder: overrides.displayOrder ?? 1,

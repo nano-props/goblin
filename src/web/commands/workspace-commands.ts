@@ -1,4 +1,4 @@
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
+import { formatTerminalWorktreeKey } from '#/shared/terminal-workspace-slot-key.ts'
 import { isShellProcessName } from '#/shared/terminal-process-name.ts'
 import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { openWorkspacePaneTab } from '#/web/components/repo-workspace/open-workspace-pane-tab.ts'
@@ -115,14 +115,14 @@ export async function runTerminalPrimaryActionCommand({
   if (!base) return true
   const bridge = readTerminalSessionCommandBridge()
   if (!bridge) return true
-  const worktreeKey = worktreeTerminalKey(base.repoRoot, base.worktreePath)
-  const worktree = bridge.worktreeSnapshot(worktreeKey)
+  const terminalWorktreeKey = formatTerminalWorktreeKey(base.repoRoot, base.worktreePath)
+  const worktree = bridge.terminalWorktreeSnapshot(terminalWorktreeKey)
   if (worktree.count > 0) {
     // The user expects "click the Terminal menu" to land them on a working
     // terminal session: focus the first existing session instead of leaving
     // the selection on whatever the user had open before.
     const firstSession = worktree.sessions[0]
-    if (firstSession) bridge.selectTerminal(worktreeKey, firstSession.terminalKey)
+    if (firstSession) bridge.selectTerminal(terminalWorktreeKey, firstSession.terminalKey)
     return true
   }
   const result = await runCreateTerminalTabCommand({
@@ -278,8 +278,8 @@ function showWorkspacePaneCommandTab(
   navigation: PrimaryWindowNavigationActions,
 ): void {
   navigation.showRepoWorkspacePaneTab(target.repoId, tab.type)
-  if (tab.kind === 'terminal' && target.worktreeTerminalKey) {
-    readTerminalSessionCommandBridge()?.selectTerminal(target.worktreeTerminalKey, tab.terminalKey)
+  if (tab.kind === 'terminal' && target.terminalWorktreeKey) {
+    readTerminalSessionCommandBridge()?.selectTerminal(target.terminalWorktreeKey, tab.terminalKey)
   }
 }
 

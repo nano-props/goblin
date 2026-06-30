@@ -1,11 +1,11 @@
 import { describe, expect, test, vi } from 'vitest'
-import { buildWorktreeTerminalSnapshot } from '#/web/components/terminal/terminal-session-worktree-snapshot.ts'
+import { buildTerminalWorktreeSnapshot } from '#/web/components/terminal/terminal-session-worktree-snapshot.ts'
 import type { TerminalSessionLike, TerminalDescriptor, TerminalSnapshot } from '#/web/components/terminal/types.ts'
 
 function makeDescriptor(sessionId: string, index: number): TerminalDescriptor {
   return {
     terminalKey: `/repo\0/repo\0${sessionId}`,
-    worktreeTerminalKey: '/repo\0/repo',
+    terminalWorktreeKey: '/repo\0/repo',
     sessionId,
     index,
     repoRoot: '/repo',
@@ -58,8 +58,8 @@ describe('terminal session worktree snapshot helper', () => {
     })
     const cache = new Map<string, TerminalSnapshot>()
 
-    const snapshot = buildWorktreeTerminalSnapshot({
-      worktreeTerminalKey: descriptor.worktreeTerminalKey,
+    const snapshot = buildTerminalWorktreeSnapshot({
+      terminalWorktreeKey: descriptor.terminalWorktreeKey,
       selectedDescriptor: descriptor,
       pendingCreate: false,
       sessions: [session],
@@ -72,7 +72,7 @@ describe('terminal session worktree snapshot helper', () => {
     })
 
     expect(snapshot).toEqual({
-      worktreeTerminalKey: descriptor.worktreeTerminalKey,
+      terminalWorktreeKey: descriptor.terminalWorktreeKey,
       selectedDescriptor: descriptor,
       sessions: [
         expect.objectContaining({
@@ -93,8 +93,8 @@ describe('terminal session worktree snapshot helper', () => {
     })
     expect(session.snapshotSpy).toHaveBeenCalledTimes(1)
 
-    buildWorktreeTerminalSnapshot({
-      worktreeTerminalKey: descriptor.worktreeTerminalKey,
+    buildTerminalWorktreeSnapshot({
+      terminalWorktreeKey: descriptor.terminalWorktreeKey,
       selectedDescriptor: descriptor,
       pendingCreate: false,
       sessions: [session],

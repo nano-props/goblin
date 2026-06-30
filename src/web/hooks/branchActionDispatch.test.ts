@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { dispatchRemoveWorktree } from '#/web/hooks/branchActionDispatch.ts'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
-import type { WorktreeTerminalSnapshot } from '#/web/components/terminal/types.ts'
+import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
@@ -50,7 +50,7 @@ describe('branch action dispatch', () => {
         }),
     )
     setTerminalSessionCommandBridge({
-      worktreeSnapshot: () => worktreeSnapshotWithTerminal(),
+      terminalWorktreeSnapshot: () => worktreeSnapshotWithTerminal(),
       createTerminal: vi.fn(async () => 'session-2'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor: vi.fn(async () => true),
@@ -106,7 +106,7 @@ describe('branch action dispatch', () => {
     const runBranchAction = vi.fn(async () => ({ ok: true, message: 'ok' }))
     useReposStore.setState({ runBranchAction })
     setTerminalSessionCommandBridge({
-      worktreeSnapshot: () => worktreeSnapshotWithTerminal(),
+      terminalWorktreeSnapshot: () => worktreeSnapshotWithTerminal(),
       createTerminal: vi.fn(async () => 'session-2'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor: vi.fn(async () => true),
@@ -148,7 +148,7 @@ describe('branch action dispatch', () => {
     useReposStore.setState({ runBranchAction })
     const closeTerminalsForWorktree = vi.fn(async () => true)
     setTerminalSessionCommandBridge({
-      worktreeSnapshot: () => emptyWorktreeSnapshot(),
+      terminalWorktreeSnapshot: () => emptyWorktreeSnapshot(),
       createTerminal: vi.fn(async () => 'session-2'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor: vi.fn(async () => true),
@@ -193,7 +193,7 @@ describe('branch action dispatch', () => {
     const closeTerminalsForWorktree = vi.fn(async () => true)
     useReposStore.setState({ runBranchAction })
     setTerminalSessionCommandBridge({
-      worktreeSnapshot: () => worktreeSnapshotWithTerminal(),
+      terminalWorktreeSnapshot: () => worktreeSnapshotWithTerminal(),
       createTerminal: vi.fn(async () => 'session-2'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor: vi.fn(async () => true),
@@ -215,9 +215,9 @@ describe('branch action dispatch', () => {
   })
 })
 
-function emptyWorktreeSnapshot(): WorktreeTerminalSnapshot {
+function emptyWorktreeSnapshot(): TerminalWorktreeSnapshot {
   return {
-    worktreeTerminalKey: WORKTREE_KEY,
+    terminalWorktreeKey: WORKTREE_KEY,
     selectedDescriptor: null,
     sessions: [],
     count: 0,
@@ -227,12 +227,12 @@ function emptyWorktreeSnapshot(): WorktreeTerminalSnapshot {
   }
 }
 
-function worktreeSnapshotWithTerminal(): WorktreeTerminalSnapshot {
+function worktreeSnapshotWithTerminal(): TerminalWorktreeSnapshot {
   return {
-    worktreeTerminalKey: WORKTREE_KEY,
+    terminalWorktreeKey: WORKTREE_KEY,
     selectedDescriptor: {
       terminalKey: 'session-1',
-      worktreeTerminalKey: WORKTREE_KEY,
+      terminalWorktreeKey: WORKTREE_KEY,
       sessionId: 'session-1',
       index: 1,
       repoRoot: REPO_ID,
@@ -243,7 +243,7 @@ function worktreeSnapshotWithTerminal(): WorktreeTerminalSnapshot {
       {
         type: 'terminal',
         terminalKey: 'session-1',
-        worktreeTerminalKey: WORKTREE_KEY,
+        terminalWorktreeKey: WORKTREE_KEY,
         sessionId: 'session-1',
         index: 1,
         displayOrder: 1,

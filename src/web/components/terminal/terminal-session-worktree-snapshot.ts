@@ -3,12 +3,12 @@ import type {
   TerminalSessionLike,
   TerminalSessionSummary,
   TerminalSnapshot,
-  WorktreeTerminalSnapshot,
+  TerminalWorktreeSnapshot,
 } from '#/web/components/terminal/types.ts'
 
-export function buildWorktreeTerminalSnapshot(input: {
-  worktreeTerminalKey: string
-  selectedDescriptor: WorktreeTerminalSnapshot['selectedDescriptor']
+export function buildTerminalWorktreeSnapshot(input: {
+  terminalWorktreeKey: string
+  selectedDescriptor: TerminalWorktreeSnapshot['selectedDescriptor']
   pendingCreate: boolean
   sessions: TerminalSessionLike[]
   selectedTerminalKey: string | null
@@ -17,12 +17,12 @@ export function buildWorktreeTerminalSnapshot(input: {
   hasBell: (terminalKey: string) => boolean
   hasRecentActivity: (terminalKey: string) => boolean
   getDisplayOrder: (session: TerminalSessionLike) => number
-}): WorktreeTerminalSnapshot {
+}): TerminalWorktreeSnapshot {
   const sessions = buildTerminalSessionSummaries(input)
   const bellCount = sessions.reduce((count, session) => count + (session.hasBell ? 1 : 0), 0)
   const activeCount = sessions.reduce((count, session) => count + (session.recentlyActive ? 1 : 0), 0)
   return {
-    worktreeTerminalKey: input.worktreeTerminalKey,
+    terminalWorktreeKey: input.terminalWorktreeKey,
     selectedDescriptor: input.selectedDescriptor,
     sessions,
     count: sessions.length,
@@ -33,7 +33,7 @@ export function buildWorktreeTerminalSnapshot(input: {
 }
 
 function buildTerminalSessionSummaries(input: {
-  worktreeTerminalKey: string
+  terminalWorktreeKey: string
   sessions: TerminalSessionLike[]
   selectedTerminalKey: string | null
   getCachedSnapshot: (terminalKey: string) => TerminalSnapshot | null
@@ -49,7 +49,7 @@ function buildTerminalSessionSummaries(input: {
     return {
       type: 'terminal',
       terminalKey: session.descriptor.terminalKey,
-      worktreeTerminalKey: input.worktreeTerminalKey,
+      terminalWorktreeKey: input.terminalWorktreeKey,
       sessionId: session.descriptor.sessionId,
       index: session.descriptor.index,
       displayOrder: input.getDisplayOrder(session),

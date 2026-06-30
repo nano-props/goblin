@@ -158,8 +158,8 @@ export interface RestorableWorkspaceState {
   /** Large-screen Zen Mode restored from WorkspaceSessionState. Compact UI is stronger and always shows one pane at a time. */
   zenMode: boolean
   workspacePaneSize: number
-  /** Per worktree terminal selection restored from WorkspaceSessionState.selectedTerminalKeyByWorktree. */
-  selectedTerminalKeyByWorktree: Record<string, string>
+  /** Per worktree terminal selection restored from WorkspaceSessionState.selectedTerminalKeyByTerminalWorktree. */
+  selectedTerminalKeyByTerminalWorktree: Record<string, string>
 }
 
 export interface SessionWorkspacePaneRestoreState {
@@ -183,12 +183,12 @@ interface LocalWorkspaceState {
 interface RestorableWorkspaceActions {
   setActive: (id: string) => void
   applySessionLayoutState: (layout: Pick<WorkspaceSessionState, 'zenMode' | 'workspacePaneSize'>) => void
-  applySessionSelectedTerminalState: (selectedTerminalKeyByWorktree: Record<string, string>) => void
+  applySessionSelectedTerminalState: (selectedTerminalKeyByTerminalWorktree: Record<string, string>) => void
   setZenMode: (enabled: boolean) => void
   toggleZenMode: () => void
   setWorkspacePaneSize: (size: number) => void
   resetLayout: () => void
-  setSelectedTerminal: (worktreeTerminalKey: string, key: string | null) => void
+  setSelectedTerminal: (terminalWorktreeKey: string, key: string | null) => void
   cycleActive: (direction: 1 | -1) => void
 }
 

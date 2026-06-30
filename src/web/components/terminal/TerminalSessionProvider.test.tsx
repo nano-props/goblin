@@ -10,10 +10,10 @@ import { setTerminalSessionProjectionForTests } from '#/web/components/terminal/
 import { terminalSessionProviderLog } from '#/web/logger.ts'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import {
-  useWorktreeTerminalCount,
+  useTerminalWorktreeCount,
   useTerminalSessionSummaries,
 } from '#/web/components/terminal/terminal-session-store.ts'
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
+import { formatTerminalWorktreeKey } from '#/shared/terminal-workspace-slot-key.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
@@ -630,7 +630,7 @@ describe('TerminalSessionProvider', () => {
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
     })
-    const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
+    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH)
     const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
 
     try {
@@ -701,7 +701,7 @@ describe('TerminalSessionProvider', () => {
     const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
     const notifyBell = vi.fn(async () => true)
     Object.assign(window.goblinNative.terminal, { notifyBell })
-    const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
+    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH)
     const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
 
     try {
@@ -743,7 +743,7 @@ describe('TerminalSessionProvider', () => {
         ['session-1', true, false],
         ['session-2', false, false],
       ])
-      expect(useReposStore.getState().selectedTerminalKeyByWorktree).toMatchObject({
+      expect(useReposStore.getState().selectedTerminalKeyByTerminalWorktree).toMatchObject({
         [terminalWorktreeKey]: `${REPO_ID}\u0000${WORKTREE_PATH}\u0000session-1`,
       })
     } finally {
@@ -759,7 +759,7 @@ describe('TerminalSessionProvider', () => {
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
     })
-    const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
+    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH)
     const { getContext, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
 
     try {
@@ -910,7 +910,7 @@ describe('TerminalSessionProvider', () => {
       snapshot: 'hydrated-screen',
       snapshotSeq: 5,
     })
-    const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
+    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH)
     const { getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
 
     try {
@@ -949,7 +949,7 @@ describe('TerminalSessionProvider', () => {
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
     })
-    const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
+    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH)
     const { unmount } = await renderProviderWithProbe(terminalWorktreeKey)
 
     try {
@@ -991,7 +991,7 @@ describe('TerminalSessionProvider', () => {
       },
     ]
     listSessionsMock.mockImplementation(async () => serverSessions)
-    const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
+    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH)
     const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
 
     try {
@@ -1027,9 +1027,9 @@ describe('TerminalSessionProvider', () => {
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
     })
-    const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
+    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH)
     useReposStore.setState({
-      selectedTerminalKeyByWorktree: {
+      selectedTerminalKeyByTerminalWorktree: {
         [terminalWorktreeKey]: `${REPO_ID}\u0000${WORKTREE_PATH}\u0000session-1`,
       },
     })
@@ -1071,7 +1071,7 @@ describe('TerminalSessionProvider', () => {
         ['session-1', true],
         ['session-2', false],
       ])
-      expect(useReposStore.getState().selectedTerminalKeyByWorktree).toMatchObject({
+      expect(useReposStore.getState().selectedTerminalKeyByTerminalWorktree).toMatchObject({
         [terminalWorktreeKey]: `${REPO_ID}\u0000${WORKTREE_PATH}\u0000session-1`,
       })
     } finally {
@@ -1120,7 +1120,7 @@ describe('TerminalSessionProvider', () => {
       },
       order: [REPO_ID, SECOND_REPO_ID],
     }))
-    const { unmount } = await renderProviderWithProbe(worktreeTerminalKey(REPO_ID, WORKTREE_PATH))
+    const { unmount } = await renderProviderWithProbe(formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH))
 
     try {
       await vi.waitFor(() => expect(listSessionsMock).toHaveBeenCalledTimes(1))
@@ -1172,7 +1172,7 @@ describe('TerminalSessionProvider', () => {
       order: [REPO_ID, SECOND_REPO_ID],
     }))
     useRepoSyncStore.setState({ cooldownMs: 0 })
-    const { unmount } = await renderProviderWithProbe(worktreeTerminalKey(REPO_ID, WORKTREE_PATH))
+    const { unmount } = await renderProviderWithProbe(formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH))
 
     try {
       await vi.waitFor(() => expect(listSessionsMock).toHaveBeenCalledTimes(1))
@@ -1194,7 +1194,7 @@ describe('TerminalSessionProvider', () => {
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
     })
-    const { unmount } = await renderProviderWithProbe(worktreeTerminalKey(REPO_ID, WORKTREE_PATH))
+    const { unmount } = await renderProviderWithProbe(formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH))
 
     try {
       await vi.waitFor(() => expect(listSessionsMock).toHaveBeenCalledTimes(1))
@@ -1243,7 +1243,7 @@ describe('TerminalSessionProvider', () => {
         displayOrder: 1,
       },
     ])
-    const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
+    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH)
     const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
 
     try {
@@ -1287,7 +1287,7 @@ describe('TerminalSessionProvider', () => {
         displayOrder: 1,
       },
     ])
-    const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
+    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH)
     const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
 
     try {
@@ -1354,7 +1354,7 @@ describe('TerminalSessionProvider', () => {
         displayOrder: 1,
       },
     ])
-    const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
+    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH)
     const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
 
     try {
@@ -1420,7 +1420,7 @@ describe('TerminalSessionProvider', () => {
       snapshot: 'old-snapshot',
       snapshotSeq: 7,
     })
-    const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
+    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH)
     const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
 
     try {
@@ -1489,7 +1489,7 @@ describe('TerminalSessionProvider', () => {
       snapshot: 'server-snapshot',
       snapshotSeq: 7,
     })
-    const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
+    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH)
     const { getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
 
     try {
@@ -1670,7 +1670,7 @@ describe('TerminalSessionProvider', () => {
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
     })
-    const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
+    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH)
     const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
 
     try {
@@ -1719,7 +1719,7 @@ describe('TerminalSessionProvider', () => {
       canonicalCols: 80,
       canonicalRows: 24,
     })
-    const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
+    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH)
     const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
 
     try {
@@ -1975,7 +1975,7 @@ describe('TerminalSessionProvider', () => {
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
     })
-    const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
+    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH)
 
     const first = await renderProviderWithProbe(terminalWorktreeKey)
     try {
@@ -2017,10 +2017,10 @@ function CaptureContext({ onContext }: { onContext: (value: TerminalSessionConte
 }
 
 function CaptureGroupProbe({
-  worktreeTerminalKey,
+  terminalWorktreeKey,
   onProbe,
 }: {
-  worktreeTerminalKey: string
+  terminalWorktreeKey: string
   onProbe: (value: {
     count: number
     terminalIds: string[]
@@ -2034,9 +2034,9 @@ function CaptureGroupProbe({
     }>
   }) => void
 }) {
-  const summaries = useTerminalSessionSummaries(worktreeTerminalKey)
+  const summaries = useTerminalSessionSummaries(terminalWorktreeKey)
   onProbe({
-    count: useWorktreeTerminalCount(worktreeTerminalKey),
+    count: useTerminalWorktreeCount(terminalWorktreeKey),
     terminalIds: summaries.map((session) => session.sessionId),
     summaries: summaries.map((session) => ({
       terminalKey: session.terminalKey,
@@ -2065,7 +2065,7 @@ async function renderProviderWithHost(): Promise<{
   const result = renderInJsdom(
     <TerminalSessionProvider>
       <CaptureContext onContext={(value) => (context = value)} />
-      <RegisterHost worktreeTerminalKey={worktreeTerminalKey(REPO_ID, WORKTREE_PATH)} />
+      <RegisterHost terminalWorktreeKey={formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH)} />
     </TerminalSessionProvider>,
   )
   await act(async () => {})
@@ -2083,7 +2083,7 @@ async function renderProviderWithHost(): Promise<{
   }
 }
 
-async function renderProviderWithProbe(worktreeTerminalKey: string): Promise<{
+async function renderProviderWithProbe(terminalWorktreeKey: string): Promise<{
   getContext: () => TerminalSessionContextValue
   getProbe: () => {
     count: number
@@ -2115,8 +2115,8 @@ async function renderProviderWithProbe(worktreeTerminalKey: string): Promise<{
   const result = renderInJsdom(
     <TerminalSessionProvider>
       <CaptureContext onContext={(value) => (context = value)} />
-      <RegisterHost worktreeTerminalKey={worktreeTerminalKey} />
-      <CaptureGroupProbe worktreeTerminalKey={worktreeTerminalKey} onProbe={(value) => (probe = value)} />
+      <RegisterHost terminalWorktreeKey={terminalWorktreeKey} />
+      <CaptureGroupProbe terminalWorktreeKey={terminalWorktreeKey} onProbe={(value) => (probe = value)} />
     </TerminalSessionProvider>,
   )
   await act(async () => {})
@@ -2138,18 +2138,18 @@ async function renderProviderWithProbe(worktreeTerminalKey: string): Promise<{
   }
 }
 
-function RegisterHost({ worktreeTerminalKey }: { worktreeTerminalKey: string }) {
+function RegisterHost({ terminalWorktreeKey }: { terminalWorktreeKey: string }) {
   const context = useTerminalSessionContext()
   const ref = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     const host = ref.current
     if (!host) return
-    context.registerHost(worktreeTerminalKey, host)
+    context.registerHost(terminalWorktreeKey, host)
     return () => {
-      context.unregisterHost(worktreeTerminalKey, host)
+      context.unregisterHost(terminalWorktreeKey, host)
     }
-  }, [context, worktreeTerminalKey])
+  }, [context, terminalWorktreeKey])
 
   return <div ref={ref} />
 }

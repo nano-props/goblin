@@ -17,7 +17,7 @@ import type {
   TerminalSessionContextValue,
   TerminalSessionSummary,
   TerminalSessionReadContextValue,
-  WorktreeTerminalSnapshot,
+  TerminalWorktreeSnapshot,
 } from '#/web/components/terminal/types.ts'
 import { createBranchSnapshot, createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -468,7 +468,7 @@ describe('RepoWorkspaceContent', () => {
 
   test('mounts the terminal session while terminal creation is pending with no sessions', () => {
     const worktreePath = '/tmp/terminal-pending-worktree'
-    const worktreeKey = `${REPO_ID}\0${worktreePath}`
+    const terminalWorktreeKey = `${REPO_ID}\0${worktreePath}`
     const repo = seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/terminal-pending', { worktree: { path: worktreePath } })],
@@ -479,14 +479,14 @@ describe('RepoWorkspaceContent', () => {
     useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceToken)
     const detail = getSelectedRepoWorkspacePresentation(repo)
     const registerHost = vi.fn()
-    const worktreeSnapshot: WorktreeTerminalSnapshot = {
+    const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
       ...emptyWorktreeSnapshot,
-      worktreeTerminalKey: worktreeKey,
+      terminalWorktreeKey,
       pendingCreate: true,
     }
     const readContext: TerminalSessionReadContextValue = {
       ...emptyTerminalReadContext,
-      worktreeSnapshot: () => worktreeSnapshot,
+      terminalWorktreeSnapshot: () => terminalWorktreeSnapshot,
     }
 
     const { container } = renderInJsdom(
@@ -504,12 +504,12 @@ describe('RepoWorkspaceContent', () => {
     expect(container.querySelector('.goblin-terminal-session__host')).not.toBeNull()
     expect(container.textContent).toContain('terminal.opening')
     expect(container.textContent).not.toContain('workspace-pane-tabs.empty')
-    expect(registerHost).toHaveBeenCalledWith(worktreeKey, expect.any(HTMLDivElement))
+    expect(registerHost).toHaveBeenCalledWith(terminalWorktreeKey, expect.any(HTMLDivElement))
   })
 
   test('mounts the terminal session while terminal creation is pending after every tab was closed', () => {
     const worktreePath = '/tmp/terminal-pending-empty-strip-worktree'
-    const worktreeKey = `${REPO_ID}\0${worktreePath}`
+    const terminalWorktreeKey = `${REPO_ID}\0${worktreePath}`
     const branchName = 'feature/terminal-pending-empty-strip'
     const seededRepo = seedRepoState({
       id: REPO_ID,
@@ -522,14 +522,14 @@ describe('RepoWorkspaceContent', () => {
     const repo = useReposStore.getState().repos[REPO_ID]!
     const detail = getSelectedRepoWorkspacePresentation(repo)
     const registerHost = vi.fn()
-    const worktreeSnapshot: WorktreeTerminalSnapshot = {
+    const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
       ...emptyWorktreeSnapshot,
-      worktreeTerminalKey: worktreeKey,
+      terminalWorktreeKey,
       pendingCreate: true,
     }
     const readContext: TerminalSessionReadContextValue = {
       ...emptyTerminalReadContext,
-      worktreeSnapshot: () => worktreeSnapshot,
+      terminalWorktreeSnapshot: () => terminalWorktreeSnapshot,
     }
 
     renderInJsdom(
@@ -542,12 +542,12 @@ describe('RepoWorkspaceContent', () => {
 
     expect(screen.getByRole('tabpanel').id).toBe('workspace-terminal-panel')
     expect(screen.queryByText('workspace-pane-tabs.empty')).toBeNull()
-    expect(registerHost).toHaveBeenCalledWith(worktreeKey, expect.any(HTMLDivElement))
+    expect(registerHost).toHaveBeenCalledWith(terminalWorktreeKey, expect.any(HTMLDivElement))
   })
 
   test('renders terminal loading without a create CTA while initial terminal sync is unresolved', () => {
     const worktreePath = '/tmp/terminal-loading-worktree'
-    const worktreeKey = `${REPO_ID}\0${worktreePath}`
+    const terminalWorktreeKey = `${REPO_ID}\0${worktreePath}`
     const repo = seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/terminal-loading', { worktree: { path: worktreePath } })],
@@ -558,14 +558,14 @@ describe('RepoWorkspaceContent', () => {
     const detail = getSelectedRepoWorkspacePresentation(repo)
     const createTerminal = vi.fn(async () => 'session-1')
     const registerHost = vi.fn()
-    const worktreeSnapshot: WorktreeTerminalSnapshot = {
+    const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
       ...emptyWorktreeSnapshot,
-      worktreeTerminalKey: worktreeKey,
+      terminalWorktreeKey,
       pendingCreate: false,
     }
     const readContext: TerminalSessionReadContextValue = {
       ...emptyTerminalReadContext,
-      worktreeSnapshot: () => worktreeSnapshot,
+      terminalWorktreeSnapshot: () => terminalWorktreeSnapshot,
     }
 
     const { container } = renderInJsdom(
@@ -584,12 +584,12 @@ describe('RepoWorkspaceContent', () => {
     expect(container.textContent).not.toContain('terminal.new')
     expect(container.querySelector('.goblin-terminal-session__empty-cta')).toBeNull()
     expect(createTerminal).not.toHaveBeenCalled()
-    expect(registerHost).toHaveBeenCalledWith(worktreeKey, expect.any(HTMLDivElement))
+    expect(registerHost).toHaveBeenCalledWith(terminalWorktreeKey, expect.any(HTMLDivElement))
   })
 
   test('labels terminal panels from the unified tab order, not runtime session order', () => {
     const worktreePath = '/tmp/terminal-reordered-worktree'
-    const worktreeKey = `${REPO_ID}\0${worktreePath}`
+    const terminalWorktreeKey = `${REPO_ID}\0${worktreePath}`
     const repo = seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/terminal-reordered', { worktree: { path: worktreePath } })],
@@ -602,15 +602,18 @@ describe('RepoWorkspaceContent', () => {
     useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceToken)
     const detail = getSelectedRepoWorkspacePresentation(repo)
     const registerHost = vi.fn()
-    const worktreeSnapshot: WorktreeTerminalSnapshot = {
+    const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
       ...emptyWorktreeSnapshot,
-      worktreeTerminalKey: worktreeKey,
-      sessions: [terminalSession('t1', 1, false, worktreeKey), terminalSession('t2', 2, true, worktreeKey)],
+      terminalWorktreeKey,
+      sessions: [
+        terminalSession('t1', 1, false, terminalWorktreeKey),
+        terminalSession('t2', 2, true, terminalWorktreeKey),
+      ],
       count: 2,
     }
     const readContext: TerminalSessionReadContextValue = {
       ...emptyTerminalReadContext,
-      worktreeSnapshot: () => worktreeSnapshot,
+      terminalWorktreeSnapshot: () => terminalWorktreeSnapshot,
     }
 
     const { container } = renderInJsdom(
@@ -624,7 +627,7 @@ describe('RepoWorkspaceContent', () => {
     expect(container.querySelector('#workspace-terminal-panel')?.getAttribute('aria-labelledby')).toBe(
       'workspace-workspace-pane-tab',
     )
-    expect(registerHost).toHaveBeenCalledWith(worktreeKey, expect.any(HTMLDivElement))
+    expect(registerHost).toHaveBeenCalledWith(terminalWorktreeKey, expect.any(HTMLDivElement))
   })
 
   test('opens a file by creating a terminal with a startup shell command instead of writing to an opening PTY', async () => {
@@ -828,8 +831,8 @@ describe('RepoWorkspaceContent', () => {
   })
 })
 
-const emptyWorktreeSnapshot: WorktreeTerminalSnapshot = {
-  worktreeTerminalKey: '',
+const emptyWorktreeSnapshot: TerminalWorktreeSnapshot = {
+  terminalWorktreeKey: '',
   selectedDescriptor: null,
   sessions: [],
   count: 0,
@@ -839,8 +842,8 @@ const emptyWorktreeSnapshot: WorktreeTerminalSnapshot = {
 }
 
 const emptyTerminalReadContext: TerminalSessionReadContextValue = {
-  worktreeSnapshot: () => emptyWorktreeSnapshot,
-  subscribeWorktree: () => () => {},
+  terminalWorktreeSnapshot: () => emptyWorktreeSnapshot,
+  subscribeTerminalWorktree: () => () => {},
   repoBellCount: () => 0,
   subscribeRepoBellCount: () => () => {},
   snapshot: () => ({ phase: 'opening', message: null, processName: 'terminal' }),
@@ -903,12 +906,12 @@ function terminalSession(
   terminalKey: string,
   index: number,
   selected: boolean,
-  worktreeTerminalKey: string,
+  terminalWorktreeKey: string,
 ): TerminalSessionSummary {
   return {
     type: 'terminal',
     terminalKey,
-    worktreeTerminalKey,
+    terminalWorktreeKey,
     sessionId: terminalKey,
     index,
     displayOrder: index,
