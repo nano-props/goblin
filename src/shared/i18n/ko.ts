@@ -456,7 +456,7 @@ export const ko: Record<DictKey, string> = {
   'action.create-worktree-confirm': '워크트리 만들기',
   'action.create-worktree-has-worktree': '브랜치 "{branch}"에 이미 워크트리가 있음',
   'action.create-worktree-busy': '브랜치 작업이 진행 중입니다. 워크트리를 만들려면 작업이 완료될 때까지 기다리세요.',
-  'action.create-worktree-bootstrap-remember': '현재 구성 신뢰',
+  'action.create-worktree-bootstrap-config-trusted': '현재 구성 신뢰',
   'action.menu': '작업',
   'action.refresh': '동기화',
   'action.refresh-title': 'git branch · git status · git log',

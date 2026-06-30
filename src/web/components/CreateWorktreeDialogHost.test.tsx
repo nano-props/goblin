@@ -28,6 +28,7 @@ beforeEach(() => {
   primaryWindowQueryClient.clear()
   globalThis.localStorage?.clear()
   resetReposStore()
+  primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
   seedRepoState({
     id: REPO_ID,
     branches: [createRepoBranch('main', { isCurrent: true, ahead: 0, behind: 0 })],
@@ -98,7 +99,7 @@ describe('CreateWorktreeDialogHost', () => {
     expect(container.textContent).toBe('')
   })
 
-  test('forwards a remembered bootstrap decision from the create dialog checkbox', async () => {
+  test('forwards a config trust state from the create dialog checkbox', async () => {
     const configHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
     primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
     const submitBranchAction = vi.spyOn(useReposStore.getState(), 'submitBranchAction').mockImplementation(() => {})
@@ -134,11 +135,11 @@ describe('CreateWorktreeDialogHost', () => {
     await flushReact()
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(document.body.textContent).toContain('action.create-worktree-bootstrap-remember')
+    expect(document.body.textContent).toContain('action.create-worktree-bootstrap-config-trusted')
     expect(submitBranchAction).not.toHaveBeenCalled()
 
     setInputValue('cwt-branch', 'feature/bootstrap')
-    await clickLabel('action.create-worktree-bootstrap-remember')
+    await clickLabel('action.create-worktree-bootstrap-config-trusted')
     await clickButton('action.create-worktree-confirm')
     await flushReact()
 
@@ -149,7 +150,7 @@ describe('CreateWorktreeDialogHost', () => {
         worktreeBootstrap: {
           kind: 'run',
           configHash,
-          rememberTrust: true,
+          configTrusted: true,
         },
       }),
       expect.objectContaining({ refreshOnError: false }),
@@ -192,7 +193,7 @@ describe('CreateWorktreeDialogHost', () => {
         worktreeBootstrap: {
           kind: 'run',
           configHash,
-          rememberTrust: false,
+          configTrusted: false,
         },
       }),
       expect.objectContaining({ refreshOnError: false }),
@@ -233,7 +234,7 @@ describe('CreateWorktreeDialogHost', () => {
         worktreeBootstrap: {
           kind: 'run',
           configHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-          rememberTrust: false,
+          configTrusted: false,
         },
       }),
       expect.objectContaining({ refreshOnError: false }),
@@ -241,7 +242,25 @@ describe('CreateWorktreeDialogHost', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  test('preflights then auto-runs a trusted goblin.toml config hash', async () => {
+  test('does not submit a bootstrap decision before settings trust state is loaded', async () => {
+    const configHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+    primaryWindowQueryClient.removeQueries({ queryKey: settingsSnapshotQueryKey(), exact: true })
+    const submitBranchAction = vi.spyOn(useReposStore.getState(), 'submitBranchAction').mockImplementation(() => {})
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => previewResponse({ hasOperations: true, configHash })),
+    )
+
+    renderHost(true, vi.fn())
+    await flushReact()
+    setInputValue('cwt-branch', 'feature/wait-for-settings')
+    await clickButton('action.create-worktree-confirm')
+    await flushReact()
+
+    expect(submitBranchAction).not.toHaveBeenCalled()
+  })
+
+  test('preflights then auto-runs a trusted goblin.toml config hash while showing the trust checkbox', async () => {
     primaryWindowQueryClient.setQueryData(
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({
@@ -284,7 +303,10 @@ describe('CreateWorktreeDialogHost', () => {
     await flushReact()
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(document.body.textContent).not.toContain('action.create-worktree-bootstrap-remember')
+    expect(document.body.textContent).toContain('action.create-worktree-bootstrap-config-trusted')
+    const trustCheckbox = checkboxForLabel('action.create-worktree-bootstrap-config-trusted')
+    expect(trustCheckbox.getAttribute('aria-checked')).toBe('true')
+    expect(trustCheckbox.hasAttribute('disabled')).toBe(false)
     expect(submitBranchAction).toHaveBeenCalledWith(
       REPO_ID,
       expect.objectContaining({
@@ -292,14 +314,58 @@ describe('CreateWorktreeDialogHost', () => {
         worktreeBootstrap: {
           kind: 'run',
           configHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-          rememberTrust: false,
+          configTrusted: true,
         },
       }),
       expect.objectContaining({ refreshOnError: false }),
     )
   })
 
-  test('keeps trusted bootstrap state in sync when settings cache updates after preview', async () => {
+  test('forwards an unchecked trust choice for an already trusted goblin.toml config hash', async () => {
+    const configHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+    primaryWindowQueryClient.setQueryData(
+      settingsSnapshotQueryKey(),
+      defaultSettingsSnapshot({
+        repoSettings: [
+          {
+            repoId: REPO_ID,
+            worktreeBootstrapTrust: {
+              configHash,
+              trustedAt: '2026-06-26T00:00:00.000Z',
+            },
+          },
+        ],
+      }),
+    )
+    const submitBranchAction = vi.spyOn(useReposStore.getState(), 'submitBranchAction').mockImplementation(() => {})
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => previewResponse({ hasOperations: true, configHash })),
+    )
+
+    renderHost(true, vi.fn())
+    await flushReact()
+
+    const trustCheckbox = checkboxForLabel('action.create-worktree-bootstrap-config-trusted')
+    expect(trustCheckbox.getAttribute('aria-checked')).toBe('true')
+    await clickLabel('action.create-worktree-bootstrap-config-trusted')
+    expect(trustCheckbox.getAttribute('aria-checked')).toBe('false')
+
+    setInputValue('cwt-branch', 'feature/untrust')
+    await clickButton('action.create-worktree-confirm')
+    await flushReact()
+
+    expect(submitBranchAction).toHaveBeenCalledWith(
+      REPO_ID,
+      expect.objectContaining({
+        kind: 'createWorktree',
+        worktreeBootstrap: { kind: 'run', configHash, configTrusted: false },
+      }),
+      expect.objectContaining({ refreshOnError: false }),
+    )
+  })
+
+  test('keeps config trust state in sync when settings cache updates after preview', async () => {
     const configHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
     primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
     const submitBranchAction = vi.spyOn(useReposStore.getState(), 'submitBranchAction').mockImplementation(() => {})
@@ -311,7 +377,7 @@ describe('CreateWorktreeDialogHost', () => {
     renderHost(true, vi.fn())
     await flushReact()
 
-    expect(document.body.textContent).toContain('action.create-worktree-bootstrap-remember')
+    expect(document.body.textContent).toContain('action.create-worktree-bootstrap-config-trusted')
 
     act(() => {
       primaryWindowQueryClient.setQueryData(
@@ -331,7 +397,10 @@ describe('CreateWorktreeDialogHost', () => {
     })
     await flushReact()
 
-    expect(document.body.textContent).not.toContain('action.create-worktree-bootstrap-remember')
+    expect(document.body.textContent).toContain('action.create-worktree-bootstrap-config-trusted')
+    const trustCheckbox = checkboxForLabel('action.create-worktree-bootstrap-config-trusted')
+    expect(trustCheckbox.getAttribute('aria-checked')).toBe('true')
+    expect(trustCheckbox.hasAttribute('disabled')).toBe(false)
 
     setInputValue('cwt-branch', 'feature/trusted-after-preview')
     await clickButton('action.create-worktree-confirm')
@@ -341,7 +410,7 @@ describe('CreateWorktreeDialogHost', () => {
       REPO_ID,
       expect.objectContaining({
         kind: 'createWorktree',
-        worktreeBootstrap: { kind: 'run', configHash, rememberTrust: false },
+        worktreeBootstrap: { kind: 'run', configHash, configTrusted: true },
       }),
       expect.objectContaining({ refreshOnError: false }),
     )
@@ -364,7 +433,7 @@ describe('CreateWorktreeDialogHost', () => {
     await flushReact()
 
     expect(document.body.textContent).not.toContain('action.create-worktree-bootstrap-error')
-    expect(document.body.textContent).not.toContain('action.create-worktree-bootstrap-remember')
+    expect(document.body.textContent).not.toContain('action.create-worktree-bootstrap-config-trusted')
     expect(document.body.textContent).not.toContain('action.create-worktree-bootstrap-run')
 
     setInputValue('cwt-branch', 'feature/preview-error')
@@ -434,7 +503,7 @@ describe('CreateWorktreeDialogHost', () => {
         input: expect.objectContaining({
           mode: expect.objectContaining({ newBranch: 'feature/new' }),
         }),
-        worktreeBootstrap: { kind: 'run', configHash, rememberTrust: false },
+        worktreeBootstrap: { kind: 'run', configHash, configTrusted: true },
       }),
       expect.objectContaining({ refreshOnError: false }),
     )
@@ -508,4 +577,12 @@ async function clickLabel(text: string): Promise<void> {
     await Promise.resolve()
     await Promise.resolve()
   })
+}
+
+function checkboxForLabel(text: string): HTMLElement {
+  const label = Array.from(document.body.querySelectorAll('label')).find((candidate) => candidate.textContent === text)
+  if (!(label instanceof HTMLLabelElement)) throw new Error(`missing label ${text}`)
+  const checkbox = document.getElementById(label.htmlFor)
+  if (!(checkbox instanceof HTMLElement)) throw new Error(`missing checkbox for ${text}`)
+  return checkbox
 }

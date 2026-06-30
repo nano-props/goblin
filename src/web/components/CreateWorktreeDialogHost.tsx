@@ -53,14 +53,14 @@ function CreateWorktreeDialogSession({ open, onOpenChange, repoId: sessionRepoId
   const [bootstrapPreview, setBootstrapPreview] = useState<WorktreeBootstrapPreview | null>(null)
   const [bootstrapPreviewError, setBootstrapPreviewError] = useState(false)
   const [bootstrapPreviewLoading, setBootstrapPreviewLoading] = useState(false)
-  const [rememberBootstrapTrust, setRememberBootstrapTrust] = useState(false)
+  const [configTrustChoice, setConfigTrustChoice] = useState<boolean | null>(null)
   const settingsSnapshot = useCurrentSettingsSnapshot()
 
   function resetBootstrapPreflightState(): void {
     setBootstrapPreview(null)
     setBootstrapPreviewError(false)
     setBootstrapPreviewLoading(false)
-    setRememberBootstrapTrust(false)
+    setConfigTrustChoice(null)
   }
 
   const repoId = liveRepo?.id ?? null
@@ -77,7 +77,7 @@ function CreateWorktreeDialogSession({ open, onOpenChange, repoId: sessionRepoId
     setBootstrapPreview(null)
     setBootstrapPreviewError(false)
     setBootstrapPreviewLoading(true)
-    setRememberBootstrapTrust(false)
+    setConfigTrustChoice(null)
 
     void getRepoWorktreeBootstrapPreview(repoId, controller.signal)
       .then((result) => {
@@ -121,7 +121,9 @@ function CreateWorktreeDialogSession({ open, onOpenChange, repoId: sessionRepoId
 
   function handleCreateWorktree(request: CreateWorktreeRequest): boolean {
     if (!liveRepo) return false
-    if (liveRepo.operations.branchAction.phase !== 'idle' || bootstrapPreviewLoading) return false
+    if (liveRepo.operations.branchAction.phase !== 'idle' || bootstrapPreviewLoading || configTrustStateLoading()) {
+      return false
+    }
     const repoId = liveRepo.id
     const token = liveRepo.instanceToken
 
@@ -132,28 +134,35 @@ function CreateWorktreeDialogSession({ open, onOpenChange, repoId: sessionRepoId
   function resolveWorktreeBootstrapDecision(repoId: string): WorktreeBootstrapDecision {
     const configHash = bootstrapPreview?.hasOperations ? bootstrapPreview.configHash : null
     if (!configHash) return { kind: 'skip' }
-    if (isCurrentBootstrapConfigTrusted(repoId, configHash)) return { kind: 'run', configHash, rememberTrust: false }
-    return { kind: 'run', configHash, rememberTrust: rememberBootstrapTrust }
+    return { kind: 'run', configHash, configTrusted: shouldConfigBeTrusted(repoId, configHash) }
   }
 
   function isCurrentBootstrapConfigTrusted(repoId: string, configHash: string | null | undefined): boolean {
     return isRepoWorktreeBootstrapConfigTrusted(settingsSnapshot?.repoSettings ?? [], repoId, configHash)
   }
 
+  function shouldConfigBeTrusted(repoId: string, configHash: string | null | undefined): boolean {
+    return configTrustChoice ?? isCurrentBootstrapConfigTrusted(repoId, configHash)
+  }
+
+  function configTrustStateLoading(): boolean {
+    return bootstrapPreview?.hasOperations === true && !!bootstrapPreview.configHash && settingsSnapshot === undefined
+  }
+
   const bootstrapConfigHash = bootstrapPreview?.configHash ?? null
-  const bootstrapTrusted = isCurrentBootstrapConfigTrusted(displayRepo.id, bootstrapConfigHash)
+  const configTrusted = settingsSnapshot ? shouldConfigBeTrusted(displayRepo.id, bootstrapConfigHash) : false
+  const worktreeBootstrapLoading = bootstrapPreviewLoading || configTrustStateLoading()
 
   return (
     <CreateWorktreeDialog
       open={open}
       repo={displayRepo}
       worktreeBootstrap={{
-        loading: bootstrapPreviewLoading,
+        loading: worktreeBootstrapLoading,
         preview: bootstrapPreview,
         error: bootstrapPreviewError,
-        trusted: bootstrapTrusted,
-        rememberTrust: rememberBootstrapTrust,
-        onRememberTrustChange: setRememberBootstrapTrust,
+        configTrusted,
+        onConfigTrustedChange: setConfigTrustChoice,
       }}
       onClose={() => onOpenChange(false)}
       onCreate={handleCreateWorktree}

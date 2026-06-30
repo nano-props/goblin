@@ -31,7 +31,9 @@ const RepoUrlTargetSchema = v.variant('type', [
 ])
 const WorktreeBootstrapDecisionSchema = v.variant('kind', [
   v.object({ kind: v.literal('skip') }),
-  v.object({ kind: v.literal('run'), configHash: WorktreeBootstrapConfigHashSchema, rememberTrust: v.boolean() }),
+  // `configTrusted` is the desired post-bootstrap trust state for `configHash`,
+  // not an assertion about the settings snapshot at request time.
+  v.object({ kind: v.literal('run'), configHash: WorktreeBootstrapConfigHashSchema, configTrusted: v.boolean() }),
 ])
 
 const RemoteRepoRefSchema = v.object({
