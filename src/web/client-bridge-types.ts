@@ -19,6 +19,7 @@ import type {
   TerminalSessionInput,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
+  TerminalTestNotificationInput,
   TerminalTitleEvent,
   TerminalWriteInput,
 } from '#/shared/terminal-types.ts'
@@ -55,7 +56,7 @@ export interface ClientTerminalBridge {
   kickReconnect: () => void
   getSessionSnapshot: (input: TerminalSessionSnapshotInput) => Promise<TerminalSessionSnapshot | null>
   notifyBell: (input: TerminalNotifyBellInput) => Promise<TerminalMutationResult>
-  sendTestNotification: () => Promise<boolean>
+  sendTestNotification: (input: TerminalTestNotificationInput) => Promise<boolean>
   setBadge: (count: number) => void
   onOutput: (cb: (event: TerminalOutputEvent) => void) => () => void
   onTitle: (cb: (event: TerminalTitleEvent) => void) => () => void

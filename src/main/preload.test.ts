@@ -172,13 +172,14 @@ describe('preload goblinNative bridge', () => {
     const { goblinNative, invocations, sends, ipcRenderer } = loadPreload()
 
     await goblinNative.terminal.notifyBell({ key: 'pty_1', title: 'Goblin', body: 'Bell', repoRoot: '/repo' })
-    await goblinNative.terminal.sendTestNotification()
+    await goblinNative.terminal.sendTestNotification({ title: 'Goblin', body: 'Test' })
     goblinNative.terminal.setBadge(2)
 
     expect(invocations.map((entry) => entry.channel)).toEqual([
       TERMINAL_NOTIFY_BELL_CHANNEL,
       TERMINAL_SEND_TEST_NOTIFICATION_CHANNEL,
     ])
+    expect(invocations[1]?.args).toEqual([{ title: 'Goblin', body: 'Test' }])
     expect(ipcRenderer.on).not.toHaveBeenCalled()
     expect(ipcRenderer.off).not.toHaveBeenCalled()
     expect(sends).toContainEqual({ channel: TERMINAL_SET_BADGE_CHANNEL, args: [2] })

@@ -154,7 +154,7 @@ contextBridge.exposeInMainWorld('goblinNative', {
   },
   terminal: {
     notifyBell: (input) => safeInvoke(IPC.terminal.notifyBell, input),
-    sendTestNotification: () => safeInvoke(IPC.terminal.sendTestNotification),
+    sendTestNotification: (input) => safeInvoke(IPC.terminal.sendTestNotification, input),
     setBadge: (count) => {
       ipcRenderer.send(IPC.terminal.setBadge, count)
     },

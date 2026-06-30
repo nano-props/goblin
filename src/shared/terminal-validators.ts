@@ -11,6 +11,7 @@ import type {
   TerminalSessionPhase,
   TerminalSessionSnapshot,
   TerminalSessionSummary,
+  TerminalTestNotificationInput,
 } from '#/shared/terminal-types.ts'
 
 const MIN_TERMINAL_COLS = 1
@@ -300,6 +301,19 @@ export function isValidTerminalNotifyBellInput(value: unknown): value is Termina
     (key === undefined || (typeof key === 'string' && key.length > 0)) &&
     typeof repoRoot === 'string' &&
     repoRoot.length > 0
+  )
+}
+
+export function isValidTerminalTestNotificationInput(value: unknown): value is TerminalTestNotificationInput {
+  if (!value || typeof value !== 'object') return false
+  const { title, body } = value as { title?: unknown; body?: unknown }
+  return (
+    typeof title === 'string' &&
+    title.length > 0 &&
+    title.length <= 200 &&
+    typeof body === 'string' &&
+    body.length > 0 &&
+    body.length <= 500
   )
 }
 

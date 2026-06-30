@@ -3,11 +3,14 @@ import type { WebContents } from 'electron'
 import { broadcastClientEffectIntent } from '#/main/client-surface-events.ts'
 import { activatePrimaryWindow } from '#/main/window.ts'
 import { platform } from '#/main/platform.ts'
-import { t } from '#/main/i18n/index.ts'
 import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
 import { terminalNodeLog } from '#/node/logger.ts'
-import { isValidTerminalNotifyBellInput } from '#/shared/terminal-validators.ts'
-import type { TerminalMutationResult, TerminalNotifyBellInput } from '#/shared/terminal-types.ts'
+import { isValidTerminalNotifyBellInput, isValidTerminalTestNotificationInput } from '#/shared/terminal-validators.ts'
+import type {
+  TerminalMutationResult,
+  TerminalNotifyBellInput,
+  TerminalTestNotificationInput,
+} from '#/shared/terminal-types.ts'
 import {
   TERMINAL_NOTIFY_BELL_CHANNEL,
   TERMINAL_SEND_TEST_NOTIFICATION_CHANNEL,
@@ -27,15 +30,14 @@ export function wireTerminalIpc(): void {
       return notifyTerminalBell(event.sender, input)
     },
   )
-  ipcMain.handle(TERMINAL_SEND_TEST_NOTIFICATION_CHANNEL, async (event): Promise<boolean> => {
-    if (!isTrustedIpcEvent(event)) return false
-    if (!Notification.isSupported()) return false
-    return showNotificationWithResult(
-      t('settings.terminal-notifications-test-title'),
-      t('settings.terminal-notifications-test-body'),
-      null,
-    )
-  })
+  ipcMain.handle(
+    TERMINAL_SEND_TEST_NOTIFICATION_CHANNEL,
+    async (event, input: TerminalTestNotificationInput): Promise<boolean> => {
+      if (!isTrustedIpcEvent(event) || !isValidTerminalTestNotificationInput(input)) return false
+      if (!Notification.isSupported()) return false
+      return showNotificationWithResult(input.title, input.body, null)
+    },
+  )
   ipcMain.on(TERMINAL_SET_BADGE_CHANNEL, (event, count: unknown): void => {
     if (!isTrustedIpcEvent(event)) return
     const n = typeof count === 'number' && Number.isFinite(count) && count >= 0 ? Math.floor(count) : 0

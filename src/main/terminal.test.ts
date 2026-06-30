@@ -89,6 +89,10 @@ describe('terminal IPC', () => {
     )
   })
 
+  test('rejects malformed test notification payloads', async () => {
+    await expect(invoke(TERMINAL_SEND_TEST_NOTIFICATION_CHANNEL, { title: '', body: 'bad' })).resolves.toBe(false)
+  })
+
   test('shows a system notification for trusted bell requests', async () => {
     const { BrowserWindow, Notification, app } = await import('electron')
     const flashFrame = vi.fn()

@@ -23,7 +23,10 @@ export function NotificationSettings() {
     if (testingTerminalNotification) return
     setTestingTerminalNotification(true)
     void terminalBridge
-      .sendTestNotification()
+      .sendTestNotification({
+        title: t('settings.terminal-notifications-test-title'),
+        body: t('settings.terminal-notifications-test-body'),
+      })
       .then((shown) => {
         if (shown) {
           toast.success(t('settings.terminal-notifications-test-sent'))

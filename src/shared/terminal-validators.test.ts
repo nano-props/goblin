@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 import {
   isValidTerminalClientId,
   isValidTerminalNotifyBellInput,
+  isValidTerminalTestNotificationInput,
   isTerminalWsMessageWithinLimit,
   isValidTerminalSize,
   isValidTerminalPtySessionId,
@@ -45,6 +46,9 @@ describe('shared terminal validators', () => {
         repoRoot: '/repo',
       }),
     ).toBe(false)
+
+    expect(isValidTerminalTestNotificationInput({ title: 'Goblin', body: 'Notifications are working' })).toBe(true)
+    expect(isValidTerminalTestNotificationInput({ title: '', body: 'Notifications are working' })).toBe(false)
   })
 
   test('measures terminal websocket messages in UTF-8 bytes', () => {

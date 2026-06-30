@@ -21,8 +21,6 @@ import { resolveWebSocketProtocol } from '#/web/lib/websocket-url.ts'
 import { ACCESS_TOKEN_QUERY } from '#/shared/access-token.ts'
 import { resolveClientServerConfig } from '#/web/lib/server-config.ts'
 
-const DEFAULT_RECONNECT_DELAY_MS = 300
-
 export interface ServerWebSocketIngressConfig<T> {
   /** WebSocket path on the server, e.g. `/ws/invalidation`. */
   path: string
@@ -40,7 +38,7 @@ export interface ServerWebSocketIngress<T> {
 }
 
 export function createServerWebSocketIngress<T>(config: ServerWebSocketIngressConfig<T>): ServerWebSocketIngress<T> {
-  const { path, parseMessage, reconnectDelayMs = DEFAULT_RECONNECT_DELAY_MS } = config
+  const { path, parseMessage, reconnectDelayMs = 300 } = config
 
   const listeners = new Set<(message: T) => void>()
   let socket: WebSocket | null = null

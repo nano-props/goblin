@@ -166,6 +166,11 @@ export interface TerminalNotifyBellInput {
   repoRoot: string
 }
 
+export interface TerminalTestNotificationInput {
+  title: string
+  body: string
+}
+
 export interface TerminalListSessionsInput {
   repoRoot: string
 }

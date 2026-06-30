@@ -4,7 +4,11 @@ import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
 import type { IpcEvent, IpcRequest, SettingsPage } from '#/shared/api-types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
-import type { TerminalMutationResult, TerminalNotifyBellInput } from '#/shared/terminal-types.ts'
+import type {
+  TerminalMutationResult,
+  TerminalNotifyBellInput,
+  TerminalTestNotificationInput,
+} from '#/shared/terminal-types.ts'
 
 /**
  * The client's view of the Electron preload's `contextBridge` surface.
@@ -32,7 +36,7 @@ interface GoblinNativeBridge {
     // `capabilitiesFromBridge` projects these into capability
     // flags so the UI can hide controls the bridge can't satisfy.
     notifyBell?: (input: TerminalNotifyBellInput) => Promise<TerminalMutationResult>
-    sendTestNotification?: () => Promise<boolean>
+    sendTestNotification?: (input: TerminalTestNotificationInput) => Promise<boolean>
     setBadge?: (count: number) => void
   }
   /**

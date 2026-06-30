@@ -1,4 +1,3 @@
-import { emitClientLocalEvent } from '#/web/local-events.ts'
 import { resolveWebSocketProtocol } from '#/web/lib/websocket-url.ts'
 import { ACCESS_TOKEN_QUERY } from '#/shared/access-token.ts'
 import {
@@ -29,10 +28,12 @@ import type {
   TerminalTakeoverResult,
   TerminalTitleEvent,
   TerminalRestartInput,
+  TerminalTestNotificationInput,
 } from '#/shared/terminal-types.ts'
 import type { ClientTerminalBridge } from '#/web/client-bridge-types.ts'
 import type { TerminalIdentityViewModel, TerminalLifecycleViewModel } from '#/web/components/terminal/types.ts'
 import { isAppQuitting, subscribeAppQuitting } from '#/web/app-lifecycle.ts'
+import type { TerminalNotificationProvider } from '#/web/terminal-notification-provider.ts'
 
 // Matches the server-side `HEARTBEAT_INTERVAL_MS`. Kept as a
 // client-local constant so the client doesn't need to import a
@@ -52,15 +53,7 @@ const TERMINAL_REQUEST_TIMEOUT_MS = 30_000
 export function createServerTerminalBridge(options: {
   getServerConfig: () => ClientServerTerminalConfig
   getClientId: () => string
-  // `notifyBell` returning `undefined` (rather than a `Promise<false>`)
-  // is the *deliberate* signal to fall through to the bridge's
-  // built-in browser-notification path. The client-bridge wrapper
-  // uses that distinction so the web-runtime bell events get the
-  // full Notification API + click handler — collapsing both paths
-  // to `Promise.resolve(false)` would make the bell click test
-  // indistinguishable from "notification dismissed".
-  notifyBell?: (input: TerminalNotifyBellInput) => Promise<TerminalMutationResult> | undefined
-  sendTestNotification?: () => Promise<boolean> | undefined
+  notificationProvider: TerminalNotificationProvider
   setBadge?: (count: number) => void
 }): ClientTerminalBridge {
   type PendingSocketRequest = {
@@ -363,23 +356,10 @@ export function createServerTerminalBridge(options: {
       })
     },
     notifyBell(input) {
-      // First check whether the wrapper has a native handler at all
-      // (the client-bridge wrapper is always present, so this is
-      // the "Electron preload registered" case). Then call it and
-      // inspect the *result*: `undefined` means "no native bridge
-      // right now, fall through to the browser notification path".
-      if (options.notifyBell) {
-        const native = options.notifyBell(input)
-        if (native !== undefined) return native
-      }
-      return showBrowserNotification(input.title, input.body, () => {
-        emitClientLocalEvent({ type: 'terminal-bell-click', repoRoot: input.repoRoot, key: input.key })
-      })
+      return options.notificationProvider.notifyBell(input)
     },
-    sendTestNotification() {
-      const native = options.sendTestNotification?.()
-      if (native !== undefined) return native
-      return showBrowserNotification('Goblin', 'Test notification')
+    sendTestNotification(input: TerminalTestNotificationInput) {
+      return options.notificationProvider.sendTestNotification(input)
     },
     setBadge(count) {
       options.setBadge?.(count)
@@ -631,32 +611,5 @@ export function readOrCreateWebTerminalClientId(): string {
     return created
   } catch {
     return fallback
-  }
-}
-
-async function showBrowserNotification(title: string, body: string, onClick?: () => void): Promise<boolean> {
-  if (typeof Notification === 'undefined') return false
-  let permission = Notification.permission
-  if (permission !== 'granted') {
-    if (permission === 'denied') return false
-    try {
-      permission = await Notification.requestPermission()
-    } catch {
-      return false
-    }
-  }
-  if (permission !== 'granted') return false
-  try {
-    const notification = new Notification(title, { body, silent: true })
-    notification.onclick = () => {
-      onClick?.()
-      try {
-        window.focus()
-      } catch {}
-      notification.close()
-    }
-    return true
-  } catch {
-    return false
   }
 }

@@ -194,6 +194,10 @@ describe('SettingsSurface', () => {
     })
 
     expect(sendTestNotification).toHaveBeenCalledTimes(1)
+    expect(sendTestNotification).toHaveBeenCalledWith({
+      title: 'settings.terminal-notifications-test-title',
+      body: 'settings.terminal-notifications-test-body',
+    })
     expect(toastMocks.success).toHaveBeenCalledWith('settings.terminal-notifications-test-sent')
   })
 

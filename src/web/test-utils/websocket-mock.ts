@@ -40,6 +40,8 @@ export interface WebSocketMockHandle {
 }
 
 export interface MockNotificationInstance {
+  readonly title: string
+  readonly options?: NotificationOptions
   onclick: (() => void) | null
   close: () => void
 }
@@ -121,8 +123,12 @@ export function installWebSocketMock(options: { autoOpen?: boolean } = {}): WebS
     static async requestPermission(): Promise<NotificationPermission> {
       return 'granted'
     }
+    readonly title: string
+    readonly options?: NotificationOptions
     onclick: (() => void) | null = null
-    constructor(_title: string, _options?: NotificationOptions) {
+    constructor(title: string, options?: NotificationOptions) {
+      this.title = title
+      this.options = options
       notificationInstances.push(this)
     }
     close() {}

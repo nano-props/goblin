@@ -10,6 +10,7 @@ import {
   readOrCreateWebTerminalClientId,
   type ClientServerTerminalConfig,
 } from '#/web/client-terminal-bridge.ts'
+import { createTerminalNotificationProvider } from '#/web/terminal-notification-provider.ts'
 
 /**
  * Compute the client's capability set from the live `goblinNative`
@@ -83,10 +84,10 @@ function readServerTerminalConfig(): ClientServerTerminalConfig | null {
 // subscriber sets, and shares state across the whole client.
 // `terminalBridge` from `#/web/terminal.ts` re-reads `getClientBridge()`
 // on every method call, so we must keep a stable singleton here.
-// The bridge's `notifyBell` / `sendTestNotification` / `setBadge`
-// callbacks re-read `goblinNative` on each invocation — that's
-// the lazy hook that lets the bell-state tests swap the
-// preload between cases without rebuilding the WebSocket layer.
+// The bridge's notification provider and badge callback re-read
+// `goblinNative` on each invocation — that's the lazy hook that lets
+// bell-state tests swap the preload between cases without rebuilding
+// the WebSocket layer.
 let memoizedTerminalBridge: ClientTerminalBridge | null = null
 function getOrCreateTerminalBridge(): ClientTerminalBridge {
   if (memoizedTerminalBridge) return memoizedTerminalBridge
@@ -97,21 +98,7 @@ function getOrCreateTerminalBridge(): ClientTerminalBridge {
       if (!server) throw new Error('Client terminal bridge is unavailable')
       return server
     },
-    // These callbacks re-read `goblinNative` on every invocation
-    // (rather than capturing it at construction time). The
-    // underlying server-terminal bridge is a singleton — its
-    // WebSocket and subscriber sets must survive across the
-    // outer bridge's per-call rebuilds — but `notifyBell` /
-    // `sendTestNotification` need to follow the live preload so
-    // tests can swap it between cases without rebuilding the
-    // WebSocket. Returning `undefined` (not `Promise.resolve(false)`)
-    // when no native bridge is present is the *signal* for the
-    // server-terminal bridge to fall through to its built-in
-    // browser-notification path — collapsing both to `false`
-    // would hide that path entirely and break the "web host
-    // mode" bell-click test.
-    notifyBell: (input) => readNativeBridge()?.terminal?.notifyBell?.(input),
-    sendTestNotification: () => readNativeBridge()?.terminal?.sendTestNotification?.(),
+    notificationProvider: createTerminalNotificationProvider(),
     setBadge: (count: number) => {
       readNativeBridge()?.terminal?.setBadge?.(count)
     },
