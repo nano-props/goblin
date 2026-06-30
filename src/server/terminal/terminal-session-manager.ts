@@ -55,6 +55,11 @@ type TerminalSessionOrderRuntimeLike<TUser extends string | number> = Pick<
   'registerTerminalSessionOrder' | 'unregisterTerminalSessionOrder' | 'sessionDisplayOrder'
 >
 
+interface TerminalPtySpawnResult {
+  generation: number
+  result: TerminalAttachResult
+}
+
 export interface TerminalEnsureSessionInput<TUser extends string | number> {
   userId: TUser
   scope: string
@@ -106,6 +111,9 @@ interface TerminalSessionView<TUser extends string | number> {
   inputQueue: string[]
   /** True when a microtask flush has already been scheduled for this session. */
   inputFlushScheduled: boolean
+  /** Monotonic ownership token for async PTY spawn/bind attempts. */
+  ptySpawnGeneration: number
+  ptySpawnPromise: Promise<TerminalPtySpawnResult> | null
 }
 
 export interface TerminalEventSink<TUser extends string | number> {
@@ -160,9 +168,8 @@ export class TerminalSessionManager<TUser extends string | number> {
       })
       if (input.clientId) {
         registerTerminalClient(existing, input.clientId, size.cols, size.rows)
-        this.applyIdentityEffect(existing, attachTerminalClient(existing, input.clientId, this.sessionPresence(existing)))
       }
-      return await this.attachResult(existing)
+      return await this.attachExistingSession(existing, input.clientId)
     }
 
     const worktreePath = parseWorktreePathFromKey(input.key) ?? input.key
@@ -194,6 +201,8 @@ export class TerminalSessionManager<TUser extends string | number> {
       takeoverPending: false,
       inputQueue: [],
       inputFlushScheduled: false,
+      ptySpawnGeneration: 0,
+      ptySpawnPromise: null,
     }
     this.sessionsByPtySessionId.set(id, session)
     this.ptySessionIdByUserSessionKey.set(userKey, id)
@@ -207,18 +216,20 @@ export class TerminalSessionManager<TUser extends string | number> {
       registerTerminalClient(session, input.clientId, size.cols, size.rows)
       this.applyIdentityEffect(session, attachTerminalClient(session, input.clientId, this.sessionPresence(session)))
     }
-    const result = await this.spawnSessionPty(session)
-    if (!result.ok) {
+    const spawn = await this.spawnSessionPty(session)
+    if (!spawn.result.ok) {
       // Spawn failed: do not leave a zombie session in the maps. The
       // catalog would otherwise find it on retry and surface it as a
       // successful attach with an empty buffer and a null pty — i.e.
       // a blank, non-responsive terminal. `closeSession` removes the
       // map entry and frees pty/listener resources via the standard
-      // disposal path.
-      this.closeSession(id)
-      return result
+      // disposal path. Stale spawns are different: another close/restart
+      // generation already owns the session, so this caller must not tear
+      // down the current generation.
+      if (this.isCurrentPtySpawn(session, spawn.generation)) this.closeSession(id)
+      return spawn.result
     }
-    return result
+    return spawn.result
   }
 
   writeSession(userId: TUser, ptySessionId: string, data: string, clientId: string): boolean {
@@ -249,6 +260,9 @@ export class TerminalSessionManager<TUser extends string | number> {
     const session = this.getSession(userId, ptySessionId)
     if (!session) return { ok: false, message: 'error.invalid-arguments' }
     registerTerminalClient(session, clientId, size.cols, size.rows)
+    const pending = await this.waitForPendingPtySpawn(session)
+    if (pending) return pending
+    if (!this.isLiveSession(session)) return { ok: false, message: 'error.unavailable' }
     this.applyIdentityEffect(session, attachTerminalClient(session, clientId, this.sessionPresence(session)))
     return await this.attachResult(session)
   }
@@ -301,11 +315,11 @@ export class TerminalSessionManager<TUser extends string | number> {
     }
     restartTerminalClientControl(session, clientId, this.sessionPresence(session))
     this.resetSessionState(session, size.cols, size.rows, 'restarting')
-    const result = await this.spawnSessionPty(session)
-    if (!result.ok) {
-      if (markTerminalSessionError(session, result.message)) this.emitLifecycle(session)
+    const spawn = await this.spawnSessionPty(session)
+    if (!spawn.result.ok && this.isCurrentPtySpawn(session, spawn.generation)) {
+      if (markTerminalSessionError(session, spawn.result.message)) this.emitLifecycle(session)
     }
-    return result
+    return spawn.result
   }
 
   closeSessionForUser(userId: TUser, ptySessionId: string): boolean {
@@ -317,6 +331,7 @@ export class TerminalSessionManager<TUser extends string | number> {
   closeSession(ptySessionId: string): void {
     const session = this.sessionsByPtySessionId.get(ptySessionId)
     if (!session) return
+    this.invalidatePtySpawns(session)
     if (markTerminalSessionClosed(session)) this.emitLifecycle(session)
     this.sessionsByPtySessionId.delete(ptySessionId)
     const userKey = this.userSessionKey(session.userId, session.key)
@@ -490,6 +505,17 @@ export class TerminalSessionManager<TUser extends string | number> {
     }
   }
 
+  private async attachExistingSession(
+    session: TerminalSessionView<TUser>,
+    clientId: string | undefined,
+  ): Promise<TerminalAttachResult> {
+    const pending = await this.waitForPendingPtySpawn(session)
+    if (pending) return pending
+    if (!this.isLiveSession(session)) return { ok: false, message: 'error.unavailable' }
+    if (clientId) this.applyIdentityEffect(session, attachTerminalClient(session, clientId, this.sessionPresence(session)))
+    return await this.attachResult(session)
+  }
+
   private userSessionKey(userId: TUser, key: string): string {
     return `${String(userId)}\0${key}`
   }
@@ -550,6 +576,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     rows: number,
     phase: TerminalSessionPhase = 'opening',
   ): void {
+    this.invalidatePtySpawns(session)
     this.disposeSessionResources(session)
     session.cols = cols
     session.rows = rows
@@ -561,7 +588,23 @@ export class TerminalSessionManager<TUser extends string | number> {
     if (phaseChanged) this.emitLifecycle(session)
   }
 
-  private async spawnSessionPty(session: TerminalSessionView<TUser>): Promise<TerminalAttachResult> {
+  private async spawnSessionPty(session: TerminalSessionView<TUser>): Promise<TerminalPtySpawnResult> {
+    // A spawn resolves asynchronously and may outlive a close or a newer restart.
+    // The generation is the capability to bind the returned handle to this session.
+    const generation = this.beginPtySpawn(session)
+    const spawn = this.resolveSessionPtySpawn(session, generation)
+    session.ptySpawnPromise = spawn
+    try {
+      return await spawn
+    } finally {
+      if (session.ptySpawnPromise === spawn) session.ptySpawnPromise = null
+    }
+  }
+
+  private async resolveSessionPtySpawn(
+    session: TerminalSessionView<TUser>,
+    generation: number,
+  ): Promise<TerminalPtySpawnResult> {
     // We do NOT call `disposeSessionResources` on the failure path
     // here. The caller decides what to do with a failed spawn:
     //   - `ensureSession` removes the just-created session from the
@@ -582,10 +625,14 @@ export class TerminalSessionManager<TUser extends string | number> {
         env: session.env,
       })
     } catch (err) {
-      return { ok: false, message: err instanceof Error ? err.message : 'error.unknown' }
+      return this.spawnResult(generation, { ok: false, message: err instanceof Error ? err.message : 'error.unknown' })
     }
     if (!resolved.ok) {
-      return resolved
+      return this.spawnResult(generation, resolved)
+    }
+    if (!this.isCurrentPtySpawn(session, generation)) {
+      this.killStalePtyHandle(session.id, resolved.handle)
+      return this.staleSpawnResult(generation)
     }
     session.pty = resolved.handle
     const handle = resolved.handle
@@ -594,6 +641,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     let lastProcessName: string = supervisor.processName(handle)
     session.disposables.push(
       supervisor.onData(handle, (data) => {
+        if (!this.isCurrentPtyBinding(session, generation, handle)) return
         if (markTerminalSessionOpen(session)) this.emitLifecycle(session)
         const titleBeforeData = session.render.title
         const processNameBeforeData = lastProcessName
@@ -641,12 +689,59 @@ export class TerminalSessionManager<TUser extends string | number> {
     )
     session.disposables.push(
       this.ptySupervisor.onExit(handle, () => {
+        if (!this.isCurrentPtyBinding(session, generation, handle)) return
         session.pty = null
         this.sink.onExit(session.userId, { ptySessionId: session.id })
         this.closeSession(session.id)
       }),
     )
-    return await this.attachResult(session)
+    const attach = await this.attachResult(session)
+    if (!this.isCurrentPtySpawn(session, generation)) return this.staleSpawnResult(generation)
+    return this.spawnResult(generation, attach)
+  }
+
+  private beginPtySpawn(session: TerminalSessionView<TUser>): number {
+    session.ptySpawnGeneration += 1
+    return session.ptySpawnGeneration
+  }
+
+  private invalidatePtySpawns(session: TerminalSessionView<TUser>): void {
+    session.ptySpawnGeneration += 1
+  }
+
+  private isCurrentPtySpawn(session: TerminalSessionView<TUser>, generation: number): boolean {
+    return this.isLiveSession(session) && session.ptySpawnGeneration === generation
+  }
+
+  private isCurrentPtyBinding(session: TerminalSessionView<TUser>, generation: number, handle: PtyHandle): boolean {
+    return this.isCurrentPtySpawn(session, generation) && session.pty === handle
+  }
+
+  private isLiveSession(session: TerminalSessionView<TUser>): boolean {
+    return this.sessionsByPtySessionId.get(session.id) === session
+  }
+
+  private async waitForPendingPtySpawn(session: TerminalSessionView<TUser>): Promise<TerminalAttachResult | null> {
+    const pending = session.ptySpawnPromise
+    if (!pending) return null
+    const spawn = await pending
+    return spawn.result.ok ? null : spawn.result
+  }
+
+  private spawnResult(generation: number, result: TerminalAttachResult): TerminalPtySpawnResult {
+    return { generation, result }
+  }
+
+  private staleSpawnResult(generation: number): TerminalPtySpawnResult {
+    return this.spawnResult(generation, { ok: false, message: 'error.unavailable' })
+  }
+
+  private killStalePtyHandle(ptySessionId: string, handle: PtyHandle): void {
+    try {
+      this.ptySupervisor.kill(handle)
+    } catch (err) {
+      sessionManagerLogger.warn({ ptySessionId, err }, 'failed to kill stale PTY')
+    }
   }
 
   private disposeSessionResources(session: TerminalSessionView<TUser>): void {
@@ -692,7 +787,7 @@ export class TerminalSessionManager<TUser extends string | number> {
 }
 
 export function isValidTerminalWriteData(value: unknown): value is string {
-  return typeof value === 'string' && value.length <= MAX_TERMINAL_WRITE_CHARS
+  return typeof value === 'string' && value.length <= MAX_TERMINAL_WRITE_CHARS && !value.includes('\0')
 }
 
 // Map the shared authority-rejection reasons to user-visible error
