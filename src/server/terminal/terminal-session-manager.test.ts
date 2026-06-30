@@ -214,4 +214,59 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     expect(manager.closeSessionForUser(USER_ID, created.ptySessionId)).toBe(true)
     expect(supervisor.killed).toEqual(['pty_initial_123456', 'pty_restart_one_123', 'pty_restart_two_123'])
   })
+
+  test('treats an older restart failure as stale when a newer restart generation wins', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const manager = createManager(supervisor)
+    const created = await createSession(manager, supervisor)
+
+    const firstRestart = manager.restartSession(USER_ID, created.ptySessionId, 100, 30, CLIENT_ID)
+    const secondRestart = manager.restartSession(USER_ID, created.ptySessionId, 120, 40, CLIENT_ID)
+
+    supervisor.spawns.shift()?.({ ok: false, message: 'old restart failed' })
+    supervisor.spawns.shift()?.(ptySpawnSuccess('pty_restart_two_456'))
+
+    await expect(firstRestart).resolves.toEqual({ ok: false, message: 'error.unavailable' })
+    await expect(secondRestart).resolves.toMatchObject({
+      ok: true,
+      ptySessionId: created.ptySessionId,
+      canonicalCols: 120,
+      canonicalRows: 40,
+    })
+
+    await expect(manager.listSessionsForUser(USER_ID, SCOPE)).resolves.toEqual([
+      expect.objectContaining({
+        ptySessionId: created.ptySessionId,
+        phase: 'restarting',
+        message: null,
+      }),
+    ])
+  })
+
+  test('attach waits past a stale restart failure for the active restart generation', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const manager = createManager(supervisor)
+    const created = await createSession(manager, supervisor)
+
+    const firstRestart = manager.restartSession(USER_ID, created.ptySessionId, 100, 30, CLIENT_ID)
+    const attach = manager.attachSession(USER_ID, created.ptySessionId, 100, 30, CLIENT_ID)
+    const secondRestart = manager.restartSession(USER_ID, created.ptySessionId, 120, 40, CLIENT_ID)
+
+    supervisor.spawns.shift()?.({ ok: false, message: 'old restart failed' })
+    supervisor.spawns.shift()?.(ptySpawnSuccess('pty_restart_two_789'))
+
+    await expect(firstRestart).resolves.toEqual({ ok: false, message: 'error.unavailable' })
+    await expect(secondRestart).resolves.toMatchObject({
+      ok: true,
+      ptySessionId: created.ptySessionId,
+      canonicalCols: 120,
+      canonicalRows: 40,
+    })
+    await expect(attach).resolves.toMatchObject({
+      ok: true,
+      ptySessionId: created.ptySessionId,
+      canonicalCols: 120,
+      canonicalRows: 40,
+    })
+  })
 })

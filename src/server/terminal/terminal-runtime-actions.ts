@@ -54,16 +54,17 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
     },
 
     async restart(clientId: string, userId: string, input: TerminalRestartInput): Promise<TerminalAttachResult> {
-      const repoRoot = manager.getSession(userId, input.ptySessionId)?.scope
+      const ptySessionId = input?.ptySessionId
       if (
         !isValidTerminalClientId(clientId) ||
-        !isValidTerminalPtySessionId(input?.ptySessionId) ||
+        !isValidTerminalPtySessionId(ptySessionId) ||
         !isValidTerminalSize(input?.cols, input?.rows)
       ) {
         return { ok: false, message: 'error.invalid-arguments' }
       }
+      const repoRoot = manager.getSessionScope(userId, ptySessionId)
       const terminalClientId = input.clientId ?? clientId
-      const result = await manager.restartSession(userId, input.ptySessionId, input.cols, input.rows, terminalClientId)
+      const result = await manager.restartSession(userId, ptySessionId, input.cols, input.rows, terminalClientId)
       if (repoRoot) broadcastRepoSessionsChanged(userId, repoRoot)
       return result
     },
@@ -102,7 +103,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       // always miss. The lookup is also gated on validity so a
       // malformed input never throws inside the action.
       const repoRoot = isValidTerminalPtySessionId(input?.ptySessionId)
-        ? manager.getSession(userId, input.ptySessionId)?.scope
+        ? manager.getSessionScope(userId, input.ptySessionId)
         : undefined
       const closed = isValidTerminalPtySessionId(input?.ptySessionId)
         ? manager.closeSessionForUser(userId, input.ptySessionId)

@@ -69,7 +69,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
         broker.broadcastToUser(userId, { type: 'title', event })
       },
       onExit(userId, event) {
-        const repoRoot = manager.getSession(userId, event.ptySessionId)?.scope
+        const repoRoot = manager.getSessionScope(userId, event.ptySessionId)
         broker.broadcastToUser(userId, { type: 'exit', event })
         if (repoRoot) broadcastRepoSessionsChanged(userId, repoRoot)
       },
