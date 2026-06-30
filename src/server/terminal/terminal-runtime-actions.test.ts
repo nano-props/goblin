@@ -23,9 +23,8 @@ function makeActions(
 ) {
   const broadcasts = options.broadcasts ?? vi.fn()
   const manager = {
-    // The close path only reads `scope` off the session record.
-    getSession: vi.fn((_userId: string, ptySessionId: string) =>
-      options.getSlotScope ? { scope: options.getSlotScope(_userId, ptySessionId) } : undefined,
+    getSessionScope: vi.fn((_userId: string, ptySessionId: string) =>
+      options.getSlotScope ? options.getSlotScope(_userId, ptySessionId) : undefined,
     ),
     closeSessionForUser: vi.fn(options.closeSessionForUser),
     // The other manager methods are unused by `close`, but the
@@ -101,7 +100,7 @@ describe('terminal-runtime-actions close broadcast', () => {
   })
 
   test('emits NEITHER broadcast when the session has no scope (lookup miss)', async () => {
-    // Defensive: if `getSession` returns undefined (e.g. the session
+    // Defensive: if the scope lookup misses (e.g. the session
     // was already removed server-side by a parallel path), the close
     // path must not synthesize a session-closed with a fake repoRoot.
     const { actions, broadcasts } = makeActions({
@@ -184,5 +183,40 @@ describe('terminal-runtime-actions clientId gate', () => {
     expect(manager.takeoverSession).toHaveBeenCalledWith(USER_ID, SESSION_ID, 80, 24, CLIENT_ID)
     expect(manager.restartSession).toHaveBeenCalledWith(USER_ID, SESSION_ID, 80, 24, CLIENT_ID)
     expect(manager.attachSession).toHaveBeenCalledWith(USER_ID, SESSION_ID, 80, 24, CLIENT_ID)
+  })
+
+  test('restart rejects invalid arguments before looking up the session scope', async () => {
+    const { actions, manager } = makeActions({
+      closeSessionForUser: () => false,
+      getSlotScope: () => '/repo',
+    })
+
+    await expect(actions.restart(CLIENT_ID, USER_ID, undefined as never)).resolves.toEqual({
+      ok: false,
+      message: 'error.invalid-arguments',
+    })
+    await expect(
+      actions.restart('not_a_client', USER_ID, {
+        ptySessionId: SESSION_ID,
+        cols: 80,
+        rows: 24,
+      } as never),
+    ).resolves.toEqual({
+      ok: false,
+      message: 'error.invalid-arguments',
+    })
+    await expect(
+      actions.restart(CLIENT_ID, USER_ID, {
+        ptySessionId: SESSION_ID,
+        cols: 0,
+        rows: 24,
+      } as never),
+    ).resolves.toEqual({
+      ok: false,
+      message: 'error.invalid-arguments',
+    })
+
+    expect(manager.getSessionScope).not.toHaveBeenCalled()
+    expect(manager.restartSession).not.toHaveBeenCalled()
   })
 })
