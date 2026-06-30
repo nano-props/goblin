@@ -10,8 +10,8 @@ import { mockFetch } from '#/test-utils/fetch-mock.ts'
 // dialog survives settings ⇄ workspace navigation.
 //
 // The subtle regression this protects against is closing the dialog
-// on its own false→true transition. The host should only force-close
-// when the active repo changes.
+// on its own false→true transition. The host should treat `open`
+// as Radix dialog state, not as its mount condition.
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
@@ -46,19 +46,19 @@ afterEach(() => {
 })
 
 function renderHost(open: boolean, onOpenChange: (open: boolean) => void) {
-  return renderInJsdom(<CreateWorktreeDialogHost open={open} onOpenChange={onOpenChange} activeId={REPO_ID} />)
+  return renderInJsdom(<CreateWorktreeDialogHost open={open} onOpenChange={onOpenChange} repoId={REPO_ID} />)
 }
 
 describe('CreateWorktreeDialogHost', () => {
   test('regression: dialog stays open after the false→true transition', () => {
-    // The bug: useEffect had `[activeId, onOpenChange, open]` in its
+    // The bug: an earlier effect had `[repoId, onOpenChange, open]` in its
     // deps. When the user clicked the "create worktree" button, the
     // parent's `open` state flipped false→true, the host re-rendered,
     // and the effect fired (because `open` changed), calling
     // `onOpenChange(false)`. The dialog was unopenable from the UI.
     //
-    // The fix only closes when the captured previous active repo differs
-    // from the current `activeId`.
+    // The fix keeps repo/session ownership outside the host and leaves `open`
+    // to the Radix dialog state machine.
     // In the real flow the host is mounted in Layout with `open=false`
     // initially; the parent flips to `true` when the user clicks the
     // create-worktree button. This test reproduces that flow.
@@ -69,10 +69,10 @@ describe('CreateWorktreeDialogHost', () => {
     expect(onOpenChange).not.toHaveBeenCalled()
 
     // (2) The user clicks the create-worktree button. Parent flips `open` to
-    // true. The host re-renders; only `open` changed, not `activeId`.
+    // true. The host re-renders; only `open` changed, not `repoId`.
     // The guarded effect must NOT call `onOpenChange(false)` — pre-fix
     // it did so in the same render.
-    rerender(<CreateWorktreeDialogHost open={true} onOpenChange={onOpenChange} activeId={REPO_ID} />)
+    rerender(<CreateWorktreeDialogHost open={true} onOpenChange={onOpenChange} repoId={REPO_ID} />)
     expect(onOpenChange).not.toHaveBeenCalledWith(false)
   })
 
@@ -84,20 +84,17 @@ describe('CreateWorktreeDialogHost', () => {
     expect(onOpenChange).not.toHaveBeenCalledWith(false)
   })
 
-  test('force-closes the dialog when the active repo changes (matches pre-PR behaviour)', () => {
+  test('does not force-close when the repo payload changes', () => {
     const onOpenChange = vi.fn()
     const { rerender } = renderHost(true, onOpenChange)
 
-    // Simulate the user switching active repo. The host must call
-    // `onOpenChange(false)` so the dialog doesn't leak across the
-    // boundary. The `activeId` dep flips, so the effect fires.
-    rerender(<CreateWorktreeDialogHost open={true} onOpenChange={onOpenChange} activeId="/tmp/other-repo" />)
+    rerender(<CreateWorktreeDialogHost open={true} onOpenChange={onOpenChange} repoId="/tmp/other-repo" />)
 
-    expect(onOpenChange).toHaveBeenCalledWith(false)
+    expect(onOpenChange).not.toHaveBeenCalledWith(false)
   })
 
   test('renders nothing when no active repo', () => {
-    const { container } = renderInJsdom(<CreateWorktreeDialogHost open onOpenChange={vi.fn()} activeId={null} />)
+    const { container } = renderInJsdom(<CreateWorktreeDialogHost open onOpenChange={vi.fn()} repoId={null} />)
     expect(container.textContent).toBe('')
   })
 
@@ -416,8 +413,8 @@ describe('CreateWorktreeDialogHost', () => {
 
     const { rerender } = renderHost(true, vi.fn())
     await flushReact()
-    rerender(<CreateWorktreeDialogHost open={false} onOpenChange={vi.fn()} activeId={REPO_ID} />)
-    rerender(<CreateWorktreeDialogHost open={true} onOpenChange={vi.fn()} activeId={REPO_ID} />)
+    rerender(<CreateWorktreeDialogHost open={false} onOpenChange={vi.fn()} repoId={REPO_ID} />)
+    rerender(<CreateWorktreeDialogHost open={true} onOpenChange={vi.fn()} repoId={REPO_ID} />)
     await flushReact()
 
     secondPreview.resolve(previewResponse({ hasOperations: true, configHash }))

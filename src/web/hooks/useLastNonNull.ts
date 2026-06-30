@@ -5,10 +5,9 @@ import { useRef } from 'react'
  * `value` observed during this component's lifetime (and `null` if no
  * non-null value has ever been seen).
  *
- * Used at the display layer of the branch action dialog host so the
- * dialog's inner content (title, body, checkboxes) keeps rendering
- * while Radix AlertDialog plays its close animation, after the
- * underlying store slot has already been cleared by `closeDialog`.
+ * Used at dialog host display boundaries so inner content keeps rendering
+ * while Radix plays its close animation, after the underlying live value has
+ * already been cleared.
  *
  * For the timer-based variant (the value stays retained for `retainMs`
  * after `active` flips to false, useful for transitions with a fixed

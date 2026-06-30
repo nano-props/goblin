@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from 'react'
 import { useOverlayRegistry } from '#/web/hooks/useOverlayRegistry.ts'
+import { useRepoScopedOverlay } from '#/web/hooks/useRepoScopedOverlay.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 export const APP_OVERLAY_KEYS = ['clone', 'openRepo', 'openRemoteRepo', 'createWorktree'] as const
 export type AppOverlayKey = (typeof APP_OVERLAY_KEYS)[number]
@@ -14,10 +15,14 @@ export function useAppOverlays(options: AppOverlayRouteOptions = {}) {
   // any overlay-specific payload (such as settingsPage). New app overlays
   // should usually be wired here rather than expanding useOverlayRegistry.
   const registry = useOverlayRegistry<AppOverlayKey>(APP_OVERLAY_KEYS)
-  const { anyOpen, closeAll, open, setOpen, state: openByKey } = registry
+  const { closeAll, open, setOpen, state: openByKey } = registry
   const routeOverlay = options.routeOverlay ?? null
   const onRouteOverlayChange = options.onRouteOverlayChange
   const routeDriven = typeof onRouteOverlayChange === 'function'
+  const activeRepoId = useReposStore((s) => {
+    const activeId = s.activeId
+    return activeId && s.repos[activeId] ? activeId : null
+  })
 
   const openCloneRepo = useCallback(() => {
     if (routeDriven) {
@@ -76,33 +81,22 @@ export function useAppOverlays(options: AppOverlayRouteOptions = {}) {
     [onRouteOverlayChange, routeDriven, routeOverlay, setOpen],
   )
 
-  const openCreateWorktree = useCallback(() => {
-    // The create-worktree dialog is repo-scoped — it has nothing to
-    // render without an active repo. Guard against a future caller
-    // (e.g. a command-palette entry) that invokes this without
-    // `activeId` set, so we don't leave `state.createWorktree.open`
-    // stuck `true` until a later `useEffect([activeId])` clears it.
-    // Currently only active-repo chrome calls this, and that chrome
-    // is itself hidden when no repo is active — this is a defensive
-    // guard for future surface expansion.
-    if (!useReposStore.getState().activeId) return
-    if (routeDriven) {
-      onRouteOverlayChange?.('createWorktree')
-      return
-    }
-    open('createWorktree')
-  }, [onRouteOverlayChange, open, routeDriven])
-
-  const setCreateWorktreeOpen = useCallback(
-    (open: boolean) => {
+  const rawCreateWorktreeOpen = routeDriven ? routeOverlay === 'createWorktree' : openByKey.createWorktree
+  const setCreateWorktreeRawOpen = useCallback(
+    (nextOpen: boolean) => {
       if (routeDriven) {
-        onRouteOverlayChange?.(open ? 'createWorktree' : routeOverlay === 'createWorktree' ? null : routeOverlay)
+        onRouteOverlayChange?.(nextOpen ? 'createWorktree' : routeOverlay === 'createWorktree' ? null : routeOverlay)
         return
       }
-      setOpen('createWorktree', open)
+      setOpen('createWorktree', nextOpen)
     },
     [onRouteOverlayChange, routeDriven, routeOverlay, setOpen],
   )
+  const createWorktreeOverlay = useRepoScopedOverlay({
+    activeRepoId,
+    rawOpen: rawCreateWorktreeOpen,
+    setRawOpen: setCreateWorktreeRawOpen,
+  })
 
   const closeAllOverlays = useCallback(() => {
     if (routeDriven) {
@@ -119,29 +113,30 @@ export function useAppOverlays(options: AppOverlayRouteOptions = {}) {
       openRemoteRepo: {
         open: routeDriven ? routeOverlay === 'openRemoteRepo' : openByKey.openRemoteRepo,
       },
-      createWorktree: { open: routeDriven ? routeOverlay === 'createWorktree' : openByKey.createWorktree },
+      createWorktree: createWorktreeOverlay.state,
     }),
     [
+      createWorktreeOverlay.state,
       openByKey.clone,
       openByKey.openRepo,
       openByKey.openRemoteRepo,
-      openByKey.createWorktree,
       routeDriven,
       routeOverlay,
     ],
   )
+  const anyOverlayOpen = state.clone.open || state.openRepo.open || state.openRemoteRepo.open || state.createWorktree.open
 
   return {
     state,
-    anyOpen: routeDriven ? routeOverlay !== null : anyOpen,
+    anyOpen: anyOverlayOpen,
     openCloneRepo,
     setCloneOpen,
     openRepoPathDialog,
     setOpenRepoOpen,
     openRemoteRepo,
     setOpenRemoteRepoOpen,
-    openCreateWorktree,
-    setCreateWorktreeOpen,
+    openCreateWorktree: createWorktreeOverlay.openForActiveRepo,
+    setCreateWorktreeOpen: createWorktreeOverlay.setOpen,
     closeAllOverlays,
   }
 }

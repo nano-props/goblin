@@ -1,0 +1,96 @@
+// @vitest-environment jsdom
+import { act } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { renderInJsdom } from '#/test-utils/render.tsx'
+import { CreateWorktreeDialogHost } from '#/web/components/CreateWorktreeDialogHost.tsx'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { useReposStore } from '#/web/stores/repos/store.ts'
+import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+
+vi.mock('#/web/components/create-worktree-dialog/CreateWorktreeDialog.tsx', () => ({
+  CreateWorktreeDialog: ({ open, repo }: { open: boolean; repo: { id: string } }) => (
+    <div data-testid="create-worktree-dialog" data-open={String(open)} data-repo-id={repo.id} />
+  ),
+}))
+
+const REPO_ID = '/tmp/create-worktree-host-close-state'
+const OTHER_REPO_ID = '/tmp/create-worktree-host-other-active'
+
+beforeEach(() => {
+  primaryWindowQueryClient.clear()
+  resetReposStore()
+  seedRepoState({
+    id: REPO_ID,
+    branches: [createRepoBranch('main', { isCurrent: true, ahead: 0, behind: 0 })],
+  })
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => new Response(JSON.stringify({ ok: true, preview: { hasOperations: false } }))),
+  )
+})
+
+afterEach(() => {
+  primaryWindowQueryClient.clear()
+  resetReposStore()
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+})
+
+describe('CreateWorktreeDialogHost close state', () => {
+  test('keeps the dialog mounted when closing so Radix can run exit motion', () => {
+    const onOpenChange = vi.fn()
+    const { container, rerender } = renderInJsdom(
+      <CreateWorktreeDialogHost open onOpenChange={onOpenChange} repoId={REPO_ID} />,
+    )
+
+    expect(dialog(container)?.getAttribute('data-open')).toBe('true')
+    expect(dialog(container)?.getAttribute('data-repo-id')).toBe(REPO_ID)
+
+    rerender(<CreateWorktreeDialogHost open={false} onOpenChange={onOpenChange} repoId={REPO_ID} />)
+
+    expect(dialog(container)?.getAttribute('data-open')).toBe('false')
+    expect(dialog(container)?.getAttribute('data-repo-id')).toBe(REPO_ID)
+  })
+
+  test('uses the supplied repo session target instead of live active repo state', () => {
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('main', { isCurrent: true, ahead: 0, behind: 0 })],
+    })
+    seedRepoState({
+      id: OTHER_REPO_ID,
+      branches: [createRepoBranch('main', { isCurrent: true, ahead: 0, behind: 0 })],
+    })
+    act(() => {
+      useReposStore.setState((state) => ({
+        repos: { ...state.repos, [REPO_ID]: repo },
+        order: [OTHER_REPO_ID, REPO_ID],
+        activeId: OTHER_REPO_ID,
+      }))
+    })
+    const onOpenChange = vi.fn()
+    const { container } = renderInJsdom(<CreateWorktreeDialogHost open onOpenChange={onOpenChange} repoId={REPO_ID} />)
+
+    expect(dialog(container)?.getAttribute('data-open')).toBe('true')
+    expect(dialog(container)?.getAttribute('data-repo-id')).toBe(REPO_ID)
+  })
+
+  test('retains the last repo snapshot if the repo is removed before the close animation finishes', () => {
+    const onOpenChange = vi.fn()
+    const { container, rerender } = renderInJsdom(
+      <CreateWorktreeDialogHost open onOpenChange={onOpenChange} repoId={REPO_ID} />,
+    )
+
+    act(() => {
+      useReposStore.setState({ repos: {}, order: [], activeId: null })
+    })
+    rerender(<CreateWorktreeDialogHost open={false} onOpenChange={onOpenChange} repoId={REPO_ID} />)
+
+    expect(dialog(container)?.getAttribute('data-open')).toBe('false')
+    expect(dialog(container)?.getAttribute('data-repo-id')).toBe(REPO_ID)
+  })
+})
+
+function dialog(container: HTMLElement): Element | null {
+  return container.querySelector('[data-testid="create-worktree-dialog"]')
+}
