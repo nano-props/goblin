@@ -2,6 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import {
+  runCloseWorkspacePaneTabCommand,
   runCloseWorkspacePaneTabOrWindowCommand,
   runMoveWorkspacePaneTabCommand,
   runNewTerminalTabCommand,
@@ -13,6 +14,10 @@ import { closeWorkspacePaneTabsForWorktree } from '#/web/workspace-pane/workspac
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
+import {
+  resetTerminalActionDialogsStore,
+  useTerminalActionDialogsStore,
+} from '#/web/stores/repos/terminal-action-dialogs.ts'
 import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import {
   workspacePaneStaticTabsForBranch,
@@ -40,11 +45,13 @@ const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
 
 beforeEach(() => {
   resetReposStore()
+  resetTerminalActionDialogsStore()
   useRepoSyncStore.setState({ ready: new Map(), timestamps: new Map() })
 })
 
 afterEach(() => {
   setTerminalSessionCommandBridge(null)
+  resetTerminalActionDialogsStore()
   toastMocks.error.mockClear()
 })
 
@@ -457,6 +464,73 @@ describe('workspace commands', () => {
     // Tab removal is owned by the projection's onTerminalSessionRemoved callback, not the command.
     expect(tabOrderFor('feature/worktree')).toEqual([staticEntry('status'), terminalEntry('session-1')])
     expect(closeWindow).not.toHaveBeenCalled()
+  })
+
+  test('close workspace tab command asks before closing a terminal with a non-shell foreground process', async () => {
+    seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      selectedBranch: 'feature/worktree',
+      preferredWorkspacePaneTab: 'terminal',
+      workspacePaneTabOrderByBranch: {
+        'feature/worktree': [staticEntry('status'), terminalEntry('session-1')],
+      },
+    })
+    const closeTerminalByDescriptor = vi.fn(async () => true)
+    const closeWindow = vi.fn()
+    setTerminalSessionCommandBridge({
+      worktreeSnapshot: () => worktreeSnapshotWithTerminal({ processName: 'node' }),
+      createTerminal: vi.fn(async () => 'session-2'),
+      selectTerminal: vi.fn(),
+      closeTerminalByDescriptor,
+    })
+
+    expect(
+      await runCloseWorkspacePaneTabOrWindowCommand({ repoId: REPO_ID, navigation: navigationWith(), closeWindow }),
+    ).toBe(true)
+
+    expect(closeTerminalByDescriptor).not.toHaveBeenCalled()
+    expect(closeWindow).not.toHaveBeenCalled()
+    expect(useTerminalActionDialogsStore.getState().closeConfirm).toMatchObject({
+      repoId: REPO_ID,
+      targetIdentity: 'terminal:session-1',
+      processName: 'node',
+    })
+  })
+
+  test('close workspace tab command bypasses the terminal process confirmation after confirm', async () => {
+    seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      selectedBranch: 'feature/worktree',
+      preferredWorkspacePaneTab: 'terminal',
+      workspacePaneTabOrderByBranch: {
+        'feature/worktree': [staticEntry('status'), terminalEntry('session-1')],
+      },
+    })
+    const closeTerminalByDescriptor = vi.fn(async () => true)
+    setTerminalSessionCommandBridge({
+      worktreeSnapshot: () => worktreeSnapshotWithTerminal({ processName: 'node' }),
+      createTerminal: vi.fn(async () => 'session-2'),
+      selectTerminal: vi.fn(),
+      closeTerminalByDescriptor,
+    })
+
+    expect(
+      await runCloseWorkspacePaneTabCommand({
+        repoId: REPO_ID,
+        navigation: navigationWith(),
+        targetIdentity: 'terminal:session-1',
+        skipTerminalCloseConfirm: true,
+      }),
+    ).toBe(true)
+
+    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('session-1', {
+      repoRoot: REPO_ID,
+      branch: 'feature/worktree',
+      worktreePath: WORKTREE_PATH,
+    })
+    expect(useTerminalActionDialogsStore.getState().closeConfirm).toBeNull()
   })
 
   test('close workspace tab command commits UI without waiting for terminal resources', async () => {
@@ -1004,7 +1078,7 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {})
   }
 }
 
-function worktreeSnapshotWithTerminal(): WorktreeTerminalSnapshot {
+function worktreeSnapshotWithTerminal(options: { processName?: string } = {}): WorktreeTerminalSnapshot {
   return {
     worktreeTerminalKey: WORKTREE_KEY,
     selectedDescriptor: {
@@ -1026,6 +1100,8 @@ function worktreeSnapshotWithTerminal(): WorktreeTerminalSnapshot {
         index: 1,
         displayOrder: 1,
         title: 'terminal 1',
+        fullTitle: 'terminal 1',
+        processName: options.processName ?? 'zsh',
         phase: 'open',
         selected: true,
         hasBell: false,

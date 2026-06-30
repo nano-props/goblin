@@ -13,6 +13,7 @@ import {
   type TerminalTakeoverResult,
 } from '#/shared/terminal-types.ts'
 import { cloneTerminalController } from '#/shared/terminal-controller.ts'
+import { isShellProcessName } from '#/shared/terminal-process-name.ts'
 import { isValidTerminalPtySessionId, normalizeTerminalSize } from '#/shared/terminal-validators.ts'
 import { parseTerminalWorkspaceSlotKey } from '#/shared/terminal-workspace-slot-key.ts'
 import { serverLogger } from '#/server/logger.ts'
@@ -31,7 +32,6 @@ import {
   appendOutput,
   createEmptyTerminalRenderState,
   disposeRender,
-  isShellProcessName,
   replaySnapshot,
   resetRender,
   resizeRender,

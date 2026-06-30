@@ -1,7 +1,9 @@
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
+import { isShellProcessName } from '#/shared/terminal-process-name.ts'
 import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { openWorkspacePaneTab } from '#/web/components/repo-workspace/open-workspace-pane-tab.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useTerminalActionDialogsStore } from '#/web/stores/repos/terminal-action-dialogs.ts'
 import { gblLog } from '#/web/logger.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
@@ -44,6 +46,7 @@ interface CloseWorkspacePaneTabCommandOptions {
   repoId: string | null
   navigation: PrimaryWindowNavigationActions
   targetIdentity?: string
+  skipTerminalCloseConfirm?: boolean
 }
 
 interface CloseWorkspacePaneTabOrWindowCommandOptions extends CloseWorkspacePaneTabCommandOptions {
@@ -146,14 +149,18 @@ export async function runCloseWorkspacePaneTabCommand({
   repoId,
   navigation,
   targetIdentity,
+  skipTerminalCloseConfirm,
 }: CloseWorkspacePaneTabCommandOptions): Promise<boolean> {
-  return await runWorkspacePaneTabUiCommand(() => closeWorkspacePaneTabCommand({ repoId, navigation, targetIdentity }))
+  return await runWorkspacePaneTabUiCommand(() =>
+    closeWorkspacePaneTabCommand({ repoId, navigation, targetIdentity, skipTerminalCloseConfirm }),
+  )
 }
 
 function closeWorkspacePaneTabCommand({
   repoId,
   navigation,
   targetIdentity,
+  skipTerminalCloseConfirm,
 }: CloseWorkspacePaneTabCommandOptions): boolean {
   const target = repoId ? workspacePaneCommandTarget(repoId) : null
   if (!target) return false
@@ -162,6 +169,14 @@ function closeWorkspacePaneTabCommand({
     ? (target?.tabs.find((candidate) => candidate.identity === targetIdentity) ?? null)
     : (target?.activeTab ?? null)
   if (!tab) return false
+  if (!skipTerminalCloseConfirm && tab.kind === 'terminal' && shouldConfirmTerminalClose(tab)) {
+    useTerminalActionDialogsStore.getState().openCloseConfirm({
+      repoId: target.repoId,
+      targetIdentity: tab.identity,
+      processName: tab.view.processName?.trim() || 'terminal',
+    })
+    return true
+  }
 
   const closingIdentity = tab.identity
   const wasActive = target.activeTab?.identity === closingIdentity
@@ -173,6 +188,13 @@ function closeWorkspacePaneTabCommand({
 
   if (nextTab) showWorkspacePaneCommandTab(target, nextTab, navigation)
   return true
+}
+
+function shouldConfirmTerminalClose(tab: Extract<RepoWorkspaceTab, { kind: 'terminal' }>): boolean {
+  if (tab.view.phase !== 'open') return false
+  const processName = tab.view.processName?.trim()
+  if (!processName) return false
+  return !isShellProcessName(processName)
 }
 
 export async function runCloseWorkspacePaneTabOrWindowCommand({

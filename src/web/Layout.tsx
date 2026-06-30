@@ -11,6 +11,7 @@ import { OpenRemoteRepositoryDialog } from '#/web/components/OpenRemoteRepositor
 import { CreateWorktreeDialogHost } from '#/web/components/CreateWorktreeDialogHost.tsx'
 import { BranchActionDialogHost } from '#/web/components/BranchActionDialogHost.tsx'
 import { FiletreeActionDialogHost } from '#/web/components/FiletreeActionDialogHost.tsx'
+import { TerminalActionDialogHost } from '#/web/components/TerminalActionDialogHost.tsx'
 import { RepoDropOverlay } from '#/web/components/RepoDropOverlay.tsx'
 import { Toaster } from '#/web/components/ui/sonner.tsx'
 import { useAuthenticatedAppBootstrap } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
@@ -27,7 +28,7 @@ import { useSessionPersistence } from '#/web/hooks/useSessionPersistence.ts'
 import { useSettingsWriteErrorToast } from '#/web/hooks/useSettingsWriteErrorToast.ts'
 import { useSettingsQueryInvalidationSync } from '#/web/settings-queries.ts'
 import { createPrimaryWindowNavigationActions } from '#/web/primary-window-navigation-actions.ts'
-import { PrimaryWindowNavigationProvider } from '#/web/primary-window-navigation.tsx'
+import { PrimaryWindowNavigationProvider, type PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { primaryWindowNavigationStoreActionsFromStore } from '#/web/stores/repos/selector-actions.ts'
@@ -115,6 +116,7 @@ export function Layout() {
                 <PrimaryWindowOverlays
                   overlays={overlays}
                   repoDrop={repoDrop}
+                  navigation={navigation}
                   activeId={activeId}
                   activeBranchName={activeBranchName}
                 />
@@ -131,11 +133,12 @@ export function Layout() {
 interface PrimaryWindowOverlaysProps {
   overlays: ReturnType<typeof useAppOverlays>
   repoDrop: ReturnType<typeof useRepoDrop>
+  navigation: PrimaryWindowNavigationActions
   activeId: string | null
   activeBranchName: string | null
 }
 
-function PrimaryWindowOverlays({ overlays, repoDrop, activeId, activeBranchName }: PrimaryWindowOverlaysProps) {
+function PrimaryWindowOverlays({ overlays, repoDrop, navigation, activeId, activeBranchName }: PrimaryWindowOverlaysProps) {
   return (
     <>
       <RepoOpenDialog open={overlays.state.openRepo.open} onOpenChange={overlays.setOpenRepoOpen} />
@@ -151,6 +154,7 @@ function PrimaryWindowOverlays({ overlays, repoDrop, activeId, activeBranchName 
       />
       <BranchActionDialogHost activeRepoId={activeId} activeBranchName={activeBranchName} />
       <FiletreeActionDialogHost activeRepoId={activeId} />
+      <TerminalActionDialogHost activeRepoId={activeId} navigation={navigation} />
       <RepoDropOverlay active={repoDrop.active} />
       <Toaster position="bottom-right" closeButton />
     </>
