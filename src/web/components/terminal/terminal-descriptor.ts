@@ -13,7 +13,7 @@ export function terminalDescriptor(base: TerminalSessionBase, sessionId: string,
     worktreeTerminalKey: terminalWorktreeKey,
     sessionId,
     index,
-    key: formatTerminalWorkspaceSlotKey(base.repoRoot, base.worktreePath, sessionId),
+    terminalKey: formatTerminalWorkspaceSlotKey(base.repoRoot, base.worktreePath, sessionId),
   }
 }
 

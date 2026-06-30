@@ -66,15 +66,16 @@ const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = {
  * survive StrictMode; the singleton removes that dance entirely.
  */
 export class TerminalSessionProjection {
-  private readonly onSelectedWorktreeChange: (worktreeTerminalKey: string, key: string | null) => void
-  private readonly onTerminalSessionRemoved: (key: string, base: TerminalSessionBase) => void
+  private readonly onSelectedWorktreeChange: (worktreeTerminalKey: string, terminalKey: string | null) => void
+  private readonly onTerminalSessionRemoved: (terminalKey: string, base: TerminalSessionBase) => void
+  private readonly onTerminalSessionsMaterialized: (base: TerminalSessionBase, terminalKeys: readonly string[]) => void
   private repoIndex: TerminalRepoIndex = {}
   private parkingRoot: HTMLDivElement | null = null
   private readonly sessions = new Map<string, TerminalSession>()
-  private readonly sessionKeyByPtySessionId = new Map<string, string>()
-  private readonly ptySessionIdByKey = new Map<string, string>()
-  private readonly selectedKeyByWorktree = new Map<string, string>()
-  private readonly preferredSelectedKeyByWorktree = new Map<string, string>()
+  private readonly terminalKeyByPtySessionId = new Map<string, string>()
+  private readonly ptySessionIdByTerminalKey = new Map<string, string>()
+  private readonly selectedTerminalKeyByWorktree = new Map<string, string>()
+  private readonly preferredSelectedTerminalKeyByWorktree = new Map<string, string>()
   private readonly hostByWorktree = new Map<string, HTMLElement>()
   private readonly startupGeometryHintByWorktree = new Map<string, { cols: number; rows: number }>()
   private readonly pendingCreateByWorktree = new Map<
@@ -83,7 +84,7 @@ export class TerminalSessionProjection {
       base: TerminalSessionBase
       options: TerminalCreateOptions
       promise: Promise<string>
-      resolve: (key: string) => void
+      resolve: (terminalKey: string) => void
       reject: (error: unknown) => void
       flushing: boolean
       creating: boolean
@@ -115,8 +116,8 @@ export class TerminalSessionProjection {
   // User-initiated close hides the session from worktree snapshots
   // synchronously while server cleanup runs. This is terminal-runtime
   // visibility, not workspace pane selection state.
-  private readonly hiddenClosingSessionKeys = new Set<string>()
-  private readonly closeCompletionBySessionKey = new Map<string, Promise<boolean>>()
+  private readonly hiddenClosingTerminalKeys = new Set<string>()
+  private readonly closeCompletionByTerminalKey = new Map<string, Promise<boolean>>()
   private readonly snapshotCache = new Map<string, TerminalSnapshot>()
   // Safety-net hard cap. The expected cleanup is the server-exit
   // event (handleExit), with removeSession / destroy as secondary
@@ -144,11 +145,11 @@ export class TerminalSessionProjection {
   // the repo picker.
   private readonly lastPublishedRepoBellCountByRepo = new Map<string, number>()
   private readonly snapshotListeners = new Map<string, Set<() => void>>()
-  private readonly displayOrderByKey = new Map<string, number>()
+  private readonly displayOrderByTerminalKey = new Map<string, number>()
   private readonly bellState = createTerminalBellState(
-    (key) => {
-      if (key) {
-        const terminalWorktreeKey = this.sessions.get(key)?.descriptor.worktreeTerminalKey
+    (terminalKey) => {
+      if (terminalKey) {
+        const terminalWorktreeKey = this.sessions.get(terminalKey)?.descriptor.worktreeTerminalKey
         if (terminalWorktreeKey) this.notifyWorktree(terminalWorktreeKey)
         return
       }
@@ -162,11 +163,13 @@ export class TerminalSessionProjection {
   )
 
   constructor(
-    onSelectedWorktreeChange: (worktreeTerminalKey: string, key: string | null) => void = () => {},
-    onTerminalSessionRemoved: (key: string, base: TerminalSessionBase) => void = () => {},
+    onSelectedWorktreeChange: (worktreeTerminalKey: string, terminalKey: string | null) => void = () => {},
+    onTerminalSessionRemoved: (terminalKey: string, base: TerminalSessionBase) => void = () => {},
+    onTerminalSessionsMaterialized: (base: TerminalSessionBase, terminalKeys: readonly string[]) => void = () => {},
   ) {
     this.onSelectedWorktreeChange = onSelectedWorktreeChange
     this.onTerminalSessionRemoved = onTerminalSessionRemoved
+    this.onTerminalSessionsMaterialized = onTerminalSessionsMaterialized
   }
 
   setRepoIndex(repoIndex: TerminalRepoIndex): void {
@@ -207,16 +210,16 @@ export class TerminalSessionProjection {
       pending.reject(new Error('terminal session projection destroyed'))
     for (const session of this.sessions.values()) session.dispose({ closeSession: false })
     this.sessions.clear()
-    this.sessionKeyByPtySessionId.clear()
-    this.ptySessionIdByKey.clear()
-    this.selectedKeyByWorktree.clear()
-    this.preferredSelectedKeyByWorktree.clear()
+    this.terminalKeyByPtySessionId.clear()
+    this.ptySessionIdByTerminalKey.clear()
+    this.selectedTerminalKeyByWorktree.clear()
+    this.preferredSelectedTerminalKeyByWorktree.clear()
     this.hostByWorktree.clear()
     this.startupGeometryHintByWorktree.clear()
     this.pendingCreateByWorktree.clear()
     this.pendingCloseByPtySessionId.clear()
-    this.hiddenClosingSessionKeys.clear()
-    this.closeCompletionBySessionKey.clear()
+    this.hiddenClosingTerminalKeys.clear()
+    this.closeCompletionByTerminalKey.clear()
     this.snapshotCache.clear()
     this.reattachSnapshotCache.clear()
     this.worktreeSnapshotCache.clear()
@@ -230,16 +233,17 @@ export class TerminalSessionProjection {
   }
 
   handleOutput(event: { ptySessionId: string; data: string; seq: number; processName: string }): void {
-    const directKey = this.sessionKeyByPtySessionId.get(event.ptySessionId)
+    const directKey = this.terminalKeyByPtySessionId.get(event.ptySessionId)
     const directSession = directKey ? this.sessions.get(directKey) : null
     if (directKey && directSession) {
-      if (event.data.length > 0) this.activityState.markActivity(directKey, directSession.descriptor.worktreeTerminalKey)
+      if (event.data.length > 0)
+        this.activityState.markActivity(directKey, directSession.descriptor.worktreeTerminalKey)
       directSession.handleOutput(event)
     }
   }
 
   handleServerTitle(event: { ptySessionId: string; canonicalTitle: string | null }): void {
-    const directKey = this.sessionKeyByPtySessionId.get(event.ptySessionId)
+    const directKey = this.terminalKeyByPtySessionId.get(event.ptySessionId)
     const directSession = directKey ? this.sessions.get(directKey) : null
     if (directSession) {
       directSession.handleServerTitle(event.canonicalTitle)
@@ -247,7 +251,7 @@ export class TerminalSessionProjection {
   }
 
   handleExit(event: { ptySessionId: string }): void {
-    const directKey = this.sessionKeyByPtySessionId.get(event.ptySessionId)
+    const directKey = this.terminalKeyByPtySessionId.get(event.ptySessionId)
     const directSession = directKey ? this.sessions.get(directKey) : null
     if (directKey && directSession?.handleExit(event)) {
       // Local runtime accepted the exit. Gating the discard on the
@@ -255,7 +259,7 @@ export class TerminalSessionProjection {
       // ptySessionId match) avoids discarding a still-valid cache entry
       // during a race where the local session has moved to a new
       // ptySessionId (e.g. after a server-side restart) but the index
-      // still maps the old ptySessionId to the same key.
+      // still maps the old ptySessionId to the same terminalKey.
       // `discardLocalSessionAndDismissDetailIfLast → removeSession`
       // is what actually evicts the reattach cache entry for `directKey`.
       this.discardLocalSessionAndDismissDetailIfLast(directKey, directSession.descriptor)
@@ -264,7 +268,7 @@ export class TerminalSessionProjection {
     if (directKey && directSession && !directSession.currentPtySessionId()) {
       // The runtime is empty (exit was observed earlier, or the
       // session was never attached) but the ptySessionId index still
-      // points at it. The cache entry is keyed by the local key, not
+      // points at it. The cache entry is keyed by the local terminalKey, not
       // the old ptySessionId, so leaving it in place is the right call —
       // the next reattach may still hydrate from it.
       this.discardLocalSessionAndDismissDetailIfLast(directKey, directSession.descriptor)
@@ -282,7 +286,7 @@ export class TerminalSessionProjection {
   // — calling `close` again would no-op the `closeSessionForUser` check
   // on the server and add a useless WS roundtrip.
   handleSessionClosed(ptySessionId: string): void {
-    const directKey = this.sessionKeyByPtySessionId.get(ptySessionId)
+    const directKey = this.terminalKeyByPtySessionId.get(ptySessionId)
     if (!directKey) return
     const session = this.sessions.get(directKey)
     if (!session) return
@@ -290,7 +294,7 @@ export class TerminalSessionProjection {
   }
 
   handleIdentity(event: TerminalIdentityViewModel): void {
-    const directKey = this.sessionKeyByPtySessionId.get(event.ptySessionId)
+    const directKey = this.terminalKeyByPtySessionId.get(event.ptySessionId)
     const directSession = directKey ? this.sessions.get(directKey) : null
     if (directSession) {
       directSession.handleIdentity(event)
@@ -298,7 +302,7 @@ export class TerminalSessionProjection {
   }
 
   handleLifecycle(event: TerminalLifecycleViewModel): void {
-    const directKey = this.sessionKeyByPtySessionId.get(event.ptySessionId)
+    const directKey = this.terminalKeyByPtySessionId.get(event.ptySessionId)
     const directSession = directKey ? this.sessions.get(directKey) : null
     if (directSession) {
       directSession.handleLifecycle(event)
@@ -320,10 +324,11 @@ export class TerminalSessionProjection {
       snapshotsByPtySessionId,
     )
 
-    const serverKeys = new Set(serverSessions.map((s) => s.key))
+    const serverKeys = new Set(serverSessions.map((s) => s.terminalKey))
     this.evictOrphanedLocalSessions(repoRoot, serverKeys)
 
     this.resolveSelectedKeysForTouchedWorktrees(touchedWorktrees, controllerKeyByWorktree)
+    this.publishMaterializedTerminalTabs(touchedWorktrees)
     for (const worktreeTerminalKey of displayOrderChangedWorktrees) {
       this.notifyWorktree(worktreeTerminalKey)
     }
@@ -332,7 +337,7 @@ export class TerminalSessionProjection {
   // Phase 1: for each server session, ensure a local TerminalSession
   // exists, hydrate it with the latest server-side metadata, and track
   // which worktrees saw any change. Side effects: ensureSession,
-  // session.hydrate, displayOrderByKey, syncPtySessionIdIndex.
+  // session.hydrate, displayOrderByTerminalKey, syncPtySessionIdIndex.
   private materializeServerSessions(
     repoRoot: string,
     serverSessions: ServerTerminalSessionSummary[],
@@ -354,17 +359,17 @@ export class TerminalSessionProjection {
         serverSession,
         clientId,
         serverSnapshot: snapshotsByPtySessionId.get(serverSession.ptySessionId) ?? null,
-        reattachSnapshot: this.reattachSnapshotCache.get(serverSession.key) ?? null,
+        reattachSnapshot: this.reattachSnapshotCache.get(serverSession.terminalKey) ?? null,
       })
       if (!projected) continue
       touchedWorktrees.add(projected.worktreeTerminalKey)
       const { descriptor } = projected
-      if (!this.sessions.has(descriptor.key)) this.ensureSession(descriptor)
-      this.sessions.get(descriptor.key)?.hydrate(projected.hydrateInput)
-      this.syncPtySessionIdIndex(descriptor.key, projected.hydrateInput.ptySessionId)
-      if (projected.controlsTerminal) controllerKeyByWorktree.set(projected.worktreeTerminalKey, descriptor.key)
-      const previousDisplayOrder = this.displayOrderByKey.get(descriptor.key)
-      this.displayOrderByKey.set(descriptor.key, projected.displayOrder)
+      if (!this.sessions.has(descriptor.terminalKey)) this.ensureSession(descriptor)
+      this.sessions.get(descriptor.terminalKey)?.hydrate(projected.hydrateInput)
+      this.syncPtySessionIdIndex(descriptor.terminalKey, projected.hydrateInput.ptySessionId)
+      if (projected.controlsTerminal) controllerKeyByWorktree.set(projected.worktreeTerminalKey, descriptor.terminalKey)
+      const previousDisplayOrder = this.displayOrderByTerminalKey.get(descriptor.terminalKey)
+      this.displayOrderByTerminalKey.set(descriptor.terminalKey, projected.displayOrder)
       if (previousDisplayOrder !== undefined && previousDisplayOrder !== projected.displayOrder) {
         displayOrderChangedWorktrees.add(projected.worktreeTerminalKey)
       }
@@ -382,14 +387,14 @@ export class TerminalSessionProjection {
     const orphanedKeys = countOrphanedTerminalSessionKeys({
       repoRoot,
       localSessionKeys: Array.from(this.sessions.keys()),
-      getRepoRootForKey: (key) => this.sessions.get(key)?.descriptor.repoRoot ?? null,
-      hasServerPtySessionId: (key) => this.ptySessionIdByKey.has(key),
+      getRepoRootForKey: (terminalKey) => this.sessions.get(terminalKey)?.descriptor.repoRoot ?? null,
+      hasServerPtySessionId: (terminalKey) => this.ptySessionIdByTerminalKey.has(terminalKey),
       serverKeys,
     })
-    for (const key of orphanedKeys) {
-      const session = this.sessions.get(key)
+    for (const terminalKey of orphanedKeys) {
+      const session = this.sessions.get(terminalKey)
       if (!session) continue
-      this.discardLocalSessionAndDismissDetailIfLast(key, session.descriptor)
+      this.discardLocalSessionAndDismissDetailIfLast(terminalKey, session.descriptor)
     }
     return orphanedKeys.length
   }
@@ -403,17 +408,38 @@ export class TerminalSessionProjection {
     controllerKeyByWorktree: Map<string, string>,
   ): void {
     for (const worktreeKey of touchedWorktrees) {
-      const current = this.selectedKeyByWorktree.get(worktreeKey) ?? null
-      const preferred = this.preferredSelectedKeyByWorktree.get(worktreeKey) ?? null
+      const current = this.selectedTerminalKeyByWorktree.get(worktreeKey) ?? null
+      const preferred = this.preferredSelectedTerminalKeyByWorktree.get(worktreeKey) ?? null
       const next = resolveSelectedTerminalKey({
         worktreeTerminalKey: worktreeKey,
-        preferredKey: preferred,
-        currentKey: current,
-        controllerKey: controllerKeyByWorktree.get(worktreeKey) ?? null,
+        preferredTerminalKey: preferred,
+        currentTerminalKey: current,
+        controllerTerminalKey: controllerKeyByWorktree.get(worktreeKey) ?? null,
         sortedDescriptors: this.visibleSessionsForWorktree(worktreeKey).map((session) => session.descriptor),
-        isSelectedKeyValid: (candidateWorktreeKey, key) => this.isSelectedKeyValid(candidateWorktreeKey, key),
+        isSelectedTerminalKeyValid: (candidateWorktreeKey, terminalKey) =>
+          this.isSelectedTerminalKeyValid(candidateWorktreeKey, terminalKey),
       })
       this.selectTerminalKey(worktreeKey, next)
+    }
+  }
+
+  private publishMaterializedTerminalTabs(touchedWorktrees: Set<string>): void {
+    for (const worktreeTerminalKey of touchedWorktrees) {
+      const descriptors = this.visibleSessionsForWorktree(worktreeTerminalKey).map((session) => session.descriptor)
+      const firstDescriptor = descriptors[0]
+      if (!firstDescriptor) continue
+      try {
+        this.onTerminalSessionsMaterialized(
+          {
+            repoRoot: firstDescriptor.repoRoot,
+            branch: firstDescriptor.branch,
+            worktreePath: firstDescriptor.worktreePath,
+          },
+          descriptors.map((descriptor) => descriptor.terminalKey),
+        )
+      } catch (err) {
+        terminalSessionProviderLog.warn('terminal materialize callback failed', { worktreeTerminalKey, err })
+      }
     }
   }
 
@@ -470,20 +496,20 @@ export class TerminalSessionProjection {
     // committed the session row but skipped the catalog append). Reject
     // and let the operator restart the create.
     const createdSession = result.sessions.find(
-      (session) => session.key === result.key && session.ptySessionId === snapshotPtySessionId,
+      (session) => session.terminalKey === result.terminalKey && session.ptySessionId === snapshotPtySessionId,
     )
     if (!createdSession) {
       throw new Error('error.terminal-create-failed')
     }
     const serverSessions = result.sessions
-    this.setPreferredSelectedTerminalKey(terminalWorktreeKey, result.key)
+    this.setPreferredSelectedTerminalKey(terminalWorktreeKey, result.terminalKey)
     this.reconcileServerSessions(
       base.repoRoot,
       serverSessions,
       clientId,
       new Map<string, TerminalSessionSnapshot>([[snapshotPtySessionId, result as TerminalSessionSnapshot]]),
     )
-    return result.key
+    return result.terminalKey
   }
 
   private startupGeometryHint(worktreeTerminalKey: string): { cols: number; rows: number } {
@@ -493,7 +519,7 @@ export class TerminalSessionProjection {
         hostByWorktree: this.hostByWorktree,
         startupGeometryHintByWorktree: this.startupGeometryHintByWorktree,
         selectedDescriptor: this.selectedDescriptor(worktreeTerminalKey),
-        getAttachmentSnapshot: (key) => this.snapshot(key).attachment,
+        getAttachmentSnapshot: (terminalKey) => this.snapshot(terminalKey).attachment,
       }) ?? { cols: DEFAULT_TERMINAL_COLS, rows: DEFAULT_TERMINAL_ROWS }
     )
   }
@@ -510,7 +536,7 @@ export class TerminalSessionProjection {
         .catch(() => undefined)
         .then(() => this.enqueuePendingCreate(base, worktreeTerminalKey, options))
     }
-    let resolve!: (key: string) => void
+    let resolve!: (terminalKey: string) => void
     let reject!: (error: unknown) => void
     const promise = new Promise<string>((innerResolve, innerReject) => {
       resolve = innerResolve
@@ -659,24 +685,24 @@ export class TerminalSessionProjection {
   }
 
   private selectedDescriptor(worktreeTerminalKey: string): TerminalDescriptor | null {
-    const selectedKey = this.selectedKeyByWorktree.get(worktreeTerminalKey)
-    if (selectedKey && this.hiddenClosingSessionKeys.has(selectedKey)) return null
+    const selectedKey = this.selectedTerminalKeyByWorktree.get(worktreeTerminalKey)
+    if (selectedKey && this.hiddenClosingTerminalKeys.has(selectedKey)) return null
     return selectedKey ? (this.sessions.get(selectedKey)?.descriptor ?? null) : null
   }
 
   setPreferredSelectedTerminalKeys(selectedKeysByWorktree: Record<string, string>): void {
     const nextPreferred = new Map(Object.entries(selectedKeysByWorktree))
     const worktrees = new Set<string>([
-      ...Array.from(this.preferredSelectedKeyByWorktree.keys()),
+      ...Array.from(this.preferredSelectedTerminalKeyByWorktree.keys()),
       ...Array.from(nextPreferred.keys()),
-      ...Array.from(this.selectedKeyByWorktree.keys()),
+      ...Array.from(this.selectedTerminalKeyByWorktree.keys()),
     ])
-    this.preferredSelectedKeyByWorktree.clear()
-    for (const [worktreeTerminalKey, key] of nextPreferred)
-      this.preferredSelectedKeyByWorktree.set(worktreeTerminalKey, key)
+    this.preferredSelectedTerminalKeyByWorktree.clear()
+    for (const [worktreeTerminalKey, terminalKey] of nextPreferred)
+      this.preferredSelectedTerminalKeyByWorktree.set(worktreeTerminalKey, terminalKey)
     for (const worktreeTerminalKey of worktrees) {
-      const preferred = this.preferredSelectedKeyByWorktree.get(worktreeTerminalKey) ?? null
-      if (!preferred || !this.isSelectedKeyValid(worktreeTerminalKey, preferred)) continue
+      const preferred = this.preferredSelectedTerminalKeyByWorktree.get(worktreeTerminalKey) ?? null
+      if (!preferred || !this.isSelectedTerminalKeyValid(worktreeTerminalKey, preferred)) continue
       this.selectTerminalKey(worktreeTerminalKey, preferred)
     }
   }
@@ -689,12 +715,12 @@ export class TerminalSessionProjection {
       selectedDescriptor: this.selectedDescriptor(worktreeTerminalKey),
       pendingCreate: this.pendingCreateByWorktree.has(worktreeTerminalKey),
       sessions: this.visibleSessionsForWorktree(worktreeTerminalKey),
-      selectedKey: this.selectedKeyByWorktree.get(worktreeTerminalKey) ?? null,
-      getCachedSnapshot: (key) => this.snapshotCache.get(key) ?? null,
-      cacheSnapshot: (key, nextSnapshot) => this.snapshotCache.set(key, nextSnapshot),
-      hasBell: (key) => this.bellState.hasBell(key),
-      hasRecentActivity: (key) => this.activityState.hasRecentActivity(key),
-      getDisplayOrder: (session) => terminalSessionDisplayOrder(session.descriptor, this.displayOrderByKey),
+      selectedTerminalKey: this.selectedTerminalKeyByWorktree.get(worktreeTerminalKey) ?? null,
+      getCachedSnapshot: (terminalKey) => this.snapshotCache.get(terminalKey) ?? null,
+      cacheSnapshot: (terminalKey, nextSnapshot) => this.snapshotCache.set(terminalKey, nextSnapshot),
+      hasBell: (terminalKey) => this.bellState.hasBell(terminalKey),
+      hasRecentActivity: (terminalKey) => this.activityState.hasRecentActivity(terminalKey),
+      getDisplayOrder: (session) => terminalSessionDisplayOrder(session.descriptor, this.displayOrderByTerminalKey),
     })
     this.worktreeSnapshotCache.set(worktreeTerminalKey, snapshot)
     return snapshot
@@ -707,11 +733,11 @@ export class TerminalSessionProjection {
   repoBellCount = (repoRoot: string): number => {
     let count = 0
     for (const session of this.sessions.values()) {
-      const key = session.descriptor.key
+      const terminalKey = session.descriptor.terminalKey
       if (
         session.descriptor.repoRoot === repoRoot &&
-        !this.hiddenClosingSessionKeys.has(key) &&
-        this.bellState.hasBell(key)
+        !this.hiddenClosingTerminalKeys.has(terminalKey) &&
+        this.bellState.hasBell(terminalKey)
       )
         count++
     }
@@ -728,49 +754,51 @@ export class TerminalSessionProjection {
     }
   }
 
-  selectTerminal = (worktreeTerminalKey: string, key: string): void => {
-    const session = this.sessions.get(key)
+  selectTerminal = (worktreeTerminalKey: string, terminalKey: string): void => {
+    const session = this.sessions.get(terminalKey)
     if (
       !session ||
-      this.hiddenClosingSessionKeys.has(key) ||
+      this.hiddenClosingTerminalKeys.has(terminalKey) ||
       session.descriptor.worktreeTerminalKey !== worktreeTerminalKey
     )
       return
-    const wasSelected = this.selectedKeyByWorktree.get(worktreeTerminalKey) === key
-    const hadBell = this.bellState.hasBell(key)
+    const wasSelected = this.selectedTerminalKeyByWorktree.get(worktreeTerminalKey) === terminalKey
+    const hadBell = this.bellState.hasBell(terminalKey)
     if (wasSelected && !hadBell) return
-    this.selectTerminalKey(worktreeTerminalKey, key, { notify: !hadBell })
-    this.bellState.clear(key)
+    this.selectTerminalKey(worktreeTerminalKey, terminalKey, { notify: !hadBell })
+    this.bellState.clear(terminalKey)
   }
 
-  clearBell = (key: string): boolean => {
-    return this.bellState.clear(key)
+  clearBell = (terminalKey: string): boolean => {
+    return this.bellState.clear(terminalKey)
   }
 
-  scrollToBottom = (key: string): void => {
-    this.sessions.get(key)?.scrollToBottom()
+  scrollToBottom = (terminalKey: string): void => {
+    this.sessions.get(terminalKey)?.scrollToBottom()
   }
 
-  scrollLines = (key: string, amount: number): void => {
-    this.sessions.get(key)?.scrollLines(amount)
+  scrollLines = (terminalKey: string, amount: number): void => {
+    this.sessions.get(terminalKey)?.scrollLines(amount)
   }
 
-  closeTerminalByDescriptor = async (key: string, base: TerminalSessionBase): Promise<boolean> => {
-    const session = this.sessions.get(key)
+  closeTerminalByDescriptor = async (terminalKey: string, base: TerminalSessionBase): Promise<boolean> => {
+    const session = this.sessions.get(terminalKey)
     if (!session || session.descriptor.worktreeTerminalKey !== worktreeTerminalKey(base.repoRoot, base.worktreePath))
       return false
-    return await this.closeTerminal(key)
+    return await this.closeTerminal(terminalKey)
   }
 
   closeTerminalsForWorktree = async (base: TerminalSessionBase): Promise<boolean> => {
     const terminalWorktreeKey = worktreeTerminalKey(base.repoRoot, base.worktreePath)
     await this.settlePendingCreateForWorktree(terminalWorktreeKey)
-    const keys = this.sortedSessionsForWorktree(terminalWorktreeKey).map((session) => session.descriptor.key)
+    const terminalKeys = this.sortedSessionsForWorktree(terminalWorktreeKey).map(
+      (session) => session.descriptor.terminalKey,
+    )
     // When no terminal sessions exist there is nothing to release. Skip the
     // durable-close wait so a stale pending close (e.g. from an earlier tab
     // that already left the worktree) cannot block worktree removal.
-    if (keys.length === 0) return true
-    const results = await Promise.all(keys.map((key) => this.closeTerminal(key)))
+    if (terminalKeys.length === 0) return true
+    const results = await Promise.all(terminalKeys.map((terminalKey) => this.closeTerminal(terminalKey)))
     const pendingClosesSettled = await this.waitForPendingClosesForWorktree(terminalWorktreeKey)
     return results.every(Boolean) && pendingClosesSettled
   }
@@ -779,72 +807,74 @@ export class TerminalSessionProjection {
     this.ensureSession(descriptor).attach(host)
   }
 
-  detach = (key: string, host: HTMLElement): void => {
-    const session = this.sessions.get(key)
+  detach = (terminalKey: string, host: HTMLElement): void => {
+    const session = this.sessions.get(terminalKey)
     if (session && this.parkingRoot) {
       const serialized = session.serialize()
       const ptySessionId = session.currentPtySessionId()
       if (serialized && ptySessionId) {
-        this.setReattachSnapshot(key, { ptySessionId, snapshot: serialized, snapshotSeq: 0 })
+        this.setReattachSnapshot(terminalKey, { ptySessionId, snapshot: serialized, snapshotSeq: 0 })
       }
       session.detach(host, this.parkingRoot)
     }
   }
 
-  restart = (key: string): void => {
-    this.sessions.get(key)?.restart()
+  restart = (terminalKey: string): void => {
+    this.sessions.get(terminalKey)?.restart()
   }
 
-  focusTerminal = (key: string): void => {
-    this.sessions.get(key)?.focus()
+  focusTerminal = (terminalKey: string): void => {
+    this.sessions.get(terminalKey)?.focus()
   }
 
-  snapshot = (key: string): TerminalSnapshot => {
-    const cached = this.snapshotCache.get(key)
+  snapshot = (terminalKey: string): TerminalSnapshot => {
+    const cached = this.snapshotCache.get(terminalKey)
     if (cached) return cached
-    const session = this.sessions.get(key)
+    const session = this.sessions.get(terminalKey)
     if (!session) return EMPTY_TERMINAL_SNAPSHOT
     const next = session.snapshot()
-    this.snapshotCache.set(key, next)
+    this.snapshotCache.set(terminalKey, next)
     return next
   }
 
-  isKnownSession = (key: string): boolean => {
-    return this.sessions.has(key)
+  isKnownSession = (terminalKey: string): boolean => {
+    return this.sessions.has(terminalKey)
   }
 
-  subscribeSnapshot = (key: string, listener: () => void): (() => void) => {
-    return this.subscribeToKeyedListeners(this.snapshotListeners, key, listener)
+  subscribeSnapshot = (terminalKey: string, listener: () => void): (() => void) => {
+    return this.subscribeToKeyedListeners(this.snapshotListeners, terminalKey, listener)
   }
 
-  isTerminalFocusTarget = (key: string, target: EventTarget | null): boolean => {
-    return this.sessions.get(key)?.isTerminalFocusTarget(target) ?? false
+  isTerminalFocusTarget = (terminalKey: string, target: EventTarget | null): boolean => {
+    return this.sessions.get(terminalKey)?.isTerminalFocusTarget(target) ?? false
   }
 
-  findNext = (key: string, term: string, incremental?: boolean) => {
-    return this.sessions.get(key)?.findNext(term, incremental) ?? { resultIndex: -1, resultCount: 0, found: false }
+  findNext = (terminalKey: string, term: string, incremental?: boolean) => {
+    return (
+      this.sessions.get(terminalKey)?.findNext(term, incremental) ?? { resultIndex: -1, resultCount: 0, found: false }
+    )
   }
 
-  findPrevious = (key: string, term: string) => {
-    return this.sessions.get(key)?.findPrevious(term) ?? { resultIndex: -1, resultCount: 0, found: false }
+  findPrevious = (terminalKey: string, term: string) => {
+    return this.sessions.get(terminalKey)?.findPrevious(term) ?? { resultIndex: -1, resultCount: 0, found: false }
   }
 
-  clearSearch = (key: string): void => {
-    this.sessions.get(key)?.clearSearch()
+  clearSearch = (terminalKey: string): void => {
+    this.sessions.get(terminalKey)?.clearSearch()
   }
 
-  writeInput = (key: string, data: string, source: TerminalUserInputSource = 'command'): void => {
-    this.sessions.get(key)?.writeInput(userTerminalInput(data, source))
+  writeInput = (terminalKey: string, data: string, source: TerminalUserInputSource = 'command'): void => {
+    this.sessions.get(terminalKey)?.writeInput(userTerminalInput(data, source))
   }
 
-  takeover = (key: string): Promise<boolean> => {
-    const session = this.sessions.get(key)
+  takeover = (terminalKey: string): Promise<boolean> => {
+    const session = this.sessions.get(terminalKey)
     if (!session) return Promise.resolve(false)
     return session.takeover()
   }
 
-  serialize = (key: string): string => {
-    return this.sessions.get(key)?.serialize() ?? ''
+  serialize = (terminalKey: string): string => {
+    return this.sessions.get(terminalKey)?.serialize() ?? ''
   }
 
   private notifyWorktree(worktreeTerminalKey: string): void {
@@ -863,14 +893,14 @@ export class TerminalSessionProjection {
     if (repoRoot) this.notifyRepoBellCountIfChanged(repoRoot)
   }
 
-  private notifySnapshot(key: string): void {
-    const listeners = this.snapshotListeners.get(key)
+  private notifySnapshot(terminalKey: string): void {
+    const listeners = this.snapshotListeners.get(terminalKey)
     if (!listeners) return
     for (const listener of Array.from(listeners)) {
       try {
         listener()
       } catch (err) {
-        terminalSessionProviderLog.warn('snapshot listener threw', { key, err })
+        terminalSessionProviderLog.warn('snapshot listener threw', { terminalKey, err })
       }
     }
   }
@@ -907,41 +937,41 @@ export class TerminalSessionProjection {
 
   private subscribeToKeyedListeners(
     listenersMap: Map<string, Set<() => void>>,
-    key: string,
+    listenerKey: string,
     listener: () => void,
   ): () => void {
-    let listeners = listenersMap.get(key)
+    let listeners = listenersMap.get(listenerKey)
     if (!listeners) {
       listeners = new Set()
-      listenersMap.set(key, listeners)
+      listenersMap.set(listenerKey, listeners)
     }
     listeners.add(listener)
     return () => {
-      const current = listenersMap.get(key)
+      const current = listenersMap.get(listenerKey)
       if (!current) return
       current.delete(listener)
-      if (current.size === 0) listenersMap.delete(key)
+      if (current.size === 0) listenersMap.delete(listenerKey)
     }
   }
 
-  private syncPtySessionIdIndex(key: string, ptySessionId: string | null): void {
+  private syncPtySessionIdIndex(terminalKey: string, ptySessionId: string | null): void {
     syncTerminalPtySessionIdIndex({
-      key,
+      terminalKey,
       ptySessionId,
-      ptySessionIdByKey: this.ptySessionIdByKey,
-      sessionKeyByPtySessionId: this.sessionKeyByPtySessionId,
+      ptySessionIdByTerminalKey: this.ptySessionIdByTerminalKey,
+      terminalKeyByPtySessionId: this.terminalKeyByPtySessionId,
     })
   }
 
-  private notifySession(key: string): void {
-    const session = this.sessions.get(key)
-    this.syncPtySessionIdIndex(key, session?.currentPtySessionId() ?? null)
+  private notifySession(terminalKey: string): void {
+    const session = this.sessions.get(terminalKey)
+    this.syncPtySessionIdIndex(terminalKey, session?.currentPtySessionId() ?? null)
     if (session) {
-      this.snapshotCache.set(key, session.snapshot())
+      this.snapshotCache.set(terminalKey, session.snapshot())
     } else {
-      this.snapshotCache.delete(key)
+      this.snapshotCache.delete(terminalKey)
     }
-    this.notifySnapshot(key)
+    this.notifySnapshot(terminalKey)
     const worktreeTerminalKey = session?.descriptor.worktreeTerminalKey
     if (worktreeTerminalKey) this.notifyWorktree(worktreeTerminalKey)
   }
@@ -952,109 +982,113 @@ export class TerminalSessionProjection {
   // bookkeeping ever drifts (e.g., a wedged server that never emits
   // exit); the limit is set well above the realistic number of
   // simultaneously-detached sessions.
-  private setReattachSnapshot(key: string, entry: ReattachSnapshotCacheEntry): void {
-    if (this.reattachSnapshotCache.has(key)) this.reattachSnapshotCache.delete(key)
-    this.reattachSnapshotCache.set(key, entry)
+  private setReattachSnapshot(terminalKey: string, entry: ReattachSnapshotCacheEntry): void {
+    if (this.reattachSnapshotCache.has(terminalKey)) this.reattachSnapshotCache.delete(terminalKey)
+    this.reattachSnapshotCache.set(terminalKey, entry)
     while (this.reattachSnapshotCache.size > TerminalSessionProjection.REATTACH_SNAPSHOT_CACHE_HARD_CAP) {
-      const oldestKey = this.reattachSnapshotCache.keys().next().value
-      if (oldestKey === undefined) break
-      this.reattachSnapshotCache.delete(oldestKey)
+      const oldestTerminalKey = this.reattachSnapshotCache.keys().next().value
+      if (oldestTerminalKey === undefined) break
+      this.reattachSnapshotCache.delete(oldestTerminalKey)
     }
   }
 
-  private removeSession(key: string, options: { dispose: boolean; closeSession?: boolean }): boolean {
-    const session = this.sessions.get(key)
+  private removeSession(terminalKey: string, options: { dispose: boolean; closeSession?: boolean }): boolean {
+    const session = this.sessions.get(terminalKey)
     if (!session) return false
     const worktreeTerminalKey = session.descriptor.worktreeTerminalKey
-    const orderedKeysBeforeRemoval = this.visibleSessionsForWorktree(worktreeTerminalKey).map(
-      (item) => item.descriptor.key,
+    const orderedTerminalKeysBeforeRemoval = this.visibleSessionsForWorktree(worktreeTerminalKey).map(
+      (item) => item.descriptor.terminalKey,
     )
-    const wasSelected = this.selectedKeyByWorktree.get(worktreeTerminalKey) === key
-    this.hiddenClosingSessionKeys.delete(key)
-    this.closeCompletionBySessionKey.delete(key)
-    this.syncPtySessionIdIndex(key, null)
-    this.sessions.delete(key)
-    this.snapshotCache.delete(key)
-    this.reattachSnapshotCache.delete(key)
-    this.displayOrderByKey.delete(key)
-    this.activityState.remove(key)
-    this.notifyTerminalSessionRemoved(key, session.descriptor)
-    this.notifySnapshot(key)
-    this.bellState.remove(key)
+    const wasSelected = this.selectedTerminalKeyByWorktree.get(worktreeTerminalKey) === terminalKey
+    this.hiddenClosingTerminalKeys.delete(terminalKey)
+    this.closeCompletionByTerminalKey.delete(terminalKey)
+    this.syncPtySessionIdIndex(terminalKey, null)
+    this.sessions.delete(terminalKey)
+    this.snapshotCache.delete(terminalKey)
+    this.reattachSnapshotCache.delete(terminalKey)
+    this.displayOrderByTerminalKey.delete(terminalKey)
+    this.activityState.remove(terminalKey)
+    this.notifyTerminalSessionRemoved(terminalKey, session.descriptor)
+    this.notifySnapshot(terminalKey)
+    this.bellState.remove(terminalKey)
     if (options.dispose) session.dispose({ closeSession: options.closeSession !== false })
     if (wasSelected) {
-      const nextKey = resolveAdjacentTerminalSelectionAfterRemoval(orderedKeysBeforeRemoval, key)
-      this.selectTerminalKey(worktreeTerminalKey, nextKey, { notify: false })
+      const nextTerminalKey = resolveAdjacentTerminalSelectionAfterRemoval(
+        orderedTerminalKeysBeforeRemoval,
+        terminalKey,
+      )
+      this.selectTerminalKey(worktreeTerminalKey, nextTerminalKey, { notify: false })
     }
     this.notifyWorktree(worktreeTerminalKey)
     return true
   }
 
-  private notifyTerminalSessionRemoved(key: string, base: TerminalSessionBase): void {
+  private notifyTerminalSessionRemoved(terminalKey: string, base: TerminalSessionBase): void {
     try {
-      this.onTerminalSessionRemoved(key, base)
+      this.onTerminalSessionRemoved(terminalKey, base)
     } catch (err) {
-      terminalSessionProviderLog.warn('terminal session removal callback failed', { key, err })
+      terminalSessionProviderLog.warn('terminal session removal callback failed', { terminalKey, err })
     }
   }
 
-  private async closeTerminal(key: string): Promise<boolean> {
-    const pending = this.closeCompletionBySessionKey.get(key)
+  private async closeTerminal(terminalKey: string): Promise<boolean> {
+    const pending = this.closeCompletionByTerminalKey.get(terminalKey)
     if (pending) return pending
-    const session = this.sessions.get(key)
+    const session = this.sessions.get(terminalKey)
     if (!session) return false
-    const promise = this.runClose(key, session)
-    this.closeCompletionBySessionKey.set(key, promise)
+    const promise = this.runClose(terminalKey, session)
+    this.closeCompletionByTerminalKey.set(terminalKey, promise)
     const cleanup = () => {
-      if (this.closeCompletionBySessionKey.get(key) === promise) this.closeCompletionBySessionKey.delete(key)
+      if (this.closeCompletionByTerminalKey.get(terminalKey) === promise)
+        this.closeCompletionByTerminalKey.delete(terminalKey)
     }
     void promise.then(cleanup, cleanup)
     return promise
   }
 
-  private async runClose(key: string, session: TerminalSession): Promise<boolean> {
-    this.hideClosingSession(key, session)
+  private async runClose(terminalKey: string, session: TerminalSession): Promise<boolean> {
+    this.hideClosingSession(terminalKey, session)
     try {
       await session.closeServerResourcesAndWait()
     } catch (err) {
-      terminalSessionProviderLog.warn('terminal close failed', { key, err })
-      this.restoreClosingSession(key, session)
+      terminalSessionProviderLog.warn('terminal close failed', { terminalKey, err })
+      this.restoreClosingSession(terminalKey, session)
       return false
     }
-    if (this.sessions.get(key) !== session) return true
-    return this.removeSession(key, { dispose: true, closeSession: false })
+    if (this.sessions.get(terminalKey) !== session) return true
+    return this.removeSession(terminalKey, { dispose: true, closeSession: false })
   }
 
-  private hideClosingSession(key: string, session: TerminalSession): void {
-    if (this.hiddenClosingSessionKeys.has(key)) return
+  private hideClosingSession(terminalKey: string, session: TerminalSession): void {
+    if (this.hiddenClosingTerminalKeys.has(terminalKey)) return
     const worktreeTerminalKey = session.descriptor.worktreeTerminalKey
-    const visibleKeysBeforeClose = this.visibleSessionsForWorktree(worktreeTerminalKey).map(
-      (item) => item.descriptor.key,
+    const visibleTerminalKeysBeforeClose = this.visibleSessionsForWorktree(worktreeTerminalKey).map(
+      (item) => item.descriptor.terminalKey,
     )
-    const wasSelected = this.selectedKeyByWorktree.get(worktreeTerminalKey) === key
-    this.hiddenClosingSessionKeys.add(key)
+    const wasSelected = this.selectedTerminalKeyByWorktree.get(worktreeTerminalKey) === terminalKey
+    this.hiddenClosingTerminalKeys.add(terminalKey)
     if (wasSelected) {
-      const nextKey = resolveAdjacentTerminalSelectionAfterRemoval(visibleKeysBeforeClose, key)
-      this.selectTerminalKey(worktreeTerminalKey, nextKey, { notify: false })
+      const nextTerminalKey = resolveAdjacentTerminalSelectionAfterRemoval(visibleTerminalKeysBeforeClose, terminalKey)
+      this.selectTerminalKey(worktreeTerminalKey, nextTerminalKey, { notify: false })
     }
     this.notifyWorktree(worktreeTerminalKey)
   }
 
-  private restoreClosingSession(key: string, session: TerminalSession): void {
-    if (this.sessions.get(key) !== session) return
+  private restoreClosingSession(terminalKey: string, session: TerminalSession): void {
+    if (this.sessions.get(terminalKey) !== session) return
     const worktreeTerminalKey = session.descriptor.worktreeTerminalKey
-    if (!this.hiddenClosingSessionKeys.delete(key)) return
-    if (!this.selectedKeyByWorktree.has(worktreeTerminalKey)) {
-      this.selectTerminalKey(worktreeTerminalKey, key, { notify: false })
+    if (!this.hiddenClosingTerminalKeys.delete(terminalKey)) return
+    if (!this.selectedTerminalKeyByWorktree.has(worktreeTerminalKey)) {
+      this.selectTerminalKey(worktreeTerminalKey, terminalKey, { notify: false })
     }
     this.notifyWorktree(worktreeTerminalKey)
   }
 
-  private discardLocalSessionAndDismissDetailIfLast(key: string, base: TerminalSessionBase): void {
-    const session = this.sessions.get(key)
+  private discardLocalSessionAndDismissDetailIfLast(terminalKey: string, base: TerminalSessionBase): void {
+    const session = this.sessions.get(terminalKey)
     const terminalWorktreeKey = worktreeTerminalKey(base.repoRoot, base.worktreePath)
     if (!session || session.descriptor.worktreeTerminalKey !== terminalWorktreeKey) return
-    this.removeSession(key, { dispose: true, closeSession: false })
+    this.removeSession(terminalKey, { dispose: true, closeSession: false })
   }
 
   private syncDescriptorsFromRepoIndex(): void {
@@ -1073,75 +1107,80 @@ export class TerminalSessionProjection {
   }
 
   private pruneSessionsMissingFromRepoIndex(): void {
-    const keysToRemove = Array.from(this.sessions.entries())
+    const terminalKeysToRemove = Array.from(this.sessions.entries())
       .filter(([, session]) => !this.repoIndex[session.descriptor.repoRoot])
-      .map(([key]) => key)
-    for (const key of keysToRemove) this.removeSession(key, { dispose: true, closeSession: false })
+      .map(([terminalKey]) => terminalKey)
+    for (const terminalKey of terminalKeysToRemove)
+      this.removeSession(terminalKey, { dispose: true, closeSession: false })
   }
 
   private ensureSession(descriptor: TerminalDescriptor): TerminalSession {
-    const current = this.sessions.get(descriptor.key)
+    const current = this.sessions.get(descriptor.terminalKey)
     if (current) {
       current.updateDescriptor(descriptor)
       this.syncPtySessionIdIndex(
-        descriptor.key,
-        current.currentPtySessionId() ?? this.ptySessionIdByKey.get(descriptor.key) ?? null,
+        descriptor.terminalKey,
+        current.currentPtySessionId() ?? this.ptySessionIdByTerminalKey.get(descriptor.terminalKey) ?? null,
       )
       this.notifyWorktree(descriptor.worktreeTerminalKey)
       return current
     }
     const session = new TerminalSession(
       descriptor,
-      () => this.notifySession(descriptor.key),
+      () => this.notifySession(descriptor.terminalKey),
       this.bellState.handleBell,
       (ptySessionId) => this.enqueueDurableClose({ ptySessionId, worktreeTerminalKey: descriptor.worktreeTerminalKey }),
     )
-    this.sessions.set(descriptor.key, session)
-    this.syncPtySessionIdIndex(descriptor.key, session.currentPtySessionId())
-    this.snapshotCache.set(descriptor.key, session.snapshot())
-    if (!this.selectedKeyByWorktree.has(descriptor.worktreeTerminalKey)) {
-      const preferred = this.preferredSelectedKeyByWorktree.get(descriptor.worktreeTerminalKey)
-      if (!preferred || preferred === descriptor.key)
-        this.selectTerminalKey(descriptor.worktreeTerminalKey, descriptor.key, { notify: false })
+    this.sessions.set(descriptor.terminalKey, session)
+    this.syncPtySessionIdIndex(descriptor.terminalKey, session.currentPtySessionId())
+    this.snapshotCache.set(descriptor.terminalKey, session.snapshot())
+    if (!this.selectedTerminalKeyByWorktree.has(descriptor.worktreeTerminalKey)) {
+      const preferred = this.preferredSelectedTerminalKeyByWorktree.get(descriptor.worktreeTerminalKey)
+      if (!preferred || preferred === descriptor.terminalKey)
+        this.selectTerminalKey(descriptor.worktreeTerminalKey, descriptor.terminalKey, { notify: false })
     }
     this.notifyWorktree(descriptor.worktreeTerminalKey)
     return session
   }
 
-  private selectTerminalKey(worktreeTerminalKey: string, key: string | null, options: { notify?: boolean } = {}): void {
-    const next = key && this.isSelectedKeyValid(worktreeTerminalKey, key) ? key : null
-    const current = this.selectedKeyByWorktree.get(worktreeTerminalKey) ?? null
+  private selectTerminalKey(
+    worktreeTerminalKey: string,
+    terminalKey: string | null,
+    options: { notify?: boolean } = {},
+  ): void {
+    const next = terminalKey && this.isSelectedTerminalKeyValid(worktreeTerminalKey, terminalKey) ? terminalKey : null
+    const current = this.selectedTerminalKeyByWorktree.get(worktreeTerminalKey) ?? null
     if (current === next) {
       this.setPreferredSelectedTerminalKey(worktreeTerminalKey, next)
       return
     }
     if (next) {
-      this.selectedKeyByWorktree.set(worktreeTerminalKey, next)
+      this.selectedTerminalKeyByWorktree.set(worktreeTerminalKey, next)
     } else {
-      this.selectedKeyByWorktree.delete(worktreeTerminalKey)
+      this.selectedTerminalKeyByWorktree.delete(worktreeTerminalKey)
     }
     this.setPreferredSelectedTerminalKey(worktreeTerminalKey, next)
     if (options.notify !== false) this.notifyWorktree(worktreeTerminalKey)
   }
 
-  private setPreferredSelectedTerminalKey(worktreeTerminalKey: string, key: string | null): void {
-    const current = this.preferredSelectedKeyByWorktree.get(worktreeTerminalKey) ?? null
-    if (current === key) return
-    if (key) this.preferredSelectedKeyByWorktree.set(worktreeTerminalKey, key)
-    else this.preferredSelectedKeyByWorktree.delete(worktreeTerminalKey)
-    this.onSelectedWorktreeChange(worktreeTerminalKey, key)
+  private setPreferredSelectedTerminalKey(worktreeTerminalKey: string, terminalKey: string | null): void {
+    const current = this.preferredSelectedTerminalKeyByWorktree.get(worktreeTerminalKey) ?? null
+    if (current === terminalKey) return
+    if (terminalKey) this.preferredSelectedTerminalKeyByWorktree.set(worktreeTerminalKey, terminalKey)
+    else this.preferredSelectedTerminalKeyByWorktree.delete(worktreeTerminalKey)
+    this.onSelectedWorktreeChange(worktreeTerminalKey, terminalKey)
   }
 
-  private isSelectedKeyValid(worktreeTerminalKey: string, key: string): boolean {
+  private isSelectedTerminalKeyValid(worktreeTerminalKey: string, terminalKey: string): boolean {
     return (
-      !this.hiddenClosingSessionKeys.has(key) &&
-      this.sessions.get(key)?.descriptor.worktreeTerminalKey === worktreeTerminalKey
+      !this.hiddenClosingTerminalKeys.has(terminalKey) &&
+      this.sessions.get(terminalKey)?.descriptor.worktreeTerminalKey === worktreeTerminalKey
     )
   }
 
   private visibleSessionsForWorktree(worktreeTerminalKey: string): TerminalSession[] {
     return this.sortedSessionsForWorktree(worktreeTerminalKey).filter(
-      (session) => !this.hiddenClosingSessionKeys.has(session.descriptor.key),
+      (session) => !this.hiddenClosingTerminalKeys.has(session.descriptor.terminalKey),
     )
   }
 
@@ -1149,16 +1188,17 @@ export class TerminalSessionProjection {
     return Array.from(this.sessions.values())
       .filter((session) => session.descriptor.worktreeTerminalKey === worktreeTerminalKey)
       .sort((a, b) => {
-        const orderA = terminalSessionDisplayOrder(a.descriptor, this.displayOrderByKey)
-        const orderB = terminalSessionDisplayOrder(b.descriptor, this.displayOrderByKey)
+        const orderA = terminalSessionDisplayOrder(a.descriptor, this.displayOrderByTerminalKey)
+        const orderB = terminalSessionDisplayOrder(b.descriptor, this.displayOrderByTerminalKey)
         return orderA - orderB || a.descriptor.index - b.descriptor.index
       })
   }
 }
 
 export interface TerminalSessionProjectionDeps {
-  onSelectedWorktreeChange: (worktreeTerminalKey: string, key: string | null) => void
-  onTerminalSessionRemoved?: (key: string, base: TerminalSessionBase) => void
+  onSelectedWorktreeChange: (worktreeTerminalKey: string, terminalKey: string | null) => void
+  onTerminalSessionRemoved?: (terminalKey: string, base: TerminalSessionBase) => void
+  onTerminalSessionsMaterialized?: (base: TerminalSessionBase, terminalKeys: readonly string[]) => void
 }
 
 let projectionInstance: TerminalSessionProjection | null = null
@@ -1177,7 +1217,11 @@ let projectionInstance: TerminalSessionProjection | null = null
  */
 export function getTerminalSessionProjection(deps: TerminalSessionProjectionDeps): TerminalSessionProjection {
   if (!projectionInstance) {
-    projectionInstance = new TerminalSessionProjection(deps.onSelectedWorktreeChange, deps.onTerminalSessionRemoved)
+    projectionInstance = new TerminalSessionProjection(
+      deps.onSelectedWorktreeChange,
+      deps.onTerminalSessionRemoved,
+      deps.onTerminalSessionsMaterialized,
+    )
   }
   return projectionInstance
 }

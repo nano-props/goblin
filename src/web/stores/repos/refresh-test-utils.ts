@@ -69,7 +69,7 @@ export function resetRefreshTest(): void {
   ipcHandlers['terminal.create'] = async (input: { kind?: string }) => ({
     ok: true,
     action: input?.kind === 'primary' ? 'reused' : 'created',
-    key: input?.kind === 'primary' ? 'repo\0worktree\0terminal-1' : 'repo\0worktree\0terminal-2',
+    terminalKey: input?.kind === 'primary' ? 'repo\0worktree\0terminal-1' : 'repo\0worktree\0terminal-2',
     sessions: [],
   })
   ipcHandlers['terminal.prune'] = async () => ({ pruned: 0, remaining: 0 })

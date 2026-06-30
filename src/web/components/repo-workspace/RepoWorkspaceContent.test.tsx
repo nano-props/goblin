@@ -834,7 +834,7 @@ const emptyWorktreeSnapshot: WorktreeTerminalSnapshot = {
   sessions: [],
   count: 0,
   bellCount: 0,
-        activeCount: 0,
+  activeCount: 0,
   pendingCreate: false,
 }
 
@@ -900,23 +900,22 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): Pri
 }
 
 function terminalSession(
-  key: string,
+  terminalKey: string,
   index: number,
   selected: boolean,
   worktreeTerminalKey: string,
 ): TerminalSessionSummary {
   return {
     type: 'terminal',
-    id: key,
-    key,
+    terminalKey,
     worktreeTerminalKey,
-    sessionId: key,
+    sessionId: terminalKey,
     index,
     displayOrder: index,
-    title: key,
+    title: terminalKey,
     phase: 'open',
     selected,
     hasBell: false,
-            recentlyActive: false,
+    recentlyActive: false,
   }
 }

@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { defaultWorkspaceSessionState } from '#/shared/settings-defaults.ts'
+import { WORKSPACE_PANE_STATIC_TAB_IDS, workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
 
 let tmp: string | null = null
 let previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
@@ -72,7 +73,7 @@ test('persists updates and notifies subscribers from the server settings store',
     ...defaultWorkspaceSessionState(),
     openRepoEntries: [{ kind: 'local', id: '/repo-b' }],
     activeRepoId: '/repo-b',
-    selectedTerminalSessionByWorktree: { '/repo-b\0/worktree': '/repo-b\0/worktree\0session-2' },
+    selectedTerminalKeyByWorktree: { '/repo-b\0/worktree': '/repo-b\0/worktree\0session-2' },
     workspacePaneTabOrderByBranchByRepo: {
       '/repo-b': {
         main: [],
@@ -105,7 +106,7 @@ test('persists updates and notifies subscribers from the server settings store',
   expect(await reloaded.getServerSessionState()).toMatchObject({
     openRepoEntries: [{ kind: 'local', id: '/repo-b' }],
     activeRepoId: '/repo-b',
-    selectedTerminalSessionByWorktree: { '/repo-b\0/worktree': '/repo-b\0/worktree\0session-2' },
+    selectedTerminalKeyByWorktree: { '/repo-b\0/worktree': '/repo-b\0/worktree\0session-2' },
     workspacePaneTabOrderByBranchByRepo: {
       '/repo-b': {
         main: [],
@@ -234,7 +235,7 @@ test('normalizes branch-scoped workspace pane tab preferences in server sessions
     } as never,
     workspacePaneTabOrderByBranchByRepo: {
       '/repo-b': {
-        main: [{ type: 'history', id: 'history' }],
+        main: [workspacePaneStaticTabOrderEntry('history')],
         changes: [],
         terminal: [],
       },
@@ -267,20 +268,20 @@ test('normalizes workspace pane tab order in server sessions', async () => {
     workspacePaneTabOrderByBranchByRepo: {
       '/repo-b': {
         main: [
-          { type: 'status', id: 'status' },
-          { type: 'terminal', id: 'session-1' },
-          { type: 'history', id: 'history' },
-          { type: 'status', id: 'status' },
-          { type: 'changes', id: 'changes' },
+          workspacePaneStaticTabOrderEntry('status'),
+          { type: 'terminal', terminalKey: 'session-1' },
+          workspacePaneStaticTabOrderEntry('history'),
+          workspacePaneStaticTabOrderEntry('status'),
+          workspacePaneStaticTabOrderEntry('changes'),
         ],
         empty: [],
-        'bad\0branch': [{ type: 'status', id: 'status' }],
-        invalid: [{ type: 'changes', id: 'status' }],
+        'bad\0branch': [workspacePaneStaticTabOrderEntry('status')],
+        invalid: [{ type: 'changes', tabId: WORKSPACE_PANE_STATIC_TAB_IDS.status }],
       },
       '/repo-c': {
-        main: [{ type: 'status', id: 'status' }],
+        main: [workspacePaneStaticTabOrderEntry('status')],
       },
-      '/repo-array': [{ type: 'status', id: 'status' }],
+      '/repo-array': [workspacePaneStaticTabOrderEntry('status')],
     } as never,
   })
 
@@ -288,10 +289,10 @@ test('normalizes workspace pane tab order in server sessions', async () => {
     workspacePaneTabOrderByBranchByRepo: {
       '/repo-b': {
         main: [
-          { type: 'status', id: 'status' },
-          { type: 'terminal', id: 'session-1' },
-          { type: 'history', id: 'history' },
-          { type: 'changes', id: 'changes' },
+          workspacePaneStaticTabOrderEntry('status'),
+          { type: 'terminal', terminalKey: 'session-1' },
+          workspacePaneStaticTabOrderEntry('history'),
+          workspacePaneStaticTabOrderEntry('changes'),
         ],
         empty: [],
         invalid: [],

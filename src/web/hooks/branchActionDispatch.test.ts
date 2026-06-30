@@ -29,7 +29,10 @@ describe('branch action dispatch', () => {
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabOrderByBranch: {
-        'feature/worktree': [workspacePaneStaticTabOrderEntry('status'), { type: 'terminal', id: 'session-1' }],
+        'feature/worktree': [
+          workspacePaneStaticTabOrderEntry('status'),
+          { type: 'terminal', terminalKey: 'session-1' },
+        ],
       },
     })
     const calls: string[] = []
@@ -94,7 +97,10 @@ describe('branch action dispatch', () => {
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabOrderByBranch: {
-        'feature/worktree': [workspacePaneStaticTabOrderEntry('status'), { type: 'terminal', id: 'session-1' }],
+        'feature/worktree': [
+          workspacePaneStaticTabOrderEntry('status'),
+          { type: 'terminal', terminalKey: 'session-1' },
+        ],
       },
     })
     const runBranchAction = vi.fn(async () => ({ ok: true, message: 'ok' }))
@@ -169,7 +175,10 @@ describe('branch action dispatch', () => {
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabOrderByBranch: {
-        'feature/worktree': [workspacePaneStaticTabOrderEntry('status'), { type: 'terminal', id: 'session-1' }],
+        'feature/worktree': [
+          workspacePaneStaticTabOrderEntry('status'),
+          { type: 'terminal', terminalKey: 'session-1' },
+        ],
       },
       worktreesByPath: {
         [WORKTREE_PATH]: {
@@ -213,7 +222,7 @@ function emptyWorktreeSnapshot(): WorktreeTerminalSnapshot {
     sessions: [],
     count: 0,
     bellCount: 0,
-        activeCount: 0,
+    activeCount: 0,
     pendingCreate: false,
   }
 }
@@ -222,7 +231,7 @@ function worktreeSnapshotWithTerminal(): WorktreeTerminalSnapshot {
   return {
     worktreeTerminalKey: WORKTREE_KEY,
     selectedDescriptor: {
-      key: 'session-1',
+      terminalKey: 'session-1',
       worktreeTerminalKey: WORKTREE_KEY,
       sessionId: 'session-1',
       index: 1,
@@ -233,8 +242,7 @@ function worktreeSnapshotWithTerminal(): WorktreeTerminalSnapshot {
     sessions: [
       {
         type: 'terminal',
-        id: 'session-1',
-        key: 'session-1',
+        terminalKey: 'session-1',
         worktreeTerminalKey: WORKTREE_KEY,
         sessionId: 'session-1',
         index: 1,
@@ -243,12 +251,12 @@ function worktreeSnapshotWithTerminal(): WorktreeTerminalSnapshot {
         phase: 'open',
         selected: true,
         hasBell: false,
-            recentlyActive: false,
+        recentlyActive: false,
       },
     ],
     count: 1,
     bellCount: 0,
-        activeCount: 0,
+    activeCount: 0,
     pendingCreate: false,
   }
 }

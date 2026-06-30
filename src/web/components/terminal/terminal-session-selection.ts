@@ -2,15 +2,25 @@ import type { TerminalDescriptor } from '#/web/components/terminal/types.ts'
 
 export function resolveSelectedTerminalKey(input: {
   worktreeTerminalKey: string
-  preferredKey: string | null
-  currentKey: string | null
-  controllerKey: string | null
+  preferredTerminalKey: string | null
+  currentTerminalKey: string | null
+  controllerTerminalKey: string | null
   sortedDescriptors: TerminalDescriptor[]
-  isSelectedKeyValid: (worktreeTerminalKey: string, key: string) => boolean
+  isSelectedTerminalKeyValid: (worktreeTerminalKey: string, terminalKey: string) => boolean
 }): string | null {
-  const { worktreeTerminalKey, preferredKey, currentKey, controllerKey, sortedDescriptors, isSelectedKeyValid } = input
-  if (preferredKey && isSelectedKeyValid(worktreeTerminalKey, preferredKey)) return preferredKey
-  if (currentKey && isSelectedKeyValid(worktreeTerminalKey, currentKey)) return currentKey
-  if (controllerKey && isSelectedKeyValid(worktreeTerminalKey, controllerKey)) return controllerKey
-  return sortedDescriptors[0]?.key ?? null
+  const {
+    worktreeTerminalKey,
+    preferredTerminalKey,
+    currentTerminalKey,
+    controllerTerminalKey,
+    sortedDescriptors,
+    isSelectedTerminalKeyValid,
+  } = input
+  if (preferredTerminalKey && isSelectedTerminalKeyValid(worktreeTerminalKey, preferredTerminalKey))
+    return preferredTerminalKey
+  if (currentTerminalKey && isSelectedTerminalKeyValid(worktreeTerminalKey, currentTerminalKey))
+    return currentTerminalKey
+  if (controllerTerminalKey && isSelectedTerminalKeyValid(worktreeTerminalKey, controllerTerminalKey))
+    return controllerTerminalKey
+  return sortedDescriptors[0]?.terminalKey ?? null
 }

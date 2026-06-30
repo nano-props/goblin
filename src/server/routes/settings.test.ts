@@ -81,7 +81,7 @@ describe('settings routes', () => {
       activeRepoId: null,
       zenMode: true,
       workspacePaneSize: 50,
-      selectedTerminalSessionByWorktree: {},
+      selectedTerminalKeyByWorktree: {},
       workspacePaneTabOrderByBranchByRepo: {},
     } as const
     mocks.handleSetSession.mockResolvedValue({ ok: true, session })
@@ -109,11 +109,14 @@ describe('settings routes', () => {
       activeRepoId: null,
       zenMode: true,
       workspacePaneSize: 50,
-      selectedTerminalSessionByWorktree: {},
+      selectedTerminalKeyByWorktree: {},
       preferredWorkspacePaneTabByBranchByRepo: { '/tmp/repo': { 'feature/worktree': 'files' } },
       workspacePaneTabOrderByBranchByRepo: {
         '/tmp/repo': {
-          'feature/worktree': [{ type: 'status', id: 'status' }, { type: 'files', id: 'files' }],
+          'feature/worktree': [
+            { type: 'status', tabId: 'workspace-pane:status' },
+            { type: 'files', tabId: 'workspace-pane:files' },
+          ],
         },
       },
     } as const

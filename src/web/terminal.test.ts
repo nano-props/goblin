@@ -215,7 +215,7 @@ describe('terminal web host bridge', () => {
         payload: {
           ok: true,
           action: 'created',
-          key: '/tmp/repo\u0000/tmp/repo\u0000session-1',
+          terminalKey: '/tmp/repo\u0000/tmp/repo\u0000session-1',
           sessions: [],
         },
       }),
@@ -255,7 +255,7 @@ describe('terminal web host bridge', () => {
         requestId: request?.requestId,
         ok: true,
         action: 'list-sessions',
-        payload: [{ ptySessionId: 'pty_1', key: 123 }],
+        payload: [{ ptySessionId: 'pty_1', terminalKey: 123 }],
       }),
     )
 
@@ -596,10 +596,10 @@ describe('terminal web host bridge', () => {
         requestId: createRequest?.requestId,
         ok: true,
         action: 'create',
-        payload: { ok: true, action: 'created', key: 'key_1', sessions: [] },
+        payload: { ok: true, action: 'created', terminalKey: 'key_1', sessions: [] },
       }),
     )
-    await expect(createPromise).resolves.toMatchObject({ ok: true, key: 'key_1' })
+    await expect(createPromise).resolves.toMatchObject({ ok: true, terminalKey: 'key_1' })
     expect(fetchMock).not.toHaveBeenCalled()
     dispose()
   })
@@ -720,9 +720,9 @@ describe('terminal web host bridge', () => {
       terminalBridge.kickReconnect()
       terminalBridge.kickReconnect()
 
-      expect(socket.sent.map((payload) => JSON.parse(payload)).filter((message) => message.type === 'ping')).toHaveLength(
-        1,
-      )
+      expect(
+        socket.sent.map((payload) => JSON.parse(payload)).filter((message) => message.type === 'ping'),
+      ).toHaveLength(1)
       dispose()
     } finally {
       vi.useRealTimers()
@@ -827,11 +827,11 @@ describe('terminal web host bridge', () => {
         requestId: request?.requestId,
         ok: true,
         action: 'create',
-        payload: { ok: true, action: 'created', key: 'key_1', sessions: [] },
+        payload: { ok: true, action: 'created', terminalKey: 'key_1', sessions: [] },
       }),
     )
 
-    await expect(createPromise).resolves.toMatchObject({ ok: true, key: 'key_1' })
+    await expect(createPromise).resolves.toMatchObject({ ok: true, terminalKey: 'key_1' })
     expect(socket.readyState).toBe(wsMock.CLOSED)
   })
 
@@ -890,14 +890,14 @@ describe('terminal web host bridge', () => {
     const { onClientLocalEventType, resetClientLocalEventsForTests } = await import('#/web/local-events.ts')
     const bellClick = vi.fn()
     const dispose = onClientLocalEventType('terminal-bell-click', bellClick)
-    const key = '/tmp/repo\0/tmp/repo\0session-2'
+    const terminalKey = '/tmp/repo\0/tmp/repo\0session-2'
 
     await expect(
-      terminalBridge.notifyBell({ title: 'repo', body: 'feature/test\\nzsh', key, repoRoot: '/tmp/repo' }),
+      terminalBridge.notifyBell({ title: 'repo', body: 'feature/test\\nzsh', terminalKey, repoRoot: '/tmp/repo' }),
     ).resolves.toBe(true)
     wsMock.notificationInstances[0]?.onclick?.()
 
-    expect(bellClick).toHaveBeenCalledWith({ type: 'terminal-bell-click', repoRoot: '/tmp/repo', key })
+    expect(bellClick).toHaveBeenCalledWith({ type: 'terminal-bell-click', repoRoot: '/tmp/repo', terminalKey })
     dispose()
     resetClientLocalEventsForTests()
   })

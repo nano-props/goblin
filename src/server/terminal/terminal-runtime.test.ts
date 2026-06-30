@@ -144,7 +144,7 @@ describe('server terminal runtime', () => {
     if (!result.ok) return
     expect(result.sessions).toEqual([
       expect.objectContaining({
-        key: result.key,
+        terminalKey: result.terminalKey,
         controller: { clientId: 'client_a', status: 'connected' },
         phase: 'opening',
         message: null,
@@ -427,7 +427,7 @@ describe('server terminal runtime', () => {
     expect(resolveRemoteTarget).toHaveBeenCalledWith({ alias: 'prod', remotePath: '/srv/repo' })
     expect(result.sessions).toEqual([
       expect.objectContaining({
-        key: 'ssh-config://prod/srv/repo\0/srv/repo\0session-1',
+        terminalKey: 'ssh-config://prod/srv/repo\0/srv/repo\0session-1',
       }),
     ])
 
@@ -458,7 +458,7 @@ describe('server terminal runtime', () => {
     expect(second.ok).toBe(true)
     if (!second.ok) return
     expect(second.action).toBe('reused')
-    expect(second.key).toBe(first.key)
+    expect(second.terminalKey).toBe(first.terminalKey)
 
     shutdown()
   })
@@ -498,7 +498,7 @@ describe('server terminal runtime', () => {
     expect(reopened.ok).toBe(true)
     if (!reopened.ok) return
     expect(reopened.action).toBe('reused')
-    expect(reopened.key).toBe(first.key)
+    expect(reopened.terminalKey).toBe(first.terminalKey)
     expect(reopened.controller).toEqual({ clientId: 'client_electron', status: 'connected' })
     expect(reopened.canonicalCols).toBe(102)
     expect(reopened.canonicalRows).toBe(33)
@@ -507,7 +507,7 @@ describe('server terminal runtime', () => {
     const sessions = await host.listSessions('client_electron', USER_1, '/repo')
     expect(sessions).toEqual([
       expect.objectContaining({
-        key: first.key,
+        terminalKey: first.terminalKey,
         controller: { clientId: 'client_electron', status: 'connected' },
         cols: 102,
         rows: 33,
@@ -925,13 +925,13 @@ describe('server terminal runtime', () => {
     const userBSession = userBCreate.sessions[0]
     if (!userBSession) throw new Error('expected user B session')
 
-    expect(userBSession.key).toBe(userASession.key)
+    expect(userBSession.terminalKey).toBe(userASession.terminalKey)
     expect(userBSession.ptySessionId).not.toBe(userASession.ptySessionId)
     expect(await host.listSessions('client_shared', USER_1, '/repo')).toEqual([
-      expect.objectContaining({ ptySessionId: userASession.ptySessionId, key: userASession.key }),
+      expect.objectContaining({ ptySessionId: userASession.ptySessionId, terminalKey: userASession.terminalKey }),
     ])
     expect(await host.listSessions('client_shared', USER_2, '/repo')).toEqual([
-      expect.objectContaining({ ptySessionId: userBSession.ptySessionId, key: userBSession.key }),
+      expect.objectContaining({ ptySessionId: userBSession.ptySessionId, terminalKey: userBSession.terminalKey }),
     ])
 
     host.unregisterSocket('client_shared_attachment_a', USER_1, userASocket)

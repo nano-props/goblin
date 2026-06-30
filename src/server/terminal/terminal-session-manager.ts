@@ -30,14 +30,8 @@ import {
   replaySnapshot,
   takeSnapshot,
 } from '#/server/terminal/terminal-render-state.ts'
-import {
-  markTerminalSessionClosed,
-  markTerminalSessionError,
-} from '#/server/terminal/terminal-session-lifecycle.ts'
-import {
-  TerminalPtyBinding,
-  type TerminalPtySessionState,
-} from '#/server/terminal/terminal-session-pty-lifecycle.ts'
+import { markTerminalSessionClosed, markTerminalSessionError } from '#/server/terminal/terminal-session-lifecycle.ts'
+import { TerminalPtyBinding, type TerminalPtySessionState } from '#/server/terminal/terminal-session-pty-lifecycle.ts'
 import type { PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 
 const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
@@ -55,7 +49,7 @@ interface TerminalPtyAttachResult {
 export interface TerminalEnsureSessionInput<TUser extends string | number> {
   userId: TUser
   scope: string
-  key: string
+  terminalKey: string
   cwd: string
   cols: number
   rows: number
@@ -69,7 +63,7 @@ export interface TerminalEnsureSessionInput<TUser extends string | number> {
 
 interface TerminalSessionView<TUser extends string | number> extends TerminalPtySessionState<TUser> {
   scope: string
-  key: string
+  terminalKey: string
   worktreePath: string
   ptyBinding: TerminalPtyBinding<TerminalSessionView<TUser>>
   attachments: Map<string, TerminalClientControllerState>
@@ -102,7 +96,7 @@ export interface TerminalEventSink<TUser extends string | number> {
 
 export class TerminalSessionManager<TUser extends string | number> {
   private readonly sessionsByPtySessionId = new Map<string, TerminalSessionView<TUser>>()
-  private readonly ptySessionIdByUserSessionKey = new Map<string, string>()
+  private readonly ptySessionIdByUserTerminalKey = new Map<string, string>()
   private readonly sink: TerminalEventSink<TUser>
   private readonly ptySupervisor: PtySupervisor
   private readonly terminalSessionOrder: TerminalSessionOrderRuntimeLike<TUser>
@@ -127,16 +121,16 @@ export class TerminalSessionManager<TUser extends string | number> {
     const cwd = path.resolve(input.cwd)
     const userId = input.userId
     if (!this.isValidUserId(userId)) return { ok: false, message: 'error.invalid-arguments' }
-    const userKey = this.userSessionKey(userId, input.key)
-    if (input.forceNew) this.closeUserKey(userId, input.key)
-    const existingId = this.ptySessionIdByUserSessionKey.get(userKey)
+    const userKey = this.userTerminalKey(userId, input.terminalKey)
+    if (input.forceNew) this.closeUserTerminalKey(userId, input.terminalKey)
+    const existingId = this.ptySessionIdByUserTerminalKey.get(userKey)
     const existing = existingId ? this.sessionsByPtySessionId.get(existingId) : undefined
     if (existing) {
       this.terminalSessionOrder.registerTerminalSessionOrder({
         userId,
         scope: existing.scope,
         worktreePath: existing.worktreePath,
-        id: existing.key,
+        id: existing.terminalKey,
       })
       if (input.clientId) {
         registerTerminalClient(existing, input.clientId, size.cols, size.rows)
@@ -144,13 +138,13 @@ export class TerminalSessionManager<TUser extends string | number> {
       return await this.attachExistingSession(existing, input.clientId)
     }
 
-    const worktreePath = parseWorktreePathFromKey(input.key) ?? input.key
+    const worktreePath = parseWorktreePathFromTerminalKey(input.terminalKey) ?? input.terminalKey
     const id = createPtySessionId()
     const session: TerminalSessionView<TUser> = {
       id,
       userId,
       scope: input.scope,
-      key: input.key,
+      terminalKey: input.terminalKey,
       worktreePath,
       cwd,
       command: input.command,
@@ -172,12 +166,12 @@ export class TerminalSessionManager<TUser extends string | number> {
       takeoverPending: false,
     }
     this.sessionsByPtySessionId.set(id, session)
-    this.ptySessionIdByUserSessionKey.set(userKey, id)
+    this.ptySessionIdByUserTerminalKey.set(userKey, id)
     this.terminalSessionOrder.registerTerminalSessionOrder({
       userId,
       scope: input.scope,
       worktreePath,
-      id: input.key,
+      id: input.terminalKey,
     })
     if (input.clientId) {
       registerTerminalClient(session, input.clientId, size.cols, size.rows)
@@ -243,7 +237,13 @@ export class TerminalSessionManager<TUser extends string | number> {
     return this.resizeSessionPty(session, size.cols, size.rows)
   }
 
-  takeoverSession(userId: TUser, ptySessionId: string, cols: number, rows: number, clientId: string): TerminalTakeoverResult {
+  takeoverSession(
+    userId: TUser,
+    ptySessionId: string,
+    cols: number,
+    rows: number,
+    clientId: string,
+  ): TerminalTakeoverResult {
     if (!isValidTerminalPtySessionId(ptySessionId)) return { ok: false, message: 'error.invalid-arguments' }
     const size = normalizeTerminalSize(cols, rows)
     if (!size) return { ok: false, message: 'error.invalid-arguments' }
@@ -299,14 +299,14 @@ export class TerminalSessionManager<TUser extends string | number> {
     session.ptyBinding.invalidateOwnership()
     if (markTerminalSessionClosed(session)) this.emitLifecycle(session)
     this.sessionsByPtySessionId.delete(ptySessionId)
-    const userKey = this.userSessionKey(session.userId, session.key)
-    if (this.ptySessionIdByUserSessionKey.get(userKey) === ptySessionId)
-      this.ptySessionIdByUserSessionKey.delete(userKey)
+    const userKey = this.userTerminalKey(session.userId, session.terminalKey)
+    if (this.ptySessionIdByUserTerminalKey.get(userKey) === ptySessionId)
+      this.ptySessionIdByUserTerminalKey.delete(userKey)
     this.terminalSessionOrder.unregisterTerminalSessionOrder({
       userId: session.userId,
       scope: session.scope,
       worktreePath: session.worktreePath,
-      id: session.key,
+      id: session.terminalKey,
     })
     session.ptyBinding.dispose(session)
   }
@@ -322,7 +322,8 @@ export class TerminalSessionManager<TUser extends string | number> {
       if (session.userId !== userId) continue
       if (!session.attachments.has(clientId) && session.controllerClientId !== clientId) continue
       const previousController = this.effectiveControllerWithOverride(session, clientId, previousOnline)
-      if (terminalIdentityChanged(session, previousController, this.sessionPresence(session))) this.emitIdentity(session)
+      if (terminalIdentityChanged(session, previousController, this.sessionPresence(session)))
+        this.emitIdentity(session)
     }
   }
 
@@ -344,9 +345,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       if (session.userId === userId && session.scope === scope) {
         sessions.push({
           ptySessionId: session.id,
-          key: session.key,
-          viewType: 'terminal',
-          viewId: session.key,
+          terminalKey: session.terminalKey,
           cwd: session.cwd,
           controller: this.effectiveController(session),
           processName: session.ptyBinding.processName(),
@@ -386,8 +385,8 @@ export class TerminalSessionManager<TUser extends string | number> {
     return { count, totalBufferChars, maxBufferChars }
   }
 
-  private closeUserKey(userId: TUser, key: string): void {
-    const id = this.ptySessionIdByUserSessionKey.get(this.userSessionKey(userId, key))
+  private closeUserTerminalKey(userId: TUser, terminalKey: string): void {
+    const id = this.ptySessionIdByUserTerminalKey.get(this.userTerminalKey(userId, terminalKey))
     if (id) this.closeSession(id)
   }
 
@@ -397,7 +396,7 @@ export class TerminalSessionManager<TUser extends string | number> {
         userId: session.userId,
         scope: session.scope,
         worktreePath: session.worktreePath,
-        id: session.key,
+        id: session.terminalKey,
       }) ?? Number.MAX_SAFE_INTEGER
     )
   }
@@ -462,12 +461,13 @@ export class TerminalSessionManager<TUser extends string | number> {
     const pending = await session.ptyBinding.waitForPendingSpawn(session)
     if (pending) return pending
     if (!this.isLiveSession(session)) return { ok: false, message: 'error.unavailable' }
-    if (clientId) this.applyIdentityEffect(session, attachTerminalClient(session, clientId, this.sessionPresence(session)))
+    if (clientId)
+      this.applyIdentityEffect(session, attachTerminalClient(session, clientId, this.sessionPresence(session)))
     return await this.attachResult(session)
   }
 
-  private userSessionKey(userId: TUser, key: string): string {
-    return `${String(userId)}\0${key}`
+  private userTerminalKey(userId: TUser, terminalKey: string): string {
+    return `${String(userId)}\0${terminalKey}`
   }
 
   private sessionPresence(session: TerminalSessionView<TUser>): (clientId: string) => boolean {
@@ -595,6 +595,6 @@ function createPtySessionId(): string {
   return `pty_${crypto.randomUUID()}`
 }
 
-function parseWorktreePathFromKey(key: string): string | null {
-  return parseTerminalWorkspaceSlotKey(key)?.worktreePath ?? null
+function parseWorktreePathFromTerminalKey(terminalKey: string): string | null {
+  return parseTerminalWorkspaceSlotKey(terminalKey)?.worktreePath ?? null
 }

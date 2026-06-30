@@ -38,7 +38,7 @@ export interface RepoWorkspaceTerminalTab extends RepoWorkspaceTabBase {
   type: 'terminal'
   kind: 'terminal'
   view: TerminalWorkspacePaneTabView
-  key: string
+  terminalKey: string
 }
 
 export interface RepoWorkspacePendingTab extends RepoWorkspaceTabBase {
@@ -187,11 +187,11 @@ function staticWorkspacePaneTab(type: WorkspacePaneStaticTabType): RepoWorkspace
 
 function terminalWorkspacePaneTab(view: TerminalWorkspacePaneTabView): RepoWorkspaceTerminalTab {
   return {
-    identity: terminalWorkspacePaneTabProvider.identity(view.id),
+    identity: terminalWorkspacePaneTabProvider.identity(view.terminalKey),
     type: 'terminal',
     kind: 'terminal',
     view,
-    key: view.key,
+    terminalKey: view.terminalKey,
   }
 }
 
@@ -228,9 +228,25 @@ function materializedWorkspacePaneTabs(input: {
   terminalViews: readonly TerminalWorkspacePaneTabView[]
   hasWorktree: boolean
 }): RepoWorkspaceMaterializedTab[] {
-  const terminalById = new Map(input.terminalViews.map((view) => [view.id, view]))
+  const terminalByKey = new Map(input.terminalViews.map((view) => [view.terminalKey, view]))
+  const orderedTerminalKeys = new Set(
+    input.tabOrder.flatMap((entry) => (entry.type === 'terminal' ? [entry.terminalKey] : [])),
+  )
   const seenTerminals = new Set<string>()
   const tabs: RepoWorkspaceMaterializedTab[] = []
+  let nextRuntimeTerminalIndex = 0
+  const pushRuntimeTerminalsBefore = (terminalId: string | null) => {
+    if (!terminalWorkspacePaneTabProvider.canOpen({ hasWorktree: input.hasWorktree })) return
+    while (nextRuntimeTerminalIndex < input.terminalViews.length) {
+      const terminal = input.terminalViews[nextRuntimeTerminalIndex]
+      if (!terminal) break
+      if (terminalId && terminal.terminalKey === terminalId) break
+      nextRuntimeTerminalIndex += 1
+      if (seenTerminals.has(terminal.terminalKey) || orderedTerminalKeys.has(terminal.terminalKey)) continue
+      seenTerminals.add(terminal.terminalKey)
+      tabs.push(terminalWorkspacePaneTab(terminal))
+    }
+  }
 
   for (const entry of input.tabOrder) {
     if (entry.type !== 'terminal') {
@@ -239,16 +255,15 @@ function materializedWorkspacePaneTabs(input: {
       continue
     }
     if (!terminalWorkspacePaneTabProvider.canOpen({ hasWorktree: input.hasWorktree })) continue
-    const terminal = terminalById.get(entry.id)
-    if (!terminal || seenTerminals.has(entry.id)) continue
-    seenTerminals.add(entry.id)
+    const terminal = terminalByKey.get(entry.terminalKey)
+    if (!terminal || seenTerminals.has(entry.terminalKey)) continue
+    pushRuntimeTerminalsBefore(entry.terminalKey)
+    if (input.terminalViews[nextRuntimeTerminalIndex]?.terminalKey === entry.terminalKey) nextRuntimeTerminalIndex += 1
+    seenTerminals.add(entry.terminalKey)
     tabs.push(terminalWorkspacePaneTab(terminal))
   }
 
-  for (const terminal of input.terminalViews) {
-    if (seenTerminals.has(terminal.id)) continue
-    tabs.push(terminalWorkspacePaneTab(terminal))
-  }
+  pushRuntimeTerminalsBefore(null)
 
   return tabs
 }
@@ -279,7 +294,7 @@ function activeRepoWorkspaceTab(
 ): RepoWorkspaceMaterializedTab | null {
   if (renderableTab === 'terminal') {
     if (selectedTerminalKey) {
-      const selected = tabs.find((tab) => tab.kind === 'terminal' && tab.key === selectedTerminalKey)
+      const selected = tabs.find((tab) => tab.kind === 'terminal' && tab.terminalKey === selectedTerminalKey)
       if (selected) return selected
     }
     return tabs.find((tab) => tab.kind === 'terminal') ?? null

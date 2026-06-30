@@ -33,7 +33,7 @@ export type TerminalBellIntentPlan =
       kind: 'show-worktree-terminal'
       repoId: string
       branch: string
-      key: string
+      terminalKey: string
       worktreeTerminalKey: string
     }
 
@@ -82,15 +82,15 @@ export function createTerminalBellIntentPlan(
   event: Extract<ClientEffectIntent, { type: 'terminal-bell-click' }>,
 ): TerminalBellIntentPlan {
   if (!repo) return { kind: 'noop' }
-  const parsedKey = event.key ? parseTerminalWorkspaceSlotKey(event.key) : null
-  if (parsedKey && parsedKey.repoRoot === repo.id && event.key) {
+  const parsedKey = event.terminalKey ? parseTerminalWorkspaceSlotKey(event.terminalKey) : null
+  if (parsedKey && parsedKey.repoRoot === repo.id && event.terminalKey) {
     const branch = repo.data.branches.find((candidate) => candidate.worktree?.path === parsedKey.worktreePath)
     if (branch) {
       return {
         kind: 'show-worktree-terminal',
         repoId: repo.id,
         branch: branch.name,
-        key: event.key,
+        terminalKey: event.terminalKey,
         worktreeTerminalKey: worktreeTerminalKey(parsedKey.repoRoot, parsedKey.worktreePath),
       }
     }

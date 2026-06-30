@@ -34,7 +34,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   // xterm views alive across settings → workspace round-trips.
   const currentRepoId = useReposStore((s) => s.activeId)
   const currentRepoInstanceToken = currentRepoId ? (repoIndex[currentRepoId]?.instanceToken ?? null) : null
-  const selectedTerminalSessionByWorktree = useReposStore((s) => s.selectedTerminalSessionByWorktree)
+  const selectedTerminalKeyByWorktree = useReposStore((s) => s.selectedTerminalKeyByWorktree)
   const setSelectedTerminal = useReposStore((s) => s.setSelectedTerminal)
   const parkingRootRef = useRef<HTMLDivElement | null>(null)
   const repoIndexRef = useRef(repoIndex)
@@ -77,8 +77,11 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       // at read time when the active tab disappears, so this callback only
       // needs to drop the tab from the branch-scoped tab order — no
       // navigation or view-switch call required.
-      onTerminalSessionRemoved: (key, base) => {
-        useReposStore.getState().removeWorkspacePaneTerminalTab(base.repoRoot, key, base.branch)
+      onTerminalSessionRemoved: (terminalKey, base) => {
+        useReposStore.getState().removeWorkspacePaneTerminalTab(base.repoRoot, terminalKey, base.branch)
+      },
+      onTerminalSessionsMaterialized: (base, terminalKeys) => {
+        useReposStore.getState().ensureWorkspacePaneTerminalTabs(base.repoRoot, base.branch, terminalKeys)
       },
     })
   }
@@ -139,8 +142,8 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   // Projection state sync
   useEffect(() => {
     projection.setRepoIndex(repoIndex)
-    projection.setPreferredSelectedTerminalKeys(selectedTerminalSessionByWorktree)
-  }, [projection, repoIndex, selectedTerminalSessionByWorktree])
+    projection.setPreferredSelectedTerminalKeys(selectedTerminalKeyByWorktree)
+  }, [projection, repoIndex, selectedTerminalKeyByWorktree])
 
   // Parking DOM
   useEffect(() => {

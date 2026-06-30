@@ -53,7 +53,7 @@ export function projectServerTerminalSession(input: {
   serverSnapshot?: TerminalSessionSnapshot | null
   reattachSnapshot?: ReattachSnapshotCacheEntry | null
 }): ProjectedServerTerminalSession | null {
-  const parsed = parseTerminalWorkspaceSlotKey(input.serverSession.key)
+  const parsed = parseTerminalWorkspaceSlotKey(input.serverSession.terminalKey)
   if (!parsed || parsed.repoRoot !== input.repoRoot) return null
   const branch = branchForTerminalWorktree(input.repoIndex, parsed.repoRoot, parsed.worktreePath)
   if (!branch) return null

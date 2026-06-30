@@ -26,11 +26,11 @@ import {
 import {
   isWorkspacePaneSessionTabType,
   isWorkspacePaneStaticTabType,
-  isWorkspacePaneTabOrderEntry,
   type WorkspacePaneSessionTabType,
   type WorkspacePaneStaticTabType,
   type WorkspacePaneTabOrderEntry,
-  workspacePaneStaticTabOrderEntry,
+  workspacePaneTabOrderEntryFromUnknown,
+  workspacePaneTabOrderEntryIdentity,
 } from '#/shared/workspace-pane.ts'
 import { normalizeGlobalShortcut } from '#/shared/accelerator.ts'
 import { isColorTheme, type ColorTheme } from '#/shared/color-theme.ts'
@@ -128,7 +128,7 @@ function defaultSession(): WorkspaceSessionState {
   return defaultWorkspaceSessionState()
 }
 
-function normalizeSelectedTerminalSessionByWorktree(value: unknown): Record<string, string> {
+function normalizeSelectedTerminalKeyByWorktree(value: unknown): Record<string, string> {
   if (!value || typeof value !== 'object') return {}
   const normalized: Record<string, string> = {}
   for (const [worktreeKey, key] of Object.entries(value)) {
@@ -198,12 +198,9 @@ function normalizeWorkspacePaneTabOrderByBranchByRepo(
       const order: WorkspacePaneTabOrderEntry[] = []
       const seen = new Set<string>()
       for (const raw of rawOrder) {
-        if (!isWorkspacePaneTabOrderEntry(raw)) continue
-        const entry =
-          raw.type === 'terminal'
-            ? { type: 'terminal' as const, id: raw.id }
-            : workspacePaneStaticTabOrderEntry(raw.type)
-        const identity = `${entry.type}:${entry.id}`
+        const entry = workspacePaneTabOrderEntryFromUnknown(raw)
+        if (!entry) continue
+        const identity = workspacePaneTabOrderEntryIdentity(entry)
         if (seen.has(identity)) continue
         seen.add(identity)
         order.push(entry)
@@ -297,9 +294,7 @@ function normalizeSession(value: unknown): WorkspaceSessionState {
       activeRepoId && openRepoEntries.some((entry) => repoSessionEntryId(entry) === activeRepoId) ? activeRepoId : null,
     zenMode: typeof partial.zenMode === 'boolean' ? partial.zenMode : DEFAULT_ZEN_MODE,
     workspacePaneSize: normalizeWorkspacePaneSize(partial.workspacePaneSize),
-    selectedTerminalSessionByWorktree: normalizeSelectedTerminalSessionByWorktree(
-      partial.selectedTerminalSessionByWorktree,
-    ),
+    selectedTerminalKeyByWorktree: normalizeSelectedTerminalKeyByWorktree(partial.selectedTerminalKeyByWorktree),
     preferredWorkspacePaneTabByBranchByRepo: normalizePreferredWorkspacePaneTabByBranchByRepo(
       partial.preferredWorkspacePaneTabByBranchByRepo,
       openRepoEntries,

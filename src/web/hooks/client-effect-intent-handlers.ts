@@ -65,7 +65,7 @@ export function handleTerminalBellClickIntent(
   deps.closeAllOverlays()
   switch (plan.kind) {
     case 'show-worktree-terminal':
-      deps.setSelectedTerminal(plan.worktreeTerminalKey, plan.key)
+      deps.setSelectedTerminal(plan.worktreeTerminalKey, plan.terminalKey)
       deps.navigation.showRepoBranchWorkspacePaneTab(plan.repoId, plan.branch, 'terminal')
       return
     case 'show-repo-terminal':

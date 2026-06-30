@@ -153,7 +153,7 @@ function makeCreateResult(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     ok: true as const,
     action: 'created' as const,
-    key: `${REPO_ROOT}\0${WORKTREE_PATH}\0session-1`,
+    terminalKey: `${REPO_ROOT}\0${WORKTREE_PATH}\0session-1`,
     ptySessionId: 'pty_session_1_aaaaaaaaa',
     processName: 'zsh',
     canonicalTitle: null,
@@ -167,7 +167,7 @@ function makeCreateResult(overrides: Partial<Record<string, unknown>> = {}) {
     sessions: [
       {
         ptySessionId: 'pty_session_1_aaaaaaaaa',
-        key: `${REPO_ROOT}\0${WORKTREE_PATH}\0session-1`,
+        terminalKey: `${REPO_ROOT}\0${WORKTREE_PATH}\0session-1`,
         cwd: WORKTREE_PATH,
         controller: { clientId: 'client_local', status: 'connected' as const },
         processName: 'zsh',
@@ -183,10 +183,10 @@ function makeCreateResult(overrides: Partial<Record<string, unknown>> = {}) {
   }
 }
 
-function emitBellForKey(projection: TerminalSessionProjection, key: string): void {
+function emitBellForKey(projection: TerminalSessionProjection, terminalKey: string): void {
   ;(projection as any).bellState.handleBell(
     {
-      key,
+      terminalKey,
       worktreeTerminalKey: WORKTREE_KEY,
       sessionId: 'session-1',
       index: 1,
@@ -280,12 +280,12 @@ describe('TerminalSessionProjection create flow', () => {
   test('queues a different startup shell command behind an in-flight create for the same worktree', async () => {
     const first = Promise.withResolvers<ReturnType<typeof makeCreateResult>>()
     const secondResult = makeCreateResult({
-      key: `${REPO_ROOT}\0${WORKTREE_PATH}\0session-2`,
+      terminalKey: `${REPO_ROOT}\0${WORKTREE_PATH}\0session-2`,
       ptySessionId: 'pty_session_2_aaaaaaaaa',
       sessions: [
         {
           ptySessionId: 'pty_session_1_aaaaaaaaa',
-          key: `${REPO_ROOT}\0${WORKTREE_PATH}\0session-1`,
+          terminalKey: `${REPO_ROOT}\0${WORKTREE_PATH}\0session-1`,
           cwd: WORKTREE_PATH,
           controller: { clientId: 'client_local', status: 'connected' as const },
           processName: 'zsh',
@@ -298,7 +298,7 @@ describe('TerminalSessionProjection create flow', () => {
         },
         {
           ptySessionId: 'pty_session_2_aaaaaaaaa',
-          key: `${REPO_ROOT}\0${WORKTREE_PATH}\0session-2`,
+          terminalKey: `${REPO_ROOT}\0${WORKTREE_PATH}\0session-2`,
           cwd: WORKTREE_PATH,
           controller: { clientId: 'client_local', status: 'connected' as const },
           processName: 'zsh',
@@ -639,11 +639,15 @@ describe('TerminalSessionProjection create flow', () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
     projection.registerHost(WORKTREE_KEY, host)
-    const key = await projection.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
+    const terminalKey = await projection.createTerminal({
+      repoRoot: REPO_ROOT,
+      branch: BRANCH,
+      worktreePath: WORKTREE_PATH,
+    })
     mocks.setBadgeMock.mockClear()
     ;(projection as any).bellState.handleBell(
       {
-        key,
+        terminalKey,
         worktreeTerminalKey: WORKTREE_KEY,
         sessionId: 'session-1',
         index: 1,
@@ -669,23 +673,27 @@ describe('TerminalSessionProjection create flow', () => {
     const unsubscribe = projection.subscribeRepoBellCount(REPO_ROOT, listener)
 
     try {
-      const key = await projection.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
+      const terminalKey = await projection.createTerminal({
+        repoRoot: REPO_ROOT,
+        branch: BRANCH,
+        worktreePath: WORKTREE_PATH,
+      })
       expect(projection.repoBellCount(REPO_ROOT)).toBe(0)
       expect(listener).not.toHaveBeenCalled()
 
-      emitBellForKey(projection, key)
+      emitBellForKey(projection, terminalKey)
 
       expect(projection.repoBellCount(REPO_ROOT)).toBe(1)
       expect(listener).toHaveBeenCalledTimes(1)
 
       listener.mockClear()
-      projection.scrollToBottom(key)
+      projection.scrollToBottom(terminalKey)
 
       expect(projection.repoBellCount(REPO_ROOT)).toBe(1)
       expect(listener).not.toHaveBeenCalled()
 
       listener.mockClear()
-      projection.clearBell(key)
+      projection.clearBell(terminalKey)
 
       expect(projection.repoBellCount(REPO_ROOT)).toBe(0)
       expect(listener).toHaveBeenCalledTimes(1)
@@ -698,8 +706,12 @@ describe('TerminalSessionProjection create flow', () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
     projection.registerHost(WORKTREE_KEY, host)
-    const key = await projection.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
-    emitBellForKey(projection, key)
+    const terminalKey = await projection.createTerminal({
+      repoRoot: REPO_ROOT,
+      branch: BRANCH,
+      worktreePath: WORKTREE_PATH,
+    })
+    emitBellForKey(projection, terminalKey)
 
     const listener = vi.fn()
     const unsubscribe = projection.subscribeRepoBellCount(REPO_ROOT, listener)

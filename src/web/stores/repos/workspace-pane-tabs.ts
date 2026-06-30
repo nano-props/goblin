@@ -1,7 +1,7 @@
 import type { RepoUiState } from '#/web/stores/repos/types.ts'
 import type { WorkspacePaneStaticTabType, WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
 import {
-  isWorkspacePaneTabOrderEntry,
+  workspacePaneTabOrderEntryFromUnknown,
   workspacePaneStaticTabOrderEntry,
   workspacePaneTerminalTabOrderEntry,
   workspacePaneTabOrderEntryIdentity,
@@ -57,8 +57,81 @@ export function workspacePaneTabOrderWithTerminal(
   terminalKey: string,
 ): WorkspacePaneTabOrderEntry[] {
   if (terminalKey.length === 0) return normalizeWorkspacePaneTabOrder(current)
-  const withoutCurrentTerminal = current.filter((entry) => entry.type !== 'terminal' || entry.id !== terminalKey)
+  const withoutCurrentTerminal = current.filter(
+    (entry) => entry.type !== 'terminal' || entry.terminalKey !== terminalKey,
+  )
   return normalizeWorkspacePaneTabOrder([...withoutCurrentTerminal, workspacePaneTerminalTabOrderEntry(terminalKey)])
+}
+
+export function workspacePaneTabOrderWithMaterializedTerminals(
+  current: readonly WorkspacePaneTabOrderEntry[],
+  terminalKeys: readonly string[],
+): WorkspacePaneTabOrderEntry[] {
+  const normalized = normalizeWorkspacePaneTabOrder(current)
+  const runtimeTerminalKeys = uniqueNonEmptyStrings(terminalKeys)
+  if (runtimeTerminalKeys.length === 0) return normalized
+
+  const orderedTerminalKeys = normalized.flatMap((entry) => (entry.type === 'terminal' ? [entry.terminalKey] : []))
+  const orderedTerminalKeySet = new Set(orderedTerminalKeys)
+  const missingTerminalKeys = runtimeTerminalKeys.filter((terminalKey) => !orderedTerminalKeySet.has(terminalKey))
+  if (missingTerminalKeys.length === 0) return normalized
+
+  const beforeByTerminalKey = new Map<string, string[]>()
+  const afterByTerminalKey = new Map<string, string[]>()
+  const appendTerminalKeys: string[] = []
+  for (const terminalKey of missingTerminalKeys) {
+    const runtimeIndex = runtimeTerminalKeys.indexOf(terminalKey)
+    const nextAnchor = runtimeTerminalKeys
+      .slice(runtimeIndex + 1)
+      .find((candidate) => orderedTerminalKeySet.has(candidate))
+    if (nextAnchor) {
+      pushMapList(beforeByTerminalKey, nextAnchor, terminalKey)
+      continue
+    }
+    const previousAnchor = runtimeTerminalKeys
+      .slice(0, runtimeIndex)
+      .reverse()
+      .find((candidate) => orderedTerminalKeySet.has(candidate))
+    if (previousAnchor) {
+      pushMapList(afterByTerminalKey, previousAnchor, terminalKey)
+      continue
+    }
+    appendTerminalKeys.push(terminalKey)
+  }
+
+  const next: WorkspacePaneTabOrderEntry[] = []
+  for (const entry of normalized) {
+    if (entry.type === 'terminal') {
+      for (const terminalKey of beforeByTerminalKey.get(entry.terminalKey) ?? []) {
+        next.push(workspacePaneTerminalTabOrderEntry(terminalKey))
+      }
+      next.push(entry)
+      for (const terminalKey of afterByTerminalKey.get(entry.terminalKey) ?? []) {
+        next.push(workspacePaneTerminalTabOrderEntry(terminalKey))
+      }
+      continue
+    }
+    next.push(entry)
+  }
+  for (const terminalKey of appendTerminalKeys) next.push(workspacePaneTerminalTabOrderEntry(terminalKey))
+  return normalizeWorkspacePaneTabOrder(next)
+}
+
+function uniqueNonEmptyStrings(values: readonly string[]): string[] {
+  const next: string[] = []
+  const seen = new Set<string>()
+  for (const value of values) {
+    if (value.length === 0 || seen.has(value)) continue
+    seen.add(value)
+    next.push(value)
+  }
+  return next
+}
+
+function pushMapList(map: Map<string, string[]>, key: string, value: string): void {
+  const current = map.get(key)
+  if (current) current.push(value)
+  else map.set(key, [value])
 }
 
 export function workspacePaneTabOrderWithoutTerminal(
@@ -66,7 +139,7 @@ export function workspacePaneTabOrderWithoutTerminal(
   terminalKey: string,
 ): WorkspacePaneTabOrderEntry[] {
   return normalizeWorkspacePaneTabOrder(
-    current.filter((entry) => entry.type !== 'terminal' || entry.id !== terminalKey),
+    current.filter((entry) => entry.type !== 'terminal' || entry.terminalKey !== terminalKey),
   )
 }
 
@@ -89,9 +162,8 @@ export function normalizeWorkspacePaneTabOrder(
   const next: WorkspacePaneTabOrderEntry[] = []
   const seen = new Set<string>()
   for (const raw of order) {
-    if (!isWorkspacePaneTabOrderEntry(raw)) continue
-    const entry =
-      raw.type === 'terminal' ? workspacePaneTerminalTabOrderEntry(raw.id) : workspacePaneStaticTabOrderEntry(raw.type)
+    const entry = workspacePaneTabOrderEntryFromUnknown(raw)
+    if (!entry) continue
     const identity = workspacePaneTabOrderEntryIdentity(entry)
     if (seen.has(identity)) continue
     seen.add(identity)

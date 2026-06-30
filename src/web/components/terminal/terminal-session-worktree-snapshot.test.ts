@@ -4,7 +4,7 @@ import type { TerminalSessionLike, TerminalDescriptor, TerminalSnapshot } from '
 
 function makeDescriptor(sessionId: string, index: number): TerminalDescriptor {
   return {
-    key: `/repo\0/repo\0${sessionId}`,
+    terminalKey: `/repo\0/repo\0${sessionId}`,
     worktreeTerminalKey: '/repo\0/repo',
     sessionId,
     index,
@@ -63,9 +63,9 @@ describe('terminal session worktree snapshot helper', () => {
       selectedDescriptor: descriptor,
       pendingCreate: false,
       sessions: [session],
-      selectedKey: descriptor.key,
-      getCachedSnapshot: (key) => cache.get(key) ?? null,
-      cacheSnapshot: (key, value) => cache.set(key, value),
+      selectedTerminalKey: descriptor.terminalKey,
+      getCachedSnapshot: (terminalKey) => cache.get(terminalKey) ?? null,
+      cacheSnapshot: (terminalKey, value) => cache.set(terminalKey, value),
       getDisplayOrder: () => 1,
       hasBell: () => true,
       hasRecentActivity: () => true,
@@ -77,8 +77,7 @@ describe('terminal session worktree snapshot helper', () => {
       sessions: [
         expect.objectContaining({
           type: 'terminal',
-          id: descriptor.key,
-          key: descriptor.key,
+          terminalKey: descriptor.terminalKey,
           sessionId: 'session-1',
           selected: true,
           hasBell: true,
@@ -99,9 +98,9 @@ describe('terminal session worktree snapshot helper', () => {
       selectedDescriptor: descriptor,
       pendingCreate: false,
       sessions: [session],
-      selectedKey: descriptor.key,
-      getCachedSnapshot: (key) => cache.get(key) ?? null,
-      cacheSnapshot: (key, value) => cache.set(key, value),
+      selectedTerminalKey: descriptor.terminalKey,
+      getCachedSnapshot: (terminalKey) => cache.get(terminalKey) ?? null,
+      cacheSnapshot: (terminalKey, value) => cache.set(terminalKey, value),
       getDisplayOrder: () => 1,
       hasBell: () => false,
       hasRecentActivity: () => false,

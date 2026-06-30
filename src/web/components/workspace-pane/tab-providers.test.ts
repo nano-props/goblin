@@ -12,19 +12,21 @@ import {
 import type { WorkspacePaneTabSummary } from '#/web/components/terminal/types.ts'
 import {
   WORKSPACE_PANE_BRANCH_TAB_TYPES,
+  WORKSPACE_PANE_STATIC_TAB_IDS,
   WORKSPACE_PANE_STATIC_TAB_TYPES,
   WORKSPACE_PANE_TAB_TYPES,
   WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES,
+  workspacePaneStaticTabOrderEntry,
   workspacePaneStaticTabScope,
   workspacePaneTabScope,
+  workspacePaneTerminalTabOrderEntry,
 } from '#/shared/workspace-pane.ts'
 
 const t = (key: string, params?: Record<string, string | number>) => (params ? `${key}:${JSON.stringify(params)}` : key)
 
 const terminalView: WorkspacePaneTabSummary = {
   type: 'terminal',
-  id: 'session-1',
-  key: 'session-1',
+  terminalKey: 'session-1',
   worktreeTerminalKey: 'repo\0worktree',
   sessionId: 'session-1',
   index: 1,
@@ -35,7 +37,7 @@ const terminalView: WorkspacePaneTabSummary = {
   phase: 'open',
   selected: true,
   hasBell: false,
-            recentlyActive: false,
+  recentlyActive: false,
 }
 
 describe('workspace pane tab providers', () => {
@@ -111,14 +113,16 @@ describe('workspace pane tab providers', () => {
   })
 
   test('builds stable identities, order entries, and labels', () => {
-    expect(workspacePaneStaticTabProvider('status').identity()).toBe('status:status')
+    expect(workspacePaneStaticTabProvider('status').identity()).toBe(WORKSPACE_PANE_STATIC_TAB_IDS.status)
     expect(workspacePaneStaticTabProvider('status').buttonId('workspace-pane')).toBe('workspace-pane-status-tab')
     expect(workspacePaneStaticTabProvider('status').panelId('workspace-pane')).toBe('workspace-pane-status-panel')
-    expect(workspacePaneStaticTabProvider('changes').orderEntry()).toEqual({ type: 'changes', id: 'changes' })
+    expect(workspacePaneStaticTabProvider('changes').orderEntry()).toEqual(workspacePaneStaticTabOrderEntry('changes'))
     expect(terminalWorkspacePaneTabProvider.identity('session-1')).toBe('terminal:session-1')
     expect(terminalWorkspacePaneTabProvider.buttonId('workspace-pane', 0)).toBe('workspace-pane-workspace-pane-tab')
     expect(terminalWorkspacePaneTabProvider.buttonId('workspace-pane', 2)).toBe('workspace-pane-workspace-pane-tab-2')
-    expect(terminalWorkspacePaneTabProvider.orderEntry('session-1')).toEqual({ type: 'terminal', id: 'session-1' })
+    expect(terminalWorkspacePaneTabProvider.orderEntry('session-1')).toEqual(
+      workspacePaneTerminalTabOrderEntry('session-1'),
+    )
     expect(changesWorkspacePaneTabProvider.label({ t, branchName: 'main', statusCount: 3 })).toBe(
       'tab.changes-with-count:{"count":3}',
     )

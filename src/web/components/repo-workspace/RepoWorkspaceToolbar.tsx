@@ -115,7 +115,7 @@ export function RepoWorkspaceToolbar({
       }
       if (isTerminalWorkspacePaneTabItem(item)) {
         enterTerminalTab()
-        selectTerminal(item.view.worktreeTerminalKey, item.view.key)
+        selectTerminal(item.view.worktreeTerminalKey, item.view.terminalKey)
         return
       }
     },
@@ -194,7 +194,7 @@ export function RepoWorkspaceToolbar({
     (item: WorkspacePaneTabItem) => {
       if (isPendingWorkspacePaneTabItem(item)) return
       if (isTerminalWorkspacePaneTabItem(item) && item.identity === activeTabIdentity) {
-        handleScrollToBottom(item.view.key)
+        handleScrollToBottom(item.view.terminalKey)
         return
       }
       showWorkspacePaneTabItem(item)

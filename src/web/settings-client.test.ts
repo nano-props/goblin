@@ -69,7 +69,7 @@ describe('settings-client', () => {
             activeRepoId: null,
             zenMode: true,
             workspacePaneSize: 50,
-            selectedTerminalSessionByWorktree: {},
+            selectedTerminalKeyByWorktree: {},
             workspacePaneTabOrderByBranchByRepo: {},
           },
           recentRepos: [],

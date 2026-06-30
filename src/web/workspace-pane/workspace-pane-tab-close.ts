@@ -15,8 +15,7 @@ interface CloseWorkspacePaneTabsForWorktreeOptions {
 }
 
 type WorkspacePaneTabCloseStart =
-  | { accepted: false; completion: null }
-  | { accepted: true; completion: Promise<boolean> }
+  { accepted: false; completion: null } | { accepted: true; completion: Promise<boolean> }
 
 export function beginWorkspacePaneTabClose(
   target: RepoWorkspaceTabModel,
@@ -34,7 +33,7 @@ export function beginWorkspacePaneTabClose(
     completion: provider.close({
       repoId: target.repoId,
       branchName: target.branchName,
-      terminalKey: tab.kind === 'terminal' ? tab.key : undefined,
+      terminalKey: tab.kind === 'terminal' ? tab.terminalKey : undefined,
       terminalBase: target.terminalBase,
       closeStaticTab: useReposStore.getState().closeWorkspacePaneStaticTab,
       closeTerminalByDescriptor: bridge?.closeTerminalByDescriptor,

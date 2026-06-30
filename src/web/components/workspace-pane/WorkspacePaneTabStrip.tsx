@@ -292,11 +292,7 @@ function WorkspacePaneTabSwitcherPopover({
                     aria-current={selected ? 'true' : undefined}
                   >
                     <span className="flex size-3.5 shrink-0 items-center justify-center">
-                      {selected ? (
-                        <Check size={13} aria-hidden />
-                      ) : (
-                        <WorkspacePaneTabIcon item={item} active={false} />
-                      )}
+                      {selected ? <Check size={13} aria-hidden /> : <WorkspacePaneTabIcon item={item} active={false} />}
                     </span>
                     <span className="min-w-0 flex-1 truncate">{item.label || item.tooltip}</span>
                     {isTerminalWorkspacePaneTabItem(item) && item.view.hasBell && (
@@ -396,7 +392,7 @@ export function WorkspacePaneTabStrip({
       if (!item) return
       if (isPendingWorkspacePaneTabItem(item)) return
       if (isTerminalWorkspacePaneTabItem(item) && item.identity === activeTabIdentity && panelActive) {
-        onScrollToBottom(item.view.key)
+        onScrollToBottom(item.view.terminalKey)
       } else {
         onSelect(item)
       }
@@ -730,7 +726,9 @@ function WorkspacePaneScrollableTabsBody({
               if (!isSortableWorkspacePaneTabItem(item)) {
                 return <WorkspacePaneTab key={item.identity} {...commonProps} />
               }
-              return <SortableWorkspacePaneTab key={item.identity} {...commonProps} sortableIdentity={item.sortableId} />
+              return (
+                <SortableWorkspacePaneTab key={item.identity} {...commonProps} sortableIdentity={item.sortableId} />
+              )
             })}
           </WorkspacePaneTabTooltipLayer>
         </SortableContext>

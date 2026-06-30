@@ -6,7 +6,11 @@ import type {
   WorkspacePaneTabOrderEntry,
   WorkspacePaneTabType,
 } from '#/shared/workspace-pane.ts'
-import { WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES, workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
+import {
+  WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES,
+  workspacePaneStaticTabOrderEntry,
+  workspacePaneTerminalTabOrderEntry,
+} from '#/shared/workspace-pane.ts'
 import {
   createRepoBranch as branch,
   installGoblinTestBridge,
@@ -96,7 +100,7 @@ function staticTabOrder(...views: WorkspacePaneStaticTabType[]): WorkspacePaneTa
 }
 
 function terminalEntry(id: string): WorkspacePaneTabOrderEntry {
-  return { type: 'terminal', id }
+  return workspacePaneTerminalTabOrderEntry(id)
 }
 
 function stubRefreshActions(
@@ -471,6 +475,30 @@ describe('setWorkspacePaneTab', () => {
     expect(tabOrderFor('main')).toEqual([workspacePaneStaticTabOrderEntry('status'), terminalEntry('session-1')])
   })
 
+  test('materializes visible terminal tabs into the branch order without changing focus', () => {
+    seedRepo({
+      selectedBranch: 'main',
+      preferredWorkspacePaneTab: 'status',
+      workspacePaneTabOrder: [
+        workspacePaneStaticTabOrderEntry('status'),
+        terminalEntry('session-2'),
+        workspacePaneStaticTabOrderEntry('history'),
+      ],
+    })
+
+    useReposStore.getState().ensureWorkspacePaneTerminalTabs(REPO_ID, 'main', ['session-1', 'session-2', 'session-3'])
+
+    expect(tabOrderFor('main')).toEqual([
+      workspacePaneStaticTabOrderEntry('status'),
+      terminalEntry('session-1'),
+      terminalEntry('session-2'),
+      terminalEntry('session-3'),
+      workspacePaneStaticTabOrderEntry('history'),
+    ])
+    expect(preferredTabFor('main')).toBe('status')
+    expect(useReposStore.getState().selectedTerminalKeyByWorktree).toEqual({})
+  })
+
   test('addAndFocus adds the tab, switches to terminal view, and selects the new terminal', () => {
     seedRepo({ selectedBranch: 'feature/worktree', preferredWorkspacePaneTab: 'status' })
 
@@ -481,7 +509,7 @@ describe('setWorkspacePaneTab', () => {
       terminalEntry('session-1'),
     ])
     expect(preferredTabFor('feature/worktree')).toBe('terminal')
-    expect(useReposStore.getState().selectedTerminalSessionByWorktree[`${REPO_ID}\0/tmp/feature-worktree`]).toBe(
+    expect(useReposStore.getState().selectedTerminalKeyByWorktree[`${REPO_ID}\0/tmp/feature-worktree`]).toBe(
       'session-1',
     )
   })
@@ -493,7 +521,7 @@ describe('setWorkspacePaneTab', () => {
       workspacePaneTabOrder: [terminalEntry('session-1')],
     })
     useReposStore.setState({
-      selectedTerminalSessionByWorktree: { [`${REPO_ID}\0/tmp/feature-worktree`]: 'session-1' },
+      selectedTerminalKeyByWorktree: { [`${REPO_ID}\0/tmp/feature-worktree`]: 'session-1' },
     })
 
     const before = useReposStore.getState().repos[REPO_ID]

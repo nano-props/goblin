@@ -49,7 +49,7 @@ export function TerminalActionDialogHost({ activeRepoId, navigation }: Props) {
           navigation,
           targetIdentity: payload.targetIdentity,
           confirmedTerminal: {
-            key: payload.terminalKey,
+            terminalKey: payload.terminalKey,
             base: payload.terminalBase,
           },
         })
@@ -58,13 +58,7 @@ export function TerminalActionDialogHost({ activeRepoId, navigation }: Props) {
   )
 }
 
-function TerminalCloseConfirmBody({
-  body,
-  processName,
-}: {
-  readonly body: string
-  readonly processName: string
-}) {
+function TerminalCloseConfirmBody({ body, processName }: { readonly body: string; readonly processName: string }) {
   return (
     <div className="space-y-1">
       <p>{body}</p>

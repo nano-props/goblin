@@ -42,8 +42,8 @@ vi.mock('#/web/components/terminal/mobile-detection.ts', () => ({
 // `renderInJsdom` registers `cleanup` via `afterEach`, which
 // unmounts all rendered components and removes their containers.
 
-type TestTerminalSummary = Omit<TerminalSessionSummary, 'type' | 'id' | 'displayOrder' | 'recentlyActive'> &
-  Partial<Pick<TerminalSessionSummary, 'type' | 'id' | 'displayOrder' | 'recentlyActive'>>
+type TestTerminalSummary = Omit<TerminalSessionSummary, 'type' | 'displayOrder' | 'recentlyActive'> &
+  Partial<Pick<TerminalSessionSummary, 'type' | 'displayOrder' | 'recentlyActive'>>
 
 type TestWorktreeSnapshot = Omit<WorktreeTerminalSnapshot, 'sessions' | 'bellCount' | 'activeCount'> & {
   sessions: TestTerminalSummary[]
@@ -55,7 +55,6 @@ function completeWorktreeSnapshot(snapshot: TestWorktreeSnapshot): WorktreeTermi
   const sessions = snapshot.sessions.map((session, index) => ({
     ...session,
     type: 'terminal' as const,
-    id: session.id ?? session.key,
     displayOrder: session.displayOrder ?? index + 1,
     recentlyActive: session.recentlyActive ?? false,
   }))
@@ -70,7 +69,7 @@ function completeWorktreeSnapshot(snapshot: TestWorktreeSnapshot): WorktreeTermi
 async function renderTerminalSession() {
   const writeInput = vi.fn()
   const descriptor = {
-    key: 'session-1',
+    terminalKey: 'session-1',
     worktreeTerminalKey: '/repo\0/worktree',
     sessionId: 'session-1',
     index: 1,
@@ -83,7 +82,7 @@ async function renderTerminalSession() {
     selectedDescriptor: descriptor,
     sessions: [
       {
-        key: 'session-1',
+        terminalKey: 'session-1',
         worktreeTerminalKey: '/repo\0/worktree',
         sessionId: 'session-1',
         index: 1,
@@ -91,7 +90,7 @@ async function renderTerminalSession() {
         phase: 'open' as const,
         selected: true,
         hasBell: false,
-            recentlyActive: false,
+        recentlyActive: false,
       },
     ],
     count: 1,
@@ -217,7 +216,7 @@ describe('TerminalSessionView', () => {
     const takeover = vi.fn().mockResolvedValue(true)
     const summaries = [
       {
-        key: 'session-1',
+        terminalKey: 'session-1',
         worktreeTerminalKey: '/repo\0/worktree',
         sessionId: 'session-1',
         index: 1,
@@ -225,11 +224,11 @@ describe('TerminalSessionView', () => {
         phase: 'open' as const,
         selected: true,
         hasBell: false,
-            recentlyActive: false,
+        recentlyActive: false,
       },
     ]
     const descriptor = {
-      key: 'session-1',
+      terminalKey: 'session-1',
       worktreeTerminalKey: '/repo\0/worktree',
       sessionId: 'session-1',
       index: 1,
@@ -375,7 +374,7 @@ describe('TerminalSessionView', () => {
 
   test('hides the xterm host while an existing session is still attaching locally', async () => {
     const descriptor = {
-      key: 'session-1',
+      terminalKey: 'session-1',
       worktreeTerminalKey: '/repo\0/worktree',
       sessionId: 'session-1',
       index: 1,
@@ -388,7 +387,7 @@ describe('TerminalSessionView', () => {
       selectedDescriptor: descriptor,
       sessions: [
         {
-          key: 'session-1',
+          terminalKey: 'session-1',
           worktreeTerminalKey: '/repo\0/worktree',
           sessionId: 'session-1',
           index: 1,
@@ -396,7 +395,7 @@ describe('TerminalSessionView', () => {
           phase: 'open' as const,
           selected: true,
           hasBell: false,
-            recentlyActive: false,
+          recentlyActive: false,
         },
       ],
       count: 1,
@@ -454,7 +453,7 @@ describe('TerminalSessionView', () => {
 
   test('focuses the controller terminal after the ready render shows the host', async () => {
     const descriptor = {
-      key: 'session-1',
+      terminalKey: 'session-1',
       worktreeTerminalKey: '/repo\0/worktree',
       sessionId: 'session-1',
       index: 1,
@@ -467,7 +466,7 @@ describe('TerminalSessionView', () => {
       selectedDescriptor: descriptor,
       sessions: [
         {
-          key: 'session-1',
+          terminalKey: 'session-1',
           worktreeTerminalKey: '/repo\0/worktree',
           sessionId: 'session-1',
           index: 1,
@@ -475,7 +474,7 @@ describe('TerminalSessionView', () => {
           phase: 'open' as const,
           selected: true,
           hasBell: false,
-            recentlyActive: false,
+          recentlyActive: false,
         },
       ],
       count: 1,
@@ -561,7 +560,7 @@ describe('TerminalSessionView', () => {
 
   test('focuses the controller terminal after search closes if ready happened while search was open', async () => {
     const descriptor = {
-      key: 'session-1',
+      terminalKey: 'session-1',
       worktreeTerminalKey: '/repo\0/worktree',
       sessionId: 'session-1',
       index: 1,
@@ -574,7 +573,7 @@ describe('TerminalSessionView', () => {
       selectedDescriptor: descriptor,
       sessions: [
         {
-          key: 'session-1',
+          terminalKey: 'session-1',
           worktreeTerminalKey: '/repo\0/worktree',
           sessionId: 'session-1',
           index: 1,
@@ -582,7 +581,7 @@ describe('TerminalSessionView', () => {
           phase: 'open' as const,
           selected: true,
           hasBell: false,
-            recentlyActive: false,
+          recentlyActive: false,
         },
       ],
       count: 1,
@@ -676,7 +675,7 @@ describe('TerminalSessionView', () => {
     const takeover = vi.fn().mockResolvedValue(true)
     const restart = vi.fn()
     const descriptor = {
-      key: 'session-1',
+      terminalKey: 'session-1',
       worktreeTerminalKey: '/repo\0/worktree',
       sessionId: 'session-1',
       index: 1,
@@ -689,7 +688,7 @@ describe('TerminalSessionView', () => {
       selectedDescriptor: descriptor,
       sessions: [
         {
-          key: 'session-1',
+          terminalKey: 'session-1',
           worktreeTerminalKey: '/repo\0/worktree',
           sessionId: 'session-1',
           index: 1,
@@ -697,7 +696,7 @@ describe('TerminalSessionView', () => {
           phase: 'error' as const,
           selected: true,
           hasBell: false,
-            recentlyActive: false,
+          recentlyActive: false,
         },
       ],
       count: 1,
@@ -789,7 +788,7 @@ describe('TerminalSessionView', () => {
     // closes that hole.
     const writeInput = vi.fn()
     const descriptor = {
-      key: 'session-1',
+      terminalKey: 'session-1',
       worktreeTerminalKey: '/repo\0/worktree',
       sessionId: 'session-1',
       index: 1,
@@ -802,7 +801,7 @@ describe('TerminalSessionView', () => {
       selectedDescriptor: descriptor,
       sessions: [
         {
-          key: 'session-1',
+          terminalKey: 'session-1',
           worktreeTerminalKey: '/repo\0/worktree',
           sessionId: 'session-1',
           index: 1,
@@ -810,7 +809,7 @@ describe('TerminalSessionView', () => {
           phase: 'open' as const,
           selected: true,
           hasBell: false,
-            recentlyActive: false,
+          recentlyActive: false,
         },
       ],
       count: 1,
@@ -907,7 +906,7 @@ describe('TerminalSessionView', () => {
     // dropped the controller gate would have slipped through.
     const writeInput = vi.fn()
     const descriptor = {
-      key: 'session-1',
+      terminalKey: 'session-1',
       worktreeTerminalKey: '/repo\0/worktree',
       sessionId: 'session-1',
       index: 1,
@@ -920,7 +919,7 @@ describe('TerminalSessionView', () => {
       selectedDescriptor: descriptor,
       sessions: [
         {
-          key: 'session-1',
+          terminalKey: 'session-1',
           worktreeTerminalKey: '/repo\0/worktree',
           sessionId: 'session-1',
           index: 1,
@@ -928,7 +927,7 @@ describe('TerminalSessionView', () => {
           phase: 'open' as const,
           selected: true,
           hasBell: false,
-            recentlyActive: false,
+          recentlyActive: false,
         },
       ],
       count: 1,
@@ -1044,7 +1043,7 @@ describe('TerminalSessionView', () => {
     // paths.
     const writeInput = vi.fn()
     const descriptor = {
-      key: 'session-1',
+      terminalKey: 'session-1',
       worktreeTerminalKey: '/repo\0/worktree',
       sessionId: 'session-1',
       index: 1,
@@ -1057,7 +1056,7 @@ describe('TerminalSessionView', () => {
       selectedDescriptor: descriptor,
       sessions: [
         {
-          key: 'session-1',
+          terminalKey: 'session-1',
           worktreeTerminalKey: '/repo\0/worktree',
           sessionId: 'session-1',
           index: 1,
@@ -1065,7 +1064,7 @@ describe('TerminalSessionView', () => {
           phase: 'open' as const,
           selected: true,
           hasBell: false,
-            recentlyActive: false,
+          recentlyActive: false,
         },
       ],
       count: 1,
@@ -1153,7 +1152,7 @@ describe('TerminalSessionView', () => {
     // is never reached; writeInput gets the shell-escaped path.
     const writeInput = vi.fn()
     const descriptor = {
-      key: 'session-1',
+      terminalKey: 'session-1',
       worktreeTerminalKey: '/repo\0/worktree',
       sessionId: 'session-1',
       index: 1,
@@ -1166,7 +1165,7 @@ describe('TerminalSessionView', () => {
       selectedDescriptor: descriptor,
       sessions: [
         {
-          key: 'session-1',
+          terminalKey: 'session-1',
           worktreeTerminalKey: '/repo\0/worktree',
           sessionId: 'session-1',
           index: 1,
@@ -1174,7 +1173,7 @@ describe('TerminalSessionView', () => {
           phase: 'open' as const,
           selected: true,
           hasBell: false,
-            recentlyActive: false,
+          recentlyActive: false,
         },
       ],
       count: 1,
@@ -1274,7 +1273,7 @@ describe('TerminalSessionView', () => {
     // check runs before any async resolver work).
     const writeInput = vi.fn()
     const descriptor = {
-      key: 'session-1',
+      terminalKey: 'session-1',
       worktreeTerminalKey: '/repo\0/worktree',
       sessionId: 'session-1',
       index: 1,
@@ -1287,7 +1286,7 @@ describe('TerminalSessionView', () => {
       selectedDescriptor: descriptor,
       sessions: [
         {
-          key: 'session-1',
+          terminalKey: 'session-1',
           worktreeTerminalKey: '/repo\0/worktree',
           sessionId: 'session-1',
           index: 1,
@@ -1295,7 +1294,7 @@ describe('TerminalSessionView', () => {
           phase: 'open' as const,
           selected: true,
           hasBell: false,
-            recentlyActive: false,
+          recentlyActive: false,
         },
       ],
       count: 1,
@@ -1551,7 +1550,7 @@ describe('TerminalSessionView', () => {
     // writeResolutionToPty wiring.
     const writeInput = vi.fn()
     const descriptor = {
-      key: 'session-1',
+      terminalKey: 'session-1',
       worktreeTerminalKey: '/repo\0/worktree',
       sessionId: 'session-1',
       index: 1,
@@ -1564,7 +1563,7 @@ describe('TerminalSessionView', () => {
       selectedDescriptor: descriptor,
       sessions: [
         {
-          key: 'session-1',
+          terminalKey: 'session-1',
           worktreeTerminalKey: '/repo\0/worktree',
           sessionId: 'session-1',
           index: 1,
@@ -1572,7 +1571,7 @@ describe('TerminalSessionView', () => {
           phase: 'open' as const,
           selected: true,
           hasBell: false,
-            recentlyActive: false,
+          recentlyActive: false,
         },
       ],
       count: 1,
@@ -1686,7 +1685,7 @@ describe('TerminalSessionView', () => {
     // they diverge.
     const writeInput = vi.fn()
     const descriptorA = {
-      key: 'session-1',
+      terminalKey: 'session-1',
       worktreeTerminalKey: '/repo\0/worktree',
       sessionId: 'session-1',
       index: 1,
@@ -1695,7 +1694,7 @@ describe('TerminalSessionView', () => {
       worktreePath: '/worktree',
     }
     const descriptorB = {
-      key: 'session-2',
+      terminalKey: 'session-2',
       worktreeTerminalKey: '/repo\0/worktree-other',
       sessionId: 'session-2',
       index: 1,
@@ -1708,7 +1707,7 @@ describe('TerminalSessionView', () => {
       selectedDescriptor: descriptorA,
       sessions: [
         {
-          key: 'session-1',
+          terminalKey: 'session-1',
           worktreeTerminalKey: '/repo\0/worktree',
           sessionId: 'session-1',
           index: 1,
@@ -1716,7 +1715,7 @@ describe('TerminalSessionView', () => {
           phase: 'open' as const,
           selected: true,
           hasBell: false,
-            recentlyActive: false,
+          recentlyActive: false,
         },
       ],
       count: 1,
@@ -1727,7 +1726,7 @@ describe('TerminalSessionView', () => {
       selectedDescriptor: descriptorB,
       sessions: [
         {
-          key: 'session-2',
+          terminalKey: 'session-2',
           worktreeTerminalKey: '/repo\0/worktree-other',
           sessionId: 'session-2',
           index: 1,
@@ -1735,7 +1734,7 @@ describe('TerminalSessionView', () => {
           phase: 'open' as const,
           selected: true,
           hasBell: false,
-            recentlyActive: false,
+          recentlyActive: false,
         },
       ],
       count: 1,

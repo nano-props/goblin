@@ -9,7 +9,7 @@ import type {
 import type { TerminalInput, TerminalUserInputSource } from '#/web/components/terminal/terminal-input.ts'
 
 export interface TerminalDescriptor {
-  key: string
+  terminalKey: string
   worktreeTerminalKey: string
   sessionId: string
   index: number
@@ -116,8 +116,7 @@ export type TerminalRepoIndex = Record<string, TerminalRepoSnapshot>
 
 export interface TerminalSessionSummary {
   type: 'terminal'
-  id: string
-  key: string
+  terminalKey: string
   worktreeTerminalKey: string
   sessionId: string
   index: number
@@ -148,23 +147,23 @@ export interface TerminalSessionContextValue {
   createTerminal: (base: TerminalSessionBase, options?: TerminalCreateOptions) => Promise<string>
   registerHost: (worktreeTerminalKey: string, host: HTMLElement) => void
   unregisterHost: (worktreeTerminalKey: string, host: HTMLElement) => void
-  selectTerminal: (worktreeTerminalKey: string, key: string) => void
-  scrollToBottom: (key: string) => void
-  scrollLines: (key: string, amount: number) => void
-  clearBell: (key: string) => boolean
-  closeTerminalByDescriptor: (key: string, base: TerminalSessionBase) => Promise<boolean>
+  selectTerminal: (worktreeTerminalKey: string, terminalKey: string) => void
+  scrollToBottom: (terminalKey: string) => void
+  scrollLines: (terminalKey: string, amount: number) => void
+  clearBell: (terminalKey: string) => boolean
+  closeTerminalByDescriptor: (terminalKey: string, base: TerminalSessionBase) => Promise<boolean>
   attach: (descriptor: TerminalDescriptor, host: HTMLElement) => void
-  detach: (key: string, host: HTMLElement) => void
-  restart: (key: string) => void
-  focusTerminal: (key: string) => void
-  isTerminalFocusTarget: (key: string, target: EventTarget | null) => boolean
-  findNext: (key: string, term: string, incremental?: boolean) => TerminalSearchResult
-  findPrevious: (key: string, term: string) => TerminalSearchResult
-  clearSearch: (key: string) => void
-  writeInput: (key: string, data: string, source?: TerminalUserInputSource) => void
-  takeover: (key: string) => Promise<boolean>
+  detach: (terminalKey: string, host: HTMLElement) => void
+  restart: (terminalKey: string) => void
+  focusTerminal: (terminalKey: string) => void
+  isTerminalFocusTarget: (terminalKey: string, target: EventTarget | null) => boolean
+  findNext: (terminalKey: string, term: string, incremental?: boolean) => TerminalSearchResult
+  findPrevious: (terminalKey: string, term: string) => TerminalSearchResult
+  clearSearch: (terminalKey: string) => void
+  writeInput: (terminalKey: string, data: string, source?: TerminalUserInputSource) => void
+  takeover: (terminalKey: string) => Promise<boolean>
   /** Serializes xterm framebuffer state as VT sequences; not plain-text output for copy UI. */
-  serialize: (key: string) => string
+  serialize: (terminalKey: string) => string
 }
 
 export interface TerminalSessionReadContextValue {
@@ -172,8 +171,8 @@ export interface TerminalSessionReadContextValue {
   subscribeWorktree: (worktreeTerminalKey: string, listener: () => void) => () => void
   repoBellCount: (repoRoot: string) => number
   subscribeRepoBellCount: (repoRoot: string, listener: () => void) => () => void
-  snapshot: (key: string) => TerminalSnapshot
-  subscribeSnapshot: (key: string, listener: () => void) => () => void
+  snapshot: (terminalKey: string) => TerminalSnapshot
+  subscribeSnapshot: (terminalKey: string, listener: () => void) => () => void
 }
 
 export interface TerminalSessionLike {

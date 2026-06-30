@@ -25,9 +25,7 @@ describe('terminal session projection helpers', () => {
       clientId: 'client_a',
       serverSession: {
         ptySessionId: 'pty_session_123_aaaaaaaaa',
-        key: `${REPO_ROOT}\0${WORKTREE_PATH}\0session-2`,
-        viewType: 'terminal',
-        viewId: `${REPO_ROOT}\0${WORKTREE_PATH}\0session-2`,
+        terminalKey: `${REPO_ROOT}\0${WORKTREE_PATH}\0session-2`,
         cwd: WORKTREE_PATH,
         controller: { clientId: 'client_a', status: 'connected' },
         processName: 'zsh',
@@ -43,7 +41,7 @@ describe('terminal session projection helpers', () => {
 
     expect(projected).toEqual({
       descriptor: {
-        key: `${REPO_ROOT}\0${WORKTREE_PATH}\0session-2`,
+        terminalKey: `${REPO_ROOT}\0${WORKTREE_PATH}\0session-2`,
         worktreeTerminalKey: `${REPO_ROOT}\0${WORKTREE_PATH}`,
         sessionId: 'session-2',
         index: 2,
@@ -77,9 +75,7 @@ describe('terminal session projection helpers', () => {
       clientId: 'client_b',
       serverSession: {
         ptySessionId: 'pty_session_123_aaaaaaaaa',
-        key: `${REPO_ROOT}\0${WORKTREE_PATH}\0session-1`,
-        viewType: 'terminal',
-        viewId: `${REPO_ROOT}\0${WORKTREE_PATH}\0session-1`,
+        terminalKey: `${REPO_ROOT}\0${WORKTREE_PATH}\0session-1`,
         cwd: WORKTREE_PATH,
         controller: { clientId: 'client_a', status: 'connected' },
         processName: 'bash',

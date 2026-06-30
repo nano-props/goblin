@@ -122,7 +122,7 @@ export function resetReposStore(): void {
     sessionReady: false,
     zenMode: DEFAULT_ZEN_MODE,
     workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
-    selectedTerminalSessionByWorktree: {},
+    selectedTerminalKeyByWorktree: {},
   })
 }
 
@@ -263,7 +263,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           return {
             ok: true,
             action: terminalKind === 'primary' ? 'reused' : 'created',
-            key: terminalKind === 'primary' ? 'repo\0worktree\0terminal-1' : 'repo\0worktree\0terminal-2',
+            terminalKey: terminalKind === 'primary' ? 'repo\0worktree\0terminal-1' : 'repo\0worktree\0terminal-2',
             sessions: [],
             ptySessionId,
             snapshot: '',

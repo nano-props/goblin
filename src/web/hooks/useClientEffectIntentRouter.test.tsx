@@ -163,12 +163,13 @@ describe('useClientEffectIntentRouter', () => {
       ],
     })
     currentRepoId = repo.id
-    const key = '/tmp/repo\0/tmp/repo-feature\0session-2'
+    const terminalKey = '/tmp/repo\0/tmp/repo-feature\0session-2'
 
     await renderHookHost()
 
     await act(async () => {
-      for (const listener of intentListeners) listener({ type: 'terminal-bell-click', repoRoot: repo.id, key })
+      for (const listener of intentListeners)
+        listener({ type: 'terminal-bell-click', repoRoot: repo.id, terminalKey })
       await Promise.resolve()
     })
 
@@ -176,8 +177,8 @@ describe('useClientEffectIntentRouter', () => {
     expect(showRepoBranchWorkspacePaneTabSpy).toHaveBeenCalledWith(repo.id, 'feature/test', 'terminal')
     expect(state.repos[repo.id]?.ui.selectedBranch).toBe('feature/test')
     expect(preferredWorkspacePaneTab(repo.id)).toBe('terminal')
-    expect(state.selectedTerminalSessionByWorktree).toMatchObject({
-      [worktreeTerminalKey(repo.id, '/tmp/repo-feature')]: key,
+    expect(state.selectedTerminalKeyByWorktree).toMatchObject({
+      [worktreeTerminalKey(repo.id, '/tmp/repo-feature')]: terminalKey,
     })
   })
 
@@ -202,12 +203,13 @@ describe('useClientEffectIntentRouter', () => {
       },
     }
     currentRepoId = repo.id
-    const key = '/tmp/repo\0/tmp/repo-feature\0session-2'
+    const terminalKey = '/tmp/repo\0/tmp/repo-feature\0session-2'
 
     await renderHookHost()
 
     await act(async () => {
-      for (const listener of intentListeners) listener({ type: 'terminal-bell-click', repoRoot: repo.id, key })
+      for (const listener of intentListeners)
+        listener({ type: 'terminal-bell-click', repoRoot: repo.id, terminalKey })
       await Promise.resolve()
     })
 

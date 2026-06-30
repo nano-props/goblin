@@ -143,12 +143,15 @@ export function useTerminalRepoSyncReady(repoRoot: string | null): boolean {
   })
 }
 
-export function useTerminalSnapshot(key: string | null): TerminalSnapshot {
+export function useTerminalSnapshot(terminalKey: string | null): TerminalSnapshot {
   const { snapshot, subscribeSnapshot } = useTerminalSessionReadContext()
   const subscribe = useCallback(
-    (listener: () => void) => (key ? subscribeSnapshot(key, listener) : () => {}),
-    [key, subscribeSnapshot],
+    (listener: () => void) => (terminalKey ? subscribeSnapshot(terminalKey, listener) : () => {}),
+    [terminalKey, subscribeSnapshot],
   )
-  const getSnapshot = useCallback(() => (key ? snapshot(key) : EMPTY_TERMINAL_SNAPSHOT), [key, snapshot])
+  const getSnapshot = useCallback(
+    () => (terminalKey ? snapshot(terminalKey) : EMPTY_TERMINAL_SNAPSHOT),
+    [terminalKey, snapshot],
+  )
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 }

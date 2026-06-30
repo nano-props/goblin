@@ -4,9 +4,9 @@ const ACTIVITY_MIN_VISIBLE_MS = 1000
 type ActivityTimer = ReturnType<typeof setTimeout>
 
 export interface TerminalActivityState {
-  hasRecentActivity: (key: string) => boolean
-  markActivity: (key: string, worktreeTerminalKey: string) => void
-  remove: (key: string) => void
+  hasRecentActivity: (terminalKey: string) => boolean
+  markActivity: (terminalKey: string, worktreeTerminalKey: string) => void
+  remove: (terminalKey: string) => void
   reset: () => void
 }
 
@@ -33,19 +33,19 @@ export function createTerminalActivityState(
     if (record.idleTimer) clearTimer(record.idleTimer)
   }
 
-  function deleteRecord(key: string, record: ActivityRecord): void {
+  function deleteRecord(terminalKey: string, record: ActivityRecord): void {
     clearRecordTimers(record)
-    records.delete(key)
+    records.delete(terminalKey)
   }
 
-  function activateActivity(key: string, record: ActivityRecord): void {
+  function activateActivity(terminalKey: string, record: ActivityRecord): void {
     if (record.confirmTimer) {
       clearTimer(record.confirmTimer)
       record.confirmTimer = null
     }
     record.pendingSince = null
     record.activeSince = now()
-    scheduleIdleExpiry(key)
+    scheduleIdleExpiry(terminalKey)
     notifyWorktree(record.worktreeTerminalKey)
   }
 
@@ -56,60 +56,60 @@ export function createTerminalActivityState(
       : Math.max(idleExpiresAt, record.activeSince + ACTIVITY_MIN_VISIBLE_MS)
   }
 
-  function confirmActivity(key: string): void {
-    const record = records.get(key)
+  function confirmActivity(terminalKey: string): void {
+    const record = records.get(terminalKey)
     if (!record || record.pendingSince === null) return
     record.confirmTimer = null
     if (now() - record.lastActivityAt >= ACTIVITY_IDLE_TIMEOUT_MS) {
-      deleteRecord(key, record)
+      deleteRecord(terminalKey, record)
       return
     }
-    if (record.lastActivityAt - record.pendingSince >= ACTIVITY_CONFIRM_DELAY_MS) activateActivity(key, record)
+    if (record.lastActivityAt - record.pendingSince >= ACTIVITY_CONFIRM_DELAY_MS) activateActivity(terminalKey, record)
   }
 
-  function expireIdleActivity(key: string): void {
-    const record = records.get(key)
+  function expireIdleActivity(terminalKey: string): void {
+    const record = records.get(terminalKey)
     if (!record) return
     record.idleTimer = null
     const remainingMs = activityExpiresAt(record) - now()
     if (remainingMs > 0) {
-      scheduleIdleExpiry(key)
+      scheduleIdleExpiry(terminalKey)
       return
     }
     const wasActive = record.activeSince !== null
-    deleteRecord(key, record)
+    deleteRecord(terminalKey, record)
     if (wasActive) notifyWorktree(record.worktreeTerminalKey)
   }
 
-  function scheduleConfirmation(key: string): void {
-    const record = records.get(key)
+  function scheduleConfirmation(terminalKey: string): void {
+    const record = records.get(terminalKey)
     if (!record || record.confirmTimer) return
-    record.confirmTimer = setTimer(() => confirmActivity(key), ACTIVITY_CONFIRM_DELAY_MS)
+    record.confirmTimer = setTimer(() => confirmActivity(terminalKey), ACTIVITY_CONFIRM_DELAY_MS)
   }
 
-  function scheduleIdleExpiry(key: string): void {
-    const record = records.get(key)
+  function scheduleIdleExpiry(terminalKey: string): void {
+    const record = records.get(terminalKey)
     if (!record) return
     if (record.idleTimer) return
     const timeout = Math.max(0, activityExpiresAt(record) - now())
-    record.idleTimer = setTimer(() => expireIdleActivity(key), timeout)
+    record.idleTimer = setTimer(() => expireIdleActivity(terminalKey), timeout)
   }
 
-  function hasRecentActivity(key: string): boolean {
-    const record = records.get(key)
+  function hasRecentActivity(terminalKey: string): boolean {
+    const record = records.get(terminalKey)
     return record !== undefined && record.activeSince !== null
   }
 
   return {
     hasRecentActivity,
-    markActivity(key, worktreeTerminalKey) {
+    markActivity(terminalKey, worktreeTerminalKey) {
       const current = now()
-      const record = records.get(key)
+      const record = records.get(terminalKey)
       if (record) {
         record.lastActivityAt = current
         record.worktreeTerminalKey = worktreeTerminalKey
       } else {
-        records.set(key, {
+        records.set(terminalKey, {
           worktreeTerminalKey,
           lastActivityAt: current,
           pendingSince: current,
@@ -118,25 +118,25 @@ export function createTerminalActivityState(
           idleTimer: null,
         })
       }
-      if (hasRecentActivity(key)) {
-        scheduleIdleExpiry(key)
+      if (hasRecentActivity(terminalKey)) {
+        scheduleIdleExpiry(terminalKey)
         return
       }
-      const nextRecord = records.get(key)
+      const nextRecord = records.get(terminalKey)
       if (
         nextRecord &&
         nextRecord.pendingSince !== null &&
         current - nextRecord.pendingSince >= ACTIVITY_CONFIRM_DELAY_MS
       ) {
-        activateActivity(key, nextRecord)
+        activateActivity(terminalKey, nextRecord)
         return
       }
-      scheduleIdleExpiry(key)
-      scheduleConfirmation(key)
+      scheduleIdleExpiry(terminalKey)
+      scheduleConfirmation(terminalKey)
     },
-    remove(key) {
-      const record = records.get(key)
-      if (record) deleteRecord(key, record)
+    remove(terminalKey) {
+      const record = records.get(terminalKey)
+      if (record) deleteRecord(terminalKey, record)
     },
     reset() {
       for (const record of records.values()) clearRecordTimers(record)

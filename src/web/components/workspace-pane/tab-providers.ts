@@ -7,6 +7,7 @@ import type {
 } from '#/shared/workspace-pane.ts'
 import {
   workspacePaneTabScope,
+  workspacePaneStaticTabId,
   workspacePaneStaticTabOrderEntry,
   workspacePaneTerminalTabOrderEntry,
 } from '#/shared/workspace-pane.ts'
@@ -54,7 +55,7 @@ export interface WorkspacePaneTabCloseInput {
   terminalKey?: string
   terminalBase?: TerminalSessionBase | null
   closeStaticTab?: (repoId: string, type: WorkspacePaneStaticTabType, branchName: string) => void
-  closeTerminalByDescriptor?: (key: string, base: TerminalSessionBase) => Promise<boolean>
+  closeTerminalByDescriptor?: (terminalKey: string, base: TerminalSessionBase) => Promise<boolean>
   closeTerminalsForWorktree?: (base: TerminalSessionBase) => Promise<boolean>
 }
 
@@ -104,6 +105,10 @@ export abstract class WorkspacePaneStaticTabProvider<
   TType extends WorkspacePaneStaticTabType = WorkspacePaneStaticTabType,
 > extends WorkspacePaneTabProvider<TType> {
   readonly kind = 'static' as const
+
+  override identity(): string {
+    return workspacePaneStaticTabId(this.type)
+  }
 
   buttonId(workspacePaneId: string): string {
     return `${workspacePaneId}-${this.type}-tab`
@@ -203,8 +208,8 @@ export class TerminalWorkspacePaneTabProvider extends WorkspacePaneTabProvider<'
     super({ type: 'terminal', icon: Terminal })
   }
 
-  orderEntry(id: string): Extract<WorkspacePaneTabOrderEntry, { type: 'terminal' }> {
-    return workspacePaneTerminalTabOrderEntry(id)
+  orderEntry(terminalKey: string): Extract<WorkspacePaneTabOrderEntry, { type: 'terminal' }> {
+    return workspacePaneTerminalTabOrderEntry(terminalKey)
   }
 
   buttonId(workspacePaneId: string, index: number): string {

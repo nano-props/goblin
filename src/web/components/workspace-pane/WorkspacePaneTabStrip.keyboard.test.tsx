@@ -72,7 +72,7 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         panelActive
-        sessions={[session({ key: 't1', selected: true })]}
+        sessions={[session({ terminalKey: 't1', selected: true })]}
         onNew={() => {}}
         onSelect={() => {}}
         onScrollToBottom={() => {}}
@@ -97,8 +97,8 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
-          session({ key: 't1', selected: true }),
-          session({ key: 't2', selected: false, sessionId: 'session-2', index: 2 }),
+          session({ terminalKey: 't1', selected: true }),
+          session({ terminalKey: 't2', selected: false, sessionId: 'session-2', index: 2 }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -173,7 +173,7 @@ function makeWorkspacePaneTabStrip(
       <WorkspacePaneTabStrip
         {...workspacePaneProps}
         items={items}
-        activeTabIdentity={selected ? terminalWorkspacePaneTabProvider.identity(selected.key) : null}
+        activeTabIdentity={selected ? terminalWorkspacePaneTabProvider.identity(selected.terminalKey) : null}
         onSelect={(item) => {
           if (isTerminalWorkspacePaneTabItem(item)) props.onSelect(props.worktreeTerminalKey, item.view)
         }}
@@ -186,12 +186,11 @@ function makeWorkspacePaneTabStrip(
 }
 
 function session(overrides: Partial<TerminalSessionSummary> = {}): TerminalSessionSummary {
-  const key = overrides.key ?? 't1'
+  const terminalKey = overrides.terminalKey ?? 't1'
   const title = overrides.title ?? 'term-1'
   return {
     type: 'terminal',
-    id: overrides.id ?? key,
-    key,
+    terminalKey,
     worktreeTerminalKey: overrides.worktreeTerminalKey ?? '/repo\0/repo/worktree',
     sessionId: overrides.sessionId ?? 'session-1',
     index: overrides.index ?? 1,

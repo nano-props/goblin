@@ -1,5 +1,5 @@
 export interface ClientLocalEventMap {
-  'terminal-bell-click': { type: 'terminal-bell-click'; repoRoot: string; key?: string }
+  'terminal-bell-click': { type: 'terminal-bell-click'; repoRoot: string; terminalKey?: string }
 }
 
 type ClientLocalEvent = ClientLocalEventMap[keyof ClientLocalEventMap]

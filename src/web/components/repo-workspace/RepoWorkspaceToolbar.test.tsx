@@ -18,7 +18,7 @@ import type {
   WorkspacePaneTabOrderEntry,
   WorkspacePaneTabType,
 } from '#/shared/workspace-pane.ts'
-import { workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneStaticTabOrderEntry, workspacePaneTerminalTabOrderEntry } from '#/shared/workspace-pane.ts'
 import type {
   TerminalSessionContextValue,
   TerminalSessionReadContextValue,
@@ -239,8 +239,8 @@ describe('RepoWorkspaceToolbar', () => {
     expect(emptyButton?.textContent ?? '').not.toContain('terminal.label')
     expect(emptyButton?.getAttribute('aria-label')).toBe('terminal.new')
     expect(emptyButton?.getAttribute('title')).toBe('terminal.new')
-    expect(c.querySelector('[data-workspace-pane-tab-tooltip-id="status:status"]')).not.toBeNull()
-    expect(c.querySelector('[data-workspace-pane-tab-tooltip-id="changes:changes"]')).toBeNull()
+    expect(c.querySelector('[data-workspace-pane-tab-tooltip-id="workspace-pane:status"]')).not.toBeNull()
+    expect(c.querySelector('[data-workspace-pane-tab-tooltip-id="workspace-pane:changes"]')).toBeNull()
   })
 
   test('renders the external app launcher at the workspace toolbar right edge', async () => {
@@ -536,7 +536,7 @@ describe('RepoWorkspaceToolbar', () => {
     const tabs = Array.from(c.querySelectorAll('[data-workspace-pane-tab-tooltip-id]')).map((node) =>
       node.getAttribute('data-workspace-pane-tab-tooltip-id'),
     )
-    expect(tabs.slice(0, 2)).toEqual(['terminal:t1', 'status:status'])
+    expect(tabs.slice(0, 2)).toEqual(['terminal:t1', 'workspace-pane:status'])
   })
 
   test('uses the workspace toolbar spacing primitives without generic toolbar gaps', () => {
@@ -578,7 +578,7 @@ describe('RepoWorkspaceToolbar', () => {
     const tabs = Array.from(c.querySelectorAll('[data-workspace-pane-tab-tooltip-id]')).map((node) =>
       node.getAttribute('data-workspace-pane-tab-tooltip-id'),
     )
-    expect(tabs.slice(0, 2)).toEqual(['history:history', 'status:status'])
+    expect(tabs.slice(0, 2)).toEqual(['workspace-pane:history', 'workspace-pane:status'])
   })
 
   test('closes the status static tab through the shared tab close control', async () => {
@@ -587,7 +587,7 @@ describe('RepoWorkspaceToolbar', () => {
       navigation: navigationWith({}),
     })
 
-    const statusCloseButton = closeButtonFor(c, 'status:status')
+    const statusCloseButton = closeButtonFor(c, 'workspace-pane:status')
     expect(statusCloseButton).not.toBeNull()
 
     act(() => {
@@ -605,7 +605,7 @@ describe('RepoWorkspaceToolbar', () => {
       navigation: navigationWith({ showRepoWorkspacePaneTab }),
     })
 
-    const statusCloseButton = closeButtonFor(c, 'status:status')
+    const statusCloseButton = closeButtonFor(c, 'workspace-pane:status')
     expect(statusCloseButton).not.toBeNull()
 
     act(() => {
@@ -625,7 +625,7 @@ describe('RepoWorkspaceToolbar', () => {
       navigation: navigationWith({}),
     })
 
-    const historyCloseButton = closeButtonFor(c, 'history:history')
+    const historyCloseButton = closeButtonFor(c, 'workspace-pane:history')
     expect(historyCloseButton).not.toBeNull()
 
     act(() => {
@@ -1001,7 +1001,7 @@ describe('RepoWorkspaceToolbar', () => {
       navigation: navigationWith({ showRepoWorkspacePaneTab }),
     })
 
-    expect(c.querySelector('[data-workspace-pane-tab-tooltip-id="changes:changes"]')).toBeNull()
+    expect(c.querySelector('[data-workspace-pane-tab-tooltip-id="workspace-pane:changes"]')).toBeNull()
     const statusTab = c.querySelector<HTMLButtonElement>('#workspace-status-tab')
     const terminalTab = c.querySelector<HTMLButtonElement>('#workspace-workspace-pane-tab')
     if (!statusTab || !terminalTab) throw new Error('missing repo workspace pane tabs')
@@ -1214,8 +1214,7 @@ function renderToolbar(options: {
   const detail = getSelectedRepoWorkspacePresentation(repo)
   const sessions: TerminalSessionSummary[] = Array.from({ length: options.terminalCount }, (_, index) => ({
     type: 'terminal',
-    id: `t${index + 1}`,
-    key: `t${index + 1}`,
+    terminalKey: `t${index + 1}`,
     worktreeTerminalKey: `${REPO_ID}\0${WORKTREE_PATH}`,
     sessionId: `t${index + 1}`,
     index: index + 1,
@@ -1225,11 +1224,11 @@ function renderToolbar(options: {
     phase: 'open' as const,
     selected: index === 0,
     hasBell: false,
-            recentlyActive: false,
+    recentlyActive: false,
   }))
   const selectedDescriptor: TerminalDescriptor | null = sessions[0]
     ? {
-        key: sessions[0].key,
+        terminalKey: sessions[0].terminalKey,
         worktreeTerminalKey: sessions[0].worktreeTerminalKey,
         sessionId: sessions[0].sessionId,
         index: sessions[0].index,
@@ -1244,7 +1243,7 @@ function renderToolbar(options: {
     sessions,
     count: options.terminalCount,
     bellCount: sessions.filter((session) => session.hasBell).length,
-        activeCount: 0,
+    activeCount: 0,
     pendingCreate: options.pendingCreate ?? false,
   }
   const terminalSnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
@@ -1376,7 +1375,7 @@ function staticEntry(type: WorkspacePaneStaticTabType): WorkspacePaneTabOrderEnt
 }
 
 function terminalEntry(id: string): WorkspacePaneTabOrderEntry {
-  return { type: 'terminal', id }
+  return workspacePaneTerminalTabOrderEntry(id)
 }
 
 /**

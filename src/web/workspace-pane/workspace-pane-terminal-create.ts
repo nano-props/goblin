@@ -9,20 +9,22 @@ export async function createWorkspacePaneTerminalTab(input: {
   createTerminal: (base: TerminalSessionBase, options?: TerminalCreateOptions) => Promise<string>
   options?: TerminalCreateOptions
 }): Promise<string> {
-  // Only publish the tab after the projection has created a concrete session key.
-  const key = input.options ? await input.createTerminal(input.base, input.options) : await input.createTerminal(input.base)
-  await runWorkspacePaneTabUiCommand(() => commitCreatedWorkspacePaneTerminalTab(input.base, key))
-  return key
+  // Only publish the tab after the projection has created a concrete terminalKey.
+  const terminalKey = input.options
+    ? await input.createTerminal(input.base, input.options)
+    : await input.createTerminal(input.base)
+  await runWorkspacePaneTabUiCommand(() => commitCreatedWorkspacePaneTerminalTab(input.base, terminalKey))
+  return terminalKey
 }
 
-function commitCreatedWorkspacePaneTerminalTab(base: TerminalSessionBase, key: string): void {
+function commitCreatedWorkspacePaneTerminalTab(base: TerminalSessionBase, terminalKey: string): void {
   const state = useReposStore.getState()
   const repo = state.repos[base.repoRoot]
   const shouldFocus =
     repo?.ui.selectedBranch === base.branch && preferredWorkspacePaneTabForBranch(repo.ui, base.branch) === 'terminal'
   if (shouldFocus) {
-    state.addAndFocusWorkspacePaneTerminalTab(base.repoRoot, key, base.branch)
+    state.addAndFocusWorkspacePaneTerminalTab(base.repoRoot, terminalKey, base.branch)
     return
   }
-  state.addWorkspacePaneTerminalTab(base.repoRoot, key, base.branch)
+  state.addWorkspacePaneTerminalTab(base.repoRoot, terminalKey, base.branch)
 }

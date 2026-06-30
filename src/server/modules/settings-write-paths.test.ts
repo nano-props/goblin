@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { WorkspaceSessionState } from '#/shared/api-types.ts'
 import { resolveI18nSnapshot } from '#/shared/i18n/snapshot.ts'
+import { WORKSPACE_PANE_STATIC_TAB_IDS, workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
 
 const mocks = vi.hoisted(() => ({
   publishSettingsInvalidation: vi.fn(),
@@ -75,7 +76,7 @@ describe('settings command handlers', () => {
       activeRepoId: null,
       zenMode: true,
       workspacePaneSize: 50,
-      selectedTerminalSessionByWorktree: {},
+      selectedTerminalKeyByWorktree: {},
       workspacePaneTabOrderByBranchByRepo: {},
     }
     mocks.setServerSessionState.mockResolvedValue(session)
@@ -143,7 +144,7 @@ describe('settings command handlers', () => {
           },
           workspacePaneTabOrderByBranchByRepo: {
             '/tmp/repo': {
-              main: [{ type: 'changes', id: 'changes' }],
+              main: [workspacePaneStaticTabOrderEntry('changes')],
             },
           },
         },
@@ -173,7 +174,7 @@ describe('settings command handlers', () => {
           ...session,
           workspacePaneTabOrderByBranchByRepo: {
             '/tmp/repo': {
-              main: [{ type: 'status', id: 'history' }],
+              main: [{ type: 'status', tabId: WORKSPACE_PANE_STATIC_TAB_IDS.history }],
             },
           },
         },
@@ -185,7 +186,7 @@ describe('settings command handlers', () => {
           ...session,
           workspacePaneTabOrderByBranchByRepo: {
             '/tmp/repo': {
-              main: [{ type: 'terminal', id: '' }],
+              main: [{ type: 'terminal', terminalKey: '' }],
             },
           },
         },

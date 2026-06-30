@@ -58,7 +58,7 @@ describe('repo selectors', () => {
         activeId: '/tmp/repo',
         zenMode: false,
         workspacePaneSize: 50,
-        selectedTerminalSessionByWorktree: {
+        selectedTerminalKeyByWorktree: {
           '/tmp/repo\0/tmp/repo': 'session-1',
         },
       }),
@@ -67,7 +67,7 @@ describe('repo selectors', () => {
       activeId: '/tmp/repo',
       zenMode: false,
       workspacePaneSize: 50,
-      selectedTerminalSessionByWorktree: {
+      selectedTerminalKeyByWorktree: {
         '/tmp/repo\0/tmp/repo': 'session-1',
       },
     })

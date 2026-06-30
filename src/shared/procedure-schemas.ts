@@ -14,6 +14,7 @@ import {
   RemotePathSuggestionsInputSchema,
   RemoteTargetSchema,
 } from '#/shared/api-types.ts'
+import { WORKSPACE_PANE_STATIC_TAB_IDS } from '#/shared/workspace-pane.ts'
 import { NativeHostProjectionSchema } from '#/shared/native-host-projection.ts'
 import { RepoTreePrefixSchema } from '#/shared/repo-tree-schema.ts'
 import { GIT_HASH_RE } from '#/shared/git-types.ts'
@@ -174,14 +175,14 @@ export const REMOTE_PROCEDURE_SCHEMAS = {
 // validates with these, then passes the parsed object directly to the
 // module layer.
 const WorkspacePaneStaticTabOrderEntrySchema = v.variant('type', [
-  v.object({ type: v.literal('status'), id: v.literal('status') }),
-  v.object({ type: v.literal('changes'), id: v.literal('changes') }),
-  v.object({ type: v.literal('history'), id: v.literal('history') }),
-  v.object({ type: v.literal('files'), id: v.literal('files') }),
+  v.object({ type: v.literal('status'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.status) }),
+  v.object({ type: v.literal('changes'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.changes) }),
+  v.object({ type: v.literal('history'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.history) }),
+  v.object({ type: v.literal('files'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.files) }),
 ])
 const WorkspacePaneTerminalTabOrderEntrySchema = v.object({
   type: v.literal('terminal'),
-  id: v.pipe(v.string(), v.minLength(1)),
+  terminalKey: v.pipe(v.string(), v.minLength(1)),
 })
 const FiletreeSessionViewStateSchema = v.object({
   selectedKeys: v.array(v.string()),
@@ -193,7 +194,7 @@ const WorkspaceSessionStateSchema = v.object({
   activeRepoId: v.nullable(v.string()),
   zenMode: v.boolean(),
   workspacePaneSize: v.number(),
-  selectedTerminalSessionByWorktree: v.optional(v.record(v.string(), v.string())),
+  selectedTerminalKeyByWorktree: v.optional(v.record(v.string(), v.string())),
   preferredWorkspacePaneTabByBranchByRepo: v.optional(
     v.record(v.string(), v.record(v.string(), v.picklist(['status', 'changes', 'history', 'files', 'terminal']))),
   ),

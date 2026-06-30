@@ -95,9 +95,7 @@ const TerminalSessionSnapshotInputSchema = v.object({
 })
 const TerminalSessionSummarySchema = v.object({
   ptySessionId: v.string(),
-  key: v.string(),
-  viewType: v.literal('terminal'),
-  viewId: v.string(),
+  terminalKey: v.string(),
   cwd: v.string(),
   controller: v.nullable(TerminalControllerSchema),
   processName: v.string(),
@@ -297,7 +295,12 @@ export function isValidTerminalClientId(value: unknown): value is string {
 
 export function isValidTerminalNotifyBellInput(value: unknown): value is TerminalNotifyBellInput {
   if (!value || typeof value !== 'object') return false
-  const { title, body, key, repoRoot } = value as { title?: unknown; body?: unknown; key?: unknown; repoRoot?: unknown }
+  const { title, body, terminalKey, repoRoot } = value as {
+    title?: unknown
+    body?: unknown
+    terminalKey?: unknown
+    repoRoot?: unknown
+  }
   return (
     typeof title === 'string' &&
     title.length > 0 &&
@@ -305,7 +308,8 @@ export function isValidTerminalNotifyBellInput(value: unknown): value is Termina
     typeof body === 'string' &&
     body.length > 0 &&
     body.length <= 500 &&
-    (key === undefined || (typeof key === 'string' && key.length > 0)) &&
+    !Object.prototype.hasOwnProperty.call(value, 'key') &&
+    (terminalKey === undefined || (typeof terminalKey === 'string' && terminalKey.length > 0)) &&
     typeof repoRoot === 'string' &&
     repoRoot.length > 0
   )

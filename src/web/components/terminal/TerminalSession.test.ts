@@ -394,10 +394,9 @@ const geometryMocks = vi.hoisted(() => ({
 }))
 
 vi.mock('#/web/components/terminal/terminal-geometry.ts', async () => {
-  const actual =
-    await vi.importActual<typeof import('#/web/components/terminal/terminal-geometry.ts')>(
-      '#/web/components/terminal/terminal-geometry.ts',
-    )
+  const actual = await vi.importActual<typeof import('#/web/components/terminal/terminal-geometry.ts')>(
+    '#/web/components/terminal/terminal-geometry.ts',
+  )
   return {
     ...actual,
     preloadTerminalFont: geometryMocks.preloadTerminalFont,
@@ -479,7 +478,7 @@ const hostOpenExternalUrl = vi.fn<NonNullable<Window['goblinNative']['host']>['o
 const mockFonts = new MockFontFaceSet()
 
 const descriptor = {
-  key: '/repo\0/worktree',
+  terminalKey: '/repo\0/worktree',
   worktreeTerminalKey: '/repo\0/worktree',
   sessionId: 'session-1',
   index: 1,
@@ -621,14 +620,14 @@ beforeEach(() => {
         input?.kind === 'primary'
           ? {
               action: 'reused' as const,
-              key: 'repo\0worktree\0session-1',
+              terminalKey: 'repo\0worktree\0session-1',
               sessions: [],
               ...createFirstFrame('session-1'),
               ok: true as const,
             }
           : {
               action: 'created' as const,
-              key: 'repo\0worktree\0session-2',
+              terminalKey: 'repo\0worktree\0session-2',
               sessions: [],
               ...createFirstFrame('session-2'),
               ok: true as const,

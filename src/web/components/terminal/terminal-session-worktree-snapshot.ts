@@ -11,11 +11,11 @@ export function buildWorktreeTerminalSnapshot(input: {
   selectedDescriptor: WorktreeTerminalSnapshot['selectedDescriptor']
   pendingCreate: boolean
   sessions: TerminalSessionLike[]
-  selectedKey: string | null
-  getCachedSnapshot: (key: string) => TerminalSnapshot | null
-  cacheSnapshot: (key: string, snapshot: TerminalSnapshot) => void
-  hasBell: (key: string) => boolean
-  hasRecentActivity: (key: string) => boolean
+  selectedTerminalKey: string | null
+  getCachedSnapshot: (terminalKey: string) => TerminalSnapshot | null
+  cacheSnapshot: (terminalKey: string, snapshot: TerminalSnapshot) => void
+  hasBell: (terminalKey: string) => boolean
+  hasRecentActivity: (terminalKey: string) => boolean
   getDisplayOrder: (session: TerminalSessionLike) => number
 }): WorktreeTerminalSnapshot {
   const sessions = buildTerminalSessionSummaries(input)
@@ -35,21 +35,20 @@ export function buildWorktreeTerminalSnapshot(input: {
 function buildTerminalSessionSummaries(input: {
   worktreeTerminalKey: string
   sessions: TerminalSessionLike[]
-  selectedKey: string | null
-  getCachedSnapshot: (key: string) => TerminalSnapshot | null
-  cacheSnapshot: (key: string, snapshot: TerminalSnapshot) => void
-  hasBell: (key: string) => boolean
-  hasRecentActivity: (key: string) => boolean
+  selectedTerminalKey: string | null
+  getCachedSnapshot: (terminalKey: string) => TerminalSnapshot | null
+  cacheSnapshot: (terminalKey: string, snapshot: TerminalSnapshot) => void
+  hasBell: (terminalKey: string) => boolean
+  hasRecentActivity: (terminalKey: string) => boolean
   getDisplayOrder: (session: TerminalSessionLike) => number
 }): TerminalSessionSummary[] {
   return input.sessions.map((session) => {
-    const cached = input.getCachedSnapshot(session.descriptor.key)
+    const cached = input.getCachedSnapshot(session.descriptor.terminalKey)
     const snapshot = cached ?? session.snapshot()
-    if (!cached) input.cacheSnapshot(session.descriptor.key, snapshot)
+    if (!cached) input.cacheSnapshot(session.descriptor.terminalKey, snapshot)
     return {
       type: 'terminal',
-      id: session.descriptor.key,
-      key: session.descriptor.key,
+      terminalKey: session.descriptor.terminalKey,
       worktreeTerminalKey: input.worktreeTerminalKey,
       sessionId: session.descriptor.sessionId,
       index: session.descriptor.index,
@@ -59,9 +58,9 @@ function buildTerminalSessionSummaries(input: {
       originalTitle: terminalOriginalTitle(snapshot),
       processName: snapshot.processName,
       phase: snapshot.phase,
-      selected: session.descriptor.key === input.selectedKey,
-      hasBell: input.hasBell(session.descriptor.key),
-      recentlyActive: input.hasRecentActivity(session.descriptor.key),
+      selected: session.descriptor.terminalKey === input.selectedTerminalKey,
+      hasBell: input.hasBell(session.descriptor.terminalKey),
+      recentlyActive: input.hasRecentActivity(session.descriptor.terminalKey),
     }
   })
 }

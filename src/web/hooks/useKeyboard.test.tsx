@@ -376,7 +376,7 @@ function worktreeSnapshot(): WorktreeTerminalSnapshot {
   return {
     worktreeTerminalKey: WORKTREE_KEY,
     selectedDescriptor: {
-      key: 'session-1',
+      terminalKey: 'session-1',
       worktreeTerminalKey: WORKTREE_KEY,
       sessionId: 'session-1',
       index: 1,
@@ -387,8 +387,7 @@ function worktreeSnapshot(): WorktreeTerminalSnapshot {
     sessions: [
       {
         type: 'terminal',
-        id: 'session-1',
-        key: 'session-1',
+        terminalKey: 'session-1',
         worktreeTerminalKey: WORKTREE_KEY,
         sessionId: 'session-1',
         index: 1,
@@ -397,12 +396,12 @@ function worktreeSnapshot(): WorktreeTerminalSnapshot {
         phase: 'open',
         selected: true,
         hasBell: false,
-            recentlyActive: false,
+        recentlyActive: false,
       },
     ],
     count: 1,
     bellCount: 0,
-        activeCount: 0,
+    activeCount: 0,
     pendingCreate: false,
   }
 }

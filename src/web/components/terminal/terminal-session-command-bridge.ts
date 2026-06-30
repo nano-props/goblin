@@ -4,8 +4,8 @@ import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 interface TerminalSessionCommandBridge {
   worktreeSnapshot: (worktreeTerminalKey: string) => WorktreeTerminalSnapshot
   createTerminal: (base: TerminalSessionBase, options?: TerminalCreateOptions) => Promise<string>
-  selectTerminal: (worktreeTerminalKey: string, key: string) => void
-  closeTerminalByDescriptor?: (key: string, base: TerminalSessionBase) => Promise<boolean>
+  selectTerminal: (worktreeTerminalKey: string, terminalKey: string) => void
+  closeTerminalByDescriptor?: (terminalKey: string, base: TerminalSessionBase) => Promise<boolean>
   closeTerminalsForWorktree?: (base: TerminalSessionBase) => Promise<boolean>
 }
 

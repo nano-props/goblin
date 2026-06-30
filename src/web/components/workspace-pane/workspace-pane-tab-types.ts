@@ -51,9 +51,7 @@ interface WorkspacePanePendingTabItem extends WorkspacePaneTabItemBase {
 }
 
 export type WorkspacePaneTabItem =
-  | WorkspacePaneStaticTabItem
-  | WorkspacePaneTerminalTabItem
-  | WorkspacePanePendingTabItem
+  WorkspacePaneStaticTabItem | WorkspacePaneTerminalTabItem | WorkspacePanePendingTabItem
 
 export function createStaticWorkspacePaneTabItem(input: {
   type: WorkspacePaneStaticTabType
@@ -86,7 +84,7 @@ export function createTerminalWorkspacePaneTabItem(input: {
   panelId?: string
 }): WorkspacePaneTerminalTabItem {
   return {
-    identity: terminalWorkspacePaneTabProvider.identity(input.view.id),
+    identity: terminalWorkspacePaneTabProvider.identity(input.view.terminalKey),
     type: input.view.type,
     kind: 'terminal',
     view: input.view,
@@ -95,8 +93,8 @@ export function createTerminalWorkspacePaneTabItem(input: {
     closeLabel: input.closeLabel,
     icon: terminalWorkspacePaneTabProvider.icon,
     panelId: input.panelId,
-    sortableId: terminalWorkspacePaneTabProvider.identity(input.view.id),
-    orderEntry: terminalWorkspacePaneTabProvider.orderEntry(input.view.id),
+    sortableId: terminalWorkspacePaneTabProvider.identity(input.view.terminalKey),
+    orderEntry: terminalWorkspacePaneTabProvider.orderEntry(input.view.terminalKey),
   }
 }
 

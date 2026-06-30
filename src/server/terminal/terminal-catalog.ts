@@ -42,7 +42,7 @@ type EnsureTerminalCatalogResult =
   | {
       ok: true
       ptySessionId: string
-      key: string
+      terminalKey: string
       action: TerminalCatalogAction
       processName: string
       canonicalTitle: string | null
@@ -59,7 +59,7 @@ type EnsureTerminalCatalogResult =
 interface TerminalCatalogEnsureSessionInput {
   userId: string
   scope: string
-  key: string
+  terminalKey: string
   cwd: string
   cols: number
   rows: number
@@ -114,12 +114,12 @@ class TerminalCatalog {
     // to scope user-scoped session lists — see the comment on
     // `terminalSessionScope` in server/terminal/terminal-session-scope.ts
     // for the normalization rationale.
-    const targetWorkspaceSlotKey = formatTerminalWorkspaceSlotKey(
+    const targetTerminalKey = formatTerminalWorkspaceSlotKey(
       sessionScope,
       isRemoteRepoId(input.repoRoot) ? input.worktreePath : path.resolve(input.worktreePath),
       sessionId,
     )
-    const existingSession = existingSessions.find((session) => session.key === targetWorkspaceSlotKey)
+    const existingSession = existingSessions.find((session) => session.terminalKey === targetTerminalKey)
     const action: TerminalCatalogAction = existingSession
       ? existingSession.controller
         ? 'restored'
@@ -127,9 +127,15 @@ class TerminalCatalog {
       : 'created'
 
     if (isRemoteRepoId(input.repoRoot)) {
-      return await this.ensureRemote(userId, input, { sessionId, cols, rows, targetSlotKey: targetWorkspaceSlotKey, action })
+      return await this.ensureRemote(userId, input, {
+        sessionId,
+        cols,
+        rows,
+        targetTerminalKey: targetTerminalKey,
+        action,
+      })
     }
-    return await this.ensureLocal(userId, input, { cols, rows, targetSlotKey: targetWorkspaceSlotKey, action })
+    return await this.ensureLocal(userId, input, { cols, rows, targetTerminalKey: targetTerminalKey, action })
   }
 
   async create(clientId: string, userId: string, input: TerminalCreateInput): Promise<TerminalCatalogMutationResult> {
@@ -148,7 +154,7 @@ class TerminalCatalog {
     return {
       ok: true,
       action: createResult.action,
-      key: createResult.key,
+      terminalKey: createResult.terminalKey,
       ptySessionId: createResult.ptySessionId,
       processName: createResult.processName,
       canonicalTitle: createResult.canonicalTitle,
@@ -180,7 +186,7 @@ class TerminalCatalog {
     const liveWorktreePaths = new Set(worktrees.map((worktree) => path.resolve(worktree.path)))
     let pruned = 0
     for (const session of allSessions) {
-      const parsed = parseTerminalWorkspaceSlotKey(session.key)
+      const parsed = parseTerminalWorkspaceSlotKey(session.terminalKey)
       if (!parsed) continue
       if (path.resolve(parsed.repoRoot) !== path.resolve(repoRoot)) continue
       if (liveWorktreePaths.has(path.resolve(parsed.worktreePath))) continue
@@ -202,7 +208,7 @@ class TerminalCatalog {
     const sessions = await this.options.manager.listSessionsForUser(userId, scopedRepoRoot)
     let maxIndex = 0
     for (const session of sessions) {
-      const parsed = parseTerminalWorkspaceSlotKey(session.key)
+      const parsed = parseTerminalWorkspaceSlotKey(session.terminalKey)
       if (!parsed || parsed.repoRoot !== scopedRepoRoot || parsed.worktreePath !== scopedWorktreePath) continue
       const index = parseTerminalSessionIdIndex(parsed.sessionId)
       if (index === null) continue
@@ -218,7 +224,7 @@ class TerminalCatalog {
       sessionId: string
       cols: number
       rows: number
-      targetSlotKey: string
+      targetTerminalKey: string
       action: TerminalCatalogAction
     },
   ): Promise<EnsureTerminalCatalogResult> {
@@ -242,7 +248,7 @@ class TerminalCatalog {
     const result = await this.options.manager.ensureSession({
       userId,
       scope: input.repoRoot,
-      key: context.targetSlotKey,
+      terminalKey: context.targetTerminalKey,
       cwd: process.cwd(),
       cols: context.cols,
       rows: context.rows,
@@ -253,7 +259,7 @@ class TerminalCatalog {
     })
     if (!result.ok) return { ok: false, message: result.message }
     this.options.broadcastSessionsChanged(userId, input.repoRoot)
-    return toEnsureResult(context.targetSlotKey, context.action, result)
+    return toEnsureResult(context.targetTerminalKey, context.action, result)
   }
 
   private async ensureLocal(
@@ -262,7 +268,7 @@ class TerminalCatalog {
     context: {
       cols: number
       rows: number
-      targetSlotKey: string
+      targetTerminalKey: string
       action: TerminalCatalogAction
     },
   ): Promise<EnsureTerminalCatalogResult> {
@@ -282,7 +288,7 @@ class TerminalCatalog {
     const result = await this.options.manager.ensureSession({
       userId,
       scope: repoRoot,
-      key: context.targetSlotKey,
+      terminalKey: context.targetTerminalKey,
       cwd: worktreePath,
       cols: context.cols,
       rows: context.rows,
@@ -293,19 +299,19 @@ class TerminalCatalog {
     })
     if (!result.ok) return { ok: false, message: result.message }
     this.options.broadcastSessionsChanged(userId, input.repoRoot)
-    return toEnsureResult(context.targetSlotKey, context.action, result)
+    return toEnsureResult(context.targetTerminalKey, context.action, result)
   }
 }
 
 function toEnsureResult(
-  key: string,
+  terminalKey: string,
   action: TerminalCatalogAction,
   snapshotResult: Extract<TerminalAttachResult, { ok: true }>,
 ): EnsureTerminalCatalogResult {
   return {
     ok: true,
     ptySessionId: snapshotResult.ptySessionId,
-    key,
+    terminalKey,
     action,
     processName: snapshotResult.processName,
     canonicalTitle: snapshotResult.canonicalTitle,

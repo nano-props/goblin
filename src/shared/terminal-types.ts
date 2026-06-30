@@ -1,5 +1,3 @@
-import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
-
 /**
  * `controllerStatus === 'connected'` while the broker reports the
  * controller client online. Disconnects and missed heartbeats make the
@@ -145,7 +143,7 @@ export type TerminalCatalogMutationResult =
   | ({
       ok: true
       action: TerminalCatalogAction
-      key: string
+      terminalKey: string
       sessions: TerminalSessionSummary[]
     } & TerminalFirstFrame)
   | { ok: false; message: string }
@@ -172,7 +170,7 @@ export interface TerminalSessionInput {
 export interface TerminalNotifyBellInput {
   title: string
   body: string
-  key?: string
+  terminalKey?: string
   repoRoot: string
 }
 
@@ -187,9 +185,7 @@ export interface TerminalListSessionsInput {
 
 export interface TerminalSessionSummary {
   ptySessionId: string
-  key: string
-  viewType: Extract<WorkspacePaneTabType, 'terminal'>
-  viewId: string
+  terminalKey: string
   cwd: string
   controller: TerminalController | null
   processName: string

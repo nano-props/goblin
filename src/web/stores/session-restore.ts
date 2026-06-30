@@ -14,7 +14,7 @@ const DEFAULT_RESTORABLE_SESSION_STATE: WorkspaceSessionState = {
   activeRepoId: null,
   zenMode: DEFAULT_ZEN_MODE,
   workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
-  selectedTerminalSessionByWorktree: {},
+  selectedTerminalKeyByWorktree: {},
   workspacePaneTabOrderByBranchByRepo: {},
   filetreeViewStateByWorktreeByRepo: {},
 }

@@ -158,8 +158,8 @@ export interface RestorableWorkspaceState {
   /** Large-screen Zen Mode restored from WorkspaceSessionState. Compact UI is stronger and always shows one pane at a time. */
   zenMode: boolean
   workspacePaneSize: number
-  /** Per worktree terminal selection restored from WorkspaceSessionState.selectedTerminalSessionByWorktree. */
-  selectedTerminalSessionByWorktree: Record<string, string>
+  /** Per worktree terminal selection restored from WorkspaceSessionState.selectedTerminalKeyByWorktree. */
+  selectedTerminalKeyByWorktree: Record<string, string>
 }
 
 export interface SessionWorkspacePaneRestoreState {
@@ -183,7 +183,7 @@ interface LocalWorkspaceState {
 interface RestorableWorkspaceActions {
   setActive: (id: string) => void
   applySessionLayoutState: (layout: Pick<WorkspaceSessionState, 'zenMode' | 'workspacePaneSize'>) => void
-  applySessionSelectedTerminalState: (selectedTerminalSessionByWorktree: Record<string, string>) => void
+  applySessionSelectedTerminalState: (selectedTerminalKeyByWorktree: Record<string, string>) => void
   setZenMode: (enabled: boolean) => void
   toggleZenMode: () => void
   setWorkspacePaneSize: (size: number) => void
@@ -215,6 +215,7 @@ interface RuntimeCoherentRepoProjectionActions {
   closeWorkspacePaneStaticTab: (id: string, tab: WorkspacePaneStaticTabType, branchName?: string) => void
   addWorkspacePaneTerminalTab: (id: string, terminalKey: string, branchName?: string) => void
   addAndFocusWorkspacePaneTerminalTab: (id: string, terminalKey: string, branchName?: string) => void
+  ensureWorkspacePaneTerminalTabs: (id: string, branchName: string, terminalKeys: readonly string[]) => void
   removeWorkspacePaneTerminalTab: (id: string, terminalKey: string, branchName?: string) => void
   reorderWorkspacePaneTabs: (id: string, orderedTabs: WorkspacePaneTabOrderEntry[], branchName?: string) => void
   setBranchViewMode: (id: string, viewMode: BranchViewMode) => void

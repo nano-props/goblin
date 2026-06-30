@@ -28,12 +28,12 @@ export function resolveTerminalStartupGeometryHint(input: {
   hostByWorktree: ReadonlyMap<string, HTMLElement>
   startupGeometryHintByWorktree: Map<string, { cols: number; rows: number }>
   selectedDescriptor: TerminalDescriptor | null
-  getAttachmentSnapshot: (key: string) => TerminalClientSnapshot | null | undefined
+  getAttachmentSnapshot: (terminalKey: string) => TerminalClientSnapshot | null | undefined
 }): { cols: number; rows: number } | null {
   const measured = captureTerminalHostGeometry(input)
   if (measured) return measured
   if (input.selectedDescriptor) {
-    const attachment = input.getAttachmentSnapshot(input.selectedDescriptor.key)
+    const attachment = input.getAttachmentSnapshot(input.selectedDescriptor.terminalKey)
     if (attachment?.canonicalCols && attachment.canonicalRows) {
       const geometry = { cols: attachment.canonicalCols, rows: attachment.canonicalRows }
       input.startupGeometryHintByWorktree.set(input.worktreeTerminalKey, geometry)

@@ -114,7 +114,7 @@ async function createSession(
   const pending = manager.ensureSession({
     userId: USER_ID,
     scope: SCOPE,
-    key: KEY,
+    terminalKey: KEY,
     cwd: '/tmp',
     cols: 80,
     rows: 24,
@@ -135,7 +135,7 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     const first = manager.ensureSession({
       userId: USER_ID,
       scope: SCOPE,
-      key: KEY,
+      terminalKey: KEY,
       cwd: '/tmp',
       cols: 80,
       rows: 24,
@@ -144,7 +144,7 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     const second = manager.ensureSession({
       userId: USER_ID,
       scope: SCOPE,
-      key: KEY,
+      terminalKey: KEY,
       cwd: '/tmp',
       cols: 100,
       rows: 30,
@@ -166,7 +166,7 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     const pending = manager.ensureSession({
       userId: USER_ID,
       scope: SCOPE,
-      key: KEY,
+      terminalKey: KEY,
       cwd: '/tmp',
       cols: 80,
       rows: 24,

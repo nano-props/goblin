@@ -1,4 +1,8 @@
-import { isWorkspacePaneSessionTabType, isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
+import {
+  isWorkspacePaneSessionTabType,
+  isWorkspacePaneStaticTabType,
+  workspacePaneTabOrderEntryIdentity,
+} from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneStaticTabType, WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
 import { replaceRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { normalizeWorkspacePaneTabOrderRecord } from '#/web/stores/repos/workspace-pane-tabs.ts'
@@ -118,7 +122,12 @@ function workspacePaneTabOrderRecordsEqual(
     return (
       !!current &&
       current.length === views.length &&
-      views.every((view, index) => view.type === current[index]?.type && view.id === current[index]?.id)
+      views.every((view, index) => {
+        const currentView = current[index]
+        return (
+          !!currentView && workspacePaneTabOrderEntryIdentity(view) === workspacePaneTabOrderEntryIdentity(currentView)
+        )
+      })
     )
   })
 }

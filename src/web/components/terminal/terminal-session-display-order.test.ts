@@ -11,7 +11,7 @@ describe('terminal session display order helpers', () => {
     expect(
       terminalSessionDisplayOrder(
         {
-          key: 'session-2',
+          terminalKey: 'session-2',
           worktreeTerminalKey: 'repo\0wt',
           sessionId: 'session-2',
           index: 2,
@@ -25,7 +25,7 @@ describe('terminal session display order helpers', () => {
     expect(
       terminalSessionDisplayOrder(
         {
-          key: 'session-3',
+          terminalKey: 'session-3',
           worktreeTerminalKey: 'repo\0wt',
           sessionId: 'session-3',
           index: 3,

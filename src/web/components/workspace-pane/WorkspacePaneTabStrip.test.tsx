@@ -61,7 +61,7 @@ describe('WorkspacePaneTabStrip', () => {
         panelActive
         sessions={[
           session({
-            key: 't1',
+            terminalKey: 't1',
             selected: true,
             originalTitle: '~/repo/worktree — npm run dev',
           }),
@@ -107,8 +107,8 @@ describe('WorkspacePaneTabStrip', () => {
         workspacePaneId="workspace"
         responsiveCompact
         sessions={[
-          session({ key: 't1', selected: false, title: 'term-1' }),
-          session({ key: 't2', selected: true, title: 'term-2' }),
+          session({ terminalKey: 't1', selected: false, title: 'term-1' }),
+          session({ terminalKey: 't2', selected: true, title: 'term-2' }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -148,8 +148,8 @@ describe('WorkspacePaneTabStrip', () => {
         workspacePaneId="workspace"
         responsiveCompact
         sessions={[
-          session({ key: 't1', selected: false, title: 'term-1' }),
-          session({ key: 't2', selected: true, title: 'term-2' }),
+          session({ terminalKey: 't1', selected: false, title: 'term-1' }),
+          session({ terminalKey: 't2', selected: true, title: 'term-2' }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -183,9 +183,9 @@ describe('WorkspacePaneTabStrip', () => {
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
-          session({ key: 't1', title: 'term-1' }),
-          session({ key: 't2', title: 'term-2', selected: false }),
-          session({ key: 't3', title: 'term-3', selected: false }),
+          session({ terminalKey: 't1', title: 'term-1' }),
+          session({ terminalKey: 't2', title: 'term-2', selected: false }),
+          session({ terminalKey: 't3', title: 'term-3', selected: false }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -226,8 +226,8 @@ describe('WorkspacePaneTabStrip', () => {
         workspacePaneId="workspace"
         panelActive
         sessions={[
-          session({ key: 't1', selected: true }),
-          session({ key: 't2', selected: false, sessionId: 'session-2', index: 2 }),
+          session({ terminalKey: 't1', selected: true }),
+          session({ terminalKey: 't2', selected: false, sessionId: 'session-2', index: 2 }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -259,7 +259,7 @@ describe('WorkspacePaneTabStrip', () => {
         panelActive
         sessions={[
           session({
-            key: 't1',
+            terminalKey: 't1',
             selected: true,
             hasBell: true,
             recentlyActive: false,
@@ -293,9 +293,9 @@ describe('WorkspacePaneTabStrip', () => {
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
-          session({ key: 't1', title: 'term-1' }),
-          session({ key: 't2', title: 'term-2', selected: false }),
-          session({ key: 't3', title: 'term-3', selected: false }),
+          session({ terminalKey: 't1', title: 'term-1' }),
+          session({ terminalKey: 't2', title: 'term-2', selected: false }),
+          session({ terminalKey: 't3', title: 'term-3', selected: false }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -349,8 +349,8 @@ describe('WorkspacePaneTabStrip', () => {
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
-          session({ key: 't1', title: 'term-1', selected: true }),
-          session({ key: 't2', title: 'term-2', selected: false, sessionId: 'session-2', index: 2 }),
+          session({ terminalKey: 't1', title: 'term-1', selected: true }),
+          session({ terminalKey: 't2', title: 'term-2', selected: false, sessionId: 'session-2', index: 2 }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -377,7 +377,10 @@ describe('WorkspacePaneTabStrip', () => {
       <TestWorkspacePaneTabStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
-        sessions={[session({ key: 't1', title: 'term-1' }), session({ key: 't2', title: 'term-2', selected: false })]}
+        sessions={[
+          session({ terminalKey: 't1', title: 'term-1' }),
+          session({ terminalKey: 't2', title: 'term-2', selected: false }),
+        ]}
         onNew={() => {}}
         onSelect={() => {}}
         onScrollToBottom={() => {}}
@@ -397,9 +400,9 @@ describe('WorkspacePaneTabStrip', () => {
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
-          session({ key: 't1', title: 'term-1' }),
-          session({ key: 't2', title: 'term-2', selected: false }),
-          session({ key: 't3', title: 'term-3', selected: false }),
+          session({ terminalKey: 't1', title: 'term-1' }),
+          session({ terminalKey: 't2', title: 'term-2', selected: false }),
+          session({ terminalKey: 't3', title: 'term-3', selected: false }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -418,9 +421,9 @@ describe('WorkspacePaneTabStrip', () => {
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
-          session({ key: 't1', title: 'term-1' }),
-          session({ key: 't2', title: 'term-2', selected: false }),
-          session({ key: 't3', title: 'term-3', selected: false }),
+          session({ terminalKey: 't1', title: 'term-1' }),
+          session({ terminalKey: 't2', title: 'term-2', selected: false }),
+          session({ terminalKey: 't3', title: 'term-3', selected: false }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -442,9 +445,9 @@ describe('WorkspacePaneTabStrip', () => {
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
-          session({ key: 't1', title: 'term-1' }),
-          session({ key: 't2', title: 'term-2', selected: false }),
-          session({ key: 't3', title: 'term-3', selected: false }),
+          session({ terminalKey: 't1', title: 'term-1' }),
+          session({ terminalKey: 't2', title: 'term-2', selected: false }),
+          session({ terminalKey: 't3', title: 'term-3', selected: false }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -462,7 +465,10 @@ describe('WorkspacePaneTabStrip', () => {
       <TestWorkspacePaneTabStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
-        sessions={[session({ key: 't1', title: 'term-1' }), session({ key: 't2', title: 'term-2', selected: false })]}
+        sessions={[
+          session({ terminalKey: 't1', title: 'term-1' }),
+          session({ terminalKey: 't2', title: 'term-2', selected: false }),
+        ]}
         onNew={() => {}}
         onSelect={() => {}}
         onScrollToBottom={() => {}}
@@ -484,9 +490,9 @@ describe('WorkspacePaneTabStrip', () => {
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
-          session({ key: 't1', title: 'term-1' }),
-          session({ key: 't2', title: 'term-2', selected: false }),
-          session({ key: 't3', title: 'term-3', selected: false }),
+          session({ terminalKey: 't1', title: 'term-1' }),
+          session({ terminalKey: 't2', title: 'term-2', selected: false }),
+          session({ terminalKey: 't3', title: 'term-3', selected: false }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -509,7 +515,10 @@ describe('WorkspacePaneTabStrip', () => {
       <TestWorkspacePaneTabStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
-        sessions={[session({ key: 't1', title: 'term-1' }), session({ key: 't2', title: 'term-2', selected: false })]}
+        sessions={[
+          session({ terminalKey: 't1', title: 'term-1' }),
+          session({ terminalKey: 't2', title: 'term-2', selected: false }),
+        ]}
         onNew={() => {}}
         onSelect={() => {}}
         onScrollToBottom={() => {}}
@@ -530,9 +539,9 @@ describe('WorkspacePaneTabStrip', () => {
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
-          session({ key: 't1', title: 'term-1' }),
-          session({ key: 't2', title: 'term-2', selected: false }),
-          session({ key: 't3', title: 'term-3', selected: false }),
+          session({ terminalKey: 't1', title: 'term-1' }),
+          session({ terminalKey: 't2', title: 'term-2', selected: false }),
+          session({ terminalKey: 't3', title: 'term-3', selected: false }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -568,7 +577,10 @@ describe('WorkspacePaneTabStrip', () => {
       <TestWorkspacePaneTabStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
-        sessions={[session({ key: 't1', title: 'term-1' }), session({ key: 't2', title: 'term-2', selected: false })]}
+        sessions={[
+          session({ terminalKey: 't1', title: 'term-1' }),
+          session({ terminalKey: 't2', title: 'term-2', selected: false }),
+        ]}
         onNew={() => {}}
         onSelect={() => {}}
         onScrollToBottom={() => {}}
@@ -589,9 +601,9 @@ describe('WorkspacePaneTabStrip', () => {
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
-          session({ key: 't1', title: 'term-1' }),
-          session({ key: 't2', title: 'term-2', selected: false }),
-          session({ key: 't3', title: 'term-3', selected: false }),
+          session({ terminalKey: 't1', title: 'term-1' }),
+          session({ terminalKey: 't2', title: 'term-2', selected: false }),
+          session({ terminalKey: 't3', title: 'term-3', selected: false }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -609,9 +621,9 @@ describe('WorkspacePaneTabStrip', () => {
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
-          session({ key: 't1', title: 'term-1' }),
-          session({ key: 't2', title: 'term-2', selected: false }),
-          session({ key: 't3', title: 'term-3 updated', selected: false }),
+          session({ terminalKey: 't1', title: 'term-1' }),
+          session({ terminalKey: 't2', title: 'term-2', selected: false }),
+          session({ terminalKey: 't3', title: 'term-3 updated', selected: false }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -635,9 +647,9 @@ describe('WorkspacePaneTabStrip', () => {
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
-          session({ key: 't1', title: 'term-1' }),
-          session({ key: 't2', title: 'term-2', selected: false }),
-          session({ key: 't3', title: 'term-3', selected: false }),
+          session({ terminalKey: 't1', title: 'term-1' }),
+          session({ terminalKey: 't2', title: 'term-2', selected: false }),
+          session({ terminalKey: 't3', title: 'term-3', selected: false }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -657,7 +669,10 @@ describe('WorkspacePaneTabStrip', () => {
       <TestWorkspacePaneTabStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
-        sessions={[session({ key: 't1', title: 'term-1' }), session({ key: 't2', title: 'term-2', selected: false })]}
+        sessions={[
+          session({ terminalKey: 't1', title: 'term-1' }),
+          session({ terminalKey: 't2', title: 'term-2', selected: false }),
+        ]}
         onNew={() => {}}
         onSelect={() => {}}
         onScrollToBottom={() => {}}
@@ -675,7 +690,10 @@ describe('WorkspacePaneTabStrip', () => {
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         responsiveCompact
-        sessions={[session({ key: 't1', title: 'term-1' }), session({ key: 't2', title: 'term-2', selected: false })]}
+        sessions={[
+          session({ terminalKey: 't1', title: 'term-1' }),
+          session({ terminalKey: 't2', title: 'term-2', selected: false }),
+        ]}
         onNew={() => {}}
         onSelect={() => {}}
         onScrollToBottom={() => {}}
@@ -708,7 +726,10 @@ describe('WorkspacePaneTabStrip', () => {
       <TestWorkspacePaneTabStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
-        sessions={[session({ key: 't1', title: 'term-1' }), session({ key: 't2', title: 'term-2', selected: false })]}
+        sessions={[
+          session({ terminalKey: 't1', title: 'term-1' }),
+          session({ terminalKey: 't2', title: 'term-2', selected: false }),
+        ]}
         onNew={() => {}}
         onSelect={() => {}}
         onScrollToBottom={() => {}}
@@ -728,7 +749,10 @@ describe('WorkspacePaneTabStrip', () => {
         workspacePaneId="workspace"
         responsiveCompact
         panelActive
-        sessions={[session({ key: 't1', title: 'term-1' }), session({ key: 't2', title: 'term-2', selected: false })]}
+        sessions={[
+          session({ terminalKey: 't1', title: 'term-1' }),
+          session({ terminalKey: 't2', title: 'term-2', selected: false }),
+        ]}
         onNew={() => {}}
         onSelect={() => {}}
         onScrollToBottom={() => {}}
@@ -749,8 +773,8 @@ describe('WorkspacePaneTabStrip', () => {
   test('focuses the next compact tab after closing the active tab', async () => {
     function CompactCloseFocusHarness() {
       const [sessions, setSessions] = useState([
-        session({ key: 't1', title: 'term-1', selected: true }),
-        session({ key: 't2', title: 'term-2', selected: false }),
+        session({ terminalKey: 't1', title: 'term-1', selected: true }),
+        session({ terminalKey: 't2', title: 'term-2', selected: false }),
       ])
 
       return (
@@ -766,7 +790,7 @@ describe('WorkspacePaneTabStrip', () => {
           onClose={(closed) => {
             setSessions((current) =>
               current
-                .filter((candidate) => candidate.key !== closed.key)
+                .filter((candidate) => candidate.terminalKey !== closed.terminalKey)
                 .map((candidate, index) => ({
                   ...candidate,
                   selected: index === 0,
@@ -799,8 +823,8 @@ describe('WorkspacePaneTabStrip', () => {
         responsiveCompact
         panelActive
         sessions={[
-          session({ key: 't1', title: 'term-1', selected: false }),
-          session({ key: 't2', title: 'term-2', selected: false }),
+          session({ terminalKey: 't1', title: 'term-1', selected: false }),
+          session({ terminalKey: 't2', title: 'term-2', selected: false }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -835,7 +859,7 @@ describe('WorkspacePaneTabStrip', () => {
         workspacePaneId="workspace"
         responsiveCompact
         panelActive
-        sessions={[session({ key: 't1', title: 'term-1', selected: false })]}
+        sessions={[session({ terminalKey: 't1', title: 'term-1', selected: false })]}
         pendingTerminal
         newTerminalBusy
         onNew={() => {}}
@@ -867,7 +891,7 @@ describe('WorkspacePaneTabStrip', () => {
         worktreeTerminalKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         panelActive
-        sessions={[session({ key: 't1', title: 'term-1', selected: false })]}
+        sessions={[session({ terminalKey: 't1', title: 'term-1', selected: false })]}
         pendingTerminal
         newTerminalBusy
         onNew={() => {}}
@@ -894,7 +918,7 @@ describe('WorkspacePaneTabStrip', () => {
 
   test('keeps placeholder terminal titles out of materialized tab text', () => {
     const placeholderView: TerminalSessionSummary = {
-      ...session({ key: 't1', title: 'terminal', selected: true }),
+      ...session({ terminalKey: 't1', title: 'terminal', selected: true }),
       fullTitle: 'terminal',
       originalTitle: null,
     }
@@ -911,7 +935,7 @@ describe('WorkspacePaneTabStrip', () => {
         workspacePaneId="workspace"
         panelActive
         items={[item]}
-        activeTabIdentity={terminalWorkspacePaneTabProvider.identity(placeholderView.key)}
+        activeTabIdentity={terminalWorkspacePaneTabProvider.identity(placeholderView.terminalKey)}
         onNew={() => {}}
         onSelect={() => {}}
         onScrollToBottom={() => {}}
@@ -967,7 +991,7 @@ function TestWorkspacePaneTabStrip(props: {
     <WorkspacePaneTabStrip
       {...workspacePaneProps}
       items={items}
-      activeTabIdentity={selected ? terminalWorkspacePaneTabProvider.identity(selected.key) : null}
+      activeTabIdentity={selected ? terminalWorkspacePaneTabProvider.identity(selected.terminalKey) : null}
       onSelect={(item) => {
         if (isTerminalWorkspacePaneTabItem(item)) props.onSelect(props.worktreeTerminalKey, item.view)
       }}
@@ -992,12 +1016,11 @@ function rerender(element: ReactNode): RenderResult {
 }
 
 function session(overrides: Partial<TerminalSessionSummary> = {}): TerminalSessionSummary {
-  const key = overrides.key ?? 't1'
+  const terminalKey = overrides.terminalKey ?? 't1'
   const title = overrides.title ?? 'term-1'
   return {
     type: 'terminal',
-    id: overrides.id ?? key,
-    key,
+    terminalKey,
     worktreeTerminalKey: overrides.worktreeTerminalKey ?? '/repo\0/repo/worktree',
     sessionId: overrides.sessionId ?? 'session-1',
     index: overrides.index ?? 1,

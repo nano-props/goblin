@@ -46,7 +46,7 @@ export function useRepoWorkspaceTabModelInput(
   const worktreeSnapshot = useWorktreeTerminalSnapshot(terminalWorktreeKey)
   const terminalSyncReady = useTerminalRepoSyncReady(repo.id)
   const selectedTerminalKey = useReposStore((s) =>
-    terminalWorktreeKey ? s.selectedTerminalSessionByWorktree[terminalWorktreeKey] : undefined,
+    terminalWorktreeKey ? s.selectedTerminalKeyByWorktree[terminalWorktreeKey] : undefined,
   )
 
   const workspacePaneTabOrder = useMemo(
@@ -101,7 +101,7 @@ export function useSyncRepoWorkspaceTerminalSelection(
   selectedTerminalKey: string | undefined,
 ): void {
   const setSelectedTerminal = useReposStore((s) => s.setSelectedTerminal)
-  const activeTerminalKey = model.activeTab?.kind === 'terminal' ? model.activeTab.key : null
+  const activeTerminalKey = model.activeTab?.kind === 'terminal' ? model.activeTab.terminalKey : null
 
   useEffect(() => {
     if (!model.worktreeTerminalKey || !activeTerminalKey) return
