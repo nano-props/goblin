@@ -48,12 +48,12 @@ if (!process.env.npm_package_version?.trim()) {
 const webIndex = path.join(repoRoot, 'dist/web/index.html')
 const webBoot = path.join(repoRoot, 'dist/web/boot.js')
 const webReady = existsSync(webIndex) && existsSync(webBoot)
-const ptyWorkerEntry = path.join(repoRoot, 'dist/server/pty-worker.js')
-const builtGCommandEntry = path.join(repoRoot, 'dist/server/g-command.js')
 const sourceGCommandEntry = path.join(repoRoot, 'src/server/entrypoints/g-command.ts')
 const server = await bootstrapServer({
-  ptyWorkerEntry: existsSync(ptyWorkerEntry) ? ptyWorkerEntry : undefined,
-  gCommandEntry: existsSync(builtGCommandEntry) ? builtGCommandEntry : sourceGCommandEntry,
+  // This wrapper is the source-mode server launcher. Do not auto-detect
+  // dist/server artifacts here: stale builds would silently change which
+  // server-side code this command runs.
+  gCommandEntry: sourceGCommandEntry,
 })
 
 console.log(`[embedded-server] listening on http://${server.hostname}:${server.port}`)
