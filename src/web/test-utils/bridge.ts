@@ -259,11 +259,11 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           return null
         case 'terminal.create': {
           const terminalKind = (payload as { kind?: string } | undefined)?.kind
-          const ptySessionId = terminalKind === 'primary' ? 'terminal-1' : 'terminal-2'
+          const ptySessionId = terminalKind === 'primary' ? 'pty_test_1_aaaaaaaaa' : 'pty_test_2_aaaaaaaaa'
           return {
             ok: true,
             action: terminalKind === 'primary' ? 'reused' : 'created',
-            terminalSessionId: terminalKind === 'primary' ? 'repo\0worktree\0terminal-1' : 'repo\0worktree\0terminal-2',
+            terminalSessionId: terminalKind === 'primary' ? 'terminal-session-test-1' : 'terminal-session-test-2',
             sessions: [],
             ptySessionId,
             snapshot: '',

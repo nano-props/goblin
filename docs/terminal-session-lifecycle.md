@@ -82,7 +82,7 @@ The combined symptom list across the root causes:
   with a swallowed rejection. A WebSocket mid-request teardown or a
   race with idle socket shutdown could drop the close before the
   server saw it. The PTY stayed alive.
-- **R2 — The catalog reused orphan sessions by key.** The terminal
+- **R2 — The catalog reused orphan sessions by terminalSessionId.** The terminal
   catalog returned `action: 'restored'` for any existing session with
   a controller. Combined with `forceNew: false`, the new client
   attached to the orphan PTY. There was no explicit per-session close
@@ -186,7 +186,7 @@ runtime crash.
 like this:
 
 ```ts
-for (const ptySessionId of sessionIds) {
+for (const ptySessionId of ptySessionIds) {
   void terminalBridge.close({ ptySessionId }).catch(() => {})
 }
 ```

@@ -8,7 +8,7 @@ import {
 } from '#/web/hooks/client-effect-intent-plans.ts'
 
 describe('client effect intent plans', () => {
-  test('creates a worktree terminal bell plan when the bell key matches a known worktree', () => {
+  test('creates a worktree terminal bell plan when the worktree group matches a known worktree', () => {
     resetReposStore()
     const repo = seedRepoState({
       id: '/tmp/repo',

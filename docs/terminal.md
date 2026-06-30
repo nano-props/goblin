@@ -80,7 +80,7 @@ The terminal feature spans `shared`, `server`, and `web`, but it still behaves a
 
 ### Shared layer
 
-- Defines protocol types, message shapes, identities, and session key rules.
+- Defines protocol types, message shapes, identities, and grouping rules.
 - Gives both server and client a common language for session, control, and realtime events.
 
 ### Server runtime
@@ -135,7 +135,7 @@ It is useful to keep three lifetimes separate:
 - **View lifetime**: client-local xterm and DOM resources for rendering a session.
 - **Tab lifetime**: user-visible workspace surface that decides which feature resources must be released before the tab is considered closed.
 
-A Workspace Pane tab is not the authoritative owner of a terminal session. The tab is a workspace-pane slot in the UI; the terminal server (TerminalSessionManager) and client projection (TerminalSessionProjection) own terminal resource cleanup for the session rendered in that slot. The tab close path is the orchestration boundary that waits for those owners to finish.
+A Workspace Pane tab is not the authoritative owner of a terminal session. The tab is a workspace-pane tab entry in the UI; the terminal server (TerminalSessionManager) and client projection (TerminalSessionProjection) own terminal resource cleanup for the session rendered by that tab. The tab close path is the orchestration boundary that waits for those owners to finish.
 
 This distinction matters for destructive worktree operations. Before a worktree directory is removed, the client should close every worktree-scoped Workspace Pane tab for that worktree and await each tab's close contract. For terminal tabs, that close contract delegates to the client projection's worktree release barrier: cancel pending creates that have not reached the server, wait for in-flight creates that cannot be cancelled, close materialized sessions, and wait for pending durable closes to settle. For future worktree-scoped tabs, such as a file tree or another long-lived tool surface, the same tab close contract should release that tab's resources before the worktree mutation starts.
 
@@ -143,18 +143,16 @@ Repo routes and server-side repo write paths should not know about Workspace Pan
 
 ## Identity model
 
-The terminal system relies on four identity scopes:
+The terminal system relies on five identity/grouping scopes:
 
 - **userId**: the server-side terminal user derived from the authenticated access token. Session visibility, lifecycle cleanup, and realtime fanout are partitioned by this id.
 - **clientId**: the logical client for one browser tab or Electron client. It validates and routes requests and is also the code-level controller identity (`TerminalController.clientId`).
-- **terminal attachment**: the conceptual relationship between a `clientId` and a terminal session. There is intentionally no separate `attachmentId` field, and none is planned. One client should have at most one Terminal View for a given `ptySessionId`; cross-client viewing/control is modeled with `clientId`, controller/viewer state, and explicit takeover.
-- **ptySessionId**: the server-owned identifier for one live terminal session.
+- **terminalSessionId**: the server-allocated persistent identity for one terminal business session. Terminal workspace-pane tabs use this value directly as their durable terminal tab identity.
+- **terminalWorktreeKey**: the repo/worktree grouping key produced by `formatTerminalWorktreeKey(repoRoot, worktreePath)`. It is used for per-worktree selection, tab-strip grouping, bell/activity summaries, and materialization callbacks. It is not a terminal identity.
+- **ptySessionId**: the server-owned runtime identifier for the current live PTY associated with a terminal session. Restart/reconnect can change PTY runtime state without changing `terminalSessionId`.
+- **terminal attachment**: the conceptual relationship between a `clientId` and a terminal session. There is intentionally no separate `attachmentId` field, and none is planned. One client should have at most one Terminal View for a given `terminalSessionId`; cross-client viewing/control is modeled with `clientId`, controller/viewer state, and explicit takeover.
 
-In addition, terminal keys encode repo and worktree scope so the system can reason about:
-
-- which worktree a session belongs to
-- which tab strip it should appear in
-- whether a request is a restore of an existing terminal identity or a request for a new one
+This means terminal identity is not encoded from repo/worktree strings. Repo and worktree location travel as explicit fields on session summaries and as `terminalWorktreeKey` only where a grouped lookup is needed.
 
 This identity model is the basis for reconnect, mirror mode, controller handoff, and multi-window coherence.
 

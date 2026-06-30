@@ -89,10 +89,12 @@ Do not use `runtime` for a queue or scheduler that is not actually a runtime fac
 
 ### Terminal
 
-Terminal terminology has one hard boundary:
+Terminal terminology has hard boundaries:
 
-- `slot` is reserved for workspace-pane UI identity.
 - `session` is the terminal business object.
+- `terminalSessionId` is the persistent identity for a terminal session and for its terminal workspace-pane tab entry.
+- `terminalWorktreeKey` is only the repo/worktree grouping key.
+- `tabId` is for fixed static workspace-pane tabs.
 - control ownership is described as `controller`, `viewer`, `unowned`, or `controller role`.
 
 Canonical terminal terms:
@@ -106,7 +108,8 @@ Canonical terminal terms:
 | Per-session client state | `TerminalSessionState` | `TerminalSlotState` |
 | Per-session client runtime | `TerminalSessionRuntime` | `TerminalSlotRuntime` |
 | Per-worktree ordering runtime | `TerminalSessionOrderRuntime` | `TerminalViewOrderRuntime` |
-| Workspace-pane slot key | `TerminalWorkspaceSlotKey` | `TerminalSlotKey` |
+| Terminal session identity | `terminalSessionId` | old composite terminal identity names |
+| Terminal worktree grouping | `terminalWorktreeKey` / `TerminalWorktreeKey` | old workspace-pane identity names |
 | Session lifecycle event | `session-closed` | `slot-closed` |
 | Session id validator | `isValidTerminalSessionId` | `isValidSlotId` |
 
@@ -114,7 +117,9 @@ Naming consequences:
 
 - Do not use `slot` for a terminal business object.
 - Do not use `session` to mean controller ownership.
-- If you mean the UI tab identity, say `workspace-pane slot` or `TerminalWorkspaceSlotKey`.
+- If you mean a static Workspace Pane tab, use `tabId`.
+- If you mean a terminal Workspace Pane tab, use `terminalSessionId`.
+- If you mean the repo/worktree grouping bucket for terminal tabs, use `terminalWorktreeKey`.
 
 ### Repo / workspace
 
