@@ -152,18 +152,31 @@ function CreateWorktreeDialogSession({ open, onOpenChange, repoId: sessionRepoId
   const bootstrapConfigHash = bootstrapPreview?.configHash ?? null
   const configTrusted = settingsSnapshot ? shouldConfigBeTrusted(displayRepo.id, bootstrapConfigHash) : false
   const worktreeBootstrapLoading = bootstrapPreviewLoading || configTrustStateLoading()
+  const worktreeBootstrap = {
+    loading: worktreeBootstrapLoading,
+    preview: bootstrapPreview,
+    error: bootstrapPreviewError,
+    configTrusted,
+    onConfigTrustedChange: setConfigTrustChoice,
+  }
+  // The effect above clears bootstrap state as soon as `open` becomes false.
+  // That keeps the next open session from inheriting stale preflight data, but
+  // Radix keeps dialog content mounted briefly for close motion. Retain the last
+  // open display state at this host boundary so body-only regions do not vanish
+  // mid-fade while the underlying business state is already reset.
+  //
+  // This is the same display-retention pattern used by branch action dialogs,
+  // not a height/CSS workaround. If CreateWorktreeDialog gains more
+  // close-sensitive dynamic regions, consolidate this into a dedicated
+  // `useCreateWorktreeDialogDisplayState` helper instead of adding one-off
+  // retained props here.
+  const displayWorktreeBootstrap = useLastNonNull(open ? worktreeBootstrap : null)
 
   return (
     <CreateWorktreeDialog
       open={open}
       repo={displayRepo}
-      worktreeBootstrap={{
-        loading: worktreeBootstrapLoading,
-        preview: bootstrapPreview,
-        error: bootstrapPreviewError,
-        configTrusted,
-        onConfigTrustedChange: setConfigTrustChoice,
-      }}
+      worktreeBootstrap={displayWorktreeBootstrap ?? undefined}
       onClose={() => onOpenChange(false)}
       onCreate={handleCreateWorktree}
     />
