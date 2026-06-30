@@ -202,7 +202,7 @@ export interface RepoTreeResult {
   readonly truncated: boolean
 }
 
-export type RepoFileViewer = 'bat' | 'cat' | 'type'
+export type RepoFileViewer = 'bat' | 'batcat' | 'cat' | 'type'
 export type RepoFileViewerShell = 'posix' | 'cmd'
 
 export interface RepoFileViewerResult {

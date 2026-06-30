@@ -680,7 +680,7 @@ describe('RepoWorkspaceContent', () => {
     expect(showRepoWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'terminal')
     expect(createTerminal).toHaveBeenCalledWith(
       { repoRoot: REPO_ID, branch: branchName, worktreePath },
-      { startupShellCommand: "bat '/tmp/filetree-open-worktree/README.md'\r" },
+      { startupShellCommand: "bat --paging=never '/tmp/filetree-open-worktree/README.md'\r" },
     )
     expect(writeInput).not.toHaveBeenCalled()
   })

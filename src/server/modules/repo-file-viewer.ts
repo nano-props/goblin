@@ -7,6 +7,7 @@ import { getWorktrees } from '#/system/git/worktrees.ts'
 import { remoteCommandExists } from '#/system/ssh/git.ts'
 import { userShellCommandExists } from '#/system/user-shell.ts'
 
+const BAT_VIEWERS = ['bat', 'batcat'] as const
 const POSIX_CAT_VIEWER: RepoFileViewerResult = { viewer: 'cat', shell: 'posix' }
 const CMD_TYPE_VIEWER: RepoFileViewerResult = { viewer: 'type', shell: 'cmd' }
 
@@ -20,15 +21,21 @@ export async function getRepositoryFileViewer(
 
   if (isRemoteRepoId(cwd)) {
     const target = await resolveRemoteRepoTarget(cwd)
-    const hasBat = await remoteCommandExists(target, worktreePath, 'bat', { signal })
-    return hasBat ? { viewer: 'bat', shell: 'posix' } : POSIX_CAT_VIEWER
+    for (const viewer of BAT_VIEWERS) {
+      const exists = await remoteCommandExists(target, worktreePath, viewer, { signal })
+      if (exists) return { viewer, shell: 'posix' }
+    }
+    return POSIX_CAT_VIEWER
   }
 
   const worktrees = await getWorktrees(cwd, { includeStatus: false, signal })
   if (!matchesKnownWorktree(worktrees, worktreePath)) return fallbackViewer
 
-  const hasBat = await userShellCommandExists('bat', worktreePath, signal)
-  return hasBat ? { viewer: 'bat', shell: localShellDialect() } : fallbackViewer
+  for (const viewer of BAT_VIEWERS) {
+    const exists = await userShellCommandExists(viewer, worktreePath, signal)
+    if (exists) return { viewer, shell: localShellDialect() }
+  }
+  return fallbackViewer
 }
 
 function localFallbackViewer(): RepoFileViewerResult {

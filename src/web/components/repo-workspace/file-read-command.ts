@@ -11,7 +11,11 @@ export function absoluteFilePathForTerminal(worktreePath: string, filePath: stri
 
 export function fileReadCommand(reader: RepoFileViewerResult, filePath: string): string {
   const quotedPath = reader.shell === 'cmd' ? cmdQuotePath(filePath) : shellEscapePath(filePath)
-  return `${reader.viewer} ${quotedPath}\r`
+  return `${fileReadViewerCommand(reader.viewer)} ${quotedPath}\r`
+}
+
+function fileReadViewerCommand(viewer: RepoFileViewerResult['viewer']): string {
+  return viewer === 'bat' || viewer === 'batcat' ? `${viewer} --paging=never` : viewer
 }
 
 function cmdQuotePath(path: string): string {
