@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { ConfirmDialog } from '#/web/components/ConfirmDialog.tsx'
-import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
+import { runConfirmCloseTerminalWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
 import { useLastNonNull } from '#/web/hooks/useLastNonNull.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { useT } from '#/web/stores/i18n.ts'
@@ -44,11 +44,14 @@ export function TerminalActionDialogHost({ activeRepoId, navigation }: Props) {
         if (!closeConfirm) return
         const payload = closeConfirm
         closeCloseConfirm()
-        await runCloseWorkspacePaneTabCommand({
+        await runConfirmCloseTerminalWorkspacePaneTabCommand({
           repoId: payload.repoId,
           navigation,
           targetIdentity: payload.targetIdentity,
-          skipTerminalCloseConfirm: true,
+          confirmedTerminal: {
+            key: payload.terminalKey,
+            base: payload.terminalBase,
+          },
         })
       }}
     />

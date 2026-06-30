@@ -36,9 +36,9 @@ import type {
   TerminalLifecycleViewModel,
   TerminalRepoIndex,
   WorktreeTerminalSnapshot,
-  TerminalSessionBase,
   TerminalSnapshot,
 } from '#/web/components/terminal/types.ts'
+import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 
 const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = {
   phase: 'opening',

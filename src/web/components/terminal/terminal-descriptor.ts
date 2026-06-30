@@ -1,5 +1,6 @@
 import type { ReposStore } from '#/web/stores/repos/types.ts'
-import type { TerminalDescriptor, TerminalSessionBase } from '#/web/components/terminal/types.ts'
+import type { TerminalDescriptor } from '#/web/components/terminal/types.ts'
+import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import {
   formatTerminalWorkspaceSlotKey,
   worktreeTerminalKey,

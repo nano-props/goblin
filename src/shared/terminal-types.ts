@@ -20,6 +20,12 @@ export interface TerminalController {
   status: Exclude<TerminalControllerStatus, 'none'>
 }
 
+export interface TerminalSessionBase {
+  repoRoot: string
+  branch: string
+  worktreePath: string
+}
+
 export interface TerminalAttachInput {
   ptySessionId: string
   cols: number

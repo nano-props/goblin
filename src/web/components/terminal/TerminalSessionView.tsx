@@ -30,7 +30,7 @@ import {
 } from '#/web/components/terminal/terminal-session-store.ts'
 import { MobileTerminalToolbar } from '#/web/components/terminal/mobile-terminal-toolbar.tsx'
 import { isMobileDevice } from '#/web/components/terminal/mobile-detection.ts'
-import type { TerminalSessionBase } from '#/web/components/terminal/types.ts'
+import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { showTerminalCreateErrorToast } from '#/web/components/terminal/terminal-create-feedback.ts'
 
 const DEFAULT_TERMINAL_ERROR_MESSAGE_KEY = 'error.unknown'

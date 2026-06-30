@@ -1,5 +1,6 @@
 import { terminalLog } from '#/web/logger.ts'
-import type { TerminalCreateOptions, TerminalSessionBase } from '#/web/components/terminal/types.ts'
+import type { TerminalCreateOptions } from '#/web/components/terminal/types.ts'
+import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import {
   showTerminalCreateErrorToast,
   terminalCreateErrorKey,

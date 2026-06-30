@@ -3,6 +3,7 @@ import type {
   TerminalControllerStatus,
   TerminalExitEvent,
   TerminalOutputEvent,
+  TerminalSessionBase,
   TerminalSessionPhase,
 } from '#/shared/terminal-types.ts'
 import type { TerminalInput, TerminalUserInputSource } from '#/web/components/terminal/terminal-input.ts'
@@ -95,12 +96,6 @@ export interface TerminalSearchResult {
   resultIndex: number
   resultCount: number
   found: boolean
-}
-
-export interface TerminalSessionBase {
-  repoRoot: string
-  branch: string
-  worktreePath: string
 }
 
 export interface TerminalCreateOptions {

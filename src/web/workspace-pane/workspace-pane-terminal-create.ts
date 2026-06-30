@@ -1,6 +1,7 @@
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
-import type { TerminalCreateOptions, TerminalSessionBase } from '#/web/components/terminal/types.ts'
+import type { TerminalCreateOptions } from '#/web/components/terminal/types.ts'
+import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { runWorkspacePaneTabUiCommand } from '#/web/workspace-pane/workspace-pane-tab-command-queue.ts'
 
 export async function createWorkspacePaneTerminalTab(input: {

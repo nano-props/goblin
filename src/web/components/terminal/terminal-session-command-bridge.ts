@@ -1,8 +1,5 @@
-import type {
-  WorktreeTerminalSnapshot,
-  TerminalCreateOptions,
-  TerminalSessionBase,
-} from '#/web/components/terminal/types.ts'
+import type { WorktreeTerminalSnapshot, TerminalCreateOptions } from '#/web/components/terminal/types.ts'
+import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 
 interface TerminalSessionCommandBridge {
   worktreeSnapshot: (worktreeTerminalKey: string) => WorktreeTerminalSnapshot

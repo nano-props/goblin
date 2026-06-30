@@ -4,7 +4,8 @@ import type {
   WorkspacePaneTabType,
 } from '#/shared/workspace-pane.ts'
 import { resolveRenderableWorkspacePaneTab } from '#/web/lib/workspace-pane-tab.ts'
-import type { TerminalSessionBase, WorkspacePaneTabSummary } from '#/web/components/terminal/types.ts'
+import type { WorkspacePaneTabSummary } from '#/web/components/terminal/types.ts'
+import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import {
   PENDING_TERMINAL_WORKSPACE_PANE_TAB_IDENTITY,
   isTerminalWorkspacePaneTab,

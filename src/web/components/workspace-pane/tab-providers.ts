@@ -10,7 +10,8 @@ import {
   workspacePaneStaticTabOrderEntry,
   workspacePaneTerminalTabOrderEntry,
 } from '#/shared/workspace-pane.ts'
-import type { TerminalSessionBase, WorkspacePaneTabSummary } from '#/web/components/terminal/types.ts'
+import type { WorkspacePaneTabSummary } from '#/web/components/terminal/types.ts'
+import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 
 type T = (key: string, params?: Record<string, string | number>) => string
 
