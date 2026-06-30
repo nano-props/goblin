@@ -96,7 +96,7 @@ export interface TerminalEventSink<TUser extends string | number> {
 
 export class TerminalSessionManager<TUser extends string | number> {
   private readonly sessionsByPtySessionId = new Map<string, TerminalSessionView<TUser>>()
-  private readonly ptySessionIdByUserTerminalSessionKey = new Map<string, string>()
+  private readonly ptySessionIdByUserTerminalSessionIndex = new Map<string, string>()
   private readonly sink: TerminalEventSink<TUser>
   private readonly ptySupervisor: PtySupervisor
   private readonly terminalSessionOrder: TerminalSessionOrderRuntimeLike<TUser>
@@ -121,9 +121,9 @@ export class TerminalSessionManager<TUser extends string | number> {
     const cwd = path.resolve(input.cwd)
     const userId = input.userId
     if (!this.isValidUserId(userId)) return { ok: false, message: 'error.invalid-arguments' }
-    const userTerminalSessionKey = this.userTerminalSessionKey(userId, input.terminalSessionId)
+    const userTerminalSessionIndex = this.formatUserTerminalSessionIndex(userId, input.terminalSessionId)
     if (input.forceNew) this.closeUserTerminalSession(userId, input.terminalSessionId)
-    const existingId = this.ptySessionIdByUserTerminalSessionKey.get(userTerminalSessionKey)
+    const existingId = this.ptySessionIdByUserTerminalSessionIndex.get(userTerminalSessionIndex)
     const existing = existingId ? this.sessionsByPtySessionId.get(existingId) : undefined
     if (existing) {
       this.replaceSessionOrderForWorktree(userId, existing.scope, existing.worktreePath)
@@ -161,7 +161,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       takeoverPending: false,
     }
     this.sessionsByPtySessionId.set(id, session)
-    this.ptySessionIdByUserTerminalSessionKey.set(userTerminalSessionKey, id)
+    this.ptySessionIdByUserTerminalSessionIndex.set(userTerminalSessionIndex, id)
     this.replaceSessionOrderForWorktree(userId, input.scope, worktreePath)
     if (input.clientId) {
       registerTerminalClient(session, input.clientId, size.cols, size.rows)
@@ -289,9 +289,9 @@ export class TerminalSessionManager<TUser extends string | number> {
     session.ptyBinding.invalidateOwnership()
     if (markTerminalSessionClosed(session)) this.emitLifecycle(session)
     this.sessionsByPtySessionId.delete(ptySessionId)
-    const userTerminalSessionKey = this.userTerminalSessionKey(session.userId, session.terminalSessionId)
-    if (this.ptySessionIdByUserTerminalSessionKey.get(userTerminalSessionKey) === ptySessionId)
-      this.ptySessionIdByUserTerminalSessionKey.delete(userTerminalSessionKey)
+    const userTerminalSessionIndex = this.formatUserTerminalSessionIndex(session.userId, session.terminalSessionId)
+    if (this.ptySessionIdByUserTerminalSessionIndex.get(userTerminalSessionIndex) === ptySessionId)
+      this.ptySessionIdByUserTerminalSessionIndex.delete(userTerminalSessionIndex)
     this.replaceSessionOrderForWorktree(session.userId, session.scope, session.worktreePath)
     session.ptyBinding.dispose(session)
   }
@@ -375,7 +375,9 @@ export class TerminalSessionManager<TUser extends string | number> {
   }
 
   private closeUserTerminalSession(userId: TUser, terminalSessionId: string): void {
-    const id = this.ptySessionIdByUserTerminalSessionKey.get(this.userTerminalSessionKey(userId, terminalSessionId))
+    const id = this.ptySessionIdByUserTerminalSessionIndex.get(
+      this.formatUserTerminalSessionIndex(userId, terminalSessionId),
+    )
     if (id) this.closeSession(id)
   }
 
@@ -476,7 +478,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     return await this.attachResult(session)
   }
 
-  private userTerminalSessionKey(userId: TUser, terminalSessionId: string): string {
+  private formatUserTerminalSessionIndex(userId: TUser, terminalSessionId: string): string {
     return `${String(userId)}\0${terminalSessionId}`
   }
 

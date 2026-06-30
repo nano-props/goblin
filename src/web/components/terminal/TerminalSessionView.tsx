@@ -311,7 +311,7 @@ export function TerminalSessionView({
       if (!terminalSessionId || !isController) return
       const files = Array.from(event.dataTransfer.files).filter(isNonPlaceholderClipboardFile)
       if (files.length === 0) return
-      // Capture the terminal key the user actually dropped into. The
+      // Capture the terminal session the user actually dropped into. The
       // blob-save tier (web HTTP path) is a real roundtrip, so a
       // worktree switch during resolve would otherwise route the
       // write to a session the user is no longer looking at.
@@ -379,7 +379,7 @@ export function TerminalSessionView({
       }
 
       // 'files' — resolve paths asynchronously. Capture the session
-      // terminal key (see `handleDrop` for the worktree-switch rationale).
+      // terminal session id (see `handleDrop` for the worktree-switch rationale).
       const capturedSessionId = terminalSessionId
       void resolvePastedFiles(files).then(
         (resolution) => {
@@ -499,7 +499,7 @@ export function TerminalSessionView({
         // is what the user reported as "blank screen" on the first
         // click. Render an explicit CTA so the affordance is
         // discoverable. The button is disabled while the create is
-        // in flight (we await `createTerminal`'s returned key to
+        // in flight (we await `createTerminal`'s returned terminalSessionId to
         // keep double-clicks idempotent — the registry dedupes by
         // worktree via the pending-create queue, but a visible
         // loading state is still the right user signal).

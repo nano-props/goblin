@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { syncTerminalPtySessionIdIndex } from '#/web/components/terminal/terminal-session-index.ts'
 
 describe('terminal session index helper', () => {
-  test('updates both key->session and session->key maps coherently', () => {
+  test('updates terminalSessionId and ptySessionId maps coherently', () => {
     const ptySessionIdByTerminalSessionId = new Map<string, string>()
     const terminalSessionIdByPtySessionId = new Map<string, string>()
 

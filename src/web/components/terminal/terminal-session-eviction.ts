@@ -1,27 +1,29 @@
 export function countOrphanedTerminalSessionIds(input: {
   repoRoot: string
-  localSessionKeys: string[]
-  getRepoRootForKey: (key: string) => string | null
-  hasServerPtySessionId: (key: string) => boolean
-  serverKeys: ReadonlySet<string>
+  localTerminalSessionIds: string[]
+  getRepoRootForTerminalSessionId: (terminalSessionId: string) => string | null
+  hasPtySessionIdForTerminalSessionId: (terminalSessionId: string) => boolean
+  serverTerminalSessionIds: ReadonlySet<string>
 }): string[] {
-  const orphanedKeys: string[] = []
-  for (const key of input.localSessionKeys) {
-    if (input.getRepoRootForKey(key) !== input.repoRoot) continue
-    if (input.serverKeys.has(key)) continue
-    if (!input.hasServerPtySessionId(key)) continue
-    orphanedKeys.push(key)
+  const orphanedTerminalSessionIds: string[] = []
+  for (const terminalSessionId of input.localTerminalSessionIds) {
+    if (input.getRepoRootForTerminalSessionId(terminalSessionId) !== input.repoRoot) continue
+    if (input.serverTerminalSessionIds.has(terminalSessionId)) continue
+    if (!input.hasPtySessionIdForTerminalSessionId(terminalSessionId)) continue
+    orphanedTerminalSessionIds.push(terminalSessionId)
   }
-  return orphanedKeys
+  return orphanedTerminalSessionIds
 }
 
 export function resolveAdjacentTerminalSelectionAfterRemoval(
-  orderedKeysBeforeRemoval: string[],
-  removedKey: string,
+  orderedTerminalSessionIdsBeforeRemoval: string[],
+  removedTerminalSessionId: string,
 ): string | null {
-  const closedOrderIndex = orderedKeysBeforeRemoval.indexOf(removedKey)
-  if (closedOrderIndex < 0) return orderedKeysBeforeRemoval[0] ?? null
-  const remaining = orderedKeysBeforeRemoval.filter((key) => key !== removedKey)
+  const closedOrderIndex = orderedTerminalSessionIdsBeforeRemoval.indexOf(removedTerminalSessionId)
+  if (closedOrderIndex < 0) return orderedTerminalSessionIdsBeforeRemoval[0] ?? null
+  const remaining = orderedTerminalSessionIdsBeforeRemoval.filter(
+    (terminalSessionId) => terminalSessionId !== removedTerminalSessionId,
+  )
   const right = remaining[closedOrderIndex] ?? null
   const left = closedOrderIndex >= 1 ? (remaining[closedOrderIndex - 1] ?? null) : null
   return right ?? left ?? null

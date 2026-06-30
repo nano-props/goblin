@@ -129,7 +129,7 @@ async function createSession(
 }
 
 describe('TerminalSessionManager PTY spawn ownership', () => {
-  test('waits for an in-flight create spawn before reusing the same session key', async () => {
+  test('waits for an in-flight create spawn before reusing the same terminalSessionId', async () => {
     const supervisor = createDeferredPtySupervisor()
     const manager = createManager(supervisor)
 

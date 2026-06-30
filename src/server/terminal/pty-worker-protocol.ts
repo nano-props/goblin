@@ -1,11 +1,11 @@
 // Wire protocol for the dedicated PTY worker subprocess.
 //
 // The worker is intentionally a thin node-pty supervisor — it does not
-// know about sessions, workspace-pane slots, catalogs, sockets, or any business state. The
+// know about terminal sessions, workspace-pane slots, catalogs, sockets, or any business state. The
 // native host owns the business runtime and talks to the worker over
 // IPC for the few low-level operations that have to live close to the
 // OS process boundary (spawn / write / resize / kill). Every other
-// concern (session lifecycle, workspace-slot mapping, controllers, sockets, catalog) is handled
+// concern (terminal session lifecycle, worktree grouping, controllers, sockets, catalog) is handled
 // in-process by the main runtime.
 //
 // Protocol surface (8 message types total):

@@ -746,9 +746,9 @@ describe('TerminalSessionProvider', () => {
       })
 
       await act(async () => {
-        const firstKey = getProbe().summaries[0]?.terminalSessionId
-        if (!firstKey) throw new Error('missing session-1 key')
-        getContext().selectTerminal(terminalWorktreeKey, firstKey)
+        const firstTerminalSessionId = getProbe().summaries[0]?.terminalSessionId
+        if (!firstTerminalSessionId) throw new Error('missing session-1 terminalSessionId')
+        getContext().selectTerminal(terminalWorktreeKey, firstTerminalSessionId)
       })
 
       expect(getProbe().summaries.map((session) => [session.terminalSessionId, session.selected, session.hasBell])).toEqual([
@@ -1301,13 +1301,13 @@ describe('TerminalSessionProvider', () => {
     try {
       await emitSessionsChanged()
 
-      const key = getProbe().summaries[0]?.terminalSessionId
-      if (!key) throw new Error('missing terminal key')
+      const terminalSessionId = getProbe().summaries[0]?.terminalSessionId
+      if (!terminalSessionId) throw new Error('missing terminalSessionId')
       const session = mockSessions.find((item) => item.descriptor.terminalSessionId === 'session-1')
       if (!session) throw new Error('missing terminal mock session')
 
       session.setSerializeValue('local-render-cache')
-      getContext().detach(key, document.createElement('div'))
+      getContext().detach(terminalSessionId, document.createElement('div'))
 
       listSessionsMock.mockResolvedValue([
         {
@@ -1366,13 +1366,13 @@ describe('TerminalSessionProvider', () => {
     try {
       await emitSessionsChanged()
 
-      const key = getProbe().summaries[0]?.terminalSessionId
-      if (!key) throw new Error('missing terminal key')
+      const terminalSessionId = getProbe().summaries[0]?.terminalSessionId
+      if (!terminalSessionId) throw new Error('missing terminalSessionId')
       const session = mockSessions.find((item) => item.descriptor.terminalSessionId === 'session-1')
       if (!session) throw new Error('missing terminal mock session')
 
       session.setSerializeValue('stale-local-cache-%')
-      getContext().detach(key, document.createElement('div'))
+      getContext().detach(terminalSessionId, document.createElement('div'))
 
       getSessionSnapshotMock.mockClear()
       getSessionSnapshotMock.mockResolvedValueOnce({
@@ -1431,13 +1431,13 @@ describe('TerminalSessionProvider', () => {
     try {
       await emitSessionsChanged()
 
-      const key = getProbe().summaries[0]?.terminalSessionId
-      if (!key) throw new Error('missing terminal key')
+      const terminalSessionId = getProbe().summaries[0]?.terminalSessionId
+      if (!terminalSessionId) throw new Error('missing terminalSessionId')
       const session = mockSessions.find((item) => item.descriptor.terminalSessionId === 'session-1')
       if (!session) throw new Error('missing terminal mock session')
 
       session.setSerializeValue('local-render-cache')
-      getContext().detach(key, document.createElement('div'))
+      getContext().detach(terminalSessionId, document.createElement('div'))
 
       listSessionsMock.mockResolvedValue([
         {

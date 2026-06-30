@@ -122,8 +122,8 @@ describe('TerminalSessionProjection', () => {
       )
 
       const terminalWorktreeSnapshot = projection.terminalWorktreeSnapshot(WORKTREE_KEY)
-      const key = terminalWorktreeSnapshot.sessions[0]!.terminalSessionId
-      const session = (projection as any).sessions.get(key)
+      const terminalSessionId = terminalWorktreeSnapshot.sessions[0]!.terminalSessionId
+      const session = (projection as any).sessions.get(terminalSessionId)
       const handleOutputSpy = vi.spyOn(session, 'handleOutput')
 
       projection.handleOutput({ ptySessionId: 'pty_session_a_aaaaaaaaa', data: 'hello', seq: 1, processName: 'bash' })
@@ -144,8 +144,8 @@ describe('TerminalSessionProjection', () => {
         new Map(),
       )
 
-      const key = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
-      const session = (projection as any).sessions.get(key)
+      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const session = (projection as any).sessions.get(terminalSessionId)
       const handleOutputSpy = vi.spyOn(session, 'handleOutput')
 
       projection.handleOutput({ ptySessionId: 'pty_session_a_aaaaaaaaa', data: '', seq: 1, processName: 'bash' })
@@ -165,8 +165,8 @@ describe('TerminalSessionProjection', () => {
         new Map(),
       )
 
-      const key = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
-      const session = (projection as any).sessions.get(key)
+      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const session = (projection as any).sessions.get(terminalSessionId)
       const handleServerTitleSpy = vi.spyOn(session, 'handleServerTitle')
 
       projection.handleServerTitle({ ptySessionId: 'pty_session_a_aaaaaaaaa', canonicalTitle: 'new title' })
@@ -186,8 +186,8 @@ describe('TerminalSessionProjection', () => {
         new Map(),
       )
 
-      const key = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
-      const session = (projection as any).sessions.get(key)
+      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const session = (projection as any).sessions.get(terminalSessionId)
       const handleExitSpy = vi.spyOn(session, 'handleExit').mockReturnValue(true)
 
       projection.handleExit({ ptySessionId: 'pty_session_a_aaaaaaaaa' })
@@ -207,25 +207,25 @@ describe('TerminalSessionProjection', () => {
         new Map(),
       )
 
-      const key = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
       // Seed the reattach cache directly so we can assert the exit
       // event is what removes the entry, not the local-session
       // cleanup.
-      ;(projection as any).reattachSnapshotCache.set(key, {
+      ;(projection as any).reattachSnapshotCache.set(terminalSessionId, {
         ptySessionId: 'pty_session_a_aaaaaaaaa',
         snapshot: 'cached',
         snapshotSeq: 7,
       })
-      expect((projection as any).reattachSnapshotCache.has(key)).toBe(true)
+      expect((projection as any).reattachSnapshotCache.has(terminalSessionId)).toBe(true)
 
       // Stub the local session's handleExit to return true so the
       // projection's existing discard path runs (the cache eviction
       // must not depend on it being absent, though).
-      const session = (projection as any).sessions.get(key)
+      const session = (projection as any).sessions.get(terminalSessionId)
       vi.spyOn(session, 'handleExit').mockReturnValue(true)
 
       projection.handleExit({ ptySessionId: 'pty_session_a_aaaaaaaaa' })
-      expect((projection as any).reattachSnapshotCache.has(key)).toBe(false)
+      expect((projection as any).reattachSnapshotCache.has(terminalSessionId)).toBe(false)
     })
 
     test('setReattachSnapshot evicts the oldest entry when the cache exceeds the safety cap', () => {
@@ -237,15 +237,15 @@ describe('TerminalSessionProjection', () => {
         .REATTACH_SNAPSHOT_CACHE_HARD_CAP
 
       for (let i = 0; i < limit + 1; i++) {
-        ;(projection as any).setReattachSnapshot(`key-${i}`, {
+        ;(projection as any).setReattachSnapshot(`session-cache-${i}`, {
           ptySessionId: `session-${i}`,
           snapshot: `snap-${i}`,
           snapshotSeq: i,
         })
       }
       expect((projection as any).reattachSnapshotCache.size).toBe(limit)
-      expect((projection as any).reattachSnapshotCache.has('key-0')).toBe(false)
-      expect((projection as any).reattachSnapshotCache.has(`key-${limit}`)).toBe(true)
+      expect((projection as any).reattachSnapshotCache.has('session-cache-0')).toBe(false)
+      expect((projection as any).reattachSnapshotCache.has(`session-cache-${limit}`)).toBe(true)
     })
 
     test('T2.1: reattach snapshot cap is 8 (was 32, sized for multi-tenant)', () => {
@@ -266,8 +266,8 @@ describe('TerminalSessionProjection', () => {
       // Race scenario: the server emitted an exit for an old
       // ptySessionId, but the local session has already been updated to
       // a new ptySessionId (e.g., after a server-side restart). The
-      // sessionKeyByPtySessionId index may still map the old ptySessionId
-      // to the local key. Evicting the reattach cache here would
+      // terminalSessionIdByPtySessionId index may still map the old ptySessionId
+      // to the local terminalSessionId. Evicting the reattach cache here would
       // discard a snapshot the user can still use on next reattach.
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(
@@ -277,23 +277,23 @@ describe('TerminalSessionProjection', () => {
         new Map(),
       )
 
-      const key = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
-      const session = (projection as any).sessions.get(key)
+      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const session = (projection as any).sessions.get(terminalSessionId)
       // Local session is alive under a *different* ptySessionId.
       session.currentPtySessionId = () => 'pty_session_b_aaaaaaaaa'
       session.handleExit = vi.fn().mockReturnValue(false)
 
       // Seed the reattach cache for the old ptySessionId.
-      ;(projection as any).reattachSnapshotCache.set(key, {
+      ;(projection as any).reattachSnapshotCache.set(terminalSessionId, {
         ptySessionId: 'pty_session_a_aaaaaaaaa',
         snapshot: 'cached',
         snapshotSeq: 7,
       })
-      expect((projection as any).reattachSnapshotCache.has(key)).toBe(true)
+      expect((projection as any).reattachSnapshotCache.has(terminalSessionId)).toBe(true)
 
       projection.handleExit({ ptySessionId: 'pty_session_a_aaaaaaaaa' })
       // Cache survives — the local session didn't confirm the exit.
-      expect((projection as any).reattachSnapshotCache.has(key)).toBe(true)
+      expect((projection as any).reattachSnapshotCache.has(terminalSessionId)).toBe(true)
     })
   })
 
@@ -315,8 +315,8 @@ describe('TerminalSessionProjection', () => {
       listener.mockClear()
 
       // Simulate metadata change via internal notifySession
-      const key = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
-      ;(projection as any).notifySession(key)
+      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      ;(projection as any).notifySession(terminalSessionId)
 
       expect(listener).toHaveBeenCalledTimes(1)
       unsubscribe()
@@ -356,15 +356,15 @@ describe('TerminalSessionProjection', () => {
         new Map(),
       )
 
-      const keyBefore = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
-      expect(projection.isKnownSession(keyBefore)).toBe(true)
+      const terminalSessionIdBefore = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      expect(projection.isKnownSession(terminalSessionIdBefore)).toBe(true)
 
       projection.reconcileServerSessions(REPO_ROOT, [], 'client_local', new Map())
 
-      expect(projection.isKnownSession(keyBefore)).toBe(false)
+      expect(projection.isKnownSession(terminalSessionIdBefore)).toBe(false)
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
       expect(removedSessions).toEqual([
-        { terminalSessionId: keyBefore, repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH },
+        { terminalSessionId: terminalSessionIdBefore, repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH },
       ])
     })
 
@@ -384,8 +384,8 @@ describe('TerminalSessionProjection', () => {
       })
       const registryWithStore = new TerminalSessionProjection(
         () => {},
-        (key, base) => {
-          useReposStore.getState().removeWorkspacePaneTerminalTab(base.repoRoot, key, base.branch)
+        (terminalSessionId, base) => {
+          useReposStore.getState().removeWorkspacePaneTerminalTab(base.repoRoot, terminalSessionId, base.branch)
         },
       )
       try {
@@ -426,15 +426,15 @@ describe('TerminalSessionProjection', () => {
           'client_local',
           new Map(),
         )
-        const key = registryWithThrowingCallback.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
-        const session = (registryWithThrowingCallback as any).sessions.get(key)
+        const terminalSessionId = registryWithThrowingCallback.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+        const session = (registryWithThrowingCallback as any).sessions.get(terminalSessionId)
         const closeServerResourcesAndWait = vi
           .spyOn(session, 'closeServerResourcesAndWait')
           .mockResolvedValue(undefined)
         const dispose = vi.spyOn(session, 'dispose').mockImplementation(() => {})
 
         await expect(
-          registryWithThrowingCallback.closeTerminalByDescriptor(key, {
+          registryWithThrowingCallback.closeTerminalByDescriptor(terminalSessionId, {
             repoRoot: REPO_ROOT,
             branch: BRANCH,
             worktreePath: WORKTREE_PATH,
@@ -443,7 +443,7 @@ describe('TerminalSessionProjection', () => {
 
         expect(closeServerResourcesAndWait).toHaveBeenCalled()
         expect(dispose).toHaveBeenCalledWith({ closeSession: false })
-        expect(registryWithThrowingCallback.isKnownSession(key)).toBe(false)
+        expect(registryWithThrowingCallback.isKnownSession(terminalSessionId)).toBe(false)
       } finally {
         registryWithThrowingCallback.destroy()
       }
@@ -457,8 +457,8 @@ describe('TerminalSessionProjection', () => {
         'client_local',
         new Map(),
       )
-      const key = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
-      const session = (projection as any).sessions.get(key)
+      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const session = (projection as any).sessions.get(terminalSessionId)
       let resolveClose!: () => void
       vi.spyOn(session, 'closeServerResourcesAndWait').mockImplementation(
         () =>
@@ -469,7 +469,7 @@ describe('TerminalSessionProjection', () => {
 
       let settled = false
       const closePromise = projection
-        .closeTerminalByDescriptor(key, {
+        .closeTerminalByDescriptor(terminalSessionId, {
           repoRoot: REPO_ROOT,
           branch: BRANCH,
           worktreePath: WORKTREE_PATH,
@@ -480,7 +480,7 @@ describe('TerminalSessionProjection', () => {
         })
       await Promise.resolve()
 
-      expect(projection.isKnownSession(key)).toBe(true)
+      expect(projection.isKnownSession(terminalSessionId)).toBe(true)
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor).toBeNull()
       expect(settled).toBe(false)
@@ -488,7 +488,7 @@ describe('TerminalSessionProjection', () => {
       resolveClose()
       await expect(closePromise).resolves.toBe(true)
       expect(settled).toBe(true)
-      expect(projection.isKnownSession(key)).toBe(false)
+      expect(projection.isKnownSession(terminalSessionId)).toBe(false)
     })
 
     test('closeTerminalByDescriptor selects an adjacent terminal before server close settles', async () => {
@@ -537,7 +537,7 @@ describe('TerminalSessionProjection', () => {
       ])
     })
 
-    test('closeTerminalByDescriptor deduplicates repeated closes for the same terminal key', async () => {
+    test('closeTerminalByDescriptor deduplicates repeated closes for the same terminal session', async () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(
         REPO_ROOT,
@@ -545,8 +545,8 @@ describe('TerminalSessionProjection', () => {
         'client_local',
         new Map(),
       )
-      const key = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
-      const session = (projection as any).sessions.get(key)
+      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const session = (projection as any).sessions.get(terminalSessionId)
       let resolveClose!: () => void
       const closeServerResourcesAndWait = vi.spyOn(session, 'closeServerResourcesAndWait').mockImplementation(
         () =>
@@ -555,12 +555,12 @@ describe('TerminalSessionProjection', () => {
           }),
       )
 
-      const firstClose = projection.closeTerminalByDescriptor(key, {
+      const firstClose = projection.closeTerminalByDescriptor(terminalSessionId, {
         repoRoot: REPO_ROOT,
         branch: BRANCH,
         worktreePath: WORKTREE_PATH,
       })
-      const secondClose = projection.closeTerminalByDescriptor(key, {
+      const secondClose = projection.closeTerminalByDescriptor(terminalSessionId, {
         repoRoot: REPO_ROOT,
         branch: BRANCH,
         worktreePath: WORKTREE_PATH,
@@ -573,7 +573,7 @@ describe('TerminalSessionProjection', () => {
       resolveClose()
       await expect(firstClose).resolves.toBe(true)
       await expect(secondClose).resolves.toBe(true)
-      expect(projection.isKnownSession(key)).toBe(false)
+      expect(projection.isKnownSession(terminalSessionId)).toBe(false)
     })
 
     test('closeTerminalByDescriptor keeps the session when server resource close fails', async () => {
@@ -584,8 +584,8 @@ describe('TerminalSessionProjection', () => {
         'client_local',
         new Map(),
       )
-      const key = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
-      const session = (projection as any).sessions.get(key)
+      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const session = (projection as any).sessions.get(terminalSessionId)
       let rejectClose!: (error: Error) => void
       vi.spyOn(session, 'closeServerResourcesAndWait').mockImplementation(
         () =>
@@ -595,7 +595,7 @@ describe('TerminalSessionProjection', () => {
       )
       const dispose = vi.spyOn(session, 'dispose')
 
-      const closePromise = projection.closeTerminalByDescriptor(key, {
+      const closePromise = projection.closeTerminalByDescriptor(terminalSessionId, {
         repoRoot: REPO_ROOT,
         branch: BRANCH,
         worktreePath: WORKTREE_PATH,
@@ -608,7 +608,7 @@ describe('TerminalSessionProjection', () => {
       rejectClose(new Error('close failed'))
       await expectation
 
-      expect(projection.isKnownSession(key)).toBe(true)
+      expect(projection.isKnownSession(terminalSessionId)).toBe(true)
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe('session-1')
       expect(dispose).not.toHaveBeenCalled()
@@ -704,15 +704,15 @@ describe('TerminalSessionProjection', () => {
         new Map(),
       )
 
-      const key = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
-      const session = (projection as any).sessions.get(key)
+      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const session = (projection as any).sessions.get(terminalSessionId)
 
       // reconcile pre-populates the cache; clear it to test the caching path
-      ;(projection as any).snapshotCache.delete(key)
+      ;(projection as any).snapshotCache.delete(terminalSessionId)
 
       const snapshotSpy = vi.spyOn(session, 'snapshot')
-      const s1 = projection.snapshot(key)
-      const s2 = projection.snapshot(key)
+      const s1 = projection.snapshot(terminalSessionId)
+      const s2 = projection.snapshot(terminalSessionId)
       expect(s1).toBe(s2) // same reference
       expect(snapshotSpy).toHaveBeenCalledTimes(1)
     })
@@ -726,12 +726,12 @@ describe('TerminalSessionProjection', () => {
         new Map(),
       )
 
-      const key = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
-      const s1 = projection.snapshot(key)
+      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const s1 = projection.snapshot(terminalSessionId)
 
       // metadata notify forces cache refresh
-      ;(projection as any).notifySession(key, 'metadata')
-      const s2 = projection.snapshot(key)
+      ;(projection as any).notifySession(terminalSessionId, 'metadata')
+      const s2 = projection.snapshot(terminalSessionId)
       expect(s1).not.toBe(s2)
     })
   })

@@ -99,7 +99,10 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
         const nextEntries = Object.entries(selectedTerminalSessionIdByTerminalWorktree)
         if (
           currentEntries.length === nextEntries.length &&
-          nextEntries.every(([terminalWorktreeKey, key]) => current[terminalWorktreeKey] === key)
+          nextEntries.every(
+            ([terminalWorktreeKey, terminalSessionId]) =>
+              current[terminalWorktreeKey] === terminalSessionId,
+          )
         ) {
           return s
         }
@@ -134,15 +137,15 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
       })
     },
 
-    setSelectedTerminal(terminalWorktreeKey: string, key: string | null) {
+    setSelectedTerminal(terminalWorktreeKey: string, terminalSessionId: string | null) {
       set((s) => {
         const current = s.selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]
-        if (key) {
-          if (current === key) return s
+        if (terminalSessionId) {
+          if (current === terminalSessionId) return s
           return {
             selectedTerminalSessionIdByTerminalWorktree: {
               ...s.selectedTerminalSessionIdByTerminalWorktree,
-              [terminalWorktreeKey]: key,
+              [terminalWorktreeKey]: terminalSessionId,
             },
           }
         }

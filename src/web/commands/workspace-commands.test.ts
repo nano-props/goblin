@@ -671,8 +671,10 @@ describe('workspace commands', () => {
 
     let visibleSessionIds = ['session-1', 'session-2']
     const closeResolvers: Array<(value: boolean) => void> = []
-    const closeTerminalByDescriptor = vi.fn((key: string) => {
-      visibleSessionIds = visibleSessionIds.filter((terminalSessionId) => terminalSessionId !== key)
+    const closeTerminalByDescriptor = vi.fn((terminalSessionId: string) => {
+      visibleSessionIds = visibleSessionIds.filter(
+        (candidateTerminalSessionId) => candidateTerminalSessionId !== terminalSessionId,
+      )
       useReposStore.getState().setSelectedTerminal(WORKTREE_KEY, visibleSessionIds[0] ?? null)
       return new Promise<boolean>((resolve) => {
         closeResolvers.push(resolve)

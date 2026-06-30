@@ -769,7 +769,7 @@ describe('TerminalSessionView', () => {
   })
 
   test('drop on a viewer session is ignored (isController gate matches paste)', async () => {
-    // Regression for the previous drop handler that only checked `!key`.
+    // Regression for the previous drop handler that only checked `!terminalSessionId`.
     // A viewer dropping a file would silently route input into the
     // controller's PTY; the isController gate added alongside paste
     // closes that hole.
@@ -1652,11 +1652,11 @@ describe('TerminalSessionView', () => {
     // controller-drop path. The blob-save tier is a real roundtrip
     // (HTTP POST in web, IPC in Electron), so the user has a real
     // window to switch worktrees before the resolver returns. The
-    // captured `slotKey` would otherwise be typed into a session
+    // captured `terminalSessionId` would otherwise be typed into a session
     // the user is no longer looking at — invisible to them, or worse,
     // into a now-detached session that the projection silently drops.
-    // The fix: capture `key` at handler invocation time, compare to
-    // a `keyRef` updated by useEffect on every render, and bail if
+    // The fix: capture `terminalSessionId` at handler invocation time, compare to
+    // a ref updated by useEffect on every render, and bail if
     // they diverge.
     const writeInput = vi.fn()
     const descriptorA = {
@@ -1797,8 +1797,8 @@ describe('TerminalSessionView', () => {
       })
 
       // User switches worktrees mid-resolve. The session re-renders with
-      // the new descriptor, which updates `keyRef.current` via the
-      // useEffect on `key`.
+      // the new descriptor, which updates the current terminalSessionId ref
+      // via the effect on every render.
       activeWorktreeSnapshot = worktreeSnapshotB
       rerender(
         <TerminalSessionContext.Provider value={context}>
@@ -1810,7 +1810,7 @@ describe('TerminalSessionView', () => {
 
       // Now resolve the in-flight blob-save call. The post-resolve
       // guard must see the divergence and drop the write — neither
-      // key (old nor new) should receive input. The chain runs
+      // terminal session (old nor new) should receive input. The chain runs
       // through several microtask hops (saveClipboardFiles.then →
       // resolvePastedFiles.then → processDrop.then → handler.then);
       // setTimeout(0) is the established pattern in the other

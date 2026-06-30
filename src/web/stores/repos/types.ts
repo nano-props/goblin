@@ -188,7 +188,7 @@ interface RestorableWorkspaceActions {
   toggleZenMode: () => void
   setWorkspacePaneSize: (size: number) => void
   resetLayout: () => void
-  setSelectedTerminal: (terminalWorktreeKey: string, key: string | null) => void
+  setSelectedTerminal: (terminalWorktreeKey: string, terminalSessionId: string | null) => void
   cycleActive: (direction: 1 | -1) => void
 }
 

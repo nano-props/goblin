@@ -317,17 +317,21 @@ export class TerminalSessionProjection {
   ): void {
     if (!this.repoIndex[repoRoot]) return
 
-    const { controllerKeyByWorktree, touchedWorktrees, orderChangedWorktrees } = this.materializeServerSessions(
+    const {
+      controllerTerminalSessionIdByWorktree,
+      touchedWorktrees,
+      orderChangedWorktrees,
+    } = this.materializeServerSessions(
       repoRoot,
       serverSessions,
       clientId,
       snapshotsByPtySessionId,
     )
 
-    const serverKeys = new Set(serverSessions.map((s) => s.terminalSessionId))
-    this.evictOrphanedLocalSessions(repoRoot, serverKeys)
+    const serverTerminalSessionIds = new Set(serverSessions.map((session) => session.terminalSessionId))
+    this.evictOrphanedLocalSessions(repoRoot, serverTerminalSessionIds)
 
-    this.resolveSelectedKeysForTouchedWorktrees(touchedWorktrees, controllerKeyByWorktree)
+    this.resolveSelectedTerminalSessionIdsForTouchedWorktrees(touchedWorktrees, controllerTerminalSessionIdByWorktree)
     this.publishMaterializedTerminalTabs(touchedWorktrees)
     for (const terminalWorktreeKey of orderChangedWorktrees) {
       this.notifyWorktree(terminalWorktreeKey)
@@ -344,11 +348,11 @@ export class TerminalSessionProjection {
     clientId: string,
     snapshotsByPtySessionId: ReadonlyMap<string, TerminalSessionSnapshot>,
   ): {
-    controllerKeyByWorktree: Map<string, string>
+    controllerTerminalSessionIdByWorktree: Map<string, string>
     touchedWorktrees: Set<string>
     orderChangedWorktrees: Set<string>
   } {
-    const controllerKeyByWorktree = new Map<string, string>()
+    const controllerTerminalSessionIdByWorktree = new Map<string, string>()
     const touchedWorktrees = new Set<string>()
     const terminalSessionIdsByTouchedWorktree = new Map<string, string[]>()
     const nextIndexByWorktree = new Map<string, number>()
@@ -371,12 +375,13 @@ export class TerminalSessionProjection {
       const descriptor = projected.descriptor
       this.ensureSession(descriptor).hydrate(projected.hydrateInput)
       this.syncPtySessionIdIndex(descriptor.terminalSessionId, projected.hydrateInput.ptySessionId)
-      if (projected.controlsTerminal) controllerKeyByWorktree.set(projected.terminalWorktreeKey, descriptor.terminalSessionId)
+      if (projected.controlsTerminal)
+        controllerTerminalSessionIdByWorktree.set(projected.terminalWorktreeKey, descriptor.terminalSessionId)
       pushUniqueMapList(terminalSessionIdsByTouchedWorktree, projected.terminalWorktreeKey, descriptor.terminalSessionId)
     }
 
     const orderChangedWorktrees = this.replaceTerminalSessionIdOrderForTouchedWorktrees(terminalSessionIdsByTouchedWorktree)
-    return { controllerKeyByWorktree, touchedWorktrees, orderChangedWorktrees }
+    return { controllerTerminalSessionIdByWorktree, touchedWorktrees, orderChangedWorktrees }
   }
 
   // Phase 2: drop local sessions that have a serverId but no longer
@@ -384,29 +389,31 @@ export class TerminalSessionProjection {
   // (i.e. have a ptySessionId in our index) are eligible for eviction;
   // never-attached local shells (purely UI placeholders) are left
   // alone. Returns the count for the debug log.
-  private evictOrphanedLocalSessions(repoRoot: string, serverKeys: Set<string>): number {
-    const orphanedKeys = countOrphanedTerminalSessionIds({
+  private evictOrphanedLocalSessions(repoRoot: string, serverTerminalSessionIds: Set<string>): number {
+    const orphanedTerminalSessionIds = countOrphanedTerminalSessionIds({
       repoRoot,
-      localSessionKeys: Array.from(this.sessions.keys()),
-      getRepoRootForKey: (terminalSessionId) => this.sessions.get(terminalSessionId)?.descriptor.repoRoot ?? null,
-      hasServerPtySessionId: (terminalSessionId) => this.ptySessionIdByTerminalSessionId.has(terminalSessionId),
-      serverKeys,
+      localTerminalSessionIds: Array.from(this.sessions.keys()),
+      getRepoRootForTerminalSessionId: (terminalSessionId) =>
+        this.sessions.get(terminalSessionId)?.descriptor.repoRoot ?? null,
+      hasPtySessionIdForTerminalSessionId: (terminalSessionId) =>
+        this.ptySessionIdByTerminalSessionId.has(terminalSessionId),
+      serverTerminalSessionIds,
     })
-    for (const terminalSessionId of orphanedKeys) {
+    for (const terminalSessionId of orphanedTerminalSessionIds) {
       const session = this.sessions.get(terminalSessionId)
       if (!session) continue
       this.discardLocalSessionAndDismissDetailIfLast(terminalSessionId, session.descriptor)
     }
-    return orphanedKeys.length
+    return orphanedTerminalSessionIds.length
   }
 
   // Phase 3: for every worktree that saw a server-side change, decide
   // which local terminal should be selected. The selection prefers the
   // controller of the worktree, then the user's last selection, then
   // the first available terminal.
-  private resolveSelectedKeysForTouchedWorktrees(
+  private resolveSelectedTerminalSessionIdsForTouchedWorktrees(
     touchedWorktrees: Set<string>,
-    controllerKeyByWorktree: Map<string, string>,
+    controllerTerminalSessionIdByWorktree: Map<string, string>,
   ): void {
     for (const terminalWorktreeKey of touchedWorktrees) {
       const current = this.selectedTerminalSessionIdByTerminalWorktree.get(terminalWorktreeKey) ?? null
@@ -415,7 +422,7 @@ export class TerminalSessionProjection {
         terminalWorktreeKey,
         preferredSessionId: preferred,
         currentSessionId: current,
-        controllerSessionId: controllerKeyByWorktree.get(terminalWorktreeKey) ?? null,
+        controllerSessionId: controllerTerminalSessionIdByWorktree.get(terminalWorktreeKey) ?? null,
         sortedDescriptors: this.visibleSessionsForWorktree(terminalWorktreeKey).map((session) => session.descriptor),
         isSelectedTerminalSessionIdValid: (candidateTerminalWorktreeKey, terminalSessionId) =>
           this.isSelectedTerminalSessionIdValid(candidateTerminalWorktreeKey, terminalSessionId),
@@ -1239,10 +1246,10 @@ export class TerminalSessionProjection {
   }
 }
 
-function pushUniqueMapList(map: Map<string, string[]>, key: string, value: string): void {
-  const current = map.get(key)
+function pushUniqueMapList(map: Map<string, string[]>, mapKey: string, value: string): void {
+  const current = map.get(mapKey)
   if (!current) {
-    map.set(key, [value])
+    map.set(mapKey, [value])
     return
   }
   if (!current.includes(value)) current.push(value)

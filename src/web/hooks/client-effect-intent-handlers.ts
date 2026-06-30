@@ -30,7 +30,7 @@ import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 interface TerminalBellIntentDeps {
   navigation: PrimaryWindowNavigationActions
   closeAllOverlays: () => void
-  setSelectedTerminal: (terminalWorktreeKey: string, key: string) => void
+  setSelectedTerminal: (terminalWorktreeKey: string, terminalSessionId: string) => void
 }
 
 interface SharedClientIntentDeps {
@@ -44,7 +44,7 @@ interface SharedClientIntentDeps {
   isOverlayOpen: () => boolean
   isWorkspaceShortcutSuppressed: () => boolean
   ensureWorkspaceOpen: (input: string | RepoSessionEntry) => Promise<OpenRepoResult>
-  setSelectedTerminal: (terminalWorktreeKey: string, key: string) => void
+  setSelectedTerminal: (terminalWorktreeKey: string, terminalSessionId: string) => void
   resetLayout: () => void
   toggleZenMode: () => void
   t: (key: string) => string

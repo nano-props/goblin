@@ -8,26 +8,30 @@ describe('terminal session eviction helpers', () => {
   test('finds orphaned local sessions that no longer exist on the server', () => {
     const orphaned = countOrphanedTerminalSessionIds({
       repoRoot: '/repo',
-      localSessionKeys: ['a', 'b', 'c'],
-      getRepoRootForKey: (key) => (key === 'c' ? '/other' : '/repo'),
-      hasServerPtySessionId: (key) => key !== 'b',
-      serverKeys: new Set(['a']),
+      localTerminalSessionIds: ['session-a', 'session-b', 'session-c'],
+      getRepoRootForTerminalSessionId: (terminalSessionId) =>
+        terminalSessionId === 'session-c' ? '/other' : '/repo',
+      hasPtySessionIdForTerminalSessionId: (terminalSessionId) => terminalSessionId !== 'session-b',
+      serverTerminalSessionIds: new Set(['session-a']),
     })
     expect(orphaned).toEqual([])
 
     const orphaned2 = countOrphanedTerminalSessionIds({
       repoRoot: '/repo',
-      localSessionKeys: ['a', 'b', 'c'],
-      getRepoRootForKey: (key) => (key === 'c' ? '/other' : '/repo'),
-      hasServerPtySessionId: (key) => key === 'b',
-      serverKeys: new Set(['a']),
+      localTerminalSessionIds: ['session-a', 'session-b', 'session-c'],
+      getRepoRootForTerminalSessionId: (terminalSessionId) =>
+        terminalSessionId === 'session-c' ? '/other' : '/repo',
+      hasPtySessionIdForTerminalSessionId: (terminalSessionId) => terminalSessionId === 'session-b',
+      serverTerminalSessionIds: new Set(['session-a']),
     })
-    expect(orphaned2).toEqual(['b'])
+    expect(orphaned2).toEqual(['session-b'])
   })
 
   test('selects the adjacent tab after removing the active terminal', () => {
-    expect(resolveAdjacentTerminalSelectionAfterRemoval(['a', 'b', 'c'], 'b')).toBe('c')
-    expect(resolveAdjacentTerminalSelectionAfterRemoval(['a', 'b'], 'b')).toBe('a')
-    expect(resolveAdjacentTerminalSelectionAfterRemoval(['a'], 'a')).toBeNull()
+    expect(resolveAdjacentTerminalSelectionAfterRemoval(['session-a', 'session-b', 'session-c'], 'session-b')).toBe(
+      'session-c',
+    )
+    expect(resolveAdjacentTerminalSelectionAfterRemoval(['session-a', 'session-b'], 'session-b')).toBe('session-a')
+    expect(resolveAdjacentTerminalSelectionAfterRemoval(['session-a'], 'session-a')).toBeNull()
   })
 })
