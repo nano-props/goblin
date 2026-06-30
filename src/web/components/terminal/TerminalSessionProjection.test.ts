@@ -99,6 +99,7 @@ describe('TerminalSessionProjection', () => {
   })
 
   afterEach(() => {
+    vi.useRealTimers()
     // Drain pending state and clear listener maps on the per-test
     // instance, then release the singleton session so the next test
     // starts clean. Mirrors the production singleton-vs-test
@@ -128,6 +129,29 @@ describe('TerminalSessionProjection', () => {
 
       projection.handleOutput({ ptySessionId: 'pty_session_b_aaaaaaaaa', data: 'hello', seq: 1, processName: 'bash' })
       expect(handleOutputSpy).toHaveBeenCalledTimes(1)
+    })
+
+    test('does not mark empty output payloads as terminal activity', () => {
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date('2026-06-30T00:00:00.000Z'))
+      projection.setRepoIndex(makeRepoIndex())
+      projection.reconcileServerSessions(
+        REPO_ROOT,
+        [makeServerSession('pty_session_a_aaaaaaaaa', 'session-1')],
+        'client_local',
+        new Map(),
+      )
+
+      const key = projection.worktreeSnapshot(WORKTREE_KEY).sessions[0]!.key
+      const session = (projection as any).sessions.get(key)
+      const handleOutputSpy = vi.spyOn(session, 'handleOutput')
+
+      projection.handleOutput({ ptySessionId: 'pty_session_a_aaaaaaaaa', data: '', seq: 1, processName: 'bash' })
+      vi.advanceTimersByTime(5000)
+      projection.handleOutput({ ptySessionId: 'pty_session_a_aaaaaaaaa', data: '', seq: 2, processName: 'bash' })
+
+      expect(handleOutputSpy).toHaveBeenCalledTimes(2)
+      expect(projection.worktreeSnapshot(WORKTREE_KEY).activeCount).toBe(0)
     })
 
     test('dispatches title changes by ptySessionId index', () => {

@@ -6,6 +6,7 @@ import { cn } from '#/web/lib/cn.ts'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { TerminalBellBadge } from '#/web/components/terminal/TerminalBellBadge.tsx'
+import { TerminalActivityIndicator } from '#/web/components/terminal/TerminalActivityIndicator.tsx'
 import {
   BRANCH_ROW_ACTION_BOX_CLASS,
   BRANCH_ROW_ACTION_SLOT_CLASS,
@@ -23,6 +24,7 @@ export interface BranchRowProps {
   actionMenuOpen?: boolean
   onActionMenuOpenChange?: (open: boolean) => void
   terminalBellCount?: number
+  terminalActive?: boolean
   /**
    * Whether a branch action (queued or running) currently targets this
    * row. Resolved by the data-binding wrapper (`BranchListRow`) from
@@ -43,6 +45,7 @@ export function BranchRow({
   actionMenuOpen,
   onActionMenuOpenChange,
   terminalBellCount = 0,
+  terminalActive = false,
   branchActionBusy = false,
 }: BranchRowProps) {
   const isSelected = branch.name === selected
@@ -53,7 +56,10 @@ export function BranchRow({
   // clicked, instead of fading out from under the in-flight action.
   const isActionsHidden = !compact && !actionMenuOpen && !branchActionBusy
   const leadingTerminalBellCount = compact ? terminalBellCount : 0
+  const showTerminalActive = !isSelected && terminalActive
+  const leadingTerminalActive = compact && terminalBellCount <= 0 && showTerminalActive
   const actionTerminalBellCount = compact ? 0 : terminalBellCount
+  const actionTerminalActive = !compact && terminalBellCount <= 0 && showTerminalActive
 
   return (
     <li
@@ -73,6 +79,7 @@ export function BranchRow({
           branch={branch}
           selected={isSelected}
           leadingTerminalBellCount={leadingTerminalBellCount}
+          leadingTerminalActive={leadingTerminalActive}
         />
       </div>
       <BranchRowActionSlot
@@ -82,6 +89,7 @@ export function BranchRow({
         onActionMenuOpenChange={onActionMenuOpenChange}
         actionHidden={isActionsHidden}
         terminalBellCount={actionTerminalBellCount}
+        terminalActive={actionTerminalActive}
       />
     </li>
   )
@@ -94,11 +102,14 @@ function BranchRowActionSlot({
   onActionMenuOpenChange,
   actionHidden,
   terminalBellCount,
+  terminalActive,
 }: Pick<BranchRowProps, 'repo' | 'branch' | 'actionMenuOpen' | 'onActionMenuOpenChange'> & {
   actionHidden: boolean
   terminalBellCount: number
+  terminalActive: boolean
 }) {
   const showBellBadge = terminalBellCount > 0 && actionHidden
+  const showActivity = terminalActive && actionHidden && !showBellBadge
 
   return (
     <div className={cn(BRANCH_ROW_ACTION_SLOT_CLASS, 'pointer-events-none relative z-20')}>
@@ -106,6 +117,11 @@ function BranchRowActionSlot({
         {showBellBadge && (
           <div className="absolute inset-0 flex items-center justify-center transition-opacity duration-100 group-hover:opacity-0 group-focus-within:opacity-0">
             <TerminalBellBadge count={terminalBellCount} />
+          </div>
+        )}
+        {showActivity && (
+          <div className="absolute inset-0 flex items-center justify-center transition-opacity duration-100 group-hover:opacity-0 group-focus-within:opacity-0">
+            <TerminalActivityIndicator />
           </div>
         )}
         <div

@@ -213,6 +213,7 @@ function emptyWorktreeSnapshot(): WorktreeTerminalSnapshot {
     sessions: [],
     count: 0,
     bellCount: 0,
+        activeCount: 0,
     pendingCreate: false,
   }
 }
@@ -242,10 +243,12 @@ function worktreeSnapshotWithTerminal(): WorktreeTerminalSnapshot {
         phase: 'open',
         selected: true,
         hasBell: false,
+            recentlyActive: false,
       },
     ],
     count: 1,
     bellCount: 0,
+        activeCount: 0,
     pendingCreate: false,
   }
 }

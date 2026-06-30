@@ -15,16 +15,19 @@ export function buildWorktreeTerminalSnapshot(input: {
   getCachedSnapshot: (key: string) => TerminalSnapshot | null
   cacheSnapshot: (key: string, snapshot: TerminalSnapshot) => void
   hasBell: (key: string) => boolean
+  hasRecentActivity: (key: string) => boolean
   getDisplayOrder: (session: TerminalSessionLike) => number
 }): WorktreeTerminalSnapshot {
   const sessions = buildTerminalSessionSummaries(input)
   const bellCount = sessions.reduce((count, session) => count + (session.hasBell ? 1 : 0), 0)
+  const activeCount = sessions.reduce((count, session) => count + (session.recentlyActive ? 1 : 0), 0)
   return {
     worktreeTerminalKey: input.worktreeTerminalKey,
     selectedDescriptor: input.selectedDescriptor,
     sessions,
     count: sessions.length,
     bellCount,
+    activeCount,
     pendingCreate: input.pendingCreate,
   }
 }
@@ -36,6 +39,7 @@ function buildTerminalSessionSummaries(input: {
   getCachedSnapshot: (key: string) => TerminalSnapshot | null
   cacheSnapshot: (key: string, snapshot: TerminalSnapshot) => void
   hasBell: (key: string) => boolean
+  hasRecentActivity: (key: string) => boolean
   getDisplayOrder: (session: TerminalSessionLike) => number
 }): TerminalSessionSummary[] {
   return input.sessions.map((session) => {
@@ -57,6 +61,7 @@ function buildTerminalSessionSummaries(input: {
       phase: snapshot.phase,
       selected: session.descriptor.key === input.selectedKey,
       hasBell: input.hasBell(session.descriptor.key),
+      recentlyActive: input.hasRecentActivity(session.descriptor.key),
     }
   })
 }

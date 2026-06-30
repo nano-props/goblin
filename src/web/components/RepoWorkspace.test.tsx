@@ -27,6 +27,7 @@ const emptyWorktreeSnapshot: WorktreeTerminalSnapshot = {
   sessions: [],
   count: 0,
   bellCount: 0,
+        activeCount: 0,
   pendingCreate: false,
 }
 

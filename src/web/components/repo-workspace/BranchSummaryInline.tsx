@@ -17,6 +17,7 @@ import { cn } from '#/web/lib/cn.ts'
 import { formatRelativeTimeOrNull } from '#/web/lib/dates.ts'
 import { getBranchWorktreeState, type BranchWorktreeRepo } from '#/web/stores/repos/worktree-state.ts'
 import { TerminalBellBadge } from '#/web/components/terminal/TerminalBellBadge.tsx'
+import { TerminalActivityIndicator } from '#/web/components/terminal/TerminalActivityIndicator.tsx'
 
 export type BranchSummaryInlineRepo = BranchWorktreeRepo & {
   data: BranchWorktreeRepo['data']
@@ -27,6 +28,7 @@ interface BranchSummaryInlineProps {
   branch: RepoBranchState
   selected?: boolean
   leadingTerminalBellCount?: number
+  leadingTerminalActive?: boolean
   className?: string
 }
 
@@ -69,6 +71,7 @@ export function buildBranchSummaryTitle(
   branch: RepoBranchState,
   t: (key: string, params?: Record<string, string | number>) => string,
   leadingTerminalBellCount = 0,
+  leadingTerminalActive = false,
 ): string {
   const worktreeStateLabelKey = state.worktreeDirty ? 'branches.dirty' : 'branches.worktree'
   return [
@@ -76,6 +79,7 @@ export function buildBranchSummaryTitle(
     branch.isDefault ? t('branches.default') : null,
     state.hasWorktree ? t(worktreeStateLabelKey) : null,
     leadingTerminalBellCount > 0 ? t('terminal.bell-unread-count', { count: leadingTerminalBellCount }) : null,
+    leadingTerminalActive ? t('terminal.active') : null,
     branch.trackingGone ? t('branches.gone') : null,
     branch.ahead > 0 ? t('branch-status.sync.ahead', { n: branch.ahead }) : null,
     branch.behind > 0 ? t('branch-status.sync.behind', { n: branch.behind }) : null,
@@ -180,13 +184,16 @@ export function BranchSummaryInline({
   branch,
   selected = false,
   leadingTerminalBellCount = 0,
+  leadingTerminalActive = false,
   className,
 }: BranchSummaryInlineProps) {
   const t = useT()
   const lang = useI18nStore((s) => s.lang)
   const state = computeBranchSummaryState(branch, repo, lang)
   const { hasWorktree, worktreeDirty } = state
-  const title = buildBranchSummaryTitle(state, branch, t, leadingTerminalBellCount)
+  const showLeadingTerminalBell = leadingTerminalBellCount > 0
+  const showLeadingTerminalActive = leadingTerminalActive && !showLeadingTerminalBell
+  const title = buildBranchSummaryTitle(state, branch, t, leadingTerminalBellCount, showLeadingTerminalActive)
   // Surface the worktree state to screen readers via the icon's
   // aria-label — the meta strip no longer renders worktree / dirty
   // badges, so this is the only textual cue left.
@@ -194,9 +201,13 @@ export function BranchSummaryInline({
 
   return (
     <div title={title} className={cn('flex min-w-0 items-center gap-1.5', className)}>
-      {leadingTerminalBellCount > 0 ? (
+      {showLeadingTerminalBell ? (
         <span className="flex w-4 shrink-0 items-center justify-center">
           <TerminalBellBadge count={leadingTerminalBellCount} />
+        </span>
+      ) : showLeadingTerminalActive ? (
+        <span className="flex w-4 shrink-0 items-center justify-center">
+          <TerminalActivityIndicator />
         </span>
       ) : (
         <BranchSummaryIcon
