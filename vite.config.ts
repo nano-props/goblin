@@ -26,10 +26,10 @@ function commitHash(): string {
 export default defineConfig(({ mode }) => ({
   plugins: [react(), tailwind()],
   root: path.resolve(import.meta.dirname, 'src/web'),
-  // Production keeps relative asset URLs so the embedded server can serve
-  // the client bundle correctly regardless of its mounted origin. Dev
-  // keeps absolute URLs for the Vite dev server.
-  base: mode === 'production' ? './' : '/',
+  // The app uses browser-history routes such as `/settings/general`.
+  // Keep assets rooted at `/` so a refreshed deep link still loads
+  // `/boot.js` and `/assets/...`, not `/settings/boot.js`.
+  base: '/',
   // Inject app version + commit hash at build time so the client can
   // show them (e.g. in the settings overlay) without an IPC round-trip.
   // JSON.stringify so the values land as string literals, not bare text.

@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
     async () => `<!doctype html>
 <html lang="en">
   <head>
-    <script type="module" src="./boot.js"></script>
+    <script type="module" src="/boot.js"></script>
   </head>
   <body>
     <div id="root"></div>
@@ -232,7 +232,7 @@ describe('server app html static', () => {
     expect(html).toContain('<div id="root"></div>')
   })
 
-  test('serves static html for deep-link paths (serveStatic falls through to index)', async () => {
+  test('serves static html for frontend route refreshes', async () => {
     const { createApp } = await import('#/server/app-factory.ts')
     const app = createApp({
       version: '0.1.0',
@@ -240,7 +240,7 @@ describe('server app html static', () => {
       accessToken: 'secret',
       terminalHost: terminalHostStub,
     })
-    for (const path of ['/repos/abc123', '/repos/abc123/changes']) {
+    for (const path of ['/repos/abc123', '/repos/abc123/changes', '/settings', '/settings/general']) {
       const response = await app.request(new Request(`http://127.0.0.1:32100${path}`))
       const html = await response.text()
       expect(response.status).toBe(200)
