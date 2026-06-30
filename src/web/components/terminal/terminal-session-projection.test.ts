@@ -34,7 +34,6 @@ describe('terminal session projection helpers', () => {
         message: null,
         cols: 120,
         rows: 40,
-        displayOrder: 2,
       },
       serverSnapshot: { ptySessionId: 'pty_session_123_aaaaaaaaa', snapshot: 'server-snap', snapshotSeq: 9 },
     })
@@ -64,7 +63,6 @@ describe('terminal session projection helpers', () => {
         snapshotSeq: 9,
       },
       controlsTerminal: true,
-      displayOrder: 2,
     })
   })
 
@@ -84,7 +82,6 @@ describe('terminal session projection helpers', () => {
         message: 'pty failed',
         cols: 80,
         rows: 24,
-        displayOrder: 1,
       },
       reattachSnapshot: { ptySessionId: 'pty_session_123_aaaaaaaaa', snapshot: 'cached-snap', snapshotSeq: 3 },
     })

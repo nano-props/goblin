@@ -833,7 +833,7 @@ describe('RepoWorkspaceToolbar', () => {
     expect(mocks.createTerminal).toHaveBeenCalledTimes(1)
   })
 
-  test('clicking the new-terminal button moves a reused stale terminal id to the end', async () => {
+  test('clicking the new-terminal button keeps a reused terminal id in its existing tab position', async () => {
     const { terminalTab } = renderToolbar({
       terminalCount: 0,
       workspacePaneTabOrder: [terminalEntry('key'), staticEntry('status')],
@@ -845,7 +845,7 @@ describe('RepoWorkspaceToolbar', () => {
     })
     await flush()
 
-    expect(tabOrderFor('feature/worktree')).toEqual([staticEntry('status'), terminalEntry('key')])
+    expect(tabOrderFor('feature/worktree')).toEqual([terminalEntry('key'), staticEntry('status')])
   })
 
   test('shows an error toast when new terminal creation fails', async () => {
@@ -1218,7 +1218,6 @@ function renderToolbar(options: {
     terminalWorktreeKey: `${REPO_ID}\0${WORKTREE_PATH}`,
     sessionId: `t${index + 1}`,
     index: index + 1,
-    displayOrder: index + 1,
     title: `term-${index + 1}`,
     fullTitle: `full-term-${index + 1}`,
     phase: 'open' as const,

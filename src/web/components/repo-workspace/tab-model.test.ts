@@ -461,14 +461,13 @@ function terminalEntry(id: string): WorkspacePaneTabOrderEntry {
   return workspacePaneTerminalTabOrderEntry(id)
 }
 
-function terminalView(terminalKey: string, displayOrder: number, selected: boolean): WorkspacePaneTabSummary {
+function terminalView(terminalKey: string, index: number, selected: boolean): WorkspacePaneTabSummary {
   return {
     type: 'terminal',
     terminalKey,
     terminalWorktreeKey: WORKTREE_KEY,
     sessionId: terminalKey,
-    index: displayOrder,
-    displayOrder,
+    index,
     title: terminalKey,
     phase: 'open',
     selected,

@@ -16,7 +16,6 @@ import {
   type ReattachSnapshotCacheEntry,
 } from '#/web/components/terminal/terminal-session-projection.ts'
 import { userTerminalInput, type TerminalUserInputSource } from '#/web/components/terminal/terminal-input.ts'
-import { terminalSessionDisplayOrder } from '#/web/components/terminal/terminal-session-display-order.ts'
 import {
   captureTerminalHostGeometry,
   resolveTerminalStartupGeometryHint,
@@ -145,7 +144,7 @@ export class TerminalSessionProjection {
   // the repo picker.
   private readonly lastPublishedRepoBellCountByRepo = new Map<string, number>()
   private readonly snapshotListeners = new Map<string, Set<() => void>>()
-  private readonly displayOrderByTerminalKey = new Map<string, number>()
+  private readonly terminalKeysByTerminalWorktree = new Map<string, string[]>()
   private readonly bellState = createTerminalBellState(
     (terminalKey) => {
       if (terminalKey) {
@@ -227,6 +226,7 @@ export class TerminalSessionProjection {
     this.repoBellCountListeners.clear()
     this.lastPublishedRepoBellCountByRepo.clear()
     this.snapshotListeners.clear()
+    this.terminalKeysByTerminalWorktree.clear()
     this.bellState.reset()
     this.activityState.reset()
     if (projectionInstance === this) projectionInstance = null
@@ -317,7 +317,7 @@ export class TerminalSessionProjection {
   ): void {
     if (!this.repoIndex[repoRoot]) return
 
-    const { controllerKeyByWorktree, touchedWorktrees, displayOrderChangedWorktrees } = this.materializeServerSessions(
+    const { controllerKeyByWorktree, touchedWorktrees, orderChangedWorktrees } = this.materializeServerSessions(
       repoRoot,
       serverSessions,
       clientId,
@@ -329,7 +329,7 @@ export class TerminalSessionProjection {
 
     this.resolveSelectedKeysForTouchedWorktrees(touchedWorktrees, controllerKeyByWorktree)
     this.publishMaterializedTerminalTabs(touchedWorktrees)
-    for (const terminalWorktreeKey of displayOrderChangedWorktrees) {
+    for (const terminalWorktreeKey of orderChangedWorktrees) {
       this.notifyWorktree(terminalWorktreeKey)
     }
   }
@@ -337,7 +337,7 @@ export class TerminalSessionProjection {
   // Phase 1: for each server session, ensure a local TerminalSession
   // exists, hydrate it with the latest server-side metadata, and track
   // which worktrees saw any change. Side effects: ensureSession,
-  // session.hydrate, displayOrderByTerminalKey, syncPtySessionIdIndex.
+  // session.hydrate, terminalKeysByTerminalWorktree, syncPtySessionIdIndex.
   private materializeServerSessions(
     repoRoot: string,
     serverSessions: ServerTerminalSessionSummary[],
@@ -346,11 +346,11 @@ export class TerminalSessionProjection {
   ): {
     controllerKeyByWorktree: Map<string, string>
     touchedWorktrees: Set<string>
-    displayOrderChangedWorktrees: Set<string>
+    orderChangedWorktrees: Set<string>
   } {
     const controllerKeyByWorktree = new Map<string, string>()
     const touchedWorktrees = new Set<string>()
-    const displayOrderChangedWorktrees = new Set<string>()
+    const terminalKeysByTouchedWorktree = new Map<string, string[]>()
 
     for (const serverSession of serverSessions) {
       const projected = projectServerTerminalSession({
@@ -368,14 +368,11 @@ export class TerminalSessionProjection {
       this.sessions.get(descriptor.terminalKey)?.hydrate(projected.hydrateInput)
       this.syncPtySessionIdIndex(descriptor.terminalKey, projected.hydrateInput.ptySessionId)
       if (projected.controlsTerminal) controllerKeyByWorktree.set(projected.terminalWorktreeKey, descriptor.terminalKey)
-      const previousDisplayOrder = this.displayOrderByTerminalKey.get(descriptor.terminalKey)
-      this.displayOrderByTerminalKey.set(descriptor.terminalKey, projected.displayOrder)
-      if (previousDisplayOrder !== undefined && previousDisplayOrder !== projected.displayOrder) {
-        displayOrderChangedWorktrees.add(projected.terminalWorktreeKey)
-      }
+      pushUniqueMapList(terminalKeysByTouchedWorktree, projected.terminalWorktreeKey, descriptor.terminalKey)
     }
 
-    return { controllerKeyByWorktree, touchedWorktrees, displayOrderChangedWorktrees }
+    const orderChangedWorktrees = this.replaceTerminalKeyOrderForTouchedWorktrees(terminalKeysByTouchedWorktree)
+    return { controllerKeyByWorktree, touchedWorktrees, orderChangedWorktrees }
   }
 
   // Phase 2: drop local sessions that have a serverId but no longer
@@ -720,7 +717,6 @@ export class TerminalSessionProjection {
       cacheSnapshot: (terminalKey, nextSnapshot) => this.snapshotCache.set(terminalKey, nextSnapshot),
       hasBell: (terminalKey) => this.bellState.hasBell(terminalKey),
       hasRecentActivity: (terminalKey) => this.activityState.hasRecentActivity(terminalKey),
-      getDisplayOrder: (session) => terminalSessionDisplayOrder(session.descriptor, this.displayOrderByTerminalKey),
     })
     this.worktreeSnapshotCache.set(terminalWorktreeKey, snapshot)
     return snapshot
@@ -1009,7 +1005,7 @@ export class TerminalSessionProjection {
     this.sessions.delete(terminalKey)
     this.snapshotCache.delete(terminalKey)
     this.reattachSnapshotCache.delete(terminalKey)
-    this.displayOrderByTerminalKey.delete(terminalKey)
+    this.removeTerminalKeyFromWorktreeOrder(terminalWorktreeKey, terminalKey)
     this.activityState.remove(terminalKey)
     this.notifyTerminalSessionRemoved(terminalKey, session.descriptor)
     this.notifySnapshot(terminalKey)
@@ -1119,6 +1115,7 @@ export class TerminalSessionProjection {
 
   private ensureSession(descriptor: TerminalDescriptor): TerminalSession {
     const current = this.sessions.get(descriptor.terminalKey)
+    this.appendTerminalKeyToWorktreeOrder(descriptor.terminalWorktreeKey, descriptor.terminalKey)
     if (current) {
       current.updateDescriptor(descriptor)
       this.syncPtySessionIdIndex(
@@ -1188,14 +1185,78 @@ export class TerminalSessionProjection {
   }
 
   private sortedSessionsForWorktree(terminalWorktreeKey: string): TerminalSession[] {
-    return Array.from(this.sessions.values())
-      .filter((session) => session.descriptor.terminalWorktreeKey === terminalWorktreeKey)
-      .sort((a, b) => {
-        const orderA = terminalSessionDisplayOrder(a.descriptor, this.displayOrderByTerminalKey)
-        const orderB = terminalSessionDisplayOrder(b.descriptor, this.displayOrderByTerminalKey)
-        return orderA - orderB || a.descriptor.index - b.descriptor.index
-      })
+    const sessions = Array.from(this.sessions.values()).filter(
+      (session) => session.descriptor.terminalWorktreeKey === terminalWorktreeKey,
+    )
+    const sessionByTerminalKey = new Map(sessions.map((session) => [session.descriptor.terminalKey, session]))
+    const seen = new Set<string>()
+    const orderedSessions: TerminalSession[] = []
+    for (const terminalKey of this.terminalKeysByTerminalWorktree.get(terminalWorktreeKey) ?? []) {
+      const session = sessionByTerminalKey.get(terminalKey)
+      if (!session || seen.has(terminalKey)) continue
+      seen.add(terminalKey)
+      orderedSessions.push(session)
+    }
+    for (const session of sessions) {
+      const terminalKey = session.descriptor.terminalKey
+      if (seen.has(terminalKey)) continue
+      seen.add(terminalKey)
+      orderedSessions.push(session)
+    }
+    return orderedSessions
   }
+
+  private appendTerminalKeyToWorktreeOrder(terminalWorktreeKey: string, terminalKey: string): void {
+    const current = this.terminalKeysByTerminalWorktree.get(terminalWorktreeKey)
+    if (current?.includes(terminalKey)) return
+    this.terminalKeysByTerminalWorktree.set(terminalWorktreeKey, [...(current ?? []), terminalKey])
+  }
+
+  private removeTerminalKeyFromWorktreeOrder(terminalWorktreeKey: string, terminalKey: string): void {
+    const current = this.terminalKeysByTerminalWorktree.get(terminalWorktreeKey)
+    if (!current) return
+    const next = current.filter((candidate) => candidate !== terminalKey)
+    if (next.length === current.length) return
+    if (next.length === 0) this.terminalKeysByTerminalWorktree.delete(terminalWorktreeKey)
+    else this.terminalKeysByTerminalWorktree.set(terminalWorktreeKey, next)
+  }
+
+  private replaceTerminalKeyOrderForTouchedWorktrees(nextByWorktree: ReadonlyMap<string, readonly string[]>): Set<string> {
+    const changedWorktrees = new Set<string>()
+    for (const [terminalWorktreeKey, terminalKeys] of nextByWorktree) {
+      const next = uniqueNonEmptyStrings(terminalKeys)
+      const current = this.terminalKeysByTerminalWorktree.get(terminalWorktreeKey) ?? []
+      if (stringArraysEqual(current, next)) continue
+      if (next.length === 0) this.terminalKeysByTerminalWorktree.delete(terminalWorktreeKey)
+      else this.terminalKeysByTerminalWorktree.set(terminalWorktreeKey, next)
+      changedWorktrees.add(terminalWorktreeKey)
+    }
+    return changedWorktrees
+  }
+}
+
+function pushUniqueMapList(map: Map<string, string[]>, key: string, value: string): void {
+  const current = map.get(key)
+  if (!current) {
+    map.set(key, [value])
+    return
+  }
+  if (!current.includes(value)) current.push(value)
+}
+
+function uniqueNonEmptyStrings(values: readonly string[]): string[] {
+  const next: string[] = []
+  const seen = new Set<string>()
+  for (const value of values) {
+    if (value.length === 0 || seen.has(value)) continue
+    seen.add(value)
+    next.push(value)
+  }
+  return next
+}
+
+function stringArraysEqual(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && b.every((value, index) => a[index] === value)
 }
 
 export interface TerminalSessionProjectionDeps {

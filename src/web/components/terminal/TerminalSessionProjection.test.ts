@@ -51,7 +51,6 @@ function makeServerSession(
     message: string | null
     cols: number
     rows: number
-    displayOrder: number
   }> = {},
 ): TerminalSessionSummary {
   const terminalKey = `${REPO_ROOT}\0${WORKTREE_PATH}\0${sessionId}`
@@ -66,7 +65,6 @@ function makeServerSession(
     message: overrides.message ?? null,
     cols: overrides.cols ?? 80,
     rows: overrides.rows ?? 24,
-    displayOrder: overrides.displayOrder ?? 1,
   }
 }
 
@@ -498,9 +496,9 @@ describe('TerminalSessionProjection', () => {
       projection.reconcileServerSessions(
         REPO_ROOT,
         [
-          makeServerSession('pty_session_1_aaaaaaaaa', 'session-1', { displayOrder: 0 }),
-          makeServerSession('pty_session_2_aaaaaaaaa', 'session-2', { displayOrder: 1 }),
-          makeServerSession('pty_session_3_aaaaaaaaa', 'session-3', { displayOrder: 2 }),
+          makeServerSession('pty_session_1_aaaaaaaaa', 'session-1'),
+          makeServerSession('pty_session_2_aaaaaaaaa', 'session-2'),
+          makeServerSession('pty_session_3_aaaaaaaaa', 'session-3'),
         ],
         'client_local',
         new Map(),
@@ -642,15 +640,15 @@ describe('TerminalSessionProjection', () => {
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.sessionId).toBe('session-2')
     })
 
-    test('closing the active terminal selects the adjacent tab in display order', () => {
+    test('closing the active terminal selects the adjacent tab in server order', () => {
       projection.setRepoIndex(makeRepoIndex())
 
       projection.reconcileServerSessions(
         REPO_ROOT,
         [
-          makeServerSession('pty_session_1_aaaaaaaaa', 'session-1', { displayOrder: 1 }),
-          makeServerSession('pty_session_2_aaaaaaaaa', 'session-2', { displayOrder: 0 }),
-          makeServerSession('pty_session_3_aaaaaaaaa', 'session-3', { displayOrder: 2 }),
+          makeServerSession('pty_session_2_aaaaaaaaa', 'session-2'),
+          makeServerSession('pty_session_1_aaaaaaaaa', 'session-1'),
+          makeServerSession('pty_session_3_aaaaaaaaa', 'session-3'),
         ],
         'client_local',
         new Map(),
@@ -666,13 +664,13 @@ describe('TerminalSessionProjection', () => {
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.sessionId).toBe('session-1')
     })
 
-    test('invalidates cached worktree snapshot when server display order changes', () => {
+    test('invalidates cached worktree snapshot when server order changes', () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(
         REPO_ROOT,
         [
-          makeServerSession('pty_session_1_aaaaaaaaa', 'session-1', { displayOrder: 0 }),
-          makeServerSession('pty_session_2_aaaaaaaaa', 'session-2', { displayOrder: 1 }),
+          makeServerSession('pty_session_1_aaaaaaaaa', 'session-1'),
+          makeServerSession('pty_session_2_aaaaaaaaa', 'session-2'),
         ],
         'client_local',
         new Map(),
@@ -684,8 +682,8 @@ describe('TerminalSessionProjection', () => {
       projection.reconcileServerSessions(
         REPO_ROOT,
         [
-          makeServerSession('pty_session_1_aaaaaaaaa', 'session-1', { displayOrder: 1 }),
-          makeServerSession('pty_session_2_aaaaaaaaa', 'session-2', { displayOrder: 0 }),
+          makeServerSession('pty_session_2_aaaaaaaaa', 'session-2'),
+          makeServerSession('pty_session_1_aaaaaaaaa', 'session-1'),
         ],
         'client_local',
         new Map(),

@@ -176,7 +176,6 @@ function makeCreateResult(overrides: Partial<Record<string, unknown>> = {}) {
         message: null,
         cols: 101,
         rows: 31,
-        displayOrder: 0,
       },
     ],
     ...overrides,
@@ -294,7 +293,6 @@ describe('TerminalSessionProjection create flow', () => {
           message: null,
           cols: 101,
           rows: 31,
-          displayOrder: 0,
         },
         {
           ptySessionId: 'pty_session_2_aaaaaaaaa',
@@ -307,7 +305,6 @@ describe('TerminalSessionProjection create flow', () => {
           message: null,
           cols: 101,
           rows: 31,
-          displayOrder: 1,
         },
       ],
     })

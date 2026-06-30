@@ -246,7 +246,6 @@ function worktreeSnapshotWithTerminal(): TerminalWorktreeSnapshot {
         terminalWorktreeKey: WORKTREE_KEY,
         sessionId: 'session-1',
         index: 1,
-        displayOrder: 1,
         title: 'terminal 1',
         phase: 'open',
         selected: true,

@@ -38,7 +38,7 @@ const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
 
 type TerminalSessionOrderRuntimeLike<TUser extends string | number> = Pick<
   TerminalSessionOrderRuntime<TUser>,
-  'registerTerminalSessionOrder' | 'unregisterTerminalSessionOrder' | 'sessionDisplayOrder'
+  'replaceTerminalSessionOrder' | 'orderedTerminalKeys'
 >
 
 interface TerminalPtyAttachResult {
@@ -126,12 +126,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     const existingId = this.ptySessionIdByUserTerminalKey.get(userKey)
     const existing = existingId ? this.sessionsByPtySessionId.get(existingId) : undefined
     if (existing) {
-      this.terminalSessionOrder.registerTerminalSessionOrder({
-        userId,
-        scope: existing.scope,
-        worktreePath: existing.worktreePath,
-        terminalKey: existing.terminalKey,
-      })
+      this.replaceSessionOrderForWorktree(userId, existing.scope, existing.worktreePath)
       if (input.clientId) {
         registerTerminalClient(existing, input.clientId, size.cols, size.rows)
       }
@@ -167,12 +162,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     }
     this.sessionsByPtySessionId.set(id, session)
     this.ptySessionIdByUserTerminalKey.set(userKey, id)
-    this.terminalSessionOrder.registerTerminalSessionOrder({
-      userId,
-      scope: input.scope,
-      worktreePath,
-      terminalKey: input.terminalKey,
-    })
+    this.replaceSessionOrderForWorktree(userId, input.scope, worktreePath)
     if (input.clientId) {
       registerTerminalClient(session, input.clientId, size.cols, size.rows)
       this.applyIdentityEffect(session, attachTerminalClient(session, input.clientId, this.sessionPresence(session)))
@@ -302,12 +292,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     const userKey = this.userTerminalKey(session.userId, session.terminalKey)
     if (this.ptySessionIdByUserTerminalKey.get(userKey) === ptySessionId)
       this.ptySessionIdByUserTerminalKey.delete(userKey)
-    this.terminalSessionOrder.unregisterTerminalSessionOrder({
-      userId: session.userId,
-      scope: session.scope,
-      worktreePath: session.worktreePath,
-      terminalKey: session.terminalKey,
-    })
+    this.replaceSessionOrderForWorktree(session.userId, session.scope, session.worktreePath)
     session.ptyBinding.dispose(session)
   }
 
@@ -340,26 +325,28 @@ export class TerminalSessionManager<TUser extends string | number> {
   }
 
   async listSessionsForUser(userId: TUser, scope: string): Promise<TerminalSessionSummary[]> {
-    const sessions: TerminalSessionSummary[] = []
+    const sessionsByWorktree = new Map<string, TerminalSessionView<TUser>[]>()
     for (const session of Array.from(this.sessionsByPtySessionId.values())) {
       if (session.userId === userId && session.scope === scope) {
-        sessions.push({
-          ptySessionId: session.id,
-          terminalKey: session.terminalKey,
-          cwd: session.cwd,
-          controller: this.effectiveController(session),
-          processName: session.ptyBinding.processName(),
-          canonicalTitle: session.render.title,
-          phase: session.phase,
-          message: session.message,
-          cols: session.cols,
-          rows: session.rows,
-          displayOrder: this.terminalSessionDisplayOrder(session),
-        })
+        const current = sessionsByWorktree.get(session.worktreePath)
+        if (current) current.push(session)
+        else sessionsByWorktree.set(session.worktreePath, [session])
       }
     }
-    sessions.sort((a, b) => a.displayOrder - b.displayOrder)
-    return sessions
+    return Array.from(sessionsByWorktree.entries()).flatMap(([worktreePath, sessions]) =>
+      this.orderedSessionsForWorktree(userId, scope, worktreePath, sessions).map((session) => ({
+        ptySessionId: session.id,
+        terminalKey: session.terminalKey,
+        cwd: session.cwd,
+        controller: this.effectiveController(session),
+        processName: session.ptyBinding.processName(),
+        canonicalTitle: session.render.title,
+        phase: session.phase,
+        message: session.message,
+        cols: session.cols,
+        rows: session.rows,
+      })),
+    )
   }
 
   getSessionScope(userId: TUser, ptySessionId: string): string | undefined {
@@ -390,15 +377,36 @@ export class TerminalSessionManager<TUser extends string | number> {
     if (id) this.closeSession(id)
   }
 
-  private terminalSessionDisplayOrder(session: TerminalSessionView<TUser>): number {
-    return (
-      this.terminalSessionOrder.sessionDisplayOrder({
-        userId: session.userId,
-        scope: session.scope,
-        worktreePath: session.worktreePath,
-        terminalKey: session.terminalKey,
-      }) ?? Number.MAX_SAFE_INTEGER
+  private orderedSessionsForWorktree(
+    userId: TUser,
+    scope: string,
+    worktreePath: string,
+    sessions: readonly TerminalSessionView<TUser>[],
+  ): TerminalSessionView<TUser>[] {
+    const sessionByTerminalKey = new Map(sessions.map((session) => [session.terminalKey, session]))
+    const seen = new Set<string>()
+    const orderedSessions: TerminalSessionView<TUser>[] = []
+    for (const terminalKey of this.terminalSessionOrder.orderedTerminalKeys({ userId, scope, worktreePath })) {
+      const session = sessionByTerminalKey.get(terminalKey)
+      if (!session || seen.has(terminalKey)) continue
+      seen.add(terminalKey)
+      orderedSessions.push(session)
+    }
+    for (const session of sessions) {
+      if (seen.has(session.terminalKey)) continue
+      seen.add(session.terminalKey)
+      orderedSessions.push(session)
+    }
+    return orderedSessions
+  }
+
+  private replaceSessionOrderForWorktree(userId: TUser, scope: string, worktreePath: string): void {
+    const terminalKeys = Array.from(this.sessionsByPtySessionId.values()).flatMap((session) =>
+      session.userId === userId && session.scope === scope && session.worktreePath === worktreePath
+        ? [session.terminalKey]
+        : [],
     )
+    this.terminalSessionOrder.replaceTerminalSessionOrder({ userId, scope, worktreePath, terminalKeys })
   }
 
   // Sends SIGWINCH to the child PTY and queues the same geometry change

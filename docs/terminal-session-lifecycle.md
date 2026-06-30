@@ -212,7 +212,7 @@ destroy) for closes.
 private readonly pendingCloseByPtySessionId = new Map<
   string,
   {
-    worktreeTerminalKey: string
+    terminalWorktreeKey: string
     promise: Promise<void>
     resolve: () => void
     reject: (error: unknown) => void

@@ -23,8 +23,8 @@ function commitCreatedWorkspacePaneTerminalTab(base: TerminalSessionBase, termin
   const shouldFocus =
     repo?.ui.selectedBranch === base.branch && preferredWorkspacePaneTabForBranch(repo.ui, base.branch) === 'terminal'
   if (shouldFocus) {
-    state.addAndFocusWorkspacePaneTerminalTab(base.repoRoot, terminalKey, base.branch)
+    state.ensureAndFocusWorkspacePaneTerminalTab(base.repoRoot, terminalKey, base.branch)
     return
   }
-  state.addWorkspacePaneTerminalTab(base.repoRoot, terminalKey, base.branch)
+  state.ensureWorkspacePaneTerminalTab(base.repoRoot, terminalKey, base.branch)
 }

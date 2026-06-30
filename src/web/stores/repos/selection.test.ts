@@ -464,15 +464,15 @@ describe('setWorkspacePaneTab', () => {
     expect(useReposStore.getState().repos[REPO_ID]).toBe(before)
   })
 
-  test('adds a terminal tab at the end even when a stale entry already exists', () => {
+  test('ensures an existing terminal tab without moving it', () => {
     seedRepo({
       selectedBranch: 'main',
       workspacePaneTabOrder: [terminalEntry('session-1'), workspacePaneStaticTabOrderEntry('status')],
     })
 
-    useReposStore.getState().addWorkspacePaneTerminalTab(REPO_ID, 'session-1')
+    useReposStore.getState().ensureWorkspacePaneTerminalTab(REPO_ID, 'session-1')
 
-    expect(tabOrderFor('main')).toEqual([workspacePaneStaticTabOrderEntry('status'), terminalEntry('session-1')])
+    expect(tabOrderFor('main')).toEqual([terminalEntry('session-1'), workspacePaneStaticTabOrderEntry('status')])
   })
 
   test('materializes visible terminal tabs into the branch order without changing focus', () => {
@@ -499,10 +499,10 @@ describe('setWorkspacePaneTab', () => {
     expect(useReposStore.getState().selectedTerminalKeyByTerminalWorktree).toEqual({})
   })
 
-  test('addAndFocus adds the tab, switches to terminal view, and selects the new terminal', () => {
+  test('ensureAndFocus adds the tab, switches to terminal view, and selects the new terminal', () => {
     seedRepo({ selectedBranch: 'feature/worktree', preferredWorkspacePaneTab: 'status' })
 
-    useReposStore.getState().addAndFocusWorkspacePaneTerminalTab(REPO_ID, 'session-1')
+    useReposStore.getState().ensureAndFocusWorkspacePaneTerminalTab(REPO_ID, 'session-1')
 
     expect(tabOrderFor('feature/worktree')).toEqual([
       workspacePaneStaticTabOrderEntry('status'),
@@ -514,7 +514,7 @@ describe('setWorkspacePaneTab', () => {
     )
   })
 
-  test('addAndFocus is a no-op when everything is already focused', () => {
+  test('ensureAndFocus is a no-op when everything is already focused', () => {
     seedRepo({
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
@@ -525,16 +525,16 @@ describe('setWorkspacePaneTab', () => {
     })
 
     const before = useReposStore.getState().repos[REPO_ID]
-    useReposStore.getState().addAndFocusWorkspacePaneTerminalTab(REPO_ID, 'session-1')
+    useReposStore.getState().ensureAndFocusWorkspacePaneTerminalTab(REPO_ID, 'session-1')
 
     expect(useReposStore.getState().repos[REPO_ID]).toBe(before)
   })
 
-  test('addAndFocus does nothing for a branch without a worktree', () => {
+  test('ensureAndFocus does nothing for a branch without a worktree', () => {
     seedRepo({ selectedBranch: 'feature/plain', preferredWorkspacePaneTab: 'status' })
 
     const before = useReposStore.getState().repos[REPO_ID]
-    useReposStore.getState().addAndFocusWorkspacePaneTerminalTab(REPO_ID, 'session-1')
+    useReposStore.getState().ensureAndFocusWorkspacePaneTerminalTab(REPO_ID, 'session-1')
 
     expect(useReposStore.getState().repos[REPO_ID]).toBe(before)
     expect(preferredTabFor('feature/plain')).toBe('status')

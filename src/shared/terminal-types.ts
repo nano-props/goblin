@@ -194,7 +194,6 @@ export interface TerminalSessionSummary {
   message: string | null
   cols: number
   rows: number
-  displayOrder: number
 }
 
 export interface TerminalSessionSnapshotInput {

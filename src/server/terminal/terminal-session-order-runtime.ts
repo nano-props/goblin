@@ -1,59 +1,31 @@
-interface TerminalSessionOrderRecord<TUser extends string | number> {
-  userId: TUser
-  scope: string
-  worktreePath: string
-  terminalKey: string
-  displayOrder: number
-}
-
 export interface TerminalSessionOrderWorktreeInput<TUser extends string | number> {
   userId: TUser
   scope: string
   worktreePath: string
 }
 
-export interface TerminalSessionOrderInput<
-  TUser extends string | number,
-> extends TerminalSessionOrderWorktreeInput<TUser> {
-  terminalKey: string
+export interface TerminalSessionOrderReplaceInput<TUser extends string | number>
+  extends TerminalSessionOrderWorktreeInput<TUser> {
+  terminalKeys: readonly string[]
 }
 
 export class TerminalSessionOrderRuntime<TUser extends string | number> {
-  private readonly sessionsByWorktree = new Map<string, Map<string, TerminalSessionOrderRecord<TUser>>>()
+  private readonly terminalKeysByWorktree = new Map<string, string[]>()
 
-  registerTerminalSessionOrder(input: TerminalSessionOrderInput<TUser>): void {
+  replaceTerminalSessionOrder(input: TerminalSessionOrderReplaceInput<TUser>): void {
     const worktreeKey = this.worktreeKey(input)
-    const views = this.sessionsByWorktree.get(worktreeKey) ?? new Map()
-    if (views.has(input.terminalKey)) {
-      this.sessionsByWorktree.set(worktreeKey, views)
-      return
-    }
-    views.set(input.terminalKey, {
-      userId: input.userId,
-      scope: input.scope,
-      worktreePath: input.worktreePath,
-      terminalKey: input.terminalKey,
-      displayOrder: nextDisplayOrder(views),
-    })
-    this.sessionsByWorktree.set(worktreeKey, views)
+    const terminalKeys = uniqueNonEmptyStrings(input.terminalKeys)
+    if (terminalKeys.length === 0) this.terminalKeysByWorktree.delete(worktreeKey)
+    else this.terminalKeysByWorktree.set(worktreeKey, terminalKeys)
   }
 
-  unregisterTerminalSessionOrder(input: TerminalSessionOrderInput<TUser>): void {
-    const worktreeKey = this.worktreeKey(input)
-    const views = this.sessionsByWorktree.get(worktreeKey)
-    if (!views) return
-    views.delete(input.terminalKey)
-    if (views.size === 0) this.sessionsByWorktree.delete(worktreeKey)
-  }
-
-  sessionDisplayOrder(input: TerminalSessionOrderInput<TUser>): number | null {
-    return this.sessionsByWorktree.get(this.worktreeKey(input))?.get(input.terminalKey)?.displayOrder ?? null
+  orderedTerminalKeys(input: TerminalSessionOrderWorktreeInput<TUser>): string[] {
+    return [...(this.terminalKeysByWorktree.get(this.worktreeKey(input)) ?? [])]
   }
 
   closeSessionsForUser(userId: TUser): void {
-    for (const [key, views] of Array.from(this.sessionsByWorktree.entries())) {
-      const hasUserViews = Array.from(views.values()).some((view) => view.userId === userId)
-      if (hasUserViews) this.sessionsByWorktree.delete(key)
+    for (const key of Array.from(this.terminalKeysByWorktree.keys())) {
+      if (key.startsWith(`${String(userId)}\0`)) this.terminalKeysByWorktree.delete(key)
     }
   }
 
@@ -66,12 +38,13 @@ export function createTerminalSessionOrderRuntime<TUser extends string | number>
   return new TerminalSessionOrderRuntime<TUser>()
 }
 
-function nextDisplayOrder<TUser extends string | number>(
-  views: ReadonlyMap<string, TerminalSessionOrderRecord<TUser>>,
-): number {
-  let max = -1
-  for (const view of views.values()) {
-    if (view.displayOrder > max) max = view.displayOrder
+function uniqueNonEmptyStrings(values: readonly string[]): string[] {
+  const next: string[] = []
+  const seen = new Set<string>()
+  for (const value of values) {
+    if (value.length === 0 || seen.has(value)) continue
+    seen.add(value)
+    next.push(value)
   }
-  return max + 1
+  return next
 }

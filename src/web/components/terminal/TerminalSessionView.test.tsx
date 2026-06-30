@@ -42,8 +42,8 @@ vi.mock('#/web/components/terminal/mobile-detection.ts', () => ({
 // `renderInJsdom` registers `cleanup` via `afterEach`, which
 // unmounts all rendered components and removes their containers.
 
-type TestTerminalSummary = Omit<TerminalSessionSummary, 'type' | 'displayOrder' | 'recentlyActive'> &
-  Partial<Pick<TerminalSessionSummary, 'type' | 'displayOrder' | 'recentlyActive'>>
+type TestTerminalSummary = Omit<TerminalSessionSummary, 'type' | 'recentlyActive'> &
+  Partial<Pick<TerminalSessionSummary, 'type' | 'recentlyActive'>>
 
 type TestWorktreeSnapshot = Omit<TerminalWorktreeSnapshot, 'sessions' | 'bellCount' | 'activeCount'> & {
   sessions: TestTerminalSummary[]
@@ -52,10 +52,9 @@ type TestWorktreeSnapshot = Omit<TerminalWorktreeSnapshot, 'sessions' | 'bellCou
 }
 
 function completeWorktreeSnapshot(snapshot: TestWorktreeSnapshot): TerminalWorktreeSnapshot {
-  const sessions = snapshot.sessions.map((session, index) => ({
+  const sessions = snapshot.sessions.map((session) => ({
     ...session,
     type: 'terminal' as const,
-    displayOrder: session.displayOrder ?? index + 1,
     recentlyActive: session.recentlyActive ?? false,
   }))
   return {

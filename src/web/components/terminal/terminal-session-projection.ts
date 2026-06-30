@@ -32,7 +32,6 @@ export interface ProjectedServerTerminalSession {
   terminalWorktreeKey: string
   hydrateInput: TerminalSessionHydrationInput
   controlsTerminal: boolean
-  displayOrder: number
 }
 
 export function projectTerminalAttachResultForClient(
@@ -83,6 +82,5 @@ export function projectServerTerminalSession(input: {
         input.serverSnapshot?.snapshotSeq ?? (isReattachMatch ? (input.reattachSnapshot?.snapshotSeq ?? 0) : 0),
     },
     controlsTerminal: input.serverSession.controller?.clientId === input.clientId,
-    displayOrder: input.serverSession.displayOrder,
   }
 }

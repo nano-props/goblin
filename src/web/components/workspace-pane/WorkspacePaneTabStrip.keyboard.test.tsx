@@ -194,7 +194,6 @@ function session(overrides: Partial<TerminalSessionSummary> = {}): TerminalSessi
     terminalWorktreeKey: overrides.terminalWorktreeKey ?? '/repo\0/repo/worktree',
     sessionId: overrides.sessionId ?? 'session-1',
     index: overrides.index ?? 1,
-    displayOrder: overrides.displayOrder ?? 1,
     title,
     fullTitle: overrides.fullTitle ?? title,
     originalTitle: overrides.originalTitle ?? title,

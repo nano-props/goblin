@@ -30,7 +30,6 @@ const terminalView: WorkspacePaneTabSummary = {
   terminalWorktreeKey: 'repo\0worktree',
   sessionId: 'session-1',
   index: 1,
-  displayOrder: 1,
   title: 'Terminal 1',
   fullTitle: 'Terminal 1 full',
   originalTitle: null,

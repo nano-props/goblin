@@ -2,79 +2,79 @@ import { describe, expect, test } from 'vitest'
 import { createTerminalSessionOrderRuntime } from '#/server/terminal/terminal-session-order-runtime.ts'
 
 describe('terminal session order runtime', () => {
-  test('tracks terminal display order within a user worktree', () => {
+  test('replaces terminal order within a user worktree', () => {
     const runtime = createTerminalSessionOrderRuntime<string>()
 
-    runtime.registerTerminalSessionOrder({
+    runtime.replaceTerminalSessionOrder({
       userId: 'user-a',
       scope: '/repo',
       worktreePath: '/repo-linked',
-      terminalKey: 'session-1',
-    })
-    runtime.registerTerminalSessionOrder({
-      userId: 'user-a',
-      scope: '/repo',
-      worktreePath: '/repo-linked',
-      terminalKey: 'session-2',
+      terminalKeys: ['session-1', 'session-2'],
     })
 
-    expect(runtime.sessionDisplayOrder(view('session-1'))).toBe(0)
-    expect(runtime.sessionDisplayOrder(view('session-2'))).toBe(1)
+    expect(runtime.orderedTerminalKeys(worktree())).toEqual(['session-1', 'session-2'])
+
+    runtime.replaceTerminalSessionOrder({
+      userId: 'user-a',
+      scope: '/repo',
+      worktreePath: '/repo-linked',
+      terminalKeys: ['session-2', 'session-1'],
+    })
+
+    expect(runtime.orderedTerminalKeys(worktree())).toEqual(['session-2', 'session-1'])
   })
 
   test('isolates identical terminal identities by user', () => {
     const runtime = createTerminalSessionOrderRuntime<string>()
 
-    runtime.registerTerminalSessionOrder({
+    runtime.replaceTerminalSessionOrder({
       userId: 'user-a',
       scope: '/repo',
       worktreePath: '/repo-linked',
-      terminalKey: 'session-1',
+      terminalKeys: ['session-1'],
     })
-    runtime.registerTerminalSessionOrder({
+    runtime.replaceTerminalSessionOrder({
       userId: 'user-b',
       scope: '/repo',
       worktreePath: '/repo-linked',
-      terminalKey: 'session-1',
+      terminalKeys: ['session-1'],
     })
 
-    expect(runtime.sessionDisplayOrder(view('session-1'))).toBe(0)
-    expect(runtime.sessionDisplayOrder({ ...view('session-1'), userId: 'user-b' })).toBe(0)
+    expect(runtime.orderedTerminalKeys(worktree())).toEqual(['session-1'])
+    expect(runtime.orderedTerminalKeys({ ...worktree(), userId: 'user-b' })).toEqual(['session-1'])
   })
 
   test('removes terminal views by user', () => {
     const runtime = createTerminalSessionOrderRuntime<string>()
 
-    runtime.registerTerminalSessionOrder({
+    runtime.replaceTerminalSessionOrder({
       userId: 'user-a',
       scope: '/repo',
       worktreePath: '/repo-linked',
-      terminalKey: 'session-1',
+      terminalKeys: ['session-1'],
     })
-    runtime.registerTerminalSessionOrder({
+    runtime.replaceTerminalSessionOrder({
       userId: 'user-b',
       scope: '/repo',
       worktreePath: '/repo-linked',
-      terminalKey: 'session-1',
+      terminalKeys: ['session-1'],
     })
 
     runtime.closeSessionsForUser('user-a')
 
-    expect(runtime.sessionDisplayOrder(view('session-1'))).toBeNull()
-    expect(runtime.sessionDisplayOrder({ ...view('session-1'), userId: 'user-b' })).toBe(0)
+    expect(runtime.orderedTerminalKeys(worktree())).toEqual([])
+    expect(runtime.orderedTerminalKeys({ ...worktree(), userId: 'user-b' })).toEqual(['session-1'])
   })
 })
 
-function view(terminalKey: string): {
+function worktree(): {
   userId: string
   scope: string
   worktreePath: string
-  terminalKey: string
 } {
   return {
     userId: 'user-a',
     scope: '/repo',
     worktreePath: '/repo-linked',
-    terminalKey,
   }
 }

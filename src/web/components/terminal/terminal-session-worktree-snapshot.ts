@@ -16,7 +16,6 @@ export function buildTerminalWorktreeSnapshot(input: {
   cacheSnapshot: (terminalKey: string, snapshot: TerminalSnapshot) => void
   hasBell: (terminalKey: string) => boolean
   hasRecentActivity: (terminalKey: string) => boolean
-  getDisplayOrder: (session: TerminalSessionLike) => number
 }): TerminalWorktreeSnapshot {
   const sessions = buildTerminalSessionSummaries(input)
   const bellCount = sessions.reduce((count, session) => count + (session.hasBell ? 1 : 0), 0)
@@ -40,7 +39,6 @@ function buildTerminalSessionSummaries(input: {
   cacheSnapshot: (terminalKey: string, snapshot: TerminalSnapshot) => void
   hasBell: (terminalKey: string) => boolean
   hasRecentActivity: (terminalKey: string) => boolean
-  getDisplayOrder: (session: TerminalSessionLike) => number
 }): TerminalSessionSummary[] {
   return input.sessions.map((session) => {
     const cached = input.getCachedSnapshot(session.descriptor.terminalKey)
@@ -52,7 +50,6 @@ function buildTerminalSessionSummaries(input: {
       terminalWorktreeKey: input.terminalWorktreeKey,
       sessionId: session.descriptor.sessionId,
       index: session.descriptor.index,
-      displayOrder: input.getDisplayOrder(session),
       title: summarizeTerminalTitle(snapshot, session.descriptor.index),
       fullTitle: fullTerminalTitle(snapshot, session.descriptor.index),
       originalTitle: terminalOriginalTitle(snapshot),

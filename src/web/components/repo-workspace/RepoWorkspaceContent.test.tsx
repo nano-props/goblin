@@ -914,7 +914,6 @@ function terminalSession(
     terminalWorktreeKey,
     sessionId: terminalKey,
     index,
-    displayOrder: index,
     title: terminalKey,
     phase: 'open',
     selected,

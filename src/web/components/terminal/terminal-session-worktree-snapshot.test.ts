@@ -66,7 +66,6 @@ describe('terminal session worktree snapshot helper', () => {
       selectedTerminalKey: descriptor.terminalKey,
       getCachedSnapshot: (terminalKey) => cache.get(terminalKey) ?? null,
       cacheSnapshot: (terminalKey, value) => cache.set(terminalKey, value),
-      getDisplayOrder: () => 1,
       hasBell: () => true,
       hasRecentActivity: () => true,
     })
@@ -101,7 +100,6 @@ describe('terminal session worktree snapshot helper', () => {
       selectedTerminalKey: descriptor.terminalKey,
       getCachedSnapshot: (terminalKey) => cache.get(terminalKey) ?? null,
       cacheSnapshot: (terminalKey, value) => cache.set(terminalKey, value),
-      getDisplayOrder: () => 1,
       hasBell: () => false,
       hasRecentActivity: () => false,
     })

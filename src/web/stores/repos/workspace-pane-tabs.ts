@@ -52,15 +52,14 @@ export function workspacePaneTabOrderWithoutStaticTab(
   return normalizeWorkspacePaneTabOrder(current.filter((entry) => entry.type !== tab))
 }
 
-export function workspacePaneTabOrderWithTerminal(
+export function workspacePaneTabOrderWithEnsuredTerminal(
   current: readonly WorkspacePaneTabOrderEntry[],
   terminalKey: string,
 ): WorkspacePaneTabOrderEntry[] {
-  if (terminalKey.length === 0) return normalizeWorkspacePaneTabOrder(current)
-  const withoutCurrentTerminal = current.filter(
-    (entry) => entry.type !== 'terminal' || entry.terminalKey !== terminalKey,
-  )
-  return normalizeWorkspacePaneTabOrder([...withoutCurrentTerminal, workspacePaneTerminalTabOrderEntry(terminalKey)])
+  const normalized = normalizeWorkspacePaneTabOrder(current)
+  if (terminalKey.length === 0) return normalized
+  if (normalized.some((entry) => entry.type === 'terminal' && entry.terminalKey === terminalKey)) return normalized
+  return normalizeWorkspacePaneTabOrder([...normalized, workspacePaneTerminalTabOrderEntry(terminalKey)])
 }
 
 export function workspacePaneTabOrderWithMaterializedTerminals(

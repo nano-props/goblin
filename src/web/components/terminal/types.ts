@@ -120,7 +120,6 @@ export interface TerminalSessionSummary {
   terminalWorktreeKey: string
   sessionId: string
   index: number
-  displayOrder: number
   title: string
   fullTitle?: string
   originalTitle?: string | null

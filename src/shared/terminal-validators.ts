@@ -104,7 +104,6 @@ const TerminalSessionSummarySchema = v.object({
   message: v.nullable(v.string()),
   cols: v.number(),
   rows: v.number(),
-  displayOrder: v.number(),
 })
 const TerminalSessionSnapshotSchema = v.object({
   ptySessionId: v.string(),

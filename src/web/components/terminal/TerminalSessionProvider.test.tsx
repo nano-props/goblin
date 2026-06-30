@@ -383,7 +383,6 @@ beforeEach(() => {
         message: null,
         cols: 80,
         rows: 24,
-        displayOrder: 1,
       },
     ]
     // New first-frame hydration contract: `create` returns
@@ -902,7 +901,6 @@ describe('TerminalSessionProvider', () => {
         message: null,
         cols: 120,
         rows: 40,
-        displayOrder: 1,
       },
     ])
     getSessionSnapshotMock.mockResolvedValue({
@@ -987,7 +985,6 @@ describe('TerminalSessionProvider', () => {
         message: null,
         cols: 80,
         rows: 24,
-        displayOrder: 1,
       },
     ]
     listSessionsMock.mockImplementation(async () => serverSessions)
@@ -1045,7 +1042,6 @@ describe('TerminalSessionProvider', () => {
         message: null,
         cols: 80,
         rows: 24,
-        displayOrder: 1,
       },
       {
         ptySessionId: 'server_session_2',
@@ -1058,7 +1054,6 @@ describe('TerminalSessionProvider', () => {
         message: null,
         cols: 80,
         rows: 24,
-        displayOrder: 1,
       },
     ]
     listSessionsMock.mockImplementation(async () => serverSessions)
@@ -1240,7 +1235,6 @@ describe('TerminalSessionProvider', () => {
         message: null,
         cols: 100,
         rows: 30,
-        displayOrder: 1,
       },
     ])
     const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH)
@@ -1284,7 +1278,6 @@ describe('TerminalSessionProvider', () => {
         message: null,
         cols: 100,
         rows: 30,
-        displayOrder: 1,
       },
     ])
     const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH)
@@ -1313,7 +1306,6 @@ describe('TerminalSessionProvider', () => {
           message: null,
           cols: 100,
           rows: 30,
-          displayOrder: 1,
         },
       ])
       getSessionSnapshotMock.mockClear()
@@ -1351,7 +1343,6 @@ describe('TerminalSessionProvider', () => {
         message: null,
         cols: 100,
         rows: 30,
-        displayOrder: 1,
       },
     ])
     const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH)
@@ -1412,7 +1403,6 @@ describe('TerminalSessionProvider', () => {
         message: null,
         cols: 100,
         rows: 30,
-        displayOrder: 1,
       },
     ])
     getSessionSnapshotMock.mockResolvedValueOnce({
@@ -1446,7 +1436,6 @@ describe('TerminalSessionProvider', () => {
           message: null,
           cols: 100,
           rows: 30,
-          displayOrder: 1,
         },
       ])
 
@@ -1481,7 +1470,6 @@ describe('TerminalSessionProvider', () => {
         message: null,
         cols: 100,
         rows: 30,
-        displayOrder: 1,
       },
     ])
     getSessionSnapshotMock.mockResolvedValueOnce({
@@ -1517,7 +1505,6 @@ describe('TerminalSessionProvider', () => {
           message: null,
           cols: 100,
           rows: 30,
-          displayOrder: 1,
         },
       ])
 
@@ -1554,7 +1541,6 @@ describe('TerminalSessionProvider', () => {
         message: null,
         cols: 100,
         rows: 30,
-        displayOrder: 1,
       },
     ])
     getSessionSnapshotMock.mockResolvedValueOnce({
@@ -1612,7 +1598,6 @@ describe('TerminalSessionProvider', () => {
         message: null,
         cols: 80,
         rows: 24,
-        displayOrder: 1,
       },
       {
         ptySessionId: 'session_ok',
@@ -1625,7 +1610,6 @@ describe('TerminalSessionProvider', () => {
         message: null,
         cols: 80,
         rows: 24,
-        displayOrder: 2,
       },
     ])
     // First snapshot rejects, second resolves. The provider uses

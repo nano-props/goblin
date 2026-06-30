@@ -286,7 +286,6 @@ describe('workspace commands', () => {
             terminalWorktreeKey: WORKTREE_KEY,
             sessionId: 'session-1',
             index: 1,
-            displayOrder: 1,
             title: 'terminal 1',
             phase: 'open',
             selected: true,
@@ -299,7 +298,6 @@ describe('workspace commands', () => {
             terminalWorktreeKey: WORKTREE_KEY,
             sessionId: 'session-2',
             index: 2,
-            displayOrder: 2,
             title: 'terminal 2',
             phase: 'open',
             selected: false,
@@ -350,7 +348,7 @@ describe('workspace commands', () => {
     })
   })
 
-  test('new terminal tab command moves a reused stale terminal id to the end of the tab order', async () => {
+  test('new terminal tab command keeps a reused terminal id in its existing tab position', async () => {
     seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -369,7 +367,7 @@ describe('workspace commands', () => {
 
     await runNewTerminalTabCommand({ repoId: REPO_ID, navigation: navigationWith() })
 
-    expect(tabOrderFor('feature/worktree')).toEqual([staticEntry('status'), terminalEntry('session-1')])
+    expect(tabOrderFor('feature/worktree')).toEqual([terminalEntry('session-1'), staticEntry('status')])
   })
 
   test('new terminal tab command catches create failures and shows feedback', async () => {
@@ -1171,7 +1169,6 @@ function worktreeSnapshotWithTerminal(options: { processName?: string } = {}): T
         terminalWorktreeKey: WORKTREE_KEY,
         sessionId: 'session-1',
         index: 1,
-        displayOrder: 1,
         title: 'terminal 1',
         fullTitle: 'terminal 1',
         processName: options.processName ?? 'zsh',
@@ -1208,7 +1205,6 @@ function worktreeSnapshotForSessions(sessionIds: string[]): TerminalWorktreeSnap
     terminalWorktreeKey: WORKTREE_KEY,
     sessionId,
     index: index + 1,
-    displayOrder: index + 1,
     title: `terminal ${index + 1}`,
     phase: 'open' as const,
     selected: sessionId === selectedKey,
@@ -1256,7 +1252,6 @@ function worktreeSnapshotWithSecondTerminalSelected(): TerminalWorktreeSnapshot 
         terminalWorktreeKey: WORKTREE_KEY,
         sessionId: 'session-1',
         index: 1,
-        displayOrder: 1,
         title: 'terminal 1',
         phase: 'open',
         selected: false,
@@ -1269,7 +1264,6 @@ function worktreeSnapshotWithSecondTerminalSelected(): TerminalWorktreeSnapshot 
         terminalWorktreeKey: WORKTREE_KEY,
         sessionId: 'session-2',
         index: 2,
-        displayOrder: 2,
         title: 'terminal 2',
         phase: 'open',
         selected: true,

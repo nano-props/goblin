@@ -213,8 +213,8 @@ interface RuntimeCoherentRepoProjectionActions {
   setWorkspacePaneTab: (id: string, tab: WorkspacePaneTabType) => void
   openWorkspacePaneStaticTab: (id: string, tab: WorkspacePaneStaticTabType, branchName?: string) => void
   closeWorkspacePaneStaticTab: (id: string, tab: WorkspacePaneStaticTabType, branchName?: string) => void
-  addWorkspacePaneTerminalTab: (id: string, terminalKey: string, branchName?: string) => void
-  addAndFocusWorkspacePaneTerminalTab: (id: string, terminalKey: string, branchName?: string) => void
+  ensureWorkspacePaneTerminalTab: (id: string, terminalKey: string, branchName?: string) => void
+  ensureAndFocusWorkspacePaneTerminalTab: (id: string, terminalKey: string, branchName?: string) => void
   ensureWorkspacePaneTerminalTabs: (id: string, branchName: string, terminalKeys: readonly string[]) => void
   removeWorkspacePaneTerminalTab: (id: string, terminalKey: string, branchName?: string) => void
   reorderWorkspacePaneTabs: (id: string, orderedTabs: WorkspacePaneTabOrderEntry[], branchName?: string) => void

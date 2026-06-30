@@ -23,7 +23,7 @@ import {
   workspacePaneTabOrderRecordWith,
   workspacePaneTabOrderWithMaterializedTerminals,
   workspacePaneTabOrderWithStaticTab,
-  workspacePaneTabOrderWithTerminal,
+  workspacePaneTabOrderWithEnsuredTerminal,
   workspacePaneTabOrderWithoutStaticTab,
   workspacePaneTabOrderWithoutTerminal,
 } from '#/web/stores/repos/workspace-pane-tabs.ts'
@@ -51,8 +51,8 @@ type RuntimeCoherentSelectionActions = Pick<
   | 'setWorkspacePaneTab'
   | 'openWorkspacePaneStaticTab'
   | 'closeWorkspacePaneStaticTab'
-  | 'addWorkspacePaneTerminalTab'
-  | 'addAndFocusWorkspacePaneTerminalTab'
+  | 'ensureWorkspacePaneTerminalTab'
+  | 'ensureAndFocusWorkspacePaneTerminalTab'
   | 'ensureWorkspacePaneTerminalTabs'
   | 'removeWorkspacePaneTerminalTab'
   | 'reorderWorkspacePaneTabs'
@@ -200,13 +200,13 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
       })
     },
 
-    addWorkspacePaneTerminalTab(id: string, terminalKey: string, branchName?: string) {
+    ensureWorkspacePaneTerminalTab(id: string, terminalKey: string, branchName?: string) {
       set((s) => {
         const repo = s.repos[id]
         const branch = branchName ?? repo?.ui.selectedBranch
         if (!repo || !branch) return s
         const current = workspacePaneTabOrderForBranch(repo.ui, branch)
-        const next = workspacePaneTabOrderWithTerminal(current, terminalKey)
+        const next = workspacePaneTabOrderWithEnsuredTerminal(current, terminalKey)
         if (workspacePaneTabOrdersEqual(current, next)) return s
         return replaceRepoState(s, repo, (r) => {
           r.ui.workspacePaneTabOrderByBranch = workspacePaneTabOrderRecordWith(r.ui, branch, next)
@@ -214,7 +214,7 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
       })
     },
 
-    addAndFocusWorkspacePaneTerminalTab(id: string, terminalKey: string, branchName?: string) {
+    ensureAndFocusWorkspacePaneTerminalTab(id: string, terminalKey: string, branchName?: string) {
       let token: number | undefined
       let viewChanged = false
       set((s) => {
@@ -225,7 +225,7 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
         const worktreePath = branchState?.worktree?.path
         if (!worktreePath) return s
         const currentOrder = workspacePaneTabOrderForBranch(repo.ui, branch)
-        const nextOrder = workspacePaneTabOrderWithTerminal(currentOrder, terminalKey)
+        const nextOrder = workspacePaneTabOrderWithEnsuredTerminal(currentOrder, terminalKey)
         const currentView = preferredWorkspacePaneTabForBranch(repo.ui, branch)
         const terminalWorktreeKey = formatTerminalWorktreeKey(id, worktreePath)
         const currentSelected = s.selectedTerminalKeyByTerminalWorktree[terminalWorktreeKey]
