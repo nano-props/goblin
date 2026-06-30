@@ -9,10 +9,7 @@ import {
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import type { TerminalDescriptor, TerminalRepoIndex } from '#/web/components/terminal/types.ts'
 import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
-import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
-import { workspacePaneTabOrderForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
-import { workspacePaneStaticTabOrderEntry, workspacePaneTerminalTabOrderEntry } from '#/shared/workspace-pane.ts'
+import { resetReposStore } from '#/web/test-utils/bridge.ts'
 
 const REPO_ROOT = '/repo'
 const WORKTREE_PATH = '/repo'
@@ -71,27 +68,12 @@ function makeServerSession(
 describe('TerminalSessionProjection', () => {
   let projection: TerminalSessionProjection
   let selectedChanges: Array<{ terminalWorktreeKey: string; terminalSessionId: string | null }>
-  let removedSessions: Array<{ terminalSessionId: string; repoRoot: string; branch: string; worktreePath: string }>
-  let materializedTerminalTabs: Array<{
-    base: { repoRoot: string; branch: string; worktreePath: string }
-    terminalSessionIds: string[]
-  }>
 
   beforeEach(() => {
     resetReposStore()
     selectedChanges = []
-    removedSessions = []
-    materializedTerminalTabs = []
     projection = new TerminalSessionProjection(
       (terminalWorktreeKey, terminalSessionId) => selectedChanges.push({ terminalWorktreeKey, terminalSessionId }),
-      (terminalSessionId, base) =>
-        removedSessions.push({
-          terminalSessionId,
-          repoRoot: base.repoRoot,
-          branch: base.branch,
-          worktreePath: base.worktreePath,
-        }),
-      (base, terminalSessionIds) => materializedTerminalTabs.push({ base, terminalSessionIds: [...terminalSessionIds] }),
     )
     // Install into the singleton session so any code that reaches the
     // projection via `getTerminalSessionProjection()` (e.g., a Provider
@@ -341,10 +323,6 @@ describe('TerminalSessionProjection', () => {
         terminalWorktreeKey: WORKTREE_KEY,
         terminalSessionId: snapshot.sessions[0]!.terminalSessionId,
       })
-      expect(materializedTerminalTabs).toContainEqual({
-        base: { repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH },
-        terminalSessionIds: [snapshot.sessions[0]!.terminalSessionId],
-      })
     })
 
     test('removes orphaned local sessions', () => {
@@ -363,90 +341,6 @@ describe('TerminalSessionProjection', () => {
 
       expect(projection.isKnownSession(terminalSessionIdBefore)).toBe(false)
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
-      expect(removedSessions).toEqual([
-        { terminalSessionId: terminalSessionIdBefore, repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH },
-      ])
-    })
-
-    test('session removal callback removes the owned workspace pane tab', async () => {
-      const descriptor = makeDescriptor('session-1', 1)
-      seedRepoState({
-        id: REPO_ROOT,
-        branches: [createRepoBranch(BRANCH, { worktree: { path: WORKTREE_PATH } })],
-        selectedBranch: BRANCH,
-        workspacePaneTabOrderByBranch: {
-          [BRANCH]: [
-            workspacePaneStaticTabOrderEntry('status'),
-            workspacePaneTerminalTabOrderEntry(descriptor.terminalSessionId),
-            workspacePaneStaticTabOrderEntry('history'),
-          ],
-        },
-      })
-      const registryWithStore = new TerminalSessionProjection(
-        () => {},
-        (terminalSessionId, base) => {
-          useReposStore.getState().removeWorkspacePaneTerminalTab(base.repoRoot, terminalSessionId, base.branch)
-        },
-      )
-      try {
-        registryWithStore.setRepoIndex(makeRepoIndex())
-        registryWithStore.reconcileServerSessions(
-          REPO_ROOT,
-          [makeServerSession('pty_session_1_aaaaaaaaa', 'session-1')],
-          'client_local',
-          new Map(),
-        )
-        const session = (registryWithStore as any).sessions.get(descriptor.terminalSessionId)
-        vi.spyOn(session, 'closeServerResourcesAndWait').mockResolvedValue(undefined)
-
-        await registryWithStore.closeTerminalByDescriptor(descriptor.terminalSessionId, descriptor)
-
-        const repo = useReposStore.getState().repos[REPO_ROOT]
-        expect(repo ? workspacePaneTabOrderForBranch(repo.ui, BRANCH) : []).toEqual([
-          workspacePaneStaticTabOrderEntry('status'),
-          workspacePaneStaticTabOrderEntry('history'),
-        ])
-      } finally {
-        registryWithStore.destroy()
-      }
-    })
-
-    test('session removal callback failures do not block terminal disposal', async () => {
-      const registryWithThrowingCallback = new TerminalSessionProjection(
-        () => {},
-        () => {
-          throw new Error('store write failed')
-        },
-      )
-      try {
-        registryWithThrowingCallback.setRepoIndex(makeRepoIndex())
-        registryWithThrowingCallback.reconcileServerSessions(
-          REPO_ROOT,
-          [makeServerSession('pty_session_1_aaaaaaaaa', 'session-1')],
-          'client_local',
-          new Map(),
-        )
-        const terminalSessionId = registryWithThrowingCallback.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
-        const session = (registryWithThrowingCallback as any).sessions.get(terminalSessionId)
-        const closeServerResourcesAndWait = vi
-          .spyOn(session, 'closeServerResourcesAndWait')
-          .mockResolvedValue(undefined)
-        const dispose = vi.spyOn(session, 'dispose').mockImplementation(() => {})
-
-        await expect(
-          registryWithThrowingCallback.closeTerminalByDescriptor(terminalSessionId, {
-            repoRoot: REPO_ROOT,
-            branch: BRANCH,
-            worktreePath: WORKTREE_PATH,
-          }),
-        ).resolves.toBe(true)
-
-        expect(closeServerResourcesAndWait).toHaveBeenCalled()
-        expect(dispose).toHaveBeenCalledWith({ closeSession: false })
-        expect(registryWithThrowingCallback.isKnownSession(terminalSessionId)).toBe(false)
-      } finally {
-        registryWithThrowingCallback.destroy()
-      }
     })
 
     test('closeTerminalByDescriptor resolves after server terminal resources close', async () => {
@@ -640,7 +534,7 @@ describe('TerminalSessionProjection', () => {
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe('session-2')
     })
 
-    test('closing the active terminal selects the adjacent tab in server order', () => {
+    test('closing the active terminal selects the adjacent tab in the server session list', () => {
       projection.setRepoIndex(makeRepoIndex())
 
       projection.reconcileServerSessions(
@@ -664,7 +558,7 @@ describe('TerminalSessionProjection', () => {
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe('session-1')
     })
 
-    test('invalidates cached worktree snapshot when server order changes', () => {
+    test('invalidates cached worktree snapshot when the server session list changes', () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(
         REPO_ROOT,

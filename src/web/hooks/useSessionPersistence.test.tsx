@@ -5,7 +5,7 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useSessionPersistence } from '#/web/hooks/useSessionPersistence.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import {
   filetreeInteractionScopeKey,
   resetFiletreeInteractionStore,
@@ -51,9 +51,9 @@ describe('useSessionPersistence', () => {
         selectedTerminalSessionIdByTerminalWorktree: {
           '/tmp/repo\0/tmp/worktree': 'session-2',
         },
-        workspacePaneTabOrderByBranchByRepo: {
+        workspacePaneTabsByBranchByRepo: {
           '/tmp/repo': {
-            'feature/worktree': [workspacePaneStaticTabOrderEntry('status')],
+            'feature/worktree': [workspacePaneStaticTabEntry('status')],
           },
         },
       }),
@@ -73,7 +73,7 @@ describe('useSessionPersistence', () => {
 
     expect(persistWorkspaceSessionStateMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        workspacePaneTabOrderByBranchByRepo: {
+        workspacePaneTabsByBranchByRepo: {
           '/tmp/repo': {
             'feature/worktree': [],
           },

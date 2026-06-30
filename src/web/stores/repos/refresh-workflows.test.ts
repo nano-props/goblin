@@ -3,7 +3,7 @@ import { runSnapshotSuccessWorkflow } from '#/web/stores/repos/refresh-workflows
 import type { ReposGet } from '#/web/stores/repos/types.ts'
 import type { ReposSet } from '#/web/stores/repos/types.ts'
 import { createBranchSnapshot, installGoblinTestBridge } from '#/web/test-utils/bridge.ts'
-import { workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 
 describe('repo refresh workflows', () => {
   test('snapshot success backfills summary then visible selected repo workspace', async () => {
@@ -26,7 +26,7 @@ describe('repo refresh workflows', () => {
             ui: {
               selectedBranch: 'feature/a',
               branchViewMode: 'all',
-              workspacePaneTabOrderByBranch: { 'feature/a': [workspacePaneStaticTabOrderEntry('status')] },
+              workspacePaneTabsByBranch: { 'feature/a': [workspacePaneStaticTabEntry('status')] },
               preferredWorkspacePaneTabByBranch: {},
             },
             dataLoads: { pullRequests: { error: null } },
@@ -85,7 +85,7 @@ describe('repo refresh workflows', () => {
             ui: {
               selectedBranch: 'feature/a',
               branchViewMode: 'all',
-              workspacePaneTabOrderByBranch: { 'feature/a': [workspacePaneStaticTabOrderEntry('status')] },
+              workspacePaneTabsByBranch: { 'feature/a': [workspacePaneStaticTabEntry('status')] },
               preferredWorkspacePaneTabByBranch: {},
             },
             dataLoads: { pullRequests: { error: null } },

@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { defaultWorkspaceSessionState } from '#/shared/settings-defaults.ts'
-import { WORKSPACE_PANE_STATIC_TAB_IDS, workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
+import { WORKSPACE_PANE_STATIC_TAB_IDS, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 
 let tmp: string | null = null
 let previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
@@ -74,7 +74,7 @@ test('persists updates and notifies subscribers from the server settings store',
     openRepoEntries: [{ kind: 'local', id: '/repo-b' }],
     activeRepoId: '/repo-b',
     selectedTerminalSessionIdByTerminalWorktree: { '/repo-b\0/worktree': 'session-2' },
-    workspacePaneTabOrderByBranchByRepo: {
+    workspacePaneTabsByBranchByRepo: {
       '/repo-b': {
         main: [],
       },
@@ -107,7 +107,7 @@ test('persists updates and notifies subscribers from the server settings store',
     openRepoEntries: [{ kind: 'local', id: '/repo-b' }],
     activeRepoId: '/repo-b',
     selectedTerminalSessionIdByTerminalWorktree: { '/repo-b\0/worktree': 'session-2' },
-    workspacePaneTabOrderByBranchByRepo: {
+    workspacePaneTabsByBranchByRepo: {
       '/repo-b': {
         main: [],
       },
@@ -233,9 +233,9 @@ test('normalizes branch-scoped workspace pane tab preferences in server sessions
       },
       '/repo-array': ['history'],
     } as never,
-    workspacePaneTabOrderByBranchByRepo: {
+    workspacePaneTabsByBranchByRepo: {
       '/repo-b': {
-        main: [workspacePaneStaticTabOrderEntry('history')],
+        main: [workspacePaneStaticTabEntry('history')],
         changes: [],
         terminal: [],
       },
@@ -252,7 +252,7 @@ test('normalizes branch-scoped workspace pane tab preferences in server sessions
   })
 })
 
-test('normalizes workspace pane tab order in server sessions', async () => {
+test('normalizes workspace pane tab list in server sessions', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
@@ -265,34 +265,34 @@ test('normalizes workspace pane tab order in server sessions', async () => {
       { kind: 'local', id: '/repo-array' },
     ],
     activeRepoId: '/repo-b',
-    workspacePaneTabOrderByBranchByRepo: {
+    workspacePaneTabsByBranchByRepo: {
       '/repo-b': {
         main: [
-          workspacePaneStaticTabOrderEntry('status'),
+          workspacePaneStaticTabEntry('status'),
           { type: 'terminal', terminalSessionId: 'session-1' },
-          workspacePaneStaticTabOrderEntry('history'),
-          workspacePaneStaticTabOrderEntry('status'),
-          workspacePaneStaticTabOrderEntry('changes'),
+          workspacePaneStaticTabEntry('history'),
+          workspacePaneStaticTabEntry('status'),
+          workspacePaneStaticTabEntry('changes'),
         ],
         empty: [],
-        'bad\0branch': [workspacePaneStaticTabOrderEntry('status')],
+        'bad\0branch': [workspacePaneStaticTabEntry('status')],
         invalid: [{ type: 'changes', tabId: WORKSPACE_PANE_STATIC_TAB_IDS.status }],
       },
       '/repo-c': {
-        main: [workspacePaneStaticTabOrderEntry('status')],
+        main: [workspacePaneStaticTabEntry('status')],
       },
-      '/repo-array': [workspacePaneStaticTabOrderEntry('status')],
+      '/repo-array': [workspacePaneStaticTabEntry('status')],
     } as never,
   })
 
   expect(await mod.getServerSessionState()).toMatchObject({
-    workspacePaneTabOrderByBranchByRepo: {
+    workspacePaneTabsByBranchByRepo: {
       '/repo-b': {
         main: [
-          workspacePaneStaticTabOrderEntry('status'),
+          workspacePaneStaticTabEntry('status'),
           { type: 'terminal', terminalSessionId: 'session-1' },
-          workspacePaneStaticTabOrderEntry('history'),
-          workspacePaneStaticTabOrderEntry('changes'),
+          workspacePaneStaticTabEntry('history'),
+          workspacePaneStaticTabEntry('changes'),
         ],
         empty: [],
         invalid: [],

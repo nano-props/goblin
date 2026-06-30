@@ -18,7 +18,7 @@ import {
   type WorkspacePaneTabItem,
 } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
-import type { WorkspacePaneStaticTabType, WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneStaticTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { RepoWorkspaceRepo, SelectedRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
 import type { RepoWorkspaceTabModel } from '#/web/components/repo-workspace/tab-model.ts'
@@ -29,6 +29,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
 import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
+import { commitWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import {
   terminalWorkspacePaneTabProvider,
   workspacePaneStaticTabProvider,
@@ -131,10 +132,16 @@ export function RepoWorkspaceToolbar({
   )
 
   const handleReorderWorkspacePaneTabStrip = useCallback(
-    (orderedTabs: WorkspacePaneTabOrderEntry[]) => {
-      useReposStore.getState().reorderWorkspacePaneTabs(repo.id, orderedTabs, branchName ?? undefined)
+    (tabs: WorkspacePaneTabEntry[]) => {
+      if (!branchName) return
+      commitWorkspacePaneTabs({
+        repoRoot: repo.id,
+        branchName,
+        worktreePath: terminalBase?.worktreePath ?? null,
+        tabs,
+      })
     },
-    [branchName, repo.id],
+    [branchName, repo.id, terminalBase?.worktreePath],
   )
 
   const workspacePaneTabItems = useMemo<WorkspacePaneTabItem[]>(

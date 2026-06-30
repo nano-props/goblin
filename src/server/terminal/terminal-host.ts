@@ -1,9 +1,10 @@
 import type {
   TerminalAttachInput,
   TerminalAttachResult,
-  TerminalCatalogMutationResult,
+  TerminalCreateResult,
   TerminalCreateInput,
   TerminalMutationResult,
+  TerminalReplaceWorkspaceTabsInput,
   TerminalResizeInput,
   TerminalRestartInput,
   TerminalSessionInput,
@@ -12,8 +13,10 @@ import type {
   TerminalSessionSummary,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
+  TerminalWorkspaceTabsEntry,
   TerminalWriteInput,
 } from '#/shared/terminal-types.ts'
+import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 
 type MaybePromise<T> = T | Promise<T>
 
@@ -99,7 +102,9 @@ export interface ServerTerminalHost {
   takeover(clientId: string, userId: string, input: TerminalTakeoverInput): MaybePromise<TerminalTakeoverResult>
   close(clientId: string, userId: string, input: TerminalSessionInput): MaybePromise<TerminalMutationResult>
   listSessions(clientId: string, userId: string, repoRoot: string): MaybePromise<TerminalSessionSummary[]>
-  create(clientId: string, userId: string, input: TerminalCreateInput): MaybePromise<TerminalCatalogMutationResult>
+  listWorkspaceTabs(clientId: string, userId: string, repoRoot: string): MaybePromise<TerminalWorkspaceTabsEntry[]>
+  create(clientId: string, userId: string, input: TerminalCreateInput): MaybePromise<TerminalCreateResult>
+  replaceTabs(clientId: string, userId: string, input: TerminalReplaceWorkspaceTabsInput): MaybePromise<WorkspacePaneTabEntry[]>
   prune(clientId: string, userId: string, repoRoot: string): MaybePromise<{ pruned: number; remaining: number }>
   getSessionSnapshot(
     clientId: string,

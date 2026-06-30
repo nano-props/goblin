@@ -12,7 +12,7 @@ import type { WorkspaceSessionState } from '#/shared/api-types.ts'
 import type {
   WorkspacePaneSessionTabType,
   WorkspacePaneStaticTabType,
-  WorkspacePaneTabOrderEntry,
+  WorkspacePaneTabEntry,
   WorkspacePaneTabType,
 } from '#/shared/workspace-pane.ts'
 import type { RepoBranchAction, RunBranchActionOptions } from '#/web/stores/repos/branch-action-types.ts'
@@ -67,11 +67,11 @@ export interface RepoUiState {
   selectedBranch: string | null
   branchViewMode: BranchViewMode
   /**
-   * Single branch-scoped workspace pane tab strip order. Static tab entries
-   * are the opened static tabs; terminal entries are ordering hints for live
-   * terminal sessions, whose lifecycle remains terminal-runtime owned.
+   * Single branch-scoped mixed workspace pane tab list. Static tab entries are
+   * opened static tabs; terminal entries point at terminal sessions owned by
+   * the terminal runtime.
    */
-  workspacePaneTabOrderByBranch: Record<string, WorkspacePaneTabOrderEntry[]>
+  workspacePaneTabsByBranch: Record<string, WorkspacePaneTabEntry[]>
   /** Branch-scoped selected workspace pane tab. Branch switches read this
    *  first so selecting a tab on one branch does not select it on another. */
   preferredWorkspacePaneTabByBranch: Record<string, WorkspacePaneTabType>
@@ -163,7 +163,7 @@ export interface RestorableWorkspaceState {
 }
 
 export interface SessionWorkspacePaneRestoreState {
-  workspacePaneTabOrderByBranchByRepo: Record<string, Record<string, WorkspacePaneTabOrderEntry[]>>
+  workspacePaneTabsByBranchByRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>>
   preferredWorkspacePaneTabByBranchByRepo: Record<string, Record<string, WorkspacePaneSessionTabType>>
 }
 
@@ -215,9 +215,7 @@ interface RuntimeCoherentRepoProjectionActions {
   closeWorkspacePaneStaticTab: (id: string, tab: WorkspacePaneStaticTabType, branchName?: string) => void
   ensureWorkspacePaneTerminalTab: (id: string, terminalSessionId: string, branchName?: string) => void
   ensureAndFocusWorkspacePaneTerminalTab: (id: string, terminalSessionId: string, branchName?: string) => void
-  ensureWorkspacePaneTerminalTabs: (id: string, branchName: string, terminalSessionIds: readonly string[]) => void
-  removeWorkspacePaneTerminalTab: (id: string, terminalSessionId: string, branchName?: string) => void
-  reorderWorkspacePaneTabs: (id: string, orderedTabs: WorkspacePaneTabOrderEntry[], branchName?: string) => void
+  replaceWorkspacePaneTabs: (id: string, tabs: WorkspacePaneTabEntry[], branchName?: string) => void
   setBranchViewMode: (id: string, viewMode: BranchViewMode) => void
   selectBranch: (id: string, branch: string) => void
   clearSelectedBranch: (id: string) => void

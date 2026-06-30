@@ -26,6 +26,24 @@ function makeActions(
     getSessionScope: vi.fn((_userId: string, ptySessionId: string) =>
       options.getSlotScope ? options.getSlotScope(_userId, ptySessionId) : undefined,
     ),
+    getSessionSummaryForUser: vi.fn((userId: string, ptySessionId: string) =>
+      options.getSlotScope?.(userId, ptySessionId)
+        ? ({
+            ptySessionId,
+            terminalSessionId: 'terminal-session-1',
+            repoRoot: options.getSlotScope(userId, ptySessionId),
+            worktreePath: '/repo',
+            cwd: '/repo',
+            controller: null,
+            processName: 'zsh',
+            canonicalTitle: null,
+            phase: 'open',
+            message: null,
+            cols: 80,
+            rows: 24,
+          } as const)
+        : null,
+    ),
     closeSessionForUser: vi.fn(options.closeSessionForUser),
     // The other manager methods are unused by `close`, but the
     // `TerminalSessionManager` type is required by the deps
@@ -38,10 +56,13 @@ function makeActions(
     getSessionSnapshot: vi.fn(() => null),
   } as any
   const broker = { broadcastToUser: broadcasts as unknown as (userId: string, message: unknown) => void }
-  const catalog = {
+  const sessionService = {
     create: vi.fn(),
     prune: vi.fn(),
     listSessions: vi.fn(),
+    listWorkspaceTabs: vi.fn(async () => []),
+    replaceTabs: vi.fn(() => []),
+    removeTerminalTab: vi.fn(() => []),
   }
   const isValidTerminalClientId =
     options.isValidTerminalClientId ?? ((value: unknown): value is string => value === CLIENT_ID)
@@ -49,7 +70,7 @@ function makeActions(
     actions: createTerminalRuntimeActions({
       manager,
       broker,
-      catalog,
+      sessionService,
       isValidTerminalClientId,
     }),
     broadcasts,
@@ -82,6 +103,8 @@ describe('terminal-runtime-actions close broadcast', () => {
       type: 'session-closed',
       ptySessionId: PTY_SESSION_ID,
       repoRoot: '/repo',
+      worktreePath: '/repo',
+      tabs: [],
     })
   })
 

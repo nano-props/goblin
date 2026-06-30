@@ -153,11 +153,15 @@ describe('shared terminal validators', () => {
         type: 'session-closed',
         ptySessionId: 'pty_session_1_aaaaaaaaa',
         repoRoot: '/repo',
+        worktreePath: '/repo/worktree',
+        tabs: [{ type: 'status', tabId: 'workspace-pane:status' }],
       }),
     ).toEqual({
       type: 'session-closed',
       ptySessionId: 'pty_session_1_aaaaaaaaa',
       repoRoot: '/repo',
+      worktreePath: '/repo/worktree',
+      tabs: [{ type: 'status', tabId: 'workspace-pane:status' }],
     })
   })
 })

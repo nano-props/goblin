@@ -1,5 +1,5 @@
 // PtySupervisor interface. The boundary between the business runtime
-// (which knows about sessions, controllers, catalogs) and the OS-level
+// (which knows about sessions, controllers, session services) and the OS-level
 // pty pool (which knows about node-pty and the IPC to a worker
 // subprocess). The runtime calls into the supervisor to spawn/write/
 // resize/kill; the supervisor emits data/exit via listeners.

@@ -46,7 +46,7 @@ Create may send a lightweight startup geometry hint before a real view exists. A
 ### Stable business boundary over PTY boundary
 
 - PTY execution is an implementation detail behind a supervisor interface.
-- Session lifecycle, control, replay, and catalog rules live above the PTY layer.
+- Session lifecycle, control, replay, and session service rules live above the PTY layer.
 - Switching between in-process PTY execution and worker-backed PTY execution must not change the terminal product model.
 
 ### Reconnect over recreation
@@ -85,7 +85,7 @@ The terminal feature spans `shared`, `server`, and `web`, but it still behaves a
 
 ### Server runtime
 
-- Owns business state for sessions, control, catalog behavior, connection tracking, and realtime dispatch.
+- Owns business state for sessions, control, session service behavior, connection tracking, and realtime dispatch.
 - Exposes the terminal host boundary used by routes and realtime transport.
 - Treats PTY execution as a dependency, not as the place where product behavior lives.
 
@@ -93,7 +93,7 @@ The terminal feature spans `shared`, `server`, and `web`, but it still behaves a
 
 - Owns spawn, write, resize, kill, and PTY event forwarding.
 - Hides whether PTYs run in-process or in a worker.
-- Does not own catalog, control, or client-facing policy.
+- Does not own session service, control, or client-facing policy.
 
 ### Client projection
 
@@ -113,7 +113,7 @@ The terminal feature spans `shared`, `server`, and `web`, but it still behaves a
 At a high level, the lifecycle is:
 
 1. A client requests create or restore for a worktree terminal.
-2. The server catalog resolves whether that request means create, reuse, or restore.
+2. The server session service resolves whether that request means create, reuse, or restore.
 3. The session manager ensures a session exists and that a PTY is running for it.
 4. The client attaches a local view to the session.
 5. Realtime output, title, exit, and identity events keep clients up to date.
@@ -275,7 +275,7 @@ The terminal feature uses realtime transport for continuous, UX-critical flows.
 
 ### Non-streaming flows
 
-- catalog reads
+- session service reads
 - snapshots
 - explicit mutations such as create, attach, restart, resize, takeover, close, and reorder
 
@@ -328,7 +328,7 @@ The terminal system should optimize for continuity, but it still needs clear fai
 
 - Failed create or restart must not leave zombie sessions presented as healthy terminals.
 - Offline presence should not destroy the session itself: a 24h detached
-  TTL keeps the catalog alive so a later attach from the same user can
+  TTL keeps the session service alive so a later attach from the same user can
   re-enter via auto-claim. The broker may close stale realtime sockets
   when presence times out, but offline controller intent still projects
   to no effective controller so siblings can claim without waiting.

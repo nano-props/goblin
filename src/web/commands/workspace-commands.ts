@@ -85,13 +85,13 @@ export async function runShowWorkspacePaneTabCommand({
   return await runWorkspacePaneTabUiCommand(() => showWorkspacePaneTabCommand({ repoId, tab, navigation }))
 }
 
-function showWorkspacePaneTabCommand({ repoId, tab, navigation }: ShowWorkspacePaneTabCommandOptions): boolean {
+async function showWorkspacePaneTabCommand({ repoId, tab, navigation }: ShowWorkspacePaneTabCommandOptions): Promise<boolean> {
   if (!repoId) return false
   const provider = workspacePaneTabProvider(tab)
   if (isWorkspacePaneStaticTabProvider(provider)) {
     const target = selectedRepoWorkspaceTarget(repoId)
     if (target) {
-      return openWorkspacePaneTab({
+      return await openWorkspacePaneTab({
         repoId,
         branchName: target.branchName,
         worktreePath: target.worktreePath,
@@ -163,7 +163,7 @@ export async function runConfirmCloseTerminalWorkspacePaneTabCommand(
   return await runWorkspacePaneTabUiCommand(() => closeConfirmedTerminalWorkspacePaneTab(options))
 }
 
-function closeWorkspacePaneTabCommand(options: CloseWorkspacePaneTabCommandOptions): boolean {
+async function closeWorkspacePaneTabCommand(options: CloseWorkspacePaneTabCommandOptions): Promise<boolean> {
   const { repoId, navigation, targetIdentity, skipTerminalCloseConfirm } = options
   const target = repoId ? workspacePaneCommandTarget(repoId) : null
   if (!target) return false
@@ -190,6 +190,7 @@ function closeWorkspacePaneTabCommand(options: CloseWorkspacePaneTabCommandOptio
   const close = beginWorkspacePaneTabClose(target, tab)
   if (!close.accepted) return false
   observeWorkspacePaneTabClose(close.completion, closingIdentity)
+  if (tab.kind === 'static' && !(await close.completion)) return false
 
   if (nextTab) showWorkspacePaneCommandTab(target, nextTab, navigation)
   return true

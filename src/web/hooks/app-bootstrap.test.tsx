@@ -46,7 +46,7 @@ describe('app bootstrap hooks', () => {
       zenMode: true,
       workspacePaneSize: 50,
       selectedTerminalSessionIdByTerminalWorktree: {},
-      workspacePaneTabOrderByBranchByRepo: {},
+      workspacePaneTabsByBranchByRepo: {},
     })
     const hydrateI18n = vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
     const hydrateHostInfo = vi.spyOn(useHostInfoStore.getState(), 'hydrate').mockResolvedValue(undefined)
@@ -68,7 +68,7 @@ describe('app bootstrap hooks', () => {
       zenMode: false,
       workspacePaneSize: 45,
       selectedTerminalSessionIdByTerminalWorktree: { '/tmp/repo\0/tmp/worktree': 'session-2' },
-      workspacePaneTabOrderByBranchByRepo: {
+      workspacePaneTabsByBranchByRepo: {
         '/tmp/repo': {
           main: [],
         },
@@ -108,7 +108,7 @@ describe('app bootstrap hooks', () => {
     })
     expect(hydrateRepoSession).toHaveBeenCalledWith([{ kind: 'local', id: '/tmp/repo' }], '/tmp/repo', {
       workspacePaneRestoreState: {
-        workspacePaneTabOrderByBranchByRepo: {
+        workspacePaneTabsByBranchByRepo: {
           '/tmp/repo': {
             main: [],
           },
@@ -127,7 +127,7 @@ describe('app bootstrap hooks', () => {
       zenMode: true,
       workspacePaneSize: 55,
       selectedTerminalSessionIdByTerminalWorktree: {},
-      workspacePaneTabOrderByBranchByRepo: {},
+      workspacePaneTabsByBranchByRepo: {},
     }
     mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot({ session }))
     vi.spyOn(useThemeStore.getState(), 'hydrateFromSettingsSnapshot').mockRejectedValue(new Error('theme unavailable'))
@@ -140,7 +140,7 @@ describe('app bootstrap hooks', () => {
 
     expect(hydrateRepoSession).toHaveBeenCalledWith([{ kind: 'local', id: '/tmp/repo' }], '/tmp/repo', {
       workspacePaneRestoreState: {
-        workspacePaneTabOrderByBranchByRepo: {},
+        workspacePaneTabsByBranchByRepo: {},
         preferredWorkspacePaneTabByBranchByRepo: {},
       },
     })

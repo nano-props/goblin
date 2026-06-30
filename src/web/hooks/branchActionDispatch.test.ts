@@ -6,7 +6,7 @@ import { setTerminalSessionCommandBridge } from '#/web/components/terminal/termi
 import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 
 const REPO_ID = '/tmp/gbl-branch-action-dispatch-repo'
 const WORKTREE_PATH = '/tmp/gbl-branch-action-dispatch-worktree'
@@ -28,9 +28,9 @@ describe('branch action dispatch', () => {
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
-      workspacePaneTabOrderByBranch: {
+      workspacePaneTabsByBranch: {
         'feature/worktree': [
-          workspacePaneStaticTabOrderEntry('status'),
+          workspacePaneStaticTabEntry('status'),
           { type: 'terminal', terminalSessionId: 'session-1' },
         ],
       },
@@ -96,9 +96,9 @@ describe('branch action dispatch', () => {
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
-      workspacePaneTabOrderByBranch: {
+      workspacePaneTabsByBranch: {
         'feature/worktree': [
-          workspacePaneStaticTabOrderEntry('status'),
+          workspacePaneStaticTabEntry('status'),
           { type: 'terminal', terminalSessionId: 'session-1' },
         ],
       },
@@ -142,7 +142,7 @@ describe('branch action dispatch', () => {
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'status',
-      workspacePaneTabOrderByBranch: {},
+      workspacePaneTabsByBranch: {},
     })
     const runBranchAction = vi.fn(async () => ({ ok: true, message: 'ok' }))
     useReposStore.setState({ runBranchAction })
@@ -174,9 +174,9 @@ describe('branch action dispatch', () => {
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
-      workspacePaneTabOrderByBranch: {
+      workspacePaneTabsByBranch: {
         'feature/worktree': [
-          workspacePaneStaticTabOrderEntry('status'),
+          workspacePaneStaticTabEntry('status'),
           { type: 'terminal', terminalSessionId: 'session-1' },
         ],
       },

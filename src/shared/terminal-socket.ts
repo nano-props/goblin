@@ -1,13 +1,15 @@
 import type {
   TerminalAttachInput,
   TerminalAttachResult,
-  TerminalCatalogMutationResult,
+  TerminalCreateResult,
   TerminalCreateInput,
   TerminalIdentityEvent,
   TerminalLifecycleEvent,
   TerminalListSessionsInput,
+  TerminalListWorkspaceTabsInput,
   TerminalMutationResult,
   TerminalOutputEvent,
+  TerminalReplaceWorkspaceTabsInput,
   TerminalResizeInput,
   TerminalRestartInput,
   TerminalSessionInput,
@@ -16,10 +18,12 @@ import type {
   TerminalSessionSummary,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
+  TerminalWorkspaceTabsEntry,
   TerminalTitleEvent,
   TerminalExitEvent,
   TerminalWriteInput,
 } from '#/shared/terminal-types.ts'
+import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 
 export type TerminalRealtimeMessage =
   | { type: 'output'; event: TerminalOutputEvent }
@@ -40,7 +44,13 @@ export type TerminalRealtimeMessage =
   // a full list-rescan. The `repoRoot` is included so the client
   // can route the event to the right worktree without a manager
   // lookup.
-  | { type: 'session-closed'; ptySessionId: string; repoRoot: string }
+  | {
+      type: 'session-closed'
+      ptySessionId: string
+      repoRoot: string
+      worktreePath: string
+      tabs: WorkspacePaneTabEntry[]
+    }
 
 export interface TerminalSocketRequestInputs {
   attach: TerminalAttachInput
@@ -50,7 +60,9 @@ export interface TerminalSocketRequestInputs {
   takeover: TerminalTakeoverInput
   close: TerminalSessionInput
   'list-sessions': TerminalListSessionsInput
+  'list-workspace-tabs': TerminalListWorkspaceTabsInput
   create: TerminalCreateInput
+  'replace-tabs': TerminalReplaceWorkspaceTabsInput
   prune: { repoRoot: string }
   'session-snapshot': TerminalSessionSnapshotInput
 }
@@ -63,7 +75,9 @@ export interface TerminalSocketResponseOutputs {
   takeover: TerminalTakeoverResult
   close: TerminalMutationResult
   'list-sessions': TerminalSessionSummary[]
-  create: TerminalCatalogMutationResult
+  'list-workspace-tabs': TerminalWorkspaceTabsEntry[]
+  create: TerminalCreateResult
+  'replace-tabs': WorkspacePaneTabEntry[]
   prune: { pruned: number; remaining: number }
   'session-snapshot': TerminalSessionSnapshot | null
 }

@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 
-import type { TerminalSessionSnapshot, TerminalSessionSummary } from '#/shared/terminal-types.ts'
+import type {
+  TerminalSessionSnapshot,
+  TerminalSessionSummary,
+  TerminalWorkspaceTabsEntry,
+} from '#/shared/terminal-types.ts'
+import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import '#/web/components/terminal/terminal-session.css'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
@@ -71,17 +76,8 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   if (!projectionRef.current) {
     projectionRef.current = getTerminalSessionProjection({
       onSelectedWorktreeChange: setSelectedTerminal,
-      // Terminal-session lifetime owns terminal tab lifetime. User closes,
-      // server exits, and reconcile removals all converge through this hook.
-      // The workspace pane tab model falls back to the first materialized tab
-      // at read time when the active tab disappears, so this callback only
-      // needs to drop the tab from the branch-scoped tab order — no
-      // navigation or view-switch call required.
-      onTerminalSessionRemoved: (terminalSessionId, base) => {
-        useReposStore.getState().removeWorkspacePaneTerminalTab(base.repoRoot, terminalSessionId, base.branch)
-      },
-      onTerminalSessionsMaterialized: (base, terminalSessionIds) => {
-        useReposStore.getState().ensureWorkspacePaneTerminalTabs(base.repoRoot, base.branch, terminalSessionIds)
+      onWorkspaceTabsChanged: (base, tabs) => {
+        useReposStore.getState().replaceWorkspacePaneTabs(base.repoRoot, [...tabs], base.branch)
       },
     })
   }
@@ -123,9 +119,13 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       if (!repoRoot || !repoIndexRef.current[repoRoot]) return
       try {
         const clientId = readOrCreateWebTerminalClientId()
-        const serverSessions = await loadTerminalSessions(repoRoot)
+        const [serverSessions, workspaceTabs] = await Promise.all([
+          loadTerminalSessions(repoRoot),
+          terminalBridge.listWorkspaceTabs({ repoRoot }),
+        ])
         const snapshotsByPtySessionId = await loadMissingSnapshots(serverSessions)
         if (!repoIndexRef.current[repoRoot]) return
+        applyWorkspaceTabsForRepo(repoRoot, workspaceTabs, repoIndexRef.current)
         projection.reconcileServerSessions(repoRoot, serverSessions, clientId, snapshotsByPtySessionId)
       } catch (err) {
         terminalSessionProviderLog.debug('failed to sync server sessions', { err })
@@ -209,6 +209,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     // there — the broadcast is multi-window safe by construction.
     const offSessionClosed = terminalBridge.onSessionClosed((event) => {
       projection.handleSessionClosed(event.ptySessionId)
+      applyWorkspaceTabsForWorktree(event.repoRoot, event.worktreePath, event.tabs, repoIndexRef.current)
     })
 
     setTerminalSessionCommandBridge({
@@ -311,4 +312,30 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       </TerminalSessionReadContext.Provider>
     </TerminalSessionContext.Provider>
   )
+}
+
+function applyWorkspaceTabsForRepo(
+  repoRoot: string,
+  entries: readonly TerminalWorkspaceTabsEntry[],
+  repoIndex: ReturnType<typeof repoIndexFromRepos>,
+): void {
+  for (const entry of entries) {
+    applyWorkspaceTabsForWorktree(repoRoot, entry.worktreePath, entry.tabs, repoIndex)
+  }
+}
+
+function applyWorkspaceTabsForWorktree(
+  repoRoot: string,
+  worktreePath: string,
+  tabs: readonly WorkspacePaneTabEntry[],
+  repoIndex: ReturnType<typeof repoIndexFromRepos>,
+): void {
+  if (!worktreePath) return
+  const storeRepoRoot =
+    repoIndex[repoRoot] !== undefined
+      ? repoRoot
+      : (Object.keys(repoIndex).find((candidate) => repoIndex[candidate]?.branchByWorktreePath[worktreePath]) ?? repoRoot)
+  const branch = repoIndex[storeRepoRoot]?.branchByWorktreePath[worktreePath]
+  if (!branch) return
+  useReposStore.getState().replaceWorkspacePaneTabs(storeRepoRoot, [...tabs], branch)
 }

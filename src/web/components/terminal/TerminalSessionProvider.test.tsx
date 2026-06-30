@@ -35,7 +35,7 @@ import type {
   TerminalSnapshot,
 } from '#/web/components/terminal/types.ts'
 import type {
-  TerminalCatalogMutationResult,
+  TerminalCreateResult,
   TerminalCreateInput,
   TerminalExitEvent,
   TerminalAttachResult,
@@ -43,7 +43,11 @@ import type {
   TerminalSessionSnapshot,
   TerminalSessionSummary,
   TerminalTitleEvent,
+  TerminalWorkspaceTabsEntry,
 } from '#/shared/terminal-types.ts'
+import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneTabsForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
 
 const mockSessions = vi.hoisted(
   () =>
@@ -264,17 +268,22 @@ let identityHandler: ((event: TerminalIdentityViewModel) => void) | null = null
 let lifecycleHandler: ((event: TerminalLifecycleViewModel) => void) | null = null
 let sessionsChangedHandler: ((repoRoot: string) => void) | null = null
 let workspacePaneChangedHandler: ((repoRoot: string) => void) | null = null
-let sessionClosedHandler: ((event: { ptySessionId: string; repoRoot: string }) => void) | null = null
+let sessionClosedHandler:
+  | ((event: { ptySessionId: string; repoRoot: string; worktreePath: string; tabs: WorkspacePaneTabEntry[] }) => void)
+  | null = null
 type TestTerminalSessionSummary = Omit<TerminalSessionSummary, 'repoRoot' | 'worktreePath'> &
   Partial<Pick<TerminalSessionSummary, 'repoRoot' | 'worktreePath'>>
 const listSessionsMock = vi.fn<(...args: Array<{ repoRoot: string }>) => Promise<TestTerminalSessionSummary[]>>(
+  async () => [],
+)
+const listWorkspaceTabsMock = vi.fn<(...args: Array<{ repoRoot: string }>) => Promise<TerminalWorkspaceTabsEntry[]>>(
   async () => [],
 )
 const getSessionSnapshotMock = vi.fn<
   (...args: Array<{ ptySessionId: string }>) => Promise<TerminalSessionSnapshot | null>
 >(async () => null)
 const closeMock = vi.fn(async () => true)
-const createTerminalMock = vi.fn<(input: TerminalCreateInput) => Promise<TerminalCatalogMutationResult>>()
+const createTerminalMock = vi.fn<(input: TerminalCreateInput) => Promise<TerminalCreateResult>>()
 let serverSessions: TestTerminalSessionSummary[] = []
 
 function completeServerSession(session: TestTerminalSessionSummary): TerminalSessionSummary {
@@ -288,6 +297,15 @@ function completeServerSession(session: TestTerminalSessionSummary): TerminalSes
 
 function completeServerSessions(sessions: TestTerminalSessionSummary[]): TerminalSessionSummary[] {
   return sessions.map(completeServerSession)
+}
+
+function workspaceTabsWithTerminal(terminalSessionId: string) {
+  return [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry(terminalSessionId)]
+}
+
+function tabsFor(repoRoot: string, branchName: string): WorkspacePaneTabEntry[] {
+  const repo = useReposStore.getState().repos[repoRoot]
+  return repo ? workspacePaneTabsForBranch(repo.ui, branchName) : []
 }
 
 function normalizeTestSessionId(terminalSessionId: string): string {
@@ -333,6 +351,8 @@ beforeEach(() => {
   serverSessions = []
   listSessionsMock.mockReset()
   listSessionsMock.mockImplementation(async () => serverSessions)
+  listWorkspaceTabsMock.mockReset()
+  listWorkspaceTabsMock.mockResolvedValue([])
   getSessionSnapshotMock.mockReset()
   getSessionSnapshotMock.mockResolvedValue(null)
   closeMock.mockReset()
@@ -361,6 +381,7 @@ beforeEach(() => {
         ok: true,
         action: 'reused',
         terminalSessionId,
+        tabs: workspaceTabsWithTerminal(terminalSessionId),
         sessions: completeServerSessions(serverSessions),
         ptySessionId: reused?.ptySessionId ?? 'session-1',
         snapshot: '',
@@ -408,6 +429,7 @@ beforeEach(() => {
       ok: true,
       action: 'created',
       terminalSessionId,
+      tabs: workspaceTabsWithTerminal(terminalSessionId),
       sessions: completeServerSessions(serverSessions),
       ptySessionId: terminalSessionId,
       snapshot: '',
@@ -482,6 +504,7 @@ beforeEach(() => {
         create: createTerminalMock,
         pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
         listSessions: async (input: { repoRoot: string }) => completeServerSessions(await listSessionsMock(input)),
+        listWorkspaceTabs: async (input: { repoRoot: string }) => await listWorkspaceTabsMock(input),
         listViews: vi.fn(async () => []),
         getSessionSnapshot: getSessionSnapshotMock,
         onOutput: vi.fn((cb: (event: TerminalOutputEvent) => void) => {
@@ -572,8 +595,10 @@ beforeEach(() => {
       })),
       close: closeMock,
       create: createTerminalMock,
+      replaceWorkspaceTabs: vi.fn(async (input) => input.tabs),
       pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
       listSessions: async (input) => completeServerSessions(await listSessionsMock(input)),
+      listWorkspaceTabs: async (input: { repoRoot: string }) => await listWorkspaceTabsMock(input),
       listViews: vi.fn(async () => []),
       openView: vi.fn(async () => true),
       closeView: vi.fn(async () => true),
@@ -616,12 +641,14 @@ beforeEach(() => {
           if (workspacePaneChangedHandler === cb) workspacePaneChangedHandler = null
         }
       }),
-      onSessionClosed: vi.fn((cb: (event: { ptySessionId: string; repoRoot: string }) => void) => {
+      onSessionClosed: vi.fn(
+        (cb: (event: { ptySessionId: string; repoRoot: string; worktreePath: string; tabs: WorkspacePaneTabEntry[] }) => void) => {
         sessionClosedHandler = cb
         return () => {
           if (sessionClosedHandler === cb) sessionClosedHandler = null
         }
-      }),
+        },
+      ),
     }),
   })
 })
@@ -923,6 +950,13 @@ describe('TerminalSessionProvider', () => {
       snapshot: 'hydrated-screen',
       snapshotSeq: 5,
     })
+    listWorkspaceTabsMock.mockResolvedValue([
+      {
+        repoRoot: REPO_ID,
+        worktreePath: WORKTREE_PATH,
+        tabs: [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-1')],
+      },
+    ])
     const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH)
     const { getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
 
@@ -931,6 +965,10 @@ describe('TerminalSessionProvider', () => {
 
       expect(getProbe().summaries).toEqual([
         expect.objectContaining({ terminalSessionId: 'session-1', title: 'zsh', phase: 'open' }),
+      ])
+      expect(tabsFor(REPO_ID, 'feature/worktree')).toEqual([
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneTerminalTabEntry('session-1'),
       ])
       const hydrated = mockSessions.find((session) => session.descriptor.terminalSessionId === 'session-1')
       expect(hydrated?.hydrate).toHaveBeenCalledWith(
@@ -947,9 +985,53 @@ describe('TerminalSessionProvider', () => {
       )
 
       listSessionsMock.mockResolvedValue([])
+      listWorkspaceTabsMock.mockResolvedValue([
+        {
+          repoRoot: REPO_ID,
+          worktreePath: WORKTREE_PATH,
+          tabs: [workspacePaneStaticTabEntry('status')],
+        },
+      ])
       await emitSessionsChanged()
 
       expect(getProbe().summaries).toEqual([])
+      expect(tabsFor(REPO_ID, 'feature/worktree')).toEqual([workspacePaneStaticTabEntry('status')])
+    } finally {
+      await unmount()
+    }
+  })
+
+  test('applies canonical workspace tabs from session-closed events', async () => {
+    seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      selectedBranch: 'feature/worktree',
+      preferredWorkspacePaneTab: 'terminal',
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [
+          workspacePaneStaticTabEntry('status'),
+          workspacePaneTerminalTabEntry('session-1'),
+          workspacePaneStaticTabEntry('history'),
+        ],
+      },
+    })
+    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH)
+    const { unmount } = await renderProviderWithProbe(terminalWorktreeKey)
+
+    try {
+      await act(async () => {
+        sessionClosedHandler?.({
+          ptySessionId: 'server_session_1',
+          repoRoot: REPO_ID,
+          worktreePath: WORKTREE_PATH,
+          tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
+        })
+      })
+
+      expect(tabsFor(REPO_ID, 'feature/worktree')).toEqual([
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneStaticTabEntry('history'),
+      ])
     } finally {
       await unmount()
     }
@@ -1706,6 +1788,7 @@ describe('TerminalSessionProvider', () => {
       ok: true as const,
       action: 'created' as const,
       terminalSessionId: 'session-1',
+      tabs: [],
       sessions: [],
       ptySessionId: 'session-1',
       snapshot: '',
@@ -1786,6 +1869,7 @@ describe('TerminalSessionProvider', () => {
           ok: true as const,
           action: 'created' as const,
           terminalSessionId: 'k',
+          tabs: [],
           sessions: [],
           ptySessionId: 'session-1',
           snapshot: '',
@@ -1798,8 +1882,10 @@ describe('TerminalSessionProvider', () => {
           canonicalCols: 80,
           canonicalRows: 24,
         })),
+        replaceWorkspaceTabs: vi.fn(async (input) => input.tabs),
         pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
         listSessions: vi.fn(async () => []),
+        listWorkspaceTabs: vi.fn(async () => []),
         listViews: vi.fn(async () => []),
         openView: vi.fn(async () => false),
         closeView: vi.fn(async () => false),
@@ -1881,6 +1967,7 @@ describe('TerminalSessionProvider', () => {
           ok: true as const,
           action: 'created' as const,
           terminalSessionId: 'k',
+          tabs: [],
           sessions: [],
           ptySessionId: 'session-1',
           snapshot: '',
@@ -1893,8 +1980,10 @@ describe('TerminalSessionProvider', () => {
           canonicalCols: 80,
           canonicalRows: 24,
         })),
+        replaceWorkspaceTabs: vi.fn(async (input) => input.tabs),
         pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
         listSessions: vi.fn(async () => []),
+        listWorkspaceTabs: vi.fn(async () => []),
         listViews: vi.fn(async () => []),
         openView: vi.fn(async () => false),
         closeView: vi.fn(async () => false),

@@ -3,12 +3,10 @@ import PQueue from 'p-queue'
 const workspacePaneTabCommandQueue = new PQueue({ concurrency: 1 })
 
 /**
- * Serializes workspace pane tab UI commits only.
- *
- * Terminal/server resource IO must happen outside this queue. Enqueue only the
- * synchronous state commit that reads the latest workspace pane state and
- * writes the final UI state.
+ * Serializes workspace pane tab commits so rapid open/close/reorder commands
+ * read a stable latest tab list and apply the server's canonical response in
+ * order.
  */
-export function runWorkspacePaneTabUiCommand<T>(command: () => T): Promise<T> {
-  return workspacePaneTabCommandQueue.add(command)
+export async function runWorkspacePaneTabUiCommand<T>(command: () => T | Promise<T>): Promise<T> {
+  return await workspacePaneTabCommandQueue.add(command)
 }

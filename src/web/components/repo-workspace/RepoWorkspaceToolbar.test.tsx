@@ -15,10 +15,10 @@ import {
 } from '#/web/components/terminal/terminal-session-context.ts'
 import type {
   WorkspacePaneStaticTabType,
-  WorkspacePaneTabOrderEntry,
+  WorkspacePaneTabEntry,
   WorkspacePaneTabType,
 } from '#/shared/workspace-pane.ts'
-import { workspacePaneStaticTabOrderEntry, workspacePaneTerminalTabOrderEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
 import type {
   TerminalSessionContextValue,
   TerminalSessionReadContextValue,
@@ -34,11 +34,16 @@ import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
-import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import {
+  createRepoBranch,
+  installWorkspacePaneTabsTestBridge,
+  resetReposStore,
+  seedRepoState,
+} from '#/web/test-utils/bridge.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import {
   workspacePaneStaticTabsForBranch,
-  workspacePaneTabOrderForBranch,
+  workspacePaneTabsForBranch,
 } from '#/web/stores/repos/workspace-pane-tabs.ts'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
@@ -132,7 +137,7 @@ beforeEach(() => {
     hydrated: true,
   })
   resetReposStore()
-  setClientBridgeForTests(null)
+  installWorkspacePaneTabsTestBridge()
   // T6.1: the toolbar reads `isInitialSyncInFlight` from
   // useRepoSyncStore; existing tests assume the repo has been
   // synced. Mark ready by default so the "+ New" button renders; the
@@ -526,10 +531,10 @@ describe('RepoWorkspaceToolbar', () => {
     expect(tablist?.querySelector('#workspace-workspace-pane-tab')).not.toBeNull()
   })
 
-  test('renders saved unified tab order across terminal and static tabs', () => {
+  test('renders saved mixed tab list across terminal and static tabs', () => {
     const { container: c } = renderToolbar({
       terminalCount: 1,
-      workspacePaneTabOrder: [terminalEntry('t1'), staticEntry('status')],
+      workspacePaneTabs: [terminalEntry('t1'), staticEntry('status')],
       navigation: navigationWith({}),
     })
 
@@ -566,7 +571,7 @@ describe('RepoWorkspaceToolbar', () => {
     expect(actions.className).toContain('goblin-workspace-toolbar__actions')
   })
 
-  test('renders static tabs in saved workspace pane order without runtime materialization', async () => {
+  test('renders static tabs from the saved workspace pane tab list without runtime materialization', async () => {
     const { container: c } = renderToolbar({
       terminalCount: 0,
       preferredWorkspacePaneTab: 'history',
@@ -699,7 +704,7 @@ describe('RepoWorkspaceToolbar', () => {
     const { container: c } = renderToolbar({
       terminalCount: 0,
       workspacePaneStaticTabs: [],
-      workspacePaneTabOrder: [],
+      workspacePaneTabs: [],
       navigation: navigationWith({}),
     })
 
@@ -836,7 +841,7 @@ describe('RepoWorkspaceToolbar', () => {
   test('clicking the new-terminal button keeps a reused terminal id in its existing tab position', async () => {
     const { terminalTab } = renderToolbar({
       terminalCount: 0,
-      workspacePaneTabOrder: [terminalEntry('key'), staticEntry('status')],
+      workspacePaneTabs: [terminalEntry('key'), staticEntry('status')],
       navigation: navigationWith({}),
     })
 
@@ -845,7 +850,7 @@ describe('RepoWorkspaceToolbar', () => {
     })
     await flush()
 
-    expect(tabOrderFor('feature/worktree')).toEqual([terminalEntry('key'), staticEntry('status')])
+    expect(tabsFor('feature/worktree')).toEqual([terminalEntry('key'), staticEntry('status')])
   })
 
   test('shows an error toast when new terminal creation fails', async () => {
@@ -1029,7 +1034,7 @@ describe('RepoWorkspaceToolbar', () => {
     const showRepoWorkspacePaneTab = vi.fn()
     const { container: c, mocks } = renderToolbar({
       terminalCount: 1,
-      workspacePaneTabOrder: [staticEntry('status'), terminalEntry('t1'), staticEntry('changes')],
+      workspacePaneTabs: [staticEntry('status'), terminalEntry('t1'), staticEntry('changes')],
       preferredWorkspacePaneTab: 'terminal',
       navigation: navigationWith({ showRepoWorkspacePaneTab }),
     })
@@ -1143,7 +1148,7 @@ function renderToolbar(options: {
   navigation: PrimaryWindowNavigationActions
   preferredWorkspacePaneTab?: WorkspacePaneTabType
   workspacePaneStaticTabs?: WorkspacePaneStaticTabType[]
-  workspacePaneTabOrder?: WorkspacePaneTabOrderEntry[]
+  workspacePaneTabs?: WorkspacePaneTabEntry[]
   worktree?: boolean
   collapsed?: boolean
   pendingCreate?: boolean
@@ -1186,11 +1191,11 @@ function renderToolbar(options: {
     branches: [branch],
     selectedBranch: branchName,
     preferredWorkspacePaneTab: options.preferredWorkspacePaneTab ?? 'status',
-    workspacePaneTabOrderByBranch:
-      options.workspacePaneTabOrder || options.workspacePaneStaticTabs
+    workspacePaneTabsByBranch:
+      options.workspacePaneTabs || options.workspacePaneStaticTabs
         ? {
             [branchName]:
-              options.workspacePaneTabOrder ?? options.workspacePaneStaticTabs?.map((type) => staticEntry(type)) ?? [],
+              options.workspacePaneTabs ?? options.workspacePaneStaticTabs?.map((type) => staticEntry(type)) ?? [],
           }
         : undefined,
     status:
@@ -1362,17 +1367,17 @@ function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
   return repo ? workspacePaneStaticTabsForBranch(repo.ui, branchName) : []
 }
 
-function tabOrderFor(branchName: string): WorkspacePaneTabOrderEntry[] {
+function tabsFor(branchName: string): WorkspacePaneTabEntry[] {
   const repo = useReposStore.getState().repos[REPO_ID]
-  return repo ? workspacePaneTabOrderForBranch(repo.ui, branchName) : []
+  return repo ? workspacePaneTabsForBranch(repo.ui, branchName) : []
 }
 
-function staticEntry(type: WorkspacePaneStaticTabType): WorkspacePaneTabOrderEntry {
-  return workspacePaneStaticTabOrderEntry(type)
+function staticEntry(type: WorkspacePaneStaticTabType): WorkspacePaneTabEntry {
+  return workspacePaneStaticTabEntry(type)
 }
 
-function terminalEntry(id: string): WorkspacePaneTabOrderEntry {
-  return workspacePaneTerminalTabOrderEntry(id)
+function terminalEntry(id: string): WorkspacePaneTabEntry {
+  return workspacePaneTerminalTabEntry(id)
 }
 
 /**

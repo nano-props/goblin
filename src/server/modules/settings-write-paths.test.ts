@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { WorkspaceSessionState } from '#/shared/api-types.ts'
 import { resolveI18nSnapshot } from '#/shared/i18n/snapshot.ts'
-import { WORKSPACE_PANE_STATIC_TAB_IDS, workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
+import { WORKSPACE_PANE_STATIC_TAB_IDS, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 
 const mocks = vi.hoisted(() => ({
   publishSettingsInvalidation: vi.fn(),
@@ -77,7 +77,7 @@ describe('settings command handlers', () => {
       zenMode: true,
       workspacePaneSize: 50,
       selectedTerminalSessionIdByTerminalWorktree: {},
-      workspacePaneTabOrderByBranchByRepo: {},
+      workspacePaneTabsByBranchByRepo: {},
     }
     mocks.setServerSessionState.mockResolvedValue(session)
     mocks.setServerSessionState.mockResolvedValue(session as WorkspaceSessionState)
@@ -119,7 +119,7 @@ describe('settings command handlers', () => {
         activeRepoId: null,
         zenMode: true,
         workspacePaneSize: 42.5,
-        workspacePaneTabOrderByBranchByRepo: {},
+        workspacePaneTabsByBranchByRepo: {},
       },
     })
     expect(parsed.session.zenMode).toBe(true)
@@ -142,9 +142,9 @@ describe('settings command handlers', () => {
               main: 'changes',
             },
           },
-          workspacePaneTabOrderByBranchByRepo: {
+          workspacePaneTabsByBranchByRepo: {
             '/tmp/repo': {
-              main: [workspacePaneStaticTabOrderEntry('changes')],
+              main: [workspacePaneStaticTabEntry('changes')],
             },
           },
         },
@@ -152,7 +152,7 @@ describe('settings command handlers', () => {
     ).not.toThrow()
   })
 
-  test('schema rejects malformed workspace pane tab order entries at the perimeter', async () => {
+  test('schema rejects malformed workspace pane tab list entries at the perimeter', async () => {
     const { SETTINGS_PATCH_SCHEMAS } = await import('#/shared/procedure-schemas.ts')
     const { parseHttpInput } = await import('#/server/common/http-validate.ts')
 
@@ -161,7 +161,7 @@ describe('settings command handlers', () => {
       activeRepoId: '/tmp/repo',
       zenMode: true,
       workspacePaneSize: 42.5,
-      workspacePaneTabOrderByBranchByRepo: {
+      workspacePaneTabsByBranchByRepo: {
         '/tmp/repo': {
           main: [],
         },
@@ -172,7 +172,7 @@ describe('settings command handlers', () => {
       parseHttpInput(SETTINGS_PATCH_SCHEMAS.session, {
         session: {
           ...session,
-          workspacePaneTabOrderByBranchByRepo: {
+          workspacePaneTabsByBranchByRepo: {
             '/tmp/repo': {
               main: [{ type: 'status', tabId: WORKSPACE_PANE_STATIC_TAB_IDS.history }],
             },
@@ -184,7 +184,7 @@ describe('settings command handlers', () => {
       parseHttpInput(SETTINGS_PATCH_SCHEMAS.session, {
         session: {
           ...session,
-          workspacePaneTabOrderByBranchByRepo: {
+          workspacePaneTabsByBranchByRepo: {
             '/tmp/repo': {
               main: [{ type: 'terminal', terminalSessionId: '' }],
             },

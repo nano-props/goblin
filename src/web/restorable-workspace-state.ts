@@ -3,7 +3,7 @@ import type { RestorableWorkspaceState, ReposStore } from '#/web/stores/repos/ty
 import { persistedOpenWorkspaceEntries } from '#/web/open-workspace-state.ts'
 import {
   persistedActiveRepoIdForSession,
-  persistedWorkspacePaneTabOrderByBranchByRepoForSession,
+  persistedWorkspacePaneTabsByBranchByRepoForSession,
   persistedSelectedTerminalSessionIdByTerminalWorktreeForSession,
   persistedPreferredWorkspacePaneTabByBranchByRepoForSession,
 } from '#/web/session-persistence-state.ts'
@@ -29,7 +29,7 @@ export function workspaceSessionStateFromRestorableWorkspaceState(input: {
       repos,
       restorableWorkspaceState.order,
     ),
-    workspacePaneTabOrderByBranchByRepo: persistedWorkspacePaneTabOrderByBranchByRepoForSession(
+    workspacePaneTabsByBranchByRepo: persistedWorkspacePaneTabsByBranchByRepoForSession(
       repos,
       restorableWorkspaceState.order,
     ),
@@ -49,7 +49,7 @@ interface RestoredWorkspaceStateFromSession extends Pick<
   'activeId' | 'zenMode' | 'workspacePaneSize' | 'selectedTerminalSessionIdByTerminalWorktree'
 > {
   preferredWorkspacePaneTabByBranchByRepo: NonNullable<WorkspaceSessionState['preferredWorkspacePaneTabByBranchByRepo']>
-  workspacePaneTabOrderByBranchByRepo: WorkspaceSessionState['workspacePaneTabOrderByBranchByRepo']
+  workspacePaneTabsByBranchByRepo: WorkspaceSessionState['workspacePaneTabsByBranchByRepo']
 }
 
 export function restoreRestorableWorkspaceStateFromSession(
@@ -62,6 +62,6 @@ export function restoreRestorableWorkspaceStateFromSession(
     workspacePaneSize: session.workspacePaneSize,
     selectedTerminalSessionIdByTerminalWorktree: session.selectedTerminalSessionIdByTerminalWorktree ?? {},
     preferredWorkspacePaneTabByBranchByRepo: session.preferredWorkspacePaneTabByBranchByRepo ?? {},
-    workspacePaneTabOrderByBranchByRepo: session.workspacePaneTabOrderByBranchByRepo ?? {},
+    workspacePaneTabsByBranchByRepo: session.workspacePaneTabsByBranchByRepo ?? {},
   }
 }

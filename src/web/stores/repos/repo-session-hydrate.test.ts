@@ -196,7 +196,7 @@ describe('repo session hydration', () => {
 
     const work = useReposStore.getState().hydrateRepoSession([localRepoSessionEntry(REPO_A)], REPO_A, {
       workspacePaneRestoreState: {
-        workspacePaneTabOrderByBranchByRepo: { [REPO_A]: { main: [] } },
+        workspacePaneTabsByBranchByRepo: { [REPO_A]: { main: [] } },
         preferredWorkspacePaneTabByBranchByRepo: { [REPO_A]: { main: 'status' } },
       },
     })
@@ -205,7 +205,7 @@ describe('repo session hydration', () => {
       const repo = useReposStore.getState().repos[REPO_A]
       expect(useReposStore.getState().sessionReady).toBe(true)
       expect(repo?.projection.source).toBe('cache')
-      expect(repo?.ui.workspacePaneTabOrderByBranch).toEqual({ main: [] })
+      expect(repo?.ui.workspacePaneTabsByBranch).toEqual({ main: [] })
     })
 
     probes.get(REPO_A)?.({ ok: true, root: REPO_A, name: 'repo-a' })

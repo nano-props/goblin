@@ -12,6 +12,7 @@ import { useI18nStore } from '#/web/stores/i18n.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useSessionRestoreStore } from '#/web/stores/session-restore.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
+import { restoreServerWorkspacePaneTabsFromSession } from '#/web/workspace-pane/workspace-pane-session-tabs-restore.ts'
 
 export function useAuthenticatedAppBootstrap() {
   const hydratedRef = useRef(false)
@@ -60,10 +61,11 @@ async function restoreBootSession(settingsSnapshot: Promise<SettingsSnapshot>): 
     applySessionSelectedTerminalState(restoredWorkspaceState.selectedTerminalSessionIdByTerminalWorktree)
     await hydrateRepoSession(session.openRepoEntries, session.activeRepoId, {
       workspacePaneRestoreState: {
-        workspacePaneTabOrderByBranchByRepo: restoredWorkspaceState.workspacePaneTabOrderByBranchByRepo,
+        workspacePaneTabsByBranchByRepo: restoredWorkspaceState.workspacePaneTabsByBranchByRepo,
         preferredWorkspacePaneTabByBranchByRepo: restoredWorkspaceState.preferredWorkspacePaneTabByBranchByRepo,
       },
     })
+    await restoreServerWorkspacePaneTabsFromSession(restoredWorkspaceState.workspacePaneTabsByBranchByRepo)
   } catch (err) {
     bootstrapLog.warn('session restore failed', { err })
     useReposStore.setState({ sessionReady: true })

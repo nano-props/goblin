@@ -70,7 +70,7 @@ describe('settings-client', () => {
             zenMode: true,
             workspacePaneSize: 50,
             selectedTerminalSessionIdByTerminalWorktree: {},
-            workspacePaneTabOrderByBranchByRepo: {},
+            workspacePaneTabsByBranchByRepo: {},
           },
           recentRepos: [],
         }),

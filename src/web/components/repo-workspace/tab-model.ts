@@ -1,6 +1,6 @@
 import type {
   WorkspacePaneStaticTabType,
-  WorkspacePaneTabOrderEntry,
+  WorkspacePaneTabEntry,
   WorkspacePaneTabType,
 } from '#/shared/workspace-pane.ts'
 import { resolveRenderableWorkspacePaneTab } from '#/web/lib/workspace-pane-tab.ts'
@@ -11,7 +11,7 @@ import {
   isTerminalWorkspacePaneTab,
 } from '#/web/components/workspace-pane/workspace-pane-tab-summary.ts'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
-import { normalizeWorkspacePaneTabOrder } from '#/web/stores/repos/workspace-pane-tabs.ts'
+import { normalizeWorkspacePaneTabs } from '#/web/stores/repos/workspace-pane-tabs.ts'
 import {
   terminalWorkspacePaneTabProvider,
   workspacePaneStaticTabProvider,
@@ -74,9 +74,9 @@ export interface RepoWorkspaceTabModel {
   terminalBase: TerminalSessionBase | null
   terminalCreatePending: boolean
   terminalSyncReady: boolean
-  /** Single branch-scoped workspace pane tab strip order. */
-  tabOrder: WorkspacePaneTabOrderEntry[]
-  /** Open static workspace pane tabs derived from tabOrder. */
+  /** Single branch-scoped mixed workspace pane tab list. */
+  tabEntries: WorkspacePaneTabEntry[]
+  /** Open static workspace pane tabs derived from tabEntries. */
   staticTabs: WorkspacePaneStaticTabType[]
   /** Live terminal views owned by the terminal runtime. */
   terminalViews: WorkspacePaneTabSummary[]
@@ -94,7 +94,7 @@ export interface RepoWorkspaceTabModelInput {
   branchName: string | null
   worktreePath: string | null
   preferredTab: WorkspacePaneTabType
-  tabOrder: readonly WorkspacePaneTabOrderEntry[]
+  tabEntries: readonly WorkspacePaneTabEntry[]
   runtimeTerminalViews: readonly WorkspacePaneTabSummary[]
   terminalSessionCount: number
   terminalCreatePending?: boolean
@@ -110,12 +110,12 @@ export interface RepoWorkspaceTabModelInput {
 }
 
 export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): RepoWorkspaceTabModel {
-  const tabOrder = input.branchName ? normalizeWorkspacePaneTabOrder(input.tabOrder) : []
+  const tabEntries = input.branchName ? normalizeWorkspacePaneTabs(input.tabEntries) : []
   const worktreePath = input.branchName ? input.worktreePath : null
   const terminalWorktreeKey = worktreePath ? formatTerminalWorktreeKey(input.repoId, worktreePath) : null
   const terminalViews = terminalWorktreeKey ? input.runtimeTerminalViews.filter(isTerminalWorkspacePaneTab) : []
   const materializedTabs = materializedWorkspacePaneTabs({
-    tabOrder,
+    tabEntries,
     terminalViews,
     hasWorktree: !!terminalWorktreeKey,
   })
@@ -143,7 +143,7 @@ export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): 
       input.branchName && worktreePath ? { repoRoot: input.repoId, branch: input.branchName, worktreePath } : null,
     terminalCreatePending: input.terminalCreatePending ?? false,
     terminalSyncReady: input.terminalSyncReady,
-    tabOrder,
+    tabEntries,
     staticTabs,
     terminalViews,
     tabs,
@@ -228,13 +228,13 @@ function isMaterializedRepoWorkspaceTab(tab: RepoWorkspaceTab): tab is RepoWorks
 }
 
 function materializedWorkspacePaneTabs(input: {
-  tabOrder: readonly WorkspacePaneTabOrderEntry[]
+  tabEntries: readonly WorkspacePaneTabEntry[]
   terminalViews: readonly TerminalWorkspacePaneTabView[]
   hasWorktree: boolean
 }): RepoWorkspaceMaterializedTab[] {
   const terminalViewByTerminalSessionId = new Map(input.terminalViews.map((view) => [view.terminalSessionId, view]))
-  const orderedTerminalSessionIds = new Set(
-    input.tabOrder.flatMap((entry) => (entry.type === 'terminal' ? [entry.terminalSessionId] : [])),
+  const listedTerminalSessionIds = new Set(
+    input.tabEntries.flatMap((entry) => (entry.type === 'terminal' ? [entry.terminalSessionId] : [])),
   )
   const seenTerminals = new Set<string>()
   const tabs: RepoWorkspaceMaterializedTab[] = []
@@ -246,13 +246,13 @@ function materializedWorkspacePaneTabs(input: {
       if (!terminal) break
       if (terminalSessionId && terminal.terminalSessionId === terminalSessionId) break
       nextRuntimeTerminalIndex += 1
-      if (seenTerminals.has(terminal.terminalSessionId) || orderedTerminalSessionIds.has(terminal.terminalSessionId)) continue
+      if (seenTerminals.has(terminal.terminalSessionId) || listedTerminalSessionIds.has(terminal.terminalSessionId)) continue
       seenTerminals.add(terminal.terminalSessionId)
       tabs.push(terminalWorkspacePaneTab(terminal))
     }
   }
 
-  for (const entry of input.tabOrder) {
+  for (const entry of input.tabEntries) {
     if (entry.type !== 'terminal') {
       if (!workspacePaneTabProvider(entry.type).canOpen({ hasWorktree: input.hasWorktree })) continue
       tabs.push(staticWorkspacePaneTab(entry.type))

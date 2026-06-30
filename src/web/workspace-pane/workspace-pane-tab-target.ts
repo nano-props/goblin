@@ -1,7 +1,7 @@
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { createRepoWorkspaceTabModel, type RepoWorkspaceTabModel } from '#/web/components/repo-workspace/tab-model.ts'
-import { workspacePaneTabOrderForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
+import { workspacePaneTabsForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
 import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -23,7 +23,7 @@ export function workspacePaneTabTargetForBranch(repoId: string, branchName: stri
     branchName,
     worktreePath: worktreePath ?? null,
     preferredTab: preferredWorkspacePaneTabForBranch(repo.ui, branchName),
-    tabOrder: workspacePaneTabOrderForBranch(repo.ui, branchName),
+    tabEntries: workspacePaneTabsForBranch(repo.ui, branchName),
     runtimeTerminalViews: snapshot?.sessions ?? [],
     terminalSessionCount: snapshot?.count ?? 0,
     terminalCreatePending: snapshot?.pendingCreate ?? false,

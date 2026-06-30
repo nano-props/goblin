@@ -12,7 +12,7 @@ import {
   type TerminalTakeoverResult,
 } from '#/shared/terminal-types.ts'
 import { isValidTerminalPtySessionId, normalizeTerminalSize } from '#/shared/terminal-validators.ts'
-import type { TerminalSessionOrderRuntime } from '#/server/terminal/terminal-session-order-runtime.ts'
+import type { TerminalWorkspaceTabsRuntime } from '#/server/terminal/terminal-workspace-tabs-runtime.ts'
 import {
   attachTerminalClient,
   claimTerminalClientControl,
@@ -35,9 +35,9 @@ import type { PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 
 const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
 
-type TerminalSessionOrderRuntimeLike<TUser extends string | number> = Pick<
-  TerminalSessionOrderRuntime<TUser>,
-  'replaceTerminalSessionOrder' | 'orderedTerminalSessionIds'
+type TerminalWorkspaceTabsRuntimeLike<TUser extends string | number> = Pick<
+  TerminalWorkspaceTabsRuntime<TUser>,
+  'terminalSessionIds'
 >
 
 interface TerminalPtyAttachResult {
@@ -99,18 +99,18 @@ export class TerminalSessionManager<TUser extends string | number> {
   private readonly ptySessionIdByUserTerminalSessionIndex = new Map<string, string>()
   private readonly sink: TerminalEventSink<TUser>
   private readonly ptySupervisor: PtySupervisor
-  private readonly terminalSessionOrder: TerminalSessionOrderRuntimeLike<TUser>
+  private readonly workspaceTabs: TerminalWorkspaceTabsRuntimeLike<TUser>
   private readonly isClientOnline: (userId: TUser, clientId: string) => boolean
 
   constructor(
     ptySupervisor: PtySupervisor,
     sink: TerminalEventSink<TUser>,
-    terminalSessionOrder: TerminalSessionOrderRuntimeLike<TUser>,
+    workspaceTabs: TerminalWorkspaceTabsRuntimeLike<TUser>,
     isClientOnline: (userId: TUser, clientId: string) => boolean,
   ) {
     this.ptySupervisor = ptySupervisor
     this.sink = sink
-    this.terminalSessionOrder = terminalSessionOrder
+    this.workspaceTabs = workspaceTabs
     this.isClientOnline = isClientOnline
   }
 
@@ -126,7 +126,6 @@ export class TerminalSessionManager<TUser extends string | number> {
     const existingId = this.ptySessionIdByUserTerminalSessionIndex.get(userTerminalSessionIndex)
     const existing = existingId ? this.sessionsByPtySessionId.get(existingId) : undefined
     if (existing) {
-      this.replaceSessionOrderForWorktree(userId, existing.scope, existing.worktreePath)
       if (input.clientId) {
         registerTerminalClient(existing, input.clientId, size.cols, size.rows)
       }
@@ -162,7 +161,6 @@ export class TerminalSessionManager<TUser extends string | number> {
     }
     this.sessionsByPtySessionId.set(id, session)
     this.ptySessionIdByUserTerminalSessionIndex.set(userTerminalSessionIndex, id)
-    this.replaceSessionOrderForWorktree(userId, input.scope, worktreePath)
     if (input.clientId) {
       registerTerminalClient(session, input.clientId, size.cols, size.rows)
       this.applyIdentityEffect(session, attachTerminalClient(session, input.clientId, this.sessionPresence(session)))
@@ -170,7 +168,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     const spawn = await this.spawnAndAttachSession(session)
     if (!spawn.result.ok) {
       // Spawn failed: do not leave a zombie session in the maps. The
-      // catalog would otherwise find it on retry and surface it as a
+      // session service would otherwise find it on retry and surface it as a
       // successful attach with an empty buffer and a null pty — i.e.
       // a blank, non-responsive terminal. `closeSession` removes the
       // map entry and frees pty/listener resources via the standard
@@ -292,7 +290,6 @@ export class TerminalSessionManager<TUser extends string | number> {
     const userTerminalSessionIndex = this.formatUserTerminalSessionIndex(session.userId, session.terminalSessionId)
     if (this.ptySessionIdByUserTerminalSessionIndex.get(userTerminalSessionIndex) === ptySessionId)
       this.ptySessionIdByUserTerminalSessionIndex.delete(userTerminalSessionIndex)
-    this.replaceSessionOrderForWorktree(session.userId, session.scope, session.worktreePath)
     session.ptyBinding.dispose(session)
   }
 
@@ -334,7 +331,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       }
     }
     return Array.from(sessionsByWorktree.entries()).flatMap(([worktreePath, sessions]) =>
-      this.orderedSessionsForWorktree(userId, scope, worktreePath, sessions).map((session) => ({
+      this.sessionsForWorktreeTabs(userId, scope, worktreePath, sessions).map((session) => ({
         ptySessionId: session.id,
         terminalSessionId: session.terminalSessionId,
         repoRoot: session.scope,
@@ -349,6 +346,11 @@ export class TerminalSessionManager<TUser extends string | number> {
         rows: session.rows,
       })),
     )
+  }
+
+  getSessionSummaryForUser(userId: TUser, ptySessionId: string): TerminalSessionSummary | null {
+    const session = this.getSession(userId, ptySessionId)
+    return session ? this.sessionSummary(session) : null
   }
 
   getSessionScope(userId: TUser, ptySessionId: string): string | undefined {
@@ -381,7 +383,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     if (id) this.closeSession(id)
   }
 
-  private orderedSessionsForWorktree(
+  private sessionsForWorktreeTabs(
     userId: TUser,
     scope: string,
     worktreePath: string,
@@ -389,28 +391,36 @@ export class TerminalSessionManager<TUser extends string | number> {
   ): TerminalSessionView<TUser>[] {
     const terminalSessionByTerminalSessionId = new Map(sessions.map((session) => [session.terminalSessionId, session]))
     const seen = new Set<string>()
-    const orderedSessions: TerminalSessionView<TUser>[] = []
-    for (const terminalSessionId of this.terminalSessionOrder.orderedTerminalSessionIds({ userId, scope, worktreePath })) {
+    const tabListedSessions: TerminalSessionView<TUser>[] = []
+    for (const terminalSessionId of this.workspaceTabs.terminalSessionIds({ userId, scope, worktreePath })) {
       const session = terminalSessionByTerminalSessionId.get(terminalSessionId)
       if (!session || seen.has(terminalSessionId)) continue
       seen.add(terminalSessionId)
-      orderedSessions.push(session)
+      tabListedSessions.push(session)
     }
     for (const session of sessions) {
       if (seen.has(session.terminalSessionId)) continue
       seen.add(session.terminalSessionId)
-      orderedSessions.push(session)
+      tabListedSessions.push(session)
     }
-    return orderedSessions
+    return tabListedSessions
   }
 
-  private replaceSessionOrderForWorktree(userId: TUser, scope: string, worktreePath: string): void {
-    const terminalSessionIds = Array.from(this.sessionsByPtySessionId.values()).flatMap((session) =>
-      session.userId === userId && session.scope === scope && session.worktreePath === worktreePath
-        ? [session.terminalSessionId]
-        : [],
-    )
-    this.terminalSessionOrder.replaceTerminalSessionOrder({ userId, scope, worktreePath, terminalSessionIds })
+  private sessionSummary(session: TerminalSessionView<TUser>): TerminalSessionSummary {
+    return {
+      ptySessionId: session.id,
+      terminalSessionId: session.terminalSessionId,
+      repoRoot: session.scope,
+      worktreePath: session.worktreePath,
+      cwd: session.cwd,
+      controller: this.effectiveController(session),
+      processName: session.ptyBinding.processName(),
+      canonicalTitle: session.render.title,
+      phase: session.phase,
+      message: session.message,
+      cols: session.cols,
+      rows: session.rows,
+    }
   }
 
   // Sends SIGWINCH to the child PTY and queues the same geometry change

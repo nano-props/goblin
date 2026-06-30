@@ -218,7 +218,7 @@ It also shows that not every complex feature needs a separate runtime facade lay
 
 - boundary: `src/server/routes/realtime.ts`, `src/web/terminal.ts`
 - read: `src/web/terminal-session-queries.ts` (loader helper), `src/web/components/terminal/TerminalSessionProjection.ts` (read projection)
-- write: `src/server/terminal/terminal-runtime.ts` (factory; the authoritative source for session/catalog/broker/dispatch), `src/web/components/terminal/TerminalSessionProjection.ts` (client-side write paths for `attach`/`select`/`create`)
+- write: `src/server/terminal/terminal-runtime.ts` (factory; the authoritative source for session/session service/broker/dispatch), `src/web/components/terminal/TerminalSessionProjection.ts` (client-side write paths for `attach`/`select`/`create`)
 - source: `src/server/terminal/terminal-session-manager.ts` (in-process state for sessions, control, render), `src/server/terminal/pty-supervisor.ts` (PtySupervisor interface), `src/server/terminal/pty-supervisor-inprocess.ts` + `pty-supervisor-worker.ts` (PTY pool impls)
 - protocol types: `src/shared/terminal-types.ts`, `src/shared/terminal-socket.ts`, `src/shared/terminal-validators.ts`, `src/shared/terminal-controller.ts`, `src/shared/terminal-worktree-key.ts` (client↔server wire types, validation, controller helpers, and repo/worktree grouping), `src/server/terminal/terminal-session-ids.ts` (server-side terminalSessionId allocation), `src/server/terminal/pty-worker-protocol.ts` (main↔PTY-worker wire types)
 

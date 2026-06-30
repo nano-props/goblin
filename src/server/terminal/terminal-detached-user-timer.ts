@@ -5,7 +5,7 @@ interface TerminalDetachedUserTimerOptions {
    * (PTY exit, view-order purge). This is unrelated to terminal
    * controller grace — by the time it fires the controller is presumed to
    * have moved on. Keep it long enough that an end-of-day quit-then-
-   * resume doesn't lose the session catalog.
+   * resume doesn't lose the session index.
    */
   detachedTtlMs: number
   onUserExpired(userId: string): void

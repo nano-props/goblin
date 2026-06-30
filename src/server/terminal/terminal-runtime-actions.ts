@@ -2,9 +2,10 @@ import { isValidRepoLocator } from '#/shared/input-validation.ts'
 import type {
   TerminalAttachInput,
   TerminalAttachResult,
-  TerminalCatalogMutationResult,
+  TerminalCreateResult,
   TerminalCreateInput,
   TerminalMutationResult,
+  TerminalReplaceWorkspaceTabsInput,
   TerminalRestartInput,
   TerminalResizeInput,
   TerminalSessionInput,
@@ -13,31 +14,36 @@ import type {
   TerminalSessionSummary,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
+  TerminalWorkspaceTabsEntry,
   TerminalWriteInput,
 } from '#/shared/terminal-types.ts'
+import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { isValidTerminalPtySessionId, isValidTerminalSize } from '#/shared/terminal-validators.ts'
 import type { TerminalRealtimeBroker } from '#/server/terminal/terminal-realtime-broker.ts'
 import { isValidTerminalWriteData, type TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
 
-interface TerminalCatalogLike {
-  create(clientId: string, userId: string, input: TerminalCreateInput): Promise<TerminalCatalogMutationResult>
+interface TerminalSessionServiceLike {
+  create(clientId: string, userId: string, input: TerminalCreateInput): Promise<TerminalCreateResult>
   prune(clientId: string, userId: string, repoRoot: string): Promise<{ pruned: number; remaining: number }>
   listSessions(userId: string, repoRoot: string): Promise<TerminalSessionSummary[]>
+  listWorkspaceTabs(userId: string, repoRoot: string): Promise<TerminalWorkspaceTabsEntry[]>
+  replaceTabs(userId: string, input: TerminalReplaceWorkspaceTabsInput): WorkspacePaneTabEntry[]
+  removeTerminalTab(userId: string, session: TerminalSessionSummary): WorkspacePaneTabEntry[]
 }
 
 interface TerminalRuntimeActionDependencies {
   manager: TerminalSessionManager<string>
   broker: Pick<TerminalRealtimeBroker, 'broadcastToUser'>
-  catalog: TerminalCatalogLike
+  sessionService: TerminalSessionServiceLike
   isValidTerminalClientId(value: unknown): value is string
 }
 
-// Manager, broker, and catalog all use `userId` as the terminal
+// Manager, broker, and session service all use `userId` as the terminal
 // partition. `clientId` remains a per-tab request validator/routing
 // identifier, but it must not decide session visibility or lifecycle
 // fanout.
 export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependencies) {
-  const { manager, broker, catalog, isValidTerminalClientId } = deps
+  const { manager, broker, sessionService, isValidTerminalClientId } = deps
 
   return {
     async attach(clientId: string, userId: string, input: TerminalAttachInput): Promise<TerminalAttachResult> {
@@ -69,12 +75,17 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       return result
     },
 
-    async create(clientId: string, userId: string, input: TerminalCreateInput): Promise<TerminalCatalogMutationResult> {
-      return await catalog.create(clientId, userId, input)
+    async create(clientId: string, userId: string, input: TerminalCreateInput): Promise<TerminalCreateResult> {
+      return await sessionService.create(clientId, userId, input)
+    },
+
+    replaceTabs(clientId: string, userId: string, input: TerminalReplaceWorkspaceTabsInput): WorkspacePaneTabEntry[] {
+      if (!isValidTerminalClientId(clientId)) return []
+      return sessionService.replaceTabs(userId, input)
     },
 
     async prune(clientId: string, userId: string, repoRoot: string): Promise<{ pruned: number; remaining: number }> {
-      return await catalog.prune(clientId, userId, repoRoot)
+      return await sessionService.prune(clientId, userId, repoRoot)
     },
 
     write(clientId: string, userId: string, input: TerminalWriteInput): TerminalMutationResult {
@@ -105,10 +116,14 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       const repoRoot = isValidTerminalPtySessionId(input?.ptySessionId)
         ? manager.getSessionScope(userId, input.ptySessionId)
         : undefined
+      const session = isValidTerminalPtySessionId(input?.ptySessionId)
+        ? manager.getSessionSummaryForUser(userId, input.ptySessionId)
+        : null
       const closed = isValidTerminalPtySessionId(input?.ptySessionId)
         ? manager.closeSessionForUser(userId, input.ptySessionId)
         : false
       if (closed && repoRoot) {
+        const tabs = session ? sessionService.removeTerminalTab(userId, session) : []
         // `sessions-changed` keeps the full repo list in sync for
         // observers that only watch that primitive. `session-closed`
         // is the immediate invalidation for any sibling window under
@@ -119,6 +134,8 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
           type: 'session-closed',
           ptySessionId: input.ptySessionId,
           repoRoot,
+          worktreePath: session?.worktreePath ?? '',
+          tabs,
         })
       }
       return closed
@@ -136,7 +153,17 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
     async listSessions(clientId: string, userId: string, repoRoot: string): Promise<TerminalSessionSummary[]> {
       if (!isValidTerminalClientId(clientId)) return []
       if (!isValidRepoLocator(repoRoot)) return []
-      return await catalog.listSessions(userId, repoRoot)
+      return await sessionService.listSessions(userId, repoRoot)
+    },
+
+    async listWorkspaceTabs(
+      clientId: string,
+      userId: string,
+      repoRoot: string,
+    ): Promise<TerminalWorkspaceTabsEntry[]> {
+      if (!isValidTerminalClientId(clientId)) return []
+      if (!isValidRepoLocator(repoRoot)) return []
+      return await sessionService.listWorkspaceTabs(userId, repoRoot)
     },
 
     async getSessionSnapshot(

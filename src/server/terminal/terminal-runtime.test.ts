@@ -1,10 +1,10 @@
 // Server-side terminal runtime integration tests.
 //
 // The lower-level modules (session-manager, controller, render-state,
-// broker, catalog) carry their own focused unit tests. This file
+// broker, session service) carry their own focused unit tests. This file
 // exercises `createServerTerminalRuntime` end-to-end through its
 // `ServerTerminalHost` surface so the wiring between the supervisor,
-// manager, broker, and catalog stays in lockstep with the shared
+// manager, broker, and session service stays in lockstep with the shared
 // protocol types in `shared/terminal-types.ts`.
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
@@ -14,6 +14,7 @@ import { createInProcessPtySupervisor } from '#/server/terminal/pty-supervisor-i
 import { createServerTerminalRuntime } from '#/server/terminal/terminal-runtime.ts'
 import { HEARTBEAT_DEADLINE_MS, HEARTBEAT_INTERVAL_MS } from '#/server/terminal/terminal-realtime-broker.ts'
 import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
+import type { WorktreeInfo } from '#/shared/git-types.ts'
 
 // Under method 2 the host threads `userId` (derived from the
 // access token) alongside `clientId` (per-tab routing). Tests use
@@ -108,6 +109,18 @@ beforeEach(() => {
   mockPtys.length = 0
   vi.clearAllMocks()
 })
+
+function createDeferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolve: (value: T) => void = () => {}
+  const promise = new Promise<T>((innerResolve) => {
+    resolve = innerResolve
+  })
+  return { promise, resolve }
+}
+
+async function flushPromiseQueue(): Promise<void> {
+  for (let i = 0; i < 5; i++) await Promise.resolve()
+}
 
 async function createTerminalSession(host: ServerTerminalHost, clientId: string, userId = USER_1): Promise<string> {
   const result = await host.create(clientId, userId, {
@@ -465,6 +478,56 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
+  test('serializes concurrent primary creates for the same worktree', async () => {
+    const worktrees: WorktreeInfo[] = [{ path: '/repo-linked', branch: 'feature', isBare: false, isPrimary: false }]
+    const firstWorktrees = createDeferred<WorktreeInfo[]>()
+    const secondWorktrees = createDeferred<WorktreeInfo[]>()
+    vi.mocked(getWorktrees)
+      .mockImplementationOnce(async () => await firstWorktrees.promise)
+      .mockImplementationOnce(async () => await secondWorktrees.promise)
+    const { host, shutdown } = buildRuntime()
+
+    const first = host.create('client_a', USER_1, {
+      repoRoot: '/repo',
+      branch: 'feature',
+      worktreePath: '/repo-linked',
+      kind: 'primary',
+      cols: 80,
+      rows: 24,
+    })
+    const second = host.create('client_b', USER_1, {
+      repoRoot: '/repo',
+      branch: 'feature',
+      worktreePath: '/repo-linked',
+      kind: 'primary',
+      cols: 80,
+      rows: 24,
+    })
+
+    await vi.waitFor(() => expect(getWorktrees).toHaveBeenCalledTimes(1))
+    await flushPromiseQueue()
+    expect(getWorktrees).toHaveBeenCalledTimes(1)
+
+    firstWorktrees.resolve(worktrees)
+    const firstResult = await first
+    expect(firstResult.ok).toBe(true)
+    if (!firstResult.ok) return
+    expect(firstResult.action).toBe('created')
+
+    await vi.waitFor(() => expect(getWorktrees).toHaveBeenCalledTimes(2))
+    secondWorktrees.resolve(worktrees)
+    const secondResult = await second
+    expect(secondResult.ok).toBe(true)
+    if (!secondResult.ok) return
+    expect(secondResult.action).toBe('reused')
+    expect(secondResult.terminalSessionId).toBe(firstResult.terminalSessionId)
+    expect(secondResult.ptySessionId).toBe(firstResult.ptySessionId)
+    expect(mockPtys).toHaveLength(1)
+    expect(mockPtys[0]?.kill).not.toHaveBeenCalled()
+
+    shutdown()
+  })
+
   test('reopening an existing terminal from a new attachment auto-reclaims user-sticky control', async () => {
     const { host, shutdown } = buildRuntime()
     const browserSocket = { send: vi.fn(), close: vi.fn() }
@@ -542,7 +605,7 @@ describe('server terminal runtime', () => {
     if (failed.ok) return
 
     // After the failure, listSessions must not report the zombie. If
-    // it did, the catalog would match it on retry and surface a
+    // it did, the session service would match it on retry and surface a
     // blank, non-responsive terminal as a successful attach.
     const sessionsAfterFailure = await host.listSessions('client_a', USER_1, '/repo')
     expect(sessionsAfterFailure).toEqual([])
@@ -880,7 +943,7 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
-  test('isolates terminal catalog reads and lifecycle broadcasts by userId', async () => {
+  test('isolates terminal session service reads and lifecycle broadcasts by userId', async () => {
     const { host, shutdown } = buildRuntime()
     const userASocket = { send: vi.fn(), close: vi.fn() }
     const userBSocket = { send: vi.fn(), close: vi.fn() }

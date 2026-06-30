@@ -1,5 +1,5 @@
 // Server-side terminal runtime. Single holder of the business state
-// for a Goblin server instance: the session manager, the catalog, the
+// for a Goblin server instance: the session manager, the session service, the
 // realtime broker, the connection-state tracker, and the realtime
 // dispatch table. Exposes a `ServerTerminalHost` to the Hono realtime
 // route. Holds no PTY state itself — the `PtySupervisor` injected at
@@ -13,8 +13,8 @@ import { BufferedTerminalSocket } from '#/server/terminal/buffered-terminal-sock
 import type { TerminalClientMessage } from '#/shared/terminal-socket.ts'
 import { normalizeTerminalClientMessage } from '#/shared/terminal-validators.ts'
 import { serverLogger } from '#/server/logger.ts'
-import { createTerminalCatalog } from '#/server/terminal/terminal-catalog.ts'
-import { createTerminalSessionOrderRuntime } from '#/server/terminal/terminal-session-order-runtime.ts'
+import { createTerminalSessionService } from '#/server/terminal/terminal-session-service.ts'
+import { createTerminalWorkspaceTabsRuntime } from '#/server/terminal/terminal-workspace-tabs-runtime.ts'
 import type { TerminalRealtimeBroker, TerminalRealtimeSocket } from '#/server/terminal/terminal-realtime-broker.ts'
 import { createTerminalRuntimeActions } from '#/server/terminal/terminal-runtime-actions.ts'
 import { createTerminalRuntimeCoordinator } from '#/server/terminal/terminal-runtime-coordinator.ts'
@@ -50,7 +50,7 @@ export interface ServerTerminalRuntime {
 
 export function createServerTerminalRuntime(options: ServerTerminalRuntimeOptions): ServerTerminalRuntime {
   const { ptySupervisor } = options
-  const terminalSessionOrder = createTerminalSessionOrderRuntime<string>()
+  const workspaceTabs = createTerminalWorkspaceTabsRuntime<string>()
 
   // Sink callbacks fan out to every clientId that shares the
   // session's userId. The manager passes `userId` (a string
@@ -80,19 +80,20 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
         broker.broadcastToUser(userId, { type: 'lifecycle', event })
       },
     },
-    terminalSessionOrder,
+    workspaceTabs,
     (userId, clientId) => broker.isClientOnline(userId, clientId),
   )
   const coordinator = createTerminalRuntimeCoordinator({
     manager,
-    terminalSessionOrder,
+    workspaceTabs,
     detachedTtlMs: TERMINAL_DETACHED_TTL_MS,
   })
   broker = coordinator.broker
-  const catalog = createTerminalCatalog({
+  const sessionService = createTerminalSessionService({
     isValidClientId: isValidTerminalClientId,
     isValidTerminalSessionId,
     manager,
+    workspaceTabs,
     broadcastSessionsChanged(userId, repoRoot) {
       broadcastRepoSessionsChanged(userId, repoRoot)
     },
@@ -104,7 +105,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   const actions = createTerminalRuntimeActions({
     manager,
     broker,
-    catalog,
+    sessionService,
     isValidTerminalClientId,
   })
 
@@ -170,8 +171,14 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     async listSessions(clientId, userId, repoRoot) {
       return await actions.listSessions(clientId, userId, repoRoot)
     },
+    async listWorkspaceTabs(clientId, userId, repoRoot) {
+      return await actions.listWorkspaceTabs(clientId, userId, repoRoot)
+    },
     async create(clientId, userId, input) {
       return await actions.create(clientId, userId, input)
+    },
+    replaceTabs(clientId, userId, input) {
+      return actions.replaceTabs(clientId, userId, input)
     },
     async prune(clientId, userId, repoRoot) {
       return await actions.prune(clientId, userId, repoRoot)

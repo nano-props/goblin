@@ -1,7 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { openWorkspacePaneTab } from '#/web/components/repo-workspace/open-workspace-pane-tab.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import {
+  createRepoBranch,
+  installWorkspacePaneTabsTestBridge,
+  resetReposStore,
+  seedRepoState,
+} from '#/web/test-utils/bridge.ts'
+import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import { workspacePaneStaticTabsForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
@@ -13,22 +19,24 @@ const originalRefreshStatus = useReposStore.getState().refreshStatus
 
 beforeEach(() => {
   resetReposStore()
+  installWorkspacePaneTabsTestBridge()
 })
 
 afterEach(() => {
   resetReposStore()
   useReposStore.setState({ refreshStatus: originalRefreshStatus })
+  setClientBridgeForTests(null)
 })
 
 describe('openWorkspacePaneTab', () => {
-  test('opens status as a branch-owned tab when the branch has a worktree', () => {
+  test('opens status as a branch-owned tab when the branch has a worktree', async () => {
     seedWorktreeRepo('status')
     useReposStore.getState().closeWorkspacePaneStaticTab(REPO_ID, 'status')
     const refreshStatus = vi.fn(async () => {})
     useReposStore.setState({ refreshStatus: refreshStatus as typeof originalRefreshStatus })
     const token = useReposStore.getState().repos[REPO_ID]!.instanceToken
 
-    expect(
+    await expect(
       openWorkspacePaneTab({
         repoId: REPO_ID,
         branchName: 'feature/worktree',
@@ -36,20 +44,20 @@ describe('openWorkspacePaneTab', () => {
         type: 'status',
         navigation: navigationWithStoreActions(),
       }),
-    ).toBe(true)
+    ).resolves.toBe(true)
 
     expect(openTabsFor('feature/worktree')).toEqual(['status'])
     expect(preferredWorkspacePaneTab()).toBe('status')
     expect(refreshStatus).toHaveBeenCalledWith(REPO_ID, { token })
   })
 
-  test('registers changes as a workspace pane static tab and refreshes status', () => {
+  test('registers changes as a workspace pane static tab and refreshes status', async () => {
     seedWorktreeRepo('changes')
     const refreshStatus = vi.fn(async () => {})
     useReposStore.setState({ refreshStatus: refreshStatus as typeof originalRefreshStatus })
     const token = useReposStore.getState().repos[REPO_ID]!.instanceToken
 
-    expect(
+    await expect(
       openWorkspacePaneTab({
         repoId: REPO_ID,
         branchName: 'feature/worktree',
@@ -57,14 +65,14 @@ describe('openWorkspacePaneTab', () => {
         type: 'changes',
         navigation: navigationWithStoreActions(),
       }),
-    ).toBe(true)
+    ).resolves.toBe(true)
 
     expect(openTabsFor('feature/worktree')).toEqual(['status', 'changes'])
     expect(preferredWorkspacePaneTab()).toBe('changes')
     expect(refreshStatus).toHaveBeenCalledWith(REPO_ID, { token })
   })
 
-  test('does not select changes when the selected branch has no worktree', () => {
+  test('does not select changes when the selected branch has no worktree', async () => {
     seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/no-worktree')],
@@ -74,7 +82,7 @@ describe('openWorkspacePaneTab', () => {
     const refreshStatus = vi.fn(async () => {})
     useReposStore.setState({ refreshStatus: refreshStatus as typeof originalRefreshStatus })
 
-    expect(
+    await expect(
       openWorkspacePaneTab({
         repoId: REPO_ID,
         branchName: 'feature/no-worktree',
@@ -82,14 +90,14 @@ describe('openWorkspacePaneTab', () => {
         type: 'changes',
         navigation: navigationWithStoreActions(),
       }),
-    ).toBe(false)
+    ).resolves.toBe(false)
 
     expect(preferredWorkspacePaneTab()).toBe('status')
     expect(openTabsFor('feature/no-worktree')).toEqual(['status'])
     expect(refreshStatus).not.toHaveBeenCalled()
   })
 
-  test('opens status for a branch without a worktree', () => {
+  test('opens status for a branch without a worktree', async () => {
     seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/no-worktree')],
@@ -97,7 +105,7 @@ describe('openWorkspacePaneTab', () => {
       preferredWorkspacePaneTab: 'changes',
     })
 
-    expect(
+    await expect(
       openWorkspacePaneTab({
         repoId: REPO_ID,
         branchName: 'feature/no-worktree',
@@ -105,17 +113,17 @@ describe('openWorkspacePaneTab', () => {
         type: 'status',
         navigation: navigationWithStoreActions(),
       }),
-    ).toBe(true)
+    ).resolves.toBe(true)
 
     expect(preferredWorkspacePaneTab()).toBe('status')
   })
 
-  test('opens history as a branch-static workspace pane tab', () => {
+  test('opens history as a branch-static workspace pane tab', async () => {
     seedWorktreeRepo('history')
     const refreshStatus = vi.fn(async () => {})
     useReposStore.setState({ refreshStatus: refreshStatus as typeof originalRefreshStatus })
 
-    expect(
+    await expect(
       openWorkspacePaneTab({
         repoId: REPO_ID,
         branchName: 'feature/worktree',
@@ -123,7 +131,7 @@ describe('openWorkspacePaneTab', () => {
         type: 'history',
         navigation: navigationWithStoreActions(),
       }),
-    ).toBe(true)
+    ).resolves.toBe(true)
 
     expect(openTabsFor('feature/worktree')).toContain('history')
     expect(preferredWorkspacePaneTab()).toBe('history')

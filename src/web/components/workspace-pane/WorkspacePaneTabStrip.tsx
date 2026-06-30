@@ -27,7 +27,7 @@ import { SortableContext, horizontalListSortingStrategy, sortableKeyboardCoordin
 import { DelegatedTooltipLayer } from '#/web/components/DelegatedTooltipLayer.tsx'
 import { createRestrictToTabStripBounds } from '#/web/components/tab-strip/drag-bounds.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import type { WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { ToolbarTabList, ToolbarTabStrip, ToolbarTabStripBody } from '#/web/components/tab-strip/ToolbarTabStrip.tsx'
 import { ToolbarClosableTab } from '#/web/components/tab-strip/ToolbarClosableTab.tsx'
 import {
@@ -68,7 +68,7 @@ interface WorkspacePaneTabStripProps {
   onSelect: (item: WorkspacePaneTabItem) => void
   onScrollToBottom: (key: string) => void
   onClose: (item: WorkspacePaneTabItem) => void
-  onReorder: (orderedTabs: WorkspacePaneTabOrderEntry[]) => void
+  onReorder: (tabs: WorkspacePaneTabEntry[]) => void
   onNavigateOut?: (direction: 'prev' | 'next' | 'first' | 'last') => void
   activateKeyboardNavigationSelection?: boolean
 }
@@ -171,7 +171,7 @@ function useWorkspacePaneTabDnd({
 }: {
   sortableItems: readonly (WorkspacePaneStaticTabItem | WorkspacePaneTerminalTabItem)[]
   newButtonRef: RefObject<HTMLButtonElement | null>
-  onReorder: (orderedTabs: WorkspacePaneTabOrderEntry[]) => void
+  onReorder: (tabs: WorkspacePaneTabEntry[]) => void
 }) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -200,7 +200,7 @@ function useWorkspacePaneTabDnd({
       if (!activeItem || !overItem) return
       onReorder(
         arrayMove(
-          sortableItems.map((item) => item.orderEntry),
+          sortableItems.map((item) => item.tabEntry),
           oldIndex,
           newIndex,
         ),

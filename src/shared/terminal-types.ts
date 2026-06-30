@@ -1,3 +1,5 @@
+import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+
 /**
  * `controllerStatus === 'connected'` while the broker reports the
  * controller client online. Disconnects and missed heartbeats make the
@@ -118,7 +120,7 @@ export type TerminalAttachResult =
     }
   | { ok: false; message: string }
 
-export type TerminalCatalogAction = 'created' | 'restored' | 'reused'
+export type TerminalCreateAction = 'created' | 'restored' | 'reused'
 
 /**
  * `create` carries the same first-frame fields as `attach`/`restart`
@@ -139,11 +141,12 @@ export interface TerminalFirstFrame {
   canonicalRows: number
 }
 
-export type TerminalCatalogMutationResult =
+export type TerminalCreateResult =
   | ({
       ok: true
-      action: TerminalCatalogAction
+      action: TerminalCreateAction
       terminalSessionId: string
+      tabs: WorkspacePaneTabEntry[]
       sessions: TerminalSessionSummary[]
     } & TerminalFirstFrame)
   | { ok: false; message: string }
@@ -182,6 +185,22 @@ export interface TerminalTestNotificationInput {
 
 export interface TerminalListSessionsInput {
   repoRoot: string
+}
+
+export interface TerminalListWorkspaceTabsInput {
+  repoRoot: string
+}
+
+export interface TerminalReplaceWorkspaceTabsInput {
+  repoRoot: string
+  worktreePath: string
+  tabs: WorkspacePaneTabEntry[]
+}
+
+export interface TerminalWorkspaceTabsEntry {
+  repoRoot: string
+  worktreePath: string
+  tabs: WorkspacePaneTabEntry[]
 }
 
 export interface TerminalSessionSummary {

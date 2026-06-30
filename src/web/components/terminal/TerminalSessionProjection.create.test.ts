@@ -154,6 +154,7 @@ function makeCreateResult(overrides: Partial<Record<string, unknown>> = {}) {
     ok: true as const,
     action: 'created' as const,
     terminalSessionId: 'session-1',
+    tabs: [],
     ptySessionId: 'pty_session_1_aaaaaaaaa',
     processName: 'zsh',
     canonicalTitle: null,
@@ -573,7 +574,7 @@ describe('TerminalSessionProjection create flow', () => {
   })
 
   test('durable close: deduplicates concurrent enqueues for the same session', async () => {
-    // The catalog may surface a session-closed event AND a parallel
+    // The session service may surface a session-closed event AND a parallel
     // dispose() call for the same ptySessionId. The first call owns the
     // request; the second observes the same outcome.
     let resolveClose!: (value: boolean) => void

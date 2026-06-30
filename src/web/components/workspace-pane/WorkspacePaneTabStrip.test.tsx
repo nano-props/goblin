@@ -13,7 +13,7 @@ import {
   type WorkspacePaneTabItem,
 } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
 import { terminalWorkspacePaneTabProvider } from '#/web/components/workspace-pane/tab-providers.ts'
-import type { WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { TerminalSessionSummary } from '#/web/components/terminal/types.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 
@@ -965,7 +965,7 @@ function TestWorkspacePaneTabStrip(props: {
   onSelect: (terminalWorktreeKey: string, tab: TerminalSessionSummary) => void
   onScrollToBottom: (key: string) => void
   onClose: (tab: TerminalSessionSummary) => void
-  onReorder: (orderedTabs: WorkspacePaneTabOrderEntry[]) => void
+  onReorder: (tabs: WorkspacePaneTabEntry[]) => void
   onNavigateOut?: (direction: 'prev' | 'next' | 'first' | 'last') => void
 }) {
   const selected = props.sessions.find((candidate) => candidate.selected) ?? null

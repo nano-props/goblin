@@ -5,21 +5,21 @@ import {
   nextRepoWorkspaceTabAfterClose,
 } from '#/web/components/repo-workspace/tab-model.ts'
 import type { WorkspacePaneTabSummary } from '#/web/components/terminal/types.ts'
-import type { WorkspacePaneStaticTabType, WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
-import { workspacePaneStaticTabOrderEntry, workspacePaneTerminalTabOrderEntry } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneStaticTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
 
 const REPO_ID = '/tmp/gbl-repo-workspace-tab-model-repo'
 const WORKTREE_PATH = '/tmp/gbl-repo-workspace-tab-model-worktree'
 const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
 
 describe('repo workspace pane tab model', () => {
-  test('projects a single tab order across static and terminal tabs', () => {
+  test('projects a mixed tab list across static and terminal tabs', () => {
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'status',
-      tabOrder: [terminalEntry('session-1'), staticEntry('status'), staticEntry('changes'), staticEntry('history')],
+      tabEntries: [terminalEntry('session-1'), staticEntry('status'), staticEntry('changes'), staticEntry('history')],
       runtimeTerminalViews: [terminalView('session-1', 1, true)],
       terminalSessionCount: 1,
       terminalSyncReady: true,
@@ -44,7 +44,7 @@ describe('repo workspace pane tab model', () => {
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
-      tabOrder: [staticEntry('status')],
+      tabEntries: [staticEntry('status')],
       runtimeTerminalViews: [terminalView('session-1', 1, false), terminalView('session-2', 2, false)],
       terminalSessionCount: 2,
       terminalSyncReady: true,
@@ -63,7 +63,7 @@ describe('repo workspace pane tab model', () => {
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
-      tabOrder: [staticEntry('status'), terminalEntry('session-2')],
+      tabEntries: [staticEntry('status'), terminalEntry('session-2')],
       runtimeTerminalViews: [terminalView('session-1', 1, false), terminalView('session-2', 2, true)],
       terminalSessionCount: 2,
       terminalSyncReady: true,
@@ -78,13 +78,13 @@ describe('repo workspace pane tab model', () => {
     expect(model.activeTab?.identity).toBe('terminal:session-2')
   })
 
-  test('keeps explicit terminal tab order ahead of runtime terminal order', () => {
+  test('keeps explicit terminal tab entries ahead of the runtime terminal snapshot list', () => {
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
-      tabOrder: [terminalEntry('session-2'), staticEntry('status'), terminalEntry('session-1')],
+      tabEntries: [terminalEntry('session-2'), staticEntry('status'), terminalEntry('session-1')],
       runtimeTerminalViews: [terminalView('session-1', 1, false), terminalView('session-2', 2, true)],
       terminalSessionCount: 2,
       terminalSyncReady: true,
@@ -105,7 +105,7 @@ describe('repo workspace pane tab model', () => {
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
-      tabOrder: [staticEntry('status')],
+      tabEntries: [staticEntry('status')],
       runtimeTerminalViews: [],
       terminalSessionCount: 0,
       terminalCreatePending: true,
@@ -128,7 +128,7 @@ describe('repo workspace pane tab model', () => {
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
-      tabOrder: [staticEntry('status')],
+      tabEntries: [staticEntry('status')],
       runtimeTerminalViews: [],
       terminalSessionCount: 0,
       terminalCreatePending: false,
@@ -148,7 +148,7 @@ describe('repo workspace pane tab model', () => {
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'changes',
-      tabOrder: [staticEntry('status')],
+      tabEntries: [staticEntry('status')],
       runtimeTerminalViews: [],
       terminalSessionCount: 0,
       terminalSyncReady: true,
@@ -175,7 +175,7 @@ describe('repo workspace pane tab model', () => {
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'history',
-      tabOrder: [staticEntry('status'), terminalEntry('session-1')],
+      tabEntries: [staticEntry('status'), terminalEntry('session-1')],
       runtimeTerminalViews: [terminalView('session-1', 1, true)],
       terminalSessionCount: 1,
       terminalSyncReady: true,
@@ -201,7 +201,7 @@ describe('repo workspace pane tab model', () => {
       branchName: 'feature/model',
       worktreePath: null,
       preferredTab: 'status',
-      tabOrder: [staticEntry('status'), staticEntry('changes'), terminalEntry('ignored')],
+      tabEntries: [staticEntry('status'), staticEntry('changes'), terminalEntry('ignored')],
       runtimeTerminalViews: [terminalView('ignored', 1, true)],
       terminalSessionCount: 1,
       terminalSyncReady: true,
@@ -225,7 +225,7 @@ describe('repo workspace pane tab model', () => {
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
-      tabOrder: [staticEntry('status')],
+      tabEntries: [staticEntry('status')],
       runtimeTerminalViews: [],
       terminalSessionCount: 0,
       terminalSyncReady: true,
@@ -244,7 +244,7 @@ describe('repo workspace pane tab model', () => {
   test('lands on the remaining terminal when the active terminal is closed among many', () => {
     // The user has [status, session-1, session-2] with session-1 selected.
     // The user closes session-1 (X click) — session-1 is removed from
-    // tabOrder, session-2 stays selected in the store. The model
+    // tabs, session-2 stays selected in the store. The model
     // re-resolves: preferred=terminal, count=1, session-2 is selected.
     // This is the "natural" case: no fallback needed, the new active
     // terminal is session-2.
@@ -253,7 +253,7 @@ describe('repo workspace pane tab model', () => {
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
-      tabOrder: [staticEntry('status'), terminalEntry('session-2')],
+      tabEntries: [staticEntry('status'), terminalEntry('session-2')],
       runtimeTerminalViews: [terminalView('session-2', 2, true)],
       terminalSessionCount: 1,
       terminalSyncReady: true,
@@ -279,7 +279,7 @@ describe('repo workspace pane tab model', () => {
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
-      tabOrder: [staticEntry('status')],
+      tabEntries: [staticEntry('status')],
       runtimeTerminalViews: [],
       terminalSessionCount: 0,
       terminalCreatePending: true,
@@ -301,7 +301,7 @@ describe('repo workspace pane tab model', () => {
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
-      tabOrder: [],
+      tabEntries: [],
       runtimeTerminalViews: [],
       terminalSessionCount: 0,
       terminalCreatePending: true,
@@ -325,7 +325,7 @@ describe('repo workspace pane tab model', () => {
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
-      tabOrder: [staticEntry('status')],
+      tabEntries: [staticEntry('status')],
       runtimeTerminalViews: [],
       terminalSessionCount: 0,
       terminalCreatePending: false,
@@ -344,7 +344,7 @@ describe('repo workspace pane tab model', () => {
       branchName: null,
       worktreePath: null,
       preferredTab: 'status',
-      tabOrder: [staticEntry('status')],
+      tabEntries: [staticEntry('status')],
       runtimeTerminalViews: [],
       terminalSessionCount: 0,
       terminalSyncReady: true,
@@ -360,14 +360,14 @@ describe('repo workspace pane tab model', () => {
   })
 
   test('falls back to tabs[0] for server-side exits', () => {
-    // The last terminal exits externally (registry onTerminalSessionRemoved),
+    // The last terminal exits externally through the server workspace tab list,
     // so the model uses the generic tabs[0] fallback.
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
-      tabOrder: [staticEntry('status')],
+      tabEntries: [staticEntry('status')],
       runtimeTerminalViews: [],
       terminalSessionCount: 0,
       terminalSyncReady: true,
@@ -387,7 +387,7 @@ describe('repo workspace pane tab model', () => {
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'status',
-      tabOrder: [staticEntry('status'), terminalEntry('session-1'), staticEntry('changes')],
+      tabEntries: [staticEntry('status'), terminalEntry('session-1'), staticEntry('changes')],
       runtimeTerminalViews: [terminalView('session-1', 1, true)],
       terminalSessionCount: 1,
       terminalSyncReady: true,
@@ -405,7 +405,7 @@ describe('repo workspace pane tab model', () => {
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
-      tabOrder: [staticEntry('status')],
+      tabEntries: [staticEntry('status')],
       runtimeTerminalViews: [],
       terminalSessionCount: 0,
       terminalCreatePending: true,
@@ -422,7 +422,7 @@ describe('repo workspace pane tab model', () => {
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
-      tabOrder: [staticEntry('status'), terminalEntry('session-1'), terminalEntry('session-2'), staticEntry('changes')],
+      tabEntries: [staticEntry('status'), terminalEntry('session-1'), terminalEntry('session-2'), staticEntry('changes')],
       runtimeTerminalViews: [terminalView('session-1', 1, false), terminalView('session-2', 2, false)],
       terminalSessionCount: 2,
       terminalSyncReady: true,
@@ -441,7 +441,7 @@ describe('repo workspace pane tab model', () => {
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
-      tabOrder: [terminalEntry('session-1'), staticEntry('status'), terminalEntry('session-2')],
+      tabEntries: [terminalEntry('session-1'), staticEntry('status'), terminalEntry('session-2')],
       runtimeTerminalViews: [terminalView('session-1', 1, false), terminalView('session-2', 2, false)],
       terminalSessionCount: 2,
       terminalSyncReady: true,
@@ -453,12 +453,12 @@ describe('repo workspace pane tab model', () => {
   })
 })
 
-function staticEntry(type: WorkspacePaneStaticTabType): WorkspacePaneTabOrderEntry {
-  return workspacePaneStaticTabOrderEntry(type)
+function staticEntry(type: WorkspacePaneStaticTabType): WorkspacePaneTabEntry {
+  return workspacePaneStaticTabEntry(type)
 }
 
-function terminalEntry(id: string): WorkspacePaneTabOrderEntry {
-  return workspacePaneTerminalTabOrderEntry(id)
+function terminalEntry(id: string): WorkspacePaneTabEntry {
+  return workspacePaneTerminalTabEntry(id)
 }
 
 function terminalView(terminalSessionId: string, index: number, selected: boolean): WorkspacePaneTabSummary {

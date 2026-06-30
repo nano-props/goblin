@@ -96,8 +96,7 @@ function createManager(supervisor: PtySupervisor) {
       onExit: vi.fn(),
     },
     {
-      replaceTerminalSessionOrder: vi.fn(),
-      orderedTerminalSessionIds: vi.fn(() => []),
+      terminalSessionIds: vi.fn(() => []),
     },
     () => true,
   )

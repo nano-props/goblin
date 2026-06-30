@@ -124,7 +124,7 @@ work is related but separate.
 
 **Status: completed.** `create` now returns the full first-frame
 payload (`ptySessionId`, `snapshot`, `snapshotSeq`, process metadata,
-geometry, and controller info) directly. `TerminalCatalogMutationResult`
+geometry, and controller info) directly. `TerminalCreateResult`
 intersects with `TerminalFirstFrame` at the type level, and the client
 hydrates from the response without a follow-up snapshot fetch.
 `create.sessions` remains projection data only. See

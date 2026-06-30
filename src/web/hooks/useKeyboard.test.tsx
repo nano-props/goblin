@@ -17,7 +17,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
-import { workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 
 const testWindow = window as unknown as { goblinNative?: Window['goblinNative'] }
 const REPO_ID = '/tmp/keyboard-repo'
@@ -93,10 +93,10 @@ describe('useKeyboard', () => {
       branches: [createRepoBranch('feature/no-worktree')],
       selectedBranch: 'feature/no-worktree',
       preferredWorkspacePaneTab: 'status',
-      workspacePaneTabOrderByBranch: {
+      workspacePaneTabsByBranch: {
         'feature/no-worktree': [
-          workspacePaneStaticTabOrderEntry('status'),
-          workspacePaneStaticTabOrderEntry('history'),
+          workspacePaneStaticTabEntry('status'),
+          workspacePaneStaticTabEntry('history'),
         ],
       },
     })

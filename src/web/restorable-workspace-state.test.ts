@@ -5,7 +5,7 @@ import {
   workspaceSessionStateFromRestorableWorkspaceState,
 } from '#/web/restorable-workspace-state.ts'
 import { createRepoBranch, seedRepoState } from '#/web/test-utils/bridge.ts'
-import { workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 
 describe('restorable-workspace-state', () => {
   test('maps restorable workspace state into WorkspaceSessionState', () => {
@@ -38,8 +38,8 @@ describe('restorable-workspace-state', () => {
         '/tmp/repo\0/tmp/worktree': 'session-2',
       },
       preferredWorkspacePaneTabByBranchByRepo: { '/tmp/repo': { 'feature/worktree': 'terminal' } },
-      workspacePaneTabOrderByBranchByRepo: {
-        '/tmp/repo': { 'feature/worktree': [workspacePaneStaticTabOrderEntry('status')] },
+      workspacePaneTabsByBranchByRepo: {
+        '/tmp/repo': { 'feature/worktree': [workspacePaneStaticTabEntry('status')] },
       },
       filetreeViewStateByWorktreeByRepo: {},
     })
@@ -51,8 +51,8 @@ describe('restorable-workspace-state', () => {
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'changes',
-      workspacePaneTabOrderByBranch: {
-        'feature/worktree': [workspacePaneStaticTabOrderEntry('status'), workspacePaneStaticTabOrderEntry('changes')],
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('changes')],
       },
     })
 
@@ -69,9 +69,9 @@ describe('restorable-workspace-state', () => {
       }),
     ).toMatchObject({
       preferredWorkspacePaneTabByBranchByRepo: { '/tmp/repo': { 'feature/worktree': 'changes' } },
-      workspacePaneTabOrderByBranchByRepo: {
+      workspacePaneTabsByBranchByRepo: {
         '/tmp/repo': {
-          'feature/worktree': [workspacePaneStaticTabOrderEntry('status'), workspacePaneStaticTabOrderEntry('changes')],
+          'feature/worktree': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('changes')],
         },
       },
     })
@@ -83,8 +83,8 @@ describe('restorable-workspace-state', () => {
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'history',
-      workspacePaneTabOrderByBranch: {
-        'feature/worktree': [workspacePaneStaticTabOrderEntry('status')],
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [workspacePaneStaticTabEntry('status')],
       },
     })
 
@@ -101,8 +101,8 @@ describe('restorable-workspace-state', () => {
       }),
     ).toMatchObject({
       preferredWorkspacePaneTabByBranchByRepo: {},
-      workspacePaneTabOrderByBranchByRepo: {
-        '/tmp/repo': { 'feature/worktree': [workspacePaneStaticTabOrderEntry('status')] },
+      workspacePaneTabsByBranchByRepo: {
+        '/tmp/repo': { 'feature/worktree': [workspacePaneStaticTabEntry('status')] },
       },
     })
   })
@@ -117,7 +117,7 @@ describe('restorable-workspace-state', () => {
         selectedTerminalSessionIdByTerminalWorktree: {
           '/tmp/repo\0/tmp/worktree': 'session-1',
         },
-        workspacePaneTabOrderByBranchByRepo: {
+        workspacePaneTabsByBranchByRepo: {
           '/tmp/repo': {
             main: [],
           },
@@ -131,7 +131,7 @@ describe('restorable-workspace-state', () => {
         '/tmp/repo\0/tmp/worktree': 'session-1',
       },
       preferredWorkspacePaneTabByBranchByRepo: {},
-      workspacePaneTabOrderByBranchByRepo: {
+      workspacePaneTabsByBranchByRepo: {
         '/tmp/repo': {
           main: [],
         },
@@ -145,8 +145,8 @@ describe('restorable-workspace-state', () => {
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'files',
-      workspacePaneTabOrderByBranch: {
-        'feature/worktree': [workspacePaneStaticTabOrderEntry('status'), workspacePaneStaticTabOrderEntry('files')],
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
       },
     })
 
@@ -163,9 +163,9 @@ describe('restorable-workspace-state', () => {
       }),
     ).toMatchObject({
       preferredWorkspacePaneTabByBranchByRepo: { '/tmp/repo': { 'feature/worktree': 'files' } },
-      workspacePaneTabOrderByBranchByRepo: {
+      workspacePaneTabsByBranchByRepo: {
         '/tmp/repo': {
-          'feature/worktree': [workspacePaneStaticTabOrderEntry('status'), workspacePaneStaticTabOrderEntry('files')],
+          'feature/worktree': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
         },
       },
     })
@@ -177,8 +177,8 @@ describe('restorable-workspace-state', () => {
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'files',
-      workspacePaneTabOrderByBranch: {
-        'feature/worktree': [workspacePaneStaticTabOrderEntry('status'), workspacePaneStaticTabOrderEntry('files')],
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
       },
     })
 
@@ -193,9 +193,9 @@ describe('restorable-workspace-state', () => {
       },
     })
     const restored = restoreRestorableWorkspaceStateFromSession(sessionState)
-    expect(restored.workspacePaneTabOrderByBranchByRepo).toEqual({
+    expect(restored.workspacePaneTabsByBranchByRepo).toEqual({
       '/tmp/repo': {
-        'feature/worktree': [workspacePaneStaticTabOrderEntry('status'), workspacePaneStaticTabOrderEntry('files')],
+        'feature/worktree': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
       },
     })
     expect(restored.preferredWorkspacePaneTabByBranchByRepo).toEqual({

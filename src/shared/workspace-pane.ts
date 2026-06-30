@@ -36,17 +36,17 @@ export const WORKSPACE_PANE_WORKTREE_TAB_TYPES = [
 export const WORKSPACE_PANE_SESSION_TAB_TYPES = WORKSPACE_PANE_TAB_TYPES
 export type WorkspacePaneSessionTabType = (typeof WORKSPACE_PANE_SESSION_TAB_TYPES)[number]
 
-export interface WorkspacePaneStaticTabOrderEntry {
+export interface WorkspacePaneStaticTabEntry {
   type: WorkspacePaneStaticTabType
   tabId: WorkspacePaneStaticTabId
 }
 
-export interface WorkspacePaneTerminalTabOrderEntry {
+export interface WorkspacePaneTerminalTabEntry {
   type: 'terminal'
   terminalSessionId: string
 }
 
-export type WorkspacePaneTabOrderEntry = WorkspacePaneStaticTabOrderEntry | WorkspacePaneTerminalTabOrderEntry
+export type WorkspacePaneTabEntry = WorkspacePaneStaticTabEntry | WorkspacePaneTerminalTabEntry
 
 export function isWorkspacePaneTabType(value: string | null | undefined): value is WorkspacePaneTabType {
   return typeof value === 'string' && (WORKSPACE_PANE_TAB_TYPES as readonly string[]).includes(value)
@@ -82,34 +82,34 @@ export function isWorkspacePaneSessionTabType(value: string | null | undefined):
   return typeof value === 'string' && (WORKSPACE_PANE_SESSION_TAB_TYPES as readonly string[]).includes(value)
 }
 
-export function isWorkspacePaneTabOrderEntry(value: unknown): value is WorkspacePaneTabOrderEntry {
-  return workspacePaneTabOrderEntryFromUnknown(value) !== null
+export function isWorkspacePaneTabEntry(value: unknown): value is WorkspacePaneTabEntry {
+  return workspacePaneTabEntryFromUnknown(value) !== null
 }
 
-export function workspacePaneTabOrderEntryFromUnknown(value: unknown): WorkspacePaneTabOrderEntry | null {
+export function workspacePaneTabEntryFromUnknown(value: unknown): WorkspacePaneTabEntry | null {
   if (!value || typeof value !== 'object') return null
   const entry = value as { type?: unknown; tabId?: unknown; terminalSessionId?: unknown }
   const type = typeof entry.type === 'string' ? entry.type : null
   if (type === 'terminal') {
     return typeof entry.terminalSessionId === 'string' && entry.terminalSessionId.length > 0
-      ? workspacePaneTerminalTabOrderEntry(entry.terminalSessionId)
+      ? workspacePaneTerminalTabEntry(entry.terminalSessionId)
       : null
   }
   if (!isWorkspacePaneStaticTabType(type)) return null
   const tabId = workspacePaneStaticTabId(type)
-  if (entry.tabId === tabId) return workspacePaneStaticTabOrderEntry(type)
+  if (entry.tabId === tabId) return workspacePaneStaticTabEntry(type)
   return null
 }
 
-export function workspacePaneStaticTabOrderEntry(type: WorkspacePaneStaticTabType): WorkspacePaneStaticTabOrderEntry {
+export function workspacePaneStaticTabEntry(type: WorkspacePaneStaticTabType): WorkspacePaneStaticTabEntry {
   return { type, tabId: workspacePaneStaticTabId(type) }
 }
 
-export function workspacePaneTerminalTabOrderEntry(terminalSessionId: string): WorkspacePaneTerminalTabOrderEntry {
+export function workspacePaneTerminalTabEntry(terminalSessionId: string): WorkspacePaneTerminalTabEntry {
   return { type: 'terminal', terminalSessionId }
 }
 
-export function workspacePaneTabOrderEntryIdentity(entry: WorkspacePaneTabOrderEntry): string {
+export function workspacePaneTabEntryIdentity(entry: WorkspacePaneTabEntry): string {
   return entry.type === 'terminal' ? `terminal:${entry.terminalSessionId}` : entry.tabId
 }
 

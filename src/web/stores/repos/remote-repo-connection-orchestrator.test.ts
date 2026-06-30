@@ -99,7 +99,7 @@ describe('runRemoteRepoConnection', () => {
         ui: {
           selectedBranch: null,
           branchViewMode: 'all',
-          workspacePaneTabOrderByBranch: {},
+          workspacePaneTabsByBranch: {},
           preferredWorkspacePaneTabByBranch: {},
         },
         projection: { source: 'fresh', savedAt: null },
@@ -146,7 +146,7 @@ describe('runRemoteRepoConnection', () => {
         ui: {
           selectedBranch: null,
           branchViewMode: 'all',
-          workspacePaneTabOrderByBranch: {},
+          workspacePaneTabsByBranch: {},
           preferredWorkspacePaneTabByBranch: {},
         },
         projection: { source: 'fresh', savedAt: null },
@@ -193,7 +193,7 @@ describe('runRemoteRepoConnection', () => {
         ui: {
           selectedBranch: null,
           branchViewMode: 'all',
-          workspacePaneTabOrderByBranch: {},
+          workspacePaneTabsByBranch: {},
           preferredWorkspacePaneTabByBranch: {},
         },
         projection: { source: 'fresh', savedAt: null },
@@ -240,7 +240,7 @@ describe('runRemoteRepoConnection', () => {
         ui: {
           selectedBranch: null,
           branchViewMode: 'all',
-          workspacePaneTabOrderByBranch: {},
+          workspacePaneTabsByBranch: {},
           preferredWorkspacePaneTabByBranch: {},
         },
         projection: { source: 'fresh', savedAt: null },
@@ -320,7 +320,7 @@ describe('runRemoteRepoConnection', () => {
         ui: {
           selectedBranch: null,
           branchViewMode: 'all',
-          workspacePaneTabOrderByBranch: {},
+          workspacePaneTabsByBranch: {},
           preferredWorkspacePaneTabByBranch: {},
         },
         projection: { source: 'fresh', savedAt: null },
@@ -387,7 +387,7 @@ describe('runRemoteRepoConnection', () => {
           ui: {
             selectedBranch: null,
             branchViewMode: 'all',
-            workspacePaneTabOrderByBranch: {},
+            workspacePaneTabsByBranch: {},
             preferredWorkspacePaneTabByBranch: {},
           },
           projection: { source: 'fresh', savedAt: null },

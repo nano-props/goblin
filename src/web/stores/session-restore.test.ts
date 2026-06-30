@@ -30,7 +30,7 @@ function installBridge(sessionOverrides: Record<string, unknown> = {}) {
               zenMode: true,
               workspacePaneSize: 0.5,
               selectedTerminalSessionIdByTerminalWorktree: {},
-              workspacePaneTabOrderByBranchByRepo: {},
+              workspacePaneTabsByBranchByRepo: {},
               ...sessionOverrides,
             },
             recentRepos: [],

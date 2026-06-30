@@ -174,13 +174,13 @@ export const REMOTE_PROCEDURE_SCHEMAS = {
 // `#/server/modules/settings-write-paths.ts` — the route layer
 // validates with these, then passes the parsed object directly to the
 // module layer.
-const WorkspacePaneStaticTabOrderEntrySchema = v.variant('type', [
+const WorkspacePaneStaticTabEntrySchema = v.variant('type', [
   v.object({ type: v.literal('status'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.status) }),
   v.object({ type: v.literal('changes'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.changes) }),
   v.object({ type: v.literal('history'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.history) }),
   v.object({ type: v.literal('files'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.files) }),
 ])
-const WorkspacePaneTerminalTabOrderEntrySchema = v.object({
+const WorkspacePaneTerminalTabEntrySchema = v.object({
   type: v.literal('terminal'),
   terminalSessionId: v.pipe(v.string(), v.minLength(1)),
 })
@@ -198,11 +198,11 @@ const WorkspaceSessionStateSchema = v.object({
   preferredWorkspacePaneTabByBranchByRepo: v.optional(
     v.record(v.string(), v.record(v.string(), v.picklist(['status', 'changes', 'history', 'files', 'terminal']))),
   ),
-  workspacePaneTabOrderByBranchByRepo: v.record(
+  workspacePaneTabsByBranchByRepo: v.record(
     v.string(),
     v.record(
       v.string(),
-      v.array(v.union([WorkspacePaneStaticTabOrderEntrySchema, WorkspacePaneTerminalTabOrderEntrySchema])),
+      v.array(v.union([WorkspacePaneStaticTabEntrySchema, WorkspacePaneTerminalTabEntrySchema])),
     ),
   ),
   filetreeViewStateByWorktreeByRepo: v.optional(

@@ -23,7 +23,7 @@ import { createBranchSnapshot, createRepoBranch, resetReposStore, seedRepoState 
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
-import { workspacePaneStaticTabOrderEntry, workspacePaneTerminalTabOrderEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import {
   PrimaryWindowNavigationProvider,
@@ -103,7 +103,7 @@ describe('RepoWorkspaceContent', () => {
       ],
       selectedBranch: 'feature/changes',
       preferredWorkspacePaneTab: 'status',
-      workspacePaneTabOrderByBranch: {
+      workspacePaneTabsByBranch: {
         'feature/changes': [staticEntry('status'), staticEntry('changes')],
       },
       statusLoaded: true,
@@ -165,7 +165,7 @@ describe('RepoWorkspaceContent', () => {
       ],
       selectedBranch: 'feature/copy-success',
       preferredWorkspacePaneTab: 'status',
-      workspacePaneTabOrderByBranch: {
+      workspacePaneTabsByBranch: {
         'feature/copy-success': [staticEntry('status')],
       },
       statusLoaded: true,
@@ -229,7 +229,7 @@ describe('RepoWorkspaceContent', () => {
       ],
       selectedBranch: 'feature/clean',
       preferredWorkspacePaneTab: 'status',
-      workspacePaneTabOrderByBranch: {
+      workspacePaneTabsByBranch: {
         'feature/clean': [staticEntry('status')],
       },
       statusLoaded: true,
@@ -270,7 +270,7 @@ describe('RepoWorkspaceContent', () => {
       ],
       selectedBranch: 'feature/hidden',
       preferredWorkspacePaneTab: 'status',
-      workspacePaneTabOrderByBranch: {
+      workspacePaneTabsByBranch: {
         'feature/hidden': [staticEntry('status')],
       },
       statusLoaded: true,
@@ -316,7 +316,7 @@ describe('RepoWorkspaceContent', () => {
       ],
       selectedBranch: 'feature/changes-panel',
       preferredWorkspacePaneTab: 'changes',
-      workspacePaneTabOrderByBranch: {
+      workspacePaneTabsByBranch: {
         'feature/changes-panel': [staticEntry('status'), staticEntry('changes')],
       },
       statusLoaded: true,
@@ -397,7 +397,7 @@ describe('RepoWorkspaceContent', () => {
       ],
       selectedBranch: 'feature/no-worktree',
       preferredWorkspacePaneTab: 'status',
-      workspacePaneTabOrderByBranch: { 'feature/no-worktree': [] },
+      workspacePaneTabsByBranch: { 'feature/no-worktree': [] },
     })
     const detail = getSelectedRepoWorkspacePresentation(repo)
 
@@ -417,7 +417,7 @@ describe('RepoWorkspaceContent', () => {
       branches: [createRepoBranch('feature/no-worktree')],
       selectedBranch: 'feature/no-worktree',
       preferredWorkspacePaneTab: 'terminal',
-      workspacePaneTabOrderByBranch: { 'feature/no-worktree': [staticEntry('status')] },
+      workspacePaneTabsByBranch: { 'feature/no-worktree': [staticEntry('status')] },
     })
     const detail = getSelectedRepoWorkspacePresentation(repo)
 
@@ -444,7 +444,7 @@ describe('RepoWorkspaceContent', () => {
       branches: [createRepoBranch('feature/terminal-empty', { worktree: { path: worktreePath } })],
       selectedBranch: 'feature/terminal-empty',
       preferredWorkspacePaneTab: 'terminal',
-      workspacePaneTabOrderByBranch: { 'feature/terminal-empty': [staticEntry('status')] },
+      workspacePaneTabsByBranch: { 'feature/terminal-empty': [staticEntry('status')] },
     })
     useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceToken)
     const detail = getSelectedRepoWorkspacePresentation(repo)
@@ -474,7 +474,7 @@ describe('RepoWorkspaceContent', () => {
       branches: [createRepoBranch('feature/terminal-pending', { worktree: { path: worktreePath } })],
       selectedBranch: 'feature/terminal-pending',
       preferredWorkspacePaneTab: 'terminal',
-      workspacePaneTabOrderByBranch: { 'feature/terminal-pending': [staticEntry('status')] },
+      workspacePaneTabsByBranch: { 'feature/terminal-pending': [staticEntry('status')] },
     })
     useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceToken)
     const detail = getSelectedRepoWorkspacePresentation(repo)
@@ -516,7 +516,7 @@ describe('RepoWorkspaceContent', () => {
       branches: [createRepoBranch(branchName, { worktree: { path: worktreePath } })],
       selectedBranch: branchName,
       preferredWorkspacePaneTab: 'terminal',
-      workspacePaneTabOrderByBranch: { [branchName]: [] },
+      workspacePaneTabsByBranch: { [branchName]: [] },
     })
     useRepoSyncStore.getState().markReady(REPO_ID, seededRepo.instanceToken)
     const repo = useReposStore.getState().repos[REPO_ID]!
@@ -553,7 +553,7 @@ describe('RepoWorkspaceContent', () => {
       branches: [createRepoBranch('feature/terminal-loading', { worktree: { path: worktreePath } })],
       selectedBranch: 'feature/terminal-loading',
       preferredWorkspacePaneTab: 'terminal',
-      workspacePaneTabOrderByBranch: { 'feature/terminal-loading': [staticEntry('status')] },
+      workspacePaneTabsByBranch: { 'feature/terminal-loading': [staticEntry('status')] },
     })
     const detail = getSelectedRepoWorkspacePresentation(repo)
     const createTerminal = vi.fn(async () => 'session-1')
@@ -587,7 +587,7 @@ describe('RepoWorkspaceContent', () => {
     expect(registerHost).toHaveBeenCalledWith(terminalWorktreeKey, expect.any(HTMLDivElement))
   })
 
-  test('labels terminal panels from the unified tab order, not runtime session order', () => {
+  test('labels terminal panels from the mixed tab list, not runtime session list', () => {
     const worktreePath = '/tmp/terminal-reordered-worktree'
     const terminalWorktreeKey = `${REPO_ID}\0${worktreePath}`
     const repo = seedRepoState({
@@ -595,7 +595,7 @@ describe('RepoWorkspaceContent', () => {
       branches: [createRepoBranch('feature/terminal-reordered', { worktree: { path: worktreePath } })],
       selectedBranch: 'feature/terminal-reordered',
       preferredWorkspacePaneTab: 'terminal',
-      workspacePaneTabOrderByBranch: {
+      workspacePaneTabsByBranch: {
         'feature/terminal-reordered': [terminalEntry('t2'), staticEntry('status'), terminalEntry('t1')],
       },
     })
@@ -651,7 +651,7 @@ describe('RepoWorkspaceContent', () => {
       branches: [createRepoBranch(branchName, { worktree: { path: worktreePath } })],
       selectedBranch: branchName,
       preferredWorkspacePaneTab: 'files',
-      workspacePaneTabOrderByBranch: { [branchName]: [staticEntry('files')] },
+      workspacePaneTabsByBranch: { [branchName]: [staticEntry('files')] },
     })
     useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceToken)
     const detail = getSelectedRepoWorkspacePresentation(repo)
@@ -694,7 +694,7 @@ describe('RepoWorkspaceContent', () => {
       branches: [createRepoBranch('feature/a'), createRepoBranch('feature/b')],
       selectedBranch: 'feature/b',
       preferredWorkspacePaneTab: 'history',
-      workspacePaneTabOrderByBranch: {
+      workspacePaneTabsByBranch: {
         'feature/a': [staticEntry('status'), staticEntry('history')],
       },
     })
@@ -709,7 +709,7 @@ describe('RepoWorkspaceContent', () => {
     )
     await flushAsyncWork()
 
-    // The selected branch (feature/b) has no explicit tab order, so it
+    // The selected branch (feature/b) has no explicit mixed tab list, so it
     // falls back to the default [status]. The user's preferred tab
     // (history) is not in the materialized tab list. The model falls
     // back to the first materialized tab (status) so the user does not
@@ -745,7 +745,7 @@ describe('RepoWorkspaceContent', () => {
       branches: [createRepoBranch('feature/history')],
       selectedBranch: 'feature/history',
       preferredWorkspacePaneTab: 'history',
-      workspacePaneTabOrderByBranch: { 'feature/history': [staticEntry('status'), staticEntry('history')] },
+      workspacePaneTabsByBranch: { 'feature/history': [staticEntry('status'), staticEntry('history')] },
     })
     const detail = getSelectedRepoWorkspacePresentation(repo)
 
@@ -792,7 +792,7 @@ describe('RepoWorkspaceContent', () => {
       branches: [createRepoBranch('feature/history', { worktree: { path: '/tmp/history-worktree' } })],
       selectedBranch: 'feature/history',
       preferredWorkspacePaneTab: 'history',
-      workspacePaneTabOrderByBranch: { 'feature/history': [staticEntry('status'), staticEntry('history')] },
+      workspacePaneTabsByBranch: { 'feature/history': [staticEntry('status'), staticEntry('history')] },
     })
     const detail = getSelectedRepoWorkspacePresentation(repo)
 
@@ -815,7 +815,7 @@ describe('RepoWorkspaceContent', () => {
       branches: [createRepoBranch('feature/history')],
       selectedBranch: 'feature/history',
       preferredWorkspacePaneTab: 'history',
-      workspacePaneTabOrderByBranch: { 'feature/history': [staticEntry('history')] },
+      workspacePaneTabsByBranch: { 'feature/history': [staticEntry('history')] },
     })
     const detail = getSelectedRepoWorkspacePresentation(repo)
 
@@ -882,11 +882,11 @@ async function flushAsyncWork() {
 }
 
 function staticEntry(type: WorkspacePaneStaticTabType) {
-  return workspacePaneStaticTabOrderEntry(type)
+  return workspacePaneStaticTabEntry(type)
 }
 
 function terminalEntry(id: string) {
-  return workspacePaneTerminalTabOrderEntry(id)
+  return workspacePaneTerminalTabEntry(id)
 }
 
 function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): PrimaryWindowNavigationActions {

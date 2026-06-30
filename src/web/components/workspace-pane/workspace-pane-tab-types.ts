@@ -1,7 +1,7 @@
 import type { LucideIcon } from 'lucide-react'
 import type {
   WorkspacePaneStaticTabType,
-  WorkspacePaneTabOrderEntry,
+  WorkspacePaneTabEntry,
   WorkspacePaneTabType,
 } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabSummary } from '#/web/components/terminal/types.ts'
@@ -29,20 +29,20 @@ interface WorkspacePaneTabItemBase {
 interface WorkspacePaneSortableTabItemBase extends WorkspacePaneTabItemBase {
   closeLabel: string
   sortableId: string
-  orderEntry: WorkspacePaneTabOrderEntry
+  tabEntry: WorkspacePaneTabEntry
 }
 
 export interface WorkspacePaneStaticTabItem extends WorkspacePaneSortableTabItemBase {
   kind: 'static'
   staticTabType: WorkspacePaneStaticTabType
-  orderEntry: Extract<WorkspacePaneTabOrderEntry, { type: WorkspacePaneStaticTabType }>
+  tabEntry: Extract<WorkspacePaneTabEntry, { type: WorkspacePaneStaticTabType }>
 }
 
 export interface WorkspacePaneTerminalTabItem extends WorkspacePaneSortableTabItemBase {
   kind: 'terminal'
   view: TerminalWorkspacePaneTabSummary
   closeLabel: string
-  orderEntry: Extract<WorkspacePaneTabOrderEntry, { type: 'terminal' }>
+  tabEntry: Extract<WorkspacePaneTabEntry, { type: 'terminal' }>
 }
 
 interface WorkspacePanePendingTabItem extends WorkspacePaneTabItemBase {
@@ -72,7 +72,7 @@ export function createStaticWorkspacePaneTabItem(input: {
     icon: provider.icon,
     panelId: input.panelId,
     sortableId: provider.identity(),
-    orderEntry: provider.orderEntry(),
+    tabEntry: provider.tabEntry(),
   }
 }
 
@@ -94,7 +94,7 @@ export function createTerminalWorkspacePaneTabItem(input: {
     icon: terminalWorkspacePaneTabProvider.icon,
     panelId: input.panelId,
     sortableId: terminalWorkspacePaneTabProvider.identity(input.view.terminalSessionId),
-    orderEntry: terminalWorkspacePaneTabProvider.orderEntry(input.view.terminalSessionId),
+    tabEntry: terminalWorkspacePaneTabProvider.tabEntry(input.view.terminalSessionId),
   }
 }
 
