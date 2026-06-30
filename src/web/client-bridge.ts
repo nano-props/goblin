@@ -61,8 +61,9 @@ function readServerTerminalConfig(): ClientServerTerminalConfig | null {
   // `plantEmbedAuthCookie` (embedded main, before loadURL) or
   // `POST /api/login` (web). The WS upgrade sends the cookie
   // automatically. We derive the URL from `window.location.origin`
-  // and use an empty `accessToken` — the WebSocket URL has no
-  // `?t=` query in that case.
+  // and use an empty `accessToken`; the WebSocket helper still
+  // serializes that as `?t=`, but the server checks cookie before
+  // query token so cookie auth remains the effective channel.
   const fromBootstrap = readWebBootstrap(readOrCreateWebTerminalClientId).initialServer
   if (fromBootstrap?.url) {
     const clientId = normalizeClientServerClientId(fromBootstrap.clientId) ?? readOrCreateWebTerminalClientId()
