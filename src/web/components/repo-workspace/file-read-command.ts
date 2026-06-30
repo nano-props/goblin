@@ -15,7 +15,7 @@ export function fileReadCommand(reader: RepoFileViewerResult, filePath: string):
 }
 
 function fileReadViewerCommand(viewer: RepoFileViewerResult['viewer']): string {
-  return viewer === 'bat' || viewer === 'batcat' ? `${viewer} --paging=never` : viewer
+  return viewer === 'bat' || viewer === 'batcat' ? `${viewer} --paging=never --style=plain` : viewer
 }
 
 function cmdQuotePath(path: string): string {

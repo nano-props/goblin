@@ -38,7 +38,11 @@ export interface TerminalCreateInput {
   branch: string
   worktreePath: string
   kind: 'primary' | 'additional'
-  /** Shell text to run as the terminal starts, before returning to an interactive shell. */
+  /**
+   * Shell text to run as the terminal starts, before returning to an interactive shell.
+   * The initial cols/rows are a best-effort client hint; width-sensitive output may render
+   * before the attached xterm reports its first authoritative fit/resize.
+   */
   startupShellCommand?: string
   cols?: number
   rows?: number

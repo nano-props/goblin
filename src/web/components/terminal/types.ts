@@ -99,7 +99,11 @@ export interface TerminalSearchResult {
 }
 
 export interface TerminalCreateOptions {
-  /** Shell text to run as the terminal starts, before returning to an interactive shell. */
+  /**
+   * Shell text to run as the terminal starts, before returning to an interactive shell.
+   * Known timing risk: the command may print before the first real xterm fit/resize
+   * reaches the PTY, so width-sensitive first-frame output can be laid out with a stale size.
+   */
   startupShellCommand?: string
 }
 

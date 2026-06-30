@@ -12,15 +12,15 @@ describe('absoluteFilePathForTerminal', () => {
 })
 
 describe('fileReadCommand', () => {
-  test('quotes POSIX reader paths through the user shell helper and disables bat paging', () => {
+  test('quotes POSIX reader paths through the user shell helper and disables bat paging with plain output', () => {
     expect(fileReadCommand({ viewer: 'bat', shell: 'posix' }, "/tmp/repo/it's here.ts")).toBe(
-      "bat --paging=never '/tmp/repo/it'\\''s here.ts'\r",
+      "bat --paging=never --style=plain '/tmp/repo/it'\\''s here.ts'\r",
     )
   })
 
-  test('disables batcat paging', () => {
+  test('disables batcat paging with plain output', () => {
     expect(fileReadCommand({ viewer: 'batcat', shell: 'posix' }, '/tmp/repo/file.ts')).toBe(
-      "batcat --paging=never '/tmp/repo/file.ts'\r",
+      "batcat --paging=never --style=plain '/tmp/repo/file.ts'\r",
     )
   })
 

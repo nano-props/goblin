@@ -147,6 +147,9 @@ export function buildRemoteTerminalInvocation(
   options: { startupShellCommand?: string } = {},
 ): RemoteCommandInvocation {
   const startupShellCommand = normalizeTerminalStartupShellCommand(options.startupShellCommand)
+  // Startup commands run as part of the initial SSH login shell. The attached browser xterm
+  // may not have delivered its first authoritative fit/resize yet, so first-frame output
+  // from width-sensitive commands can be formatted with the create-time size hint.
   const script = startupShellCommand
     ? `cd ${shellQuote(remotePath)} && exec "\${SHELL:-/bin/sh}" -ilc ${shellQuote(`${startupShellCommand}\nexec "\${SHELL:-/bin/sh}" -l`)}`
     : `cd ${shellQuote(remotePath)} && exec "\${SHELL:-/bin/sh}" -l`
