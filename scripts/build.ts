@@ -18,7 +18,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync } fr
 import os from 'node:os'
 import path from 'node:path'
 import { parseArgs } from 'node:util'
-import { closeRunningApp } from './close-app.ts'
+import { closeRunningApp } from '#scripts/close-app.ts'
 
 const repoRoot = path.resolve(import.meta.dirname, '..')
 process.chdir(repoRoot)

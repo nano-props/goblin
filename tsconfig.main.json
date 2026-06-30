@@ -6,7 +6,8 @@
     "moduleResolution": "NodeNext",
     "strict": true,
     "paths": {
-      "#/*": ["./src/*"]
+      "#/*": ["./src/*"],
+      "#scripts/*": ["./scripts/*"]
     },
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,

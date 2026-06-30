@@ -7,7 +7,8 @@
   "type": "module",
   "main": "src/main/main.ts",
   "imports": {
-    "#/*": "./src/*"
+    "#/*": "./src/*",
+    "#scripts/*": "./scripts/*"
   },
   "scripts": {
     "dev": "bun scripts/dev.ts",
