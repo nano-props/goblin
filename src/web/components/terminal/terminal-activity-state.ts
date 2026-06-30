@@ -49,6 +49,13 @@ export function createTerminalActivityState(
     notifyWorktree(record.worktreeTerminalKey)
   }
 
+  function activityExpiresAt(record: ActivityRecord): number {
+    const idleExpiresAt = record.lastActivityAt + ACTIVITY_IDLE_TIMEOUT_MS
+    return record.activeSince === null
+      ? idleExpiresAt
+      : Math.max(idleExpiresAt, record.activeSince + ACTIVITY_MIN_VISIBLE_MS)
+  }
+
   function confirmActivity(key: string): void {
     const record = records.get(key)
     if (!record || record.pendingSince === null) return
@@ -64,16 +71,9 @@ export function createTerminalActivityState(
     const record = records.get(key)
     if (!record) return
     record.idleTimer = null
-    const current = now()
-    const remainingMs = ACTIVITY_IDLE_TIMEOUT_MS - (current - record.lastActivityAt)
+    const remainingMs = activityExpiresAt(record) - now()
     if (remainingMs > 0) {
       scheduleIdleExpiry(key)
-      return
-    }
-    const minVisibleRemainingMs =
-      record.activeSince === null ? 0 : ACTIVITY_MIN_VISIBLE_MS - Math.max(0, current - record.activeSince)
-    if (minVisibleRemainingMs > 0) {
-      record.idleTimer = setTimer(() => expireIdleActivity(key), minVisibleRemainingMs)
       return
     }
     const wasActive = record.activeSince !== null
@@ -90,8 +90,8 @@ export function createTerminalActivityState(
   function scheduleIdleExpiry(key: string): void {
     const record = records.get(key)
     if (!record) return
-    if (record.idleTimer) clearTimer(record.idleTimer)
-    const timeout = Math.max(0, ACTIVITY_IDLE_TIMEOUT_MS - (now() - record.lastActivityAt))
+    if (record.idleTimer) return
+    const timeout = Math.max(0, activityExpiresAt(record) - now())
     record.idleTimer = setTimer(() => expireIdleActivity(key), timeout)
   }
 
@@ -122,7 +122,6 @@ export function createTerminalActivityState(
         scheduleIdleExpiry(key)
         return
       }
-      scheduleIdleExpiry(key)
       const nextRecord = records.get(key)
       if (
         nextRecord &&
@@ -132,6 +131,7 @@ export function createTerminalActivityState(
         activateActivity(key, nextRecord)
         return
       }
+      scheduleIdleExpiry(key)
       scheduleConfirmation(key)
     },
     remove(key) {

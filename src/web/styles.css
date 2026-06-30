@@ -187,7 +187,7 @@ button,
 @keyframes goblin-terminal-activity-alpha {
   0%,
   100% {
-    opacity: 0.68;
+    opacity: 0.6;
   }
 
   45% {
