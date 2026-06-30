@@ -464,7 +464,7 @@ export const ja: Record<DictKey, string> = {
   'action.create-worktree-confirm': 'ワークツリーを作成',
   'action.create-worktree-has-worktree': 'ブランチ "{branch}" はすでにワークツリーがあります',
   'action.create-worktree-busy': 'ブランチ操作が進行中です。完了するまで新しいワークツリーの作成を待ってください。',
-  'action.create-worktree-bootstrap-remember': '現在の設定を信頼',
+  'action.create-worktree-bootstrap-config-trusted': '現在の設定を信頼',
   'action.menu': '操作',
   'action.refresh': '同期',
   'action.refresh-title': 'git branch · git status · git log',

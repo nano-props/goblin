@@ -468,7 +468,7 @@ export const en = {
   'action.create-worktree-confirm': 'Create worktree',
   'action.create-worktree-has-worktree': 'Branch "{branch}" already has a worktree',
   'action.create-worktree-busy': 'A branch action is in progress. Wait for it to finish before creating a worktree.',
-  'action.create-worktree-bootstrap-remember': 'Trust this config',
+  'action.create-worktree-bootstrap-config-trusted': 'Trust this config',
   'action.menu': 'Actions',
   'action.refresh': 'Sync',
   'action.refresh-title': 'git branch · git status · git log',

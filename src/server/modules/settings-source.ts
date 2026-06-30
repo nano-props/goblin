@@ -578,6 +578,29 @@ export async function trustServerRepoWorktreeBootstrapConfig(input: {
   return cloneRepoSettings(data.repoSettings)
 }
 
+export async function untrustServerRepoWorktreeBootstrapConfig(input: {
+  repoId: string
+  configHash: string
+}): Promise<boolean> {
+  const data = await loadUserSettings()
+  const repoId = toSafeRepoLocator(input.repoId)
+  if (!repoId || !isWorktreeBootstrapConfigHash(input.configHash)) return false
+  const existingIndex = data.repoSettings.findIndex((entry) => entry.repoId === repoId)
+  if (existingIndex < 0) return false
+  const existing = data.repoSettings[existingIndex]
+  if (existing.worktreeBootstrapTrust?.configHash !== input.configHash) return false
+
+  const nextEntry: RepoSettingsEntry = { ...existing }
+  delete nextEntry.worktreeBootstrapTrust
+  if (nextEntry.workspaceExternalAppRecent) {
+    data.repoSettings = data.repoSettings.map((entry, index) => (index === existingIndex ? nextEntry : entry))
+  } else {
+    data.repoSettings = data.repoSettings.filter((_, index) => index !== existingIndex)
+  }
+  await writeUserSettingsFile(data)
+  return true
+}
+
 /**
  * Record the most recently chosen workspace external app id for a
  * (repo, worktree) scope. The split-button primary in the workspace

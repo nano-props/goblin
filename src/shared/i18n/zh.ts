@@ -444,7 +444,7 @@ export const zh: Record<DictKey, string> = {
   'action.create-worktree-confirm': '创建工作树',
   'action.create-worktree-has-worktree': '分支 "{branch}" 已有工作树',
   'action.create-worktree-busy': '正在执行分支操作，请等待完成后再新建工作树。',
-  'action.create-worktree-bootstrap-remember': '信任当前 goblin.toml 配置',
+  'action.create-worktree-bootstrap-config-trusted': '信任当前 goblin.toml 配置',
   'action.menu': '操作',
   'action.refresh': '同步',
   'action.refresh-title': 'git branch · git status · git log',

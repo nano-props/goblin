@@ -155,6 +155,57 @@ test('updates repo-level worktree bootstrap trust by repo id', async () => {
   ])
 })
 
+test('clears repo-level worktree bootstrap trust without dropping other repo settings', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+
+  const mod = await import('#/server/modules/settings-source.ts')
+  const configHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+
+  await mod.trustServerRepoWorktreeBootstrapConfig({
+    repoId: '/repo-a',
+    configHash,
+  })
+  await mod.setServerRepoWorkspaceExternalAppRecent({
+    repoId: '/repo-a',
+    worktreePath: '/repo-a-worktree',
+    itemId: 'vscode',
+  })
+
+  await expect(
+    mod.untrustServerRepoWorktreeBootstrapConfig({
+      repoId: '/repo-a',
+      configHash: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+    }),
+  ).resolves.toBe(false)
+  await expect(mod.untrustServerRepoWorktreeBootstrapConfig({ repoId: '/repo-a', configHash })).resolves.toBe(true)
+
+  expect(await mod.getServerRepoSettings()).toEqual([
+    {
+      repoId: '/repo-a',
+      workspaceExternalAppRecent: { byWorktree: { '/repo-a-worktree': 'vscode' } },
+    },
+  ])
+})
+
+test('clears empty repo settings entry when removing only worktree bootstrap trust', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+
+  const mod = await import('#/server/modules/settings-source.ts')
+  const configHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+
+  await mod.trustServerRepoWorktreeBootstrapConfig({
+    repoId: '/repo-a',
+    configHash,
+  })
+
+  await expect(mod.untrustServerRepoWorktreeBootstrapConfig({ repoId: '/repo-a', configHash })).resolves.toBe(true)
+  expect(await mod.getServerRepoSettings()).toEqual([])
+})
+
 test('normalizes branch-scoped workspace pane tab preferences in server sessions', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR

@@ -53,9 +53,8 @@ interface WorktreeBootstrapPromptState {
   loading: boolean
   preview: WorktreeBootstrapPreview | null
   error: boolean
-  trusted: boolean
-  rememberTrust: boolean
-  onRememberTrustChange: (remember: boolean) => void
+  configTrusted: boolean
+  onConfigTrustedChange: (trust: boolean) => void
 }
 
 export function CreateWorktreeDialog({ open, repo, worktreeBootstrap, onClose, onCreate }: Props) {
@@ -379,13 +378,13 @@ export function CreateWorktreeDialog({ open, repo, worktreeBootstrap, onClose, o
 function WorktreeBootstrapTrustCheckbox({ state }: { state: WorktreeBootstrapPromptState | undefined }) {
   const t = useT()
   const preview = state?.preview ?? null
-  const showPrompt = !state?.loading && !state?.error && !state?.trusted && preview?.hasOperations && preview.configHash
+  const showPrompt = !state?.loading && !state?.error && preview?.hasOperations === true && !!preview.configHash
   if (!state || !showPrompt) return null
 
   return (
     <div className="pt-0.5 text-sm">
-      <ConfirmCheckbox checked={state.rememberTrust} onCheckedChange={state.onRememberTrustChange}>
-        {t('action.create-worktree-bootstrap-remember')}
+      <ConfirmCheckbox checked={state.configTrusted} onCheckedChange={state.onConfigTrustedChange}>
+        {t('action.create-worktree-bootstrap-config-trusted')}
       </ConfirmCheckbox>
     </div>
   )

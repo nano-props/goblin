@@ -1,4 +1,5 @@
 import path from 'node:path'
+import PQueue from 'p-queue'
 import { runServerCancellable, abortServerNetworkOp } from '#/server/common/network-ops.ts'
 import { publishRepoQueryInvalidation, publishSettingsInvalidation } from '#/server/modules/invalidation-broker.ts'
 import { resolveRepoSource, runWithRepoSource, type RepoMutationResult } from '#/server/modules/repo-source.ts'
@@ -6,6 +7,7 @@ import {
   getServerRepoSettings,
   pruneServerRepoSettingsForRemovedWorktree,
   trustServerRepoWorktreeBootstrapConfig,
+  untrustServerRepoWorktreeBootstrapConfig,
 } from '#/server/modules/settings-source.ts'
 import { cloneRepo as cloneGitRepo } from '#/system/git/clone.ts'
 import { openInPreferredEditor } from '#/system/editors.ts'
@@ -32,6 +34,7 @@ const CLONE_OPERATION_ID_RE = /^[A-Za-z0-9_-]{1,128}$/
 const INVALIDATION_SOURCE_TOKEN_RE = /^[A-Za-z0-9_-]{1,128}$/
 const activeCloneControllers = new Map<string, AbortController>()
 const activeBackgroundFetches = new Map<string, Promise<{ ok: boolean; message: string }>>()
+const createWorktreeOperationQueuesByRepo = new Map<string, PQueue>()
 
 async function probeReadableDirectory(cwd: string): Promise<ProbeAvailability> {
   try {
@@ -281,26 +284,64 @@ export async function createRepoWorktree(
     return { ok: false, message: 'error.invalid-path' }
   }
   const worktreeBootstrap = options?.worktreeBootstrap ?? { kind: 'skip' }
-  return await runWithRepoSource(cwd, async (source) => {
-    const result = await source.createWorktree(normalized, signal, {
-      worktreeBootstrap,
+  return await runCreateWorktreeServiceOperation(repoId, async () => {
+    if (signal?.aborted) return { ok: false, message: 'cancelled' }
+    return await runWithRepoSource(cwd, async (source) => {
+      const result = await source.createWorktree(normalized, signal, {
+        worktreeBootstrap,
+      })
+      const trustSyncedResult = await syncWorktreeBootstrapTrustAfterSuccessfulRun(repoId, worktreeBootstrap, result)
+      return await publishSnapshotInvalidationAfterMutation(cwd, trustSyncedResult, sourceToken)
     })
-    const trustedResult = await trustWorktreeBootstrapAfterSuccessfulRun(repoId, worktreeBootstrap, result)
-    return await publishSnapshotInvalidationAfterMutation(cwd, trustedResult, sourceToken)
   })
 }
 
-async function trustWorktreeBootstrapAfterSuccessfulRun(
+async function runCreateWorktreeServiceOperation<T>(repoId: string, task: () => Promise<T>): Promise<T> {
+  // Create worktree is one service mutation: git create, bootstrap, trust sync,
+  // and invalidation must apply in request order for the same repo.
+  const queue = createWorktreeOperationQueueForRepo(repoId)
+  try {
+    return await queue.add(task)
+  } finally {
+    scheduleCreateWorktreeOperationQueueCleanup(repoId, queue)
+  }
+}
+
+function createWorktreeOperationQueueForRepo(repoId: string): PQueue {
+  let queue = createWorktreeOperationQueuesByRepo.get(repoId)
+  if (!queue) {
+    queue = new PQueue({ concurrency: 1 })
+    createWorktreeOperationQueuesByRepo.set(repoId, queue)
+  }
+  return queue
+}
+
+function scheduleCreateWorktreeOperationQueueCleanup(repoId: string, queue: PQueue): void {
+  void queue.onIdle().then(() => {
+    if (createWorktreeOperationQueuesByRepo.get(repoId) !== queue) return
+    if (queue.size === 0 && queue.pending === 0) createWorktreeOperationQueuesByRepo.delete(repoId)
+  })
+}
+
+async function syncWorktreeBootstrapTrustAfterSuccessfulRun(
   repoId: string,
   decision: WorktreeBootstrapDecision,
   result: RepoMutationResult,
 ): Promise<RepoMutationResult> {
-  if (!result.ok || decision.kind !== 'run' || !decision.rememberTrust) return result
+  if (!result.ok || decision.kind !== 'run') return result
   try {
     const repoSettings = await getServerRepoSettings()
-    if (isRepoWorktreeBootstrapConfigTrusted(repoSettings, repoId, decision.configHash)) return result
-    await trustServerRepoWorktreeBootstrapConfig({ repoId, configHash: decision.configHash })
-    publishSettingsInvalidation(['settings-snapshot'])
+    const currentlyTrusted = isRepoWorktreeBootstrapConfigTrusted(repoSettings, repoId, decision.configHash)
+    if (decision.configTrusted) {
+      if (currentlyTrusted) return result
+      await trustServerRepoWorktreeBootstrapConfig({ repoId, configHash: decision.configHash })
+      publishSettingsInvalidation(['settings-snapshot'])
+      return result
+    }
+    if (!currentlyTrusted) return result
+    if (await untrustServerRepoWorktreeBootstrapConfig({ repoId, configHash: decision.configHash })) {
+      publishSettingsInvalidation(['settings-snapshot'])
+    }
     return result
   } catch {
     return { ...result, ok: false, message: 'error.settings-write-title', repoChanged: true }
