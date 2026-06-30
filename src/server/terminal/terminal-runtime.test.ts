@@ -1220,6 +1220,21 @@ describe('server terminal runtime', () => {
     expect(host.getDiagnostics().shuttingDown).toBe(true)
   })
 
+  test('shutdown does not leave detached-user timers after closing registered sockets', () => {
+    vi.useFakeTimers()
+    try {
+      const { host, shutdown } = buildRuntime()
+      const socket = { send: vi.fn(), close: vi.fn() }
+      host.registerSocket('client_shutdown', USER_1, socket)
+
+      shutdown()
+
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   test('emits an identity change when a takeover succeeds', async () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }

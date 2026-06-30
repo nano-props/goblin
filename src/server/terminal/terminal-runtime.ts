@@ -89,7 +89,6 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     detachedTtlMs: TERMINAL_DETACHED_TTL_MS,
   })
   broker = coordinator.broker
-  const { detachedUsers } = coordinator
   const catalog = createTerminalCatalog({
     isValidClientId: isValidTerminalClientId,
     isValidTerminalSessionId,
@@ -237,8 +236,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     shutdown() {
       if (shuttingDown) return
       shuttingDown = true
-      detachedUsers.shutdown()
-      broker.disconnectAll()
+      coordinator.shutdown()
       manager.closeAll()
       ptySupervisor.shutdown()
     },

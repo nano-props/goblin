@@ -11,7 +11,7 @@ export interface TerminalRuntimeCoordinatorOptions {
 
 export interface TerminalRuntimeCoordinator {
   broker: TerminalRealtimeBroker
-  detachedUsers: TerminalDetachedUserTimer
+  shutdown(): void
 }
 
 export function createTerminalRuntimeCoordinator(
@@ -43,5 +43,14 @@ export function createTerminalRuntimeCoordinator(
     },
   })
 
-  return { broker, detachedUsers }
+  return {
+    broker,
+    shutdown() {
+      // Draining broker sockets can synchronously unregister buffered sockets
+      // and schedule detached-user timers. Stop those timers after the broker
+      // drain so runtime shutdown cannot leave a 24h cleanup timeout behind.
+      broker.disconnectAll()
+      detachedUsers.shutdown()
+    },
+  }
 }
