@@ -1225,6 +1225,7 @@ function renderToolbar(options: {
     phase: 'open' as const,
     selected: index === 0,
     hasBell: false,
+            recentlyActive: false,
   }))
   const selectedDescriptor: TerminalDescriptor | null = sessions[0]
     ? {
@@ -1243,6 +1244,7 @@ function renderToolbar(options: {
     sessions,
     count: options.terminalCount,
     bellCount: sessions.filter((session) => session.hasBell).length,
+        activeCount: 0,
     pendingCreate: options.pendingCreate ?? false,
   }
   const terminalSnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }

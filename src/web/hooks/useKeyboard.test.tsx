@@ -397,10 +397,12 @@ function worktreeSnapshot(): WorktreeTerminalSnapshot {
         phase: 'open',
         selected: true,
         hasBell: false,
+            recentlyActive: false,
       },
     ],
     count: 1,
     bellCount: 0,
+        activeCount: 0,
     pendingCreate: false,
   }
 }

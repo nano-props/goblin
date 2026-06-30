@@ -71,6 +71,7 @@ describe('workspace commands', () => {
         sessions: [],
         count: 0,
         bellCount: 0,
+        activeCount: 0,
         pendingCreate: false,
       }),
       createTerminal: vi.fn(async () => 'session-1'),
@@ -98,6 +99,7 @@ describe('workspace commands', () => {
         sessions: [],
         count: 0,
         bellCount: 0,
+        activeCount: 0,
         pendingCreate: false,
       }),
       createTerminal: vi.fn(async () => 'session-1'),
@@ -125,6 +127,7 @@ describe('workspace commands', () => {
         sessions: [],
         count: 0,
         bellCount: 0,
+        activeCount: 0,
         pendingCreate: false,
       }),
       createTerminal: vi.fn(async () => 'session-1'),
@@ -154,6 +157,7 @@ describe('workspace commands', () => {
           sessions: [],
           count: 0,
           bellCount: 0,
+        activeCount: 0,
           pendingCreate: false,
         }),
         createTerminal: vi.fn(async () => 'session-1'),
@@ -187,6 +191,7 @@ describe('workspace commands', () => {
         sessions: [],
         count: 0,
         bellCount: 0,
+        activeCount: 0,
         pendingCreate: false,
       }),
       createTerminal: vi.fn(async () => 'session-1'),
@@ -213,6 +218,7 @@ describe('workspace commands', () => {
         sessions: [],
         count: 0,
         bellCount: 0,
+        activeCount: 0,
         pendingCreate: false,
       }),
       createTerminal: vi.fn(async () => 'session-1'),
@@ -240,6 +246,7 @@ describe('workspace commands', () => {
         sessions: [],
         count: 0,
         bellCount: 0,
+        activeCount: 0,
         pendingCreate: false,
       }),
       createTerminal,
@@ -284,6 +291,7 @@ describe('workspace commands', () => {
             phase: 'open',
             selected: true,
             hasBell: false,
+            recentlyActive: false,
           },
           {
             type: 'terminal',
@@ -297,10 +305,12 @@ describe('workspace commands', () => {
             phase: 'open',
             selected: false,
             hasBell: false,
+            recentlyActive: false,
           },
         ],
         count: 2,
         bellCount: 0,
+        activeCount: 0,
         pendingCreate: false,
       }),
       createTerminal,
@@ -1105,10 +1115,12 @@ function worktreeSnapshotWithTerminal(options: { processName?: string } = {}): W
         phase: 'open',
         selected: true,
         hasBell: false,
+            recentlyActive: false,
       },
     ],
     count: 1,
     bellCount: 0,
+        activeCount: 0,
     pendingCreate: false,
   }
 }
@@ -1120,6 +1132,7 @@ function emptyWorktreeSnapshot(): WorktreeTerminalSnapshot {
     sessions: [],
     count: 0,
     bellCount: 0,
+        activeCount: 0,
     pendingCreate: false,
   }
 }
@@ -1138,6 +1151,7 @@ function worktreeSnapshotForSessions(sessionIds: string[]): WorktreeTerminalSnap
     phase: 'open' as const,
     selected: sessionId === selectedKey,
     hasBell: false,
+            recentlyActive: false,
   }))
   const selectedSession = sessions.find((session) => session.key === selectedKey) ?? null
   return {
@@ -1156,6 +1170,7 @@ function worktreeSnapshotForSessions(sessionIds: string[]): WorktreeTerminalSnap
     sessions,
     count: sessions.length,
     bellCount: 0,
+        activeCount: 0,
     pendingCreate: false,
   }
 }
@@ -1185,6 +1200,7 @@ function worktreeSnapshotWithSecondTerminalSelected(): WorktreeTerminalSnapshot 
         phase: 'open',
         selected: false,
         hasBell: false,
+            recentlyActive: false,
       },
       {
         type: 'terminal',
@@ -1198,10 +1214,12 @@ function worktreeSnapshotWithSecondTerminalSelected(): WorktreeTerminalSnapshot 
         phase: 'open',
         selected: true,
         hasBell: false,
+            recentlyActive: false,
       },
     ],
     count: 2,
     bellCount: 0,
+        activeCount: 0,
     pendingCreate: false,
   }
 }

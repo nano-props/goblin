@@ -175,6 +175,26 @@ button,
   justify-content: center;
 }
 
+.goblin-terminal-activity-indicator__icon-wrap {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  animation: goblin-terminal-activity-alpha 2400ms ease-in-out infinite;
+}
+
+@keyframes goblin-terminal-activity-alpha {
+  0%,
+  100% {
+    opacity: 0.68;
+  }
+
+  45% {
+    opacity: 1;
+  }
+}
+
 /* Workspace split-pane collapse motion. Kept at the layout boundary so
  * Zen Mode changes the pane geometry without remounting the workspace. */
 .goblin-split-pane {

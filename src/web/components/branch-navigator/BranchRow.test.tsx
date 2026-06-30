@@ -24,6 +24,8 @@ vi.mock(import('#/web/stores/i18n.ts'), async (importOriginal) => {
           return '已失联'
         case 'terminal.bell-unread-count':
           return `${params?.count ?? 0} 个未读终端提醒`
+        case 'terminal.active':
+          return '终端正在活动'
         case 'branch-status.changes-count':
           return `${params?.n ?? 0} 个改动`
         case 'branch-status.sync.ahead':
@@ -143,6 +145,78 @@ describe('BranchRow', () => {
     expect(actionArea?.contains(badge ?? null)).toBe(true)
   })
 
+  test('shows terminal activity in the action slot in non-compact mode', () => {
+    const repo = emptyRepo('/tmp/repo', 'repo')
+    const branch = createRepoBranch('feature/a', { worktree: { path: '/tmp/worktree-a' } })
+
+    const { container } = renderInJsdom(
+      <ul>
+        <BranchRow
+          repo={repo}
+          branch={branch}
+          selected={null}
+          onSelectBranch={vi.fn()}
+          onOpenBranchStatus={vi.fn()}
+          selectedRef={createRef<HTMLLIElement>()}
+          terminalActive
+        />
+      </ul>,
+    )
+
+    const indicator = container.querySelector('[data-testid="terminal-activity-indicator"]')
+    const branchIcon = container.querySelector('[data-testid="branch-summary-icon"]')
+    const actionArea = container.querySelector('li')?.children[1]
+    expect(indicator).not.toBeNull()
+    expect(indicator?.getAttribute('aria-label')).toBe('终端正在活动')
+    expect(branchIcon).not.toBeNull()
+    expect(actionArea?.contains(indicator ?? null)).toBe(true)
+  })
+
+  test('hides terminal activity when the branch row is selected in non-compact mode', () => {
+    const repo = emptyRepo('/tmp/repo', 'repo')
+    const branch = createRepoBranch('feature/a', { worktree: { path: '/tmp/worktree-a' } })
+
+    const { container } = renderInJsdom(
+      <ul>
+        <BranchRow
+          repo={repo}
+          branch={branch}
+          selected="feature/a"
+          onSelectBranch={vi.fn()}
+          onOpenBranchStatus={vi.fn()}
+          selectedRef={createRef<HTMLLIElement>()}
+          terminalActive
+        />
+      </ul>,
+    )
+
+    expect(container.querySelector('[data-testid="terminal-activity-indicator"]')).toBeNull()
+    expect(container.querySelector('[data-testid="branch-summary-icon"]')).not.toBeNull()
+  })
+
+  test('gives terminal bell priority over terminal activity', () => {
+    const repo = emptyRepo('/tmp/repo', 'repo')
+    const branch = createRepoBranch('feature/a', { worktree: { path: '/tmp/worktree-a' } })
+
+    const { container } = renderInJsdom(
+      <ul>
+        <BranchRow
+          repo={repo}
+          branch={branch}
+          selected={null}
+          onSelectBranch={vi.fn()}
+          onOpenBranchStatus={vi.fn()}
+          selectedRef={createRef<HTMLLIElement>()}
+          terminalBellCount={2}
+          terminalActive
+        />
+      </ul>,
+    )
+
+    expect(container.querySelector('[aria-label="2 个未读终端提醒"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="terminal-activity-indicator"]')).toBeNull()
+  })
+
   test('keeps the branch icon when there are no unread terminal bells', () => {
     const repo = emptyRepo('/tmp/repo', 'repo')
     const branch = createRepoBranch('feature/a')
@@ -220,6 +294,60 @@ describe('BranchRow', () => {
     expect(badge!.compareDocumentPosition(branchLabel!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
+  test('shows terminal activity on the leading edge in compact mode', () => {
+    responsiveMocks.compact = true
+    const repo = emptyRepo('/tmp/repo', 'repo')
+    const branch = createRepoBranch('feature/a')
+
+    const { container } = renderInJsdom(
+      <ul>
+        <BranchRow
+          repo={repo}
+          branch={branch}
+          selected={null}
+          onSelectBranch={vi.fn()}
+          onOpenBranchStatus={vi.fn()}
+          selectedRef={createRef<HTMLLIElement>()}
+          terminalActive
+        />
+      </ul>,
+    )
+
+    const indicator = container.querySelector('[data-testid="terminal-activity-indicator"]')
+    const branchIcon = container.querySelector('[data-testid="branch-summary-icon"]')
+    const branchLabel = Array.from(container.querySelectorAll('span')).find((node) => node.textContent === 'feature/a')
+    const actionArea = container.querySelector('li')?.children[1]
+
+    expect(indicator).not.toBeNull()
+    expect(branchIcon).toBeNull()
+    expect(branchLabel).not.toBeUndefined()
+    expect(actionArea?.contains(indicator ?? null)).toBe(false)
+    expect(indicator!.compareDocumentPosition(branchLabel!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  test('hides terminal activity when the branch row is selected in compact mode', () => {
+    responsiveMocks.compact = true
+    const repo = emptyRepo('/tmp/repo', 'repo')
+    const branch = createRepoBranch('feature/a')
+
+    const { container } = renderInJsdom(
+      <ul>
+        <BranchRow
+          repo={repo}
+          branch={branch}
+          selected="feature/a"
+          onSelectBranch={vi.fn()}
+          onOpenBranchStatus={vi.fn()}
+          selectedRef={createRef<HTMLLIElement>()}
+          terminalActive
+        />
+      </ul>,
+    )
+
+    expect(container.querySelector('[data-testid="terminal-activity-indicator"]')).toBeNull()
+    expect(container.querySelector('[data-testid="branch-summary-icon"]')).not.toBeNull()
+  })
+
   test('shows the relative commit time without the last commit author', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-06-05T12:00:00.000Z'))
@@ -289,7 +417,7 @@ describe('BranchRow', () => {
 
 function renderRow(
   compact: boolean,
-  options: { actionMenuOpen?: boolean; branchActionBusy?: boolean } = {},
+  options: { actionMenuOpen?: boolean; branchActionBusy?: boolean; terminalActive?: boolean } = {},
 ): { container: HTMLElement; shell: HTMLDivElement | undefined } {
   responsiveMocks.compact = compact
   const repo = emptyRepo('/tmp/repo', 'repo')
@@ -306,6 +434,7 @@ function renderRow(
         actionMenuOpen={options.actionMenuOpen}
         onActionMenuOpenChange={vi.fn()}
         branchActionBusy={options.branchActionBusy}
+        terminalActive={options.terminalActive}
       />
     </ul>,
   )

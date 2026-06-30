@@ -68,6 +68,7 @@ describe('terminal session worktree snapshot helper', () => {
       cacheSnapshot: (key, value) => cache.set(key, value),
       getDisplayOrder: () => 1,
       hasBell: () => true,
+      hasRecentActivity: () => true,
     })
 
     expect(snapshot).toEqual({
@@ -81,12 +82,14 @@ describe('terminal session worktree snapshot helper', () => {
           sessionId: 'session-1',
           selected: true,
           hasBell: true,
+          recentlyActive: true,
           phase: 'open',
           originalTitle: 'npm run dev',
         }),
       ],
       count: 1,
       bellCount: 1,
+      activeCount: 1,
       pendingCreate: false,
     })
     expect(session.snapshotSpy).toHaveBeenCalledTimes(1)
@@ -101,6 +104,7 @@ describe('terminal session worktree snapshot helper', () => {
       cacheSnapshot: (key, value) => cache.set(key, value),
       getDisplayOrder: () => 1,
       hasBell: () => false,
+      hasRecentActivity: () => false,
     })
     expect(session.snapshotSpy).toHaveBeenCalledTimes(1)
   })

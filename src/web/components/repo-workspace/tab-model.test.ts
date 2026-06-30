@@ -431,5 +431,6 @@ function terminalView(key: string, displayOrder: number, selected: boolean): Wor
     phase: 'open',
     selected,
     hasBell: false,
+            recentlyActive: false,
   }
 }

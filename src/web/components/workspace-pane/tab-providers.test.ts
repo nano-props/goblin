@@ -35,6 +35,7 @@ const terminalView: WorkspacePaneTabSummary = {
   phase: 'open',
   selected: true,
   hasBell: false,
+            recentlyActive: false,
 }
 
 describe('workspace pane tab providers', () => {
