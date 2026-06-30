@@ -157,24 +157,6 @@ button,
   }
 }
 
-/* Inline keycap chip — used by the help overlay. Defined as plain CSS
- * (not @utility) so it's reachable even without Tailwind seeing every
- * call site. */
-.kbd {
-  display: inline-flex;
-  align-items: center;
-  padding: 0 0.35rem;
-  border-radius: 4px;
-  border: 1px solid var(--color-border);
-  background: var(--color-muted);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  line-height: 1.4;
-  color: var(--color-foreground);
-  min-width: 1.5rem;
-  justify-content: center;
-}
-
 .goblin-terminal-activity-indicator__icon-wrap {
   display: inline-flex;
   width: 16px;

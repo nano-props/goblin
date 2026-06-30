@@ -86,7 +86,7 @@ export const CLIENT_NAVIGATION_SHORTCUTS: ClientKeyboardShortcutDefinition<Clien
 ]
 
 export const BRANCH_ACTION_SHORTCUTS: BranchActionShortcutDefinition[] = [
-  branchActionShortcut([{ code: 'KeyP', shiftKey: false }], 'pull', [['p']], 'action.pull'),
+  branchActionShortcut([{ code: 'KeyP', shiftKey: false }], 'pull', [['P']], 'action.pull'),
   branchActionShortcut([{ code: 'KeyP', shiftKey: true }], 'push', [['⇧', 'P']], 'action.push'),
 ]
 
