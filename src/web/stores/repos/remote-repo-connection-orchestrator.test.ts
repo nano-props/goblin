@@ -99,8 +99,7 @@ describe('runRemoteRepoConnection', () => {
         ui: {
           selectedBranch: null,
           branchViewMode: 'all',
-          workspacePaneTabOrderByBranch: {},
-          preferredWorkspacePaneTabByBranch: {},
+          preferredWorkspacePaneTabByTarget: {},
         },
         projection: { source: 'fresh', savedAt: null },
         remote: {
@@ -146,8 +145,7 @@ describe('runRemoteRepoConnection', () => {
         ui: {
           selectedBranch: null,
           branchViewMode: 'all',
-          workspacePaneTabOrderByBranch: {},
-          preferredWorkspacePaneTabByBranch: {},
+          preferredWorkspacePaneTabByTarget: {},
         },
         projection: { source: 'fresh', savedAt: null },
         remote: {
@@ -193,8 +191,7 @@ describe('runRemoteRepoConnection', () => {
         ui: {
           selectedBranch: null,
           branchViewMode: 'all',
-          workspacePaneTabOrderByBranch: {},
-          preferredWorkspacePaneTabByBranch: {},
+          preferredWorkspacePaneTabByTarget: {},
         },
         projection: { source: 'fresh', savedAt: null },
         remote: {
@@ -240,8 +237,7 @@ describe('runRemoteRepoConnection', () => {
         ui: {
           selectedBranch: null,
           branchViewMode: 'all',
-          workspacePaneTabOrderByBranch: {},
-          preferredWorkspacePaneTabByBranch: {},
+          preferredWorkspacePaneTabByTarget: {},
         },
         projection: { source: 'fresh', savedAt: null },
         remote: {
@@ -320,8 +316,7 @@ describe('runRemoteRepoConnection', () => {
         ui: {
           selectedBranch: null,
           branchViewMode: 'all',
-          workspacePaneTabOrderByBranch: {},
-          preferredWorkspacePaneTabByBranch: {},
+          preferredWorkspacePaneTabByTarget: {},
         },
         projection: { source: 'fresh', savedAt: null },
         remote: {
@@ -387,8 +382,7 @@ describe('runRemoteRepoConnection', () => {
           ui: {
             selectedBranch: null,
             branchViewMode: 'all',
-            workspacePaneTabOrderByBranch: {},
-            preferredWorkspacePaneTabByBranch: {},
+            preferredWorkspacePaneTabByTarget: {},
           },
           projection: { source: 'fresh', savedAt: null },
           remote: {

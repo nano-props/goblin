@@ -47,7 +47,7 @@ describe('TerminalActionDialogHost', () => {
       useTerminalActionDialogsStore.getState().openCloseConfirm({
         repoId: '/repo',
         targetIdentity: 'terminal:session-1',
-        terminalKey: 'session-1',
+        terminalSessionId: 'session-1',
         terminalBase: { repoRoot: '/repo', branch: 'main', worktreePath: '/repo-worktree' },
         processName: 'node',
       })

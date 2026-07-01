@@ -46,7 +46,7 @@ Create may send a lightweight startup geometry hint before a real view exists. A
 ### Stable business boundary over PTY boundary
 
 - PTY execution is an implementation detail behind a supervisor interface.
-- Session lifecycle, control, replay, and catalog rules live above the PTY layer.
+- Session lifecycle, control, replay, and session service rules live above the PTY layer.
 - Switching between in-process PTY execution and worker-backed PTY execution must not change the terminal product model.
 
 ### Reconnect over recreation
@@ -80,12 +80,12 @@ The terminal feature spans `shared`, `server`, and `web`, but it still behaves a
 
 ### Shared layer
 
-- Defines protocol types, message shapes, identities, and session key rules.
+- Defines protocol types, message shapes, identities, and grouping rules.
 - Gives both server and client a common language for session, control, and realtime events.
 
 ### Server runtime
 
-- Owns business state for sessions, control, catalog behavior, connection tracking, and realtime dispatch.
+- Owns business state for sessions, control, session service behavior, connection tracking, and realtime dispatch.
 - Exposes the terminal host boundary used by routes and realtime transport.
 - Treats PTY execution as a dependency, not as the place where product behavior lives.
 
@@ -93,7 +93,7 @@ The terminal feature spans `shared`, `server`, and `web`, but it still behaves a
 
 - Owns spawn, write, resize, kill, and PTY event forwarding.
 - Hides whether PTYs run in-process or in a worker.
-- Does not own catalog, control, or client-facing policy.
+- Does not own session service, control, or client-facing policy.
 
 ### Client projection
 
@@ -113,7 +113,7 @@ The terminal feature spans `shared`, `server`, and `web`, but it still behaves a
 At a high level, the lifecycle is:
 
 1. A client requests create or restore for a worktree terminal.
-2. The server catalog resolves whether that request means create, reuse, or restore.
+2. The server session service resolves whether that request means create, reuse, or restore.
 3. The session manager ensures a session exists and that a PTY is running for it.
 4. The client attaches a local view to the session.
 5. Realtime output, title, exit, and identity events keep clients up to date.
@@ -135,7 +135,7 @@ It is useful to keep three lifetimes separate:
 - **View lifetime**: client-local xterm and DOM resources for rendering a session.
 - **Tab lifetime**: user-visible workspace surface that decides which feature resources must be released before the tab is considered closed.
 
-A Workspace Pane tab is not the authoritative owner of a terminal session. The tab is a workspace-pane slot in the UI; the terminal server (TerminalSessionManager) and client projection (TerminalSessionProjection) own terminal resource cleanup for the session rendered in that slot. The tab close path is the orchestration boundary that waits for those owners to finish.
+A Workspace Pane tab is not the authoritative owner of a terminal session. The tab is a workspace-pane tab entry in the UI; the terminal server (TerminalSessionManager) and client projection (TerminalSessionProjection) own terminal resource cleanup for the session rendered by that tab. The tab close path is the orchestration boundary that waits for those owners to finish.
 
 This distinction matters for destructive worktree operations. Before a worktree directory is removed, the client should close every worktree-scoped Workspace Pane tab for that worktree and await each tab's close contract. For terminal tabs, that close contract delegates to the client projection's worktree release barrier: cancel pending creates that have not reached the server, wait for in-flight creates that cannot be cancelled, close materialized sessions, and wait for pending durable closes to settle. For future worktree-scoped tabs, such as a file tree or another long-lived tool surface, the same tab close contract should release that tab's resources before the worktree mutation starts.
 
@@ -143,18 +143,16 @@ Repo routes and server-side repo write paths should not know about Workspace Pan
 
 ## Identity model
 
-The terminal system relies on four identity scopes:
+The terminal system relies on five identity/grouping scopes:
 
 - **userId**: the server-side terminal user derived from the authenticated access token. Session visibility, lifecycle cleanup, and realtime fanout are partitioned by this id.
 - **clientId**: the logical client for one browser tab or Electron client. It validates and routes requests and is also the code-level controller identity (`TerminalController.clientId`).
-- **terminal attachment**: the conceptual relationship between a `clientId` and a terminal session. There is intentionally no separate `attachmentId` field, and none is planned. One client should have at most one Terminal View for a given `ptySessionId`; cross-client viewing/control is modeled with `clientId`, controller/viewer state, and explicit takeover.
-- **ptySessionId**: the server-owned identifier for one live terminal session.
+- **terminalSessionId**: the server-allocated persistent identity for one terminal business session. Terminal workspace-pane tabs use this value directly as their durable terminal tab identity.
+- **terminalWorktreeKey**: the repo/worktree grouping key produced by `formatTerminalWorktreeKey(repoRoot, worktreePath)`. It is used for per-worktree selection, tab-strip grouping, bell/activity summaries, and materialization callbacks. It is not a terminal identity.
+- **ptySessionId**: the server-owned runtime identifier for the current live PTY associated with a terminal session. Restart/reconnect can change PTY runtime state without changing `terminalSessionId`.
+- **terminal attachment**: the conceptual relationship between a `clientId` and a terminal session. There is intentionally no separate `attachmentId` field, and none is planned. One client should have at most one Terminal View for a given `terminalSessionId`; cross-client viewing/control is modeled with `clientId`, controller/viewer state, and explicit takeover.
 
-In addition, terminal keys encode repo and worktree scope so the system can reason about:
-
-- which worktree a session belongs to
-- which tab strip it should appear in
-- whether a request is a restore of an existing terminal identity or a request for a new one
+This means terminal identity is not encoded from repo/worktree strings. Repo and worktree location travel as explicit fields on session summaries and as `terminalWorktreeKey` only where a grouped lookup is needed.
 
 This identity model is the basis for reconnect, mirror mode, controller handoff, and multi-window coherence.
 
@@ -277,7 +275,7 @@ The terminal feature uses realtime transport for continuous, UX-critical flows.
 
 ### Non-streaming flows
 
-- catalog reads
+- session service reads
 - snapshots
 - explicit mutations such as create, attach, restart, resize, takeover, close, and reorder
 
@@ -330,7 +328,7 @@ The terminal system should optimize for continuity, but it still needs clear fai
 
 - Failed create or restart must not leave zombie sessions presented as healthy terminals.
 - Offline presence should not destroy the session itself: a 24h detached
-  TTL keeps the catalog alive so a later attach from the same user can
+  TTL keeps the session service alive so a later attach from the same user can
   re-enter via auto-claim. The broker may close stale realtime sockets
   when presence times out, but offline controller intent still projects
   to no effective controller so siblings can claim without waiting.

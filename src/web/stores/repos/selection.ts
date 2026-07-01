@@ -7,27 +7,12 @@ import {
   normalizeWorkspaceSessionLayoutState,
 } from '#/shared/workspace-layout.ts'
 import type { BranchViewMode, RepoState, ReposGet, ReposSet, ReposStore } from '#/web/stores/repos/types.ts'
-import {
-  WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES,
-  type WorkspacePaneStaticTabType,
-  type WorkspacePaneTabOrderEntry,
-  type WorkspacePaneTabType,
-} from '#/shared/workspace-pane.ts'
-import { formatWorktreeKey } from '#/shared/terminal-workspace-slot-key.ts'
+import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
 import {
-  normalizeWorkspacePaneTabOrder,
-  workspacePaneStaticTabsForBranch,
-  workspacePaneTabOrderForBranch,
-  workspacePaneTabOrderRecordWith,
-  workspacePaneTabOrderWithStaticTab,
-  workspacePaneTabOrderWithTerminal,
-  workspacePaneTabOrderWithoutStaticTab,
-  workspacePaneTabOrderWithoutTerminal,
-} from '#/web/stores/repos/workspace-pane-tabs.ts'
-import {
-  preferredWorkspacePaneTabForBranch,
-  preferredWorkspacePaneTabByBranchRecordWith,
+  preferredWorkspacePaneTabForTarget,
+  preferredWorkspacePaneTabByTargetRecordWith,
+  workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
 
 type RestorableWorkspaceSelectionActions = Pick<
@@ -45,16 +30,7 @@ type RestorableWorkspaceSelectionActions = Pick<
 
 type RuntimeCoherentSelectionActions = Pick<
   ReposStore,
-  | 'setBranchViewMode'
-  | 'setWorkspacePaneTab'
-  | 'openWorkspacePaneStaticTab'
-  | 'closeWorkspacePaneStaticTab'
-  | 'addWorkspacePaneTerminalTab'
-  | 'addAndFocusWorkspacePaneTerminalTab'
-  | 'removeWorkspacePaneTerminalTab'
-  | 'reorderWorkspacePaneTabs'
-  | 'selectBranch'
-  | 'clearSelectedBranch'
+  'setBranchViewMode' | 'setWorkspacePaneTab' | 'selectBranch' | 'clearSelectedBranch'
 >
 
 function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet): RestorableWorkspaceSelectionActions {
@@ -87,20 +63,22 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
       })
     },
 
-    applySessionSelectedTerminalState(selectedTerminalSessionByWorktree: Record<string, string>) {
+    applySessionSelectedTerminalState(selectedTerminalSessionIdByTerminalWorktree: Record<string, string>) {
       // One-shot boot/session restore of per-worktree terminal selection. This
       // seeds client state; later selection changes remain client-owned.
       set((s) => {
-        const current = s.selectedTerminalSessionByWorktree
+        const current = s.selectedTerminalSessionIdByTerminalWorktree
         const currentEntries = Object.entries(current)
-        const nextEntries = Object.entries(selectedTerminalSessionByWorktree)
+        const nextEntries = Object.entries(selectedTerminalSessionIdByTerminalWorktree)
         if (
           currentEntries.length === nextEntries.length &&
-          nextEntries.every(([worktreeKey, key]) => current[worktreeKey] === key)
+          nextEntries.every(
+            ([terminalWorktreeKey, terminalSessionId]) => current[terminalWorktreeKey] === terminalSessionId,
+          )
         ) {
           return s
         }
-        return { selectedTerminalSessionByWorktree: { ...selectedTerminalSessionByWorktree } }
+        return { selectedTerminalSessionIdByTerminalWorktree: { ...selectedTerminalSessionIdByTerminalWorktree } }
       })
     },
 
@@ -131,19 +109,22 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
       })
     },
 
-    setSelectedTerminal(worktreeTerminalKey: string, key: string | null) {
+    setSelectedTerminal(terminalWorktreeKey: string, terminalSessionId: string | null) {
       set((s) => {
-        const current = s.selectedTerminalSessionByWorktree[worktreeTerminalKey]
-        if (key) {
-          if (current === key) return s
+        const current = s.selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]
+        if (terminalSessionId) {
+          if (current === terminalSessionId) return s
           return {
-            selectedTerminalSessionByWorktree: { ...s.selectedTerminalSessionByWorktree, [worktreeTerminalKey]: key },
+            selectedTerminalSessionIdByTerminalWorktree: {
+              ...s.selectedTerminalSessionIdByTerminalWorktree,
+              [terminalWorktreeKey]: terminalSessionId,
+            },
           }
         }
         if (current === undefined) return s
-        const selectedTerminalSessionByWorktree = { ...s.selectedTerminalSessionByWorktree }
-        delete selectedTerminalSessionByWorktree[worktreeTerminalKey]
-        return { selectedTerminalSessionByWorktree }
+        const selectedTerminalSessionIdByTerminalWorktree = { ...s.selectedTerminalSessionIdByTerminalWorktree }
+        delete selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]
+        return { selectedTerminalSessionIdByTerminalWorktree }
       })
     },
   }
@@ -166,137 +147,6 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
   }
 
   return {
-    openWorkspacePaneStaticTab(id: string, tab: WorkspacePaneStaticTabType, branchName?: string) {
-      set((s) => {
-        const repo = s.repos[id]
-        const branch = branchName ?? repo?.ui.selectedBranch
-        if (!repo || !branch) return s
-        const current = workspacePaneTabOrderForBranch(repo.ui, branch)
-        const next = workspacePaneTabOrderWithStaticTab(current, tab)
-        if (workspacePaneTabOrdersEqual(current, next)) return s
-        return replaceRepoState(s, repo, (r) => {
-          r.ui.workspacePaneTabOrderByBranch = workspacePaneTabOrderRecordWith(r.ui, branch, next)
-        })
-      })
-    },
-
-    closeWorkspacePaneStaticTab(id: string, tab: WorkspacePaneStaticTabType, branchName?: string) {
-      set((s) => {
-        const repo = s.repos[id]
-        const branch = branchName ?? repo?.ui.selectedBranch
-        if (!repo || !branch) return s
-        if (!workspacePaneStaticTabsForBranch(repo.ui, branch).includes(tab)) return s
-        const current = workspacePaneTabOrderForBranch(repo.ui, branch)
-        const next = workspacePaneTabOrderWithoutStaticTab(current, tab)
-        return replaceRepoState(s, repo, (r) => {
-          r.ui.workspacePaneTabOrderByBranch = workspacePaneTabOrderRecordWith(r.ui, branch, next)
-        })
-      })
-    },
-
-    addWorkspacePaneTerminalTab(id: string, terminalKey: string, branchName?: string) {
-      set((s) => {
-        const repo = s.repos[id]
-        const branch = branchName ?? repo?.ui.selectedBranch
-        if (!repo || !branch) return s
-        const current = workspacePaneTabOrderForBranch(repo.ui, branch)
-        const next = workspacePaneTabOrderWithTerminal(current, terminalKey)
-        if (workspacePaneTabOrdersEqual(current, next)) return s
-        return replaceRepoState(s, repo, (r) => {
-          r.ui.workspacePaneTabOrderByBranch = workspacePaneTabOrderRecordWith(r.ui, branch, next)
-        })
-      })
-    },
-
-    addAndFocusWorkspacePaneTerminalTab(id: string, terminalKey: string, branchName?: string) {
-      let token: number | undefined
-      let viewChanged = false
-      set((s) => {
-        const repo = s.repos[id]
-        const branch = branchName ?? repo?.ui.selectedBranch
-        if (!repo || !branch) return s
-        const branchState = repo.data.branches.find((candidate) => candidate.name === branch)
-        const worktreePath = branchState?.worktree?.path
-        if (!worktreePath) return s
-        const currentOrder = workspacePaneTabOrderForBranch(repo.ui, branch)
-        const nextOrder = workspacePaneTabOrderWithTerminal(currentOrder, terminalKey)
-        const currentView = preferredWorkspacePaneTabForBranch(repo.ui, branch)
-        const wtKey = formatWorktreeKey(id, worktreePath)
-        const currentSelected = s.selectedTerminalSessionByWorktree[wtKey]
-        const orderChanged = !workspacePaneTabOrdersEqual(currentOrder, nextOrder)
-        viewChanged = currentView !== 'terminal'
-        const selectionChanged = currentSelected !== terminalKey
-        if (!orderChanged && !viewChanged && !selectionChanged) return s
-        token = repo.instanceToken
-        const repoPatch = replaceRepoState(s, repo, (r) => {
-          if (orderChanged) {
-            r.ui.workspacePaneTabOrderByBranch = workspacePaneTabOrderRecordWith(r.ui, branch, nextOrder)
-          }
-          if (viewChanged) {
-            r.ui.preferredWorkspacePaneTabByBranch = preferredWorkspacePaneTabByBranchRecordWith(
-              r.ui,
-              branch,
-              'terminal',
-            )
-          }
-        })
-        if (!selectionChanged) return repoPatch
-        return {
-          ...repoPatch,
-          selectedTerminalSessionByWorktree: { ...s.selectedTerminalSessionByWorktree, [wtKey]: terminalKey },
-        }
-      })
-      if (!viewChanged || token === undefined) return
-      const repo = get().repos[id]
-      persistRepoSnapshotCacheEntry(set, repo, token)
-      void runRepoRefreshIntent(get, {
-        kind: 'visible-pull-request-changed',
-        id,
-        token,
-        branch:
-          repo && preferredWorkspacePaneTabForBranch(repo.ui, repo.ui.selectedBranch) === 'status'
-            ? repo.ui.selectedBranch
-            : null,
-      })
-    },
-
-    removeWorkspacePaneTerminalTab(id: string, terminalKey: string, branchName?: string) {
-      set((s) => {
-        const repo = s.repos[id]
-        const branch = branchName ?? repo?.ui.selectedBranch
-        if (!repo || !branch) return s
-        const current = workspacePaneTabOrderForBranch(repo.ui, branch)
-        const next = workspacePaneTabOrderWithoutTerminal(current, terminalKey)
-        if (workspacePaneTabOrdersEqual(current, next)) return s
-        return replaceRepoState(s, repo, (r) => {
-          r.ui.workspacePaneTabOrderByBranch = workspacePaneTabOrderRecordWith(r.ui, branch, next)
-        })
-      })
-    },
-
-    reorderWorkspacePaneTabs(id: string, orderedTabs: WorkspacePaneTabOrderEntry[], branchName?: string) {
-      set((s) => {
-        const repo = s.repos[id]
-        const branch = branchName ?? repo?.ui.selectedBranch
-        if (!repo || !branch) return s
-        const current = workspacePaneTabOrderForBranch(repo.ui, branch)
-        const hiddenStaticTabs = hiddenWorkspacePaneStaticTabs(repo, branch)
-        const currentStaticTabs = workspacePaneStaticTabsForBranch(repo.ui, branch).filter(
-          (tab) => !hiddenStaticTabs.has(tab),
-        )
-        const next = normalizeWorkspacePaneTabOrder(orderedTabs)
-        const nextStaticTabs = next.flatMap((entry) => (entry.type === 'terminal' ? [] : [entry.type]))
-        if (nextStaticTabs.length !== currentStaticTabs.length) return s
-        const currentStaticSet = new Set(currentStaticTabs)
-        if (!nextStaticTabs.every((tab) => currentStaticSet.has(tab))) return s
-        const nextOrder = mergeHiddenWorkspacePaneStaticTabs(current, next, hiddenStaticTabs)
-        if (workspacePaneTabOrdersEqual(current, nextOrder)) return s
-        return replaceRepoState(s, repo, (r) => {
-          r.ui.workspacePaneTabOrderByBranch = workspacePaneTabOrderRecordWith(r.ui, branch, nextOrder)
-        })
-      })
-    },
-
     setBranchViewMode(id: string, viewMode: BranchViewMode) {
       let changed = false
       let selectedForPullRequest: string | null = null
@@ -318,37 +168,30 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
     },
 
     setWorkspacePaneTab(id: string, tab: WorkspacePaneTabType) {
-      // Persists the user's branch-scoped preferred tab type verbatim.
+      // Persists the user's target-scoped preferred tab type verbatim.
       // Opening/closing branch tabs is owned by explicit open/close actions;
       // this action only changes selection intent.
       let changed = false
       let token: number | undefined
       set((s) => {
         const repo = s.repos[id]
-        const branch = repo?.ui.selectedBranch
-        const current = repo ? preferredWorkspacePaneTabForBranch(repo.ui, branch) : null
-        if (!repo || !branch || current === tab) return s
+        if (!repo) return s
+        const target = workspacePaneTabsTargetForRepoBranch(repo, repo.ui.selectedBranch)
+        const current = preferredWorkspacePaneTabForTarget(repo.ui, target)
+        if (!target || current === tab) return s
         changed = true
         token = repo.instanceToken
         return replaceRepoState(s, repo, (r) => {
-          const selectedBranch = r.ui.selectedBranch
-          if (selectedBranch) {
-            r.ui.preferredWorkspacePaneTabByBranch = preferredWorkspacePaneTabByBranchRecordWith(
-              r.ui,
-              selectedBranch,
-              tab,
-            )
-          }
+          r.ui.preferredWorkspacePaneTabByTarget = preferredWorkspacePaneTabByTargetRecordWith(r.ui, target, tab)
         })
       })
       if (!changed || token === undefined) return
       const repo = get().repos[id]
+      const target = repo ? workspacePaneTabsTargetForRepoBranch(repo, repo.ui.selectedBranch) : null
       afterSelectionChange(
         id,
         token,
-        repo && preferredWorkspacePaneTabForBranch(repo.ui, repo.ui.selectedBranch) === 'status'
-          ? repo.ui.selectedBranch
-          : null,
+        repo && target && preferredWorkspacePaneTabForTarget(repo.ui, target) === 'status' ? repo.ui.selectedBranch : null,
       )
     },
 
@@ -391,37 +234,4 @@ export function createSelectionActions(set: ReposSet, get: ReposGet) {
     ...createRestorableWorkspaceSelectionActions(set, get),
     ...createRuntimeCoherentSelectionActions(set, get),
   }
-}
-
-function workspacePaneTabOrdersEqual(
-  a: readonly WorkspacePaneTabOrderEntry[],
-  b: readonly WorkspacePaneTabOrderEntry[],
-): boolean {
-  return a.length === b.length && b.every((entry, index) => entry.type === a[index]?.type && entry.id === a[index]?.id)
-}
-
-function hiddenWorkspacePaneStaticTabs(repo: RepoState, branchName: string): ReadonlySet<WorkspacePaneStaticTabType> {
-  const branch = repo.data.branches.find((candidate) => candidate.name === branchName)
-  if (branch?.worktree?.path) return new Set()
-  return new Set(WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES)
-}
-
-function mergeHiddenWorkspacePaneStaticTabs(
-  current: readonly WorkspacePaneTabOrderEntry[],
-  visibleOrder: readonly WorkspacePaneTabOrderEntry[],
-  hiddenStaticTabs: ReadonlySet<WorkspacePaneStaticTabType>,
-): WorkspacePaneTabOrderEntry[] {
-  if (hiddenStaticTabs.size === 0) return [...visibleOrder]
-  const visible = [...visibleOrder]
-  const next: WorkspacePaneTabOrderEntry[] = []
-  for (const entry of current) {
-    if (entry.type !== 'terminal' && hiddenStaticTabs.has(entry.type)) {
-      next.push(entry)
-      continue
-    }
-    const replacement = visible.shift()
-    if (replacement) next.push(replacement)
-  }
-  next.push(...visible)
-  return next
 }

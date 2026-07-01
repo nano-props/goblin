@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { createNativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
+import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 
 const mocks = vi.hoisted(() => ({
   getServerExternalAppsSnapshot: vi.fn(),
@@ -81,8 +82,10 @@ describe('settings routes', () => {
       activeRepoId: null,
       zenMode: true,
       workspacePaneSize: 50,
-      selectedTerminalSessionByWorktree: {},
-      workspacePaneTabOrderByBranchByRepo: {},
+      selectedTerminalSessionIdByTerminalWorktree: {},
+      preferredWorkspacePaneTabByTargetByRepo: {},
+      workspacePaneTabsByTargetByRepo: {},
+      filetreeViewStateByWorktreeByRepo: {},
     } as const
     mocks.handleSetSession.mockResolvedValue({ ok: true, session })
 
@@ -103,19 +106,28 @@ describe('settings routes', () => {
     expect(mocks.handleSetSession).toHaveBeenCalledWith({ session })
   })
 
-  test('accepts a session state with files in preferred tab and tab order picklist', async () => {
+  test('accepts a session state with files in preferred tab and mixed tab list picklist', async () => {
+    const targetKey = workspacePaneTabsTargetIdentityKey({
+      repoRoot: '/tmp/repo',
+      branchName: 'feature/worktree',
+      worktreePath: '/tmp/repo-worktree',
+    })
     const session = {
       openRepoEntries: [],
       activeRepoId: null,
       zenMode: true,
       workspacePaneSize: 50,
-      selectedTerminalSessionByWorktree: {},
-      preferredWorkspacePaneTabByBranchByRepo: { '/tmp/repo': { 'feature/worktree': 'files' } },
-      workspacePaneTabOrderByBranchByRepo: {
+      selectedTerminalSessionIdByTerminalWorktree: {},
+      preferredWorkspacePaneTabByTargetByRepo: { '/tmp/repo': { [targetKey]: 'files' } },
+      workspacePaneTabsByTargetByRepo: {
         '/tmp/repo': {
-          'feature/worktree': [{ type: 'status', id: 'status' }, { type: 'files', id: 'files' }],
+          [targetKey]: [
+            { type: 'status', tabId: 'workspace-pane:status' },
+            { type: 'files', tabId: 'workspace-pane:files' },
+          ],
         },
       },
+      filetreeViewStateByWorktreeByRepo: {},
     } as const
     mocks.handleSetSession.mockResolvedValue({ ok: true, session })
 

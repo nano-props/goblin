@@ -38,7 +38,7 @@ import type { TerminalTakeoverResult } from '#/shared/terminal-types.ts'
  *   (typically only in tests / startup). The takeover round-trip
  *   never started.
  * - `session-unknown` — the server reported the ptySessionId is not
- *   known to this user. The client's catalog is stale; the user
+ *   known to this user. The client session index is stale; the user
  *   needs to re-list before retrying.
  * - `client-offline` — the server's broker has no live socket
  *   for `(userId, clientId)`. The client is reconnecting.

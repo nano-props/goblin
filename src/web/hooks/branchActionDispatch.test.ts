@@ -3,10 +3,10 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { dispatchRemoveWorktree } from '#/web/hooks/branchActionDispatch.ts'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
-import type { WorktreeTerminalSnapshot } from '#/web/components/terminal/types.ts'
+import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 
 const REPO_ID = '/tmp/gbl-branch-action-dispatch-repo'
 const WORKTREE_PATH = '/tmp/gbl-branch-action-dispatch-worktree'
@@ -28,8 +28,11 @@ describe('branch action dispatch', () => {
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
-      workspacePaneTabOrderByBranch: {
-        'feature/worktree': [workspacePaneStaticTabOrderEntry('status'), { type: 'terminal', id: 'session-1' }],
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [
+          workspacePaneStaticTabEntry('status'),
+          { type: 'terminal', terminalSessionId: 'session-1' },
+        ],
       },
     })
     const calls: string[] = []
@@ -47,7 +50,7 @@ describe('branch action dispatch', () => {
         }),
     )
     setTerminalSessionCommandBridge({
-      worktreeSnapshot: () => worktreeSnapshotWithTerminal(),
+      terminalWorktreeSnapshot: () => worktreeSnapshotWithTerminal(),
       createTerminal: vi.fn(async () => 'session-2'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor: vi.fn(async () => true),
@@ -93,14 +96,17 @@ describe('branch action dispatch', () => {
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
-      workspacePaneTabOrderByBranch: {
-        'feature/worktree': [workspacePaneStaticTabOrderEntry('status'), { type: 'terminal', id: 'session-1' }],
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [
+          workspacePaneStaticTabEntry('status'),
+          { type: 'terminal', terminalSessionId: 'session-1' },
+        ],
       },
     })
     const runBranchAction = vi.fn(async () => ({ ok: true, message: 'ok' }))
     useReposStore.setState({ runBranchAction })
     setTerminalSessionCommandBridge({
-      worktreeSnapshot: () => worktreeSnapshotWithTerminal(),
+      terminalWorktreeSnapshot: () => worktreeSnapshotWithTerminal(),
       createTerminal: vi.fn(async () => 'session-2'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor: vi.fn(async () => true),
@@ -136,13 +142,13 @@ describe('branch action dispatch', () => {
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'status',
-      workspacePaneTabOrderByBranch: {},
+      workspacePaneTabsByBranch: {},
     })
     const runBranchAction = vi.fn(async () => ({ ok: true, message: 'ok' }))
     useReposStore.setState({ runBranchAction })
     const closeTerminalsForWorktree = vi.fn(async () => true)
     setTerminalSessionCommandBridge({
-      worktreeSnapshot: () => emptyWorktreeSnapshot(),
+      terminalWorktreeSnapshot: () => emptyWorktreeSnapshot(),
       createTerminal: vi.fn(async () => 'session-2'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor: vi.fn(async () => true),
@@ -168,8 +174,11 @@ describe('branch action dispatch', () => {
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
-      workspacePaneTabOrderByBranch: {
-        'feature/worktree': [workspacePaneStaticTabOrderEntry('status'), { type: 'terminal', id: 'session-1' }],
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [
+          workspacePaneStaticTabEntry('status'),
+          { type: 'terminal', terminalSessionId: 'session-1' },
+        ],
       },
       worktreesByPath: {
         [WORKTREE_PATH]: {
@@ -184,7 +193,7 @@ describe('branch action dispatch', () => {
     const closeTerminalsForWorktree = vi.fn(async () => true)
     useReposStore.setState({ runBranchAction })
     setTerminalSessionCommandBridge({
-      worktreeSnapshot: () => worktreeSnapshotWithTerminal(),
+      terminalWorktreeSnapshot: () => worktreeSnapshotWithTerminal(),
       createTerminal: vi.fn(async () => 'session-2'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor: vi.fn(async () => true),
@@ -206,25 +215,24 @@ describe('branch action dispatch', () => {
   })
 })
 
-function emptyWorktreeSnapshot(): WorktreeTerminalSnapshot {
+function emptyWorktreeSnapshot(): TerminalWorktreeSnapshot {
   return {
-    worktreeTerminalKey: WORKTREE_KEY,
+    terminalWorktreeKey: WORKTREE_KEY,
     selectedDescriptor: null,
     sessions: [],
     count: 0,
     bellCount: 0,
-        activeCount: 0,
+    activeCount: 0,
     pendingCreate: false,
   }
 }
 
-function worktreeSnapshotWithTerminal(): WorktreeTerminalSnapshot {
+function worktreeSnapshotWithTerminal(): TerminalWorktreeSnapshot {
   return {
-    worktreeTerminalKey: WORKTREE_KEY,
+    terminalWorktreeKey: WORKTREE_KEY,
     selectedDescriptor: {
-      key: 'session-1',
-      worktreeTerminalKey: WORKTREE_KEY,
-      sessionId: 'session-1',
+      terminalSessionId: 'session-1',
+      terminalWorktreeKey: WORKTREE_KEY,
       index: 1,
       repoRoot: REPO_ID,
       branch: 'feature/worktree',
@@ -233,22 +241,19 @@ function worktreeSnapshotWithTerminal(): WorktreeTerminalSnapshot {
     sessions: [
       {
         type: 'terminal',
-        id: 'session-1',
-        key: 'session-1',
-        worktreeTerminalKey: WORKTREE_KEY,
-        sessionId: 'session-1',
+        terminalSessionId: 'session-1',
+        terminalWorktreeKey: WORKTREE_KEY,
         index: 1,
-        displayOrder: 1,
         title: 'terminal 1',
         phase: 'open',
         selected: true,
         hasBell: false,
-            recentlyActive: false,
+        recentlyActive: false,
       },
     ],
     count: 1,
     bellCount: 0,
-        activeCount: 0,
+    activeCount: 0,
     pendingCreate: false,
   }
 }

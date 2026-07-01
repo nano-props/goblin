@@ -6,12 +6,12 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useClientEffectIntentRouter } from '#/web/hooks/useClientEffectIntentRouter.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
+import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 import { createBranchSnapshot, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
-import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { preferredWorkspacePaneTabForTarget, workspacePaneTabsTargetForRepoBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 
 const appDataClientMocks = vi.hoisted(() => ({
   clearRecentRepoHistory: vi.fn(async () => {}),
@@ -163,12 +163,14 @@ describe('useClientEffectIntentRouter', () => {
       ],
     })
     currentRepoId = repo.id
-    const key = '/tmp/repo\0/tmp/repo-feature\0session-2'
+    const terminalSessionId = 'session-2'
+    const terminalWorktreeKey = formatTerminalWorktreeKey(repo.id, '/tmp/repo-feature')
 
     await renderHookHost()
 
     await act(async () => {
-      for (const listener of intentListeners) listener({ type: 'terminal-bell-click', repoRoot: repo.id, key })
+      for (const listener of intentListeners)
+        listener({ type: 'terminal-bell-click', repoRoot: repo.id, terminalSessionId, terminalWorktreeKey })
       await Promise.resolve()
     })
 
@@ -176,8 +178,8 @@ describe('useClientEffectIntentRouter', () => {
     expect(showRepoBranchWorkspacePaneTabSpy).toHaveBeenCalledWith(repo.id, 'feature/test', 'terminal')
     expect(state.repos[repo.id]?.ui.selectedBranch).toBe('feature/test')
     expect(preferredWorkspacePaneTab(repo.id)).toBe('terminal')
-    expect(state.selectedTerminalSessionByWorktree).toMatchObject({
-      [worktreeTerminalKey(repo.id, '/tmp/repo-feature')]: key,
+    expect(state.selectedTerminalSessionIdByTerminalWorktree).toMatchObject({
+      [terminalWorktreeKey]: terminalSessionId,
     })
   })
 
@@ -202,12 +204,14 @@ describe('useClientEffectIntentRouter', () => {
       },
     }
     currentRepoId = repo.id
-    const key = '/tmp/repo\0/tmp/repo-feature\0session-2'
+    const terminalSessionId = 'session-2'
+    const terminalWorktreeKey = formatTerminalWorktreeKey(repo.id, '/tmp/repo-feature')
 
     await renderHookHost()
 
     await act(async () => {
-      for (const listener of intentListeners) listener({ type: 'terminal-bell-click', repoRoot: repo.id, key })
+      for (const listener of intentListeners)
+        listener({ type: 'terminal-bell-click', repoRoot: repo.id, terminalSessionId, terminalWorktreeKey })
       await Promise.resolve()
     })
 
@@ -410,7 +414,7 @@ describe('useClientEffectIntentRouter', () => {
 
 function preferredWorkspacePaneTab(repoId: string) {
   const repo = useReposStore.getState().repos[repoId]
-  return repo ? preferredWorkspacePaneTabForBranch(repo.ui, repo.ui.selectedBranch) : null
+  return repo ? preferredWorkspacePaneTabForTarget(repo.ui, workspacePaneTabsTargetForRepoBranch(repo, repo.ui.selectedBranch)) : null
 }
 
 async function renderHookHost() {

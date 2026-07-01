@@ -12,6 +12,7 @@ import { useI18nStore } from '#/web/stores/i18n.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useSessionRestoreStore } from '#/web/stores/session-restore.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
+import { restoreServerWorkspacePaneTabsFromSession } from '#/web/workspace-pane/workspace-pane-session-tabs-restore.ts'
 
 export function useAuthenticatedAppBootstrap() {
   const hydratedRef = useRef(false)
@@ -46,6 +47,7 @@ async function hydrateNonCriticalAuthenticatedState(settingsSnapshot: Promise<Se
 
 async function restoreBootSession(settingsSnapshot: Promise<SettingsSnapshot>): Promise<void> {
   try {
+    useReposStore.setState({ sessionPersistenceReady: false })
     useSessionRestoreStore.getState().hydrateFromSettingsSnapshot(await settingsSnapshot)
     const session = useSessionRestoreStore.getState().consumeBootSessionSnapshot()
     const normalizedLayout = normalizeWorkspaceSessionLayoutState(session)
@@ -57,16 +59,21 @@ async function restoreBootSession(settingsSnapshot: Promise<SettingsSnapshot>): 
     const restoredWorkspaceState = restoreRestorableWorkspaceStateFromSession(session)
     restoreFiletreeViewStateFromSession(session.filetreeViewStateByWorktreeByRepo)
     applySessionLayoutState(normalizedLayout)
-    applySessionSelectedTerminalState(restoredWorkspaceState.selectedTerminalSessionByWorktree)
+    applySessionSelectedTerminalState(restoredWorkspaceState.selectedTerminalSessionIdByTerminalWorktree)
     await hydrateRepoSession(session.openRepoEntries, session.activeRepoId, {
       workspacePaneRestoreState: {
-        workspacePaneTabOrderByBranchByRepo: restoredWorkspaceState.workspacePaneTabOrderByBranchByRepo,
-        preferredWorkspacePaneTabByBranchByRepo: restoredWorkspaceState.preferredWorkspacePaneTabByBranchByRepo,
+        workspacePaneTabsByTargetByRepo: restoredWorkspaceState.workspacePaneTabsByTargetByRepo,
+        preferredWorkspacePaneTabByTargetByRepo: restoredWorkspaceState.preferredWorkspacePaneTabByTargetByRepo,
       },
     })
+    const workspaceTabsRestored = await restoreServerWorkspacePaneTabsFromSession(
+      restoredWorkspaceState.workspacePaneTabsByTargetByRepo,
+    )
+    if (!workspaceTabsRestored) bootstrapLog.warn('workspace pane tabs restore incomplete')
+    if (workspaceTabsRestored) useReposStore.setState({ sessionPersistenceReady: true })
   } catch (err) {
     bootstrapLog.warn('session restore failed', { err })
-    useReposStore.setState({ sessionReady: true })
+    useReposStore.setState({ sessionReady: true, sessionPersistenceReady: true })
   }
 }
 

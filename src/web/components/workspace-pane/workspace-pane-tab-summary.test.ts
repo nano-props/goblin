@@ -7,17 +7,14 @@ import type { WorkspacePaneTabSummary } from '#/web/components/terminal/types.ts
 
 const terminalView: WorkspacePaneTabSummary = {
   type: 'terminal',
-  id: 'session-1',
-  key: 'session-1',
-  worktreeTerminalKey: 'repo\0worktree',
-  sessionId: 'session-1',
+  terminalSessionId: 'session-1',
+  terminalWorktreeKey: 'repo\0worktree',
   index: 1,
-  displayOrder: 1,
   title: 'terminal 1',
   phase: 'open',
   selected: true,
   hasBell: false,
-            recentlyActive: false,
+  recentlyActive: false,
 }
 
 describe('workspace pane tab model', () => {

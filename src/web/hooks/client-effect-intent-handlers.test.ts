@@ -11,7 +11,7 @@ vi.mock('sonner', () => ({
   },
 }))
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
-import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { preferredWorkspacePaneTabForTarget, workspacePaneTabsTargetForRepoBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 
@@ -39,7 +39,7 @@ describe('client effect intent handlers', () => {
     ).resolves.toBe(false)
 
     const repo = useReposStore.getState().repos[REPO_ID]
-    expect(repo ? preferredWorkspacePaneTabForBranch(repo.ui, repo.ui.selectedBranch) : null).toBe('status')
+    expect(repo ? preferredWorkspacePaneTabForTarget(repo.ui, workspacePaneTabsTargetForRepoBranch(repo, repo.ui.selectedBranch)) : null).toBe('status')
   })
 
   test('create-worktree-requested opens create-worktree for the current repo', async () => {

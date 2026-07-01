@@ -1,4 +1,4 @@
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
+import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { isShellProcessName } from '#/shared/terminal-process-name.ts'
 import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { openWorkspacePaneTab } from '#/web/components/repo-workspace/open-workspace-pane-tab.ts'
@@ -21,7 +21,6 @@ import {
   workspacePaneTabProvider,
 } from '#/web/components/workspace-pane/tab-providers.ts'
 import { beginWorkspacePaneTabClose } from '#/web/workspace-pane/workspace-pane-tab-close.ts'
-import { runWorkspacePaneTabUiCommand } from '#/web/workspace-pane/workspace-pane-tab-command-queue.ts'
 import { workspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 
 interface ShowWorkspacePaneTabCommandOptions {
@@ -53,7 +52,7 @@ interface CloseWorkspacePaneTabCommandOptions extends WorkspacePaneTabCommandTar
 }
 
 interface ConfirmedTerminalClose {
-  key: string
+  terminalSessionId: string
   base: TerminalSessionBase
 }
 
@@ -82,20 +81,16 @@ export async function runShowWorkspacePaneTabCommand({
   tab,
   navigation,
 }: ShowWorkspacePaneTabCommandOptions): Promise<boolean> {
-  return await runWorkspacePaneTabUiCommand(() => showWorkspacePaneTabCommand({ repoId, tab, navigation }))
+  return await showWorkspacePaneTabCommand({ repoId, tab, navigation })
 }
 
-function showWorkspacePaneTabCommand({
-  repoId,
-  tab,
-  navigation,
-}: ShowWorkspacePaneTabCommandOptions): boolean {
+async function showWorkspacePaneTabCommand({ repoId, tab, navigation }: ShowWorkspacePaneTabCommandOptions): Promise<boolean> {
   if (!repoId) return false
   const provider = workspacePaneTabProvider(tab)
   if (isWorkspacePaneStaticTabProvider(provider)) {
     const target = selectedRepoWorkspaceTarget(repoId)
     if (target) {
-      return openWorkspacePaneTab({
+      return await openWorkspacePaneTab({
         repoId,
         branchName: target.branchName,
         worktreePath: target.worktreePath,
@@ -119,14 +114,14 @@ export async function runTerminalPrimaryActionCommand({
   if (!base) return true
   const bridge = readTerminalSessionCommandBridge()
   if (!bridge) return true
-  const worktreeKey = worktreeTerminalKey(base.repoRoot, base.worktreePath)
-  const worktree = bridge.worktreeSnapshot(worktreeKey)
+  const terminalWorktreeKey = formatTerminalWorktreeKey(base.repoRoot, base.worktreePath)
+  const worktree = bridge.terminalWorktreeSnapshot(terminalWorktreeKey)
   if (worktree.count > 0) {
     // The user expects "click the Terminal menu" to land them on a working
     // terminal session: focus the first existing session instead of leaving
     // the selection on whatever the user had open before.
     const firstSession = worktree.sessions[0]
-    if (firstSession) bridge.selectTerminal(worktreeKey, firstSession.key)
+    if (firstSession) bridge.selectTerminal(terminalWorktreeKey, firstSession.terminalSessionId)
     return true
   }
   const result = await runCreateTerminalTabCommand({
@@ -158,16 +153,16 @@ export async function runNewTerminalTabCommand({
 }
 
 export async function runCloseWorkspacePaneTabCommand(options: CloseWorkspacePaneTabCommandOptions): Promise<boolean> {
-  return await runWorkspacePaneTabUiCommand(() => closeWorkspacePaneTabCommand(options))
+  return await closeWorkspacePaneTabCommand(options)
 }
 
 export async function runConfirmCloseTerminalWorkspacePaneTabCommand(
   options: ConfirmCloseTerminalWorkspacePaneTabCommandOptions,
 ): Promise<boolean> {
-  return await runWorkspacePaneTabUiCommand(() => closeConfirmedTerminalWorkspacePaneTab(options))
+  return closeConfirmedTerminalWorkspacePaneTab(options)
 }
 
-function closeWorkspacePaneTabCommand(options: CloseWorkspacePaneTabCommandOptions): boolean {
+async function closeWorkspacePaneTabCommand(options: CloseWorkspacePaneTabCommandOptions): Promise<boolean> {
   const { repoId, navigation, targetIdentity, skipTerminalCloseConfirm } = options
   const target = repoId ? workspacePaneCommandTarget(repoId) : null
   if (!target) return false
@@ -180,7 +175,7 @@ function closeWorkspacePaneTabCommand(options: CloseWorkspacePaneTabCommandOptio
     useTerminalActionDialogsStore.getState().openCloseConfirm({
       repoId: target.repoId,
       targetIdentity: tab.identity,
-      terminalKey: tab.key,
+      terminalSessionId: tab.terminalSessionId,
       terminalBase: target.terminalBase,
       processName: tab.view.processName?.trim() || 'terminal',
     })
@@ -194,6 +189,7 @@ function closeWorkspacePaneTabCommand(options: CloseWorkspacePaneTabCommandOptio
   const close = beginWorkspacePaneTabClose(target, tab)
   if (!close.accepted) return false
   observeWorkspacePaneTabClose(close.completion, closingIdentity)
+  if (tab.kind === 'static' && !(await close.completion)) return false
 
   if (nextTab) showWorkspacePaneCommandTab(target, nextTab, navigation)
   return true
@@ -208,8 +204,8 @@ function closeConfirmedTerminalWorkspacePaneTab(options: ConfirmCloseTerminalWor
   const closeTerminalByDescriptor = readTerminalSessionCommandBridge()?.closeTerminalByDescriptor
   if (!closeTerminalByDescriptor) return false
   observeWorkspacePaneTabClose(
-    closeTerminalByDescriptor(confirmedTerminal.key, confirmedTerminal.base),
-    targetIdentity ?? confirmedTerminal.key,
+    closeTerminalByDescriptor(confirmedTerminal.terminalSessionId, confirmedTerminal.base),
+    targetIdentity ?? confirmedTerminal.terminalSessionId,
   )
   if (target && nextTab) showWorkspacePaneCommandTab(target, nextTab, navigation)
   return true
@@ -282,8 +278,8 @@ function showWorkspacePaneCommandTab(
   navigation: PrimaryWindowNavigationActions,
 ): void {
   navigation.showRepoWorkspacePaneTab(target.repoId, tab.type)
-  if (tab.kind === 'terminal' && target.worktreeTerminalKey) {
-    readTerminalSessionCommandBridge()?.selectTerminal(target.worktreeTerminalKey, tab.key)
+  if (tab.kind === 'terminal' && target.terminalWorktreeKey) {
+    readTerminalSessionCommandBridge()?.selectTerminal(target.terminalWorktreeKey, tab.terminalSessionId)
   }
 }
 

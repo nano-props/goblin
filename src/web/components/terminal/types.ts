@@ -9,9 +9,8 @@ import type {
 import type { TerminalInput, TerminalUserInputSource } from '#/web/components/terminal/terminal-input.ts'
 
 export interface TerminalDescriptor {
-  key: string
-  worktreeTerminalKey: string
-  sessionId: string
+  terminalWorktreeKey: string
+  terminalSessionId: string
   index: number
   repoRoot: string
   branch: string
@@ -116,12 +115,9 @@ export type TerminalRepoIndex = Record<string, TerminalRepoSnapshot>
 
 export interface TerminalSessionSummary {
   type: 'terminal'
-  id: string
-  key: string
-  worktreeTerminalKey: string
-  sessionId: string
+  terminalWorktreeKey: string
+  terminalSessionId: string
   index: number
-  displayOrder: number
   title: string
   fullTitle?: string
   originalTitle?: string | null
@@ -134,8 +130,8 @@ export interface TerminalSessionSummary {
 
 export type WorkspacePaneTabSummary = TerminalSessionSummary
 
-export interface WorktreeTerminalSnapshot {
-  worktreeTerminalKey: string
+export interface TerminalWorktreeSnapshot {
+  terminalWorktreeKey: string
   selectedDescriptor: TerminalDescriptor | null
   sessions: TerminalSessionSummary[]
   count: number
@@ -146,34 +142,34 @@ export interface WorktreeTerminalSnapshot {
 
 export interface TerminalSessionContextValue {
   createTerminal: (base: TerminalSessionBase, options?: TerminalCreateOptions) => Promise<string>
-  registerHost: (worktreeTerminalKey: string, host: HTMLElement) => void
-  unregisterHost: (worktreeTerminalKey: string, host: HTMLElement) => void
-  selectTerminal: (worktreeTerminalKey: string, key: string) => void
-  scrollToBottom: (key: string) => void
-  scrollLines: (key: string, amount: number) => void
-  clearBell: (key: string) => boolean
-  closeTerminalByDescriptor: (key: string, base: TerminalSessionBase) => Promise<boolean>
+  registerHost: (terminalWorktreeKey: string, host: HTMLElement) => void
+  unregisterHost: (terminalWorktreeKey: string, host: HTMLElement) => void
+  selectTerminal: (terminalWorktreeKey: string, terminalSessionId: string) => void
+  scrollToBottom: (terminalSessionId: string) => void
+  scrollLines: (terminalSessionId: string, amount: number) => void
+  clearBell: (terminalSessionId: string) => boolean
+  closeTerminalByDescriptor: (terminalSessionId: string, base: TerminalSessionBase) => Promise<boolean>
   attach: (descriptor: TerminalDescriptor, host: HTMLElement) => void
-  detach: (key: string, host: HTMLElement) => void
-  restart: (key: string) => void
-  focusTerminal: (key: string) => void
-  isTerminalFocusTarget: (key: string, target: EventTarget | null) => boolean
-  findNext: (key: string, term: string, incremental?: boolean) => TerminalSearchResult
-  findPrevious: (key: string, term: string) => TerminalSearchResult
-  clearSearch: (key: string) => void
-  writeInput: (key: string, data: string, source?: TerminalUserInputSource) => void
-  takeover: (key: string) => Promise<boolean>
+  detach: (terminalSessionId: string, host: HTMLElement) => void
+  restart: (terminalSessionId: string) => void
+  focusTerminal: (terminalSessionId: string) => void
+  isTerminalFocusTarget: (terminalSessionId: string, target: EventTarget | null) => boolean
+  findNext: (terminalSessionId: string, term: string, incremental?: boolean) => TerminalSearchResult
+  findPrevious: (terminalSessionId: string, term: string) => TerminalSearchResult
+  clearSearch: (terminalSessionId: string) => void
+  writeInput: (terminalSessionId: string, data: string, source?: TerminalUserInputSource) => void
+  takeover: (terminalSessionId: string) => Promise<boolean>
   /** Serializes xterm framebuffer state as VT sequences; not plain-text output for copy UI. */
-  serialize: (key: string) => string
+  serialize: (terminalSessionId: string) => string
 }
 
 export interface TerminalSessionReadContextValue {
-  worktreeSnapshot: (worktreeTerminalKey: string) => WorktreeTerminalSnapshot
-  subscribeWorktree: (worktreeTerminalKey: string, listener: () => void) => () => void
+  terminalWorktreeSnapshot: (terminalWorktreeKey: string) => TerminalWorktreeSnapshot
+  subscribeTerminalWorktree: (terminalWorktreeKey: string, listener: () => void) => () => void
   repoBellCount: (repoRoot: string) => number
   subscribeRepoBellCount: (repoRoot: string, listener: () => void) => () => void
-  snapshot: (key: string) => TerminalSnapshot
-  subscribeSnapshot: (key: string, listener: () => void) => () => void
+  snapshot: (terminalSessionId: string) => TerminalSnapshot
+  subscribeSnapshot: (terminalSessionId: string, listener: () => void) => () => void
 }
 
 export interface TerminalSessionLike {

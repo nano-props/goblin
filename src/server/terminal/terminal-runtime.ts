@@ -1,5 +1,5 @@
 // Server-side terminal runtime. Single holder of the business state
-// for a Goblin server instance: the session manager, the catalog, the
+// for a Goblin server instance: the session manager, the session service, the
 // realtime broker, the connection-state tracker, and the realtime
 // dispatch table. Exposes a `ServerTerminalHost` to the Hono realtime
 // route. Holds no PTY state itself — the `PtySupervisor` injected at
@@ -13,8 +13,8 @@ import { BufferedTerminalSocket } from '#/server/terminal/buffered-terminal-sock
 import type { TerminalClientMessage } from '#/shared/terminal-socket.ts'
 import { normalizeTerminalClientMessage } from '#/shared/terminal-validators.ts'
 import { serverLogger } from '#/server/logger.ts'
-import { createTerminalCatalog } from '#/server/terminal/terminal-catalog.ts'
-import { createTerminalSessionOrderRuntime } from '#/server/terminal/terminal-session-order-runtime.ts'
+import { createTerminalSessionService } from '#/server/terminal/terminal-session-service.ts'
+import { createWorkspacePaneTabsRuntime } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
 import type { TerminalRealtimeBroker, TerminalRealtimeSocket } from '#/server/terminal/terminal-realtime-broker.ts'
 import { createTerminalRuntimeActions } from '#/server/terminal/terminal-runtime-actions.ts'
 import { createTerminalRuntimeCoordinator } from '#/server/terminal/terminal-runtime-coordinator.ts'
@@ -28,6 +28,7 @@ import { TerminalSessionManager } from '#/server/terminal/terminal-session-manag
 import { type PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 import { type ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 import type { GoblinTerminalCommandRuntime } from '#/server/terminal/g-command.ts'
+import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
 
 // Intentionally long TTL: we want terminals to survive as long as possible in
 // the background so users can leave builds or long-running tasks unattended.
@@ -50,7 +51,7 @@ export interface ServerTerminalRuntime {
 
 export function createServerTerminalRuntime(options: ServerTerminalRuntimeOptions): ServerTerminalRuntime {
   const { ptySupervisor } = options
-  const terminalSessionOrder = createTerminalSessionOrderRuntime<string>()
+  const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
 
   // Sink callbacks fan out to every clientId that shares the
   // session's userId. The manager passes `userId` (a string
@@ -59,6 +60,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   // same `userId`) without an extra attach roundtrip. See
   // `identity.ts` for the model.
   let broker: TerminalRealtimeBroker
+  let sessionService: ReturnType<typeof createTerminalSessionService>
   const manager = new TerminalSessionManager<string>(
     ptySupervisor,
     {
@@ -69,9 +71,10 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
         broker.broadcastToUser(userId, { type: 'title', event })
       },
       onExit(userId, event) {
-        const repoRoot = manager.getSessionScope(userId, event.ptySessionId)
         broker.broadcastToUser(userId, { type: 'exit', event })
-        if (repoRoot) broadcastRepoSessionsChanged(userId, repoRoot)
+      },
+      onSessionClosed(userId, session) {
+        handleSessionClosed(userId, session)
       },
       onIdentity(userId, event) {
         broker.broadcastToUser(userId, { type: 'identity', event })
@@ -80,19 +83,20 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
         broker.broadcastToUser(userId, { type: 'lifecycle', event })
       },
     },
-    terminalSessionOrder,
+    workspaceTabs,
     (userId, clientId) => broker.isClientOnline(userId, clientId),
   )
   const coordinator = createTerminalRuntimeCoordinator({
     manager,
-    terminalSessionOrder,
+    workspaceTabs,
     detachedTtlMs: TERMINAL_DETACHED_TTL_MS,
   })
   broker = coordinator.broker
-  const catalog = createTerminalCatalog({
+  sessionService = createTerminalSessionService({
     isValidClientId: isValidTerminalClientId,
     isValidTerminalSessionId,
     manager,
+    workspaceTabs,
     broadcastSessionsChanged(userId, repoRoot) {
       broadcastRepoSessionsChanged(userId, repoRoot)
     },
@@ -104,7 +108,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   const actions = createTerminalRuntimeActions({
     manager,
     broker,
-    catalog,
+    sessionService,
     isValidTerminalClientId,
   })
 
@@ -164,14 +168,23 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     takeover(clientId, userId, input) {
       return actions.takeover(clientId, userId, input)
     },
-    close(clientId, userId, input) {
-      return actions.close(clientId, userId, input)
+    async close(clientId, userId, input) {
+      return await actions.close(clientId, userId, input)
     },
     async listSessions(clientId, userId, repoRoot) {
       return await actions.listSessions(clientId, userId, repoRoot)
     },
+    async listWorkspaceTabs(clientId, userId, repoRoot) {
+      return await actions.listWorkspaceTabs(clientId, userId, repoRoot)
+    },
     async create(clientId, userId, input) {
       return await actions.create(clientId, userId, input)
+    },
+    async replaceTabs(clientId, userId, input) {
+      return await actions.replaceTabs(clientId, userId, input)
+    },
+    async updateTabs(clientId, userId, input) {
+      return await actions.updateTabs(clientId, userId, input)
     },
     async prune(clientId, userId, repoRoot) {
       return await actions.prune(clientId, userId, repoRoot)
@@ -255,5 +268,24 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
 
   function broadcastRepoSessionsChanged(userId: string, repoRoot: string): void {
     broker.broadcastToUser(userId, { type: 'sessions-changed', repoRoot })
+  }
+
+  function broadcastRepoWorkspaceTabsChanged(userId: string, repoRoot: string): void {
+    broker.broadcastToUser(userId, { type: 'workspace-tabs-changed', repoRoot })
+  }
+
+  function handleSessionClosed(userId: string, session: TerminalSessionSummary): void {
+    broadcastRepoSessionsChanged(userId, session.repoRoot)
+    void sessionService
+      .reconcileTerminalTabsForSession(userId, session)
+      .then(() => {
+        broadcastRepoWorkspaceTabsChanged(userId, session.repoRoot)
+      })
+      .catch((err) => {
+        terminalRuntimeLogger.warn(
+          { userId, ptySessionId: session.ptySessionId, repoRoot: session.repoRoot, err },
+          'failed to reconcile workspace tabs after terminal session close',
+        )
+      })
   }
 }

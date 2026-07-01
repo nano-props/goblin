@@ -103,10 +103,11 @@ export const useReposStore = create<ReposStore>()(
       activeId: null,
       zenMode: DEFAULT_ZEN_MODE,
       workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
-      selectedTerminalSessionByWorktree: {},
+      selectedTerminalSessionIdByTerminalWorktree: {},
 
       // Local client-only state.
       sessionReady: false,
+      sessionPersistenceReady: false,
 
       ...createRepoSessionActions(set, get),
       ...createSelectionActions(set, get),

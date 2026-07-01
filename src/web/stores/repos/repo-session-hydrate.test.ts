@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { localRepoSessionEntry, normalizeRemoteTarget, remoteRepoSessionEntry } from '#/shared/remote-repo.ts'
+import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { deriveConnectivity } from '#/web/stores/repos/repo-guards.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { BranchSnapshotInfo } from '#/web/types.ts'
@@ -162,7 +163,7 @@ describe('repo session hydration', () => {
     expect(useReposStore.getState().sessionReady).toBe(true)
   })
 
-  test('hydrateRepoSession applies restored branch tab open-sets before cached placeholders become ready', async () => {
+  test('hydrateRepoSession leaves server-owned branch tab open-sets out of repo store', async () => {
     const savedAt = Date.now()
     useReposStore.setState({
       repoSnapshotCache: {
@@ -196,8 +197,8 @@ describe('repo session hydration', () => {
 
     const work = useReposStore.getState().hydrateRepoSession([localRepoSessionEntry(REPO_A)], REPO_A, {
       workspacePaneRestoreState: {
-        workspacePaneTabOrderByBranchByRepo: { [REPO_A]: { main: [] } },
-        preferredWorkspacePaneTabByBranchByRepo: { [REPO_A]: { main: 'status' } },
+        workspacePaneTabsByTargetByRepo: { [REPO_A]: { [branchTargetKey(REPO_A, 'main')]: [] } },
+        preferredWorkspacePaneTabByTargetByRepo: { [REPO_A]: { [branchTargetKey(REPO_A, 'main')]: 'status' } },
       },
     })
 
@@ -205,7 +206,7 @@ describe('repo session hydration', () => {
       const repo = useReposStore.getState().repos[REPO_A]
       expect(useReposStore.getState().sessionReady).toBe(true)
       expect(repo?.projection.source).toBe('cache')
-      expect(repo?.ui.workspacePaneTabOrderByBranch).toEqual({ main: [] })
+      expect(repo?.ui.preferredWorkspacePaneTabByTarget).toEqual({})
     })
 
     probes.get(REPO_A)?.({ ok: true, root: REPO_A, name: 'repo-a' })
@@ -418,3 +419,7 @@ describe('repo session hydration', () => {
     expect(useReposStore.getState().repos[REPO_B]?.remote.lifecycle).toBeNull()
   })
 })
+
+function branchTargetKey(repoRoot: string, branchName: string): string {
+  return workspacePaneTabsTargetIdentityKey({ repoRoot, branchName, worktreePath: null })
+}

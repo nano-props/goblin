@@ -8,7 +8,7 @@ import {
 } from '#/web/hooks/client-effect-intent-plans.ts'
 
 describe('client effect intent plans', () => {
-  test('creates a worktree terminal bell plan when the bell key matches a known worktree', () => {
+  test('creates a worktree terminal bell plan when the worktree group matches a known worktree', () => {
     resetReposStore()
     const repo = seedRepoState({
       id: '/tmp/repo',
@@ -23,15 +23,16 @@ describe('client effect intent plans', () => {
     const plan = createTerminalBellIntentPlan(repo, {
       type: 'terminal-bell-click',
       repoRoot: repo.id,
-      key: '/tmp/repo\0/tmp/repo-feature\0session-2',
+      terminalSessionId: 'session-2',
+      terminalWorktreeKey: '/tmp/repo\0/tmp/repo-feature',
     })
 
     expect(plan).toEqual({
       kind: 'show-worktree-terminal',
       repoId: repo.id,
       branch: 'feature/test',
-      key: '/tmp/repo\0/tmp/repo-feature\0session-2',
-      worktreeTerminalKey: '/tmp/repo\0/tmp/repo-feature',
+      terminalSessionId: 'session-2',
+      terminalWorktreeKey: '/tmp/repo\0/tmp/repo-feature',
     })
   })
 

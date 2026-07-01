@@ -18,7 +18,7 @@ import {
   type WorkspacePaneTabItem,
 } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
-import type { WorkspacePaneStaticTabType, WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneStaticTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { RepoWorkspaceRepo, SelectedRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
 import type { RepoWorkspaceTabModel } from '#/web/components/repo-workspace/tab-model.ts'
@@ -26,13 +26,14 @@ import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import { useIsInitialSyncInFlight } from '#/web/stores/repo-sync.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
 import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
 import {
   terminalWorkspacePaneTabProvider,
   workspacePaneStaticTabProvider,
 } from '#/web/components/workspace-pane/tab-providers.ts'
+import { useWorkspacePaneTabDragPreview } from '#/web/components/workspace-pane/workspace-pane-tab-drag-preview.ts'
 import {
   WorkspaceToolbar,
   WorkspaceToolbarActions,
@@ -42,6 +43,8 @@ import {
 } from '#/web/components/workspace-toolbar-chrome.tsx'
 import { WorkspaceOpenExternallyMenu } from '#/web/components/repo-workspace/WorkspaceOpenExternallyMenu.tsx'
 import type { BranchActions } from '#/web/hooks/useBranchActions.tsx'
+import { useWorkspacePaneTabsReorderMutation } from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
+import { orderWorkspacePaneItemsByTabEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 
 interface Props {
   repo: RepoWorkspaceRepo
@@ -70,7 +73,10 @@ export function RepoWorkspaceToolbar({
   // of every syncServerSessions.
   const isInitialSyncInFlight = useIsInitialSyncInFlight(repo.id)
   const branchName = detail.branch?.name ?? null
-  const preferredWorkspacePaneTab = preferredWorkspacePaneTabForBranch(repo.ui, branchName)
+  const preferredWorkspacePaneTab = preferredWorkspacePaneTabForTarget(
+    repo.ui,
+    branchName ? { repoRoot: repo.id, branchName, worktreePath: detail.branch?.worktree?.path ?? null } : null,
+  )
   const showBranchLevelTabs = !!detail.branch
 
   const { createTerminal, selectTerminal, scrollToBottom } = useTerminalSessionContext()
@@ -115,7 +121,7 @@ export function RepoWorkspaceToolbar({
       }
       if (isTerminalWorkspacePaneTabItem(item)) {
         enterTerminalTab()
-        selectTerminal(item.view.worktreeTerminalKey, item.view.key)
+        selectTerminal(item.view.terminalWorktreeKey, item.view.terminalSessionId)
         return
       }
     },
@@ -130,14 +136,33 @@ export function RepoWorkspaceToolbar({
     [enterTerminalTab, scrollToBottom],
   )
 
+  const {
+    visualTabs: visualWorkspacePaneTabs,
+    stageDragPreview: stageWorkspacePaneTabDragPreview,
+    clearDragPreview: clearWorkspacePaneTabDragPreview,
+  } = useWorkspacePaneTabDragPreview({
+    repoRoot: repo.id,
+    branchName,
+    worktreePath: terminalBase?.worktreePath ?? null,
+    canonicalTabs: workspacePaneTabModel.tabEntries,
+  })
+  const { reorderTabs: reorderWorkspacePaneTabs } = useWorkspacePaneTabsReorderMutation({
+    repoRoot: repo.id,
+    branchName,
+    worktreePath: terminalBase?.worktreePath ?? null,
+    canonicalTabs: workspacePaneTabModel.tabEntries,
+    onReorderRejected: clearWorkspacePaneTabDragPreview,
+  })
+
   const handleReorderWorkspacePaneTabStrip = useCallback(
-    (orderedTabs: WorkspacePaneTabOrderEntry[]) => {
-      useReposStore.getState().reorderWorkspacePaneTabs(repo.id, orderedTabs, branchName ?? undefined)
+    (tabs: WorkspacePaneTabEntry[]) => {
+      if (!stageWorkspacePaneTabDragPreview(tabs)) return
+      reorderWorkspacePaneTabs(tabs)
     },
-    [branchName, repo.id],
+    [reorderWorkspacePaneTabs, stageWorkspacePaneTabDragPreview],
   )
 
-  const workspacePaneTabItems = useMemo<WorkspacePaneTabItem[]>(
+  const canonicalWorkspacePaneTabItems = useMemo<WorkspacePaneTabItem[]>(
     () =>
       workspacePaneTabModel.tabs.map((tab) => {
         if (tab.kind === 'static') {
@@ -189,12 +214,21 @@ export function RepoWorkspaceToolbar({
       workspacePaneId,
     ],
   )
+  const workspacePaneTabItems = useMemo<WorkspacePaneTabItem[]>(
+    () =>
+      orderWorkspacePaneItemsByTabEntries(
+        canonicalWorkspacePaneTabItems,
+        visualWorkspacePaneTabs,
+        workspacePaneTabEntryForItem,
+      ),
+    [canonicalWorkspacePaneTabItems, visualWorkspacePaneTabs],
+  )
   const activeTabIdentity = workspacePaneTabModel.activeTab?.identity ?? null
   const handleSelectWorkspacePaneTabItem = useCallback(
     (item: WorkspacePaneTabItem) => {
       if (isPendingWorkspacePaneTabItem(item)) return
       if (isTerminalWorkspacePaneTabItem(item) && item.identity === activeTabIdentity) {
-        handleScrollToBottom(item.view.key)
+        handleScrollToBottom(item.view.terminalSessionId)
         return
       }
       showWorkspacePaneTabItem(item)
@@ -254,7 +288,7 @@ export function RepoWorkspaceToolbar({
           {compact && repoWorkspaceBackAction}
           {showBranchLevelTabs && (
             <WorkspacePaneTabStrip
-              worktreeTerminalKey={workspacePaneTabModel.worktreeTerminalKey}
+              terminalWorktreeKey={workspacePaneTabModel.terminalWorktreeKey}
               items={workspacePaneTabItems}
               workspacePaneId={workspacePaneId}
               activeTabIdentity={activeTabIdentity}
@@ -283,4 +317,8 @@ export function RepoWorkspaceToolbar({
       </WorkspaceToolbarContent>
     </WorkspaceToolbar>
   )
+}
+
+function workspacePaneTabEntryForItem(item: WorkspacePaneTabItem): WorkspacePaneTabEntry | null {
+  return isPendingWorkspacePaneTabItem(item) ? null : item.tabEntry
 }

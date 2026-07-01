@@ -5,68 +5,74 @@ import { getRuntimeFetchSettings } from '#/web/runtime-settings-fetch.ts'
 const BELL_NOTIFICATION_THROTTLE_MS = 5000
 
 export interface TerminalBellState {
-  hasBell: (key: string) => boolean
-  clear: (key: string) => boolean
-  remove: (key: string) => void
+  hasBell: (terminalSessionId: string) => boolean
+  clear: (terminalSessionId: string) => boolean
+  remove: (terminalSessionId: string) => void
   reset: () => void
   handleBell: (descriptor: TerminalDescriptor, event: TerminalBellEvent) => void
 }
 
 export function createTerminalBellState(
-  notify: (key?: string) => void,
+  notify: (terminalSessionId?: string) => void,
   onBadgeChange: (count: number) => void,
 ): TerminalBellState {
-  const unreadKeys = new Set<string>()
-  const lastSystemNotificationAtByKey = new Map<string, number>()
+  const unreadSessionIds = new Set<string>()
+  const lastSystemNotificationAtByTerminalSessionId = new Map<string, number>()
 
-  onBadgeChange(unreadKeys.size)
+  onBadgeChange(unreadSessionIds.size)
 
-  function notifyAndBadge(key?: string) {
-    notify(key)
-    onBadgeChange(unreadKeys.size)
+  function notifyAndBadge(terminalSessionId?: string) {
+    notify(terminalSessionId)
+    onBadgeChange(unreadSessionIds.size)
   }
 
   return {
-    hasBell(key) {
-      return unreadKeys.has(key)
+    hasBell(terminalSessionId) {
+      return unreadSessionIds.has(terminalSessionId)
     },
-    clear(key) {
-      const changed = unreadKeys.delete(key)
-      if (changed) notifyAndBadge(key)
+    clear(terminalSessionId) {
+      const changed = unreadSessionIds.delete(terminalSessionId)
+      if (changed) notifyAndBadge(terminalSessionId)
       return changed
     },
-    remove(key) {
-      const had = unreadKeys.has(key)
-      unreadKeys.delete(key)
-      lastSystemNotificationAtByKey.delete(key)
-      if (had) notifyAndBadge(key)
+    remove(terminalSessionId) {
+      const had = unreadSessionIds.has(terminalSessionId)
+      unreadSessionIds.delete(terminalSessionId)
+      lastSystemNotificationAtByTerminalSessionId.delete(terminalSessionId)
+      if (had) notifyAndBadge(terminalSessionId)
     },
     reset() {
-      const had = unreadKeys.size > 0
-      unreadKeys.clear()
-      lastSystemNotificationAtByKey.clear()
+      const had = unreadSessionIds.size > 0
+      unreadSessionIds.clear()
+      lastSystemNotificationAtByTerminalSessionId.clear()
       if (had) notifyAndBadge()
     },
     handleBell(descriptor, event) {
       const windowFocused = typeof document !== 'undefined' ? document.hasFocus() : true
       if (event.visible && windowFocused) return
-      const changed = !unreadKeys.has(descriptor.key)
-      unreadKeys.add(descriptor.key)
-      if (changed) notifyAndBadge(descriptor.key)
+      const changed = !unreadSessionIds.has(descriptor.terminalSessionId)
+      unreadSessionIds.add(descriptor.terminalSessionId)
+      if (changed) notifyAndBadge(descriptor.terminalSessionId)
       if (!getRuntimeFetchSettings().terminalNotificationsEnabled) return
       const now = Date.now()
-      const lastNotifiedAt = lastSystemNotificationAtByKey.get(descriptor.key) ?? 0
+      const lastNotifiedAt = lastSystemNotificationAtByTerminalSessionId.get(descriptor.terminalSessionId) ?? 0
       // Leading-edge throttle for native/system notifications only.
       // The in-app unread state above is published immediately.
       if (now - lastNotifiedAt < BELL_NOTIFICATION_THROTTLE_MS) return
-      lastSystemNotificationAtByKey.set(descriptor.key, now)
+      lastSystemNotificationAtByTerminalSessionId.set(descriptor.terminalSessionId, now)
       const repoName = lastPathSegment(descriptor.repoRoot)
       const bodyParts = [descriptor.branch]
       const canonicalTitle = typeof event.canonicalTitle === 'string' ? event.canonicalTitle.trim() : ''
       if (canonicalTitle) bodyParts.push(canonicalTitle)
       else if (event.processName) bodyParts.push(event.processName)
       void terminalBridge
-        .notifyBell({ title: repoName, body: bodyParts.join('\n'), key: descriptor.key, repoRoot: descriptor.repoRoot })
+        .notifyBell({
+          title: repoName,
+          body: bodyParts.join('\n'),
+          terminalSessionId: descriptor.terminalSessionId,
+          terminalWorktreeKey: descriptor.terminalWorktreeKey,
+          repoRoot: descriptor.repoRoot,
+        })
         .catch(() => {})
     },
   }

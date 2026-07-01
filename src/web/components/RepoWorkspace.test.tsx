@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, cleanup, render, screen } from '@testing-library/react'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { RepoWorkspace } from '#/web/components/RepoWorkspace.tsx'
 import {
@@ -10,7 +11,7 @@ import {
 import type {
   TerminalSessionContextValue,
   TerminalSessionReadContextValue,
-  WorktreeTerminalSnapshot,
+  TerminalWorktreeSnapshot,
 } from '#/web/components/terminal/types.ts'
 import {
   PrimaryWindowNavigationProvider,
@@ -18,22 +19,23 @@ import {
 } from '#/web/primary-window-navigation.tsx'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import { resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 
 const REPO_ID = '/tmp/repo-workspace-container-repo'
 
-const emptyWorktreeSnapshot: WorktreeTerminalSnapshot = {
-  worktreeTerminalKey: '',
+const emptyWorktreeSnapshot: TerminalWorktreeSnapshot = {
+  terminalWorktreeKey: '',
   selectedDescriptor: null,
   sessions: [],
   count: 0,
   bellCount: 0,
-        activeCount: 0,
+  activeCount: 0,
   pendingCreate: false,
 }
 
 const terminalReadContext: TerminalSessionReadContextValue = {
-  worktreeSnapshot: () => emptyWorktreeSnapshot,
-  subscribeWorktree: () => () => {},
+  terminalWorktreeSnapshot: () => emptyWorktreeSnapshot,
+  subscribeTerminalWorktree: () => () => {},
   repoBellCount: () => 0,
   subscribeRepoBellCount: () => () => {},
   snapshot: () => ({ phase: 'opening', message: null, processName: 'terminal' }),
@@ -85,13 +87,15 @@ afterEach(() => {
 describe('RepoWorkspace', () => {
   test('can render after the repo appears without changing hook order', () => {
     render(
-      <PrimaryWindowNavigationProvider value={navigation}>
-        <TerminalSessionContext.Provider value={terminalCommandContext}>
-          <TerminalSessionReadContext.Provider value={terminalReadContext}>
-            <RepoWorkspace repoId={REPO_ID} />
-          </TerminalSessionReadContext.Provider>
-        </TerminalSessionContext.Provider>
-      </PrimaryWindowNavigationProvider>,
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={navigation}>
+          <TerminalSessionContext.Provider value={terminalCommandContext}>
+            <TerminalSessionReadContext.Provider value={terminalReadContext}>
+              <RepoWorkspace repoId={REPO_ID} />
+            </TerminalSessionReadContext.Provider>
+          </TerminalSessionContext.Provider>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
     )
 
     expect(() => {

@@ -38,9 +38,8 @@ class MockResizeObserver {
 
 function descriptor(): TerminalDescriptor {
   return {
-    key: '/repo\0/repo\0session-1',
-    worktreeTerminalKey: '/repo\0/repo',
-    sessionId: 'session-1',
+    terminalSessionId: 'session-1',
+    terminalWorktreeKey: '/repo\0/repo',
     index: 1,
     repoRoot: '/repo',
     branch: 'main',
@@ -65,7 +64,7 @@ describe('terminal session geometry helpers', () => {
     const startupGeometryHintByWorktree = new Map<string, { cols: number; rows: number }>()
 
     const geometry = captureTerminalHostGeometry({
-      worktreeTerminalKey: '/repo\0/repo',
+      terminalWorktreeKey: '/repo\0/repo',
       hostByWorktree: new Map([['/repo\0/repo', host]]),
       startupGeometryHintByWorktree,
     })
@@ -76,7 +75,7 @@ describe('terminal session geometry helpers', () => {
 
   test('falls back to selected attachment canonical size or cached geometry', async () => {
     const geometry = resolveTerminalStartupGeometryHint({
-      worktreeTerminalKey: '/repo\0/repo',
+      terminalWorktreeKey: '/repo\0/repo',
       hostByWorktree: new Map(),
       startupGeometryHintByWorktree: new Map(),
       selectedDescriptor: descriptor(),
@@ -93,7 +92,7 @@ describe('terminal session geometry helpers', () => {
     expect(geometry).toEqual({ cols: 90, rows: 30 })
 
     const cached = resolveTerminalStartupGeometryHint({
-      worktreeTerminalKey: '/repo\0/repo',
+      terminalWorktreeKey: '/repo\0/repo',
       hostByWorktree: new Map(),
       startupGeometryHintByWorktree: new Map([['/repo\0/repo', { cols: 70, rows: 20 }]]),
       selectedDescriptor: null,

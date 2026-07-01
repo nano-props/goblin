@@ -3,15 +3,17 @@ import type { IpcEvent, IpcRequest, SettingsPage } from '#/shared/api-types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
 import type {
-  TerminalCatalogMutationResult,
+  TerminalCreateResult,
   TerminalAttachInput,
   TerminalAttachResult,
   TerminalCreateInput,
   TerminalExitEvent,
+  TerminalListWorkspaceTabsInput,
   TerminalMutationResult,
   TerminalNotifyBellInput,
   TerminalOutputEvent,
   TerminalResizeInput,
+  TerminalReplaceWorkspaceTabsInput,
   TerminalRestartInput,
   TerminalSessionSnapshot,
   TerminalSessionSnapshotInput,
@@ -20,9 +22,12 @@ import type {
   TerminalTakeoverInput,
   TerminalTakeoverResult,
   TerminalTestNotificationInput,
+  TerminalUpdateWorkspaceTabsInput,
+  WorkspacePaneTabsEntry,
   TerminalTitleEvent,
   TerminalWriteInput,
 } from '#/shared/terminal-types.ts'
+import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { TerminalIdentityViewModel, TerminalLifecycleViewModel } from '#/web/components/terminal/types.ts'
 
 export interface ClientTerminalBridge {
@@ -32,9 +37,12 @@ export interface ClientTerminalBridge {
   resize: (input: TerminalResizeInput) => Promise<TerminalMutationResult>
   takeover: (input: TerminalTakeoverInput) => Promise<TerminalTakeoverResult>
   close: (input: TerminalSessionInput) => Promise<TerminalMutationResult>
-  create: (input: TerminalCreateInput) => Promise<TerminalCatalogMutationResult>
+  create: (input: TerminalCreateInput) => Promise<TerminalCreateResult>
+  replaceWorkspaceTabs: (input: TerminalReplaceWorkspaceTabsInput) => Promise<WorkspacePaneTabEntry[]>
+  updateWorkspaceTabs: (input: TerminalUpdateWorkspaceTabsInput) => Promise<WorkspacePaneTabEntry[]>
   pruneTerminals: (repoRoot: string) => Promise<{ pruned: number; remaining: number }>
   listSessions: (input: { repoRoot: string }) => Promise<TerminalSessionSummary[]>
+  listWorkspaceTabs: (input: TerminalListWorkspaceTabsInput) => Promise<WorkspacePaneTabsEntry[]>
   /**
    * Open the underlying WebSocket (if not already open) and resolve
    * once it reaches the OPEN state. Used as a T1.2 prewarm when the
@@ -65,6 +73,7 @@ export interface ClientTerminalBridge {
   onIdentity: (cb: (event: TerminalIdentityViewModel) => void) => () => void
   onLifecycle: (cb: (event: TerminalLifecycleViewModel) => void) => () => void
   onSessionsChanged: (cb: (repoRoot: string) => void) => () => void
+  onWorkspaceTabsChanged: (cb: (repoRoot: string) => void) => () => void
   /**
    * Subscribe to per-session close broadcasts from the server. Emitted
    * after a successful `close` IPC alongside the broader
@@ -74,7 +83,13 @@ export interface ClientTerminalBridge {
    * see the previous shell's `Restored session: …` line print twice"
    * bug, where a lost close request left the server PTY alive.
    */
-  onSessionClosed: (cb: (event: { ptySessionId: string; repoRoot: string }) => void) => () => void
+  onSessionClosed: (
+    cb: (event: {
+      ptySessionId: string
+      repoRoot: string
+      worktreePath: string
+    }) => void,
+  ) => () => void
 }
 
 export interface ClientHostBridge {

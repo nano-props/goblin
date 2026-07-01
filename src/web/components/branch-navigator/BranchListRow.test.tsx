@@ -22,8 +22,8 @@ vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
 }))
 
 vi.mock('#/web/components/terminal/terminal-session-store.ts', () => ({
-  useWorktreeTerminalActive: () => terminalStoreMocks.active,
-  useWorktreeTerminalBellCount: () => 0,
+  useTerminalWorktreeActive: () => terminalStoreMocks.active,
+  useTerminalWorktreeBellCount: () => 0,
 }))
 
 const branchRowPropsSpy = vi.fn()

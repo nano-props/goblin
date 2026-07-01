@@ -1,13 +1,15 @@
 import type {
   TerminalAttachInput,
   TerminalAttachResult,
-  TerminalCatalogMutationResult,
+  TerminalCreateResult,
   TerminalCreateInput,
   TerminalIdentityEvent,
   TerminalLifecycleEvent,
   TerminalListSessionsInput,
+  TerminalListWorkspaceTabsInput,
   TerminalMutationResult,
   TerminalOutputEvent,
+  TerminalReplaceWorkspaceTabsInput,
   TerminalResizeInput,
   TerminalRestartInput,
   TerminalSessionInput,
@@ -16,10 +18,13 @@ import type {
   TerminalSessionSummary,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
+  TerminalUpdateWorkspaceTabsInput,
+  WorkspacePaneTabsEntry,
   TerminalTitleEvent,
   TerminalExitEvent,
   TerminalWriteInput,
 } from '#/shared/terminal-types.ts'
+import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 
 export type TerminalRealtimeMessage =
   | { type: 'output'; event: TerminalOutputEvent }
@@ -33,6 +38,7 @@ export type TerminalRealtimeMessage =
   | { type: 'identity'; event: TerminalIdentityEvent }
   | { type: 'lifecycle'; event: TerminalLifecycleEvent }
   | { type: 'sessions-changed'; repoRoot: string }
+  | { type: 'workspace-tabs-changed'; repoRoot: string }
   // Targeted per-session close. Emitted by the server after a
   // successful `close` request, alongside the existing
   // `sessions-changed` global broadcast. Multi-window clients use
@@ -40,7 +46,12 @@ export type TerminalRealtimeMessage =
   // a full list-rescan. The `repoRoot` is included so the client
   // can route the event to the right worktree without a manager
   // lookup.
-  | { type: 'session-closed'; ptySessionId: string; repoRoot: string }
+  | {
+      type: 'session-closed'
+      ptySessionId: string
+      repoRoot: string
+      worktreePath: string
+    }
 
 export interface TerminalSocketRequestInputs {
   attach: TerminalAttachInput
@@ -50,7 +61,10 @@ export interface TerminalSocketRequestInputs {
   takeover: TerminalTakeoverInput
   close: TerminalSessionInput
   'list-sessions': TerminalListSessionsInput
+  'list-workspace-tabs': TerminalListWorkspaceTabsInput
   create: TerminalCreateInput
+  'replace-tabs': TerminalReplaceWorkspaceTabsInput
+  'update-tabs': TerminalUpdateWorkspaceTabsInput
   prune: { repoRoot: string }
   'session-snapshot': TerminalSessionSnapshotInput
 }
@@ -63,7 +77,10 @@ export interface TerminalSocketResponseOutputs {
   takeover: TerminalTakeoverResult
   close: TerminalMutationResult
   'list-sessions': TerminalSessionSummary[]
-  create: TerminalCatalogMutationResult
+  'list-workspace-tabs': WorkspacePaneTabsEntry[]
+  create: TerminalCreateResult
+  'replace-tabs': WorkspacePaneTabEntry[]
+  'update-tabs': WorkspacePaneTabEntry[]
   prune: { pruned: number; remaining: number }
   'session-snapshot': TerminalSessionSnapshot | null
 }
@@ -101,7 +118,8 @@ export type TerminalSocketResponseMessage =
 
 export type TerminalHealthPongMessage = { type: 'pong'; requestId: string }
 
-export type TerminalSocketServerMessage = TerminalRealtimeMessage | TerminalSocketResponseMessage | TerminalHealthPongMessage
+export type TerminalSocketServerMessage =
+  TerminalRealtimeMessage | TerminalSocketResponseMessage | TerminalHealthPongMessage
 /**
  * Heartbeat envelope. Sent client→server every
  * `HEARTBEAT_INTERVAL_MS` while the realtime socket is `OPEN`. Carries

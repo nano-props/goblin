@@ -13,7 +13,7 @@ import type {
   TerminalSessionReadContextValue,
   TerminalSessionSummary,
   TerminalSnapshot,
-  WorktreeTerminalSnapshot,
+  TerminalWorktreeSnapshot,
 } from '#/web/components/terminal/types.ts'
 
 // Side-effect import: registers a partial mock of `#/web/stores/i18n.ts`
@@ -42,21 +42,19 @@ vi.mock('#/web/components/terminal/mobile-detection.ts', () => ({
 // `renderInJsdom` registers `cleanup` via `afterEach`, which
 // unmounts all rendered components and removes their containers.
 
-type TestTerminalSummary = Omit<TerminalSessionSummary, 'type' | 'id' | 'displayOrder' | 'recentlyActive'> &
-  Partial<Pick<TerminalSessionSummary, 'type' | 'id' | 'displayOrder' | 'recentlyActive'>>
+type TestTerminalSummary = Omit<TerminalSessionSummary, 'type' | 'recentlyActive'> &
+  Partial<Pick<TerminalSessionSummary, 'type' | 'recentlyActive'>>
 
-type TestWorktreeSnapshot = Omit<WorktreeTerminalSnapshot, 'sessions' | 'bellCount' | 'activeCount'> & {
+type TestWorktreeSnapshot = Omit<TerminalWorktreeSnapshot, 'sessions' | 'bellCount' | 'activeCount'> & {
   sessions: TestTerminalSummary[]
   bellCount?: number
   activeCount?: number
 }
 
-function completeWorktreeSnapshot(snapshot: TestWorktreeSnapshot): WorktreeTerminalSnapshot {
-  const sessions = snapshot.sessions.map((session, index) => ({
+function completeWorktreeSnapshot(snapshot: TestWorktreeSnapshot): TerminalWorktreeSnapshot {
+  const sessions = snapshot.sessions.map((session) => ({
     ...session,
     type: 'terminal' as const,
-    id: session.id ?? session.key,
-    displayOrder: session.displayOrder ?? index + 1,
     recentlyActive: session.recentlyActive ?? false,
   }))
   return {
@@ -70,28 +68,26 @@ function completeWorktreeSnapshot(snapshot: TestWorktreeSnapshot): WorktreeTermi
 async function renderTerminalSession() {
   const writeInput = vi.fn()
   const descriptor = {
-    key: 'session-1',
-    worktreeTerminalKey: '/repo\0/worktree',
-    sessionId: 'session-1',
+    terminalSessionId: 'session-1',
+    terminalWorktreeKey: '/repo\0/worktree',
     index: 1,
     repoRoot: '/repo',
     branch: 'feature',
     worktreePath: '/worktree',
   }
-  const worktreeSnapshot = {
-    worktreeTerminalKey: '/repo\0/worktree',
+  const terminalWorktreeSnapshot = {
+    terminalWorktreeKey: '/repo\0/worktree',
     selectedDescriptor: descriptor,
     sessions: [
       {
-        key: 'session-1',
-        worktreeTerminalKey: '/repo\0/worktree',
-        sessionId: 'session-1',
+        terminalSessionId: 'session-1',
+        terminalWorktreeKey: '/repo\0/worktree',
         index: 1,
         title: 'zsh',
         phase: 'open' as const,
         selected: true,
         hasBell: false,
-            recentlyActive: false,
+        recentlyActive: false,
       },
     ],
     count: 1,
@@ -133,8 +129,8 @@ async function renderTerminalSession() {
     serialize: vi.fn(() => ''),
   }
   const readContext: TerminalSessionReadContextValue = {
-    worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
-    subscribeWorktree: () => () => {},
+    terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
+    subscribeTerminalWorktree: () => () => {},
     repoBellCount: () => 0,
     subscribeRepoBellCount: () => () => {},
     snapshot: () => snapshot,
@@ -217,28 +213,26 @@ describe('TerminalSessionView', () => {
     const takeover = vi.fn().mockResolvedValue(true)
     const summaries = [
       {
-        key: 'session-1',
-        worktreeTerminalKey: '/repo\0/worktree',
-        sessionId: 'session-1',
+        terminalSessionId: 'session-1',
+        terminalWorktreeKey: '/repo\0/worktree',
         index: 1,
         title: 'zsh',
         phase: 'open' as const,
         selected: true,
         hasBell: false,
-            recentlyActive: false,
+        recentlyActive: false,
       },
     ]
     const descriptor = {
-      key: 'session-1',
-      worktreeTerminalKey: '/repo\0/worktree',
-      sessionId: 'session-1',
+      terminalSessionId: 'session-1',
+      terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
       worktreePath: '/worktree',
     }
-    const worktreeSnapshot = {
-      worktreeTerminalKey: '/repo\0/worktree',
+    const terminalWorktreeSnapshot = {
+      terminalWorktreeKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
       sessions: summaries,
       count: 1,
@@ -280,8 +274,8 @@ describe('TerminalSessionView', () => {
       serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
-      worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
-      subscribeWorktree: () => () => {},
+      terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
+      subscribeTerminalWorktree: () => () => {},
       repoBellCount: () => 0,
       subscribeRepoBellCount: () => () => {},
       snapshot: () => snapshot,
@@ -318,7 +312,7 @@ describe('TerminalSessionView', () => {
 
   test('does not automatically create a default terminal from render lifecycle', async () => {
     const emptyWorktreeSnapshot = {
-      worktreeTerminalKey: '/repo\0/worktree',
+      terminalWorktreeKey: '/repo\0/worktree',
       selectedDescriptor: null,
       sessions: [],
       count: 0,
@@ -347,8 +341,8 @@ describe('TerminalSessionView', () => {
       serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
-      worktreeSnapshot: () => completeWorktreeSnapshot(emptyWorktreeSnapshot),
-      subscribeWorktree: () => () => {},
+      terminalWorktreeSnapshot: () => completeWorktreeSnapshot(emptyWorktreeSnapshot),
+      subscribeTerminalWorktree: () => () => {},
       repoBellCount: () => 0,
       subscribeRepoBellCount: () => () => {},
       snapshot: () => emptySnapshot,
@@ -375,28 +369,26 @@ describe('TerminalSessionView', () => {
 
   test('hides the xterm host while an existing session is still attaching locally', async () => {
     const descriptor = {
-      key: 'session-1',
-      worktreeTerminalKey: '/repo\0/worktree',
-      sessionId: 'session-1',
+      terminalSessionId: 'session-1',
+      terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
       worktreePath: '/worktree',
     }
-    const worktreeSnapshot = {
-      worktreeTerminalKey: '/repo\0/worktree',
+    const terminalWorktreeSnapshot = {
+      terminalWorktreeKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
       sessions: [
         {
-          key: 'session-1',
-          worktreeTerminalKey: '/repo\0/worktree',
-          sessionId: 'session-1',
+          terminalSessionId: 'session-1',
+          terminalWorktreeKey: '/repo\0/worktree',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
           selected: true,
           hasBell: false,
-            recentlyActive: false,
+          recentlyActive: false,
         },
       ],
       count: 1,
@@ -425,8 +417,8 @@ describe('TerminalSessionView', () => {
       serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
-      worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
-      subscribeWorktree: () => () => {},
+      terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
+      subscribeTerminalWorktree: () => () => {},
       repoBellCount: () => 0,
       subscribeRepoBellCount: () => () => {},
       snapshot: () => snapshot,
@@ -454,28 +446,26 @@ describe('TerminalSessionView', () => {
 
   test('focuses the controller terminal after the ready render shows the host', async () => {
     const descriptor = {
-      key: 'session-1',
-      worktreeTerminalKey: '/repo\0/worktree',
-      sessionId: 'session-1',
+      terminalSessionId: 'session-1',
+      terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
       worktreePath: '/worktree',
     }
-    const worktreeSnapshot = {
-      worktreeTerminalKey: '/repo\0/worktree',
+    const terminalWorktreeSnapshot = {
+      terminalWorktreeKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
       sessions: [
         {
-          key: 'session-1',
-          worktreeTerminalKey: '/repo\0/worktree',
-          sessionId: 'session-1',
+          terminalSessionId: 'session-1',
+          terminalWorktreeKey: '/repo\0/worktree',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
           selected: true,
           hasBell: false,
-            recentlyActive: false,
+          recentlyActive: false,
         },
       ],
       count: 1,
@@ -520,8 +510,8 @@ describe('TerminalSessionView', () => {
     }
     let activeSnapshot: TerminalSnapshot = openingSnapshot
     const readContext: TerminalSessionReadContextValue = {
-      worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
-      subscribeWorktree: () => () => {},
+      terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
+      subscribeTerminalWorktree: () => () => {},
       repoBellCount: () => 0,
       subscribeRepoBellCount: () => () => {},
       snapshot: () => activeSnapshot,
@@ -561,28 +551,26 @@ describe('TerminalSessionView', () => {
 
   test('focuses the controller terminal after search closes if ready happened while search was open', async () => {
     const descriptor = {
-      key: 'session-1',
-      worktreeTerminalKey: '/repo\0/worktree',
-      sessionId: 'session-1',
+      terminalSessionId: 'session-1',
+      terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
       worktreePath: '/worktree',
     }
-    const worktreeSnapshot = {
-      worktreeTerminalKey: '/repo\0/worktree',
+    const terminalWorktreeSnapshot = {
+      terminalWorktreeKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
       sessions: [
         {
-          key: 'session-1',
-          worktreeTerminalKey: '/repo\0/worktree',
-          sessionId: 'session-1',
+          terminalSessionId: 'session-1',
+          terminalWorktreeKey: '/repo\0/worktree',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
           selected: true,
           hasBell: false,
-            recentlyActive: false,
+          recentlyActive: false,
         },
       ],
       count: 1,
@@ -627,8 +615,8 @@ describe('TerminalSessionView', () => {
     }
     let activeSnapshot: TerminalSnapshot = openingSnapshot
     const readContext: TerminalSessionReadContextValue = {
-      worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
-      subscribeWorktree: () => () => {},
+      terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
+      subscribeTerminalWorktree: () => () => {},
       repoBellCount: () => 0,
       subscribeRepoBellCount: () => () => {},
       snapshot: () => activeSnapshot,
@@ -676,28 +664,26 @@ describe('TerminalSessionView', () => {
     const takeover = vi.fn().mockResolvedValue(true)
     const restart = vi.fn()
     const descriptor = {
-      key: 'session-1',
-      worktreeTerminalKey: '/repo\0/worktree',
-      sessionId: 'session-1',
+      terminalSessionId: 'session-1',
+      terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
       worktreePath: '/worktree',
     }
-    const worktreeSnapshot = {
-      worktreeTerminalKey: '/repo\0/worktree',
+    const terminalWorktreeSnapshot = {
+      terminalWorktreeKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
       sessions: [
         {
-          key: 'session-1',
-          worktreeTerminalKey: '/repo\0/worktree',
-          sessionId: 'session-1',
+          terminalSessionId: 'session-1',
+          terminalWorktreeKey: '/repo\0/worktree',
           index: 1,
           title: 'zsh',
           phase: 'error' as const,
           selected: true,
           hasBell: false,
-            recentlyActive: false,
+          recentlyActive: false,
         },
       ],
       count: 1,
@@ -739,8 +725,8 @@ describe('TerminalSessionView', () => {
       serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
-      worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
-      subscribeWorktree: () => () => {},
+      terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
+      subscribeTerminalWorktree: () => () => {},
       repoBellCount: () => 0,
       subscribeRepoBellCount: () => () => {},
       snapshot: () => snapshot,
@@ -783,34 +769,32 @@ describe('TerminalSessionView', () => {
   })
 
   test('drop on a viewer session is ignored (isController gate matches paste)', async () => {
-    // Regression for the previous drop handler that only checked `!key`.
+    // Regression for the previous drop handler that only checked `!terminalSessionId`.
     // A viewer dropping a file would silently route input into the
     // controller's PTY; the isController gate added alongside paste
     // closes that hole.
     const writeInput = vi.fn()
     const descriptor = {
-      key: 'session-1',
-      worktreeTerminalKey: '/repo\0/worktree',
-      sessionId: 'session-1',
+      terminalSessionId: 'session-1',
+      terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
       worktreePath: '/worktree',
     }
-    const worktreeSnapshot = {
-      worktreeTerminalKey: '/repo\0/worktree',
+    const terminalWorktreeSnapshot = {
+      terminalWorktreeKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
       sessions: [
         {
-          key: 'session-1',
-          worktreeTerminalKey: '/repo\0/worktree',
-          sessionId: 'session-1',
+          terminalSessionId: 'session-1',
+          terminalWorktreeKey: '/repo\0/worktree',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
           selected: true,
           hasBell: false,
-            recentlyActive: false,
+          recentlyActive: false,
         },
       ],
       count: 1,
@@ -854,8 +838,8 @@ describe('TerminalSessionView', () => {
       serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
-      worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
-      subscribeWorktree: () => () => {},
+      terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
+      subscribeTerminalWorktree: () => () => {},
       repoBellCount: () => 0,
       subscribeRepoBellCount: () => () => {},
       snapshot: () => snapshot,
@@ -907,28 +891,26 @@ describe('TerminalSessionView', () => {
     // dropped the controller gate would have slipped through.
     const writeInput = vi.fn()
     const descriptor = {
-      key: 'session-1',
-      worktreeTerminalKey: '/repo\0/worktree',
-      sessionId: 'session-1',
+      terminalSessionId: 'session-1',
+      terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
       worktreePath: '/worktree',
     }
-    const worktreeSnapshot = {
-      worktreeTerminalKey: '/repo\0/worktree',
+    const terminalWorktreeSnapshot = {
+      terminalWorktreeKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
       sessions: [
         {
-          key: 'session-1',
-          worktreeTerminalKey: '/repo\0/worktree',
-          sessionId: 'session-1',
+          terminalSessionId: 'session-1',
+          terminalWorktreeKey: '/repo\0/worktree',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
           selected: true,
           hasBell: false,
-            recentlyActive: false,
+          recentlyActive: false,
         },
       ],
       count: 1,
@@ -972,8 +954,8 @@ describe('TerminalSessionView', () => {
       serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
-      worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
-      subscribeWorktree: () => () => {},
+      terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
+      subscribeTerminalWorktree: () => () => {},
       repoBellCount: () => 0,
       subscribeRepoBellCount: () => () => {},
       snapshot: () => snapshot,
@@ -1044,28 +1026,26 @@ describe('TerminalSessionView', () => {
     // paths.
     const writeInput = vi.fn()
     const descriptor = {
-      key: 'session-1',
-      worktreeTerminalKey: '/repo\0/worktree',
-      sessionId: 'session-1',
+      terminalSessionId: 'session-1',
+      terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
       worktreePath: '/worktree',
     }
-    const worktreeSnapshot = {
-      worktreeTerminalKey: '/repo\0/worktree',
+    const terminalWorktreeSnapshot = {
+      terminalWorktreeKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
       sessions: [
         {
-          key: 'session-1',
-          worktreeTerminalKey: '/repo\0/worktree',
-          sessionId: 'session-1',
+          terminalSessionId: 'session-1',
+          terminalWorktreeKey: '/repo\0/worktree',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
           selected: true,
           hasBell: false,
-            recentlyActive: false,
+          recentlyActive: false,
         },
       ],
       count: 1,
@@ -1107,8 +1087,8 @@ describe('TerminalSessionView', () => {
       serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
-      worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
-      subscribeWorktree: () => () => {},
+      terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
+      subscribeTerminalWorktree: () => () => {},
       repoBellCount: () => 0,
       subscribeRepoBellCount: () => () => {},
       snapshot: () => snapshot,
@@ -1153,28 +1133,26 @@ describe('TerminalSessionView', () => {
     // is never reached; writeInput gets the shell-escaped path.
     const writeInput = vi.fn()
     const descriptor = {
-      key: 'session-1',
-      worktreeTerminalKey: '/repo\0/worktree',
-      sessionId: 'session-1',
+      terminalSessionId: 'session-1',
+      terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
       worktreePath: '/worktree',
     }
-    const worktreeSnapshot = {
-      worktreeTerminalKey: '/repo\0/worktree',
+    const terminalWorktreeSnapshot = {
+      terminalWorktreeKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
       sessions: [
         {
-          key: 'session-1',
-          worktreeTerminalKey: '/repo\0/worktree',
-          sessionId: 'session-1',
+          terminalSessionId: 'session-1',
+          terminalWorktreeKey: '/repo\0/worktree',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
           selected: true,
           hasBell: false,
-            recentlyActive: false,
+          recentlyActive: false,
         },
       ],
       count: 1,
@@ -1216,8 +1194,8 @@ describe('TerminalSessionView', () => {
       serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
-      worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
-      subscribeWorktree: () => () => {},
+      terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
+      subscribeTerminalWorktree: () => () => {},
       repoBellCount: () => 0,
       subscribeRepoBellCount: () => () => {},
       snapshot: () => snapshot,
@@ -1274,28 +1252,26 @@ describe('TerminalSessionView', () => {
     // check runs before any async resolver work).
     const writeInput = vi.fn()
     const descriptor = {
-      key: 'session-1',
-      worktreeTerminalKey: '/repo\0/worktree',
-      sessionId: 'session-1',
+      terminalSessionId: 'session-1',
+      terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
       worktreePath: '/worktree',
     }
-    const worktreeSnapshot = {
-      worktreeTerminalKey: '/repo\0/worktree',
+    const terminalWorktreeSnapshot = {
+      terminalWorktreeKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
       sessions: [
         {
-          key: 'session-1',
-          worktreeTerminalKey: '/repo\0/worktree',
-          sessionId: 'session-1',
+          terminalSessionId: 'session-1',
+          terminalWorktreeKey: '/repo\0/worktree',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
           selected: true,
           hasBell: false,
-            recentlyActive: false,
+          recentlyActive: false,
         },
       ],
       count: 1,
@@ -1337,8 +1313,8 @@ describe('TerminalSessionView', () => {
       serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
-      worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
-      subscribeWorktree: () => () => {},
+      terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
+      subscribeTerminalWorktree: () => () => {},
       repoBellCount: () => 0,
       subscribeRepoBellCount: () => () => {},
       snapshot: () => snapshot,
@@ -1551,28 +1527,26 @@ describe('TerminalSessionView', () => {
     // writeResolutionToPty wiring.
     const writeInput = vi.fn()
     const descriptor = {
-      key: 'session-1',
-      worktreeTerminalKey: '/repo\0/worktree',
-      sessionId: 'session-1',
+      terminalSessionId: 'session-1',
+      terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
       worktreePath: '/worktree',
     }
-    const worktreeSnapshot = {
-      worktreeTerminalKey: '/repo\0/worktree',
+    const terminalWorktreeSnapshot = {
+      terminalWorktreeKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
       sessions: [
         {
-          key: 'session-1',
-          worktreeTerminalKey: '/repo\0/worktree',
-          sessionId: 'session-1',
+          terminalSessionId: 'session-1',
+          terminalWorktreeKey: '/repo\0/worktree',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
           selected: true,
           hasBell: false,
-            recentlyActive: false,
+          recentlyActive: false,
         },
       ],
       count: 1,
@@ -1614,8 +1588,8 @@ describe('TerminalSessionView', () => {
       serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
-      worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
-      subscribeWorktree: () => () => {},
+      terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
+      subscribeTerminalWorktree: () => () => {},
       repoBellCount: () => 0,
       subscribeRepoBellCount: () => () => {},
       snapshot: () => snapshot,
@@ -1678,64 +1652,60 @@ describe('TerminalSessionView', () => {
     // controller-drop path. The blob-save tier is a real roundtrip
     // (HTTP POST in web, IPC in Electron), so the user has a real
     // window to switch worktrees before the resolver returns. The
-    // captured `slotKey` would otherwise be typed into a session
+    // captured `terminalSessionId` would otherwise be typed into a session
     // the user is no longer looking at — invisible to them, or worse,
     // into a now-detached session that the projection silently drops.
-    // The fix: capture `key` at handler invocation time, compare to
-    // a `keyRef` updated by useEffect on every render, and bail if
+    // The fix: capture `terminalSessionId` at handler invocation time, compare to
+    // a ref updated by useEffect on every render, and bail if
     // they diverge.
     const writeInput = vi.fn()
     const descriptorA = {
-      key: 'session-1',
-      worktreeTerminalKey: '/repo\0/worktree',
-      sessionId: 'session-1',
+      terminalSessionId: 'session-1',
+      terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
       worktreePath: '/worktree',
     }
     const descriptorB = {
-      key: 'session-2',
-      worktreeTerminalKey: '/repo\0/worktree-other',
-      sessionId: 'session-2',
+      terminalSessionId: 'session-2',
+      terminalWorktreeKey: '/repo\0/worktree-other',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
       worktreePath: '/worktree-other',
     }
     const worktreeSnapshotA = {
-      worktreeTerminalKey: '/repo\0/worktree',
+      terminalWorktreeKey: '/repo\0/worktree',
       selectedDescriptor: descriptorA,
       sessions: [
         {
-          key: 'session-1',
-          worktreeTerminalKey: '/repo\0/worktree',
-          sessionId: 'session-1',
+          terminalSessionId: 'session-1',
+          terminalWorktreeKey: '/repo\0/worktree',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
           selected: true,
           hasBell: false,
-            recentlyActive: false,
+          recentlyActive: false,
         },
       ],
       count: 1,
       pendingCreate: false,
     }
     const worktreeSnapshotB = {
-      worktreeTerminalKey: '/repo\0/worktree-other',
+      terminalWorktreeKey: '/repo\0/worktree-other',
       selectedDescriptor: descriptorB,
       sessions: [
         {
-          key: 'session-2',
-          worktreeTerminalKey: '/repo\0/worktree-other',
-          sessionId: 'session-2',
+          terminalSessionId: 'session-2',
+          terminalWorktreeKey: '/repo\0/worktree-other',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
           selected: true,
           hasBell: false,
-            recentlyActive: false,
+          recentlyActive: false,
         },
       ],
       count: 1,
@@ -1778,8 +1748,8 @@ describe('TerminalSessionView', () => {
     }
     let activeWorktreeSnapshot = worktreeSnapshotA
     const readContext: TerminalSessionReadContextValue = {
-      worktreeSnapshot: () => completeWorktreeSnapshot(activeWorktreeSnapshot),
-      subscribeWorktree: () => () => {},
+      terminalWorktreeSnapshot: () => completeWorktreeSnapshot(activeWorktreeSnapshot),
+      subscribeTerminalWorktree: () => () => {},
       repoBellCount: () => 0,
       subscribeRepoBellCount: () => () => {},
       snapshot: () => snapshotOpen,
@@ -1827,8 +1797,8 @@ describe('TerminalSessionView', () => {
       })
 
       // User switches worktrees mid-resolve. The session re-renders with
-      // the new descriptor, which updates `keyRef.current` via the
-      // useEffect on `key`.
+      // the new descriptor, which updates the current terminalSessionId ref
+      // via the effect on every render.
       activeWorktreeSnapshot = worktreeSnapshotB
       rerender(
         <TerminalSessionContext.Provider value={context}>
@@ -1840,7 +1810,7 @@ describe('TerminalSessionView', () => {
 
       // Now resolve the in-flight blob-save call. The post-resolve
       // guard must see the divergence and drop the write — neither
-      // key (old nor new) should receive input. The chain runs
+      // terminal session (old nor new) should receive input. The chain runs
       // through several microtask hops (saveClipboardFiles.then →
       // resolvePastedFiles.then → processDrop.then → handler.then);
       // setTimeout(0) is the established pattern in the other
@@ -1863,7 +1833,7 @@ describe('TerminalSessionView', () => {
     // affordance without reaching for the per-worktree "+" tab.
     const createTerminal = vi.fn(async () => 'session-1')
     const emptyWorktreeSnapshot = {
-      worktreeTerminalKey: '/repo\0/worktree',
+      terminalWorktreeKey: '/repo\0/worktree',
       selectedDescriptor: null,
       sessions: [],
       count: 0,
@@ -1892,8 +1862,8 @@ describe('TerminalSessionView', () => {
       serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
-      worktreeSnapshot: () => completeWorktreeSnapshot(emptyWorktreeSnapshot),
-      subscribeWorktree: () => () => {},
+      terminalWorktreeSnapshot: () => completeWorktreeSnapshot(emptyWorktreeSnapshot),
+      subscribeTerminalWorktree: () => () => {},
       repoBellCount: () => 0,
       subscribeRepoBellCount: () => () => {},
       snapshot: () => emptySnapshot,
@@ -1946,7 +1916,7 @@ describe('TerminalSessionView', () => {
     })
     const { toast } = await import('sonner')
     const emptyWorktreeSnapshot = {
-      worktreeTerminalKey: '/repo\0/worktree',
+      terminalWorktreeKey: '/repo\0/worktree',
       selectedDescriptor: null,
       sessions: [],
       count: 0,
@@ -1975,8 +1945,8 @@ describe('TerminalSessionView', () => {
       serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
-      worktreeSnapshot: () => completeWorktreeSnapshot(emptyWorktreeSnapshot),
-      subscribeWorktree: () => () => {},
+      terminalWorktreeSnapshot: () => completeWorktreeSnapshot(emptyWorktreeSnapshot),
+      subscribeTerminalWorktree: () => () => {},
       repoBellCount: () => 0,
       subscribeRepoBellCount: () => () => {},
       snapshot: () => emptySnapshot,

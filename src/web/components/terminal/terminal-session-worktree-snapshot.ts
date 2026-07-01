@@ -3,26 +3,25 @@ import type {
   TerminalSessionLike,
   TerminalSessionSummary,
   TerminalSnapshot,
-  WorktreeTerminalSnapshot,
+  TerminalWorktreeSnapshot,
 } from '#/web/components/terminal/types.ts'
 
-export function buildWorktreeTerminalSnapshot(input: {
-  worktreeTerminalKey: string
-  selectedDescriptor: WorktreeTerminalSnapshot['selectedDescriptor']
+export function buildTerminalWorktreeSnapshot(input: {
+  terminalWorktreeKey: string
+  selectedDescriptor: TerminalWorktreeSnapshot['selectedDescriptor']
   pendingCreate: boolean
   sessions: TerminalSessionLike[]
-  selectedKey: string | null
-  getCachedSnapshot: (key: string) => TerminalSnapshot | null
-  cacheSnapshot: (key: string, snapshot: TerminalSnapshot) => void
-  hasBell: (key: string) => boolean
-  hasRecentActivity: (key: string) => boolean
-  getDisplayOrder: (session: TerminalSessionLike) => number
-}): WorktreeTerminalSnapshot {
+  selectedTerminalSessionId: string | null
+  getCachedSnapshot: (terminalSessionId: string) => TerminalSnapshot | null
+  cacheSnapshot: (terminalSessionId: string, snapshot: TerminalSnapshot) => void
+  hasBell: (terminalSessionId: string) => boolean
+  hasRecentActivity: (terminalSessionId: string) => boolean
+}): TerminalWorktreeSnapshot {
   const sessions = buildTerminalSessionSummaries(input)
   const bellCount = sessions.reduce((count, session) => count + (session.hasBell ? 1 : 0), 0)
   const activeCount = sessions.reduce((count, session) => count + (session.recentlyActive ? 1 : 0), 0)
   return {
-    worktreeTerminalKey: input.worktreeTerminalKey,
+    terminalWorktreeKey: input.terminalWorktreeKey,
     selectedDescriptor: input.selectedDescriptor,
     sessions,
     count: sessions.length,
@@ -33,35 +32,31 @@ export function buildWorktreeTerminalSnapshot(input: {
 }
 
 function buildTerminalSessionSummaries(input: {
-  worktreeTerminalKey: string
+  terminalWorktreeKey: string
   sessions: TerminalSessionLike[]
-  selectedKey: string | null
-  getCachedSnapshot: (key: string) => TerminalSnapshot | null
-  cacheSnapshot: (key: string, snapshot: TerminalSnapshot) => void
-  hasBell: (key: string) => boolean
-  hasRecentActivity: (key: string) => boolean
-  getDisplayOrder: (session: TerminalSessionLike) => number
+  selectedTerminalSessionId: string | null
+  getCachedSnapshot: (terminalSessionId: string) => TerminalSnapshot | null
+  cacheSnapshot: (terminalSessionId: string, snapshot: TerminalSnapshot) => void
+  hasBell: (terminalSessionId: string) => boolean
+  hasRecentActivity: (terminalSessionId: string) => boolean
 }): TerminalSessionSummary[] {
   return input.sessions.map((session) => {
-    const cached = input.getCachedSnapshot(session.descriptor.key)
+    const cached = input.getCachedSnapshot(session.descriptor.terminalSessionId)
     const snapshot = cached ?? session.snapshot()
-    if (!cached) input.cacheSnapshot(session.descriptor.key, snapshot)
+    if (!cached) input.cacheSnapshot(session.descriptor.terminalSessionId, snapshot)
     return {
       type: 'terminal',
-      id: session.descriptor.key,
-      key: session.descriptor.key,
-      worktreeTerminalKey: input.worktreeTerminalKey,
-      sessionId: session.descriptor.sessionId,
+      terminalSessionId: session.descriptor.terminalSessionId,
+      terminalWorktreeKey: input.terminalWorktreeKey,
       index: session.descriptor.index,
-      displayOrder: input.getDisplayOrder(session),
       title: summarizeTerminalTitle(snapshot, session.descriptor.index),
       fullTitle: fullTerminalTitle(snapshot, session.descriptor.index),
       originalTitle: terminalOriginalTitle(snapshot),
       processName: snapshot.processName,
       phase: snapshot.phase,
-      selected: session.descriptor.key === input.selectedKey,
-      hasBell: input.hasBell(session.descriptor.key),
-      recentlyActive: input.hasRecentActivity(session.descriptor.key),
+      selected: session.descriptor.terminalSessionId === input.selectedTerminalSessionId,
+      hasBell: input.hasBell(session.descriptor.terminalSessionId),
+      recentlyActive: input.hasRecentActivity(session.descriptor.terminalSessionId),
     }
   })
 }

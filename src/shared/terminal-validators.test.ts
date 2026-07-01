@@ -104,6 +104,52 @@ describe('shared terminal validators', () => {
     ).toBeNull()
   })
 
+  test('rejects empty terminal ids in workspace tab replacement requests', () => {
+    expect(
+      normalizeTerminalClientMessage({
+        type: 'request',
+        requestId: 'request_123',
+        action: 'replace-tabs',
+        input: {
+          repoRoot: '/repo',
+          branchName: 'main',
+          worktreePath: '/repo',
+          tabs: [{ type: 'terminal', terminalSessionId: '' }],
+        },
+      }),
+    ).toBeNull()
+  })
+
+  test('accepts workspace tab operation requests and rejects invalid identities', () => {
+    expect(
+      normalizeTerminalClientMessage({
+        type: 'request',
+        requestId: 'request_123',
+        action: 'update-tabs',
+        input: {
+          repoRoot: '/repo',
+          branchName: 'main',
+          worktreePath: '/repo',
+          operation: { type: 'open-static', tabType: 'history' },
+        },
+      }),
+    ).toMatchObject({ type: 'request', action: 'update-tabs' })
+
+    expect(
+      normalizeTerminalClientMessage({
+        type: 'request',
+        requestId: 'request_124',
+        action: 'update-tabs',
+        input: {
+          repoRoot: '/repo',
+          branchName: 'main',
+          worktreePath: '/repo',
+          operation: { type: 'reorder', tabIdentities: ['workspace-pane:status', 'bad\0identity'] },
+        },
+      }),
+    ).toBeNull()
+  })
+
   test('rejects NUL bytes in startup shell commands', () => {
     expect(
       normalizeTerminalClientMessage({
@@ -153,10 +199,24 @@ describe('shared terminal validators', () => {
         type: 'session-closed',
         ptySessionId: 'pty_session_1_aaaaaaaaa',
         repoRoot: '/repo',
+        worktreePath: '/repo/worktree',
       }),
     ).toEqual({
       type: 'session-closed',
       ptySessionId: 'pty_session_1_aaaaaaaaa',
+      repoRoot: '/repo',
+      worktreePath: '/repo/worktree',
+    })
+  })
+
+  test('normalizes workspace tabs changed realtime messages', () => {
+    expect(
+      normalizeTerminalSocketServerMessage({
+        type: 'workspace-tabs-changed',
+        repoRoot: '/repo',
+      }),
+    ).toEqual({
+      type: 'workspace-tabs-changed',
       repoRoot: '/repo',
     })
   })

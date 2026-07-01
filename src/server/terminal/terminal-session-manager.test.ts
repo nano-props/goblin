@@ -11,7 +11,8 @@ import { TerminalSessionManager } from '#/server/terminal/terminal-session-manag
 const USER_ID = 'user_terminal_session_manager'
 const CLIENT_ID = 'client_terminal_session_manager'
 const SCOPE = '/repo'
-const KEY = '/repo\0/repo\0session-1'
+const WORKTREE_PATH = '/repo'
+const TERMINAL_SESSION_ID = 'session-1'
 
 function createDeferredPtySupervisor(): PtySupervisor & {
   spawns: Array<(result: PtySpawnResult) => void>
@@ -95,9 +96,7 @@ function createManager(supervisor: PtySupervisor) {
       onExit: vi.fn(),
     },
     {
-      registerTerminalSessionOrder: vi.fn(),
-      unregisterTerminalSessionOrder: vi.fn(),
-      sessionDisplayOrder: vi.fn(() => 0),
+      terminalSessionIds: vi.fn(() => []),
     },
     () => true,
   )
@@ -114,7 +113,8 @@ async function createSession(
   const pending = manager.ensureSession({
     userId: USER_ID,
     scope: SCOPE,
-    key: KEY,
+    terminalSessionId: TERMINAL_SESSION_ID,
+    worktreePath: WORKTREE_PATH,
     cwd: '/tmp',
     cols: 80,
     rows: 24,
@@ -128,14 +128,15 @@ async function createSession(
 }
 
 describe('TerminalSessionManager PTY spawn ownership', () => {
-  test('waits for an in-flight create spawn before reusing the same session key', async () => {
+  test('waits for an in-flight create spawn before reusing the same terminalSessionId', async () => {
     const supervisor = createDeferredPtySupervisor()
     const manager = createManager(supervisor)
 
     const first = manager.ensureSession({
       userId: USER_ID,
       scope: SCOPE,
-      key: KEY,
+      terminalSessionId: TERMINAL_SESSION_ID,
+      worktreePath: WORKTREE_PATH,
       cwd: '/tmp',
       cols: 80,
       rows: 24,
@@ -144,7 +145,8 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     const second = manager.ensureSession({
       userId: USER_ID,
       scope: SCOPE,
-      key: KEY,
+      terminalSessionId: TERMINAL_SESSION_ID,
+      worktreePath: WORKTREE_PATH,
       cwd: '/tmp',
       cols: 100,
       rows: 30,
@@ -166,7 +168,8 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     const pending = manager.ensureSession({
       userId: USER_ID,
       scope: SCOPE,
-      key: KEY,
+      terminalSessionId: TERMINAL_SESSION_ID,
+      worktreePath: WORKTREE_PATH,
       cwd: '/tmp',
       cols: 80,
       rows: 24,

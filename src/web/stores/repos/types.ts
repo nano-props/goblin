@@ -11,8 +11,7 @@ import type { RemoteRepoConnectionLifecycle, RepoSessionEntry } from '#/shared/r
 import type { WorkspaceSessionState } from '#/shared/api-types.ts'
 import type {
   WorkspacePaneSessionTabType,
-  WorkspacePaneStaticTabType,
-  WorkspacePaneTabOrderEntry,
+  WorkspacePaneTabEntry,
   WorkspacePaneTabType,
 } from '#/shared/workspace-pane.ts'
 import type { RepoBranchAction, RunBranchActionOptions } from '#/web/stores/repos/branch-action-types.ts'
@@ -66,15 +65,9 @@ export interface RepoWorktreeState {
 export interface RepoUiState {
   selectedBranch: string | null
   branchViewMode: BranchViewMode
-  /**
-   * Single branch-scoped workspace pane tab strip order. Static tab entries
-   * are the opened static tabs; terminal entries are ordering hints for live
-   * terminal sessions, whose lifecycle remains terminal-runtime owned.
-   */
-  workspacePaneTabOrderByBranch: Record<string, WorkspacePaneTabOrderEntry[]>
-  /** Branch-scoped selected workspace pane tab. Branch switches read this
-   *  first so selecting a tab on one branch does not select it on another. */
-  preferredWorkspacePaneTabByBranch: Record<string, WorkspacePaneTabType>
+  /** Target-scoped selected workspace pane tab. Worktree-backed panes are keyed by
+   *  worktree path; branch-only panes are keyed by branch name. */
+  preferredWorkspacePaneTabByTarget: Record<string, WorkspacePaneTabType>
 }
 
 interface RepoProjectionMeta {
@@ -158,13 +151,13 @@ export interface RestorableWorkspaceState {
   /** Large-screen Zen Mode restored from WorkspaceSessionState. Compact UI is stronger and always shows one pane at a time. */
   zenMode: boolean
   workspacePaneSize: number
-  /** Per worktree terminal selection restored from WorkspaceSessionState.selectedTerminalSessionByWorktree. */
-  selectedTerminalSessionByWorktree: Record<string, string>
+  /** Per worktree terminal selection restored from WorkspaceSessionState.selectedTerminalSessionIdByTerminalWorktree. */
+  selectedTerminalSessionIdByTerminalWorktree: Record<string, string>
 }
 
 export interface SessionWorkspacePaneRestoreState {
-  workspacePaneTabOrderByBranchByRepo: Record<string, Record<string, WorkspacePaneTabOrderEntry[]>>
-  preferredWorkspacePaneTabByBranchByRepo: Record<string, Record<string, WorkspacePaneSessionTabType>>
+  workspacePaneTabsByTargetByRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>>
+  preferredWorkspacePaneTabByTargetByRepo: Record<string, Record<string, WorkspacePaneSessionTabType>>
 }
 
 export interface RepoSessionHydrationOptions {
@@ -178,17 +171,20 @@ interface LocalWorkspaceState {
   /** Hydration flag — true once boot session is restored, so we don't
    *  overwrite the saved session with an empty one before restore. */
   sessionReady: boolean
+  /** Persistence gate — true only after all boot-restored state that can
+   *  affect WorkspaceSessionState has converged back into the client store. */
+  sessionPersistenceReady: boolean
 }
 
 interface RestorableWorkspaceActions {
   setActive: (id: string) => void
   applySessionLayoutState: (layout: Pick<WorkspaceSessionState, 'zenMode' | 'workspacePaneSize'>) => void
-  applySessionSelectedTerminalState: (selectedTerminalSessionByWorktree: Record<string, string>) => void
+  applySessionSelectedTerminalState: (selectedTerminalSessionIdByTerminalWorktree: Record<string, string>) => void
   setZenMode: (enabled: boolean) => void
   toggleZenMode: () => void
   setWorkspacePaneSize: (size: number) => void
   resetLayout: () => void
-  setSelectedTerminal: (worktreeTerminalKey: string, key: string | null) => void
+  setSelectedTerminal: (terminalWorktreeKey: string, terminalSessionId: string | null) => void
   cycleActive: (direction: 1 | -1) => void
 }
 
@@ -206,17 +202,11 @@ interface RuntimeCoherentRepoProjectionActions {
    * Returns the new outcome, or `null` for non-remote ids.
    */
   retryRemoteRepoConnection: (id: string) => Promise<{ ok: boolean; reason?: string } | null>
-  /** Updates the selected branch's workspace pane tab type. The store does not project
+  /** Updates the selected target's workspace pane tab type. The store does not project
    *  against terminal session count, worktree presence, or opened workspace pane tabs;
    *  the UI resolves the active pane at read time so session restore preserves
-   *  branch-scoped user intent. */
+   *  target-scoped user intent. */
   setWorkspacePaneTab: (id: string, tab: WorkspacePaneTabType) => void
-  openWorkspacePaneStaticTab: (id: string, tab: WorkspacePaneStaticTabType, branchName?: string) => void
-  closeWorkspacePaneStaticTab: (id: string, tab: WorkspacePaneStaticTabType, branchName?: string) => void
-  addWorkspacePaneTerminalTab: (id: string, terminalKey: string, branchName?: string) => void
-  addAndFocusWorkspacePaneTerminalTab: (id: string, terminalKey: string, branchName?: string) => void
-  removeWorkspacePaneTerminalTab: (id: string, terminalKey: string, branchName?: string) => void
-  reorderWorkspacePaneTabs: (id: string, orderedTabs: WorkspacePaneTabOrderEntry[], branchName?: string) => void
   setBranchViewMode: (id: string, viewMode: BranchViewMode) => void
   selectBranch: (id: string, branch: string) => void
   clearSelectedBranch: (id: string) => void

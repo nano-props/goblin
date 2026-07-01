@@ -5,27 +5,30 @@ import {
   type RepoWorkspaceTabModel,
   type RepoWorkspaceTabModelInput,
 } from '#/web/components/repo-workspace/tab-model.ts'
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
+import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import {
   useTerminalRepoSyncReady,
-  useWorktreeTerminalSnapshot,
+  useTerminalWorktreeSnapshot,
 } from '#/web/components/terminal/terminal-session-store.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
-import { workspacePaneTabOrderForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
+import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import {
+  useWorkspacePaneTabsQuery,
+  workspacePaneTabsForTargetFromQueryData,
+} from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 
 export interface RepoWorkspaceTabModelInputState {
   input: RepoWorkspaceTabModelInput
-  selectedTerminalKey: string | undefined
+  selectedTerminalSessionId: string | undefined
 }
 
 export function useRepoWorkspaceTabModel(
   repo: Pick<RepoWorkspaceRepo, 'id' | 'ui'>,
   detail: SelectedRepoWorkspacePresentation,
 ) {
-  const { input, selectedTerminalKey } = useRepoWorkspaceTabModelInput(repo, detail)
+  const { input, selectedTerminalSessionId } = useRepoWorkspaceTabModelInput(repo, detail)
   const model = useMemo(() => createRepoWorkspaceTabModel(input), [input])
-  useSyncRepoWorkspaceTerminalSelection(model, selectedTerminalKey)
+  useSyncRepoWorkspaceTerminalSelection(model, selectedTerminalSessionId)
   return model
 }
 
@@ -41,25 +44,35 @@ export function useRepoWorkspaceTabModelInput(
   const { branch } = detail
   const branchName = branch?.name ?? null
   const worktreePath = branch?.worktree?.path ?? null
-  const terminalWorktreeKey = worktreePath ? worktreeTerminalKey(repo.id, worktreePath) : null
+  const terminalWorktreeKey = worktreePath ? formatTerminalWorktreeKey(repo.id, worktreePath) : null
 
-  const worktreeSnapshot = useWorktreeTerminalSnapshot(terminalWorktreeKey)
+  const terminalWorktreeSnapshot = useTerminalWorktreeSnapshot(terminalWorktreeKey)
   const terminalSyncReady = useTerminalRepoSyncReady(repo.id)
-  const selectedTerminalKey = useReposStore((s) =>
-    terminalWorktreeKey ? s.selectedTerminalSessionByWorktree[terminalWorktreeKey] : undefined,
+  const workspacePaneTabsQuery = useWorkspacePaneTabsQuery(repo.id)
+  const selectedTerminalSessionId = useReposStore((s) =>
+    terminalWorktreeKey ? s.selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey] : undefined,
   )
 
-  const workspacePaneTabOrder = useMemo(
-    () => workspacePaneTabOrderForBranch(repo.ui, branchName),
-    [repo.ui.workspacePaneTabOrderByBranch, branchName],
+  const workspacePaneTabEntries = useMemo(
+    () =>
+      workspacePaneTabsForTargetFromQueryData(workspacePaneTabsQuery.data ?? [], {
+        repoRoot: repo.id,
+        branchName,
+        worktreePath,
+      }),
+    [workspacePaneTabsQuery.data, repo.id, branchName, worktreePath],
   )
 
   const preferredTab = useMemo(
-    () => preferredWorkspacePaneTabForBranch(repo.ui, branchName),
-    [repo.ui.preferredWorkspacePaneTabByBranch, branchName],
+    () =>
+      preferredWorkspacePaneTabForTarget(
+        repo.ui,
+        branchName ? { repoRoot: repo.id, branchName, worktreePath } : null,
+      ),
+    [repo.ui.preferredWorkspacePaneTabByTarget, repo.id, branchName, worktreePath],
   )
 
-  const modelSelectedTerminalKey = terminalWorktreeKey ? (selectedTerminalKey ?? null) : null
+  const modelSelectedTerminalSessionId = terminalWorktreeKey ? (selectedTerminalSessionId ?? null) : null
 
   const input = useMemo<RepoWorkspaceTabModelInput>(
     () => ({
@@ -67,28 +80,26 @@ export function useRepoWorkspaceTabModelInput(
       branchName,
       worktreePath,
       preferredTab,
-      tabOrder: workspacePaneTabOrder,
-      runtimeTerminalViews: worktreeSnapshot.sessions,
-      terminalSessionCount: worktreeSnapshot.count,
-      terminalCreatePending: worktreeSnapshot.pendingCreate,
+      tabEntries: workspacePaneTabEntries,
+      runtimeTerminalViews: terminalWorktreeSnapshot.sessions,
+      terminalCreatePending: terminalWorktreeSnapshot.pendingCreate,
       terminalSyncReady,
-      selectedTerminalKey: modelSelectedTerminalKey,
+      selectedTerminalSessionId: modelSelectedTerminalSessionId,
     }),
     [
       repo.id,
       branchName,
       worktreePath,
       preferredTab,
-      workspacePaneTabOrder,
-      worktreeSnapshot.sessions,
-      worktreeSnapshot.count,
-      worktreeSnapshot.pendingCreate,
+      workspacePaneTabEntries,
+      terminalWorktreeSnapshot.sessions,
+      terminalWorktreeSnapshot.pendingCreate,
       terminalSyncReady,
-      modelSelectedTerminalKey,
+      modelSelectedTerminalSessionId,
     ],
   )
 
-  return useMemo(() => ({ input, selectedTerminalKey }), [input, selectedTerminalKey])
+  return useMemo(() => ({ input, selectedTerminalSessionId }), [input, selectedTerminalSessionId])
 }
 
 /**
@@ -97,15 +108,15 @@ export function useRepoWorkspaceTabModelInput(
  * the tab-model hook explicit.
  */
 export function useSyncRepoWorkspaceTerminalSelection(
-  model: Pick<RepoWorkspaceTabModel, 'activeTab' | 'worktreeTerminalKey'>,
-  selectedTerminalKey: string | undefined,
+  model: Pick<RepoWorkspaceTabModel, 'activeTab' | 'terminalWorktreeKey'>,
+  selectedTerminalSessionId: string | undefined,
 ): void {
   const setSelectedTerminal = useReposStore((s) => s.setSelectedTerminal)
-  const activeTerminalKey = model.activeTab?.kind === 'terminal' ? model.activeTab.key : null
+  const activeTerminalSessionId = model.activeTab?.kind === 'terminal' ? model.activeTab.terminalSessionId : null
 
   useEffect(() => {
-    if (!model.worktreeTerminalKey || !activeTerminalKey) return
-    if (activeTerminalKey === selectedTerminalKey) return
-    setSelectedTerminal(model.worktreeTerminalKey, activeTerminalKey)
-  }, [activeTerminalKey, model.worktreeTerminalKey, selectedTerminalKey, setSelectedTerminal])
+    if (!model.terminalWorktreeKey || !activeTerminalSessionId) return
+    if (activeTerminalSessionId === selectedTerminalSessionId) return
+    setSelectedTerminal(model.terminalWorktreeKey, activeTerminalSessionId)
+  }, [activeTerminalSessionId, model.terminalWorktreeKey, selectedTerminalSessionId, setSelectedTerminal])
 }

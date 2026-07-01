@@ -38,7 +38,7 @@ direction, not for facts.
   worktrees and the view follows; switch branches within one worktree and the
   view does not blink.
 - **Layering**: sits inside the workspace pane as a static tab. It reuses the
-  pane's tab ordering, drag-reorder, keyboard navigation, and tooltip layer
+  pane's mixed tab list, drag-reorder, keyboard navigation, and tooltip layer
   rather than inventing its own chrome.
 - **State**: refresh is driven by the same invalidation channel the rest of
   the repository views use. Tree state does not leak into the global stores.

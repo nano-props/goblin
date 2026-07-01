@@ -2,19 +2,19 @@
 // terminal session projection and delegates rendering to BranchRow.
 
 import { BranchRow, type BranchRowProps } from '#/web/components/branch-navigator/BranchRow.tsx'
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
+import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import {
-  useWorktreeTerminalActive,
-  useWorktreeTerminalBellCount,
+  useTerminalWorktreeActive,
+  useTerminalWorktreeBellCount,
 } from '#/web/components/terminal/terminal-session-store.ts'
 import { branchActionDisplayPhase } from '#/web/hooks/branch-action-state.ts'
 
 export function BranchListRow(props: BranchRowProps) {
-  const terminalKey = props.branch.worktree?.path
-    ? worktreeTerminalKey(props.repo.id, props.branch.worktree.path)
+  const terminalSessionId = props.branch.worktree?.path
+    ? formatTerminalWorktreeKey(props.repo.id, props.branch.worktree.path)
     : null
-  const terminalBellCount = useWorktreeTerminalBellCount(terminalKey)
-  const terminalActive = useWorktreeTerminalActive(terminalKey)
+  const terminalBellCount = useTerminalWorktreeBellCount(terminalSessionId)
+  const terminalActive = useTerminalWorktreeActive(terminalSessionId)
   const branchActionBusy = branchActionDisplayPhase(props.repo, props.branch.name) !== null
   return (
     <BranchRow

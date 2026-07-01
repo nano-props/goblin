@@ -8,7 +8,8 @@ import {
 } from '#/web/components/terminal/terminal-create-feedback.ts'
 import { createWorkspacePaneTerminalTab } from '#/web/workspace-pane/workspace-pane-terminal-create.ts'
 
-export type TerminalCreateCommandResult = { ok: true; key: string } | { ok: false; error: unknown; messageKey: string }
+export type TerminalCreateCommandResult =
+  { ok: true; terminalSessionId: string } | { ok: false; error: unknown; messageKey: string }
 
 export async function runCreateTerminalTabCommand(input: {
   base: TerminalSessionBase
@@ -18,12 +19,12 @@ export async function runCreateTerminalTabCommand(input: {
   logMessage?: string
 }): Promise<TerminalCreateCommandResult> {
   try {
-    const key = await createWorkspacePaneTerminalTab({
+    const terminalSessionId = await createWorkspacePaneTerminalTab({
       base: input.base,
       createTerminal: input.createTerminal,
       options: input.options,
     })
-    return { ok: true, key }
+    return { ok: true, terminalSessionId }
   } catch (error) {
     const messageKey = input.t ? showTerminalCreateErrorToast(error, input.t) : terminalCreateErrorKey(error)
     terminalLog.warn(input.logMessage ?? 'failed to create terminal', { err: error, messageKey })

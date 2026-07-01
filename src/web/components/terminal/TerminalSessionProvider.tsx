@@ -15,6 +15,10 @@ import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
 import { preloadTerminalFont } from '#/web/components/terminal/terminal-geometry.ts'
 import { loadTerminalSessions } from '#/web/terminal-session-queries.ts'
 import {
+  invalidateWorkspacePaneTabs,
+  setWorkspacePaneTabsForTargetQueryData,
+} from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import {
   TerminalSessionProjection,
   getTerminalSessionProjection,
 } from '#/web/components/terminal/TerminalSessionProjection.ts'
@@ -34,7 +38,9 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   // xterm views alive across settings → workspace round-trips.
   const currentRepoId = useReposStore((s) => s.activeId)
   const currentRepoInstanceToken = currentRepoId ? (repoIndex[currentRepoId]?.instanceToken ?? null) : null
-  const selectedTerminalSessionByWorktree = useReposStore((s) => s.selectedTerminalSessionByWorktree)
+  const selectedTerminalSessionIdByTerminalWorktree = useReposStore(
+    (s) => s.selectedTerminalSessionIdByTerminalWorktree,
+  )
   const setSelectedTerminal = useReposStore((s) => s.setSelectedTerminal)
   const parkingRootRef = useRef<HTMLDivElement | null>(null)
   const repoIndexRef = useRef(repoIndex)
@@ -52,7 +58,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
 
   // T1.2: pay the WebSocket handshake cost when the user enters a repo,
   // before they click a terminal view. The bridge maintains a single
-  // shared socket, so watching currentRepoId (not worktreeTerminalKey)
+  // shared socket, so watching currentRepoId (not terminalWorktreeKey)
   // is the right granularity: one handshake per repo visit, not one per
   // worktree tab. The prewarm is fire-and-forget — failures are
   // swallowed inside the bridge; the next real IPC will surface a real
@@ -71,14 +77,13 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   if (!projectionRef.current) {
     projectionRef.current = getTerminalSessionProjection({
       onSelectedWorktreeChange: setSelectedTerminal,
-      // Terminal-session lifetime owns terminal tab lifetime. User closes,
-      // server exits, and reconcile removals all converge through this hook.
-      // The workspace pane tab model falls back to the first materialized tab
-      // at read time when the active tab disappears, so this callback only
-      // needs to drop the tab from the branch-scoped tab order — no
-      // navigation or view-switch call required.
-      onTerminalSessionRemoved: (key, base) => {
-        useReposStore.getState().removeWorkspacePaneTerminalTab(base.repoRoot, key, base.branch)
+      onWorkspaceTabsChanged: (base, tabs) => {
+        setWorkspacePaneTabsForTargetQueryData({
+          repoRoot: base.repoRoot,
+          branchName: base.branch,
+          worktreePath: base.worktreePath,
+          tabs,
+        })
       },
     })
   }
@@ -139,8 +144,8 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   // Projection state sync
   useEffect(() => {
     projection.setRepoIndex(repoIndex)
-    projection.setPreferredSelectedTerminalKeys(selectedTerminalSessionByWorktree)
-  }, [projection, repoIndex, selectedTerminalSessionByWorktree])
+    projection.setPreferredSelectedTerminalSessionIds(selectedTerminalSessionIdByTerminalWorktree)
+  }, [projection, repoIndex, selectedTerminalSessionIdByTerminalWorktree])
 
   // Parking DOM
   useEffect(() => {
@@ -206,10 +211,11 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     // there — the broadcast is multi-window safe by construction.
     const offSessionClosed = terminalBridge.onSessionClosed((event) => {
       projection.handleSessionClosed(event.ptySessionId)
+      invalidateWorkspacePaneTabs(event.repoRoot)
     })
 
     setTerminalSessionCommandBridge({
-      worktreeSnapshot: projection.worktreeSnapshot,
+      terminalWorktreeSnapshot: projection.terminalWorktreeSnapshot,
       createTerminal: projection.createTerminal,
       selectTerminal: projection.selectTerminal,
       closeTerminalByDescriptor: projection.closeTerminalByDescriptor,
@@ -255,12 +261,17 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       }, 0)
     }
     const offSessionsChanged = terminalBridge.onSessionsChanged(scheduleServerSync)
+    const offWorkspaceTabsChanged = terminalBridge.onWorkspaceTabsChanged((repoRoot) => {
+      invalidateWorkspacePaneTabs(repoRoot)
+      scheduleServerSync(repoRoot)
+    })
 
     return () => {
       disposed = true
       if (syncTimer !== null) window.clearTimeout(syncTimer)
       window.removeEventListener('focus', handleFocus)
       offSessionsChanged()
+      offWorkspaceTabsChanged()
     }
   }, [currentRepoId, currentRepoInstanceToken, syncServerSessions])
 
@@ -290,8 +301,8 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   )
   const readValue = useMemo<TerminalSessionReadContextValue>(
     () => ({
-      worktreeSnapshot: projection.worktreeSnapshot,
-      subscribeWorktree: projection.subscribeWorktree,
+      terminalWorktreeSnapshot: projection.terminalWorktreeSnapshot,
+      subscribeTerminalWorktree: projection.subscribeTerminalWorktree,
       repoBellCount: projection.repoBellCount,
       subscribeRepoBellCount: projection.subscribeRepoBellCount,
       snapshot: projection.snapshot,

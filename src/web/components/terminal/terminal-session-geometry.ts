@@ -5,15 +5,15 @@ import {
 import type { TerminalClientSnapshot, TerminalDescriptor } from '#/web/components/terminal/types.ts'
 
 export function captureTerminalHostGeometry(input: {
-  worktreeTerminalKey: string
+  terminalWorktreeKey: string
   hostByWorktree: ReadonlyMap<string, HTMLElement>
   startupGeometryHintByWorktree: Map<string, { cols: number; rows: number }>
 }): { cols: number; rows: number } | null {
-  const host = input.hostByWorktree.get(input.worktreeTerminalKey)
+  const host = input.hostByWorktree.get(input.terminalWorktreeKey)
   if (!host?.isConnected) return null
   const geometry = estimateManagedTerminalGeometry(host)
   if (!geometry) return null
-  input.startupGeometryHintByWorktree.set(input.worktreeTerminalKey, geometry)
+  input.startupGeometryHintByWorktree.set(input.terminalWorktreeKey, geometry)
   return geometry
 }
 
@@ -24,23 +24,23 @@ export function captureTerminalHostGeometry(input: {
  * a default. The live xterm view becomes geometry authority after attach.
  */
 export function resolveTerminalStartupGeometryHint(input: {
-  worktreeTerminalKey: string
+  terminalWorktreeKey: string
   hostByWorktree: ReadonlyMap<string, HTMLElement>
   startupGeometryHintByWorktree: Map<string, { cols: number; rows: number }>
   selectedDescriptor: TerminalDescriptor | null
-  getAttachmentSnapshot: (key: string) => TerminalClientSnapshot | null | undefined
+  getAttachmentSnapshot: (terminalSessionId: string) => TerminalClientSnapshot | null | undefined
 }): { cols: number; rows: number } | null {
   const measured = captureTerminalHostGeometry(input)
   if (measured) return measured
   if (input.selectedDescriptor) {
-    const attachment = input.getAttachmentSnapshot(input.selectedDescriptor.key)
+    const attachment = input.getAttachmentSnapshot(input.selectedDescriptor.terminalSessionId)
     if (attachment?.canonicalCols && attachment.canonicalRows) {
       const geometry = { cols: attachment.canonicalCols, rows: attachment.canonicalRows }
-      input.startupGeometryHintByWorktree.set(input.worktreeTerminalKey, geometry)
+      input.startupGeometryHintByWorktree.set(input.terminalWorktreeKey, geometry)
       return geometry
     }
   }
-  return input.startupGeometryHintByWorktree.get(input.worktreeTerminalKey) ?? null
+  return input.startupGeometryHintByWorktree.get(input.terminalWorktreeKey) ?? null
 }
 
 /**

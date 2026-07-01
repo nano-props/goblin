@@ -27,7 +27,7 @@ import { SortableContext, horizontalListSortingStrategy, sortableKeyboardCoordin
 import { DelegatedTooltipLayer } from '#/web/components/DelegatedTooltipLayer.tsx'
 import { createRestrictToTabStripBounds } from '#/web/components/tab-strip/drag-bounds.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import type { WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { ToolbarTabList, ToolbarTabStrip, ToolbarTabStripBody } from '#/web/components/tab-strip/ToolbarTabStrip.tsx'
 import { ToolbarClosableTab } from '#/web/components/tab-strip/ToolbarClosableTab.tsx'
 import {
@@ -54,7 +54,7 @@ import { WorkspacePaneTabTitle } from '#/web/components/workspace-pane/Workspace
 type WorkspacePaneT = (key: string, params?: Record<string, string | number>) => string
 
 interface WorkspacePaneTabStripProps {
-  worktreeTerminalKey: string | null
+  terminalWorktreeKey: string | null
   items: WorkspacePaneTabItem[]
   workspacePaneId: string
   responsiveCompact?: boolean
@@ -68,7 +68,7 @@ interface WorkspacePaneTabStripProps {
   onSelect: (item: WorkspacePaneTabItem) => void
   onScrollToBottom: (key: string) => void
   onClose: (item: WorkspacePaneTabItem) => void
-  onReorder: (orderedTabs: WorkspacePaneTabOrderEntry[]) => void
+  onReorder: (tabs: WorkspacePaneTabEntry[]) => void
   onNavigateOut?: (direction: 'prev' | 'next' | 'first' | 'last') => void
   activateKeyboardNavigationSelection?: boolean
 }
@@ -171,7 +171,7 @@ function useWorkspacePaneTabDnd({
 }: {
   sortableItems: readonly (WorkspacePaneStaticTabItem | WorkspacePaneTerminalTabItem)[]
   newButtonRef: RefObject<HTMLButtonElement | null>
-  onReorder: (orderedTabs: WorkspacePaneTabOrderEntry[]) => void
+  onReorder: (tabs: WorkspacePaneTabEntry[]) => void
 }) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -200,7 +200,7 @@ function useWorkspacePaneTabDnd({
       if (!activeItem || !overItem) return
       onReorder(
         arrayMove(
-          sortableItems.map((item) => item.orderEntry),
+          sortableItems.map((item) => item.tabEntry),
           oldIndex,
           newIndex,
         ),
@@ -292,11 +292,7 @@ function WorkspacePaneTabSwitcherPopover({
                     aria-current={selected ? 'true' : undefined}
                   >
                     <span className="flex size-3.5 shrink-0 items-center justify-center">
-                      {selected ? (
-                        <Check size={13} aria-hidden />
-                      ) : (
-                        <WorkspacePaneTabIcon item={item} active={false} />
-                      )}
+                      {selected ? <Check size={13} aria-hidden /> : <WorkspacePaneTabIcon item={item} active={false} />}
                     </span>
                     <span className="min-w-0 flex-1 truncate">{item.label || item.tooltip}</span>
                     {isTerminalWorkspacePaneTabItem(item) && item.view.hasBell && (
@@ -345,7 +341,7 @@ function WorkspacePaneTabSwitcherPopover({
 }
 
 export function WorkspacePaneTabStrip({
-  worktreeTerminalKey,
+  terminalWorktreeKey,
   items,
   workspacePaneId,
   activeTabIdentity,
@@ -365,7 +361,7 @@ export function WorkspacePaneTabStrip({
   const t = useT()
   const terminalItems = useMemo(() => items.filter(isTerminalWorkspacePaneTabItem), [items])
   const sortableItems = useMemo(() => items.filter(isSortableWorkspacePaneTabItem), [items])
-  const canCreateNew = worktreeTerminalKey !== null
+  const canCreateNew = terminalWorktreeKey !== null
   const showCollapsedTabs = !!responsiveCompact
   const activeItem = activeTabIdentity ? (items.find((item) => item.identity === activeTabIdentity) ?? null) : null
   const compactPendingItem = showCollapsedTabs ? (items.find(isPendingWorkspacePaneTabItem) ?? null) : null
@@ -396,7 +392,7 @@ export function WorkspacePaneTabStrip({
       if (!item) return
       if (isPendingWorkspacePaneTabItem(item)) return
       if (isTerminalWorkspacePaneTabItem(item) && item.identity === activeTabIdentity && panelActive) {
-        onScrollToBottom(item.view.key)
+        onScrollToBottom(item.view.terminalSessionId)
       } else {
         onSelect(item)
       }
@@ -730,7 +726,9 @@ function WorkspacePaneScrollableTabsBody({
               if (!isSortableWorkspacePaneTabItem(item)) {
                 return <WorkspacePaneTab key={item.identity} {...commonProps} />
               }
-              return <SortableWorkspacePaneTab key={item.identity} {...commonProps} sortableIdentity={item.sortableId} />
+              return (
+                <SortableWorkspacePaneTab key={item.identity} {...commonProps} sortableIdentity={item.sortableId} />
+              )
             })}
           </WorkspacePaneTabTooltipLayer>
         </SortableContext>

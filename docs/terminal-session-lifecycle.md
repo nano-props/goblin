@@ -17,7 +17,7 @@ lifecycle end to end.
   terminal.
 - `dispose()` closed the local view state but only fire-and-forget the
   server-side close. The PTY could stay alive. The next create in the
-  same window then re-attached to the orphan PTY and the catalog
+  same window then re-attached to the orphan PTY and the session service
   happily returned `action: 'restored'` for it. Result: opening a new
   terminal could surface two identical `Restored session: …` lines from
   macOS zsh's session-restore mechanism, because two zsh processes were
@@ -82,8 +82,8 @@ The combined symptom list across the root causes:
   with a swallowed rejection. A WebSocket mid-request teardown or a
   race with idle socket shutdown could drop the close before the
   server saw it. The PTY stayed alive.
-- **R2 — The catalog reused orphan sessions by key.** The terminal
-  catalog returned `action: 'restored'` for any existing session with
+- **R2 — The session service reused orphan sessions by terminalSessionId.** The terminal
+  session service returned `action: 'restored'` for any existing session with
   a controller. Combined with `forceNew: false`, the new client
   attached to the orphan PTY. There was no explicit per-session close
   broadcast, so other windows could not drop their local copy
@@ -153,7 +153,7 @@ That extra requirement was removed. The client now trusts the
 authoritative `create` payload for first paint. `create.sessions`
 remains useful for tab-strip and count updates, but a lagging list
 no longer triggers the false-failure toast. If the server claims
-`action: 'created'` yet the catalog `sessions[]` does not echo that
+`action: 'created'` yet the session service `sessions[]` does not echo that
 session, the create is rejected as a half-applied protocol mismatch
 rather than silently fabricating a synthetic entry.
 
@@ -170,7 +170,7 @@ runtime crash.
    `canonicalRows`).
 2. `TerminalAttachResult` no longer accepts optional `canonicalCols` /
    `canonicalRows` — both are required.
-3. `TerminalCatalogMutationResult` intersects with `TerminalFirstFrame`
+3. `TerminalCreateResult` intersects with `TerminalFirstFrame`
    instead of a partial attach result, so every `create` success carries
    the full first-frame payload at the type level. The client's runtime
    "missing ptySessionId" check stays as a belt-and-suspenders guard
@@ -186,7 +186,7 @@ runtime crash.
 like this:
 
 ```ts
-for (const ptySessionId of sessionIds) {
+for (const ptySessionId of ptySessionIds) {
   void terminalBridge.close({ ptySessionId }).catch(() => {})
 }
 ```
@@ -197,8 +197,8 @@ Two problems:
   teardown or a race with idle socket shutdown can drop the close
   before the server sees it.
 - The dispose path is not awaited. A subsequent create in the same
-  worktree can race ahead, the catalog can still see the orphan PTY
-  in its directory, and the catalog returns `action: 'restored'`
+  worktree can race ahead, the session service can still see the orphan PTY
+  in its directory, and the session service returns `action: 'restored'`
   for the same key.
 
 ### Design
@@ -212,7 +212,7 @@ destroy) for closes.
 private readonly pendingCloseByPtySessionId = new Map<
   string,
   {
-    worktreeTerminalKey: string
+    terminalWorktreeKey: string
     promise: Promise<void>
     resolve: () => void
     reject: (error: unknown) => void
@@ -232,7 +232,7 @@ private readonly pendingCloseByPtySessionId = new Map<
   create flush for the same worktree so a subsequent create cannot
   race with a lost close. Drains all entries whose worktree key
   matches before the create is issued.
-  - If the close succeeds, the orphan is gone and the catalog will
+  - If the close succeeds, the orphan is gone and the session service will
     create fresh.
   - If the close fails (timeout / disconnect), log loudly and
     proceed. The user can `pruneTerminals` from the UI to clean up.
@@ -261,7 +261,7 @@ private readonly pendingCloseByPtySessionId = new Map<
 - Each piece of state (pending close, flush, destroy) has a single
   keeper.
 - The create path does not change; it only waits for the close path
-  to settle before issuing. The catalog can still return `action:
+  to settle before issuing. The session service can still return `action:
 'restored'` — that is correct behavior when an orphan exists; the
   bug is that the orphan exists when it should not.
 
@@ -550,7 +550,7 @@ any individual implementation:
    close, other windows learn about it through `session-closed`, not
    through a full reconcile.
 5. **A subsequent create in the same worktree must await in-flight
-   closes in that worktree.** The catalog must never hand back an
+   closes in that worktree.** The session service must never hand back an
    orphan as `action: 'restored'` when the local dispose is still
    pending.
 6. **Empty-state UI is part of the contract.** A terminal session with
@@ -568,7 +568,7 @@ any individual implementation:
 
 ## Suggested follow-ups
 
-1. **Done** — tighten the shared `TerminalCatalogMutationResult`
+1. **Done** — tighten the shared `TerminalCreateResult`
    type so the first-frame fields are required at the type level.
 2. **Done** — decide explicitly that same-session snapshot reapply is
    not a supported repair path. The long-term rule now lives in

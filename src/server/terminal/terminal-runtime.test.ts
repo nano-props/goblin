@@ -1,10 +1,10 @@
 // Server-side terminal runtime integration tests.
 //
 // The lower-level modules (session-manager, controller, render-state,
-// broker, catalog) carry their own focused unit tests. This file
+// broker, session service) carry their own focused unit tests. This file
 // exercises `createServerTerminalRuntime` end-to-end through its
 // `ServerTerminalHost` surface so the wiring between the supervisor,
-// manager, broker, and catalog stays in lockstep with the shared
+// manager, broker, and session service stays in lockstep with the shared
 // protocol types in `shared/terminal-types.ts`.
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
@@ -14,6 +14,7 @@ import { createInProcessPtySupervisor } from '#/server/terminal/pty-supervisor-i
 import { createServerTerminalRuntime } from '#/server/terminal/terminal-runtime.ts'
 import { HEARTBEAT_DEADLINE_MS, HEARTBEAT_INTERVAL_MS } from '#/server/terminal/terminal-realtime-broker.ts'
 import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
+import type { WorktreeInfo } from '#/shared/git-types.ts'
 
 // Under method 2 the host threads `userId` (derived from the
 // access token) alongside `clientId` (per-tab routing). Tests use
@@ -109,6 +110,22 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
+function createDeferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolve: (value: T) => void = () => {}
+  const promise = new Promise<T>((innerResolve) => {
+    resolve = innerResolve
+  })
+  return { promise, resolve }
+}
+
+async function flushPromiseQueue(): Promise<void> {
+  for (let i = 0; i < 5; i++) await Promise.resolve()
+}
+
+function sentSocketMessages(socket: { send: ReturnType<typeof vi.fn> }): Array<{ type?: string; [key: string]: unknown }> {
+  return socket.send.mock.calls.map(([payload]) => JSON.parse(String(payload)))
+}
+
 async function createTerminalSession(host: ServerTerminalHost, clientId: string, userId = USER_1): Promise<string> {
   const result = await host.create(clientId, userId, {
     repoRoot: '/repo',
@@ -144,7 +161,7 @@ describe('server terminal runtime', () => {
     if (!result.ok) return
     expect(result.sessions).toEqual([
       expect.objectContaining({
-        key: result.key,
+        terminalSessionId: result.terminalSessionId,
         controller: { clientId: 'client_a', status: 'connected' },
         phase: 'opening',
         message: null,
@@ -395,6 +412,80 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
+  test('reconciles workspace tabs when a PTY exits naturally', async () => {
+    const { host, shutdown } = buildRuntime()
+    const socket = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_a', USER_1, socket)
+    const created = await host.create('client_a', USER_1, {
+      repoRoot: '/repo',
+      branch: 'feature',
+      worktreePath: '/repo-linked',
+      kind: 'additional',
+      cols: 80,
+      rows: 24,
+      clientId: 'client_a',
+    })
+    expect(created.ok).toBe(true)
+    if (!created.ok) return
+    expect(created.tabs).toContainEqual({ type: 'terminal', terminalSessionId: created.terminalSessionId })
+    socket.send.mockClear()
+
+    mockPtys[0]?.emitExit()
+
+    await vi.waitFor(() => {
+      expect(sentSocketMessages(socket).some((message) => message.type === 'workspace-tabs-changed')).toBe(true)
+    })
+    expect(sentSocketMessages(socket).filter((message) => message.type === 'sessions-changed')).toHaveLength(1)
+    await expect(host.listWorkspaceTabs('client_a', USER_1, '/repo')).resolves.toEqual([
+      {
+        repoRoot: '/repo',
+        branchName: 'feature',
+        worktreePath: '/repo-linked',
+        tabs: [expect.objectContaining({ type: 'status' })],
+      },
+    ])
+
+    host.unregisterSocket('client_a', USER_1, socket)
+    shutdown()
+  })
+
+  test('reconciles workspace tabs when prune closes removed-worktree sessions', async () => {
+    const { host, shutdown } = buildRuntime()
+    const socket = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_a', USER_1, socket)
+    const created = await host.create('client_a', USER_1, {
+      repoRoot: '/repo',
+      branch: 'feature',
+      worktreePath: '/repo-linked',
+      kind: 'additional',
+      cols: 80,
+      rows: 24,
+      clientId: 'client_a',
+    })
+    expect(created.ok).toBe(true)
+    if (!created.ok) return
+    socket.send.mockClear()
+    vi.mocked(getWorktrees).mockResolvedValueOnce([])
+
+    await expect(host.prune('client_a', USER_1, '/repo')).resolves.toEqual({ pruned: 1, remaining: 0 })
+
+    await vi.waitFor(() => {
+      expect(sentSocketMessages(socket).some((message) => message.type === 'workspace-tabs-changed')).toBe(true)
+    })
+    expect(sentSocketMessages(socket).filter((message) => message.type === 'sessions-changed')).toHaveLength(1)
+    await expect(host.listWorkspaceTabs('client_a', USER_1, '/repo')).resolves.toEqual([
+      {
+        repoRoot: '/repo',
+        branchName: 'feature',
+        worktreePath: '/repo-linked',
+        tabs: [expect.objectContaining({ type: 'status' })],
+      },
+    ])
+
+    host.unregisterSocket('client_a', USER_1, socket)
+    shutdown()
+  })
+
   test('unregisters a buffered socket when raw send fails during broadcast', async () => {
     const { host, shutdown, isClientOnline } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
@@ -427,7 +518,9 @@ describe('server terminal runtime', () => {
     expect(resolveRemoteTarget).toHaveBeenCalledWith({ alias: 'prod', remotePath: '/srv/repo' })
     expect(result.sessions).toEqual([
       expect.objectContaining({
-        key: 'ssh-config://prod/srv/repo\0/srv/repo\0session-1',
+        terminalSessionId: expect.stringMatching(/^terminal-session-[0-9a-z]{25}$/),
+        repoRoot: 'ssh-config://prod/srv/repo',
+        worktreePath: '/srv/repo',
       }),
     ])
 
@@ -458,7 +551,57 @@ describe('server terminal runtime', () => {
     expect(second.ok).toBe(true)
     if (!second.ok) return
     expect(second.action).toBe('reused')
-    expect(second.key).toBe(first.key)
+    expect(second.terminalSessionId).toBe(first.terminalSessionId)
+
+    shutdown()
+  })
+
+  test('serializes concurrent primary creates for the same worktree', async () => {
+    const worktrees: WorktreeInfo[] = [{ path: '/repo-linked', branch: 'feature', isBare: false, isPrimary: false }]
+    const firstWorktrees = createDeferred<WorktreeInfo[]>()
+    const secondWorktrees = createDeferred<WorktreeInfo[]>()
+    vi.mocked(getWorktrees)
+      .mockImplementationOnce(async () => await firstWorktrees.promise)
+      .mockImplementationOnce(async () => await secondWorktrees.promise)
+    const { host, shutdown } = buildRuntime()
+
+    const first = host.create('client_a', USER_1, {
+      repoRoot: '/repo',
+      branch: 'feature',
+      worktreePath: '/repo-linked',
+      kind: 'primary',
+      cols: 80,
+      rows: 24,
+    })
+    const second = host.create('client_b', USER_1, {
+      repoRoot: '/repo',
+      branch: 'feature',
+      worktreePath: '/repo-linked',
+      kind: 'primary',
+      cols: 80,
+      rows: 24,
+    })
+
+    await vi.waitFor(() => expect(getWorktrees).toHaveBeenCalledTimes(1))
+    await flushPromiseQueue()
+    expect(getWorktrees).toHaveBeenCalledTimes(1)
+
+    firstWorktrees.resolve(worktrees)
+    const firstResult = await first
+    expect(firstResult.ok).toBe(true)
+    if (!firstResult.ok) return
+    expect(firstResult.action).toBe('created')
+
+    await vi.waitFor(() => expect(getWorktrees).toHaveBeenCalledTimes(2))
+    secondWorktrees.resolve(worktrees)
+    const secondResult = await second
+    expect(secondResult.ok).toBe(true)
+    if (!secondResult.ok) return
+    expect(secondResult.action).toBe('reused')
+    expect(secondResult.terminalSessionId).toBe(firstResult.terminalSessionId)
+    expect(secondResult.ptySessionId).toBe(firstResult.ptySessionId)
+    expect(mockPtys).toHaveLength(1)
+    expect(mockPtys[0]?.kill).not.toHaveBeenCalled()
 
     shutdown()
   })
@@ -498,7 +641,7 @@ describe('server terminal runtime', () => {
     expect(reopened.ok).toBe(true)
     if (!reopened.ok) return
     expect(reopened.action).toBe('reused')
-    expect(reopened.key).toBe(first.key)
+    expect(reopened.terminalSessionId).toBe(first.terminalSessionId)
     expect(reopened.controller).toEqual({ clientId: 'client_electron', status: 'connected' })
     expect(reopened.canonicalCols).toBe(102)
     expect(reopened.canonicalRows).toBe(33)
@@ -507,7 +650,7 @@ describe('server terminal runtime', () => {
     const sessions = await host.listSessions('client_electron', USER_1, '/repo')
     expect(sessions).toEqual([
       expect.objectContaining({
-        key: first.key,
+        terminalSessionId: first.terminalSessionId,
         controller: { clientId: 'client_electron', status: 'connected' },
         cols: 102,
         rows: 33,
@@ -540,7 +683,7 @@ describe('server terminal runtime', () => {
     if (failed.ok) return
 
     // After the failure, listSessions must not report the zombie. If
-    // it did, the catalog would match it on retry and surface a
+    // it did, the session service would match it on retry and surface a
     // blank, non-responsive terminal as a successful attach.
     const sessionsAfterFailure = await host.listSessions('client_a', USER_1, '/repo')
     expect(sessionsAfterFailure).toEqual([])
@@ -878,7 +1021,7 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
-  test('isolates terminal catalog reads and lifecycle broadcasts by userId', async () => {
+  test('isolates terminal session service reads and lifecycle broadcasts by userId', async () => {
     const { host, shutdown } = buildRuntime()
     const userASocket = { send: vi.fn(), close: vi.fn() }
     const userBSocket = { send: vi.fn(), close: vi.fn() }
@@ -903,7 +1046,7 @@ describe('server terminal runtime', () => {
     await expect(
       host.getSessionSnapshot('client_shared', USER_2, { ptySessionId: userASession.ptySessionId }),
     ).resolves.toBeNull()
-    expect(host.close('client_shared', USER_2, { ptySessionId: userASession.ptySessionId })).toBe(false)
+    await expect(host.close('client_shared', USER_2, { ptySessionId: userASession.ptySessionId })).resolves.toBe(false)
     expect(
       userBSocket.send.mock.calls.some(([payload]) => {
         const parsed = JSON.parse(String(payload))
@@ -925,13 +1068,13 @@ describe('server terminal runtime', () => {
     const userBSession = userBCreate.sessions[0]
     if (!userBSession) throw new Error('expected user B session')
 
-    expect(userBSession.key).toBe(userASession.key)
+    expect(userBSession.terminalSessionId).not.toBe(userASession.terminalSessionId)
     expect(userBSession.ptySessionId).not.toBe(userASession.ptySessionId)
     expect(await host.listSessions('client_shared', USER_1, '/repo')).toEqual([
-      expect.objectContaining({ ptySessionId: userASession.ptySessionId, key: userASession.key }),
+      expect.objectContaining({ ptySessionId: userASession.ptySessionId, terminalSessionId: userASession.terminalSessionId }),
     ])
     expect(await host.listSessions('client_shared', USER_2, '/repo')).toEqual([
-      expect.objectContaining({ ptySessionId: userBSession.ptySessionId, key: userBSession.key }),
+      expect.objectContaining({ ptySessionId: userBSession.ptySessionId, terminalSessionId: userBSession.terminalSessionId }),
     ])
 
     host.unregisterSocket('client_shared_attachment_a', USER_1, userASocket)

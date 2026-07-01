@@ -63,22 +63,22 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
       set((s) => {
         let nextActiveId: string | null = s.activeId
         let nextRepos = s.repos
-        let nextOrder = s.order
+        let nextTabs = s.order
         let changed = false
         for (const entry of openRepoEntries) {
           const result = insertPlaceholderRepo(
-            { repos: nextRepos, repoSnapshotCache: s.repoSnapshotCache, order: nextOrder },
+            { repos: nextRepos, repoSnapshotCache: s.repoSnapshotCache, order: nextTabs },
             entry,
             rankById,
           )
           if (!result.changed) continue
           changed = true
           nextRepos = result.repos
-          nextOrder = result.order
+          nextTabs = result.order
           nextActiveId = activeRepoIdAfterWorkspaceHydration(
             nextActiveId,
             nextRepos,
-            nextOrder,
+            nextTabs,
             activeRepoId,
             managedActiveId,
           )
@@ -90,7 +90,7 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
           nextRepos = restoredRepos
         }
         if (!changed) return s
-        return { repos: nextRepos, order: nextOrder, activeId: nextActiveId }
+        return { repos: nextRepos, order: nextTabs, activeId: nextActiveId }
       })
 
       // Flip sessionReady unconditionally once Phase 1 has finished.

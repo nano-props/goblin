@@ -1,14 +1,15 @@
 import { Diff, FolderTree, GitBranch, History, Terminal, type LucideIcon } from 'lucide-react'
 import type {
   WorkspacePaneStaticTabType,
-  WorkspacePaneTabOrderEntry,
+  WorkspacePaneTabEntry,
   WorkspacePaneTabType,
   WorkspacePaneTabScope,
 } from '#/shared/workspace-pane.ts'
 import {
   workspacePaneTabScope,
-  workspacePaneStaticTabOrderEntry,
-  workspacePaneTerminalTabOrderEntry,
+  workspacePaneStaticTabId,
+  workspacePaneStaticTabEntry,
+  workspacePaneTerminalTabEntry,
 } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabSummary } from '#/web/components/terminal/types.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
@@ -51,10 +52,14 @@ export interface WorkspacePanePanelLabel {
 export interface WorkspacePaneTabCloseInput {
   repoId: string
   branchName: string | null
-  terminalKey?: string
+  terminalSessionId?: string
   terminalBase?: TerminalSessionBase | null
-  closeStaticTab?: (repoId: string, type: WorkspacePaneStaticTabType, branchName: string) => void
-  closeTerminalByDescriptor?: (key: string, base: TerminalSessionBase) => Promise<boolean>
+  closeStaticTab?: (
+    repoId: string,
+    type: WorkspacePaneStaticTabType,
+    branchName: string,
+  ) => boolean | void | Promise<boolean | void>
+  closeTerminalByDescriptor?: (terminalSessionId: string, base: TerminalSessionBase) => Promise<boolean>
   closeTerminalsForWorktree?: (base: TerminalSessionBase) => Promise<boolean>
 }
 
@@ -105,12 +110,16 @@ export abstract class WorkspacePaneStaticTabProvider<
 > extends WorkspacePaneTabProvider<TType> {
   readonly kind = 'static' as const
 
+  override identity(): string {
+    return workspacePaneStaticTabId(this.type)
+  }
+
   buttonId(workspacePaneId: string): string {
     return `${workspacePaneId}-${this.type}-tab`
   }
 
-  orderEntry(): Extract<WorkspacePaneTabOrderEntry, { type: TType }> {
-    return workspacePaneStaticTabOrderEntry(this.type) as Extract<WorkspacePaneTabOrderEntry, { type: TType }>
+  tabEntry(): Extract<WorkspacePaneTabEntry, { type: TType }> {
+    return workspacePaneStaticTabEntry(this.type) as Extract<WorkspacePaneTabEntry, { type: TType }>
   }
 
   abstract label(input: WorkspacePaneStaticTabMetadataInput): string
@@ -122,8 +131,7 @@ export abstract class WorkspacePaneStaticTabProvider<
 
   close(input: WorkspacePaneTabCloseInput): Promise<boolean> {
     if (!input.branchName || !input.closeStaticTab) return Promise.resolve(false)
-    input.closeStaticTab(input.repoId, this.type, input.branchName)
-    return Promise.resolve(true)
+    return Promise.resolve(input.closeStaticTab(input.repoId, this.type, input.branchName)).then((result) => result !== false)
   }
 }
 
@@ -203,8 +211,8 @@ export class TerminalWorkspacePaneTabProvider extends WorkspacePaneTabProvider<'
     super({ type: 'terminal', icon: Terminal })
   }
 
-  orderEntry(id: string): Extract<WorkspacePaneTabOrderEntry, { type: 'terminal' }> {
-    return workspacePaneTerminalTabOrderEntry(id)
+  tabEntry(terminalSessionId: string): Extract<WorkspacePaneTabEntry, { type: 'terminal' }> {
+    return workspacePaneTerminalTabEntry(terminalSessionId)
   }
 
   buttonId(workspacePaneId: string, index: number): string {
@@ -244,8 +252,8 @@ export class TerminalWorkspacePaneTabProvider extends WorkspacePaneTabProvider<'
   }
 
   async close(input: WorkspacePaneTabCloseInput): Promise<boolean> {
-    if (!input.terminalKey || !input.terminalBase || !input.closeTerminalByDescriptor) return false
-    return await input.closeTerminalByDescriptor(input.terminalKey, input.terminalBase)
+    if (!input.terminalSessionId || !input.terminalBase || !input.closeTerminalByDescriptor) return false
+    return await input.closeTerminalByDescriptor(input.terminalSessionId, input.terminalBase)
   }
 
   override async closeWorktree(input: WorkspacePaneTabCloseInput): Promise<boolean> {

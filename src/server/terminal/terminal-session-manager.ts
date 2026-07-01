@@ -12,8 +12,7 @@ import {
   type TerminalTakeoverResult,
 } from '#/shared/terminal-types.ts'
 import { isValidTerminalPtySessionId, normalizeTerminalSize } from '#/shared/terminal-validators.ts'
-import { parseTerminalWorkspaceSlotKey } from '#/shared/terminal-workspace-slot-key.ts'
-import type { TerminalSessionOrderRuntime } from '#/server/terminal/terminal-session-order-runtime.ts'
+import type { WorkspacePaneTabsRuntime } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
 import {
   attachTerminalClient,
   claimTerminalClientControl,
@@ -30,21 +29,15 @@ import {
   replaySnapshot,
   takeSnapshot,
 } from '#/server/terminal/terminal-render-state.ts'
-import {
-  markTerminalSessionClosed,
-  markTerminalSessionError,
-} from '#/server/terminal/terminal-session-lifecycle.ts'
-import {
-  TerminalPtyBinding,
-  type TerminalPtySessionState,
-} from '#/server/terminal/terminal-session-pty-lifecycle.ts'
+import { markTerminalSessionClosed, markTerminalSessionError } from '#/server/terminal/terminal-session-lifecycle.ts'
+import { TerminalPtyBinding, type TerminalPtySessionState } from '#/server/terminal/terminal-session-pty-lifecycle.ts'
 import type { PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 
 const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
 
-type TerminalSessionOrderRuntimeLike<TUser extends string | number> = Pick<
-  TerminalSessionOrderRuntime<TUser>,
-  'registerTerminalSessionOrder' | 'unregisterTerminalSessionOrder' | 'sessionDisplayOrder'
+type WorkspacePaneTabsRuntimeLike<TUser extends string | number> = Pick<
+  WorkspacePaneTabsRuntime<TUser>,
+  'terminalSessionIds'
 >
 
 interface TerminalPtyAttachResult {
@@ -55,12 +48,12 @@ interface TerminalPtyAttachResult {
 export interface TerminalEnsureSessionInput<TUser extends string | number> {
   userId: TUser
   scope: string
-  key: string
+  terminalSessionId: string
+  worktreePath: string
   cwd: string
   cols: number
   rows: number
   clientId?: string
-  forceNew?: boolean
   command?: string
   args?: string[]
   startupShellCommand?: string
@@ -69,7 +62,7 @@ export interface TerminalEnsureSessionInput<TUser extends string | number> {
 
 interface TerminalSessionView<TUser extends string | number> extends TerminalPtySessionState<TUser> {
   scope: string
-  key: string
+  terminalSessionId: string
   worktreePath: string
   ptyBinding: TerminalPtyBinding<TerminalSessionView<TUser>>
   attachments: Map<string, TerminalClientControllerState>
@@ -92,6 +85,7 @@ export interface TerminalEventSink<TUser extends string | number> {
   onOutput(userId: TUser, event: TerminalOutputEvent): void
   onTitle?(userId: TUser, event: { ptySessionId: string; canonicalTitle: string | null }): void
   onExit(userId: TUser, event: TerminalExitEvent): void
+  onSessionClosed?(userId: TUser, session: TerminalSessionSummary): void
   // Identity and lifecycle are emitted on separate channels so the
   // client's teardown decision can subscribe to identity only.
   // A transitional phase update arrives as `onLifecycle` and never
@@ -102,21 +96,21 @@ export interface TerminalEventSink<TUser extends string | number> {
 
 export class TerminalSessionManager<TUser extends string | number> {
   private readonly sessionsByPtySessionId = new Map<string, TerminalSessionView<TUser>>()
-  private readonly ptySessionIdByUserSessionKey = new Map<string, string>()
+  private readonly ptySessionIdByUserTerminalSessionIndex = new Map<string, string>()
   private readonly sink: TerminalEventSink<TUser>
   private readonly ptySupervisor: PtySupervisor
-  private readonly terminalSessionOrder: TerminalSessionOrderRuntimeLike<TUser>
+  private readonly workspaceTabs: WorkspacePaneTabsRuntimeLike<TUser>
   private readonly isClientOnline: (userId: TUser, clientId: string) => boolean
 
   constructor(
     ptySupervisor: PtySupervisor,
     sink: TerminalEventSink<TUser>,
-    terminalSessionOrder: TerminalSessionOrderRuntimeLike<TUser>,
+    workspaceTabs: WorkspacePaneTabsRuntimeLike<TUser>,
     isClientOnline: (userId: TUser, clientId: string) => boolean,
   ) {
     this.ptySupervisor = ptySupervisor
     this.sink = sink
-    this.terminalSessionOrder = terminalSessionOrder
+    this.workspaceTabs = workspaceTabs
     this.isClientOnline = isClientOnline
   }
 
@@ -127,30 +121,23 @@ export class TerminalSessionManager<TUser extends string | number> {
     const cwd = path.resolve(input.cwd)
     const userId = input.userId
     if (!this.isValidUserId(userId)) return { ok: false, message: 'error.invalid-arguments' }
-    const userKey = this.userSessionKey(userId, input.key)
-    if (input.forceNew) this.closeUserKey(userId, input.key)
-    const existingId = this.ptySessionIdByUserSessionKey.get(userKey)
+    const userTerminalSessionIndex = this.formatUserTerminalSessionIndex(userId, input.terminalSessionId)
+    const existingId = this.ptySessionIdByUserTerminalSessionIndex.get(userTerminalSessionIndex)
     const existing = existingId ? this.sessionsByPtySessionId.get(existingId) : undefined
     if (existing) {
-      this.terminalSessionOrder.registerTerminalSessionOrder({
-        userId,
-        scope: existing.scope,
-        worktreePath: existing.worktreePath,
-        id: existing.key,
-      })
       if (input.clientId) {
         registerTerminalClient(existing, input.clientId, size.cols, size.rows)
       }
       return await this.attachExistingSession(existing, input.clientId)
     }
 
-    const worktreePath = parseWorktreePathFromKey(input.key) ?? input.key
+    const worktreePath = input.worktreePath
     const id = createPtySessionId()
     const session: TerminalSessionView<TUser> = {
       id,
       userId,
       scope: input.scope,
-      key: input.key,
+      terminalSessionId: input.terminalSessionId,
       worktreePath,
       cwd,
       command: input.command,
@@ -172,13 +159,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       takeoverPending: false,
     }
     this.sessionsByPtySessionId.set(id, session)
-    this.ptySessionIdByUserSessionKey.set(userKey, id)
-    this.terminalSessionOrder.registerTerminalSessionOrder({
-      userId,
-      scope: input.scope,
-      worktreePath,
-      id: input.key,
-    })
+    this.ptySessionIdByUserTerminalSessionIndex.set(userTerminalSessionIndex, id)
     if (input.clientId) {
       registerTerminalClient(session, input.clientId, size.cols, size.rows)
       this.applyIdentityEffect(session, attachTerminalClient(session, input.clientId, this.sessionPresence(session)))
@@ -186,7 +167,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     const spawn = await this.spawnAndAttachSession(session)
     if (!spawn.result.ok) {
       // Spawn failed: do not leave a zombie session in the maps. The
-      // catalog would otherwise find it on retry and surface it as a
+      // session service would otherwise find it on retry and surface it as a
       // successful attach with an empty buffer and a null pty — i.e.
       // a blank, non-responsive terminal. `closeSession` removes the
       // map entry and frees pty/listener resources via the standard
@@ -243,7 +224,13 @@ export class TerminalSessionManager<TUser extends string | number> {
     return this.resizeSessionPty(session, size.cols, size.rows)
   }
 
-  takeoverSession(userId: TUser, ptySessionId: string, cols: number, rows: number, clientId: string): TerminalTakeoverResult {
+  takeoverSession(
+    userId: TUser,
+    ptySessionId: string,
+    cols: number,
+    rows: number,
+    clientId: string,
+  ): TerminalTakeoverResult {
     if (!isValidTerminalPtySessionId(ptySessionId)) return { ok: false, message: 'error.invalid-arguments' }
     const size = normalizeTerminalSize(cols, rows)
     if (!size) return { ok: false, message: 'error.invalid-arguments' }
@@ -298,17 +285,13 @@ export class TerminalSessionManager<TUser extends string | number> {
     if (!session) return
     session.ptyBinding.invalidateOwnership()
     if (markTerminalSessionClosed(session)) this.emitLifecycle(session)
+    const closedSession = this.sessionSummary(session)
     this.sessionsByPtySessionId.delete(ptySessionId)
-    const userKey = this.userSessionKey(session.userId, session.key)
-    if (this.ptySessionIdByUserSessionKey.get(userKey) === ptySessionId)
-      this.ptySessionIdByUserSessionKey.delete(userKey)
-    this.terminalSessionOrder.unregisterTerminalSessionOrder({
-      userId: session.userId,
-      scope: session.scope,
-      worktreePath: session.worktreePath,
-      id: session.key,
-    })
+    const userTerminalSessionIndex = this.formatUserTerminalSessionIndex(session.userId, session.terminalSessionId)
+    if (this.ptySessionIdByUserTerminalSessionIndex.get(userTerminalSessionIndex) === ptySessionId)
+      this.ptySessionIdByUserTerminalSessionIndex.delete(userTerminalSessionIndex)
     session.ptyBinding.dispose(session)
+    this.sink.onSessionClosed?.(session.userId, closedSession)
   }
 
   closeSessionsForUser(userId: TUser): void {
@@ -322,7 +305,8 @@ export class TerminalSessionManager<TUser extends string | number> {
       if (session.userId !== userId) continue
       if (!session.attachments.has(clientId) && session.controllerClientId !== clientId) continue
       const previousController = this.effectiveControllerWithOverride(session, clientId, previousOnline)
-      if (terminalIdentityChanged(session, previousController, this.sessionPresence(session))) this.emitIdentity(session)
+      if (terminalIdentityChanged(session, previousController, this.sessionPresence(session)))
+        this.emitIdentity(session)
     }
   }
 
@@ -339,28 +323,35 @@ export class TerminalSessionManager<TUser extends string | number> {
   }
 
   async listSessionsForUser(userId: TUser, scope: string): Promise<TerminalSessionSummary[]> {
-    const sessions: TerminalSessionSummary[] = []
+    const sessionsByWorktree = new Map<string, TerminalSessionView<TUser>[]>()
     for (const session of Array.from(this.sessionsByPtySessionId.values())) {
       if (session.userId === userId && session.scope === scope) {
-        sessions.push({
-          ptySessionId: session.id,
-          key: session.key,
-          viewType: 'terminal',
-          viewId: session.key,
-          cwd: session.cwd,
-          controller: this.effectiveController(session),
-          processName: session.ptyBinding.processName(),
-          canonicalTitle: session.render.title,
-          phase: session.phase,
-          message: session.message,
-          cols: session.cols,
-          rows: session.rows,
-          displayOrder: this.terminalSessionDisplayOrder(session),
-        })
+        const current = sessionsByWorktree.get(session.worktreePath)
+        if (current) current.push(session)
+        else sessionsByWorktree.set(session.worktreePath, [session])
       }
     }
-    sessions.sort((a, b) => a.displayOrder - b.displayOrder)
-    return sessions
+    return Array.from(sessionsByWorktree.entries()).flatMap(([worktreePath, sessions]) =>
+      this.sessionsForWorktreeTabs(userId, scope, worktreePath, sessions).map((session) => ({
+        ptySessionId: session.id,
+        terminalSessionId: session.terminalSessionId,
+        repoRoot: session.scope,
+        worktreePath: session.worktreePath,
+        cwd: session.cwd,
+        controller: this.effectiveController(session),
+        processName: session.ptyBinding.processName(),
+        canonicalTitle: session.render.title,
+        phase: session.phase,
+        message: session.message,
+        cols: session.cols,
+        rows: session.rows,
+      })),
+    )
+  }
+
+  getSessionSummaryForUser(userId: TUser, ptySessionId: string): TerminalSessionSummary | null {
+    const session = this.getSession(userId, ptySessionId)
+    return session ? this.sessionSummary(session) : null
   }
 
   getSessionScope(userId: TUser, ptySessionId: string): string | undefined {
@@ -386,20 +377,44 @@ export class TerminalSessionManager<TUser extends string | number> {
     return { count, totalBufferChars, maxBufferChars }
   }
 
-  private closeUserKey(userId: TUser, key: string): void {
-    const id = this.ptySessionIdByUserSessionKey.get(this.userSessionKey(userId, key))
-    if (id) this.closeSession(id)
+  private sessionsForWorktreeTabs(
+    userId: TUser,
+    scope: string,
+    worktreePath: string,
+    sessions: readonly TerminalSessionView<TUser>[],
+  ): TerminalSessionView<TUser>[] {
+    const terminalSessionByTerminalSessionId = new Map(sessions.map((session) => [session.terminalSessionId, session]))
+    const seen = new Set<string>()
+    const tabListedSessions: TerminalSessionView<TUser>[] = []
+    for (const terminalSessionId of this.workspaceTabs.terminalSessionIds({ userId, scope, worktreePath })) {
+      const session = terminalSessionByTerminalSessionId.get(terminalSessionId)
+      if (!session || seen.has(terminalSessionId)) continue
+      seen.add(terminalSessionId)
+      tabListedSessions.push(session)
+    }
+    for (const session of sessions) {
+      if (seen.has(session.terminalSessionId)) continue
+      seen.add(session.terminalSessionId)
+      tabListedSessions.push(session)
+    }
+    return tabListedSessions
   }
 
-  private terminalSessionDisplayOrder(session: TerminalSessionView<TUser>): number {
-    return (
-      this.terminalSessionOrder.sessionDisplayOrder({
-        userId: session.userId,
-        scope: session.scope,
-        worktreePath: session.worktreePath,
-        id: session.key,
-      }) ?? Number.MAX_SAFE_INTEGER
-    )
+  private sessionSummary(session: TerminalSessionView<TUser>): TerminalSessionSummary {
+    return {
+      ptySessionId: session.id,
+      terminalSessionId: session.terminalSessionId,
+      repoRoot: session.scope,
+      worktreePath: session.worktreePath,
+      cwd: session.cwd,
+      controller: this.effectiveController(session),
+      processName: session.ptyBinding.processName(),
+      canonicalTitle: session.render.title,
+      phase: session.phase,
+      message: session.message,
+      cols: session.cols,
+      rows: session.rows,
+    }
   }
 
   // Sends SIGWINCH to the child PTY and queues the same geometry change
@@ -462,12 +477,13 @@ export class TerminalSessionManager<TUser extends string | number> {
     const pending = await session.ptyBinding.waitForPendingSpawn(session)
     if (pending) return pending
     if (!this.isLiveSession(session)) return { ok: false, message: 'error.unavailable' }
-    if (clientId) this.applyIdentityEffect(session, attachTerminalClient(session, clientId, this.sessionPresence(session)))
+    if (clientId)
+      this.applyIdentityEffect(session, attachTerminalClient(session, clientId, this.sessionPresence(session)))
     return await this.attachResult(session)
   }
 
-  private userSessionKey(userId: TUser, key: string): string {
-    return `${String(userId)}\0${key}`
+  private formatUserTerminalSessionIndex(userId: TUser, terminalSessionId: string): string {
+    return `${String(userId)}\0${terminalSessionId}`
   }
 
   private sessionPresence(session: TerminalSessionView<TUser>): (clientId: string) => boolean {
@@ -593,8 +609,4 @@ function authorityReasonToMessage(reason: 'not-controller' | 'session-unowned' |
 
 function createPtySessionId(): string {
   return `pty_${crypto.randomUUID()}`
-}
-
-function parseWorktreePathFromKey(key: string): string | null {
-  return parseTerminalWorkspaceSlotKey(key)?.worktreePath ?? null
 }

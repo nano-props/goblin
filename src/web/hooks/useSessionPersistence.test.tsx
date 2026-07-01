@@ -1,16 +1,18 @@
 // @vitest-environment jsdom
 
+import { act } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useSessionPersistence } from '#/web/hooks/useSessionPersistence.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import {
   filetreeInteractionScopeKey,
   resetFiletreeInteractionStore,
   useFiletreeInteractionStore,
 } from '#/web/stores/repos/filetree-interaction-state.ts'
+import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 
 const persistWorkspaceSessionStateMock = vi.fn(async (_session: unknown) => {})
 
@@ -26,19 +28,24 @@ beforeEach(() => {
 
 describe('useSessionPersistence', () => {
   test('persists the active terminal map into settings session state', () => {
+    const targetKey = worktreeTargetKey('/tmp/repo', 'feature/worktree', '/tmp/worktree')
     const repo = seedRepoState({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [workspacePaneStaticTabEntry('status')],
+      },
     })
     useReposStore.setState({
       repos: { [repo.id]: repo },
       order: [repo.id],
       activeId: repo.id,
       sessionReady: true,
-      selectedTerminalSessionByWorktree: {
-        '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0session-2',
+      sessionPersistenceReady: true,
+      selectedTerminalSessionIdByTerminalWorktree: {
+        '/tmp/repo\0/tmp/worktree': 'session-2',
       },
     })
 
@@ -48,12 +55,12 @@ describe('useSessionPersistence', () => {
       expect.objectContaining({
         openRepoEntries: [{ kind: 'local', id: '/tmp/repo' }],
         activeRepoId: '/tmp/repo',
-        selectedTerminalSessionByWorktree: {
-          '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0session-2',
+        selectedTerminalSessionIdByTerminalWorktree: {
+          '/tmp/repo\0/tmp/worktree': 'session-2',
         },
-        workspacePaneTabOrderByBranchByRepo: {
+        workspacePaneTabsByTargetByRepo: {
           '/tmp/repo': {
-            'feature/worktree': [workspacePaneStaticTabOrderEntry('status')],
+            [targetKey]: [workspacePaneStaticTabEntry('status')],
           },
         },
       }),
@@ -61,21 +68,24 @@ describe('useSessionPersistence', () => {
   })
 
   test('persists explicitly closed workspace pane tabs as empty arrays', () => {
+    const targetKey = worktreeTargetKey('/tmp/repo', 'feature/worktree', '/tmp/worktree')
     const repo = seedRepoState({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'status',
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [],
+      },
     })
-    useReposStore.getState().closeWorkspacePaneStaticTab(repo.id, 'status', 'feature/worktree')
 
     renderInJsdom(<Harness />)
 
     expect(persistWorkspaceSessionStateMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        workspacePaneTabOrderByBranchByRepo: {
+        workspacePaneTabsByTargetByRepo: {
           '/tmp/repo': {
-            'feature/worktree': [],
+            [targetKey]: [],
           },
         },
       }),
@@ -94,6 +104,7 @@ describe('useSessionPersistence', () => {
       order: [repo.id],
       activeId: repo.id,
       sessionReady: true,
+      sessionPersistenceReady: true,
     })
     useFiletreeInteractionStore.getState().restoreViewState({
       [scopeKey]: {
@@ -119,9 +130,43 @@ describe('useSessionPersistence', () => {
       }),
     )
   })
+
+  test('does not persist until boot-restored workspace tabs have converged', () => {
+    const repo = seedRepoState({
+      id: '/tmp/repo',
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
+      selectedBranch: 'feature/worktree',
+    })
+    useReposStore.setState({
+      repos: { [repo.id]: repo },
+      order: [repo.id],
+      activeId: repo.id,
+      sessionReady: true,
+      sessionPersistenceReady: false,
+    })
+
+    const result = renderInJsdom(<Harness />)
+
+    expect(persistWorkspaceSessionStateMock).not.toHaveBeenCalled()
+
+    act(() => {
+      useReposStore.setState({ sessionPersistenceReady: true })
+    })
+
+    expect(persistWorkspaceSessionStateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        openRepoEntries: [{ kind: 'local', id: '/tmp/repo' }],
+      }),
+    )
+    result.unmount()
+  })
 })
 
 function Harness() {
   useSessionPersistence()
   return null
+}
+
+function worktreeTargetKey(repoRoot: string, branchName: string, worktreePath: string): string {
+  return workspacePaneTabsTargetIdentityKey({ repoRoot, branchName, worktreePath })
 }

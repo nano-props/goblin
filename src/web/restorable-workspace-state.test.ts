@@ -1,19 +1,28 @@
-import { describe, expect, test } from 'vitest'
+import { beforeEach, describe, expect, test } from 'vitest'
 import { localRepoSessionEntry } from '#/shared/remote-repo.ts'
 import {
   restoreRestorableWorkspaceStateFromSession,
   workspaceSessionStateFromRestorableWorkspaceState,
 } from '#/web/restorable-workspace-state.ts'
-import { createRepoBranch, seedRepoState } from '#/web/test-utils/bridge.ts'
-import { workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
+import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 
 describe('restorable-workspace-state', () => {
+  beforeEach(() => {
+    resetReposStore()
+  })
+
   test('maps restorable workspace state into WorkspaceSessionState', () => {
+    const targetKey = worktreeTargetKey('/tmp/repo', 'feature/worktree', '/tmp/worktree')
     const repo = seedRepoState({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [workspacePaneStaticTabEntry('status')],
+      },
     })
 
     expect(
@@ -24,8 +33,8 @@ describe('restorable-workspace-state', () => {
           activeId: repo.id,
           zenMode: false,
           workspacePaneSize: 55,
-          selectedTerminalSessionByWorktree: {
-            '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0session-2',
+          selectedTerminalSessionIdByTerminalWorktree: {
+            '/tmp/repo\0/tmp/worktree': 'session-2',
           },
         },
       }),
@@ -34,25 +43,26 @@ describe('restorable-workspace-state', () => {
       activeRepoId: '/tmp/repo',
       zenMode: false,
       workspacePaneSize: 55,
-      selectedTerminalSessionByWorktree: {
-        '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0session-2',
+      selectedTerminalSessionIdByTerminalWorktree: {
+        '/tmp/repo\0/tmp/worktree': 'session-2',
       },
-      preferredWorkspacePaneTabByBranchByRepo: { '/tmp/repo': { 'feature/worktree': 'terminal' } },
-      workspacePaneTabOrderByBranchByRepo: {
-        '/tmp/repo': { 'feature/worktree': [workspacePaneStaticTabOrderEntry('status')] },
+      preferredWorkspacePaneTabByTargetByRepo: { '/tmp/repo': { [targetKey]: 'terminal' } },
+      workspacePaneTabsByTargetByRepo: {
+        '/tmp/repo': { [targetKey]: [workspacePaneStaticTabEntry('status')] },
       },
       filetreeViewStateByWorktreeByRepo: {},
     })
   })
 
   test('persists changes as a session-restorable preferred tab when its static tab is open', () => {
+    const targetKey = worktreeTargetKey('/tmp/repo', 'feature/worktree', '/tmp/worktree')
     const repo = seedRepoState({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'changes',
-      workspacePaneTabOrderByBranch: {
-        'feature/worktree': [workspacePaneStaticTabOrderEntry('status'), workspacePaneStaticTabOrderEntry('changes')],
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('changes')],
       },
     })
 
@@ -64,27 +74,28 @@ describe('restorable-workspace-state', () => {
           activeId: repo.id,
           zenMode: false,
           workspacePaneSize: 55,
-          selectedTerminalSessionByWorktree: {},
+          selectedTerminalSessionIdByTerminalWorktree: {},
         },
       }),
     ).toMatchObject({
-      preferredWorkspacePaneTabByBranchByRepo: { '/tmp/repo': { 'feature/worktree': 'changes' } },
-      workspacePaneTabOrderByBranchByRepo: {
+      preferredWorkspacePaneTabByTargetByRepo: { '/tmp/repo': { [targetKey]: 'changes' } },
+      workspacePaneTabsByTargetByRepo: {
         '/tmp/repo': {
-          'feature/worktree': [workspacePaneStaticTabOrderEntry('status'), workspacePaneStaticTabOrderEntry('changes')],
+          [targetKey]: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('changes')],
         },
       },
     })
   })
 
   test('does not persist a branch preferred tab whose tab is closed', () => {
+    const targetKey = worktreeTargetKey('/tmp/repo', 'feature/worktree', '/tmp/worktree')
     const repo = seedRepoState({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'history',
-      workspacePaneTabOrderByBranch: {
-        'feature/worktree': [workspacePaneStaticTabOrderEntry('status')],
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [workspacePaneStaticTabEntry('status')],
       },
     })
 
@@ -96,57 +107,61 @@ describe('restorable-workspace-state', () => {
           activeId: repo.id,
           zenMode: false,
           workspacePaneSize: 55,
-          selectedTerminalSessionByWorktree: {},
+          selectedTerminalSessionIdByTerminalWorktree: {},
         },
       }),
     ).toMatchObject({
-      preferredWorkspacePaneTabByBranchByRepo: {},
-      workspacePaneTabOrderByBranchByRepo: {
-        '/tmp/repo': { 'feature/worktree': [workspacePaneStaticTabOrderEntry('status')] },
+      preferredWorkspacePaneTabByTargetByRepo: {},
+      workspacePaneTabsByTargetByRepo: {
+        '/tmp/repo': { [targetKey]: [workspacePaneStaticTabEntry('status')] },
       },
     })
   })
 
   test('restores restorable workspace state from WorkspaceSessionState', () => {
+    const targetKey = branchTargetKey('/tmp/repo', 'main')
     expect(
       restoreRestorableWorkspaceStateFromSession({
         openRepoEntries: [localRepoSessionEntry('/tmp/repo')],
         activeRepoId: '/tmp/repo',
         zenMode: false,
         workspacePaneSize: 40,
-        selectedTerminalSessionByWorktree: {
-          '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0session-1',
+        selectedTerminalSessionIdByTerminalWorktree: {
+          '/tmp/repo\0/tmp/worktree': 'session-1',
         },
-        workspacePaneTabOrderByBranchByRepo: {
+        preferredWorkspacePaneTabByTargetByRepo: {},
+        workspacePaneTabsByTargetByRepo: {
           '/tmp/repo': {
-            main: [],
+            [targetKey]: [],
           },
         },
+        filetreeViewStateByWorktreeByRepo: {},
       }),
     ).toEqual({
       activeId: '/tmp/repo',
       zenMode: false,
       workspacePaneSize: 40,
-      selectedTerminalSessionByWorktree: {
-        '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0session-1',
+      selectedTerminalSessionIdByTerminalWorktree: {
+        '/tmp/repo\0/tmp/worktree': 'session-1',
       },
-      preferredWorkspacePaneTabByBranchByRepo: {},
-      workspacePaneTabOrderByBranchByRepo: {
+      preferredWorkspacePaneTabByTargetByRepo: {},
+      workspacePaneTabsByTargetByRepo: {
         '/tmp/repo': {
-          main: [],
+          [targetKey]: [],
         },
       },
     })
   })
 
   test('persists files as a session-restorable preferred tab when its static tab is open', () => {
+    const targetKey = worktreeTargetKey('/tmp/repo', 'feature/worktree', '/tmp/worktree')
     const repo = seedRepoState({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'files',
-      workspacePaneTabOrderByBranch: {
-        'feature/worktree': [workspacePaneStaticTabOrderEntry('status'), workspacePaneStaticTabOrderEntry('files')],
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
       },
     })
 
@@ -158,27 +173,28 @@ describe('restorable-workspace-state', () => {
           activeId: repo.id,
           zenMode: false,
           workspacePaneSize: 55,
-          selectedTerminalSessionByWorktree: {},
+          selectedTerminalSessionIdByTerminalWorktree: {},
         },
       }),
     ).toMatchObject({
-      preferredWorkspacePaneTabByBranchByRepo: { '/tmp/repo': { 'feature/worktree': 'files' } },
-      workspacePaneTabOrderByBranchByRepo: {
+      preferredWorkspacePaneTabByTargetByRepo: { '/tmp/repo': { [targetKey]: 'files' } },
+      workspacePaneTabsByTargetByRepo: {
         '/tmp/repo': {
-          'feature/worktree': [workspacePaneStaticTabOrderEntry('status'), workspacePaneStaticTabOrderEntry('files')],
+          [targetKey]: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
         },
       },
     })
   })
 
   test('round-trips a files tab through session-restore', () => {
+    const targetKey = worktreeTargetKey('/tmp/repo', 'feature/worktree', '/tmp/worktree')
     const repo = seedRepoState({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'files',
-      workspacePaneTabOrderByBranch: {
-        'feature/worktree': [workspacePaneStaticTabOrderEntry('status'), workspacePaneStaticTabOrderEntry('files')],
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
       },
     })
 
@@ -189,17 +205,17 @@ describe('restorable-workspace-state', () => {
         activeId: repo.id,
         zenMode: false,
         workspacePaneSize: 55,
-        selectedTerminalSessionByWorktree: {},
+        selectedTerminalSessionIdByTerminalWorktree: {},
       },
     })
     const restored = restoreRestorableWorkspaceStateFromSession(sessionState)
-    expect(restored.workspacePaneTabOrderByBranchByRepo).toEqual({
+    expect(restored.workspacePaneTabsByTargetByRepo).toEqual({
       '/tmp/repo': {
-        'feature/worktree': [workspacePaneStaticTabOrderEntry('status'), workspacePaneStaticTabOrderEntry('files')],
+        [targetKey]: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
       },
     })
-    expect(restored.preferredWorkspacePaneTabByBranchByRepo).toEqual({
-      '/tmp/repo': { 'feature/worktree': 'files' },
+    expect(restored.preferredWorkspacePaneTabByTargetByRepo).toEqual({
+      '/tmp/repo': { [targetKey]: 'files' },
     })
   })
 
@@ -218,7 +234,7 @@ describe('restorable-workspace-state', () => {
           activeId: repo.id,
           zenMode: false,
           workspacePaneSize: 55,
-          selectedTerminalSessionByWorktree: {},
+          selectedTerminalSessionIdByTerminalWorktree: {},
         },
         filetreeInteractionByScope: {
           '/tmp/repo\0/tmp/worktree': {
@@ -241,3 +257,11 @@ describe('restorable-workspace-state', () => {
     })
   })
 })
+
+function branchTargetKey(repoRoot: string, branchName: string): string {
+  return workspacePaneTabsTargetIdentityKey({ repoRoot, branchName, worktreePath: null })
+}
+
+function worktreeTargetKey(repoRoot: string, branchName: string, worktreePath: string): string {
+  return workspacePaneTabsTargetIdentityKey({ repoRoot, branchName, worktreePath })
+}

@@ -394,10 +394,9 @@ const geometryMocks = vi.hoisted(() => ({
 }))
 
 vi.mock('#/web/components/terminal/terminal-geometry.ts', async () => {
-  const actual =
-    await vi.importActual<typeof import('#/web/components/terminal/terminal-geometry.ts')>(
-      '#/web/components/terminal/terminal-geometry.ts',
-    )
+  const actual = await vi.importActual<typeof import('#/web/components/terminal/terminal-geometry.ts')>(
+    '#/web/components/terminal/terminal-geometry.ts',
+  )
   return {
     ...actual,
     preloadTerminalFont: geometryMocks.preloadTerminalFont,
@@ -479,9 +478,8 @@ const hostOpenExternalUrl = vi.fn<NonNullable<Window['goblinNative']['host']>['o
 const mockFonts = new MockFontFaceSet()
 
 const descriptor = {
-  key: '/repo\0/worktree',
-  worktreeTerminalKey: '/repo\0/worktree',
-  sessionId: 'session-1',
+  terminalSessionId: 'session-1',
+  terminalWorktreeKey: '/repo\0/worktree',
   index: 1,
   repoRoot: '/repo',
   branch: 'feature',
@@ -581,6 +579,7 @@ beforeEach(() => {
         onIdentity: vi.fn(),
         onLifecycle: vi.fn(),
         onSessionsChanged: vi.fn(),
+        onWorkspaceTabsChanged: vi.fn(),
         onSessionClosed: vi.fn(),
       },
     },
@@ -621,21 +620,26 @@ beforeEach(() => {
         input?.kind === 'primary'
           ? {
               action: 'reused' as const,
-              key: 'repo\0worktree\0session-1',
+              terminalSessionId: 'session-1',
+              tabs: [],
               sessions: [],
               ...createFirstFrame('session-1'),
               ok: true as const,
             }
           : {
               action: 'created' as const,
-              key: 'repo\0worktree\0session-2',
+              terminalSessionId: 'session-2',
+              tabs: [],
               sessions: [],
               ...createFirstFrame('session-2'),
               ok: true as const,
             },
       ),
+      replaceWorkspaceTabs: vi.fn(async (input) => input.tabs),
+      updateWorkspaceTabs: vi.fn(async () => []),
       pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
       listSessions: vi.fn(async () => []),
+      listWorkspaceTabs: vi.fn(async () => []),
       prewarm: vi.fn(async () => {}),
       kickReconnect: vi.fn(() => {}),
       getSessionSnapshot: vi.fn(async () => null),
@@ -648,6 +652,7 @@ beforeEach(() => {
       onIdentity: vi.fn(() => () => {}),
       onLifecycle: vi.fn(() => () => {}),
       onSessionsChanged: vi.fn(() => () => {}),
+      onWorkspaceTabsChanged: vi.fn(() => () => {}),
       onSessionClosed: vi.fn(() => () => {}),
     }),
   })
@@ -1081,7 +1086,7 @@ describe('TerminalSession', () => {
     warnSpy.mockRestore()
   })
 
-  test('uses first-class restart IPC instead of recreating through ensureSession forceNew', async () => {
+  test('uses first-class restart IPC instead of recreating through ensureSession', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
     const session = new TerminalSession(descriptor, vi.fn())

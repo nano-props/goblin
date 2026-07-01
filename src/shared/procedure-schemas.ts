@@ -14,6 +14,7 @@ import {
   RemotePathSuggestionsInputSchema,
   RemoteTargetSchema,
 } from '#/shared/api-types.ts'
+import { WORKSPACE_PANE_STATIC_TAB_IDS } from '#/shared/workspace-pane.ts'
 import { NativeHostProjectionSchema } from '#/shared/native-host-projection.ts'
 import { RepoTreePrefixSchema } from '#/shared/repo-tree-schema.ts'
 import { GIT_HASH_RE } from '#/shared/git-types.ts'
@@ -173,15 +174,15 @@ export const REMOTE_PROCEDURE_SCHEMAS = {
 // `#/server/modules/settings-write-paths.ts` — the route layer
 // validates with these, then passes the parsed object directly to the
 // module layer.
-const WorkspacePaneStaticTabOrderEntrySchema = v.variant('type', [
-  v.object({ type: v.literal('status'), id: v.literal('status') }),
-  v.object({ type: v.literal('changes'), id: v.literal('changes') }),
-  v.object({ type: v.literal('history'), id: v.literal('history') }),
-  v.object({ type: v.literal('files'), id: v.literal('files') }),
+const WorkspacePaneStaticTabEntrySchema = v.variant('type', [
+  v.object({ type: v.literal('status'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.status) }),
+  v.object({ type: v.literal('changes'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.changes) }),
+  v.object({ type: v.literal('history'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.history) }),
+  v.object({ type: v.literal('files'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.files) }),
 ])
-const WorkspacePaneTerminalTabOrderEntrySchema = v.object({
+const WorkspacePaneTerminalTabEntrySchema = v.object({
   type: v.literal('terminal'),
-  id: v.pipe(v.string(), v.minLength(1)),
+  terminalSessionId: v.pipe(v.string(), v.minLength(1)),
 })
 const FiletreeSessionViewStateSchema = v.object({
   selectedKeys: v.array(v.string()),
@@ -193,20 +194,16 @@ const WorkspaceSessionStateSchema = v.object({
   activeRepoId: v.nullable(v.string()),
   zenMode: v.boolean(),
   workspacePaneSize: v.number(),
-  selectedTerminalSessionByWorktree: v.optional(v.record(v.string(), v.string())),
-  preferredWorkspacePaneTabByBranchByRepo: v.optional(
-    v.record(v.string(), v.record(v.string(), v.picklist(['status', 'changes', 'history', 'files', 'terminal']))),
-  ),
-  workspacePaneTabOrderByBranchByRepo: v.record(
+  selectedTerminalSessionIdByTerminalWorktree: v.record(v.string(), v.string()),
+  preferredWorkspacePaneTabByTargetByRepo: v.record(
     v.string(),
-    v.record(
-      v.string(),
-      v.array(v.union([WorkspacePaneStaticTabOrderEntrySchema, WorkspacePaneTerminalTabOrderEntrySchema])),
-    ),
+    v.record(v.string(), v.picklist(['status', 'changes', 'history', 'files', 'terminal'])),
   ),
-  filetreeViewStateByWorktreeByRepo: v.optional(
-    v.record(v.string(), v.record(v.string(), FiletreeSessionViewStateSchema)),
+  workspacePaneTabsByTargetByRepo: v.record(
+    v.string(),
+    v.record(v.string(), v.array(v.union([WorkspacePaneStaticTabEntrySchema, WorkspacePaneTerminalTabEntrySchema]))),
   ),
+  filetreeViewStateByWorktreeByRepo: v.record(v.string(), v.record(v.string(), FiletreeSessionViewStateSchema)),
 })
 
 // Shared shape for the GitHub CLI state endpoints (`/api/settings/github-cli`

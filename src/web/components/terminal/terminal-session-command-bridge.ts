@@ -1,11 +1,11 @@
-import type { WorktreeTerminalSnapshot, TerminalCreateOptions } from '#/web/components/terminal/types.ts'
+import type { TerminalWorktreeSnapshot, TerminalCreateOptions } from '#/web/components/terminal/types.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 
 interface TerminalSessionCommandBridge {
-  worktreeSnapshot: (worktreeTerminalKey: string) => WorktreeTerminalSnapshot
+  terminalWorktreeSnapshot: (terminalWorktreeKey: string) => TerminalWorktreeSnapshot
   createTerminal: (base: TerminalSessionBase, options?: TerminalCreateOptions) => Promise<string>
-  selectTerminal: (worktreeTerminalKey: string, key: string) => void
-  closeTerminalByDescriptor?: (key: string, base: TerminalSessionBase) => Promise<boolean>
+  selectTerminal: (terminalWorktreeKey: string, terminalSessionId: string) => void
+  closeTerminalByDescriptor?: (terminalSessionId: string, base: TerminalSessionBase) => Promise<boolean>
   closeTerminalsForWorktree?: (base: TerminalSessionBase) => Promise<boolean>
 }
 

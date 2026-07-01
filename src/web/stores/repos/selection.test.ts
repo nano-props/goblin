@@ -3,10 +3,10 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { RepoState, SessionWorkspacePaneRestoreState } from '#/web/stores/repos/types.ts'
 import type {
   WorkspacePaneStaticTabType,
-  WorkspacePaneTabOrderEntry,
+  WorkspacePaneTabEntry,
   WorkspacePaneTabType,
 } from '#/shared/workspace-pane.ts'
-import { WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES, workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
+import { WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import {
   createRepoBranch as branch,
   installGoblinTestBridge,
@@ -14,13 +14,15 @@ import {
   seedRepoState,
 } from '#/web/test-utils/bridge.ts'
 import {
-  workspacePaneStaticTabsForBranch,
-  workspacePaneTabOrderForBranch,
-} from '#/web/stores/repos/workspace-pane-tabs.ts'
-import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
+  preferredWorkspacePaneTabForTarget,
+  workspacePaneTabsTargetForRepoBranch,
+} from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { restoreSessionWorkspacePaneStateInRepos } from '#/web/stores/repos/workspace-pane-session-restore.ts'
 import type { BranchSnapshotInfo } from '#/web/types.ts'
 import { DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
+import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
+import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 const REPO_ID = '/tmp/gbl-selection-test-repo'
 const ipcHandlers: Record<string, (input: any) => unknown> = {}
 
@@ -29,7 +31,6 @@ function seedRepo(options: {
   currentBranch?: string
   preferredWorkspacePaneTab?: WorkspacePaneTabType
   workspacePaneStaticTabs?: WorkspacePaneStaticTabType[]
-  workspacePaneTabOrder?: WorkspacePaneTabOrderEntry[]
   branches?: BranchSnapshotInfo[]
 }) {
   const selectedBranch = options.selectedBranch === undefined ? 'feature/plain' : options.selectedBranch
@@ -43,11 +44,10 @@ function seedRepo(options: {
     currentBranch: options.currentBranch ?? 'main',
     selectedBranch,
     preferredWorkspacePaneTab: options.preferredWorkspacePaneTab ?? 'status',
-    workspacePaneTabOrderByBranch:
-      selectedBranch && (options.workspacePaneTabOrder ?? options.workspacePaneStaticTabs)
+    workspacePaneTabsByBranch:
+      selectedBranch && options.workspacePaneStaticTabs
         ? {
-            [selectedBranch]:
-              options.workspacePaneTabOrder ?? staticTabOrder(...(options.workspacePaneStaticTabs ?? [])),
+            [selectedBranch]: staticTabs(...options.workspacePaneStaticTabs),
           }
         : undefined,
     remote: {
@@ -63,23 +63,24 @@ function seedRepo(options: {
 
 function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
   const repo = useReposStore.getState().repos[REPO_ID]
-  return repo ? workspacePaneStaticTabsForBranch(repo.ui, branchName) : []
-}
-
-function tabOrderFor(branchName: string): WorkspacePaneTabOrderEntry[] {
-  const repo = useReposStore.getState().repos[REPO_ID]
-  return repo ? workspacePaneTabOrderForBranch(repo.ui, branchName) : []
+  const target = repo ? workspacePaneTabsTargetForRepoBranch(repo, branchName) : null
+  return workspacePaneStaticTabsFromEntries(target ? readWorkspacePaneTabsForTarget(target) : [])
 }
 
 function preferredTabFor(branchName?: string | null): WorkspacePaneTabType | null {
   const repo = useReposStore.getState().repos[REPO_ID]
-  return repo ? preferredWorkspacePaneTabForBranch(repo.ui, branchName ?? repo.ui.selectedBranch) : null
+  return repo
+    ? preferredWorkspacePaneTabForTarget(
+        repo.ui,
+        workspacePaneTabsTargetForRepoBranch(repo, branchName ?? repo.ui.selectedBranch),
+      )
+    : null
 }
 
 function restoreWorkspacePaneState(restoreState: Partial<SessionWorkspacePaneRestoreState>) {
   const normalizedRestoreState: SessionWorkspacePaneRestoreState = {
-    workspacePaneTabOrderByBranchByRepo: restoreState.workspacePaneTabOrderByBranchByRepo ?? {},
-    preferredWorkspacePaneTabByBranchByRepo: restoreState.preferredWorkspacePaneTabByBranchByRepo ?? {},
+    workspacePaneTabsByTargetByRepo: restoreState.workspacePaneTabsByTargetByRepo ?? {},
+    preferredWorkspacePaneTabByTargetByRepo: restoreState.preferredWorkspacePaneTabByTargetByRepo ?? {},
   }
   useReposStore.setState((s) => {
     const repos = restoreSessionWorkspacePaneStateInRepos(s.repos, normalizedRestoreState)
@@ -91,12 +92,8 @@ async function flushAsyncWork() {
   await new Promise((resolve) => setTimeout(resolve, 0))
 }
 
-function staticTabOrder(...views: WorkspacePaneStaticTabType[]): WorkspacePaneTabOrderEntry[] {
-  return views.map((view) => workspacePaneStaticTabOrderEntry(view))
-}
-
-function terminalEntry(id: string): WorkspacePaneTabOrderEntry {
-  return { type: 'terminal', id }
+function staticTabs(...views: WorkspacePaneStaticTabType[]): WorkspacePaneTabEntry[] {
+  return views.map((view) => workspacePaneStaticTabEntry(view))
 }
 
 function stubRefreshActions(
@@ -326,34 +323,6 @@ describe('setWorkspacePaneTab', () => {
     expect(useReposStore.getState().repos[REPO_ID]).toBe(before)
   })
 
-  test('does not reopen a closed branch-level tab when only selecting its view', () => {
-    seedRepo({ selectedBranch: 'main', preferredWorkspacePaneTab: 'status' })
-    useReposStore.getState().closeWorkspacePaneStaticTab(REPO_ID, 'status')
-
-    useReposStore.getState().setWorkspacePaneTab(REPO_ID, 'status')
-
-    expect(openTabsFor('main')).toEqual([])
-  })
-
-  test('restores workspace pane tab order during session restore', () => {
-    seedRepo({ selectedBranch: 'main', preferredWorkspacePaneTab: 'status', workspacePaneStaticTabs: ['status'] })
-
-    restoreWorkspacePaneState({
-      workspacePaneTabOrderByBranchByRepo: { [REPO_ID]: { main: staticTabOrder('history') } },
-    })
-
-    expect(preferredTabFor('main')).toBe('status')
-    expect(openTabsFor('main')).toEqual(['history'])
-  })
-
-  test('restores an explicitly empty workspace pane tab order during session restore', () => {
-    seedRepo({ selectedBranch: 'main', preferredWorkspacePaneTab: 'status', workspacePaneStaticTabs: ['status'] })
-
-    restoreWorkspacePaneState({ workspacePaneTabOrderByBranchByRepo: { [REPO_ID]: { main: [] } } })
-
-    expect(openTabsFor('main')).toEqual([])
-  })
-
   test('restores a session-preferred files tab when its static tab is open', () => {
     seedRepo({
       selectedBranch: 'main',
@@ -365,26 +334,12 @@ describe('setWorkspacePaneTab', () => {
     expect(openTabsFor('main')).toEqual(['status', 'files'])
   })
 
-  test('restores a files tab in workspace pane tab order during session restore', () => {
-    seedRepo({ selectedBranch: 'main', preferredWorkspacePaneTab: 'status', workspacePaneStaticTabs: ['status'] })
-
-    restoreWorkspacePaneState({
-      workspacePaneTabOrderByBranchByRepo: {
-        [REPO_ID]: { main: [workspacePaneStaticTabOrderEntry('status'), workspacePaneStaticTabOrderEntry('files')] },
-      },
-    })
-
-    expect(openTabsFor('main')).toEqual(['status', 'files'])
-    expect(tabOrderFor('main')).toEqual([
-      workspacePaneStaticTabOrderEntry('status'),
-      workspacePaneStaticTabOrderEntry('files'),
-    ])
-  })
-
   test('does not restore files as preferred when the files tab is closed', () => {
     seedRepo({ selectedBranch: 'main', preferredWorkspacePaneTab: 'status', workspacePaneStaticTabs: ['status'] })
 
-    restoreWorkspacePaneState({ preferredWorkspacePaneTabByBranchByRepo: { [REPO_ID]: { main: 'files' } } })
+    restoreWorkspacePaneState({
+      preferredWorkspacePaneTabByTargetByRepo: { [REPO_ID]: { [worktreeTargetKey('main', '/repo')]: 'files' } },
+    })
 
     expect(preferredTabFor('main')).toBe('status')
     expect(openTabsFor('main')).toEqual(['status'])
@@ -394,179 +349,15 @@ describe('setWorkspacePaneTab', () => {
     expect(WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES).toContain('files')
   })
 
-  test('preserves restored workspace pane tab order before branch snapshot is loaded', () => {
-    seedRepo({ selectedBranch: null, branches: [] })
-
-    restoreWorkspacePaneState({ workspacePaneTabOrderByBranchByRepo: { [REPO_ID]: { main: [] } } })
-
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.workspacePaneTabOrderByBranch).toEqual({ main: [] })
-  })
-
-  test('does not restore a branch-level preferred tab whose tab is closed', () => {
+  test('does not restore a target-level preferred tab whose tab is closed', () => {
     seedRepo({ selectedBranch: 'main', preferredWorkspacePaneTab: 'status', workspacePaneStaticTabs: ['status'] })
 
-    restoreWorkspacePaneState({ preferredWorkspacePaneTabByBranchByRepo: { [REPO_ID]: { main: 'history' } } })
+    restoreWorkspacePaneState({
+      preferredWorkspacePaneTabByTargetByRepo: { [REPO_ID]: { [worktreeTargetKey('main', '/repo')]: 'history' } },
+    })
 
     expect(preferredTabFor('main')).toBe('status')
     expect(openTabsFor('main')).toEqual(['status'])
-  })
-
-  test('opens and closes static workspace pane tabs independently of branch selection', () => {
-    seedRepo({ selectedBranch: 'main', preferredWorkspacePaneTab: 'status' })
-
-    useReposStore.getState().closeWorkspacePaneStaticTab(REPO_ID, 'status')
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBe('main')
-    expect(openTabsFor('main')).toEqual([])
-
-    useReposStore.getState().openWorkspacePaneStaticTab(REPO_ID, 'status')
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBe('main')
-    expect(openTabsFor('main')).toEqual(['status'])
-  })
-
-  test('reorders the unified workspace pane tab strip without changing the static open set', () => {
-    seedRepo({
-      selectedBranch: 'main',
-      preferredWorkspacePaneTab: 'history',
-      workspacePaneTabOrder: [
-        workspacePaneStaticTabOrderEntry('status'),
-        terminalEntry('session-1'),
-        workspacePaneStaticTabOrderEntry('history'),
-      ],
-    })
-
-    useReposStore
-      .getState()
-      .reorderWorkspacePaneTabs(REPO_ID, [
-        workspacePaneStaticTabOrderEntry('history'),
-        terminalEntry('session-1'),
-        workspacePaneStaticTabOrderEntry('status'),
-      ])
-
-    expect(openTabsFor('main')).toEqual(['history', 'status'])
-    expect(tabOrderFor('main')).toEqual([
-      workspacePaneStaticTabOrderEntry('history'),
-      terminalEntry('session-1'),
-      workspacePaneStaticTabOrderEntry('status'),
-    ])
-
-    const before = useReposStore.getState().repos[REPO_ID]
-    useReposStore.getState().reorderWorkspacePaneTabs(REPO_ID, [workspacePaneStaticTabOrderEntry('history')])
-    useReposStore
-      .getState()
-      .reorderWorkspacePaneTabs(REPO_ID, [
-        workspacePaneStaticTabOrderEntry('history'),
-        workspacePaneStaticTabOrderEntry('history'),
-      ])
-    expect(useReposStore.getState().repos[REPO_ID]).toBe(before)
-  })
-
-  test('adds a terminal tab at the end even when a stale entry already exists', () => {
-    seedRepo({
-      selectedBranch: 'main',
-      workspacePaneTabOrder: [terminalEntry('session-1'), workspacePaneStaticTabOrderEntry('status')],
-    })
-
-    useReposStore.getState().addWorkspacePaneTerminalTab(REPO_ID, 'session-1')
-
-    expect(tabOrderFor('main')).toEqual([workspacePaneStaticTabOrderEntry('status'), terminalEntry('session-1')])
-  })
-
-  test('addAndFocus adds the tab, switches to terminal view, and selects the new terminal', () => {
-    seedRepo({ selectedBranch: 'feature/worktree', preferredWorkspacePaneTab: 'status' })
-
-    useReposStore.getState().addAndFocusWorkspacePaneTerminalTab(REPO_ID, 'session-1')
-
-    expect(tabOrderFor('feature/worktree')).toEqual([
-      workspacePaneStaticTabOrderEntry('status'),
-      terminalEntry('session-1'),
-    ])
-    expect(preferredTabFor('feature/worktree')).toBe('terminal')
-    expect(useReposStore.getState().selectedTerminalSessionByWorktree[`${REPO_ID}\0/tmp/feature-worktree`]).toBe(
-      'session-1',
-    )
-  })
-
-  test('addAndFocus is a no-op when everything is already focused', () => {
-    seedRepo({
-      selectedBranch: 'feature/worktree',
-      preferredWorkspacePaneTab: 'terminal',
-      workspacePaneTabOrder: [terminalEntry('session-1')],
-    })
-    useReposStore.setState({
-      selectedTerminalSessionByWorktree: { [`${REPO_ID}\0/tmp/feature-worktree`]: 'session-1' },
-    })
-
-    const before = useReposStore.getState().repos[REPO_ID]
-    useReposStore.getState().addAndFocusWorkspacePaneTerminalTab(REPO_ID, 'session-1')
-
-    expect(useReposStore.getState().repos[REPO_ID]).toBe(before)
-  })
-
-  test('addAndFocus does nothing for a branch without a worktree', () => {
-    seedRepo({ selectedBranch: 'feature/plain', preferredWorkspacePaneTab: 'status' })
-
-    const before = useReposStore.getState().repos[REPO_ID]
-    useReposStore.getState().addAndFocusWorkspacePaneTerminalTab(REPO_ID, 'session-1')
-
-    expect(useReposStore.getState().repos[REPO_ID]).toBe(before)
-    expect(preferredTabFor('feature/plain')).toBe('status')
-  })
-
-  test('removes a terminal tab order entry when its terminal closes', () => {
-    seedRepo({
-      selectedBranch: 'main',
-      workspacePaneTabOrder: [
-        workspacePaneStaticTabOrderEntry('status'),
-        terminalEntry('session-1'),
-        workspacePaneStaticTabOrderEntry('history'),
-      ],
-    })
-
-    useReposStore.getState().removeWorkspacePaneTerminalTab(REPO_ID, 'session-1')
-
-    expect(tabOrderFor('main')).toEqual([
-      workspacePaneStaticTabOrderEntry('status'),
-      workspacePaneStaticTabOrderEntry('history'),
-    ])
-  })
-
-  test('reorders visible tabs while preserving hidden worktree-scoped static tabs', () => {
-    const hiddenWorktreeEntries = WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES.map(workspacePaneStaticTabOrderEntry)
-    seedRepo({
-      selectedBranch: 'feature/plain',
-      workspacePaneTabOrder: [
-        workspacePaneStaticTabOrderEntry('status'),
-        ...hiddenWorktreeEntries,
-        workspacePaneStaticTabOrderEntry('history'),
-      ],
-    })
-
-    useReposStore
-      .getState()
-      .reorderWorkspacePaneTabs(REPO_ID, [
-        workspacePaneStaticTabOrderEntry('history'),
-        workspacePaneStaticTabOrderEntry('status'),
-      ])
-
-    expect(tabOrderFor('feature/plain')).toEqual([
-      workspacePaneStaticTabOrderEntry('history'),
-      ...hiddenWorktreeEntries,
-      workspacePaneStaticTabOrderEntry('status'),
-    ])
-  })
-
-  test('keeps static workspace pane tabs isolated by branch', () => {
-    seedRepo({ selectedBranch: 'feature/plain' })
-
-    useReposStore.getState().openWorkspacePaneStaticTab(REPO_ID, 'history')
-
-    expect(openTabsFor('feature/plain')).toEqual(['status', 'history'])
-    expect(openTabsFor('main')).toEqual(['status'])
-
-    useReposStore.getState().selectBranch(REPO_ID, 'main')
-
-    expect(openTabsFor('main')).toEqual(['status'])
-    expect(openTabsFor('feature/plain')).toEqual(['status', 'history'])
   })
 
   test('keeps selected workspace pane tabs isolated by branch', () => {
@@ -583,17 +374,6 @@ describe('setWorkspacePaneTab', () => {
 
     expect(preferredTabFor('main')).toBe('changes')
     expect(preferredTabFor('feature/plain')).toBe('history')
-  })
-
-  test('keeps an explicitly closed status tab closed on its branch', () => {
-    seedRepo({ selectedBranch: 'main' })
-
-    useReposStore.getState().closeWorkspacePaneStaticTab(REPO_ID, 'status')
-    useReposStore.getState().selectBranch(REPO_ID, 'feature/plain')
-    useReposStore.getState().openWorkspacePaneStaticTab(REPO_ID, 'status')
-
-    expect(openTabsFor('feature/plain')).toEqual(['status'])
-    expect(openTabsFor('main')).toEqual([])
   })
 
   test('persists the changes tab immediately', async () => {
@@ -659,6 +439,10 @@ describe('setWorkspacePaneTab', () => {
     expect(preferredTabFor('feature/plain')).toBe('terminal')
   })
 })
+
+function worktreeTargetKey(branchName: string, worktreePath: string): string {
+  return workspacePaneTabsTargetIdentityKey({ repoRoot: REPO_ID, branchName, worktreePath })
+}
 
 describe('workspace pane layout state', () => {
   test('applies session pane state atomically with shared normalization rules', () => {

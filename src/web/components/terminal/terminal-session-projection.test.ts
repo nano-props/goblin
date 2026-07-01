@@ -23,11 +23,12 @@ describe('terminal session projection helpers', () => {
       repoIndex: makeRepoIndex(),
       repoRoot: REPO_ROOT,
       clientId: 'client_a',
+      index: 2,
       serverSession: {
         ptySessionId: 'pty_session_123_aaaaaaaaa',
-        key: `${REPO_ROOT}\0${WORKTREE_PATH}\0session-2`,
-        viewType: 'terminal',
-        viewId: `${REPO_ROOT}\0${WORKTREE_PATH}\0session-2`,
+        terminalSessionId: 'session-2',
+        repoRoot: REPO_ROOT,
+        worktreePath: WORKTREE_PATH,
         cwd: WORKTREE_PATH,
         controller: { clientId: 'client_a', status: 'connected' },
         processName: 'zsh',
@@ -36,22 +37,20 @@ describe('terminal session projection helpers', () => {
         message: null,
         cols: 120,
         rows: 40,
-        displayOrder: 2,
       },
       serverSnapshot: { ptySessionId: 'pty_session_123_aaaaaaaaa', snapshot: 'server-snap', snapshotSeq: 9 },
     })
 
     expect(projected).toEqual({
       descriptor: {
-        key: `${REPO_ROOT}\0${WORKTREE_PATH}\0session-2`,
-        worktreeTerminalKey: `${REPO_ROOT}\0${WORKTREE_PATH}`,
-        sessionId: 'session-2',
+        terminalSessionId: 'session-2',
+        terminalWorktreeKey: `${REPO_ROOT}\0${WORKTREE_PATH}`,
         index: 2,
         repoRoot: REPO_ROOT,
         branch: 'main',
         worktreePath: WORKTREE_PATH,
       },
-      worktreeTerminalKey: `${REPO_ROOT}\0${WORKTREE_PATH}`,
+      terminalWorktreeKey: `${REPO_ROOT}\0${WORKTREE_PATH}`,
       hydrateInput: {
         ptySessionId: 'pty_session_123_aaaaaaaaa',
         processName: 'zsh',
@@ -66,7 +65,6 @@ describe('terminal session projection helpers', () => {
         snapshotSeq: 9,
       },
       controlsTerminal: true,
-      displayOrder: 2,
     })
   })
 
@@ -75,11 +73,12 @@ describe('terminal session projection helpers', () => {
       repoIndex: makeRepoIndex(),
       repoRoot: REPO_ROOT,
       clientId: 'client_b',
+      index: 1,
       serverSession: {
         ptySessionId: 'pty_session_123_aaaaaaaaa',
-        key: `${REPO_ROOT}\0${WORKTREE_PATH}\0session-1`,
-        viewType: 'terminal',
-        viewId: `${REPO_ROOT}\0${WORKTREE_PATH}\0session-1`,
+        terminalSessionId: 'session-1',
+        repoRoot: REPO_ROOT,
+        worktreePath: WORKTREE_PATH,
         cwd: WORKTREE_PATH,
         controller: { clientId: 'client_a', status: 'connected' },
         processName: 'bash',
@@ -88,7 +87,6 @@ describe('terminal session projection helpers', () => {
         message: 'pty failed',
         cols: 80,
         rows: 24,
-        displayOrder: 1,
       },
       reattachSnapshot: { ptySessionId: 'pty_session_123_aaaaaaaaa', snapshot: 'cached-snap', snapshotSeq: 3 },
     })

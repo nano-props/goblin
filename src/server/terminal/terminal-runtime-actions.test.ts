@@ -11,7 +11,7 @@ const CLIENT_ID = 'client_terminal_actions'
 const USER_ID = 'user_terminal_actions'
 // 16+ alphanumerics, matches TERMINAL_PTY_SESSION_ID_RE in
 // shared/terminal-validators.ts.
-const SESSION_ID = 'session_aaaaaaaaaaaaaa'
+const PTY_SESSION_ID = 'session_aaaaaaaaaaaaaa'
 
 function makeActions(
   options: {
@@ -26,6 +26,24 @@ function makeActions(
     getSessionScope: vi.fn((_userId: string, ptySessionId: string) =>
       options.getSlotScope ? options.getSlotScope(_userId, ptySessionId) : undefined,
     ),
+    getSessionSummaryForUser: vi.fn((userId: string, ptySessionId: string) =>
+      options.getSlotScope?.(userId, ptySessionId)
+        ? ({
+            ptySessionId,
+            terminalSessionId: 'terminal-session-1',
+            repoRoot: options.getSlotScope(userId, ptySessionId),
+            worktreePath: '/repo',
+            cwd: '/repo',
+            controller: null,
+            processName: 'zsh',
+            canonicalTitle: null,
+            phase: 'open',
+            message: null,
+            cols: 80,
+            rows: 24,
+          } as const)
+        : null,
+    ),
     closeSessionForUser: vi.fn(options.closeSessionForUser),
     // The other manager methods are unused by `close`, but the
     // `TerminalSessionManager` type is required by the deps
@@ -38,10 +56,13 @@ function makeActions(
     getSessionSnapshot: vi.fn(() => null),
   } as any
   const broker = { broadcastToUser: broadcasts as unknown as (userId: string, message: unknown) => void }
-  const catalog = {
+  const sessionService = {
     create: vi.fn(),
     prune: vi.fn(),
     listSessions: vi.fn(),
+    listWorkspaceTabs: vi.fn(async () => []),
+    replaceTabs: vi.fn(async () => []),
+    updateTabs: vi.fn(async () => []),
   }
   const isValidTerminalClientId =
     options.isValidTerminalClientId ?? ((value: unknown): value is string => value === CLIENT_ID)
@@ -49,39 +70,84 @@ function makeActions(
     actions: createTerminalRuntimeActions({
       manager,
       broker,
-      catalog,
+      sessionService,
       isValidTerminalClientId,
     }),
     broadcasts,
     manager,
+    sessionService,
   }
 }
 
 describe('terminal-runtime-actions close broadcast', () => {
-  test('emits repo and targeted close broadcasts on a successful close', async () => {
-    // The new sibling-window broadcast rides alongside the existing
-    // `sessions-changed` list-rescan. The session-closed event is the
-    // targeted counterpart; sibling windows drop the local entry
-    // immediately instead of waiting for the next reconcile.
+  test('emits workspace tab invalidation after a successful create', async () => {
+    const { actions, broadcasts, sessionService } = makeActions()
+    sessionService.create.mockResolvedValue({
+      ok: true,
+      action: 'created',
+      terminalSessionId: 'session-1',
+      tabs: [],
+      sessions: [],
+      ptySessionId: PTY_SESSION_ID,
+      processName: 'zsh',
+      canonicalTitle: null,
+      phase: 'open',
+      message: null,
+      snapshot: '',
+      snapshotSeq: 0,
+      controller: null,
+      canonicalCols: 80,
+      canonicalRows: 24,
+    })
+
+    await expect(
+      actions.create(CLIENT_ID, USER_ID, {
+        repoRoot: '/repo',
+        branch: 'feature/worktree',
+        worktreePath: '/repo',
+        kind: 'additional',
+      }),
+    ).resolves.toMatchObject({ ok: true })
+
+    expect(broadcasts).toHaveBeenCalledWith(USER_ID, { type: 'workspace-tabs-changed', repoRoot: '/repo' })
+  })
+
+  test('does not emit workspace tab invalidation after a failed create', async () => {
+    const { actions, broadcasts, sessionService } = makeActions()
+    sessionService.create.mockResolvedValue({ ok: false, message: 'error.invalid-arguments' })
+
+    await expect(
+      actions.create(CLIENT_ID, USER_ID, {
+        repoRoot: '/repo',
+        branch: 'feature/worktree',
+        worktreePath: '/repo',
+        kind: 'additional',
+      }),
+    ).resolves.toEqual({ ok: false, message: 'error.invalid-arguments' })
+
+    expect(broadcasts).not.toHaveBeenCalled()
+  })
+
+  test('emits targeted close broadcast on a successful close', async () => {
+    // Repo/session-list invalidation is owned by the manager close
+    // lifecycle. The action owns only the targeted sibling-window
+    // event that lets clients drop the local entry immediately.
     const close = vi.fn(() => true)
     const { actions, broadcasts } = makeActions({
       closeSessionForUser: close,
       getSlotScope: () => '/repo',
     })
 
-    const closed = actions.close(CLIENT_ID, USER_ID, { ptySessionId: SESSION_ID })
+    const closed = await actions.close(CLIENT_ID, USER_ID, { ptySessionId: PTY_SESSION_ID })
 
     expect(closed).toBe(true)
-    expect(close).toHaveBeenCalledWith(USER_ID, SESSION_ID)
-    expect(broadcasts).toHaveBeenCalledTimes(2)
-    expect(broadcasts).toHaveBeenNthCalledWith(1, USER_ID, {
-      type: 'sessions-changed',
-      repoRoot: '/repo',
-    })
-    expect(broadcasts).toHaveBeenNthCalledWith(2, USER_ID, {
+    expect(close).toHaveBeenCalledWith(USER_ID, PTY_SESSION_ID)
+    expect(broadcasts).toHaveBeenCalledTimes(1)
+    expect(broadcasts).toHaveBeenCalledWith(USER_ID, {
       type: 'session-closed',
-      ptySessionId: SESSION_ID,
+      ptySessionId: PTY_SESSION_ID,
       repoRoot: '/repo',
+      worktreePath: '/repo',
     })
   })
 
@@ -93,7 +159,7 @@ describe('terminal-runtime-actions close broadcast', () => {
       getSlotScope: () => '/repo',
     })
 
-    const closed = actions.close(CLIENT_ID, USER_ID, { ptySessionId: SESSION_ID })
+    const closed = await actions.close(CLIENT_ID, USER_ID, { ptySessionId: PTY_SESSION_ID })
 
     expect(closed).toBe(false)
     expect(broadcasts).not.toHaveBeenCalled()
@@ -108,7 +174,7 @@ describe('terminal-runtime-actions close broadcast', () => {
       getSlotScope: () => undefined,
     })
 
-    const closed = actions.close(CLIENT_ID, USER_ID, { ptySessionId: SESSION_ID })
+    const closed = await actions.close(CLIENT_ID, USER_ID, { ptySessionId: PTY_SESSION_ID })
 
     expect(closed).toBe(true)
     expect(broadcasts).not.toHaveBeenCalled()
@@ -122,7 +188,7 @@ describe('terminal-runtime-actions close broadcast', () => {
       closeSessionForUser: () => true,
     })
 
-    const closed = actions.close(CLIENT_ID, USER_ID, { ptySessionId: '' })
+    const closed = await actions.close(CLIENT_ID, USER_ID, { ptySessionId: '' })
 
     expect(closed).toBe(false)
     expect(broadcasts).not.toHaveBeenCalled()
@@ -139,11 +205,66 @@ describe('terminal-runtime-actions close broadcast', () => {
       getSlotScope: () => '/repo',
     })
 
-    const closed = actions.close('not_a_client', USER_ID, { ptySessionId: SESSION_ID })
+    const closed = await actions.close('not_a_client', USER_ID, { ptySessionId: PTY_SESSION_ID })
 
     expect(closed).toBe(false)
     expect(close).not.toHaveBeenCalled()
     expect(broadcasts).not.toHaveBeenCalled()
+  })
+})
+
+describe('terminal-runtime-actions workspace tabs broadcast', () => {
+  test('emits a workspace tabs invalidation after replaceTabs succeeds', async () => {
+    const { actions, broadcasts } = makeActions({ closeSessionForUser: () => false })
+
+    await expect(
+      actions.replaceTabs(CLIENT_ID, USER_ID, {
+        repoRoot: '/repo',
+        branchName: 'feature/worktree',
+        worktreePath: '/repo',
+        tabs: [{ type: 'status', tabId: 'workspace-pane:status' }],
+      }),
+    ).resolves.toEqual([])
+
+    expect(broadcasts).toHaveBeenCalledTimes(1)
+    expect(broadcasts).toHaveBeenCalledWith(USER_ID, {
+      type: 'workspace-tabs-changed',
+      repoRoot: '/repo',
+    })
+  })
+
+  test('rejects invalid replaceTabs input without emitting', async () => {
+    const { actions, broadcasts } = makeActions({ closeSessionForUser: () => false })
+
+    await expect(
+      actions.replaceTabs(CLIENT_ID, USER_ID, {
+        repoRoot: '',
+        branchName: 'feature/worktree',
+        worktreePath: '/repo',
+        tabs: [{ type: 'status', tabId: 'workspace-pane:status' }],
+      }),
+    ).resolves.toEqual([])
+
+    expect(broadcasts).not.toHaveBeenCalled()
+  })
+
+  test('emits a workspace tabs invalidation after updateTabs succeeds', async () => {
+    const { actions, broadcasts } = makeActions({ closeSessionForUser: () => false })
+
+    await expect(
+      actions.updateTabs(CLIENT_ID, USER_ID, {
+        repoRoot: '/repo',
+        branchName: 'feature/worktree',
+        worktreePath: '/repo',
+        operation: { type: 'open-static', tabType: 'status' },
+      }),
+    ).resolves.toEqual([])
+
+    expect(broadcasts).toHaveBeenCalledTimes(1)
+    expect(broadcasts).toHaveBeenCalledWith(USER_ID, {
+      type: 'workspace-tabs-changed',
+      repoRoot: '/repo',
+    })
   })
 })
 
@@ -158,31 +279,31 @@ describe('terminal-runtime-actions clientId gate', () => {
   test('write / resize / takeover / restart / attach all fall back to outer clientId when input omits it', async () => {
     const { actions, manager } = makeActions({ closeSessionForUser: () => false })
 
-    actions.write(CLIENT_ID, USER_ID, { ptySessionId: SESSION_ID, data: 'x' } as never)
-    actions.resize(CLIENT_ID, USER_ID, { ptySessionId: SESSION_ID, cols: 80, rows: 24 } as never)
+    actions.write(CLIENT_ID, USER_ID, { ptySessionId: PTY_SESSION_ID, data: 'x' } as never)
+    actions.resize(CLIENT_ID, USER_ID, { ptySessionId: PTY_SESSION_ID, cols: 80, rows: 24 } as never)
     actions.takeover(CLIENT_ID, USER_ID, {
-      ptySessionId: SESSION_ID,
+      ptySessionId: PTY_SESSION_ID,
       cols: 80,
       rows: 24,
     } as never)
     await actions.restart(CLIENT_ID, USER_ID, {
-      ptySessionId: SESSION_ID,
+      ptySessionId: PTY_SESSION_ID,
       cols: 80,
       rows: 24,
     } as never)
     await actions.attach(CLIENT_ID, USER_ID, {
-      ptySessionId: SESSION_ID,
+      ptySessionId: PTY_SESSION_ID,
       cols: 80,
       rows: 24,
     } as never)
 
     // Each call crossed the gate and reached the manager, passing
     // the outer CLIENT_ID as the session-level clientId.
-    expect(manager.writeSession).toHaveBeenCalledWith(USER_ID, SESSION_ID, 'x', CLIENT_ID)
-    expect(manager.resizeSession).toHaveBeenCalledWith(USER_ID, SESSION_ID, 80, 24, CLIENT_ID)
-    expect(manager.takeoverSession).toHaveBeenCalledWith(USER_ID, SESSION_ID, 80, 24, CLIENT_ID)
-    expect(manager.restartSession).toHaveBeenCalledWith(USER_ID, SESSION_ID, 80, 24, CLIENT_ID)
-    expect(manager.attachSession).toHaveBeenCalledWith(USER_ID, SESSION_ID, 80, 24, CLIENT_ID)
+    expect(manager.writeSession).toHaveBeenCalledWith(USER_ID, PTY_SESSION_ID, 'x', CLIENT_ID)
+    expect(manager.resizeSession).toHaveBeenCalledWith(USER_ID, PTY_SESSION_ID, 80, 24, CLIENT_ID)
+    expect(manager.takeoverSession).toHaveBeenCalledWith(USER_ID, PTY_SESSION_ID, 80, 24, CLIENT_ID)
+    expect(manager.restartSession).toHaveBeenCalledWith(USER_ID, PTY_SESSION_ID, 80, 24, CLIENT_ID)
+    expect(manager.attachSession).toHaveBeenCalledWith(USER_ID, PTY_SESSION_ID, 80, 24, CLIENT_ID)
   })
 
   test('restart rejects invalid arguments before looking up the session scope', async () => {
@@ -197,7 +318,7 @@ describe('terminal-runtime-actions clientId gate', () => {
     })
     await expect(
       actions.restart('not_a_client', USER_ID, {
-        ptySessionId: SESSION_ID,
+        ptySessionId: PTY_SESSION_ID,
         cols: 80,
         rows: 24,
       } as never),
@@ -207,7 +328,7 @@ describe('terminal-runtime-actions clientId gate', () => {
     })
     await expect(
       actions.restart(CLIENT_ID, USER_ID, {
-        ptySessionId: SESSION_ID,
+        ptySessionId: PTY_SESSION_ID,
         cols: 0,
         rows: 24,
       } as never),

@@ -1,4 +1,5 @@
-import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneStaticTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 
 /**
  * `controllerStatus === 'connected'` while the broker reports the
@@ -120,7 +121,7 @@ export type TerminalAttachResult =
     }
   | { ok: false; message: string }
 
-export type TerminalCatalogAction = 'created' | 'restored' | 'reused'
+export type TerminalCreateAction = 'created' | 'restored' | 'reused'
 
 /**
  * `create` carries the same first-frame fields as `attach`/`restart`
@@ -141,11 +142,12 @@ export interface TerminalFirstFrame {
   canonicalRows: number
 }
 
-export type TerminalCatalogMutationResult =
+export type TerminalCreateResult =
   | ({
       ok: true
-      action: TerminalCatalogAction
-      key: string
+      action: TerminalCreateAction
+      terminalSessionId: string
+      tabs: WorkspacePaneTabEntry[]
       sessions: TerminalSessionSummary[]
     } & TerminalFirstFrame)
   | { ok: false; message: string }
@@ -172,7 +174,8 @@ export interface TerminalSessionInput {
 export interface TerminalNotifyBellInput {
   title: string
   body: string
-  key?: string
+  terminalSessionId?: string
+  terminalWorktreeKey?: string
   repoRoot: string
 }
 
@@ -185,11 +188,32 @@ export interface TerminalListSessionsInput {
   repoRoot: string
 }
 
+export interface TerminalListWorkspaceTabsInput {
+  repoRoot: string
+}
+
+export interface TerminalReplaceWorkspaceTabsInput extends WorkspacePaneTabsTarget {
+  tabs: WorkspacePaneTabEntry[]
+}
+
+export type TerminalUpdateWorkspaceTabsOperation =
+  | { type: 'open-static'; tabType: WorkspacePaneStaticTabType }
+  | { type: 'close-static'; tabType: WorkspacePaneStaticTabType }
+  | { type: 'reorder'; tabIdentities: string[] }
+
+export interface TerminalUpdateWorkspaceTabsInput extends WorkspacePaneTabsTarget {
+  operation: TerminalUpdateWorkspaceTabsOperation
+}
+
+export interface WorkspacePaneTabsEntry extends WorkspacePaneTabsTarget {
+  tabs: WorkspacePaneTabEntry[]
+}
+
 export interface TerminalSessionSummary {
   ptySessionId: string
-  key: string
-  viewType: Extract<WorkspacePaneTabType, 'terminal'>
-  viewId: string
+  terminalSessionId: string
+  repoRoot: string
+  worktreePath: string
   cwd: string
   controller: TerminalController | null
   processName: string
@@ -198,7 +222,6 @@ export interface TerminalSessionSummary {
   message: string | null
   cols: number
   rows: number
-  displayOrder: number
 }
 
 export interface TerminalSessionSnapshotInput {

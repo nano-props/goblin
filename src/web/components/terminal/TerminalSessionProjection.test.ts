@@ -6,24 +6,20 @@ import {
   getTerminalSessionProjection,
   setTerminalSessionProjectionForTests,
 } from '#/web/components/terminal/TerminalSessionProjection.ts'
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-workspace-slot-keys.ts'
+import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import type { TerminalDescriptor, TerminalRepoIndex } from '#/web/components/terminal/types.ts'
 import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
-import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
-import { workspacePaneTabOrderForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
-import { workspacePaneStaticTabOrderEntry, workspacePaneTerminalTabOrderEntry } from '#/shared/workspace-pane.ts'
+import { resetReposStore } from '#/web/test-utils/bridge.ts'
 
 const REPO_ROOT = '/repo'
 const WORKTREE_PATH = '/repo'
 const BRANCH = 'main'
-const WORKTREE_KEY = worktreeTerminalKey(REPO_ROOT, WORKTREE_PATH)
+const WORKTREE_KEY = formatTerminalWorktreeKey(REPO_ROOT, WORKTREE_PATH)
 
-function makeDescriptor(sessionId: string, index: number): TerminalDescriptor {
+function makeDescriptor(terminalSessionId: string, index: number): TerminalDescriptor {
   return {
-    key: `${REPO_ROOT}\0${WORKTREE_PATH}\0${sessionId}`,
-    worktreeTerminalKey: WORKTREE_KEY,
-    sessionId,
+    terminalSessionId,
+    terminalWorktreeKey: WORKTREE_KEY,
     index,
     repoRoot: REPO_ROOT,
     branch: BRANCH,
@@ -42,7 +38,7 @@ function makeRepoIndex(): TerminalRepoIndex {
 
 function makeServerSession(
   ptySessionId: string,
-  sessionId: string,
+  terminalSessionId: string,
   overrides: Partial<{
     controller: { clientId: string; status: 'connected' }
     processName: string
@@ -51,15 +47,13 @@ function makeServerSession(
     message: string | null
     cols: number
     rows: number
-    displayOrder: number
   }> = {},
 ): TerminalSessionSummary {
-  const key = `${REPO_ROOT}\0${WORKTREE_PATH}\0${sessionId}`
   return {
     ptySessionId,
-    key,
-    viewType: 'terminal',
-    viewId: key,
+    terminalSessionId,
+    repoRoot: REPO_ROOT,
+    worktreePath: WORKTREE_PATH,
     cwd: WORKTREE_PATH,
     controller: overrides.controller ?? null,
     processName: overrides.processName ?? 'bash',
@@ -68,28 +62,18 @@ function makeServerSession(
     message: overrides.message ?? null,
     cols: overrides.cols ?? 80,
     rows: overrides.rows ?? 24,
-    displayOrder: overrides.displayOrder ?? 1,
   }
 }
 
 describe('TerminalSessionProjection', () => {
   let projection: TerminalSessionProjection
-  let selectedChanges: Array<{ worktreeTerminalKey: string; key: string | null }>
-  let removedSessions: Array<{ key: string; repoRoot: string; branch: string; worktreePath: string }>
+  let selectedChanges: Array<{ terminalWorktreeKey: string; terminalSessionId: string | null }>
 
   beforeEach(() => {
     resetReposStore()
     selectedChanges = []
-    removedSessions = []
     projection = new TerminalSessionProjection(
-      (worktreeTerminalKey, key) => selectedChanges.push({ worktreeTerminalKey, key }),
-      (key, base) =>
-        removedSessions.push({
-          key,
-          repoRoot: base.repoRoot,
-          branch: base.branch,
-          worktreePath: base.worktreePath,
-        }),
+      (terminalWorktreeKey, terminalSessionId) => selectedChanges.push({ terminalWorktreeKey, terminalSessionId }),
     )
     // Install into the singleton session so any code that reaches the
     // projection via `getTerminalSessionProjection()` (e.g., a Provider
@@ -119,9 +103,9 @@ describe('TerminalSessionProjection', () => {
         new Map(),
       )
 
-      const worktreeSnapshot = projection.worktreeSnapshot(WORKTREE_KEY)
-      const key = worktreeSnapshot.sessions[0]!.key
-      const session = (projection as any).sessions.get(key)
+      const terminalWorktreeSnapshot = projection.terminalWorktreeSnapshot(WORKTREE_KEY)
+      const terminalSessionId = terminalWorktreeSnapshot.sessions[0]!.terminalSessionId
+      const session = (projection as any).sessions.get(terminalSessionId)
       const handleOutputSpy = vi.spyOn(session, 'handleOutput')
 
       projection.handleOutput({ ptySessionId: 'pty_session_a_aaaaaaaaa', data: 'hello', seq: 1, processName: 'bash' })
@@ -142,8 +126,8 @@ describe('TerminalSessionProjection', () => {
         new Map(),
       )
 
-      const key = projection.worktreeSnapshot(WORKTREE_KEY).sessions[0]!.key
-      const session = (projection as any).sessions.get(key)
+      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const session = (projection as any).sessions.get(terminalSessionId)
       const handleOutputSpy = vi.spyOn(session, 'handleOutput')
 
       projection.handleOutput({ ptySessionId: 'pty_session_a_aaaaaaaaa', data: '', seq: 1, processName: 'bash' })
@@ -151,7 +135,7 @@ describe('TerminalSessionProjection', () => {
       projection.handleOutput({ ptySessionId: 'pty_session_a_aaaaaaaaa', data: '', seq: 2, processName: 'bash' })
 
       expect(handleOutputSpy).toHaveBeenCalledTimes(2)
-      expect(projection.worktreeSnapshot(WORKTREE_KEY).activeCount).toBe(0)
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).activeCount).toBe(0)
     })
 
     test('dispatches title changes by ptySessionId index', () => {
@@ -163,8 +147,8 @@ describe('TerminalSessionProjection', () => {
         new Map(),
       )
 
-      const key = projection.worktreeSnapshot(WORKTREE_KEY).sessions[0]!.key
-      const session = (projection as any).sessions.get(key)
+      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const session = (projection as any).sessions.get(terminalSessionId)
       const handleServerTitleSpy = vi.spyOn(session, 'handleServerTitle')
 
       projection.handleServerTitle({ ptySessionId: 'pty_session_a_aaaaaaaaa', canonicalTitle: 'new title' })
@@ -184,8 +168,8 @@ describe('TerminalSessionProjection', () => {
         new Map(),
       )
 
-      const key = projection.worktreeSnapshot(WORKTREE_KEY).sessions[0]!.key
-      const session = (projection as any).sessions.get(key)
+      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const session = (projection as any).sessions.get(terminalSessionId)
       const handleExitSpy = vi.spyOn(session, 'handleExit').mockReturnValue(true)
 
       projection.handleExit({ ptySessionId: 'pty_session_a_aaaaaaaaa' })
@@ -205,25 +189,25 @@ describe('TerminalSessionProjection', () => {
         new Map(),
       )
 
-      const key = projection.worktreeSnapshot(WORKTREE_KEY).sessions[0]!.key
+      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
       // Seed the reattach cache directly so we can assert the exit
       // event is what removes the entry, not the local-session
       // cleanup.
-      ;(projection as any).reattachSnapshotCache.set(key, {
+      ;(projection as any).reattachSnapshotCache.set(terminalSessionId, {
         ptySessionId: 'pty_session_a_aaaaaaaaa',
         snapshot: 'cached',
         snapshotSeq: 7,
       })
-      expect((projection as any).reattachSnapshotCache.has(key)).toBe(true)
+      expect((projection as any).reattachSnapshotCache.has(terminalSessionId)).toBe(true)
 
       // Stub the local session's handleExit to return true so the
       // projection's existing discard path runs (the cache eviction
       // must not depend on it being absent, though).
-      const session = (projection as any).sessions.get(key)
+      const session = (projection as any).sessions.get(terminalSessionId)
       vi.spyOn(session, 'handleExit').mockReturnValue(true)
 
       projection.handleExit({ ptySessionId: 'pty_session_a_aaaaaaaaa' })
-      expect((projection as any).reattachSnapshotCache.has(key)).toBe(false)
+      expect((projection as any).reattachSnapshotCache.has(terminalSessionId)).toBe(false)
     })
 
     test('setReattachSnapshot evicts the oldest entry when the cache exceeds the safety cap', () => {
@@ -235,15 +219,15 @@ describe('TerminalSessionProjection', () => {
         .REATTACH_SNAPSHOT_CACHE_HARD_CAP
 
       for (let i = 0; i < limit + 1; i++) {
-        ;(projection as any).setReattachSnapshot(`key-${i}`, {
+        ;(projection as any).setReattachSnapshot(`session-cache-${i}`, {
           ptySessionId: `session-${i}`,
           snapshot: `snap-${i}`,
           snapshotSeq: i,
         })
       }
       expect((projection as any).reattachSnapshotCache.size).toBe(limit)
-      expect((projection as any).reattachSnapshotCache.has('key-0')).toBe(false)
-      expect((projection as any).reattachSnapshotCache.has(`key-${limit}`)).toBe(true)
+      expect((projection as any).reattachSnapshotCache.has('session-cache-0')).toBe(false)
+      expect((projection as any).reattachSnapshotCache.has(`session-cache-${limit}`)).toBe(true)
     })
 
     test('T2.1: reattach snapshot cap is 8 (was 32, sized for multi-tenant)', () => {
@@ -264,8 +248,8 @@ describe('TerminalSessionProjection', () => {
       // Race scenario: the server emitted an exit for an old
       // ptySessionId, but the local session has already been updated to
       // a new ptySessionId (e.g., after a server-side restart). The
-      // sessionKeyByPtySessionId index may still map the old ptySessionId
-      // to the local key. Evicting the reattach cache here would
+      // terminalSessionIdByPtySessionId index may still map the old ptySessionId
+      // to the local terminalSessionId. Evicting the reattach cache here would
       // discard a snapshot the user can still use on next reattach.
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(
@@ -275,23 +259,23 @@ describe('TerminalSessionProjection', () => {
         new Map(),
       )
 
-      const key = projection.worktreeSnapshot(WORKTREE_KEY).sessions[0]!.key
-      const session = (projection as any).sessions.get(key)
+      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const session = (projection as any).sessions.get(terminalSessionId)
       // Local session is alive under a *different* ptySessionId.
       session.currentPtySessionId = () => 'pty_session_b_aaaaaaaaa'
       session.handleExit = vi.fn().mockReturnValue(false)
 
       // Seed the reattach cache for the old ptySessionId.
-      ;(projection as any).reattachSnapshotCache.set(key, {
+      ;(projection as any).reattachSnapshotCache.set(terminalSessionId, {
         ptySessionId: 'pty_session_a_aaaaaaaaa',
         snapshot: 'cached',
         snapshotSeq: 7,
       })
-      expect((projection as any).reattachSnapshotCache.has(key)).toBe(true)
+      expect((projection as any).reattachSnapshotCache.has(terminalSessionId)).toBe(true)
 
       projection.handleExit({ ptySessionId: 'pty_session_a_aaaaaaaaa' })
       // Cache survives — the local session didn't confirm the exit.
-      expect((projection as any).reattachSnapshotCache.has(key)).toBe(true)
+      expect((projection as any).reattachSnapshotCache.has(terminalSessionId)).toBe(true)
     })
   })
 
@@ -306,15 +290,15 @@ describe('TerminalSessionProjection', () => {
       )
 
       const listener = vi.fn()
-      const unsubscribe = projection.subscribeWorktree(WORKTREE_KEY, listener)
+      const unsubscribe = projection.subscribeTerminalWorktree(WORKTREE_KEY, listener)
 
       // Prime the cache
-      projection.worktreeSnapshot(WORKTREE_KEY)
+      projection.terminalWorktreeSnapshot(WORKTREE_KEY)
       listener.mockClear()
 
       // Simulate metadata change via internal notifySession
-      const key = projection.worktreeSnapshot(WORKTREE_KEY).sessions[0]!.key
-      ;(projection as any).notifySession(key)
+      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      ;(projection as any).notifySession(terminalSessionId)
 
       expect(listener).toHaveBeenCalledTimes(1)
       unsubscribe()
@@ -332,10 +316,13 @@ describe('TerminalSessionProjection', () => {
         new Map(),
       )
 
-      const snapshot = projection.worktreeSnapshot(WORKTREE_KEY)
+      const snapshot = projection.terminalWorktreeSnapshot(WORKTREE_KEY)
       expect(snapshot.count).toBe(1)
-      expect(snapshot.sessions[0]!.sessionId).toBe('session-1')
-      expect(selectedChanges).toContainEqual({ worktreeTerminalKey: WORKTREE_KEY, key: snapshot.sessions[0]!.key })
+      expect(snapshot.sessions[0]!.terminalSessionId).toBe('session-1')
+      expect(selectedChanges).toContainEqual({
+        terminalWorktreeKey: WORKTREE_KEY,
+        terminalSessionId: snapshot.sessions[0]!.terminalSessionId,
+      })
     })
 
     test('removes orphaned local sessions', () => {
@@ -347,97 +334,13 @@ describe('TerminalSessionProjection', () => {
         new Map(),
       )
 
-      const keyBefore = projection.worktreeSnapshot(WORKTREE_KEY).sessions[0]!.key
-      expect(projection.isKnownSession(keyBefore)).toBe(true)
+      const terminalSessionIdBefore = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      expect(projection.isKnownSession(terminalSessionIdBefore)).toBe(true)
 
       projection.reconcileServerSessions(REPO_ROOT, [], 'client_local', new Map())
 
-      expect(projection.isKnownSession(keyBefore)).toBe(false)
-      expect(projection.worktreeSnapshot(WORKTREE_KEY).count).toBe(0)
-      expect(removedSessions).toEqual([
-        { key: keyBefore, repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH },
-      ])
-    })
-
-    test('session removal callback removes the owned workspace pane tab', async () => {
-      const descriptor = makeDescriptor('session-1', 1)
-      seedRepoState({
-        id: REPO_ROOT,
-        branches: [createRepoBranch(BRANCH, { worktree: { path: WORKTREE_PATH } })],
-        selectedBranch: BRANCH,
-        workspacePaneTabOrderByBranch: {
-          [BRANCH]: [
-            workspacePaneStaticTabOrderEntry('status'),
-            workspacePaneTerminalTabOrderEntry(descriptor.key),
-            workspacePaneStaticTabOrderEntry('history'),
-          ],
-        },
-      })
-      const registryWithStore = new TerminalSessionProjection(
-        () => {},
-        (key, base) => {
-          useReposStore.getState().removeWorkspacePaneTerminalTab(base.repoRoot, key, base.branch)
-        },
-      )
-      try {
-        registryWithStore.setRepoIndex(makeRepoIndex())
-        registryWithStore.reconcileServerSessions(
-          REPO_ROOT,
-          [makeServerSession('pty_session_1_aaaaaaaaa', 'session-1')],
-          'client_local',
-          new Map(),
-        )
-        const session = (registryWithStore as any).sessions.get(descriptor.key)
-        vi.spyOn(session, 'closeServerResourcesAndWait').mockResolvedValue(undefined)
-
-        await registryWithStore.closeTerminalByDescriptor(descriptor.key, descriptor)
-
-        const repo = useReposStore.getState().repos[REPO_ROOT]
-        expect(repo ? workspacePaneTabOrderForBranch(repo.ui, BRANCH) : []).toEqual([
-          workspacePaneStaticTabOrderEntry('status'),
-          workspacePaneStaticTabOrderEntry('history'),
-        ])
-      } finally {
-        registryWithStore.destroy()
-      }
-    })
-
-    test('session removal callback failures do not block terminal disposal', async () => {
-      const registryWithThrowingCallback = new TerminalSessionProjection(
-        () => {},
-        () => {
-          throw new Error('store write failed')
-        },
-      )
-      try {
-        registryWithThrowingCallback.setRepoIndex(makeRepoIndex())
-        registryWithThrowingCallback.reconcileServerSessions(
-          REPO_ROOT,
-          [makeServerSession('pty_session_1_aaaaaaaaa', 'session-1')],
-          'client_local',
-          new Map(),
-        )
-        const key = registryWithThrowingCallback.worktreeSnapshot(WORKTREE_KEY).sessions[0]!.key
-        const session = (registryWithThrowingCallback as any).sessions.get(key)
-        const closeServerResourcesAndWait = vi
-          .spyOn(session, 'closeServerResourcesAndWait')
-          .mockResolvedValue(undefined)
-        const dispose = vi.spyOn(session, 'dispose').mockImplementation(() => {})
-
-        await expect(
-          registryWithThrowingCallback.closeTerminalByDescriptor(key, {
-            repoRoot: REPO_ROOT,
-            branch: BRANCH,
-            worktreePath: WORKTREE_PATH,
-          }),
-        ).resolves.toBe(true)
-
-        expect(closeServerResourcesAndWait).toHaveBeenCalled()
-        expect(dispose).toHaveBeenCalledWith({ closeSession: false })
-        expect(registryWithThrowingCallback.isKnownSession(key)).toBe(false)
-      } finally {
-        registryWithThrowingCallback.destroy()
-      }
+      expect(projection.isKnownSession(terminalSessionIdBefore)).toBe(false)
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
     })
 
     test('closeTerminalByDescriptor resolves after server terminal resources close', async () => {
@@ -448,8 +351,8 @@ describe('TerminalSessionProjection', () => {
         'client_local',
         new Map(),
       )
-      const key = projection.worktreeSnapshot(WORKTREE_KEY).sessions[0]!.key
-      const session = (projection as any).sessions.get(key)
+      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const session = (projection as any).sessions.get(terminalSessionId)
       let resolveClose!: () => void
       vi.spyOn(session, 'closeServerResourcesAndWait').mockImplementation(
         () =>
@@ -460,7 +363,7 @@ describe('TerminalSessionProjection', () => {
 
       let settled = false
       const closePromise = projection
-        .closeTerminalByDescriptor(key, {
+        .closeTerminalByDescriptor(terminalSessionId, {
           repoRoot: REPO_ROOT,
           branch: BRANCH,
           worktreePath: WORKTREE_PATH,
@@ -471,15 +374,15 @@ describe('TerminalSessionProjection', () => {
         })
       await Promise.resolve()
 
-      expect(projection.isKnownSession(key)).toBe(true)
-      expect(projection.worktreeSnapshot(WORKTREE_KEY).count).toBe(0)
-      expect(projection.worktreeSnapshot(WORKTREE_KEY).selectedDescriptor).toBeNull()
+      expect(projection.isKnownSession(terminalSessionId)).toBe(true)
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor).toBeNull()
       expect(settled).toBe(false)
 
       resolveClose()
       await expect(closePromise).resolves.toBe(true)
       expect(settled).toBe(true)
-      expect(projection.isKnownSession(key)).toBe(false)
+      expect(projection.isKnownSession(terminalSessionId)).toBe(false)
     })
 
     test('closeTerminalByDescriptor selects an adjacent terminal before server close settles', async () => {
@@ -487,17 +390,17 @@ describe('TerminalSessionProjection', () => {
       projection.reconcileServerSessions(
         REPO_ROOT,
         [
-          makeServerSession('pty_session_1_aaaaaaaaa', 'session-1', { displayOrder: 0 }),
-          makeServerSession('pty_session_2_aaaaaaaaa', 'session-2', { displayOrder: 1 }),
-          makeServerSession('pty_session_3_aaaaaaaaa', 'session-3', { displayOrder: 2 }),
+          makeServerSession('pty_session_1_aaaaaaaaa', 'session-1'),
+          makeServerSession('pty_session_2_aaaaaaaaa', 'session-2'),
+          makeServerSession('pty_session_3_aaaaaaaaa', 'session-3'),
         ],
         'client_local',
         new Map(),
       )
 
       const activeKey = projection
-        .worktreeSnapshot(WORKTREE_KEY)
-        .sessions.find((session) => session.sessionId === 'session-2')?.key
+        .terminalWorktreeSnapshot(WORKTREE_KEY)
+        .sessions.find((session) => session.terminalSessionId === 'session-2')?.terminalSessionId
       if (!activeKey) throw new Error('missing session-2')
       projection.selectTerminal(WORKTREE_KEY, activeKey)
       const session = (projection as any).sessions.get(activeKey)
@@ -516,19 +419,19 @@ describe('TerminalSessionProjection', () => {
       })
       await Promise.resolve()
 
-      const closingSnapshot = projection.worktreeSnapshot(WORKTREE_KEY)
-      expect(closingSnapshot.sessions.map((item) => item.sessionId)).toEqual(['session-1', 'session-3'])
-      expect(closingSnapshot.selectedDescriptor?.sessionId).toBe('session-3')
+      const closingSnapshot = projection.terminalWorktreeSnapshot(WORKTREE_KEY)
+      expect(closingSnapshot.sessions.map((item) => item.terminalSessionId)).toEqual(['session-1', 'session-3'])
+      expect(closingSnapshot.selectedDescriptor?.terminalSessionId).toBe('session-3')
 
       resolveClose()
       await expect(closePromise).resolves.toBe(true)
-      expect(projection.worktreeSnapshot(WORKTREE_KEY).sessions.map((item) => item.sessionId)).toEqual([
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.map((item) => item.terminalSessionId)).toEqual([
         'session-1',
         'session-3',
       ])
     })
 
-    test('closeTerminalByDescriptor deduplicates repeated closes for the same terminal key', async () => {
+    test('closeTerminalByDescriptor deduplicates repeated closes for the same terminal session', async () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(
         REPO_ROOT,
@@ -536,8 +439,8 @@ describe('TerminalSessionProjection', () => {
         'client_local',
         new Map(),
       )
-      const key = projection.worktreeSnapshot(WORKTREE_KEY).sessions[0]!.key
-      const session = (projection as any).sessions.get(key)
+      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const session = (projection as any).sessions.get(terminalSessionId)
       let resolveClose!: () => void
       const closeServerResourcesAndWait = vi.spyOn(session, 'closeServerResourcesAndWait').mockImplementation(
         () =>
@@ -546,12 +449,12 @@ describe('TerminalSessionProjection', () => {
           }),
       )
 
-      const firstClose = projection.closeTerminalByDescriptor(key, {
+      const firstClose = projection.closeTerminalByDescriptor(terminalSessionId, {
         repoRoot: REPO_ROOT,
         branch: BRANCH,
         worktreePath: WORKTREE_PATH,
       })
-      const secondClose = projection.closeTerminalByDescriptor(key, {
+      const secondClose = projection.closeTerminalByDescriptor(terminalSessionId, {
         repoRoot: REPO_ROOT,
         branch: BRANCH,
         worktreePath: WORKTREE_PATH,
@@ -559,12 +462,12 @@ describe('TerminalSessionProjection', () => {
       await Promise.resolve()
 
       expect(closeServerResourcesAndWait).toHaveBeenCalledTimes(1)
-      expect(projection.worktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
 
       resolveClose()
       await expect(firstClose).resolves.toBe(true)
       await expect(secondClose).resolves.toBe(true)
-      expect(projection.isKnownSession(key)).toBe(false)
+      expect(projection.isKnownSession(terminalSessionId)).toBe(false)
     })
 
     test('closeTerminalByDescriptor keeps the session when server resource close fails', async () => {
@@ -575,8 +478,8 @@ describe('TerminalSessionProjection', () => {
         'client_local',
         new Map(),
       )
-      const key = projection.worktreeSnapshot(WORKTREE_KEY).sessions[0]!.key
-      const session = (projection as any).sessions.get(key)
+      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const session = (projection as any).sessions.get(terminalSessionId)
       let rejectClose!: (error: Error) => void
       vi.spyOn(session, 'closeServerResourcesAndWait').mockImplementation(
         () =>
@@ -586,22 +489,22 @@ describe('TerminalSessionProjection', () => {
       )
       const dispose = vi.spyOn(session, 'dispose')
 
-      const closePromise = projection.closeTerminalByDescriptor(key, {
+      const closePromise = projection.closeTerminalByDescriptor(terminalSessionId, {
         repoRoot: REPO_ROOT,
         branch: BRANCH,
         worktreePath: WORKTREE_PATH,
       })
       await Promise.resolve()
 
-      expect(projection.worktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
 
       const expectation = expect(closePromise).resolves.toBe(false)
       rejectClose(new Error('close failed'))
       await expectation
 
-      expect(projection.isKnownSession(key)).toBe(true)
-      expect(projection.worktreeSnapshot(WORKTREE_KEY).count).toBe(1)
-      expect(projection.worktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.sessionId).toBe('session-1')
+      expect(projection.isKnownSession(terminalSessionId)).toBe(true)
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe('session-1')
       expect(dispose).not.toHaveBeenCalled()
     })
 
@@ -615,7 +518,7 @@ describe('TerminalSessionProjection', () => {
         'client_local',
         new Map(),
       )
-      expect(projection.worktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.sessionId).toBe('session-1')
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe('session-1')
 
       // Second reconcile: session-1 removed, session-2 is controller
       projection.reconcileServerSessions(
@@ -628,60 +531,60 @@ describe('TerminalSessionProjection', () => {
         'client_local',
         new Map(),
       )
-      expect(projection.worktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.sessionId).toBe('session-2')
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe('session-2')
     })
 
-    test('closing the active terminal selects the adjacent tab in display order', () => {
+    test('closing the active terminal selects the adjacent tab in the server session list', () => {
       projection.setRepoIndex(makeRepoIndex())
 
       projection.reconcileServerSessions(
         REPO_ROOT,
         [
-          makeServerSession('pty_session_1_aaaaaaaaa', 'session-1', { displayOrder: 1 }),
-          makeServerSession('pty_session_2_aaaaaaaaa', 'session-2', { displayOrder: 0 }),
-          makeServerSession('pty_session_3_aaaaaaaaa', 'session-3', { displayOrder: 2 }),
+          makeServerSession('pty_session_2_aaaaaaaaa', 'session-2'),
+          makeServerSession('pty_session_1_aaaaaaaaa', 'session-1'),
+          makeServerSession('pty_session_3_aaaaaaaaa', 'session-3'),
         ],
         'client_local',
         new Map(),
       )
 
-      const snapshot = projection.worktreeSnapshot(WORKTREE_KEY)
-      const activeKey = snapshot.sessions.find((session) => session.sessionId === 'session-2')?.key
+      const snapshot = projection.terminalWorktreeSnapshot(WORKTREE_KEY)
+      const activeKey = snapshot.sessions.find((session) => session.terminalSessionId === 'session-2')?.terminalSessionId
       if (!activeKey) throw new Error('missing session-2')
 
       projection.selectTerminal(WORKTREE_KEY, activeKey)
       ;(projection as any).removeSession(activeKey, { dispose: false, closeSession: false })
 
-      expect(projection.worktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.sessionId).toBe('session-1')
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe('session-1')
     })
 
-    test('invalidates cached worktree snapshot when server display order changes', () => {
+    test('invalidates cached worktree snapshot when the server session list changes', () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(
         REPO_ROOT,
         [
-          makeServerSession('pty_session_1_aaaaaaaaa', 'session-1', { displayOrder: 0 }),
-          makeServerSession('pty_session_2_aaaaaaaaa', 'session-2', { displayOrder: 1 }),
+          makeServerSession('pty_session_1_aaaaaaaaa', 'session-1'),
+          makeServerSession('pty_session_2_aaaaaaaaa', 'session-2'),
         ],
         'client_local',
         new Map(),
       )
 
-      const firstSnapshot = projection.worktreeSnapshot(WORKTREE_KEY)
-      expect(firstSnapshot.sessions.map((session) => session.sessionId)).toEqual(['session-1', 'session-2'])
+      const firstSnapshot = projection.terminalWorktreeSnapshot(WORKTREE_KEY)
+      expect(firstSnapshot.sessions.map((session) => session.terminalSessionId)).toEqual(['session-1', 'session-2'])
 
       projection.reconcileServerSessions(
         REPO_ROOT,
         [
-          makeServerSession('pty_session_1_aaaaaaaaa', 'session-1', { displayOrder: 1 }),
-          makeServerSession('pty_session_2_aaaaaaaaa', 'session-2', { displayOrder: 0 }),
+          makeServerSession('pty_session_2_aaaaaaaaa', 'session-2'),
+          makeServerSession('pty_session_1_aaaaaaaaa', 'session-1'),
         ],
         'client_local',
         new Map(),
       )
 
-      const secondSnapshot = projection.worktreeSnapshot(WORKTREE_KEY)
-      expect(secondSnapshot.sessions.map((session) => session.sessionId)).toEqual(['session-2', 'session-1'])
+      const secondSnapshot = projection.terminalWorktreeSnapshot(WORKTREE_KEY)
+      expect(secondSnapshot.sessions.map((session) => session.terminalSessionId)).toEqual(['session-2', 'session-1'])
     })
   })
 
@@ -695,15 +598,15 @@ describe('TerminalSessionProjection', () => {
         new Map(),
       )
 
-      const key = projection.worktreeSnapshot(WORKTREE_KEY).sessions[0]!.key
-      const session = (projection as any).sessions.get(key)
+      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const session = (projection as any).sessions.get(terminalSessionId)
 
       // reconcile pre-populates the cache; clear it to test the caching path
-      ;(projection as any).snapshotCache.delete(key)
+      ;(projection as any).snapshotCache.delete(terminalSessionId)
 
       const snapshotSpy = vi.spyOn(session, 'snapshot')
-      const s1 = projection.snapshot(key)
-      const s2 = projection.snapshot(key)
+      const s1 = projection.snapshot(terminalSessionId)
+      const s2 = projection.snapshot(terminalSessionId)
       expect(s1).toBe(s2) // same reference
       expect(snapshotSpy).toHaveBeenCalledTimes(1)
     })
@@ -717,12 +620,12 @@ describe('TerminalSessionProjection', () => {
         new Map(),
       )
 
-      const key = projection.worktreeSnapshot(WORKTREE_KEY).sessions[0]!.key
-      const s1 = projection.snapshot(key)
+      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const s1 = projection.snapshot(terminalSessionId)
 
       // metadata notify forces cache refresh
-      ;(projection as any).notifySession(key, 'metadata')
-      const s2 = projection.snapshot(key)
+      ;(projection as any).notifySession(terminalSessionId, 'metadata')
+      const s2 = projection.snapshot(terminalSessionId)
       expect(s1).not.toBe(s2)
     })
   })
@@ -776,7 +679,7 @@ describe('TerminalSessionProjection', () => {
       const descriptor = makeDescriptor('session-1', 1)
       // Add a session via the internal API (no real WS, no
       // TerminalSession — just the projection bookkeeping).
-      ;(projection as any).sessions.set(descriptor.key, {
+      ;(projection as any).sessions.set(descriptor.terminalSessionId, {
         descriptor,
         snapshot: () => ({ phase: 'open', message: null, processName: 'zsh', canonicalTitle: null }),
         currentPtySessionId: () => 'pty_session_1_aaaaaaaaa',
@@ -790,8 +693,9 @@ describe('TerminalSessionProjection', () => {
       expect(after).toBe(projection)
       // The session we injected is still in the projection's map —
       // i.e. the state survived the synthetic remount.
-      const stored = (after as any).sessions.get(descriptor.key) as { descriptor: TerminalDescriptor } | undefined
-      expect(stored?.descriptor.sessionId).toBe('session-1')
+      const stored = (after as any).sessions.get(descriptor.terminalSessionId) as
+        { descriptor: TerminalDescriptor } | undefined
+      expect(stored?.descriptor.terminalSessionId).toBe('session-1')
     })
   })
 })

@@ -17,18 +17,19 @@ import type {
   TerminalSessionContextValue,
   TerminalSessionSummary,
   TerminalSessionReadContextValue,
-  WorktreeTerminalSnapshot,
+  TerminalWorktreeSnapshot,
 } from '#/web/components/terminal/types.ts'
 import { createBranchSnapshot, createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
-import { workspacePaneStaticTabOrderEntry, workspacePaneTerminalTabOrderEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import {
   PrimaryWindowNavigationProvider,
   type PrimaryWindowNavigationActions,
 } from '#/web/primary-window-navigation.tsx'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 
 const repoClientMocks = vi.hoisted(() => ({
   getRepoLog: vi.fn(),
@@ -51,6 +52,14 @@ const REPO_ID = '/tmp/gbl-repo-workspace-content-repo'
 type RepoWorkspaceContentHarnessProps = Omit<ComponentProps<typeof RepoWorkspaceContent>, 'workspacePaneTabModel'>
 
 function RepoWorkspaceContentHarness(props: RepoWorkspaceContentHarnessProps) {
+  return (
+    <QueryClientProvider client={primaryWindowQueryClient}>
+      <RepoWorkspaceContentInner {...props} />
+    </QueryClientProvider>
+  )
+}
+
+function RepoWorkspaceContentInner(props: RepoWorkspaceContentHarnessProps) {
   const workspacePaneTabModel = useRepoWorkspaceTabModel(props.repo, props.detail)
   return <RepoWorkspaceContent {...props} workspacePaneTabModel={workspacePaneTabModel} />
 }
@@ -103,7 +112,7 @@ describe('RepoWorkspaceContent', () => {
       ],
       selectedBranch: 'feature/changes',
       preferredWorkspacePaneTab: 'status',
-      workspacePaneTabOrderByBranch: {
+      workspacePaneTabsByBranch: {
         'feature/changes': [staticEntry('status'), staticEntry('changes')],
       },
       statusLoaded: true,
@@ -165,7 +174,7 @@ describe('RepoWorkspaceContent', () => {
       ],
       selectedBranch: 'feature/copy-success',
       preferredWorkspacePaneTab: 'status',
-      workspacePaneTabOrderByBranch: {
+      workspacePaneTabsByBranch: {
         'feature/copy-success': [staticEntry('status')],
       },
       statusLoaded: true,
@@ -229,7 +238,7 @@ describe('RepoWorkspaceContent', () => {
       ],
       selectedBranch: 'feature/clean',
       preferredWorkspacePaneTab: 'status',
-      workspacePaneTabOrderByBranch: {
+      workspacePaneTabsByBranch: {
         'feature/clean': [staticEntry('status')],
       },
       statusLoaded: true,
@@ -270,7 +279,7 @@ describe('RepoWorkspaceContent', () => {
       ],
       selectedBranch: 'feature/hidden',
       preferredWorkspacePaneTab: 'status',
-      workspacePaneTabOrderByBranch: {
+      workspacePaneTabsByBranch: {
         'feature/hidden': [staticEntry('status')],
       },
       statusLoaded: true,
@@ -316,7 +325,7 @@ describe('RepoWorkspaceContent', () => {
       ],
       selectedBranch: 'feature/changes-panel',
       preferredWorkspacePaneTab: 'changes',
-      workspacePaneTabOrderByBranch: {
+      workspacePaneTabsByBranch: {
         'feature/changes-panel': [staticEntry('status'), staticEntry('changes')],
       },
       statusLoaded: true,
@@ -397,7 +406,7 @@ describe('RepoWorkspaceContent', () => {
       ],
       selectedBranch: 'feature/no-worktree',
       preferredWorkspacePaneTab: 'status',
-      workspacePaneTabOrderByBranch: { 'feature/no-worktree': [] },
+      workspacePaneTabsByBranch: { 'feature/no-worktree': [] },
     })
     const detail = getSelectedRepoWorkspacePresentation(repo)
 
@@ -417,7 +426,7 @@ describe('RepoWorkspaceContent', () => {
       branches: [createRepoBranch('feature/no-worktree')],
       selectedBranch: 'feature/no-worktree',
       preferredWorkspacePaneTab: 'terminal',
-      workspacePaneTabOrderByBranch: { 'feature/no-worktree': [staticEntry('status')] },
+      workspacePaneTabsByBranch: { 'feature/no-worktree': [staticEntry('status')] },
     })
     const detail = getSelectedRepoWorkspacePresentation(repo)
 
@@ -444,7 +453,7 @@ describe('RepoWorkspaceContent', () => {
       branches: [createRepoBranch('feature/terminal-empty', { worktree: { path: worktreePath } })],
       selectedBranch: 'feature/terminal-empty',
       preferredWorkspacePaneTab: 'terminal',
-      workspacePaneTabOrderByBranch: { 'feature/terminal-empty': [staticEntry('status')] },
+      workspacePaneTabsByBranch: { 'feature/terminal-empty': [staticEntry('status')] },
     })
     useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceToken)
     const detail = getSelectedRepoWorkspacePresentation(repo)
@@ -468,25 +477,25 @@ describe('RepoWorkspaceContent', () => {
 
   test('mounts the terminal session while terminal creation is pending with no sessions', () => {
     const worktreePath = '/tmp/terminal-pending-worktree'
-    const worktreeKey = `${REPO_ID}\0${worktreePath}`
+    const terminalWorktreeKey = `${REPO_ID}\0${worktreePath}`
     const repo = seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/terminal-pending', { worktree: { path: worktreePath } })],
       selectedBranch: 'feature/terminal-pending',
       preferredWorkspacePaneTab: 'terminal',
-      workspacePaneTabOrderByBranch: { 'feature/terminal-pending': [staticEntry('status')] },
+      workspacePaneTabsByBranch: { 'feature/terminal-pending': [staticEntry('status')] },
     })
     useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceToken)
     const detail = getSelectedRepoWorkspacePresentation(repo)
     const registerHost = vi.fn()
-    const worktreeSnapshot: WorktreeTerminalSnapshot = {
+    const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
       ...emptyWorktreeSnapshot,
-      worktreeTerminalKey: worktreeKey,
+      terminalWorktreeKey,
       pendingCreate: true,
     }
     const readContext: TerminalSessionReadContextValue = {
       ...emptyTerminalReadContext,
-      worktreeSnapshot: () => worktreeSnapshot,
+      terminalWorktreeSnapshot: () => terminalWorktreeSnapshot,
     }
 
     const { container } = renderInJsdom(
@@ -504,32 +513,32 @@ describe('RepoWorkspaceContent', () => {
     expect(container.querySelector('.goblin-terminal-session__host')).not.toBeNull()
     expect(container.textContent).toContain('terminal.opening')
     expect(container.textContent).not.toContain('workspace-pane-tabs.empty')
-    expect(registerHost).toHaveBeenCalledWith(worktreeKey, expect.any(HTMLDivElement))
+    expect(registerHost).toHaveBeenCalledWith(terminalWorktreeKey, expect.any(HTMLDivElement))
   })
 
   test('mounts the terminal session while terminal creation is pending after every tab was closed', () => {
     const worktreePath = '/tmp/terminal-pending-empty-strip-worktree'
-    const worktreeKey = `${REPO_ID}\0${worktreePath}`
+    const terminalWorktreeKey = `${REPO_ID}\0${worktreePath}`
     const branchName = 'feature/terminal-pending-empty-strip'
     const seededRepo = seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch(branchName, { worktree: { path: worktreePath } })],
       selectedBranch: branchName,
       preferredWorkspacePaneTab: 'terminal',
-      workspacePaneTabOrderByBranch: { [branchName]: [] },
+      workspacePaneTabsByBranch: { [branchName]: [] },
     })
     useRepoSyncStore.getState().markReady(REPO_ID, seededRepo.instanceToken)
     const repo = useReposStore.getState().repos[REPO_ID]!
     const detail = getSelectedRepoWorkspacePresentation(repo)
     const registerHost = vi.fn()
-    const worktreeSnapshot: WorktreeTerminalSnapshot = {
+    const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
       ...emptyWorktreeSnapshot,
-      worktreeTerminalKey: worktreeKey,
+      terminalWorktreeKey,
       pendingCreate: true,
     }
     const readContext: TerminalSessionReadContextValue = {
       ...emptyTerminalReadContext,
-      worktreeSnapshot: () => worktreeSnapshot,
+      terminalWorktreeSnapshot: () => terminalWorktreeSnapshot,
     }
 
     renderInJsdom(
@@ -542,30 +551,30 @@ describe('RepoWorkspaceContent', () => {
 
     expect(screen.getByRole('tabpanel').id).toBe('workspace-terminal-panel')
     expect(screen.queryByText('workspace-pane-tabs.empty')).toBeNull()
-    expect(registerHost).toHaveBeenCalledWith(worktreeKey, expect.any(HTMLDivElement))
+    expect(registerHost).toHaveBeenCalledWith(terminalWorktreeKey, expect.any(HTMLDivElement))
   })
 
   test('renders terminal loading without a create CTA while initial terminal sync is unresolved', () => {
     const worktreePath = '/tmp/terminal-loading-worktree'
-    const worktreeKey = `${REPO_ID}\0${worktreePath}`
+    const terminalWorktreeKey = `${REPO_ID}\0${worktreePath}`
     const repo = seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/terminal-loading', { worktree: { path: worktreePath } })],
       selectedBranch: 'feature/terminal-loading',
       preferredWorkspacePaneTab: 'terminal',
-      workspacePaneTabOrderByBranch: { 'feature/terminal-loading': [staticEntry('status')] },
+      workspacePaneTabsByBranch: { 'feature/terminal-loading': [staticEntry('status')] },
     })
     const detail = getSelectedRepoWorkspacePresentation(repo)
     const createTerminal = vi.fn(async () => 'session-1')
     const registerHost = vi.fn()
-    const worktreeSnapshot: WorktreeTerminalSnapshot = {
+    const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
       ...emptyWorktreeSnapshot,
-      worktreeTerminalKey: worktreeKey,
+      terminalWorktreeKey,
       pendingCreate: false,
     }
     const readContext: TerminalSessionReadContextValue = {
       ...emptyTerminalReadContext,
-      worktreeSnapshot: () => worktreeSnapshot,
+      terminalWorktreeSnapshot: () => terminalWorktreeSnapshot,
     }
 
     const { container } = renderInJsdom(
@@ -584,33 +593,36 @@ describe('RepoWorkspaceContent', () => {
     expect(container.textContent).not.toContain('terminal.new')
     expect(container.querySelector('.goblin-terminal-session__empty-cta')).toBeNull()
     expect(createTerminal).not.toHaveBeenCalled()
-    expect(registerHost).toHaveBeenCalledWith(worktreeKey, expect.any(HTMLDivElement))
+    expect(registerHost).toHaveBeenCalledWith(terminalWorktreeKey, expect.any(HTMLDivElement))
   })
 
-  test('labels terminal panels from the unified tab order, not runtime session order', () => {
+  test('labels terminal panels from the mixed tab list, not runtime session list', () => {
     const worktreePath = '/tmp/terminal-reordered-worktree'
-    const worktreeKey = `${REPO_ID}\0${worktreePath}`
+    const terminalWorktreeKey = `${REPO_ID}\0${worktreePath}`
     const repo = seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/terminal-reordered', { worktree: { path: worktreePath } })],
       selectedBranch: 'feature/terminal-reordered',
       preferredWorkspacePaneTab: 'terminal',
-      workspacePaneTabOrderByBranch: {
+      workspacePaneTabsByBranch: {
         'feature/terminal-reordered': [terminalEntry('t2'), staticEntry('status'), terminalEntry('t1')],
       },
     })
     useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceToken)
     const detail = getSelectedRepoWorkspacePresentation(repo)
     const registerHost = vi.fn()
-    const worktreeSnapshot: WorktreeTerminalSnapshot = {
+    const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
       ...emptyWorktreeSnapshot,
-      worktreeTerminalKey: worktreeKey,
-      sessions: [terminalSession('t1', 1, false, worktreeKey), terminalSession('t2', 2, true, worktreeKey)],
+      terminalWorktreeKey,
+      sessions: [
+        terminalSession('t1', 1, false, terminalWorktreeKey),
+        terminalSession('t2', 2, true, terminalWorktreeKey),
+      ],
       count: 2,
     }
     const readContext: TerminalSessionReadContextValue = {
       ...emptyTerminalReadContext,
-      worktreeSnapshot: () => worktreeSnapshot,
+      terminalWorktreeSnapshot: () => terminalWorktreeSnapshot,
     }
 
     const { container } = renderInJsdom(
@@ -624,7 +636,7 @@ describe('RepoWorkspaceContent', () => {
     expect(container.querySelector('#workspace-terminal-panel')?.getAttribute('aria-labelledby')).toBe(
       'workspace-workspace-pane-tab',
     )
-    expect(registerHost).toHaveBeenCalledWith(worktreeKey, expect.any(HTMLDivElement))
+    expect(registerHost).toHaveBeenCalledWith(terminalWorktreeKey, expect.any(HTMLDivElement))
   })
 
   test('opens a file by creating a terminal with a startup shell command instead of writing to an opening PTY', async () => {
@@ -648,7 +660,7 @@ describe('RepoWorkspaceContent', () => {
       branches: [createRepoBranch(branchName, { worktree: { path: worktreePath } })],
       selectedBranch: branchName,
       preferredWorkspacePaneTab: 'files',
-      workspacePaneTabOrderByBranch: { [branchName]: [staticEntry('files')] },
+      workspacePaneTabsByBranch: { [branchName]: [staticEntry('files')] },
     })
     useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceToken)
     const detail = getSelectedRepoWorkspacePresentation(repo)
@@ -691,7 +703,7 @@ describe('RepoWorkspaceContent', () => {
       branches: [createRepoBranch('feature/a'), createRepoBranch('feature/b')],
       selectedBranch: 'feature/b',
       preferredWorkspacePaneTab: 'history',
-      workspacePaneTabOrderByBranch: {
+      workspacePaneTabsByBranch: {
         'feature/a': [staticEntry('status'), staticEntry('history')],
       },
     })
@@ -706,7 +718,7 @@ describe('RepoWorkspaceContent', () => {
     )
     await flushAsyncWork()
 
-    // The selected branch (feature/b) has no explicit tab order, so it
+    // The selected branch (feature/b) has no explicit mixed tab list, so it
     // falls back to the default [status]. The user's preferred tab
     // (history) is not in the materialized tab list. The model falls
     // back to the first materialized tab (status) so the user does not
@@ -742,7 +754,7 @@ describe('RepoWorkspaceContent', () => {
       branches: [createRepoBranch('feature/history')],
       selectedBranch: 'feature/history',
       preferredWorkspacePaneTab: 'history',
-      workspacePaneTabOrderByBranch: { 'feature/history': [staticEntry('status'), staticEntry('history')] },
+      workspacePaneTabsByBranch: { 'feature/history': [staticEntry('status'), staticEntry('history')] },
     })
     const detail = getSelectedRepoWorkspacePresentation(repo)
 
@@ -783,13 +795,13 @@ describe('RepoWorkspaceContent', () => {
     expect(rows[1]?.textContent).toContain('Start history graph')
   })
 
-  test('labels worktree history panels with the branch-owned tab id', async () => {
+  test('labels worktree history panels with the static tab id', async () => {
     const repo = seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/history', { worktree: { path: '/tmp/history-worktree' } })],
       selectedBranch: 'feature/history',
       preferredWorkspacePaneTab: 'history',
-      workspacePaneTabOrderByBranch: { 'feature/history': [staticEntry('status'), staticEntry('history')] },
+      workspacePaneTabsByBranch: { 'feature/history': [staticEntry('status'), staticEntry('history')] },
     })
     const detail = getSelectedRepoWorkspacePresentation(repo)
 
@@ -812,7 +824,7 @@ describe('RepoWorkspaceContent', () => {
       branches: [createRepoBranch('feature/history')],
       selectedBranch: 'feature/history',
       preferredWorkspacePaneTab: 'history',
-      workspacePaneTabOrderByBranch: { 'feature/history': [staticEntry('history')] },
+      workspacePaneTabsByBranch: { 'feature/history': [staticEntry('history')] },
     })
     const detail = getSelectedRepoWorkspacePresentation(repo)
 
@@ -828,19 +840,19 @@ describe('RepoWorkspaceContent', () => {
   })
 })
 
-const emptyWorktreeSnapshot: WorktreeTerminalSnapshot = {
-  worktreeTerminalKey: '',
+const emptyWorktreeSnapshot: TerminalWorktreeSnapshot = {
+  terminalWorktreeKey: '',
   selectedDescriptor: null,
   sessions: [],
   count: 0,
   bellCount: 0,
-        activeCount: 0,
+  activeCount: 0,
   pendingCreate: false,
 }
 
 const emptyTerminalReadContext: TerminalSessionReadContextValue = {
-  worktreeSnapshot: () => emptyWorktreeSnapshot,
-  subscribeWorktree: () => () => {},
+  terminalWorktreeSnapshot: () => emptyWorktreeSnapshot,
+  subscribeTerminalWorktree: () => () => {},
   repoBellCount: () => 0,
   subscribeRepoBellCount: () => () => {},
   snapshot: () => ({ phase: 'opening', message: null, processName: 'terminal' }),
@@ -879,11 +891,11 @@ async function flushAsyncWork() {
 }
 
 function staticEntry(type: WorkspacePaneStaticTabType) {
-  return workspacePaneStaticTabOrderEntry(type)
+  return workspacePaneStaticTabEntry(type)
 }
 
 function terminalEntry(id: string) {
-  return workspacePaneTerminalTabOrderEntry(id)
+  return workspacePaneTerminalTabEntry(id)
 }
 
 function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): PrimaryWindowNavigationActions {
@@ -900,23 +912,20 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): Pri
 }
 
 function terminalSession(
-  key: string,
+  terminalSessionId: string,
   index: number,
   selected: boolean,
-  worktreeTerminalKey: string,
+  terminalWorktreeKey: string,
 ): TerminalSessionSummary {
   return {
     type: 'terminal',
-    id: key,
-    key,
-    worktreeTerminalKey,
-    sessionId: key,
+    terminalSessionId,
+    terminalWorktreeKey,
     index,
-    displayOrder: index,
-    title: key,
+    title: terminalSessionId,
     phase: 'open',
     selected,
     hasBell: false,
-            recentlyActive: false,
+    recentlyActive: false,
   }
 }

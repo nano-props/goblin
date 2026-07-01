@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { WorkspaceSessionState } from '#/shared/api-types.ts'
 import { resolveI18nSnapshot } from '#/shared/i18n/snapshot.ts'
+import { WORKSPACE_PANE_STATIC_TAB_IDS, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 
 const mocks = vi.hoisted(() => ({
   publishSettingsInvalidation: vi.fn(),
@@ -75,8 +77,10 @@ describe('settings command handlers', () => {
       activeRepoId: null,
       zenMode: true,
       workspacePaneSize: 50,
-      selectedTerminalSessionByWorktree: {},
-      workspacePaneTabOrderByBranchByRepo: {},
+      selectedTerminalSessionIdByTerminalWorktree: {},
+      preferredWorkspacePaneTabByTargetByRepo: {},
+      workspacePaneTabsByTargetByRepo: {},
+      filetreeViewStateByWorktreeByRepo: {},
     }
     mocks.setServerSessionState.mockResolvedValue(session)
     mocks.setServerSessionState.mockResolvedValue(session as WorkspaceSessionState)
@@ -118,7 +122,10 @@ describe('settings command handlers', () => {
         activeRepoId: null,
         zenMode: true,
         workspacePaneSize: 42.5,
-        workspacePaneTabOrderByBranchByRepo: {},
+        selectedTerminalSessionIdByTerminalWorktree: {},
+        preferredWorkspacePaneTabByTargetByRepo: {},
+        workspacePaneTabsByTargetByRepo: {},
+        filetreeViewStateByWorktreeByRepo: {},
       },
     })
     expect(parsed.session.zenMode).toBe(true)
@@ -128,6 +135,7 @@ describe('settings command handlers', () => {
   test('schema accepts changes as a session-restorable preferred tab', async () => {
     const { SETTINGS_PATCH_SCHEMAS } = await import('#/shared/procedure-schemas.ts')
     const { parseHttpInput } = await import('#/server/common/http-validate.ts')
+    const targetKey = branchTargetKey('/tmp/repo', 'main')
 
     expect(() =>
       parseHttpInput(SETTINGS_PATCH_SCHEMAS.session, {
@@ -136,44 +144,50 @@ describe('settings command handlers', () => {
           activeRepoId: '/tmp/repo',
           zenMode: true,
           workspacePaneSize: 42.5,
-          preferredWorkspacePaneTabByBranchByRepo: {
+          selectedTerminalSessionIdByTerminalWorktree: {},
+          preferredWorkspacePaneTabByTargetByRepo: {
             '/tmp/repo': {
-              main: 'changes',
+              [targetKey]: 'changes',
             },
           },
-          workspacePaneTabOrderByBranchByRepo: {
+          workspacePaneTabsByTargetByRepo: {
             '/tmp/repo': {
-              main: [{ type: 'changes', id: 'changes' }],
+              [targetKey]: [workspacePaneStaticTabEntry('changes')],
             },
           },
+          filetreeViewStateByWorktreeByRepo: {},
         },
       }),
     ).not.toThrow()
   })
 
-  test('schema rejects malformed workspace pane tab order entries at the perimeter', async () => {
+  test('schema rejects malformed workspace pane tab list entries at the perimeter', async () => {
     const { SETTINGS_PATCH_SCHEMAS } = await import('#/shared/procedure-schemas.ts')
     const { parseHttpInput } = await import('#/server/common/http-validate.ts')
+    const targetKey = branchTargetKey('/tmp/repo', 'main')
 
     const session = {
       openRepoEntries: [{ kind: 'local', id: '/tmp/repo' }],
       activeRepoId: '/tmp/repo',
       zenMode: true,
       workspacePaneSize: 42.5,
-      workspacePaneTabOrderByBranchByRepo: {
+      selectedTerminalSessionIdByTerminalWorktree: {},
+      preferredWorkspacePaneTabByTargetByRepo: {},
+      workspacePaneTabsByTargetByRepo: {
         '/tmp/repo': {
-          main: [],
+          [targetKey]: [],
         },
       },
+      filetreeViewStateByWorktreeByRepo: {},
     }
 
     expect(() =>
       parseHttpInput(SETTINGS_PATCH_SCHEMAS.session, {
         session: {
           ...session,
-          workspacePaneTabOrderByBranchByRepo: {
+          workspacePaneTabsByTargetByRepo: {
             '/tmp/repo': {
-              main: [{ type: 'status', id: 'history' }],
+              [targetKey]: [{ type: 'status', tabId: WORKSPACE_PANE_STATIC_TAB_IDS.history }],
             },
           },
         },
@@ -183,9 +197,9 @@ describe('settings command handlers', () => {
       parseHttpInput(SETTINGS_PATCH_SCHEMAS.session, {
         session: {
           ...session,
-          workspacePaneTabOrderByBranchByRepo: {
+          workspacePaneTabsByTargetByRepo: {
             '/tmp/repo': {
-              main: [{ type: 'terminal', id: '' }],
+              [targetKey]: [{ type: 'terminal', terminalSessionId: '' }],
             },
           },
         },
@@ -193,3 +207,7 @@ describe('settings command handlers', () => {
     ).toThrow()
   })
 })
+
+function branchTargetKey(repoRoot: string, branchName: string): string {
+  return workspacePaneTabsTargetIdentityKey({ repoRoot, branchName, worktreePath: null })
+}

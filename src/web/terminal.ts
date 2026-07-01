@@ -22,8 +22,11 @@ export const terminalBridge: ClientTerminalBridge = {
   takeover: bindTerminalMethod('takeover'),
   close: bindTerminalMethod('close'),
   create: bindTerminalMethod('create'),
+  replaceWorkspaceTabs: bindTerminalMethod('replaceWorkspaceTabs'),
+  updateWorkspaceTabs: bindTerminalMethod('updateWorkspaceTabs'),
   pruneTerminals: bindTerminalMethod('pruneTerminals'),
   listSessions: bindTerminalMethod('listSessions'),
+  listWorkspaceTabs: bindTerminalMethod('listWorkspaceTabs'),
   prewarm: bindTerminalMethod('prewarm'),
   kickReconnect: bindTerminalMethod('kickReconnect'),
   getSessionSnapshot: bindTerminalMethod('getSessionSnapshot'),
@@ -36,5 +39,6 @@ export const terminalBridge: ClientTerminalBridge = {
   onIdentity: bindTerminalMethod('onIdentity'),
   onLifecycle: bindTerminalMethod('onLifecycle'),
   onSessionsChanged: bindTerminalMethod('onSessionsChanged'),
+  onWorkspaceTabsChanged: bindTerminalMethod('onWorkspaceTabsChanged'),
   onSessionClosed: bindTerminalMethod('onSessionClosed'),
 }

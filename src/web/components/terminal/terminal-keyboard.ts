@@ -1,4 +1,4 @@
-interface TerminalKeyEventLike {
+interface SessionIdEventLike {
   type: string
   key: string
   altKey: boolean
@@ -81,7 +81,7 @@ const SAFARI_SHIFT_KEY_PAIRS: Record<string, ReadonlyArray<SafariShiftKeyPair>> 
 }
 
 export function terminalInputForMacOptionArrow(
-  event: TerminalKeyEventLike,
+  event: SessionIdEventLike,
   options: { isMac: boolean; applicationCursorKeysMode: boolean },
 ): string | null {
   if (!options.isMac || options.applicationCursorKeysMode || event.type !== 'keydown') return null
@@ -100,7 +100,7 @@ export class SafariShiftKeyResolver {
     this.layoutIndexByCode.clear()
   }
 
-  inputForEvent(event: TerminalKeyEventLike): string | null {
+  inputForEvent(event: SessionIdEventLike): string | null {
     if (typeof navigator === 'undefined') return null
     if (!isSafariNavigator()) return null
     if (event.type !== 'keydown') return null

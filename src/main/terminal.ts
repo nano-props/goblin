@@ -74,7 +74,7 @@ async function notifyTerminalBell(webContents: WebContents, input: TerminalNotif
     if (!Notification.isSupported()) return true
     // showNotificationWithResult is async: it waits for the 'show' or 'failed'
     // event so the caller gets an accurate result instead of an optimistic true.
-    return await showNotificationWithResult(input.title, input.body, input.repoRoot, input.key)
+    return await showNotificationWithResult(input.title, input.body, input.repoRoot, input.terminalSessionId, input.terminalWorktreeKey)
   } catch (err) {
     terminalNodeLog.warn({ err }, 'failed to show bell notification')
     return false
@@ -98,7 +98,8 @@ function showNotificationWithResult(
   title: string,
   body: string,
   repoRoot: string | null,
-  key?: string,
+  terminalSessionId?: string,
+  terminalWorktreeKey?: string,
 ): Promise<boolean> {
   return new Promise((resolve) => {
     const notif = new Notification({ title, body })
@@ -116,7 +117,7 @@ function showNotificationWithResult(
       // Bring the window to the foreground, then tell the client to switch
       // to the repo and open the terminal view (only when repoRoot is known).
       void activatePrimaryWindow().catch(() => {})
-      if (repoRoot) broadcastClientEffectIntent({ type: 'terminal-bell-click', repoRoot, key })
+      if (repoRoot) broadcastClientEffectIntent({ type: 'terminal-bell-click', repoRoot, terminalSessionId, terminalWorktreeKey })
     })
     notif.show()
   })

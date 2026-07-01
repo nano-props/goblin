@@ -1,12 +1,11 @@
 import { describe, expect, test } from 'vitest'
-import { resolveSelectedTerminalKey } from '#/web/components/terminal/terminal-session-selection.ts'
+import { resolveSelectedTerminalSessionId } from '#/web/components/terminal/terminal-session-selection.ts'
 import type { TerminalDescriptor } from '#/web/components/terminal/types.ts'
 
-function descriptor(key: string): TerminalDescriptor {
+function descriptor(terminalSessionId: string): TerminalDescriptor {
   return {
-    key,
-    worktreeTerminalKey: 'repo\0wt',
-    sessionId: key,
+    terminalSessionId,
+    terminalWorktreeKey: 'repo\0wt',
     index: 1,
     repoRoot: '/repo',
     branch: 'main',
@@ -20,46 +19,46 @@ describe('terminal session selection helper', () => {
     const sortedDescriptors = [descriptor('session-1'), descriptor('session-2'), descriptor('session-3')]
 
     expect(
-      resolveSelectedTerminalKey({
-        worktreeTerminalKey: 'repo\0wt',
-        preferredKey: 'session-3',
-        currentKey: 'session-2',
-        controllerKey: 'session-1',
+      resolveSelectedTerminalSessionId({
+        terminalWorktreeKey: 'repo\0wt',
+        preferredSessionId: 'session-3',
+        currentSessionId: 'session-2',
+        controllerSessionId: 'session-1',
         sortedDescriptors,
-        isSelectedKeyValid: isValid,
+        isSelectedTerminalSessionIdValid: isValid,
       }),
     ).toBe('session-3')
 
     expect(
-      resolveSelectedTerminalKey({
-        worktreeTerminalKey: 'repo\0wt',
-        preferredKey: 'missing',
-        currentKey: 'session-2',
-        controllerKey: 'session-1',
+      resolveSelectedTerminalSessionId({
+        terminalWorktreeKey: 'repo\0wt',
+        preferredSessionId: 'missing',
+        currentSessionId: 'session-2',
+        controllerSessionId: 'session-1',
         sortedDescriptors,
-        isSelectedKeyValid: isValid,
+        isSelectedTerminalSessionIdValid: isValid,
       }),
     ).toBe('session-2')
 
     expect(
-      resolveSelectedTerminalKey({
-        worktreeTerminalKey: 'repo\0wt',
-        preferredKey: null,
-        currentKey: null,
-        controllerKey: 'session-1',
+      resolveSelectedTerminalSessionId({
+        terminalWorktreeKey: 'repo\0wt',
+        preferredSessionId: null,
+        currentSessionId: null,
+        controllerSessionId: 'session-1',
         sortedDescriptors,
-        isSelectedKeyValid: isValid,
+        isSelectedTerminalSessionIdValid: isValid,
       }),
     ).toBe('session-1')
 
     expect(
-      resolveSelectedTerminalKey({
-        worktreeTerminalKey: 'repo\0wt',
-        preferredKey: null,
-        currentKey: null,
-        controllerKey: null,
+      resolveSelectedTerminalSessionId({
+        terminalWorktreeKey: 'repo\0wt',
+        preferredSessionId: null,
+        currentSessionId: null,
+        controllerSessionId: null,
         sortedDescriptors,
-        isSelectedKeyValid: isValid,
+        isSelectedTerminalSessionIdValid: isValid,
       }),
     ).toBe('session-1')
   })

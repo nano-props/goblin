@@ -12,7 +12,9 @@ import type {
   TerminalSessionSnapshot,
   TerminalSessionSummary,
   TerminalTestNotificationInput,
+  WorkspacePaneTabsEntry,
 } from '#/shared/terminal-types.ts'
+import { WORKSPACE_PANE_STATIC_TAB_IDS, WORKSPACE_PANE_STATIC_TAB_TYPES } from '#/shared/workspace-pane.ts'
 
 const MIN_TERMINAL_COLS = 1
 const MAX_TERMINAL_COLS = 500
@@ -31,7 +33,10 @@ const TERMINAL_SOCKET_ACTIONS = [
   'takeover',
   'close',
   'list-sessions',
+  'list-workspace-tabs',
   'create',
+  'replace-tabs',
+  'update-tabs',
   'prune',
   'session-snapshot',
 ] as const satisfies TerminalSocketRequestAction[]
@@ -77,6 +82,7 @@ const TerminalSessionInputSchema = v.object({
 const TerminalListSessionsInputSchema = v.object({
   repoRoot: v.string(),
 })
+const TerminalListWorkspaceTabsInputSchema = TerminalListSessionsInputSchema
 const TerminalCreateInputSchema = v.object({
   repoRoot: v.string(),
   branch: v.string(),
@@ -90,14 +96,53 @@ const TerminalCreateInputSchema = v.object({
 const TerminalPruneInputSchema = v.object({
   repoRoot: v.string(),
 })
+const WorkspacePaneStaticTabEntrySchema = v.variant('type', [
+  v.object({ type: v.literal('status'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.status) }),
+  v.object({ type: v.literal('changes'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.changes) }),
+  v.object({ type: v.literal('history'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.history) }),
+  v.object({ type: v.literal('files'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.files) }),
+])
+const WorkspacePaneStaticTabTypeSchema = v.picklist(WORKSPACE_PANE_STATIC_TAB_TYPES)
+const WorkspacePaneTerminalTabEntrySchema = v.object({
+  type: v.literal('terminal'),
+  terminalSessionId: v.pipe(v.string(), v.minLength(1)),
+})
+const TerminalReplaceWorkspaceTabsInputSchema = v.object({
+  repoRoot: v.string(),
+  branchName: v.string(),
+  worktreePath: v.nullable(v.string()),
+  tabs: v.array(v.union([WorkspacePaneStaticTabEntrySchema, WorkspacePaneTerminalTabEntrySchema])),
+})
+const WorkspacePaneTabIdentitySchema = v.pipe(
+  v.string(),
+  v.minLength(1),
+  v.check((value) => !value.includes('\0'), 'Invalid workspace pane tab identity'),
+)
+const TerminalUpdateWorkspaceTabsInputSchema = v.object({
+  repoRoot: v.string(),
+  branchName: v.string(),
+  worktreePath: v.nullable(v.string()),
+  operation: v.variant('type', [
+    v.object({ type: v.literal('open-static'), tabType: WorkspacePaneStaticTabTypeSchema }),
+    v.object({ type: v.literal('close-static'), tabType: WorkspacePaneStaticTabTypeSchema }),
+    v.object({ type: v.literal('reorder'), tabIdentities: v.array(WorkspacePaneTabIdentitySchema) }),
+  ]),
+})
+const WorkspacePaneTabEntrySchema = v.union([WorkspacePaneStaticTabEntrySchema, WorkspacePaneTerminalTabEntrySchema])
+const WorkspacePaneTabsEntrySchema = v.object({
+  repoRoot: v.string(),
+  branchName: v.string(),
+  worktreePath: v.nullable(v.string()),
+  tabs: v.array(WorkspacePaneTabEntrySchema),
+})
 const TerminalSessionSnapshotInputSchema = v.object({
   ptySessionId: TerminalPtySessionIdSchema,
 })
 const TerminalSessionSummarySchema = v.object({
   ptySessionId: v.string(),
-  key: v.string(),
-  viewType: v.literal('terminal'),
-  viewId: v.string(),
+  terminalSessionId: v.string(),
+  repoRoot: v.string(),
+  worktreePath: v.string(),
   cwd: v.string(),
   controller: v.nullable(TerminalControllerSchema),
   processName: v.string(),
@@ -106,7 +151,6 @@ const TerminalSessionSummarySchema = v.object({
   message: v.nullable(v.string()),
   cols: v.number(),
   rows: v.number(),
-  displayOrder: v.number(),
 })
 const TerminalSessionSnapshotSchema = v.object({
   ptySessionId: v.string(),
@@ -130,6 +174,7 @@ const TerminalSessionClosedEventSchema = v.object({
   type: v.literal('session-closed'),
   ptySessionId: v.string(),
   repoRoot: v.string(),
+  worktreePath: v.string(),
 })
 
 export function isValidTerminalPtySessionId(value: unknown): value is string {
@@ -154,6 +199,7 @@ const TerminalRealtimeMessageVariants = [
   v.object({ type: v.literal('identity'), event: TerminalIdentityEventSchema }),
   v.object({ type: v.literal('lifecycle'), event: TerminalLifecycleEventSchema }),
   v.object({ type: v.literal('sessions-changed'), repoRoot: v.string() }),
+  v.object({ type: v.literal('workspace-tabs-changed'), repoRoot: v.string() }),
   TerminalSessionClosedEventSchema,
 ] as const
 const TerminalRealtimeMessageSchema = v.variant('type', TerminalRealtimeMessageVariants)
@@ -224,8 +270,26 @@ const TerminalClientMessageSchema = v.variant('type', [
   v.object({
     type: v.literal('request'),
     requestId: TerminalRequestIdSchema,
+    action: v.literal('list-workspace-tabs'),
+    input: TerminalListWorkspaceTabsInputSchema,
+  }),
+  v.object({
+    type: v.literal('request'),
+    requestId: TerminalRequestIdSchema,
     action: v.literal('create'),
     input: TerminalCreateInputSchema,
+  }),
+  v.object({
+    type: v.literal('request'),
+    requestId: TerminalRequestIdSchema,
+    action: v.literal('replace-tabs'),
+    input: TerminalReplaceWorkspaceTabsInputSchema,
+  }),
+  v.object({
+    type: v.literal('request'),
+    requestId: TerminalRequestIdSchema,
+    action: v.literal('update-tabs'),
+    input: TerminalUpdateWorkspaceTabsInputSchema,
   }),
   v.object({
     type: v.literal('request'),
@@ -297,7 +361,13 @@ export function isValidTerminalClientId(value: unknown): value is string {
 
 export function isValidTerminalNotifyBellInput(value: unknown): value is TerminalNotifyBellInput {
   if (!value || typeof value !== 'object') return false
-  const { title, body, key, repoRoot } = value as { title?: unknown; body?: unknown; key?: unknown; repoRoot?: unknown }
+  const { title, body, terminalSessionId, terminalWorktreeKey, repoRoot } = value as {
+    title?: unknown
+    body?: unknown
+    terminalSessionId?: unknown
+    terminalWorktreeKey?: unknown
+    repoRoot?: unknown
+  }
   return (
     typeof title === 'string' &&
     title.length > 0 &&
@@ -305,7 +375,10 @@ export function isValidTerminalNotifyBellInput(value: unknown): value is Termina
     typeof body === 'string' &&
     body.length > 0 &&
     body.length <= 500 &&
-    (key === undefined || (typeof key === 'string' && key.length > 0)) &&
+    !Object.prototype.hasOwnProperty.call(value, 'key') &&
+    (terminalSessionId === undefined || (typeof terminalSessionId === 'string' && terminalSessionId.length > 0)) &&
+    (terminalWorktreeKey === undefined ||
+      (typeof terminalWorktreeKey === 'string' && terminalWorktreeKey.length > 0)) &&
     typeof repoRoot === 'string' &&
     repoRoot.length > 0
   )
@@ -326,6 +399,11 @@ export function isValidTerminalTestNotificationInput(value: unknown): value is T
 
 export function normalizeTerminalSessionSummaryList(value: unknown): TerminalSessionSummary[] | null {
   const parsed = v.safeParse(v.array(TerminalSessionSummarySchema), value)
+  return parsed.success ? parsed.output : null
+}
+
+export function normalizeWorkspacePaneTabsEntryList(value: unknown): WorkspacePaneTabsEntry[] | null {
+  const parsed = v.safeParse(v.array(WorkspacePaneTabsEntrySchema), value)
   return parsed.success ? parsed.output : null
 }
 

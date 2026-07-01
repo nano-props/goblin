@@ -1,5 +1,6 @@
 import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import type { RepoWorkspaceTab, RepoWorkspaceTabModel } from '#/web/components/repo-workspace/tab-model.ts'
+import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import {
   isWorkspacePaneStaticTabProvider,
@@ -7,6 +8,7 @@ import {
   workspacePaneTabProviders,
 } from '#/web/components/workspace-pane/tab-providers.ts'
 import { workspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import { updateWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 
 interface CloseWorkspacePaneTabsForWorktreeOptions {
   repoId: string
@@ -15,8 +17,7 @@ interface CloseWorkspacePaneTabsForWorktreeOptions {
 }
 
 type WorkspacePaneTabCloseStart =
-  | { accepted: false; completion: null }
-  | { accepted: true; completion: Promise<boolean> }
+  { accepted: false; completion: null } | { accepted: true; completion: Promise<boolean> }
 
 export function beginWorkspacePaneTabClose(
   target: RepoWorkspaceTabModel,
@@ -34,9 +35,9 @@ export function beginWorkspacePaneTabClose(
     completion: provider.close({
       repoId: target.repoId,
       branchName: target.branchName,
-      terminalKey: tab.kind === 'terminal' ? tab.key : undefined,
+      terminalSessionId: tab.kind === 'terminal' ? tab.terminalSessionId : undefined,
       terminalBase: target.terminalBase,
-      closeStaticTab: useReposStore.getState().closeWorkspacePaneStaticTab,
+      closeStaticTab: closeStaticTabWithCommit(target.worktreePath),
       closeTerminalByDescriptor: bridge?.closeTerminalByDescriptor,
       closeTerminalsForWorktree: bridge?.closeTerminalsForWorktree,
     }),
@@ -63,7 +64,7 @@ export async function closeWorkspacePaneTabsForWorktree({
     repoId,
     branchName,
     terminalBase,
-    closeStaticTab: useReposStore.getState().closeWorkspacePaneStaticTab,
+    closeStaticTab: closeStaticTabWithCommit(worktreePath),
     closeTerminalByDescriptor: bridge?.closeTerminalByDescriptor,
     closeTerminalsForWorktree: bridge?.closeTerminalsForWorktree,
   }
@@ -78,5 +79,18 @@ export async function closeWorkspacePaneTabsForWorktree({
     return results.every(Boolean)
   } catch {
     return false
+  }
+}
+
+function closeStaticTabWithCommit(worktreePath: string | null) {
+  return async (repoId: string, type: WorkspacePaneStaticTabType, branchName: string): Promise<boolean> => {
+    const repo = useReposStore.getState().repos[repoId]
+    if (!repo) return false
+    return await updateWorkspacePaneTabs({
+      repoRoot: repoId,
+      branchName,
+      worktreePath,
+      operation: { type: 'close-static', tabType: type },
+    })
   }
 }

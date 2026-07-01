@@ -5,11 +5,11 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { emptyRepo, replaceRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { isRepoStatusRefreshable, useRepoStatusRefresh } from '#/web/hooks/useRepoStatusRefresh.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { resetReposStore } from '#/web/test-utils/bridge.ts'
-import { preferredWorkspacePaneTabByBranchRecordWith } from '#/web/stores/repos/workspace-pane-preferences.ts'
-import { workspacePaneTabOrderRecordWith } from '#/web/stores/repos/workspace-pane-tabs.ts'
+import { createRepoBranch, resetReposStore } from '#/web/test-utils/bridge.ts'
+import { preferredWorkspacePaneTabByTargetRecordWith } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
-import { workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
+import { setWorkspacePaneTabsForTargetQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 
 const originalRefreshStatus = useReposStore.getState().refreshStatus
 
@@ -37,14 +37,20 @@ function createRepo(
   } = {},
 ) {
   const repo = emptyRepo(id, 'repo')
+  const worktreePath = `${id}/main`
   repo.instanceToken = id === '/repo-a' ? 1 : 2
+  repo.data.branches = [createRepoBranch('main', { worktree: { path: worktreePath } })]
+  repo.data.currentBranch = 'main'
   repo.ui.selectedBranch = 'main'
-  repo.ui.workspacePaneTabOrderByBranch = workspacePaneTabOrderRecordWith(repo.ui, 'main', [
-    workspacePaneStaticTabOrderEntry('status'),
-  ])
-  repo.ui.preferredWorkspacePaneTabByBranch = preferredWorkspacePaneTabByBranchRecordWith(
+  setWorkspacePaneTabsForTargetQueryData({
+    repoRoot: id,
+    branchName: 'main',
+    worktreePath,
+    tabs: [workspacePaneStaticTabEntry('status')],
+  })
+  repo.ui.preferredWorkspacePaneTabByTarget = preferredWorkspacePaneTabByTargetRecordWith(
     repo.ui,
-    'main',
+    { repoRoot: id, branchName: 'main', worktreePath },
     options.preferredWorkspacePaneTab ?? 'status',
   )
   if (options.unavailable) repo.availability = { phase: 'unavailable', reason: 'error.failed-read-repo', checkedAt: 0 }

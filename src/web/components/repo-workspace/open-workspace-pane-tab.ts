@@ -3,17 +3,29 @@ import { requestVisibleRepoStatusRefresh } from '#/web/stores/repos/refresh-coor
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import { workspacePaneStaticTabProvider } from '#/web/components/workspace-pane/tab-providers.ts'
+import { updateWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 
-export function openWorkspacePaneTab(input: {
+export async function openWorkspacePaneTab(input: {
   repoId: string
   branchName?: string
   worktreePath: string | null | undefined
   type: WorkspacePaneStaticTabType
   navigation: Pick<PrimaryWindowNavigationActions, 'showRepoBranchWorkspacePaneTab' | 'showRepoWorkspacePaneTab'>
-}): boolean {
+}): Promise<boolean> {
   const provider = workspacePaneStaticTabProvider(input.type)
   if (!provider.canOpen({ hasWorktree: !!input.worktreePath })) return false
-  useReposStore.getState().openWorkspacePaneStaticTab(input.repoId, input.type, input.branchName)
+  const repo = useReposStore.getState().repos[input.repoId]
+  if (!repo) return false
+  const branchName = input.branchName ?? repo?.ui.selectedBranch
+  if (branchName) {
+    const committed = await updateWorkspacePaneTabs({
+      repoRoot: input.repoId,
+      branchName,
+      worktreePath: input.worktreePath ?? null,
+      operation: { type: 'open-static', tabType: input.type },
+    })
+    if (!committed) return false
+  }
   showWorkspacePaneTab(input)
   if (provider.refreshOnOpen) requestVisibleRepoStatusRefresh(useReposStore.getState, input.repoId)
   return true

@@ -1,12 +1,11 @@
 import { describe, expect, test, vi } from 'vitest'
-import { buildWorktreeTerminalSnapshot } from '#/web/components/terminal/terminal-session-worktree-snapshot.ts'
+import { buildTerminalWorktreeSnapshot } from '#/web/components/terminal/terminal-session-worktree-snapshot.ts'
 import type { TerminalSessionLike, TerminalDescriptor, TerminalSnapshot } from '#/web/components/terminal/types.ts'
 
-function makeDescriptor(sessionId: string, index: number): TerminalDescriptor {
+function makeDescriptor(terminalSessionId: string, index: number): TerminalDescriptor {
   return {
-    key: `/repo\0/repo\0${sessionId}`,
-    worktreeTerminalKey: '/repo\0/repo',
-    sessionId,
+    terminalSessionId: `/repo\0/repo\0${terminalSessionId}`,
+    terminalWorktreeKey: '/repo\0/repo',
     index,
     repoRoot: '/repo',
     branch: 'main',
@@ -58,28 +57,25 @@ describe('terminal session worktree snapshot helper', () => {
     })
     const cache = new Map<string, TerminalSnapshot>()
 
-    const snapshot = buildWorktreeTerminalSnapshot({
-      worktreeTerminalKey: descriptor.worktreeTerminalKey,
+    const snapshot = buildTerminalWorktreeSnapshot({
+      terminalWorktreeKey: descriptor.terminalWorktreeKey,
       selectedDescriptor: descriptor,
       pendingCreate: false,
       sessions: [session],
-      selectedKey: descriptor.key,
-      getCachedSnapshot: (key) => cache.get(key) ?? null,
-      cacheSnapshot: (key, value) => cache.set(key, value),
-      getDisplayOrder: () => 1,
+      selectedTerminalSessionId: descriptor.terminalSessionId,
+      getCachedSnapshot: (terminalSessionId) => cache.get(terminalSessionId) ?? null,
+      cacheSnapshot: (terminalSessionId, value) => cache.set(terminalSessionId, value),
       hasBell: () => true,
       hasRecentActivity: () => true,
     })
 
     expect(snapshot).toEqual({
-      worktreeTerminalKey: descriptor.worktreeTerminalKey,
+      terminalWorktreeKey: descriptor.terminalWorktreeKey,
       selectedDescriptor: descriptor,
       sessions: [
         expect.objectContaining({
           type: 'terminal',
-          id: descriptor.key,
-          key: descriptor.key,
-          sessionId: 'session-1',
+          terminalSessionId: descriptor.terminalSessionId,
           selected: true,
           hasBell: true,
           recentlyActive: true,
@@ -94,15 +90,14 @@ describe('terminal session worktree snapshot helper', () => {
     })
     expect(session.snapshotSpy).toHaveBeenCalledTimes(1)
 
-    buildWorktreeTerminalSnapshot({
-      worktreeTerminalKey: descriptor.worktreeTerminalKey,
+    buildTerminalWorktreeSnapshot({
+      terminalWorktreeKey: descriptor.terminalWorktreeKey,
       selectedDescriptor: descriptor,
       pendingCreate: false,
       sessions: [session],
-      selectedKey: descriptor.key,
-      getCachedSnapshot: (key) => cache.get(key) ?? null,
-      cacheSnapshot: (key, value) => cache.set(key, value),
-      getDisplayOrder: () => 1,
+      selectedTerminalSessionId: descriptor.terminalSessionId,
+      getCachedSnapshot: (terminalSessionId) => cache.get(terminalSessionId) ?? null,
+      cacheSnapshot: (terminalSessionId, value) => cache.set(terminalSessionId, value),
       hasBell: () => false,
       hasRecentActivity: () => false,
     })

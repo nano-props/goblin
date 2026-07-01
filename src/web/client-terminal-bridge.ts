@@ -1,4 +1,8 @@
-import { normalizeTerminalSessionSnapshot, normalizeTerminalSessionSummaryList } from '#/shared/terminal-validators.ts'
+import {
+  normalizeTerminalSessionSnapshot,
+  normalizeTerminalSessionSummaryList,
+  normalizeWorkspacePaneTabsEntryList,
+} from '#/shared/terminal-validators.ts'
 import { resolveTerminalController } from '#/shared/terminal-controller.ts'
 import type { TerminalRealtimeMessage } from '#/shared/terminal-socket.ts'
 import type {
@@ -31,7 +35,10 @@ export function createServerTerminalBridge(options: {
   const identitySubscribers = new Set<(event: TerminalIdentityViewModel) => void>()
   const lifecycleSubscribers = new Set<(event: TerminalLifecycleViewModel) => void>()
   const sessionsChangedSubscribers = new Set<(repoRoot: string) => void>()
-  const sessionClosedSubscribers = new Set<(event: { ptySessionId: string; repoRoot: string }) => void>()
+  const workspaceTabsChangedSubscribers = new Set<(repoRoot: string) => void>()
+  const sessionClosedSubscribers = new Set<
+    (event: { ptySessionId: string; repoRoot: string; worktreePath: string }) => void
+  >()
 
   const connection = createTerminalSocketConnection({
     getServerConfig: options.getServerConfig,
@@ -61,6 +68,12 @@ export function createServerTerminalBridge(options: {
     create(input) {
       return connection.request('create', input satisfies TerminalCreateInput)
     },
+    replaceWorkspaceTabs(input) {
+      return connection.request('replace-tabs', input)
+    },
+    updateWorkspaceTabs(input) {
+      return connection.request('update-tabs', input)
+    },
     pruneTerminals(repoRoot) {
       return connection.request('prune', { repoRoot })
     },
@@ -69,6 +82,13 @@ export function createServerTerminalBridge(options: {
         const sessions = normalizeTerminalSessionSummaryList(value)
         if (!sessions) throw new Error('Terminal socket response failed: invalid terminal sessions response')
         return sessions
+      })
+    },
+    listWorkspaceTabs(input) {
+      return connection.request('list-workspace-tabs', input).then((value) => {
+        const tabs = normalizeWorkspacePaneTabsEntryList(value)
+        if (!tabs) throw new Error('Terminal socket response failed: invalid workspace tabs response')
+        return tabs
       })
     },
     prewarm() {
@@ -139,6 +159,14 @@ export function createServerTerminalBridge(options: {
         connection.closeSocketIfIdle()
       }
     },
+    onWorkspaceTabsChanged(cb) {
+      workspaceTabsChangedSubscribers.add(cb)
+      connection.openForRealtime()
+      return () => {
+        workspaceTabsChangedSubscribers.delete(cb)
+        connection.closeSocketIfIdle()
+      }
+    },
     onSessionClosed(cb) {
       sessionClosedSubscribers.add(cb)
       connection.openForRealtime()
@@ -160,6 +188,7 @@ export function createServerTerminalBridge(options: {
       identitySubscribers.size > 0 ||
       lifecycleSubscribers.size > 0 ||
       sessionsChangedSubscribers.size > 0 ||
+      workspaceTabsChangedSubscribers.size > 0 ||
       sessionClosedSubscribers.size > 0
     )
   }
@@ -178,9 +207,16 @@ export function createServerTerminalBridge(options: {
       case 'sessions-changed':
         for (const subscriber of sessionsChangedSubscribers) subscriber(message.repoRoot)
         return
+      case 'workspace-tabs-changed':
+        for (const subscriber of workspaceTabsChangedSubscribers) subscriber(message.repoRoot)
+        return
       case 'session-closed':
         for (const subscriber of sessionClosedSubscribers)
-          subscriber({ ptySessionId: message.ptySessionId, repoRoot: message.repoRoot })
+          subscriber({
+            ptySessionId: message.ptySessionId,
+            repoRoot: message.repoRoot,
+            worktreePath: message.worktreePath,
+          })
         return
       case 'identity': {
         const identityEvent = {

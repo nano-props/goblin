@@ -6,8 +6,12 @@ import {
 import { isRepoUnavailable } from '#/web/stores/repos/repo-guards.ts'
 import type { RepoState, ReposGet } from '#/web/stores/repos/types.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
-import { workspacePaneStaticTabsForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
-import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
+import {
+  preferredWorkspacePaneTabForTarget,
+  workspacePaneTabsTargetForRepoBranch,
+} from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 
 interface RepoRefreshIntentBase {
   id: string
@@ -34,11 +38,18 @@ export interface RepoStatusRefreshSnapshot {
 }
 
 export function repoStatusRefreshSnapshot(repo: RepoState): RepoStatusRefreshSnapshot {
+  const selectedTarget = workspacePaneTabsTargetForRepoBranch(repo, repo.ui.selectedBranch)
   return {
     id: repo.id,
     token: repo.instanceToken,
-    preferredWorkspacePaneTab: preferredWorkspacePaneTabForBranch(repo.ui, repo.ui.selectedBranch),
-    statusViewOpen: workspacePaneStaticTabsForBranch(repo.ui, repo.ui.selectedBranch).includes('status'),
+    preferredWorkspacePaneTab: preferredWorkspacePaneTabForTarget(repo.ui, selectedTarget),
+    statusViewOpen: workspacePaneStaticTabsFromEntries(
+      readWorkspacePaneTabsForTarget({
+        repoRoot: repo.id,
+        branchName: selectedTarget?.branchName ?? null,
+        worktreePath: selectedTarget?.worktreePath ?? null,
+      }),
+    ).includes('status'),
     unavailable: isRepoUnavailable(repo),
     statusPhase: repo.dataLoads.status.phase,
   }

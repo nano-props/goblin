@@ -3,8 +3,12 @@ import { isRepoUnavailable, updateIfFresh } from '#/web/stores/repos/repo-guards
 import { persistRepoSnapshotCacheEntry } from '#/web/stores/repos/persistence.ts'
 import { refreshPullRequestsLog, terminalLog } from '#/web/logger.ts'
 import { terminalBridge } from '#/web/terminal.ts'
-import { workspacePaneStaticTabsForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
-import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
+import {
+  preferredWorkspacePaneTabForTarget,
+  workspacePaneTabsTargetForRepoBranch,
+} from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import {
   PULL_REQUEST_UNKNOWN_RETRY_DELAY_MS,
   PULL_REQUEST_UNKNOWN_RETRY_LIMIT,
@@ -25,10 +29,11 @@ function pullRequestRefreshFailed(get: ReposGet, id: string, token: number): boo
 function visibleDetailPullRequestPending(get: ReposGet, id: string, token: number): boolean {
   const repo = get().repos[id]
   if (!repo) return false
-  const openStaticTabs = workspacePaneStaticTabsForBranch(repo.ui, repo.ui.selectedBranch)
+  const target = workspacePaneTabsTargetForSelectedBranch(repo)
+  const openStaticTabs = workspacePaneStaticTabsFromEntries(readWorkspacePaneTabsForSelectedBranch(repo))
   if (
     repo.instanceToken !== token ||
-    preferredWorkspacePaneTabForBranch(repo.ui, repo.ui.selectedBranch) !== 'status' ||
+    preferredWorkspacePaneTabForTarget(repo.ui, target) !== 'status' ||
     !openStaticTabs.includes('status') ||
     !repo.ui.selectedBranch
   )
@@ -40,15 +45,29 @@ function visibleDetailPullRequestPending(get: ReposGet, id: string, token: numbe
 async function refreshVisibleDetailPullRequest(get: ReposGet, id: string, token: number): Promise<void> {
   const repo = get().repos[id]
   if (!repo) return
-  const openStaticTabs = workspacePaneStaticTabsForBranch(repo.ui, repo.ui.selectedBranch)
+  const target = workspacePaneTabsTargetForSelectedBranch(repo)
+  const openStaticTabs = workspacePaneStaticTabsFromEntries(readWorkspacePaneTabsForSelectedBranch(repo))
   if (
     repo.instanceToken !== token ||
-    preferredWorkspacePaneTabForBranch(repo.ui, repo.ui.selectedBranch) !== 'status' ||
+    preferredWorkspacePaneTabForTarget(repo.ui, target) !== 'status' ||
     !openStaticTabs.includes('status') ||
     !repo.ui.selectedBranch
   )
     return
   await get().refreshPullRequests(id, [repo.ui.selectedBranch], { token, mode: 'full' })
+}
+
+function readWorkspacePaneTabsForSelectedBranch(repo: NonNullable<ReturnType<ReposGet>['repos'][string]>) {
+  const target = workspacePaneTabsTargetForSelectedBranch(repo)
+  return readWorkspacePaneTabsForTarget({
+    repoRoot: repo.id,
+    branchName: target?.branchName ?? null,
+    worktreePath: target?.worktreePath ?? null,
+  })
+}
+
+function workspacePaneTabsTargetForSelectedBranch(repo: NonNullable<ReturnType<ReposGet>['repos'][string]>) {
+  return workspacePaneTabsTargetForRepoBranch(repo, repo.ui.selectedBranch)
 }
 
 async function delay(ms: number): Promise<void> {
