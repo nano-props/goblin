@@ -17,7 +17,15 @@ export type WorkspacePaneTabsTargetIdentity =
     }
 
 export function workspacePaneTabsTargetIdentityKey(target: WorkspacePaneTabsTarget): string {
-  if (target.worktreePath !== null) return `${target.repoRoot}\0worktree\0${target.worktreePath}`
+  return workspacePaneTabsTargetIdentityKeyFromIdentity(
+    target.worktreePath !== null
+      ? { kind: 'worktree', repoRoot: target.repoRoot, worktreePath: target.worktreePath }
+      : { kind: 'branch', repoRoot: target.repoRoot, branchName: target.branchName },
+  )
+}
+
+export function workspacePaneTabsTargetIdentityKeyFromIdentity(target: WorkspacePaneTabsTargetIdentity): string {
+  if (target.kind === 'worktree') return `${target.repoRoot}\0worktree\0${target.worktreePath}`
   return `${target.repoRoot}\0branch\0${target.branchName}`
 }
 

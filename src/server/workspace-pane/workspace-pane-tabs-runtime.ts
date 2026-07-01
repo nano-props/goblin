@@ -95,25 +95,6 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
     return this.replaceTabs({ ...input, tabs: workspacePaneTabsWithIdentityOrder(this.tabs(input), tabIdentities) })
   }
 
-  removeTerminalTabForWorktree(
-    input: WorkspacePaneTabsWorktreeInput<TUser>,
-    terminalSessionId: string,
-  ): WorkspacePaneTabsScopeEntry[] {
-    const updated: WorkspacePaneTabsScopeEntry[] = []
-    for (const [key, entry] of this.tabsByTarget.entries()) {
-      if (!this.entryBelongsToWorktree(input, key, entry)) continue
-      const tabs = this.replaceTabs({
-        userId: input.userId,
-        scope: input.scope,
-        branchName: entry.branchName,
-        worktreePath: entry.worktreePath,
-        tabs: entry.tabs.filter((tab) => tab.type !== 'terminal' || tab.terminalSessionId !== terminalSessionId),
-      })
-      updated.push({ branchName: entry.branchName, worktreePath: entry.worktreePath, tabs })
-    }
-    return updated
-  }
-
   tabs(input: WorkspacePaneTabsTargetInput<TUser>): WorkspacePaneTabEntry[] {
     return [...(this.tabsByTarget.get(this.targetKey(input))?.tabs ?? DEFAULT_WORKSPACE_TABS)]
   }
@@ -150,14 +131,6 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
     })}`
   }
 
-  private entryBelongsToWorktree(
-    input: WorkspacePaneTabsWorktreeInput<TUser>,
-    key: string,
-    entry: StoredWorkspacePaneTabsEntry,
-  ): boolean {
-    const prefix = `${String(input.userId)}\0${input.scope}\0`
-    return key.startsWith(prefix) && entry.worktreePath === input.worktreePath
-  }
 }
 
 export function createWorkspacePaneTabsRuntime<TUser extends string | number>(): WorkspacePaneTabsRuntime<TUser> {

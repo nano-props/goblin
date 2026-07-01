@@ -23,7 +23,10 @@ import {
   type WorkspacePaneTabEntry,
   workspacePaneTabEntryIdentity,
 } from '#/shared/workspace-pane.ts'
-import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
+import {
+  workspacePaneTabsTargetIdentityKeyFromIdentity,
+  type WorkspacePaneTabsTargetIdentity,
+} from '#/shared/workspace-pane-tabs-target.ts'
 import { isValidTerminalClientId, isValidTerminalSize } from '#/shared/terminal-validators.ts'
 import { createTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
 import { terminalSessionScope } from '#/server/terminal/terminal-session-scope.ts'
@@ -97,7 +100,6 @@ interface TerminalSessionServiceOptions {
     | 'closeStaticTab'
     | 'ensureTerminalTab'
     | 'openStaticTab'
-    | 'removeTerminalTabForWorktree'
     | 'reorderTabsByIdentity'
     | 'replaceTabs'
     | 'tabs'
@@ -111,6 +113,10 @@ interface TerminalSessionIdAllocation {
   terminalSessionId: string
   reservationKey: string | null
 }
+
+type WorkspaceTabsOperationQueueTarget =
+  | ({ userId: string } & Extract<WorkspacePaneTabsTargetIdentity, { kind: 'branch' }>)
+  | ({ userId: string } & Extract<WorkspacePaneTabsTargetIdentity, { kind: 'worktree' }>)
 
 class TerminalSessionService {
   private readonly options: TerminalSessionServiceOptions
@@ -187,8 +193,13 @@ class TerminalSessionService {
             createdSession.repoRoot,
             input.branch,
             createdSession.worktreePath,
-            async () =>
-              this.options.workspaceTabs.replaceTabs({
+            async () => {
+              const liveTerminalSessionIds = await this.liveTerminalSessionIdsForWorktree(
+                userId,
+                createdSession.repoRoot,
+                createdSession.worktreePath,
+              )
+              return this.options.workspaceTabs.replaceTabs({
                 userId,
                 scope: createdSession.repoRoot,
                 branchName: input.branch,
@@ -203,11 +214,10 @@ class TerminalSessionService {
                     },
                     createResult.terminalSessionId,
                   ),
-                  sessions
-                    .filter((session) => session.worktreePath === createdSession.worktreePath)
-                    .map((session) => session.terminalSessionId),
+                  liveTerminalSessionIds,
                 ),
-              }),
+              })
+            },
           )
         : []
       return {
@@ -277,53 +287,40 @@ class TerminalSessionService {
   }
 
   async removeTerminalTab(userId: string, session: TerminalSessionSummary): Promise<void> {
-    const updatedEntries = this.options.workspaceTabs.removeTerminalTabForWorktree(
-      { userId, scope: session.repoRoot, worktreePath: session.worktreePath },
-      session.terminalSessionId,
-    )
-    const liveTerminalSessionIds = await this.liveTerminalSessionIdsForWorktree(
-      userId,
-      session.repoRoot,
-      session.worktreePath,
-    )
-    for (const entry of updatedEntries) {
-      this.options.workspaceTabs.replaceTabs({
+    await this.runWorkspaceTabsWorktreeOperation(userId, session.repoRoot, session.worktreePath, async () => {
+      const liveTerminalSessionIds = await this.liveTerminalSessionIdsForWorktree(
+        userId,
+        session.repoRoot,
+        session.worktreePath,
+      )
+      this.pruneWorkspaceTabsForWorktree({
         userId,
         scope: session.repoRoot,
-        branchName: entry.branchName,
-        worktreePath: entry.worktreePath,
-        tabs: workspaceTabsWithoutStaleTerminalEntries(entry.tabs, liveTerminalSessionIds),
+        worktreePath: session.worktreePath,
+        liveTerminalSessionIds,
+        removeTerminalSessionId: session.terminalSessionId,
       })
-    }
+    })
   }
 
   async listWorkspaceTabs(userId: string, repoRoot: string): Promise<WorkspacePaneTabsEntry[]> {
     if (!isValidRepoLocator(repoRoot)) return []
     const scope = terminalSessionScope(repoRoot)
-    const sessions = await this.options.manager.listSessionsForUser(userId, scope)
-    const liveTerminalSessionIdsByWorktree = new Map<string, string[]>()
-    for (const session of sessions) {
-      const ids = liveTerminalSessionIdsByWorktree.get(session.worktreePath) ?? []
-      ids.push(session.terminalSessionId)
-      liveTerminalSessionIdsByWorktree.set(session.worktreePath, ids)
-    }
-    for (const entry of this.options.workspaceTabs.tabsForScope({ userId, scope })) {
-      if (entry.worktreePath === null) continue
-      const currentTabs = this.options.workspaceTabs.tabs({
-        userId,
-        scope,
-        branchName: entry.branchName,
-        worktreePath: entry.worktreePath,
-      })
-      this.options.workspaceTabs.replaceTabs({
-        userId,
-        scope,
-        branchName: entry.branchName,
-        worktreePath: entry.worktreePath,
-        tabs: workspaceTabsWithoutStaleTerminalEntries(
-          currentTabs,
-          liveTerminalSessionIdsByWorktree.get(entry.worktreePath) ?? [],
-        ),
+    const worktreePaths = new Set(
+      this.options.workspaceTabs
+        .tabsForScope({ userId, scope })
+        .flatMap((entry) => (entry.worktreePath === null ? [] : [entry.worktreePath])),
+    )
+    for (const worktreePath of worktreePaths) {
+      await this.runWorkspaceTabsWorktreeOperation(userId, scope, worktreePath, async () => {
+        const liveTerminalSessionIds = await this.liveTerminalSessionIdsForWorktree(userId, scope, worktreePath)
+        this.pruneWorkspaceTabsForWorktree({
+          userId,
+          scope,
+          worktreePath,
+          liveTerminalSessionIds,
+          removeTerminalSessionId: null,
+        })
       })
     }
     return this.options.workspaceTabs.tabsForScope({ userId, scope }).map((entry) => ({
@@ -355,7 +352,25 @@ class TerminalSessionService {
     worktreePath: string | null,
     task: () => Promise<T> | T,
   ): Promise<T> {
-    const queueKey = workspaceTabsOperationQueueKey(userId, scope, branchName, worktreePath)
+    return await this.runWorkspaceTabsOperationByKey(
+      workspaceTabsOperationQueueKey(workspaceTabsOperationQueueTarget(userId, scope, branchName, worktreePath)),
+      task,
+    )
+  }
+
+  private async runWorkspaceTabsWorktreeOperation<T>(
+    userId: string,
+    scope: string,
+    worktreePath: string,
+    task: () => Promise<T> | T,
+  ): Promise<T> {
+    return await this.runWorkspaceTabsOperationByKey(
+      workspaceTabsOperationQueueKey({ kind: 'worktree', userId, repoRoot: scope, worktreePath }),
+      task,
+    )
+  }
+
+  private async runWorkspaceTabsOperationByKey<T>(queueKey: string, task: () => Promise<T> | T): Promise<T> {
     const queue = this.workspaceTabsOperationQueue(queueKey)
     try {
       return await queue.add(task)
@@ -378,6 +393,38 @@ class TerminalSessionService {
       if (this.workspaceTabOperationQueuesByTarget.get(queueKey) !== queue) return
       if (queue.size === 0 && queue.pending === 0) this.workspaceTabOperationQueuesByTarget.delete(queueKey)
     })
+  }
+
+  private pruneWorkspaceTabsForWorktree(input: {
+    userId: string
+    scope: string
+    worktreePath: string
+    liveTerminalSessionIds: readonly string[]
+    removeTerminalSessionId: string | null
+  }): void {
+    const entries = this.options.workspaceTabs
+      .tabsForScope({ userId: input.userId, scope: input.scope })
+      .filter((entry) => entry.worktreePath === input.worktreePath)
+    for (const entry of entries) {
+      const currentTabs = this.options.workspaceTabs.tabs({
+        userId: input.userId,
+        scope: input.scope,
+        branchName: entry.branchName,
+        worktreePath: entry.worktreePath,
+      })
+      const tabsWithoutClosedTerminal = input.removeTerminalSessionId
+        ? currentTabs.filter(
+            (tab) => tab.type !== 'terminal' || tab.terminalSessionId !== input.removeTerminalSessionId,
+          )
+        : currentTabs
+      this.options.workspaceTabs.replaceTabs({
+        userId: input.userId,
+        scope: input.scope,
+        branchName: entry.branchName,
+        worktreePath: entry.worktreePath,
+        tabs: workspaceTabsWithoutStaleTerminalEntries(tabsWithoutClosedTerminal, input.liveTerminalSessionIds),
+      })
+    }
   }
 
   private async runCreateInWorktreeQueue<T>(
@@ -619,13 +666,19 @@ function terminalCreateQueueKey(userId: string, repoRoot: string, worktreePath: 
   return terminalUserWorktreeKey(userId, terminalSessionScope(repoRoot), terminalWorktreePath(repoRoot, worktreePath))
 }
 
-function workspaceTabsOperationQueueKey(
+function workspaceTabsOperationQueueTarget(
   userId: string,
   scope: string,
   branchName: string,
   worktreePath: string | null,
-): string {
-  return `${userId}\0${workspacePaneTabsTargetIdentityKey({ repoRoot: scope, branchName, worktreePath })}`
+): WorkspaceTabsOperationQueueTarget {
+  return worktreePath === null
+    ? { kind: 'branch', userId, repoRoot: scope, branchName }
+    : { kind: 'worktree', userId, repoRoot: scope, worktreePath }
+}
+
+function workspaceTabsOperationQueueKey(target: WorkspaceTabsOperationQueueTarget): string {
+  return `${target.userId}\0${workspacePaneTabsTargetIdentityKeyFromIdentity(target)}`
 }
 
 function terminalSessionIdReservationKey(userId: string, scope: string, worktreePath: string): string {

@@ -156,6 +156,62 @@ describe('terminal session service workspace tabs', () => {
     ])
   })
 
+  test('serializes workspace tab list pruning with later workspace tab reorder operations', async () => {
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    workspaceTabs.replaceTabs({
+      userId: USER_ID,
+      scope: path.resolve(REPO_ROOT),
+      branchName: BRANCH_NAME,
+      worktreePath: path.resolve(WORKTREE_PATH),
+      tabs: [
+        workspacePaneTerminalTabEntry('session-live'),
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneStaticTabEntry('history'),
+      ],
+    })
+    const listSessionResolves: Array<(sessions: TerminalSessionSummary[]) => void> = []
+    const service = createService({
+      sessions: () =>
+        new Promise<TerminalSessionSummary[]>((resolve) => {
+          listSessionResolves.push(resolve)
+        }),
+      workspaceTabs,
+    })
+
+    const list = service.listWorkspaceTabs(USER_ID, REPO_ROOT)
+    await vi.waitFor(() => expect(listSessionResolves).toHaveLength(1))
+
+    const reorder = service.updateTabs(USER_ID, {
+      repoRoot: REPO_ROOT,
+      branchName: BRANCH_NAME,
+      worktreePath: WORKTREE_PATH,
+      operation: { type: 'reorder', tabIdentities: ['workspace-pane:history', 'workspace-pane:status'] },
+    })
+
+    expect(listSessionResolves).toHaveLength(1)
+    listSessionResolves[0]!([terminalSession('session-live')])
+    await expect(list).resolves.toEqual([
+      {
+        repoRoot: REPO_ROOT,
+        branchName: BRANCH_NAME,
+        worktreePath: path.resolve(WORKTREE_PATH),
+        tabs: [
+          workspacePaneTerminalTabEntry('session-live'),
+          workspacePaneStaticTabEntry('status'),
+          workspacePaneStaticTabEntry('history'),
+        ],
+      },
+    ])
+    await vi.waitFor(() => expect(listSessionResolves).toHaveLength(2))
+    listSessionResolves[1]!([terminalSession('session-live')])
+
+    await expect(reorder).resolves.toEqual([
+      workspacePaneStaticTabEntry('history'),
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneTerminalTabEntry('session-live'),
+    ])
+  })
+
   test('removeTerminalTab returns canonical tabs without unrelated stale terminal tabs', async () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     workspaceTabs.replaceTabs({
@@ -184,6 +240,58 @@ describe('terminal session service workspace tabs', () => {
         worktreePath: path.resolve(WORKTREE_PATH),
       }),
     ).toEqual([workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-live')])
+  })
+
+  test('serializes terminal tab removal with later workspace tab reorder operations', async () => {
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    workspaceTabs.replaceTabs({
+      userId: USER_ID,
+      scope: path.resolve(REPO_ROOT),
+      branchName: BRANCH_NAME,
+      worktreePath: path.resolve(WORKTREE_PATH),
+      tabs: [
+        workspacePaneTerminalTabEntry('session-closed'),
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneStaticTabEntry('history'),
+      ],
+    })
+    const listSessionResolves: Array<(sessions: TerminalSessionSummary[]) => void> = []
+    const service = createService({
+      sessions: () =>
+        new Promise<TerminalSessionSummary[]>((resolve) => {
+          listSessionResolves.push(resolve)
+        }),
+      workspaceTabs,
+    })
+
+    const close = service.removeTerminalTab(USER_ID, terminalSession('session-closed'))
+    await vi.waitFor(() => expect(listSessionResolves).toHaveLength(1))
+
+    const reorder = service.updateTabs(USER_ID, {
+      repoRoot: REPO_ROOT,
+      branchName: BRANCH_NAME,
+      worktreePath: WORKTREE_PATH,
+      operation: { type: 'reorder', tabIdentities: ['workspace-pane:history', 'workspace-pane:status'] },
+    })
+
+    expect(listSessionResolves).toHaveLength(1)
+    listSessionResolves[0]!([])
+    await expect(close).resolves.toBeUndefined()
+    await vi.waitFor(() => expect(listSessionResolves).toHaveLength(2))
+    listSessionResolves[1]!([])
+
+    await expect(reorder).resolves.toEqual([
+      workspacePaneStaticTabEntry('history'),
+      workspacePaneStaticTabEntry('status'),
+    ])
+    expect(
+      workspaceTabs.tabs({
+        userId: USER_ID,
+        scope: path.resolve(REPO_ROOT),
+        branchName: BRANCH_NAME,
+        worktreePath: path.resolve(WORKTREE_PATH),
+      }),
+    ).toEqual([workspacePaneStaticTabEntry('history'), workspacePaneStaticTabEntry('status')])
   })
 
   test('replaceTabs keeps no-worktree branch tabs server-owned and static-only', async () => {
@@ -299,7 +407,7 @@ describe('terminal session service workspace tabs', () => {
 })
 
 function createService(options: {
-  sessions: TerminalSessionSummary[] | (() => TerminalSessionSummary[])
+  sessions: TerminalSessionSummary[] | (() => TerminalSessionSummary[] | Promise<TerminalSessionSummary[]>)
   workspaceTabs: WorkspacePaneTabsRuntime<string>
   ensureSession?: (input: EnsureSessionInput) => Promise<TerminalAttachResult>
 }) {
@@ -314,7 +422,7 @@ function createService(options: {
           message: 'unused',
         })),
       listSessionsForUser: vi.fn(async () =>
-        typeof options.sessions === 'function' ? options.sessions() : options.sessions,
+        await (typeof options.sessions === 'function' ? options.sessions() : options.sessions),
       ),
       closeSession: vi.fn(),
     },
