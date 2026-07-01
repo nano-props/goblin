@@ -9,7 +9,7 @@ import {
   getRepoTreeSourceLocal,
   getRepoTreeSourceRemote,
 } from '#/server/modules/repo-tree-source.ts'
-import { buildChildNodes } from '#/server/modules/repo-tree-source-pure.ts'
+import { buildChildNodes, buildLimitedChildNodes } from '#/server/modules/repo-tree-source-pure.ts'
 import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
 
 async function makeTempWorktree(files: Record<string, string>): Promise<string> {
@@ -115,21 +115,6 @@ describe('repo-tree-source — local direct children', () => {
     expect(secrets.nodes.map((node) => node.id)).toEqual(['secrets/tracked.txt'])
   })
 
-  test('truncates large direct-child result sets', async () => {
-    worktree = await makeTempWorktree({ 'package.json': '{}' })
-    const batchSize = 500
-    for (let i = 0; i < MAX_REPO_TREE_NODES + 16; i += batchSize) {
-      const batch = Array.from({ length: Math.min(batchSize, MAX_REPO_TREE_NODES + 16 - i) }, (_, j) =>
-        fs.writeFile(path.join(worktree as string, `f${i + j}.txt`), 'x'),
-      )
-      await Promise.all(batch)
-    }
-
-    const result = await getRepoTreeSourceLocal(worktree, {}, undefined)
-    expect(result.nodes.length).toBeLessThanOrEqual(MAX_REPO_TREE_NODES)
-    expect(result.truncated).toBe(true)
-  })
-
   test('returns empty nodes when the worktree path does not exist', async () => {
     const missing = path.join(os.tmpdir(), 'definitely-not-a-real-path-' + Date.now())
     const result = await getRepoTreeSourceLocal(missing, {}, undefined)
@@ -162,6 +147,14 @@ describe('repo-tree-source — buildChildNodes pure helper', () => {
     })
     const ids = nodes.map((node) => node.id)
     expect(ids).toEqual(['dir', 'good.ts'])
+  })
+
+  test('truncates large direct-child result sets', () => {
+    const entries = Array.from({ length: MAX_REPO_TREE_NODES + 16 }, (_, index) => `f${index}.txt`)
+    const result = buildLimitedChildNodes({ prefix: '', entries, maxNodes: MAX_REPO_TREE_NODES })
+
+    expect(result.nodes).toHaveLength(MAX_REPO_TREE_NODES)
+    expect(result.truncated).toBe(true)
   })
 })
 

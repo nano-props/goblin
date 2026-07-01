@@ -36,10 +36,28 @@
 // cookie, the server returns 200, the gate clears. No bootstrap
 // plumbing, no IPC for the access token, no sync-vs-async dance.
 
-import { type WebContents } from 'electron'
 import { ACCESS_TOKEN_COOKIE } from '#/shared/access-token.ts'
 
 const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365
+
+interface AuthCookieDetails {
+  url: string
+  name: string
+  value: string
+  httpOnly: boolean
+  sameSite: 'lax'
+  secure: boolean
+  path: string
+  expirationDate: number
+}
+
+export interface EmbedAuthCookieWebContents {
+  session: {
+    cookies: {
+      set(details: AuthCookieDetails): Promise<void>
+    }
+  }
+}
 
 export interface EmbedAuthCookieOptions {
   /**
@@ -59,7 +77,7 @@ export interface EmbedAuthCookieOptions {
    * the client/whoami probe succeed on first paint.
    */
   url: string
-  webContents: WebContents
+  webContents: EmbedAuthCookieWebContents
 }
 
 /**
@@ -106,15 +124,15 @@ export async function plantEmbedAuthCookie({ accessToken, url, webContents }: Em
 export interface ReplantEmbedAuthCookieForRotationOptions {
   accessToken: string
   url: string
-  webContents: Pick<WebContents, 'session'>
+  webContents: EmbedAuthCookieWebContents
 }
 
 /**
  * Replant the auth cookie after the embedded server restarts with a
  * new access token. Thin wrapper over `plantEmbedAuthCookie` that
- * uses a narrower `webContents` type so the rotation flow in
- * `access-token-ipc.ts` can inject a `Pick<WebContents, 'session'>`
- * without depending on the full Electron surface.
+ * uses a narrow structural `webContents` type so the rotation flow in
+ * `access-token-ipc.ts` can inject only the cookie surface it needs
+ * without depending on the full Electron runtime module.
  *
  * Without this replant, a rotation leaves the client's
  * `webContents.session.cookies` holding the OLD token. The next
@@ -130,6 +148,6 @@ export async function replantEmbedAuthCookieForRotation({
   await plantEmbedAuthCookie({
     accessToken,
     url,
-    webContents: webContents as WebContents,
+    webContents,
   })
 }

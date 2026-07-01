@@ -11,7 +11,7 @@ import type { RepoTreeNode } from '#/shared/api-types.ts'
 import type { WorktreeInfo } from '#/shared/git-types.ts'
 import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
 import { getRemoteTreeWalk } from '#/system/ssh/git.ts'
-import { buildChildNodes, parseNullSeparatedPaths, stripRemoteEntryPrefix } from '#/server/modules/repo-tree-source-pure.ts'
+import { buildLimitedChildNodes, parseNullSeparatedPaths, stripRemoteEntryPrefix } from '#/server/modules/repo-tree-source-pure.ts'
 
 export const MAX_REPO_TREE_NODES = 50_000
 
@@ -135,12 +135,9 @@ async function visibleGitDirectoryEntries(
 }
 
 function nodesFromDirectoryEntries(prefix: string, entries: ReadonlyArray<string>): RepoTreeSourceResult {
-  const limitedEntries = entries.slice(0, MAX_REPO_TREE_NODES + 1)
-  const allNodes = buildChildNodes({ prefix, entries: limitedEntries })
-  const truncated = entries.length > MAX_REPO_TREE_NODES
-  const sliced = truncated ? allNodes.slice(0, MAX_REPO_TREE_NODES) : allNodes
-  const nodes: RepoTreeNode[] = sliced.map((node) => ({ ...node, status: 'clean' }))
-  return { nodes, truncated }
+  const result = buildLimitedChildNodes({ prefix, entries, maxNodes: MAX_REPO_TREE_NODES })
+  const nodes: RepoTreeNode[] = result.nodes.map((node) => ({ ...node, status: 'clean' }))
+  return { nodes, truncated: result.truncated }
 }
 
 async function ignoredGitPathSet(

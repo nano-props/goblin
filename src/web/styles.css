@@ -66,8 +66,11 @@ html[data-host='electron']:not([data-chrome='overlay']) {
 }
 
 html[data-host='electron'][data-chrome='overlay'] {
-  --goblin-title-bar-chrome-left: 16px;
-  --goblin-title-bar-chrome-right: 150px;
+  --goblin-title-bar-chrome-left: max(16px, env(titlebar-area-x, 16px));
+  --goblin-title-bar-chrome-right: max(
+    16px,
+    calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 150px)))
+  );
 }
 
 /* Window-chrome drag region — leaves room for macOS traffic lights on the left.

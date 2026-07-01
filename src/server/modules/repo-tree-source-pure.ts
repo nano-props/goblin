@@ -14,6 +14,15 @@ export interface BuildChildNodesInput {
   readonly entries: ReadonlyArray<string>
 }
 
+export interface BuildLimitedChildNodesInput extends BuildChildNodesInput {
+  readonly maxNodes: number
+}
+
+export interface BuildLimitedChildNodesResult {
+  readonly nodes: RepoTreeNode[]
+  readonly truncated: boolean
+}
+
 /** Build only the direct children of `prefix`. Directory entries are
  *  represented by a trailing slash in the input and are marked as
  *  expandable without recursively reading their descendants. */
@@ -30,6 +39,13 @@ export function buildChildNodes(input: BuildChildNodesInput): RepoTreeNode[] {
   }
 
   return Array.from(byId.values()).sort(compareNodes)
+}
+
+export function buildLimitedChildNodes(input: BuildLimitedChildNodesInput): BuildLimitedChildNodesResult {
+  const limitedEntries = input.entries.slice(0, input.maxNodes + 1)
+  const allNodes = buildChildNodes({ prefix: input.prefix, entries: limitedEntries })
+  const truncated = input.entries.length > input.maxNodes
+  return { nodes: truncated ? allNodes.slice(0, input.maxNodes) : allNodes, truncated }
 }
 
 function directChildForPrefix(relative: string, prefix: string): RepoTreeNode | null {

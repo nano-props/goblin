@@ -1,14 +1,14 @@
 // @vitest-environment node
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import type { EmbedAuthCookieWebContents } from '#/main/cookie-bootstrap.ts'
 
 const cookieSetMock = vi.fn()
 const sessionMock = { cookies: { set: cookieSetMock } }
-// `Pick<WebContents, 'session'>` — only the `session` surface is
-// touched by `plantEmbedAuthCookie`. Cast through `unknown` so we
-// can pass a minimal stub without dragging in the full Electron
-// `WebContents` type (which has dozens of unrelated properties).
-const webContentsMock = { session: sessionMock } as unknown as Pick<Electron.WebContents, 'session'>
+// Only the `session.cookies.set` surface is touched by
+// `plantEmbedAuthCookie`; keep the mock structural so this node test
+// never resolves Electron's runtime package.
+const webContentsMock = { session: sessionMock } as EmbedAuthCookieWebContents
 
 beforeEach(() => {
   cookieSetMock.mockReset()
