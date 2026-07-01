@@ -63,7 +63,6 @@ function makeActions(
     listWorkspaceTabs: vi.fn(async () => []),
     replaceTabs: vi.fn(async () => []),
     updateTabs: vi.fn(async () => []),
-    removeTerminalTab: vi.fn(async () => {}),
   }
   const isValidTerminalClientId =
     options.isValidTerminalClientId ?? ((value: unknown): value is string => value === CLIENT_ID)
@@ -129,11 +128,10 @@ describe('terminal-runtime-actions close broadcast', () => {
     expect(broadcasts).not.toHaveBeenCalled()
   })
 
-  test('emits repo and targeted close broadcasts on a successful close', async () => {
-    // The new sibling-window broadcast rides alongside the existing
-    // `sessions-changed` list-rescan. The session-closed event is the
-    // targeted counterpart; sibling windows drop the local entry
-    // immediately instead of waiting for the next reconcile.
+  test('emits targeted close broadcast on a successful close', async () => {
+    // Repo/session-list invalidation is owned by the manager close
+    // lifecycle. The action owns only the targeted sibling-window
+    // event that lets clients drop the local entry immediately.
     const close = vi.fn(() => true)
     const { actions, broadcasts } = makeActions({
       closeSessionForUser: close,
@@ -144,16 +142,8 @@ describe('terminal-runtime-actions close broadcast', () => {
 
     expect(closed).toBe(true)
     expect(close).toHaveBeenCalledWith(USER_ID, PTY_SESSION_ID)
-    expect(broadcasts).toHaveBeenCalledTimes(3)
-    expect(broadcasts).toHaveBeenNthCalledWith(1, USER_ID, {
-      type: 'sessions-changed',
-      repoRoot: '/repo',
-    })
-    expect(broadcasts).toHaveBeenNthCalledWith(2, USER_ID, {
-      type: 'workspace-tabs-changed',
-      repoRoot: '/repo',
-    })
-    expect(broadcasts).toHaveBeenNthCalledWith(3, USER_ID, {
+    expect(broadcasts).toHaveBeenCalledTimes(1)
+    expect(broadcasts).toHaveBeenCalledWith(USER_ID, {
       type: 'session-closed',
       ptySessionId: PTY_SESSION_ID,
       repoRoot: '/repo',

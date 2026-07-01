@@ -122,6 +122,10 @@ async function flushPromiseQueue(): Promise<void> {
   for (let i = 0; i < 5; i++) await Promise.resolve()
 }
 
+function sentSocketMessages(socket: { send: ReturnType<typeof vi.fn> }): Array<{ type?: string; [key: string]: unknown }> {
+  return socket.send.mock.calls.map(([payload]) => JSON.parse(String(payload)))
+}
+
 async function createTerminalSession(host: ServerTerminalHost, clientId: string, userId = USER_1): Promise<string> {
   const result = await host.create(clientId, userId, {
     repoRoot: '/repo',
@@ -403,6 +407,80 @@ describe('server terminal runtime', () => {
       .find((message) => message.type === 'exit')
     expect(exitMessage).toMatchObject({ type: 'exit' })
     expect(host.getDiagnostics().pty.state).toBe('idle')
+
+    host.unregisterSocket('client_a', USER_1, socket)
+    shutdown()
+  })
+
+  test('reconciles workspace tabs when a PTY exits naturally', async () => {
+    const { host, shutdown } = buildRuntime()
+    const socket = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_a', USER_1, socket)
+    const created = await host.create('client_a', USER_1, {
+      repoRoot: '/repo',
+      branch: 'feature',
+      worktreePath: '/repo-linked',
+      kind: 'additional',
+      cols: 80,
+      rows: 24,
+      clientId: 'client_a',
+    })
+    expect(created.ok).toBe(true)
+    if (!created.ok) return
+    expect(created.tabs).toContainEqual({ type: 'terminal', terminalSessionId: created.terminalSessionId })
+    socket.send.mockClear()
+
+    mockPtys[0]?.emitExit()
+
+    await vi.waitFor(() => {
+      expect(sentSocketMessages(socket).some((message) => message.type === 'workspace-tabs-changed')).toBe(true)
+    })
+    expect(sentSocketMessages(socket).filter((message) => message.type === 'sessions-changed')).toHaveLength(1)
+    await expect(host.listWorkspaceTabs('client_a', USER_1, '/repo')).resolves.toEqual([
+      {
+        repoRoot: '/repo',
+        branchName: 'feature',
+        worktreePath: '/repo-linked',
+        tabs: [expect.objectContaining({ type: 'status' })],
+      },
+    ])
+
+    host.unregisterSocket('client_a', USER_1, socket)
+    shutdown()
+  })
+
+  test('reconciles workspace tabs when prune closes removed-worktree sessions', async () => {
+    const { host, shutdown } = buildRuntime()
+    const socket = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_a', USER_1, socket)
+    const created = await host.create('client_a', USER_1, {
+      repoRoot: '/repo',
+      branch: 'feature',
+      worktreePath: '/repo-linked',
+      kind: 'additional',
+      cols: 80,
+      rows: 24,
+      clientId: 'client_a',
+    })
+    expect(created.ok).toBe(true)
+    if (!created.ok) return
+    socket.send.mockClear()
+    vi.mocked(getWorktrees).mockResolvedValueOnce([])
+
+    await expect(host.prune('client_a', USER_1, '/repo')).resolves.toEqual({ pruned: 1, remaining: 0 })
+
+    await vi.waitFor(() => {
+      expect(sentSocketMessages(socket).some((message) => message.type === 'workspace-tabs-changed')).toBe(true)
+    })
+    expect(sentSocketMessages(socket).filter((message) => message.type === 'sessions-changed')).toHaveLength(1)
+    await expect(host.listWorkspaceTabs('client_a', USER_1, '/repo')).resolves.toEqual([
+      {
+        repoRoot: '/repo',
+        branchName: 'feature',
+        worktreePath: '/repo-linked',
+        tabs: [expect.objectContaining({ type: 'status' })],
+      },
+    ])
 
     host.unregisterSocket('client_a', USER_1, socket)
     shutdown()

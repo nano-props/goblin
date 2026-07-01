@@ -212,7 +212,7 @@ describe('terminal session service workspace tabs', () => {
     ])
   })
 
-  test('removeTerminalTab returns canonical tabs without unrelated stale terminal tabs', async () => {
+  test('reconcileTerminalTabsForSession returns canonical tabs without unrelated stale terminal tabs', async () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     workspaceTabs.replaceTabs({
       userId: USER_ID,
@@ -231,7 +231,7 @@ describe('terminal session service workspace tabs', () => {
       workspaceTabs,
     })
 
-    await expect(service.removeTerminalTab(USER_ID, terminalSession('session-closed'))).resolves.toBeUndefined()
+    await expect(service.reconcileTerminalTabsForSession(USER_ID, terminalSession('session-closed'))).resolves.toBeUndefined()
     expect(
       workspaceTabs.tabs({
         userId: USER_ID,
@@ -242,7 +242,32 @@ describe('terminal session service workspace tabs', () => {
     ).toEqual([workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-live')])
   })
 
-  test('serializes terminal tab removal with later workspace tab reorder operations', async () => {
+  test('reconcileTerminalTabsForSession keeps the closed session id when it is still live', async () => {
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    workspaceTabs.replaceTabs({
+      userId: USER_ID,
+      scope: path.resolve(REPO_ROOT),
+      branchName: BRANCH_NAME,
+      worktreePath: path.resolve(WORKTREE_PATH),
+      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-live')],
+    })
+    const service = createService({
+      sessions: [terminalSession('session-live')],
+      workspaceTabs,
+    })
+
+    await expect(service.reconcileTerminalTabsForSession(USER_ID, terminalSession('session-live'))).resolves.toBeUndefined()
+    expect(
+      workspaceTabs.tabs({
+        userId: USER_ID,
+        scope: path.resolve(REPO_ROOT),
+        branchName: BRANCH_NAME,
+        worktreePath: path.resolve(WORKTREE_PATH),
+      }),
+    ).toEqual([workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-live')])
+  })
+
+  test('serializes terminal tab reconciliation with later workspace tab reorder operations', async () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     workspaceTabs.replaceTabs({
       userId: USER_ID,
@@ -264,7 +289,7 @@ describe('terminal session service workspace tabs', () => {
       workspaceTabs,
     })
 
-    const close = service.removeTerminalTab(USER_ID, terminalSession('session-closed'))
+    const close = service.reconcileTerminalTabsForSession(USER_ID, terminalSession('session-closed'))
     await vi.waitFor(() => expect(listSessionResolves).toHaveLength(1))
 
     const reorder = service.updateTabs(USER_ID, {

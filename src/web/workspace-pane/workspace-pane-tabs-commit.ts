@@ -34,6 +34,7 @@ async function commitWorkspacePaneTabsNow(input: CommitWorkspacePaneTabsInput): 
   try {
     await cancelWorkspacePaneTabs(input.repoRoot)
     const serverTabs = await replaceWorkspacePaneTabsOnServer(input)
+    await cancelWorkspacePaneTabs(input.repoRoot)
     setWorkspacePaneTabsForTargetQueryData({
       repoRoot: input.repoRoot,
       branchName: input.branchName,
@@ -55,6 +56,7 @@ async function updateWorkspacePaneTabsNow(input: UpdateWorkspacePaneTabsInput): 
   try {
     await cancelWorkspacePaneTabs(input.repoRoot)
     const serverTabs = await updateWorkspacePaneTabsOnServer(input)
+    await cancelWorkspacePaneTabs(input.repoRoot)
     setWorkspacePaneTabsForTargetQueryData({
       repoRoot: input.repoRoot,
       branchName: input.branchName,

@@ -8,17 +8,24 @@ export async function restoreServerWorkspacePaneTabsFromSession(
 ): Promise<boolean> {
   const commits: Promise<boolean>[] = []
   const repos = useReposStore.getState().repos
+  let allTargetsResolved = true
   for (const [repoRoot, tabsByTarget] of Object.entries(workspacePaneTabsByTargetByRepo)) {
     const repo = repos[repoRoot]
-    if (!repo) continue
+    if (!repo) {
+      allTargetsResolved = false
+      continue
+    }
     for (const [targetKey, tabs] of Object.entries(tabsByTarget)) {
       const target = workspacePaneTabsTargetForRepoTargetKey(repo, targetKey)
-      if (!target) continue
+      if (!target) {
+        allTargetsResolved = false
+        continue
+      }
       commits.push(restoreWorkspacePaneTabs({ ...target, tabs }))
     }
   }
   const results = await Promise.all(commits)
-  return results.every(Boolean)
+  return allTargetsResolved && results.every(Boolean)
 }
 
 async function restoreWorkspacePaneTabs(input: {

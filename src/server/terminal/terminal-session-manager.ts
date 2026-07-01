@@ -54,7 +54,6 @@ export interface TerminalEnsureSessionInput<TUser extends string | number> {
   cols: number
   rows: number
   clientId?: string
-  forceNew?: boolean
   command?: string
   args?: string[]
   startupShellCommand?: string
@@ -86,6 +85,7 @@ export interface TerminalEventSink<TUser extends string | number> {
   onOutput(userId: TUser, event: TerminalOutputEvent): void
   onTitle?(userId: TUser, event: { ptySessionId: string; canonicalTitle: string | null }): void
   onExit(userId: TUser, event: TerminalExitEvent): void
+  onSessionClosed?(userId: TUser, session: TerminalSessionSummary): void
   // Identity and lifecycle are emitted on separate channels so the
   // client's teardown decision can subscribe to identity only.
   // A transitional phase update arrives as `onLifecycle` and never
@@ -122,7 +122,6 @@ export class TerminalSessionManager<TUser extends string | number> {
     const userId = input.userId
     if (!this.isValidUserId(userId)) return { ok: false, message: 'error.invalid-arguments' }
     const userTerminalSessionIndex = this.formatUserTerminalSessionIndex(userId, input.terminalSessionId)
-    if (input.forceNew) this.closeUserTerminalSession(userId, input.terminalSessionId)
     const existingId = this.ptySessionIdByUserTerminalSessionIndex.get(userTerminalSessionIndex)
     const existing = existingId ? this.sessionsByPtySessionId.get(existingId) : undefined
     if (existing) {
@@ -286,11 +285,13 @@ export class TerminalSessionManager<TUser extends string | number> {
     if (!session) return
     session.ptyBinding.invalidateOwnership()
     if (markTerminalSessionClosed(session)) this.emitLifecycle(session)
+    const closedSession = this.sessionSummary(session)
     this.sessionsByPtySessionId.delete(ptySessionId)
     const userTerminalSessionIndex = this.formatUserTerminalSessionIndex(session.userId, session.terminalSessionId)
     if (this.ptySessionIdByUserTerminalSessionIndex.get(userTerminalSessionIndex) === ptySessionId)
       this.ptySessionIdByUserTerminalSessionIndex.delete(userTerminalSessionIndex)
     session.ptyBinding.dispose(session)
+    this.sink.onSessionClosed?.(session.userId, closedSession)
   }
 
   closeSessionsForUser(userId: TUser): void {
@@ -374,13 +375,6 @@ export class TerminalSessionManager<TUser extends string | number> {
       if (chars > maxBufferChars) maxBufferChars = chars
     }
     return { count, totalBufferChars, maxBufferChars }
-  }
-
-  private closeUserTerminalSession(userId: TUser, terminalSessionId: string): void {
-    const id = this.ptySessionIdByUserTerminalSessionIndex.get(
-      this.formatUserTerminalSessionIndex(userId, terminalSessionId),
-    )
-    if (id) this.closeSession(id)
   }
 
   private sessionsForWorktreeTabs(

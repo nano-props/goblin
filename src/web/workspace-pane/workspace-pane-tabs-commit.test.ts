@@ -125,6 +125,54 @@ describe('commitWorkspacePaneTabs', () => {
       workspacePaneStaticTabEntry('status'),
     ])
   })
+
+  test('cancels list queries that start while a commit is in flight before writing committed tabs', async () => {
+    let resolveServerTabs!: (tabs: WorkspacePaneTabEntry[]) => void
+    const serverTabs = new Promise<WorkspacePaneTabEntry[]>((resolve) => {
+      resolveServerTabs = resolve
+    })
+    let resolveListTabs!: (tabs: WorkspacePaneTabsEntry[]) => void
+    const listTabs = new Promise<WorkspacePaneTabsEntry[]>((resolve) => {
+      resolveListTabs = resolve
+    })
+    let markReplaceStarted!: () => void
+    const replaceStarted = new Promise<void>((resolve) => {
+      markReplaceStarted = resolve
+    })
+    installWorkspacePaneTabsTestBridge({
+      listWorkspaceTabs: async () => await listTabs,
+      replaceWorkspaceTabs: async () => {
+        markReplaceStarted()
+        return await serverTabs
+      },
+    })
+
+    const commit = commitWorkspacePaneTabs({
+      repoRoot: REPO_ROOT,
+      branchName: BRANCH_NAME,
+      worktreePath: WORKTREE_PATH,
+      tabs: [workspacePaneTerminalTabEntry('session-1'), workspacePaneStaticTabEntry('status')],
+    })
+    await replaceStarted
+    const fetch = primaryWindowQueryClient.fetchQuery(workspacePaneTabsQueryOptions(REPO_ROOT)).catch(() => null)
+
+    resolveServerTabs([workspacePaneTerminalTabEntry('session-1'), workspacePaneStaticTabEntry('status')])
+    await expect(commit).resolves.toBe(true)
+    resolveListTabs([
+      {
+        repoRoot: REPO_ROOT,
+        branchName: BRANCH_NAME,
+        worktreePath: WORKTREE_PATH,
+        tabs: [workspacePaneStaticTabEntry('history')],
+      },
+    ])
+    await fetch
+
+    expect(readWorkspacePaneTabs()).toEqual([
+      workspacePaneTerminalTabEntry('session-1'),
+      workspacePaneStaticTabEntry('status'),
+    ])
+  })
 })
 
 describe('updateWorkspacePaneTabs', () => {

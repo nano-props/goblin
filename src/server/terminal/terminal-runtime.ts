@@ -28,6 +28,7 @@ import { TerminalSessionManager } from '#/server/terminal/terminal-session-manag
 import { type PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 import { type ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 import type { GoblinTerminalCommandRuntime } from '#/server/terminal/g-command.ts'
+import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
 
 // Intentionally long TTL: we want terminals to survive as long as possible in
 // the background so users can leave builds or long-running tasks unattended.
@@ -59,6 +60,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   // same `userId`) without an extra attach roundtrip. See
   // `identity.ts` for the model.
   let broker: TerminalRealtimeBroker
+  let sessionService: ReturnType<typeof createTerminalSessionService>
   const manager = new TerminalSessionManager<string>(
     ptySupervisor,
     {
@@ -69,9 +71,10 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
         broker.broadcastToUser(userId, { type: 'title', event })
       },
       onExit(userId, event) {
-        const repoRoot = manager.getSessionScope(userId, event.ptySessionId)
         broker.broadcastToUser(userId, { type: 'exit', event })
-        if (repoRoot) broadcastRepoSessionsChanged(userId, repoRoot)
+      },
+      onSessionClosed(userId, session) {
+        handleSessionClosed(userId, session)
       },
       onIdentity(userId, event) {
         broker.broadcastToUser(userId, { type: 'identity', event })
@@ -89,7 +92,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     detachedTtlMs: TERMINAL_DETACHED_TTL_MS,
   })
   broker = coordinator.broker
-  const sessionService = createTerminalSessionService({
+  sessionService = createTerminalSessionService({
     isValidClientId: isValidTerminalClientId,
     isValidTerminalSessionId,
     manager,
@@ -265,5 +268,24 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
 
   function broadcastRepoSessionsChanged(userId: string, repoRoot: string): void {
     broker.broadcastToUser(userId, { type: 'sessions-changed', repoRoot })
+  }
+
+  function broadcastRepoWorkspaceTabsChanged(userId: string, repoRoot: string): void {
+    broker.broadcastToUser(userId, { type: 'workspace-tabs-changed', repoRoot })
+  }
+
+  function handleSessionClosed(userId: string, session: TerminalSessionSummary): void {
+    broadcastRepoSessionsChanged(userId, session.repoRoot)
+    void sessionService
+      .reconcileTerminalTabsForSession(userId, session)
+      .then(() => {
+        broadcastRepoWorkspaceTabsChanged(userId, session.repoRoot)
+      })
+      .catch((err) => {
+        terminalRuntimeLogger.warn(
+          { userId, ptySessionId: session.ptySessionId, repoRoot: session.repoRoot, err },
+          'failed to reconcile workspace tabs after terminal session close',
+        )
+      })
   }
 }

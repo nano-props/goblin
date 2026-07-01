@@ -30,7 +30,6 @@ interface TerminalSessionServiceLike {
   listWorkspaceTabs(userId: string, repoRoot: string): Promise<WorkspacePaneTabsEntry[]>
   replaceTabs(userId: string, input: TerminalReplaceWorkspaceTabsInput): Promise<WorkspacePaneTabEntry[]>
   updateTabs(userId: string, input: TerminalUpdateWorkspaceTabsInput): Promise<WorkspacePaneTabEntry[]>
-  removeTerminalTab(userId: string, session: TerminalSessionSummary): Promise<void>
 }
 
 interface TerminalRuntimeActionDependencies {
@@ -148,14 +147,10 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         ? manager.closeSessionForUser(userId, input.ptySessionId)
         : false
       if (closed && repoRoot) {
-        if (session) await sessionService.removeTerminalTab(userId, session)
-        // `sessions-changed` keeps the full repo list in sync for
-        // observers that only watch that primitive. `session-closed`
-        // is the immediate invalidation for any sibling window under
-        // the same user. Other users must not hear about this
+        // General repo/session-list invalidation is emitted by the
+        // manager close lifecycle. This action owns only the targeted
+        // sibling-window event; other users must not hear about this
         // session id.
-        broadcastRepoSessionsChanged(userId, repoRoot)
-        broadcastRepoWorkspaceTabsChanged(userId, repoRoot)
         broker.broadcastToUser(userId, {
           type: 'session-closed',
           ptySessionId: input.ptySessionId,

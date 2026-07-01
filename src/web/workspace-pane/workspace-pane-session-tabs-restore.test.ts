@@ -125,6 +125,36 @@ describe('restoreServerWorkspacePaneTabsFromSession', () => {
 
     expect(readTabsFor('feature/worktree', WORKTREE_PATH)).toEqual([workspacePaneStaticTabEntry('status')])
   })
+
+  test('reports incomplete restore when a persisted repo is not loaded', async () => {
+    installWorkspacePaneTabsTestBridge({
+      replaceWorkspaceTabs: async () => [workspacePaneStaticTabEntry('history')],
+    })
+
+    await expect(
+      restoreServerWorkspacePaneTabsFromSession({
+        [REPO_ID]: {
+          [worktreeTargetKey()]: [workspacePaneStaticTabEntry('history')],
+        },
+      }),
+    ).resolves.toBe(false)
+  })
+
+  test('reports incomplete restore when a persisted target no longer resolves', async () => {
+    seedRepo()
+    const replaceWorkspaceTabs = vi.fn(async () => [workspacePaneStaticTabEntry('history')])
+    installWorkspacePaneTabsTestBridge({ replaceWorkspaceTabs })
+
+    await expect(
+      restoreServerWorkspacePaneTabsFromSession({
+        [REPO_ID]: {
+          [branchTargetKey('feature/missing')]: [workspacePaneStaticTabEntry('history')],
+        },
+      }),
+    ).resolves.toBe(false)
+
+    expect(replaceWorkspaceTabs).not.toHaveBeenCalled()
+  })
 })
 
 function seedRepo(): void {

@@ -78,7 +78,6 @@ interface TerminalServiceEnsureSessionInput {
   cols: number
   rows: number
   clientId?: string
-  forceNew?: boolean
   command?: string
   args?: string[]
   startupShellCommand?: string
@@ -286,7 +285,7 @@ class TerminalSessionService {
     })
   }
 
-  async removeTerminalTab(userId: string, session: TerminalSessionSummary): Promise<void> {
+  async reconcileTerminalTabsForSession(userId: string, session: TerminalSessionSummary): Promise<void> {
     await this.runWorkspaceTabsWorktreeOperation(userId, session.repoRoot, session.worktreePath, async () => {
       const liveTerminalSessionIds = await this.liveTerminalSessionIdsForWorktree(
         userId,
@@ -298,7 +297,6 @@ class TerminalSessionService {
         scope: session.repoRoot,
         worktreePath: session.worktreePath,
         liveTerminalSessionIds,
-        removeTerminalSessionId: session.terminalSessionId,
       })
     })
   }
@@ -319,7 +317,6 @@ class TerminalSessionService {
           scope,
           worktreePath,
           liveTerminalSessionIds,
-          removeTerminalSessionId: null,
         })
       })
     }
@@ -400,7 +397,6 @@ class TerminalSessionService {
     scope: string
     worktreePath: string
     liveTerminalSessionIds: readonly string[]
-    removeTerminalSessionId: string | null
   }): void {
     const entries = this.options.workspaceTabs
       .tabsForScope({ userId: input.userId, scope: input.scope })
@@ -412,17 +408,12 @@ class TerminalSessionService {
         branchName: entry.branchName,
         worktreePath: entry.worktreePath,
       })
-      const tabsWithoutClosedTerminal = input.removeTerminalSessionId
-        ? currentTabs.filter(
-            (tab) => tab.type !== 'terminal' || tab.terminalSessionId !== input.removeTerminalSessionId,
-          )
-        : currentTabs
       this.options.workspaceTabs.replaceTabs({
         userId: input.userId,
         scope: input.scope,
         branchName: entry.branchName,
         worktreePath: entry.worktreePath,
-        tabs: workspaceTabsWithoutStaleTerminalEntries(tabsWithoutClosedTerminal, input.liveTerminalSessionIds),
+        tabs: workspaceTabsWithoutStaleTerminalEntries(currentTabs, input.liveTerminalSessionIds),
       })
     }
   }
@@ -479,7 +470,6 @@ class TerminalSessionService {
       this.options.manager.closeSession(session.ptySessionId)
       pruned += 1
     }
-    if (pruned > 0) this.options.broadcastSessionsChanged(userId, repoRoot)
     const remaining = await this.options.manager
       .listSessionsForUser(userId, sessionScope)
       .then((sessions) => sessions.length)
@@ -504,11 +494,9 @@ class TerminalSessionService {
     const scope = terminalSessionScope(input.repoRoot)
     const worktreePath = terminalWorktreePath(input.repoRoot, input.worktreePath)
     const sessions = await this.options.manager.listSessionsForUser(userId, scope)
-    const existingSessionIds = sessions
-      .filter((session) => session.worktreePath === worktreePath)
-      .map((session) => session.terminalSessionId)
-    if (input.kind === 'primary' && existingSessionIds[0]) {
-      return { terminalSessionId: existingSessionIds[0], reservationKey: null }
+    const existingSession = sessions.find((session) => session.worktreePath === worktreePath)
+    if (input.kind === 'primary' && existingSession) {
+      return { terminalSessionId: existingSession.terminalSessionId, reservationKey: null }
     }
     const reservationKey = terminalSessionIdReservationKey(userId, scope, worktreePath)
     const reservedTerminalSessionId = this.reservedTerminalSessionIdsByWorktree
@@ -517,22 +505,18 @@ class TerminalSessionService {
       .next().value
     if (input.kind === 'primary' && reservedTerminalSessionId)
       return { terminalSessionId: reservedTerminalSessionId, reservationKey: null }
-    return { terminalSessionId: this.reserveNewSessionId(reservationKey, new Set(existingSessionIds)), reservationKey }
+    return { terminalSessionId: this.reserveNewSessionId(reservationKey), reservationKey }
   }
 
-  private reserveNewSessionId(reservationKey: string, existingSessionIds: ReadonlySet<string>): string {
+  private reserveNewSessionId(reservationKey: string): string {
     let reserved = this.reservedTerminalSessionIdsByWorktree.get(reservationKey)
     if (!reserved) {
       reserved = new Set()
       this.reservedTerminalSessionIdsByWorktree.set(reservationKey, reserved)
     }
-    for (let attempt = 0; attempt < 100; attempt++) {
-      const terminalSessionId = createTerminalSessionId()
-      if (existingSessionIds.has(terminalSessionId) || reserved.has(terminalSessionId)) continue
-      reserved.add(terminalSessionId)
-      return terminalSessionId
-    }
-    throw new Error('Unable to allocate terminal session id')
+    const terminalSessionId = createTerminalSessionId()
+    reserved.add(terminalSessionId)
+    return terminalSessionId
   }
 
   private releaseSessionIdReservation(allocation: TerminalSessionIdAllocation): void {
@@ -580,7 +564,6 @@ class TerminalSessionService {
       cols: context.cols,
       rows: context.rows,
       clientId: input.clientId,
-      forceNew: context.action === 'created',
       command: invocation.command,
       args: invocation.args,
     })
@@ -622,7 +605,6 @@ class TerminalSessionService {
       cols: context.cols,
       rows: context.rows,
       clientId: input.clientId,
-      forceNew: context.action === 'created',
       startupShellCommand: input.startupShellCommand,
       env,
     })

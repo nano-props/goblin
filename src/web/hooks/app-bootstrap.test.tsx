@@ -165,7 +165,7 @@ describe('app bootstrap hooks', () => {
     expect(mockedGetSettingsSnapshot).toHaveBeenCalledTimes(1)
   })
 
-  test('opens persistence after a failed server workspace tabs restore attempt', async () => {
+  test('keeps persistence closed after a failed server workspace tabs restore attempt', async () => {
     const targetKey = branchTargetKey('/tmp/repo', 'main')
     const session = {
       openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
@@ -191,7 +191,7 @@ describe('app bootstrap hooks', () => {
     renderInJsdom(<Harness />)
     await flushMicrotasks(3)
 
-    expect(useReposStore.getState().sessionPersistenceReady).toBe(true)
+    expect(useReposStore.getState().sessionPersistenceReady).toBe(false)
     expect(mockedRestoreServerWorkspacePaneTabsFromSession).toHaveBeenCalledWith({
       '/tmp/repo': {
         [targetKey]: [],

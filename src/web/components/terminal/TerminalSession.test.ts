@@ -1086,7 +1086,7 @@ describe('TerminalSession', () => {
     warnSpy.mockRestore()
   })
 
-  test('uses first-class restart IPC instead of recreating through ensureSession forceNew', async () => {
+  test('uses first-class restart IPC instead of recreating through ensureSession', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
     const session = new TerminalSession(descriptor, vi.fn())
