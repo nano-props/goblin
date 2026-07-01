@@ -78,6 +78,8 @@ export async function writeCanonicalWorkspacePaneTabsForTarget(
   input: CommitWorkspacePaneTabsInput,
   queryClient?: QueryClient,
 ): Promise<void> {
+  // A list query may have started while the server write was in flight.
+  // Cancel again so stale list results cannot overwrite the canonical tabs.
   await cancelWorkspacePaneTabs(input.repoRoot, queryClient)
   setWorkspacePaneTabsForTargetQueryData(input, queryClient)
 }
