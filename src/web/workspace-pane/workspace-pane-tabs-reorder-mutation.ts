@@ -12,10 +12,10 @@ import {
   workspacePaneTabsQueryKey,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import {
+  reportWorkspacePaneTabsFailure,
   updateWorkspacePaneTabsOnServer,
   writeCanonicalWorkspacePaneTabsForTarget,
 } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
-import { gblLog } from '#/web/logger.ts'
 import { runWorkspacePaneTabsOperation } from '#/web/workspace-pane/workspace-pane-tabs-operation-queue.ts'
 import {
   workspacePaneTabEntryListIdentity,
@@ -96,12 +96,14 @@ export function useWorkspacePaneTabsReorderMutation(
         } catch (err) {
           restoreWorkspacePaneTabsTargetQueryData(target, previousTargetEntry, queryClient)
           invalidateWorkspacePaneTabs(target.repoRoot, queryClient)
-          input.onReorderRejected?.()
-          gblLog.warn('workspace pane tabs mutation failed', {
+          reportWorkspacePaneTabsFailure({
+            operation: 'reorder',
             repoRoot: target.repoRoot,
+            branchName: target.branchName,
             worktreePath: target.worktreePath,
-            err,
+            error: err,
           })
+          input.onReorderRejected?.()
         }
       })
     },
