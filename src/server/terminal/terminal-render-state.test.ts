@@ -203,17 +203,40 @@ describe('terminal-render-state', () => {
       expect(state.title).toBeNull()
     })
 
-    // Pin the deliberately-dropped behavior: OSC 0/2 sequences split
-    // across two PTY writes are not reassembled. The shell typically
-    // emits the full sequence in one write, but a misbehaving or
-    // boundary-pushing program could split it. If we later want to
-    // reassemble, this test is the contract to update.
-    test('does not reassemble an OSC 0 sequence split across two appendOutput calls', () => {
+    test('reassembles an OSC 0 sequence split across two appendOutput calls', () => {
       const state = createRawOnlyState()
       appendOutput(state, '\x1b]0;~/Developer/goblin — ')
       expect(state.title).toBeNull()
       appendOutput(state, 'npm run dev\x07')
+      expect(state.title).toBe('~/Developer/goblin — npm run dev')
+    })
+
+    test('reassembles a split ESC before an OSC 0 sequence', () => {
+      const state = createRawOnlyState()
+      appendOutput(state, '\x1b')
       expect(state.title).toBeNull()
+      appendOutput(state, ']0;split-start\x07')
+      expect(state.title).toBe('split-start')
+    })
+
+    test('captures an ST-terminated OSC 0 sequence', () => {
+      const state = createRawOnlyState()
+      appendOutput(state, '\x1b]0;st title\x1b\\')
+      expect(state.title).toBe('st title')
+    })
+
+    test('reassembles a split ST terminator', () => {
+      const state = createRawOnlyState()
+      appendOutput(state, '\x1b]0;split-st\x1b')
+      expect(state.title).toBeNull()
+      appendOutput(state, '\\')
+      expect(state.title).toBe('split-st')
+    })
+
+    test('ignores unsupported OSC commands without losing a later title', () => {
+      const state = createRawOnlyState()
+      appendOutput(state, '\x1b]9;ignored\x07\x1b]2;window title\x07')
+      expect(state.title).toBe('window title')
     })
   })
 

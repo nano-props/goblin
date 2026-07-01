@@ -15,6 +15,7 @@ import type {
 // each newly-attached client.
 
 const MAX_BUFFER_CHARS = 16 * 1024 * 1024
+const MAX_TITLE_CHARS = 4096
 const DEFAULT_COLS = 80
 const DEFAULT_ROWS = 24
 const HEADLESS_SCROLLBACK_ROWS = 10_000
@@ -44,8 +45,9 @@ export interface TerminalRenderState {
   buffer: string
   /** Set to true the first time the buffer is truncated. Stays true for the rest of the session. */
   bufferTruncated: boolean
-  /** Last OSC 0 title set by the shell (parsed out of `buffer`). */
+  /** Last OSC 0/2 title set by the shell. */
   title: string | null
+  titleParser: TerminalTitleParserState
   screen: TerminalScreenState
 }
 
@@ -53,7 +55,14 @@ export function createEmptyTerminalRenderState(
   cols: number = DEFAULT_COLS,
   rows: number = DEFAULT_ROWS,
 ): TerminalRenderState {
-  return { sequence: 0, buffer: '', bufferTruncated: false, title: null, screen: createScreenState(cols, rows) }
+  return {
+    sequence: 0,
+    buffer: '',
+    bufferTruncated: false,
+    title: null,
+    titleParser: createEmptyTerminalTitleParserState(),
+    screen: createScreenState(cols, rows),
+  }
 }
 
 export function appendOutput(state: TerminalRenderState, data: string): number {
@@ -64,10 +73,30 @@ export function appendOutput(state: TerminalRenderState, data: string): number {
     state.buffer = safeTail(state.buffer, MAX_BUFFER_CHARS)
     state.bufferTruncated = true
   }
-  const newTitle = extractTitle(data)
+  const newTitle = scanTerminalOutputForTitle(data, state.titleParser)
   if (newTitle !== undefined && newTitle !== state.title) state.title = newTitle
   queueScreenWrite(state.screen, data, seq)
   return seq
+}
+
+interface TerminalTitleParserState {
+  inOsc: boolean
+  pendingEsc: boolean
+  command: string
+  payload: string
+  collectingTitle: boolean
+  titleTooLong: boolean
+}
+
+function createEmptyTerminalTitleParserState(): TerminalTitleParserState {
+  return {
+    inOsc: false,
+    pendingEsc: false,
+    command: '',
+    payload: '',
+    collectingTitle: false,
+    titleTooLong: false,
+  }
 }
 
 export interface TerminalOutputBellScanState {
@@ -168,6 +197,7 @@ export function resetRender(
   state.buffer = ''
   state.bufferTruncated = false
   state.title = null
+  state.titleParser = createEmptyTerminalTitleParserState()
   state.screen = createScreenState(cols, rows)
 }
 
@@ -309,23 +339,93 @@ function stripLeadingIncompleteAnsi(s: string): string {
   return s.slice(2)
 }
 
-// OSC 0 is the "set window title" sequence the shell uses for the tab title.
-// The shell may also use OSC 2 — we treat both the same way: keep the
-// last title seen in this chunk. Returns `undefined` if no title sequence
-// was present (caller can skip the assignment in that case); an empty
-// captured string maps to `null` (clear the title).
-//
-// BEL-terminated only: shells like zsh and bash emit `\x1b]0;title\x07`,
-// and tmux/screen default to BEL as well. The xterm spec also allows
-// ST-terminated sequences (`\x1b]0;title\x1b\\`) but those are rare in
-// practice; if a tool starts emitting them the title will silently stop
-// updating. Cross-chunk OSC reassembly is also not performed — a title
-// split across two PTY writes will be dropped.
-function extractTitle(data: string): string | null | undefined {
+// OSC 0 and OSC 2 are the title-setting sequences shells use for terminal
+// tabs. This parser is stateful because PTY writes may split ESC ], payload,
+// BEL, or ST across chunks. Unsupported OSC commands are skipped without
+// retaining their payloads.
+function scanTerminalOutputForTitle(
+  data: string,
+  state: TerminalTitleParserState,
+): string | null | undefined {
   let title: string | null | undefined
-  for (const m of data.matchAll(/\x1b\][02];([^\x07\x1b]*)\x07/g)) {
-    const captured = m[1] ?? null
-    title = captured === '' ? null : captured
+  for (let i = 0; i < data.length; i += 1) {
+    const char = data[i]
+    if (state.pendingEsc) {
+      state.pendingEsc = false
+      if (state.inOsc && char === '\\') {
+        title = finishTitleOsc(state)
+        continue
+      }
+      if (!state.inOsc && char === ']') {
+        startTitleOsc(state)
+        continue
+      }
+      if (state.inOsc) appendTitleOscChar(state, '\x1b')
+    }
+
+    if (state.inOsc) {
+      if (char === '\x07') {
+        title = finishTitleOsc(state)
+        continue
+      }
+      if (char === '\x1b') {
+        if (i === data.length - 1) {
+          state.pendingEsc = true
+        } else if (data[i + 1] === '\\') {
+          title = finishTitleOsc(state)
+          i += 1
+        } else {
+          appendTitleOscChar(state, char)
+        }
+        continue
+      }
+      appendTitleOscChar(state, char)
+      continue
+    }
+
+    if (char === '\x1b') {
+      if (i === data.length - 1) {
+        state.pendingEsc = true
+      } else if (data[i + 1] === ']') {
+        startTitleOsc(state)
+        i += 1
+      }
+    }
   }
   return title
+}
+
+function startTitleOsc(state: TerminalTitleParserState): void {
+  state.inOsc = true
+  state.pendingEsc = false
+  state.command = ''
+  state.payload = ''
+  state.collectingTitle = false
+  state.titleTooLong = false
+}
+
+function finishTitleOsc(state: TerminalTitleParserState): string | null | undefined {
+  const shouldApply = state.collectingTitle && !state.titleTooLong
+  const payload = state.payload
+  Object.assign(state, createEmptyTerminalTitleParserState())
+  if (!shouldApply) return undefined
+  return payload === '' ? null : payload
+}
+
+function appendTitleOscChar(state: TerminalTitleParserState, char: string): void {
+  if (!state.collectingTitle) {
+    if (char === ';') {
+      state.collectingTitle = state.command === '0' || state.command === '2'
+      return
+    }
+    if (state.command.length < 8) state.command += char
+    return
+  }
+  if (state.titleTooLong) return
+  if (state.payload.length + char.length > MAX_TITLE_CHARS) {
+    state.payload = ''
+    state.titleTooLong = true
+    return
+  }
+  state.payload += char
 }

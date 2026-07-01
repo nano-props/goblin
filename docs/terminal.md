@@ -309,6 +309,10 @@ The terminal feature uses all three app state classes:
 
 - preferred selected terminal per worktree
 
+Terminal selection is intentionally a client preference, not runtime-coherent
+terminal truth. The server owns which sessions exist and who controls them;
+each client may remember which terminal it prefers to show for a worktree.
+
 The server should own runtime-coherent terminal truth.
 The client may cache and project it, but should not invent parallel business truth.
 

@@ -418,7 +418,7 @@ describe('TerminalSessionProjection create flow', () => {
     const pending = projection.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
 
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(true)
-    expect((projection as any).pendingCreateByWorktree.size).toBe(1)
+    expect((projection as any).lifecycleQueues.hasCreate(WORKTREE_KEY)).toBe(true)
     await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
 
     // Attach the rejection handler before destroy() so the rejected
@@ -427,7 +427,7 @@ describe('TerminalSessionProjection create flow', () => {
     const expectation = expect(pending).rejects.toThrow('terminal session projection destroyed')
     projection.destroy()
     await expectation
-    expect((projection as any).pendingCreateByWorktree.size).toBe(0)
+    expect((projection as any).lifecycleQueues.hasCreate(WORKTREE_KEY)).toBe(false)
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
   })
 
@@ -448,7 +448,7 @@ describe('TerminalSessionProjection create flow', () => {
 
     await expect(pending).resolves.toBe('session-1')
     await expect(closePromise).resolves.toBe(true)
-    expect((projection as any).pendingCreateByWorktree.size).toBe(0)
+    expect((projection as any).lifecycleQueues.hasCreate(WORKTREE_KEY)).toBe(false)
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
   })
@@ -556,7 +556,7 @@ describe('TerminalSessionProjection create flow', () => {
     expect(callOrder).toEqual(['close', 'create'])
 
     // The pending entry is cleaned up after the close settles.
-    expect((projection as any).pendingCloseByPtySessionId.size).toBe(0)
+    expect((projection as any).lifecycleQueues.hasCloses()).toBe(false)
   })
 
   test('durable close: failures do not block the next create', async () => {
@@ -574,7 +574,7 @@ describe('TerminalSessionProjection create flow', () => {
     })
 
     await expect(closePromise).rejects.toThrow('Terminal socket closed')
-    expect((projection as any).pendingCloseByPtySessionId.size).toBe(0)
+    expect((projection as any).lifecycleQueues.hasCloses()).toBe(false)
 
     // The next create proceeds normally.
     await expect(
@@ -626,10 +626,10 @@ describe('TerminalSessionProjection create flow', () => {
       ...durableCloseInput(),
     })
 
-    expect((projection as any).pendingCloseByPtySessionId.size).toBe(1)
+    expect((projection as any).lifecycleQueues.hasCloses()).toBe(true)
     projection.destroy()
     await expect(closePromise).rejects.toThrow('terminal session projection destroyed')
-    expect((projection as any).pendingCloseByPtySessionId.size).toBe(0)
+    expect((projection as any).lifecycleQueues.hasCloses()).toBe(false)
     resolveClose(true)
     await vi.waitFor(() => expect(mocks.listWorkspaceTabsMock).toHaveBeenCalled())
   })
