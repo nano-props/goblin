@@ -1,6 +1,11 @@
 import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query'
 import type { WorkspacePaneTabsEntry } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+import {
+  type WorkspacePaneTabsTarget,
+  workspacePaneTabsEntryMatchesTarget,
+  workspacePaneTabsTargetIdentityKey,
+} from '#/shared/workspace-pane-tabs-target.ts'
 import { terminalBridge } from '#/web/terminal.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { defaultWorkspacePaneTabs, normalizeWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs.ts'
@@ -28,34 +33,47 @@ export function useWorkspacePaneTabsQuery(repoRoot: string) {
   return useQuery(workspacePaneTabsQueryOptions(repoRoot))
 }
 
-export function readWorkspacePaneTabsForBranch(
-  repoRoot: string,
-  branchName: string | null | undefined,
+export function readWorkspacePaneTabsForTarget(
+  target: {
+    repoRoot: string
+    branchName: string | null | undefined
+    worktreePath: string | null
+  },
   queryClient: QueryClient = primaryWindowQueryClient,
 ): WorkspacePaneTabEntry[] {
-  const data = queryClient.getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(repoRoot)) ?? []
-  return workspacePaneTabsForBranchFromQueryData(data, branchName)
+  const data = queryClient.getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(target.repoRoot)) ?? []
+  return workspacePaneTabsForTargetFromQueryData(data, target)
 }
 
-export async function fetchWorkspacePaneTabsForBranch(input: {
+export async function fetchWorkspacePaneTabsForTarget(input: {
   repoRoot: string
   branchName: string
+  worktreePath: string | null
   queryClient?: QueryClient
 }): Promise<WorkspacePaneTabEntry[]> {
   const queryClient = input.queryClient ?? primaryWindowQueryClient
   const data = await queryClient.fetchQuery(workspacePaneTabsQueryOptions(input.repoRoot))
-  return workspacePaneTabsForBranchFromQueryData(data, input.branchName)
+  return workspacePaneTabsForTargetFromQueryData(data, input)
 }
 
-export function workspacePaneTabsForBranchFromQueryData(
+export function workspacePaneTabsForTargetFromQueryData(
   data: readonly WorkspacePaneTabsEntry[],
-  branchName: string | null | undefined,
+  target: {
+    repoRoot: string
+    branchName: string | null | undefined
+    worktreePath: string | null
+  },
 ): WorkspacePaneTabEntry[] {
-  if (!branchName) return []
-  return [...(data.find((entry) => entry.branchName === branchName)?.tabs ?? defaultWorkspacePaneTabs())]
+  if (!target.branchName) return []
+  const entry = workspacePaneTabsEntryForTarget(data, {
+    repoRoot: target.repoRoot,
+    branchName: target.branchName,
+    worktreePath: target.worktreePath,
+  })
+  return [...(entry?.tabs ?? defaultWorkspacePaneTabs())]
 }
 
-export function setWorkspacePaneTabsForBranchQueryData(
+export function setWorkspacePaneTabsForTargetQueryData(
   input: {
     repoRoot: string
     branchName: string
@@ -66,7 +84,7 @@ export function setWorkspacePaneTabsForBranchQueryData(
 ): void {
   queryClient.setQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(input.repoRoot), (current) => {
     return normalizeWorkspacePaneTabsQueryData([
-      ...(current ?? []).filter((entry) => entry.branchName !== input.branchName),
+      ...(current ?? []).filter((entry) => !workspacePaneTabsEntryMatchesTarget(entry, input)),
       {
         repoRoot: input.repoRoot,
         branchName: input.branchName,
@@ -77,37 +95,53 @@ export function setWorkspacePaneTabsForBranchQueryData(
   })
 }
 
-export async function cancelWorkspacePaneTabs(repoRoot: string, queryClient: QueryClient = primaryWindowQueryClient): Promise<void> {
+export async function cancelWorkspacePaneTabs(
+  repoRoot: string,
+  queryClient: QueryClient = primaryWindowQueryClient,
+): Promise<void> {
   await queryClient.cancelQueries({ queryKey: workspacePaneTabsQueryKey(repoRoot), exact: true })
 }
 
-export function invalidateWorkspacePaneTabs(repoRoot: string, queryClient: QueryClient = primaryWindowQueryClient): void {
+export function invalidateWorkspacePaneTabs(
+  repoRoot: string,
+  queryClient: QueryClient = primaryWindowQueryClient,
+): void {
   void queryClient.invalidateQueries({ queryKey: workspacePaneTabsQueryKey(repoRoot), exact: true })
 }
 
-export function workspacePaneTabsByBranchFromQueryData(
+export function workspacePaneTabsByTargetFromQueryData(
   data: readonly WorkspacePaneTabsEntry[],
 ): Record<string, WorkspacePaneTabEntry[]> {
-  const byBranch: Record<string, WorkspacePaneTabEntry[]> = {}
+  const byTarget: Record<string, WorkspacePaneTabEntry[]> = {}
   for (const entry of data) {
-    if (!entry.branchName || entry.branchName.includes('\0')) continue
-    byBranch[entry.branchName] = normalizeWorkspacePaneTabs(entry.tabs, { hasWorktree: entry.worktreePath !== null })
+    byTarget[workspacePaneTabsTargetIdentityKey(entry)] = normalizeWorkspacePaneTabs(entry.tabs, {
+      hasWorktree: entry.worktreePath !== null,
+    })
   }
-  return byBranch
+  return byTarget
 }
 
-function normalizeWorkspacePaneTabsQueryData(
-  entries: readonly WorkspacePaneTabsEntry[],
-): WorkspacePaneTabsQueryData {
-  const byBranch = new Map<string, WorkspacePaneTabsEntry>()
+function normalizeWorkspacePaneTabsQueryData(entries: readonly WorkspacePaneTabsEntry[]): WorkspacePaneTabsQueryData {
+  const byTarget = new Map<string, WorkspacePaneTabsEntry>()
   for (const entry of entries) {
     if (!entry.branchName || entry.branchName.includes('\0')) continue
-    byBranch.set(entry.branchName, {
+    byTarget.set(workspacePaneTabsTargetIdentityKey(entry), {
       repoRoot: entry.repoRoot,
       branchName: entry.branchName,
       worktreePath: entry.worktreePath,
       tabs: normalizeWorkspacePaneTabs(entry.tabs, { hasWorktree: entry.worktreePath !== null }),
     })
   }
-  return Array.from(byBranch.values())
+  return Array.from(byTarget.values())
+}
+
+function workspacePaneTabsEntryForTarget(
+  data: readonly WorkspacePaneTabsEntry[],
+  target: WorkspacePaneTabsTarget,
+): WorkspacePaneTabsEntry | undefined {
+  for (let index = data.length - 1; index >= 0; index -= 1) {
+    const entry = data[index]
+    if (entry && workspacePaneTabsEntryMatchesTarget(entry, target)) return entry
+  }
+  return undefined
 }

@@ -1,10 +1,12 @@
 import {
+  type WorkspacePaneStaticTabType,
   type WorkspacePaneTabEntry,
   workspacePaneStaticTabEntry,
   workspacePaneTabEntryIdentity,
   workspacePaneTabRequiresWorktree,
   workspacePaneTerminalTabEntry,
 } from '#/shared/workspace-pane.ts'
+import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 
 export interface WorkspacePaneTabsTargetInput<TUser extends string | number> {
   userId: TUser
@@ -13,8 +15,9 @@ export interface WorkspacePaneTabsTargetInput<TUser extends string | number> {
   worktreePath: string | null
 }
 
-export interface WorkspacePaneTabsReplaceInput<TUser extends string | number>
-  extends WorkspacePaneTabsTargetInput<TUser> {
+export interface WorkspacePaneTabsReplaceInput<
+  TUser extends string | number,
+> extends WorkspacePaneTabsTargetInput<TUser> {
   tabs: readonly WorkspacePaneTabEntry[]
 }
 
@@ -57,10 +60,7 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
     return [...tabs]
   }
 
-  ensureTerminalTab(
-    input: WorkspacePaneTabsTargetInput<TUser>,
-    terminalSessionId: string,
-  ): WorkspacePaneTabEntry[] {
+  ensureTerminalTab(input: WorkspacePaneTabsTargetInput<TUser>, terminalSessionId: string): WorkspacePaneTabEntry[] {
     const current = this.tabs(input)
     if (input.worktreePath === null || terminalSessionId.length === 0) return current
     if (current.some((entry) => entry.type === 'terminal' && entry.terminalSessionId === terminalSessionId)) {
@@ -70,6 +70,29 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
       ...input,
       tabs: [...current, workspacePaneTerminalTabEntry(terminalSessionId)],
     })
+  }
+
+  openStaticTab(
+    input: WorkspacePaneTabsTargetInput<TUser>,
+    tabType: WorkspacePaneStaticTabType,
+  ): WorkspacePaneTabEntry[] {
+    const current = this.tabs(input)
+    if (current.some((entry) => entry.type === tabType)) return current
+    return this.replaceTabs({ ...input, tabs: [...current, workspacePaneStaticTabEntry(tabType)] })
+  }
+
+  closeStaticTab(
+    input: WorkspacePaneTabsTargetInput<TUser>,
+    tabType: WorkspacePaneStaticTabType,
+  ): WorkspacePaneTabEntry[] {
+    return this.replaceTabs({ ...input, tabs: this.tabs(input).filter((entry) => entry.type !== tabType) })
+  }
+
+  reorderTabsByIdentity(
+    input: WorkspacePaneTabsTargetInput<TUser>,
+    tabIdentities: readonly string[],
+  ): WorkspacePaneTabEntry[] {
+    return this.replaceTabs({ ...input, tabs: workspacePaneTabsWithIdentityOrder(this.tabs(input), tabIdentities) })
   }
 
   removeTerminalTabForWorktree(
@@ -107,7 +130,9 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
     const entries = this.tabsForScope({ userId: input.userId, scope: input.scope }).filter(
       (entry) => entry.worktreePath === input.worktreePath,
     )
-    return entries.flatMap((entry) => entry.tabs.flatMap((tab) => (tab.type === 'terminal' ? [tab.terminalSessionId] : [])))
+    return entries.flatMap((entry) =>
+      entry.tabs.flatMap((tab) => (tab.type === 'terminal' ? [tab.terminalSessionId] : [])),
+    )
   }
 
   closeSessionsForUser(userId: TUser): void {
@@ -118,7 +143,11 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
   }
 
   private targetKey(input: WorkspacePaneTabsTargetInput<TUser>): string {
-    return `${String(input.userId)}\0${input.scope}\0${input.branchName}`
+    return `${String(input.userId)}\0${workspacePaneTabsTargetIdentityKey({
+      repoRoot: input.scope,
+      branchName: input.branchName,
+      worktreePath: input.worktreePath,
+    })}`
   }
 
   private entryBelongsToWorktree(
@@ -144,11 +173,35 @@ function normalizeWorkspacePaneTabs(
   for (const entry of tabs) {
     if (!context.hasWorktree && workspacePaneTabRequiresWorktree(entry.type)) continue
     const normalized =
-      entry.type === 'terminal' ? workspacePaneTerminalTabEntry(entry.terminalSessionId) : workspacePaneStaticTabEntry(entry.type)
+      entry.type === 'terminal'
+        ? workspacePaneTerminalTabEntry(entry.terminalSessionId)
+        : workspacePaneStaticTabEntry(entry.type)
     const identity = workspacePaneTabEntryIdentity(normalized)
     if (seen.has(identity)) continue
     seen.add(identity)
     next.push(normalized)
   }
   return next
+}
+
+function workspacePaneTabsWithIdentityOrder(
+  currentTabs: readonly WorkspacePaneTabEntry[],
+  tabIdentities: readonly string[],
+): WorkspacePaneTabEntry[] {
+  const tabByIdentity = new Map(currentTabs.map((tab) => [workspacePaneTabEntryIdentity(tab), tab]))
+  const used = new Set<string>()
+  const ordered: WorkspacePaneTabEntry[] = []
+  for (const identity of tabIdentities) {
+    const tab = tabByIdentity.get(identity)
+    if (!tab || used.has(identity)) continue
+    used.add(identity)
+    ordered.push(tab)
+  }
+  for (const tab of currentTabs) {
+    const identity = workspacePaneTabEntryIdentity(tab)
+    if (used.has(identity)) continue
+    used.add(identity)
+    ordered.push(tab)
+  }
+  return ordered
 }

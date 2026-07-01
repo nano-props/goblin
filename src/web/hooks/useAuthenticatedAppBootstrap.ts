@@ -62,12 +62,12 @@ async function restoreBootSession(settingsSnapshot: Promise<SettingsSnapshot>): 
     applySessionSelectedTerminalState(restoredWorkspaceState.selectedTerminalSessionIdByTerminalWorktree)
     await hydrateRepoSession(session.openRepoEntries, session.activeRepoId, {
       workspacePaneRestoreState: {
-        workspacePaneTabsByBranchByRepo: restoredWorkspaceState.workspacePaneTabsByBranchByRepo,
-        preferredWorkspacePaneTabByBranchByRepo: restoredWorkspaceState.preferredWorkspacePaneTabByBranchByRepo,
+        workspacePaneTabsByTargetByRepo: restoredWorkspaceState.workspacePaneTabsByTargetByRepo,
+        preferredWorkspacePaneTabByTargetByRepo: restoredWorkspaceState.preferredWorkspacePaneTabByTargetByRepo,
       },
     })
     const workspaceTabsRestored = await restoreServerWorkspacePaneTabsFromSession(
-      restoredWorkspaceState.workspacePaneTabsByBranchByRepo,
+      restoredWorkspaceState.workspacePaneTabsByTargetByRepo,
     )
     if (!workspaceTabsRestored) bootstrapLog.warn('workspace pane tabs restore incomplete')
     useReposStore.setState({ sessionPersistenceReady: true })

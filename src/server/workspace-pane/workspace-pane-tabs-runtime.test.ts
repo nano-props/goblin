@@ -3,7 +3,7 @@ import { createWorkspacePaneTabsRuntime } from '#/server/workspace-pane/workspac
 import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
 
 describe('workspace pane tabs runtime', () => {
-  test('replaces mixed tabs within a user branch target', () => {
+  test('replaces mixed tabs within a user tab target', () => {
     const runtime = createWorkspacePaneTabsRuntime<string>()
 
     runtime.replaceTabs({
@@ -35,6 +35,79 @@ describe('workspace pane tabs runtime', () => {
       workspacePaneTerminalTabEntry('session-1'),
       workspacePaneStaticTabEntry('status'),
       workspacePaneTerminalTabEntry('session-2'),
+    ])
+  })
+
+  test('opens and closes static tabs in the mixed list', () => {
+    const runtime = createWorkspacePaneTabsRuntime<string>()
+
+    expect(runtime.openStaticTab(target(), 'history')).toEqual([
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneStaticTabEntry('history'),
+    ])
+    expect(runtime.openStaticTab(target(), 'history')).toEqual([
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneStaticTabEntry('history'),
+    ])
+    expect(runtime.closeStaticTab(target(), 'status')).toEqual([workspacePaneStaticTabEntry('history')])
+  })
+
+  test('reorders only current tab identities and preserves current tabs absent from the drag snapshot', () => {
+    const runtime = createWorkspacePaneTabsRuntime<string>()
+    runtime.replaceTabs({
+      ...target(),
+      tabs: [
+        workspacePaneTerminalTabEntry('session-1'),
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneStaticTabEntry('history'),
+      ],
+    })
+
+    expect(
+      runtime.reorderTabsByIdentity(target(), [
+        'workspace-pane:status',
+        'terminal:session-1',
+        'workspace-pane:closed-before-reorder',
+      ]),
+    ).toEqual([
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneTerminalTabEntry('session-1'),
+      workspacePaneStaticTabEntry('history'),
+    ])
+  })
+
+  test('uses worktree path as the identity for worktree-backed tab lists', () => {
+    const runtime = createWorkspacePaneTabsRuntime<string>()
+
+    runtime.replaceTabs({
+      ...target(),
+      branchName: 'feature/old',
+      tabs: [workspacePaneTerminalTabEntry('session-1'), workspacePaneStaticTabEntry('status')],
+    })
+
+    const retargeted = {
+      ...target(),
+      branchName: 'feature/new',
+    }
+    expect(runtime.tabs(retargeted)).toEqual([
+      workspacePaneTerminalTabEntry('session-1'),
+      workspacePaneStaticTabEntry('status'),
+    ])
+    expect(runtime.openStaticTab(retargeted, 'history')).toEqual([
+      workspacePaneTerminalTabEntry('session-1'),
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneStaticTabEntry('history'),
+    ])
+    expect(runtime.tabsForScope({ userId: 'user-a', scope: '/repo' })).toEqual([
+      {
+        branchName: 'feature/new',
+        worktreePath: '/repo-linked',
+        tabs: [
+          workspacePaneTerminalTabEntry('session-1'),
+          workspacePaneStaticTabEntry('status'),
+          workspacePaneStaticTabEntry('history'),
+        ],
+      },
     ])
   })
 

@@ -41,9 +41,10 @@ import {
   seedRepoState,
 } from '#/web/test-utils/bridge.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
+import { workspacePaneTabsTargetForRepoBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import {
-  readWorkspacePaneTabsForBranch,
-  setWorkspacePaneTabsForBranchQueryData,
+  readWorkspacePaneTabsForTarget,
+  setWorkspacePaneTabsForTargetQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
@@ -1307,8 +1308,8 @@ function renderToolbar(options: {
       worktreePath: options.worktree === false ? null : WORKTREE_PATH,
       tabs: workspacePaneTabs,
     }
-    setWorkspacePaneTabsForBranchQueryData(workspacePaneTabsQueryInput)
-    setWorkspacePaneTabsForBranchQueryData(workspacePaneTabsQueryInput, queryClient)
+    setWorkspacePaneTabsForTargetQueryData(workspacePaneTabsQueryInput)
+    setWorkspacePaneTabsForTargetQueryData(workspacePaneTabsQueryInput, queryClient)
   }
   queryClient.setQueryData(
     settingsSnapshotQueryKey(),
@@ -1382,11 +1383,13 @@ function closeButtonFor(container: HTMLElement, identity: string): HTMLButtonEle
 }
 
 function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
-  return workspacePaneStaticTabsFromEntries(readWorkspacePaneTabsForBranch(REPO_ID, branchName))
+  return workspacePaneStaticTabsFromEntries(tabsFor(branchName))
 }
 
 function tabsFor(branchName: string): WorkspacePaneTabEntry[] {
-  return readWorkspacePaneTabsForBranch(REPO_ID, branchName)
+  const repo = useReposStore.getState().repos[REPO_ID]
+  const target = repo ? workspacePaneTabsTargetForRepoBranch(repo, branchName) : null
+  return target ? readWorkspacePaneTabsForTarget(target) : []
 }
 
 function staticEntry(type: WorkspacePaneStaticTabType): WorkspacePaneTabEntry {

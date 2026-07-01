@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { defaultWorkspaceSessionState } from '#/shared/settings-defaults.ts'
 import { WORKSPACE_PANE_STATIC_TAB_IDS, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 
 let tmp: string | null = null
 let previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
@@ -74,9 +75,9 @@ test('persists updates and notifies subscribers from the server settings store',
     openRepoEntries: [{ kind: 'local', id: '/repo-b' }],
     activeRepoId: '/repo-b',
     selectedTerminalSessionIdByTerminalWorktree: { '/repo-b\0/worktree': 'session-2' },
-    workspacePaneTabsByBranchByRepo: {
+    workspacePaneTabsByTargetByRepo: {
       '/repo-b': {
-        main: [],
+        [branchTargetKey('/repo-b', 'main')]: [],
       },
     },
   })
@@ -107,9 +108,9 @@ test('persists updates and notifies subscribers from the server settings store',
     openRepoEntries: [{ kind: 'local', id: '/repo-b' }],
     activeRepoId: '/repo-b',
     selectedTerminalSessionIdByTerminalWorktree: { '/repo-b\0/worktree': 'session-2' },
-    workspacePaneTabsByBranchByRepo: {
+    workspacePaneTabsByTargetByRepo: {
       '/repo-b': {
-        main: [],
+        [branchTargetKey('/repo-b', 'main')]: [],
       },
     },
   })
@@ -207,12 +208,16 @@ test('clears empty repo settings entry when removing only worktree bootstrap tru
   expect(await mod.getServerRepoSettings()).toEqual([])
 })
 
-test('normalizes branch-scoped workspace pane tab preferences in server sessions', async () => {
+test('normalizes target-scoped workspace pane tab preferences in server sessions', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
 
   const mod = await import('#/server/modules/settings-source.ts')
+  const mainTargetKey = branchTargetKey('/repo-b', 'main')
+  const changesTargetKey = branchTargetKey('/repo-b', 'changes')
+  const terminalTargetKey = worktreeTargetKey('/repo-b', 'feature/worktree', '/tmp/repo-b-worktree')
+  const invalidBranchTargetKey = '/repo-b\0branch\0bad\0branch'
   await mod.setServerSessionState({
     ...defaultWorkspaceSessionState(),
     openRepoEntries: [
@@ -220,33 +225,36 @@ test('normalizes branch-scoped workspace pane tab preferences in server sessions
       { kind: 'local', id: '/repo-array' },
     ],
     activeRepoId: '/repo-b',
-    preferredWorkspacePaneTabByBranchByRepo: {
+    preferredWorkspacePaneTabByTargetByRepo: {
       '/repo-b': {
-        main: 'history',
-        changes: 'changes',
-        terminal: 'terminal',
-        'bad\0branch': 'changes',
-        feature: 'not-a-pane-view',
+        [mainTargetKey]: 'history',
+        [changesTargetKey]: 'changes',
+        [terminalTargetKey]: 'terminal',
+        [invalidBranchTargetKey]: 'changes',
+        [branchTargetKey('/repo-b', 'feature')]: 'not-a-pane-view',
       },
       '/repo-c': {
-        main: 'terminal',
+        [branchTargetKey('/repo-c', 'main')]: 'terminal',
       },
       '/repo-array': ['history'],
     } as never,
-    workspacePaneTabsByBranchByRepo: {
+    workspacePaneTabsByTargetByRepo: {
       '/repo-b': {
-        main: [workspacePaneStaticTabEntry('history')],
-        changes: [],
-        terminal: [],
+        [mainTargetKey]: [workspacePaneStaticTabEntry('history')],
+        [changesTargetKey]: [workspacePaneStaticTabEntry('changes')],
+        [terminalTargetKey]: [
+          workspacePaneStaticTabEntry('status'),
+          { type: 'terminal', terminalSessionId: 'session-1' },
+        ],
       },
     },
   })
 
   expect(await mod.getServerSessionState()).toMatchObject({
-    preferredWorkspacePaneTabByBranchByRepo: {
+    preferredWorkspacePaneTabByTargetByRepo: {
       '/repo-b': {
-        main: 'history',
-        terminal: 'terminal',
+        [mainTargetKey]: 'history',
+        [terminalTargetKey]: 'terminal',
       },
     },
   })
@@ -258,6 +266,10 @@ test('normalizes workspace pane tab list in server sessions', async () => {
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
 
   const mod = await import('#/server/modules/settings-source.ts')
+  const mainTargetKey = branchTargetKey('/repo-b', 'main')
+  const worktreeTargetKeyValue = worktreeTargetKey('/repo-b', 'feature/worktree', '/tmp/repo-b-worktree')
+  const emptyTargetKey = branchTargetKey('/repo-b', 'empty')
+  const invalidTargetKey = branchTargetKey('/repo-b', 'invalid')
   await mod.setServerSessionState({
     ...defaultWorkspaceSessionState(),
     openRepoEntries: [
@@ -265,37 +277,42 @@ test('normalizes workspace pane tab list in server sessions', async () => {
       { kind: 'local', id: '/repo-array' },
     ],
     activeRepoId: '/repo-b',
-    workspacePaneTabsByBranchByRepo: {
+    workspacePaneTabsByTargetByRepo: {
       '/repo-b': {
-        main: [
+        [mainTargetKey]: [
           workspacePaneStaticTabEntry('status'),
           { type: 'terminal', terminalSessionId: 'session-1' },
           workspacePaneStaticTabEntry('history'),
           workspacePaneStaticTabEntry('status'),
           workspacePaneStaticTabEntry('changes'),
         ],
-        empty: [],
-        'bad\0branch': [workspacePaneStaticTabEntry('status')],
-        invalid: [{ type: 'changes', tabId: WORKSPACE_PANE_STATIC_TAB_IDS.status }],
+        [worktreeTargetKeyValue]: [
+          workspacePaneStaticTabEntry('status'),
+          { type: 'terminal', terminalSessionId: 'session-1' },
+          workspacePaneStaticTabEntry('changes'),
+        ],
+        [emptyTargetKey]: [],
+        '/repo-b\0branch\0bad\0branch': [workspacePaneStaticTabEntry('status')],
+        [invalidTargetKey]: [{ type: 'changes', tabId: WORKSPACE_PANE_STATIC_TAB_IDS.status }],
       },
       '/repo-c': {
-        main: [workspacePaneStaticTabEntry('status')],
+        [branchTargetKey('/repo-c', 'main')]: [workspacePaneStaticTabEntry('status')],
       },
       '/repo-array': [workspacePaneStaticTabEntry('status')],
     } as never,
   })
 
   expect(await mod.getServerSessionState()).toMatchObject({
-    workspacePaneTabsByBranchByRepo: {
+    workspacePaneTabsByTargetByRepo: {
       '/repo-b': {
-        main: [
+        [mainTargetKey]: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
+        [worktreeTargetKeyValue]: [
           workspacePaneStaticTabEntry('status'),
           { type: 'terminal', terminalSessionId: 'session-1' },
-          workspacePaneStaticTabEntry('history'),
           workspacePaneStaticTabEntry('changes'),
         ],
-        empty: [],
-        invalid: [],
+        [emptyTargetKey]: [],
+        [invalidTargetKey]: [],
       },
     },
   })
@@ -499,6 +516,14 @@ test('rejects invalid workspace external app recent input without touching disk'
 
   expect(await mod.getServerRepoSettings()).toEqual([])
 })
+
+function branchTargetKey(repoRoot: string, branchName: string): string {
+  return workspacePaneTabsTargetIdentityKey({ repoRoot, branchName, worktreePath: null })
+}
+
+function worktreeTargetKey(repoRoot: string, branchName: string, worktreePath: string): string {
+  return workspacePaneTabsTargetIdentityKey({ repoRoot, branchName, worktreePath })
+}
 
 test('normalizer drops malformed workspace external app recent entries on load', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))

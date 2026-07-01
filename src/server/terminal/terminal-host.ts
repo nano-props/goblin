@@ -13,6 +13,7 @@ import type {
   TerminalSessionSummary,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
+  TerminalUpdateWorkspaceTabsInput,
   WorkspacePaneTabsEntry,
   TerminalWriteInput,
 } from '#/shared/terminal-types.ts'
@@ -105,6 +106,7 @@ export interface ServerTerminalHost {
   listWorkspaceTabs(clientId: string, userId: string, repoRoot: string): MaybePromise<WorkspacePaneTabsEntry[]>
   create(clientId: string, userId: string, input: TerminalCreateInput): MaybePromise<TerminalCreateResult>
   replaceTabs(clientId: string, userId: string, input: TerminalReplaceWorkspaceTabsInput): MaybePromise<WorkspacePaneTabEntry[]>
+  updateTabs(clientId: string, userId: string, input: TerminalUpdateWorkspaceTabsInput): MaybePromise<WorkspacePaneTabEntry[]>
   prune(clientId: string, userId: string, repoRoot: string): MaybePromise<{ pruned: number; remaining: number }>
   getSessionSnapshot(
     clientId: string,

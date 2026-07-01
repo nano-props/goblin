@@ -18,6 +18,7 @@ import { useSessionRestoreStore } from '#/web/stores/session-restore.ts'
 import { resetReposStore } from '#/web/test-utils/bridge.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
 import { restoreServerWorkspacePaneTabsFromSession } from '#/web/workspace-pane/workspace-pane-session-tabs-restore.ts'
+import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 
 vi.mock('#/web/settings-client.ts', async (importOriginal) => {
   const actual = await importOriginal<typeof import('#/web/settings-client.ts')>()
@@ -54,8 +55,8 @@ describe('app bootstrap hooks', () => {
       zenMode: true,
       workspacePaneSize: 50,
       selectedTerminalSessionIdByTerminalWorktree: {},
-      preferredWorkspacePaneTabByBranchByRepo: {},
-      workspacePaneTabsByBranchByRepo: {},
+      preferredWorkspacePaneTabByTargetByRepo: {},
+      workspacePaneTabsByTargetByRepo: {},
       filetreeViewStateByWorktreeByRepo: {},
     })
     const hydrateI18n = vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
@@ -72,16 +73,17 @@ describe('app bootstrap hooks', () => {
   })
 
   test('canonicalizes boot session pane state before applying it to the repos store', async () => {
+    const targetKey = branchTargetKey('/tmp/repo', 'main')
     const session = {
       openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
       activeRepoId: '/tmp/repo',
       zenMode: false,
       workspacePaneSize: 45,
       selectedTerminalSessionIdByTerminalWorktree: { '/tmp/repo\0/tmp/worktree': 'session-2' },
-      preferredWorkspacePaneTabByBranchByRepo: {},
-      workspacePaneTabsByBranchByRepo: {
+      preferredWorkspacePaneTabByTargetByRepo: {},
+      workspacePaneTabsByTargetByRepo: {
         '/tmp/repo': {
-          main: [],
+          [targetKey]: [],
         },
       },
       filetreeViewStateByWorktreeByRepo: {
@@ -119,12 +121,12 @@ describe('app bootstrap hooks', () => {
     })
     expect(hydrateRepoSession).toHaveBeenCalledWith([{ kind: 'local', id: '/tmp/repo' }], '/tmp/repo', {
       workspacePaneRestoreState: {
-        workspacePaneTabsByBranchByRepo: {
+        workspacePaneTabsByTargetByRepo: {
           '/tmp/repo': {
-            main: [],
+            [targetKey]: [],
           },
         },
-        preferredWorkspacePaneTabByBranchByRepo: {},
+        preferredWorkspacePaneTabByTargetByRepo: {},
       },
     })
     expect(hydrateTheme).toHaveBeenCalledWith(settings)
@@ -139,8 +141,8 @@ describe('app bootstrap hooks', () => {
       zenMode: true,
       workspacePaneSize: 55,
       selectedTerminalSessionIdByTerminalWorktree: {},
-      preferredWorkspacePaneTabByBranchByRepo: {},
-      workspacePaneTabsByBranchByRepo: {},
+      preferredWorkspacePaneTabByTargetByRepo: {},
+      workspacePaneTabsByTargetByRepo: {},
       filetreeViewStateByWorktreeByRepo: {},
     }
     mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot({ session }))
@@ -154,8 +156,8 @@ describe('app bootstrap hooks', () => {
 
     expect(hydrateRepoSession).toHaveBeenCalledWith([{ kind: 'local', id: '/tmp/repo' }], '/tmp/repo', {
       workspacePaneRestoreState: {
-        workspacePaneTabsByBranchByRepo: {},
-        preferredWorkspacePaneTabByBranchByRepo: {},
+        workspacePaneTabsByTargetByRepo: {},
+        preferredWorkspacePaneTabByTargetByRepo: {},
       },
     })
     expect(useReposStore.getState().workspacePaneSize).toBe(55)
@@ -164,16 +166,17 @@ describe('app bootstrap hooks', () => {
   })
 
   test('opens persistence after a failed server workspace tabs restore attempt', async () => {
+    const targetKey = branchTargetKey('/tmp/repo', 'main')
     const session = {
       openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
       activeRepoId: '/tmp/repo',
       zenMode: true,
       workspacePaneSize: 55,
       selectedTerminalSessionIdByTerminalWorktree: {},
-      preferredWorkspacePaneTabByBranchByRepo: {},
-      workspacePaneTabsByBranchByRepo: {
+      preferredWorkspacePaneTabByTargetByRepo: {},
+      workspacePaneTabsByTargetByRepo: {
         '/tmp/repo': {
-          main: [],
+          [targetKey]: [],
         },
       },
       filetreeViewStateByWorktreeByRepo: {},
@@ -191,7 +194,7 @@ describe('app bootstrap hooks', () => {
     expect(useReposStore.getState().sessionPersistenceReady).toBe(true)
     expect(mockedRestoreServerWorkspacePaneTabsFromSession).toHaveBeenCalledWith({
       '/tmp/repo': {
-        main: [],
+        [targetKey]: [],
       },
     })
   })
@@ -215,4 +218,8 @@ function Harness() {
 function PublicHarness() {
   usePublicAppBootstrap()
   return null
+}
+
+function branchTargetKey(repoRoot: string, branchName: string): string {
+  return workspacePaneTabsTargetIdentityKey({ repoRoot, branchName, worktreePath: null })
 }

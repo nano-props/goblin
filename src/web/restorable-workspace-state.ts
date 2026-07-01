@@ -4,15 +4,15 @@ import type { RestorableWorkspaceState, ReposStore } from '#/web/stores/repos/ty
 import { persistedOpenWorkspaceEntries } from '#/web/open-workspace-state.ts'
 import {
   persistedActiveRepoIdForSession,
-  persistedWorkspacePaneTabsByBranchByRepoForSession,
+  persistedWorkspacePaneTabsByTargetByRepoForSession,
   persistedSelectedTerminalSessionIdByTerminalWorktreeForSession,
-  persistedPreferredWorkspacePaneTabByBranchByRepoForSession,
+  persistedPreferredWorkspacePaneTabByTargetByRepoForSession,
 } from '#/web/session-persistence-state.ts'
 import { persistedFiletreeViewStateByWorktreeByRepoForSession } from '#/web/filetree-session-state.ts'
 import type { FiletreeInteractionSnapshot } from '#/web/stores/repos/filetree-interaction-state.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import {
-  workspacePaneTabsByBranchFromQueryData,
+  workspacePaneTabsByTargetFromQueryData,
   workspacePaneTabsQueryKey,
   type WorkspacePaneTabsQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
@@ -23,7 +23,7 @@ export function workspaceSessionStateFromRestorableWorkspaceState(input: {
   filetreeInteractionByScope?: Readonly<Record<string, FiletreeInteractionSnapshot>>
 }): WorkspaceSessionState {
   const { repos, restorableWorkspaceState } = input
-  const workspacePaneTabsByBranchByRepo = workspacePaneTabsByBranchByRepoFromQueryCache(
+  const workspacePaneTabsByTargetByRepo = workspacePaneTabsByTargetByRepoFromQueryCache(
     repos,
     restorableWorkspaceState.order,
   )
@@ -36,15 +36,15 @@ export function workspaceSessionStateFromRestorableWorkspaceState(input: {
       restorableWorkspaceState.selectedTerminalSessionIdByTerminalWorktree,
       repos,
     ),
-    preferredWorkspacePaneTabByBranchByRepo: persistedPreferredWorkspacePaneTabByBranchByRepoForSession(
+    preferredWorkspacePaneTabByTargetByRepo: persistedPreferredWorkspacePaneTabByTargetByRepoForSession(
       repos,
       restorableWorkspaceState.order,
-      workspacePaneTabsByBranchByRepo,
+      workspacePaneTabsByTargetByRepo,
     ),
-    workspacePaneTabsByBranchByRepo: persistedWorkspacePaneTabsByBranchByRepoForSession(
+    workspacePaneTabsByTargetByRepo: persistedWorkspacePaneTabsByTargetByRepoForSession(
       repos,
       restorableWorkspaceState.order,
-      workspacePaneTabsByBranchByRepo,
+      workspacePaneTabsByTargetByRepo,
     ),
     filetreeViewStateByWorktreeByRepo: persistedFiletreeViewStateByWorktreeByRepoForSession(
       input.filetreeInteractionByScope ?? {},
@@ -54,7 +54,7 @@ export function workspaceSessionStateFromRestorableWorkspaceState(input: {
   }
 }
 
-function workspacePaneTabsByBranchByRepoFromQueryCache(
+function workspacePaneTabsByTargetByRepoFromQueryCache(
   repos: ReposStore['repos'],
   order: readonly string[],
 ): Record<string, Record<string, WorkspacePaneTabEntry[]>> {
@@ -63,8 +63,8 @@ function workspacePaneTabsByBranchByRepoFromQueryCache(
     if (!repos[id]) continue
     const data = primaryWindowQueryClient.getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(id))
     if (!data) continue
-    const byBranch = workspacePaneTabsByBranchFromQueryData(data)
-    if (Object.keys(byBranch).length > 0) byRepo[id] = byBranch
+    const byTarget = workspacePaneTabsByTargetFromQueryData(data)
+    if (Object.keys(byTarget).length > 0) byRepo[id] = byTarget
   }
   return byRepo
 }
@@ -76,8 +76,8 @@ interface RestoredWorkspaceStateFromSession extends Pick<
   RestorableWorkspaceState,
   'activeId' | 'zenMode' | 'workspacePaneSize' | 'selectedTerminalSessionIdByTerminalWorktree'
 > {
-  preferredWorkspacePaneTabByBranchByRepo: WorkspaceSessionState['preferredWorkspacePaneTabByBranchByRepo']
-  workspacePaneTabsByBranchByRepo: WorkspaceSessionState['workspacePaneTabsByBranchByRepo']
+  preferredWorkspacePaneTabByTargetByRepo: WorkspaceSessionState['preferredWorkspacePaneTabByTargetByRepo']
+  workspacePaneTabsByTargetByRepo: WorkspaceSessionState['workspacePaneTabsByTargetByRepo']
 }
 
 export function restoreRestorableWorkspaceStateFromSession(
@@ -89,7 +89,7 @@ export function restoreRestorableWorkspaceStateFromSession(
     zenMode: session.zenMode,
     workspacePaneSize: session.workspacePaneSize,
     selectedTerminalSessionIdByTerminalWorktree: session.selectedTerminalSessionIdByTerminalWorktree,
-    preferredWorkspacePaneTabByBranchByRepo: session.preferredWorkspacePaneTabByBranchByRepo,
-    workspacePaneTabsByBranchByRepo: session.workspacePaneTabsByBranchByRepo,
+    preferredWorkspacePaneTabByTargetByRepo: session.preferredWorkspacePaneTabByTargetByRepo,
+    workspacePaneTabsByTargetByRepo: session.workspacePaneTabsByTargetByRepo,
   }
 }

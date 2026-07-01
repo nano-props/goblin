@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { flushSync } from 'react-dom'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { workspacePaneTabEntryListIdentity } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 
 interface WorkspacePaneTabDragPreviewSnapshot {
@@ -90,5 +91,5 @@ function workspacePaneTabDragPreviewTargetKey(input: {
   branchName: string
   worktreePath: string | null
 }): string {
-  return `${input.repoRoot}\0${input.branchName}\0${input.worktreePath ?? ''}`
+  return workspacePaneTabsTargetIdentityKey(input)
 }

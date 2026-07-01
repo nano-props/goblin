@@ -22,6 +22,7 @@ import type {
   TerminalTakeoverInput,
   TerminalTakeoverResult,
   TerminalTestNotificationInput,
+  TerminalUpdateWorkspaceTabsInput,
   WorkspacePaneTabsEntry,
   TerminalTitleEvent,
   TerminalWriteInput,
@@ -38,6 +39,7 @@ export interface ClientTerminalBridge {
   close: (input: TerminalSessionInput) => Promise<TerminalMutationResult>
   create: (input: TerminalCreateInput) => Promise<TerminalCreateResult>
   replaceWorkspaceTabs: (input: TerminalReplaceWorkspaceTabsInput) => Promise<WorkspacePaneTabEntry[]>
+  updateWorkspaceTabs: (input: TerminalUpdateWorkspaceTabsInput) => Promise<WorkspacePaneTabEntry[]>
   pruneTerminals: (repoRoot: string) => Promise<{ pruned: number; remaining: number }>
   listSessions: (input: { repoRoot: string }) => Promise<TerminalSessionSummary[]>
   listWorkspaceTabs: (input: TerminalListWorkspaceTabsInput) => Promise<WorkspacePaneTabsEntry[]>

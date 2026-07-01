@@ -31,7 +31,7 @@ import { resolveSelectedTerminalSessionId } from '#/web/components/terminal/term
 import { buildTerminalWorktreeSnapshot } from '#/web/components/terminal/terminal-session-worktree-snapshot.ts'
 import { runWorkspacePaneTabsOperation } from '#/web/workspace-pane/workspace-pane-tabs-operation-queue.ts'
 import {
-  fetchWorkspacePaneTabsForBranch,
+  fetchWorkspacePaneTabsForTarget,
   invalidateWorkspacePaneTabs,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import type {
@@ -323,16 +323,8 @@ export class TerminalSessionProjection {
   ): void {
     if (!this.repoIndex[repoRoot]) return
 
-    const {
-      controllerTerminalSessionIdByWorktree,
-      touchedWorktrees,
-      tabsChangedWorktrees,
-    } = this.materializeServerSessions(
-      repoRoot,
-      serverSessions,
-      clientId,
-      snapshotsByPtySessionId,
-    )
+    const { controllerTerminalSessionIdByWorktree, touchedWorktrees, tabsChangedWorktrees } =
+      this.materializeServerSessions(repoRoot, serverSessions, clientId, snapshotsByPtySessionId)
 
     const serverTerminalSessionIds = new Set(serverSessions.map((session) => session.terminalSessionId))
     this.evictOrphanedLocalSessions(repoRoot, serverTerminalSessionIds)
@@ -382,10 +374,16 @@ export class TerminalSessionProjection {
       this.syncPtySessionIdIndex(descriptor.terminalSessionId, projected.hydrateInput.ptySessionId)
       if (projected.controlsTerminal)
         controllerTerminalSessionIdByWorktree.set(projected.terminalWorktreeKey, descriptor.terminalSessionId)
-      pushUniqueMapList(terminalSessionIdsByTouchedWorktree, projected.terminalWorktreeKey, descriptor.terminalSessionId)
+      pushUniqueMapList(
+        terminalSessionIdsByTouchedWorktree,
+        projected.terminalWorktreeKey,
+        descriptor.terminalSessionId,
+      )
     }
 
-    const tabsChangedWorktrees = this.replaceTerminalSessionIdListForTouchedWorktrees(terminalSessionIdsByTouchedWorktree)
+    const tabsChangedWorktrees = this.replaceTerminalSessionIdListForTouchedWorktrees(
+      terminalSessionIdsByTouchedWorktree,
+    )
     return { controllerTerminalSessionIdByWorktree, touchedWorktrees, tabsChangedWorktrees }
   }
 
@@ -504,7 +502,8 @@ export class TerminalSessionProjection {
     // committed the session row but skipped the session service append). Reject
     // and let the operator restart the create.
     const createdSession = result.sessions.find(
-      (session) => session.terminalSessionId === result.terminalSessionId && session.ptySessionId === snapshotPtySessionId,
+      (session) =>
+        session.terminalSessionId === result.terminalSessionId && session.ptySessionId === snapshotPtySessionId,
     )
     if (!createdSession) {
       throw new Error('error.terminal-create-failed')
@@ -672,9 +671,10 @@ export class TerminalSessionProjection {
           await terminalBridge.close({ ptySessionId })
           try {
             invalidateWorkspacePaneTabs(input.repoRoot)
-            await fetchWorkspacePaneTabsForBranch({
+            await fetchWorkspacePaneTabsForTarget({
               repoRoot: input.repoRoot,
               branchName: input.branchName,
+              worktreePath: input.worktreePath,
             })
           } catch (err) {
             terminalSessionProviderLog.warn('workspace pane tabs refresh failed after terminal close', {
@@ -846,7 +846,9 @@ export class TerminalSessionProjection {
     // durable-close wait so a stale pending close (e.g. from an earlier tab
     // that already left the worktree) cannot block worktree removal.
     if (terminalSessionIds.length === 0) return true
-    const results = await Promise.all(terminalSessionIds.map((terminalSessionId) => this.closeTerminal(terminalSessionId)))
+    const results = await Promise.all(
+      terminalSessionIds.map((terminalSessionId) => this.closeTerminal(terminalSessionId)),
+    )
     const pendingClosesSettled = await this.waitForPendingClosesForWorktree(terminalWorktreeKey)
     return results.every(Boolean) && pendingClosesSettled
   }
@@ -899,7 +901,11 @@ export class TerminalSessionProjection {
 
   findNext = (terminalSessionId: string, term: string, incremental?: boolean) => {
     return (
-      this.sessions.get(terminalSessionId)?.findNext(term, incremental) ?? { resultIndex: -1, resultCount: 0, found: false }
+      this.sessions.get(terminalSessionId)?.findNext(term, incremental) ?? {
+        resultIndex: -1,
+        resultCount: 0,
+        found: false,
+      }
     )
   }
 
@@ -1107,7 +1113,10 @@ export class TerminalSessionProjection {
     const wasSelected = this.selectedTerminalSessionIdByTerminalWorktree.get(terminalWorktreeKey) === terminalSessionId
     this.hiddenClosingTerminalSessionIds.add(terminalSessionId)
     if (wasSelected) {
-      const nextSessionId = resolveAdjacentTerminalSelectionAfterRemoval(visibleSessionIdsBeforeClose, terminalSessionId)
+      const nextSessionId = resolveAdjacentTerminalSelectionAfterRemoval(
+        visibleSessionIdsBeforeClose,
+        terminalSessionId,
+      )
       this.selectTerminalSessionId(terminalWorktreeKey, nextSessionId, { notify: false })
     }
     this.notifyWorktree(terminalWorktreeKey)
@@ -1196,7 +1205,10 @@ export class TerminalSessionProjection {
     terminalSessionId: string | null,
     options: { notify?: boolean } = {},
   ): void {
-    const next = terminalSessionId && this.isSelectedTerminalSessionIdValid(terminalWorktreeKey, terminalSessionId) ? terminalSessionId : null
+    const next =
+      terminalSessionId && this.isSelectedTerminalSessionIdValid(terminalWorktreeKey, terminalSessionId)
+        ? terminalSessionId
+        : null
     const current = this.selectedTerminalSessionIdByTerminalWorktree.get(terminalWorktreeKey) ?? null
     if (current === next) {
       this.setPreferredSelectedTerminalSessionId(terminalWorktreeKey, next)
@@ -1214,7 +1226,8 @@ export class TerminalSessionProjection {
   private setPreferredSelectedTerminalSessionId(terminalWorktreeKey: string, terminalSessionId: string | null): void {
     const current = this.preferredSelectedTerminalSessionIdByTerminalWorktree.get(terminalWorktreeKey) ?? null
     if (current === terminalSessionId) return
-    if (terminalSessionId) this.preferredSelectedTerminalSessionIdByTerminalWorktree.set(terminalWorktreeKey, terminalSessionId)
+    if (terminalSessionId)
+      this.preferredSelectedTerminalSessionIdByTerminalWorktree.set(terminalWorktreeKey, terminalSessionId)
     else this.preferredSelectedTerminalSessionIdByTerminalWorktree.delete(terminalWorktreeKey)
     this.onSelectedWorktreeChange(terminalWorktreeKey, terminalSessionId)
   }
@@ -1236,7 +1249,9 @@ export class TerminalSessionProjection {
     const sessions = Array.from(this.sessions.values()).filter(
       (session) => session.descriptor.terminalWorktreeKey === terminalWorktreeKey,
     )
-    const terminalSessionByTerminalSessionId = new Map(sessions.map((session) => [session.descriptor.terminalSessionId, session]))
+    const terminalSessionByTerminalSessionId = new Map(
+      sessions.map((session) => [session.descriptor.terminalSessionId, session]),
+    )
     const seen = new Set<string>()
     const listedSessions: TerminalSession[] = []
     for (const terminalSessionId of this.terminalSessionIdsByTerminalWorktree.get(terminalWorktreeKey) ?? []) {
@@ -1269,7 +1284,9 @@ export class TerminalSessionProjection {
     else this.terminalSessionIdsByTerminalWorktree.set(terminalWorktreeKey, next)
   }
 
-  private replaceTerminalSessionIdListForTouchedWorktrees(nextByWorktree: ReadonlyMap<string, readonly string[]>): Set<string> {
+  private replaceTerminalSessionIdListForTouchedWorktrees(
+    nextByWorktree: ReadonlyMap<string, readonly string[]>,
+  ): Set<string> {
     const changedWorktrees = new Set<string>()
     for (const [terminalWorktreeKey, terminalSessionIds] of nextByWorktree) {
       const next = uniqueNonEmptyStrings(terminalSessionIds)
@@ -1328,10 +1345,7 @@ let projectionInstance: TerminalSessionProjection | null = null
  */
 export function getTerminalSessionProjection(deps: TerminalSessionProjectionDeps): TerminalSessionProjection {
   if (!projectionInstance) {
-    projectionInstance = new TerminalSessionProjection(
-      deps.onSelectedWorktreeChange,
-      deps.onWorkspaceTabsChanged,
-    )
+    projectionInstance = new TerminalSessionProjection(deps.onSelectedWorktreeChange, deps.onWorkspaceTabsChanged)
   }
   return projectionInstance
 }

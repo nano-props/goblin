@@ -1,4 +1,5 @@
-import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneStaticTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 
 /**
  * `controllerStatus === 'connected'` while the broker reports the
@@ -191,17 +192,20 @@ export interface TerminalListWorkspaceTabsInput {
   repoRoot: string
 }
 
-export interface TerminalReplaceWorkspaceTabsInput {
-  repoRoot: string
-  branchName: string
-  worktreePath: string | null
+export interface TerminalReplaceWorkspaceTabsInput extends WorkspacePaneTabsTarget {
   tabs: WorkspacePaneTabEntry[]
 }
 
-export interface WorkspacePaneTabsEntry {
-  repoRoot: string
-  branchName: string
-  worktreePath: string | null
+export type TerminalUpdateWorkspaceTabsOperation =
+  | { type: 'open-static'; tabType: WorkspacePaneStaticTabType }
+  | { type: 'close-static'; tabType: WorkspacePaneStaticTabType }
+  | { type: 'reorder'; tabIdentities: string[] }
+
+export interface TerminalUpdateWorkspaceTabsInput extends WorkspacePaneTabsTarget {
+  operation: TerminalUpdateWorkspaceTabsOperation
+}
+
+export interface WorkspacePaneTabsEntry extends WorkspacePaneTabsTarget {
   tabs: WorkspacePaneTabEntry[]
 }
 

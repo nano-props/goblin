@@ -24,7 +24,7 @@ interface Props {
 }
 
 // Pure view: the workspace pane body is derived from the repos store's
-// branch-scoped preferred tab and the live terminal session truth. The store
+// target-scoped preferred tab and the live terminal session truth. The store
 // never re-projects on snapshot refresh, branch switch, or session restore.
 // The tab model keeps the body render target separate from the active
 // materialized tab.

@@ -149,12 +149,6 @@ describe('terminal session service workspace tabs', () => {
     await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT)).resolves.toEqual([
       {
         repoRoot: REPO_ROOT,
-        branchName: BRANCH_NAME,
-        worktreePath: path.resolve(WORKTREE_PATH),
-        tabs: [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-live')],
-      },
-      {
-        repoRoot: REPO_ROOT,
         branchName: 'feature/static-only',
         worktreePath: path.resolve(WORKTREE_PATH),
         tabs: [workspacePaneStaticTabEntry('history')],
@@ -189,10 +183,7 @@ describe('terminal session service workspace tabs', () => {
         branchName: BRANCH_NAME,
         worktreePath: path.resolve(WORKTREE_PATH),
       }),
-    ).toEqual([
-      workspacePaneStaticTabEntry('status'),
-      workspacePaneTerminalTabEntry('session-live'),
-    ])
+    ).toEqual([workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-live')])
   })
 
   test('replaceTabs keeps no-worktree branch tabs server-owned and static-only', async () => {
@@ -223,6 +214,87 @@ describe('terminal session service workspace tabs', () => {
         worktreePath: null,
       }),
     ).toEqual([workspacePaneStaticTabEntry('status')])
+  })
+
+  test('updateTabs applies reorder to current server tabs without reviving stale static tabs', async () => {
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    workspaceTabs.replaceTabs({
+      userId: USER_ID,
+      scope: path.resolve(REPO_ROOT),
+      branchName: BRANCH_NAME,
+      worktreePath: path.resolve(WORKTREE_PATH),
+      tabs: [
+        workspacePaneTerminalTabEntry('session-live'),
+        workspacePaneStaticTabEntry('history'),
+        workspacePaneStaticTabEntry('status'),
+      ],
+    })
+    const service = createService({
+      sessions: [terminalSession('session-live')],
+      workspaceTabs,
+    })
+
+    await expect(
+      service.updateTabs(USER_ID, {
+        repoRoot: REPO_ROOT,
+        branchName: BRANCH_NAME,
+        worktreePath: WORKTREE_PATH,
+        operation: { type: 'close-static', tabType: 'history' },
+      }),
+    ).resolves.toEqual([workspacePaneTerminalTabEntry('session-live'), workspacePaneStaticTabEntry('status')])
+
+    await expect(
+      service.updateTabs(USER_ID, {
+        repoRoot: REPO_ROOT,
+        branchName: BRANCH_NAME,
+        worktreePath: WORKTREE_PATH,
+        operation: {
+          type: 'reorder',
+          tabIdentities: ['workspace-pane:history', 'workspace-pane:status', 'terminal:session-live'],
+        },
+      }),
+    ).resolves.toEqual([workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-live')])
+  })
+
+  test('updateTabs retargets worktree tabs when the worktree branch changes', async () => {
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    workspaceTabs.replaceTabs({
+      userId: USER_ID,
+      scope: path.resolve(REPO_ROOT),
+      branchName: 'feature/old',
+      worktreePath: path.resolve(WORKTREE_PATH),
+      tabs: [workspacePaneTerminalTabEntry('session-live'), workspacePaneStaticTabEntry('status')],
+    })
+    const service = createService({
+      sessions: [terminalSession('session-live')],
+      workspaceTabs,
+    })
+
+    await expect(
+      service.updateTabs(USER_ID, {
+        repoRoot: REPO_ROOT,
+        branchName: 'feature/new',
+        worktreePath: WORKTREE_PATH,
+        operation: { type: 'open-static', tabType: 'history' },
+      }),
+    ).resolves.toEqual([
+      workspacePaneTerminalTabEntry('session-live'),
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneStaticTabEntry('history'),
+    ])
+
+    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT)).resolves.toEqual([
+      {
+        repoRoot: REPO_ROOT,
+        branchName: 'feature/new',
+        worktreePath: path.resolve(WORKTREE_PATH),
+        tabs: [
+          workspacePaneTerminalTabEntry('session-live'),
+          workspacePaneStaticTabEntry('status'),
+          workspacePaneStaticTabEntry('history'),
+        ],
+      },
+    ])
   })
 })
 

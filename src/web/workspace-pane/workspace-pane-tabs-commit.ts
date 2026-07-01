@@ -1,10 +1,10 @@
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+import type { TerminalUpdateWorkspaceTabsOperation } from '#/shared/terminal-types.ts'
 import { terminalBridge } from '#/web/terminal.ts'
 import { gblLog } from '#/web/logger.ts'
 import {
   cancelWorkspacePaneTabs,
-  fetchWorkspacePaneTabsForBranch,
-  setWorkspacePaneTabsForBranchQueryData,
+  setWorkspacePaneTabsForTargetQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { runWorkspacePaneTabsOperation } from '#/web/workspace-pane/workspace-pane-tabs-operation-queue.ts'
 
@@ -19,7 +19,7 @@ export interface UpdateWorkspacePaneTabsInput {
   repoRoot: string
   branchName: string
   worktreePath: string | null
-  update: (currentTabs: WorkspacePaneTabEntry[]) => readonly WorkspacePaneTabEntry[]
+  operation: TerminalUpdateWorkspaceTabsOperation
 }
 
 export async function commitWorkspacePaneTabs(input: CommitWorkspacePaneTabsInput): Promise<boolean> {
@@ -27,25 +27,14 @@ export async function commitWorkspacePaneTabs(input: CommitWorkspacePaneTabsInpu
 }
 
 export async function updateWorkspacePaneTabs(input: UpdateWorkspacePaneTabsInput): Promise<boolean> {
-  return await runWorkspacePaneTabsOperation(input, async () => {
-    const currentTabs = await fetchWorkspacePaneTabsForBranch({
-      repoRoot: input.repoRoot,
-      branchName: input.branchName,
-    })
-    return await commitWorkspacePaneTabsNow({
-      repoRoot: input.repoRoot,
-      branchName: input.branchName,
-      worktreePath: input.worktreePath,
-      tabs: [...input.update(currentTabs)],
-    })
-  })
+  return await runWorkspacePaneTabsOperation(input, async () => await updateWorkspacePaneTabsNow(input))
 }
 
 async function commitWorkspacePaneTabsNow(input: CommitWorkspacePaneTabsInput): Promise<boolean> {
   try {
     await cancelWorkspacePaneTabs(input.repoRoot)
     const serverTabs = await replaceWorkspacePaneTabsOnServer(input)
-    setWorkspacePaneTabsForBranchQueryData({
+    setWorkspacePaneTabsForTargetQueryData({
       repoRoot: input.repoRoot,
       branchName: input.branchName,
       worktreePath: input.worktreePath,
@@ -56,6 +45,28 @@ async function commitWorkspacePaneTabsNow(input: CommitWorkspacePaneTabsInput): 
     gblLog.warn('workspace pane tabs commit failed', {
       repoRoot: input.repoRoot,
       worktreePath: input.worktreePath,
+      err,
+    })
+    return false
+  }
+}
+
+async function updateWorkspacePaneTabsNow(input: UpdateWorkspacePaneTabsInput): Promise<boolean> {
+  try {
+    await cancelWorkspacePaneTabs(input.repoRoot)
+    const serverTabs = await updateWorkspacePaneTabsOnServer(input)
+    setWorkspacePaneTabsForTargetQueryData({
+      repoRoot: input.repoRoot,
+      branchName: input.branchName,
+      worktreePath: input.worktreePath,
+      tabs: serverTabs,
+    })
+    return true
+  } catch (err) {
+    gblLog.warn('workspace pane tabs operation failed', {
+      repoRoot: input.repoRoot,
+      worktreePath: input.worktreePath,
+      operation: input.operation.type,
       err,
     })
     return false
@@ -74,5 +85,16 @@ export async function replaceWorkspacePaneTabsOnServer(
     branchName: input.branchName,
     worktreePath: input.worktreePath,
     tabs: input.tabs,
+  })
+}
+
+export async function updateWorkspacePaneTabsOnServer(
+  input: UpdateWorkspacePaneTabsInput,
+): Promise<WorkspacePaneTabEntry[]> {
+  return await terminalBridge.updateWorkspaceTabs({
+    repoRoot: input.repoRoot,
+    branchName: input.branchName,
+    worktreePath: input.worktreePath,
+    operation: input.operation,
   })
 }

@@ -4,7 +4,9 @@ import {
   type WorkspacePaneSessionTabType,
   type WorkspacePaneTabEntry,
   type WorkspacePaneTabType,
+  workspacePaneTabRequiresWorktree,
 } from '#/shared/workspace-pane.ts'
+import { parseWorkspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import {
   defaultWorkspacePaneTabs,
   normalizeWorkspacePaneTabs,
@@ -15,68 +17,77 @@ export function persistedActiveRepoIdForSession(activeId: string | null): string
   return activeId
 }
 
-export function persistedPreferredWorkspacePaneTabByBranchByRepoForSession(
+export function persistedPreferredWorkspacePaneTabByTargetByRepoForSession(
   repos: Record<
     string,
     | {
-        data?: { branches?: Array<{ name?: string }> }
+        data?: { branches?: Array<{ name?: string; worktree?: { path?: string } | undefined }> }
         ui: {
-          preferredWorkspacePaneTabByBranch: Record<string, WorkspacePaneTabType>
+          preferredWorkspacePaneTabByTarget: Record<string, WorkspacePaneTabType>
         }
       }
     | undefined
   >,
   order: string[],
-  workspacePaneTabsByBranchByRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>>,
+  workspacePaneTabsByTargetByRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>>,
 ): Record<string, Record<string, WorkspacePaneSessionTabType>> {
   const byRepo: Record<string, Record<string, WorkspacePaneSessionTabType>> = {}
   for (const id of order) {
     const repo = repos[id]
     if (!repo) continue
-    const knownBranches = new Set((repo.data?.branches ?? []).map((branch) => branch.name).filter(Boolean))
-    const byBranch: Record<string, WorkspacePaneSessionTabType> = {}
-    for (const [branchName, tab] of Object.entries(repo.ui.preferredWorkspacePaneTabByBranch)) {
-      if (!branchName || branchName.includes('\0')) continue
-      if (knownBranches.size > 0 && !knownBranches.has(branchName)) continue
+    const byTarget: Record<string, WorkspacePaneSessionTabType> = {}
+    for (const [targetKey, tab] of Object.entries(repo.ui.preferredWorkspacePaneTabByTarget)) {
+      const target = workspacePaneTabsTargetKeyBelongsToRepo(targetKey, id, repo)
+      if (!target) continue
       if (!isWorkspacePaneSessionTabType(tab)) continue
-      const branchTabs = workspacePaneTabsByBranchByRepo[id]?.[branchName] ?? defaultWorkspacePaneTabs()
-      if (
-        isWorkspacePaneStaticTabType(tab) &&
-        !workspacePaneStaticTabsFromEntries(branchTabs).includes(tab)
-      )
-        continue
-      byBranch[branchName] = tab
+      if (target.kind === 'branch' && workspacePaneTabRequiresWorktree(tab)) continue
+      const targetTabs = workspacePaneTabsByTargetByRepo[id]?.[targetKey] ?? defaultWorkspacePaneTabs()
+      if (isWorkspacePaneStaticTabType(tab) && !workspacePaneStaticTabsFromEntries(targetTabs).includes(tab)) continue
+      byTarget[targetKey] = tab
     }
-    if (Object.keys(byBranch).length > 0) byRepo[id] = byBranch
+    if (Object.keys(byTarget).length > 0) byRepo[id] = byTarget
   }
   return byRepo
 }
 
-export function persistedWorkspacePaneTabsByBranchByRepoForSession(
+export function persistedWorkspacePaneTabsByTargetByRepoForSession(
   repos: Record<
     string,
     | {
-        data?: { branches?: Array<{ name?: string }> }
+        data?: { branches?: Array<{ name?: string; worktree?: { path?: string } | undefined }> }
       }
     | undefined
   >,
   order: string[],
-  workspacePaneTabsByBranchByRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>>,
+  workspacePaneTabsByTargetByRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>>,
 ): Record<string, Record<string, WorkspacePaneTabEntry[]>> {
   const byRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>> = {}
   for (const id of order) {
     const repo = repos[id]
     if (!repo) continue
-    const knownBranches = new Set((repo.data?.branches ?? []).map((branch) => branch.name).filter(Boolean))
-    const byBranch: Record<string, WorkspacePaneTabEntry[]> = {}
-    for (const [branchName, tabs] of Object.entries(workspacePaneTabsByBranchByRepo[id] ?? {})) {
-      if (!branchName || branchName.includes('\0')) continue
-      if (knownBranches.size > 0 && !knownBranches.has(branchName)) continue
-      byBranch[branchName] = normalizeWorkspacePaneTabs(tabs)
+    const byTarget: Record<string, WorkspacePaneTabEntry[]> = {}
+    for (const [targetKey, tabs] of Object.entries(workspacePaneTabsByTargetByRepo[id] ?? {})) {
+      const target = workspacePaneTabsTargetKeyBelongsToRepo(targetKey, id, repo)
+      if (!target) continue
+      byTarget[targetKey] = normalizeWorkspacePaneTabs(tabs, { hasWorktree: target.kind === 'worktree' })
     }
-    if (Object.keys(byBranch).length > 0) byRepo[id] = byBranch
+    if (Object.keys(byTarget).length > 0) byRepo[id] = byTarget
   }
   return byRepo
+}
+
+function workspacePaneTabsTargetKeyBelongsToRepo(
+  targetKey: string,
+  repoRoot: string,
+  repo: { data?: { branches?: Array<{ name?: string; worktree?: { path?: string } | undefined }> } },
+) {
+  const target = parseWorkspacePaneTabsTargetIdentityKey(targetKey)
+  if (!target || target.repoRoot !== repoRoot) return null
+  const branches = repo.data?.branches ?? []
+  if (target.kind === 'branch') {
+    return branches.some((branch) => branch.name === target.branchName) ? target : null
+  }
+  return branches.some((branch) => branch.worktree?.path === target.worktreePath) ? target : null
 }
 
 export function persistedSelectedTerminalSessionIdByTerminalWorktreeForSession(

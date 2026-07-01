@@ -14,7 +14,7 @@ import type {
   TerminalTestNotificationInput,
   WorkspacePaneTabsEntry,
 } from '#/shared/terminal-types.ts'
-import { WORKSPACE_PANE_STATIC_TAB_IDS } from '#/shared/workspace-pane.ts'
+import { WORKSPACE_PANE_STATIC_TAB_IDS, WORKSPACE_PANE_STATIC_TAB_TYPES } from '#/shared/workspace-pane.ts'
 
 const MIN_TERMINAL_COLS = 1
 const MAX_TERMINAL_COLS = 500
@@ -36,6 +36,7 @@ const TERMINAL_SOCKET_ACTIONS = [
   'list-workspace-tabs',
   'create',
   'replace-tabs',
+  'update-tabs',
   'prune',
   'session-snapshot',
 ] as const satisfies TerminalSocketRequestAction[]
@@ -101,6 +102,7 @@ const WorkspacePaneStaticTabEntrySchema = v.variant('type', [
   v.object({ type: v.literal('history'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.history) }),
   v.object({ type: v.literal('files'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.files) }),
 ])
+const WorkspacePaneStaticTabTypeSchema = v.picklist(WORKSPACE_PANE_STATIC_TAB_TYPES)
 const WorkspacePaneTerminalTabEntrySchema = v.object({
   type: v.literal('terminal'),
   terminalSessionId: v.pipe(v.string(), v.minLength(1)),
@@ -110,6 +112,21 @@ const TerminalReplaceWorkspaceTabsInputSchema = v.object({
   branchName: v.string(),
   worktreePath: v.nullable(v.string()),
   tabs: v.array(v.union([WorkspacePaneStaticTabEntrySchema, WorkspacePaneTerminalTabEntrySchema])),
+})
+const WorkspacePaneTabIdentitySchema = v.pipe(
+  v.string(),
+  v.minLength(1),
+  v.check((value) => !value.includes('\0'), 'Invalid workspace pane tab identity'),
+)
+const TerminalUpdateWorkspaceTabsInputSchema = v.object({
+  repoRoot: v.string(),
+  branchName: v.string(),
+  worktreePath: v.nullable(v.string()),
+  operation: v.variant('type', [
+    v.object({ type: v.literal('open-static'), tabType: WorkspacePaneStaticTabTypeSchema }),
+    v.object({ type: v.literal('close-static'), tabType: WorkspacePaneStaticTabTypeSchema }),
+    v.object({ type: v.literal('reorder'), tabIdentities: v.array(WorkspacePaneTabIdentitySchema) }),
+  ]),
 })
 const WorkspacePaneTabEntrySchema = v.union([WorkspacePaneStaticTabEntrySchema, WorkspacePaneTerminalTabEntrySchema])
 const WorkspacePaneTabsEntrySchema = v.object({
@@ -267,6 +284,12 @@ const TerminalClientMessageSchema = v.variant('type', [
     requestId: TerminalRequestIdSchema,
     action: v.literal('replace-tabs'),
     input: TerminalReplaceWorkspaceTabsInputSchema,
+  }),
+  v.object({
+    type: v.literal('request'),
+    requestId: TerminalRequestIdSchema,
+    action: v.literal('update-tabs'),
+    input: TerminalUpdateWorkspaceTabsInputSchema,
   }),
   v.object({
     type: v.literal('request'),

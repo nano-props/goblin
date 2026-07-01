@@ -7,6 +7,7 @@ import {
   runtimeRecentReposStateFromSettingsSnapshot,
   runtimeSettingsSnapshotFromSettingsSnapshot,
 } from '#/shared/settings-snapshot.ts'
+import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 
 describe('settings snapshot partitions', () => {
   test('builds runtime settings without recent repo or restorable session fields', () => {
@@ -50,6 +51,11 @@ describe('settings snapshot partitions', () => {
   })
 
   test('splits a full settings snapshot into runtime settings and restorable session', () => {
+    const mainTargetKey = workspacePaneTabsTargetIdentityKey({
+      repoRoot: '/tmp/repo-b',
+      branchName: 'main',
+      worktreePath: null,
+    })
     const snapshot = buildSettingsSnapshot({
       prefs: {
         lang: 'auto',
@@ -79,10 +85,10 @@ describe('settings snapshot partitions', () => {
         zenMode: false,
         workspacePaneSize: 50,
         selectedTerminalSessionIdByTerminalWorktree: { '/tmp/repo-b\0/tmp/repo-b': 'session-1' },
-        preferredWorkspacePaneTabByBranchByRepo: {},
-        workspacePaneTabsByBranchByRepo: {
+        preferredWorkspacePaneTabByTargetByRepo: {},
+        workspacePaneTabsByTargetByRepo: {
           '/tmp/repo-b': {
-            main: [],
+            [mainTargetKey]: [],
           },
         },
         filetreeViewStateByWorktreeByRepo: {
@@ -109,10 +115,10 @@ describe('settings snapshot partitions', () => {
       zenMode: false,
       workspacePaneSize: 50,
       selectedTerminalSessionIdByTerminalWorktree: { '/tmp/repo-b\0/tmp/repo-b': 'session-1' },
-      preferredWorkspacePaneTabByBranchByRepo: {},
-      workspacePaneTabsByBranchByRepo: {
+      preferredWorkspacePaneTabByTargetByRepo: {},
+      workspacePaneTabsByTargetByRepo: {
         '/tmp/repo-b': {
-          main: [],
+          [mainTargetKey]: [],
         },
       },
       filetreeViewStateByWorktreeByRepo: {

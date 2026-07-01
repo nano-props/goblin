@@ -7,8 +7,9 @@ import { branch, REPO_ID, resetRefreshTest, ipcHandlers, seedRepo } from '#/web/
 import { seedRepoState } from '#/web/test-utils/bridge.ts'
 import { canStartRemoteFetch } from '#/web/stores/repos/sync-state.ts'
 import {
-  preferredWorkspacePaneTabForBranch,
-  preferredWorkspacePaneTabByBranchRecordWith,
+  preferredWorkspacePaneTabForTarget,
+  preferredWorkspacePaneTabByTargetRecordWith,
+  workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import type { WorktreeStatus } from '#/web/types.ts'
 beforeEach(resetRefreshTest)
@@ -825,9 +826,9 @@ describe('core refresh request ordering', () => {
     const token = seedRepo([branch('main', undefined, { worktree: { path: '/repo' } }), branch('feature/a')])
     updateRepoForTest((repo) => {
       repo.ui.selectedBranch = 'feature/a'
-      repo.ui.preferredWorkspacePaneTabByBranch = preferredWorkspacePaneTabByBranchRecordWith(
+      repo.ui.preferredWorkspacePaneTabByTarget = preferredWorkspacePaneTabByTargetRecordWith(
         repo.ui,
-        'feature/a',
+        { repoRoot: REPO_ID, branchName: 'feature/a', worktreePath: null },
         'terminal',
       )
     })
@@ -837,7 +838,36 @@ describe('core refresh request ordering', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.ui.selectedBranch).toBe('feature/a')
-    expect(repo ? preferredWorkspacePaneTabForBranch(repo.ui, 'feature/a') : null).toBe('terminal')
+    expect(repo ? preferredWorkspacePaneTabForTarget(repo.ui, workspacePaneTabsTargetForRepoBranch(repo, 'feature/a')) : null).toBe(
+      'terminal',
+    )
+  })
+
+  test('snapshot refresh follows the selected worktree when checkout moves it to another branch', async () => {
+    const token = seedRepo([
+      branch('feature/old', undefined, { worktree: { path: '/tmp/worktree-a' } }),
+      branch('feature/new'),
+    ])
+    updateRepoForTest((repo) => {
+      repo.ui.selectedBranch = 'feature/old'
+      repo.ui.preferredWorkspacePaneTabByTarget = preferredWorkspacePaneTabByTargetRecordWith(
+        repo.ui,
+        { repoRoot: REPO_ID, branchName: 'feature/old', worktreePath: '/tmp/worktree-a' },
+        'terminal',
+      )
+    })
+    ipcHandlers['repo.snapshot'] = async () => ({
+      branches: [branch('feature/old'), branch('feature/new', undefined, { worktree: { path: '/tmp/worktree-a' } })],
+      current: 'feature/new',
+    })
+
+    await useReposStore.getState().refreshSnapshot(REPO_ID, { token })
+
+    const repo = useReposStore.getState().repos[REPO_ID]
+    expect(repo?.ui.selectedBranch).toBe('feature/new')
+    expect(
+      repo ? preferredWorkspacePaneTabForTarget(repo.ui, workspacePaneTabsTargetForRepoBranch(repo, 'feature/new')) : null,
+    ).toBe('terminal')
   })
 
   test('snapshot refresh prunes terminal sessions to current worktree paths', async () => {

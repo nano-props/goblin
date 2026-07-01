@@ -49,8 +49,8 @@ export function useSessionPersistence() {
       zenMode: session.zenMode,
       workspacePaneSize: session.workspacePaneSize,
       selectedTerminalSessionIdByTerminalWorktree: session.selectedTerminalSessionIdByTerminalWorktree,
-      preferredWorkspacePaneTabByBranchByRepo: session.preferredWorkspacePaneTabByBranchByRepo,
-      workspacePaneTabsByBranchByRepo: session.workspacePaneTabsByBranchByRepo,
+      preferredWorkspacePaneTabByTargetByRepo: session.preferredWorkspacePaneTabByTargetByRepo,
+      workspacePaneTabsByTargetByRepo: session.workspacePaneTabsByTargetByRepo,
     })
     const immediate = lastImmediateKeyRef.current !== immediateKey
     lastImmediateKeyRef.current = immediateKey

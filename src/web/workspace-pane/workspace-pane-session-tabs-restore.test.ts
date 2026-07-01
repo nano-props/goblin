@@ -10,7 +10,8 @@ import {
   seedRepoState,
 } from '#/web/test-utils/bridge.ts'
 import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
-import { readWorkspacePaneTabsForBranch } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
+import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 
 const REPO_ID = '/tmp/workspace-pane-session-tabs-restore-repo'
 const WORKTREE_PATH = '/tmp/workspace-pane-session-tabs-restore-worktree'
@@ -37,12 +38,15 @@ describe('restoreServerWorkspacePaneTabsFromSession', () => {
     await expect(
       restoreServerWorkspacePaneTabsFromSession({
         [REPO_ID]: {
-          'feature/worktree': [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-stale')],
+          [worktreeTargetKey()]: [
+            workspacePaneStaticTabEntry('status'),
+            workspacePaneTerminalTabEntry('session-stale'),
+          ],
         },
       }),
     ).resolves.toBe(true)
 
-    expect(readWorkspacePaneTabsForBranch(REPO_ID, 'feature/worktree')).toEqual([
+    expect(readTabsFor('feature/worktree', WORKTREE_PATH)).toEqual([
       workspacePaneStaticTabEntry('status'),
       workspacePaneTerminalTabEntry('session-live'),
     ])
@@ -63,7 +67,7 @@ describe('restoreServerWorkspacePaneTabsFromSession', () => {
     await expect(
       restoreServerWorkspacePaneTabsFromSession({
         [REPO_ID]: {
-          'feature/no-worktree': [
+          [branchTargetKey('feature/no-worktree')]: [
             workspacePaneStaticTabEntry('status'),
             workspacePaneTerminalTabEntry('session-stale'),
           ],
@@ -77,9 +81,30 @@ describe('restoreServerWorkspacePaneTabsFromSession', () => {
       worktreePath: null,
       tabs: [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-stale')],
     })
-    expect(readWorkspacePaneTabsForBranch(REPO_ID, 'feature/no-worktree')).toEqual([
-      workspacePaneStaticTabEntry('status'),
-    ])
+    expect(readTabsFor('feature/no-worktree', null)).toEqual([workspacePaneStaticTabEntry('status')])
+  })
+
+  test('does not retarget an explicit branch target to a worktree target', async () => {
+    seedRepo()
+    const replaceWorkspaceTabs = vi.fn(async () => [workspacePaneStaticTabEntry('history')])
+    installWorkspacePaneTabsTestBridge({ replaceWorkspaceTabs })
+
+    await expect(
+      restoreServerWorkspacePaneTabsFromSession({
+        [REPO_ID]: {
+          [branchTargetKey('feature/worktree')]: [workspacePaneStaticTabEntry('history')],
+        },
+      }),
+    ).resolves.toBe(true)
+
+    expect(replaceWorkspaceTabs).toHaveBeenCalledWith({
+      repoRoot: REPO_ID,
+      branchName: 'feature/worktree',
+      worktreePath: null,
+      tabs: [workspacePaneStaticTabEntry('history')],
+    })
+    expect(readTabsFor('feature/worktree', null)).toEqual([workspacePaneStaticTabEntry('history')])
+    expect(readTabsFor('feature/worktree', WORKTREE_PATH)).toEqual([workspacePaneStaticTabEntry('status')])
   })
 
   test('reports failure without applying local restored tabs when the server commit fails', async () => {
@@ -93,14 +118,12 @@ describe('restoreServerWorkspacePaneTabsFromSession', () => {
     await expect(
       restoreServerWorkspacePaneTabsFromSession({
         [REPO_ID]: {
-          'feature/worktree': [workspacePaneStaticTabEntry('history')],
+          [worktreeTargetKey()]: [workspacePaneStaticTabEntry('history')],
         },
       }),
     ).resolves.toBe(false)
 
-    expect(readWorkspacePaneTabsForBranch(REPO_ID, 'feature/worktree')).toEqual([
-      workspacePaneStaticTabEntry('status'),
-    ])
+    expect(readTabsFor('feature/worktree', WORKTREE_PATH)).toEqual([workspacePaneStaticTabEntry('status')])
   })
 })
 
@@ -113,4 +136,20 @@ function seedRepo(): void {
       'feature/worktree': [workspacePaneStaticTabEntry('status')],
     },
   })
+}
+
+function readTabsFor(branchName: string, worktreePath: string | null) {
+  return readWorkspacePaneTabsForTarget({ repoRoot: REPO_ID, branchName, worktreePath })
+}
+
+function worktreeTargetKey(): string {
+  return workspacePaneTabsTargetIdentityKey({
+    repoRoot: REPO_ID,
+    branchName: 'feature/worktree',
+    worktreePath: WORKTREE_PATH,
+  })
+}
+
+function branchTargetKey(branchName: string): string {
+  return workspacePaneTabsTargetIdentityKey({ repoRoot: REPO_ID, branchName, worktreePath: null })
 }

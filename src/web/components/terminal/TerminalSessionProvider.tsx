@@ -16,7 +16,7 @@ import { preloadTerminalFont } from '#/web/components/terminal/terminal-geometry
 import { loadTerminalSessions } from '#/web/terminal-session-queries.ts'
 import {
   invalidateWorkspacePaneTabs,
-  setWorkspacePaneTabsForBranchQueryData,
+  setWorkspacePaneTabsForTargetQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import {
   TerminalSessionProjection,
@@ -78,7 +78,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     projectionRef.current = getTerminalSessionProjection({
       onSelectedWorktreeChange: setSelectedTerminal,
       onWorkspaceTabsChanged: (base, tabs) => {
-        setWorkspacePaneTabsForBranchQueryData({
+        setWorkspacePaneTabsForTargetQueryData({
           repoRoot: base.repoRoot,
           branchName: base.branch,
           worktreePath: base.worktreePath,

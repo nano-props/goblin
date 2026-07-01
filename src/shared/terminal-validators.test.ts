@@ -120,6 +120,36 @@ describe('shared terminal validators', () => {
     ).toBeNull()
   })
 
+  test('accepts workspace tab operation requests and rejects invalid identities', () => {
+    expect(
+      normalizeTerminalClientMessage({
+        type: 'request',
+        requestId: 'request_123',
+        action: 'update-tabs',
+        input: {
+          repoRoot: '/repo',
+          branchName: 'main',
+          worktreePath: '/repo',
+          operation: { type: 'open-static', tabType: 'history' },
+        },
+      }),
+    ).toMatchObject({ type: 'request', action: 'update-tabs' })
+
+    expect(
+      normalizeTerminalClientMessage({
+        type: 'request',
+        requestId: 'request_124',
+        action: 'update-tabs',
+        input: {
+          repoRoot: '/repo',
+          branchName: 'main',
+          worktreePath: '/repo',
+          operation: { type: 'reorder', tabIdentities: ['workspace-pane:status', 'bad\0identity'] },
+        },
+      }),
+    ).toBeNull()
+  })
+
   test('rejects NUL bytes in startup shell commands', () => {
     expect(
       normalizeTerminalClientMessage({

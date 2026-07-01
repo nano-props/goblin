@@ -65,9 +65,9 @@ export interface RepoWorktreeState {
 export interface RepoUiState {
   selectedBranch: string | null
   branchViewMode: BranchViewMode
-  /** Branch-scoped selected workspace pane tab. Branch switches read this
-   *  first so selecting a tab on one branch does not select it on another. */
-  preferredWorkspacePaneTabByBranch: Record<string, WorkspacePaneTabType>
+  /** Target-scoped selected workspace pane tab. Worktree-backed panes are keyed by
+   *  worktree path; branch-only panes are keyed by branch name. */
+  preferredWorkspacePaneTabByTarget: Record<string, WorkspacePaneTabType>
 }
 
 interface RepoProjectionMeta {
@@ -156,8 +156,8 @@ export interface RestorableWorkspaceState {
 }
 
 export interface SessionWorkspacePaneRestoreState {
-  workspacePaneTabsByBranchByRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>>
-  preferredWorkspacePaneTabByBranchByRepo: Record<string, Record<string, WorkspacePaneSessionTabType>>
+  workspacePaneTabsByTargetByRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>>
+  preferredWorkspacePaneTabByTargetByRepo: Record<string, Record<string, WorkspacePaneSessionTabType>>
 }
 
 export interface RepoSessionHydrationOptions {
@@ -202,10 +202,10 @@ interface RuntimeCoherentRepoProjectionActions {
    * Returns the new outcome, or `null` for non-remote ids.
    */
   retryRemoteRepoConnection: (id: string) => Promise<{ ok: boolean; reason?: string } | null>
-  /** Updates the selected branch's workspace pane tab type. The store does not project
+  /** Updates the selected target's workspace pane tab type. The store does not project
    *  against terminal session count, worktree presence, or opened workspace pane tabs;
    *  the UI resolves the active pane at read time so session restore preserves
-   *  branch-scoped user intent. */
+   *  target-scoped user intent. */
   setWorkspacePaneTab: (id: string, tab: WorkspacePaneTabType) => void
   setBranchViewMode: (id: string, viewMode: BranchViewMode) => void
   selectBranch: (id: string, branch: string) => void

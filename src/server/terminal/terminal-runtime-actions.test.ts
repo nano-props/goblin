@@ -62,6 +62,7 @@ function makeActions(
     listSessions: vi.fn(),
     listWorkspaceTabs: vi.fn(async () => []),
     replaceTabs: vi.fn(async () => []),
+    updateTabs: vi.fn(async () => []),
     removeTerminalTab: vi.fn(async () => {}),
   }
   const isValidTerminalClientId =
@@ -255,6 +256,25 @@ describe('terminal-runtime-actions workspace tabs broadcast', () => {
     ).resolves.toEqual([])
 
     expect(broadcasts).not.toHaveBeenCalled()
+  })
+
+  test('emits a workspace tabs invalidation after updateTabs succeeds', async () => {
+    const { actions, broadcasts } = makeActions({ closeSessionForUser: () => false })
+
+    await expect(
+      actions.updateTabs(CLIENT_ID, USER_ID, {
+        repoRoot: '/repo',
+        branchName: 'feature/worktree',
+        worktreePath: '/repo',
+        operation: { type: 'open-static', tabType: 'status' },
+      }),
+    ).resolves.toEqual([])
+
+    expect(broadcasts).toHaveBeenCalledTimes(1)
+    expect(broadcasts).toHaveBeenCalledWith(USER_ID, {
+      type: 'workspace-tabs-changed',
+      repoRoot: '/repo',
+    })
   })
 })
 

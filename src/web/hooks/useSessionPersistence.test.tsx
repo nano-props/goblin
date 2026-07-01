@@ -12,6 +12,7 @@ import {
   resetFiletreeInteractionStore,
   useFiletreeInteractionStore,
 } from '#/web/stores/repos/filetree-interaction-state.ts'
+import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 
 const persistWorkspaceSessionStateMock = vi.fn(async (_session: unknown) => {})
 
@@ -27,6 +28,7 @@ beforeEach(() => {
 
 describe('useSessionPersistence', () => {
   test('persists the active terminal map into settings session state', () => {
+    const targetKey = worktreeTargetKey('/tmp/repo', 'feature/worktree', '/tmp/worktree')
     const repo = seedRepoState({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
@@ -56,9 +58,9 @@ describe('useSessionPersistence', () => {
         selectedTerminalSessionIdByTerminalWorktree: {
           '/tmp/repo\0/tmp/worktree': 'session-2',
         },
-        workspacePaneTabsByBranchByRepo: {
+        workspacePaneTabsByTargetByRepo: {
           '/tmp/repo': {
-            'feature/worktree': [workspacePaneStaticTabEntry('status')],
+            [targetKey]: [workspacePaneStaticTabEntry('status')],
           },
         },
       }),
@@ -66,6 +68,7 @@ describe('useSessionPersistence', () => {
   })
 
   test('persists explicitly closed workspace pane tabs as empty arrays', () => {
+    const targetKey = worktreeTargetKey('/tmp/repo', 'feature/worktree', '/tmp/worktree')
     const repo = seedRepoState({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
@@ -80,9 +83,9 @@ describe('useSessionPersistence', () => {
 
     expect(persistWorkspaceSessionStateMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        workspacePaneTabsByBranchByRepo: {
+        workspacePaneTabsByTargetByRepo: {
           '/tmp/repo': {
-            'feature/worktree': [],
+            [targetKey]: [],
           },
         },
       }),
@@ -162,4 +165,8 @@ describe('useSessionPersistence', () => {
 function Harness() {
   useSessionPersistence()
   return null
+}
+
+function worktreeTargetKey(repoRoot: string, branchName: string, worktreePath: string): string {
+  return workspacePaneTabsTargetIdentityKey({ repoRoot, branchName, worktreePath })
 }

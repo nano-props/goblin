@@ -55,6 +55,9 @@ export function createTerminalRealtimeHandlers(host: ServerTerminalHost): {
     'replace-tabs'(clientId, userId, input) {
       return host.replaceTabs(clientId, userId, input)
     },
+    'update-tabs'(clientId, userId, input) {
+      return host.updateTabs(clientId, userId, input)
+    },
     prune(clientId, userId, input) {
       return host.prune(clientId, userId, input.repoRoot)
     },

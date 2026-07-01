@@ -9,7 +9,6 @@ import {
 } from '#/web/components/workspace-pane/tab-providers.ts'
 import { workspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { updateWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
-import { workspacePaneTabsWithoutStaticTab } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 
 interface CloseWorkspacePaneTabsForWorktreeOptions {
   repoId: string
@@ -91,7 +90,7 @@ function closeStaticTabWithCommit(worktreePath: string | null) {
       repoRoot: repoId,
       branchName,
       worktreePath,
-      update: (currentTabs) => workspacePaneTabsWithoutStaticTab(currentTabs, type),
+      operation: { type: 'close-static', tabType: type },
     })
   }
 }

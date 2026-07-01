@@ -2,14 +2,11 @@
 
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
-import { commitWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
+import { commitWorkspacePaneTabs, updateWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
+import { installWorkspacePaneTabsTestBridge, resetReposStore } from '#/web/test-utils/bridge.ts'
 import {
-  installWorkspacePaneTabsTestBridge,
-  resetReposStore,
-} from '#/web/test-utils/bridge.ts'
-import {
-  readWorkspacePaneTabsForBranch,
-  setWorkspacePaneTabsForBranchQueryData,
+  readWorkspacePaneTabsForTarget,
+  setWorkspacePaneTabsForTargetQueryData,
   workspacePaneTabsQueryOptions,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
@@ -43,7 +40,7 @@ describe('commitWorkspacePaneTabs', () => {
       replaceWorkspaceTabs: async () => await serverTabs,
     })
 
-    setWorkspacePaneTabsForBranchQueryData({
+    setWorkspacePaneTabsForTargetQueryData({
       repoRoot: REPO_ROOT,
       branchName: BRANCH_NAME,
       worktreePath: WORKTREE_PATH,
@@ -57,11 +54,11 @@ describe('commitWorkspacePaneTabs', () => {
       tabs: [workspacePaneTerminalTabEntry('session-1'), workspacePaneStaticTabEntry('status')],
     })
 
-    expect(readWorkspacePaneTabsForBranch(REPO_ROOT, BRANCH_NAME)).toEqual([workspacePaneStaticTabEntry('history')])
+    expect(readWorkspacePaneTabs()).toEqual([workspacePaneStaticTabEntry('history')])
 
     resolveServerTabs([workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-1')])
     await expect(commit).resolves.toBe(true)
-    expect(readWorkspacePaneTabsForBranch(REPO_ROOT, BRANCH_NAME)).toEqual([
+    expect(readWorkspacePaneTabs()).toEqual([
       workspacePaneStaticTabEntry('status'),
       workspacePaneTerminalTabEntry('session-1'),
     ])
@@ -73,7 +70,7 @@ describe('commitWorkspacePaneTabs', () => {
         throw new Error('server unavailable')
       },
     })
-    setWorkspacePaneTabsForBranchQueryData({
+    setWorkspacePaneTabsForTargetQueryData({
       repoRoot: REPO_ROOT,
       branchName: BRANCH_NAME,
       worktreePath: WORKTREE_PATH,
@@ -89,7 +86,7 @@ describe('commitWorkspacePaneTabs', () => {
       }),
     ).resolves.toBe(false)
 
-    expect(readWorkspacePaneTabsForBranch(REPO_ROOT, BRANCH_NAME)).toEqual([workspacePaneStaticTabEntry('status')])
+    expect(readWorkspacePaneTabs()).toEqual([workspacePaneStaticTabEntry('status')])
   })
 
   test('cancels stale in-flight list queries before writing committed tabs', async () => {
@@ -123,9 +120,73 @@ describe('commitWorkspacePaneTabs', () => {
     ])
     await fetch
 
-    expect(readWorkspacePaneTabsForBranch(REPO_ROOT, BRANCH_NAME)).toEqual([
+    expect(readWorkspacePaneTabs()).toEqual([
       workspacePaneTerminalTabEntry('session-1'),
       workspacePaneStaticTabEntry('status'),
     ])
   })
 })
+
+describe('updateWorkspacePaneTabs', () => {
+  test('sends a server operation and writes canonical server tabs', async () => {
+    installWorkspacePaneTabsTestBridge({
+      updateWorkspaceTabs: async (input) => {
+        expect(input.operation).toEqual({ type: 'open-static', tabType: 'history' })
+        return [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')]
+      },
+    })
+    setWorkspacePaneTabsForTargetQueryData({
+      repoRoot: REPO_ROOT,
+      branchName: BRANCH_NAME,
+      worktreePath: WORKTREE_PATH,
+      tabs: [workspacePaneStaticTabEntry('status')],
+    })
+
+    await expect(
+      updateWorkspacePaneTabs({
+        repoRoot: REPO_ROOT,
+        branchName: BRANCH_NAME,
+        worktreePath: WORKTREE_PATH,
+        operation: { type: 'open-static', tabType: 'history' },
+      }),
+    ).resolves.toBe(true)
+
+    expect(readWorkspacePaneTabs()).toEqual([
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneStaticTabEntry('history'),
+    ])
+  })
+
+  test('returns false and leaves cached tabs untouched when the server operation fails', async () => {
+    installWorkspacePaneTabsTestBridge({
+      updateWorkspaceTabs: async () => {
+        throw new Error('server unavailable')
+      },
+    })
+    setWorkspacePaneTabsForTargetQueryData({
+      repoRoot: REPO_ROOT,
+      branchName: BRANCH_NAME,
+      worktreePath: WORKTREE_PATH,
+      tabs: [workspacePaneStaticTabEntry('status')],
+    })
+
+    await expect(
+      updateWorkspacePaneTabs({
+        repoRoot: REPO_ROOT,
+        branchName: BRANCH_NAME,
+        worktreePath: WORKTREE_PATH,
+        operation: { type: 'open-static', tabType: 'history' },
+      }),
+    ).resolves.toBe(false)
+
+    expect(readWorkspacePaneTabs()).toEqual([workspacePaneStaticTabEntry('status')])
+  })
+})
+
+function readWorkspacePaneTabs(): WorkspacePaneTabEntry[] {
+  return readWorkspacePaneTabsForTarget({
+    repoRoot: REPO_ROOT,
+    branchName: BRANCH_NAME,
+    worktreePath: WORKTREE_PATH,
+  })
+}

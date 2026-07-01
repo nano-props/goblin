@@ -5,13 +5,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { flushMicrotasks, renderInJsdom } from '#/test-utils/render.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
+import { installWorkspacePaneTabsTestBridge, resetReposStore } from '#/web/test-utils/bridge.ts'
 import {
-  installWorkspacePaneTabsTestBridge,
-  resetReposStore,
-} from '#/web/test-utils/bridge.ts'
-import {
-  readWorkspacePaneTabsForBranch,
-  setWorkspacePaneTabsForBranchQueryData,
+  readWorkspacePaneTabsForTarget,
+  setWorkspacePaneTabsForTargetQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import {
   type WorkspacePaneTabsReorderMutationInput,
@@ -20,15 +17,15 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
 import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import type { TerminalReplaceWorkspaceTabsInput } from '#/shared/terminal-types.ts'
+import type { TerminalUpdateWorkspaceTabsInput } from '#/shared/terminal-types.ts'
 import { clearWorkspacePaneTabsOperationQueuesForTests } from '#/web/workspace-pane/workspace-pane-tabs-operation-queue.ts'
 
 const REPO_ROOT = '/tmp/workspace-pane-tabs-reorder-mutation-repo'
 const BRANCH_NAME = 'feature/worktree'
 const WORKTREE_PATH = '/tmp/workspace-pane-tabs-reorder-mutation-worktree'
 
-interface DeferredReplaceWorkspaceTabsRequest {
-  input: TerminalReplaceWorkspaceTabsInput
+interface DeferredUpdateWorkspaceTabsRequest {
+  input: TerminalUpdateWorkspaceTabsInput
   resolve: (tabs: WorkspacePaneTabEntry[]) => void
   reject: (err: unknown) => void
 }
@@ -63,7 +60,7 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
       resolveServerTabs = resolve
     })
     installWorkspacePaneTabsTestBridge({
-      replaceWorkspaceTabs: async () => await serverTabs,
+      updateWorkspaceTabs: async () => await serverTabs,
     })
     const sourceTabs = [terminalEntry('session-1'), staticEntry('status')]
     const reorderedTabs = [staticEntry('status'), terminalEntry('session-1')]
@@ -76,19 +73,19 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     })
 
     await vi.waitFor(() => {
-      expect(readWorkspacePaneTabsForBranch(REPO_ROOT, BRANCH_NAME, queryClient)).toEqual(reorderedTabs)
+      expect(readWorkspacePaneTabs()).toEqual(reorderedTabs)
     })
 
     resolveServerTabs(canonicalServerTabs)
 
     await vi.waitFor(() => {
-      expect(readWorkspacePaneTabsForBranch(REPO_ROOT, BRANCH_NAME, queryClient)).toEqual(canonicalServerTabs)
+      expect(readWorkspacePaneTabs()).toEqual(canonicalServerTabs)
     })
   })
 
   test('queues reorders and recomputes the next reorder from current cached tabs', async () => {
     const sourceTabs = [terminalEntry('session-1'), staticEntry('status'), staticEntry('history')]
-    const requests = installDeferredReplaceWorkspaceTabs()
+    const requests = installDeferredUpdateWorkspaceTabs()
     const firstReorderTabs = [staticEntry('status'), terminalEntry('session-1'), staticEntry('history')]
     const secondDraggedTabs = [terminalEntry('session-1'), staticEntry('status')]
     const expectedSecondCommitTabs = [terminalEntry('session-1'), staticEntry('status'), staticEntry('history')]
@@ -99,14 +96,14 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
       currentControls().reorderTabs(firstReorderTabs)
     })
     await vi.waitFor(() => {
-      expect(readWorkspacePaneTabsForBranch(REPO_ROOT, BRANCH_NAME, queryClient)).toEqual(firstReorderTabs)
+      expect(readWorkspacePaneTabs()).toEqual(firstReorderTabs)
       expect(requests).toHaveLength(1)
     })
 
     act(() => {
       currentControls().reorderTabs(secondDraggedTabs)
     })
-    expect(readWorkspacePaneTabsForBranch(REPO_ROOT, BRANCH_NAME, queryClient)).toEqual(firstReorderTabs)
+    expect(readWorkspacePaneTabs()).toEqual(firstReorderTabs)
 
     await act(async () => {
       requests[0]!.resolve(firstReorderTabs)
@@ -115,22 +112,25 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     await vi.waitFor(() => {
       expect(requests).toHaveLength(2)
     })
-    expect(requests[1]!.input.tabs).toEqual(expectedSecondCommitTabs)
-    expect(readWorkspacePaneTabsForBranch(REPO_ROOT, BRANCH_NAME, queryClient)).toEqual(expectedSecondCommitTabs)
+    expect(requests[1]!.input.operation).toEqual({
+      type: 'reorder',
+      tabIdentities: ['terminal:session-1', 'workspace-pane:status'],
+    })
+    expect(readWorkspacePaneTabs()).toEqual(expectedSecondCommitTabs)
 
     await act(async () => {
       requests[1]!.resolve(expectedSecondCommitTabs)
       await flushMicrotasks()
     })
     await vi.waitFor(() => {
-      expect(readWorkspacePaneTabsForBranch(REPO_ROOT, BRANCH_NAME, queryClient)).toEqual(expectedSecondCommitTabs)
+      expect(readWorkspacePaneTabs()).toEqual(expectedSecondCommitTabs)
     })
   })
 
   test('continues to the next queued reorder after an earlier reorder fails', async () => {
     const onReorderRejected = vi.fn()
     const sourceTabs = [terminalEntry('session-1'), staticEntry('status'), staticEntry('history')]
-    const requests = installDeferredReplaceWorkspaceTabs()
+    const requests = installDeferredUpdateWorkspaceTabs()
     const firstReorderTabs = [staticEntry('status'), terminalEntry('session-1'), staticEntry('history')]
     const secondReorderTabs = [staticEntry('history'), staticEntry('status'), terminalEntry('session-1')]
     seedWorkspacePaneTabs(sourceTabs)
@@ -140,14 +140,14 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
       currentControls().reorderTabs(firstReorderTabs)
     })
     await vi.waitFor(() => {
-      expect(readWorkspacePaneTabsForBranch(REPO_ROOT, BRANCH_NAME, queryClient)).toEqual(firstReorderTabs)
+      expect(readWorkspacePaneTabs()).toEqual(firstReorderTabs)
       expect(requests).toHaveLength(1)
     })
 
     act(() => {
       currentControls().reorderTabs(secondReorderTabs)
     })
-    expect(readWorkspacePaneTabsForBranch(REPO_ROOT, BRANCH_NAME, queryClient)).toEqual(firstReorderTabs)
+    expect(readWorkspacePaneTabs()).toEqual(firstReorderTabs)
 
     await act(async () => {
       requests[0]!.reject(new Error('first reorder failed'))
@@ -156,7 +156,7 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     await vi.waitFor(() => {
       expect(requests).toHaveLength(2)
     })
-    expect(readWorkspacePaneTabsForBranch(REPO_ROOT, BRANCH_NAME, queryClient)).toEqual(secondReorderTabs)
+    expect(readWorkspacePaneTabs()).toEqual(secondReorderTabs)
     expect(onReorderRejected).toHaveBeenCalledTimes(1)
 
     await act(async () => {
@@ -164,14 +164,14 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
       await flushMicrotasks()
     })
     await vi.waitFor(() => {
-      expect(readWorkspacePaneTabsForBranch(REPO_ROOT, BRANCH_NAME, queryClient)).toEqual(secondReorderTabs)
+      expect(readWorkspacePaneTabs()).toEqual(secondReorderTabs)
     })
   })
 
   test('rolls query cache back and reports failure when the server rejects reorder', async () => {
     const onReorderRejected = vi.fn()
     installWorkspacePaneTabsTestBridge({
-      replaceWorkspaceTabs: async () => {
+      updateWorkspaceTabs: async () => {
         throw new Error('server unavailable')
       },
     })
@@ -185,14 +185,63 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     })
 
     await vi.waitFor(() => {
-      expect(readWorkspacePaneTabsForBranch(REPO_ROOT, BRANCH_NAME, queryClient)).toEqual(sourceTabs)
+      expect(readWorkspacePaneTabs()).toEqual(sourceTabs)
       expect(onReorderRejected).toHaveBeenCalledTimes(1)
     })
   })
 
+  test('rolls back only the failed branch when another branch updates while reorder is pending', async () => {
+    const requests = installDeferredUpdateWorkspaceTabs()
+    const sourceTabs = [terminalEntry('session-1'), staticEntry('status')]
+    const reorderedTabs = [staticEntry('status'), terminalEntry('session-1')]
+    const otherBranchName = 'feature/other'
+    seedWorkspacePaneTabs(sourceTabs)
+    setWorkspacePaneTabsForTargetQueryData(
+      {
+        repoRoot: REPO_ROOT,
+        branchName: otherBranchName,
+        worktreePath: null,
+        tabs: [staticEntry('status')],
+      },
+      queryClient,
+    )
+    renderMutationHook({ canonicalTabs: sourceTabs })
+
+    act(() => {
+      currentControls().reorderTabs(reorderedTabs)
+    })
+    await vi.waitFor(() => {
+      expect(requests).toHaveLength(1)
+    })
+    setWorkspacePaneTabsForTargetQueryData(
+      {
+        repoRoot: REPO_ROOT,
+        branchName: otherBranchName,
+        worktreePath: null,
+        tabs: [staticEntry('history')],
+      },
+      queryClient,
+    )
+
+    await act(async () => {
+      requests[0]!.reject(new Error('server unavailable'))
+      await flushMicrotasks()
+    })
+
+    await vi.waitFor(() => {
+      expect(readWorkspacePaneTabs()).toEqual(sourceTabs)
+      expect(
+        readWorkspacePaneTabsForTarget(
+          { repoRoot: REPO_ROOT, branchName: otherBranchName, worktreePath: null },
+          queryClient,
+        ),
+      ).toEqual([staticEntry('history')])
+    })
+  })
+
   test('does not commit no-op reorder', () => {
-    const replaceWorkspaceTabs = vi.fn(async (input: TerminalReplaceWorkspaceTabsInput) => [...input.tabs])
-    installWorkspacePaneTabsTestBridge({ replaceWorkspaceTabs })
+    const updateWorkspaceTabs = vi.fn(async () => [])
+    installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs })
     const sourceTabs = [terminalEntry('session-1'), staticEntry('status')]
     renderMutationHook({ canonicalTabs: sourceTabs })
 
@@ -200,7 +249,7 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
       currentControls().reorderTabs([...sourceTabs])
     })
 
-    expect(replaceWorkspaceTabs).not.toHaveBeenCalled()
+    expect(updateWorkspaceTabs).not.toHaveBeenCalled()
   })
 })
 
@@ -230,8 +279,19 @@ function currentControls(): WorkspacePaneTabsReorderMutationResult {
   return controls
 }
 
+function readWorkspacePaneTabs(): WorkspacePaneTabEntry[] {
+  return readWorkspacePaneTabsForTarget(
+    {
+      repoRoot: REPO_ROOT,
+      branchName: BRANCH_NAME,
+      worktreePath: WORKTREE_PATH,
+    },
+    queryClient,
+  )
+}
+
 function seedWorkspacePaneTabs(tabs: WorkspacePaneTabEntry[]): void {
-  setWorkspacePaneTabsForBranchQueryData(
+  setWorkspacePaneTabsForTargetQueryData(
     {
       repoRoot: REPO_ROOT,
       branchName: BRANCH_NAME,
@@ -242,10 +302,10 @@ function seedWorkspacePaneTabs(tabs: WorkspacePaneTabEntry[]): void {
   )
 }
 
-function installDeferredReplaceWorkspaceTabs(): DeferredReplaceWorkspaceTabsRequest[] {
-  const requests: DeferredReplaceWorkspaceTabsRequest[] = []
+function installDeferredUpdateWorkspaceTabs(): DeferredUpdateWorkspaceTabsRequest[] {
+  const requests: DeferredUpdateWorkspaceTabsRequest[] = []
   installWorkspacePaneTabsTestBridge({
-    replaceWorkspaceTabs: async (input) =>
+    updateWorkspaceTabs: async (input) =>
       await new Promise<WorkspacePaneTabEntry[]>((resolve, reject) => {
         requests.push({ input, resolve, reject })
       }),

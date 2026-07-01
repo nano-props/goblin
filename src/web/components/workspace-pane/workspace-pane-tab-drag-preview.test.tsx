@@ -53,7 +53,7 @@ describe('useWorkspacePaneTabDragPreview', () => {
     expect(currentControls().visualTabs).toEqual(reorderedTabs)
   })
 
-  test('does not stage a preview when the reorder is a no-op or has no branch target', () => {
+  test('does not stage a preview when the reorder is a no-op or has no tab target', () => {
     const sourceTabs = [terminalEntry('session-1'), staticEntry('status')]
     const renderResult = renderPreviewHook({ canonicalTabs: sourceTabs })
 
@@ -71,7 +71,7 @@ describe('useWorkspacePaneTabDragPreview', () => {
     expect(currentControls().visualTabs).toEqual(sourceTabs)
   })
 
-  test('clears a staged preview when the branch target changes', () => {
+  test('keeps a staged preview when only a worktree target branch changes', () => {
     const sourceTabs = [terminalEntry('session-1'), staticEntry('status')]
     const reorderedTabs = [staticEntry('status'), terminalEntry('session-1')]
     const renderResult = renderPreviewHook({ canonicalTabs: sourceTabs })
@@ -84,6 +84,30 @@ describe('useWorkspacePaneTabDragPreview', () => {
     act(() => {
       renderResult.rerender(
         <HookHost input={previewInput({ branchName: 'feature/other', canonicalTabs: sourceTabs })} />,
+      )
+    })
+
+    expect(currentControls().visualTabs).toEqual(reorderedTabs)
+  })
+
+  test('clears a staged preview when the tab target identity changes', () => {
+    const sourceTabs = [terminalEntry('session-1'), staticEntry('status')]
+    const reorderedTabs = [staticEntry('status'), terminalEntry('session-1')]
+    const renderResult = renderPreviewHook({ canonicalTabs: sourceTabs })
+
+    act(() => {
+      expect(currentControls().stageDragPreview(reorderedTabs)).toBe(true)
+    })
+    expect(currentControls().visualTabs).toEqual(reorderedTabs)
+
+    act(() => {
+      renderResult.rerender(
+        <HookHost
+          input={previewInput({
+            worktreePath: '/tmp/workspace-pane-tab-drag-preview-other',
+            canonicalTabs: sourceTabs,
+          })}
+        />,
       )
     })
 

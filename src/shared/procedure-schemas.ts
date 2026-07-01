@@ -195,11 +195,11 @@ const WorkspaceSessionStateSchema = v.object({
   zenMode: v.boolean(),
   workspacePaneSize: v.number(),
   selectedTerminalSessionIdByTerminalWorktree: v.record(v.string(), v.string()),
-  preferredWorkspacePaneTabByBranchByRepo: v.record(
+  preferredWorkspacePaneTabByTargetByRepo: v.record(
     v.string(),
     v.record(v.string(), v.picklist(['status', 'changes', 'history', 'files', 'terminal'])),
   ),
-  workspacePaneTabsByBranchByRepo: v.record(
+  workspacePaneTabsByTargetByRepo: v.record(
     v.string(),
     v.record(v.string(), v.array(v.union([WorkspacePaneStaticTabEntrySchema, WorkspacePaneTerminalTabEntrySchema]))),
   ),

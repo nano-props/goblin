@@ -10,8 +10,11 @@ import {
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
-import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
-import { readWorkspacePaneTabsForBranch } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import {
+  preferredWorkspacePaneTabForTarget,
+  workspacePaneTabsTargetForRepoBranch,
+} from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 
 const REPO_ID = '/tmp/workspace-pane-tab-repo'
@@ -30,7 +33,7 @@ afterEach(() => {
 })
 
 describe('openWorkspacePaneTab', () => {
-  test('opens status as a branch-owned tab when the branch has a worktree', async () => {
+  test('opens status as a target-owned tab when the branch has a worktree', async () => {
     seedWorktreeRepo('status')
     const refreshStatus = vi.fn(async () => {})
     useReposStore.setState({ refreshStatus: refreshStatus as typeof originalRefreshStatus })
@@ -174,12 +177,16 @@ function seedWorktreeRepo(preferredWorkspacePaneTab: WorkspacePaneStaticTabType)
 }
 
 function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
-  return workspacePaneStaticTabsFromEntries(readWorkspacePaneTabsForBranch(REPO_ID, branchName))
+  const repo = useReposStore.getState().repos[REPO_ID]
+  const target = repo ? workspacePaneTabsTargetForRepoBranch(repo, branchName) : null
+  return workspacePaneStaticTabsFromEntries(target ? readWorkspacePaneTabsForTarget(target) : [])
 }
 
 function preferredWorkspacePaneTab() {
   const repo = useReposStore.getState().repos[REPO_ID]
-  return repo ? preferredWorkspacePaneTabForBranch(repo.ui, repo.ui.selectedBranch) : null
+  return repo
+    ? preferredWorkspacePaneTabForTarget(repo.ui, workspacePaneTabsTargetForRepoBranch(repo, repo.ui.selectedBranch))
+    : null
 }
 
 function navigationWithStoreActions(): Pick<

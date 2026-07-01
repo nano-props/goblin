@@ -204,6 +204,7 @@ describe('client bootstrap', () => {
                 sessions: [],
               },
         replaceWorkspaceTabs: async (input) => input.tabs,
+        updateWorkspaceTabs: async () => [],
         pruneTerminals: async () => ({ pruned: 0, remaining: 0 }),
         listSessions: async () => [],
         listWorkspaceTabs: async () => [],

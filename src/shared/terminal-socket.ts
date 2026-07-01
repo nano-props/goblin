@@ -18,6 +18,7 @@ import type {
   TerminalSessionSummary,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
+  TerminalUpdateWorkspaceTabsInput,
   WorkspacePaneTabsEntry,
   TerminalTitleEvent,
   TerminalExitEvent,
@@ -63,6 +64,7 @@ export interface TerminalSocketRequestInputs {
   'list-workspace-tabs': TerminalListWorkspaceTabsInput
   create: TerminalCreateInput
   'replace-tabs': TerminalReplaceWorkspaceTabsInput
+  'update-tabs': TerminalUpdateWorkspaceTabsInput
   prune: { repoRoot: string }
   'session-snapshot': TerminalSessionSnapshotInput
 }
@@ -78,6 +80,7 @@ export interface TerminalSocketResponseOutputs {
   'list-workspace-tabs': WorkspacePaneTabsEntry[]
   create: TerminalCreateResult
   'replace-tabs': WorkspacePaneTabEntry[]
+  'update-tabs': WorkspacePaneTabEntry[]
   prune: { pruned: number; remaining: number }
   'session-snapshot': TerminalSessionSnapshot | null
 }

@@ -14,6 +14,7 @@ import type {
   TerminalSessionSummary,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
+  TerminalUpdateWorkspaceTabsInput,
   WorkspacePaneTabsEntry,
   TerminalWriteInput,
 } from '#/shared/terminal-types.ts'
@@ -28,6 +29,7 @@ interface TerminalSessionServiceLike {
   listSessions(userId: string, repoRoot: string): Promise<TerminalSessionSummary[]>
   listWorkspaceTabs(userId: string, repoRoot: string): Promise<WorkspacePaneTabsEntry[]>
   replaceTabs(userId: string, input: TerminalReplaceWorkspaceTabsInput): Promise<WorkspacePaneTabEntry[]>
+  updateTabs(userId: string, input: TerminalUpdateWorkspaceTabsInput): Promise<WorkspacePaneTabEntry[]>
   removeTerminalTab(userId: string, session: TerminalSessionSummary): Promise<void>
 }
 
@@ -90,6 +92,19 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       if (!isValidRepoLocator(input?.repoRoot)) return []
       if (input?.worktreePath !== null && !isValidCwd(input?.worktreePath)) return []
       const tabs = await sessionService.replaceTabs(userId, input)
+      broadcastRepoWorkspaceTabsChanged(userId, input.repoRoot)
+      return tabs
+    },
+
+    async updateTabs(
+      clientId: string,
+      userId: string,
+      input: TerminalUpdateWorkspaceTabsInput,
+    ): Promise<WorkspacePaneTabEntry[]> {
+      if (!isValidTerminalClientId(clientId)) return []
+      if (!isValidRepoLocator(input?.repoRoot)) return []
+      if (input?.worktreePath !== null && !isValidCwd(input?.worktreePath)) return []
+      const tabs = await sessionService.updateTabs(userId, input)
       broadcastRepoWorkspaceTabsChanged(userId, input.repoRoot)
       return tabs
     },

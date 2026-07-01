@@ -180,7 +180,7 @@ function seedRepo(id: string, lifecycle: RemoteRepoConnectionLifecycle | null) {
           selectedBranch: null,
           branchViewMode: 'all',
           workspacePaneTabsByBranch: {},
-          preferredWorkspacePaneTabByBranch: {},
+          preferredWorkspacePaneTabByTarget: {},
         },
         projection: { source: 'fresh', savedAt: null },
         remote: {

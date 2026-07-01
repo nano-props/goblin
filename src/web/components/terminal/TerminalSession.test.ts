@@ -636,6 +636,7 @@ beforeEach(() => {
             },
       ),
       replaceWorkspaceTabs: vi.fn(async (input) => input.tabs),
+      updateWorkspaceTabs: vi.fn(async () => []),
       pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
       listSessions: vi.fn(async () => []),
       listWorkspaceTabs: vi.fn(async () => []),

@@ -71,6 +71,9 @@ export function createServerTerminalBridge(options: {
     replaceWorkspaceTabs(input) {
       return connection.request('replace-tabs', input)
     },
+    updateWorkspaceTabs(input) {
+      return connection.request('update-tabs', input)
+    },
     pruneTerminals(repoRoot) {
       return connection.request('prune', { repoRoot })
     },

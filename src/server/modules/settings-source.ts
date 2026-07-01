@@ -6,6 +6,7 @@ import {
   toSafeSessionPath,
   toSafeSessionRepoEntry,
 } from '#/shared/input-validation.ts'
+import { isSafeBranchName } from '#/shared/refnames.ts'
 import { serverDataFile } from '#/shared/data-dir.ts'
 import type {
   FiletreeSessionViewState,
@@ -31,7 +32,12 @@ import {
   type WorkspacePaneTabEntry,
   workspacePaneTabEntryFromUnknown,
   workspacePaneTabEntryIdentity,
+  workspacePaneTabRequiresWorktree,
 } from '#/shared/workspace-pane.ts'
+import {
+  parseWorkspacePaneTabsTargetIdentityKey,
+  type WorkspacePaneTabsTargetIdentity,
+} from '#/shared/workspace-pane-tabs-target.ts'
 import { normalizeGlobalShortcut } from '#/shared/accelerator.ts'
 import { isColorTheme, type ColorTheme } from '#/shared/color-theme.ts'
 import {
@@ -132,7 +138,12 @@ function normalizeSelectedTerminalSessionIdByTerminalWorktree(value: unknown): R
   if (!value || typeof value !== 'object') return {}
   const normalized: Record<string, string> = {}
   for (const [terminalWorktreeKey, terminalSessionId] of Object.entries(value)) {
-    if (typeof terminalWorktreeKey !== 'string' || typeof terminalSessionId !== 'string' || terminalSessionId.length === 0) continue
+    if (
+      typeof terminalWorktreeKey !== 'string' ||
+      typeof terminalSessionId !== 'string' ||
+      terminalSessionId.length === 0
+    )
+      continue
     const parts = terminalWorktreeKey.split('\0')
     if (parts.length !== 2 || !parts[0] || !parts[1]) continue
     normalized[terminalWorktreeKey] = terminalSessionId
@@ -140,7 +151,7 @@ function normalizeSelectedTerminalSessionIdByTerminalWorktree(value: unknown): R
   return normalized
 }
 
-function normalizePreferredWorkspacePaneTabByBranchByRepo(
+function normalizePreferredWorkspacePaneTabByTargetByRepo(
   value: unknown,
   openRepoEntries: RepoSessionEntry[],
   tabsByRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>>,
@@ -148,67 +159,81 @@ function normalizePreferredWorkspacePaneTabByBranchByRepo(
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
   const openRepoIds = new Set(openRepoEntries.map(repoSessionEntryId))
   const normalized: Record<string, Record<string, WorkspacePaneSessionTabType>> = {}
-  for (const [repoId, rawByBranch] of Object.entries(value)) {
+  for (const [repoId, rawByTarget] of Object.entries(value)) {
     const safeRepoId = toSafeRepoLocator(repoId)
     if (
       !safeRepoId ||
       !openRepoIds.has(safeRepoId) ||
-      !rawByBranch ||
-      typeof rawByBranch !== 'object' ||
-      Array.isArray(rawByBranch)
+      !rawByTarget ||
+      typeof rawByTarget !== 'object' ||
+      Array.isArray(rawByTarget)
     )
       continue
-    const byBranch: Record<string, WorkspacePaneSessionTabType> = {}
-    for (const [branchName, paneTab] of Object.entries(rawByBranch)) {
-      if (!branchName || branchName.includes('\0')) continue
+    const byTarget: Record<string, WorkspacePaneSessionTabType> = {}
+    for (const [targetKey, paneTab] of Object.entries(rawByTarget)) {
+      const target = safeWorkspacePaneTabsTargetIdentity(safeRepoId, targetKey)
+      if (!target) continue
       if (typeof paneTab !== 'string' || !isWorkspacePaneSessionTabType(paneTab)) continue
+      if (target.kind === 'branch' && workspacePaneTabRequiresWorktree(paneTab)) continue
       if (
         isWorkspacePaneStaticTabType(paneTab) &&
-        !workspacePaneStaticTabs(tabsByRepo[safeRepoId]?.[branchName] ?? []).includes(paneTab)
+        !workspacePaneStaticTabs(tabsByRepo[safeRepoId]?.[targetKey] ?? []).includes(paneTab)
       )
         continue
-      byBranch[branchName] = paneTab
+      byTarget[targetKey] = paneTab
     }
-    if (Object.keys(byBranch).length > 0) normalized[safeRepoId] = byBranch
+    if (Object.keys(byTarget).length > 0) normalized[safeRepoId] = byTarget
   }
   return normalized
 }
 
-function normalizeWorkspacePaneTabsByBranchByRepo(
+function normalizeWorkspacePaneTabsByTargetByRepo(
   value: unknown,
   openRepoEntries: RepoSessionEntry[],
 ): Record<string, Record<string, WorkspacePaneTabEntry[]>> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
   const openRepoIds = new Set(openRepoEntries.map(repoSessionEntryId))
   const normalized: Record<string, Record<string, WorkspacePaneTabEntry[]>> = {}
-  for (const [repoId, rawByBranch] of Object.entries(value)) {
+  for (const [repoId, rawByTarget] of Object.entries(value)) {
     const safeRepoId = toSafeRepoLocator(repoId)
     if (
       !safeRepoId ||
       !openRepoIds.has(safeRepoId) ||
-      !rawByBranch ||
-      typeof rawByBranch !== 'object' ||
-      Array.isArray(rawByBranch)
+      !rawByTarget ||
+      typeof rawByTarget !== 'object' ||
+      Array.isArray(rawByTarget)
     )
       continue
-    const byBranch: Record<string, WorkspacePaneTabEntry[]> = {}
-    for (const [branchName, rawTabs] of Object.entries(rawByBranch)) {
-      if (!branchName || branchName.includes('\0') || !Array.isArray(rawTabs)) continue
+    const byTarget: Record<string, WorkspacePaneTabEntry[]> = {}
+    for (const [targetKey, rawTabs] of Object.entries(rawByTarget)) {
+      const target = safeWorkspacePaneTabsTargetIdentity(safeRepoId, targetKey)
+      if (!target || !Array.isArray(rawTabs)) continue
       const tabs: WorkspacePaneTabEntry[] = []
       const seen = new Set<string>()
       for (const raw of rawTabs) {
         const entry = workspacePaneTabEntryFromUnknown(raw)
         if (!entry) continue
+        if (target.kind === 'branch' && workspacePaneTabRequiresWorktree(entry.type)) continue
         const identity = workspacePaneTabEntryIdentity(entry)
         if (seen.has(identity)) continue
         seen.add(identity)
         tabs.push(entry)
       }
-      byBranch[branchName] = tabs
+      byTarget[targetKey] = tabs
     }
-    if (Object.keys(byBranch).length > 0) normalized[safeRepoId] = byBranch
+    if (Object.keys(byTarget).length > 0) normalized[safeRepoId] = byTarget
   }
   return normalized
+}
+
+function safeWorkspacePaneTabsTargetIdentity(
+  repoId: string,
+  targetKey: string,
+): WorkspacePaneTabsTargetIdentity | null {
+  const parsed = parseWorkspacePaneTabsTargetIdentityKey(targetKey)
+  if (!parsed || parsed.repoRoot !== repoId) return null
+  if (parsed.kind === 'branch') return isSafeBranchName(parsed.branchName) ? parsed : null
+  return toSafeSessionPath(parsed.worktreePath) === parsed.worktreePath ? parsed : null
 }
 
 function normalizeFiletreeViewStateByWorktreeByRepo(
@@ -283,8 +308,8 @@ function normalizeSession(value: unknown): WorkspaceSessionState {
       )
     : []
   const activeRepoId = toSafeRepoLocator(partial.activeRepoId)
-  const workspacePaneTabsByBranchByRepo = normalizeWorkspacePaneTabsByBranchByRepo(
-    partial.workspacePaneTabsByBranchByRepo,
+  const workspacePaneTabsByTargetByRepo = normalizeWorkspacePaneTabsByTargetByRepo(
+    partial.workspacePaneTabsByTargetByRepo,
     openRepoEntries,
   )
   return {
@@ -296,12 +321,12 @@ function normalizeSession(value: unknown): WorkspaceSessionState {
     selectedTerminalSessionIdByTerminalWorktree: normalizeSelectedTerminalSessionIdByTerminalWorktree(
       partial.selectedTerminalSessionIdByTerminalWorktree,
     ),
-    preferredWorkspacePaneTabByBranchByRepo: normalizePreferredWorkspacePaneTabByBranchByRepo(
-      partial.preferredWorkspacePaneTabByBranchByRepo,
+    preferredWorkspacePaneTabByTargetByRepo: normalizePreferredWorkspacePaneTabByTargetByRepo(
+      partial.preferredWorkspacePaneTabByTargetByRepo,
       openRepoEntries,
-      workspacePaneTabsByBranchByRepo,
+      workspacePaneTabsByTargetByRepo,
     ),
-    workspacePaneTabsByBranchByRepo,
+    workspacePaneTabsByTargetByRepo,
     filetreeViewStateByWorktreeByRepo: normalizeFiletreeViewStateByWorktreeByRepo(
       partial.filetreeViewStateByWorktreeByRepo,
       openRepoEntries,

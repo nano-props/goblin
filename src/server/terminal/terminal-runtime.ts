@@ -180,6 +180,9 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     async replaceTabs(clientId, userId, input) {
       return await actions.replaceTabs(clientId, userId, input)
     },
+    async updateTabs(clientId, userId, input) {
+      return await actions.updateTabs(clientId, userId, input)
+    },
     async prune(clientId, userId, repoRoot) {
       return await actions.prune(clientId, userId, repoRoot)
     },

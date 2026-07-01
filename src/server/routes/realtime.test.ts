@@ -22,6 +22,7 @@ function makeTerminalHost(overrides: Partial<ServerTerminalHost> = {}): ServerTe
     listWorkspaceTabs: vi.fn(async () => []),
     create: vi.fn(async () => ({ ok: true }) as never),
     replaceTabs: vi.fn(async () => []),
+    updateTabs: vi.fn(async () => []),
     prune: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
     getSessionSnapshot: vi.fn(async () => null),
     handleRealtimeMessage: vi.fn(),

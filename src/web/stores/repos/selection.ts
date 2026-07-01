@@ -10,8 +10,9 @@ import type { BranchViewMode, RepoState, ReposGet, ReposSet, ReposStore } from '
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
 import {
-  preferredWorkspacePaneTabForBranch,
-  preferredWorkspacePaneTabByBranchRecordWith,
+  preferredWorkspacePaneTabForTarget,
+  preferredWorkspacePaneTabByTargetRecordWith,
+  workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
 
 type RestorableWorkspaceSelectionActions = Pick<
@@ -167,37 +168,30 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
     },
 
     setWorkspacePaneTab(id: string, tab: WorkspacePaneTabType) {
-      // Persists the user's branch-scoped preferred tab type verbatim.
+      // Persists the user's target-scoped preferred tab type verbatim.
       // Opening/closing branch tabs is owned by explicit open/close actions;
       // this action only changes selection intent.
       let changed = false
       let token: number | undefined
       set((s) => {
         const repo = s.repos[id]
-        const branch = repo?.ui.selectedBranch
-        const current = repo ? preferredWorkspacePaneTabForBranch(repo.ui, branch) : null
-        if (!repo || !branch || current === tab) return s
+        if (!repo) return s
+        const target = workspacePaneTabsTargetForRepoBranch(repo, repo.ui.selectedBranch)
+        const current = preferredWorkspacePaneTabForTarget(repo.ui, target)
+        if (!target || current === tab) return s
         changed = true
         token = repo.instanceToken
         return replaceRepoState(s, repo, (r) => {
-          const selectedBranch = r.ui.selectedBranch
-          if (selectedBranch) {
-            r.ui.preferredWorkspacePaneTabByBranch = preferredWorkspacePaneTabByBranchRecordWith(
-              r.ui,
-              selectedBranch,
-              tab,
-            )
-          }
+          r.ui.preferredWorkspacePaneTabByTarget = preferredWorkspacePaneTabByTargetRecordWith(r.ui, target, tab)
         })
       })
       if (!changed || token === undefined) return
       const repo = get().repos[id]
+      const target = repo ? workspacePaneTabsTargetForRepoBranch(repo, repo.ui.selectedBranch) : null
       afterSelectionChange(
         id,
         token,
-        repo && preferredWorkspacePaneTabForBranch(repo.ui, repo.ui.selectedBranch) === 'status'
-          ? repo.ui.selectedBranch
-          : null,
+        repo && target && preferredWorkspacePaneTabForTarget(repo.ui, target) === 'status' ? repo.ui.selectedBranch : null,
       )
     },
 

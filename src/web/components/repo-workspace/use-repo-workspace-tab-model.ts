@@ -11,10 +11,10 @@ import {
   useTerminalWorktreeSnapshot,
 } from '#/web/components/terminal/terminal-session-store.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import {
   useWorkspacePaneTabsQuery,
-  workspacePaneTabsForBranchFromQueryData,
+  workspacePaneTabsForTargetFromQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 
 export interface RepoWorkspaceTabModelInputState {
@@ -54,13 +54,22 @@ export function useRepoWorkspaceTabModelInput(
   )
 
   const workspacePaneTabEntries = useMemo(
-    () => workspacePaneTabsForBranchFromQueryData(workspacePaneTabsQuery.data ?? [], branchName),
-    [workspacePaneTabsQuery.data, branchName],
+    () =>
+      workspacePaneTabsForTargetFromQueryData(workspacePaneTabsQuery.data ?? [], {
+        repoRoot: repo.id,
+        branchName,
+        worktreePath,
+      }),
+    [workspacePaneTabsQuery.data, repo.id, branchName, worktreePath],
   )
 
   const preferredTab = useMemo(
-    () => preferredWorkspacePaneTabForBranch(repo.ui, branchName),
-    [repo.ui.preferredWorkspacePaneTabByBranch, branchName],
+    () =>
+      preferredWorkspacePaneTabForTarget(
+        repo.ui,
+        branchName ? { repoRoot: repo.id, branchName, worktreePath } : null,
+      ),
+    [repo.ui.preferredWorkspacePaneTabByTarget, repo.id, branchName, worktreePath],
   )
 
   const modelSelectedTerminalSessionId = terminalWorktreeKey ? (selectedTerminalSessionId ?? null) : null

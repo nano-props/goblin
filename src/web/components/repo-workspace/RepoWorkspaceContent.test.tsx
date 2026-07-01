@@ -795,7 +795,7 @@ describe('RepoWorkspaceContent', () => {
     expect(rows[1]?.textContent).toContain('Start history graph')
   })
 
-  test('labels worktree history panels with the branch-owned tab id', async () => {
+  test('labels worktree history panels with the static tab id', async () => {
     const repo = seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/history', { worktree: { path: '/tmp/history-worktree' } })],

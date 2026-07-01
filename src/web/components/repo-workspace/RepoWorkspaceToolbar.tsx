@@ -26,7 +26,7 @@ import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import { useIsInitialSyncInFlight } from '#/web/stores/repo-sync.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
 import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
 import {
@@ -73,7 +73,10 @@ export function RepoWorkspaceToolbar({
   // of every syncServerSessions.
   const isInitialSyncInFlight = useIsInitialSyncInFlight(repo.id)
   const branchName = detail.branch?.name ?? null
-  const preferredWorkspacePaneTab = preferredWorkspacePaneTabForBranch(repo.ui, branchName)
+  const preferredWorkspacePaneTab = preferredWorkspacePaneTabForTarget(
+    repo.ui,
+    branchName ? { repoRoot: repo.id, branchName, worktreePath: detail.branch?.worktree?.path ?? null } : null,
+  )
   const showBranchLevelTabs = !!detail.branch
 
   const { createTerminal, selectTerminal, scrollToBottom } = useTerminalSessionContext()

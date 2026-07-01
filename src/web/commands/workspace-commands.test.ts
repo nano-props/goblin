@@ -25,10 +25,13 @@ import {
   resetTerminalActionDialogsStore,
   useTerminalActionDialogsStore,
 } from '#/web/stores/repos/terminal-action-dialogs.ts'
-import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import {
-  readWorkspacePaneTabsForBranch,
-  setWorkspacePaneTabsForBranchQueryData,
+  preferredWorkspacePaneTabForTarget,
+  workspacePaneTabsTargetForRepoBranch,
+} from '#/web/stores/repos/workspace-pane-preferences.ts'
+import {
+  readWorkspacePaneTabsForTarget,
+  setWorkspacePaneTabsForTargetQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
@@ -736,11 +739,7 @@ describe('workspace commands', () => {
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: {
-        'feature/worktree': [
-          staticEntry('status'),
-          terminalEntry('session-1'),
-          terminalEntry('session-2'),
-        ],
+        'feature/worktree': [staticEntry('status'), terminalEntry('session-1'), terminalEntry('session-2')],
       },
     })
     useReposStore.getState().setSelectedTerminal(WORKTREE_KEY, 'session-2')
@@ -1128,28 +1127,38 @@ describe('workspace commands', () => {
 
 function preferredWorkspacePaneTab() {
   const repo = useReposStore.getState().repos[REPO_ID]
-  return repo ? preferredWorkspacePaneTabForBranch(repo.ui, repo.ui.selectedBranch) : null
+  return repo
+    ? preferredWorkspacePaneTabForTarget(repo.ui, workspacePaneTabsTargetForRepoBranch(repo, repo.ui.selectedBranch))
+    : null
 }
 
 function openTabsFor(branch: string) {
-  return workspacePaneStaticTabsFromEntries(readWorkspacePaneTabsForBranch(REPO_ID, branch))
+  return workspacePaneStaticTabsFromEntries(tabsFor(branch))
 }
 
 function tabsFor(branch: string): WorkspacePaneTabEntry[] {
-  return readWorkspacePaneTabsForBranch(REPO_ID, branch)
+  const repo = useReposStore.getState().repos[REPO_ID]
+  const target = repo ? workspacePaneTabsTargetForRepoBranch(repo, branch) : null
+  return target ? readWorkspacePaneTabsForTarget(target) : []
 }
 
 function createTerminalWithProjection(resolveSessionId: () => string | Promise<string>) {
   return vi.fn(async (base: TerminalSessionBase) => {
     const terminalSessionId = await resolveSessionId()
-    const currentTabs = readWorkspacePaneTabsForBranch(base.repoRoot, base.branch)
-    setWorkspacePaneTabsForBranchQueryData({
+    const currentTabs = readWorkspacePaneTabsForTarget({
+      repoRoot: base.repoRoot,
+      branchName: base.branch,
+      worktreePath: base.worktreePath,
+    })
+    setWorkspacePaneTabsForTargetQueryData({
       repoRoot: base.repoRoot,
       branchName: base.branch,
       worktreePath: base.worktreePath,
       tabs: [...currentTabs, terminalEntry(terminalSessionId)],
     })
-    useReposStore.getState().setSelectedTerminal(formatTerminalWorktreeKey(base.repoRoot, base.worktreePath), terminalSessionId)
+    useReposStore
+      .getState()
+      .setSelectedTerminal(formatTerminalWorktreeKey(base.repoRoot, base.worktreePath), terminalSessionId)
     return terminalSessionId
   })
 }

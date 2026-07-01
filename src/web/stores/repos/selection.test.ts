@@ -6,21 +6,22 @@ import type {
   WorkspacePaneTabEntry,
   WorkspacePaneTabType,
 } from '#/shared/workspace-pane.ts'
-import {
-  WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES,
-  workspacePaneStaticTabEntry,
-} from '#/shared/workspace-pane.ts'
+import { WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import {
   createRepoBranch as branch,
   installGoblinTestBridge,
   resetReposStore,
   seedRepoState,
 } from '#/web/test-utils/bridge.ts'
-import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import {
+  preferredWorkspacePaneTabForTarget,
+  workspacePaneTabsTargetForRepoBranch,
+} from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { restoreSessionWorkspacePaneStateInRepos } from '#/web/stores/repos/workspace-pane-session-restore.ts'
 import type { BranchSnapshotInfo } from '#/web/types.ts'
 import { DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
-import { readWorkspacePaneTabsForBranch } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
+import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 const REPO_ID = '/tmp/gbl-selection-test-repo'
 const ipcHandlers: Record<string, (input: any) => unknown> = {}
@@ -61,18 +62,25 @@ function seedRepo(options: {
 }
 
 function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
-  return workspacePaneStaticTabsFromEntries(readWorkspacePaneTabsForBranch(REPO_ID, branchName))
+  const repo = useReposStore.getState().repos[REPO_ID]
+  const target = repo ? workspacePaneTabsTargetForRepoBranch(repo, branchName) : null
+  return workspacePaneStaticTabsFromEntries(target ? readWorkspacePaneTabsForTarget(target) : [])
 }
 
 function preferredTabFor(branchName?: string | null): WorkspacePaneTabType | null {
   const repo = useReposStore.getState().repos[REPO_ID]
-  return repo ? preferredWorkspacePaneTabForBranch(repo.ui, branchName ?? repo.ui.selectedBranch) : null
+  return repo
+    ? preferredWorkspacePaneTabForTarget(
+        repo.ui,
+        workspacePaneTabsTargetForRepoBranch(repo, branchName ?? repo.ui.selectedBranch),
+      )
+    : null
 }
 
 function restoreWorkspacePaneState(restoreState: Partial<SessionWorkspacePaneRestoreState>) {
   const normalizedRestoreState: SessionWorkspacePaneRestoreState = {
-    workspacePaneTabsByBranchByRepo: restoreState.workspacePaneTabsByBranchByRepo ?? {},
-    preferredWorkspacePaneTabByBranchByRepo: restoreState.preferredWorkspacePaneTabByBranchByRepo ?? {},
+    workspacePaneTabsByTargetByRepo: restoreState.workspacePaneTabsByTargetByRepo ?? {},
+    preferredWorkspacePaneTabByTargetByRepo: restoreState.preferredWorkspacePaneTabByTargetByRepo ?? {},
   }
   useReposStore.setState((s) => {
     const repos = restoreSessionWorkspacePaneStateInRepos(s.repos, normalizedRestoreState)
@@ -329,7 +337,9 @@ describe('setWorkspacePaneTab', () => {
   test('does not restore files as preferred when the files tab is closed', () => {
     seedRepo({ selectedBranch: 'main', preferredWorkspacePaneTab: 'status', workspacePaneStaticTabs: ['status'] })
 
-    restoreWorkspacePaneState({ preferredWorkspacePaneTabByBranchByRepo: { [REPO_ID]: { main: 'files' } } })
+    restoreWorkspacePaneState({
+      preferredWorkspacePaneTabByTargetByRepo: { [REPO_ID]: { [worktreeTargetKey('main', '/repo')]: 'files' } },
+    })
 
     expect(preferredTabFor('main')).toBe('status')
     expect(openTabsFor('main')).toEqual(['status'])
@@ -339,10 +349,12 @@ describe('setWorkspacePaneTab', () => {
     expect(WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES).toContain('files')
   })
 
-  test('does not restore a branch-level preferred tab whose tab is closed', () => {
+  test('does not restore a target-level preferred tab whose tab is closed', () => {
     seedRepo({ selectedBranch: 'main', preferredWorkspacePaneTab: 'status', workspacePaneStaticTabs: ['status'] })
 
-    restoreWorkspacePaneState({ preferredWorkspacePaneTabByBranchByRepo: { [REPO_ID]: { main: 'history' } } })
+    restoreWorkspacePaneState({
+      preferredWorkspacePaneTabByTargetByRepo: { [REPO_ID]: { [worktreeTargetKey('main', '/repo')]: 'history' } },
+    })
 
     expect(preferredTabFor('main')).toBe('status')
     expect(openTabsFor('main')).toEqual(['status'])
@@ -427,6 +439,10 @@ describe('setWorkspacePaneTab', () => {
     expect(preferredTabFor('feature/plain')).toBe('terminal')
   })
 })
+
+function worktreeTargetKey(branchName: string, worktreePath: string): string {
+  return workspacePaneTabsTargetIdentityKey({ repoRoot: REPO_ID, branchName, worktreePath })
+}
 
 describe('workspace pane layout state', () => {
   test('applies session pane state atomically with shared normalization rules', () => {

@@ -1,10 +1,10 @@
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { createRepoWorkspaceTabModel, type RepoWorkspaceTabModel } from '#/web/components/repo-workspace/tab-model.ts'
-import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { readWorkspacePaneTabsForBranch } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 
 export function workspacePaneTabTargetForBranch(repoId: string, branchName: string): RepoWorkspaceTabModel | null {
   const state = useReposStore.getState()
@@ -22,8 +22,12 @@ export function workspacePaneTabTargetForBranch(repoId: string, branchName: stri
     repoId,
     branchName,
     worktreePath: worktreePath ?? null,
-    preferredTab: preferredWorkspacePaneTabForBranch(repo.ui, branchName),
-    tabEntries: readWorkspacePaneTabsForBranch(repoId, branchName),
+    preferredTab: preferredWorkspacePaneTabForTarget(repo.ui, {
+      repoRoot: repoId,
+      branchName,
+      worktreePath: worktreePath ?? null,
+    }),
+    tabEntries: readWorkspacePaneTabsForTarget({ repoRoot: repoId, branchName, worktreePath: worktreePath ?? null }),
     runtimeTerminalViews: snapshot?.sessions ?? [],
     terminalCreatePending: snapshot?.pendingCreate ?? false,
     terminalSyncReady,

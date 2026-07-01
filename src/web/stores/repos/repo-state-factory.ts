@@ -29,7 +29,7 @@ export function emptyRepo(id: string, name: string): RepoState {
     ui: {
       selectedBranch: null,
       branchViewMode: 'all',
-      preferredWorkspacePaneTabByBranch: {},
+      preferredWorkspacePaneTabByTarget: {},
     },
     projection: {
       source: 'fresh',

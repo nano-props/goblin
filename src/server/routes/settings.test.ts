@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { createNativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
+import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 
 const mocks = vi.hoisted(() => ({
   getServerExternalAppsSnapshot: vi.fn(),
@@ -82,8 +83,8 @@ describe('settings routes', () => {
       zenMode: true,
       workspacePaneSize: 50,
       selectedTerminalSessionIdByTerminalWorktree: {},
-      preferredWorkspacePaneTabByBranchByRepo: {},
-      workspacePaneTabsByBranchByRepo: {},
+      preferredWorkspacePaneTabByTargetByRepo: {},
+      workspacePaneTabsByTargetByRepo: {},
       filetreeViewStateByWorktreeByRepo: {},
     } as const
     mocks.handleSetSession.mockResolvedValue({ ok: true, session })
@@ -106,16 +107,21 @@ describe('settings routes', () => {
   })
 
   test('accepts a session state with files in preferred tab and mixed tab list picklist', async () => {
+    const targetKey = workspacePaneTabsTargetIdentityKey({
+      repoRoot: '/tmp/repo',
+      branchName: 'feature/worktree',
+      worktreePath: '/tmp/repo-worktree',
+    })
     const session = {
       openRepoEntries: [],
       activeRepoId: null,
       zenMode: true,
       workspacePaneSize: 50,
       selectedTerminalSessionIdByTerminalWorktree: {},
-      preferredWorkspacePaneTabByBranchByRepo: { '/tmp/repo': { 'feature/worktree': 'files' } },
-      workspacePaneTabsByBranchByRepo: {
+      preferredWorkspacePaneTabByTargetByRepo: { '/tmp/repo': { [targetKey]: 'files' } },
+      workspacePaneTabsByTargetByRepo: {
         '/tmp/repo': {
-          'feature/worktree': [
+          [targetKey]: [
             { type: 'status', tabId: 'workspace-pane:status' },
             { type: 'files', tabId: 'workspace-pane:files' },
           ],

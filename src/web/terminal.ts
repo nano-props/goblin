@@ -23,6 +23,7 @@ export const terminalBridge: ClientTerminalBridge = {
   close: bindTerminalMethod('close'),
   create: bindTerminalMethod('create'),
   replaceWorkspaceTabs: bindTerminalMethod('replaceWorkspaceTabs'),
+  updateWorkspaceTabs: bindTerminalMethod('updateWorkspaceTabs'),
   pruneTerminals: bindTerminalMethod('pruneTerminals'),
   listSessions: bindTerminalMethod('listSessions'),
   listWorkspaceTabs: bindTerminalMethod('listWorkspaceTabs'),

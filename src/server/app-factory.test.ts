@@ -68,6 +68,7 @@ const terminalHostStub = {
   listWorkspaceTabs: vi.fn(() => []),
   create: vi.fn(),
   replaceTabs: vi.fn(() => []),
+  updateTabs: vi.fn(() => []),
   prune: vi.fn(),
   getSessionSnapshot: vi.fn(),
   handleRealtimeMessage: vi.fn(),

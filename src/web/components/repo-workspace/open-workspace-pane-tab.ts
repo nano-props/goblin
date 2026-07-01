@@ -4,7 +4,6 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import { workspacePaneStaticTabProvider } from '#/web/components/workspace-pane/tab-providers.ts'
 import { updateWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
-import { workspacePaneTabsWithStaticTab } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 
 export async function openWorkspacePaneTab(input: {
   repoId: string
@@ -23,7 +22,7 @@ export async function openWorkspacePaneTab(input: {
       repoRoot: input.repoId,
       branchName,
       worktreePath: input.worktreePath ?? null,
-      update: (currentTabs) => workspacePaneTabsWithStaticTab(currentTabs, input.type),
+      operation: { type: 'open-static', tabType: input.type },
     })
     if (!committed) return false
   }

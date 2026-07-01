@@ -64,10 +64,15 @@ function finishPullRequestBranchDataLoads(
 }
 
 export function applySnapshotToRepoProjection(r: RepoState, snap: RepoSnapshot, validBranches: Set<string>): void {
+  const selectedWorktreeRetarget = selectedWorktreeBranchRetarget({
+    previousBranches: r.data.branches,
+    nextBranches: snap.branches,
+    selectedBranch: r.ui.selectedBranch,
+  })
   const selected = selectedBranchForBranchSet({
     branches: snap.branches,
     currentBranch: snap.current,
-    selectedBranch: r.ui.selectedBranch,
+    selectedBranch: selectedWorktreeRetarget?.toBranchName ?? r.ui.selectedBranch,
     viewMode: r.ui.branchViewMode,
   })
   const preservePullRequests = snap.remote ? snap.remote.hasGitHubRemote === true : r.remote.hasGitHubRemote === true
@@ -112,6 +117,20 @@ export function applySnapshotToRepoProjection(r: RepoState, snap: RepoSnapshot, 
   r.projection.source = 'fresh'
   r.projection.savedAt = null
   finishDataLoadSuccess(r.dataLoads.snapshot)
+}
+
+function selectedWorktreeBranchRetarget(input: {
+  previousBranches: RepoState['data']['branches']
+  nextBranches: RepoSnapshot['branches']
+  selectedBranch: string | null
+}): { fromBranchName: string; toBranchName: string } | null {
+  if (!input.selectedBranch) return null
+  const previousWorktreePath = input.previousBranches.find((branch) => branch.name === input.selectedBranch)?.worktree
+    ?.path
+  if (!previousWorktreePath) return null
+  const nextBranch = input.nextBranches.find((branch) => branch.worktree?.path === previousWorktreePath)
+  if (!nextBranch || nextBranch.name === input.selectedBranch) return null
+  return { fromBranchName: input.selectedBranch, toBranchName: nextBranch.name }
 }
 
 export function startPullRequestRefreshDataLoads(

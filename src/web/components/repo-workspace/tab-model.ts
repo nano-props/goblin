@@ -74,7 +74,7 @@ export interface RepoWorkspaceTabModel {
   terminalBase: TerminalSessionBase | null
   terminalCreatePending: boolean
   terminalSyncReady: boolean
-  /** Single branch-scoped mixed workspace pane tab list. */
+  /** Single target-scoped mixed workspace pane tab list. */
   tabEntries: WorkspacePaneTabEntry[]
   /** Open static workspace pane tabs derived from tabEntries. */
   staticTabs: WorkspacePaneStaticTabType[]
@@ -278,7 +278,9 @@ function activeRepoWorkspaceTab(
 ): RepoWorkspaceMaterializedTab | null {
   if (renderableTab === 'terminal') {
     if (selectedTerminalSessionId) {
-      const selected = tabs.find((tab) => tab.kind === 'terminal' && tab.terminalSessionId === selectedTerminalSessionId)
+      const selected = tabs.find(
+        (tab) => tab.kind === 'terminal' && tab.terminalSessionId === selectedTerminalSessionId,
+      )
       if (selected) return selected
     }
     return tabs.find((tab) => tab.kind === 'terminal') ?? null
