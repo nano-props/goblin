@@ -3,13 +3,13 @@ import { defineConfig } from 'vitest/config'
 
 // Two projects, one per environment:
 //   - `node` (default) covers everything outside the web tree
-//     (`src/main`, `src/server`, `src/shared`, `src/system`, and the
-//     top-level `src/check-ls.test.ts`). It is the cheap project — no
-//     DOM, no `ResizeObserver` shim, no `window`. Baseline `environment`
-//     was 38s because the jsdom startup was paid even when the worker
-//     was running a node-only file. Splitting by environment removes
-//     that overhead from server/shared runs.
-//   - `jsdom` covers `src/web/**`. Files there already declare
+//     (`src/main`, `src/server`, `src/shared`, and `src/system`). It is
+//     the cheap project: no DOM, no `ResizeObserver` shim, no `window`.
+//     Baseline `environment` was 38s because the jsdom startup was paid
+//     even when the worker was running a node-only file. Splitting by
+//     environment removes that overhead from server/shared runs.
+//   - `jsdom` covers `src/web/**` and the top-level
+//     `src/vitest-storage-shim.test.ts` canary. Files there already declare
 //     `// @vitest-environment jsdom`; the directive still wins when
 //     present, but the project default is now also `jsdom`, which
 //     means files that omitted the directive also run under jsdom
@@ -55,7 +55,6 @@ export default defineConfig({
             'src/shared/**/*.test.tsx',
             'src/system/**/*.test.ts',
             'src/system/**/*.test.tsx',
-            'src/check-ls.test.ts',
             // Cross-cutting helpers under `src/test-utils/` and
             // `src/web/test-utils/` run under the `node` project because
             // they do not need DOM. They are intentionally excluded from
@@ -75,7 +74,7 @@ export default defineConfig({
           // Only the web app/tests tree; helper modules under
           // `src/test-utils/` and `src/web/test-utils/` live in the
           // `node` project so we don't run them twice.
-          include: ['src/web/**/*.test.ts', 'src/web/**/*.test.tsx'],
+          include: ['src/web/**/*.test.ts', 'src/web/**/*.test.tsx', 'src/vitest-storage-shim.test.ts'],
           exclude: ['src/web/test-utils/**', 'src/test-utils/**'],
         },
       },

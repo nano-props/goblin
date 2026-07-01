@@ -21,9 +21,10 @@ the canonical spec; `AGENTS.md` defers to it for testing conventions.
 
 Vitest runs across two projects declared in `vitest.config.ts`:
 
-- `node` (default): everything under `src/{main,server,shared,system}` and
-  the top-level `src/check-ls.test.ts`. No DOM is loaded.
-- `jsdom`: every file under `src/web/**` and any test that needs
+- `node` (default): everything under `src/{main,server,shared,system}`. No
+  DOM is loaded.
+- `jsdom`: every file under `src/web/**`, the top-level
+  `src/vitest-storage-shim.test.ts` canary, and any test that needs
   `document`, `window`, or layout primitives.
 
 Tests select an environment with the standard Vitest directive, e.g.
