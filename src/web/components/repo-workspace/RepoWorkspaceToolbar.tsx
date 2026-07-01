@@ -309,9 +309,9 @@ export function RepoWorkspaceToolbar({
             />
           )}
         </WorkspaceToolbarPrimary>
-        {detail.branch && (
+        {!compact && branchActions && (
           <WorkspaceToolbarActions data-workspace-toolbar-trailing-actions="">
-            <WorkspaceOpenExternallyMenu repo={repo} branch={detail.branch} branchActions={branchActions!} />
+            <WorkspaceOpenExternallyMenu repo={repo} branch={detail.branch} branchActions={branchActions} />
           </WorkspaceToolbarActions>
         )}
       </WorkspaceToolbarContent>
