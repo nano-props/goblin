@@ -2272,8 +2272,13 @@ describe('TerminalSession', () => {
     session.detach(host, parking)
     expect(firstObserver.disconnect).toHaveBeenCalledTimes(1)
     expect(parking.querySelector('.goblin-managed-terminal-frame')).not.toBeNull()
+    const parkedItem = parking.querySelector<HTMLElement>('.goblin-terminal-parking__item')!
+    expect(parkedItem.style.getPropertyValue('--goblin-terminal-parked-width')).toBe('800px')
+    expect(parkedItem.style.getPropertyValue('--goblin-terminal-parked-height')).toBe('400px')
 
     session.attach(host)
+    expect(parkedItem.style.getPropertyValue('--goblin-terminal-parked-width')).toBe('')
+    expect(parkedItem.style.getPropertyValue('--goblin-terminal-parked-height')).toBe('')
     expect(MockResizeObserver.instances).toHaveLength(2)
     expect(MockResizeObserver.instances[1]!.observe).toHaveBeenCalled()
   })

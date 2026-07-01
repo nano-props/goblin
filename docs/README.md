@@ -17,5 +17,6 @@ Use these docs for app-level product and architecture decisions:
 - `terminal-session-lifecycle.md`: terminal session lifecycle correctness (first-frame protocol, durable close, `session-closed` broadcast, empty-state CTA)
 - `terminal-roadmap.md`: terminal refactor roadmap
 - `terminal-target-model.md`: terminal target lifecycle and control model
+- `terminal-ephemeral-xterm.md`: memo for the long-term option of removing live xterm DOM from inactive terminal tabs
 - `terminal-takeover.md`: terminal takeover — who controls the cursor (single-user, multi-device, intent-recent, user-scoped)
 - `filetree.md`: worktree-scoped file tree view (server-first, read-only v1)
