@@ -137,6 +137,31 @@ describe('openWorkspacePaneTab', () => {
     expect(preferredWorkspacePaneTab()).toBe('history')
     expect(refreshStatus).not.toHaveBeenCalled()
   })
+
+  test('serializes direct open calls so concurrent static tab opens do not overwrite each other', async () => {
+    seedWorktreeRepo('status')
+
+    await expect(
+      Promise.all([
+        openWorkspacePaneTab({
+          repoId: REPO_ID,
+          branchName: 'feature/worktree',
+          worktreePath: WORKTREE_PATH,
+          type: 'changes',
+          navigation: navigationWithStoreActions(),
+        }),
+        openWorkspacePaneTab({
+          repoId: REPO_ID,
+          branchName: 'feature/worktree',
+          worktreePath: WORKTREE_PATH,
+          type: 'history',
+          navigation: navigationWithStoreActions(),
+        }),
+      ]),
+    ).resolves.toEqual([true, true])
+
+    expect(openTabsFor('feature/worktree')).toEqual(['status', 'changes', 'history'])
+  })
 })
 
 function seedWorktreeRepo(preferredWorkspacePaneTab: WorkspacePaneStaticTabType) {

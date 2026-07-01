@@ -104,6 +104,22 @@ describe('shared terminal validators', () => {
     ).toBeNull()
   })
 
+  test('rejects empty terminal ids in workspace tab replacement requests', () => {
+    expect(
+      normalizeTerminalClientMessage({
+        type: 'request',
+        requestId: 'request_123',
+        action: 'replace-tabs',
+        input: {
+          repoRoot: '/repo',
+          branchName: 'main',
+          worktreePath: '/repo',
+          tabs: [{ type: 'terminal', terminalSessionId: '' }],
+        },
+      }),
+    ).toBeNull()
+  })
+
   test('rejects NUL bytes in startup shell commands', () => {
     expect(
       normalizeTerminalClientMessage({

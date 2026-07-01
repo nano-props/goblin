@@ -1,8 +1,6 @@
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import { terminalBridge } from '#/web/terminal.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { bootstrapLog } from '#/web/logger.ts'
-import { setWorkspacePaneTabsForBranchQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { commitWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 
 export async function restoreServerWorkspacePaneTabsFromSession(
   workspacePaneTabsByBranchByRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>>,
@@ -29,26 +27,5 @@ async function restoreWorkspacePaneTabs(input: {
   worktreePath: string | null
   tabs: WorkspacePaneTabEntry[]
 }): Promise<boolean> {
-  try {
-    const serverTabs = await terminalBridge.replaceWorkspaceTabs({
-      repoRoot: input.repoRoot,
-      branchName: input.branchName,
-      worktreePath: input.worktreePath,
-      tabs: input.tabs,
-    })
-    setWorkspacePaneTabsForBranchQueryData({
-      repoRoot: input.repoRoot,
-      branchName: input.branchName,
-      worktreePath: input.worktreePath,
-      tabs: serverTabs,
-    })
-    return true
-  } catch (err) {
-    bootstrapLog.warn('workspace pane tabs restore failed', {
-      repoRoot: input.repoRoot,
-      worktreePath: input.worktreePath,
-      err,
-    })
-    return false
-  }
+  return await commitWorkspacePaneTabs(input)
 }

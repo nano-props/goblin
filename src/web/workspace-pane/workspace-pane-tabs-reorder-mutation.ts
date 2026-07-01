@@ -12,7 +12,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import {
   type CommitWorkspacePaneTabsInput,
-  replaceWorkspacePaneTabsOnServer,
+  replaceWorkspacePaneTabs,
 } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import { gblLog } from '#/web/logger.ts'
 
@@ -77,7 +77,7 @@ export function useWorkspacePaneTabsReorderMutation(input: {
     CommitWorkspacePaneTabsInput,
     WorkspacePaneTabsReorderMutationContext
   >({
-    mutationFn: replaceWorkspacePaneTabsOnServer,
+    mutationFn: replaceWorkspacePaneTabs,
     onMutate: async (variables) => {
       await cancelWorkspacePaneTabs(variables.repoRoot, queryClient)
       const previousData = queryClient.getQueryData<WorkspacePaneTabsQueryData>(

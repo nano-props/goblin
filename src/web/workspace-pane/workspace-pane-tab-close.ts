@@ -8,9 +8,8 @@ import {
   workspacePaneTabProviders,
 } from '#/web/components/workspace-pane/tab-providers.ts'
 import { workspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import { commitWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
+import { updateWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import { workspacePaneTabsWithoutStaticTab } from '#/web/workspace-pane/workspace-pane-tabs.ts'
-import { fetchWorkspacePaneTabsForBranch } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 
 interface CloseWorkspacePaneTabsForWorktreeOptions {
   repoId: string
@@ -88,12 +87,11 @@ function closeStaticTabWithCommit(worktreePath: string | null) {
   return async (repoId: string, type: WorkspacePaneStaticTabType, branchName: string): Promise<boolean> => {
     const repo = useReposStore.getState().repos[repoId]
     if (!repo) return false
-    const currentTabs = await fetchWorkspacePaneTabsForBranch({ repoRoot: repoId, branchName })
-    return await commitWorkspacePaneTabs({
+    return await updateWorkspacePaneTabs({
       repoRoot: repoId,
       branchName,
       worktreePath,
-      tabs: workspacePaneTabsWithoutStaticTab(currentTabs, type),
+      update: (currentTabs) => workspacePaneTabsWithoutStaticTab(currentTabs, type),
     })
   }
 }

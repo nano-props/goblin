@@ -21,7 +21,6 @@ import {
   workspacePaneTabProvider,
 } from '#/web/components/workspace-pane/tab-providers.ts'
 import { beginWorkspacePaneTabClose } from '#/web/workspace-pane/workspace-pane-tab-close.ts'
-import { runWorkspacePaneTabUiCommand } from '#/web/workspace-pane/workspace-pane-tab-command-queue.ts'
 import { workspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 
 interface ShowWorkspacePaneTabCommandOptions {
@@ -82,7 +81,7 @@ export async function runShowWorkspacePaneTabCommand({
   tab,
   navigation,
 }: ShowWorkspacePaneTabCommandOptions): Promise<boolean> {
-  return await runWorkspacePaneTabUiCommand(() => showWorkspacePaneTabCommand({ repoId, tab, navigation }))
+  return await showWorkspacePaneTabCommand({ repoId, tab, navigation })
 }
 
 async function showWorkspacePaneTabCommand({ repoId, tab, navigation }: ShowWorkspacePaneTabCommandOptions): Promise<boolean> {
@@ -154,13 +153,13 @@ export async function runNewTerminalTabCommand({
 }
 
 export async function runCloseWorkspacePaneTabCommand(options: CloseWorkspacePaneTabCommandOptions): Promise<boolean> {
-  return await runWorkspacePaneTabUiCommand(() => closeWorkspacePaneTabCommand(options))
+  return await closeWorkspacePaneTabCommand(options)
 }
 
 export async function runConfirmCloseTerminalWorkspacePaneTabCommand(
   options: ConfirmCloseTerminalWorkspacePaneTabCommandOptions,
 ): Promise<boolean> {
-  return await runWorkspacePaneTabUiCommand(() => closeConfirmedTerminalWorkspacePaneTab(options))
+  return closeConfirmedTerminalWorkspacePaneTab(options)
 }
 
 async function closeWorkspacePaneTabCommand(options: CloseWorkspacePaneTabCommandOptions): Promise<boolean> {

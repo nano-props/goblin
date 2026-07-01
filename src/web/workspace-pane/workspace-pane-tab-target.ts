@@ -25,7 +25,6 @@ export function workspacePaneTabTargetForBranch(repoId: string, branchName: stri
     preferredTab: preferredWorkspacePaneTabForBranch(repo.ui, branchName),
     tabEntries: readWorkspacePaneTabsForBranch(repoId, branchName),
     runtimeTerminalViews: snapshot?.sessions ?? [],
-    terminalSessionCount: snapshot?.count ?? 0,
     terminalCreatePending: snapshot?.pendingCreate ?? false,
     terminalSyncReady,
     selectedTerminalSessionId: terminalWorktreeKey

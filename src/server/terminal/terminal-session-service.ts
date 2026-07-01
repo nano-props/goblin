@@ -19,7 +19,6 @@ import {
 import {
   type WorkspacePaneTabEntry,
   workspacePaneTabEntryIdentity,
-  workspacePaneTerminalTabEntry,
 } from '#/shared/workspace-pane.ts'
 import { isValidTerminalClientId, isValidTerminalSize } from '#/shared/terminal-validators.ts'
 import { createTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
@@ -176,7 +175,7 @@ class TerminalSessionService {
             scope: createdSession.repoRoot,
             branchName: input.branch,
             worktreePath: createdSession.worktreePath,
-            tabs: workspaceTabsWithLiveTerminalSessions(
+            tabs: workspaceTabsWithoutStaleTerminalEntries(
               this.options.workspaceTabs.ensureTerminalTab(
                 { userId, scope: createdSession.repoRoot, branchName: input.branch, worktreePath: createdSession.worktreePath },
                 createResult.terminalSessionId,
@@ -223,7 +222,7 @@ class TerminalSessionService {
       scope,
       branchName: input.branchName,
       worktreePath,
-      tabs: workspaceTabsWithLiveTerminalSessions(input.tabs, liveTerminalSessionIds),
+      tabs: workspaceTabsWithoutStaleTerminalEntries(input.tabs, liveTerminalSessionIds),
     })
   }
 
@@ -243,7 +242,7 @@ class TerminalSessionService {
         scope: session.repoRoot,
         branchName: entry.branchName,
         worktreePath: entry.worktreePath,
-        tabs: workspaceTabsWithLiveTerminalSessions(entry.tabs, liveTerminalSessionIds),
+        tabs: workspaceTabsWithoutStaleTerminalEntries(entry.tabs, liveTerminalSessionIds),
       })
     }
   }
@@ -258,32 +257,24 @@ class TerminalSessionService {
       ids.push(session.terminalSessionId)
       liveTerminalSessionIdsByWorktree.set(session.worktreePath, ids)
     }
-    const worktreePaths = new Set([
-      ...this.options.workspaceTabs.tabsForScope({ userId, scope }).map((entry) => entry.worktreePath),
-      ...liveTerminalSessionIdsByWorktree.keys(),
-    ])
-    for (const worktreePath of worktreePaths) {
-      if (worktreePath === null) continue
-      for (const entry of this.options.workspaceTabs
-        .tabsForScope({ userId, scope })
-        .filter((candidate) => candidate.worktreePath === worktreePath)) {
-        const currentTabs = this.options.workspaceTabs.tabs({
-          userId,
-          scope,
-          branchName: entry.branchName,
-          worktreePath,
-        })
-        this.options.workspaceTabs.replaceTabs({
-          userId,
-          scope,
-          branchName: entry.branchName,
-          worktreePath,
-          tabs: workspaceTabsWithLiveTerminalSessions(
-            currentTabs,
-            liveTerminalSessionIdsByWorktree.get(worktreePath) ?? [],
-          ),
-        })
-      }
+    for (const entry of this.options.workspaceTabs.tabsForScope({ userId, scope })) {
+      if (entry.worktreePath === null) continue
+      const currentTabs = this.options.workspaceTabs.tabs({
+        userId,
+        scope,
+        branchName: entry.branchName,
+        worktreePath: entry.worktreePath,
+      })
+      this.options.workspaceTabs.replaceTabs({
+        userId,
+        scope,
+        branchName: entry.branchName,
+        worktreePath: entry.worktreePath,
+        tabs: workspaceTabsWithoutStaleTerminalEntries(
+          currentTabs,
+          liveTerminalSessionIdsByWorktree.get(entry.worktreePath) ?? [],
+        ),
+      })
     }
     return this.options.workspaceTabs.tabsForScope({ userId, scope }).map((entry) => ({
       repoRoot,
@@ -540,30 +531,19 @@ function terminalUserWorktreeKey(userId: string, scope: string, worktreePath: st
   return `${userId}\0${formatTerminalWorktreeKey(scope, worktreePath)}`
 }
 
-function workspaceTabsWithLiveTerminalSessions(
+function workspaceTabsWithoutStaleTerminalEntries(
   tabs: readonly WorkspacePaneTabEntry[],
   liveTerminalSessionIds: readonly string[],
 ): WorkspacePaneTabEntry[] {
   const liveTerminalSessionIdsSet = new Set(
     liveTerminalSessionIds.filter((terminalSessionId) => terminalSessionId.length > 0),
   )
-  const representedTerminalSessionIds = new Set<string>()
   const seen = new Set<string>()
   const next: WorkspacePaneTabEntry[] = []
   for (const entry of tabs) {
     if (entry.type === 'terminal') {
       if (!liveTerminalSessionIdsSet.has(entry.terminalSessionId)) continue
-      representedTerminalSessionIds.add(entry.terminalSessionId)
     }
-    const identity = workspacePaneTabEntryIdentity(entry)
-    if (seen.has(identity)) continue
-    seen.add(identity)
-    next.push(entry)
-  }
-  for (const terminalSessionId of liveTerminalSessionIds) {
-    if (!liveTerminalSessionIdsSet.has(terminalSessionId)) continue
-    if (representedTerminalSessionIds.has(terminalSessionId)) continue
-    const entry = workspacePaneTerminalTabEntry(terminalSessionId)
     const identity = workspacePaneTabEntryIdentity(entry)
     if (seen.has(identity)) continue
     seen.add(identity)

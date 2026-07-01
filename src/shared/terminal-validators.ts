@@ -103,7 +103,7 @@ const WorkspacePaneStaticTabEntrySchema = v.variant('type', [
 ])
 const WorkspacePaneTerminalTabEntrySchema = v.object({
   type: v.literal('terminal'),
-  terminalSessionId: v.string(),
+  terminalSessionId: v.pipe(v.string(), v.minLength(1)),
 })
 const TerminalReplaceWorkspaceTabsInputSchema = v.object({
   repoRoot: v.string(),

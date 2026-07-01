@@ -96,7 +96,6 @@ export interface RepoWorkspaceTabModelInput {
   preferredTab: WorkspacePaneTabType
   tabEntries: readonly WorkspacePaneTabEntry[]
   runtimeTerminalViews: readonly WorkspacePaneTabSummary[]
-  terminalSessionCount: number
   terminalCreatePending?: boolean
   terminalSyncReady: boolean
   /**

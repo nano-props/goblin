@@ -72,7 +72,7 @@ describe('terminal session service workspace tabs', () => {
     ])
   })
 
-  test('replaceTabs drops stale terminal tabs and appends live terminal tabs', async () => {
+  test('replaceTabs drops stale terminal tabs without appending missing live terminals', async () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     const service = createService({
       sessions: [terminalSession('session-live')],
@@ -100,9 +100,18 @@ describe('terminal session service workspace tabs', () => {
         worktreePath: path.resolve(WORKTREE_PATH),
       }),
     ).toEqual([workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-live')])
+
+    await expect(
+      service.replaceTabs(USER_ID, {
+        repoRoot: REPO_ROOT,
+        branchName: BRANCH_NAME,
+        worktreePath: WORKTREE_PATH,
+        tabs: [workspacePaneStaticTabEntry('status')],
+      }),
+    ).resolves.toEqual([workspacePaneStaticTabEntry('status')])
   })
 
-  test('listWorkspaceTabs prunes stale terminal tabs from existing canonical tabs', async () => {
+  test('listWorkspaceTabs prunes stale terminal tabs without appending missing live terminals', async () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     workspaceTabs.replaceTabs({
       userId: USER_ID,
@@ -126,6 +135,29 @@ describe('terminal session service workspace tabs', () => {
         branchName: BRANCH_NAME,
         worktreePath: path.resolve(WORKTREE_PATH),
         tabs: [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-live')],
+      },
+    ])
+
+    workspaceTabs.replaceTabs({
+      userId: USER_ID,
+      scope: path.resolve(REPO_ROOT),
+      branchName: 'feature/static-only',
+      worktreePath: path.resolve(WORKTREE_PATH),
+      tabs: [workspacePaneStaticTabEntry('history')],
+    })
+
+    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT)).resolves.toEqual([
+      {
+        repoRoot: REPO_ROOT,
+        branchName: BRANCH_NAME,
+        worktreePath: path.resolve(WORKTREE_PATH),
+        tabs: [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-live')],
+      },
+      {
+        repoRoot: REPO_ROOT,
+        branchName: 'feature/static-only',
+        worktreePath: path.resolve(WORKTREE_PATH),
+        tabs: [workspacePaneStaticTabEntry('history')],
       },
     ])
   })
