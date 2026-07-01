@@ -23,15 +23,77 @@ export interface UpdateWorkspacePaneTabsInput {
   operation: TerminalUpdateWorkspaceTabsOperation
 }
 
-export async function commitWorkspacePaneTabs(input: CommitWorkspacePaneTabsInput): Promise<boolean> {
+export type WorkspacePaneTabsMutationOperation = 'commit' | 'update' | 'reorder'
+
+export interface WorkspacePaneTabsMutationSuccess {
+  ok: true
+}
+
+export interface WorkspacePaneTabsMutationFailure {
+  ok: false
+  operation: WorkspacePaneTabsMutationOperation
+  repoRoot: string
+  branchName: string
+  worktreePath: string | null
+  message: string
+  error: unknown
+}
+
+export type WorkspacePaneTabsMutationResult = WorkspacePaneTabsMutationSuccess | WorkspacePaneTabsMutationFailure
+
+/**
+ * Logs a workspace-pane-tabs mutation failure and returns the structured
+ * failure result. Callers that wrap a public mutation API (e.g. `commit`,
+ * `update`) should return the result so consumers can branch on `ok`; callers
+ * that only need the log can discard it.
+ */
+export function reportWorkspacePaneTabsFailure(input: {
+  operation: WorkspacePaneTabsMutationOperation
+  repoRoot: string
+  branchName: string
+  worktreePath: string | null
+  error: unknown
+}): WorkspacePaneTabsMutationFailure {
+  const message =
+    input.error instanceof Error
+      ? input.error.message
+      : typeof input.error === 'string'
+        ? input.error
+        : 'workspace pane tabs operation failed'
+  gblLog.warn(`workspace pane tabs ${input.operation} failed`, {
+    repoRoot: input.repoRoot,
+    branchName: input.branchName,
+    worktreePath: input.worktreePath,
+    operation: input.operation,
+    message,
+    error: input.error,
+  })
+  return {
+    ok: false,
+    operation: input.operation,
+    repoRoot: input.repoRoot,
+    branchName: input.branchName,
+    worktreePath: input.worktreePath,
+    message,
+    error: input.error,
+  }
+}
+
+export async function commitWorkspacePaneTabs(
+  input: CommitWorkspacePaneTabsInput,
+): Promise<WorkspacePaneTabsMutationResult> {
   return await runWorkspacePaneTabsOperation(input, async () => await commitWorkspacePaneTabsNow(input))
 }
 
-export async function updateWorkspacePaneTabs(input: UpdateWorkspacePaneTabsInput): Promise<boolean> {
+export async function updateWorkspacePaneTabs(
+  input: UpdateWorkspacePaneTabsInput,
+): Promise<WorkspacePaneTabsMutationResult> {
   return await runWorkspacePaneTabsOperation(input, async () => await updateWorkspacePaneTabsNow(input))
 }
 
-async function commitWorkspacePaneTabsNow(input: CommitWorkspacePaneTabsInput): Promise<boolean> {
+async function commitWorkspacePaneTabsNow(
+  input: CommitWorkspacePaneTabsInput,
+): Promise<WorkspacePaneTabsMutationResult> {
   try {
     await cancelWorkspacePaneTabs(input.repoRoot)
     const serverTabs = await replaceWorkspacePaneTabsOnServer(input)
@@ -41,18 +103,21 @@ async function commitWorkspacePaneTabsNow(input: CommitWorkspacePaneTabsInput): 
       worktreePath: input.worktreePath,
       tabs: serverTabs,
     })
-    return true
+    return { ok: true }
   } catch (err) {
-    gblLog.warn('workspace pane tabs commit failed', {
+    return reportWorkspacePaneTabsFailure({
+      operation: 'commit',
       repoRoot: input.repoRoot,
+      branchName: input.branchName,
       worktreePath: input.worktreePath,
-      err,
+      error: err,
     })
-    return false
   }
 }
 
-async function updateWorkspacePaneTabsNow(input: UpdateWorkspacePaneTabsInput): Promise<boolean> {
+async function updateWorkspacePaneTabsNow(
+  input: UpdateWorkspacePaneTabsInput,
+): Promise<WorkspacePaneTabsMutationResult> {
   try {
     await cancelWorkspacePaneTabs(input.repoRoot)
     const serverTabs = await updateWorkspacePaneTabsOnServer(input)
@@ -62,15 +127,15 @@ async function updateWorkspacePaneTabsNow(input: UpdateWorkspacePaneTabsInput): 
       worktreePath: input.worktreePath,
       tabs: serverTabs,
     })
-    return true
+    return { ok: true }
   } catch (err) {
-    gblLog.warn('workspace pane tabs operation failed', {
+    return reportWorkspacePaneTabsFailure({
+      operation: 'update',
       repoRoot: input.repoRoot,
+      branchName: input.branchName,
       worktreePath: input.worktreePath,
-      operation: input.operation.type,
-      err,
+      error: err,
     })
-    return false
   }
 }
 

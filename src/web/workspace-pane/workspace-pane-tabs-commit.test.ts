@@ -57,7 +57,7 @@ describe('commitWorkspacePaneTabs', () => {
     expect(readWorkspacePaneTabs()).toEqual([workspacePaneStaticTabEntry('history')])
 
     resolveServerTabs([workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-1')])
-    await expect(commit).resolves.toBe(true)
+    await expect(commit).resolves.toMatchObject({ ok: true })
     expect(readWorkspacePaneTabs()).toEqual([
       workspacePaneStaticTabEntry('status'),
       workspacePaneTerminalTabEntry('session-1'),
@@ -84,7 +84,7 @@ describe('commitWorkspacePaneTabs', () => {
         worktreePath: WORKTREE_PATH,
         tabs: [workspacePaneStaticTabEntry('history')],
       }),
-    ).resolves.toBe(false)
+    ).resolves.toMatchObject({ ok: false })
 
     expect(readWorkspacePaneTabs()).toEqual([workspacePaneStaticTabEntry('status')])
   })
@@ -108,7 +108,7 @@ describe('commitWorkspacePaneTabs', () => {
         worktreePath: WORKTREE_PATH,
         tabs: [workspacePaneTerminalTabEntry('session-1'), workspacePaneStaticTabEntry('status')],
       }),
-    ).resolves.toBe(true)
+    ).resolves.toMatchObject({ ok: true })
 
     resolveListTabs([
       {
@@ -157,7 +157,7 @@ describe('commitWorkspacePaneTabs', () => {
     const fetch = primaryWindowQueryClient.fetchQuery(workspacePaneTabsQueryOptions(REPO_ROOT)).catch(() => null)
 
     resolveServerTabs([workspacePaneTerminalTabEntry('session-1'), workspacePaneStaticTabEntry('status')])
-    await expect(commit).resolves.toBe(true)
+    await expect(commit).resolves.toMatchObject({ ok: true })
     resolveListTabs([
       {
         repoRoot: REPO_ROOT,
@@ -197,7 +197,7 @@ describe('updateWorkspacePaneTabs', () => {
         worktreePath: WORKTREE_PATH,
         operation: { type: 'open-static', tabType: 'history' },
       }),
-    ).resolves.toBe(true)
+    ).resolves.toMatchObject({ ok: true })
 
     expect(readWorkspacePaneTabs()).toEqual([
       workspacePaneStaticTabEntry('status'),
@@ -205,7 +205,7 @@ describe('updateWorkspacePaneTabs', () => {
     ])
   })
 
-  test('returns false and leaves cached tabs untouched when the server operation fails', async () => {
+  test('returns a failure result and leaves cached tabs untouched when the server operation fails', async () => {
     installWorkspacePaneTabsTestBridge({
       updateWorkspaceTabs: async () => {
         throw new Error('server unavailable')
@@ -225,7 +225,7 @@ describe('updateWorkspacePaneTabs', () => {
         worktreePath: WORKTREE_PATH,
         operation: { type: 'open-static', tabType: 'history' },
       }),
-    ).resolves.toBe(false)
+    ).resolves.toMatchObject({ ok: false })
 
     expect(readWorkspacePaneTabs()).toEqual([workspacePaneStaticTabEntry('status')])
   })

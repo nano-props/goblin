@@ -24,9 +24,9 @@ import {
   workspacePaneTabEntryIdentity,
 } from '#/shared/workspace-pane.ts'
 import {
-  workspacePaneTabsTargetIdentityKeyFromIdentity,
-  type WorkspacePaneTabsTargetIdentity,
-} from '#/shared/workspace-pane-tabs-target.ts'
+  workspacePaneTabsUserQueueKey,
+  workspacePaneTabsUserQueueTarget,
+} from '#/server/workspace-pane/workspace-pane-tabs-user-queue-key.ts'
 import { isValidTerminalClientId, isValidTerminalSize } from '#/shared/terminal-validators.ts'
 import { createTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
 import { terminalSessionScope } from '#/server/terminal/terminal-session-scope.ts'
@@ -34,7 +34,7 @@ import {
   buildGoblinTerminalCommandEnvironment,
   type GoblinTerminalCommandRuntime,
 } from '#/server/terminal/g-command.ts'
-import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
+import { terminalSessionUserWorktreeKey } from '#/shared/terminal-session-keys.ts'
 import type { WorkspacePaneTabsRuntime } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
 
 interface EnsureTerminalSessionInput {
@@ -112,10 +112,6 @@ interface TerminalSessionIdAllocation {
   terminalSessionId: string
   reservationKey: string | null
 }
-
-type WorkspaceTabsOperationQueueTarget =
-  | ({ userId: string } & Extract<WorkspacePaneTabsTargetIdentity, { kind: 'branch' }>)
-  | ({ userId: string } & Extract<WorkspacePaneTabsTargetIdentity, { kind: 'worktree' }>)
 
 class TerminalSessionService {
   private readonly options: TerminalSessionServiceOptions
@@ -350,7 +346,7 @@ class TerminalSessionService {
     task: () => Promise<T> | T,
   ): Promise<T> {
     return await this.runWorkspaceTabsOperationByKey(
-      workspaceTabsOperationQueueKey(workspaceTabsOperationQueueTarget(userId, scope, branchName, worktreePath)),
+      workspacePaneTabsUserQueueKey(workspacePaneTabsUserQueueTarget(userId, scope, branchName, worktreePath)),
       task,
     )
   }
@@ -362,7 +358,7 @@ class TerminalSessionService {
     task: () => Promise<T> | T,
   ): Promise<T> {
     return await this.runWorkspaceTabsOperationByKey(
-      workspaceTabsOperationQueueKey({ kind: 'worktree', userId, repoRoot: scope, worktreePath }),
+      workspacePaneTabsUserQueueKey({ kind: 'worktree', userId, repoRoot: scope, worktreePath }),
       task,
     )
   }
@@ -423,7 +419,12 @@ class TerminalSessionService {
     input: TerminalCreateInput,
     task: () => Promise<T>,
   ): Promise<T> {
-    const queueKey = terminalCreateQueueKey(userId, input.repoRoot, input.worktreePath)
+    const scope = terminalSessionScope(input.repoRoot)
+    const queueKey = terminalSessionUserWorktreeKey({
+      userId,
+      scope,
+      worktreePath: terminalWorktreePath(input.repoRoot, input.worktreePath),
+    })
     const queue = this.createQueueForUserWorktree(queueKey)
     try {
       return await queue.add(task)
@@ -498,7 +499,7 @@ class TerminalSessionService {
     if (input.kind === 'primary' && existingSession) {
       return { terminalSessionId: existingSession.terminalSessionId, reservationKey: null }
     }
-    const reservationKey = terminalSessionIdReservationKey(userId, scope, worktreePath)
+    const reservationKey = terminalSessionUserWorktreeKey({ userId, scope, worktreePath })
     const reservedTerminalSessionId = this.reservedTerminalSessionIdsByWorktree
       .get(reservationKey)
       ?.values()
@@ -642,33 +643,6 @@ export function createTerminalSessionService(options: TerminalSessionServiceOpti
 
 function terminalWorktreePath(repoRoot: string, worktreePath: string): string {
   return isRemoteRepoId(repoRoot) ? worktreePath : path.resolve(worktreePath)
-}
-
-function terminalCreateQueueKey(userId: string, repoRoot: string, worktreePath: string): string {
-  return terminalUserWorktreeKey(userId, terminalSessionScope(repoRoot), terminalWorktreePath(repoRoot, worktreePath))
-}
-
-function workspaceTabsOperationQueueTarget(
-  userId: string,
-  scope: string,
-  branchName: string,
-  worktreePath: string | null,
-): WorkspaceTabsOperationQueueTarget {
-  return worktreePath === null
-    ? { kind: 'branch', userId, repoRoot: scope, branchName }
-    : { kind: 'worktree', userId, repoRoot: scope, worktreePath }
-}
-
-function workspaceTabsOperationQueueKey(target: WorkspaceTabsOperationQueueTarget): string {
-  return `${target.userId}\0${workspacePaneTabsTargetIdentityKeyFromIdentity(target)}`
-}
-
-function terminalSessionIdReservationKey(userId: string, scope: string, worktreePath: string): string {
-  return terminalUserWorktreeKey(userId, scope, worktreePath)
-}
-
-function terminalUserWorktreeKey(userId: string, scope: string, worktreePath: string): string {
-  return `${userId}\0${formatTerminalWorktreeKey(scope, worktreePath)}`
 }
 
 function workspaceTabsWithoutStaleTerminalEntries(

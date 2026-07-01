@@ -6,7 +6,11 @@ import {
   workspacePaneTabRequiresWorktree,
   workspacePaneTerminalTabEntry,
 } from '#/shared/workspace-pane.ts'
-import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
+import {
+  workspacePaneTabsRuntimeKey,
+  workspacePaneTabsRuntimeScopePrefixKey,
+  workspacePaneTabsRuntimeUserPrefixKey,
+} from '#/shared/workspace-pane-tabs-runtime-keys.ts'
 
 export interface WorkspacePaneTabsTargetInput<TUser extends string | number> {
   userId: TUser
@@ -100,7 +104,7 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
   }
 
   tabsForScope(input: WorkspacePaneTabsScopeInput<TUser>): WorkspacePaneTabsScopeEntry[] {
-    const prefix = `${String(input.userId)}\0${input.scope}\0`
+    const prefix = workspacePaneTabsRuntimeScopePrefixKey(input.userId, input.scope)
     return Array.from(this.tabsByTarget.entries()).flatMap(([key, entry]) => {
       if (!key.startsWith(prefix)) return []
       return [{ branchName: entry.branchName, worktreePath: entry.worktreePath, tabs: [...entry.tabs] }]
@@ -117,18 +121,19 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
   }
 
   closeSessionsForUser(userId: TUser): void {
-    const prefix = `${String(userId)}\0`
+    const prefix = workspacePaneTabsRuntimeUserPrefixKey(userId)
     for (const key of Array.from(this.tabsByTarget.keys())) {
       if (key.startsWith(prefix)) this.tabsByTarget.delete(key)
     }
   }
 
   private targetKey(input: WorkspacePaneTabsTargetInput<TUser>): string {
-    return `${String(input.userId)}\0${workspacePaneTabsTargetIdentityKey({
-      repoRoot: input.scope,
+    return workspacePaneTabsRuntimeKey({
+      userId: input.userId,
+      scope: input.scope,
       branchName: input.branchName,
       worktreePath: input.worktreePath,
-    })}`
+    })
   }
 
 }

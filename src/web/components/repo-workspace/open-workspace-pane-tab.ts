@@ -24,7 +24,7 @@ export async function openWorkspacePaneTab(input: {
       worktreePath: input.worktreePath ?? null,
       operation: { type: 'open-static', tabType: input.type },
     })
-    if (!committed) return false
+    if (!committed.ok) return false
   }
   showWorkspacePaneTab(input)
   if (provider.refreshOnOpen) requestVisibleRepoStatusRefresh(useReposStore.getState, input.repoId)
