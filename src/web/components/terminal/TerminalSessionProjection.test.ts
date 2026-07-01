@@ -6,6 +6,7 @@ import {
   getTerminalSessionProjection,
   setTerminalSessionProjectionForTests,
 } from '#/web/components/terminal/TerminalSessionProjection.ts'
+import { TerminalSession } from '#/web/components/terminal/TerminalSession.ts'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import type { TerminalDescriptor, TerminalRepoIndex } from '#/web/components/terminal/types.ts'
 import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
@@ -113,6 +114,35 @@ describe('TerminalSessionProjection', () => {
 
       projection.handleOutput({ ptySessionId: 'pty_session_b_aaaaaaaaa', data: 'hello', seq: 1, processName: 'bash' })
       expect(handleOutputSpy).toHaveBeenCalledTimes(1)
+    })
+
+    test('recovers output that arrived before the pty index through the next server snapshot', () => {
+      projection.setRepoIndex(makeRepoIndex())
+      const ptySessionId = 'pty_session_late_aaaaaaaaa'
+      const hydrateSpy = vi.spyOn(TerminalSession.prototype, 'hydrate')
+
+      try {
+        projection.handleOutput({ ptySessionId, data: 'before-index', seq: 1, processName: 'bash' })
+        expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions).toEqual([])
+
+        projection.reconcileServerSessions(
+          REPO_ROOT,
+          [
+            makeServerSession(ptySessionId, 'session-1', {
+              controller: { clientId: 'client_local', status: 'connected' },
+            }),
+          ],
+          'client_local',
+          new Map([[ptySessionId, { ptySessionId, snapshot: 'before-index', snapshotSeq: 1 }]]),
+        )
+
+        expect(hydrateSpy).toHaveBeenCalledWith(
+          expect.objectContaining({ ptySessionId, snapshot: 'before-index', snapshotSeq: 1 }),
+        )
+        expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]?.terminalSessionId).toBe('session-1')
+      } finally {
+        hydrateSpy.mockRestore()
+      }
     })
 
     test('does not mark empty output payloads as terminal activity', () => {
