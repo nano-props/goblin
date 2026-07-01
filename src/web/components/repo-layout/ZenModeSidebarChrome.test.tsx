@@ -33,6 +33,9 @@ vi.mock('#/web/components/repo-layout/RepoLayoutSidebar.tsx', async () => {
             </PopoverTrigger>
             <PopoverContent>
               <div data-testid="descendant-popover-content">Descendant menu</div>
+              <button type="button" onClick={() => setOpen(false)}>
+                Close descendant menu
+              </button>
             </PopoverContent>
           </Popover>
         </div>
@@ -86,15 +89,14 @@ describe('ZenModeSidebarChrome', () => {
     })
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
 
-    await user.click(screen.getByTestId('descendant-popover-trigger'))
+    await user.click(screen.getByRole('button', { name: 'Close descendant menu' }))
     await waitFor(() => {
       expect(screen.queryByTestId('descendant-popover-content')).toBeNull()
     })
 
-    act(() => {
-      document.body.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: 900, clientY: 24 }))
+    await waitFor(() => {
+      expect(zenModeSidebarReveal(container)?.dataset.open).toBe('false')
     })
-    expect(zenModeSidebarReveal(container)?.dataset.open).toBe('false')
   })
 })
 

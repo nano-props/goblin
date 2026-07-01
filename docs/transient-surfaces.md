@@ -1,140 +1,166 @@
 # Transient Surfaces
 
-Use this doc for temporary UI surfaces that reveal from hover/focus/pointer proximity and may contain anchored floating menus.
+Use this spec for temporary UI surfaces that appear from hover, focus, pointer
+proximity, or another lightweight affordance, and that may contain anchored
+floating controls.
 
-## Problem
+## Core Invariant
 
-Zen Mode collapses the branch navigator into a temporary left-side reveal. The reveal opens when the pointer enters the trigger/hit area and closes when the pointer leaves the reveal surface.
+A transient parent surface must not auto-dismiss while a descendant anchored
+floating surface is open.
 
-Some controls inside that reveal open their own Radix-backed floating surfaces:
+This invariant protects the anchor relationship: if a menu, popover, or similar
+floating surface is opened from a transient parent, the anchor UI must remain
+mounted, visible, and interactive until that child surface closes or the parent is
+explicitly dismissed by a higher-level lifecycle transition.
 
-- the repository picker opens a repo menu;
-- branch rows open branch action menus;
-- future sidebar controls may open more `Popover` / `DropdownMenu` content.
+Pointer hit-testing alone is not enough. A child floating surface may render
+through a portal and sit outside the parent's DOM subtree, so the parent needs to
+know whether a descendant floating surface is open, not merely whether the
+pointer is currently over a floating element.
 
-Those child menus render through portals and are visually outside the reveal panel's DOM subtree. The existing reveal code recognizes `[data-floating-surface]` during pointer hit-testing, but it only answers "is the pointer currently over a floating surface?" It does not answer "is there an open child floating surface that was launched from this reveal?"
+## Terms
 
-As a result, a child menu can remain open after the Zen Mode reveal auto-hides. That leaves an orphaned menu whose anchor surface has disappeared.
+| Term                          | Meaning                                                                                                                       |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Transient surface             | A temporary parent surface whose visibility is controlled by hover, focus, pointer proximity, or another ambient interaction. |
+| Anchor-bound floating surface | A menu, popover, picker, or similar surface whose position and semantics depend on an anchor inside the transient parent.     |
+| Boundary                      | A React-tree scope that lets descendants report open floating surfaces even when their content portals elsewhere in the DOM.  |
+| Pinned                        | The transient parent suppresses ambient auto-close because at least one descendant floating surface is open.                  |
 
-## Design goal
+## Interaction Contract
 
-Temporary parent surfaces should not disappear while an anchored child floating surface they spawned is open.
+The expected lifecycle is:
 
-The desired interaction is:
+1. A transient parent opens from its normal trigger or proximity rule.
+2. A descendant opens an anchor-bound floating surface.
+3. The parent becomes pinned while that descendant surface is open.
+4. Ambient close rules, such as pointer-leave or pointer-outside movement, are
+   suppressed while pinned.
+5. The child floating surface continues to own Escape, outside-click, focus
+   restoration, and selection behavior.
+6. When the child surface closes or unmounts, the parent becomes unpinned.
+7. After unpinning, the parent resumes its normal ambient close policy.
 
-1. A transient surface opens from hover/proximity.
-2. The user opens a child menu inside it.
-3. The parent surface becomes pinned while the child menu is open.
-4. Pointer movement outside the parent does not auto-close it during that pinned period.
-5. When the child menu closes, the parent returns to its normal close-on-leave behavior.
-6. App-level dialogs triggered from menu actions may outlive the transient surface if their state is explicitly centralized.
+Explicit parent lifecycle transitions still win. For example, exiting Zen Mode or
+unmounting a workspace may close or remove the parent even if a descendant
+surface was previously open.
 
-This preserves stable menu anchors without lifting row/menu-local state to app-level stores.
-
-## Non-goals
-
-- Do not centralize every row/menu `Popover` in `useAppOverlays`. Anchor-bound transient menus should remain local to their owning component or list.
-- Do not make Zen Mode know about specific child controls such as `RepoPicker` or `BranchActionsMenu`.
-- Do not close child menus as the primary fix. Closing menus on parent leave avoids orphans, but it makes hover-revealed UI fragile and requires every child menu to expose control state upward.
-- Do not replace the Zen Mode reveal with Radix `HoverCard` as part of this fix. The reveal has custom sizing, resize, title-bar, animation-retention, and inert behavior.
-
-## Primitive model
-
-Introduce a UI-layer primitive for transient surfaces with descendant floating-surface pinning.
+## Primitive Contract
 
 ### `FloatingSurfaceBoundary`
 
-A boundary tracks floating surfaces opened by descendants in the React tree, even when those surfaces render through portals.
+`FloatingSurfaceBoundary` is the UI-layer primitive that tracks open floating
+surfaces launched by descendants in the React tree.
 
 Responsibilities:
 
-- expose a provider around the contents of a transient parent surface;
-- allow shared floating primitives to report open/closed transitions;
-- keep an aggregate `openDescendantCount` rather than identities for specific menus;
-- notify the parent when the boundary is pinned (`openDescendantCount > 0`).
+- provide a boundary around the contents of a transient parent;
+- aggregate open descendant floating surfaces as a count, not as
+  consumer-specific identities;
+- report pinned state as `openDescendantCount > 0`;
+- remain independent of repo, branch, workspace, Zen Mode, or server modules.
 
-This is intentionally generic: it should not import repo, branch, Zen Mode, or workspace modules.
+The boundary deliberately tracks participation, not ownership. It does not open,
+close, position, or render child surfaces; it only reports whether descendants
+currently require the parent to remain stable.
 
-### Shared floating primitive integration
+### Shared Floating Primitives
 
-The shared `Popover` wrapper in `src/web/components/ui/popover.tsx` should report its open state to the nearest `FloatingSurfaceBoundary` if one exists.
+Shared floating wrappers should report to the nearest
+`FloatingSurfaceBoundary` when they have an effective open state.
 
-Rules:
+Current rule for `Popover`:
 
-- Controlled and uncontrolled popovers both participate.
-- A popover contributes exactly one open unit while its effective `open` state is true.
-- On close or unmount, the contribution is removed.
-- If there is no boundary provider, behavior is unchanged.
-- The reporting should live in the shared wrapper so callers such as `RepoPicker`, `ActionPopover`, and future popovers do not need bespoke code.
+- controlled and uncontrolled popovers both participate;
+- one open popover contributes exactly one open unit;
+- closing or unmounting removes that contribution;
+- if no boundary exists, behavior is unchanged;
+- callers such as repo pickers and row action menus do not add bespoke
+  reporting code.
 
-`DropdownMenu` can adopt the same boundary reporting later if a transient surface contains dropdown menus. The immediate bug path uses `Popover` via `RepoPicker` and `ActionPopover`.
+`DropdownMenu` should follow the same contract if a transient parent contains a
+dropdown-backed control.
 
-### `TransientSurface`
+### Transient Parents
 
-A transient surface owns its own open/close policy and consumes boundary pin state.
+A transient parent owns its own visibility and interactivity policy. It consumes
+boundary pinned state and applies it only to ambient dismissal.
 
-The primitive contract is:
+While pinned, a parent should suppress:
 
-- parent controls whether the surface is mounted/open/interactive;
-- pointer/focus/proximity events may request open or close;
-- descendant floating surfaces can pin the parent open;
-- while pinned, automatic close-on-leave is suppressed;
-- when unpinned, the surface resumes its own close policy.
+- pointer-leave auto-close;
+- document-level pointer-outside auto-close;
+- proximity-based auto-close.
 
-The first concrete consumer is the Zen Mode sidebar reveal. The implementation can start as a local use of `FloatingSurfaceBoundary` inside `ZenModeSidebarReveal`; if a second transient parent surface appears, extract the repeated policy into a reusable `TransientSurface` component/hook.
+While pinned, a parent should not:
 
-## Zen Mode behavior
+- trap focus;
+- override Escape or outside-click behavior owned by the child floating
+  primitive;
+- centralize the child's local open state.
 
-`ZenModeSidebarReveal` should wrap its sidebar contents in the floating boundary and keep a local `pinnedByDescendantSurface` boolean.
+## State Ownership
 
-When `pinnedByDescendantSurface` is true:
+Keep state at the layer that owns the invariant.
 
-- pointer-leave handlers should not call `onSurfaceLeave`;
-- document-level pointer-move auto-close should be suppressed;
-- the reveal remains interactive and visible;
-- resize-drag behavior remains unchanged.
+| State                                            | Owner                                                 |
+| ------------------------------------------------ | ----------------------------------------------------- |
+| Anchor-bound menu open state                     | Owning control, row, picker, or list component        |
+| Transient parent open/rendered/interactive state | The transient parent or its local controller hook     |
+| Descendant floating surface pin state            | `FloatingSurfaceBoundary` inside the transient parent |
+| Cross-surface dialogs or confirmations           | Centralized dialog/app overlay state                  |
 
-When the boundary becomes unpinned:
+This keeps local menus close to their anchors while giving transient parents a
+generic way to remain stable.
 
-- normal pointer-leave behavior resumes;
-- the next pointer movement outside the reveal may close it;
-- optionally, the reveal may immediately re-check the last pointer position and close if it is already outside. This should be implemented only if it does not make menu close animations feel abrupt.
+## Zen Mode Sidebar Reveal
 
-## State ownership
+The Zen Mode sidebar reveal is the first concrete transient parent using this
+contract.
 
-Keep state at the layer that owns the invariant:
+Requirements:
 
-| State | Owner |
-| --- | --- |
-| Repository picker menu open state | `RepoPicker` |
-| Branch action menu open row | `BranchList` |
-| Zen Mode reveal open/rendered/interactive state | `ZenModeSidebarChrome` / `useZenModeSidebarReveal` |
-| "A descendant floating surface pins this transient surface" | `FloatingSurfaceBoundary` inside the transient parent |
-| Cross-surface confirmation dialogs | centralized dialog/app overlay state |
+- wrap reveal contents in `FloatingSurfaceBoundary`;
+- keep the reveal visible and interactive while descendant popovers are open;
+- suppress pointer-leave and document pointer-move auto-close while pinned;
+- keep resize dragging independent of pin state;
+- resume normal close-on-leave behavior after the descendant surface closes.
 
-This keeps anchor-bound menus close to their anchors while giving transient parents a generic way to remain stable.
+The reveal must remain generic. It should not know whether the child control is a
+repo picker, branch action menu, file action menu, or future sidebar control.
 
-## Accessibility and interaction notes
+## Non-Goals
 
-- Pinning must not trap focus. It only suppresses hover/proximity auto-close while a descendant floating surface is open.
-- Escape and outside-click behavior remains owned by the child floating primitive.
-- When the child menu closes, focus restoration should continue to follow Radix behavior.
-- If the parent becomes non-interactive for reasons other than pointer leave, such as exiting Zen Mode, it may still force unpin/close through existing lifecycle cleanup.
+- Do not move every row or picker popover into centralized app overlay state.
+- Do not make transient parents know about specific child controls.
+- Do not fix anchor stability by eagerly closing child menus on parent leave.
+- Do not replace custom transient parents with a Radix primitive solely to get
+  hover behavior; custom parents may own sizing, animation retention, inert
+  state, title-bar behavior, and resize interaction.
 
-## Testing plan
+## Accessibility
 
-Add tests around the primitive and the Zen Mode consumer:
+Pinning is a dismissal policy, not a focus policy.
 
-- A `Popover` opened under a `FloatingSurfaceBoundary` increments the boundary pin state and decrements it on close.
-- Unmounting an open popover decrements the boundary contribution.
-- Opening the repo picker menu from the Zen Mode reveal prevents pointer-outside auto-close until the menu closes.
-- Opening a branch action menu from the Zen Mode reveal has the same behavior through `ActionPopover`.
-- With no child menu open, existing Zen Mode close-on-leave behavior is unchanged.
+- Focus remains governed by the child floating primitive and its trigger.
+- Escape and outside-click behavior remain governed by the child primitive.
+- Focus restoration should continue to follow the child primitive's behavior.
+- App-level dialogs triggered from menus may outlive the transient parent only
+  when their state is intentionally centralized.
 
-## Migration plan
+## Testing Requirements
 
-1. Add the generic floating boundary primitive under `src/web/components/ui/`.
-2. Integrate boundary reporting into the shared `Popover` wrapper.
-3. Use the boundary in `ZenModeSidebarReveal` to pin the reveal while descendant popovers are open.
-4. Add regression tests for repo picker and branch action menus in Zen Mode.
-5. If future transient parents need the same policy, extract a reusable `TransientSurface` component/hook from the Zen Mode implementation.
+Tests for this pattern should cover both the primitive and a concrete parent:
+
+- an open `Popover` under a `FloatingSurfaceBoundary` pins the boundary;
+- closing the `Popover` unpins the boundary;
+- unmounting an open `Popover` unpins the boundary;
+- multiple open descendants keep the boundary pinned until all close;
+- the transient parent suppresses ambient auto-close while pinned;
+- the transient parent resumes ambient auto-close after unpinning;
+- without descendant surfaces, existing close-on-leave behavior is unchanged.
+
+Prefer tests that assert observable behavior: pinned UI remains mounted and
+interactive, child surfaces close normally, and ambient close behavior resumes
+after unpinning.

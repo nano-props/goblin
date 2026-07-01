@@ -202,8 +202,11 @@ function ZenModeSidebarReveal({
   const resizeDragCleanupRef = useRef<(() => void) | null>(null)
   const closeAnimationTimerRef = useRef<number | null>(null)
   const openAnimationFrameRef = useRef<number | null>(null)
+  const unpinRecheckFrameRef = useRef<number | null>(null)
   const panelStateRef = useRef<RevealPanelState>(open ? 'open' : 'closed')
   const lastPointerRef = useRef({ x: 0, y: 0 })
+  const lastPointerKnownRef = useRef(false)
+  const hadDescendantSurfacePinRef = useRef(false)
   const [resizeRailState, setResizeRailState] = useState<ResizeRailState>('idle')
   const [panelState, setPanelState] = useState<RevealPanelState>(() => (open ? 'open' : 'closed'))
   const [pinnedByDescendantSurface, setPinnedByDescendantSurface] = useState(false)
@@ -236,6 +239,11 @@ function ZenModeSidebarReveal({
     window.cancelAnimationFrame(openAnimationFrameRef.current)
     openAnimationFrameRef.current = null
   }, [])
+  const clearUnpinRecheckFrame = useCallback(() => {
+    if (unpinRecheckFrameRef.current === null) return
+    window.cancelAnimationFrame(unpinRecheckFrameRef.current)
+    unpinRecheckFrameRef.current = null
+  }, [])
   const handleResizePointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
       if (!panelInteractive) return
@@ -247,6 +255,7 @@ function ZenModeSidebarReveal({
       resizeDragCleanupRef.current?.()
       resizingRef.current = true
       lastPointerRef.current = { x: event.clientX, y: event.clientY }
+      lastPointerKnownRef.current = true
       setResizeRailState('active')
       onSurfaceEnter()
 
@@ -261,6 +270,7 @@ function ZenModeSidebarReveal({
       }
       const handlePointerMove = (moveEvent: PointerEvent) => {
         lastPointerRef.current = { x: moveEvent.clientX, y: moveEvent.clientY }
+        lastPointerKnownRef.current = true
         update(moveEvent.clientX)
       }
       const cleanupDragListeners = () => {
@@ -296,10 +306,11 @@ function ZenModeSidebarReveal({
       resizeDragCleanupRef.current?.()
       clearCloseAnimationTimer()
       clearOpenAnimationFrame()
+      clearUnpinRecheckFrame()
       resizeDragCleanupRef.current = null
       resizingRef.current = false
     }
-  }, [clearCloseAnimationTimer, clearOpenAnimationFrame])
+  }, [clearCloseAnimationTimer, clearOpenAnimationFrame, clearUnpinRecheckFrame])
   useEffect(() => {
     clearCloseAnimationTimer()
     clearOpenAnimationFrame()
@@ -322,6 +333,8 @@ function ZenModeSidebarReveal({
   }, [clearCloseAnimationTimer, clearOpenAnimationFrame, open, setPanelVisualState])
   const handleSurfaceLeave = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
+      lastPointerRef.current = { x: event.clientX, y: event.clientY }
+      lastPointerKnownRef.current = true
       if (resizingRef.current) return
       if (pinnedByDescendantSurface) return
       if (isPointerInsideRevealBounds(event, hostRef.current, panelRef.current)) return
@@ -330,7 +343,51 @@ function ZenModeSidebarReveal({
     },
     [onSurfaceLeave, pinnedByDescendantSurface],
   )
+  const recheckSurfaceAfterUnpin = useEffectEvent(() => {
+    if (!panelInteractive) return
+    if (resizingRef.current) return
+    if (pinnedByDescendantSurface) return
+    if (!lastPointerKnownRef.current) return
+
+    const pointer = lastPointerRef.current
+    const target =
+      typeof document.elementFromPoint === 'function' ? document.elementFromPoint(pointer.x, pointer.y) : null
+    if (
+      (target && isZenRevealSurfaceTarget(target, panelRef.current, hitAreaRef.current)) ||
+      isPointerInsideRevealBounds({ clientX: pointer.x, clientY: pointer.y }, hostRef.current, panelRef.current) ||
+      isPointerInsideElement({ clientX: pointer.x, clientY: pointer.y }, hitAreaRef.current)
+    ) {
+      return
+    }
+
+    onSurfaceLeave()
+  })
+  const requestUnpinRecheck = useCallback(() => {
+    clearUnpinRecheckFrame()
+    unpinRecheckFrameRef.current = window.requestAnimationFrame(() => {
+      unpinRecheckFrameRef.current = null
+      recheckSurfaceAfterUnpin()
+    })
+  }, [clearUnpinRecheckFrame, recheckSurfaceAfterUnpin])
+  const handleDescendantSurfacePinnedChange = useCallback(
+    (nextPinned: boolean) => {
+      setPinnedByDescendantSurface(nextPinned)
+
+      if (nextPinned) {
+        hadDescendantSurfacePinRef.current = true
+        clearUnpinRecheckFrame()
+        return
+      }
+
+      if (!hadDescendantSurfacePinRef.current) return
+      hadDescendantSurfacePinRef.current = false
+      requestUnpinRecheck()
+    },
+    [clearUnpinRecheckFrame, requestUnpinRecheck],
+  )
   const handleDocumentPointerMove = useEffectEvent((event: PointerEvent) => {
+    lastPointerRef.current = { x: event.clientX, y: event.clientY }
+    lastPointerKnownRef.current = true
     if (resizingRef.current) return
     if (pinnedByDescendantSurface) return
     if (
@@ -391,7 +448,7 @@ function ZenModeSidebarReveal({
         onMouseEnter={panelInteractive ? onSurfaceEnter : undefined}
         onMouseLeave={panelInteractive ? handleSurfaceLeave : undefined}
       >
-        <FloatingSurfaceBoundary onPinnedChange={setPinnedByDescendantSurface}>
+        <FloatingSurfaceBoundary onPinnedChange={handleDescendantSurfacePinnedChange}>
           <RepoLayoutSidebar
             repoId={repoId}
             compact={false}
@@ -427,7 +484,10 @@ function zenRevealHostRect(host: HTMLElement | null): DOMRect | null {
   return parentRect && parentRect.width > 0 ? parentRect : null
 }
 
-function isPointerInsideElement(event: PointerEvent, element: HTMLElement | null): boolean {
+function isPointerInsideElement(
+  event: Pick<MouseEvent | PointerEvent, 'clientX' | 'clientY'>,
+  element: HTMLElement | null,
+): boolean {
   if (!element) return false
   const rect = element.getBoundingClientRect()
   if (rect.width <= 0 || rect.height <= 0) return false
