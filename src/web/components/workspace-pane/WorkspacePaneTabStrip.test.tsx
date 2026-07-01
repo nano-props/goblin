@@ -262,7 +262,7 @@ describe('WorkspacePaneTabStrip', () => {
             terminalSessionId: 't1',
             selected: true,
             hasBell: true,
-            recentlyActive: false,
+            hasRecentOutput: false,
             originalTitle: '~/repo/worktree — npm run dev',
           }),
         ]}
@@ -1029,7 +1029,7 @@ function session(overrides: Partial<TerminalSessionSummary> = {}): TerminalSessi
     phase: overrides.phase ?? 'open',
     selected: overrides.selected ?? true,
     hasBell: overrides.hasBell ?? false,
-    recentlyActive: overrides.recentlyActive ?? false,
+    hasRecentOutput: overrides.hasRecentOutput ?? false,
   }
 }
 

@@ -2,7 +2,7 @@ import { setTerminalFocused } from '#/web/terminal-focus.ts'
 import { terminalSessionProviderLog } from '#/web/logger.ts'
 import { TerminalSession } from '#/web/components/terminal/TerminalSession.ts'
 import { createTerminalBellState } from '#/web/components/terminal/terminal-bell-state.ts'
-import { createTerminalActivityState } from '#/web/components/terminal/terminal-activity-state.ts'
+import { createTerminalOutputActivityState } from '#/web/components/terminal/terminal-output-activity-state.ts'
 import { formatTerminalWorktreeKey, parseTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { terminalBridge } from '#/web/terminal.ts'
 import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
@@ -165,7 +165,7 @@ export class TerminalSessionProjection {
     },
     (count) => terminalBridge.setBadge(count),
   )
-  private readonly activityState = createTerminalActivityState((terminalWorktreeKey) =>
+  private readonly outputActivityState = createTerminalOutputActivityState((terminalWorktreeKey) =>
     this.notifyWorktree(terminalWorktreeKey),
   )
 
@@ -234,7 +234,7 @@ export class TerminalSessionProjection {
     this.snapshotListeners.clear()
     this.terminalSessionIdsByTerminalWorktree.clear()
     this.bellState.reset()
-    this.activityState.reset()
+    this.outputActivityState.reset()
     if (projectionInstance === this) projectionInstance = null
   }
 
@@ -243,7 +243,7 @@ export class TerminalSessionProjection {
     const directSession = directKey ? this.sessions.get(directKey) : null
     if (directKey && directSession) {
       if (event.data.length > 0)
-        this.activityState.markActivity(directKey, directSession.descriptor.terminalWorktreeKey)
+        this.outputActivityState.markOutput(directKey, directSession.descriptor.terminalWorktreeKey)
       directSession.handleOutput(event)
     }
   }
@@ -765,7 +765,7 @@ export class TerminalSessionProjection {
       getCachedSnapshot: (terminalSessionId) => this.snapshotCache.get(terminalSessionId) ?? null,
       cacheSnapshot: (terminalSessionId, nextSnapshot) => this.snapshotCache.set(terminalSessionId, nextSnapshot),
       hasBell: (terminalSessionId) => this.bellState.hasBell(terminalSessionId),
-      hasRecentActivity: (terminalSessionId) => this.activityState.hasRecentActivity(terminalSessionId),
+      hasRecentOutput: (terminalSessionId) => this.outputActivityState.hasRecentOutput(terminalSessionId),
     })
     this.worktreeSnapshotCache.set(terminalWorktreeKey, snapshot)
     return snapshot
@@ -1061,7 +1061,7 @@ export class TerminalSessionProjection {
     this.snapshotCache.delete(terminalSessionId)
     this.reattachSnapshotCache.delete(terminalSessionId)
     this.removeTerminalSessionIdFromWorktreeList(terminalWorktreeKey, terminalSessionId)
-    this.activityState.remove(terminalSessionId)
+    this.outputActivityState.remove(terminalSessionId)
     this.notifySnapshot(terminalSessionId)
     this.bellState.remove(terminalSessionId)
     if (options.dispose) session.dispose({ closeSession: options.closeSession !== false })

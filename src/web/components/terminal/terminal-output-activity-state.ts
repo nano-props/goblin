@@ -3,9 +3,19 @@ const ACTIVITY_IDLE_TIMEOUT_MS = 5000
 const ACTIVITY_MIN_VISIBLE_MS = 1000
 type ActivityTimer = ReturnType<typeof setTimeout>
 
-export interface TerminalActivityState {
-  hasRecentActivity: (terminalSessionId: string) => boolean
-  markActivity: (terminalSessionId: string, terminalWorktreeKey: string) => void
+function monotonicNow(): number {
+  // Activity windows are duration-based, so wall-clock changes must not
+  // stretch or shrink the breathing output indicator lifetime.
+  if (typeof globalThis.performance?.now === 'function') return globalThis.performance.now()
+  return Date.now()
+}
+
+// Tracks sustained terminal output, not whether a process is still running.
+// A quiet long-running command should not show the breathing output indicator;
+// the indicator is for terminals actively producing visible output.
+export interface TerminalOutputActivityState {
+  hasRecentOutput: (terminalSessionId: string) => boolean
+  markOutput: (terminalSessionId: string, terminalWorktreeKey: string) => void
   remove: (terminalSessionId: string) => void
   reset: () => void
 }
@@ -19,13 +29,13 @@ interface ActivityRecord {
   idleTimer: ActivityTimer | null
 }
 
-export function createTerminalActivityState(
+export function createTerminalOutputActivityState(
   notifyWorktree: (terminalWorktreeKey: string) => void,
-  now: () => number = () => Date.now(),
+  now: () => number = monotonicNow,
   setTimer: (handler: () => void, timeout: number) => ActivityTimer = (handler, timeout) =>
     setTimeout(handler, timeout),
   clearTimer: (timer: ActivityTimer) => void = (timer) => clearTimeout(timer),
-): TerminalActivityState {
+): TerminalOutputActivityState {
   const records = new Map<string, ActivityRecord>()
 
   function clearRecordTimers(record: ActivityRecord): void {
@@ -95,14 +105,14 @@ export function createTerminalActivityState(
     record.idleTimer = setTimer(() => expireIdleActivity(terminalSessionId), timeout)
   }
 
-  function hasRecentActivity(terminalSessionId: string): boolean {
+  function hasRecentOutput(terminalSessionId: string): boolean {
     const record = records.get(terminalSessionId)
     return record !== undefined && record.activeSince !== null
   }
 
   return {
-    hasRecentActivity,
-    markActivity(terminalSessionId, terminalWorktreeKey) {
+    hasRecentOutput,
+    markOutput(terminalSessionId, terminalWorktreeKey) {
       const current = now()
       const record = records.get(terminalSessionId)
       if (record) {
@@ -118,7 +128,7 @@ export function createTerminalActivityState(
           idleTimer: null,
         })
       }
-      if (hasRecentActivity(terminalSessionId)) {
+      if (hasRecentOutput(terminalSessionId)) {
         scheduleIdleExpiry(terminalSessionId)
         return
       }

@@ -22,13 +22,13 @@ vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
 }))
 
 vi.mock('#/web/components/terminal/terminal-session-store.ts', () => ({
-  useTerminalWorktreeActive: () => terminalStoreMocks.active,
+  useTerminalWorktreeOutputActive: () => terminalStoreMocks.outputActive,
   useTerminalWorktreeBellCount: () => 0,
 }))
 
 const branchRowPropsSpy = vi.fn()
 const terminalStoreMocks = vi.hoisted(() => ({
-  active: false,
+  outputActive: false,
 }))
 
 vi.mock('#/web/components/branch-navigator/BranchRow.tsx', () => ({
@@ -40,7 +40,7 @@ vi.mock('#/web/components/branch-navigator/BranchRow.tsx', () => ({
 
 beforeEach(() => {
   branchRowPropsSpy.mockClear()
-  terminalStoreMocks.active = false
+  terminalStoreMocks.outputActive = false
 })
 
 describe('BranchListRow', () => {
@@ -64,11 +64,11 @@ describe('BranchListRow', () => {
     expect(branchRowPropsSpy).toHaveBeenCalledWith(expect.objectContaining({ branchActionBusy: false }))
   })
 
-  test('forwards terminal activity from the worktree terminal snapshot', () => {
-    terminalStoreMocks.active = true
+  test('forwards terminal output activity from the worktree terminal snapshot', () => {
+    terminalStoreMocks.outputActive = true
     const repo = emptyRepo('/tmp/repo', 'repo')
     renderInJsdom(<BranchListRow {...baseProps(repo, 'feature/a')} />)
-    expect(branchRowPropsSpy).toHaveBeenCalledWith(expect.objectContaining({ terminalActive: true }))
+    expect(branchRowPropsSpy).toHaveBeenCalledWith(expect.objectContaining({ terminalOutputActive: true }))
   })
 })
 

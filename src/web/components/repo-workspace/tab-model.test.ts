@@ -467,6 +467,6 @@ function terminalView(terminalSessionId: string, index: number, selected: boolea
     phase: 'open',
     selected,
     hasBell: false,
-    recentlyActive: false,
+    hasRecentOutput: false,
   }
 }

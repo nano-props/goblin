@@ -15,7 +15,7 @@ const EMPTY_WORKTREE_TERMINAL_SNAPSHOT: TerminalWorktreeSnapshot = {
   sessions: [],
   count: 0,
   bellCount: 0,
-  activeCount: 0,
+  outputActiveCount: 0,
   pendingCreate: false,
 }
 
@@ -100,7 +100,7 @@ export function useRepoTerminalBellCounts(repoIds: readonly string[]): Record<st
   }, [snapshot])
 }
 
-export function useTerminalWorktreeActive(terminalWorktreeKey: string | null): boolean {
+export function useTerminalWorktreeOutputActive(terminalWorktreeKey: string | null): boolean {
   const { terminalWorktreeSnapshot, subscribeTerminalWorktree } = useTerminalSessionReadContext()
   const subscribe = useCallback(
     (listener: () => void) =>
@@ -108,7 +108,7 @@ export function useTerminalWorktreeActive(terminalWorktreeKey: string | null): b
     [terminalWorktreeKey, subscribeTerminalWorktree],
   )
   const getSnapshot = useCallback(
-    () => (terminalWorktreeKey ? terminalWorktreeSnapshot(terminalWorktreeKey).activeCount > 0 : false),
+    () => (terminalWorktreeKey ? terminalWorktreeSnapshot(terminalWorktreeKey).outputActiveCount > 0 : false),
     [terminalWorktreeKey, terminalWorktreeSnapshot],
   )
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)

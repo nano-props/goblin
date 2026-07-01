@@ -339,7 +339,7 @@ export const ja: Record<DictKey, string> = {
   'terminal.confirm-close-running-confirm': 'ターミナルを閉じる',
   'terminal.progress': 'ターミナル進行状況',
   'terminal.empty': '開いているターミナルはありません',
-  'terminal.active': 'ターミナルはアクティブです',
+  'terminal.output-active': 'ターミナルが出力中',
   'terminal.drop-hint': 'ドロップしてパスを貼り付け',
   'terminal.mirror-controlled': '別のセッションが現在このターミナルを制御しています。',
   'terminal.unowned': '現在このターミナルを制御しているセッションはありません。',

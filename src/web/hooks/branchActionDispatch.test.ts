@@ -222,7 +222,7 @@ function emptyWorktreeSnapshot(): TerminalWorktreeSnapshot {
     sessions: [],
     count: 0,
     bellCount: 0,
-    activeCount: 0,
+    outputActiveCount: 0,
     pendingCreate: false,
   }
 }
@@ -248,12 +248,12 @@ function worktreeSnapshotWithTerminal(): TerminalWorktreeSnapshot {
         phase: 'open',
         selected: true,
         hasBell: false,
-        recentlyActive: false,
+        hasRecentOutput: false,
       },
     ],
     count: 1,
     bellCount: 0,
-    activeCount: 0,
+    outputActiveCount: 0,
     pendingCreate: false,
   }
 }

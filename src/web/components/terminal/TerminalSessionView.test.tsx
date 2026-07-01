@@ -42,26 +42,26 @@ vi.mock('#/web/components/terminal/mobile-detection.ts', () => ({
 // `renderInJsdom` registers `cleanup` via `afterEach`, which
 // unmounts all rendered components and removes their containers.
 
-type TestTerminalSummary = Omit<TerminalSessionSummary, 'type' | 'recentlyActive'> &
-  Partial<Pick<TerminalSessionSummary, 'type' | 'recentlyActive'>>
+type TestTerminalSummary = Omit<TerminalSessionSummary, 'type' | 'hasRecentOutput'> &
+  Partial<Pick<TerminalSessionSummary, 'type' | 'hasRecentOutput'>>
 
-type TestWorktreeSnapshot = Omit<TerminalWorktreeSnapshot, 'sessions' | 'bellCount' | 'activeCount'> & {
+type TestWorktreeSnapshot = Omit<TerminalWorktreeSnapshot, 'sessions' | 'bellCount' | 'outputActiveCount'> & {
   sessions: TestTerminalSummary[]
   bellCount?: number
-  activeCount?: number
+  outputActiveCount?: number
 }
 
 function completeWorktreeSnapshot(snapshot: TestWorktreeSnapshot): TerminalWorktreeSnapshot {
   const sessions = snapshot.sessions.map((session) => ({
     ...session,
     type: 'terminal' as const,
-    recentlyActive: session.recentlyActive ?? false,
+    hasRecentOutput: session.hasRecentOutput ?? false,
   }))
   return {
     ...snapshot,
     sessions,
     bellCount: snapshot.bellCount ?? sessions.filter((session) => session.hasBell).length,
-    activeCount: snapshot.activeCount ?? sessions.filter((session) => session.recentlyActive).length,
+    outputActiveCount: snapshot.outputActiveCount ?? sessions.filter((session) => session.hasRecentOutput).length,
   }
 }
 
@@ -87,7 +87,7 @@ async function renderTerminalSession() {
         phase: 'open' as const,
         selected: true,
         hasBell: false,
-        recentlyActive: false,
+        hasRecentOutput: false,
       },
     ],
     count: 1,
@@ -220,7 +220,7 @@ describe('TerminalSessionView', () => {
         phase: 'open' as const,
         selected: true,
         hasBell: false,
-        recentlyActive: false,
+        hasRecentOutput: false,
       },
     ]
     const descriptor = {
@@ -388,7 +388,7 @@ describe('TerminalSessionView', () => {
           phase: 'open' as const,
           selected: true,
           hasBell: false,
-          recentlyActive: false,
+          hasRecentOutput: false,
         },
       ],
       count: 1,
@@ -465,7 +465,7 @@ describe('TerminalSessionView', () => {
           phase: 'open' as const,
           selected: true,
           hasBell: false,
-          recentlyActive: false,
+          hasRecentOutput: false,
         },
       ],
       count: 1,
@@ -570,7 +570,7 @@ describe('TerminalSessionView', () => {
           phase: 'open' as const,
           selected: true,
           hasBell: false,
-          recentlyActive: false,
+          hasRecentOutput: false,
         },
       ],
       count: 1,
@@ -683,7 +683,7 @@ describe('TerminalSessionView', () => {
           phase: 'error' as const,
           selected: true,
           hasBell: false,
-          recentlyActive: false,
+          hasRecentOutput: false,
         },
       ],
       count: 1,
@@ -794,7 +794,7 @@ describe('TerminalSessionView', () => {
           phase: 'open' as const,
           selected: true,
           hasBell: false,
-          recentlyActive: false,
+          hasRecentOutput: false,
         },
       ],
       count: 1,
@@ -910,7 +910,7 @@ describe('TerminalSessionView', () => {
           phase: 'open' as const,
           selected: true,
           hasBell: false,
-          recentlyActive: false,
+          hasRecentOutput: false,
         },
       ],
       count: 1,
@@ -1045,7 +1045,7 @@ describe('TerminalSessionView', () => {
           phase: 'open' as const,
           selected: true,
           hasBell: false,
-          recentlyActive: false,
+          hasRecentOutput: false,
         },
       ],
       count: 1,
@@ -1152,7 +1152,7 @@ describe('TerminalSessionView', () => {
           phase: 'open' as const,
           selected: true,
           hasBell: false,
-          recentlyActive: false,
+          hasRecentOutput: false,
         },
       ],
       count: 1,
@@ -1271,7 +1271,7 @@ describe('TerminalSessionView', () => {
           phase: 'open' as const,
           selected: true,
           hasBell: false,
-          recentlyActive: false,
+          hasRecentOutput: false,
         },
       ],
       count: 1,
@@ -1546,7 +1546,7 @@ describe('TerminalSessionView', () => {
           phase: 'open' as const,
           selected: true,
           hasBell: false,
-          recentlyActive: false,
+          hasRecentOutput: false,
         },
       ],
       count: 1,
@@ -1687,7 +1687,7 @@ describe('TerminalSessionView', () => {
           phase: 'open' as const,
           selected: true,
           hasBell: false,
-          recentlyActive: false,
+          hasRecentOutput: false,
         },
       ],
       count: 1,
@@ -1705,7 +1705,7 @@ describe('TerminalSessionView', () => {
           phase: 'open' as const,
           selected: true,
           hasBell: false,
-          recentlyActive: false,
+          hasRecentOutput: false,
         },
       ],
       count: 1,

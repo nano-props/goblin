@@ -29,7 +29,7 @@ const emptyWorktreeSnapshot: TerminalWorktreeSnapshot = {
   sessions: [],
   count: 0,
   bellCount: 0,
-  activeCount: 0,
+  outputActiveCount: 0,
   pendingCreate: false,
 }
 

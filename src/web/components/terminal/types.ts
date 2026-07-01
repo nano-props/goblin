@@ -125,7 +125,7 @@ export interface TerminalSessionSummary {
   phase: TerminalSessionPhase
   selected: boolean
   hasBell: boolean
-  recentlyActive: boolean
+  hasRecentOutput: boolean
 }
 
 export type WorkspacePaneTabSummary = TerminalSessionSummary
@@ -136,7 +136,7 @@ export interface TerminalWorktreeSnapshot {
   sessions: TerminalSessionSummary[]
   count: number
   bellCount: number
-  activeCount: number
+  outputActiveCount: number
   pendingCreate: boolean
 }
 

@@ -145,7 +145,7 @@ describe('TerminalSessionProjection', () => {
       }
     })
 
-    test('does not mark empty output payloads as terminal activity', () => {
+    test('does not mark empty output payloads as terminal output activity', () => {
       vi.useFakeTimers()
       vi.setSystemTime(new Date('2026-06-30T00:00:00.000Z'))
       projection.setRepoIndex(makeRepoIndex())
@@ -165,7 +165,7 @@ describe('TerminalSessionProjection', () => {
       projection.handleOutput({ ptySessionId: 'pty_session_a_aaaaaaaaa', data: '', seq: 2, processName: 'bash' })
 
       expect(handleOutputSpy).toHaveBeenCalledTimes(2)
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).activeCount).toBe(0)
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).outputActiveCount).toBe(0)
     })
 
     test('dispatches title changes by ptySessionId index', () => {

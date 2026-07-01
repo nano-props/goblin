@@ -846,7 +846,7 @@ const emptyWorktreeSnapshot: TerminalWorktreeSnapshot = {
   sessions: [],
   count: 0,
   bellCount: 0,
-  activeCount: 0,
+  outputActiveCount: 0,
   pendingCreate: false,
 }
 
@@ -926,6 +926,6 @@ function terminalSession(
     phase: 'open',
     selected,
     hasBell: false,
-    recentlyActive: false,
+    hasRecentOutput: false,
   }
 }
