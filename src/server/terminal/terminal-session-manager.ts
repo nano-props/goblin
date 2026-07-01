@@ -552,7 +552,13 @@ export class TerminalSessionManager<TUser extends string | number> {
       isSessionLive: (session) => this.isLiveSession(session),
       emitLifecycle: (session) => this.emitLifecycle(session),
       emitOutput: (session, event) => this.sink.onOutput(session.userId, event),
-      emitBell: (session, event) => this.sink.onBell?.(session.userId, event),
+      emitBell: (session, event) =>
+        this.sink.onBell?.(session.userId, {
+          ...event,
+          terminalSessionId: session.terminalSessionId,
+          repoRoot: session.scope,
+          worktreePath: session.worktreePath,
+        }),
       emitTitle: (session, event) => this.sink.onTitle?.(session.userId, event),
       emitExit: (session, event) => this.sink.onExit(session.userId, event),
       closeSession: (ptySessionId) => this.closeSession(ptySessionId),

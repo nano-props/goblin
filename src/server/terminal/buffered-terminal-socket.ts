@@ -1,10 +1,11 @@
-// Per-socket buffer used to pause output during attach/restart so the
-// replay in the response is not duplicated by live output events that
-// arrived between the request and the response.
+// Per-socket buffer used to pause realtime messages during terminal
+// frame transitions so live events do not race ahead of the
+// authoritative mutation response.
 //
 // Used by the server-side terminal runtime when it needs to hold
-// back a single socket's `output` events while a long-running request
-// (`attach` / `restart`) is being prepared. Multiple concurrent
+// back a single socket's realtime events while a frame-transition
+// request (`attach` / `restart` / `create` / `takeover`) is being
+// prepared. Multiple concurrent
 // pauses stack via the `paused` counter; on `resume()` the buffer
 // is drained in insertion order and any pending `close` ends the
 // drain early (consistent with a real socket that won't accept

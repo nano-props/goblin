@@ -269,6 +269,7 @@ The terminal feature uses realtime transport for continuous, UX-critical flows.
 ### Streaming flows
 
 - terminal output
+- terminal bells
 - title updates
 - exit notifications
 - control changes

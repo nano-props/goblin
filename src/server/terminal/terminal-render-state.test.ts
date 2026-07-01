@@ -127,34 +127,50 @@ describe('terminal-render-state', () => {
   })
 
   describe('scanTerminalOutputForBell', () => {
+    const cleanBellScanState = { inOsc: false, pendingEsc: false }
+
     test('detects a plain BEL control character', () => {
-      expect(scanTerminalOutputForBell('done\x07', false).hasBell).toBe(true)
+      expect(scanTerminalOutputForBell('done\x07', cleanBellScanState).hasBell).toBe(true)
     })
 
     test('does not treat BEL-terminated OSC title as a terminal bell', () => {
-      expect(scanTerminalOutputForBell('\x1b]0;~/repo\x07', false).hasBell).toBe(false)
+      expect(scanTerminalOutputForBell('\x1b]0;~/repo\x07', cleanBellScanState).hasBell).toBe(false)
     })
 
     test('detects a plain BEL after an OSC title sequence', () => {
-      expect(scanTerminalOutputForBell('\x1b]0;~/repo\x07done\x07', false).hasBell).toBe(true)
+      expect(scanTerminalOutputForBell('\x1b]0;~/repo\x07done\x07', cleanBellScanState).hasBell).toBe(true)
     })
 
     test('does not treat ST-terminated OSC content as a terminal bell', () => {
-      expect(scanTerminalOutputForBell('\x1b]0;~/repo\x1b\\', false).hasBell).toBe(false)
+      expect(scanTerminalOutputForBell('\x1b]0;~/repo\x1b\\', cleanBellScanState).hasBell).toBe(false)
     })
 
     test('carries OSC state across chunks so split title terminators are not terminal bells', () => {
-      const first = scanTerminalOutputForBell('\x1b]0;~/repo', false)
-      expect(first).toEqual({ hasBell: false, inOsc: true })
-      const second = scanTerminalOutputForBell('\x07', first.inOsc)
-      expect(second).toEqual({ hasBell: false, inOsc: false })
+      const first = scanTerminalOutputForBell('\x1b]0;~/repo', cleanBellScanState)
+      expect(first).toEqual({ hasBell: false, state: { inOsc: true, pendingEsc: false } })
+      const second = scanTerminalOutputForBell('\x07', first.state)
+      expect(second).toEqual({ hasBell: false, state: cleanBellScanState })
     })
 
     test('continues scanning after a bell so later split OSC state is preserved', () => {
-      const first = scanTerminalOutputForBell('\x07\x1b]0;~/repo', false)
-      expect(first).toEqual({ hasBell: true, inOsc: true })
-      const second = scanTerminalOutputForBell('\x07', first.inOsc)
-      expect(second).toEqual({ hasBell: false, inOsc: false })
+      const first = scanTerminalOutputForBell('\x07\x1b]0;~/repo', cleanBellScanState)
+      expect(first).toEqual({ hasBell: true, state: { inOsc: true, pendingEsc: false } })
+      const second = scanTerminalOutputForBell('\x07', first.state)
+      expect(second).toEqual({ hasBell: false, state: cleanBellScanState })
+    })
+
+    test('carries a split ESC before OSC start across chunks', () => {
+      const first = scanTerminalOutputForBell('\x1b', cleanBellScanState)
+      expect(first).toEqual({ hasBell: false, state: { inOsc: false, pendingEsc: true } })
+      const second = scanTerminalOutputForBell(']0;~/repo\x07', first.state)
+      expect(second).toEqual({ hasBell: false, state: cleanBellScanState })
+    })
+
+    test('carries a split ESC before ST across chunks', () => {
+      const first = scanTerminalOutputForBell('\x1b]0;~/repo\x1b', cleanBellScanState)
+      expect(first).toEqual({ hasBell: false, state: { inOsc: true, pendingEsc: true } })
+      const second = scanTerminalOutputForBell('\\done\x07', first.state)
+      expect(second).toEqual({ hasBell: true, state: cleanBellScanState })
     })
   })
 

@@ -139,6 +139,7 @@ export class TerminalSessionProjection {
   private readonly lastPublishedRepoBellCountByRepo = new Map<string, number>()
   private readonly snapshotListeners = new Map<string, Set<() => void>>()
   private readonly terminalSessionIdsByTerminalWorktree = new Map<string, string[]>()
+  private readonly pendingServerBellByTerminalSessionId = new Map<string, TerminalBellRealtimeEvent>()
   private readonly bellState = createTerminalBellState(
     (terminalSessionId) => {
       if (terminalSessionId) {
@@ -214,6 +215,7 @@ export class TerminalSessionProjection {
     this.lastPublishedRepoBellCountByRepo.clear()
     this.snapshotListeners.clear()
     this.terminalSessionIdsByTerminalWorktree.clear()
+    this.pendingServerBellByTerminalSessionId.clear()
     this.bellState.reset()
     this.outputActivityState.reset()
     if (projectionInstance === this) projectionInstance = null
@@ -230,9 +232,18 @@ export class TerminalSessionProjection {
   }
 
   handleServerBell(event: TerminalBellRealtimeEvent): void {
-    const terminalSessionId = this.terminalSessionIdByPtySessionId.get(event.ptySessionId)
-    const session = terminalSessionId ? this.sessions.get(terminalSessionId) : null
-    if (!session) return
+    const session =
+      this.sessions.get(event.terminalSessionId) ??
+      this.sessions.get(this.terminalSessionIdByPtySessionId.get(event.ptySessionId) ?? '')
+    if (!session) {
+      this.pendingServerBellByTerminalSessionId.set(event.terminalSessionId, event)
+      return
+    }
+    this.applyServerBell(session, event)
+  }
+
+  private applyServerBell(session: TerminalSession, event: TerminalBellRealtimeEvent): void {
+    this.pendingServerBellByTerminalSessionId.delete(event.terminalSessionId)
     this.bellState.handleBell(session.descriptor, {
       processName: event.processName,
       canonicalTitle: event.canonicalTitle,
@@ -358,8 +369,11 @@ export class TerminalSessionProjection {
       touchedWorktrees.add(projected.terminalWorktreeKey)
       nextIndexByWorktree.set(projected.terminalWorktreeKey, index)
       const descriptor = projected.descriptor
-      this.ensureSession(descriptor).hydrate(projected.hydrateInput)
+      const session = this.ensureSession(descriptor)
+      session.hydrate(projected.hydrateInput)
       this.syncPtySessionIdIndex(descriptor.terminalSessionId, projected.hydrateInput.ptySessionId)
+      const pendingBell = this.pendingServerBellByTerminalSessionId.get(descriptor.terminalSessionId)
+      if (pendingBell) this.applyServerBell(session, pendingBell)
       if (projected.controlsTerminal)
         controllerTerminalSessionIdByWorktree.set(projected.terminalWorktreeKey, descriptor.terminalSessionId)
       pushUniqueMapList(
@@ -1004,6 +1018,7 @@ export class TerminalSessionProjection {
     const wasSelected = this.selectedTerminalSessionIdByTerminalWorktree.get(terminalWorktreeKey) === terminalSessionId
     this.hiddenClosingTerminalSessionIds.delete(terminalSessionId)
     this.closeCompletionByTerminalSessionId.delete(terminalSessionId)
+    this.pendingServerBellByTerminalSessionId.delete(terminalSessionId)
     this.syncPtySessionIdIndex(terminalSessionId, null)
     this.sessions.delete(terminalSessionId)
     this.snapshotCache.delete(terminalSessionId)

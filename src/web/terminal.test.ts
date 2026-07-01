@@ -593,7 +593,14 @@ describe('terminal web host bridge', () => {
     socket.emitMessage(
       JSON.stringify({
         type: 'bell',
-        event: { ptySessionId: 'pty_1', processName: 'zsh', canonicalTitle: null },
+        event: {
+          ptySessionId: 'pty_1',
+          terminalSessionId: 'terminal_1',
+          repoRoot: '/tmp/repo',
+          worktreePath: '/tmp/repo-worktree',
+          processName: 'zsh',
+          canonicalTitle: null,
+        },
       }),
     )
     socket.emitMessage(
@@ -628,7 +635,14 @@ describe('terminal web host bridge', () => {
     )
 
     expect(onOutput).toHaveBeenCalledWith({ ptySessionId: 'pty_1', data: 'hello', seq: 1, processName: 'zsh' })
-    expect(onBell).toHaveBeenCalledWith({ ptySessionId: 'pty_1', processName: 'zsh', canonicalTitle: null })
+    expect(onBell).toHaveBeenCalledWith({
+      ptySessionId: 'pty_1',
+      terminalSessionId: 'terminal_1',
+      repoRoot: '/tmp/repo',
+      worktreePath: '/tmp/repo-worktree',
+      processName: 'zsh',
+      canonicalTitle: null,
+    })
     expect(onTitle).toHaveBeenCalledWith({ ptySessionId: 'pty_1', canonicalTitle: '~/Developer/goblin — npm run dev' })
     expect(onExit).toHaveBeenCalledWith({ ptySessionId: 'pty_1' })
     expect(onIdentity).toHaveBeenCalledWith({

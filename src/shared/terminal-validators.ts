@@ -155,6 +155,9 @@ const TerminalOutputEventSchema = v.object({
 })
 const TerminalBellRealtimeEventSchema = v.object({
   ptySessionId: v.string(),
+  terminalSessionId: v.string(),
+  repoRoot: v.string(),
+  worktreePath: v.string(),
   processName: v.string(),
   canonicalTitle: v.nullable(v.string()),
 })

@@ -751,6 +751,9 @@ describe('TerminalSessionProvider', () => {
       await act(async () => {
         bellHandler?.({
           ptySessionId: 'session-1',
+          terminalSessionId: 'session-1',
+          repoRoot: REPO_ID,
+          worktreePath: WORKTREE_PATH,
           processName: 'zsh',
           canonicalTitle: '~/Developer/goblin — npm run dev',
         })
@@ -816,7 +819,14 @@ describe('TerminalSessionProvider', () => {
       })
 
       await act(async () => {
-        bellHandler?.({ ptySessionId: 'session-1', processName: 'zsh', canonicalTitle: null })
+        bellHandler?.({
+          ptySessionId: 'session-1',
+          terminalSessionId: 'session-1',
+          repoRoot: REPO_ID,
+          worktreePath: WORKTREE_PATH,
+          processName: 'zsh',
+          canonicalTitle: null,
+        })
       })
 
       expect(
@@ -828,6 +838,52 @@ describe('TerminalSessionProvider', () => {
       expect(notifyBell).toHaveBeenCalledWith({
         title: 'gbl-terminal-provider-repo',
         body: 'feature/worktree\nzsh',
+        terminalSessionId: 'session-1',
+        terminalWorktreeKey,
+        repoRoot: REPO_ID,
+      })
+    } finally {
+      hasFocus.mockRestore()
+      await unmount()
+    }
+  })
+
+  test('applies a server bell that arrives before the session projection materializes', async () => {
+    seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      selectedBranch: 'feature/worktree',
+      preferredWorkspacePaneTab: 'terminal',
+    })
+    primaryWindowQueryClient.setQueryData(
+      settingsSnapshotQueryKey(),
+      defaultSettingsSnapshot({ terminalNotificationsEnabled: true }),
+    )
+    const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
+    const notifyBell = vi.fn(async () => true)
+    Object.assign(window.goblinNative.terminal, { notifyBell })
+    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH)
+    const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
+
+    try {
+      await act(async () => {
+        bellHandler?.({
+          ptySessionId: 'session-1',
+          terminalSessionId: 'session-1',
+          repoRoot: REPO_ID,
+          worktreePath: WORKTREE_PATH,
+          processName: 'zsh',
+          canonicalTitle: 'build running',
+        })
+        await getContext().createTerminal({ repoRoot: REPO_ID, branch: 'feature/worktree', worktreePath: WORKTREE_PATH })
+      })
+
+      expect(getProbe().summaries.map((session) => [session.terminalSessionId, session.hasBell])).toEqual([
+        ['session-1', true],
+      ])
+      expect(notifyBell).toHaveBeenCalledWith({
+        title: 'gbl-terminal-provider-repo',
+        body: 'feature/worktree\nbuild running',
         terminalSessionId: 'session-1',
         terminalWorktreeKey,
         repoRoot: REPO_ID,
@@ -954,6 +1010,9 @@ describe('TerminalSessionProvider', () => {
       await act(async () => {
         bellHandler?.({
           ptySessionId: 'session-1',
+          terminalSessionId: 'session-1',
+          repoRoot: REPO_ID,
+          worktreePath: WORKTREE_PATH,
           processName: 'zsh',
           canonicalTitle: '~/Developer/goblin — npm run dev',
         })

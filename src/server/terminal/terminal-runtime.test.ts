@@ -382,7 +382,7 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
-  test('broadcasts output and exit events to registered web terminal sockets', async () => {
+  test('broadcasts output, bell, and exit events to registered web terminal sockets', async () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
@@ -412,6 +412,9 @@ describe('server terminal runtime', () => {
       type: 'bell',
       event: {
         ptySessionId,
+        terminalSessionId: expect.any(String),
+        repoRoot: '/repo',
+        worktreePath: '/repo-linked',
         processName: 'zsh',
         canonicalTitle: 'build running',
       },

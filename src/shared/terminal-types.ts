@@ -241,6 +241,9 @@ export interface TerminalOutputEvent {
 
 export interface TerminalBellRealtimeEvent {
   ptySessionId: string
+  terminalSessionId: string
+  repoRoot: string
+  worktreePath: string
   processName: string
   canonicalTitle: string | null
 }

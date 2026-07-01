@@ -70,16 +70,38 @@ export function appendOutput(state: TerminalRenderState, data: string): number {
   return seq
 }
 
-export function scanTerminalOutputForBell(data: string, initialInOsc: boolean): { hasBell: boolean; inOsc: boolean } {
-  let inOsc = initialInOsc
+export interface TerminalOutputBellScanState {
+  inOsc: boolean
+  pendingEsc: boolean
+}
+
+export function scanTerminalOutputForBell(
+  data: string,
+  initialState: TerminalOutputBellScanState,
+): { hasBell: boolean; state: TerminalOutputBellScanState } {
+  let inOsc = initialState.inOsc
+  let pendingEsc = initialState.pendingEsc
   let hasBell = false
   for (let i = 0; i < data.length; i += 1) {
     const char = data[i]
+    if (pendingEsc) {
+      pendingEsc = false
+      if (inOsc && char === '\\') {
+        inOsc = false
+        continue
+      }
+      if (!inOsc && char === ']') {
+        inOsc = true
+        continue
+      }
+    }
     if (inOsc) {
       if (char === '\x07') inOsc = false
       else if (char === '\x1b' && data[i + 1] === '\\') {
         inOsc = false
         i += 1
+      } else if (char === '\x1b' && i === data.length - 1) {
+        pendingEsc = true
       }
       continue
     }
@@ -90,9 +112,11 @@ export function scanTerminalOutputForBell(data: string, initialInOsc: boolean): 
     if (char === '\x1b' && data[i + 1] === ']') {
       inOsc = true
       i += 1
+    } else if (char === '\x1b' && i === data.length - 1) {
+      pendingEsc = true
     }
   }
-  return { hasBell, inOsc }
+  return { hasBell, state: { inOsc, pendingEsc } }
 }
 
 export interface RenderSnapshot {
