@@ -23,7 +23,7 @@ const AuthContext = createContext<AccessTokenStatusState | null>(null)
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const status = useAccessTokenStatus()
-  return <AuthContext.Provider value={status}>{children}</AuthContext.Provider>
+  return <AuthContext value={status}>{children}</AuthContext>
 }
 
 export function useAuth(): AccessTokenStatusState {

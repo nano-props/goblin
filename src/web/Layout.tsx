@@ -28,7 +28,10 @@ import { useSessionPersistence } from '#/web/hooks/useSessionPersistence.ts'
 import { useSettingsWriteErrorToast } from '#/web/hooks/useSettingsWriteErrorToast.ts'
 import { useSettingsQueryInvalidationSync } from '#/web/settings-queries.ts'
 import { createPrimaryWindowNavigationActions } from '#/web/primary-window-navigation-actions.ts'
-import { PrimaryWindowNavigationProvider, type PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
+import {
+  PrimaryWindowNavigationProvider,
+  type PrimaryWindowNavigationActions,
+} from '#/web/primary-window-navigation.tsx'
 import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { primaryWindowNavigationStoreActionsFromStore } from '#/web/stores/repos/selector-actions.ts'
@@ -96,7 +99,7 @@ export function Layout() {
       <TokenGate>
         <AuthenticatedSideEffects />
         <PrimaryWindowNavigationProvider value={navigation}>
-          <LayoutOverlayActions.Provider
+          <LayoutOverlayActions
             value={{
               openRepoPathDialog: overlays.openRepoPathDialog,
               openCloneRepo: overlays.openCloneRepo,
@@ -122,7 +125,7 @@ export function Layout() {
                 />
               </div>
             </TerminalSessionProvider>
-          </LayoutOverlayActions.Provider>
+          </LayoutOverlayActions>
         </PrimaryWindowNavigationProvider>
         {import.meta.env.DEV ? <TanStackRouterDevtools /> : null}
       </TokenGate>
@@ -138,7 +141,13 @@ interface PrimaryWindowOverlaysProps {
   activeBranchName: string | null
 }
 
-function PrimaryWindowOverlays({ overlays, repoDrop, navigation, activeId, activeBranchName }: PrimaryWindowOverlaysProps) {
+function PrimaryWindowOverlays({
+  overlays,
+  repoDrop,
+  navigation,
+  activeId,
+  activeBranchName,
+}: PrimaryWindowOverlaysProps) {
   return (
     <>
       <RepoOpenDialog open={overlays.state.openRepo.open} onOpenChange={overlays.setOpenRepoOpen} />

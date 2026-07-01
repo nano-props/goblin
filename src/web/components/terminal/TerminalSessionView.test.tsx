@@ -138,11 +138,11 @@ async function renderTerminalSession() {
   }
 
   const { container, unmount } = renderInJsdom(
-    <TerminalSessionContext.Provider value={context}>
-      <TerminalSessionReadContext.Provider value={readContext}>
+    <TerminalSessionContext value={context}>
+      <TerminalSessionReadContext value={readContext}>
         <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-      </TerminalSessionReadContext.Provider>
-    </TerminalSessionContext.Provider>,
+      </TerminalSessionReadContext>
+    </TerminalSessionContext>,
   )
 
   return {
@@ -283,11 +283,11 @@ describe('TerminalSessionView', () => {
     }
 
     const { container, unmount } = renderInJsdom(
-      <TerminalSessionContext.Provider value={context}>
-        <TerminalSessionReadContext.Provider value={readContext}>
+      <TerminalSessionContext value={context}>
+        <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-        </TerminalSessionReadContext.Provider>
-      </TerminalSessionContext.Provider>,
+        </TerminalSessionReadContext>
+      </TerminalSessionContext>,
     )
 
     try {
@@ -350,11 +350,11 @@ describe('TerminalSessionView', () => {
     }
 
     const tree = (
-      <TerminalSessionContext.Provider value={context}>
-        <TerminalSessionReadContext.Provider value={readContext}>
+      <TerminalSessionContext value={context}>
+        <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-        </TerminalSessionReadContext.Provider>
-      </TerminalSessionContext.Provider>
+        </TerminalSessionReadContext>
+      </TerminalSessionContext>
     )
 
     const { container, rerender, unmount } = renderInJsdom(tree)
@@ -426,11 +426,11 @@ describe('TerminalSessionView', () => {
     }
 
     const { container, unmount } = renderInJsdom(
-      <TerminalSessionContext.Provider value={context}>
-        <TerminalSessionReadContext.Provider value={readContext}>
+      <TerminalSessionContext value={context}>
+        <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-        </TerminalSessionReadContext.Provider>
-      </TerminalSessionContext.Provider>,
+        </TerminalSessionReadContext>
+      </TerminalSessionContext>,
     )
 
     try {
@@ -518,11 +518,11 @@ describe('TerminalSessionView', () => {
       subscribeSnapshot: () => () => {},
     }
     const tree = () => (
-      <TerminalSessionContext.Provider value={context}>
-        <TerminalSessionReadContext.Provider value={readContext}>
+      <TerminalSessionContext value={context}>
+        <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-        </TerminalSessionReadContext.Provider>
-      </TerminalSessionContext.Provider>
+        </TerminalSessionReadContext>
+      </TerminalSessionContext>
     )
 
     const { container, rerender, unmount } = renderInJsdom(tree())
@@ -623,11 +623,11 @@ describe('TerminalSessionView', () => {
       subscribeSnapshot: () => () => {},
     }
     const tree = () => (
-      <TerminalSessionContext.Provider value={context}>
-        <TerminalSessionReadContext.Provider value={readContext}>
+      <TerminalSessionContext value={context}>
+        <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-        </TerminalSessionReadContext.Provider>
-      </TerminalSessionContext.Provider>
+        </TerminalSessionReadContext>
+      </TerminalSessionContext>
     )
 
     const { container, rerender, unmount } = renderInJsdom(tree())
@@ -734,11 +734,11 @@ describe('TerminalSessionView', () => {
     }
 
     const { container, unmount } = renderInJsdom(
-      <TerminalSessionContext.Provider value={context}>
-        <TerminalSessionReadContext.Provider value={readContext}>
+      <TerminalSessionContext value={context}>
+        <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-        </TerminalSessionReadContext.Provider>
-      </TerminalSessionContext.Provider>,
+        </TerminalSessionReadContext>
+      </TerminalSessionContext>,
     )
 
     try {
@@ -847,11 +847,11 @@ describe('TerminalSessionView', () => {
     }
 
     const { container, unmount } = renderInJsdom(
-      <TerminalSessionContext.Provider value={context}>
-        <TerminalSessionReadContext.Provider value={readContext}>
+      <TerminalSessionContext value={context}>
+        <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-        </TerminalSessionReadContext.Provider>
-      </TerminalSessionContext.Provider>,
+        </TerminalSessionReadContext>
+      </TerminalSessionContext>,
     )
 
     try {
@@ -972,11 +972,11 @@ describe('TerminalSessionView', () => {
     vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
 
     const { container, unmount } = renderInJsdom(
-      <TerminalSessionContext.Provider value={context}>
-        <TerminalSessionReadContext.Provider value={readContext}>
+      <TerminalSessionContext value={context}>
+        <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-        </TerminalSessionReadContext.Provider>
-      </TerminalSessionContext.Provider>,
+        </TerminalSessionReadContext>
+      </TerminalSessionContext>,
     )
 
     try {
@@ -1096,11 +1096,11 @@ describe('TerminalSessionView', () => {
     }
 
     const { container, unmount } = renderInJsdom(
-      <TerminalSessionContext.Provider value={context}>
-        <TerminalSessionReadContext.Provider value={readContext}>
+      <TerminalSessionContext value={context}>
+        <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-        </TerminalSessionReadContext.Provider>
-      </TerminalSessionContext.Provider>,
+        </TerminalSessionReadContext>
+      </TerminalSessionContext>,
     )
 
     try {
@@ -1207,11 +1207,11 @@ describe('TerminalSessionView', () => {
     vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
 
     const { container, unmount } = renderInJsdom(
-      <TerminalSessionContext.Provider value={context}>
-        <TerminalSessionReadContext.Provider value={readContext}>
+      <TerminalSessionContext value={context}>
+        <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-        </TerminalSessionReadContext.Provider>
-      </TerminalSessionContext.Provider>,
+        </TerminalSessionReadContext>
+      </TerminalSessionContext>,
     )
 
     try {
@@ -1329,11 +1329,11 @@ describe('TerminalSessionView', () => {
     expect(oversized.size).toBeGreaterThan(10 * 1024 * 1024)
 
     const { container, unmount } = renderInJsdom(
-      <TerminalSessionContext.Provider value={context}>
-        <TerminalSessionReadContext.Provider value={readContext}>
+      <TerminalSessionContext value={context}>
+        <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-        </TerminalSessionReadContext.Provider>
-      </TerminalSessionContext.Provider>,
+        </TerminalSessionReadContext>
+      </TerminalSessionContext>,
     )
 
     try {
@@ -1607,11 +1607,11 @@ describe('TerminalSessionView', () => {
     const { toast } = await import('sonner')
 
     const { container, unmount } = renderInJsdom(
-      <TerminalSessionContext.Provider value={context}>
-        <TerminalSessionReadContext.Provider value={readContext}>
+      <TerminalSessionContext value={context}>
+        <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-        </TerminalSessionReadContext.Provider>
-      </TerminalSessionContext.Provider>,
+        </TerminalSessionReadContext>
+      </TerminalSessionContext>,
     )
 
     try {
@@ -1771,11 +1771,11 @@ describe('TerminalSessionView', () => {
     )
 
     const { container, rerender, unmount } = renderInJsdom(
-      <TerminalSessionContext.Provider value={context}>
-        <TerminalSessionReadContext.Provider value={readContext}>
+      <TerminalSessionContext value={context}>
+        <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-        </TerminalSessionReadContext.Provider>
-      </TerminalSessionContext.Provider>,
+        </TerminalSessionReadContext>
+      </TerminalSessionContext>,
     )
 
     try {
@@ -1801,11 +1801,11 @@ describe('TerminalSessionView', () => {
       // via the effect on every render.
       activeWorktreeSnapshot = worktreeSnapshotB
       rerender(
-        <TerminalSessionContext.Provider value={context}>
-          <TerminalSessionReadContext.Provider value={readContext}>
+        <TerminalSessionContext value={context}>
+          <TerminalSessionReadContext value={readContext}>
             <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree-other" />
-          </TerminalSessionReadContext.Provider>
-        </TerminalSessionContext.Provider>,
+          </TerminalSessionReadContext>
+        </TerminalSessionContext>,
       )
 
       // Now resolve the in-flight blob-save call. The post-resolve
@@ -1871,11 +1871,11 @@ describe('TerminalSessionView', () => {
     }
 
     const { container, unmount } = renderInJsdom(
-      <TerminalSessionContext.Provider value={context}>
-        <TerminalSessionReadContext.Provider value={readContext}>
+      <TerminalSessionContext value={context}>
+        <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-        </TerminalSessionReadContext.Provider>
-      </TerminalSessionContext.Provider>,
+        </TerminalSessionReadContext>
+      </TerminalSessionContext>,
     )
 
     try {
@@ -1954,11 +1954,11 @@ describe('TerminalSessionView', () => {
     }
 
     const { container, unmount } = renderInJsdom(
-      <TerminalSessionContext.Provider value={context}>
-        <TerminalSessionReadContext.Provider value={readContext}>
+      <TerminalSessionContext value={context}>
+        <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-        </TerminalSessionReadContext.Provider>
-      </TerminalSessionContext.Provider>,
+        </TerminalSessionReadContext>
+      </TerminalSessionContext>,
     )
 
     try {

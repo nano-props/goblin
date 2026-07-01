@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo } from 'react'
+import { createContext, useContext, useMemo, type ReactNode } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -12,7 +12,15 @@ export type { PrimaryWindowNavigationActions } from '#/web/primary-window-naviga
 
 const PrimaryWindowNavigationContext = createContext<PrimaryWindowNavigationActions | null>(null)
 
-export const PrimaryWindowNavigationProvider = PrimaryWindowNavigationContext.Provider
+export function PrimaryWindowNavigationProvider({
+  value,
+  children,
+}: {
+  value: PrimaryWindowNavigationActions | null
+  children: ReactNode
+}) {
+  return <PrimaryWindowNavigationContext value={value}>{children}</PrimaryWindowNavigationContext>
+}
 
 export function usePrimaryWindowNavigation(): PrimaryWindowNavigationActions {
   const context = useContext(PrimaryWindowNavigationContext)

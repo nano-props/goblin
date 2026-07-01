@@ -68,7 +68,7 @@ describe('App boot skeleton', () => {
 
 function render(element: React.ReactNode) {
   return renderInJsdom(
-    <LayoutOverlayActions.Provider
+    <LayoutOverlayActions
       value={{
         openRepoPathDialog: vi.fn(),
         openRemoteRepo: vi.fn(),
@@ -77,6 +77,6 @@ function render(element: React.ReactNode) {
       }}
     >
       {element}
-    </LayoutOverlayActions.Provider>,
+    </LayoutOverlayActions>,
   )
 }

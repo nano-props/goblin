@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useActionState, useState, type ReactNode } from 'react'
 import { useAuth } from '#/web/auth/AuthProvider.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import { postServerJson } from '#/web/lib/server-fetch.ts'
@@ -46,32 +46,27 @@ function CheckingPlaceholder() {
 function LoginForm({ onSuccess }: { onSuccess: () => void }) {
   const t = useT()
   const [value, setValue] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [submitting, setSubmitting] = useState(false)
+  const [state, loginAction, submitting] = useActionState(
+    async (_previous: { error: string | null }, formData: FormData): Promise<{ error: string | null }> => {
+      const trimmed = String(formData.get('token') ?? '').trim()
+      if (trimmed.length === 0) return { error: t('auth.gate.error-empty') }
+      try {
+        await postServerJson<{ token: string }, { ok: true }>('/api/login', { token: trimmed })
+        onSuccess()
+        return { error: null }
+      } catch (err) {
+        return { error: err instanceof Error ? err.message : t('auth.gate.error-failed') }
+      }
+    },
+    { error: null },
+  )
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    if (submitting) return
-    const trimmed = value.trim()
-    if (trimmed.length === 0) {
-      setError(t('auth.gate.error-empty'))
-      return
-    }
-    setSubmitting(true)
-    setError(null)
-    try {
-      await postServerJson<{ token: string }, { ok: true }>('/api/login', { token: trimmed })
-      onSuccess()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t('auth.gate.error-failed'))
-      setSubmitting(false)
-    }
-  }
+  const error = submitting ? null : state.error
 
   return (
     <div className="flex h-full items-center justify-center bg-background p-4">
       <form
-        onSubmit={handleSubmit}
+        action={loginAction}
         className="flex w-full max-w-sm flex-col gap-3 rounded-md border border-border bg-card p-6 text-card-foreground shadow-sm"
       >
         <h1 className="text-lg font-semibold">{t('auth.gate.title')}</h1>
@@ -79,6 +74,7 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
         <label className="flex flex-col gap-1">
           <span className="text-sm font-medium">{t('auth.gate.token-label')}</span>
           <input
+            name="token"
             type="text"
             inputMode="text"
             autoComplete="off"

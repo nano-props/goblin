@@ -1319,16 +1319,16 @@ function renderToolbar(options: {
   const { container, rerender } = renderInJsdom(
     <QueryClientProvider client={queryClient}>
       <PrimaryWindowNavigationProvider value={options.navigation}>
-        <TerminalSessionContext.Provider value={commandContext}>
-          <TerminalSessionReadContext.Provider value={readContext}>
+        <TerminalSessionContext value={commandContext}>
+          <TerminalSessionReadContext value={readContext}>
             <RepoWorkspaceToolbarHarness
               repo={repo}
               detail={detail}
               workspacePaneId="workspace"
               trafficLightOffset={options.trafficLightOffset}
             />
-          </TerminalSessionReadContext.Provider>
-        </TerminalSessionContext.Provider>
+          </TerminalSessionReadContext>
+        </TerminalSessionContext>
       </PrimaryWindowNavigationProvider>
     </QueryClientProvider>,
   )

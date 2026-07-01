@@ -1,8 +1,8 @@
-import { forwardRef, type ComponentPropsWithoutRef, type ReactNode } from 'react'
+import type { ComponentProps, ReactNode } from 'react'
 import { cn } from '#/web/lib/cn.ts'
 import { focusRing } from '#/web/components/ui/focus.ts'
 
-interface SidebarRowButtonProps extends Omit<ComponentPropsWithoutRef<'button'>, 'children'> {
+interface SidebarRowButtonProps extends Omit<ComponentProps<'button'>, 'children'> {
   children: ReactNode
   leading?: ReactNode
   trailing?: ReactNode
@@ -16,25 +16,23 @@ const SIDEBAR_ROW_ICON_CLASS = 'flex size-4 shrink-0 items-center justify-center
 const SIDEBAR_ROW_BUTTON_CLASS =
   'flex min-w-0 cursor-pointer items-center rounded-md border border-transparent bg-transparent text-left text-sm font-medium outline-none transition-colors duration-100 disabled:pointer-events-none disabled:opacity-50'
 
-export const SidebarRowButton = forwardRef<HTMLButtonElement, SidebarRowButtonProps>(function SidebarRowButton(
-  {
-    children,
-    leading,
-    trailing,
-    contentClassName,
-    selected = false,
-    size = 'default',
-    fill = size !== 'icon',
-    className,
-    type = 'button',
-    ...buttonProps
-  },
-  forwardedRef,
-) {
+export function SidebarRowButton({
+  children,
+  leading,
+  trailing,
+  contentClassName,
+  selected = false,
+  size = 'default',
+  fill = size !== 'icon',
+  className,
+  type = 'button',
+  ref,
+  ...buttonProps
+}: SidebarRowButtonProps) {
   return (
     <button
       {...buttonProps}
-      ref={forwardedRef}
+      ref={ref}
       type={type}
       data-interactive
       className={cn(
@@ -59,4 +57,4 @@ export const SidebarRowButton = forwardRef<HTMLButtonElement, SidebarRowButtonPr
       ) : null}
     </button>
   )
-})
+}

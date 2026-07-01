@@ -61,7 +61,10 @@ function stripAccessTokenFromUrl(): void {
 export function useAccessTokenStatus(): AccessTokenStatusState {
   const [state, setState] = useState<AccessTokenStatus>('checking')
   const [refreshKey, setRefreshKey] = useState(0)
-  const refresh = useCallback(() => setRefreshKey((k) => k + 1), [])
+  const refresh = useCallback(() => {
+    setState('checking')
+    setRefreshKey((k) => k + 1)
+  }, [])
 
   useEffect(() => {
     let cancelled = false

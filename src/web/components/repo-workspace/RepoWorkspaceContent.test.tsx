@@ -133,8 +133,8 @@ describe('RepoWorkspaceContent', () => {
     const detail = getSelectedRepoWorkspacePresentation(repo)
 
     const { container } = renderInJsdom(
-      <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
-        <BranchActionSurfaceContext.Provider
+      <TerminalSessionReadContext value={emptyTerminalReadContext}>
+        <BranchActionSurfaceContext
           value={branchActionSurfaceWithCopyPatch({
             label: 'status.copy-patch',
             title: 'status.copy-patch-title',
@@ -144,8 +144,8 @@ describe('RepoWorkspaceContent', () => {
           })}
         >
           <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-        </BranchActionSurfaceContext.Provider>
-      </TerminalSessionReadContext.Provider>,
+        </BranchActionSurfaceContext>
+      </TerminalSessionReadContext>,
     )
 
     expect(container.querySelector('#workspace-status-panel')).not.toBeNull()
@@ -191,8 +191,8 @@ describe('RepoWorkspaceContent', () => {
     const onCopyPatch = vi.fn().mockResolvedValue(true)
 
     const { container } = renderInJsdom(
-      <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
-        <BranchActionSurfaceContext.Provider
+      <TerminalSessionReadContext value={emptyTerminalReadContext}>
+        <BranchActionSurfaceContext
           value={branchActionSurfaceWithCopyPatch({
             label: 'status.copy-patch',
             title: 'status.copy-patch-title',
@@ -202,8 +202,8 @@ describe('RepoWorkspaceContent', () => {
           })}
         >
           <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-        </BranchActionSurfaceContext.Provider>
-      </TerminalSessionReadContext.Provider>,
+        </BranchActionSurfaceContext>
+      </TerminalSessionReadContext>,
     )
 
     const copyButton = container.querySelector<HTMLButtonElement>('button[aria-label="status.copy-patch-title"]')!
@@ -247,8 +247,8 @@ describe('RepoWorkspaceContent', () => {
     const detail = getSelectedRepoWorkspacePresentation(repo)
 
     const { container } = renderInJsdom(
-      <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
-        <BranchActionSurfaceContext.Provider
+      <TerminalSessionReadContext value={emptyTerminalReadContext}>
+        <BranchActionSurfaceContext
           value={branchActionSurfaceWithCopyPatch({
             label: 'status.copy-patch',
             title: 'status.copy-patch-title',
@@ -258,8 +258,8 @@ describe('RepoWorkspaceContent', () => {
           })}
         >
           <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-        </BranchActionSurfaceContext.Provider>
-      </TerminalSessionReadContext.Provider>,
+        </BranchActionSurfaceContext>
+      </TerminalSessionReadContext>,
     )
 
     expect(container.querySelector('#workspace-status-panel')).not.toBeNull()
@@ -295,8 +295,8 @@ describe('RepoWorkspaceContent', () => {
     const detail = getSelectedRepoWorkspacePresentation(repo)
 
     const { container } = renderInJsdom(
-      <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
-        <BranchActionSurfaceContext.Provider
+      <TerminalSessionReadContext value={emptyTerminalReadContext}>
+        <BranchActionSurfaceContext
           value={branchActionSurfaceWithCopyPatch({
             label: 'status.copy-patch',
             title: 'status.copy-patch-title',
@@ -306,8 +306,8 @@ describe('RepoWorkspaceContent', () => {
           })}
         >
           <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-        </BranchActionSurfaceContext.Provider>
-      </TerminalSessionReadContext.Provider>,
+        </BranchActionSurfaceContext>
+      </TerminalSessionReadContext>,
     )
 
     expect(container.textContent).toContain('branch-status.changes-count')
@@ -344,11 +344,11 @@ describe('RepoWorkspaceContent', () => {
     const detail = getSelectedRepoWorkspacePresentation(repo)
 
     const { container } = renderInJsdom(
-      <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
-        <BranchActionSurfaceContext.Provider value={defaultBranchActionSurface()}>
+      <TerminalSessionReadContext value={emptyTerminalReadContext}>
+        <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
           <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-        </BranchActionSurfaceContext.Provider>
-      </TerminalSessionReadContext.Provider>,
+        </BranchActionSurfaceContext>
+      </TerminalSessionReadContext>,
     )
 
     const panel = container.querySelector('#workspace-changes-panel')
@@ -379,11 +379,11 @@ describe('RepoWorkspaceContent', () => {
     const detail = getSelectedRepoWorkspacePresentation(repo)
 
     const { container } = renderInJsdom(
-      <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
-        <BranchActionSurfaceContext.Provider value={defaultBranchActionSurface()}>
+      <TerminalSessionReadContext value={emptyTerminalReadContext}>
+        <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
           <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-        </BranchActionSurfaceContext.Provider>
-      </TerminalSessionReadContext.Provider>,
+        </BranchActionSurfaceContext>
+      </TerminalSessionReadContext>,
     )
 
     expect(container.querySelector('#workspace-status-panel')).not.toBeNull()
@@ -411,9 +411,9 @@ describe('RepoWorkspaceContent', () => {
     const detail = getSelectedRepoWorkspacePresentation(repo)
 
     const { container } = renderInJsdom(
-      <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
+      <TerminalSessionReadContext value={emptyTerminalReadContext}>
         <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-      </TerminalSessionReadContext.Provider>,
+      </TerminalSessionReadContext>,
     )
 
     expect(container.querySelector('#workspace-status-panel')).toBeNull()
@@ -431,11 +431,11 @@ describe('RepoWorkspaceContent', () => {
     const detail = getSelectedRepoWorkspacePresentation(repo)
 
     const { container } = renderInJsdom(
-      <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
-        <BranchActionSurfaceContext.Provider value={defaultBranchActionSurface()}>
+      <TerminalSessionReadContext value={emptyTerminalReadContext}>
+        <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
           <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-        </BranchActionSurfaceContext.Provider>
-      </TerminalSessionReadContext.Provider>,
+        </BranchActionSurfaceContext>
+      </TerminalSessionReadContext>,
     )
 
     // The user's preferred tab (terminal) is unrenderable without a
@@ -459,11 +459,11 @@ describe('RepoWorkspaceContent', () => {
     const detail = getSelectedRepoWorkspacePresentation(repo)
 
     const { container } = renderInJsdom(
-      <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
-        <BranchActionSurfaceContext.Provider value={defaultBranchActionSurface()}>
+      <TerminalSessionReadContext value={emptyTerminalReadContext}>
+        <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
           <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-        </BranchActionSurfaceContext.Provider>
-      </TerminalSessionReadContext.Provider>,
+        </BranchActionSurfaceContext>
+      </TerminalSessionReadContext>,
     )
 
     // Sync is ready, the worktree has no terminal sessions, and the user
@@ -499,11 +499,11 @@ describe('RepoWorkspaceContent', () => {
     }
 
     const { container } = renderInJsdom(
-      <TerminalSessionContext.Provider value={terminalCommandContextWith({ registerHost })}>
-        <TerminalSessionReadContext.Provider value={readContext}>
+      <TerminalSessionContext value={terminalCommandContextWith({ registerHost })}>
+        <TerminalSessionReadContext value={readContext}>
           <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-        </TerminalSessionReadContext.Provider>
-      </TerminalSessionContext.Provider>,
+        </TerminalSessionReadContext>
+      </TerminalSessionContext>,
     )
 
     const panel = container.querySelector('#workspace-terminal-panel')
@@ -542,11 +542,11 @@ describe('RepoWorkspaceContent', () => {
     }
 
     renderInJsdom(
-      <TerminalSessionContext.Provider value={terminalCommandContextWith({ registerHost })}>
-        <TerminalSessionReadContext.Provider value={readContext}>
+      <TerminalSessionContext value={terminalCommandContextWith({ registerHost })}>
+        <TerminalSessionReadContext value={readContext}>
           <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-        </TerminalSessionReadContext.Provider>
-      </TerminalSessionContext.Provider>,
+        </TerminalSessionReadContext>
+      </TerminalSessionContext>,
     )
 
     expect(screen.getByRole('tabpanel').id).toBe('workspace-terminal-panel')
@@ -578,11 +578,11 @@ describe('RepoWorkspaceContent', () => {
     }
 
     const { container } = renderInJsdom(
-      <TerminalSessionContext.Provider value={terminalCommandContextWith({ createTerminal, registerHost })}>
-        <TerminalSessionReadContext.Provider value={readContext}>
+      <TerminalSessionContext value={terminalCommandContextWith({ createTerminal, registerHost })}>
+        <TerminalSessionReadContext value={readContext}>
           <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-        </TerminalSessionReadContext.Provider>
-      </TerminalSessionContext.Provider>,
+        </TerminalSessionReadContext>
+      </TerminalSessionContext>,
     )
 
     const panel = container.querySelector('#workspace-terminal-panel')
@@ -626,11 +626,11 @@ describe('RepoWorkspaceContent', () => {
     }
 
     const { container } = renderInJsdom(
-      <TerminalSessionContext.Provider value={terminalCommandContextWith({ registerHost })}>
-        <TerminalSessionReadContext.Provider value={readContext}>
+      <TerminalSessionContext value={terminalCommandContextWith({ registerHost })}>
+        <TerminalSessionReadContext value={readContext}>
           <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-        </TerminalSessionReadContext.Provider>
-      </TerminalSessionContext.Provider>,
+        </TerminalSessionReadContext>
+      </TerminalSessionContext>,
     )
 
     expect(container.querySelector('#workspace-terminal-panel')?.getAttribute('aria-labelledby')).toBe(
@@ -672,13 +672,13 @@ describe('RepoWorkspaceContent', () => {
     renderInJsdom(
       <QueryClientProvider client={queryClient}>
         <PrimaryWindowNavigationProvider value={navigationWith({ showRepoWorkspacePaneTab })}>
-          <TerminalSessionContext.Provider value={terminalCommandContextWith({ createTerminal, writeInput })}>
-            <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
-              <BranchActionSurfaceContext.Provider value={defaultBranchActionSurface()}>
+          <TerminalSessionContext value={terminalCommandContextWith({ createTerminal, writeInput })}>
+            <TerminalSessionReadContext value={emptyTerminalReadContext}>
+              <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
                 <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-              </BranchActionSurfaceContext.Provider>
-            </TerminalSessionReadContext.Provider>
-          </TerminalSessionContext.Provider>
+              </BranchActionSurfaceContext>
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
         </PrimaryWindowNavigationProvider>
       </QueryClientProvider>,
     )
@@ -710,11 +710,11 @@ describe('RepoWorkspaceContent', () => {
     const detail = getSelectedRepoWorkspacePresentation(repo)
 
     const { container } = renderInJsdom(
-      <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
-        <BranchActionSurfaceContext.Provider value={defaultBranchActionSurface()}>
+      <TerminalSessionReadContext value={emptyTerminalReadContext}>
+        <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
           <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-        </BranchActionSurfaceContext.Provider>
-      </TerminalSessionReadContext.Provider>,
+        </BranchActionSurfaceContext>
+      </TerminalSessionReadContext>,
     )
     await flushAsyncWork()
 
@@ -759,9 +759,9 @@ describe('RepoWorkspaceContent', () => {
     const detail = getSelectedRepoWorkspacePresentation(repo)
 
     const { container } = renderInJsdom(
-      <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
+      <TerminalSessionReadContext value={emptyTerminalReadContext}>
         <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-      </TerminalSessionReadContext.Provider>,
+      </TerminalSessionReadContext>,
     )
     await flushAsyncWork()
     await flushAsyncWork()
@@ -806,9 +806,9 @@ describe('RepoWorkspaceContent', () => {
     const detail = getSelectedRepoWorkspacePresentation(repo)
 
     const { container } = renderInJsdom(
-      <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
+      <TerminalSessionReadContext value={emptyTerminalReadContext}>
         <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-      </TerminalSessionReadContext.Provider>,
+      </TerminalSessionReadContext>,
     )
     await flushAsyncWork()
 
@@ -829,9 +829,9 @@ describe('RepoWorkspaceContent', () => {
     const detail = getSelectedRepoWorkspacePresentation(repo)
 
     const { container } = renderInJsdom(
-      <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
+      <TerminalSessionReadContext value={emptyTerminalReadContext}>
         <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
-      </TerminalSessionReadContext.Provider>,
+      </TerminalSessionReadContext>,
     )
     await flushAsyncWork()
 

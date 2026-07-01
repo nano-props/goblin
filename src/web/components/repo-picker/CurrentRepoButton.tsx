@@ -1,4 +1,4 @@
-import { forwardRef, type ComponentPropsWithoutRef, type KeyboardEvent, type Ref } from 'react'
+import type { ComponentProps, KeyboardEvent } from 'react'
 import { AlertCircle, ChevronDown, FolderGit2, Loader2, Server } from 'lucide-react'
 import type { RepoPickerRepo } from '#/web/components/repo-picker/types.ts'
 import type { FocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
@@ -9,6 +9,7 @@ import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 import { cn } from '#/web/lib/cn.ts'
 import { SidebarRowButton } from '#/web/components/ui/sidebar-row-button.tsx'
 import { TerminalBellBadge } from '#/web/components/terminal/TerminalBellBadge.tsx'
+import { composeRefs } from '#/web/components/ui/refs.ts'
 
 const CURRENT_REPO_ICON_CLASS = 'flex size-3.5 shrink-0 items-center justify-center'
 
@@ -26,8 +27,7 @@ interface CurrentRepoToolbarButtonProps extends CurrentRepoButtonBaseProps {
   onActivate: (id: string) => void
 }
 
-type CurrentRepoSidebarButtonProps = Omit<ComponentPropsWithoutRef<'button'>, 'children' | 'type'> &
-  CurrentRepoButtonBaseProps
+type CurrentRepoSidebarButtonProps = Omit<ComponentProps<'button'>, 'children' | 'type'> & CurrentRepoButtonBaseProps
 
 export function CurrentRepoToolbarButton({
   repo,
@@ -90,58 +90,51 @@ export function CurrentRepoToolbarButton({
   )
 }
 
-export const CurrentRepoSidebarButton = forwardRef<HTMLButtonElement, CurrentRepoSidebarButtonProps>(
-  function CurrentRepoSidebarButton(
-    {
-      repo,
-      focusRegistry,
-      onKeyboardNavigate,
-      unavailableLabel,
-      terminalBellCount = 0,
-      fill = false,
-      className,
-      onKeyDown,
-      ...buttonProps
-    },
-    forwardedRef,
-  ) {
-    const t = useT()
-    const unreadBellLabel = terminalBellCount > 0 ? t('terminal.bell-unread-count', { count: terminalBellCount }) : null
-    const state = currentRepoButtonState(repo, unavailableLabel, unreadBellLabel)
-    const registryRef = focusRegistry?.setRef(repo.id)
+export function CurrentRepoSidebarButton({
+  repo,
+  focusRegistry,
+  onKeyboardNavigate,
+  unavailableLabel,
+  terminalBellCount = 0,
+  fill = false,
+  className,
+  onKeyDown,
+  ref,
+  ...buttonProps
+}: CurrentRepoSidebarButtonProps) {
+  const t = useT()
+  const unreadBellLabel = terminalBellCount > 0 ? t('terminal.bell-unread-count', { count: terminalBellCount }) : null
+  const state = currentRepoButtonState(repo, unavailableLabel, unreadBellLabel)
+  const registryRef = focusRegistry?.setRef(repo.id)
 
-    return (
-      <SidebarRowButton
-        {...buttonProps}
-        ref={(node) => {
-          registryRef?.(node)
-          assignRef(forwardedRef, node)
-        }}
-        data-current-repo-chrome
-        data-current-repo-id={repo.id}
-        data-current-repo-connecting={state.showConnecting ? 'true' : undefined}
-        className={className}
-        size="dense"
-        aria-label={state.repoLabel}
-        fill={fill}
-        leading={<CurrentRepoButtonIcon repo={repo} size={16} />}
-        trailing={
-          <span className="flex items-center gap-1.5">
-            <TerminalBellBadge count={terminalBellCount} />
-            <ChevronDown size={14} aria-hidden />
-          </span>
-        }
-        contentClassName="flex min-w-0 flex-1 items-center gap-2"
-        onKeyDown={(event) => {
-          onKeyDown?.(event)
-          if (!event.defaultPrevented) handleRepoKeyboardNavigation(event, repo.id, onKeyboardNavigate)
-        }}
-      >
-        <CurrentRepoButtonText repo={repo} state={state} />
-      </SidebarRowButton>
-    )
-  },
-)
+  return (
+    <SidebarRowButton
+      {...buttonProps}
+      ref={composeRefs(registryRef, ref)}
+      data-current-repo-chrome
+      data-current-repo-id={repo.id}
+      data-current-repo-connecting={state.showConnecting ? 'true' : undefined}
+      className={className}
+      size="dense"
+      aria-label={state.repoLabel}
+      fill={fill}
+      leading={<CurrentRepoButtonIcon repo={repo} size={16} />}
+      trailing={
+        <span className="flex items-center gap-1.5">
+          <TerminalBellBadge count={terminalBellCount} />
+          <ChevronDown size={14} aria-hidden />
+        </span>
+      }
+      contentClassName="flex min-w-0 flex-1 items-center gap-2"
+      onKeyDown={(event) => {
+        onKeyDown?.(event)
+        if (!event.defaultPrevented) handleRepoKeyboardNavigation(event, repo.id, onKeyboardNavigate)
+      }}
+    >
+      <CurrentRepoButtonText repo={repo} state={state} />
+    </SidebarRowButton>
+  )
+}
 
 function currentRepoButtonState(repo: RepoPickerRepo, unavailableLabel: string, unreadBellLabel: string | null = null) {
   const showConnecting = repo.lifecycle?.kind === 'connecting'
@@ -209,13 +202,4 @@ function handleRepoKeyboardNavigation(
     repoId,
     event.key === 'ArrowLeft' ? 'prev' : event.key === 'ArrowRight' ? 'next' : event.key === 'Home' ? 'first' : 'last',
   )
-}
-
-function assignRef<T>(ref: Ref<T> | undefined, value: T | null) {
-  if (!ref) return
-  if (typeof ref === 'function') {
-    ref(value)
-    return
-  }
-  ref.current = value
 }
