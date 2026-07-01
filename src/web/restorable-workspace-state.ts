@@ -48,7 +48,7 @@ interface RestoredWorkspaceStateFromSession extends Pick<
   RestorableWorkspaceState,
   'activeId' | 'zenMode' | 'workspacePaneSize' | 'selectedTerminalSessionIdByTerminalWorktree'
 > {
-  preferredWorkspacePaneTabByBranchByRepo: NonNullable<WorkspaceSessionState['preferredWorkspacePaneTabByBranchByRepo']>
+  preferredWorkspacePaneTabByBranchByRepo: WorkspaceSessionState['preferredWorkspacePaneTabByBranchByRepo']
   workspacePaneTabsByBranchByRepo: WorkspaceSessionState['workspacePaneTabsByBranchByRepo']
 }
 
@@ -60,8 +60,8 @@ export function restoreRestorableWorkspaceStateFromSession(
     activeId,
     zenMode: session.zenMode,
     workspacePaneSize: session.workspacePaneSize,
-    selectedTerminalSessionIdByTerminalWorktree: session.selectedTerminalSessionIdByTerminalWorktree ?? {},
-    preferredWorkspacePaneTabByBranchByRepo: session.preferredWorkspacePaneTabByBranchByRepo ?? {},
-    workspacePaneTabsByBranchByRepo: session.workspacePaneTabsByBranchByRepo ?? {},
+    selectedTerminalSessionIdByTerminalWorktree: session.selectedTerminalSessionIdByTerminalWorktree,
+    preferredWorkspacePaneTabByBranchByRepo: session.preferredWorkspacePaneTabByBranchByRepo,
+    workspacePaneTabsByBranchByRepo: session.workspacePaneTabsByBranchByRepo,
   }
 }

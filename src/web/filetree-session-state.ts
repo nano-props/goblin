@@ -44,7 +44,7 @@ function interactionByScopeFromSessionViewState(
   filetreeViewStateByWorktreeByRepo: WorkspaceSessionState['filetreeViewStateByWorktreeByRepo'],
 ): Record<string, FiletreeInteractionSnapshot> {
   const interactionByScope: Record<string, FiletreeInteractionSnapshot> = {}
-  for (const [repoId, byWorktree] of Object.entries(filetreeViewStateByWorktreeByRepo ?? {})) {
+  for (const [repoId, byWorktree] of Object.entries(filetreeViewStateByWorktreeByRepo)) {
     if (!repoId || repoId.includes('\0')) continue
     for (const [worktreePath, viewState] of Object.entries(byWorktree)) {
       if (!worktreePath || worktreePath.includes('\0')) continue

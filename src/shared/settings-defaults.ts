@@ -19,6 +19,7 @@ export function defaultWorkspaceSessionState(): WorkspaceSessionState {
     zenMode: DEFAULT_ZEN_MODE,
     workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
     selectedTerminalSessionIdByTerminalWorktree: {},
+    preferredWorkspacePaneTabByBranchByRepo: {},
     workspacePaneTabsByBranchByRepo: {},
     filetreeViewStateByWorktreeByRepo: {},
   }

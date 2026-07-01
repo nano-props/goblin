@@ -66,7 +66,10 @@ async function restoreBootSession(settingsSnapshot: Promise<SettingsSnapshot>): 
         preferredWorkspacePaneTabByBranchByRepo: restoredWorkspaceState.preferredWorkspacePaneTabByBranchByRepo,
       },
     })
-    await restoreServerWorkspacePaneTabsFromSession(restoredWorkspaceState.workspacePaneTabsByBranchByRepo)
+    const workspaceTabsRestored = await restoreServerWorkspacePaneTabsFromSession(
+      restoredWorkspaceState.workspacePaneTabsByBranchByRepo,
+    )
+    if (!workspaceTabsRestored) return
     useReposStore.setState({ sessionPersistenceReady: true })
   } catch (err) {
     bootstrapLog.warn('session restore failed', { err })

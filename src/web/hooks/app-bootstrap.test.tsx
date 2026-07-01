@@ -17,6 +17,7 @@ import {
 import { useSessionRestoreStore } from '#/web/stores/session-restore.ts'
 import { resetReposStore } from '#/web/test-utils/bridge.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
+import { restoreServerWorkspacePaneTabsFromSession } from '#/web/workspace-pane/workspace-pane-session-tabs-restore.ts'
 
 vi.mock('#/web/settings-client.ts', async (importOriginal) => {
   const actual = await importOriginal<typeof import('#/web/settings-client.ts')>()
@@ -26,7 +27,12 @@ vi.mock('#/web/settings-client.ts', async (importOriginal) => {
   }
 })
 
+vi.mock('#/web/workspace-pane/workspace-pane-session-tabs-restore.ts', () => ({
+  restoreServerWorkspacePaneTabsFromSession: vi.fn(async () => true),
+}))
+
 const mockedGetSettingsSnapshot = vi.mocked(getSettingsSnapshot)
+const mockedRestoreServerWorkspacePaneTabsFromSession = vi.mocked(restoreServerWorkspacePaneTabsFromSession)
 
 beforeEach(() => {
   resetReposStore()
@@ -34,6 +40,8 @@ beforeEach(() => {
   vi.restoreAllMocks()
   mockedGetSettingsSnapshot.mockReset()
   mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())
+  mockedRestoreServerWorkspacePaneTabsFromSession.mockReset()
+  mockedRestoreServerWorkspacePaneTabsFromSession.mockResolvedValue(true)
   useSessionRestoreStore.setState({ bootSessionSnapshot: null })
 })
 
@@ -46,7 +54,9 @@ describe('app bootstrap hooks', () => {
       zenMode: true,
       workspacePaneSize: 50,
       selectedTerminalSessionIdByTerminalWorktree: {},
+      preferredWorkspacePaneTabByBranchByRepo: {},
       workspacePaneTabsByBranchByRepo: {},
+      filetreeViewStateByWorktreeByRepo: {},
     })
     const hydrateI18n = vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
     const hydrateHostInfo = vi.spyOn(useHostInfoStore.getState(), 'hydrate').mockResolvedValue(undefined)
@@ -68,6 +78,7 @@ describe('app bootstrap hooks', () => {
       zenMode: false,
       workspacePaneSize: 45,
       selectedTerminalSessionIdByTerminalWorktree: { '/tmp/repo\0/tmp/worktree': 'session-2' },
+      preferredWorkspacePaneTabByBranchByRepo: {},
       workspacePaneTabsByBranchByRepo: {
         '/tmp/repo': {
           main: [],
@@ -128,7 +139,9 @@ describe('app bootstrap hooks', () => {
       zenMode: true,
       workspacePaneSize: 55,
       selectedTerminalSessionIdByTerminalWorktree: {},
+      preferredWorkspacePaneTabByBranchByRepo: {},
       workspacePaneTabsByBranchByRepo: {},
+      filetreeViewStateByWorktreeByRepo: {},
     }
     mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot({ session }))
     vi.spyOn(useThemeStore.getState(), 'hydrateFromSettingsSnapshot').mockRejectedValue(new Error('theme unavailable'))
@@ -148,6 +161,39 @@ describe('app bootstrap hooks', () => {
     expect(useReposStore.getState().workspacePaneSize).toBe(55)
     expect(useReposStore.getState().sessionPersistenceReady).toBe(true)
     expect(mockedGetSettingsSnapshot).toHaveBeenCalledTimes(1)
+  })
+
+  test('keeps persistence gated when server workspace tabs restore fails', async () => {
+    const session = {
+      openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
+      activeRepoId: '/tmp/repo',
+      zenMode: true,
+      workspacePaneSize: 55,
+      selectedTerminalSessionIdByTerminalWorktree: {},
+      preferredWorkspacePaneTabByBranchByRepo: {},
+      workspacePaneTabsByBranchByRepo: {
+        '/tmp/repo': {
+          main: [],
+        },
+      },
+      filetreeViewStateByWorktreeByRepo: {},
+    }
+    mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot({ session }))
+    mockedRestoreServerWorkspacePaneTabsFromSession.mockResolvedValue(false)
+    vi.spyOn(useThemeStore.getState(), 'hydrateFromSettingsSnapshot').mockResolvedValue(undefined)
+    vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
+    vi.spyOn(useHostInfoStore.getState(), 'hydrate').mockResolvedValue(undefined)
+    vi.spyOn(useReposStore.getState(), 'hydrateRepoSession').mockResolvedValue(undefined)
+
+    renderInJsdom(<Harness />)
+    await flushMicrotasks(3)
+
+    expect(useReposStore.getState().sessionPersistenceReady).toBe(false)
+    expect(mockedRestoreServerWorkspacePaneTabsFromSession).toHaveBeenCalledWith({
+      '/tmp/repo': {
+        main: [],
+      },
+    })
   })
 
   test('opens the persistence gate even when boot session restore fails', async () => {

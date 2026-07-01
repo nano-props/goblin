@@ -5,8 +5,8 @@ import { bootstrapLog } from '#/web/logger.ts'
 
 export async function restoreServerWorkspacePaneTabsFromSession(
   workspacePaneTabsByBranchByRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>>,
-): Promise<void> {
-  const commits: Promise<void>[] = []
+): Promise<boolean> {
+  const commits: Promise<boolean>[] = []
   const repos = useReposStore.getState().repos
   for (const [repoRoot, tabsByBranch] of Object.entries(workspacePaneTabsByBranchByRepo)) {
     const repo = repos[repoRoot]
@@ -17,7 +17,8 @@ export async function restoreServerWorkspacePaneTabsFromSession(
       commits.push(restoreWorktreeWorkspacePaneTabs({ repoRoot, branchName, worktreePath, tabs }))
     }
   }
-  await Promise.all(commits)
+  const results = await Promise.all(commits)
+  return results.every(Boolean)
 }
 
 async function restoreWorktreeWorkspacePaneTabs(input: {
@@ -25,7 +26,7 @@ async function restoreWorktreeWorkspacePaneTabs(input: {
   branchName: string
   worktreePath: string
   tabs: WorkspacePaneTabEntry[]
-}): Promise<void> {
+}): Promise<boolean> {
   try {
     const serverTabs = await terminalBridge.replaceWorkspaceTabs({
       repoRoot: input.repoRoot,
@@ -33,11 +34,13 @@ async function restoreWorktreeWorkspacePaneTabs(input: {
       tabs: input.tabs,
     })
     useReposStore.getState().replaceWorkspacePaneTabs(input.repoRoot, serverTabs, input.branchName)
+    return true
   } catch (err) {
     bootstrapLog.warn('workspace pane tabs restore failed', {
       repoRoot: input.repoRoot,
       worktreePath: input.worktreePath,
       err,
     })
+    return false
   }
 }

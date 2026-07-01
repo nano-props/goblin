@@ -194,20 +194,16 @@ const WorkspaceSessionStateSchema = v.object({
   activeRepoId: v.nullable(v.string()),
   zenMode: v.boolean(),
   workspacePaneSize: v.number(),
-  selectedTerminalSessionIdByTerminalWorktree: v.optional(v.record(v.string(), v.string())),
-  preferredWorkspacePaneTabByBranchByRepo: v.optional(
-    v.record(v.string(), v.record(v.string(), v.picklist(['status', 'changes', 'history', 'files', 'terminal']))),
+  selectedTerminalSessionIdByTerminalWorktree: v.record(v.string(), v.string()),
+  preferredWorkspacePaneTabByBranchByRepo: v.record(
+    v.string(),
+    v.record(v.string(), v.picklist(['status', 'changes', 'history', 'files', 'terminal'])),
   ),
   workspacePaneTabsByBranchByRepo: v.record(
     v.string(),
-    v.record(
-      v.string(),
-      v.array(v.union([WorkspacePaneStaticTabEntrySchema, WorkspacePaneTerminalTabEntrySchema])),
-    ),
+    v.record(v.string(), v.array(v.union([WorkspacePaneStaticTabEntrySchema, WorkspacePaneTerminalTabEntrySchema]))),
   ),
-  filetreeViewStateByWorktreeByRepo: v.optional(
-    v.record(v.string(), v.record(v.string(), FiletreeSessionViewStateSchema)),
-  ),
+  filetreeViewStateByWorktreeByRepo: v.record(v.string(), v.record(v.string(), FiletreeSessionViewStateSchema)),
 })
 
 // Shared shape for the GitHub CLI state endpoints (`/api/settings/github-cli`

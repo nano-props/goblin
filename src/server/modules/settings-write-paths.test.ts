@@ -77,7 +77,9 @@ describe('settings command handlers', () => {
       zenMode: true,
       workspacePaneSize: 50,
       selectedTerminalSessionIdByTerminalWorktree: {},
+      preferredWorkspacePaneTabByBranchByRepo: {},
       workspacePaneTabsByBranchByRepo: {},
+      filetreeViewStateByWorktreeByRepo: {},
     }
     mocks.setServerSessionState.mockResolvedValue(session)
     mocks.setServerSessionState.mockResolvedValue(session as WorkspaceSessionState)
@@ -119,7 +121,10 @@ describe('settings command handlers', () => {
         activeRepoId: null,
         zenMode: true,
         workspacePaneSize: 42.5,
+        selectedTerminalSessionIdByTerminalWorktree: {},
+        preferredWorkspacePaneTabByBranchByRepo: {},
         workspacePaneTabsByBranchByRepo: {},
+        filetreeViewStateByWorktreeByRepo: {},
       },
     })
     expect(parsed.session.zenMode).toBe(true)
@@ -137,6 +142,7 @@ describe('settings command handlers', () => {
           activeRepoId: '/tmp/repo',
           zenMode: true,
           workspacePaneSize: 42.5,
+          selectedTerminalSessionIdByTerminalWorktree: {},
           preferredWorkspacePaneTabByBranchByRepo: {
             '/tmp/repo': {
               main: 'changes',
@@ -147,6 +153,7 @@ describe('settings command handlers', () => {
               main: [workspacePaneStaticTabEntry('changes')],
             },
           },
+          filetreeViewStateByWorktreeByRepo: {},
         },
       }),
     ).not.toThrow()
@@ -161,11 +168,14 @@ describe('settings command handlers', () => {
       activeRepoId: '/tmp/repo',
       zenMode: true,
       workspacePaneSize: 42.5,
+      selectedTerminalSessionIdByTerminalWorktree: {},
+      preferredWorkspacePaneTabByBranchByRepo: {},
       workspacePaneTabsByBranchByRepo: {
         '/tmp/repo': {
           main: [],
         },
       },
+      filetreeViewStateByWorktreeByRepo: {},
     }
 
     expect(() =>

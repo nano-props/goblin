@@ -117,11 +117,13 @@ describe('restorable-workspace-state', () => {
         selectedTerminalSessionIdByTerminalWorktree: {
           '/tmp/repo\0/tmp/worktree': 'session-1',
         },
+        preferredWorkspacePaneTabByBranchByRepo: {},
         workspacePaneTabsByBranchByRepo: {
           '/tmp/repo': {
             main: [],
           },
         },
+        filetreeViewStateByWorktreeByRepo: {},
       }),
     ).toEqual({
       activeId: '/tmp/repo',

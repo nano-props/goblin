@@ -82,7 +82,9 @@ describe('settings routes', () => {
       zenMode: true,
       workspacePaneSize: 50,
       selectedTerminalSessionIdByTerminalWorktree: {},
+      preferredWorkspacePaneTabByBranchByRepo: {},
       workspacePaneTabsByBranchByRepo: {},
+      filetreeViewStateByWorktreeByRepo: {},
     } as const
     mocks.handleSetSession.mockResolvedValue({ ok: true, session })
 
@@ -119,6 +121,7 @@ describe('settings routes', () => {
           ],
         },
       },
+      filetreeViewStateByWorktreeByRepo: {},
     } as const
     mocks.handleSetSession.mockResolvedValue({ ok: true, session })
 
