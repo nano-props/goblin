@@ -206,7 +206,7 @@ function ZenModeSidebarReveal({
   const panelStateRef = useRef<RevealPanelState>(open ? 'open' : 'closed')
   const lastPointerRef = useRef({ x: 0, y: 0 })
   const lastPointerKnownRef = useRef(false)
-  const hadDescendantSurfacePinRef = useRef(false)
+  const previousDescendantSurfacePinnedRef = useRef(false)
   const [resizeRailState, setResizeRailState] = useState<ResizeRailState>('idle')
   const [panelState, setPanelState] = useState<RevealPanelState>(() => (open ? 'open' : 'closed'))
   const [pinnedByDescendantSurface, setPinnedByDescendantSurface] = useState(false)
@@ -374,16 +374,16 @@ function ZenModeSidebarReveal({
   }, [clearUnpinRecheckFrame, recheckSurfaceAfterUnpin])
   const handleDescendantSurfacePinnedChange = useCallback(
     (nextPinned: boolean) => {
+      const wasPinned = previousDescendantSurfacePinnedRef.current
+      previousDescendantSurfacePinnedRef.current = nextPinned
       setPinnedByDescendantSurface(nextPinned)
 
       if (nextPinned) {
-        hadDescendantSurfacePinRef.current = true
         clearUnpinRecheckFrame()
         return
       }
 
-      if (!hadDescendantSurfacePinRef.current) return
-      hadDescendantSurfacePinRef.current = false
+      if (!wasPinned) return
       requestUnpinRecheck()
     },
     [clearUnpinRecheckFrame, requestUnpinRecheck],
