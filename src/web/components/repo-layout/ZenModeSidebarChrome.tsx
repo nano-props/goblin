@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useEffectEvent,
   useRef,
   useState,
   type CSSProperties,
@@ -16,6 +17,7 @@ import {
   repoSidebarWidthPx,
 } from '#/web/components/repo-layout/sidebar-sizing.ts'
 import { ResizeHandleLine, resizeHandleClassNames } from '#/web/components/ui/resizable.tsx'
+import { FloatingSurfaceBoundary } from '#/web/components/ui/floating-surface-boundary.tsx'
 import { useElementInlineSize } from '#/web/hooks/useElementInlineSize.ts'
 import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
@@ -200,10 +202,14 @@ function ZenModeSidebarReveal({
   const resizeDragCleanupRef = useRef<(() => void) | null>(null)
   const closeAnimationTimerRef = useRef<number | null>(null)
   const openAnimationFrameRef = useRef<number | null>(null)
+  const unpinRecheckFrameRef = useRef<number | null>(null)
   const panelStateRef = useRef<RevealPanelState>(open ? 'open' : 'closed')
   const lastPointerRef = useRef({ x: 0, y: 0 })
+  const lastPointerKnownRef = useRef(false)
+  const previousDescendantSurfacePinnedRef = useRef(false)
   const [resizeRailState, setResizeRailState] = useState<ResizeRailState>('idle')
   const [panelState, setPanelState] = useState<RevealPanelState>(() => (open ? 'open' : 'closed'))
+  const [pinnedByDescendantSurface, setPinnedByDescendantSurface] = useState(false)
   const rootFontSizePx = useRootFontSizePx()
   const hostWidth = useElementInlineSize(hostRef, true)
   const measuredWidthPx =
@@ -233,6 +239,11 @@ function ZenModeSidebarReveal({
     window.cancelAnimationFrame(openAnimationFrameRef.current)
     openAnimationFrameRef.current = null
   }, [])
+  const clearUnpinRecheckFrame = useCallback(() => {
+    if (unpinRecheckFrameRef.current === null) return
+    window.cancelAnimationFrame(unpinRecheckFrameRef.current)
+    unpinRecheckFrameRef.current = null
+  }, [])
   const handleResizePointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
       if (!panelInteractive) return
@@ -244,6 +255,7 @@ function ZenModeSidebarReveal({
       resizeDragCleanupRef.current?.()
       resizingRef.current = true
       lastPointerRef.current = { x: event.clientX, y: event.clientY }
+      lastPointerKnownRef.current = true
       setResizeRailState('active')
       onSurfaceEnter()
 
@@ -258,6 +270,7 @@ function ZenModeSidebarReveal({
       }
       const handlePointerMove = (moveEvent: PointerEvent) => {
         lastPointerRef.current = { x: moveEvent.clientX, y: moveEvent.clientY }
+        lastPointerKnownRef.current = true
         update(moveEvent.clientX)
       }
       const cleanupDragListeners = () => {
@@ -293,10 +306,11 @@ function ZenModeSidebarReveal({
       resizeDragCleanupRef.current?.()
       clearCloseAnimationTimer()
       clearOpenAnimationFrame()
+      clearUnpinRecheckFrame()
       resizeDragCleanupRef.current = null
       resizingRef.current = false
     }
-  }, [clearCloseAnimationTimer, clearOpenAnimationFrame])
+  }, [clearCloseAnimationTimer, clearOpenAnimationFrame, clearUnpinRecheckFrame])
   useEffect(() => {
     clearCloseAnimationTimer()
     clearOpenAnimationFrame()
@@ -319,32 +333,86 @@ function ZenModeSidebarReveal({
   }, [clearCloseAnimationTimer, clearOpenAnimationFrame, open, setPanelVisualState])
   const handleSurfaceLeave = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
+      lastPointerRef.current = { x: event.clientX, y: event.clientY }
+      lastPointerKnownRef.current = true
       if (resizingRef.current) return
+      if (pinnedByDescendantSurface) return
       if (isPointerInsideRevealBounds(event, hostRef.current, panelRef.current)) return
       if (isZenRevealSurfaceTarget(event.relatedTarget, panelRef.current, hitAreaRef.current)) return
       onSurfaceLeave()
     },
-    [onSurfaceLeave],
+    [onSurfaceLeave, pinnedByDescendantSurface],
   )
+  const recheckSurfaceAfterUnpin = useEffectEvent(() => {
+    if (!panelInteractive) return
+    if (resizingRef.current) return
+    if (pinnedByDescendantSurface) return
+    if (!lastPointerKnownRef.current) return
+
+    const pointer = lastPointerRef.current
+    const target =
+      typeof document.elementFromPoint === 'function' ? document.elementFromPoint(pointer.x, pointer.y) : null
+    if (
+      (target &&
+        isZenRevealSurfaceTarget(target, panelRef.current, hitAreaRef.current, {
+          includeClosedFloatingSurfaces: false,
+        })) ||
+      isPointerInsideRevealBounds({ clientX: pointer.x, clientY: pointer.y }, hostRef.current, panelRef.current) ||
+      isPointerInsideElement({ clientX: pointer.x, clientY: pointer.y }, hitAreaRef.current)
+    ) {
+      return
+    }
+
+    onSurfaceLeave()
+  })
+  const requestUnpinRecheck = useCallback(() => {
+    clearUnpinRecheckFrame()
+    unpinRecheckFrameRef.current = window.requestAnimationFrame(() => {
+      unpinRecheckFrameRef.current = null
+      recheckSurfaceAfterUnpin()
+    })
+  }, [clearUnpinRecheckFrame, recheckSurfaceAfterUnpin])
+  const handleDescendantSurfacePinnedChange = useCallback(
+    (nextPinned: boolean) => {
+      const wasPinned = previousDescendantSurfacePinnedRef.current
+      previousDescendantSurfacePinnedRef.current = nextPinned
+      setPinnedByDescendantSurface(nextPinned)
+
+      if (nextPinned) {
+        clearUnpinRecheckFrame()
+        return
+      }
+
+      if (!wasPinned) return
+      requestUnpinRecheck()
+    },
+    [clearUnpinRecheckFrame, requestUnpinRecheck],
+  )
+  const handleDocumentPointerMove = useEffectEvent((event: PointerEvent) => {
+    lastPointerRef.current = { x: event.clientX, y: event.clientY }
+    lastPointerKnownRef.current = true
+    if (resizingRef.current) return
+    if (pinnedByDescendantSurface) return
+    if (
+      isZenRevealSurfaceTarget(event.target, panelRef.current, hitAreaRef.current) ||
+      isPointerInsideRevealBounds(event, hostRef.current, panelRef.current) ||
+      isPointerInsideElement(event, hitAreaRef.current)
+    ) {
+      onSurfaceEnter()
+      return
+    }
+    onSurfaceLeave()
+  })
   useEffect(() => {
     if (!panelInteractive) return
 
     const handlePointerMove = (event: PointerEvent) => {
-      if (resizingRef.current) return
-      if (
-        isZenRevealSurfaceTarget(event.target, panelRef.current, hitAreaRef.current) ||
-        isPointerInsideRevealBounds(event, hostRef.current, panelRef.current) ||
-        isPointerInsideElement(event, hitAreaRef.current)
-      ) {
-        onSurfaceEnter()
-        return
-      }
-      onSurfaceLeave()
+      handleDocumentPointerMove(event)
     }
 
     document.addEventListener('pointermove', handlePointerMove)
     return () => document.removeEventListener('pointermove', handlePointerMove)
-  }, [onSurfaceEnter, onSurfaceLeave, panelInteractive])
+  }, [panelInteractive])
   const handleResizeRailMouseEnter = useCallback(() => {
     if (!resizingRef.current) setResizeRailState('hover')
   }, [])
@@ -383,28 +451,30 @@ function ZenModeSidebarReveal({
         onMouseEnter={panelInteractive ? onSurfaceEnter : undefined}
         onMouseLeave={panelInteractive ? handleSurfaceLeave : undefined}
       >
-        <RepoLayoutSidebar
-          repoId={repoId}
-          compact={false}
-          chromeRegion={panelInteractive ? 'drag' : 'none'}
-          onOpenSettings={onOpenSettings}
-        />
-        <TitleBarInteractiveRegion
-          data-testid="zen-mode-sidebar-resize-handle"
-          data-separator={resizeRailState === 'idle' ? undefined : resizeRailState}
-          role="separator"
-          aria-orientation="vertical"
-          className={cn(
-            resizeHandleClassNames.hitTarget,
-            resizeHandleClassNames.horizontal,
-            'absolute inset-y-0 right-0 z-20',
-          )}
-          onPointerDown={panelInteractive ? handleResizePointerDown : undefined}
-          onMouseEnter={panelInteractive ? handleResizeRailMouseEnter : undefined}
-          onMouseLeave={panelInteractive ? handleResizeRailMouseLeave : undefined}
-        >
-          <ResizeHandleLine />
-        </TitleBarInteractiveRegion>
+        <FloatingSurfaceBoundary onPinnedChange={handleDescendantSurfacePinnedChange}>
+          <RepoLayoutSidebar
+            repoId={repoId}
+            compact={false}
+            chromeRegion={panelInteractive ? 'drag' : 'none'}
+            onOpenSettings={onOpenSettings}
+          />
+          <TitleBarInteractiveRegion
+            data-testid="zen-mode-sidebar-resize-handle"
+            data-separator={resizeRailState === 'idle' ? undefined : resizeRailState}
+            role="separator"
+            aria-orientation="vertical"
+            className={cn(
+              resizeHandleClassNames.hitTarget,
+              resizeHandleClassNames.horizontal,
+              'absolute inset-y-0 right-0 z-20',
+            )}
+            onPointerDown={panelInteractive ? handleResizePointerDown : undefined}
+            onMouseEnter={panelInteractive ? handleResizeRailMouseEnter : undefined}
+            onMouseLeave={panelInteractive ? handleResizeRailMouseLeave : undefined}
+          >
+            <ResizeHandleLine />
+          </TitleBarInteractiveRegion>
+        </FloatingSurfaceBoundary>
       </div>
     </div>
   )
@@ -417,7 +487,10 @@ function zenRevealHostRect(host: HTMLElement | null): DOMRect | null {
   return parentRect && parentRect.width > 0 ? parentRect : null
 }
 
-function isPointerInsideElement(event: PointerEvent, element: HTMLElement | null): boolean {
+function isPointerInsideElement(
+  event: Pick<MouseEvent | PointerEvent, 'clientX' | 'clientY'>,
+  element: HTMLElement | null,
+): boolean {
   if (!element) return false
   const rect = element.getBoundingClientRect()
   if (rect.width <= 0 || rect.height <= 0) return false
@@ -452,12 +525,21 @@ function isZenRevealSurfaceTarget(
   target: EventTarget | null,
   panel: HTMLElement | null,
   hitArea: HTMLElement | null,
+  options: { includeClosedFloatingSurfaces?: boolean } = {},
 ): boolean {
   if (!(target instanceof Node)) return false
   if (panel?.contains(target) || hitArea?.contains(target)) return true
 
   const targetElement = target instanceof Element ? target : target.parentElement
-  return !!targetElement?.closest(ZEN_REVEAL_SURFACE_SELECTOR)
+  const surfaceElement = targetElement?.closest(ZEN_REVEAL_SURFACE_SELECTOR)
+  if (!surfaceElement) return false
+  if (
+    options.includeClosedFloatingSurfaces === false &&
+    surfaceElement.matches('[data-floating-surface][data-state="closed"]')
+  ) {
+    return false
+  }
+  return true
 }
 
 function useRootFontSizePx(): number {
