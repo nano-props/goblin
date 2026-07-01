@@ -51,6 +51,7 @@ const mockPtys: Array<{
   emitData: (data: string) => void
   emitExit: () => void
 }> = []
+let mockDataToEmitOnRegistration: string | null = null
 
 vi.mock('node-pty', () => ({
   spawn: vi.fn(() => {
@@ -71,6 +72,11 @@ vi.mock('node-pty', () => ({
       ...pty,
       onData: (cb: (data: string) => void) => {
         onData = cb
+        if (mockDataToEmitOnRegistration !== null) {
+          const data = mockDataToEmitOnRegistration
+          mockDataToEmitOnRegistration = null
+          cb(data)
+        }
         return {
           dispose: vi.fn(() => {
             if (onData === cb) onData = null
@@ -107,6 +113,7 @@ function buildRuntime(): RuntimeHandle {
 beforeEach(() => {
   vi.useRealTimers()
   mockPtys.length = 0
+  mockDataToEmitOnRegistration = null
   vi.clearAllMocks()
 })
 
@@ -883,6 +890,69 @@ describe('server terminal runtime', () => {
         canonicalCols: 80,
         canonicalRows: 24,
       },
+    })
+
+    host.unregisterSocket('client_a', USER_1, socket)
+    shutdown()
+  })
+
+  test('sends create response before flushing buffered output emitted during the create request', async () => {
+    const { host, shutdown } = buildRuntime()
+    const socket = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_a', USER_1, socket)
+    mockDataToEmitOnRegistration = 'during-create'
+
+    host.handleRealtimeMessage(
+      'client_a',
+      USER_1,
+      socket,
+      JSON.stringify({
+        type: 'request',
+        requestId: 'req_create_buffered_output',
+        action: 'create',
+        input: {
+          repoRoot: '/repo',
+          branch: 'feature',
+          worktreePath: '/repo-linked',
+          kind: 'primary',
+          cols: 80,
+          rows: 24,
+        },
+      }),
+    )
+
+    await vi.waitFor(() => {
+      const messages = sentSocketMessages(socket)
+      expect(messages.some((message) => message.type === 'response')).toBe(true)
+      expect(messages.some((message) => message.type === 'output')).toBe(true)
+    })
+
+    const messages = sentSocketMessages(socket)
+    const responseIndex = messages.findIndex(
+      (message) => message.type === 'response' && message.requestId === 'req_create_buffered_output',
+    )
+    const outputIndex = messages.findIndex((message) => message.type === 'output')
+    expect(responseIndex).toBeGreaterThanOrEqual(0)
+    expect(outputIndex).toBeGreaterThan(responseIndex)
+
+    const response = messages[responseIndex]
+    expect(response).toMatchObject({
+      type: 'response',
+      requestId: 'req_create_buffered_output',
+      ok: true,
+      action: 'create',
+      payload: {
+        ok: true,
+        snapshot: expect.stringContaining('during-create'),
+        snapshotSeq: 1,
+      },
+    })
+
+    const output = messages[outputIndex]
+    const ptySessionId = (response.payload as { ptySessionId: string }).ptySessionId
+    expect(output).toMatchObject({
+      type: 'output',
+      event: { ptySessionId, data: 'during-create', seq: 1 },
     })
 
     host.unregisterSocket('client_a', USER_1, socket)
