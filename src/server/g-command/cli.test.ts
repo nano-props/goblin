@@ -45,7 +45,7 @@ describe('g command cli', () => {
     expect(io.stdout).toHaveBeenCalledWith(expect.stringContaining('g help'))
     expect(io.stdout).toHaveBeenCalledWith(expect.stringContaining('g init'))
     expect(io.stdout).toHaveBeenCalledWith(expect.stringContaining('Open the changes tab'))
-    expect(io.stdout).toHaveBeenCalledWith(expect.stringContaining('g st'))
+    expect(io.stdout).toHaveBeenCalledWith(expect.stringContaining('g info'))
     expect(io.stdout).toHaveBeenCalledWith(expect.stringContaining('g log'))
     expect(postJson).not.toHaveBeenCalled()
   })
@@ -82,12 +82,12 @@ describe('g command cli', () => {
     expect(postJson).toHaveBeenCalledWith('/api/repo/view', { tab: 'changes' })
   })
 
-  test('g st posts a view intent for the status tab', async () => {
+  test('g info posts a view intent for the status tab', async () => {
     const { io } = makeIo()
     const { transport, postJson } = makeTransport()
     postJson.mockResolvedValue({ ok: true })
 
-    const code = await runGoblinCommand(['st'], {}, io, transport)
+    const code = await runGoblinCommand(['info'], {}, io, transport)
 
     expect(code).toBe(0)
     expect(postJson).toHaveBeenCalledWith('/api/repo/view', { tab: 'status' })
