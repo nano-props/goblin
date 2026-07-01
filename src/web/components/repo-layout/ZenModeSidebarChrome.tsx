@@ -353,7 +353,10 @@ function ZenModeSidebarReveal({
     const target =
       typeof document.elementFromPoint === 'function' ? document.elementFromPoint(pointer.x, pointer.y) : null
     if (
-      (target && isZenRevealSurfaceTarget(target, panelRef.current, hitAreaRef.current)) ||
+      (target &&
+        isZenRevealSurfaceTarget(target, panelRef.current, hitAreaRef.current, {
+          includeClosedFloatingSurfaces: false,
+        })) ||
       isPointerInsideRevealBounds({ clientX: pointer.x, clientY: pointer.y }, hostRef.current, panelRef.current) ||
       isPointerInsideElement({ clientX: pointer.x, clientY: pointer.y }, hitAreaRef.current)
     ) {
@@ -522,12 +525,21 @@ function isZenRevealSurfaceTarget(
   target: EventTarget | null,
   panel: HTMLElement | null,
   hitArea: HTMLElement | null,
+  options: { includeClosedFloatingSurfaces?: boolean } = {},
 ): boolean {
   if (!(target instanceof Node)) return false
   if (panel?.contains(target) || hitArea?.contains(target)) return true
 
   const targetElement = target instanceof Element ? target : target.parentElement
-  return !!targetElement?.closest(ZEN_REVEAL_SURFACE_SELECTOR)
+  const surfaceElement = targetElement?.closest(ZEN_REVEAL_SURFACE_SELECTOR)
+  if (!surfaceElement) return false
+  if (
+    options.includeClosedFloatingSurfaces === false &&
+    surfaceElement.matches('[data-floating-surface][data-state="closed"]')
+  ) {
+    return false
+  }
+  return true
 }
 
 function useRootFontSizePx(): number {

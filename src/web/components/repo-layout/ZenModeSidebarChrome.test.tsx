@@ -89,14 +89,32 @@ describe('ZenModeSidebarChrome', () => {
     })
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
 
-    await user.click(screen.getByRole('button', { name: 'Close descendant menu' }))
-    await waitFor(() => {
-      expect(screen.queryByTestId('descendant-popover-content')).toBeNull()
+    const closedFloatingSurface = document.createElement('div')
+    closedFloatingSurface.setAttribute('data-floating-surface', '')
+    closedFloatingSurface.setAttribute('data-state', 'closed')
+    document.body.appendChild(closedFloatingSurface)
+    const originalElementFromPoint = document.elementFromPoint
+    Object.defineProperty(document, 'elementFromPoint', {
+      configurable: true,
+      value: () => closedFloatingSurface,
     })
 
-    await waitFor(() => {
-      expect(zenModeSidebarReveal(container)?.dataset.open).toBe('false')
-    })
+    try {
+      await user.click(screen.getByRole('button', { name: 'Close descendant menu' }))
+      await waitFor(() => {
+        expect(screen.queryByTestId('descendant-popover-content')).toBeNull()
+      })
+
+      await waitFor(() => {
+        expect(zenModeSidebarReveal(container)?.dataset.open).toBe('false')
+      })
+    } finally {
+      Object.defineProperty(document, 'elementFromPoint', {
+        configurable: true,
+        value: originalElementFromPoint,
+      })
+      closedFloatingSurface.remove()
+    }
   })
 })
 
