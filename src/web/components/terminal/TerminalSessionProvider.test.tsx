@@ -263,8 +263,9 @@ let identityHandler: ((event: TerminalIdentityViewModel) => void) | null = null
 let lifecycleHandler: ((event: TerminalLifecycleViewModel) => void) | null = null
 let sessionsChangedHandler: ((repoRoot: string) => void) | null = null
 let workspaceTabsChangedHandler: ((repoRoot: string) => void) | null = null
-let sessionClosedHandler: ((event: { ptySessionId: string; repoRoot: string; worktreePath: string }) => void) | null =
-  null
+let sessionClosedHandler:
+  | ((event: { ptySessionId: string; terminalSessionId: string; repoRoot: string; worktreePath: string }) => void)
+  | null = null
 type TestTerminalSessionSummary = Omit<TerminalSessionSummary, 'repoRoot' | 'worktreePath'> &
   Partial<Pick<TerminalSessionSummary, 'repoRoot' | 'worktreePath'>>
 const listSessionsMock = vi.fn<(...args: Array<{ repoRoot: string }>) => Promise<TestTerminalSessionSummary[]>>(
@@ -639,7 +640,7 @@ beforeEach(() => {
         }
       }),
       onSessionClosed: vi.fn(
-        (cb: (event: { ptySessionId: string; repoRoot: string; worktreePath: string }) => void) => {
+        (cb: (event: { ptySessionId: string; terminalSessionId: string; repoRoot: string; worktreePath: string }) => void) => {
           sessionClosedHandler = cb
           return () => {
             if (sessionClosedHandler === cb) sessionClosedHandler = null
@@ -1115,6 +1116,7 @@ describe('TerminalSessionProvider', () => {
       await act(async () => {
         sessionClosedHandler?.({
           ptySessionId: 'server_session_1',
+          terminalSessionId: 'session-1',
           repoRoot: REPO_ID,
           worktreePath: WORKTREE_PATH,
         })

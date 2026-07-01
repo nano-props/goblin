@@ -145,6 +145,7 @@ describe('terminal-runtime-actions close broadcast', () => {
     expect(broadcasts).toHaveBeenCalledWith(USER_ID, {
       type: 'session-closed',
       ptySessionId: PTY_SESSION_ID,
+      terminalSessionId: 'terminal-session-1',
       repoRoot: '/repo',
       worktreePath: '/repo',
     })

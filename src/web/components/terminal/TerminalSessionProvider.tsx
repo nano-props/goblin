@@ -174,7 +174,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     // already disposed the local entry, so the handler is a no-op
     // there — the broadcast is multi-window safe by construction.
     const offSessionClosed = terminalBridge.onSessionClosed((event) => {
-      projection.handleSessionClosed(event.ptySessionId)
+      projection.handleSessionClosed(event)
       invalidateWorkspacePaneTabs(event.repoRoot)
     })
 

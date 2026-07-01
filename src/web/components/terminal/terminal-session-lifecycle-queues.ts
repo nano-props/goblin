@@ -1,3 +1,16 @@
+/**
+ * Per-worktree lifecycle queues for terminal create/close orchestration.
+ *
+ * Create requests are serialized by terminal worktree. A second create for the
+ * same worktree either dedupes onto the existing promise when
+ * `isSameRequest(existing, next)` is true, or re-enqueues itself after the
+ * current promise settles when it is a distinct request. Same-request dedupe
+ * must therefore resolve to the same terminalSessionId; distinct requests must
+ * get their own later create attempt.
+ *
+ * Close requests are deduped by ptySessionId and are awaited by later creates
+ * for the same worktree so a fresh create cannot race an orphan close.
+ */
 export interface PendingTerminalCreate<TBase, TOptions> {
   base: TBase
   options: TOptions

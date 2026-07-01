@@ -144,7 +144,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       const closed = isValidTerminalPtySessionId(input?.ptySessionId)
         ? manager.closeSessionForUser(userId, input.ptySessionId)
         : false
-      if (closed && repoRoot) {
+      if (closed && repoRoot && session) {
         // General repo/session-list invalidation is emitted by the
         // manager close lifecycle. This action owns only the targeted
         // sibling-window event; other users must not hear about this
@@ -152,8 +152,9 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         broker.broadcastToUser(userId, {
           type: 'session-closed',
           ptySessionId: input.ptySessionId,
+          terminalSessionId: session.terminalSessionId,
           repoRoot,
-          worktreePath: session?.worktreePath ?? '',
+          worktreePath: session.worktreePath,
         })
       }
       return closed

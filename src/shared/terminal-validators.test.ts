@@ -198,12 +198,14 @@ describe('shared terminal validators', () => {
       normalizeTerminalSocketServerMessage({
         type: 'session-closed',
         ptySessionId: 'pty_session_1_aaaaaaaaa',
+        terminalSessionId: 'session-1',
         repoRoot: '/repo',
         worktreePath: '/repo/worktree',
       }),
     ).toEqual({
       type: 'session-closed',
       ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalSessionId: 'session-1',
       repoRoot: '/repo',
       worktreePath: '/repo/worktree',
     })

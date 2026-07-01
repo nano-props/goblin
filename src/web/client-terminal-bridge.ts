@@ -34,7 +34,7 @@ export function createServerTerminalBridge(options: {
   const sessionsChangedSubscribers = new Set<(repoRoot: string) => void>()
   const workspaceTabsChangedSubscribers = new Set<(repoRoot: string) => void>()
   const sessionClosedSubscribers = new Set<
-    (event: { ptySessionId: string; repoRoot: string; worktreePath: string }) => void
+    (event: { ptySessionId: string; terminalSessionId: string; repoRoot: string; worktreePath: string }) => void
   >()
 
   const connection = createTerminalSocketConnection({
@@ -215,6 +215,7 @@ export function createServerTerminalBridge(options: {
         for (const subscriber of sessionClosedSubscribers)
           subscriber({
             ptySessionId: message.ptySessionId,
+            terminalSessionId: message.terminalSessionId,
             repoRoot: message.repoRoot,
             worktreePath: message.worktreePath,
           })

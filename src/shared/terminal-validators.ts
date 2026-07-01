@@ -171,6 +171,7 @@ const TerminalExitEventSchema = v.object({
 const TerminalSessionClosedEventSchema = v.object({
   type: v.literal('session-closed'),
   ptySessionId: v.string(),
+  terminalSessionId: v.string(),
   repoRoot: v.string(),
   worktreePath: v.string(),
 })

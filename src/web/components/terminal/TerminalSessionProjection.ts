@@ -54,6 +54,7 @@ const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = {
   canonicalTitle: null,
 }
 const EMPTY_SERVER_SNAPSHOTS = new Map<string, TerminalSessionSnapshot>()
+const MAX_PENDING_SERVER_BELLS = 99
 /**
  * Client-level authority for terminal session state.
  *
@@ -212,10 +213,20 @@ export class TerminalSessionProjection {
       this.sessions.get(event.terminalSessionId) ??
       this.sessions.get(this.terminalSessionIdByPtySessionId.get(event.ptySessionId) ?? '')
     if (!session) {
+      this.trimPendingServerBellsForInsert(event.terminalSessionId)
       this.pendingServerBellByTerminalSessionId.set(event.terminalSessionId, event)
       return
     }
     this.applyServerBell(session, event)
+  }
+
+  private trimPendingServerBellsForInsert(terminalSessionId: string): void {
+    if (this.pendingServerBellByTerminalSessionId.has(terminalSessionId)) return
+    while (this.pendingServerBellByTerminalSessionId.size >= MAX_PENDING_SERVER_BELLS) {
+      const oldestTerminalSessionId = this.pendingServerBellByTerminalSessionId.keys().next().value
+      if (!oldestTerminalSessionId) return
+      this.pendingServerBellByTerminalSessionId.delete(oldestTerminalSessionId)
+    }
   }
 
   private applyServerBell(session: TerminalSession, event: TerminalBellRealtimeEvent): void {
@@ -267,12 +278,14 @@ export class TerminalSessionProjection {
   // `closeTerminal`) because the server has already killed the PTY
   // — calling `close` again would no-op the `closeSessionForUser` check
   // on the server and add a useless WS roundtrip.
-  handleSessionClosed(ptySessionId: string): void {
-    const directKey = this.terminalSessionIdByPtySessionId.get(ptySessionId)
-    if (!directKey) return
-    const session = this.sessions.get(directKey)
+  handleSessionClosed(event: { ptySessionId: string; terminalSessionId: string }): void {
+    const terminalSessionId = this.sessions.has(event.terminalSessionId)
+      ? event.terminalSessionId
+      : (this.terminalSessionIdByPtySessionId.get(event.ptySessionId) ?? null)
+    if (!terminalSessionId) return
+    const session = this.sessions.get(terminalSessionId)
     if (!session) return
-    this.discardLocalSessionAndDismissDetailIfLast(directKey, session.descriptor)
+    this.discardLocalSessionAndDismissDetailIfLast(terminalSessionId, session.descriptor)
   }
 
   handleIdentity(event: TerminalIdentityViewModel): void {

@@ -85,6 +85,7 @@ export interface ClientTerminalBridge {
   onSessionClosed: (
     cb: (event: {
       ptySessionId: string
+      terminalSessionId: string
       repoRoot: string
       worktreePath: string
     }) => void,

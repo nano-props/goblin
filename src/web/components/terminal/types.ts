@@ -102,6 +102,9 @@ export interface TerminalCreateOptions {
    * Shell text to run as the terminal starts, before returning to an interactive shell.
    * Known timing risk: the command may print before the first real xterm fit/resize
    * reaches the PTY, so width-sensitive first-frame output can be laid out with a stale size.
+   *
+   * Create dedupe treats requests as the same only when this command matches exactly.
+   * If future create options affect the launched session, update the dedupe predicate too.
    */
   startupShellCommand?: string
 }

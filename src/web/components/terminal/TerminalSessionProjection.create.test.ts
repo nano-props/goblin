@@ -290,6 +290,28 @@ describe('TerminalSessionProjection create flow', () => {
     })
   })
 
+  test('deduplicates identical in-flight creates for the same worktree', async () => {
+    const first = Promise.withResolvers<ReturnType<typeof makeCreateResult>>()
+    mocks.createMock.mockReset()
+    mocks.createMock.mockReturnValueOnce(first.promise)
+
+    const base = { repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH }
+    const options = { startupShellCommand: "bat '/repo/a.ts'\r" }
+
+    const firstCreate = projection.createTerminal(base, options)
+    await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
+
+    const secondCreate = projection.createTerminal(base, { ...options })
+
+    expect(secondCreate).toBe(firstCreate)
+    expect(mocks.createMock).toHaveBeenCalledTimes(1)
+
+    first.resolve(makeCreateResult())
+    await expect(firstCreate).resolves.toBe('session-1')
+    await expect(secondCreate).resolves.toBe('session-1')
+    expect(mocks.createMock).toHaveBeenCalledTimes(1)
+  })
+
   test('queues a different startup shell command behind an in-flight create for the same worktree', async () => {
     const first = Promise.withResolvers<ReturnType<typeof makeCreateResult>>()
     const secondResult = makeCreateResult({
@@ -646,10 +668,41 @@ describe('TerminalSessionProjection create flow', () => {
 
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
 
-    projection.handleSessionClosed('pty_session_1_aaaaaaaaa')
+    projection.handleSessionClosed({ ptySessionId: 'pty_session_1_aaaaaaaaa', terminalSessionId: 'session-1' })
 
     // The local session is gone; the worktree snapshot is empty.
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(0)
+  })
+
+  test('durable close: handleSessionClosed falls back to terminalSessionId when the pty index misses', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    projection.registerHost(WORKTREE_KEY, host)
+    await projection.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
+
+    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
+
+    projection.handleSessionClosed({ ptySessionId: 'pty_session_missing_aaaaaaaaa', terminalSessionId: 'session-1' })
+
+    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(0)
+  })
+
+  test('caps pending server bells for unknown sessions', () => {
+    for (let index = 0; index < 100; index += 1) {
+      projection.handleServerBell({
+        ptySessionId: `pty_session_${index}_aaaaaaaaa`,
+        terminalSessionId: `session-${index}`,
+        repoRoot: REPO_ROOT,
+        worktreePath: WORKTREE_PATH,
+        processName: 'zsh',
+        canonicalTitle: null,
+      })
+    }
+
+    const pendingBells = (projection as any).pendingServerBellByTerminalSessionId as Map<string, unknown>
+    expect(pendingBells.size).toBe(99)
+    expect(pendingBells.has('session-0')).toBe(false)
+    expect(pendingBells.has('session-99')).toBe(true)
   })
 
   test('prunes sessions missing from the repo index and clears their bell badge', async () => {
@@ -735,7 +788,7 @@ describe('TerminalSessionProjection create flow', () => {
     try {
       expect(projection.repoBellCount(REPO_ROOT)).toBe(1)
 
-      projection.handleSessionClosed('pty_session_1_aaaaaaaaa')
+      projection.handleSessionClosed({ ptySessionId: 'pty_session_1_aaaaaaaaa', terminalSessionId })
 
       expect(projection.repoBellCount(REPO_ROOT)).toBe(0)
       expect(listener).toHaveBeenCalledTimes(1)

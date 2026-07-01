@@ -49,6 +49,7 @@ export type TerminalRealtimeMessage =
   | {
       type: 'session-closed'
       ptySessionId: string
+      terminalSessionId: string
       repoRoot: string
       worktreePath: string
     }
