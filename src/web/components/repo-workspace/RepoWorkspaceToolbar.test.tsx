@@ -509,7 +509,7 @@ describe('RepoWorkspaceToolbar', () => {
     expect(container.querySelector<HTMLButtonElement>('button[aria-label="worktrees.reveal-title"]')).toBeNull()
   })
 
-  test('keeps the external app launcher reachable in compact mode', () => {
+  test('hides the external app launcher in compact mode', () => {
     compactUi = true
     const { container: c } = renderToolbar({
       terminalCount: 1,
@@ -517,7 +517,8 @@ describe('RepoWorkspaceToolbar', () => {
       navigation: navigationWith({}),
     })
 
-    expect(c.querySelector('button[aria-label="workspace.open-externally.open"]')).not.toBeNull()
+    expect(c.querySelector('button[aria-label="workspace.open-externally.open"]')).toBeNull()
+    expect(c.querySelector('[data-workspace-toolbar-trailing-actions]')).toBeNull()
   })
 
   test('renders status and terminal tabs in one workspace tab strip with a separator', () => {
