@@ -21,6 +21,7 @@ import {
 import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { TerminalReplaceWorkspaceTabsInput } from '#/shared/terminal-types.ts'
+import { clearWorkspacePaneTabsOperationQueuesForTests } from '#/web/workspace-pane/workspace-pane-tabs-operation-queue.ts'
 
 const REPO_ROOT = '/tmp/workspace-pane-tabs-reorder-mutation-repo'
 const BRANCH_NAME = 'feature/worktree'
@@ -36,6 +37,7 @@ let queryClient: QueryClient
 let controls: WorkspacePaneTabsReorderMutationResult | null = null
 
 beforeEach(() => {
+  clearWorkspacePaneTabsOperationQueuesForTests()
   resetReposStore()
   queryClient = new QueryClient({
     defaultOptions: {
@@ -47,6 +49,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  clearWorkspacePaneTabsOperationQueuesForTests()
   queryClient.clear()
   resetReposStore()
   setClientBridgeForTests(null)
@@ -83,11 +86,12 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     })
   })
 
-  test('does not let an older server response overwrite a newer optimistic reorder', async () => {
-    const requests = installDeferredReplaceWorkspaceTabs()
+  test('queues reorders and recomputes the next reorder from current cached tabs', async () => {
     const sourceTabs = [terminalEntry('session-1'), staticEntry('status'), staticEntry('history')]
+    const requests = installDeferredReplaceWorkspaceTabs()
     const firstReorderTabs = [staticEntry('status'), terminalEntry('session-1'), staticEntry('history')]
-    const secondReorderTabs = [staticEntry('history'), staticEntry('status'), terminalEntry('session-1')]
+    const secondDraggedTabs = [terminalEntry('session-1'), staticEntry('status')]
+    const expectedSecondCommitTabs = [terminalEntry('session-1'), staticEntry('status'), staticEntry('history')]
     seedWorkspacePaneTabs(sourceTabs)
     renderMutationHook({ canonicalTabs: sourceTabs })
 
@@ -100,11 +104,9 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     })
 
     act(() => {
-      currentControls().reorderTabs(secondReorderTabs)
+      currentControls().reorderTabs(secondDraggedTabs)
     })
-    await vi.waitFor(() => {
-      expect(readWorkspacePaneTabsForBranch(REPO_ROOT, BRANCH_NAME, queryClient)).toEqual(secondReorderTabs)
-    })
+    expect(readWorkspacePaneTabsForBranch(REPO_ROOT, BRANCH_NAME, queryClient)).toEqual(firstReorderTabs)
 
     await act(async () => {
       requests[0]!.resolve(firstReorderTabs)
@@ -113,21 +115,22 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     await vi.waitFor(() => {
       expect(requests).toHaveLength(2)
     })
-    expect(readWorkspacePaneTabsForBranch(REPO_ROOT, BRANCH_NAME, queryClient)).toEqual(secondReorderTabs)
+    expect(requests[1]!.input.tabs).toEqual(expectedSecondCommitTabs)
+    expect(readWorkspacePaneTabsForBranch(REPO_ROOT, BRANCH_NAME, queryClient)).toEqual(expectedSecondCommitTabs)
 
     await act(async () => {
-      requests[1]!.resolve(secondReorderTabs)
+      requests[1]!.resolve(expectedSecondCommitTabs)
       await flushMicrotasks()
     })
     await vi.waitFor(() => {
-      expect(readWorkspacePaneTabsForBranch(REPO_ROOT, BRANCH_NAME, queryClient)).toEqual(secondReorderTabs)
+      expect(readWorkspacePaneTabsForBranch(REPO_ROOT, BRANCH_NAME, queryClient)).toEqual(expectedSecondCommitTabs)
     })
   })
 
-  test('does not roll back a newer optimistic reorder when an older reorder fails', async () => {
+  test('continues to the next queued reorder after an earlier reorder fails', async () => {
     const onReorderRejected = vi.fn()
-    const requests = installDeferredReplaceWorkspaceTabs()
     const sourceTabs = [terminalEntry('session-1'), staticEntry('status'), staticEntry('history')]
+    const requests = installDeferredReplaceWorkspaceTabs()
     const firstReorderTabs = [staticEntry('status'), terminalEntry('session-1'), staticEntry('history')]
     const secondReorderTabs = [staticEntry('history'), staticEntry('status'), terminalEntry('session-1')]
     seedWorkspacePaneTabs(sourceTabs)
@@ -144,9 +147,7 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     act(() => {
       currentControls().reorderTabs(secondReorderTabs)
     })
-    await vi.waitFor(() => {
-      expect(readWorkspacePaneTabsForBranch(REPO_ROOT, BRANCH_NAME, queryClient)).toEqual(secondReorderTabs)
-    })
+    expect(readWorkspacePaneTabsForBranch(REPO_ROOT, BRANCH_NAME, queryClient)).toEqual(firstReorderTabs)
 
     await act(async () => {
       requests[0]!.reject(new Error('first reorder failed'))
@@ -156,7 +157,7 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
       expect(requests).toHaveLength(2)
     })
     expect(readWorkspacePaneTabsForBranch(REPO_ROOT, BRANCH_NAME, queryClient)).toEqual(secondReorderTabs)
-    expect(onReorderRejected).not.toHaveBeenCalled()
+    expect(onReorderRejected).toHaveBeenCalledTimes(1)
 
     await act(async () => {
       requests[1]!.resolve(secondReorderTabs)
@@ -177,27 +178,6 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     const sourceTabs = [terminalEntry('session-1'), staticEntry('status')]
     const reorderedTabs = [staticEntry('status'), terminalEntry('session-1')]
     seedWorkspacePaneTabs(sourceTabs)
-    renderMutationHook({ canonicalTabs: sourceTabs, onReorderRejected })
-
-    act(() => {
-      currentControls().reorderTabs(reorderedTabs)
-    })
-
-    await vi.waitFor(() => {
-      expect(readWorkspacePaneTabsForBranch(REPO_ROOT, BRANCH_NAME, queryClient)).toEqual(sourceTabs)
-      expect(onReorderRejected).toHaveBeenCalledTimes(1)
-    })
-  })
-
-  test('clears optimistic query data when a failed reorder has no previous cache', async () => {
-    const onReorderRejected = vi.fn()
-    installWorkspacePaneTabsTestBridge({
-      replaceWorkspaceTabs: async () => {
-        throw new Error('server unavailable')
-      },
-    })
-    const sourceTabs = [staticEntry('status')]
-    const reorderedTabs = [staticEntry('status'), terminalEntry('session-1')]
     renderMutationHook({ canonicalTabs: sourceTabs, onReorderRejected })
 
     act(() => {

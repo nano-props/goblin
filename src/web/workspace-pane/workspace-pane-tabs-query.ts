@@ -20,6 +20,7 @@ export function workspacePaneTabsQueryOptions(repoRoot: string) {
     queryKey: workspacePaneTabsQueryKey(repoRoot),
     queryFn: async () => normalizeWorkspacePaneTabsQueryData(await terminalBridge.listWorkspaceTabs({ repoRoot })),
     staleTime: Number.POSITIVE_INFINITY,
+    gcTime: Number.POSITIVE_INFINITY,
   })
 }
 

@@ -72,6 +72,13 @@ export function orderWorkspacePaneItemsByTabEntries<T>(
   return [...orderedItems, ...nonSortableItems]
 }
 
+export function workspacePaneTabsWithDraggedOrder(
+  currentTabs: readonly WorkspacePaneTabEntry[],
+  draggedTabs: readonly WorkspacePaneTabEntry[],
+): WorkspacePaneTabEntry[] {
+  return orderWorkspacePaneItemsByTabEntries(currentTabs, draggedTabs, (entry) => entry)
+}
+
 export function workspacePaneTabEntryListIdentity(tabs: readonly WorkspacePaneTabEntry[]): string {
   return tabs.map(workspacePaneTabEntryIdentity).join('\0')
 }

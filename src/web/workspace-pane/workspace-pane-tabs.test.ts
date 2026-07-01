@@ -1,7 +1,10 @@
 import { describe, expect, test } from 'vitest'
 import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import { orderWorkspacePaneItemsByTabEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
+import {
+  orderWorkspacePaneItemsByTabEntries,
+  workspacePaneTabsWithDraggedOrder,
+} from '#/web/workspace-pane/workspace-pane-tabs.ts'
 
 describe('orderWorkspacePaneItemsByTabEntries', () => {
   test('orders materialized items by tab entries without creating missing items', () => {
@@ -26,6 +29,20 @@ describe('orderWorkspacePaneItemsByTabEntries', () => {
       'terminal-2',
       'terminal-1',
       'pending',
+    ])
+  })
+})
+
+describe('workspacePaneTabsWithDraggedOrder', () => {
+  test('reorders current tabs by dragged tabs while preserving tabs absent from the drag snapshot', () => {
+    const terminalOne = terminalEntry('session-1')
+    const status = staticEntry('status')
+    const history = staticEntry('history')
+
+    expect(workspacePaneTabsWithDraggedOrder([terminalOne, status, history], [status, terminalOne])).toEqual([
+      status,
+      terminalOne,
+      history,
     ])
   })
 })

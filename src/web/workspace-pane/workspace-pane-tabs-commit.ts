@@ -6,7 +6,7 @@ import {
   fetchWorkspacePaneTabsForBranch,
   setWorkspacePaneTabsForBranchQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { runWorkspacePaneTabsMutation } from '#/web/workspace-pane/workspace-pane-tabs-mutation-queue.ts'
+import { runWorkspacePaneTabsOperation } from '#/web/workspace-pane/workspace-pane-tabs-operation-queue.ts'
 
 export interface CommitWorkspacePaneTabsInput {
   repoRoot: string
@@ -23,15 +23,11 @@ export interface UpdateWorkspacePaneTabsInput {
 }
 
 export async function commitWorkspacePaneTabs(input: CommitWorkspacePaneTabsInput): Promise<boolean> {
-  return await runWorkspacePaneTabsMutation(async () => await commitWorkspacePaneTabsNow(input))
-}
-
-export async function replaceWorkspacePaneTabs(input: CommitWorkspacePaneTabsInput): Promise<WorkspacePaneTabEntry[]> {
-  return await runWorkspacePaneTabsMutation(async () => await replaceWorkspacePaneTabsOnServer(input))
+  return await runWorkspacePaneTabsOperation(input, async () => await commitWorkspacePaneTabsNow(input))
 }
 
 export async function updateWorkspacePaneTabs(input: UpdateWorkspacePaneTabsInput): Promise<boolean> {
-  return await runWorkspacePaneTabsMutation(async () => {
+  return await runWorkspacePaneTabsOperation(input, async () => {
     const currentTabs = await fetchWorkspacePaneTabsForBranch({
       repoRoot: input.repoRoot,
       branchName: input.branchName,
@@ -66,7 +62,11 @@ async function commitWorkspacePaneTabsNow(input: CommitWorkspacePaneTabsInput): 
   }
 }
 
-async function replaceWorkspacePaneTabsOnServer(
+/**
+ * Low-level full-list server replace. User-facing tab operations should run
+ * through runWorkspacePaneTabsOperation before calling this.
+ */
+export async function replaceWorkspacePaneTabsOnServer(
   input: CommitWorkspacePaneTabsInput,
 ): Promise<WorkspacePaneTabEntry[]> {
   return await terminalBridge.replaceWorkspaceTabs({

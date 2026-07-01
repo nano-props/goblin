@@ -29,6 +29,11 @@ import {
 import { syncTerminalPtySessionIdIndex } from '#/web/components/terminal/terminal-session-index.ts'
 import { resolveSelectedTerminalSessionId } from '#/web/components/terminal/terminal-session-selection.ts'
 import { buildTerminalWorktreeSnapshot } from '#/web/components/terminal/terminal-session-worktree-snapshot.ts'
+import { runWorkspacePaneTabsOperation } from '#/web/workspace-pane/workspace-pane-tabs-operation-queue.ts'
+import {
+  fetchWorkspacePaneTabsForBranch,
+  invalidateWorkspacePaneTabs,
+} from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import type {
   TerminalDescriptor,
   TerminalCreateOptions,
@@ -106,6 +111,9 @@ export class TerminalSessionProjection {
   private readonly pendingCloseByPtySessionId = new Map<
     string,
     {
+      repoRoot: string
+      branchName: string
+      worktreePath: string
       terminalWorktreeKey: string
       promise: Promise<void>
       resolve: () => void
@@ -450,6 +458,21 @@ export class TerminalSessionProjection {
     geometry: { cols: number; rows: number },
     options: TerminalCreateOptions,
   ): Promise<string> {
+    return await runWorkspacePaneTabsOperation(
+      {
+        repoRoot: base.repoRoot,
+        branchName: base.branch,
+        worktreePath: base.worktreePath,
+      },
+      async () => await this.performCreateTerminalNow(base, geometry, options),
+    )
+  }
+
+  private async performCreateTerminalNow(
+    base: TerminalSessionBase,
+    geometry: { cols: number; rows: number },
+    options: TerminalCreateOptions,
+  ): Promise<string> {
     const clientId = readOrCreateWebTerminalClientId()
     const terminalWorktreeKey = formatTerminalWorktreeKey(base.repoRoot, base.worktreePath)
     const createKind = options.startupShellCommand
@@ -585,7 +608,13 @@ export class TerminalSessionProjection {
   // a `restart` and a `dispose` can both call this for the same
   // ptySessionId in quick succession. The first call owns the request;
   // the second is a no-op and just observes the same outcome.
-  enqueueDurableClose(input: { ptySessionId: string; terminalWorktreeKey: string }): Promise<void> {
+  enqueueDurableClose(input: {
+    ptySessionId: string
+    repoRoot: string
+    branchName: string
+    worktreePath: string
+    terminalWorktreeKey: string
+  }): Promise<void> {
     const existing = this.pendingCloseByPtySessionId.get(input.ptySessionId)
     if (existing) return existing.promise
 
@@ -596,13 +625,16 @@ export class TerminalSessionProjection {
       reject = innerReject
     })
     this.pendingCloseByPtySessionId.set(input.ptySessionId, {
+      repoRoot: input.repoRoot,
+      branchName: input.branchName,
+      worktreePath: input.worktreePath,
       terminalWorktreeKey: input.terminalWorktreeKey,
       promise,
       resolve,
       reject,
     })
 
-    void this.performDurableClose(input.ptySessionId)
+    void this.performDurableClose(input)
     return promise
   }
 
@@ -622,9 +654,37 @@ export class TerminalSessionProjection {
     await Promise.allSettled(pendingForWorktree.map(([, entry]) => entry.promise))
   }
 
-  private async performDurableClose(ptySessionId: string): Promise<void> {
+  private async performDurableClose(input: {
+    ptySessionId: string
+    repoRoot: string
+    branchName: string
+    worktreePath: string
+  }): Promise<void> {
+    const { ptySessionId } = input
     try {
-      await terminalBridge.close({ ptySessionId })
+      await runWorkspacePaneTabsOperation(
+        {
+          repoRoot: input.repoRoot,
+          branchName: input.branchName,
+          worktreePath: input.worktreePath,
+        },
+        async () => {
+          await terminalBridge.close({ ptySessionId })
+          try {
+            invalidateWorkspacePaneTabs(input.repoRoot)
+            await fetchWorkspacePaneTabsForBranch({
+              repoRoot: input.repoRoot,
+              branchName: input.branchName,
+            })
+          } catch (err) {
+            terminalSessionProviderLog.warn('workspace pane tabs refresh failed after terminal close', {
+              repoRoot: input.repoRoot,
+              worktreePath: input.worktreePath,
+              err,
+            })
+          }
+        },
+      )
       const entry = this.pendingCloseByPtySessionId.get(ptySessionId)
       this.pendingCloseByPtySessionId.delete(ptySessionId)
       entry?.resolve()
@@ -1105,11 +1165,19 @@ export class TerminalSessionProjection {
       this.notifyWorktree(descriptor.terminalWorktreeKey)
       return current
     }
-    const session = new TerminalSession(
+    let session!: TerminalSession
+    session = new TerminalSession(
       descriptor,
       () => this.notifySession(descriptor.terminalSessionId),
       this.bellState.handleBell,
-      (ptySessionId) => this.enqueueDurableClose({ ptySessionId, terminalWorktreeKey: descriptor.terminalWorktreeKey }),
+      (ptySessionId) =>
+        this.enqueueDurableClose({
+          ptySessionId,
+          repoRoot: session.descriptor.repoRoot,
+          branchName: session.descriptor.branch,
+          worktreePath: session.descriptor.worktreePath,
+          terminalWorktreeKey: session.descriptor.terminalWorktreeKey,
+        }),
     )
     this.sessions.set(descriptor.terminalSessionId, session)
     this.syncPtySessionIdIndex(descriptor.terminalSessionId, session.currentPtySessionId())

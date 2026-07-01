@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   createMock: vi.fn(),
   closeMock: vi.fn(),
+  listWorkspaceTabsMock: vi.fn(),
   setBadgeMock: vi.fn(),
   estimateTerminalGeometryMock: vi.fn<() => { cols: number; rows: number } | null>(() => ({
     cols: 101,
@@ -21,6 +22,7 @@ vi.mock('#/web/terminal.ts', () => ({
   terminalBridge: {
     create: mocks.createMock,
     close: mocks.closeMock,
+    listWorkspaceTabs: mocks.listWorkspaceTabsMock,
     setBadge: mocks.setBadgeMock,
   },
 }))
@@ -117,6 +119,7 @@ import {
   TerminalSessionProjection,
   setTerminalSessionProjectionForTests,
 } from '#/web/components/terminal/TerminalSessionProjection.ts'
+import { clearWorkspacePaneTabsOperationQueuesForTests } from '#/web/workspace-pane/workspace-pane-tabs-operation-queue.ts'
 
 const REPO_ROOT = '/repo'
 const WORKTREE_PATH = '/repo'
@@ -199,14 +202,27 @@ function emitBellForKey(projection: TerminalSessionProjection, terminalSessionId
   )
 }
 
+function durableCloseInput() {
+  return {
+    ptySessionId: 'session-stale',
+    repoRoot: REPO_ROOT,
+    branchName: BRANCH,
+    worktreePath: WORKTREE_PATH,
+    terminalWorktreeKey: WORKTREE_KEY,
+  }
+}
+
 describe('TerminalSessionProjection create flow', () => {
   let projection: TerminalSessionProjection
 
   beforeEach(() => {
+    clearWorkspacePaneTabsOperationQueuesForTests()
     mocks.createMock.mockReset()
     mocks.createMock.mockResolvedValue(makeCreateResult())
     mocks.closeMock.mockReset()
     mocks.closeMock.mockResolvedValue(true)
+    mocks.listWorkspaceTabsMock.mockReset()
+    mocks.listWorkspaceTabsMock.mockResolvedValue([])
     mocks.setBadgeMock.mockReset()
     mocks.estimateTerminalGeometryMock.mockClear()
     mocks.estimateManagedTerminalGeometryMock.mockClear()
@@ -224,6 +240,7 @@ describe('TerminalSessionProjection create flow', () => {
 
   afterEach(() => {
     projection.destroy()
+    clearWorkspacePaneTabsOperationQueuesForTests()
     setTerminalSessionProjectionForTests(null)
     document.body.innerHTML = ''
     if (originalResizeObserver) {
@@ -523,8 +540,7 @@ describe('TerminalSessionProjection create flow', () => {
     // createTerminal must wait for the close to settle before
     // issuing its own create call.
     const closePromise = projection.enqueueDurableClose({
-      ptySessionId: 'session-stale',
-      terminalWorktreeKey: WORKTREE_KEY,
+      ...durableCloseInput(),
     })
 
     // Start the create before the close settles. The promise must
@@ -559,8 +575,7 @@ describe('TerminalSessionProjection create flow', () => {
     mocks.closeMock.mockRejectedValueOnce(new Error('Terminal socket closed'))
 
     const closePromise = projection.enqueueDurableClose({
-      ptySessionId: 'session-stale',
-      terminalWorktreeKey: WORKTREE_KEY,
+      ...durableCloseInput(),
     })
 
     await expect(closePromise).rejects.toThrow('Terminal socket closed')
@@ -585,12 +600,10 @@ describe('TerminalSessionProjection create flow', () => {
     )
 
     const first = projection.enqueueDurableClose({
-      ptySessionId: 'session-stale',
-      terminalWorktreeKey: WORKTREE_KEY,
+      ...durableCloseInput(),
     })
     const second = projection.enqueueDurableClose({
-      ptySessionId: 'session-stale',
-      terminalWorktreeKey: WORKTREE_KEY,
+      ...durableCloseInput(),
     })
 
     // Only one close call was dispatched.
@@ -607,17 +620,23 @@ describe('TerminalSessionProjection create flow', () => {
     // destroy, every entry rejects so callers awaiting it can clean
     // up. The mock `close` is left hanging so the entry is still
     // pending when destroy runs.
-    mocks.closeMock.mockReturnValueOnce(new Promise<boolean>(() => {}))
+    let resolveClose!: (value: boolean) => void
+    mocks.closeMock.mockReturnValueOnce(
+      new Promise<boolean>((resolve) => {
+        resolveClose = resolve
+      }),
+    )
 
     const closePromise = projection.enqueueDurableClose({
-      ptySessionId: 'session-stale',
-      terminalWorktreeKey: WORKTREE_KEY,
+      ...durableCloseInput(),
     })
 
     expect((projection as any).pendingCloseByPtySessionId.size).toBe(1)
     projection.destroy()
     await expect(closePromise).rejects.toThrow('terminal session projection destroyed')
     expect((projection as any).pendingCloseByPtySessionId.size).toBe(0)
+    resolveClose(true)
+    await vi.waitFor(() => expect(mocks.listWorkspaceTabsMock).toHaveBeenCalled())
   })
 
   test('durable close: handleSessionClosed drops the matching local session', async () => {

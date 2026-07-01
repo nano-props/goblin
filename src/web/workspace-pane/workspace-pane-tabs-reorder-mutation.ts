@@ -1,24 +1,21 @@
 import { useCallback, useMemo } from 'react'
-import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import {
   cancelWorkspacePaneTabs,
   invalidateWorkspacePaneTabs,
+  readWorkspacePaneTabsForBranch,
   setWorkspacePaneTabsForBranchQueryData,
-  workspacePaneTabsForBranchFromQueryData,
   workspacePaneTabsQueryKey,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import {
-  type CommitWorkspacePaneTabsInput,
-  replaceWorkspacePaneTabs,
-} from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
+import { replaceWorkspacePaneTabsOnServer } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import { gblLog } from '#/web/logger.ts'
-import { workspacePaneTabEntryListIdentity } from '#/web/workspace-pane/workspace-pane-tabs.ts'
-
-interface WorkspacePaneTabsReorderMutationContext {
-  previousQueryData: WorkspacePaneTabsQueryData | undefined
-}
+import { runWorkspacePaneTabsOperation } from '#/web/workspace-pane/workspace-pane-tabs-operation-queue.ts'
+import {
+  workspacePaneTabEntryListIdentity,
+  workspacePaneTabsWithDraggedOrder,
+} from '#/web/workspace-pane/workspace-pane-tabs.ts'
 
 export interface WorkspacePaneTabsReorderMutationInput {
   repoRoot: string
@@ -52,83 +49,62 @@ export function useWorkspacePaneTabsReorderMutation(
     [input.canonicalTabs],
   )
 
-  const { mutate } = useMutation<
-    WorkspacePaneTabEntry[],
-    unknown,
-    CommitWorkspacePaneTabsInput,
-    WorkspacePaneTabsReorderMutationContext
-  >({
-    mutationFn: replaceWorkspacePaneTabs,
-    onMutate: async (variables) => {
-      await cancelWorkspacePaneTabs(variables.repoRoot, queryClient)
-      const previousQueryData = queryClient.getQueryData<WorkspacePaneTabsQueryData>(
-        workspacePaneTabsQueryKey(variables.repoRoot),
-      )
-      setWorkspacePaneTabsForBranchQueryData(
-        {
-          repoRoot: variables.repoRoot,
-          branchName: variables.branchName,
-          worktreePath: variables.worktreePath,
-          tabs: variables.tabs,
-        },
-        queryClient,
-      )
-      return { previousQueryData }
-    },
-    onSuccess: (serverTabs, variables) => {
-      if (!workspacePaneTabsMutationStillCurrent(variables, queryClient)) return
-      setWorkspacePaneTabsForBranchQueryData(
-        {
-          repoRoot: variables.repoRoot,
-          branchName: variables.branchName,
-          worktreePath: variables.worktreePath,
-          tabs: serverTabs,
-        },
-        queryClient,
-      )
-    },
-    onError: (err, variables, context) => {
-      if (!workspacePaneTabsMutationStillCurrent(variables, queryClient)) return
-      queryClient.setQueryData<WorkspacePaneTabsQueryData>(
-        workspacePaneTabsQueryKey(variables.repoRoot),
-        context?.previousQueryData ?? [],
-      )
-      invalidateWorkspacePaneTabs(variables.repoRoot, queryClient)
-      input.onReorderRejected?.()
-      gblLog.warn('workspace pane tabs mutation failed', {
-        repoRoot: variables.repoRoot,
-        worktreePath: variables.worktreePath,
-        err,
-      })
-    },
-  })
-
   const reorderTabs = useCallback(
     (tabs: readonly WorkspacePaneTabEntry[]) => {
       if (!target) return
       const nextIdentity = workspacePaneTabEntryListIdentity(tabs)
       if (nextIdentity === canonicalTabsIdentity) return
-      const nextTabs = [...tabs]
-      mutate({
-        repoRoot: target.repoRoot,
-        branchName: target.branchName,
-        worktreePath: target.worktreePath,
-        tabs: nextTabs,
+      const draggedTabs = [...tabs]
+      void runWorkspacePaneTabsOperation(target, async () => {
+        await cancelWorkspacePaneTabs(target.repoRoot, queryClient)
+        const currentTabs = readWorkspacePaneTabsForBranch(target.repoRoot, target.branchName, queryClient)
+        const nextTabs = workspacePaneTabsWithDraggedOrder(currentTabs, draggedTabs)
+        if (workspacePaneTabEntryListIdentity(nextTabs) === workspacePaneTabEntryListIdentity(currentTabs)) return
+        const previousQueryData = queryClient.getQueryData<WorkspacePaneTabsQueryData>(
+          workspacePaneTabsQueryKey(target.repoRoot),
+        )
+        setWorkspacePaneTabsForBranchQueryData(
+          {
+            repoRoot: target.repoRoot,
+            branchName: target.branchName,
+            worktreePath: target.worktreePath,
+            tabs: nextTabs,
+          },
+          queryClient,
+        )
+        try {
+          const serverTabs = await replaceWorkspacePaneTabsOnServer({
+            repoRoot: target.repoRoot,
+            branchName: target.branchName,
+            worktreePath: target.worktreePath,
+            tabs: nextTabs,
+          })
+          setWorkspacePaneTabsForBranchQueryData(
+            {
+              repoRoot: target.repoRoot,
+              branchName: target.branchName,
+              worktreePath: target.worktreePath,
+              tabs: serverTabs,
+            },
+            queryClient,
+          )
+        } catch (err) {
+          queryClient.setQueryData<WorkspacePaneTabsQueryData>(
+            workspacePaneTabsQueryKey(target.repoRoot),
+            previousQueryData ?? [],
+          )
+          invalidateWorkspacePaneTabs(target.repoRoot, queryClient)
+          input.onReorderRejected?.()
+          gblLog.warn('workspace pane tabs mutation failed', {
+            repoRoot: target.repoRoot,
+            worktreePath: target.worktreePath,
+            err,
+          })
+        }
       })
     },
-    [canonicalTabsIdentity, mutate, target],
+    [canonicalTabsIdentity, input.onReorderRejected, queryClient, target],
   )
 
   return { reorderTabs }
-}
-
-function workspacePaneTabsMutationStillCurrent(
-  variables: CommitWorkspacePaneTabsInput,
-  queryClient: QueryClient,
-): boolean {
-  const currentData = queryClient.getQueryData<WorkspacePaneTabsQueryData>(
-    workspacePaneTabsQueryKey(variables.repoRoot),
-  )
-  const currentTabs = workspacePaneTabsForBranchFromQueryData(currentData ?? [], variables.branchName)
-  return workspacePaneTabEntryListIdentity(currentTabs) === workspacePaneTabEntryListIdentity(variables.tabs)
 }
