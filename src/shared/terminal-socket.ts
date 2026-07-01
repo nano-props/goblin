@@ -18,7 +18,7 @@ import type {
   TerminalSessionSummary,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
-  TerminalWorkspaceTabsEntry,
+  WorkspacePaneTabsEntry,
   TerminalTitleEvent,
   TerminalExitEvent,
   TerminalWriteInput,
@@ -50,7 +50,6 @@ export type TerminalRealtimeMessage =
       ptySessionId: string
       repoRoot: string
       worktreePath: string
-      tabs: WorkspacePaneTabEntry[]
     }
 
 export interface TerminalSocketRequestInputs {
@@ -76,7 +75,7 @@ export interface TerminalSocketResponseOutputs {
   takeover: TerminalTakeoverResult
   close: TerminalMutationResult
   'list-sessions': TerminalSessionSummary[]
-  'list-workspace-tabs': TerminalWorkspaceTabsEntry[]
+  'list-workspace-tabs': WorkspacePaneTabsEntry[]
   create: TerminalCreateResult
   'replace-tabs': WorkspacePaneTabEntry[]
   prune: { pruned: number; remaining: number }

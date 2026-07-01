@@ -1,19 +1,26 @@
-import { describe, expect, test } from 'vitest'
+import { beforeEach, describe, expect, test } from 'vitest'
 import { localRepoSessionEntry } from '#/shared/remote-repo.ts'
 import {
   restoreRestorableWorkspaceStateFromSession,
   workspaceSessionStateFromRestorableWorkspaceState,
 } from '#/web/restorable-workspace-state.ts'
-import { createRepoBranch, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 
 describe('restorable-workspace-state', () => {
+  beforeEach(() => {
+    resetReposStore()
+  })
+
   test('maps restorable workspace state into WorkspaceSessionState', () => {
     const repo = seedRepoState({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [workspacePaneStaticTabEntry('status')],
+      },
     })
 
     expect(

@@ -10,8 +10,9 @@ import {
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
-import { workspacePaneStaticTabsForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
 import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { readWorkspacePaneTabsForBranch } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 
 const REPO_ID = '/tmp/workspace-pane-tab-repo'
 const WORKTREE_PATH = '/tmp/workspace-pane-tab-worktree'
@@ -31,7 +32,6 @@ afterEach(() => {
 describe('openWorkspacePaneTab', () => {
   test('opens status as a branch-owned tab when the branch has a worktree', async () => {
     seedWorktreeRepo('status')
-    useReposStore.getState().closeWorkspacePaneStaticTab(REPO_ID, 'status')
     const refreshStatus = vi.fn(async () => {})
     useReposStore.setState({ refreshStatus: refreshStatus as typeof originalRefreshStatus })
     const token = useReposStore.getState().repos[REPO_ID]!.instanceToken
@@ -149,8 +149,7 @@ function seedWorktreeRepo(preferredWorkspacePaneTab: WorkspacePaneStaticTabType)
 }
 
 function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
-  const repo = useReposStore.getState().repos[REPO_ID]
-  return repo ? workspacePaneStaticTabsForBranch(repo.ui, branchName) : []
+  return workspacePaneStaticTabsFromEntries(readWorkspacePaneTabsForBranch(REPO_ID, branchName))
 }
 
 function preferredWorkspacePaneTab() {

@@ -22,7 +22,7 @@ import type {
   TerminalTakeoverInput,
   TerminalTakeoverResult,
   TerminalTestNotificationInput,
-  TerminalWorkspaceTabsEntry,
+  WorkspacePaneTabsEntry,
   TerminalTitleEvent,
   TerminalWriteInput,
 } from '#/shared/terminal-types.ts'
@@ -40,7 +40,7 @@ export interface ClientTerminalBridge {
   replaceWorkspaceTabs: (input: TerminalReplaceWorkspaceTabsInput) => Promise<WorkspacePaneTabEntry[]>
   pruneTerminals: (repoRoot: string) => Promise<{ pruned: number; remaining: number }>
   listSessions: (input: { repoRoot: string }) => Promise<TerminalSessionSummary[]>
-  listWorkspaceTabs: (input: TerminalListWorkspaceTabsInput) => Promise<TerminalWorkspaceTabsEntry[]>
+  listWorkspaceTabs: (input: TerminalListWorkspaceTabsInput) => Promise<WorkspacePaneTabsEntry[]>
   /**
    * Open the underlying WebSocket (if not already open) and resolve
    * once it reaches the OPEN state. Used as a T1.2 prewarm when the
@@ -86,7 +86,6 @@ export interface ClientTerminalBridge {
       ptySessionId: string
       repoRoot: string
       worktreePath: string
-      tabs: WorkspacePaneTabEntry[]
     }) => void,
   ) => () => void
 }

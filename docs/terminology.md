@@ -107,7 +107,7 @@ Canonical terminal terms:
 | Per-session client view | `TerminalSessionView` | `TerminalSlotView` |
 | Per-session client state | `TerminalSessionState` | `TerminalSlotState` |
 | Per-session client runtime | `TerminalSessionRuntime` | `TerminalSlotRuntime` |
-| Per-worktree mixed tab runtime | `TerminalWorkspaceTabsRuntime` | terminal-only worktree list runtimes |
+| Workspace pane tab runtime | `WorkspacePaneTabsRuntime` | terminal-only or worktree-only tab list runtimes |
 | Terminal session identity | `terminalSessionId` | old composite terminal identity names |
 | Terminal worktree grouping | `terminalWorktreeKey` / `TerminalWorktreeKey` | old workspace-pane identity names |
 | Session lifecycle event | `session-closed` | `slot-closed` |

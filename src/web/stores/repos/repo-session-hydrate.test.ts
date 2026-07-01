@@ -162,7 +162,7 @@ describe('repo session hydration', () => {
     expect(useReposStore.getState().sessionReady).toBe(true)
   })
 
-  test('hydrateRepoSession applies restored branch tab open-sets before cached placeholders become ready', async () => {
+  test('hydrateRepoSession leaves server-owned branch tab open-sets out of repo store', async () => {
     const savedAt = Date.now()
     useReposStore.setState({
       repoSnapshotCache: {
@@ -205,7 +205,7 @@ describe('repo session hydration', () => {
       const repo = useReposStore.getState().repos[REPO_A]
       expect(useReposStore.getState().sessionReady).toBe(true)
       expect(repo?.projection.source).toBe('cache')
-      expect(repo?.ui.workspacePaneTabsByBranch).toEqual({ main: [] })
+      expect(repo?.ui.preferredWorkspacePaneTabByBranch).toEqual({})
     })
 
     probes.get(REPO_A)?.({ ok: true, root: REPO_A, name: 'repo-a' })

@@ -17,7 +17,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
-import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
 
 const testWindow = window as unknown as { goblinNative?: Window['goblinNative'] }
 const REPO_ID = '/tmp/keyboard-repo'
@@ -65,6 +65,9 @@ describe('useKeyboard', () => {
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'status',
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-1')],
+      },
     })
     const selectTerminal = vi.fn()
     const showRepoWorkspacePaneTab = vi.fn()
@@ -124,6 +127,9 @@ describe('useKeyboard', () => {
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'status',
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-1')],
+      },
     })
     const selectTerminal = vi.fn()
     const showRepoWorkspacePaneTab = vi.fn()
@@ -159,6 +165,9 @@ describe('useKeyboard', () => {
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-1')],
+      },
     })
     const createTerminal = vi.fn(async () => 'session-2')
     setTerminalSessionCommandBridge({
@@ -275,6 +284,9 @@ describe('useKeyboard', () => {
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-1')],
+      },
     })
     const createTerminal = vi.fn(async () => 'session-2')
     const closeTerminalByDescriptor = vi.fn(async () => true)
@@ -307,6 +319,9 @@ describe('useKeyboard', () => {
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-1')],
+      },
     })
     const closeTerminalByDescriptor = vi.fn(async () => true)
     setTerminalSessionCommandBridge({

@@ -7,9 +7,9 @@ import { isRepoStatusRefreshable, useRepoStatusRefresh } from '#/web/hooks/useRe
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { resetReposStore } from '#/web/test-utils/bridge.ts'
 import { preferredWorkspacePaneTabByBranchRecordWith } from '#/web/stores/repos/workspace-pane-preferences.ts'
-import { workspacePaneTabsRecordWith } from '#/web/stores/repos/workspace-pane-tabs.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
+import { setWorkspacePaneTabsForBranchQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 
 const originalRefreshStatus = useReposStore.getState().refreshStatus
 
@@ -39,9 +39,12 @@ function createRepo(
   const repo = emptyRepo(id, 'repo')
   repo.instanceToken = id === '/repo-a' ? 1 : 2
   repo.ui.selectedBranch = 'main'
-  repo.ui.workspacePaneTabsByBranch = workspacePaneTabsRecordWith(repo.ui, 'main', [
-    workspacePaneStaticTabEntry('status'),
-  ])
+  setWorkspacePaneTabsForBranchQueryData({
+    repoRoot: id,
+    branchName: 'main',
+    worktreePath: null,
+    tabs: [workspacePaneStaticTabEntry('status')],
+  })
   repo.ui.preferredWorkspacePaneTabByBranch = preferredWorkspacePaneTabByBranchRecordWith(
     repo.ui,
     'main',

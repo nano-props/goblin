@@ -12,7 +12,7 @@ import {
   type TerminalTakeoverResult,
 } from '#/shared/terminal-types.ts'
 import { isValidTerminalPtySessionId, normalizeTerminalSize } from '#/shared/terminal-validators.ts'
-import type { TerminalWorkspaceTabsRuntime } from '#/server/terminal/terminal-workspace-tabs-runtime.ts'
+import type { WorkspacePaneTabsRuntime } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
 import {
   attachTerminalClient,
   claimTerminalClientControl,
@@ -35,8 +35,8 @@ import type { PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 
 const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
 
-type TerminalWorkspaceTabsRuntimeLike<TUser extends string | number> = Pick<
-  TerminalWorkspaceTabsRuntime<TUser>,
+type WorkspacePaneTabsRuntimeLike<TUser extends string | number> = Pick<
+  WorkspacePaneTabsRuntime<TUser>,
   'terminalSessionIds'
 >
 
@@ -99,13 +99,13 @@ export class TerminalSessionManager<TUser extends string | number> {
   private readonly ptySessionIdByUserTerminalSessionIndex = new Map<string, string>()
   private readonly sink: TerminalEventSink<TUser>
   private readonly ptySupervisor: PtySupervisor
-  private readonly workspaceTabs: TerminalWorkspaceTabsRuntimeLike<TUser>
+  private readonly workspaceTabs: WorkspacePaneTabsRuntimeLike<TUser>
   private readonly isClientOnline: (userId: TUser, clientId: string) => boolean
 
   constructor(
     ptySupervisor: PtySupervisor,
     sink: TerminalEventSink<TUser>,
-    workspaceTabs: TerminalWorkspaceTabsRuntimeLike<TUser>,
+    workspaceTabs: WorkspacePaneTabsRuntimeLike<TUser>,
     isClientOnline: (userId: TUser, clientId: string) => boolean,
   ) {
     this.ptySupervisor = ptySupervisor

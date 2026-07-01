@@ -1,11 +1,11 @@
 import { TerminalDetachedUserTimer } from '#/server/terminal/terminal-detached-user-timer.ts'
 import { TerminalRealtimeBroker } from '#/server/terminal/terminal-realtime-broker.ts'
 import type { TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
-import type { TerminalWorkspaceTabsRuntime } from '#/server/terminal/terminal-workspace-tabs-runtime.ts'
+import type { WorkspacePaneTabsRuntime } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
 
 export interface TerminalRuntimeCoordinatorOptions {
   manager: TerminalSessionManager<string>
-  workspaceTabs: TerminalWorkspaceTabsRuntime<string>
+  workspaceTabs: WorkspacePaneTabsRuntime<string>
   detachedTtlMs: number
 }
 

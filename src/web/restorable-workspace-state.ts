@@ -1,4 +1,5 @@
 import type { WorkspaceSessionState } from '#/shared/api-types.ts'
+import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { RestorableWorkspaceState, ReposStore } from '#/web/stores/repos/types.ts'
 import { persistedOpenWorkspaceEntries } from '#/web/open-workspace-state.ts'
 import {
@@ -9,6 +10,12 @@ import {
 } from '#/web/session-persistence-state.ts'
 import { persistedFiletreeViewStateByWorktreeByRepoForSession } from '#/web/filetree-session-state.ts'
 import type { FiletreeInteractionSnapshot } from '#/web/stores/repos/filetree-interaction-state.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import {
+  workspacePaneTabsByBranchFromQueryData,
+  workspacePaneTabsQueryKey,
+  type WorkspacePaneTabsQueryData,
+} from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 
 export function workspaceSessionStateFromRestorableWorkspaceState(input: {
   repos: ReposStore['repos']
@@ -16,6 +23,10 @@ export function workspaceSessionStateFromRestorableWorkspaceState(input: {
   filetreeInteractionByScope?: Readonly<Record<string, FiletreeInteractionSnapshot>>
 }): WorkspaceSessionState {
   const { repos, restorableWorkspaceState } = input
+  const workspacePaneTabsByBranchByRepo = workspacePaneTabsByBranchByRepoFromQueryCache(
+    repos,
+    restorableWorkspaceState.order,
+  )
   return {
     openRepoEntries: persistedOpenWorkspaceEntries(restorableWorkspaceState.order, repos),
     activeRepoId: persistedActiveRepoIdForSession(restorableWorkspaceState.activeId),
@@ -28,10 +39,12 @@ export function workspaceSessionStateFromRestorableWorkspaceState(input: {
     preferredWorkspacePaneTabByBranchByRepo: persistedPreferredWorkspacePaneTabByBranchByRepoForSession(
       repos,
       restorableWorkspaceState.order,
+      workspacePaneTabsByBranchByRepo,
     ),
     workspacePaneTabsByBranchByRepo: persistedWorkspacePaneTabsByBranchByRepoForSession(
       repos,
       restorableWorkspaceState.order,
+      workspacePaneTabsByBranchByRepo,
     ),
     filetreeViewStateByWorktreeByRepo: persistedFiletreeViewStateByWorktreeByRepoForSession(
       input.filetreeInteractionByScope ?? {},
@@ -39,6 +52,21 @@ export function workspaceSessionStateFromRestorableWorkspaceState(input: {
       restorableWorkspaceState.order,
     ),
   }
+}
+
+function workspacePaneTabsByBranchByRepoFromQueryCache(
+  repos: ReposStore['repos'],
+  order: readonly string[],
+): Record<string, Record<string, WorkspacePaneTabEntry[]>> {
+  const byRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>> = {}
+  for (const id of order) {
+    if (!repos[id]) continue
+    const data = primaryWindowQueryClient.getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(id))
+    if (!data) continue
+    const byBranch = workspacePaneTabsByBranchFromQueryData(data)
+    if (Object.keys(byBranch).length > 0) byRepo[id] = byBranch
+  }
+  return byRepo
 }
 
 /** Restores only the restorable workspace UI projection from WorkspaceSessionState.

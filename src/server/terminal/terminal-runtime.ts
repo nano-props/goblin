@@ -14,7 +14,7 @@ import type { TerminalClientMessage } from '#/shared/terminal-socket.ts'
 import { normalizeTerminalClientMessage } from '#/shared/terminal-validators.ts'
 import { serverLogger } from '#/server/logger.ts'
 import { createTerminalSessionService } from '#/server/terminal/terminal-session-service.ts'
-import { createTerminalWorkspaceTabsRuntime } from '#/server/terminal/terminal-workspace-tabs-runtime.ts'
+import { createWorkspacePaneTabsRuntime } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
 import type { TerminalRealtimeBroker, TerminalRealtimeSocket } from '#/server/terminal/terminal-realtime-broker.ts'
 import { createTerminalRuntimeActions } from '#/server/terminal/terminal-runtime-actions.ts'
 import { createTerminalRuntimeCoordinator } from '#/server/terminal/terminal-runtime-coordinator.ts'
@@ -50,7 +50,7 @@ export interface ServerTerminalRuntime {
 
 export function createServerTerminalRuntime(options: ServerTerminalRuntimeOptions): ServerTerminalRuntime {
   const { ptySupervisor } = options
-  const workspaceTabs = createTerminalWorkspaceTabsRuntime<string>()
+  const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
 
   // Sink callbacks fan out to every clientId that shares the
   // session's userId. The manager passes `userId` (a string

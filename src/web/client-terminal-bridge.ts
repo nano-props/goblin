@@ -1,7 +1,7 @@
 import {
   normalizeTerminalSessionSnapshot,
   normalizeTerminalSessionSummaryList,
-  normalizeTerminalWorkspaceTabsEntryList,
+  normalizeWorkspacePaneTabsEntryList,
 } from '#/shared/terminal-validators.ts'
 import { resolveTerminalController } from '#/shared/terminal-controller.ts'
 import type { TerminalRealtimeMessage } from '#/shared/terminal-socket.ts'
@@ -21,7 +21,6 @@ import {
   type TerminalSocketServerConfig,
 } from '#/web/client-terminal-socket-connection.ts'
 import type { TerminalNotificationProvider } from '#/web/terminal-notification-provider.ts'
-import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 
 export type ClientServerTerminalConfig = TerminalSocketServerConfig
 
@@ -38,7 +37,7 @@ export function createServerTerminalBridge(options: {
   const sessionsChangedSubscribers = new Set<(repoRoot: string) => void>()
   const workspaceTabsChangedSubscribers = new Set<(repoRoot: string) => void>()
   const sessionClosedSubscribers = new Set<
-    (event: { ptySessionId: string; repoRoot: string; worktreePath: string; tabs: WorkspacePaneTabEntry[] }) => void
+    (event: { ptySessionId: string; repoRoot: string; worktreePath: string }) => void
   >()
 
   const connection = createTerminalSocketConnection({
@@ -84,7 +83,7 @@ export function createServerTerminalBridge(options: {
     },
     listWorkspaceTabs(input) {
       return connection.request('list-workspace-tabs', input).then((value) => {
-        const tabs = normalizeTerminalWorkspaceTabsEntryList(value)
+        const tabs = normalizeWorkspacePaneTabsEntryList(value)
         if (!tabs) throw new Error('Terminal socket response failed: invalid workspace tabs response')
         return tabs
       })
@@ -214,7 +213,6 @@ export function createServerTerminalBridge(options: {
             ptySessionId: message.ptySessionId,
             repoRoot: message.repoRoot,
             worktreePath: message.worktreePath,
-            tabs: message.tabs,
           })
         return
       case 'identity': {

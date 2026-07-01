@@ -32,6 +32,9 @@ describe('useSessionPersistence', () => {
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [workspacePaneStaticTabEntry('status')],
+      },
     })
     useReposStore.setState({
       repos: { [repo.id]: repo },
@@ -68,8 +71,10 @@ describe('useSessionPersistence', () => {
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'status',
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [],
+      },
     })
-    useReposStore.getState().closeWorkspacePaneStaticTab(repo.id, 'status', 'feature/worktree')
 
     renderInJsdom(<Harness />)
 

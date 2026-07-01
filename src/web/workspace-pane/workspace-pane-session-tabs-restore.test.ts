@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { afterEach, beforeEach, describe, expect, test } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { restoreServerWorkspacePaneTabsFromSession } from '#/web/workspace-pane/workspace-pane-session-tabs-restore.ts'
 import {
@@ -10,8 +10,7 @@ import {
   seedRepoState,
 } from '#/web/test-utils/bridge.ts'
 import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
-import { workspacePaneTabsForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { readWorkspacePaneTabsForBranch } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 
 const REPO_ID = '/tmp/workspace-pane-session-tabs-restore-repo'
 const WORKTREE_PATH = '/tmp/workspace-pane-session-tabs-restore-worktree'
@@ -43,9 +42,43 @@ describe('restoreServerWorkspacePaneTabsFromSession', () => {
       }),
     ).resolves.toBe(true)
 
-    expect(workspacePaneTabsForBranch(useReposStore.getState().repos[REPO_ID]!.ui, 'feature/worktree')).toEqual([
+    expect(readWorkspacePaneTabsForBranch(REPO_ID, 'feature/worktree')).toEqual([
       workspacePaneStaticTabEntry('status'),
       workspacePaneTerminalTabEntry('session-live'),
+    ])
+  })
+
+  test('commits restored no-worktree branch tabs with a null worktree target', async () => {
+    seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/no-worktree')],
+      selectedBranch: 'feature/no-worktree',
+      workspacePaneTabsByBranch: {
+        'feature/no-worktree': [workspacePaneStaticTabEntry('status')],
+      },
+    })
+    const replaceWorkspaceTabs = vi.fn(async () => [workspacePaneStaticTabEntry('status')])
+    installWorkspacePaneTabsTestBridge({ replaceWorkspaceTabs })
+
+    await expect(
+      restoreServerWorkspacePaneTabsFromSession({
+        [REPO_ID]: {
+          'feature/no-worktree': [
+            workspacePaneStaticTabEntry('status'),
+            workspacePaneTerminalTabEntry('session-stale'),
+          ],
+        },
+      }),
+    ).resolves.toBe(true)
+
+    expect(replaceWorkspaceTabs).toHaveBeenCalledWith({
+      repoRoot: REPO_ID,
+      branchName: 'feature/no-worktree',
+      worktreePath: null,
+      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-stale')],
+    })
+    expect(readWorkspacePaneTabsForBranch(REPO_ID, 'feature/no-worktree')).toEqual([
+      workspacePaneStaticTabEntry('status'),
     ])
   })
 
@@ -65,7 +98,7 @@ describe('restoreServerWorkspacePaneTabsFromSession', () => {
       }),
     ).resolves.toBe(false)
 
-    expect(workspacePaneTabsForBranch(useReposStore.getState().repos[REPO_ID]!.ui, 'feature/worktree')).toEqual([
+    expect(readWorkspacePaneTabsForBranch(REPO_ID, 'feature/worktree')).toEqual([
       workspacePaneStaticTabEntry('status'),
     ])
   })

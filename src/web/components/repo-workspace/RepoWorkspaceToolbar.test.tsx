@@ -42,9 +42,10 @@ import {
 } from '#/web/test-utils/bridge.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import {
-  workspacePaneStaticTabsForBranch,
-  workspacePaneTabsForBranch,
-} from '#/web/stores/repos/workspace-pane-tabs.ts'
+  readWorkspacePaneTabsForBranch,
+  setWorkspacePaneTabsForBranchQueryData,
+} from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
@@ -1291,6 +1292,24 @@ function renderToolbar(options: {
   })
 
   const queryClient = new QueryClient()
+  const workspacePaneTabs =
+    options.workspacePaneTabs ??
+    (options.workspacePaneStaticTabs || options.terminalCount > 0
+      ? [
+          ...(options.workspacePaneStaticTabs?.map((type) => staticEntry(type)) ?? [staticEntry('status')]),
+          ...sessions.map((session) => terminalEntry(session.terminalSessionId)),
+        ]
+      : undefined)
+  if (workspacePaneTabs) {
+    const workspacePaneTabsQueryInput = {
+      repoRoot: REPO_ID,
+      branchName,
+      worktreePath: options.worktree === false ? null : WORKTREE_PATH,
+      tabs: workspacePaneTabs,
+    }
+    setWorkspacePaneTabsForBranchQueryData(workspacePaneTabsQueryInput)
+    setWorkspacePaneTabsForBranchQueryData(workspacePaneTabsQueryInput, queryClient)
+  }
   queryClient.setQueryData(
     settingsSnapshotQueryKey(),
     defaultSettingsSnapshot({ repoSettings: options.seedRepoSettings ?? [] }),
@@ -1363,13 +1382,11 @@ function closeButtonFor(container: HTMLElement, identity: string): HTMLButtonEle
 }
 
 function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
-  const repo = useReposStore.getState().repos[REPO_ID]
-  return repo ? workspacePaneStaticTabsForBranch(repo.ui, branchName) : []
+  return workspacePaneStaticTabsFromEntries(readWorkspacePaneTabsForBranch(REPO_ID, branchName))
 }
 
 function tabsFor(branchName: string): WorkspacePaneTabEntry[] {
-  const repo = useReposStore.getState().repos[REPO_ID]
-  return repo ? workspacePaneTabsForBranch(repo.ui, branchName) : []
+  return readWorkspacePaneTabsForBranch(REPO_ID, branchName)
 }
 
 function staticEntry(type: WorkspacePaneStaticTabType): WorkspacePaneTabEntry {

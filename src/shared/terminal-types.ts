@@ -193,13 +193,15 @@ export interface TerminalListWorkspaceTabsInput {
 
 export interface TerminalReplaceWorkspaceTabsInput {
   repoRoot: string
-  worktreePath: string
+  branchName: string
+  worktreePath: string | null
   tabs: WorkspacePaneTabEntry[]
 }
 
-export interface TerminalWorkspaceTabsEntry {
+export interface WorkspacePaneTabsEntry {
   repoRoot: string
-  worktreePath: string
+  branchName: string
+  worktreePath: string | null
   tabs: WorkspacePaneTabEntry[]
 }
 

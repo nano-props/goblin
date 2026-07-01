@@ -25,17 +25,18 @@ import { disposeAllRepoOperationSchedulers } from '#/web/stores/repos/repo-opera
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import type { ClientBridge } from '#/web/client-bridge-types.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { normalizeWorkspacePaneTabsRecord } from '#/web/stores/repos/workspace-pane-tabs.ts'
+import { setWorkspacePaneTabsForBranchQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { DEFAULT_ZEN_MODE, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
 import type {
   TerminalAttachResult,
   TerminalCreateResult,
+  TerminalListWorkspaceTabsInput,
   TerminalReplaceWorkspaceTabsInput,
   TerminalMutationResult,
   TerminalSessionSnapshot,
   TerminalSessionSummary,
-  TerminalWorkspaceTabsEntry,
+  WorkspacePaneTabsEntry,
   TerminalTakeoverResult,
 } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry, WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
@@ -54,7 +55,7 @@ interface TerminalBridgeTestOutputs {
   'terminal.close': TerminalMutationResult
   'terminal.create': TerminalCreateResult
   'terminal.replaceWorkspaceTabs': WorkspacePaneTabEntry[]
-  'terminal.listWorkspaceTabs': TerminalWorkspaceTabsEntry[]
+  'terminal.listWorkspaceTabs': WorkspacePaneTabsEntry[]
   'terminal.prune': { pruned: number; remaining: number }
   'terminal.listSessions': TerminalSessionSummary[]
   'terminal.getSessionSnapshot': TerminalSessionSnapshot | null
@@ -125,6 +126,9 @@ export function installWorkspacePaneTabsTestBridge(
     replaceWorkspaceTabs?: (
       input: TerminalReplaceWorkspaceTabsInput,
     ) => WorkspacePaneTabEntry[] | Promise<WorkspacePaneTabEntry[]>
+    listWorkspaceTabs?: (
+      input: TerminalListWorkspaceTabsInput,
+    ) => WorkspacePaneTabsEntry[] | Promise<WorkspacePaneTabsEntry[]>
   } = {},
 ): void {
   setClientBridgeForTests({
@@ -186,7 +190,10 @@ export function installWorkspacePaneTabsTestBridge(
         if (options.replaceWorkspaceTabs) return await options.replaceWorkspaceTabs(input)
         return [...input.tabs]
       },
-      listWorkspaceTabs: async () => [],
+      listWorkspaceTabs: async (input) => {
+        if (options.listWorkspaceTabs) return await options.listWorkspaceTabs(input)
+        return []
+      },
       pruneTerminals: async () => ({ pruned: 0, remaining: 0 }),
       listSessions: async () => [],
       prewarm: async () => {},
@@ -605,11 +612,6 @@ export function seedRepoState(options: {
   const branches = options.branches ?? stripBranchWorktreeMetadata(branchesWithSnapshotWorktreeMetadata)
   const status = options.status ?? base.data.status
   const selectedBranch = options.selectedBranch ?? base.ui.selectedBranch
-  const rawWorkspacePaneTabsByBranch = options.workspacePaneTabsByBranch ?? base.ui.workspacePaneTabsByBranch
-  const workspacePaneTabsByBranch = normalizeWorkspacePaneTabsRecord(
-    rawWorkspacePaneTabsByBranch,
-    branches.map((branch) => branch.name),
-  )
   const preferredWorkspacePaneTabByBranch =
     options.preferredWorkspacePaneTabByBranch ??
     (selectedBranch && options.preferredWorkspacePaneTab !== undefined
@@ -631,7 +633,6 @@ export function seedRepoState(options: {
     ui: {
       ...base.ui,
       selectedBranch,
-      workspacePaneTabsByBranch,
       preferredWorkspacePaneTabByBranch,
     },
     remote: {
@@ -649,5 +650,15 @@ export function seedRepoState(options: {
     zenMode: DEFAULT_ZEN_MODE,
     workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
   })
+  for (const [branchName, tabs] of Object.entries(options.workspacePaneTabsByBranch ?? {})) {
+    const branch = branches.find((candidate) => candidate.name === branchName)
+    if (!branch) continue
+    setWorkspacePaneTabsForBranchQueryData({
+      repoRoot: options.id,
+      branchName,
+      worktreePath: branch.worktree?.path ?? null,
+      tabs,
+    })
+  }
   return repo
 }

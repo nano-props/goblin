@@ -12,7 +12,10 @@ import {
 } from '#/web/components/terminal/terminal-session-store.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
-import { workspacePaneTabsForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
+import {
+  useWorkspacePaneTabsQuery,
+  workspacePaneTabsForBranchFromQueryData,
+} from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 
 export interface RepoWorkspaceTabModelInputState {
   input: RepoWorkspaceTabModelInput
@@ -45,13 +48,14 @@ export function useRepoWorkspaceTabModelInput(
 
   const terminalWorktreeSnapshot = useTerminalWorktreeSnapshot(terminalWorktreeKey)
   const terminalSyncReady = useTerminalRepoSyncReady(repo.id)
+  const workspacePaneTabsQuery = useWorkspacePaneTabsQuery(repo.id)
   const selectedTerminalSessionId = useReposStore((s) =>
     terminalWorktreeKey ? s.selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey] : undefined,
   )
 
   const workspacePaneTabEntries = useMemo(
-    () => workspacePaneTabsForBranch(repo.ui, branchName),
-    [repo.ui.workspacePaneTabsByBranch, branchName],
+    () => workspacePaneTabsForBranchFromQueryData(workspacePaneTabsQuery.data ?? [], branchName),
+    [workspacePaneTabsQuery.data, branchName],
   )
 
   const preferredTab = useMemo(

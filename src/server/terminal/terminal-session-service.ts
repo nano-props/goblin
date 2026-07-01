@@ -14,7 +14,7 @@ import {
   type TerminalCreateInput,
   type TerminalSessionPhase,
   type TerminalSessionSummary,
-  type TerminalWorkspaceTabsEntry,
+  type WorkspacePaneTabsEntry,
 } from '#/shared/terminal-types.ts'
 import {
   type WorkspacePaneTabEntry,
@@ -29,7 +29,7 @@ import {
   type GoblinTerminalCommandRuntime,
 } from '#/server/terminal/g-command.ts'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
-import type { TerminalWorkspaceTabsRuntime } from '#/server/terminal/terminal-workspace-tabs-runtime.ts'
+import type { WorkspacePaneTabsRuntime } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
 
 interface EnsureTerminalSessionInput {
   repoRoot: string
@@ -90,8 +90,8 @@ interface TerminalSessionServiceOptions {
   isValidTerminalSessionId(value: unknown): value is string
   manager: TerminalSessionServiceManager
   workspaceTabs: Pick<
-    TerminalWorkspaceTabsRuntime<string>,
-    'ensureTerminalTab' | 'removeTerminalTab' | 'replaceTabs' | 'tabs' | 'tabsForScope'
+    WorkspacePaneTabsRuntime<string>,
+    'ensureTerminalTab' | 'removeTerminalTabForWorktree' | 'replaceTabs' | 'tabs' | 'tabsForScope'
   >
   broadcastSessionsChanged(userId: string, repoRoot: string): void
   gCommand?: GoblinTerminalCommandRuntime
@@ -174,10 +174,11 @@ class TerminalSessionService {
         ? this.options.workspaceTabs.replaceTabs({
             userId,
             scope: createdSession.repoRoot,
+            branchName: input.branch,
             worktreePath: createdSession.worktreePath,
             tabs: workspaceTabsWithLiveTerminalSessions(
               this.options.workspaceTabs.ensureTerminalTab(
-                { userId, scope: createdSession.repoRoot, worktreePath: createdSession.worktreePath },
+                { userId, scope: createdSession.repoRoot, branchName: input.branch, worktreePath: createdSession.worktreePath },
                 createResult.terminalSessionId,
               ),
               sessions
@@ -208,23 +209,26 @@ class TerminalSessionService {
 
   async replaceTabs(
     userId: string,
-    input: { repoRoot: string; worktreePath: string; tabs: readonly WorkspacePaneTabEntry[] },
+    input: { repoRoot: string; branchName: string; worktreePath: string | null; tabs: readonly WorkspacePaneTabEntry[] },
   ): Promise<WorkspacePaneTabEntry[]> {
     if (!isValidRepoLocator(input.repoRoot)) return []
-    if (!isValidCwd(input.worktreePath)) return []
+    if (!isValidBranch(input.branchName)) return []
+    if (input.worktreePath !== null && !isValidCwd(input.worktreePath)) return []
     const scope = terminalSessionScope(input.repoRoot)
-    const worktreePath = terminalWorktreePath(input.repoRoot, input.worktreePath)
-    const liveTerminalSessionIds = await this.liveTerminalSessionIdsForWorktree(userId, scope, worktreePath)
+    const worktreePath = input.worktreePath === null ? null : terminalWorktreePath(input.repoRoot, input.worktreePath)
+    const liveTerminalSessionIds =
+      worktreePath === null ? [] : await this.liveTerminalSessionIdsForWorktree(userId, scope, worktreePath)
     return this.options.workspaceTabs.replaceTabs({
       userId,
       scope,
+      branchName: input.branchName,
       worktreePath,
       tabs: workspaceTabsWithLiveTerminalSessions(input.tabs, liveTerminalSessionIds),
     })
   }
 
-  async removeTerminalTab(userId: string, session: TerminalSessionSummary): Promise<WorkspacePaneTabEntry[]> {
-    const currentTabs = this.options.workspaceTabs.removeTerminalTab(
+  async removeTerminalTab(userId: string, session: TerminalSessionSummary): Promise<void> {
+    const updatedEntries = this.options.workspaceTabs.removeTerminalTabForWorktree(
       { userId, scope: session.repoRoot, worktreePath: session.worktreePath },
       session.terminalSessionId,
     )
@@ -233,15 +237,18 @@ class TerminalSessionService {
       session.repoRoot,
       session.worktreePath,
     )
-    return this.options.workspaceTabs.replaceTabs({
-      userId,
-      scope: session.repoRoot,
-      worktreePath: session.worktreePath,
-      tabs: workspaceTabsWithLiveTerminalSessions(currentTabs, liveTerminalSessionIds),
-    })
+    for (const entry of updatedEntries) {
+      this.options.workspaceTabs.replaceTabs({
+        userId,
+        scope: session.repoRoot,
+        branchName: entry.branchName,
+        worktreePath: entry.worktreePath,
+        tabs: workspaceTabsWithLiveTerminalSessions(entry.tabs, liveTerminalSessionIds),
+      })
+    }
   }
 
-  async listWorkspaceTabs(userId: string, repoRoot: string): Promise<TerminalWorkspaceTabsEntry[]> {
+  async listWorkspaceTabs(userId: string, repoRoot: string): Promise<WorkspacePaneTabsEntry[]> {
     if (!isValidRepoLocator(repoRoot)) return []
     const scope = terminalSessionScope(repoRoot)
     const sessions = await this.options.manager.listSessionsForUser(userId, scope)
@@ -256,19 +263,31 @@ class TerminalSessionService {
       ...liveTerminalSessionIdsByWorktree.keys(),
     ])
     for (const worktreePath of worktreePaths) {
-      const currentTabs = this.options.workspaceTabs.tabs({ userId, scope, worktreePath })
-      this.options.workspaceTabs.replaceTabs({
-        userId,
-        scope,
-        worktreePath,
-        tabs: workspaceTabsWithLiveTerminalSessions(
-          currentTabs,
-          liveTerminalSessionIdsByWorktree.get(worktreePath) ?? [],
-        ),
-      })
+      if (worktreePath === null) continue
+      for (const entry of this.options.workspaceTabs
+        .tabsForScope({ userId, scope })
+        .filter((candidate) => candidate.worktreePath === worktreePath)) {
+        const currentTabs = this.options.workspaceTabs.tabs({
+          userId,
+          scope,
+          branchName: entry.branchName,
+          worktreePath,
+        })
+        this.options.workspaceTabs.replaceTabs({
+          userId,
+          scope,
+          branchName: entry.branchName,
+          worktreePath,
+          tabs: workspaceTabsWithLiveTerminalSessions(
+            currentTabs,
+            liveTerminalSessionIdsByWorktree.get(worktreePath) ?? [],
+          ),
+        })
+      }
     }
     return this.options.workspaceTabs.tabsForScope({ userId, scope }).map((entry) => ({
       repoRoot,
+      branchName: entry.branchName,
       worktreePath: entry.worktreePath,
       tabs: entry.tabs,
     }))

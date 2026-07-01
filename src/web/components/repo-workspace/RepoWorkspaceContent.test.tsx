@@ -29,6 +29,7 @@ import {
   PrimaryWindowNavigationProvider,
   type PrimaryWindowNavigationActions,
 } from '#/web/primary-window-navigation.tsx'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 
 const repoClientMocks = vi.hoisted(() => ({
   getRepoLog: vi.fn(),
@@ -51,6 +52,14 @@ const REPO_ID = '/tmp/gbl-repo-workspace-content-repo'
 type RepoWorkspaceContentHarnessProps = Omit<ComponentProps<typeof RepoWorkspaceContent>, 'workspacePaneTabModel'>
 
 function RepoWorkspaceContentHarness(props: RepoWorkspaceContentHarnessProps) {
+  return (
+    <QueryClientProvider client={primaryWindowQueryClient}>
+      <RepoWorkspaceContentInner {...props} />
+    </QueryClientProvider>
+  )
+}
+
+function RepoWorkspaceContentInner(props: RepoWorkspaceContentHarnessProps) {
   const workspacePaneTabModel = useRepoWorkspaceTabModel(props.repo, props.detail)
   return <RepoWorkspaceContent {...props} workspacePaneTabModel={workspacePaneTabModel} />
 }

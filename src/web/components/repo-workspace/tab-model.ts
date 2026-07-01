@@ -11,7 +11,7 @@ import {
   isTerminalWorkspacePaneTab,
 } from '#/web/components/workspace-pane/workspace-pane-tab-summary.ts'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
-import { normalizeWorkspacePaneTabs } from '#/web/stores/repos/workspace-pane-tabs.ts'
+import { normalizeWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import {
   terminalWorkspacePaneTabProvider,
   workspacePaneStaticTabProvider,
@@ -120,9 +120,10 @@ export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): 
     hasWorktree: !!terminalWorktreeKey,
   })
   const staticTabs = materializedTabs.flatMap((tab) => (tab.kind === 'static' ? [tab.type] : []))
+  const materializedTerminalCount = materializedTabs.filter((tab) => tab.kind === 'terminal').length
   const candidateTab = resolveRenderableWorkspacePaneTab(input.preferredTab, {
     hasWorktree: !!terminalWorktreeKey,
-    terminalSessionCount: input.terminalSessionCount,
+    terminalSessionCount: materializedTerminalCount,
     terminalCreatePending: input.terminalCreatePending,
     terminalSyncReady: input.terminalSyncReady,
   })
@@ -233,24 +234,8 @@ function materializedWorkspacePaneTabs(input: {
   hasWorktree: boolean
 }): RepoWorkspaceMaterializedTab[] {
   const terminalViewByTerminalSessionId = new Map(input.terminalViews.map((view) => [view.terminalSessionId, view]))
-  const listedTerminalSessionIds = new Set(
-    input.tabEntries.flatMap((entry) => (entry.type === 'terminal' ? [entry.terminalSessionId] : [])),
-  )
   const seenTerminals = new Set<string>()
   const tabs: RepoWorkspaceMaterializedTab[] = []
-  let nextRuntimeTerminalIndex = 0
-  const pushRuntimeTerminalsBefore = (terminalSessionId: string | null) => {
-    if (!terminalWorkspacePaneTabProvider.canOpen({ hasWorktree: input.hasWorktree })) return
-    while (nextRuntimeTerminalIndex < input.terminalViews.length) {
-      const terminal = input.terminalViews[nextRuntimeTerminalIndex]
-      if (!terminal) break
-      if (terminalSessionId && terminal.terminalSessionId === terminalSessionId) break
-      nextRuntimeTerminalIndex += 1
-      if (seenTerminals.has(terminal.terminalSessionId) || listedTerminalSessionIds.has(terminal.terminalSessionId)) continue
-      seenTerminals.add(terminal.terminalSessionId)
-      tabs.push(terminalWorkspacePaneTab(terminal))
-    }
-  }
 
   for (const entry of input.tabEntries) {
     if (entry.type !== 'terminal') {
@@ -261,13 +246,9 @@ function materializedWorkspacePaneTabs(input: {
     if (!terminalWorkspacePaneTabProvider.canOpen({ hasWorktree: input.hasWorktree })) continue
     const terminal = terminalViewByTerminalSessionId.get(entry.terminalSessionId)
     if (!terminal || seenTerminals.has(entry.terminalSessionId)) continue
-    pushRuntimeTerminalsBefore(entry.terminalSessionId)
-    if (input.terminalViews[nextRuntimeTerminalIndex]?.terminalSessionId === entry.terminalSessionId) nextRuntimeTerminalIndex += 1
     seenTerminals.add(entry.terminalSessionId)
     tabs.push(terminalWorkspacePaneTab(terminal))
   }
-
-  pushRuntimeTerminalsBefore(null)
 
   return tabs
 }

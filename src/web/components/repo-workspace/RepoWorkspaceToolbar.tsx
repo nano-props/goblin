@@ -139,6 +139,7 @@ export function RepoWorkspaceToolbar({
         branchName,
         worktreePath: terminalBase?.worktreePath ?? null,
         tabs,
+        optimistic: true,
       })
     },
     [branchName, repo.id, terminalBase?.worktreePath],

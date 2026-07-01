@@ -12,7 +12,7 @@ import type {
   TerminalSessionSnapshot,
   TerminalSessionSummary,
   TerminalTestNotificationInput,
-  TerminalWorkspaceTabsEntry,
+  WorkspacePaneTabsEntry,
 } from '#/shared/terminal-types.ts'
 import { WORKSPACE_PANE_STATIC_TAB_IDS } from '#/shared/workspace-pane.ts'
 
@@ -107,13 +107,15 @@ const WorkspacePaneTerminalTabEntrySchema = v.object({
 })
 const TerminalReplaceWorkspaceTabsInputSchema = v.object({
   repoRoot: v.string(),
-  worktreePath: v.string(),
+  branchName: v.string(),
+  worktreePath: v.nullable(v.string()),
   tabs: v.array(v.union([WorkspacePaneStaticTabEntrySchema, WorkspacePaneTerminalTabEntrySchema])),
 })
 const WorkspacePaneTabEntrySchema = v.union([WorkspacePaneStaticTabEntrySchema, WorkspacePaneTerminalTabEntrySchema])
-const TerminalWorkspaceTabsEntrySchema = v.object({
+const WorkspacePaneTabsEntrySchema = v.object({
   repoRoot: v.string(),
-  worktreePath: v.string(),
+  branchName: v.string(),
+  worktreePath: v.nullable(v.string()),
   tabs: v.array(WorkspacePaneTabEntrySchema),
 })
 const TerminalSessionSnapshotInputSchema = v.object({
@@ -156,7 +158,6 @@ const TerminalSessionClosedEventSchema = v.object({
   ptySessionId: v.string(),
   repoRoot: v.string(),
   worktreePath: v.string(),
-  tabs: v.array(WorkspacePaneTabEntrySchema),
 })
 
 export function isValidTerminalPtySessionId(value: unknown): value is string {
@@ -378,8 +379,8 @@ export function normalizeTerminalSessionSummaryList(value: unknown): TerminalSes
   return parsed.success ? parsed.output : null
 }
 
-export function normalizeTerminalWorkspaceTabsEntryList(value: unknown): TerminalWorkspaceTabsEntry[] | null {
-  const parsed = v.safeParse(v.array(TerminalWorkspaceTabsEntrySchema), value)
+export function normalizeWorkspacePaneTabsEntryList(value: unknown): WorkspacePaneTabsEntry[] | null {
+  const parsed = v.safeParse(v.array(WorkspacePaneTabsEntrySchema), value)
   return parsed.success ? parsed.output : null
 }
 

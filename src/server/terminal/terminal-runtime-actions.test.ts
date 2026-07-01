@@ -62,7 +62,7 @@ function makeActions(
     listSessions: vi.fn(),
     listWorkspaceTabs: vi.fn(async () => []),
     replaceTabs: vi.fn(async () => []),
-    removeTerminalTab: vi.fn(async () => []),
+    removeTerminalTab: vi.fn(async () => {}),
   }
   const isValidTerminalClientId =
     options.isValidTerminalClientId ?? ((value: unknown): value is string => value === CLIENT_ID)
@@ -75,10 +75,59 @@ function makeActions(
     }),
     broadcasts,
     manager,
+    sessionService,
   }
 }
 
 describe('terminal-runtime-actions close broadcast', () => {
+  test('emits workspace tab invalidation after a successful create', async () => {
+    const { actions, broadcasts, sessionService } = makeActions()
+    sessionService.create.mockResolvedValue({
+      ok: true,
+      action: 'created',
+      terminalSessionId: 'session-1',
+      tabs: [],
+      sessions: [],
+      ptySessionId: PTY_SESSION_ID,
+      processName: 'zsh',
+      canonicalTitle: null,
+      phase: 'open',
+      message: null,
+      snapshot: '',
+      snapshotSeq: 0,
+      controller: null,
+      canonicalCols: 80,
+      canonicalRows: 24,
+    })
+
+    await expect(
+      actions.create(CLIENT_ID, USER_ID, {
+        repoRoot: '/repo',
+        branch: 'feature/worktree',
+        worktreePath: '/repo',
+        kind: 'additional',
+      }),
+    ).resolves.toMatchObject({ ok: true })
+
+    expect(broadcasts).toHaveBeenCalledWith(USER_ID, { type: 'workspace-tabs-changed', repoRoot: '/repo' })
+  })
+
+  test('does not emit workspace tab invalidation after a failed create', async () => {
+    const { actions, broadcasts, sessionService } = makeActions()
+    sessionService.create.mockResolvedValue({ ok: false, message: 'error.invalid-arguments' })
+
+    await expect(
+      actions.create(CLIENT_ID, USER_ID, {
+        repoRoot: '/repo',
+        branch: 'feature/worktree',
+        worktreePath: '/repo',
+        kind: 'additional',
+      }),
+    ).resolves.toEqual({ ok: false, message: 'error.invalid-arguments' })
+
+    expect(broadcasts).not.toHaveBeenCalled()
+  })
+
   test('emits repo and targeted close broadcasts on a successful close', async () => {
     // The new sibling-window broadcast rides alongside the existing
     // `sessions-changed` list-rescan. The session-closed event is the
@@ -108,7 +157,6 @@ describe('terminal-runtime-actions close broadcast', () => {
       ptySessionId: PTY_SESSION_ID,
       repoRoot: '/repo',
       worktreePath: '/repo',
-      tabs: [],
     })
   })
 
@@ -181,6 +229,7 @@ describe('terminal-runtime-actions workspace tabs broadcast', () => {
     await expect(
       actions.replaceTabs(CLIENT_ID, USER_ID, {
         repoRoot: '/repo',
+        branchName: 'feature/worktree',
         worktreePath: '/repo',
         tabs: [{ type: 'status', tabId: 'workspace-pane:status' }],
       }),
@@ -199,6 +248,7 @@ describe('terminal-runtime-actions workspace tabs broadcast', () => {
     await expect(
       actions.replaceTabs(CLIENT_ID, USER_ID, {
         repoRoot: '',
+        branchName: 'feature/worktree',
         worktreePath: '/repo',
         tabs: [{ type: 'status', tabId: 'workspace-pane:status' }],
       }),

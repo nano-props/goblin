@@ -44,7 +44,7 @@ describe('repo workspace pane tab model', () => {
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
-      tabEntries: [staticEntry('status')],
+      tabEntries: [staticEntry('status'), terminalEntry('session-1'), terminalEntry('session-2')],
       runtimeTerminalViews: [terminalView('session-1', 1, false), terminalView('session-2', 2, false)],
       terminalSessionCount: 2,
       terminalSyncReady: true,
@@ -57,7 +57,7 @@ describe('repo workspace pane tab model', () => {
     expect(model.activeTab?.kind === 'terminal' ? model.activeTab.terminalSessionId : null).toBe('session-2')
   })
 
-  test('keeps runtime-only terminals before a newly recorded terminal that follows them', () => {
+  test('does not materialize runtime-only terminals outside the server tab list', () => {
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
       branchName: 'feature/model',
@@ -72,10 +72,27 @@ describe('repo workspace pane tab model', () => {
 
     expect(model.tabs.map((tab) => tab.identity)).toEqual([
       'workspace-pane:status',
-      'terminal:session-1',
       'terminal:session-2',
     ])
     expect(model.activeTab?.identity).toBe('terminal:session-2')
+  })
+
+  test('falls back when the preferred terminal is runtime-only and not in the server tab list', () => {
+    const model = createRepoWorkspaceTabModel({
+      repoId: REPO_ID,
+      branchName: 'feature/model',
+      worktreePath: WORKTREE_PATH,
+      preferredTab: 'terminal',
+      tabEntries: [staticEntry('status')],
+      runtimeTerminalViews: [terminalView('session-1', 1, true)],
+      terminalSessionCount: 1,
+      terminalSyncReady: true,
+      selectedTerminalSessionId: 'session-1',
+    })
+
+    expect(model.renderedTab).toBe('status')
+    expect(model.tabs.map((tab) => tab.identity)).toEqual(['workspace-pane:status'])
+    expect(model.activeTab?.identity).toBe('workspace-pane:status')
   })
 
   test('keeps explicit terminal tab entries ahead of the runtime terminal snapshot list', () => {

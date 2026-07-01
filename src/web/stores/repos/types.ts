@@ -11,7 +11,6 @@ import type { RemoteRepoConnectionLifecycle, RepoSessionEntry } from '#/shared/r
 import type { WorkspaceSessionState } from '#/shared/api-types.ts'
 import type {
   WorkspacePaneSessionTabType,
-  WorkspacePaneStaticTabType,
   WorkspacePaneTabEntry,
   WorkspacePaneTabType,
 } from '#/shared/workspace-pane.ts'
@@ -66,12 +65,6 @@ export interface RepoWorktreeState {
 export interface RepoUiState {
   selectedBranch: string | null
   branchViewMode: BranchViewMode
-  /**
-   * Single branch-scoped mixed workspace pane tab list. Static tab entries are
-   * opened static tabs; terminal entries point at terminal sessions owned by
-   * the terminal runtime.
-   */
-  workspacePaneTabsByBranch: Record<string, WorkspacePaneTabEntry[]>
   /** Branch-scoped selected workspace pane tab. Branch switches read this
    *  first so selecting a tab on one branch does not select it on another. */
   preferredWorkspacePaneTabByBranch: Record<string, WorkspacePaneTabType>
@@ -214,9 +207,6 @@ interface RuntimeCoherentRepoProjectionActions {
    *  the UI resolves the active pane at read time so session restore preserves
    *  branch-scoped user intent. */
   setWorkspacePaneTab: (id: string, tab: WorkspacePaneTabType) => void
-  openWorkspacePaneStaticTab: (id: string, tab: WorkspacePaneStaticTabType, branchName?: string) => void
-  closeWorkspacePaneStaticTab: (id: string, tab: WorkspacePaneStaticTabType, branchName?: string) => void
-  replaceWorkspacePaneTabs: (id: string, tabs: WorkspacePaneTabEntry[], branchName?: string) => void
   setBranchViewMode: (id: string, viewMode: BranchViewMode) => void
   selectBranch: (id: string, branch: string) => void
   clearSelectedBranch: (id: string) => void

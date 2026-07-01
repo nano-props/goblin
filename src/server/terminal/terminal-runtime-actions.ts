@@ -14,7 +14,7 @@ import type {
   TerminalSessionSummary,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
-  TerminalWorkspaceTabsEntry,
+  WorkspacePaneTabsEntry,
   TerminalWriteInput,
 } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
@@ -26,9 +26,9 @@ interface TerminalSessionServiceLike {
   create(clientId: string, userId: string, input: TerminalCreateInput): Promise<TerminalCreateResult>
   prune(clientId: string, userId: string, repoRoot: string): Promise<{ pruned: number; remaining: number }>
   listSessions(userId: string, repoRoot: string): Promise<TerminalSessionSummary[]>
-  listWorkspaceTabs(userId: string, repoRoot: string): Promise<TerminalWorkspaceTabsEntry[]>
+  listWorkspaceTabs(userId: string, repoRoot: string): Promise<WorkspacePaneTabsEntry[]>
   replaceTabs(userId: string, input: TerminalReplaceWorkspaceTabsInput): Promise<WorkspacePaneTabEntry[]>
-  removeTerminalTab(userId: string, session: TerminalSessionSummary): Promise<WorkspacePaneTabEntry[]>
+  removeTerminalTab(userId: string, session: TerminalSessionSummary): Promise<void>
 }
 
 interface TerminalRuntimeActionDependencies {
@@ -76,7 +76,9 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
     },
 
     async create(clientId: string, userId: string, input: TerminalCreateInput): Promise<TerminalCreateResult> {
-      return await sessionService.create(clientId, userId, input)
+      const result = await sessionService.create(clientId, userId, input)
+      if (result.ok) broadcastRepoWorkspaceTabsChanged(userId, input.repoRoot)
+      return result
     },
 
     async replaceTabs(
@@ -86,7 +88,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
     ): Promise<WorkspacePaneTabEntry[]> {
       if (!isValidTerminalClientId(clientId)) return []
       if (!isValidRepoLocator(input?.repoRoot)) return []
-      if (!isValidCwd(input?.worktreePath)) return []
+      if (input?.worktreePath !== null && !isValidCwd(input?.worktreePath)) return []
       const tabs = await sessionService.replaceTabs(userId, input)
       broadcastRepoWorkspaceTabsChanged(userId, input.repoRoot)
       return tabs
@@ -131,7 +133,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         ? manager.closeSessionForUser(userId, input.ptySessionId)
         : false
       if (closed && repoRoot) {
-        const tabs = session ? await sessionService.removeTerminalTab(userId, session) : []
+        if (session) await sessionService.removeTerminalTab(userId, session)
         // `sessions-changed` keeps the full repo list in sync for
         // observers that only watch that primitive. `session-closed`
         // is the immediate invalidation for any sibling window under
@@ -144,7 +146,6 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
           ptySessionId: input.ptySessionId,
           repoRoot,
           worktreePath: session?.worktreePath ?? '',
-          tabs,
         })
       }
       return closed
@@ -165,7 +166,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       return await sessionService.listSessions(userId, repoRoot)
     },
 
-    async listWorkspaceTabs(clientId: string, userId: string, repoRoot: string): Promise<TerminalWorkspaceTabsEntry[]> {
+    async listWorkspaceTabs(clientId: string, userId: string, repoRoot: string): Promise<WorkspacePaneTabsEntry[]> {
       if (!isValidTerminalClientId(clientId)) return []
       if (!isValidRepoLocator(repoRoot)) return []
       return await sessionService.listWorkspaceTabs(userId, repoRoot)

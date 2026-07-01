@@ -7,21 +7,8 @@ import {
   normalizeWorkspaceSessionLayoutState,
 } from '#/shared/workspace-layout.ts'
 import type { BranchViewMode, RepoState, ReposGet, ReposSet, ReposStore } from '#/web/stores/repos/types.ts'
-import {
-  type WorkspacePaneStaticTabType,
-  type WorkspacePaneTabEntry,
-  type WorkspacePaneTabType,
-  workspacePaneTabEntryIdentity,
-} from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
-import {
-  normalizeWorkspacePaneTabs,
-  workspacePaneStaticTabsForBranch,
-  workspacePaneTabsForBranch,
-  workspacePaneTabsRecordWith,
-  workspacePaneTabsWithStaticTab,
-  workspacePaneTabsWithoutStaticTab,
-} from '#/web/stores/repos/workspace-pane-tabs.ts'
 import {
   preferredWorkspacePaneTabForBranch,
   preferredWorkspacePaneTabByBranchRecordWith,
@@ -42,13 +29,7 @@ type RestorableWorkspaceSelectionActions = Pick<
 
 type RuntimeCoherentSelectionActions = Pick<
   ReposStore,
-  | 'setBranchViewMode'
-  | 'setWorkspacePaneTab'
-  | 'openWorkspacePaneStaticTab'
-  | 'closeWorkspacePaneStaticTab'
-  | 'replaceWorkspacePaneTabs'
-  | 'selectBranch'
-  | 'clearSelectedBranch'
+  'setBranchViewMode' | 'setWorkspacePaneTab' | 'selectBranch' | 'clearSelectedBranch'
 >
 
 function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet): RestorableWorkspaceSelectionActions {
@@ -165,48 +146,6 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
   }
 
   return {
-    openWorkspacePaneStaticTab(id: string, tab: WorkspacePaneStaticTabType, branchName?: string) {
-      set((s) => {
-        const repo = s.repos[id]
-        const branch = branchName ?? repo?.ui.selectedBranch
-        if (!repo || !branch) return s
-        const current = workspacePaneTabsForBranch(repo.ui, branch)
-        const next = workspacePaneTabsWithStaticTab(current, tab)
-        if (workspacePaneTabsEqual(current, next)) return s
-        return replaceRepoState(s, repo, (r) => {
-          r.ui.workspacePaneTabsByBranch = workspacePaneTabsRecordWith(r.ui, branch, next)
-        })
-      })
-    },
-
-    closeWorkspacePaneStaticTab(id: string, tab: WorkspacePaneStaticTabType, branchName?: string) {
-      set((s) => {
-        const repo = s.repos[id]
-        const branch = branchName ?? repo?.ui.selectedBranch
-        if (!repo || !branch) return s
-        if (!workspacePaneStaticTabsForBranch(repo.ui, branch).includes(tab)) return s
-        const current = workspacePaneTabsForBranch(repo.ui, branch)
-        const next = workspacePaneTabsWithoutStaticTab(current, tab)
-        return replaceRepoState(s, repo, (r) => {
-          r.ui.workspacePaneTabsByBranch = workspacePaneTabsRecordWith(r.ui, branch, next)
-        })
-      })
-    },
-
-    replaceWorkspacePaneTabs(id: string, tabs: WorkspacePaneTabEntry[], branchName?: string) {
-      set((s) => {
-        const repo = s.repos[id]
-        const branch = branchName ?? repo?.ui.selectedBranch
-        if (!repo || !branch) return s
-        const current = workspacePaneTabsForBranch(repo.ui, branch)
-        const nextTabs = normalizeWorkspacePaneTabs(tabs)
-        if (workspacePaneTabsEqual(current, nextTabs)) return s
-        return replaceRepoState(s, repo, (r) => {
-          r.ui.workspacePaneTabsByBranch = workspacePaneTabsRecordWith(r.ui, branch, nextTabs)
-        })
-      })
-    },
-
     setBranchViewMode(id: string, viewMode: BranchViewMode) {
       let changed = false
       let selectedForPullRequest: string | null = null
@@ -301,14 +240,4 @@ export function createSelectionActions(set: ReposSet, get: ReposGet) {
     ...createRestorableWorkspaceSelectionActions(set, get),
     ...createRuntimeCoherentSelectionActions(set, get),
   }
-}
-
-function workspacePaneTabsEqual(a: readonly WorkspacePaneTabEntry[], b: readonly WorkspacePaneTabEntry[]): boolean {
-  return (
-    a.length === b.length &&
-    b.every((entry, index) => {
-      const current = a[index]
-      return !!current && workspacePaneTabEntryIdentity(entry) === workspacePaneTabEntryIdentity(current)
-    })
-  )
 }

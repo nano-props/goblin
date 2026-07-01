@@ -43,11 +43,15 @@ import type {
   TerminalSessionSnapshot,
   TerminalSessionSummary,
   TerminalTitleEvent,
-  TerminalWorkspaceTabsEntry,
+  WorkspacePaneTabsEntry,
 } from '#/shared/terminal-types.ts'
 import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import { workspacePaneTabsForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
+import {
+  readWorkspacePaneTabsForBranch,
+  setWorkspacePaneTabsForBranchQueryData,
+  workspacePaneTabsQueryKey,
+} from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 
 const mockSessions = vi.hoisted(
   () =>
@@ -269,14 +273,14 @@ let lifecycleHandler: ((event: TerminalLifecycleViewModel) => void) | null = nul
 let sessionsChangedHandler: ((repoRoot: string) => void) | null = null
 let workspaceTabsChangedHandler: ((repoRoot: string) => void) | null = null
 let sessionClosedHandler:
-  | ((event: { ptySessionId: string; repoRoot: string; worktreePath: string; tabs: WorkspacePaneTabEntry[] }) => void)
+  | ((event: { ptySessionId: string; repoRoot: string; worktreePath: string }) => void)
   | null = null
 type TestTerminalSessionSummary = Omit<TerminalSessionSummary, 'repoRoot' | 'worktreePath'> &
   Partial<Pick<TerminalSessionSummary, 'repoRoot' | 'worktreePath'>>
 const listSessionsMock = vi.fn<(...args: Array<{ repoRoot: string }>) => Promise<TestTerminalSessionSummary[]>>(
   async () => [],
 )
-const listWorkspaceTabsMock = vi.fn<(...args: Array<{ repoRoot: string }>) => Promise<TerminalWorkspaceTabsEntry[]>>(
+const listWorkspaceTabsMock = vi.fn<(...args: Array<{ repoRoot: string }>) => Promise<WorkspacePaneTabsEntry[]>>(
   async () => [],
 )
 const getSessionSnapshotMock = vi.fn<
@@ -304,8 +308,7 @@ function workspaceTabsWithTerminal(terminalSessionId: string) {
 }
 
 function tabsFor(repoRoot: string, branchName: string): WorkspacePaneTabEntry[] {
-  const repo = useReposStore.getState().repos[repoRoot]
-  return repo ? workspacePaneTabsForBranch(repo.ui, branchName) : []
+  return readWorkspacePaneTabsForBranch(repoRoot, branchName)
 }
 
 function normalizeTestSessionId(terminalSessionId: string): string {
@@ -650,7 +653,6 @@ beforeEach(() => {
             ptySessionId: string
             repoRoot: string
             worktreePath: string
-            tabs: WorkspacePaneTabEntry[]
           }) => void,
         ) => {
           sessionClosedHandler = cb
@@ -966,13 +968,6 @@ describe('TerminalSessionProvider', () => {
       snapshot: 'hydrated-screen',
       snapshotSeq: 5,
     })
-    listWorkspaceTabsMock.mockResolvedValue([
-      {
-        repoRoot: REPO_ID,
-        worktreePath: WORKTREE_PATH,
-        tabs: [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-1')],
-      },
-    ])
     const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH)
     const { getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
 
@@ -981,10 +976,6 @@ describe('TerminalSessionProvider', () => {
 
       expect(getProbe().summaries).toEqual([
         expect.objectContaining({ terminalSessionId: 'session-1', title: 'zsh', phase: 'open' }),
-      ])
-      expect(tabsFor(REPO_ID, 'feature/worktree')).toEqual([
-        workspacePaneStaticTabEntry('status'),
-        workspacePaneTerminalTabEntry('session-1'),
       ])
       const hydrated = mockSessions.find((session) => session.descriptor.terminalSessionId === 'session-1')
       expect(hydrated?.hydrate).toHaveBeenCalledWith(
@@ -1001,23 +992,15 @@ describe('TerminalSessionProvider', () => {
       )
 
       listSessionsMock.mockResolvedValue([])
-      listWorkspaceTabsMock.mockResolvedValue([
-        {
-          repoRoot: REPO_ID,
-          worktreePath: WORKTREE_PATH,
-          tabs: [workspacePaneStaticTabEntry('status')],
-        },
-      ])
       await emitSessionsChanged()
 
       expect(getProbe().summaries).toEqual([])
-      expect(tabsFor(REPO_ID, 'feature/worktree')).toEqual([workspacePaneStaticTabEntry('status')])
     } finally {
       await unmount()
     }
   })
 
-  test('applies canonical workspace tabs from session-closed events', async () => {
+  test('invalidates workspace tabs query from session-closed events', async () => {
     seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -1031,6 +1014,16 @@ describe('TerminalSessionProvider', () => {
         ],
       },
     })
+    setWorkspacePaneTabsForBranchQueryData({
+      repoRoot: REPO_ID,
+      branchName: 'feature/worktree',
+      worktreePath: WORKTREE_PATH,
+      tabs: [
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneTerminalTabEntry('session-1'),
+        workspacePaneStaticTabEntry('history'),
+      ],
+    })
     const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH)
     const { unmount } = await renderProviderWithProbe(terminalWorktreeKey)
 
@@ -1040,20 +1033,16 @@ describe('TerminalSessionProvider', () => {
           ptySessionId: 'server_session_1',
           repoRoot: REPO_ID,
           worktreePath: WORKTREE_PATH,
-          tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
         })
       })
 
-      expect(tabsFor(REPO_ID, 'feature/worktree')).toEqual([
-        workspacePaneStaticTabEntry('status'),
-        workspacePaneStaticTabEntry('history'),
-      ])
+      expect(primaryWindowQueryClient.getQueryState(workspacePaneTabsQueryKey(REPO_ID))?.isInvalidated).toBe(true)
     } finally {
       await unmount()
     }
   })
 
-  test('applies canonical workspace tabs from workspace-tabs-changed broadcasts', async () => {
+  test('invalidates workspace tabs query from workspace-tabs-changed broadcasts', async () => {
     seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -1063,36 +1052,22 @@ describe('TerminalSessionProvider', () => {
         'feature/worktree': [workspacePaneStaticTabEntry('status')],
       },
     })
-    listWorkspaceTabsMock.mockResolvedValue([
-      {
-        repoRoot: REPO_ID,
-        worktreePath: WORKTREE_PATH,
-        tabs: [workspacePaneStaticTabEntry('status')],
-      },
-    ])
+    setWorkspacePaneTabsForBranchQueryData({
+      repoRoot: REPO_ID,
+      branchName: 'feature/worktree',
+      worktreePath: WORKTREE_PATH,
+      tabs: [workspacePaneStaticTabEntry('status')],
+    })
     const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH)
     const { unmount } = await renderProviderWithProbe(terminalWorktreeKey)
 
     try {
-      await vi.waitFor(() => expect(listWorkspaceTabsMock).toHaveBeenCalled())
-      listWorkspaceTabsMock.mockClear()
-      listWorkspaceTabsMock.mockResolvedValue([
-        {
-          repoRoot: REPO_ID,
-          worktreePath: WORKTREE_PATH,
-          tabs: [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-1')],
-        },
-      ])
       await act(async () => {
         workspaceTabsChangedHandler?.(REPO_ID)
         await waitForScheduledServerSync()
       })
 
-      expect(listWorkspaceTabsMock).toHaveBeenCalledWith({ repoRoot: REPO_ID })
-      expect(tabsFor(REPO_ID, 'feature/worktree')).toEqual([
-        workspacePaneStaticTabEntry('status'),
-        workspacePaneTerminalTabEntry('session-1'),
-      ])
+      expect(primaryWindowQueryClient.getQueryState(workspacePaneTabsQueryKey(REPO_ID))?.isInvalidated).toBe(true)
     } finally {
       await unmount()
     }
