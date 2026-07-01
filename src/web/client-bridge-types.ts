@@ -6,6 +6,7 @@ import type {
   TerminalCreateResult,
   TerminalAttachInput,
   TerminalAttachResult,
+  TerminalBellRealtimeEvent,
   TerminalCreateInput,
   TerminalExitEvent,
   TerminalListWorkspaceTabsInput,
@@ -15,8 +16,6 @@ import type {
   TerminalResizeInput,
   TerminalReplaceWorkspaceTabsInput,
   TerminalRestartInput,
-  TerminalSessionSnapshot,
-  TerminalSessionSnapshotInput,
   TerminalSessionSummary,
   TerminalSessionInput,
   TerminalTakeoverInput,
@@ -63,11 +62,11 @@ export interface ClientTerminalBridge {
    * fails or times out.
    */
   kickReconnect: () => void
-  getSessionSnapshot: (input: TerminalSessionSnapshotInput) => Promise<TerminalSessionSnapshot | null>
   notifyBell: (input: TerminalNotifyBellInput) => Promise<TerminalMutationResult>
   sendTestNotification: (input: TerminalTestNotificationInput) => Promise<boolean>
   setBadge: (count: number) => void
   onOutput: (cb: (event: TerminalOutputEvent) => void) => () => void
+  onBell: (cb: (event: TerminalBellRealtimeEvent) => void) => () => void
   onTitle: (cb: (event: TerminalTitleEvent) => void) => () => void
   onExit: (cb: (event: TerminalExitEvent) => void) => () => void
   onIdentity: (cb: (event: TerminalIdentityViewModel) => void) => () => void

@@ -61,7 +61,6 @@ const terminalCommandContext: TerminalSessionContextValue = {
   writeInput: vi.fn(),
   takeover: vi.fn(async () => true),
   focusTerminal: vi.fn(),
-  serialize: vi.fn(() => ''),
 }
 
 const navigation: PrimaryWindowNavigationActions = {

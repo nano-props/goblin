@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 
-import type { TerminalSessionSnapshot, TerminalSessionSummary } from '#/shared/terminal-types.ts'
 import '#/web/components/terminal/terminal-session.css'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
@@ -34,15 +33,14 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   const repoIndex = useStoreWithEqualityFn(useReposStore, (s) => repoIndexFromRepos(s.repos), repoIndexEqual)
   // The provider lives at the router root (above the per-route App), so it
   // reads the active repo directly from the repos store rather than via a
-  // prop. This keeps the terminal session projection, parking root, and
-  // xterm views alive across settings → workspace round-trips.
+  // prop. This keeps the terminal session projection alive across settings
+  // → workspace round-trips.
   const currentRepoId = useReposStore((s) => s.activeId)
   const currentRepoInstanceToken = currentRepoId ? (repoIndex[currentRepoId]?.instanceToken ?? null) : null
   const selectedTerminalSessionIdByTerminalWorktree = useReposStore(
     (s) => s.selectedTerminalSessionIdByTerminalWorktree,
   )
   const setSelectedTerminal = useReposStore((s) => s.setSelectedTerminal)
-  const parkingRootRef = useRef<HTMLDivElement | null>(null)
   const repoIndexRef = useRef(repoIndex)
   repoIndexRef.current = repoIndex
 
@@ -89,46 +87,14 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   }
   const projection = projectionRef.current
 
-  const loadMissingSnapshots = useCallback(
-    async (serverSessions: TerminalSessionSummary[]): Promise<Map<string, TerminalSessionSnapshot>> => {
-      // allSettled (not all) so a single rejected snapshot fetch does not
-      // cancel the rest of the reconciliation. Each request is bounded by
-      // the bridge's per-request timeout, so the worst case here is that
-      // one slow session delays the final map by that timeout — but every
-      // other session's snapshot is delivered to the caller regardless.
-      // Rejections are surfaced via `result.reason` so they remain visible
-      // in logs without poisoning the reconciliation.
-      const settled = await Promise.allSettled(
-        serverSessions.map((session) => terminalBridge.getSessionSnapshot({ ptySessionId: session.ptySessionId })),
-      )
-      const entries: Array<readonly [string, TerminalSessionSnapshot]> = []
-      settled.forEach((result, index) => {
-        const session = serverSessions[index]
-        if (!session) return
-        if (result.status === 'fulfilled') {
-          const snapshot = result.value
-          if (snapshot) entries.push([session.ptySessionId, snapshot])
-          return
-        }
-        terminalSessionProviderLog.debug('failed to load terminal session snapshot', {
-          ptySessionId: session.ptySessionId,
-          err: result.reason,
-        })
-      })
-      return new Map(entries)
-    },
-    [projection],
-  )
-
   const syncServerSessions = useCallback(
     async (repoRoot: string) => {
       if (!repoRoot || !repoIndexRef.current[repoRoot]) return
       try {
         const clientId = readOrCreateWebTerminalClientId()
         const serverSessions = await loadTerminalSessions(repoRoot)
-        const snapshotsByPtySessionId = await loadMissingSnapshots(serverSessions)
         if (!repoIndexRef.current[repoRoot]) return
-        projection.reconcileServerSessions(repoRoot, serverSessions, clientId, snapshotsByPtySessionId)
+        projection.reconcileServerSessions(repoRoot, serverSessions, clientId)
       } catch (err) {
         terminalSessionProviderLog.debug('failed to sync server sessions', { err })
       } finally {
@@ -138,7 +104,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
         }
       }
     },
-    [loadMissingSnapshots, projection],
+    [projection],
   )
 
   // Projection state sync
@@ -146,11 +112,6 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     projection.setRepoIndex(repoIndex)
     projection.setPreferredSelectedTerminalSessionIds(selectedTerminalSessionIdByTerminalWorktree)
   }, [projection, repoIndex, selectedTerminalSessionIdByTerminalWorktree])
-
-  // Parking DOM
-  useEffect(() => {
-    projection.setParkingRoot(parkingRootRef.current)
-  })
 
   // T5.1: visibility recovery hook. On `visibilitychange:visible` and
   // on `pageshow` (bfcache restore on Safari/Firefox mobile), call
@@ -191,6 +152,9 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     const offOutput = terminalBridge.onOutput((event) => {
       projection.handleOutput(event)
     })
+    const offBell = terminalBridge.onBell((event) => {
+      projection.handleServerBell(event)
+    })
     const offTitle = terminalBridge.onTitle((event) => {
       projection.handleServerTitle(event)
     })
@@ -224,6 +188,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
 
     return () => {
       offOutput()
+      offBell()
       offTitle()
       offExit()
       offIdentity()
@@ -295,7 +260,6 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       clearSearch: projection.clearSearch,
       writeInput: projection.writeInput,
       takeover: projection.takeover,
-      serialize: projection.serialize,
     }),
     [projection],
   )
@@ -313,10 +277,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
 
   return (
     <TerminalSessionContext value={commandValue}>
-      <TerminalSessionReadContext value={readValue}>
-        {children}
-        <div ref={parkingRootRef} className="goblin-terminal-parking" aria-hidden="true" />
-      </TerminalSessionReadContext>
+      <TerminalSessionReadContext value={readValue}>{children}</TerminalSessionReadContext>
     </TerminalSessionContext>
   )
 }

@@ -152,10 +152,10 @@ The client was doing an overly strict validation step:
 That extra requirement was removed. The client now trusts the
 authoritative `create` payload for first paint. `create.sessions`
 remains useful for tab-strip and count updates, but a lagging list
-no longer triggers the false-failure toast. If the server claims
-`action: 'created'` yet the session service `sessions[]` does not echo that
-session, the create is rejected as a half-applied protocol mismatch
-rather than silently fabricating a synthetic entry.
+no longer triggers the false-failure toast. If the response has the
+required first-frame fields but `sessions[]` does not echo the target
+yet, the client materializes a minimal local projection from the create
+payload and lets the next server sync reconcile the directory data.
 
 ### Type-level atomicity
 

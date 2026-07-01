@@ -113,6 +113,7 @@ beforeEach(() => {
         sendTestNotification: vi.fn(),
         setBadge: vi.fn(),
         onOutput: vi.fn(() => () => {}),
+        onBell: vi.fn(() => () => {}),
         onTitle: vi.fn(() => () => {}),
         onExit: vi.fn(() => () => {}),
       },

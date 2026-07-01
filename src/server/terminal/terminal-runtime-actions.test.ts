@@ -53,7 +53,6 @@ function makeActions(
     writeSession: vi.fn(() => false),
     resizeSession: vi.fn(() => false),
     takeoverSession: vi.fn(),
-    getSessionSnapshot: vi.fn(() => null),
   } as any
   const broker = { broadcastToUser: broadcasts as unknown as (userId: string, message: unknown) => void }
   const sessionService = {

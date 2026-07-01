@@ -1,16 +1,12 @@
-import {
-  normalizeTerminalSessionSnapshot,
-  normalizeTerminalSessionSummaryList,
-  normalizeWorkspacePaneTabsEntryList,
-} from '#/shared/terminal-validators.ts'
+import { normalizeTerminalSessionSummaryList, normalizeWorkspacePaneTabsEntryList } from '#/shared/terminal-validators.ts'
 import { resolveTerminalController } from '#/shared/terminal-controller.ts'
 import type { TerminalRealtimeMessage } from '#/shared/terminal-socket.ts'
 import type {
+  TerminalBellRealtimeEvent,
   TerminalCreateInput,
   TerminalExitEvent,
   TerminalNotifyBellInput,
   TerminalOutputEvent,
-  TerminalSessionSnapshotInput,
   TerminalTestNotificationInput,
   TerminalTitleEvent,
 } from '#/shared/terminal-types.ts'
@@ -30,6 +26,7 @@ export function createServerTerminalBridge(options: {
   setBadge?: (count: number) => void
 }): ClientTerminalBridge {
   const outputSubscribers = new Set<(event: TerminalOutputEvent) => void>()
+  const bellSubscribers = new Set<(event: TerminalBellRealtimeEvent) => void>()
   const titleSubscribers = new Set<(event: TerminalTitleEvent) => void>()
   const exitSubscribers = new Set<(event: TerminalExitEvent) => void>()
   const identitySubscribers = new Set<(event: TerminalIdentityViewModel) => void>()
@@ -94,14 +91,6 @@ export function createServerTerminalBridge(options: {
     prewarm() {
       return connection.prewarm()
     },
-    getSessionSnapshot(input) {
-      return connection.request('session-snapshot', input satisfies TerminalSessionSnapshotInput).then((value) => {
-        if (value === null) return null
-        const snapshot = normalizeTerminalSessionSnapshot(value)
-        if (!snapshot) throw new Error('Terminal socket response failed: invalid terminal session snapshot response')
-        return snapshot
-      })
-    },
     notifyBell(input: TerminalNotifyBellInput) {
       return options.notificationProvider.notifyBell(input)
     },
@@ -116,6 +105,14 @@ export function createServerTerminalBridge(options: {
       connection.openForRealtime()
       return () => {
         outputSubscribers.delete(cb)
+        connection.closeSocketIfIdle()
+      }
+    },
+    onBell(cb) {
+      bellSubscribers.add(cb)
+      connection.openForRealtime()
+      return () => {
+        bellSubscribers.delete(cb)
         connection.closeSocketIfIdle()
       }
     },
@@ -183,6 +180,7 @@ export function createServerTerminalBridge(options: {
   function hasRealtimeSubscribers(): boolean {
     return (
       outputSubscribers.size > 0 ||
+      bellSubscribers.size > 0 ||
       titleSubscribers.size > 0 ||
       exitSubscribers.size > 0 ||
       identitySubscribers.size > 0 ||
@@ -197,6 +195,9 @@ export function createServerTerminalBridge(options: {
     switch (message.type) {
       case 'output':
         for (const subscriber of outputSubscribers) subscriber(message.event)
+        return
+      case 'bell':
+        for (const subscriber of bellSubscribers) subscriber(message.event)
         return
       case 'title':
         for (const subscriber of titleSubscribers) subscriber(message.event)

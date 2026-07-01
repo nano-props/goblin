@@ -61,9 +61,6 @@ export function createTerminalRealtimeHandlers(host: ServerTerminalHost): {
     prune(clientId, userId, input) {
       return host.prune(clientId, userId, input.repoRoot)
     },
-    'session-snapshot'(clientId, userId, input) {
-      return host.getSessionSnapshot(clientId, userId, input)
-    },
   }
 }
 
@@ -126,10 +123,8 @@ function sendRealtimeResponse(socket: TerminalRealtimeSocket, message: TerminalS
 // during the request can race ahead of the authoritative response and
 // split the client's transition across two sources.
 //
-// `attach`, `restart`, and now `create` all return snapshot hydration
-// data that the client applies as one boundary. `session-snapshot`
-// still remains excluded because that payload is consumed as a later
-// reconciliation path rather than the primary first-frame handshake.
+// `attach`, `restart`, and `create` all return snapshot hydration
+// data that the client applies as one boundary.
 // `takeover` does not return a fresh snapshot, but its response is still
 // the authoritative identity/geometry handshake for the new controller;
 // the same socket must not observe the identity event before that

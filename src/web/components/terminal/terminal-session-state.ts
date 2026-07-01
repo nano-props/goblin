@@ -218,8 +218,8 @@ export class TerminalSessionState {
   }
 
   // Updates the replay boundary. The pending-output buffer is
-  // preserved across calls, so a preload window (cached snapshot's
-  // seq) followed by a post-attach window (new snapshot's seq)
+  // preserved across calls, so a preload window (server snapshot's
+  // seq) followed by a post-attach window (new server snapshot's seq)
   // shares the same buffer; the post-attach `finishReplay` filters
   // by the new boundary.
   beginReplay(replaySeq: number): number {

@@ -8,8 +8,6 @@ import type {
   TerminalResizeInput,
   TerminalRestartInput,
   TerminalSessionInput,
-  TerminalSessionSnapshot,
-  TerminalSessionSnapshotInput,
   TerminalSessionSummary,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
@@ -108,11 +106,6 @@ export interface ServerTerminalHost {
   replaceTabs(clientId: string, userId: string, input: TerminalReplaceWorkspaceTabsInput): MaybePromise<WorkspacePaneTabEntry[]>
   updateTabs(clientId: string, userId: string, input: TerminalUpdateWorkspaceTabsInput): MaybePromise<WorkspacePaneTabEntry[]>
   prune(clientId: string, userId: string, repoRoot: string): MaybePromise<{ pruned: number; remaining: number }>
-  getSessionSnapshot(
-    clientId: string,
-    userId: string,
-    input: TerminalSessionSnapshotInput,
-  ): MaybePromise<TerminalSessionSnapshot | null>
   /** Handle an incoming realtime message from a client socket. */
   handleRealtimeMessage(clientId: string, userId: string, socket: ServerTerminalSocket, message: string): void
   shutdown(): void

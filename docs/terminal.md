@@ -97,7 +97,7 @@ The terminal feature spans `shared`, `server`, and `web`, but it still behaves a
 
 ### Client projection
 
-- Maintains the client-local projection of live sessions, selection, bells, and local reattach state.
+- Maintains the client-local projection of live sessions, selection, bells, and attach/replay orchestration state.
 - Coordinates create, attach, detach, select, restart, takeover, and local session lifecycle.
 - Treats the bridge as the transport to server truth, not as the source of truth itself.
 - Owns input provenance before writes are sent to the server.
@@ -224,7 +224,7 @@ The system supports replay and snapshot hydration so users can reattach to runni
 ### Purpose
 
 - restore visible content after reconnect
-- avoid blank terminals during attach
+- minimize blank time during attach using server-authored first-frame hydration
 - preserve continuity across client lifecycle changes
 
 ### Rules
@@ -260,7 +260,7 @@ For `create` specifically:
 - `ptySessionId` plus `snapshot` / `snapshotSeq` are the authoritative created-session handshake
 - any returned `sessions` list is useful for tab-strip and projection updates, but is not the created session's primary truth source
 
-This keeps `create`, `attach`, and `restart` aligned and prevents blank first paint, prompt tearing, and false create failures caused by projection lag.
+This keeps `create`, `attach`, and `restart` aligned and prevents prompt tearing and false create failures caused by projection lag. A selected view may still be blank while the fresh xterm is created and the server-authored snapshot is replayed.
 
 ## Realtime model
 
@@ -276,13 +276,13 @@ The terminal feature uses realtime transport for continuous, UX-critical flows.
 ### Non-streaming flows
 
 - session service reads
-- snapshots
+- first-frame mutation responses that carry snapshots
 - explicit mutations such as create, attach, restart, resize, takeover, close, and reorder
 
 ### Design rule
 
 Use realtime streaming where the user experience requires continuity.
-Use targeted request/response flows for mutations and snapshots.
+Use targeted request/response flows for mutations; when a mutation opens or replaces a visible frame, its response carries the server-authored snapshot.
 
 ## State model
 
@@ -307,7 +307,6 @@ The terminal feature uses all three app state classes:
 ### Restorable state
 
 - preferred selected terminal per worktree
-- client-side reattach hints that improve continuity across UI movement
 
 The server should own runtime-coherent terminal truth.
 The client may cache and project it, but should not invent parallel business truth.

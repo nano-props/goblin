@@ -879,7 +879,6 @@ function terminalCommandContextWith(overrides: Partial<TerminalSessionContextVal
     writeInput: vi.fn(),
     takeover: vi.fn(async () => true),
     focusTerminal: vi.fn(),
-    serialize: vi.fn(() => ''),
     ...overrides,
   }
 }

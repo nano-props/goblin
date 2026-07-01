@@ -139,8 +139,8 @@ describe('TerminalSessionRuntime', () => {
       { cols: 100, rows: 30 },
     )
 
-    // Preload window: events arrive during the cached-snapshot write.
-    // The boundary is the cached snapshot's seq.
+    // Preload window: events arrive during the server-snapshot write.
+    // The boundary is the server snapshot's seq.
     runtime.beginReplay(2)
     runtime.handleOutput({ ptySessionId: 'pty_session_1_aaaaaaaaa', data: 'preload-old', seq: 3, processName: 'bash' })
     runtime.handleOutput({ ptySessionId: 'pty_session_1_aaaaaaaaa', data: 'preload-new', seq: 6, processName: 'bash' })

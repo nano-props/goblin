@@ -7,14 +7,15 @@ import { formatTerminalWorktreeKey, parseTerminalWorktreeKey } from '#/shared/te
 import { terminalBridge } from '#/web/terminal.ts'
 import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
 import type {
+  TerminalBellRealtimeEvent,
   TerminalSessionSnapshot,
   TerminalSessionSummary as ServerTerminalSessionSummary,
 } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { branchForTerminalWorktree } from '#/web/components/terminal/terminal-repo-index.ts'
 import {
+  projectCreateResultForClient,
   projectServerTerminalSession,
-  type ReattachSnapshotCacheEntry,
 } from '#/web/components/terminal/terminal-session-projection.ts'
 import { userTerminalInput, type TerminalUserInputSource } from '#/web/components/terminal/terminal-input.ts'
 import {
@@ -51,6 +52,7 @@ const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = {
   processName: 'terminal',
   canonicalTitle: null,
 }
+const EMPTY_SERVER_SNAPSHOTS = new Map<string, TerminalSessionSnapshot>()
 /**
  * Client-level authority for terminal session state.
  *
@@ -64,8 +66,8 @@ const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = {
  * `terminal-roadmap.md` P1.7.
  *
  * **Why singleton**: the terminal feature owns cross-cutting state
- * (parking root, per-worktree session lists, bell controller, startup geometry
- * cache, snapshot caches, pending create/close queues) that has no
+ * (per-worktree session lists, bell controller, startup geometry hints,
+ * selector snapshot caches, pending create/close queues) that has no
  * natural React tree boundary. The previous Provider-owned lifetime
  * required a `pendingProjectionDestroyRef + setTimeout(0)` debounce to
  * survive StrictMode; the singleton removes that dance entirely.
@@ -74,7 +76,6 @@ export class TerminalSessionProjection {
   private readonly onSelectedWorktreeChange: (terminalWorktreeKey: string, terminalSessionId: string | null) => void
   private readonly onWorkspaceTabsChanged: (base: TerminalSessionBase, tabs: readonly WorkspacePaneTabEntry[]) => void
   private repoIndex: TerminalRepoIndex = {}
-  private parkingRoot: HTMLDivElement | null = null
   private readonly sessions = new Map<string, TerminalSession>()
   private readonly terminalSessionIdByPtySessionId = new Map<string, string>()
   private readonly ptySessionIdByTerminalSessionId = new Map<string, string>()
@@ -125,24 +126,9 @@ export class TerminalSessionProjection {
   // visibility, not workspace pane selection state.
   private readonly hiddenClosingTerminalSessionIds = new Set<string>()
   private readonly closeCompletionByTerminalSessionId = new Map<string, Promise<boolean>>()
+  // Selector publication caches only. They memoize lightweight UI snapshots
+  // for React subscribers and do not contain terminal render buffers.
   private readonly snapshotCache = new Map<string, TerminalSnapshot>()
-  // Safety-net hard cap. The expected cleanup is the server-exit
-  // event (handleExit), with removeSession / destroy as secondary
-  // sites; a small ceiling trims the oldest entries if bookkeeping
-  // ever drifts (e.g. a wedged server that never emits exit). Set
-  // well above the realistic number of simultaneously-detached
-  // sessions, so in normal use no entry is evicted by the trim path.
-  //
-  // T2.1: lowered from 32 to 8. The 32 was sized for multi-tenant
-  // assumptions; for a single user, typical detached-session count
-  // is 1-3 with occasional 5. 8 gives generous headroom. Per-snapshot
-  // size is bounded by the server's 16 MiB ring buffer (terminal-render-state.ts),
-  // so worst-case reattach memory is 8 × 16 MiB = 128 MiB — almost
-  // never realised because most snapshots are KB-scale. Eviction is
-  // the source-of-truth fallback: a user who lost the snapshot sees
-  // the server's ring buffer on next attach.
-  private static readonly REATTACH_SNAPSHOT_CACHE_HARD_CAP = 8
-  private readonly reattachSnapshotCache = new Map<string, ReattachSnapshotCacheEntry>()
   private readonly worktreeSnapshotCache = new Map<string, TerminalWorktreeSnapshot>()
   private readonly worktreeListeners = new Map<string, Set<() => void>>()
   private readonly repoBellCountListeners = new Map<string, Set<() => void>>()
@@ -181,10 +167,6 @@ export class TerminalSessionProjection {
     this.repoIndex = repoIndex
     this.pruneSessionsMissingFromRepoIndex()
     this.syncDescriptorsFromRepoIndex()
-  }
-
-  setParkingRoot(root: HTMLDivElement | null): void {
-    this.parkingRoot = root
   }
 
   /**
@@ -226,7 +208,6 @@ export class TerminalSessionProjection {
     this.hiddenClosingTerminalSessionIds.clear()
     this.closeCompletionByTerminalSessionId.clear()
     this.snapshotCache.clear()
-    this.reattachSnapshotCache.clear()
     this.worktreeSnapshotCache.clear()
     this.worktreeListeners.clear()
     this.repoBellCountListeners.clear()
@@ -248,6 +229,17 @@ export class TerminalSessionProjection {
     }
   }
 
+  handleServerBell(event: TerminalBellRealtimeEvent): void {
+    const terminalSessionId = this.terminalSessionIdByPtySessionId.get(event.ptySessionId)
+    const session = terminalSessionId ? this.sessions.get(terminalSessionId) : null
+    if (!session) return
+    this.bellState.handleBell(session.descriptor, {
+      processName: event.processName,
+      canonicalTitle: event.canonicalTitle,
+      visible: session.isVisible(),
+    })
+  }
+
   handleServerTitle(event: { ptySessionId: string; canonicalTitle: string | null }): void {
     const directKey = this.terminalSessionIdByPtySessionId.get(event.ptySessionId)
     const directSession = directKey ? this.sessions.get(directKey) : null
@@ -262,21 +254,18 @@ export class TerminalSessionProjection {
     if (directKey && directSession?.handleExit(event)) {
       // Local runtime accepted the exit. Gating the discard on the
       // runtime's accept (rather than evicting eagerly on the
-      // ptySessionId match) avoids discarding a still-valid cache entry
-      // during a race where the local session has moved to a new
-      // ptySessionId (e.g. after a server-side restart) but the index
-      // still maps the old ptySessionId to the same terminalSessionId.
-      // `discardLocalSessionAndDismissDetailIfLast → removeSession`
-      // is what actually evicts the reattach cache entry for `directKey`.
+      // ptySessionId match) avoids discarding a live local session
+      // during a race where the session has moved to a new ptySessionId
+      // (e.g. after a server-side restart) but the index still maps the
+      // old ptySessionId to the same terminalSessionId.
       this.discardLocalSessionAndDismissDetailIfLast(directKey, directSession.descriptor)
       return
     }
     if (directKey && directSession && !directSession.currentPtySessionId()) {
       // The runtime is empty (exit was observed earlier, or the
       // session was never attached) but the ptySessionId index still
-      // points at it. The cache entry is keyed by the local terminalSessionId, not
-      // the old ptySessionId, so leaving it in place is the right call —
-      // the next reattach may still hydrate from it.
+      // points at it. Drop the local projection; future render recovery
+      // comes from the server snapshot, not a client-side render cache.
       this.discardLocalSessionAndDismissDetailIfLast(directKey, directSession.descriptor)
     }
   }
@@ -319,7 +308,7 @@ export class TerminalSessionProjection {
     repoRoot: string,
     serverSessions: ServerTerminalSessionSummary[],
     clientId: string,
-    snapshotsByPtySessionId: ReadonlyMap<string, TerminalSessionSnapshot>,
+    snapshotsByPtySessionId: ReadonlyMap<string, TerminalSessionSnapshot> = EMPTY_SERVER_SNAPSHOTS,
   ): void {
     if (!this.repoIndex[repoRoot]) return
 
@@ -364,7 +353,6 @@ export class TerminalSessionProjection {
         clientId,
         index,
         serverSnapshot: snapshotsByPtySessionId.get(serverSession.ptySessionId) ?? null,
-        reattachSnapshot: this.reattachSnapshotCache.get(serverSession.terminalSessionId) ?? null,
       })
       if (!projected) continue
       touchedWorktrees.add(projected.terminalWorktreeKey)
@@ -495,27 +483,14 @@ export class TerminalSessionProjection {
     if (!snapshotPtySessionId || typeof result.snapshot !== 'string' || typeof result.snapshotSeq !== 'number') {
       throw new Error('error.terminal-create-failed')
     }
-    // First-frame contract: when the server reports `action: 'created'`,
-    // the session service must echo that session in `sessions[]`. The first-frame
-    // payload is the source of truth — fabricates below this point would
-    // hide a real protocol mismatch (e.g., a half-applied create that
-    // committed the session row but skipped the session service append). Reject
-    // and let the operator restart the create.
-    const createdSession = result.sessions.find(
-      (session) =>
-        session.terminalSessionId === result.terminalSessionId && session.ptySessionId === snapshotPtySessionId,
-    )
-    if (!createdSession) {
-      throw new Error('error.terminal-create-failed')
-    }
-    const serverSessions = result.sessions
+    const projectedCreate = projectCreateResultForClient(base, result)
     this.onWorkspaceTabsChanged(base, result.tabs)
     this.setPreferredSelectedTerminalSessionId(terminalWorktreeKey, result.terminalSessionId)
     this.reconcileServerSessions(
       base.repoRoot,
-      serverSessions,
+      projectedCreate.serverSessions,
       clientId,
-      new Map<string, TerminalSessionSnapshot>([[snapshotPtySessionId, result as TerminalSessionSnapshot]]),
+      projectedCreate.snapshotByPtySessionId,
     )
     return result.terminalSessionId
   }
@@ -859,14 +834,7 @@ export class TerminalSessionProjection {
 
   detach = (terminalSessionId: string, host: HTMLElement): void => {
     const session = this.sessions.get(terminalSessionId)
-    if (session && this.parkingRoot) {
-      const serialized = session.serialize()
-      const ptySessionId = session.currentPtySessionId()
-      if (serialized && ptySessionId) {
-        this.setReattachSnapshot(terminalSessionId, { ptySessionId, snapshot: serialized, snapshotSeq: 0 })
-      }
-      session.detach(host, this.parkingRoot)
-    }
+    session?.detach(host)
   }
 
   restart = (terminalSessionId: string): void => {
@@ -925,10 +893,6 @@ export class TerminalSessionProjection {
     const session = this.sessions.get(terminalSessionId)
     if (!session) return Promise.resolve(false)
     return session.takeover()
-  }
-
-  serialize = (terminalSessionId: string): string => {
-    return this.sessions.get(terminalSessionId)?.serialize() ?? ''
   }
 
   private notifyWorktree(terminalWorktreeKey: string): void {
@@ -1030,22 +994,6 @@ export class TerminalSessionProjection {
     if (terminalWorktreeKey) this.notifyWorktree(terminalWorktreeKey)
   }
 
-  // Cache write for the reattach path. The expected cleanup is the
-  // server-exit event (handleExit), with removeSession / destroy as
-  // secondary sites. A small hard cap trims the oldest entries if
-  // bookkeeping ever drifts (e.g., a wedged server that never emits
-  // exit); the limit is set well above the realistic number of
-  // simultaneously-detached sessions.
-  private setReattachSnapshot(terminalSessionId: string, entry: ReattachSnapshotCacheEntry): void {
-    if (this.reattachSnapshotCache.has(terminalSessionId)) this.reattachSnapshotCache.delete(terminalSessionId)
-    this.reattachSnapshotCache.set(terminalSessionId, entry)
-    while (this.reattachSnapshotCache.size > TerminalSessionProjection.REATTACH_SNAPSHOT_CACHE_HARD_CAP) {
-      const oldestSessionId = this.reattachSnapshotCache.keys().next().value
-      if (oldestSessionId === undefined) break
-      this.reattachSnapshotCache.delete(oldestSessionId)
-    }
-  }
-
   private removeSession(terminalSessionId: string, options: { dispose: boolean; closeSession?: boolean }): boolean {
     const session = this.sessions.get(terminalSessionId)
     if (!session) return false
@@ -1059,7 +1007,6 @@ export class TerminalSessionProjection {
     this.syncPtySessionIdIndex(terminalSessionId, null)
     this.sessions.delete(terminalSessionId)
     this.snapshotCache.delete(terminalSessionId)
-    this.reattachSnapshotCache.delete(terminalSessionId)
     this.removeTerminalSessionIdFromWorktreeList(terminalWorktreeKey, terminalSessionId)
     this.outputActivityState.remove(terminalSessionId)
     this.notifySnapshot(terminalSessionId)
@@ -1178,7 +1125,6 @@ export class TerminalSessionProjection {
     session = new TerminalSession(
       descriptor,
       () => this.notifySession(descriptor.terminalSessionId),
-      this.bellState.handleBell,
       (ptySessionId) =>
         this.enqueueDurableClose({
           ptySessionId,

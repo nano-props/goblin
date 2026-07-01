@@ -1,6 +1,8 @@
 import { resolveTerminalController } from '#/shared/terminal-controller.ts'
 import type {
   TerminalAttachResult,
+  TerminalCreateResult,
+  TerminalSessionBase,
   TerminalSessionSnapshot,
   TerminalSessionSummary as ServerTerminalSessionSummary,
 } from '#/shared/terminal-types.ts'
@@ -14,12 +16,6 @@ import type {
   TerminalIdentityViewModel,
 } from '#/web/components/terminal/types.ts'
 
-export interface ReattachSnapshotCacheEntry {
-  ptySessionId: string
-  snapshot: string
-  snapshotSeq: number
-}
-
 export type TerminalAttachResultWithController = Extract<TerminalAttachResult, { ok: true }> & {
   role: TerminalIdentityViewModel['role']
   controllerStatus: TerminalIdentityViewModel['controllerStatus']
@@ -32,6 +28,11 @@ export interface ProjectedServerTerminalSession {
   controlsTerminal: boolean
 }
 
+export interface ProjectedCreateTerminalSessions {
+  serverSessions: ServerTerminalSessionSummary[]
+  snapshotByPtySessionId: Map<string, TerminalSessionSnapshot>
+}
+
 export function projectTerminalAttachResultForClient(
   result: Extract<TerminalAttachResult, { ok: true }>,
   clientId: string,
@@ -42,6 +43,26 @@ export function projectTerminalAttachResultForClient(
   }
 }
 
+export function projectCreateResultForClient(
+  base: TerminalSessionBase,
+  result: Extract<TerminalCreateResult, { ok: true }>,
+): ProjectedCreateTerminalSessions {
+  const targetSession = createSessionSummaryFromCreate(base, result)
+  let sawTarget = false
+  const serverSessions = result.sessions.map((session) => {
+    if (session.terminalSessionId !== result.terminalSessionId) return session
+    sawTarget = true
+    return session.ptySessionId === result.ptySessionId ? session : targetSession
+  })
+  if (!sawTarget) serverSessions.push(targetSession)
+  return {
+    serverSessions,
+    snapshotByPtySessionId: new Map<string, TerminalSessionSnapshot>([
+      [result.ptySessionId, { ptySessionId: result.ptySessionId, snapshot: result.snapshot, snapshotSeq: result.snapshotSeq }],
+    ]),
+  }
+}
+
 export function projectServerTerminalSession(input: {
   repoIndex: TerminalRepoIndex
   repoRoot: string
@@ -49,7 +70,6 @@ export function projectServerTerminalSession(input: {
   clientId: string
   index: number
   serverSnapshot?: TerminalSessionSnapshot | null
-  reattachSnapshot?: ReattachSnapshotCacheEntry | null
 }): ProjectedServerTerminalSession | null {
   if (input.serverSession.repoRoot !== input.repoRoot) return null
   const branch = branchForTerminalWorktree(input.repoIndex, input.serverSession.repoRoot, input.serverSession.worktreePath)
@@ -61,7 +81,6 @@ export function projectServerTerminalSession(input: {
   )
   const terminalWorktree = formatTerminalWorktreeKey(input.serverSession.repoRoot, input.serverSession.worktreePath)
   const controller = resolveTerminalController(input.serverSession.controller, input.clientId)
-  const isReattachMatch = input.reattachSnapshot?.ptySessionId === input.serverSession.ptySessionId
   return {
     descriptor,
     terminalWorktreeKey: terminalWorktree,
@@ -75,10 +94,29 @@ export function projectServerTerminalSession(input: {
       controllerStatus: controller.controllerStatus,
       canonicalCols: input.serverSession.cols,
       canonicalRows: input.serverSession.rows,
-      snapshot: input.serverSnapshot?.snapshot ?? (isReattachMatch ? (input.reattachSnapshot?.snapshot ?? '') : ''),
-      snapshotSeq:
-        input.serverSnapshot?.snapshotSeq ?? (isReattachMatch ? (input.reattachSnapshot?.snapshotSeq ?? 0) : 0),
+      snapshot: input.serverSnapshot?.snapshot ?? '',
+      snapshotSeq: input.serverSnapshot?.snapshotSeq ?? 0,
     },
     controlsTerminal: input.serverSession.controller?.clientId === input.clientId,
+  }
+}
+
+function createSessionSummaryFromCreate(
+  base: TerminalSessionBase,
+  result: Extract<TerminalCreateResult, { ok: true }>,
+): ServerTerminalSessionSummary {
+  return {
+    ptySessionId: result.ptySessionId,
+    terminalSessionId: result.terminalSessionId,
+    repoRoot: base.repoRoot,
+    worktreePath: base.worktreePath,
+    cwd: base.worktreePath,
+    controller: result.controller,
+    processName: result.processName,
+    canonicalTitle: result.canonicalTitle,
+    phase: result.phase,
+    message: result.message,
+    cols: result.canonicalCols,
+    rows: result.canonicalRows,
   }
 }

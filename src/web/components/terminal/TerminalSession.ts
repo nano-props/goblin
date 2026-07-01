@@ -42,7 +42,6 @@ import { terminalLog } from '#/web/logger.ts'
 import { t } from 'i18next'
 import { toast } from 'sonner'
 import type {
-  TerminalBellEvent,
   TerminalDescriptor,
   TerminalIdentityViewModel,
   TerminalLifecycleViewModel,
@@ -56,7 +55,6 @@ export type TerminalNotifyReason = 'metadata'
 export class TerminalSession {
   descriptor: TerminalDescriptor
   private readonly notify: (reason: TerminalNotifyReason) => void
-  private readonly onBell: ((descriptor: TerminalDescriptor, event: TerminalBellEvent) => void) | null
   private readonly requestDurableClose: (ptySessionId: string) => Promise<void>
   private readonly runtime = new TerminalSessionRuntime()
   private readonly view: TerminalSessionView
@@ -87,7 +85,6 @@ export class TerminalSession {
   constructor(
     descriptor: TerminalDescriptor,
     notify: (reason: TerminalNotifyReason) => void,
-    onBell: ((descriptor: TerminalDescriptor, event: TerminalBellEvent) => void) | null = null,
     // Durable close hook. The projection passes this in so dispose() can
     // hand the close to a queue (drained on the next create for the
     // same worktree) instead of firing `terminalBridge.close` as a
@@ -99,11 +96,9 @@ export class TerminalSession {
   ) {
     this.descriptor = descriptor
     this.notify = notify
-    this.onBell = onBell
     this.requestDurableClose = requestDurableClose
     this.view = new TerminalSessionView({
       onInput: (data) => this.writeInput(data),
-      onBell: () => this.handleBell(),
       onResize: ({ cols, rows }) => this.queueResize(cols, rows),
       onSearchResult: (event) => this.updateSearchResult(event),
       onProgress: (state, value) => this.updateProgress(state, value),
@@ -137,9 +132,9 @@ export class TerminalSession {
     return this.runtime.phase() === 'open' && this.runtime.clientRole() === 'unowned'
   }
 
-  detach(host: HTMLElement, parkingRoot: HTMLElement): void {
+  detach(host: HTMLElement): void {
     this.clearTerminalFocusIfOwned()
-    this.view.detach(host, parkingRoot)
+    if (this.view.detach(host)) this.destroyActiveView()
   }
 
   restart(): void {
@@ -193,6 +188,10 @@ export class TerminalSession {
 
   isTerminalFocusTarget(target: EventTarget | null): boolean {
     return this.view.isTerminalFocusTarget(target)
+  }
+
+  isVisible(): boolean {
+    return this.view.isVisible()
   }
 
   writeInput(input: TerminalInput): void {
@@ -329,10 +328,6 @@ export class TerminalSession {
 
   scrollLines(amount: number): void {
     this.view.scrollLines(amount)
-  }
-
-  serialize(): string {
-    return this.view.serialize()
   }
 
   currentPtySessionId(): string | null {
@@ -645,8 +640,8 @@ export class TerminalSession {
       // and the attach IPC reads them synchronously when ipcPhase runs.
       // The rAF settles the *layout paint* for measurement accuracy in
       // later operations, but the attach roundtrip doesn't need that
-      // paint to have completed. A future refactor that turns attach into
-      // a local cache lookup MUST restore the blocking wait.
+      // paint to have completed. A future local first-frame optimization
+      // MUST restore the blocking wait before trusting local geometry.
       void waitForTerminalLayout()
       this.guardStart(token, term)
       return { term, preloadReplayGeneration }
@@ -670,8 +665,10 @@ export class TerminalSession {
       ? await terminalBridge.restart(this.terminalRestartInput(ptySessionId, term))
       : await terminalBridge.attach(this.terminalAttachInput(ptySessionId, term))
     if (this.disposed || this.startToken !== token || this.view.currentTerminal() !== term) {
-      if (result.ok) void terminalBridge.close({ ptySessionId: result.ptySessionId }).catch(() => {})
-      else this.closeReplacingPtySession()
+      if (this.disposed) {
+        if (result.ok) void terminalBridge.close({ ptySessionId: result.ptySessionId }).catch(() => {})
+        else this.closeReplacingPtySession()
+      }
       throw new StartCancelledError()
     }
     this.runtime.settleStartAttempt()
@@ -960,14 +957,6 @@ export class TerminalSession {
 
   private updateProgress(state: number, value: number): void {
     if (this.runtime.setProgress(state, value)) this.notify('metadata')
-  }
-
-  private handleBell(): void {
-    this.onBell?.(this.descriptor, {
-      processName: this.runtime.processName(),
-      canonicalTitle: this.runtime.canonicalTitle(),
-      visible: this.view.isVisible(),
-    })
   }
 
   private find(term: string, direction: 'next' | 'previous', incremental: boolean): TerminalSearchResult {

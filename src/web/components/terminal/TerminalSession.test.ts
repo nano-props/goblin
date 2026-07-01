@@ -25,7 +25,6 @@ const xtermMocks = vi.hoisted(() => {
   const terminals: any[] = []
   const fitAddons: any[] = []
   const searchAddons: any[] = []
-  const serializeAddons: any[] = []
   const unicodeAddons: any[] = []
   const webLinkAddons: any[] = []
   const imageAddons: any[] = []
@@ -34,7 +33,6 @@ const xtermMocks = vi.hoisted(() => {
   let deferWriteCallbacks = false
   const addonFailures = {
     search: false,
-    serialize: false,
     unicode: false,
     webLinks: false,
     image: false,
@@ -95,7 +93,6 @@ const xtermMocks = vi.hoisted(() => {
     private dataHandlers: Array<(data: string) => void> = []
     private binaryHandlers: Array<(data: string) => void> = []
     private keyHandlers: Array<(event: { key: string; domEvent: KeyboardEvent }) => void> = []
-    private bellHandlers: Array<() => void> = []
     private titleHandlers: Array<(title: string) => void> = []
 
     constructor(options: {
@@ -165,11 +162,6 @@ const xtermMocks = vi.hoisted(() => {
       return { dispose: vi.fn(() => (this.resizeHandlers = this.resizeHandlers.filter((handler) => handler !== cb))) }
     }
 
-    onBell(cb: () => void) {
-      this.bellHandlers.push(cb)
-      return { dispose: vi.fn(() => (this.bellHandlers = this.bellHandlers.filter((handler) => handler !== cb))) }
-    }
-
     onTitleChange(cb: (title: string) => void) {
       this.titleHandlers.push(cb)
       return { dispose: vi.fn(() => (this.titleHandlers = this.titleHandlers.filter((handler) => handler !== cb))) }
@@ -203,10 +195,6 @@ const xtermMocks = vi.hoisted(() => {
 
     emitBinary(data: string) {
       for (const handler of this.binaryHandlers) handler(data)
-    }
-
-    emitBell() {
-      for (const handler of this.bellHandlers) handler()
     }
 
     emitTitleChange(title: string) {
@@ -263,21 +251,6 @@ const xtermMocks = vi.hoisted(() => {
       const event = found ? { resultIndex: 0, resultCount: 2 } : { resultIndex: -1, resultCount: 0 }
       for (const handler of this.resultHandlers) handler(event)
       return found
-    }
-  }
-
-  class MockSerializeAddon {
-    term: MockTerminal | null = null
-    serialize = vi.fn(() => 'serialized-output')
-    serializeAsHTML = vi.fn(() => '<pre>serialized-output</pre>')
-
-    constructor() {
-      if (addonFailures.serialize) throw new Error('serialize addon failed')
-      serializeAddons.push(this)
-    }
-
-    activate(term: MockTerminal) {
-      this.term = term
     }
   }
 
@@ -353,7 +326,6 @@ const xtermMocks = vi.hoisted(() => {
     terminals,
     fitAddons,
     searchAddons,
-    serializeAddons,
     unicodeAddons,
     webLinkAddons,
     imageAddons,
@@ -371,7 +343,6 @@ const xtermMocks = vi.hoisted(() => {
     MockTerminal,
     MockFitAddon,
     MockSearchAddon,
-    MockSerializeAddon,
     MockUnicode11Addon,
     MockWebLinksAddon,
     MockImageAddon,
@@ -384,7 +355,6 @@ vi.mock('@xterm/addon-fit', () => ({ FitAddon: xtermMocks.MockFitAddon }))
 vi.mock('@xterm/addon-image', () => ({ ImageAddon: xtermMocks.MockImageAddon }))
 vi.mock('@xterm/addon-progress', () => ({ ProgressAddon: xtermMocks.MockProgressAddon }))
 vi.mock('@xterm/addon-search', () => ({ SearchAddon: xtermMocks.MockSearchAddon }))
-vi.mock('@xterm/addon-serialize', () => ({ SerializeAddon: xtermMocks.MockSerializeAddon }))
 vi.mock('@xterm/addon-unicode11', () => ({ Unicode11Addon: xtermMocks.MockUnicode11Addon }))
 vi.mock('@xterm/addon-web-links', () => ({ WebLinksAddon: xtermMocks.MockWebLinksAddon }))
 
@@ -495,7 +465,6 @@ beforeEach(() => {
   xtermMocks.terminals.length = 0
   xtermMocks.fitAddons.length = 0
   xtermMocks.searchAddons.length = 0
-  xtermMocks.serializeAddons.length = 0
   xtermMocks.unicodeAddons.length = 0
   xtermMocks.webLinkAddons.length = 0
   xtermMocks.imageAddons.length = 0
@@ -504,7 +473,6 @@ beforeEach(() => {
   xtermMocks.flushDeferredWriteCallbacks()
   Object.assign(xtermMocks.addonFailures, {
     search: false,
-    serialize: false,
     unicode: false,
     webLinks: false,
     image: false,
@@ -574,6 +542,7 @@ beforeEach(() => {
         create: vi.fn(),
         pruneTerminals: vi.fn(),
         onOutput: vi.fn(),
+        onBell: vi.fn(),
         onTitle: vi.fn(),
         onExit: vi.fn(),
         onIdentity: vi.fn(),
@@ -642,11 +611,11 @@ beforeEach(() => {
       listWorkspaceTabs: vi.fn(async () => []),
       prewarm: vi.fn(async () => {}),
       kickReconnect: vi.fn(() => {}),
-      getSessionSnapshot: vi.fn(async () => null),
       notifyBell: terminalCalls.notifyBell.mockResolvedValue(true),
       sendTestNotification: vi.fn(async () => true),
       setBadge: terminalCalls.setBadge,
       onOutput: vi.fn(() => () => {}),
+      onBell: vi.fn(() => () => {}),
       onTitle: vi.fn(() => () => {}),
       onExit: vi.fn(() => () => {}),
       onIdentity: vi.fn(() => () => {}),
@@ -709,11 +678,31 @@ describe('TerminalSession', () => {
     expect(session.snapshot().phase).toBe('open')
   })
 
+  test('does not close the server session when deselected while attach is in flight', async () => {
+    const attach = deferred<TerminalAttachResult>()
+    terminalCalls.attach.mockReturnValueOnce(attach.promise)
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session)
+
+    session.attach(host)
+    await flushTerminalStart()
+    expect(terminalCalls.attach).toHaveBeenCalledTimes(1)
+
+    session.detach(host)
+    attach.resolve(attachResult('pty_session_1_aaaaaaaaa'))
+    await flushTerminalStart()
+
+    expect(terminalCalls.close).not.toHaveBeenCalled()
+    expect(host.querySelector('.goblin-managed-terminal-frame')).toBeNull()
+  })
+
   test('dispose during font preload aborts before waitForMeasurableHost runs', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
 
-    // Park preloadTerminalFont so the orchestrator yields mid-openPhase.
+    // Hold preloadTerminalFont so the orchestrator yields mid-openPhase.
     let resolvePreload!: () => void
     geometryMocks.preloadTerminalFont.mockImplementationOnce(
       () =>
@@ -728,7 +717,7 @@ describe('TerminalSession', () => {
     session.attach(host)
     await flushTerminalStart()
 
-    // Session is parked inside the await preloadTerminalFont() call —
+    // Session is suspended inside the await preloadTerminalFont() call —
     // no ResizeObserver should exist yet because the geometry wait has
     // not been reached.
     expect(MockResizeObserver.instances).toHaveLength(0)
@@ -821,7 +810,7 @@ describe('TerminalSession', () => {
     expect(term.scrollToBottom).not.toHaveBeenCalled()
   })
 
-  test('loads terminal addons and exposes search and serialization', async () => {
+  test('loads terminal addons and exposes search', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
     const session = new TerminalSession(descriptor, vi.fn())
@@ -835,7 +824,6 @@ describe('TerminalSession', () => {
     expect(xtermMocks.terminals[0]!.unicode.activeVersion).toBe('11')
     expect(xtermMocks.webLinkAddons).toHaveLength(1)
     expect(xtermMocks.searchAddons).toHaveLength(1)
-    expect(xtermMocks.serializeAddons).toHaveLength(1)
     expect(session.findNext('needle', true)).toEqual({ resultIndex: 0, resultCount: 2, found: true })
     expect(xtermMocks.searchAddons[0]!.findNext).toHaveBeenCalledWith(
       'needle',
@@ -843,7 +831,6 @@ describe('TerminalSession', () => {
     )
     expect(session.findPrevious('needle')).toEqual({ resultIndex: 0, resultCount: 2, found: true })
     expect(session.findNext('missing')).toEqual({ resultIndex: -1, resultCount: 0, found: false })
-    expect(session.serialize()).toBe('serialized-output')
     session.clearSearch()
     expect(xtermMocks.searchAddons[0]!.clearDecorations).toHaveBeenCalled()
     expect(session.snapshot().search).toBeUndefined()
@@ -1056,7 +1043,6 @@ describe('TerminalSession', () => {
   test('opens terminal when optional addon setup fails', async () => {
     Object.assign(xtermMocks.addonFailures, {
       search: true,
-      serialize: true,
       unicode: true,
       webLinks: true,
       image: true,
@@ -1075,11 +1061,9 @@ describe('TerminalSession', () => {
     expect(terminalCalls.attach).toHaveBeenCalled()
     expect(session.snapshot().phase).toBe('open')
     expect(session.findNext('needle')).toEqual({ resultIndex: -1, resultCount: 0, found: false })
-    expect(session.serialize()).toBe('')
     expect(warnSpy).toHaveBeenCalledWith('failed to load unicode11 addon', { err: expect.any(Error) })
     expect(warnSpy).toHaveBeenCalledWith('failed to load web links addon', { err: expect.any(Error) })
     expect(warnSpy).toHaveBeenCalledWith('failed to load search addon', { err: expect.any(Error) })
-    expect(warnSpy).toHaveBeenCalledWith('failed to load serialize addon', { err: expect.any(Error) })
     expect(warnSpy).toHaveBeenCalledWith('failed to load image addon', { err: expect.any(Error) })
     expect(warnSpy).toHaveBeenCalledWith('failed to load progress addon', { err: expect.any(Error) })
     expect(session.snapshot().progress).toBeUndefined()
@@ -2210,7 +2194,7 @@ describe('TerminalSession', () => {
     // this test we wire it straight to `terminalCalls.close` so the same
     // assertions the old test made still hold.
     const pendingCloses: Array<Promise<unknown>> = []
-    const session = new TerminalSession(descriptor, vi.fn(), null, async (ptySessionId) => {
+    const session = new TerminalSession(descriptor, vi.fn(), async (ptySessionId) => {
       const promise = terminalCalls.close({ ptySessionId })
       pendingCloses.push(promise)
       await promise
@@ -2239,7 +2223,7 @@ describe('TerminalSession', () => {
     // See the comment in the previous test for why we wire
     // `requestDurableClose` to `terminalCalls.close` here.
     const pendingCloses: Array<Promise<unknown>> = []
-    const session = new TerminalSession(descriptor, vi.fn(), null, async (ptySessionId) => {
+    const session = new TerminalSession(descriptor, vi.fn(), async (ptySessionId) => {
       const promise = terminalCalls.close({ ptySessionId })
       pendingCloses.push(promise)
       await promise
@@ -2259,28 +2243,47 @@ describe('TerminalSession', () => {
     expect(terminalCalls.close).toHaveBeenCalledWith({ ptySessionId: 'pty_session_2_aaaaaaaaa' })
   })
 
-  test('disconnects ResizeObserver while parked and reinstalls on attach', async () => {
+  test('does not close restart result when deselected while restart is in flight', async () => {
+    const restart = deferred<TerminalAttachResult>()
+    terminalCalls.restart.mockReturnValueOnce(restart.promise)
     const host = document.createElement('div')
-    const parking = document.createElement('div')
-    document.body.append(host, parking)
+    document.body.appendChild(host)
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session)
+    session.attach(host)
+    await flushTerminalStart()
+
+    session.restart()
+    await flushUntil(() => terminalCalls.restart.mock.calls.length === 1)
+    session.detach(host)
+    restart.resolve(attachResult('pty_session_2_aaaaaaaaa'))
+    await flushTerminalStart()
+
+    expect(terminalCalls.close).not.toHaveBeenCalled()
+    expect(host.querySelector('.goblin-managed-terminal-frame')).toBeNull()
+  })
+
+  test('destroys inactive xterm and opens a fresh view on attach', async () => {
+    const host = document.createElement('div')
+    document.body.append(host)
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
     await flushTerminalStart()
     const firstObserver = MockResizeObserver.instances[0]!
+    const firstTerm = xtermMocks.terminals[0]!
 
-    session.detach(host, parking)
+    session.detach(host)
     expect(firstObserver.disconnect).toHaveBeenCalledTimes(1)
-    expect(parking.querySelector('.goblin-managed-terminal-frame')).not.toBeNull()
-    const parkedItem = parking.querySelector<HTMLElement>('.goblin-terminal-parking__item')!
-    expect(parkedItem.style.getPropertyValue('--goblin-terminal-parked-width')).toBe('800px')
-    expect(parkedItem.style.getPropertyValue('--goblin-terminal-parked-height')).toBe('400px')
+    expect(firstTerm.dispose).toHaveBeenCalledTimes(1)
+    expect(host.querySelector('.goblin-managed-terminal-frame')).toBeNull()
 
     session.attach(host)
-    expect(parkedItem.style.getPropertyValue('--goblin-terminal-parked-width')).toBe('')
-    expect(parkedItem.style.getPropertyValue('--goblin-terminal-parked-height')).toBe('')
+    await flushTerminalStart()
     expect(MockResizeObserver.instances).toHaveLength(2)
     expect(MockResizeObserver.instances[1]!.observe).toHaveBeenCalled()
+    expect(xtermMocks.terminals).toHaveLength(2)
+    expect(host.querySelector('.goblin-managed-terminal-frame')).not.toBeNull()
   })
 
   test('focus checks are derived from the xterm DOM host', async () => {
@@ -2337,22 +2340,6 @@ describe('TerminalSession', () => {
 
     expect(xtermMocks.imageAddons).toHaveLength(1)
     expect(xtermMocks.progressAddons).toHaveLength(1)
-  })
-
-  test('emits bell events for provider-level policy handling', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const notify = vi.fn()
-    const onBell = vi.fn()
-    const session = new TerminalSession(descriptor, notify, onBell)
-    hydrateManagedSession(session)
-
-    session.attach(host)
-    await flushTerminalStart()
-    await flushUntil(() => session.snapshot().phase === 'open')
-
-    xtermMocks.terminals[0]!.emitBell()
-    expect(onBell).toHaveBeenCalledWith(descriptor, { processName: 'zsh', canonicalTitle: null, visible: true })
   })
 
   test('progress state appears in snapshot and clears on state 0', async () => {

@@ -43,7 +43,6 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
     descriptor: any
     private ptySessionId: string | null = null
     private snapshotState: any = { phase: 'opening', message: null, processName: 'terminal', canonicalTitle: null }
-    private serializeValue = ''
 
     constructor(descriptor: any) {
       this.descriptor = descriptor
@@ -77,9 +76,6 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
     takeover(): Promise<boolean> {
       return Promise.resolve(true)
     }
-    serialize(): string {
-      return this.serializeValue
-    }
     handleOutput(): void {}
     handleServerTitle(): void {}
     handleExit(): boolean {
@@ -94,7 +90,6 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
     }
     hydrate(input: any): void {
       this.ptySessionId = input.ptySessionId
-      this.serializeValue = input.snapshot ?? this.serializeValue
       this.snapshotState = {
         phase: 'open',
         message: null,

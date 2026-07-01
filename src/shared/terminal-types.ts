@@ -224,10 +224,6 @@ export interface TerminalSessionSummary {
   rows: number
 }
 
-export interface TerminalSessionSnapshotInput {
-  ptySessionId: string
-}
-
 export interface TerminalSessionSnapshot {
   ptySessionId: string
   snapshot: string
@@ -241,6 +237,12 @@ export interface TerminalOutputEvent {
   data: string
   seq: number
   processName: string
+}
+
+export interface TerminalBellRealtimeEvent {
+  ptySessionId: string
+  processName: string
+  canonicalTitle: string | null
 }
 
 export interface TerminalTitleEvent {

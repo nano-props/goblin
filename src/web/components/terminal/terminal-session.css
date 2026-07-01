@@ -270,21 +270,6 @@
   color: var(--color-muted-foreground);
 }
 
-.goblin-terminal-parking {
-  position: fixed;
-  left: -10000px;
-  top: -10000px;
-  visibility: hidden;
-  pointer-events: none;
-}
-
-.goblin-terminal-parking__item {
-  width: var(--goblin-terminal-parked-width, auto);
-  height: var(--goblin-terminal-parked-height, auto);
-  contain: layout paint size;
-  overflow: hidden;
-}
-
 .goblin-terminal-mobile-toolbar {
   display: flex;
   flex-direction: column;

@@ -126,7 +126,6 @@ async function renderTerminalSession() {
     writeInput,
     takeover: vi.fn(),
     focusTerminal: vi.fn(),
-    serialize: vi.fn(() => ''),
   }
   const readContext: TerminalSessionReadContextValue = {
     terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
@@ -271,7 +270,6 @@ describe('TerminalSessionView', () => {
       writeInput: vi.fn(),
       takeover,
       focusTerminal: vi.fn(),
-      serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
@@ -338,7 +336,6 @@ describe('TerminalSessionView', () => {
       writeInput: vi.fn(),
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
-      serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(emptyWorktreeSnapshot),
@@ -414,7 +411,6 @@ describe('TerminalSessionView', () => {
       writeInput: vi.fn(),
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
-      serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
@@ -506,7 +502,6 @@ describe('TerminalSessionView', () => {
       writeInput: vi.fn(),
       takeover: vi.fn(),
       focusTerminal,
-      serialize: vi.fn(() => ''),
     }
     let activeSnapshot: TerminalSnapshot = openingSnapshot
     const readContext: TerminalSessionReadContextValue = {
@@ -611,7 +606,6 @@ describe('TerminalSessionView', () => {
       writeInput: vi.fn(),
       takeover: vi.fn(),
       focusTerminal,
-      serialize: vi.fn(() => ''),
     }
     let activeSnapshot: TerminalSnapshot = openingSnapshot
     const readContext: TerminalSessionReadContextValue = {
@@ -722,7 +716,6 @@ describe('TerminalSessionView', () => {
       writeInput: vi.fn(),
       takeover,
       focusTerminal: vi.fn(),
-      serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
@@ -835,7 +828,6 @@ describe('TerminalSessionView', () => {
       writeInput,
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
-      serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
@@ -951,7 +943,6 @@ describe('TerminalSessionView', () => {
       writeInput,
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
-      serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
@@ -1084,7 +1075,6 @@ describe('TerminalSessionView', () => {
       writeInput,
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
-      serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
@@ -1191,7 +1181,6 @@ describe('TerminalSessionView', () => {
       writeInput,
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
-      serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
@@ -1310,7 +1299,6 @@ describe('TerminalSessionView', () => {
       writeInput,
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
-      serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
@@ -1585,7 +1573,6 @@ describe('TerminalSessionView', () => {
       writeInput,
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
-      serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
@@ -1744,7 +1731,6 @@ describe('TerminalSessionView', () => {
       writeInput,
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
-      serialize: vi.fn(() => ''),
     }
     let activeWorktreeSnapshot = worktreeSnapshotA
     const readContext: TerminalSessionReadContextValue = {
@@ -1859,7 +1845,6 @@ describe('TerminalSessionView', () => {
       writeInput: vi.fn(),
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
-      serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(emptyWorktreeSnapshot),
@@ -1942,7 +1927,6 @@ describe('TerminalSessionView', () => {
       writeInput: vi.fn(),
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
-      serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(emptyWorktreeSnapshot),

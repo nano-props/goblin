@@ -70,6 +70,31 @@ export function appendOutput(state: TerminalRenderState, data: string): number {
   return seq
 }
 
+export function scanTerminalOutputForBell(data: string, initialInOsc: boolean): { hasBell: boolean; inOsc: boolean } {
+  let inOsc = initialInOsc
+  let hasBell = false
+  for (let i = 0; i < data.length; i += 1) {
+    const char = data[i]
+    if (inOsc) {
+      if (char === '\x07') inOsc = false
+      else if (char === '\x1b' && data[i + 1] === '\\') {
+        inOsc = false
+        i += 1
+      }
+      continue
+    }
+    if (char === '\x07') {
+      hasBell = true
+      continue
+    }
+    if (char === '\x1b' && data[i + 1] === ']') {
+      inOsc = true
+      i += 1
+    }
+  }
+  return { hasBell, inOsc }
+}
+
 export interface RenderSnapshot {
   /** Serialized current screen to write into the client xterm. */
   snapshot: string

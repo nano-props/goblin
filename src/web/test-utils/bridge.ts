@@ -43,7 +43,6 @@ import type {
   TerminalListWorkspaceTabsInput,
   TerminalReplaceWorkspaceTabsInput,
   TerminalMutationResult,
-  TerminalSessionSnapshot,
   TerminalSessionSummary,
   TerminalUpdateWorkspaceTabsInput,
   WorkspacePaneTabsEntry,
@@ -69,7 +68,6 @@ interface TerminalBridgeTestOutputs {
   'terminal.listWorkspaceTabs': WorkspacePaneTabsEntry[]
   'terminal.prune': { pruned: number; remaining: number }
   'terminal.listSessions': TerminalSessionSummary[]
-  'terminal.getSessionSnapshot': TerminalSessionSnapshot | null
   'terminal.notifyBell': TerminalMutationResult
 }
 
@@ -99,8 +97,6 @@ function terminalHandlerNameForSocketAction(action: string): keyof TerminalBridg
       return 'terminal.prune'
     case 'list-sessions':
       return 'terminal.listSessions'
-    case 'session-snapshot':
-      return 'terminal.getSessionSnapshot'
     default:
       return null
   }
@@ -218,11 +214,11 @@ export function installWorkspacePaneTabsTestBridge(
       listSessions: async () => [],
       prewarm: async () => {},
       kickReconnect: () => {},
-      getSessionSnapshot: async () => null,
       notifyBell: async () => true,
       sendTestNotification: async () => true,
       setBadge: () => {},
       onOutput: () => () => {},
+      onBell: () => () => {},
       onTitle: () => () => {},
       onExit: () => () => {},
       onIdentity: () => () => {},
@@ -355,6 +351,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           create: () => Promise.resolve({ ok: false, message: 'unhandled terminal create' }),
           pruneTerminals: () => Promise.resolve({ pruned: 0, remaining: 0 }),
           onOutput: () => () => {},
+          onBell: () => () => {},
           onExit: () => () => {},
         },
       },
@@ -395,10 +392,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
     name: 'terminal.listSessions',
     payload: unknown,
   ): TerminalBridgeTestOutputs['terminal.listSessions']
-  function callTerminalHandler(
-    name: 'terminal.getSessionSnapshot',
-    payload: unknown,
-  ): TerminalBridgeTestOutputs['terminal.getSessionSnapshot']
   function callTerminalHandler(
     name: 'terminal.notifyBell',
     payload: unknown,
@@ -445,8 +438,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           return []
         case 'terminal.listSessions':
           return []
-        case 'terminal.getSessionSnapshot':
-          return null
         case 'terminal.create': {
           const terminalKind = (payload as { kind?: string } | undefined)?.kind
           const ptySessionId = terminalKind === 'primary' ? 'pty_test_1_aaaaaaaaa' : 'pty_test_2_aaaaaaaaa'
@@ -559,11 +550,11 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       listSessions: async (input) => callTerminalHandler('terminal.listSessions', input),
       prewarm: async () => {},
       kickReconnect: () => {},
-      getSessionSnapshot: async (input) => callTerminalHandler('terminal.getSessionSnapshot', input),
       notifyBell: async (input) => callTerminalHandler('terminal.notifyBell', input),
       sendTestNotification: async () => true,
       setBadge: () => {},
       onOutput: () => () => {},
+      onBell: () => () => {},
       onTitle: () => () => {},
       onExit: () => () => {},
       onIdentity: () => () => {},

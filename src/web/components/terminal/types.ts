@@ -24,7 +24,7 @@ export interface TerminalProgressState {
   value: number
 }
 
-export interface TerminalBellEvent {
+export interface TerminalBellPolicyEvent {
   processName: string
   /** Server-canonical terminal title parsed from the OSC 0/2 stream. */
   canonicalTitle?: string | null
@@ -159,8 +159,6 @@ export interface TerminalSessionContextValue {
   clearSearch: (terminalSessionId: string) => void
   writeInput: (terminalSessionId: string, data: string, source?: TerminalUserInputSource) => void
   takeover: (terminalSessionId: string) => Promise<boolean>
-  /** Serializes xterm framebuffer state as VT sequences; not plain-text output for copy UI. */
-  serialize: (terminalSessionId: string) => string
 }
 
 export interface TerminalSessionReadContextValue {
@@ -176,7 +174,7 @@ export interface TerminalSessionLike {
   descriptor: TerminalDescriptor
   updateDescriptor: (descriptor: TerminalDescriptor) => void
   attach: (host: HTMLElement) => void
-  detach: (host: HTMLElement, parkingRoot: HTMLElement) => void
+  detach: (host: HTMLElement) => void
   restart: () => void
   focus: () => void
   dispose: (options?: { closeSession?: boolean }) => void
@@ -192,8 +190,6 @@ export interface TerminalSessionLike {
   takeover: () => void
   handleIdentity: (event: TerminalIdentityViewModel) => void
   handleLifecycle: (event: TerminalLifecycleViewModel) => void
-  /** Serializes xterm framebuffer state as VT sequences; not plain-text output for copy UI. */
-  serialize: () => string
   handleOutput: (event: TerminalOutputEvent) => void
   handleServerTitle: (canonicalTitle: string | null) => void
   handleExit: (event: TerminalExitEvent) => boolean

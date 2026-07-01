@@ -9,8 +9,6 @@ import type {
   TerminalRestartInput,
   TerminalResizeInput,
   TerminalSessionInput,
-  TerminalSessionSnapshot,
-  TerminalSessionSnapshotInput,
   TerminalSessionSummary,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
@@ -182,15 +180,6 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       return await sessionService.listWorkspaceTabs(userId, repoRoot)
     },
 
-    async getSessionSnapshot(
-      clientId: string,
-      userId: string,
-      input: TerminalSessionSnapshotInput,
-    ): Promise<TerminalSessionSnapshot | null> {
-      if (!isValidTerminalClientId(clientId)) return null
-      if (!isValidTerminalPtySessionId(input?.ptySessionId)) return null
-      return await manager.getSessionSnapshot(userId, input.ptySessionId)
-    },
   }
 
   function broadcastRepoSessionsChanged(userId: string, repoRoot: string): void {
