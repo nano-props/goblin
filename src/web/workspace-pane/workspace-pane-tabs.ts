@@ -33,6 +33,49 @@ export function workspacePaneTabsWithoutStaticTab(
   return normalizeWorkspacePaneTabs(current.filter((entry) => entry.type !== tab))
 }
 
+export function orderWorkspacePaneItemsByTabEntries<T>(
+  items: readonly T[],
+  tabs: readonly WorkspacePaneTabEntry[],
+  getTabEntry: (item: T) => WorkspacePaneTabEntry | null,
+): T[] {
+  const itemByIdentity = new Map<string, T>()
+  const used = new Set<string>()
+  const nonSortableItems: T[] = []
+
+  for (const item of items) {
+    const entry = getTabEntry(item)
+    if (!entry) {
+      nonSortableItems.push(item)
+      continue
+    }
+    itemByIdentity.set(workspacePaneTabEntryIdentity(entry), item)
+  }
+
+  const orderedItems: T[] = []
+  for (const tab of tabs) {
+    const identity = workspacePaneTabEntryIdentity(tab)
+    const item = itemByIdentity.get(identity)
+    if (!item || used.has(identity)) continue
+    used.add(identity)
+    orderedItems.push(item)
+  }
+
+  for (const item of items) {
+    const entry = getTabEntry(item)
+    if (!entry) continue
+    const identity = workspacePaneTabEntryIdentity(entry)
+    if (used.has(identity)) continue
+    used.add(identity)
+    orderedItems.push(item)
+  }
+
+  return [...orderedItems, ...nonSortableItems]
+}
+
+export function workspacePaneTabEntryListIdentity(tabs: readonly WorkspacePaneTabEntry[]): string {
+  return tabs.map(workspacePaneTabEntryIdentity).join('\0')
+}
+
 export function normalizeWorkspacePaneTabs(
   tabs: readonly WorkspacePaneTabEntry[],
   context?: { hasWorktree?: boolean },

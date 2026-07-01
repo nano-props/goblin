@@ -33,6 +33,7 @@ import {
   terminalWorkspacePaneTabProvider,
   workspacePaneStaticTabProvider,
 } from '#/web/components/workspace-pane/tab-providers.ts'
+import { useWorkspacePaneTabDragPreview } from '#/web/components/workspace-pane/workspace-pane-tab-drag-preview.ts'
 import {
   WorkspaceToolbar,
   WorkspaceToolbarActions,
@@ -42,10 +43,8 @@ import {
 } from '#/web/components/workspace-toolbar-chrome.tsx'
 import { WorkspaceOpenExternallyMenu } from '#/web/components/repo-workspace/WorkspaceOpenExternallyMenu.tsx'
 import type { BranchActions } from '#/web/hooks/useBranchActions.tsx'
-import {
-  orderWorkspacePaneItemsByTabEntries,
-  useWorkspacePaneTabsReorderMutation,
-} from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
+import { useWorkspacePaneTabsReorderMutation } from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
+import { orderWorkspacePaneItemsByTabEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 
 interface Props {
   repo: RepoWorkspaceRepo
@@ -134,19 +133,30 @@ export function RepoWorkspaceToolbar({
     [enterTerminalTab, scrollToBottom],
   )
 
-  const { displayTabs: displayWorkspacePaneTabs, reorderTabs: reorderWorkspacePaneTabs } =
-    useWorkspacePaneTabsReorderMutation({
-      repoRoot: repo.id,
-      branchName,
-      worktreePath: terminalBase?.worktreePath ?? null,
-      canonicalTabs: workspacePaneTabModel.tabEntries,
-    })
+  const {
+    visualTabs: visualWorkspacePaneTabs,
+    stageDragPreview: stageWorkspacePaneTabDragPreview,
+    clearDragPreview: clearWorkspacePaneTabDragPreview,
+  } = useWorkspacePaneTabDragPreview({
+    repoRoot: repo.id,
+    branchName,
+    worktreePath: terminalBase?.worktreePath ?? null,
+    canonicalTabs: workspacePaneTabModel.tabEntries,
+  })
+  const { reorderTabs: reorderWorkspacePaneTabs } = useWorkspacePaneTabsReorderMutation({
+    repoRoot: repo.id,
+    branchName,
+    worktreePath: terminalBase?.worktreePath ?? null,
+    canonicalTabs: workspacePaneTabModel.tabEntries,
+    onReorderError: clearWorkspacePaneTabDragPreview,
+  })
 
   const handleReorderWorkspacePaneTabStrip = useCallback(
     (tabs: WorkspacePaneTabEntry[]) => {
+      if (!stageWorkspacePaneTabDragPreview(tabs)) return
       reorderWorkspacePaneTabs(tabs)
     },
-    [reorderWorkspacePaneTabs],
+    [reorderWorkspacePaneTabs, stageWorkspacePaneTabDragPreview],
   )
 
   const canonicalWorkspacePaneTabItems = useMemo<WorkspacePaneTabItem[]>(
@@ -205,10 +215,10 @@ export function RepoWorkspaceToolbar({
     () =>
       orderWorkspacePaneItemsByTabEntries(
         canonicalWorkspacePaneTabItems,
-        displayWorkspacePaneTabs,
+        visualWorkspacePaneTabs,
         workspacePaneTabEntryForItem,
       ),
-    [canonicalWorkspacePaneTabItems, displayWorkspacePaneTabs],
+    [canonicalWorkspacePaneTabItems, visualWorkspacePaneTabs],
   )
   const activeTabIdentity = workspacePaneTabModel.activeTab?.identity ?? null
   const handleSelectWorkspacePaneTabItem = useCallback(

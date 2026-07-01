@@ -3,7 +3,7 @@
 import { act } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { flushMicrotasks, renderInJsdom } from '#/test-utils/render.tsx'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import {
   installWorkspacePaneTabsTestBridge,
@@ -13,10 +13,7 @@ import {
   readWorkspacePaneTabsForBranch,
   setWorkspacePaneTabsForBranchQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import {
-  orderWorkspacePaneItemsByTabEntries,
-  useWorkspacePaneTabsReorderMutation,
-} from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
+import { useWorkspacePaneTabsReorderMutation } from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
 import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { TerminalReplaceWorkspaceTabsInput } from '#/shared/terminal-types.ts'
@@ -47,36 +44,6 @@ afterEach(() => {
 })
 
 describe('useWorkspacePaneTabsReorderMutation', () => {
-  test('exposes the reordered tabs synchronously for drag layout', async () => {
-    let resolveServerTabs!: (tabs: WorkspacePaneTabEntry[]) => void
-    const serverTabs = new Promise<WorkspacePaneTabEntry[]>((resolve) => {
-      resolveServerTabs = resolve
-    })
-    installWorkspacePaneTabsTestBridge({
-      replaceWorkspaceTabs: async () => await serverTabs,
-    })
-    const sourceTabs = [terminalEntry('session-1'), staticEntry('status')]
-    const reorderedTabs = [staticEntry('status'), terminalEntry('session-1')]
-    renderMutationHook({ canonicalTabs: sourceTabs })
-
-    expect(currentControls().displayTabs).toEqual(sourceTabs)
-
-    act(() => {
-      currentControls().reorderTabs(reorderedTabs)
-    })
-
-    expect(currentControls().displayTabs).toEqual(reorderedTabs)
-    await act(async () => {
-      await flushMicrotasks()
-    })
-    expect(currentControls().displayTabs).toEqual(reorderedTabs)
-
-    resolveServerTabs(reorderedTabs)
-    await act(async () => {
-      await flushMicrotasks()
-    })
-  })
-
   test('optimistically writes query cache and then applies canonical server tabs', async () => {
     let resolveServerTabs!: (tabs: WorkspacePaneTabEntry[]) => void
     const serverTabs = new Promise<WorkspacePaneTabEntry[]>((resolve) => {
@@ -106,7 +73,8 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     })
   })
 
-  test('rolls query cache and display state back when the server rejects reorder', async () => {
+  test('rolls query cache back and reports failure when the server rejects reorder', async () => {
+    const onReorderError = vi.fn()
     installWorkspacePaneTabsTestBridge({
       replaceWorkspaceTabs: async () => {
         throw new Error('server unavailable')
@@ -115,7 +83,7 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     const sourceTabs = [terminalEntry('session-1'), staticEntry('status')]
     const reorderedTabs = [staticEntry('status'), terminalEntry('session-1')]
     seedWorkspacePaneTabs(sourceTabs)
-    renderMutationHook({ canonicalTabs: sourceTabs })
+    renderMutationHook({ canonicalTabs: sourceTabs, onReorderError })
 
     act(() => {
       currentControls().reorderTabs(reorderedTabs)
@@ -123,11 +91,12 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
 
     await vi.waitFor(() => {
       expect(readWorkspacePaneTabsForBranch(REPO_ROOT, BRANCH_NAME, queryClient)).toEqual(sourceTabs)
-      expect(currentControls().displayTabs).toEqual(sourceTabs)
+      expect(onReorderError).toHaveBeenCalledTimes(1)
     })
   })
 
   test('clears optimistic query data when a failed reorder has no previous cache', async () => {
+    const onReorderError = vi.fn()
     installWorkspacePaneTabsTestBridge({
       replaceWorkspaceTabs: async () => {
         throw new Error('server unavailable')
@@ -135,7 +104,7 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     })
     const sourceTabs = [staticEntry('status')]
     const reorderedTabs = [staticEntry('status'), terminalEntry('session-1')]
-    renderMutationHook({ canonicalTabs: sourceTabs })
+    renderMutationHook({ canonicalTabs: sourceTabs, onReorderError })
 
     act(() => {
       currentControls().reorderTabs(reorderedTabs)
@@ -143,7 +112,7 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
 
     await vi.waitFor(() => {
       expect(readWorkspacePaneTabsForBranch(REPO_ROOT, BRANCH_NAME, queryClient)).toEqual(sourceTabs)
-      expect(currentControls().displayTabs).toEqual(sourceTabs)
+      expect(onReorderError).toHaveBeenCalledTimes(1)
     })
   })
 
@@ -158,34 +127,6 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     })
 
     expect(replaceWorkspaceTabs).not.toHaveBeenCalled()
-    expect(currentControls().displayTabs).toEqual(sourceTabs)
-  })
-})
-
-describe('orderWorkspacePaneItemsByTabEntries', () => {
-  test('orders materialized items by tab entries without creating missing items', () => {
-    const terminalOne = terminalEntry('session-1')
-    const terminalTwo = terminalEntry('session-2')
-    const status = staticEntry('status')
-    const items = [
-      item('terminal-1', terminalOne),
-      item('pending', null),
-      item('status', status),
-      item('terminal-2', terminalTwo),
-    ]
-
-    const ordered = orderWorkspacePaneItemsByTabEntries(
-      items,
-      [status, terminalTwo],
-      (candidate) => candidate.entry,
-    )
-
-    expect(ordered.map((candidate) => candidate.key)).toEqual([
-      'status',
-      'terminal-2',
-      'terminal-1',
-      'pending',
-    ])
   })
 })
 
@@ -236,8 +177,4 @@ function terminalEntry(sessionId: string): WorkspacePaneTabEntry {
 
 function staticEntry(type: Parameters<typeof workspacePaneStaticTabEntry>[0]): WorkspacePaneTabEntry {
   return workspacePaneStaticTabEntry(type)
-}
-
-function item(key: string, entry: WorkspacePaneTabEntry | null): { key: string; entry: WorkspacePaneTabEntry | null } {
-  return { key, entry }
 }
