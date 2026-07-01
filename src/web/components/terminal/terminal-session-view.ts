@@ -33,6 +33,13 @@ import {
 import { terminalLog } from '#/web/logger.ts'
 const RESIZE_DEBOUNCE_MS = 80
 const FONT_REMEASURE_DEBOUNCE_MS = 80
+const PARKED_FRAME_WIDTH_VAR = '--goblin-terminal-parked-width'
+const PARKED_FRAME_HEIGHT_VAR = '--goblin-terminal-parked-height'
+
+interface FrameGeometry {
+  width: number
+  height: number
+}
 
 export class TerminalSessionView {
   private readonly frame: HTMLDivElement
@@ -85,6 +92,7 @@ export class TerminalSessionView {
   attach(host: HTMLElement): void {
     this.host = host
     host.replaceChildren(this.frame)
+    this.releaseParkedFrameGeometry()
     if (this.term) {
       this.installResizeObserver()
       this.fitSoon()
@@ -97,6 +105,8 @@ export class TerminalSessionView {
 
   detach(host: HTMLElement, parkingRoot: HTMLElement): void {
     if (this.host !== host) return
+    this.fitNow()
+    this.preserveParkedFrameGeometry()
     this.host = null
     this.blurIfFocused()
     this.disconnectResizeObserver()
@@ -480,6 +490,30 @@ export class TerminalSessionView {
     if (this.fitFlushTimer === null) return
     window.clearTimeout(this.fitFlushTimer)
     this.fitFlushTimer = null
+  }
+
+  private preserveParkedFrameGeometry(): void {
+    const geometry = this.captureFrameGeometry()
+    if (!geometry) {
+      this.releaseParkedFrameGeometry()
+      return
+    }
+    this.parkingElement.style.setProperty(PARKED_FRAME_WIDTH_VAR, `${geometry.width}px`)
+    this.parkingElement.style.setProperty(PARKED_FRAME_HEIGHT_VAR, `${geometry.height}px`)
+  }
+
+  private captureFrameGeometry(): FrameGeometry | null {
+    // Park the full frame box, not only the inner xterm host: the frame's
+    // padding is part of the layout contract that keeps xterm's fitted cols
+    // aligned with the DOM while live output continues in the parking root.
+    const rect = this.frame.getBoundingClientRect()
+    if (rect.width <= 0 || rect.height <= 0) return null
+    return { width: rect.width, height: rect.height }
+  }
+
+  private releaseParkedFrameGeometry(): void {
+    this.parkingElement.style.removeProperty(PARKED_FRAME_WIDTH_VAR)
+    this.parkingElement.style.removeProperty(PARKED_FRAME_HEIGHT_VAR)
   }
 }
 

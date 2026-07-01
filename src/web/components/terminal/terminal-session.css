@@ -252,6 +252,9 @@
 }
 
 .goblin-terminal-parking__item {
+  width: var(--goblin-terminal-parked-width, auto);
+  height: var(--goblin-terminal-parked-height, auto);
+  contain: layout paint size;
   overflow: hidden;
 }
 
