@@ -157,16 +157,16 @@ button,
   }
 }
 
-.goblin-terminal-activity-indicator__icon-wrap {
+.goblin-terminal-output-activity-indicator__icon-wrap {
   display: inline-flex;
   width: 16px;
   height: 16px;
   align-items: center;
   justify-content: center;
-  animation: goblin-terminal-activity-alpha 2400ms ease-in-out infinite;
+  animation: goblin-terminal-output-activity-alpha 2400ms ease-in-out infinite;
 }
 
-@keyframes goblin-terminal-activity-alpha {
+@keyframes goblin-terminal-output-activity-alpha {
   0%,
   100% {
     opacity: 0.6;

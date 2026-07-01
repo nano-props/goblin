@@ -199,6 +199,6 @@ function session(overrides: Partial<TerminalSessionSummary> = {}): TerminalSessi
     phase: overrides.phase ?? 'open',
     selected: overrides.selected ?? true,
     hasBell: overrides.hasBell ?? false,
-    recentlyActive: overrides.recentlyActive ?? false,
+    hasRecentOutput: overrides.hasRecentOutput ?? false,
   }
 }

@@ -341,7 +341,7 @@ export const en = {
   'terminal.confirm-close-running-confirm': 'Close terminal',
   'terminal.progress': 'Terminal progress',
   'terminal.empty': 'No terminal open',
-  'terminal.active': 'Terminal active',
+  'terminal.output-active': 'Terminal output active',
   'terminal.drop-hint': 'Drop to paste path',
   'terminal.mirror-controlled': 'Another session is currently controlling this terminal.',
   'terminal.unowned': 'No session is currently controlling this terminal.',

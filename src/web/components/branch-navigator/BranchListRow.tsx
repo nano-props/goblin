@@ -4,7 +4,7 @@
 import { BranchRow, type BranchRowProps } from '#/web/components/branch-navigator/BranchRow.tsx'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import {
-  useTerminalWorktreeActive,
+  useTerminalWorktreeOutputActive,
   useTerminalWorktreeBellCount,
 } from '#/web/components/terminal/terminal-session-store.ts'
 import { branchActionDisplayPhase } from '#/web/hooks/branch-action-state.ts'
@@ -14,13 +14,13 @@ export function BranchListRow(props: BranchRowProps) {
     ? formatTerminalWorktreeKey(props.repo.id, props.branch.worktree.path)
     : null
   const terminalBellCount = useTerminalWorktreeBellCount(terminalSessionId)
-  const terminalActive = useTerminalWorktreeActive(terminalSessionId)
+  const terminalOutputActive = useTerminalWorktreeOutputActive(terminalSessionId)
   const branchActionBusy = branchActionDisplayPhase(props.repo, props.branch.name) !== null
   return (
     <BranchRow
       {...props}
       terminalBellCount={terminalBellCount}
-      terminalActive={terminalActive}
+      terminalOutputActive={terminalOutputActive}
       branchActionBusy={branchActionBusy}
     />
   )

@@ -2,7 +2,7 @@
 
 // Unit tests for the presentational BranchList. Its contract is
 // "given branches + a highlighted name + callbacks, paint rows and
-// bubble events up". We stub BranchActionsMenu and the terminal bell
+// bubble events up". We stub BranchActionsMenu and the terminal bell/output
 // hook so the suite stays focused on the list.
 
 import { afterEach, describe, expect, test, vi } from 'vitest'
@@ -26,7 +26,7 @@ vi.mock('#/web/components/BranchActionsMenu.tsx', () => ({
 }))
 
 vi.mock('#/web/components/terminal/terminal-session-store.ts', () => ({
-  useTerminalWorktreeActive: () => false,
+  useTerminalWorktreeOutputActive: () => false,
   useTerminalWorktreeBellCount: () => 0,
 }))
 

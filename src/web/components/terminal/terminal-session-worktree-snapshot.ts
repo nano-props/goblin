@@ -15,18 +15,18 @@ export function buildTerminalWorktreeSnapshot(input: {
   getCachedSnapshot: (terminalSessionId: string) => TerminalSnapshot | null
   cacheSnapshot: (terminalSessionId: string, snapshot: TerminalSnapshot) => void
   hasBell: (terminalSessionId: string) => boolean
-  hasRecentActivity: (terminalSessionId: string) => boolean
+  hasRecentOutput: (terminalSessionId: string) => boolean
 }): TerminalWorktreeSnapshot {
   const sessions = buildTerminalSessionSummaries(input)
   const bellCount = sessions.reduce((count, session) => count + (session.hasBell ? 1 : 0), 0)
-  const activeCount = sessions.reduce((count, session) => count + (session.recentlyActive ? 1 : 0), 0)
+  const outputActiveCount = sessions.reduce((count, session) => count + (session.hasRecentOutput ? 1 : 0), 0)
   return {
     terminalWorktreeKey: input.terminalWorktreeKey,
     selectedDescriptor: input.selectedDescriptor,
     sessions,
     count: sessions.length,
     bellCount,
-    activeCount,
+    outputActiveCount,
     pendingCreate: input.pendingCreate,
   }
 }
@@ -38,7 +38,7 @@ function buildTerminalSessionSummaries(input: {
   getCachedSnapshot: (terminalSessionId: string) => TerminalSnapshot | null
   cacheSnapshot: (terminalSessionId: string, snapshot: TerminalSnapshot) => void
   hasBell: (terminalSessionId: string) => boolean
-  hasRecentActivity: (terminalSessionId: string) => boolean
+  hasRecentOutput: (terminalSessionId: string) => boolean
 }): TerminalSessionSummary[] {
   return input.sessions.map((session) => {
     const cached = input.getCachedSnapshot(session.descriptor.terminalSessionId)
@@ -56,7 +56,7 @@ function buildTerminalSessionSummaries(input: {
       phase: snapshot.phase,
       selected: session.descriptor.terminalSessionId === input.selectedTerminalSessionId,
       hasBell: input.hasBell(session.descriptor.terminalSessionId),
-      recentlyActive: input.hasRecentActivity(session.descriptor.terminalSessionId),
+      hasRecentOutput: input.hasRecentOutput(session.descriptor.terminalSessionId),
     }
   })
 }

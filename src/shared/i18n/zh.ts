@@ -324,7 +324,7 @@ export const zh: Record<DictKey, string> = {
   'terminal.confirm-close-running-confirm': '关闭终端',
   'terminal.progress': '终端进度',
   'terminal.empty': '没有打开的终端',
-  'terminal.active': '终端正在活动',
+  'terminal.output-active': '终端正在输出',
   'terminal.drop-hint': '松手粘贴路径',
   'terminal.mirror-controlled': '另一个会话正在控制此终端',
   'terminal.unowned': '当前没有会话正在控制此终端',

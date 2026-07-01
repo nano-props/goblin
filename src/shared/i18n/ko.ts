@@ -332,7 +332,7 @@ export const ko: Record<DictKey, string> = {
   'terminal.confirm-close-running-confirm': '터미널 닫기',
   'terminal.progress': '터미널 진행률',
   'terminal.empty': '열린 터미널 없음',
-  'terminal.active': '터미널 활성 상태',
+  'terminal.output-active': '터미널 출력 중',
   'terminal.drop-hint': '놓아서 경로 붙여넣기',
   'terminal.mirror-controlled': '다른 세션이 현재 이 터미널을 제어하고 있습니다.',
   'terminal.unowned': '현재 이 터미널을 제어하는 세션이 없습니다.',
