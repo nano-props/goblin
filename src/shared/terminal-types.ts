@@ -239,6 +239,8 @@ export interface TerminalOutputEvent {
   processName: string
 }
 
+// Bell is an ephemeral realtime hint for currently connected clients. It is
+// intentionally not part of terminal summaries or any persisted unread model.
 export interface TerminalBellRealtimeEvent {
   ptySessionId: string
   terminalSessionId: string

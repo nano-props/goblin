@@ -16,6 +16,8 @@ export function createTerminalBellState(
   notify: (terminalSessionId?: string) => void,
   onBadgeChange: (count: number) => void,
 ): TerminalBellState {
+  // Client-local UI state only. Server bell events are not replayed or
+  // persisted, and this unread set is rebuilt from live realtime events.
   const unreadSessionIds = new Set<string>()
   const lastSystemNotificationAtByTerminalSessionId = new Map<string, number>()
 
