@@ -165,7 +165,7 @@ describe('terminal session projection helpers', () => {
     })
   })
 
-  test('keeps create sessions projection when it already includes the target', () => {
+  test('uses authoritative create first-frame metadata when sessions projection already includes the target', () => {
     const existingSession = {
       ptySessionId: 'pty_session_123_aaaaaaaaa',
       terminalSessionId: 'session-1',
@@ -173,10 +173,10 @@ describe('terminal session projection helpers', () => {
       worktreePath: WORKTREE_PATH,
       cwd: WORKTREE_PATH,
       controller: { clientId: 'client_a', status: 'connected' as const },
-      processName: 'zsh',
-      canonicalTitle: null,
-      phase: 'open' as const,
-      message: null,
+      processName: 'old-shell',
+      canonicalTitle: 'old title',
+      phase: 'opening' as const,
+      message: 'old message',
       cols: 80,
       rows: 24,
     }
@@ -190,8 +190,8 @@ describe('terminal session projection helpers', () => {
         tabs: [],
         sessions: [existingSession],
         ptySessionId: 'pty_session_123_aaaaaaaaa',
-        processName: 'zsh',
-        canonicalTitle: null,
+        processName: 'new-shell',
+        canonicalTitle: 'new title',
         phase: 'open',
         message: null,
         snapshot: '',
@@ -202,7 +202,17 @@ describe('terminal session projection helpers', () => {
       },
     )
 
-    expect(projected.serverSessions).toEqual([existingSession])
+    expect(projected.serverSessions).toEqual([
+      {
+        ...existingSession,
+        processName: 'new-shell',
+        canonicalTitle: 'new title',
+        phase: 'open',
+        message: null,
+        cols: 120,
+        rows: 40,
+      },
+    ])
   })
 
   test('replaces stale create projection entry for the same terminal session id', () => {

@@ -2220,14 +2220,8 @@ describe('TerminalSession', () => {
     terminalCalls.restart.mockReturnValueOnce(restart.promise)
     const host = document.createElement('div')
     document.body.appendChild(host)
-    // See the comment in the previous test for why we wire
-    // `requestDurableClose` to `terminalCalls.close` here.
-    const pendingCloses: Array<Promise<unknown>> = []
-    const session = new TerminalSession(descriptor, vi.fn(), async (ptySessionId) => {
-      const promise = terminalCalls.close({ ptySessionId })
-      pendingCloses.push(promise)
-      await promise
-    })
+    const durableClose = vi.fn(async () => {})
+    const session = new TerminalSession(descriptor, vi.fn(), durableClose)
     hydrateManagedSession(session)
     session.attach(host)
     await flushTerminalStart()
@@ -2237,10 +2231,10 @@ describe('TerminalSession', () => {
     session.dispose()
     restart.resolve(attachResult('pty_session_2_aaaaaaaaa'))
     await flushTerminalStart()
-    await Promise.allSettled(pendingCloses)
 
-    expect(terminalCalls.close).toHaveBeenCalledWith({ ptySessionId: 'pty_session_1_aaaaaaaaa' })
-    expect(terminalCalls.close).toHaveBeenCalledWith({ ptySessionId: 'pty_session_2_aaaaaaaaa' })
+    expect(durableClose).toHaveBeenCalledWith('pty_session_1_aaaaaaaaa')
+    expect(durableClose).toHaveBeenCalledWith('pty_session_2_aaaaaaaaa')
+    expect(terminalCalls.close).not.toHaveBeenCalled()
   })
 
   test('does not close restart result when deselected while restart is in flight', async () => {
@@ -2260,7 +2254,19 @@ describe('TerminalSession', () => {
     await flushTerminalStart()
 
     expect(terminalCalls.close).not.toHaveBeenCalled()
+    expect(session.currentPtySessionId()).toBe('pty_session_2_aaaaaaaaa')
     expect(host.querySelector('.goblin-managed-terminal-frame')).toBeNull()
+
+    session.attach(host)
+    await flushTerminalStart()
+    await flushUntil(() => terminalCalls.attach.mock.calls.length === 2)
+
+    expect(terminalCalls.restart).toHaveBeenCalledTimes(1)
+    expect(terminalCalls.attach).toHaveBeenLastCalledWith({
+      ptySessionId: 'pty_session_2_aaaaaaaaa',
+      cols: 100,
+      rows: 30,
+    })
   })
 
   test('destroys inactive xterm and opens a fresh view on attach', async () => {
@@ -2400,6 +2406,27 @@ describe('TerminalSession', () => {
     await flushUntil(() => session.snapshot().phase === 'open')
 
     expect(session.snapshot().progress).toBeUndefined()
+  })
+
+  test('progress state is cleared and published on detach', async () => {
+    const notify = vi.fn()
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new TerminalSession(descriptor, notify)
+    hydrateManagedSession(session)
+
+    session.attach(host)
+    await flushTerminalStart()
+    await flushUntil(() => session.snapshot().phase === 'open')
+
+    xtermMocks.progressAddons[0]!.emitProgress(1, 75)
+    expect(session.snapshot().progress).toEqual({ state: 1, value: 75 })
+    notify.mockClear()
+
+    session.detach(host)
+
+    expect(session.snapshot().progress).toBeUndefined()
+    expect(notify).toHaveBeenCalledTimes(1)
   })
 
   test('progress value is clamped to 0-100', async () => {

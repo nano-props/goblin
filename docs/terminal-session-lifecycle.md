@@ -271,7 +271,13 @@ A per-session broadcast is the targeted counterpart.
 Add to `TerminalRealtimeMessage`:
 
 ```ts
-| { type: 'session-closed'; ptySessionId: string; repoRoot: string }
+| {
+    type: 'session-closed'
+    ptySessionId: string
+    terminalSessionId: string
+    repoRoot: string
+    worktreePath: string
+  }
 ```
 
 ### Server emit
@@ -282,11 +288,14 @@ After a user-initiated close succeeds:
 broker.broadcastToUser(userId, {
   type: 'session-closed',
   ptySessionId,
+  terminalSessionId,
   repoRoot,
+  worktreePath,
 })
 ```
 
-The `repoRoot` is derived from the session's scope. The message is
+The `repoRoot`, `worktreePath`, and `terminalSessionId` are captured
+before the close removes the session from the manager. The message is
 sent only to sockets for the same `userId`; other users never see
 the closed session id. Internal/non-user closes (PTY exit, shutdown)
 do **not** emit `session-closed`; those paths rely on the broader
@@ -304,7 +313,7 @@ The provider mirrors the `onExit` pattern. On `session-closed`:
 
 ```ts
 terminalBridge.onSessionClosed((event) => {
-  projection.handleSessionClosed(event.ptySessionId)
+  projection.handleSessionClosed(event)
 })
 ```
 

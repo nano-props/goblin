@@ -279,6 +279,7 @@ export class TerminalSessionProjection {
   // — calling `close` again would no-op the `closeSessionForUser` check
   // on the server and add a useless WS roundtrip.
   handleSessionClosed(event: { ptySessionId: string; terminalSessionId: string }): void {
+    this.pendingServerBellByTerminalSessionId.delete(event.terminalSessionId)
     const terminalSessionId = this.sessions.has(event.terminalSessionId)
       ? event.terminalSessionId
       : (this.terminalSessionIdByPtySessionId.get(event.ptySessionId) ?? null)

@@ -134,7 +134,7 @@ export class TerminalSession {
 
   detach(host: HTMLElement): void {
     this.clearTerminalFocusIfOwned()
-    if (this.view.detach(host)) this.destroyActiveView()
+    if (this.view.detach(host) && this.destroyActiveView()) this.notify('metadata')
   }
 
   restart(): void {
@@ -666,8 +666,10 @@ export class TerminalSession {
       : await terminalBridge.attach(this.terminalAttachInput(ptySessionId, term))
     if (this.disposed || this.startToken !== token || this.view.currentTerminal() !== term) {
       if (this.disposed) {
-        if (result.ok) void terminalBridge.close({ ptySessionId: result.ptySessionId }).catch(() => {})
+        if (result.ok) void this.requestDurableClose(result.ptySessionId).catch(() => {})
         else this.closeReplacingPtySession()
+      } else {
+        this.absorbDetachedIpcResult(result, { cols: term.cols, rows: term.rows })
       }
       throw new StartCancelledError()
     }
@@ -679,6 +681,20 @@ export class TerminalSession {
       throw new StartCancelledError()
     }
     return this.withLocalController(result)
+  }
+
+  private absorbDetachedIpcResult(result: TerminalAttachResult, fallbackSize: { cols: number; rows: number }): void {
+    this.runtime.settleStartAttempt()
+    if (!result.ok) {
+      this.closeReplacingPtySession()
+      if (this.runtime.failAttachAttempt(result.message)) this.notify('metadata')
+      return
+    }
+    const projected = this.withLocalController(result)
+    const changed = this.runtime.applyAttachResult(projected, fallbackSize)
+    this.syncExternalCommandGate(projected.ptySessionId, terminalSnapshotHasOutput(projected.snapshot, projected.snapshotSeq))
+    this.authority().setRole(projected.role)
+    if (changed) this.notify('metadata')
   }
 
   private async replayPhase(
@@ -929,7 +945,7 @@ export class TerminalSession {
     this.queuedExternalCommandInput = ''
   }
 
-  private destroyActiveView(options?: { preserveTransientState?: boolean }): void {
+  private destroyActiveView(options?: { preserveTransientState?: boolean }): boolean {
     this.geometryAbortController?.abort()
     this.geometryAbortController = null
     this.cancelResizeFlush()
@@ -943,8 +959,9 @@ export class TerminalSession {
     this.inputFlushScheduled = false
     this.clearExternalCommandGate()
     this.startToken += 1
-    if (!options?.preserveTransientState) this.runtime.resetTransientState()
+    const transientChanged = options?.preserveTransientState ? false : this.runtime.resetTransientState()
     this.view.destroyTerminal()
+    return transientChanged
   }
 
   private currentStart(token: number, term: XTermTerminal): boolean {

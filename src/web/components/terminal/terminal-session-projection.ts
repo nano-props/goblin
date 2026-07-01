@@ -52,7 +52,7 @@ export function projectCreateResultForClient(
   const serverSessions = result.sessions.map((session) => {
     if (session.terminalSessionId !== result.terminalSessionId) return session
     sawTarget = true
-    return session.ptySessionId === result.ptySessionId ? session : targetSession
+    return targetSession
   })
   if (!sawTarget) serverSessions.push(targetSession)
   return {

@@ -705,6 +705,27 @@ describe('TerminalSessionProjection create flow', () => {
     expect(pendingBells.has('session-99')).toBe(true)
   })
 
+  test('clears pending server bell when an unknown session is closed', () => {
+    projection.handleServerBell({
+      ptySessionId: 'pty_session_unknown_aaaaaaaaa',
+      terminalSessionId: 'session-unknown',
+      repoRoot: REPO_ROOT,
+      worktreePath: WORKTREE_PATH,
+      processName: 'zsh',
+      canonicalTitle: null,
+    })
+
+    const pendingBells = (projection as any).pendingServerBellByTerminalSessionId as Map<string, unknown>
+    expect(pendingBells.has('session-unknown')).toBe(true)
+
+    projection.handleSessionClosed({
+      ptySessionId: 'pty_session_unknown_aaaaaaaaa',
+      terminalSessionId: 'session-unknown',
+    })
+
+    expect(pendingBells.has('session-unknown')).toBe(false)
+  })
+
   test('prunes sessions missing from the repo index and clears their bell badge', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
