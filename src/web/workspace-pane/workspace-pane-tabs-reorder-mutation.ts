@@ -1,11 +1,12 @@
 import { useCallback, useMemo } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import {
   cancelWorkspacePaneTabs,
   invalidateWorkspacePaneTabs,
   setWorkspacePaneTabsForBranchQueryData,
+  workspacePaneTabsForBranchFromQueryData,
   workspacePaneTabsQueryKey,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import {
@@ -75,6 +76,7 @@ export function useWorkspacePaneTabsReorderMutation(
       return { previousQueryData }
     },
     onSuccess: (serverTabs, variables) => {
+      if (!workspacePaneTabsMutationStillCurrent(variables, queryClient)) return
       setWorkspacePaneTabsForBranchQueryData(
         {
           repoRoot: variables.repoRoot,
@@ -86,6 +88,7 @@ export function useWorkspacePaneTabsReorderMutation(
       )
     },
     onError: (err, variables, context) => {
+      if (!workspacePaneTabsMutationStillCurrent(variables, queryClient)) return
       queryClient.setQueryData<WorkspacePaneTabsQueryData>(
         workspacePaneTabsQueryKey(variables.repoRoot),
         context?.previousQueryData ?? [],
@@ -117,4 +120,15 @@ export function useWorkspacePaneTabsReorderMutation(
   )
 
   return { reorderTabs }
+}
+
+function workspacePaneTabsMutationStillCurrent(
+  variables: CommitWorkspacePaneTabsInput,
+  queryClient: QueryClient,
+): boolean {
+  const currentData = queryClient.getQueryData<WorkspacePaneTabsQueryData>(
+    workspacePaneTabsQueryKey(variables.repoRoot),
+  )
+  const currentTabs = workspacePaneTabsForBranchFromQueryData(currentData ?? [], variables.branchName)
+  return workspacePaneTabEntryListIdentity(currentTabs) === workspacePaneTabEntryListIdentity(variables.tabs)
 }
