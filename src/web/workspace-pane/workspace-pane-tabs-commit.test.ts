@@ -9,8 +9,8 @@ import {
 } from '#/web/test-utils/bridge.ts'
 import {
   readWorkspacePaneTabsForBranch,
+  setWorkspacePaneTabsForBranchQueryData,
   workspacePaneTabsQueryOptions,
-  workspacePaneTabsQueryKey,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
@@ -31,7 +31,7 @@ afterEach(() => {
 })
 
 describe('commitWorkspacePaneTabs', () => {
-  test('optimistically applies reorder tabs and then replaces them with canonical server tabs', async () => {
+  test('writes canonical server tabs after a successful commit', async () => {
     let resolveServerTabs!: (tabs: WorkspacePaneTabEntry[]) => void
     const serverTabs = new Promise<WorkspacePaneTabEntry[]>((resolve) => {
       resolveServerTabs = resolve
@@ -40,18 +40,21 @@ describe('commitWorkspacePaneTabs', () => {
       replaceWorkspaceTabs: async () => await serverTabs,
     })
 
+    setWorkspacePaneTabsForBranchQueryData({
+      repoRoot: REPO_ROOT,
+      branchName: BRANCH_NAME,
+      worktreePath: WORKTREE_PATH,
+      tabs: [workspacePaneStaticTabEntry('history')],
+    })
+
     const commit = commitWorkspacePaneTabs({
       repoRoot: REPO_ROOT,
       branchName: BRANCH_NAME,
       worktreePath: WORKTREE_PATH,
       tabs: [workspacePaneTerminalTabEntry('session-1'), workspacePaneStaticTabEntry('status')],
-      optimistic: true,
     })
 
-    expect(readWorkspacePaneTabsForBranch(REPO_ROOT, BRANCH_NAME)).toEqual([
-      workspacePaneTerminalTabEntry('session-1'),
-      workspacePaneStaticTabEntry('status'),
-    ])
+    expect(readWorkspacePaneTabsForBranch(REPO_ROOT, BRANCH_NAME)).toEqual([workspacePaneStaticTabEntry('history')])
 
     resolveServerTabs([workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-1')])
     await expect(commit).resolves.toBe(true)
@@ -61,11 +64,17 @@ describe('commitWorkspacePaneTabs', () => {
     ])
   })
 
-  test('invalidates workspace pane tabs when an optimistic commit fails', async () => {
+  test('leaves cached tabs untouched when a commit fails', async () => {
     installWorkspacePaneTabsTestBridge({
       replaceWorkspaceTabs: async () => {
         throw new Error('server unavailable')
       },
+    })
+    setWorkspacePaneTabsForBranchQueryData({
+      repoRoot: REPO_ROOT,
+      branchName: BRANCH_NAME,
+      worktreePath: WORKTREE_PATH,
+      tabs: [workspacePaneStaticTabEntry('status')],
     })
 
     await expect(
@@ -74,14 +83,13 @@ describe('commitWorkspacePaneTabs', () => {
         branchName: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
         tabs: [workspacePaneStaticTabEntry('history')],
-        optimistic: true,
       }),
     ).resolves.toBe(false)
 
-    expect(primaryWindowQueryClient.getQueryState(workspacePaneTabsQueryKey(REPO_ROOT))?.isInvalidated).toBe(true)
+    expect(readWorkspacePaneTabsForBranch(REPO_ROOT, BRANCH_NAME)).toEqual([workspacePaneStaticTabEntry('status')])
   })
 
-  test('cancels stale in-flight list queries before applying an optimistic commit', async () => {
+  test('cancels stale in-flight list queries before writing committed tabs', async () => {
     let resolveListTabs!: (tabs: WorkspacePaneTabsEntry[]) => void
     const listTabs = new Promise<WorkspacePaneTabsEntry[]>((resolve) => {
       resolveListTabs = resolve
@@ -99,7 +107,6 @@ describe('commitWorkspacePaneTabs', () => {
         branchName: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
         tabs: [workspacePaneTerminalTabEntry('session-1'), workspacePaneStaticTabEntry('status')],
-        optimistic: true,
       }),
     ).resolves.toBe(true)
 

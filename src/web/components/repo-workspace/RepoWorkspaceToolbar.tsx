@@ -29,7 +29,6 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { preferredWorkspacePaneTabForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
 import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
-import { commitWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import {
   terminalWorkspacePaneTabProvider,
   workspacePaneStaticTabProvider,
@@ -43,6 +42,10 @@ import {
 } from '#/web/components/workspace-toolbar-chrome.tsx'
 import { WorkspaceOpenExternallyMenu } from '#/web/components/repo-workspace/WorkspaceOpenExternallyMenu.tsx'
 import type { BranchActions } from '#/web/hooks/useBranchActions.tsx'
+import {
+  orderWorkspacePaneItemsByTabEntries,
+  useWorkspacePaneTabsReorderMutation,
+} from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
 
 interface Props {
   repo: RepoWorkspaceRepo
@@ -131,21 +134,22 @@ export function RepoWorkspaceToolbar({
     [enterTerminalTab, scrollToBottom],
   )
 
+  const { displayTabs: displayWorkspacePaneTabs, reorderTabs: reorderWorkspacePaneTabs } =
+    useWorkspacePaneTabsReorderMutation({
+      repoRoot: repo.id,
+      branchName,
+      worktreePath: terminalBase?.worktreePath ?? null,
+      canonicalTabs: workspacePaneTabModel.tabEntries,
+    })
+
   const handleReorderWorkspacePaneTabStrip = useCallback(
     (tabs: WorkspacePaneTabEntry[]) => {
-      if (!branchName) return
-      commitWorkspacePaneTabs({
-        repoRoot: repo.id,
-        branchName,
-        worktreePath: terminalBase?.worktreePath ?? null,
-        tabs,
-        optimistic: true,
-      })
+      reorderWorkspacePaneTabs(tabs)
     },
-    [branchName, repo.id, terminalBase?.worktreePath],
+    [reorderWorkspacePaneTabs],
   )
 
-  const workspacePaneTabItems = useMemo<WorkspacePaneTabItem[]>(
+  const canonicalWorkspacePaneTabItems = useMemo<WorkspacePaneTabItem[]>(
     () =>
       workspacePaneTabModel.tabs.map((tab) => {
         if (tab.kind === 'static') {
@@ -196,6 +200,15 @@ export function RepoWorkspaceToolbar({
       workspacePaneTabModel.tabs,
       workspacePaneId,
     ],
+  )
+  const workspacePaneTabItems = useMemo<WorkspacePaneTabItem[]>(
+    () =>
+      orderWorkspacePaneItemsByTabEntries(
+        canonicalWorkspacePaneTabItems,
+        displayWorkspacePaneTabs,
+        workspacePaneTabEntryForItem,
+      ),
+    [canonicalWorkspacePaneTabItems, displayWorkspacePaneTabs],
   )
   const activeTabIdentity = workspacePaneTabModel.activeTab?.identity ?? null
   const handleSelectWorkspacePaneTabItem = useCallback(
@@ -291,4 +304,8 @@ export function RepoWorkspaceToolbar({
       </WorkspaceToolbarContent>
     </WorkspaceToolbar>
   )
+}
+
+function workspacePaneTabEntryForItem(item: WorkspacePaneTabItem): WorkspacePaneTabEntry | null {
+  return isPendingWorkspacePaneTabItem(item) ? null : item.tabEntry
 }
