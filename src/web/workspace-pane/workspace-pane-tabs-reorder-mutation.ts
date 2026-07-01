@@ -16,18 +16,24 @@ import { gblLog } from '#/web/logger.ts'
 import { workspacePaneTabEntryListIdentity } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 
 interface WorkspacePaneTabsReorderMutationContext {
-  previousData: WorkspacePaneTabsQueryData | undefined
+  previousQueryData: WorkspacePaneTabsQueryData | undefined
 }
 
-export function useWorkspacePaneTabsReorderMutation(input: {
+export interface WorkspacePaneTabsReorderMutationInput {
   repoRoot: string
   branchName: string | null
   worktreePath: string | null
   canonicalTabs: readonly WorkspacePaneTabEntry[]
-  onReorderError?: () => void
-}): {
+  onReorderRejected?: () => void
+}
+
+export interface WorkspacePaneTabsReorderMutationResult {
   reorderTabs: (tabs: readonly WorkspacePaneTabEntry[]) => void
-} {
+}
+
+export function useWorkspacePaneTabsReorderMutation(
+  input: WorkspacePaneTabsReorderMutationInput,
+): WorkspacePaneTabsReorderMutationResult {
   const queryClient = useQueryClient()
   const target = useMemo(
     () =>
@@ -40,7 +46,7 @@ export function useWorkspacePaneTabsReorderMutation(input: {
         : null,
     [input.branchName, input.repoRoot, input.worktreePath],
   )
-  const canonicalIdentity = useMemo(
+  const canonicalTabsIdentity = useMemo(
     () => workspacePaneTabEntryListIdentity(input.canonicalTabs),
     [input.canonicalTabs],
   )
@@ -54,7 +60,7 @@ export function useWorkspacePaneTabsReorderMutation(input: {
     mutationFn: replaceWorkspacePaneTabs,
     onMutate: async (variables) => {
       await cancelWorkspacePaneTabs(variables.repoRoot, queryClient)
-      const previousData = queryClient.getQueryData<WorkspacePaneTabsQueryData>(
+      const previousQueryData = queryClient.getQueryData<WorkspacePaneTabsQueryData>(
         workspacePaneTabsQueryKey(variables.repoRoot),
       )
       setWorkspacePaneTabsForBranchQueryData(
@@ -66,7 +72,7 @@ export function useWorkspacePaneTabsReorderMutation(input: {
         },
         queryClient,
       )
-      return { previousData }
+      return { previousQueryData }
     },
     onSuccess: (serverTabs, variables) => {
       setWorkspacePaneTabsForBranchQueryData(
@@ -82,10 +88,10 @@ export function useWorkspacePaneTabsReorderMutation(input: {
     onError: (err, variables, context) => {
       queryClient.setQueryData<WorkspacePaneTabsQueryData>(
         workspacePaneTabsQueryKey(variables.repoRoot),
-        context?.previousData ?? [],
+        context?.previousQueryData ?? [],
       )
       invalidateWorkspacePaneTabs(variables.repoRoot, queryClient)
-      input.onReorderError?.()
+      input.onReorderRejected?.()
       gblLog.warn('workspace pane tabs mutation failed', {
         repoRoot: variables.repoRoot,
         worktreePath: variables.worktreePath,
@@ -98,7 +104,7 @@ export function useWorkspacePaneTabsReorderMutation(input: {
     (tabs: readonly WorkspacePaneTabEntry[]) => {
       if (!target) return
       const nextIdentity = workspacePaneTabEntryListIdentity(tabs)
-      if (nextIdentity === canonicalIdentity) return
+      if (nextIdentity === canonicalTabsIdentity) return
       const nextTabs = [...tabs]
       mutate({
         repoRoot: target.repoRoot,
@@ -107,7 +113,7 @@ export function useWorkspacePaneTabsReorderMutation(input: {
         tabs: nextTabs,
       })
     },
-    [canonicalIdentity, mutate, target],
+    [canonicalTabsIdentity, mutate, target],
   )
 
   return { reorderTabs }

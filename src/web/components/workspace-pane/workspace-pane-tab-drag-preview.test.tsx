@@ -5,13 +5,17 @@ import { afterEach, describe, expect, test } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import { useWorkspacePaneTabDragPreview } from '#/web/components/workspace-pane/workspace-pane-tab-drag-preview.ts'
+import {
+  type WorkspacePaneTabDragPreviewInput,
+  type WorkspacePaneTabDragPreviewState,
+  useWorkspacePaneTabDragPreview,
+} from '#/web/components/workspace-pane/workspace-pane-tab-drag-preview.ts'
 
 const REPO_ROOT = '/tmp/workspace-pane-tab-drag-preview-repo'
 const BRANCH_NAME = 'feature/worktree'
 const WORKTREE_PATH = '/tmp/workspace-pane-tab-drag-preview-worktree'
 
-let controls: WorkspacePaneTabDragPreviewControls | null = null
+let controls: WorkspacePaneTabDragPreviewState | null = null
 
 afterEach(() => {
   controls = null
@@ -87,9 +91,6 @@ describe('useWorkspacePaneTabDragPreview', () => {
   })
 })
 
-type WorkspacePaneTabDragPreviewControls = ReturnType<typeof useWorkspacePaneTabDragPreview>
-type WorkspacePaneTabDragPreviewInput = Parameters<typeof useWorkspacePaneTabDragPreview>[0]
-
 function renderPreviewHook(input: Partial<WorkspacePaneTabDragPreviewInput> = {}) {
   return renderInJsdom(<HookHost input={previewInput(input)} />)
 }
@@ -109,7 +110,7 @@ function HookHost({ input }: { input: WorkspacePaneTabDragPreviewInput }) {
   return null
 }
 
-function currentControls(): WorkspacePaneTabDragPreviewControls {
+function currentControls(): WorkspacePaneTabDragPreviewState {
   if (!controls) throw new Error('missing workspace pane tab drag preview controls')
   return controls
 }

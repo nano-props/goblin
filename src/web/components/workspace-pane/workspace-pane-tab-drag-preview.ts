@@ -3,22 +3,29 @@ import { flushSync } from 'react-dom'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabEntryListIdentity } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 
-interface WorkspacePaneTabDragPreview {
+interface WorkspacePaneTabDragPreviewSnapshot {
   targetKey: string
-  sourceIdentity: string
+  baseTabsIdentity: string
   tabs: WorkspacePaneTabEntry[]
 }
 
-export function useWorkspacePaneTabDragPreview(input: {
+export interface WorkspacePaneTabDragPreviewInput {
   repoRoot: string
   branchName: string | null
   worktreePath: string | null
   canonicalTabs: readonly WorkspacePaneTabEntry[]
-}): {
+}
+
+export interface WorkspacePaneTabDragPreviewState {
   visualTabs: readonly WorkspacePaneTabEntry[]
+  /** Returns true when a non-noop preview was staged for the current tab target. */
   stageDragPreview: (tabs: readonly WorkspacePaneTabEntry[]) => boolean
   clearDragPreview: () => void
-} {
+}
+
+export function useWorkspacePaneTabDragPreview(
+  input: WorkspacePaneTabDragPreviewInput,
+): WorkspacePaneTabDragPreviewState {
   const targetKey = useMemo(
     () =>
       input.branchName
@@ -30,16 +37,16 @@ export function useWorkspacePaneTabDragPreview(input: {
         : null,
     [input.branchName, input.repoRoot, input.worktreePath],
   )
-  const canonicalIdentity = useMemo(
+  const canonicalTabsIdentity = useMemo(
     () => workspacePaneTabEntryListIdentity(input.canonicalTabs),
     [input.canonicalTabs],
   )
-  const [dragPreview, setDragPreview] = useState<WorkspacePaneTabDragPreview | null>(null)
+  const [dragPreview, setDragPreview] = useState<WorkspacePaneTabDragPreviewSnapshot | null>(null)
   const activeDragPreview =
     dragPreview &&
-    targetKey &&
+    targetKey !== null &&
     dragPreview.targetKey === targetKey &&
-    dragPreview.sourceIdentity === canonicalIdentity
+    dragPreview.baseTabsIdentity === canonicalTabsIdentity
       ? dragPreview
       : null
 
@@ -55,20 +62,20 @@ export function useWorkspacePaneTabDragPreview(input: {
     (tabs: readonly WorkspacePaneTabEntry[]) => {
       if (!targetKey) return false
       const nextTabs = [...tabs]
-      if (workspacePaneTabEntryListIdentity(nextTabs) === canonicalIdentity) {
+      if (workspacePaneTabEntryListIdentity(nextTabs) === canonicalTabsIdentity) {
         setDragPreview(null)
         return false
       }
       flushSync(() => {
         setDragPreview({
           targetKey,
-          sourceIdentity: canonicalIdentity,
+          baseTabsIdentity: canonicalTabsIdentity,
           tabs: nextTabs,
         })
       })
       return true
     },
-    [canonicalIdentity, targetKey],
+    [canonicalTabsIdentity, targetKey],
   )
 
   return {

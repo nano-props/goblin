@@ -13,7 +13,11 @@ import {
   readWorkspacePaneTabsForBranch,
   setWorkspacePaneTabsForBranchQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { useWorkspacePaneTabsReorderMutation } from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
+import {
+  type WorkspacePaneTabsReorderMutationInput,
+  type WorkspacePaneTabsReorderMutationResult,
+  useWorkspacePaneTabsReorderMutation,
+} from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
 import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { TerminalReplaceWorkspaceTabsInput } from '#/shared/terminal-types.ts'
@@ -23,7 +27,7 @@ const BRANCH_NAME = 'feature/worktree'
 const WORKTREE_PATH = '/tmp/workspace-pane-tabs-reorder-mutation-worktree'
 
 let queryClient: QueryClient
-let controls: WorkspacePaneTabsReorderMutationControls | null = null
+let controls: WorkspacePaneTabsReorderMutationResult | null = null
 
 beforeEach(() => {
   resetReposStore()
@@ -74,7 +78,7 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
   })
 
   test('rolls query cache back and reports failure when the server rejects reorder', async () => {
-    const onReorderError = vi.fn()
+    const onReorderRejected = vi.fn()
     installWorkspacePaneTabsTestBridge({
       replaceWorkspaceTabs: async () => {
         throw new Error('server unavailable')
@@ -83,7 +87,7 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     const sourceTabs = [terminalEntry('session-1'), staticEntry('status')]
     const reorderedTabs = [staticEntry('status'), terminalEntry('session-1')]
     seedWorkspacePaneTabs(sourceTabs)
-    renderMutationHook({ canonicalTabs: sourceTabs, onReorderError })
+    renderMutationHook({ canonicalTabs: sourceTabs, onReorderRejected })
 
     act(() => {
       currentControls().reorderTabs(reorderedTabs)
@@ -91,12 +95,12 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
 
     await vi.waitFor(() => {
       expect(readWorkspacePaneTabsForBranch(REPO_ROOT, BRANCH_NAME, queryClient)).toEqual(sourceTabs)
-      expect(onReorderError).toHaveBeenCalledTimes(1)
+      expect(onReorderRejected).toHaveBeenCalledTimes(1)
     })
   })
 
   test('clears optimistic query data when a failed reorder has no previous cache', async () => {
-    const onReorderError = vi.fn()
+    const onReorderRejected = vi.fn()
     installWorkspacePaneTabsTestBridge({
       replaceWorkspaceTabs: async () => {
         throw new Error('server unavailable')
@@ -104,7 +108,7 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     })
     const sourceTabs = [staticEntry('status')]
     const reorderedTabs = [staticEntry('status'), terminalEntry('session-1')]
-    renderMutationHook({ canonicalTabs: sourceTabs, onReorderError })
+    renderMutationHook({ canonicalTabs: sourceTabs, onReorderRejected })
 
     act(() => {
       currentControls().reorderTabs(reorderedTabs)
@@ -112,7 +116,7 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
 
     await vi.waitFor(() => {
       expect(readWorkspacePaneTabsForBranch(REPO_ROOT, BRANCH_NAME, queryClient)).toEqual(sourceTabs)
-      expect(onReorderError).toHaveBeenCalledTimes(1)
+      expect(onReorderRejected).toHaveBeenCalledTimes(1)
     })
   })
 
@@ -129,9 +133,6 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     expect(replaceWorkspaceTabs).not.toHaveBeenCalled()
   })
 })
-
-type WorkspacePaneTabsReorderMutationControls = ReturnType<typeof useWorkspacePaneTabsReorderMutation>
-type WorkspacePaneTabsReorderMutationInput = Parameters<typeof useWorkspacePaneTabsReorderMutation>[0]
 
 function renderMutationHook(input: Partial<WorkspacePaneTabsReorderMutationInput> = {}) {
   return renderInJsdom(
@@ -154,7 +155,7 @@ function HookHost({ input }: { input: WorkspacePaneTabsReorderMutationInput }) {
   return null
 }
 
-function currentControls(): WorkspacePaneTabsReorderMutationControls {
+function currentControls(): WorkspacePaneTabsReorderMutationResult {
   if (!controls) throw new Error('missing workspace pane tabs mutation controls')
   return controls
 }

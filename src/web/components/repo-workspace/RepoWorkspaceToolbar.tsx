@@ -148,7 +148,7 @@ export function RepoWorkspaceToolbar({
     branchName,
     worktreePath: terminalBase?.worktreePath ?? null,
     canonicalTabs: workspacePaneTabModel.tabEntries,
-    onReorderError: clearWorkspacePaneTabDragPreview,
+    onReorderRejected: clearWorkspacePaneTabDragPreview,
   })
 
   const handleReorderWorkspacePaneTabStrip = useCallback(
