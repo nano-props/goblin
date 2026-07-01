@@ -8,6 +8,7 @@ import { ResponsiveUiProvider } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { PrimaryWindowRouterProvider } from '#/web/primary-window-router.tsx'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { bootstrapLog } from '#/web/logger.ts'
+import { markReactRenderErrorLogged } from '#/web/react-error-logging.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 
 const INITIAL_I18N_HYDRATE_TIMEOUT_MS = 15_000
@@ -15,7 +16,7 @@ const INITIAL_I18N_HYDRATE_TIMEOUT_MS = 15_000
 const rootEl = document.getElementById('root')
 if (!rootEl) throw new Error('root element missing')
 
-const root = createRoot(rootEl)
+const root = createRoot(rootEl, reactRootOptions())
 
 void boot()
 
@@ -42,6 +43,23 @@ function createTimeoutController(ms: number): { signal: AbortSignal; dispose: ()
   return {
     signal: controller.signal,
     dispose: () => window.clearTimeout(id),
+  }
+}
+
+function reactRootOptions(): Parameters<typeof createRoot>[1] {
+  if (import.meta.env.DEV) return undefined
+  return {
+    onCaughtError(error, errorInfo) {
+      if (markReactRenderErrorLogged(error)) return
+      bootstrapLog.error('caught render error', { error, componentStack: errorInfo.componentStack })
+    },
+    onUncaughtError(error, errorInfo) {
+      if (markReactRenderErrorLogged(error)) return
+      bootstrapLog.error('uncaught render error', { error, componentStack: errorInfo.componentStack })
+    },
+    onRecoverableError(error, errorInfo) {
+      bootstrapLog.warn('recoverable render error', { error, componentStack: errorInfo.componentStack })
+    },
   }
 }
 

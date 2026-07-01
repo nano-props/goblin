@@ -211,10 +211,9 @@ describe('repo-tree-source — remote direct children', () => {
   test('walks NUL-separated direct entries into directory and file nodes', async () => {
     remoteMocks.getRemoteTreeWalk.mockResolvedValueOnce({
       ok: true,
-      message: [
-        '/srv/repos/myrepo/.worktrees/feature/README.md',
-        '/srv/repos/myrepo/.worktrees/feature/src/',
-      ].join(NUL),
+      message: ['/srv/repos/myrepo/.worktrees/feature/README.md', '/srv/repos/myrepo/.worktrees/feature/src/'].join(
+        NUL,
+      ),
     })
 
     const result = await getRepoTreeSourceRemote(makeRemoteInput('/srv/repos/myrepo/.worktrees/feature'))

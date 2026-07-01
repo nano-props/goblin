@@ -1,8 +1,8 @@
-import { forwardRef, type ComponentPropsWithoutRef, type ReactNode } from 'react'
+import type { ComponentProps, ReactNode } from 'react'
 import { cn } from '#/web/lib/cn.ts'
 import { focusRing } from '#/web/components/ui/focus.ts'
 
-interface MenuRowButtonProps extends Omit<ComponentPropsWithoutRef<'button'>, 'children'> {
+interface MenuRowButtonProps extends Omit<ComponentProps<'button'>, 'children'> {
   children: ReactNode
   leading?: ReactNode
   trailing?: ReactNode
@@ -15,24 +15,22 @@ const MENU_ROW_ICON_CLASS = 'flex size-3.5 shrink-0 items-center justify-center'
 const MENU_ROW_BUTTON_BASE_CLASS =
   'flex w-full min-w-0 shrink-0 cursor-pointer items-center rounded-sm text-left text-sm outline-none transition-colors duration-100 disabled:pointer-events-none disabled:opacity-50'
 
-export const MenuRowButton = forwardRef<HTMLButtonElement, MenuRowButtonProps>(function MenuRowButton(
-  {
-    children,
-    leading,
-    trailing,
-    contentClassName,
-    selected = false,
-    size = 'compact',
-    className,
-    type = 'button',
-    ...buttonProps
-  },
-  forwardedRef,
-) {
+export function MenuRowButton({
+  children,
+  leading,
+  trailing,
+  contentClassName,
+  selected = false,
+  size = 'compact',
+  className,
+  type = 'button',
+  ref,
+  ...buttonProps
+}: MenuRowButtonProps) {
   return (
     <button
       {...buttonProps}
-      ref={forwardedRef}
+      ref={ref}
       type={type}
       className={cn(
         MENU_ROW_BUTTON_BASE_CLASS,
@@ -50,4 +48,4 @@ export const MenuRowButton = forwardRef<HTMLButtonElement, MenuRowButtonProps>(f
       {trailing ? <span className="ml-auto flex shrink-0 items-center">{trailing}</span> : null}
     </button>
   )
-})
+}

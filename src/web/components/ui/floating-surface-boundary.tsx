@@ -30,7 +30,7 @@ export function FloatingSurfaceBoundary({ children, onPinnedChange }: FloatingSu
     onPinnedChange?.(pinned)
   }, [onPinnedChange, pinned])
 
-  return <FloatingSurfaceBoundaryContext.Provider value={value}>{children}</FloatingSurfaceBoundaryContext.Provider>
+  return <FloatingSurfaceBoundaryContext value={value}>{children}</FloatingSurfaceBoundaryContext>
 }
 
 export function useFloatingSurfaceBoundaryPin(open: boolean) {

@@ -18,7 +18,7 @@ export function ResponsiveUiProvider({ children }: { children: ReactNode }) {
     }),
     [isSmallScreen],
   )
-  return <ResponsiveUiContext.Provider value={value}>{children}</ResponsiveUiContext.Provider>
+  return <ResponsiveUiContext value={value}>{children}</ResponsiveUiContext>
 }
 
 export function useResponsiveUi(): ResponsiveUiContextValue {

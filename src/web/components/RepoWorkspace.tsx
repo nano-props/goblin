@@ -185,7 +185,7 @@ function BranchShortcutHandler({
   useBranchActionShortcutRegistry(actions, shortcutsEnabled)
 
   return (
-    <BranchActionSurfaceContext.Provider value={actions}>
+    <BranchActionSurfaceContext value={actions}>
       <RepoWorkspacePane
         repo={repo}
         detail={detail}
@@ -193,6 +193,6 @@ function BranchShortcutHandler({
         toolbarTrafficLightOffset={toolbarTrafficLightOffset}
         branchActions={branchActions}
       />
-    </BranchActionSurfaceContext.Provider>
+    </BranchActionSurfaceContext>
   )
 }

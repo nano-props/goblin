@@ -1,4 +1,4 @@
-import { forwardRef, type ComponentPropsWithoutRef, type ReactNode } from 'react'
+import type { ComponentProps, ReactNode } from 'react'
 import { CopyButton } from '#/web/components/CopyButton.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { STATUS_TONE_CHIP_CLASS, STATUS_TONE_TEXT_CLASS, type StatusTone } from '#/web/components/ui/status-tones.ts'
@@ -18,20 +18,17 @@ const ROW_VALUE_CLASS: Record<StatusRowValueLayout, string> = {
   fill: 'min-w-0 flex-1 text-sm text-foreground',
   chips: 'flex min-w-0 max-w-full flex-wrap items-center gap-1.5 text-sm text-foreground',
 }
-type StatusChipProps = ComponentPropsWithoutRef<'span'> & {
+type StatusChipProps = ComponentProps<'span'> & {
   tone?: Tone
 }
 
-export const StatusChip = forwardRef<HTMLSpanElement, StatusChipProps>(function StatusChip(
-  { children, className, tone = 'neutral', ...props },
-  ref,
-) {
+export function StatusChip({ children, className, tone = 'neutral', ref, ...props }: StatusChipProps) {
   return (
     <span ref={ref} {...props} className={cn(STATUS_CHIP_CLASS, STATUS_TONE_CHIP_CLASS[tone], className)}>
       {children}
     </span>
   )
-})
+}
 
 export function StatusRows({ children }: { children: ReactNode }) {
   return (
@@ -41,7 +38,7 @@ export function StatusRows({ children }: { children: ReactNode }) {
   )
 }
 
-type StatusRowProps = Omit<ComponentPropsWithoutRef<'div'>, 'value'> & {
+type StatusRowProps = Omit<ComponentProps<'div'>, 'value'> & {
   icon: ReactNode
   label: string
   value: ReactNode
@@ -50,10 +47,17 @@ type StatusRowProps = Omit<ComponentPropsWithoutRef<'div'>, 'value'> & {
   tone?: Tone
 }
 
-export const StatusRow = forwardRef<HTMLDivElement, StatusRowProps>(function StatusRow(
-  { icon, label, value, valueLayout = 'inline', after, tone = 'neutral', className, ...props },
+export function StatusRow({
+  icon,
+  label,
+  value,
+  valueLayout = 'inline',
+  after,
+  tone = 'neutral',
+  className,
   ref,
-) {
+  ...props
+}: StatusRowProps) {
   return (
     <div ref={ref} role="listitem" className={cn(ROW_CLASS, className)} {...props}>
       <span className={cn(ROW_ICON_CLASS, STATUS_TONE_TEXT_CLASS[tone])}>{icon}</span>
@@ -64,7 +68,7 @@ export const StatusRow = forwardRef<HTMLDivElement, StatusRowProps>(function Sta
       </div>
     </div>
   )
-})
+}
 
 export function MonoValue({
   children,

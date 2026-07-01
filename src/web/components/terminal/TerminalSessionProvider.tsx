@@ -312,11 +312,11 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   )
 
   return (
-    <TerminalSessionContext.Provider value={commandValue}>
-      <TerminalSessionReadContext.Provider value={readValue}>
+    <TerminalSessionContext value={commandValue}>
+      <TerminalSessionReadContext value={readValue}>
         {children}
         <div ref={parkingRootRef} className="goblin-terminal-parking" aria-hidden="true" />
-      </TerminalSessionReadContext.Provider>
-    </TerminalSessionContext.Provider>
+      </TerminalSessionReadContext>
+    </TerminalSessionContext>
   )
 }

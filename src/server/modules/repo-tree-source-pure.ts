@@ -79,7 +79,8 @@ function compareNodes(a: RepoTreeNode, b: RepoTreeNode): number {
 function sanitizeRelativeEntry(rawEntry: string): string | null {
   const normalized = rawEntry.split(path.sep).join('/')
   const withoutTrailingSlash = normalized.replace(/\/+$/u, '')
-  const relative = normalized.endsWith('/') && withoutTrailingSlash.length > 0 ? `${withoutTrailingSlash}/` : withoutTrailingSlash
+  const relative =
+    normalized.endsWith('/') && withoutTrailingSlash.length > 0 ? `${withoutTrailingSlash}/` : withoutTrailingSlash
   if (relative === '') return null
   if (relative.startsWith('../') || relative === '..' || path.isAbsolute(relative)) return null
   if (relative.split('/').includes('..')) return null
@@ -87,7 +88,10 @@ function sanitizeRelativeEntry(rawEntry: string): string | null {
 }
 
 function normalizeTreePrefix(prefix: string): string {
-  return prefix.replace(/^\.\/+/, '').replace(/^\/+/, '').replace(/\/+$/, '')
+  return prefix
+    .replace(/^\.\/+/, '')
+    .replace(/^\/+/, '')
+    .replace(/\/+$/, '')
 }
 
 export function parseNullSeparatedPaths(input: string): string[] {

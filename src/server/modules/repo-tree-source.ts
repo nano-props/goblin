@@ -11,7 +11,11 @@ import type { RepoTreeNode } from '#/shared/api-types.ts'
 import type { WorktreeInfo } from '#/shared/git-types.ts'
 import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
 import { getRemoteTreeWalk } from '#/system/ssh/git.ts'
-import { buildLimitedChildNodes, parseNullSeparatedPaths, stripRemoteEntryPrefix } from '#/server/modules/repo-tree-source-pure.ts'
+import {
+  buildLimitedChildNodes,
+  parseNullSeparatedPaths,
+  stripRemoteEntryPrefix,
+} from '#/server/modules/repo-tree-source-pure.ts'
 
 export const MAX_REPO_TREE_NODES = 50_000
 
@@ -123,14 +127,14 @@ async function visibleGitDirectoryEntries(
   entries: ReadonlyArray<DirectoryEntryCandidate>,
   signal: AbortSignal | undefined,
 ): Promise<ReadonlyArray<DirectoryEntryCandidate>> {
-  const ignored = await ignoredGitPathSet(worktreePath, entries.map((entry) => entry.checkPath), signal)
-  if (signal?.aborted) return []
-  const ignoredEntries = entries.filter((entry) => ignored.has(entry.checkPath))
-  const trackedIgnored = await trackedGitPathSet(
+  const ignored = await ignoredGitPathSet(
     worktreePath,
-    ignoredEntries,
+    entries.map((entry) => entry.checkPath),
     signal,
   )
+  if (signal?.aborted) return []
+  const ignoredEntries = entries.filter((entry) => ignored.has(entry.checkPath))
+  const trackedIgnored = await trackedGitPathSet(worktreePath, ignoredEntries, signal)
   return entries.filter((entry) => !ignored.has(entry.checkPath) || trackedIgnored.has(entry.checkPath))
 }
 

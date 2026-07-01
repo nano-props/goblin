@@ -5,8 +5,8 @@ import {
   useMemo,
   useRef,
   useState,
-  forwardRef,
   type ComponentPropsWithoutRef,
+  type Ref,
   type RefObject,
 } from 'react'
 import { Button } from '#/web/components/ui/button.tsx'
@@ -764,16 +764,21 @@ interface WorkspacePaneTabProps {
   onHoverChange?: (identity: string | null) => void
 }
 
-const WorkspacePaneNewButton = forwardRef<
-  HTMLButtonElement,
-  {
-    id?: string
-    onClick: () => void
-    busy?: boolean
-    compact?: boolean
-    t: WorkspacePaneT
-  }
->(function WorkspacePaneNewButton({ id, onClick, busy = false, compact = false, t }, ref) {
+function WorkspacePaneNewButton({
+  id,
+  onClick,
+  busy = false,
+  compact = false,
+  t,
+  ref,
+}: {
+  id?: string
+  onClick: () => void
+  busy?: boolean
+  compact?: boolean
+  t: WorkspacePaneT
+  ref?: Ref<HTMLButtonElement>
+}) {
   const label = t('terminal.new')
   return (
     <Button
@@ -792,7 +797,7 @@ const WorkspacePaneNewButton = forwardRef<
       <Plus size={14} />
     </Button>
   )
-})
+}
 
 interface WorkspacePaneTabChromeProps {
   item: WorkspacePaneTabItem

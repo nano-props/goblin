@@ -89,11 +89,11 @@ describe('RepoWorkspace', () => {
     render(
       <QueryClientProvider client={primaryWindowQueryClient}>
         <PrimaryWindowNavigationProvider value={navigation}>
-          <TerminalSessionContext.Provider value={terminalCommandContext}>
-            <TerminalSessionReadContext.Provider value={terminalReadContext}>
+          <TerminalSessionContext value={terminalCommandContext}>
+            <TerminalSessionReadContext value={terminalReadContext}>
               <RepoWorkspace repoId={REPO_ID} />
-            </TerminalSessionReadContext.Provider>
-          </TerminalSessionContext.Provider>
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
         </PrimaryWindowNavigationProvider>
       </QueryClientProvider>,
     )
