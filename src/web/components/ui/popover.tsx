@@ -1,9 +1,24 @@
 import * as React from 'react'
 import { Popover as PopoverPrimitive } from 'radix-ui'
 import { FloatingContent } from '#/web/components/ui/floating-content.tsx'
+import { useFloatingSurfaceBoundaryPin } from '#/web/components/ui/floating-surface-boundary.tsx'
 import { cn } from '#/web/lib/cn.ts'
-function Popover({ ...props }: React.ComponentProps<typeof PopoverPrimitive.Root>) {
-  return <PopoverPrimitive.Root data-slot="popover" {...props} />
+function Popover({ open, defaultOpen, onOpenChange, ...props }: React.ComponentProps<typeof PopoverPrimitive.Root>) {
+  const controlled = open !== undefined
+  const [internalOpen, setInternalOpen] = React.useState(defaultOpen ?? false)
+  const effectiveOpen = controlled ? open : internalOpen
+
+  useFloatingSurfaceBoundaryPin(effectiveOpen)
+
+  const handleOpenChange = React.useCallback(
+    (nextOpen: boolean) => {
+      if (!controlled) setInternalOpen(nextOpen)
+      onOpenChange?.(nextOpen)
+    },
+    [controlled, onOpenChange],
+  )
+
+  return <PopoverPrimitive.Root data-slot="popover" open={effectiveOpen} onOpenChange={handleOpenChange} {...props} />
 }
 
 function PopoverTrigger({ ...props }: React.ComponentProps<typeof PopoverPrimitive.Trigger>) {

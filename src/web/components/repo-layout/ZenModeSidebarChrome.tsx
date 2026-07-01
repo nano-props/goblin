@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useEffectEvent,
   useRef,
   useState,
   type CSSProperties,
@@ -16,6 +17,7 @@ import {
   repoSidebarWidthPx,
 } from '#/web/components/repo-layout/sidebar-sizing.ts'
 import { ResizeHandleLine, resizeHandleClassNames } from '#/web/components/ui/resizable.tsx'
+import { FloatingSurfaceBoundary } from '#/web/components/ui/floating-surface-boundary.tsx'
 import { useElementInlineSize } from '#/web/hooks/useElementInlineSize.ts'
 import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
@@ -204,6 +206,7 @@ function ZenModeSidebarReveal({
   const lastPointerRef = useRef({ x: 0, y: 0 })
   const [resizeRailState, setResizeRailState] = useState<ResizeRailState>('idle')
   const [panelState, setPanelState] = useState<RevealPanelState>(() => (open ? 'open' : 'closed'))
+  const [pinnedByDescendantSurface, setPinnedByDescendantSurface] = useState(false)
   const rootFontSizePx = useRootFontSizePx()
   const hostWidth = useElementInlineSize(hostRef, true)
   const measuredWidthPx =
@@ -320,31 +323,36 @@ function ZenModeSidebarReveal({
   const handleSurfaceLeave = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
       if (resizingRef.current) return
+      if (pinnedByDescendantSurface) return
       if (isPointerInsideRevealBounds(event, hostRef.current, panelRef.current)) return
       if (isZenRevealSurfaceTarget(event.relatedTarget, panelRef.current, hitAreaRef.current)) return
       onSurfaceLeave()
     },
-    [onSurfaceLeave],
+    [onSurfaceLeave, pinnedByDescendantSurface],
   )
+  const handleDocumentPointerMove = useEffectEvent((event: PointerEvent) => {
+    if (resizingRef.current) return
+    if (pinnedByDescendantSurface) return
+    if (
+      isZenRevealSurfaceTarget(event.target, panelRef.current, hitAreaRef.current) ||
+      isPointerInsideRevealBounds(event, hostRef.current, panelRef.current) ||
+      isPointerInsideElement(event, hitAreaRef.current)
+    ) {
+      onSurfaceEnter()
+      return
+    }
+    onSurfaceLeave()
+  })
   useEffect(() => {
     if (!panelInteractive) return
 
     const handlePointerMove = (event: PointerEvent) => {
-      if (resizingRef.current) return
-      if (
-        isZenRevealSurfaceTarget(event.target, panelRef.current, hitAreaRef.current) ||
-        isPointerInsideRevealBounds(event, hostRef.current, panelRef.current) ||
-        isPointerInsideElement(event, hitAreaRef.current)
-      ) {
-        onSurfaceEnter()
-        return
-      }
-      onSurfaceLeave()
+      handleDocumentPointerMove(event)
     }
 
     document.addEventListener('pointermove', handlePointerMove)
     return () => document.removeEventListener('pointermove', handlePointerMove)
-  }, [onSurfaceEnter, onSurfaceLeave, panelInteractive])
+  }, [panelInteractive])
   const handleResizeRailMouseEnter = useCallback(() => {
     if (!resizingRef.current) setResizeRailState('hover')
   }, [])
@@ -383,28 +391,30 @@ function ZenModeSidebarReveal({
         onMouseEnter={panelInteractive ? onSurfaceEnter : undefined}
         onMouseLeave={panelInteractive ? handleSurfaceLeave : undefined}
       >
-        <RepoLayoutSidebar
-          repoId={repoId}
-          compact={false}
-          chromeRegion={panelInteractive ? 'drag' : 'none'}
-          onOpenSettings={onOpenSettings}
-        />
-        <TitleBarInteractiveRegion
-          data-testid="zen-mode-sidebar-resize-handle"
-          data-separator={resizeRailState === 'idle' ? undefined : resizeRailState}
-          role="separator"
-          aria-orientation="vertical"
-          className={cn(
-            resizeHandleClassNames.hitTarget,
-            resizeHandleClassNames.horizontal,
-            'absolute inset-y-0 right-0 z-20',
-          )}
-          onPointerDown={panelInteractive ? handleResizePointerDown : undefined}
-          onMouseEnter={panelInteractive ? handleResizeRailMouseEnter : undefined}
-          onMouseLeave={panelInteractive ? handleResizeRailMouseLeave : undefined}
-        >
-          <ResizeHandleLine />
-        </TitleBarInteractiveRegion>
+        <FloatingSurfaceBoundary onPinnedChange={setPinnedByDescendantSurface}>
+          <RepoLayoutSidebar
+            repoId={repoId}
+            compact={false}
+            chromeRegion={panelInteractive ? 'drag' : 'none'}
+            onOpenSettings={onOpenSettings}
+          />
+          <TitleBarInteractiveRegion
+            data-testid="zen-mode-sidebar-resize-handle"
+            data-separator={resizeRailState === 'idle' ? undefined : resizeRailState}
+            role="separator"
+            aria-orientation="vertical"
+            className={cn(
+              resizeHandleClassNames.hitTarget,
+              resizeHandleClassNames.horizontal,
+              'absolute inset-y-0 right-0 z-20',
+            )}
+            onPointerDown={panelInteractive ? handleResizePointerDown : undefined}
+            onMouseEnter={panelInteractive ? handleResizeRailMouseEnter : undefined}
+            onMouseLeave={panelInteractive ? handleResizeRailMouseLeave : undefined}
+          >
+            <ResizeHandleLine />
+          </TitleBarInteractiveRegion>
+        </FloatingSurfaceBoundary>
       </div>
     </div>
   )
