@@ -1317,7 +1317,7 @@ describe('TerminalSession', () => {
     await flushTerminalStart()
     await flushUntil(() => session.snapshot().phase === 'open')
 
-    // The T1.5 fix: after the write resolves, the field should be reset
+    // After the write resolves, the field should be reset
     // to the empty sentinel so we don't keep a stale up-to-16 MiB copy
     // around until the next hydrate().
     expect(hydratedSnapshot(session)).toEqual({ snapshot: '', snapshotSeq: 0 })
@@ -1353,7 +1353,7 @@ describe('TerminalSession', () => {
 
     expect(term.write).toHaveBeenCalledWith('rehydrated', expect.any(Function))
 
-    // The T1.5 fix: after the term.write callback fires, the field is
+    // After the term.write callback fires, the field is
     // cleared. The mock invokes the callback via queueMicrotask, so
     // draining microtasks is enough to observe the post-callback state.
     await flushResizeDispatch()
@@ -1388,8 +1388,8 @@ describe('TerminalSession', () => {
     await flushTerminalStart()
 
     expect(term.reset).toHaveBeenCalled()
-    // T1.5: applyHydratedSnapshotToActiveView now passes a callback as the
-    // second arg so it can clear the field after the write resolves.
+    // applyHydratedSnapshotToActiveView passes a callback as the second arg
+    // so it can clear the field after the write resolves.
     expect(term.write).toHaveBeenCalledWith('remote-screen', expect.any(Function))
     expect(session.currentPtySessionId()).toBe('session-remote')
   })

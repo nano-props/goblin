@@ -8,7 +8,8 @@ import {
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import {
   useTerminalRepoSyncReady,
-  useTerminalWorktreeSnapshot,
+  useTerminalSessionSummaries,
+  useTerminalWorktreePendingCreate,
 } from '#/web/components/terminal/terminal-session-store.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
@@ -46,7 +47,8 @@ export function useRepoWorkspaceTabModelInput(
   const worktreePath = branch?.worktree?.path ?? null
   const terminalWorktreeKey = worktreePath ? formatTerminalWorktreeKey(repo.id, worktreePath) : null
 
-  const terminalWorktreeSnapshot = useTerminalWorktreeSnapshot(terminalWorktreeKey)
+  const terminalSessionSummaries = useTerminalSessionSummaries(terminalWorktreeKey)
+  const terminalCreatePending = useTerminalWorktreePendingCreate(terminalWorktreeKey)
   const terminalSyncReady = useTerminalRepoSyncReady(repo.id)
   const workspacePaneTabsQuery = useWorkspacePaneTabsQuery(repo.id)
   const selectedTerminalSessionId = useReposStore((s) =>
@@ -81,8 +83,8 @@ export function useRepoWorkspaceTabModelInput(
       worktreePath,
       preferredTab,
       tabEntries: workspacePaneTabEntries,
-      runtimeTerminalViews: terminalWorktreeSnapshot.sessions,
-      terminalCreatePending: terminalWorktreeSnapshot.pendingCreate,
+      runtimeTerminalViews: terminalSessionSummaries,
+      terminalCreatePending,
       terminalSyncReady,
       selectedTerminalSessionId: modelSelectedTerminalSessionId,
     }),
@@ -92,8 +94,8 @@ export function useRepoWorkspaceTabModelInput(
       worktreePath,
       preferredTab,
       workspacePaneTabEntries,
-      terminalWorktreeSnapshot.sessions,
-      terminalWorktreeSnapshot.pendingCreate,
+      terminalSessionSummaries,
+      terminalCreatePending,
       terminalSyncReady,
       modelSelectedTerminalSessionId,
     ],

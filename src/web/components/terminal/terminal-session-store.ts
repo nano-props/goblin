@@ -3,37 +3,13 @@ import { useTerminalSessionReadContext } from '#/web/components/terminal/termina
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type {
-  TerminalWorktreeSnapshot,
   TerminalSnapshot,
   TerminalDescriptor,
   TerminalSessionSummary,
 } from '#/web/components/terminal/types.ts'
 
-const EMPTY_WORKTREE_TERMINAL_SNAPSHOT: TerminalWorktreeSnapshot = {
-  terminalWorktreeKey: '',
-  selectedDescriptor: null,
-  sessions: [],
-  count: 0,
-  bellCount: 0,
-  outputActiveCount: 0,
-  pendingCreate: false,
-}
-
 const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = { phase: 'opening', message: null, processName: 'terminal' }
-
-export function useTerminalWorktreeSnapshot(terminalWorktreeKey: string | null): TerminalWorktreeSnapshot {
-  const { terminalWorktreeSnapshot, subscribeTerminalWorktree } = useTerminalSessionReadContext()
-  const subscribe = useCallback(
-    (listener: () => void) =>
-      terminalWorktreeKey ? subscribeTerminalWorktree(terminalWorktreeKey, listener) : () => {},
-    [terminalWorktreeKey, subscribeTerminalWorktree],
-  )
-  const getSnapshot = useCallback(
-    () => (terminalWorktreeKey ? terminalWorktreeSnapshot(terminalWorktreeKey) : EMPTY_WORKTREE_TERMINAL_SNAPSHOT),
-    [terminalWorktreeKey, terminalWorktreeSnapshot],
-  )
-  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
-}
+const EMPTY_TERMINAL_SESSION_SUMMARIES: TerminalSessionSummary[] = []
 
 export function useTerminalWorktreeCount(terminalWorktreeKey: string | null): number {
   const { terminalWorktreeSnapshot, subscribeTerminalWorktree } = useTerminalSessionReadContext()
@@ -136,7 +112,7 @@ export function useTerminalSessionSummaries(terminalWorktreeKey: string | null):
     [terminalWorktreeKey, subscribeTerminalWorktree],
   )
   const getSnapshot = useCallback(
-    () => (terminalWorktreeKey ? terminalWorktreeSnapshot(terminalWorktreeKey).sessions : []),
+    () => (terminalWorktreeKey ? terminalWorktreeSnapshot(terminalWorktreeKey).sessions : EMPTY_TERMINAL_SESSION_SUMMARIES),
     [terminalWorktreeKey, terminalWorktreeSnapshot],
   )
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)

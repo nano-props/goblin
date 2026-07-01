@@ -203,22 +203,10 @@ Two problems:
 
 ### Design
 
-Mirror the existing pending-create queue (enqueue / flush /
-destroy) for closes.
-
-**New projection state**:
-
-```ts
-private readonly pendingCloseByPtySessionId = new Map<
-  string,
-  {
-    terminalWorktreeKey: string
-    promise: Promise<void>
-    resolve: () => void
-    reject: (error: unknown) => void
-  }
->()
-```
+Terminal close now shares the same lifecycle-queue boundary as
+pending create. `TerminalSessionLifecycleQueues` owns dedupe and
+promise settlement; `TerminalSessionProjection` decides when to drain
+pending closes before create.
 
 **New projection methods**:
 

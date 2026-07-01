@@ -91,7 +91,7 @@ export class TerminalSession {
     // fire-and-forget. The old `void … .catch(() => {})` path could
     // drop the request if the WebSocket was already closing, leaving
     // the server PTY alive and the next create reattaching to the
-    // orphan. See `TerminalSessionProjection.pendingCloseByPtySessionId`.
+    // orphan. See `TerminalSessionLifecycleQueues`.
     requestDurableClose: (ptySessionId: string) => Promise<void> = () => Promise.resolve(),
   ) {
     this.descriptor = descriptor
