@@ -1,3 +1,4 @@
+import type { QueryClient } from '@tanstack/react-query'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { TerminalUpdateWorkspaceTabsOperation } from '#/shared/terminal-types.ts'
 import { terminalBridge } from '#/web/terminal.ts'
@@ -34,8 +35,7 @@ async function commitWorkspacePaneTabsNow(input: CommitWorkspacePaneTabsInput): 
   try {
     await cancelWorkspacePaneTabs(input.repoRoot)
     const serverTabs = await replaceWorkspacePaneTabsOnServer(input)
-    await cancelWorkspacePaneTabs(input.repoRoot)
-    setWorkspacePaneTabsForTargetQueryData({
+    await writeCanonicalWorkspacePaneTabsForTarget({
       repoRoot: input.repoRoot,
       branchName: input.branchName,
       worktreePath: input.worktreePath,
@@ -56,8 +56,7 @@ async function updateWorkspacePaneTabsNow(input: UpdateWorkspacePaneTabsInput): 
   try {
     await cancelWorkspacePaneTabs(input.repoRoot)
     const serverTabs = await updateWorkspacePaneTabsOnServer(input)
-    await cancelWorkspacePaneTabs(input.repoRoot)
-    setWorkspacePaneTabsForTargetQueryData({
+    await writeCanonicalWorkspacePaneTabsForTarget({
       repoRoot: input.repoRoot,
       branchName: input.branchName,
       worktreePath: input.worktreePath,
@@ -73,6 +72,14 @@ async function updateWorkspacePaneTabsNow(input: UpdateWorkspacePaneTabsInput): 
     })
     return false
   }
+}
+
+export async function writeCanonicalWorkspacePaneTabsForTarget(
+  input: CommitWorkspacePaneTabsInput,
+  queryClient?: QueryClient,
+): Promise<void> {
+  await cancelWorkspacePaneTabs(input.repoRoot, queryClient)
+  setWorkspacePaneTabsForTargetQueryData(input, queryClient)
 }
 
 /**

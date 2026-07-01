@@ -11,7 +11,10 @@ import {
   setWorkspacePaneTabsForTargetQueryData,
   workspacePaneTabsQueryKey,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { updateWorkspacePaneTabsOnServer } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
+import {
+  updateWorkspacePaneTabsOnServer,
+  writeCanonicalWorkspacePaneTabsForTarget,
+} from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import { gblLog } from '#/web/logger.ts'
 import { runWorkspacePaneTabsOperation } from '#/web/workspace-pane/workspace-pane-tabs-operation-queue.ts'
 import {
@@ -81,7 +84,7 @@ export function useWorkspacePaneTabsReorderMutation(
             worktreePath: target.worktreePath,
             operation: { type: 'reorder', tabIdentities: draggedTabs.map(workspacePaneTabEntryIdentity) },
           })
-          setWorkspacePaneTabsForTargetQueryData(
+          await writeCanonicalWorkspacePaneTabsForTarget(
             {
               repoRoot: target.repoRoot,
               branchName: target.branchName,

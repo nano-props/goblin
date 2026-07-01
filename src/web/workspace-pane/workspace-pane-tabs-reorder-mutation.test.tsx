@@ -9,6 +9,7 @@ import { installWorkspacePaneTabsTestBridge, resetReposStore } from '#/web/test-
 import {
   readWorkspacePaneTabsForTarget,
   setWorkspacePaneTabsForTargetQueryData,
+  workspacePaneTabsQueryOptions,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import {
   type WorkspacePaneTabsReorderMutationInput,
@@ -17,7 +18,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
 import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import type { TerminalUpdateWorkspaceTabsInput } from '#/shared/terminal-types.ts'
+import type { TerminalUpdateWorkspaceTabsInput, WorkspacePaneTabsEntry } from '#/shared/terminal-types.ts'
 import { clearWorkspacePaneTabsOperationQueuesForTests } from '#/web/workspace-pane/workspace-pane-tabs-operation-queue.ts'
 
 const REPO_ROOT = '/tmp/workspace-pane-tabs-reorder-mutation-repo'
@@ -81,6 +82,55 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     await vi.waitFor(() => {
       expect(readWorkspacePaneTabs()).toEqual(canonicalServerTabs)
     })
+  })
+
+  test('cancels list queries that start while reorder is in flight before writing server tabs', async () => {
+    let resolveServerTabs!: (tabs: WorkspacePaneTabEntry[]) => void
+    const serverTabs = new Promise<WorkspacePaneTabEntry[]>((resolve) => {
+      resolveServerTabs = resolve
+    })
+    let resolveListTabs!: (tabs: WorkspacePaneTabsEntry[]) => void
+    const listTabs = new Promise<WorkspacePaneTabsEntry[]>((resolve) => {
+      resolveListTabs = resolve
+    })
+    let markUpdateStarted!: () => void
+    const updateStarted = new Promise<void>((resolve) => {
+      markUpdateStarted = resolve
+    })
+    installWorkspacePaneTabsTestBridge({
+      listWorkspaceTabs: async () => await listTabs,
+      updateWorkspaceTabs: async () => {
+        markUpdateStarted()
+        return await serverTabs
+      },
+    })
+    const sourceTabs = [terminalEntry('session-1'), staticEntry('status')]
+    const reorderedTabs = [staticEntry('status'), terminalEntry('session-1')]
+    const canonicalServerTabs = [terminalEntry('session-1'), staticEntry('history')]
+    seedWorkspacePaneTabs(sourceTabs)
+    renderMutationHook({ canonicalTabs: sourceTabs })
+
+    act(() => {
+      currentControls().reorderTabs(reorderedTabs)
+    })
+    await updateStarted
+    const fetch = queryClient.fetchQuery(workspacePaneTabsQueryOptions(REPO_ROOT)).catch(() => null)
+
+    resolveServerTabs(canonicalServerTabs)
+    await vi.waitFor(() => {
+      expect(readWorkspacePaneTabs()).toEqual(canonicalServerTabs)
+    })
+    resolveListTabs([
+      {
+        repoRoot: REPO_ROOT,
+        branchName: BRANCH_NAME,
+        worktreePath: WORKTREE_PATH,
+        tabs: [staticEntry('status')],
+      },
+    ])
+    await fetch
+
+    expect(readWorkspacePaneTabs()).toEqual(canonicalServerTabs)
   })
 
   test('queues reorders and recomputes the next reorder from current cached tabs', async () => {
