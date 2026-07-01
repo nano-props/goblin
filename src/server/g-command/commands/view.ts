@@ -41,6 +41,6 @@ function createViewCommand(name: string, tab: WorkspacePaneStaticTabType): Gobli
 
 export const VIEW_COMMANDS: readonly GoblinCommand[] = [
   createViewCommand('delta', 'changes'),
-  createViewCommand('st', 'status'),
+  createViewCommand('info', 'status'),
   createViewCommand('log', 'history'),
 ]

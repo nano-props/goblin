@@ -33,7 +33,7 @@ export interface GoblinCommandContext {
 // (`cli.ts`) is reduced to lookup-and-run; adding a command = adding
 // one entry to the registry (`registry.ts`).
 export interface GoblinCommand {
-  /** Primary name (e.g. `delta`, `st`, `log`, `help`). */
+  /** Primary name (e.g. `delta`, `info`, `log`, `help`). */
   name: string
   /** One-line summary shown in `g help` and `usage()`. */
   summary: string
