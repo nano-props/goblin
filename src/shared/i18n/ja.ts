@@ -490,6 +490,7 @@ export const ja: Record<DictKey, string> = {
   'error.trash-unavailable': 'システムのごみ箱を利用できません',
   'error.failed-trash-file': 'ファイルをごみ箱に移動できませんでした',
   'error.invalid-arguments': '無効な引数',
+  'error.repo-instance-stale': 'リポジトリインスタンスは失効しています',
   'error.not-controller': 'このターミナルは他のセッションが制御しています',
   'error.network-op-in-progress': '別の git ネットワーク操作がすでに実行中です。',
   'error.branch-action-wait-timeout': 'リポジトリの更新完了待ちがタイムアウトしました。',

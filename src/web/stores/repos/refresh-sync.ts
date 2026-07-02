@@ -5,7 +5,7 @@ import {
   applyFetchDataLoadResult,
   canRunRemoteFetchNow,
   repoIfFresh,
-  resolveActionToken,
+  resolveActionRepoInstanceId,
   shouldAttemptFetch,
 } from '#/web/stores/repos/refresh-state.ts'
 import { startDataLoad } from '#/web/stores/repos/repo-data-load-state.ts'
@@ -20,20 +20,20 @@ export function createRefreshSyncHelpers(set: ReposSet, get: ReposGet) {
   async function runNetworkTask(
     id: string,
     task: (signal: AbortSignal) => Promise<ExecResult>,
-    options?: { token?: number; reason?: RepoOperationReason; priority?: number },
+    options?: { repoInstanceId?: string; reason?: RepoOperationReason; priority?: number },
   ): Promise<ExecResult | null> {
-    const resolved = resolveActionToken(get, id, options?.token)
+    const resolved = resolveActionRepoInstanceId(get, id, options?.repoInstanceId)
     if (!resolved) return null
-    const { repo: repoBefore, token } = resolved
+    const { repo: repoBefore, repoInstanceId } = resolved
     if (!canRunRemoteFetchNow(repoBefore)) return { ok: false, message: 'error.network-op-in-progress' }
-    updateIfFresh(set, id, token, (r) => {
+    updateIfFresh(set, id, repoInstanceId, (r) => {
       startDataLoad(r.dataLoads.fetch, { hasData: r.dataLoads.fetch.loadedAt !== null })
     })
     return runExclusiveOperation({
       set,
       get,
       id,
-      token,
+      repoInstanceId,
       lane: 'network',
       priority: options?.priority ?? 50,
       targets: [{ key: 'fetch', reason: options?.reason ?? 'network' }],
@@ -42,12 +42,12 @@ export function createRefreshSyncHelpers(set: ReposSet, get: ReposGet) {
       task,
       errorFromResult: (result) => (!result.ok && result.message !== 'cancelled' ? result.message : null),
       onResult: (result) => {
-        updateIfFresh(set, id, token, (r) => {
+        updateIfFresh(set, id, repoInstanceId, (r) => {
           applyFetchDataLoadResult(r, result)
         })
       },
       onError: (message) => {
-        updateIfFresh(set, id, token, (r) => {
+        updateIfFresh(set, id, repoInstanceId, (r) => {
           applyFetchDataLoadError(r, message)
         })
       },
@@ -55,22 +55,22 @@ export function createRefreshSyncHelpers(set: ReposSet, get: ReposGet) {
     })
   }
 
-  async function attemptFetch(id: string, token: number, sourceToken?: string): Promise<ExecResult | null> {
-    let repo = repoIfFresh(get, id, token)
-    if (!repo || !shouldAttemptFetch(repo, token)) return null
+  async function attemptFetch(id: string, repoInstanceId: string, sourceToken?: string): Promise<ExecResult | null> {
+    let repo = repoIfFresh(get, id, repoInstanceId)
+    if (!repo || !shouldAttemptFetch(repo, repoInstanceId)) return null
     if (!canStartRemoteFetch(repo)) {
       try {
         await waitForRepoOperationsIdle(id, ['snapshot', 'status'])
       } catch {
         return null
       }
-      repo = repoIfFresh(get, id, token)
+      repo = repoIfFresh(get, id, repoInstanceId)
       if (!repo || isRepoUnavailable(repo)) return null
       if (!canStartRemoteFetch(repo)) return null
     }
     try {
       return await runNetworkTask(id, (signal) => fetchRepo(id, 'user', signal, sourceToken), {
-        token,
+        repoInstanceId,
         reason: 'user-fetch',
         priority: 100,
       })
@@ -79,26 +79,26 @@ export function createRefreshSyncHelpers(set: ReposSet, get: ReposGet) {
     }
   }
 
-  function finalizeSyncFetchResult(id: string, token: number, fetchResult: ExecResult | null): void {
+  function finalizeSyncFetchResult(id: string, repoInstanceId: string, fetchResult: ExecResult | null): void {
     if (!fetchResult) return
     if (fetchResult.ok) {
-      get().clearFetchFailed(id, token)
+      get().clearFetchFailed(id, repoInstanceId)
       return
     }
-    if (fetchResult.message !== 'cancelled') get().setLastResult(id, fetchResult, token)
+    if (fetchResult.message !== 'cancelled') get().setLastResult(id, fetchResult, repoInstanceId)
   }
 
-  async function runManualSyncPipeline(id: string, token: number, sourceToken: string): Promise<void> {
+  async function runManualSyncPipeline(id: string, repoInstanceId: string, sourceToken: string): Promise<void> {
     let fetchResult: ExecResult | null = null
-    const repoBeforeFetch = repoIfFresh(get, id, token)
+    const repoBeforeFetch = repoIfFresh(get, id, repoInstanceId)
     if (!repoBeforeFetch) return
-    if (shouldAttemptFetch(repoBeforeFetch, token)) {
-      fetchResult = await attemptFetch(id, token, sourceToken)
+    if (shouldAttemptFetch(repoBeforeFetch, repoInstanceId)) {
+      fetchResult = await attemptFetch(id, repoInstanceId, sourceToken)
     }
-    if (repoIfFresh(get, id, token)) {
-      await get().refreshCoreData(id, { token })
+    if (repoIfFresh(get, id, repoInstanceId)) {
+      await get().refreshCoreData(id, { repoInstanceId })
     }
-    finalizeSyncFetchResult(id, token, fetchResult)
+    finalizeSyncFetchResult(id, repoInstanceId, fetchResult)
   }
 
   return {

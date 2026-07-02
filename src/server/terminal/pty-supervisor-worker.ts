@@ -6,7 +6,6 @@
 // worker is left to exit on its own (or killed during shutdown).
 
 import { spawn, type ChildProcess } from 'node:child_process'
-import crypto from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { serverLogger } from '#/server/logger.ts'
 import {
@@ -18,6 +17,7 @@ import {
 } from '#/server/terminal/pty-supervisor.ts'
 import { normalizePtyWorkerMessage, type PtyWorkerMessage } from '#/server/terminal/pty-worker-protocol.ts'
 import type { PtySupervisorDiagnostics, PtySupervisorFailureDiagnostics } from '#/server/terminal/terminal-host.ts'
+import { createOpaqueId } from '#/shared/opaque-id.ts'
 import { resolvePtyWorkerEntry } from '#/server/terminal/pty-worker-entry.ts'
 
 const STABLE_WORKER_UPTIME_MS = 15_000
@@ -421,5 +421,5 @@ function defaultSpawnWorker(entry: string): TerminalWorkerChildProcess {
 }
 
 function createRequestId(): string {
-  return `req_${crypto.randomUUID()}`
+  return createOpaqueId('req')
 }

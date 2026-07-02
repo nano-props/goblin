@@ -15,7 +15,7 @@ import type {
   TerminalTitleEvent,
 } from '#/shared/terminal-types.ts'
 import type { ClientTerminalBridge } from '#/web/client-bridge-types.ts'
-import type { TerminalIdentityViewModel, TerminalLifecycleViewModel } from '#/web/components/terminal/types.ts'
+import type { TerminalIdentityRealtimeEvent, TerminalLifecycleRealtimeEvent } from '#/web/components/terminal/types.ts'
 import {
   createTerminalSocketConnection,
   type TerminalSocketServerConfig,
@@ -33,8 +33,8 @@ export function createServerTerminalBridge(options: {
   const bellSubscribers = new Set<(event: TerminalBellRealtimeEvent) => void>()
   const titleSubscribers = new Set<(event: TerminalTitleEvent) => void>()
   const exitSubscribers = new Set<(event: TerminalExitEvent) => void>()
-  const identitySubscribers = new Set<(event: TerminalIdentityViewModel) => void>()
-  const lifecycleSubscribers = new Set<(event: TerminalLifecycleViewModel) => void>()
+  const identitySubscribers = new Set<(event: TerminalIdentityRealtimeEvent) => void>()
+  const lifecycleSubscribers = new Set<(event: TerminalLifecycleRealtimeEvent) => void>()
   const sessionsChangedSubscribers = new Set<(repoRoot: string) => void>()
   const workspaceTabsChangedSubscribers = new Set<(repoRoot: string) => void>()
   const sessionClosedSubscribers = new Set<
@@ -67,11 +67,13 @@ export function createServerTerminalBridge(options: {
       return connection.request('close', input)
     },
     create(input) {
-      return connection.request('create', input satisfies TerminalCreateInput).then((value) => {
-        const result = normalizeTerminalCreateResult(value)
-        if (!result) throw new Error('Terminal socket response failed: invalid terminal create response')
-        return result
-      })
+      return connection
+        .request('create', input satisfies TerminalCreateInput)
+        .then((value) => {
+          const result = normalizeTerminalCreateResult(value)
+          if (!result) throw new Error('Terminal socket response failed: invalid terminal create response')
+          return result
+        })
     },
     replaceWorkspaceTabs(input) {
       return connection.request('replace-tabs', input)
@@ -79,22 +81,26 @@ export function createServerTerminalBridge(options: {
     updateWorkspaceTabs(input) {
       return connection.request('update-tabs', input)
     },
-    pruneTerminals(repoRoot) {
-      return connection.request('prune', { repoRoot })
+    pruneTerminals(repoRoot, repoInstanceId) {
+      return connection.request('prune', { repoRoot, repoInstanceId })
     },
     listSessions(input) {
-      return connection.request('list-sessions', input).then((value) => {
-        const sessions = normalizeTerminalSessionSummaryList(value)
-        if (!sessions) throw new Error('Terminal socket response failed: invalid terminal sessions response')
-        return sessions
-      })
+      return connection
+        .request('list-sessions', input)
+        .then((value) => {
+          const sessions = normalizeTerminalSessionSummaryList(value)
+          if (!sessions) throw new Error('Terminal socket response failed: invalid terminal sessions response')
+          return sessions
+        })
     },
     listWorkspaceTabs(input) {
-      return connection.request('list-workspace-tabs', input).then((value) => {
-        const tabs = normalizeWorkspacePaneTabsEntryList(value)
-        if (!tabs) throw new Error('Terminal socket response failed: invalid workspace tabs response')
-        return tabs
-      })
+      return connection
+        .request('list-workspace-tabs', input)
+        .then((value) => {
+          const tabs = normalizeWorkspacePaneTabsEntryList(value)
+          if (!tabs) throw new Error('Terminal socket response failed: invalid workspace tabs response')
+          return tabs
+        })
     },
     prewarm() {
       return connection.prewarm()
@@ -231,6 +237,7 @@ export function createServerTerminalBridge(options: {
       case 'identity': {
         const identityEvent = {
           ptySessionId: message.event.ptySessionId,
+          terminalSessionId: message.event.terminalSessionId,
           ...resolveTerminalController(message.event.controller, currentClientId),
           canonicalCols: message.event.canonicalCols,
           canonicalRows: message.event.canonicalRows,

@@ -36,7 +36,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   // prop. This keeps the terminal session projection alive across settings
   // → workspace round-trips.
   const currentRepoId = useReposStore((s) => s.activeId)
-  const currentRepoInstanceToken = currentRepoId ? (repoIndex[currentRepoId]?.instanceToken ?? null) : null
+  const currentRepoInstanceId = currentRepoId ? (repoIndex[currentRepoId]?.instanceId ?? null) : null
   const selectedTerminalSessionIdByTerminalWorktree = useReposStore(
     (s) => s.selectedTerminalSessionIdByTerminalWorktree,
   )
@@ -73,35 +73,34 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   // reach the singleton without re-calling the getter on every render.
   const projectionRef = useRef<TerminalSessionProjection | null>(null)
   if (!projectionRef.current) {
-    projectionRef.current = getTerminalSessionProjection({
-      onSelectedWorktreeChange: setSelectedTerminal,
-      onWorkspaceTabsChanged: (base, tabs) => {
-        setWorkspacePaneTabsForTargetQueryData({
-          repoRoot: base.repoRoot,
-          branchName: base.branch,
-          worktreePath: base.worktreePath,
-          tabs,
-        })
-      },
+      projectionRef.current = getTerminalSessionProjection({
+        onSelectedWorktreeChange: setSelectedTerminal,
+        onWorkspaceTabsChanged: (base, tabs) => {
+          if (typeof base.repoInstanceId !== 'string') return
+          setWorkspacePaneTabsForTargetQueryData({
+            repoRoot: base.repoRoot,
+            repoInstanceId: base.repoInstanceId,
+            branchName: base.branch,
+            worktreePath: base.worktreePath,
+            tabs,
+          })
+        },
     })
   }
   const projection = projectionRef.current
 
   const syncServerSessions = useCallback(
     async (repoRoot: string) => {
-      if (!repoRoot || !repoIndexRef.current[repoRoot]) return
+      const repo = repoIndexRef.current[repoRoot]
+      if (!repoRoot || !repo) return
       try {
         const clientId = readOrCreateWebTerminalClientId()
-        const serverSessions = await loadTerminalSessions(repoRoot)
-        if (!repoIndexRef.current[repoRoot]) return
+        const serverSessions = await loadTerminalSessions(repoRoot, repo.instanceId)
+        if (repoIndexRef.current[repoRoot]?.instanceId !== repo.instanceId) return
         projection.reconcileServerSessions(repoRoot, serverSessions, clientId)
+        useRepoSyncStore.getState().markReady(repoRoot, repo.instanceId)
       } catch (err) {
         terminalSessionProviderLog.debug('failed to sync server sessions', { err })
-      } finally {
-        const instanceToken = repoIndexRef.current[repoRoot]?.instanceToken
-        if (typeof instanceToken === 'number') {
-          useRepoSyncStore.getState().markReady(repoRoot, instanceToken)
-        }
       }
     },
     [projection],
@@ -175,7 +174,8 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     // there — the broadcast is multi-window safe by construction.
     const offSessionClosed = terminalBridge.onSessionClosed((event) => {
       projection.handleSessionClosed(event)
-      invalidateWorkspacePaneTabs(event.repoRoot)
+      const repoInstanceId = repoIndexRef.current[event.repoRoot]?.instanceId
+      if (typeof repoInstanceId === 'string') invalidateWorkspacePaneTabs(event.repoRoot, repoInstanceId)
     })
 
     setTerminalSessionCommandBridge({
@@ -227,7 +227,8 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     }
     const offSessionsChanged = terminalBridge.onSessionsChanged(scheduleServerSync)
     const offWorkspaceTabsChanged = terminalBridge.onWorkspaceTabsChanged((repoRoot) => {
-      invalidateWorkspacePaneTabs(repoRoot)
+      const repoInstanceId = repoIndexRef.current[repoRoot]?.instanceId
+      if (typeof repoInstanceId === 'string') invalidateWorkspacePaneTabs(repoRoot, repoInstanceId)
       scheduleServerSync(repoRoot)
     })
 
@@ -238,11 +239,12 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       offSessionsChanged()
       offWorkspaceTabsChanged()
     }
-  }, [currentRepoId, currentRepoInstanceToken, syncServerSessions])
+  }, [currentRepoId, currentRepoInstanceId, syncServerSessions])
 
   const commandValue = useMemo<TerminalSessionContextValue>(
     () => ({
       createTerminal: projection.createTerminal,
+      createOwnedTerminal: projection.createOwnedTerminal,
       registerHost: projection.registerHost,
       unregisterHost: projection.unregisterHost,
       selectTerminal: projection.selectTerminal,

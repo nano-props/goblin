@@ -156,9 +156,16 @@ export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): 
 export function nextRepoWorkspaceTabAfterClose(
   tabs: readonly RepoWorkspaceTab[],
   closingIdentity: string,
+  openerIdentity?: string | null,
 ): RepoWorkspaceMaterializedTab | null {
   const index = tabs.findIndex((tab) => tab.identity === closingIdentity)
   if (index === -1) return null
+  // Chrome-style opener preference: if the tab that opened this one is still
+  // open, reactivate it before falling back to the nearest neighbor.
+  if (openerIdentity) {
+    const opener = tabs.find((tab) => tab.identity === openerIdentity)
+    if (opener && isMaterializedRepoWorkspaceTab(opener)) return opener
+  }
   return nextSelectableRepoWorkspaceTab(tabs, index, 1) ?? nextSelectableRepoWorkspaceTab(tabs, index, -1)
 }
 

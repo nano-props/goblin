@@ -110,9 +110,11 @@ async function createSession(
   manager: TerminalSessionManager<string>,
   supervisor: ReturnType<typeof createDeferredPtySupervisor>,
 ): Promise<Extract<TerminalAttachResult, { ok: true }>> {
-  const pending = manager.ensureSession({
-    userId: USER_ID,
-    scope: SCOPE,
+    const pending = manager.ensureSession({
+      userId: USER_ID,
+      scope: SCOPE,
+      repoRoot: SCOPE,
+      repoInstanceId: 'repo-instance-test',
     terminalSessionId: TERMINAL_SESSION_ID,
     worktreePath: WORKTREE_PATH,
     cwd: '/tmp',
@@ -135,6 +137,8 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     const first = manager.ensureSession({
       userId: USER_ID,
       scope: SCOPE,
+      repoRoot: SCOPE,
+      repoInstanceId: 'repo-instance-test',
       terminalSessionId: TERMINAL_SESSION_ID,
       worktreePath: WORKTREE_PATH,
       cwd: '/tmp',
@@ -145,6 +149,8 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     const second = manager.ensureSession({
       userId: USER_ID,
       scope: SCOPE,
+      repoRoot: SCOPE,
+      repoInstanceId: 'repo-instance-test',
       terminalSessionId: TERMINAL_SESSION_ID,
       worktreePath: WORKTREE_PATH,
       cwd: '/tmp',
@@ -168,6 +174,8 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     const pending = manager.ensureSession({
       userId: USER_ID,
       scope: SCOPE,
+      repoRoot: SCOPE,
+      repoInstanceId: 'repo-instance-test',
       terminalSessionId: TERMINAL_SESSION_ID,
       worktreePath: WORKTREE_PATH,
       cwd: '/tmp',

@@ -1,4 +1,5 @@
 import { ACCESS_TOKEN_QUERY } from '#/shared/access-token.ts'
+import { createOpaqueId } from '#/shared/opaque-id.ts'
 import type { TerminalClientMessage, TerminalSocketServerMessage } from '#/shared/terminal-socket.ts'
 import { normalizeTerminalSocketServerMessage } from '#/shared/terminal-validators.ts'
 import { resolveWebSocketProtocol } from '#/web/lib/websocket-url.ts'
@@ -30,7 +31,5 @@ export function encodeClientMessage(message: TerminalClientMessage): string {
 }
 
 export function createSocketRequestId(): string {
-  return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-    ? crypto.randomUUID()
-    : `request_${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`
+  return createOpaqueId('req')
 }

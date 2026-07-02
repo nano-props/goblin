@@ -6,6 +6,7 @@ import { installWebSocketMock, type WebSocketMockHandle } from '#/web/test-utils
 import { installHostBootstrap } from '#/web/test-utils/host-bootstrap.ts'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
 let wsMock: WebSocketMockHandle
+const REPO_INSTANCE_ID = 'repo-instance-test'
 describe('terminal web host bridge', () => {
   beforeEach(() => {
     wsMock = installWebSocketMock({ autoOpen: false })
@@ -128,6 +129,7 @@ describe('terminal web host bridge', () => {
         type: 'identity',
         event: {
           ptySessionId: 'pty_1',
+          terminalSessionId: 'terminal_1',
           controller: { clientId: 'client_sharedterminal', status: 'connected' },
           canonicalCols: 100,
           canonicalRows: 30,
@@ -138,6 +140,7 @@ describe('terminal web host bridge', () => {
     expect(socket.url).toContain('clientId=client_sharedterminal')
     expect(onIdentity).toHaveBeenCalledWith({
       ptySessionId: 'pty_1',
+      terminalSessionId: 'terminal_1',
       role: 'controller',
       controllerStatus: 'connected',
       canonicalCols: 100,
@@ -189,6 +192,7 @@ describe('terminal web host bridge', () => {
 
     const createPromise = terminalBridge.create({
       repoRoot: '/tmp/repo',
+      repoInstanceId: REPO_INSTANCE_ID,
       branch: 'feature',
       worktreePath: '/tmp/repo',
       kind: 'primary',
@@ -201,6 +205,7 @@ describe('terminal web host bridge', () => {
       action: 'create',
       input: {
         repoRoot: '/tmp/repo',
+        repoInstanceId: REPO_INSTANCE_ID,
         branch: 'feature',
         worktreePath: '/tmp/repo',
         kind: 'primary',
@@ -233,7 +238,7 @@ describe('terminal web host bridge', () => {
     const dispose = terminalBridge.onOutput(() => {})
     const socket = wsMock.instances[0]
 
-    const listPromise = terminalBridge.listSessions({ repoRoot: '/tmp/repo' })
+    const listPromise = terminalBridge.listSessions({ repoRoot: '/tmp/repo', repoInstanceId: REPO_INSTANCE_ID })
     socket?.emitOpen()
     await Promise.resolve()
     const request = socket?.sent
@@ -244,6 +249,7 @@ describe('terminal web host bridge', () => {
       action: 'list-sessions',
       input: {
         repoRoot: '/tmp/repo',
+        repoInstanceId: REPO_INSTANCE_ID,
       },
     })
     socket?.emitMessage(
@@ -268,6 +274,7 @@ describe('terminal web host bridge', () => {
     const socket = wsMock.instances[0]
     const createPromise = terminalBridge.create({
       repoRoot: '/tmp/repo',
+      repoInstanceId: REPO_INSTANCE_ID,
       branch: 'feature',
       worktreePath: '/tmp/repo',
       kind: 'primary',
@@ -285,6 +292,7 @@ describe('terminal web host bridge', () => {
     const { terminalBridge } = await import('#/web/terminal.ts')
     const createPromise = terminalBridge.create({
       repoRoot: '/tmp/repo',
+      repoInstanceId: REPO_INSTANCE_ID,
       branch: 'feature',
       worktreePath: '/tmp/repo',
       kind: 'primary',
@@ -306,6 +314,7 @@ describe('terminal web host bridge', () => {
       const { terminalBridge } = await import('#/web/terminal.ts')
       const createPromise = terminalBridge.create({
         repoRoot: '/tmp/repo',
+        repoInstanceId: REPO_INSTANCE_ID,
         branch: 'feature',
         worktreePath: '/tmp/repo',
         kind: 'primary',
@@ -329,7 +338,10 @@ describe('terminal web host bridge', () => {
     try {
       const fetchMock = mockFetch()
       const { terminalBridge } = await import('#/web/terminal.ts')
-      const listPromise = terminalBridge.listSessions({ repoRoot: '/tmp/repo' })
+      const listPromise = terminalBridge.listSessions({
+        repoRoot: '/tmp/repo',
+        repoInstanceId: REPO_INSTANCE_ID,
+      })
       const socket = wsMock.instances[0]
       if (!socket) throw new Error('missing web terminal socket')
       const expectation = expect(listPromise).rejects.toThrow('Terminal socket open timed out')
@@ -349,7 +361,7 @@ describe('terminal web host bridge', () => {
     const { terminalBridge } = await import('#/web/terminal.ts')
     const dispose = terminalBridge.onOutput(() => {})
     const socket = wsMock.instances[0]
-    const listPromise = terminalBridge.listSessions({ repoRoot: '/tmp/repo' })
+    const listPromise = terminalBridge.listSessions({ repoRoot: '/tmp/repo', repoInstanceId: REPO_INSTANCE_ID })
 
     socket?.close()
 
@@ -363,7 +375,7 @@ describe('terminal web host bridge', () => {
     const { terminalBridge } = await import('#/web/terminal.ts')
     const dispose = terminalBridge.onOutput(() => {})
     const socket = wsMock.instances[0]
-    const prunePromise = terminalBridge.pruneTerminals('/tmp/repo')
+    const prunePromise = terminalBridge.pruneTerminals('/tmp/repo', REPO_INSTANCE_ID)
 
     socket?.close()
 
@@ -377,14 +389,14 @@ describe('terminal web host bridge', () => {
     const { terminalBridge } = await import('#/web/terminal.ts')
     const dispose = terminalBridge.onOutput(() => {})
     const socket = wsMock.instances[0]
-    const prunePromise = terminalBridge.pruneTerminals('/tmp/repo')
+    const prunePromise = terminalBridge.pruneTerminals('/tmp/repo', REPO_INSTANCE_ID)
     socket?.emitOpen()
     await Promise.resolve()
     const request = socket?.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'prune')
     expect(request).toMatchObject({
       type: 'request',
       action: 'prune',
-      input: { repoRoot: '/tmp/repo' },
+      input: { repoRoot: '/tmp/repo', repoInstanceId: REPO_INSTANCE_ID },
     })
     socket?.emitMessage(
       JSON.stringify({
@@ -403,7 +415,7 @@ describe('terminal web host bridge', () => {
 
   test('closes an idle terminal socket after a one-shot websocket request resolves without subscribers', async () => {
     const { terminalBridge } = await import('#/web/terminal.ts')
-    const prunePromise = terminalBridge.pruneTerminals('/tmp/repo')
+    const prunePromise = terminalBridge.pruneTerminals('/tmp/repo', REPO_INSTANCE_ID)
     const socket = wsMock.instances[0]
     if (!socket) throw new Error('missing web terminal socket')
 
@@ -428,14 +440,18 @@ describe('terminal web host bridge', () => {
     vi.useFakeTimers()
     try {
       const { terminalBridge } = await import('#/web/terminal.ts')
-      const prunePromise = terminalBridge.pruneTerminals('/tmp/repo')
+      const prunePromise = terminalBridge.pruneTerminals('/tmp/repo', REPO_INSTANCE_ID)
       const socket = wsMock.instances[0]
       if (!socket) throw new Error('missing web terminal socket')
 
       socket.emitOpen()
       await Promise.resolve()
       const request = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'prune')
-      expect(request).toMatchObject({ type: 'request', action: 'prune' })
+      expect(request).toMatchObject({
+        type: 'request',
+        action: 'prune',
+        input: { repoRoot: '/tmp/repo', repoInstanceId: REPO_INSTANCE_ID },
+      })
       const expectation = expect(prunePromise).rejects.toThrow('Terminal request timed out')
 
       await vi.advanceTimersByTimeAsync(30_000)
@@ -474,10 +490,14 @@ describe('terminal web host bridge', () => {
       if (!socket) throw new Error('missing web terminal socket')
       socket.emitOpen()
       await vi.advanceTimersByTimeAsync(1_000)
-      const prunePromise = terminalBridge.pruneTerminals('/tmp/repo')
+      const prunePromise = terminalBridge.pruneTerminals('/tmp/repo', REPO_INSTANCE_ID)
       await Promise.resolve()
       const request = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'prune')
-      expect(request).toMatchObject({ type: 'request', action: 'prune' })
+      expect(request).toMatchObject({
+        type: 'request',
+        action: 'prune',
+        input: { repoRoot: '/tmp/repo', repoInstanceId: REPO_INSTANCE_ID },
+      })
       socket.send = vi.fn(() => {
         throw new Error('send failed')
       })
@@ -505,10 +525,14 @@ describe('terminal web host bridge', () => {
       socket.emitOpen()
       await Promise.resolve()
 
-      const prunePromise = terminalBridge.pruneTerminals('/tmp/repo')
+      const prunePromise = terminalBridge.pruneTerminals('/tmp/repo', REPO_INSTANCE_ID)
       await Promise.resolve()
       const request = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'prune')
-      expect(request).toMatchObject({ type: 'request', action: 'prune' })
+      expect(request).toMatchObject({
+        type: 'request',
+        action: 'prune',
+        input: { repoRoot: '/tmp/repo', repoInstanceId: REPO_INSTANCE_ID },
+      })
       const expectation = expect(prunePromise).rejects.toThrow('Terminal request timed out')
 
       await vi.advanceTimersByTimeAsync(30_000)
@@ -530,6 +554,7 @@ describe('terminal web host bridge', () => {
     const socket = wsMock.instances[0]
     const createPromise = terminalBridge.create({
       repoRoot: '/tmp/repo',
+      repoInstanceId: REPO_INSTANCE_ID,
       branch: 'feature',
       worktreePath: '/tmp/repo',
       kind: 'primary',
@@ -559,6 +584,7 @@ describe('terminal web host bridge', () => {
     const socket = wsMock.instances[0]
     const createPromise = terminalBridge.create({
       repoRoot: '/tmp/repo',
+      repoInstanceId: REPO_INSTANCE_ID,
       branch: 'feature',
       worktreePath: '/tmp/repo',
       kind: 'primary',
@@ -607,13 +633,19 @@ describe('terminal web host bridge', () => {
     socket.emitMessage(
       JSON.stringify({
         type: 'title',
-        event: { ptySessionId: 'pty_1', canonicalTitle: '~/Developer/goblin — npm run dev' },
+        event: {
+          ptySessionId: 'pty_1',
+          terminalSessionId: 'terminal_1',
+          repoRoot: '/tmp/repo',
+          worktreePath: '/tmp/repo-worktree',
+          canonicalTitle: '~/Developer/goblin — npm run dev',
+        },
       }),
     )
     socket.emitMessage(
       JSON.stringify({
         type: 'output',
-        event: { ptySessionId: 'pty_1', data: 'hello', seq: 1, processName: 'zsh' },
+        event: { ptySessionId: 'pty_1', terminalSessionId: 'terminal_1', data: 'hello', seq: 1, processName: 'zsh' },
       }),
     )
     socket.emitMessage(
@@ -632,19 +664,31 @@ describe('terminal web host bridge', () => {
     socket.emitMessage(
       JSON.stringify({
         type: 'exit',
-        event: { ptySessionId: 'pty_1' },
+        event: { ptySessionId: 'pty_1', terminalSessionId: 'terminal_1' },
       }),
     )
     socket.emitMessage(
       JSON.stringify({
         type: 'identity',
-        event: { ptySessionId: 'pty_1', controller: null, canonicalCols: 100, canonicalRows: 30 },
+        event: {
+          ptySessionId: 'pty_1',
+          terminalSessionId: 'terminal_1',
+          controller: null,
+          canonicalCols: 100,
+          canonicalRows: 30,
+        },
       }),
     )
     socket.emitMessage(
       JSON.stringify({
         type: 'lifecycle',
-        event: { ptySessionId: 'pty_1', phase: 'open', message: null, takeoverPending: false },
+        event: {
+          ptySessionId: 'pty_1',
+          terminalSessionId: 'terminal_1',
+          phase: 'open',
+          message: null,
+          takeoverPending: false,
+        },
       }),
     )
     socket.emitMessage(
@@ -660,7 +704,13 @@ describe('terminal web host bridge', () => {
       }),
     )
 
-    expect(onOutput).toHaveBeenCalledWith({ ptySessionId: 'pty_1', data: 'hello', seq: 1, processName: 'zsh' })
+    expect(onOutput).toHaveBeenCalledWith({
+      ptySessionId: 'pty_1',
+      terminalSessionId: 'terminal_1',
+      data: 'hello',
+      seq: 1,
+      processName: 'zsh',
+    })
     expect(onBell).toHaveBeenCalledWith({
       ptySessionId: 'pty_1',
       terminalSessionId: 'terminal_1',
@@ -669,10 +719,17 @@ describe('terminal web host bridge', () => {
       processName: 'zsh',
       canonicalTitle: null,
     })
-    expect(onTitle).toHaveBeenCalledWith({ ptySessionId: 'pty_1', canonicalTitle: '~/Developer/goblin — npm run dev' })
-    expect(onExit).toHaveBeenCalledWith({ ptySessionId: 'pty_1' })
+    expect(onTitle).toHaveBeenCalledWith({
+      ptySessionId: 'pty_1',
+      terminalSessionId: 'terminal_1',
+      repoRoot: '/tmp/repo',
+      worktreePath: '/tmp/repo-worktree',
+      canonicalTitle: '~/Developer/goblin — npm run dev',
+    })
+    expect(onExit).toHaveBeenCalledWith({ ptySessionId: 'pty_1', terminalSessionId: 'terminal_1' })
     expect(onIdentity).toHaveBeenCalledWith({
       ptySessionId: 'pty_1',
+      terminalSessionId: 'terminal_1',
       role: 'unowned',
       controllerStatus: 'none',
       canonicalCols: 100,
@@ -680,6 +737,7 @@ describe('terminal web host bridge', () => {
     })
     expect(onLifecycle).toHaveBeenCalledWith({
       ptySessionId: 'pty_1',
+      terminalSessionId: 'terminal_1',
       phase: 'open',
       message: null,
       takeoverPending: false,
@@ -804,7 +862,7 @@ describe('terminal web host bridge', () => {
     socket.emitMessage(
       JSON.stringify({
         type: 'output',
-        event: { ptySessionId: 'pty_1', data: 'hello', seq: 1, processName: 'zsh' },
+        event: { ptySessionId: 'pty_1', terminalSessionId: 'terminal_1', data: 'hello', seq: 1, processName: 'zsh' },
       }),
     )
 
@@ -823,6 +881,7 @@ describe('terminal web host bridge', () => {
     dispose()
     const createPromise = terminalBridge.create({
       repoRoot: '/tmp/repo',
+      repoInstanceId: REPO_INSTANCE_ID,
       branch: 'feature',
       worktreePath: '/tmp/repo',
       kind: 'primary',
@@ -864,18 +923,36 @@ describe('terminal web host bridge', () => {
     firstSocket.emitMessage(
       JSON.stringify({
         type: 'output',
-        event: { ptySessionId: 'term_old', data: 'stale', seq: 1, processName: 'zsh' },
+        event: {
+          ptySessionId: 'term_old',
+          terminalSessionId: 'terminal_old',
+          data: 'stale',
+          seq: 1,
+          processName: 'zsh',
+        },
       }),
     )
     secondSocket.emitMessage(
       JSON.stringify({
         type: 'output',
-        event: { ptySessionId: 'term_new', data: 'fresh', seq: 2, processName: 'zsh' },
+        event: {
+          ptySessionId: 'term_new',
+          terminalSessionId: 'terminal_new',
+          data: 'fresh',
+          seq: 2,
+          processName: 'zsh',
+        },
       }),
     )
 
     expect(onOutput).toHaveBeenCalledTimes(1)
-    expect(onOutput).toHaveBeenCalledWith({ ptySessionId: 'term_new', data: 'fresh', seq: 2, processName: 'zsh' })
+    expect(onOutput).toHaveBeenCalledWith({
+      ptySessionId: 'term_new',
+      terminalSessionId: 'terminal_new',
+      data: 'fresh',
+      seq: 2,
+      processName: 'zsh',
+    })
     dispose()
     vi.useRealTimers()
   })

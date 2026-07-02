@@ -32,6 +32,23 @@ describe('repo session hydration', () => {
     })
   })
 
+  test('hydrateRepoSession binds server runtime ids to the canonical repo root', async () => {
+    const subdir = `${REPO_A}/src`
+    const calls = installGoblin({
+      probe: (path: string) => ({ ok: true, root: path === subdir ? REPO_A : path, name: 'repo-a' }),
+    })
+
+    await useReposStore.getState().hydrateRepoSession([localRepoSessionEntry(subdir)], REPO_A)
+
+    expect(useReposStore.getState().repos[subdir]).toBeUndefined()
+    const repo = useReposStore.getState().repos[REPO_A]
+    expect(repo).toBeDefined()
+    expect(repo?.instanceId).toMatch(/^repo-instance-/)
+    await vi.waitFor(() => {
+      expect(calls.composite).toEqual([REPO_A])
+    })
+  })
+
   test('hydrateRepoSession uses cached repo data while the initial refresh runs', async () => {
     const savedAt = Date.now()
     useReposStore.setState({
@@ -129,33 +146,30 @@ describe('repo session hydration', () => {
     const work = useReposStore
       .getState()
       .hydrateRepoSession([localRepoSessionEntry(REPO_A), localRepoSessionEntry(REPO_B)], REPO_A)
-    // Placeholder repos are inserted synchronously before any probe runs,
-    // so REPO_A's cached projection is visible immediately.
+    // Local hydrate is server-first: the repo becomes visible after
+    // the server canonicalizes the input and returns the authoritative
+    // repoInstanceId. A slower sibling must not block this repo's
+    // cached projection from rendering.
     await vi.waitFor(() => {
-      const cachedRepo = useReposStore.getState().repos[REPO_A]
-      expect(cachedRepo?.projection.source).toBe('cache')
-      expect(useReposStore.getState().activeId).toBe(REPO_A)
-      expect(useReposStore.getState().sessionReady).toBe(true)
+      expect(probes.has(REPO_A)).toBe(true)
     })
-
-    // Slow probe on REPO_B shouldn't block sessionReady or REPO_A's view.
     probes.get(REPO_A)?.({ ok: true, root: REPO_A, name: 'repo-a' })
     await flushIpc()
 
     await vi.waitFor(() => {
-      // The probe resolution promotes REPO_A into the resolved branch:
-      // addResolvedRepo kicks off refreshInitialRepoState, which fires
-      // a core-data-changed intent. Until the (hanging) snapshot resolves,
-      // the cached branches stay rendered but the repo is now an active
-      // workspace member rather than a placeholder.
       const repo = useReposStore.getState().repos[REPO_A]
       expect(repo).toBeDefined()
       expect(repo?.data.branches.map((b) => b.name)).toEqual(['cached'])
       // Local repos read as 'connected' under deriveConnectivity; the
       // meaningful invariant is just that the repo stays in the store.
       expect(deriveConnectivity(repo!)).toBe('connected')
+      expect(useReposStore.getState().activeId).toBe(REPO_A)
+      expect(useReposStore.getState().sessionReady).toBe(false)
     })
 
+    await vi.waitFor(() => {
+      expect(probes.has(REPO_B)).toBe(true)
+    })
     probes.get(REPO_B)?.({ ok: true, root: REPO_B, name: 'repo-b' })
     await work
 
@@ -203,14 +217,15 @@ describe('repo session hydration', () => {
     })
 
     await vi.waitFor(() => {
-      const repo = useReposStore.getState().repos[REPO_A]
-      expect(useReposStore.getState().sessionReady).toBe(true)
-      expect(repo?.projection.source).toBe('cache')
-      expect(repo?.ui.preferredWorkspacePaneTabByTarget).toEqual({})
+      expect(probes.has(REPO_A)).toBe(true)
     })
-
     probes.get(REPO_A)?.({ ok: true, root: REPO_A, name: 'repo-a' })
     await work
+
+    const repo = useReposStore.getState().repos[REPO_A]
+    expect(useReposStore.getState().sessionReady).toBe(true)
+    expect(repo?.projection.source).toBe('cache')
+    expect(repo?.ui.preferredWorkspacePaneTabByTarget).toEqual({})
   })
 
   test('hydrateRepoSession keeps a user-selected active repo when boot probing settles later', async () => {
@@ -261,20 +276,16 @@ describe('repo session hydration', () => {
     expect(deriveConnectivity(repo!)).toBe('connected')
   })
 
-  test('hydrateRepoSession restores unavailable repos as workspace entries', async () => {
+  test('hydrateRepoSession does not restore local failures with fake runtime authority', async () => {
     installGoblin()
 
     await useReposStore
       .getState()
       .hydrateRepoSession([localRepoSessionEntry(REPO_A), localRepoSessionEntry('/missing')], '/missing')
 
-    expect(useReposStore.getState().order).toEqual([REPO_A, '/missing'])
-    expect(useReposStore.getState().activeId).toBe('/missing')
-    expect(useReposStore.getState().repos['/missing']).toMatchObject({
-      id: '/missing',
-      name: 'missing',
-      availability: { phase: 'unavailable', reason: 'missing' },
-    })
+    expect(useReposStore.getState().order).toEqual([REPO_A])
+    expect(useReposStore.getState().activeId).toBe(REPO_A)
+    expect(useReposStore.getState().repos['/missing']).toBeUndefined()
   })
 
   test('hydrateRepoSession limits concurrent repo probes', async () => {
@@ -295,10 +306,10 @@ describe('repo session hydration', () => {
     })
 
     const work = useReposStore.getState().hydrateRepoSession(repos.map(localRepoSessionEntry), null)
-    for (let i = 0; i < 5 && resolvers.length < 4; i += 1) await Promise.resolve()
-
-    expect(maxActive).toBe(4)
-    expect(resolvers).toHaveLength(4)
+    await vi.waitFor(() => {
+      expect(maxActive).toBe(4)
+      expect(resolvers).toHaveLength(4)
+    })
 
     resolvers.splice(0).forEach((resolve) => resolve())
     for (let i = 0; i < 20 && resolvers.length < 2; i += 1) await Promise.resolve()
@@ -393,9 +404,10 @@ describe('repo session hydration', () => {
         signal: controller.signal,
       })
 
-    // Phase 1 (placeholder insertion) is synchronous and runs before
-    // any probe check, so the placeholders and sessionReady are intact.
-    expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
+    // Server-first hydrate now establishes runtime authority before
+    // inserting placeholders. An already-aborted boot run therefore
+    // short-circuits before either placeholder or probe work starts.
+    expect(useReposStore.getState().order).toEqual([])
     expect(useReposStore.getState().sessionReady).toBe(true)
     // But the probe handler was never invoked because the abort check
     // fires before resolveRepoPath is called.
@@ -406,17 +418,50 @@ describe('repo session hydration', () => {
     // resolved target should not be applied.
     pending.splice(0).forEach((resolve) => resolve())
     await flushIpc()
-    // After abort, the local-probe path is short-circuited
-    // (the abort check in `resolveRepoPath` fires before
-    // the probe runs). The placeholder stays in the store
-    // with its initial `lifecycle: null` (local repos don't
-    // carry a lifecycle). The aborted probe is dropped without
-    // writing any state — there's no equivalent of the
-    // orchestrator's "no orphaned connecting" invariant
-    // here, because local repos don't have a `connecting`
-    // projection in the first place.
-    expect(useReposStore.getState().repos[REPO_A]?.remote.lifecycle).toBeNull()
-    expect(useReposStore.getState().repos[REPO_B]?.remote.lifecycle).toBeNull()
+    // The aborted canonical-open path is dropped without writing
+    // any repo state.
+    expect(useReposStore.getState().repos[REPO_A]?.remote.lifecycle).toBeUndefined()
+    expect(useReposStore.getState().repos[REPO_B]?.remote.lifecycle).toBeUndefined()
+  })
+
+  test('hydrateRepoSession rolls back runtime-open when abort lands before placeholder commit', async () => {
+    let releaseRuntimeOpen!: () => void
+    let runtimeOpenResolved = false
+    let runtimeCloseCount = 0
+    installGoblin({
+      'repo.runtimeOpen': async () => {
+        await new Promise<void>((resolve) => {
+          releaseRuntimeOpen = () => {
+            runtimeOpenResolved = true
+            resolve()
+          }
+        })
+        return {
+          ok: true as const,
+          repo: { id: REPO_A, name: 'repo-a' },
+          repoInstanceId: 'repo-instance-test',
+        }
+      },
+      'repo.runtimeClose': async () => {
+        runtimeCloseCount += 1
+        return { ok: true as const, closed: true }
+      },
+    })
+    const controller = new AbortController()
+    const work = useReposStore.getState().hydrateRepoSession([localRepoSessionEntry(REPO_A)], REPO_A, {
+      signal: controller.signal,
+    })
+
+    await vi.waitFor(() => {
+      expect(releaseRuntimeOpen).toBeTypeOf('function')
+    })
+    controller.abort()
+    releaseRuntimeOpen()
+    await work
+
+    expect(runtimeOpenResolved).toBe(true)
+    expect(runtimeCloseCount).toBe(1)
+    expect(useReposStore.getState().order).toEqual([])
   })
 })
 

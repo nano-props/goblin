@@ -134,14 +134,14 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
   // Shared post-write effects for actions that may have updated preferred workspace pane tab/branch:
   // persist the warm-restore snapshot and refresh the visible branch's pull
   // request. Centralized so every selection-changing action stays consistent.
-  function afterSelectionChange(id: string, token: number, branchForPullRequest: string | null): void {
+  function afterSelectionChange(id: string, repoInstanceId: string, branchForPullRequest: string | null): void {
     const repo = get().repos[id]
     if (!repo) return
-    persistRepoSnapshotCacheEntry(set, repo, token)
+    persistRepoSnapshotCacheEntry(set, repo, repoInstanceId)
     void runRepoRefreshIntent(get, {
       kind: 'visible-pull-request-changed',
       id,
-      token,
+      repoInstanceId,
       branch: branchForPullRequest,
     })
   }
@@ -150,12 +150,12 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
     setBranchViewMode(id: string, viewMode: BranchViewMode) {
       let changed = false
       let selectedForPullRequest: string | null = null
-      let token: number | undefined
+      let repoInstanceId: string | undefined
       set((s) => {
         const repo = s.repos[id]
         if (!repo || repo.ui.branchViewMode === viewMode) return s
         changed = true
-        token = repo.instanceToken
+        repoInstanceId = repo.instanceId
         const selectedBranch = selectedBranchForViewMode(repo, viewMode)
         const selectionChanged = selectedBranch !== repo.ui.selectedBranch
         selectedForPullRequest = selectionChanged ? selectedBranch : null
@@ -164,7 +164,7 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
           r.ui.selectedBranch = selectedBranch
         })
       })
-      if (changed && token !== undefined) afterSelectionChange(id, token, selectedForPullRequest)
+      if (changed && repoInstanceId !== undefined) afterSelectionChange(id, repoInstanceId, selectedForPullRequest)
     },
 
     setWorkspacePaneTab(id: string, tab: WorkspacePaneTabType) {
@@ -172,7 +172,7 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
       // Opening/closing branch tabs is owned by explicit open/close actions;
       // this action only changes selection intent.
       let changed = false
-      let token: number | undefined
+      let repoInstanceId: string | undefined
       set((s) => {
         const repo = s.repos[id]
         if (!repo) return s
@@ -180,51 +180,51 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
         const current = preferredWorkspacePaneTabForTarget(repo.ui, target)
         if (!target || current === tab) return s
         changed = true
-        token = repo.instanceToken
+        repoInstanceId = repo.instanceId
         return replaceRepoState(s, repo, (r) => {
           r.ui.preferredWorkspacePaneTabByTarget = preferredWorkspacePaneTabByTargetRecordWith(r.ui, target, tab)
         })
       })
-      if (!changed || token === undefined) return
+      if (!changed || repoInstanceId === undefined) return
       const repo = get().repos[id]
       const target = repo ? workspacePaneTabsTargetForRepoBranch(repo, repo.ui.selectedBranch) : null
       afterSelectionChange(
         id,
-        token,
+        repoInstanceId,
         repo && target && preferredWorkspacePaneTabForTarget(repo.ui, target) === 'status' ? repo.ui.selectedBranch : null,
       )
     },
 
     selectBranch(id: string, branch: string) {
       let changed = false
-      let token: number | undefined
+      let repoInstanceId: string | undefined
       set((s) => {
         const repo = s.repos[id]
         if (!repo) return s
         if (!repo.data.branches.some((b) => b.name === branch)) return s
         if (repo.ui.selectedBranch === branch) return s
         changed = true
-        token = repo.instanceToken
+        repoInstanceId = repo.instanceId
         return replaceRepoState(s, repo, (r) => {
           r.ui.selectedBranch = branch
         })
       })
-      if (changed && token !== undefined) afterSelectionChange(id, token, branch)
+      if (changed && repoInstanceId !== undefined) afterSelectionChange(id, repoInstanceId, branch)
     },
 
     clearSelectedBranch(id: string) {
       let changed = false
-      let token: number | undefined
+      let repoInstanceId: string | undefined
       set((s) => {
         const repo = s.repos[id]
         if (!repo || repo.ui.selectedBranch === null) return s
         changed = true
-        token = repo.instanceToken
+        repoInstanceId = repo.instanceId
         return replaceRepoState(s, repo, (r) => {
           r.ui.selectedBranch = null
         })
       })
-      if (changed && token !== undefined) afterSelectionChange(id, token, null)
+      if (changed && repoInstanceId !== undefined) afterSelectionChange(id, repoInstanceId, null)
     },
   }
 }

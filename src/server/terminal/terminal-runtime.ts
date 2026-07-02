@@ -29,6 +29,8 @@ import { type PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 import { type ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 import type { GoblinTerminalCommandRuntime } from '#/server/terminal/g-command.ts'
 import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
+import { onRepoRuntimeInstanceClosed } from '#/server/modules/repo-runtime-instances.ts'
+import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 
 // Intentionally long TTL: we want terminals to survive as long as possible in
 // the background so users can leave builds or long-running tasks unattended.
@@ -105,6 +107,13 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     },
     gCommand: options.gCommand,
   })
+  const unsubscribeRepoRuntimeInstanceClosed = onRepoRuntimeInstanceClosed((event) => {
+    const scope = terminalSessionRuntimeScope(event.repoRoot, event.repoInstanceId)
+    manager.closeSessionsForRepo(event.userId, scope)
+    workspaceTabs.closeSessionsForScope(event.userId, scope)
+    broadcastRepoSessionsChanged(event.userId, event.repoRoot)
+    broadcastRepoWorkspaceTabsChanged(event.userId, event.repoRoot)
+  })
 
   const bufferedSocketByRawSocket = new WeakMap<TerminalRealtimeSocket, BufferedTerminalSocket>()
   let shuttingDown = false
@@ -174,11 +183,11 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     async close(clientId, userId, input) {
       return await actions.close(clientId, userId, input)
     },
-    async listSessions(clientId, userId, repoRoot) {
-      return await actions.listSessions(clientId, userId, repoRoot)
+    async listSessions(clientId, userId, input) {
+      return await actions.listSessions(clientId, userId, input)
     },
-    async listWorkspaceTabs(clientId, userId, repoRoot) {
-      return await actions.listWorkspaceTabs(clientId, userId, repoRoot)
+    async listWorkspaceTabs(clientId, userId, input) {
+      return await actions.listWorkspaceTabs(clientId, userId, input)
     },
     async create(clientId, userId, input) {
       return await actions.create(clientId, userId, input)
@@ -189,8 +198,8 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     async updateTabs(clientId, userId, input) {
       return await actions.updateTabs(clientId, userId, input)
     },
-    async prune(clientId, userId, repoRoot) {
-      return await actions.prune(clientId, userId, repoRoot)
+    async prune(clientId, userId, input) {
+      return await actions.prune(clientId, userId, input)
     },
     handleRealtimeMessage(clientId, userId, socket, payload) {
       // Log invalid identifier/parse drops so a stuck takeover
@@ -249,6 +258,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     shutdown() {
       if (shuttingDown) return
       shuttingDown = true
+      unsubscribeRepoRuntimeInstanceClosed()
       coordinator.shutdown()
       manager.closeAll()
       ptySupervisor.shutdown()

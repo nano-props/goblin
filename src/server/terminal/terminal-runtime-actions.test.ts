@@ -1,6 +1,10 @@
 // @vitest-environment node
 
 import { describe, expect, test, vi } from 'vitest'
+import {
+  clearRepoRuntimeInstancesForUser,
+  openRepoRuntimeInstance,
+} from '#/server/modules/repo-runtime-instances.ts'
 import { createTerminalRuntimeActions } from '#/server/terminal/terminal-runtime-actions.ts'
 
 const CLIENT_ID = 'client_terminal_actions'
@@ -9,6 +13,8 @@ const CLIENT_ID = 'client_terminal_actions'
 // manager. The test stub uses a fixed value so the assertions
 // don't have to mock the derivation helper.
 const USER_ID = 'user_terminal_actions'
+const REPO_ROOT = '/repo'
+let REPO_INSTANCE_ID = ''
 // 16+ alphanumerics, matches TERMINAL_PTY_SESSION_ID_RE in
 // shared/terminal-validators.ts.
 const PTY_SESSION_ID = 'session_aaaaaaaaaaaaaa'
@@ -23,14 +29,12 @@ function makeActions(
 ) {
   const broadcasts = options.broadcasts ?? vi.fn()
   const manager = {
-    getSessionScope: vi.fn((_userId: string, ptySessionId: string) =>
-      options.getSlotScope ? options.getSlotScope(_userId, ptySessionId) : undefined,
-    ),
     getSessionSummaryForUser: vi.fn((userId: string, ptySessionId: string) =>
       options.getSlotScope?.(userId, ptySessionId)
         ? ({
             ptySessionId,
             terminalSessionId: 'terminal-session-1',
+            repoInstanceId: REPO_INSTANCE_ID,
             repoRoot: options.getSlotScope(userId, ptySessionId),
             worktreePath: '/repo',
             cwd: '/repo',
@@ -78,8 +82,14 @@ function makeActions(
   }
 }
 
+function syncCurrentRepoInstance(): void {
+  REPO_INSTANCE_ID = openRepoRuntimeInstance(USER_ID, REPO_ROOT)
+}
+
 describe('terminal-runtime-actions close broadcast', () => {
   test('emits workspace tab invalidation after a successful create', async () => {
+    clearRepoRuntimeInstancesForUser(USER_ID)
+    syncCurrentRepoInstance()
     const { actions, broadcasts, sessionService } = makeActions()
     sessionService.create.mockResolvedValue({
       ok: true,
@@ -102,6 +112,7 @@ describe('terminal-runtime-actions close broadcast', () => {
     await expect(
       actions.create(CLIENT_ID, USER_ID, {
         repoRoot: '/repo',
+        repoInstanceId: REPO_INSTANCE_ID,
         branch: 'feature/worktree',
         worktreePath: '/repo',
         kind: 'additional',
@@ -112,12 +123,15 @@ describe('terminal-runtime-actions close broadcast', () => {
   })
 
   test('does not emit workspace tab invalidation after a failed create', async () => {
+    clearRepoRuntimeInstancesForUser(USER_ID)
+    syncCurrentRepoInstance()
     const { actions, broadcasts, sessionService } = makeActions()
     sessionService.create.mockResolvedValue({ ok: false, message: 'error.invalid-arguments' })
 
     await expect(
       actions.create(CLIENT_ID, USER_ID, {
         repoRoot: '/repo',
+        repoInstanceId: REPO_INSTANCE_ID,
         branch: 'feature/worktree',
         worktreePath: '/repo',
         kind: 'additional',
@@ -215,11 +229,14 @@ describe('terminal-runtime-actions close broadcast', () => {
 
 describe('terminal-runtime-actions workspace tabs broadcast', () => {
   test('emits a workspace tabs invalidation after replaceTabs succeeds', async () => {
+    clearRepoRuntimeInstancesForUser(USER_ID)
+    syncCurrentRepoInstance()
     const { actions, broadcasts } = makeActions({ closeSessionForUser: () => false })
 
     await expect(
       actions.replaceTabs(CLIENT_ID, USER_ID, {
         repoRoot: '/repo',
+        repoInstanceId: REPO_INSTANCE_ID,
         branchName: 'feature/worktree',
         worktreePath: '/repo',
         tabs: [{ type: 'status', tabId: 'workspace-pane:status' }],
@@ -234,11 +251,14 @@ describe('terminal-runtime-actions workspace tabs broadcast', () => {
   })
 
   test('rejects invalid replaceTabs input without emitting', async () => {
+    clearRepoRuntimeInstancesForUser(USER_ID)
+    syncCurrentRepoInstance()
     const { actions, broadcasts } = makeActions({ closeSessionForUser: () => false })
 
     await expect(
       actions.replaceTabs(CLIENT_ID, USER_ID, {
         repoRoot: '',
+        repoInstanceId: REPO_INSTANCE_ID,
         branchName: 'feature/worktree',
         worktreePath: '/repo',
         tabs: [{ type: 'status', tabId: 'workspace-pane:status' }],
@@ -249,11 +269,14 @@ describe('terminal-runtime-actions workspace tabs broadcast', () => {
   })
 
   test('emits a workspace tabs invalidation after updateTabs succeeds', async () => {
+    clearRepoRuntimeInstancesForUser(USER_ID)
+    syncCurrentRepoInstance()
     const { actions, broadcasts } = makeActions({ closeSessionForUser: () => false })
 
     await expect(
       actions.updateTabs(CLIENT_ID, USER_ID, {
         repoRoot: '/repo',
+        repoInstanceId: REPO_INSTANCE_ID,
         branchName: 'feature/worktree',
         worktreePath: '/repo',
         operation: { type: 'open-static', tabType: 'status' },
@@ -265,6 +288,22 @@ describe('terminal-runtime-actions workspace tabs broadcast', () => {
       type: 'workspace-tabs-changed',
       repoRoot: '/repo',
     })
+  })
+
+  test('rejects stale repo-instance prune requests before touching session state', async () => {
+    clearRepoRuntimeInstancesForUser(USER_ID)
+    syncCurrentRepoInstance()
+    const { actions, broadcasts, sessionService } = makeActions({ closeSessionForUser: () => false })
+
+    await expect(
+      actions.prune(CLIENT_ID, USER_ID, {
+        repoRoot: '/repo',
+        repoInstanceId: 'repo-instance-stale',
+      }),
+    ).rejects.toThrow('error.repo-instance-stale')
+
+    expect(sessionService.prune).not.toHaveBeenCalled()
+    expect(broadcasts).not.toHaveBeenCalled()
   })
 })
 
@@ -337,7 +376,7 @@ describe('terminal-runtime-actions clientId gate', () => {
       message: 'error.invalid-arguments',
     })
 
-    expect(manager.getSessionScope).not.toHaveBeenCalled()
+    expect(manager.getSessionSummaryForUser).not.toHaveBeenCalled()
     expect(manager.restartSession).not.toHaveBeenCalled()
   })
 })

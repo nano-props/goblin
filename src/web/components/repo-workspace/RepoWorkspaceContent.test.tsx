@@ -3,7 +3,7 @@
 import type { ComponentProps } from 'react'
 import { act, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { RepoWorkspaceContent } from '#/web/components/repo-workspace/RepoWorkspaceContent.tsx'
 import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
 import { getSelectedRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
@@ -19,8 +19,16 @@ import type {
   TerminalSessionReadContextValue,
   TerminalWorktreeSnapshot,
 } from '#/web/components/terminal/types.ts'
-import { createBranchSnapshot, createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import {
+  createBranchSnapshot,
+  createRepoBranch,
+  installWorkspacePaneTabsTestBridge,
+  resetReposStore,
+  seedRepoState,
+} from '#/web/test-utils/bridge.ts'
+import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
+import { tabOpenerScopeKey } from '#/web/stores/repos/tab-opener.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
@@ -66,11 +74,16 @@ function RepoWorkspaceContentInner(props: RepoWorkspaceContentHarnessProps) {
 
 beforeEach(() => {
   resetReposStore()
+  installWorkspacePaneTabsTestBridge()
   useRepoSyncStore.setState({ ready: new Map(), timestamps: new Map() })
   repoClientMocks.getRepoLog.mockResolvedValue([])
   repoClientMocks.openRepoUrl.mockResolvedValue({ ok: true, message: '' })
   filetreeClientMocks.getRepositoryTree.mockResolvedValue({ nodes: [], truncated: false })
   filetreeClientMocks.getRepositoryFileViewer.mockResolvedValue({ viewer: 'bat', shell: 'posix' })
+})
+
+afterEach(() => {
+  setClientBridgeForTests(null)
 })
 
 describe('RepoWorkspaceContent', () => {
@@ -582,7 +595,7 @@ describe('RepoWorkspaceContent', () => {
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { 'feature/terminal-empty': [staticEntry('status')] },
     })
-    useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceToken)
+    useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceId)
     const detail = getSelectedRepoWorkspacePresentation(repo)
 
     const { container } = renderInJsdom(
@@ -612,7 +625,7 @@ describe('RepoWorkspaceContent', () => {
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { 'feature/terminal-pending': [staticEntry('status')] },
     })
-    useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceToken)
+    useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceId)
     const detail = getSelectedRepoWorkspacePresentation(repo)
     const registerHost = vi.fn()
     const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
@@ -654,7 +667,7 @@ describe('RepoWorkspaceContent', () => {
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { [branchName]: [] },
     })
-    useRepoSyncStore.getState().markReady(REPO_ID, seededRepo.instanceToken)
+    useRepoSyncStore.getState().markReady(REPO_ID, seededRepo.instanceId)
     const repo = useReposStore.getState().repos[REPO_ID]!
     const detail = getSelectedRepoWorkspacePresentation(repo)
     const registerHost = vi.fn()
@@ -735,7 +748,7 @@ describe('RepoWorkspaceContent', () => {
         'feature/terminal-reordered': [terminalEntry('t2'), staticEntry('status'), terminalEntry('t1')],
       },
     })
-    useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceToken)
+    useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceId)
     const detail = getSelectedRepoWorkspacePresentation(repo)
     const registerHost = vi.fn()
     const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
@@ -787,13 +800,20 @@ describe('RepoWorkspaceContent', () => {
       branches: [createRepoBranch(branchName, { worktree: { path: worktreePath } })],
       selectedBranch: branchName,
       preferredWorkspacePaneTab: 'files',
-      workspacePaneTabsByBranch: { [branchName]: [staticEntry('files')] },
+      workspacePaneTabsByBranch: { [branchName]: [staticEntry('files'), staticEntry('status')] },
     })
-    useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceToken)
+    useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceId)
     const detail = getSelectedRepoWorkspacePresentation(repo)
     const createTerminal = vi.fn(async () => 'session-1')
     const writeInput = vi.fn()
     const showRepoWorkspacePaneTab = vi.fn()
+    let resolveViewer!: (value: { viewer: 'bat'; shell: 'posix' }) => void
+    filetreeClientMocks.getRepositoryFileViewer.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveViewer = resolve
+        }),
+    )
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
 
     renderInJsdom(
@@ -815,13 +835,27 @@ describe('RepoWorkspaceContent', () => {
       row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
       await Promise.resolve()
     })
+    useReposStore.getState().setWorkspacePaneTab(REPO_ID, 'status')
+    await act(async () => {
+      resolveViewer({ viewer: 'bat', shell: 'posix' })
+      await Promise.resolve()
+    })
 
     expect(showRepoWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'terminal')
     expect(createTerminal).toHaveBeenCalledWith(
-      { repoRoot: REPO_ID, branch: branchName, worktreePath },
+      { repoRoot: REPO_ID, repoInstanceId: repo.instanceId, branch: branchName, worktreePath },
       { startupShellCommand: "bat --paging=never --style=plain '/tmp/filetree-open-worktree/README.md'\r" },
     )
     expect(writeInput).not.toHaveBeenCalled()
+
+    // Chrome-tab-style opener tracking: the terminal this opened should be
+    // attributed to "files" (the only tab open, and active, when the file
+    // was double-clicked), scoped to this branch.
+    expect(
+      useReposStore.getState().tabOpenerIdentityByScope[tabOpenerScopeKey(REPO_ID, branchName)]?.[
+        'terminal:session-1'
+      ],
+    ).toBe('workspace-pane:files')
   })
 
   test('falls back to status when a branch preference names a closed tab', async () => {

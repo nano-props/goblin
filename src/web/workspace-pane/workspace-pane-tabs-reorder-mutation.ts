@@ -24,6 +24,7 @@ import {
 
 export interface WorkspacePaneTabsReorderMutationInput {
   repoRoot: string
+  repoInstanceId: string
   branchName: string | null
   worktreePath: string | null
   canonicalTabs: readonly WorkspacePaneTabEntry[]
@@ -43,6 +44,7 @@ export function useWorkspacePaneTabsReorderMutation(
       input.branchName
         ? {
             repoRoot: input.repoRoot,
+            repoInstanceId: input.repoInstanceId,
             branchName: input.branchName,
             worktreePath: input.worktreePath,
           }
@@ -61,16 +63,19 @@ export function useWorkspacePaneTabsReorderMutation(
       if (nextIdentity === canonicalTabsIdentity) return
       const draggedTabs = [...tabs]
       void runWorkspacePaneTabsOperation(target, async () => {
-        await cancelWorkspacePaneTabs(target.repoRoot, queryClient)
+        await cancelWorkspacePaneTabs(target.repoRoot, target.repoInstanceId, queryClient)
         const currentTabs = readWorkspacePaneTabsForTarget(target, queryClient)
         const nextTabs = workspacePaneTabsWithDraggedOrder(currentTabs, draggedTabs)
         if (workspacePaneTabEntryListIdentity(nextTabs) === workspacePaneTabEntryListIdentity(currentTabs)) return
         const previousTargetEntry = queryClient
-          .getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(target.repoRoot))
+          .getQueryData<WorkspacePaneTabsQueryData>(
+            workspacePaneTabsQueryKey(target.repoRoot, target.repoInstanceId),
+          )
           ?.find((entry) => workspacePaneTabsEntryMatchesTarget(entry, target))
         setWorkspacePaneTabsForTargetQueryData(
           {
             repoRoot: target.repoRoot,
+            repoInstanceId: target.repoInstanceId,
             branchName: target.branchName,
             worktreePath: target.worktreePath,
             tabs: nextTabs,
@@ -80,6 +85,7 @@ export function useWorkspacePaneTabsReorderMutation(
         try {
           const serverTabs = await updateWorkspacePaneTabsOnServer({
             repoRoot: target.repoRoot,
+            repoInstanceId: target.repoInstanceId,
             branchName: target.branchName,
             worktreePath: target.worktreePath,
             operation: { type: 'reorder', tabIdentities: draggedTabs.map(workspacePaneTabEntryIdentity) },
@@ -87,6 +93,7 @@ export function useWorkspacePaneTabsReorderMutation(
           await writeCanonicalWorkspacePaneTabsForTarget(
             {
               repoRoot: target.repoRoot,
+              repoInstanceId: target.repoInstanceId,
               branchName: target.branchName,
               worktreePath: target.worktreePath,
               tabs: serverTabs,
@@ -95,7 +102,7 @@ export function useWorkspacePaneTabsReorderMutation(
           )
         } catch (err) {
           restoreWorkspacePaneTabsTargetQueryData(target, previousTargetEntry, queryClient)
-          invalidateWorkspacePaneTabs(target.repoRoot, queryClient)
+          invalidateWorkspacePaneTabs(target.repoRoot, target.repoInstanceId, queryClient)
           reportWorkspacePaneTabsFailure({
             operation: 'reorder',
             repoRoot: target.repoRoot,
@@ -116,14 +123,18 @@ export function useWorkspacePaneTabsReorderMutation(
 function restoreWorkspacePaneTabsTargetQueryData(
   target: {
     repoRoot: string
+    repoInstanceId: string
     branchName: string
     worktreePath: string | null
   },
   previousTargetEntry: WorkspacePaneTabsQueryData[number] | undefined,
   queryClient: QueryClient,
 ): void {
-  queryClient.setQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(target.repoRoot), (current) => [
+  queryClient.setQueryData<WorkspacePaneTabsQueryData>(
+    workspacePaneTabsQueryKey(target.repoRoot, target.repoInstanceId),
+    (current) => [
     ...(current ?? []).filter((entry) => !workspacePaneTabsEntryMatchesTarget(entry, target)),
     ...(previousTargetEntry ? [previousTargetEntry] : []),
-  ])
+    ],
+  )
 }

@@ -24,7 +24,7 @@ export interface RepoWorkspaceTabModelInputState {
 }
 
 export function useRepoWorkspaceTabModel(
-  repo: Pick<RepoWorkspaceRepo, 'id' | 'ui'>,
+  repo: Pick<RepoWorkspaceRepo, 'id' | 'instanceId' | 'ui'>,
   detail: SelectedRepoWorkspacePresentation,
 ) {
   const { input, selectedTerminalSessionId } = useRepoWorkspaceTabModelInput(repo, detail)
@@ -39,7 +39,7 @@ export function useRepoWorkspaceTabModel(
  * projection.
  */
 export function useRepoWorkspaceTabModelInput(
-  repo: Pick<RepoWorkspaceRepo, 'id' | 'ui'>,
+  repo: Pick<RepoWorkspaceRepo, 'id' | 'instanceId' | 'ui'>,
   detail: SelectedRepoWorkspacePresentation,
 ): RepoWorkspaceTabModelInputState {
   const { branch } = detail
@@ -50,7 +50,7 @@ export function useRepoWorkspaceTabModelInput(
   const terminalSessionSummaries = useTerminalSessionSummaries(terminalWorktreeKey)
   const terminalCreatePending = useTerminalWorktreePendingCreate(terminalWorktreeKey)
   const terminalSyncReady = useTerminalRepoSyncReady(repo.id)
-  const workspacePaneTabsQuery = useWorkspacePaneTabsQuery(repo.id)
+  const workspacePaneTabsQuery = useWorkspacePaneTabsQuery(repo.id, repo.instanceId)
   const selectedTerminalSessionId = useReposStore((s) =>
     terminalWorktreeKey ? s.selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey] : undefined,
   )
@@ -62,7 +62,7 @@ export function useRepoWorkspaceTabModelInput(
         branchName,
         worktreePath,
       }),
-    [workspacePaneTabsQuery.data, repo.id, branchName, worktreePath],
+    [workspacePaneTabsQuery.data, repo.id, repo.instanceId, branchName, worktreePath],
   )
 
   const preferredTab = useMemo(

@@ -8,6 +8,11 @@
 // protocol types in `shared/terminal-types.ts`.
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import {
+  clearRepoRuntimeInstancesForUser,
+  closeRepoRuntimeInstance,
+  openRepoRuntimeInstance,
+} from '#/server/modules/repo-runtime-instances.ts'
 import { getWorktrees } from '#/system/git/worktrees.ts'
 import { resolveRemoteTarget } from '#/system/ssh/config.ts'
 import { createInProcessPtySupervisor } from '#/server/terminal/pty-supervisor-inprocess.ts'
@@ -22,6 +27,10 @@ import type { WorktreeInfo } from '#/shared/git-types.ts'
 // derivation helper.
 const USER_1 = 'user_terminal_runtime'
 const USER_2 = 'user_terminal_runtime_second'
+const REPO_ROOT = '/repo'
+let REPO_INSTANCE_ID = ''
+let SSH_REPO_INSTANCE_ID = ''
+let USER_2_REPO_INSTANCE_ID = ''
 const TEST_NOW = new Date('2026-06-24T00:00:00Z')
 const DETACHED_TTL_MS = 24 * 60 * 60 * 1000
 const HEARTBEAT_SILENCE_MS = HEARTBEAT_DEADLINE_MS + HEARTBEAT_INTERVAL_MS
@@ -103,6 +112,10 @@ interface RuntimeHandle {
 
 function buildRuntime(): RuntimeHandle {
   const runtime = createServerTerminalRuntime({ ptySupervisor: createInProcessPtySupervisor() })
+  REPO_INSTANCE_ID = openRepoRuntimeInstance(USER_1, REPO_ROOT)
+  SSH_REPO_INSTANCE_ID = openRepoRuntimeInstance(USER_1, 'ssh-config://prod/srv/repo')
+  USER_2_REPO_INSTANCE_ID = openRepoRuntimeInstance(USER_2, REPO_ROOT)
+  openRepoRuntimeInstance(USER_2, 'ssh-config://prod/srv/repo')
   return {
     host: runtime.host,
     shutdown: () => runtime.shutdown(),
@@ -115,6 +128,8 @@ beforeEach(() => {
   mockPtys.length = 0
   mockDataToEmitOnRegistration = null
   vi.clearAllMocks()
+  clearRepoRuntimeInstancesForUser(USER_1)
+  clearRepoRuntimeInstancesForUser(USER_2)
 })
 
 function createDeferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
@@ -129,13 +144,16 @@ async function flushPromiseQueue(): Promise<void> {
   for (let i = 0; i < 5; i++) await Promise.resolve()
 }
 
-function sentSocketMessages(socket: { send: ReturnType<typeof vi.fn> }): Array<{ type?: string; [key: string]: unknown }> {
+function sentSocketMessages(socket: {
+  send: ReturnType<typeof vi.fn>
+}): Array<{ type?: string; [key: string]: unknown }> {
   return socket.send.mock.calls.map(([payload]) => JSON.parse(String(payload)))
 }
 
 async function createTerminalSession(host: ServerTerminalHost, clientId: string, userId = USER_1): Promise<string> {
   const result = await host.create(clientId, userId, {
-    repoRoot: '/repo',
+    repoRoot: REPO_ROOT,
+    repoInstanceId: REPO_INSTANCE_ID,
     branch: 'feature',
     worktreePath: '/repo-linked',
     kind: 'additional',
@@ -150,12 +168,13 @@ async function createTerminalSession(host: ServerTerminalHost, clientId: string,
 
 describe('server terminal runtime', () => {
   test('create claims controller control for the provided attachment', async () => {
-    const { host, shutdown } = buildRuntime()
+  const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
 
     const result = await host.create('client_a', USER_1, {
-      repoRoot: '/repo',
+      repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
       branch: 'feature',
       worktreePath: '/repo-linked',
       kind: 'additional',
@@ -181,7 +200,7 @@ describe('server terminal runtime', () => {
 
     mockPtys[0]?.emitData('ready')
 
-    await expect(host.listSessions('client_a', USER_1, '/repo')).resolves.toEqual([
+    await expect(host.listSessions('client_a', USER_1, { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID })).resolves.toEqual([
       expect.objectContaining({
         ptySessionId,
         phase: 'open',
@@ -201,7 +220,8 @@ describe('server terminal runtime', () => {
     host.registerSocket('client_b', USER_1, socketB)
 
     const createResult = await host.create('client_a', USER_1, {
-      repoRoot: '/repo',
+      repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
       branch: 'feature',
       worktreePath: '/repo-linked',
       kind: 'additional',
@@ -228,7 +248,7 @@ describe('server terminal runtime', () => {
       canonicalRows: 24,
     })
 
-    const sessions = await host.listSessions('client_a', USER_1, '/repo')
+    const sessions = await host.listSessions('client_a', USER_1, { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID })
     expect(sessions).toEqual([
       expect.objectContaining({
         ptySessionId,
@@ -276,7 +296,8 @@ describe('server terminal runtime', () => {
     host.registerSocket('client_a', USER_1, socketA)
 
     const createResult = await host.create('client_a', USER_1, {
-      repoRoot: '/repo',
+      repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
       branch: 'feature',
       worktreePath: '/repo-linked',
       kind: 'additional',
@@ -308,7 +329,7 @@ describe('server terminal runtime', () => {
     })
     expect(mockPtys[0]?.resize).toHaveBeenLastCalledWith(101, 31)
 
-    const sessions = await host.listSessions('client_a', USER_1, '/repo')
+    const sessions = await host.listSessions('client_a', USER_1, { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID })
     expect(sessions).toEqual([
       expect.objectContaining({
         ptySessionId,
@@ -328,7 +349,8 @@ describe('server terminal runtime', () => {
     host.registerSocket('client_a', USER_1, socket)
 
     const createResult = await host.create('client_a', USER_1, {
-      repoRoot: '/repo',
+      repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
       branch: 'feature',
       worktreePath: '/repo-linked',
       kind: 'primary',
@@ -402,7 +424,7 @@ describe('server terminal runtime', () => {
       .find((message) => message.type === 'output')
     expect(outputMessage).toMatchObject({
       type: 'output',
-      event: { data: 'hello', seq: 1 },
+      event: { ptySessionId, terminalSessionId: expect.any(String), data: 'hello', seq: 1 },
     })
 
     socket.send.mockClear()
@@ -424,7 +446,10 @@ describe('server terminal runtime', () => {
     const exitMessage = socket.send.mock.calls
       .map(([payload]) => JSON.parse(String(payload)))
       .find((message) => message.type === 'exit')
-    expect(exitMessage).toMatchObject({ type: 'exit' })
+    expect(exitMessage).toMatchObject({
+      type: 'exit',
+      event: { ptySessionId, terminalSessionId: expect.any(String) },
+    })
     expect(host.getDiagnostics().pty.state).toBe('idle')
 
     host.unregisterSocket('client_a', USER_1, socket)
@@ -436,7 +461,8 @@ describe('server terminal runtime', () => {
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
     const created = await host.create('client_a', USER_1, {
-      repoRoot: '/repo',
+      repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
       branch: 'feature',
       worktreePath: '/repo-linked',
       kind: 'additional',
@@ -455,9 +481,11 @@ describe('server terminal runtime', () => {
       expect(sentSocketMessages(socket).some((message) => message.type === 'workspace-tabs-changed')).toBe(true)
     })
     expect(sentSocketMessages(socket).filter((message) => message.type === 'sessions-changed')).toHaveLength(1)
-    await expect(host.listWorkspaceTabs('client_a', USER_1, '/repo')).resolves.toEqual([
+    await expect(
+      host.listWorkspaceTabs('client_a', USER_1, { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID }),
+    ).resolves.toEqual([
       {
-        repoRoot: '/repo',
+        repoRoot: REPO_ROOT,
         branchName: 'feature',
         worktreePath: '/repo-linked',
         tabs: [expect.objectContaining({ type: 'status' })],
@@ -473,7 +501,8 @@ describe('server terminal runtime', () => {
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
     const created = await host.create('client_a', USER_1, {
-      repoRoot: '/repo',
+      repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
       branch: 'feature',
       worktreePath: '/repo-linked',
       kind: 'additional',
@@ -486,15 +515,19 @@ describe('server terminal runtime', () => {
     socket.send.mockClear()
     vi.mocked(getWorktrees).mockResolvedValueOnce([])
 
-    await expect(host.prune('client_a', USER_1, '/repo')).resolves.toEqual({ pruned: 1, remaining: 0 })
+    await expect(
+      host.prune('client_a', USER_1, { repoRoot: '/repo', repoInstanceId: REPO_INSTANCE_ID }),
+    ).resolves.toEqual({ pruned: 1, remaining: 0 })
 
     await vi.waitFor(() => {
       expect(sentSocketMessages(socket).some((message) => message.type === 'workspace-tabs-changed')).toBe(true)
     })
     expect(sentSocketMessages(socket).filter((message) => message.type === 'sessions-changed')).toHaveLength(1)
-    await expect(host.listWorkspaceTabs('client_a', USER_1, '/repo')).resolves.toEqual([
+    await expect(
+      host.listWorkspaceTabs('client_a', USER_1, { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID }),
+    ).resolves.toEqual([
       {
-        repoRoot: '/repo',
+        repoRoot: REPO_ROOT,
         branchName: 'feature',
         worktreePath: '/repo-linked',
         tabs: [expect.objectContaining({ type: 'status' })],
@@ -525,6 +558,7 @@ describe('server terminal runtime', () => {
     const { host, shutdown } = buildRuntime()
     const result = await host.create('client_a', USER_1, {
       repoRoot: 'ssh-config://prod/srv/repo',
+      repoInstanceId: SSH_REPO_INSTANCE_ID,
       branch: 'feature',
       worktreePath: '/srv/repo',
       kind: 'primary',
@@ -537,7 +571,7 @@ describe('server terminal runtime', () => {
     expect(resolveRemoteTarget).toHaveBeenCalledWith({ alias: 'prod', remotePath: '/srv/repo' })
     expect(result.sessions).toEqual([
       expect.objectContaining({
-        terminalSessionId: expect.stringMatching(/^terminal-session-[0-9a-z]{25}$/),
+        terminalSessionId: expect.stringMatching(/^terminal-session-[A-Za-z0-9_-]{21}$/),
         repoRoot: 'ssh-config://prod/srv/repo',
         worktreePath: '/srv/repo',
       }),
@@ -549,7 +583,8 @@ describe('server terminal runtime', () => {
   test('reuses the existing terminal when reopening the same repo root', async () => {
     const { host, shutdown } = buildRuntime()
     const first = await host.create('client_a', USER_1, {
-      repoRoot: '/repo',
+      repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
       branch: 'feature',
       worktreePath: '/repo-linked',
       kind: 'primary',
@@ -560,7 +595,8 @@ describe('server terminal runtime', () => {
     if (!first.ok) return
     expect(first.action).toBe('created')
     const second = await host.create('client_a', USER_1, {
-      repoRoot: '/repo',
+      repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
       branch: 'feature',
       worktreePath: '/repo-linked',
       kind: 'primary',
@@ -575,6 +611,60 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
+  test('repo instance close makes old terminal sessions and workspace tabs unreachable to the reopened instance', async () => {
+    const { host, shutdown } = buildRuntime()
+    const first = await host.create('client_a', USER_1, {
+      repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
+      branch: 'feature',
+      worktreePath: '/repo-linked',
+      kind: 'primary',
+      cols: 80,
+      rows: 24,
+    })
+    expect(first.ok).toBe(true)
+    if (!first.ok) return
+    await expect(
+      host.updateTabs('client_a', USER_1, {
+        repoRoot: REPO_ROOT,
+        repoInstanceId: REPO_INSTANCE_ID,
+        branchName: 'feature',
+        worktreePath: '/repo-linked',
+        operation: { type: 'open-static', tabType: 'history' },
+      }),
+    ).resolves.toEqual([
+      { type: 'status', tabId: 'workspace-pane:status' },
+      { type: 'terminal', terminalSessionId: first.terminalSessionId },
+      { type: 'history', tabId: 'workspace-pane:history' },
+    ])
+
+    expect(closeRepoRuntimeInstance(USER_1, REPO_ROOT, REPO_INSTANCE_ID)).toBe(true)
+    const nextRepoInstanceId = openRepoRuntimeInstance(USER_1, REPO_ROOT)
+
+    await expect(
+      host.listSessions('client_a', USER_1, { repoRoot: REPO_ROOT, repoInstanceId: nextRepoInstanceId }),
+    ).resolves.toEqual([])
+    await expect(
+      host.listWorkspaceTabs('client_a', USER_1, { repoRoot: REPO_ROOT, repoInstanceId: nextRepoInstanceId }),
+    ).resolves.toEqual([])
+
+    const second = await host.create('client_a', USER_1, {
+      repoRoot: REPO_ROOT,
+      repoInstanceId: nextRepoInstanceId,
+      branch: 'feature',
+      worktreePath: '/repo-linked',
+      kind: 'primary',
+      cols: 80,
+      rows: 24,
+    })
+    expect(second.ok).toBe(true)
+    if (!second.ok) return
+    expect(second.action).toBe('created')
+    expect(second.terminalSessionId).not.toBe(first.terminalSessionId)
+
+    shutdown()
+  })
+
   test('serializes concurrent primary creates for the same worktree', async () => {
     const worktrees: WorktreeInfo[] = [{ path: '/repo-linked', branch: 'feature', isBare: false, isPrimary: false }]
     const firstWorktrees = createDeferred<WorktreeInfo[]>()
@@ -585,7 +675,8 @@ describe('server terminal runtime', () => {
     const { host, shutdown } = buildRuntime()
 
     const first = host.create('client_a', USER_1, {
-      repoRoot: '/repo',
+      repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
       branch: 'feature',
       worktreePath: '/repo-linked',
       kind: 'primary',
@@ -593,7 +684,8 @@ describe('server terminal runtime', () => {
       rows: 24,
     })
     const second = host.create('client_b', USER_1, {
-      repoRoot: '/repo',
+      repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
       branch: 'feature',
       worktreePath: '/repo-linked',
       kind: 'primary',
@@ -631,7 +723,8 @@ describe('server terminal runtime', () => {
     host.registerSocket('client_browser', USER_1, browserSocket)
 
     const first = await host.create('client_browser', USER_1, {
-      repoRoot: '/repo',
+      repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
       branch: 'feature',
       worktreePath: '/repo-linked',
       kind: 'primary',
@@ -649,7 +742,8 @@ describe('server terminal runtime', () => {
     host.registerSocket('client_electron', USER_1, electronSocket)
 
     const reopened = await host.create('client_electron', USER_1, {
-      repoRoot: '/repo',
+      repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
       branch: 'feature',
       worktreePath: '/repo-linked',
       kind: 'primary',
@@ -666,7 +760,7 @@ describe('server terminal runtime', () => {
     expect(reopened.canonicalRows).toBe(33)
     expect(mockPtys[0]?.resize).toHaveBeenLastCalledWith(102, 33)
 
-    const sessions = await host.listSessions('client_electron', USER_1, '/repo')
+    const sessions = await host.listSessions('client_electron', USER_1, { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID })
     expect(sessions).toEqual([
       expect.objectContaining({
         terminalSessionId: first.terminalSessionId,
@@ -691,7 +785,8 @@ describe('server terminal runtime', () => {
     socket.send.mockClear()
 
     const failed = await host.create('client_a', USER_1, {
-      repoRoot: '/repo',
+      repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
       branch: 'feature',
       worktreePath: '/repo-linked',
       kind: 'primary',
@@ -704,7 +799,7 @@ describe('server terminal runtime', () => {
     // After the failure, listSessions must not report the zombie. If
     // it did, the session service would match it on retry and surface a
     // blank, non-responsive terminal as a successful attach.
-    const sessionsAfterFailure = await host.listSessions('client_a', USER_1, '/repo')
+    const sessionsAfterFailure = await host.listSessions('client_a', USER_1, { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID })
     expect(sessionsAfterFailure).toEqual([])
 
     // A never-spawned session has no exit event — lock in that
@@ -716,7 +811,8 @@ describe('server terminal runtime', () => {
 
     // Retry with a working spawn must succeed as a brand-new create.
     const retried = await host.create('client_a', USER_1, {
-      repoRoot: '/repo',
+      repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
       branch: 'feature',
       worktreePath: '/repo-linked',
       kind: 'primary',
@@ -751,7 +847,7 @@ describe('server terminal runtime', () => {
     if (restarted.ok) return
     expect(restarted.message).toBe('pty restart failed')
 
-    const sessionsAfterFailure = await host.listSessions('client_a', USER_1, '/repo')
+    const sessionsAfterFailure = await host.listSessions('client_a', USER_1, { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID })
     expect(sessionsAfterFailure).toEqual([
       expect.objectContaining({
         ptySessionId,
@@ -844,7 +940,7 @@ describe('server terminal runtime', () => {
     })
     expect(messages[outputIndex]).toMatchObject({
       type: 'output',
-      event: { ptySessionId, data: 'during-attach', seq: 1 },
+      event: { ptySessionId, terminalSessionId: expect.any(String), data: 'during-attach', seq: 1 },
     })
 
     host.unregisterSocket('client_a', USER_1, socket)
@@ -865,7 +961,8 @@ describe('server terminal runtime', () => {
         requestId: 'req_create',
         action: 'create',
         input: {
-          repoRoot: '/repo',
+          repoRoot: REPO_ROOT,
+          repoInstanceId: REPO_INSTANCE_ID,
           branch: 'feature',
           worktreePath: '/repo-linked',
           kind: 'primary',
@@ -923,7 +1020,8 @@ describe('server terminal runtime', () => {
         requestId: 'req_create_buffered_output',
         action: 'create',
         input: {
-          repoRoot: '/repo',
+          repoRoot: REPO_ROOT,
+          repoInstanceId: REPO_INSTANCE_ID,
           branch: 'feature',
           worktreePath: '/repo-linked',
           kind: 'primary',
@@ -961,10 +1059,15 @@ describe('server terminal runtime', () => {
     })
 
     const output = messages[outputIndex]
-    const ptySessionId = (response.payload as { ptySessionId: string }).ptySessionId
+    const createdPayload = response.payload as { ptySessionId: string; terminalSessionId: string }
     expect(output).toMatchObject({
       type: 'output',
-      event: { ptySessionId, data: 'during-create', seq: 1 },
+      event: {
+        ptySessionId: createdPayload.ptySessionId,
+        terminalSessionId: createdPayload.terminalSessionId,
+        data: 'during-create',
+        seq: 1,
+      },
     })
 
     host.unregisterSocket('client_a', USER_1, socket)
@@ -974,7 +1077,8 @@ describe('server terminal runtime', () => {
   test('rejects terminal IPC calls from untrusted senders', async () => {
     const { host, shutdown } = buildRuntime()
     const result = await host.create('client_with_$pecial!chars' as never, USER_1, {
-      repoRoot: '/repo',
+      repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
       branch: 'feature',
       worktreePath: '/repo-linked',
       kind: 'primary',
@@ -1087,7 +1191,7 @@ describe('server terminal runtime', () => {
     })
     expect(result.ok).toBe(true)
 
-    const sessions = await host.listSessions('client_2', USER_1, '/repo')
+    const sessions = await host.listSessions('client_2', USER_1, { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID })
     expect(sessions).toHaveLength(1)
     expect(sessions[0]?.ptySessionId).toBe(ptySessionId)
 
@@ -1111,7 +1215,8 @@ describe('server terminal runtime', () => {
     host.registerSocket('client_shared_attachment_b', USER_2, userBSocket)
 
     const userACreate = await host.create('client_shared', USER_1, {
-      repoRoot: '/repo',
+      repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
       branch: 'feature',
       worktreePath: '/repo-linked',
       kind: 'additional',
@@ -1124,7 +1229,7 @@ describe('server terminal runtime', () => {
     const userASession = userACreate.sessions[0]
     if (!userASession) throw new Error('expected user A session')
 
-    expect(await host.listSessions('client_shared', USER_2, '/repo')).toEqual([])
+    expect(await host.listSessions('client_shared', USER_2, { repoRoot: REPO_ROOT, repoInstanceId: USER_2_REPO_INSTANCE_ID })).toEqual([])
     await expect(host.close('client_shared', USER_2, { ptySessionId: userASession.ptySessionId })).resolves.toBe(false)
     expect(
       userBSocket.send.mock.calls.some(([payload]) => {
@@ -1134,7 +1239,8 @@ describe('server terminal runtime', () => {
     ).toBe(false)
 
     const userBCreate = await host.create('client_shared', USER_2, {
-      repoRoot: '/repo',
+      repoRoot: REPO_ROOT,
+      repoInstanceId: USER_2_REPO_INSTANCE_ID,
       branch: 'feature',
       worktreePath: '/repo-linked',
       kind: 'additional',
@@ -1149,10 +1255,10 @@ describe('server terminal runtime', () => {
 
     expect(userBSession.terminalSessionId).not.toBe(userASession.terminalSessionId)
     expect(userBSession.ptySessionId).not.toBe(userASession.ptySessionId)
-    expect(await host.listSessions('client_shared', USER_1, '/repo')).toEqual([
+    expect(await host.listSessions('client_shared', USER_1, { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID })).toEqual([
       expect.objectContaining({ ptySessionId: userASession.ptySessionId, terminalSessionId: userASession.terminalSessionId }),
     ])
-    expect(await host.listSessions('client_shared', USER_2, '/repo')).toEqual([
+    expect(await host.listSessions('client_shared', USER_2, { repoRoot: REPO_ROOT, repoInstanceId: USER_2_REPO_INSTANCE_ID })).toEqual([
       expect.objectContaining({ ptySessionId: userBSession.ptySessionId, terminalSessionId: userBSession.terminalSessionId }),
     ])
 
@@ -1209,7 +1315,8 @@ describe('server terminal runtime', () => {
     const socketB = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socketA)
     const created = await host.create('client_a', USER_1, {
-      repoRoot: '/repo',
+      repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
       branch: 'feature',
       worktreePath: '/repo-linked',
       kind: 'additional',
@@ -1267,7 +1374,8 @@ describe('server terminal runtime', () => {
     const socketAReconnect = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socketA)
     const created = await host.create('client_a', USER_1, {
-      repoRoot: '/repo',
+      repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
       branch: 'feature',
       worktreePath: '/repo-linked',
       kind: 'additional',
@@ -1333,7 +1441,7 @@ describe('server terminal runtime', () => {
 
     // listSessions confirms the global view: B is the controller,
     // canonical geometry follows B (the most recent writer).
-    const sessions = await host.listSessions('client_a', USER_1, '/repo')
+    const sessions = await host.listSessions('client_a', USER_1, { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID })
     expect(sessions).toEqual([
       expect.objectContaining({
         ptySessionId,
@@ -1361,7 +1469,8 @@ describe('server terminal runtime', () => {
     const socketB = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socketA)
     const created = await host.create('client_a', USER_1, {
-      repoRoot: '/repo',
+      repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
       branch: 'feature',
       worktreePath: '/repo-linked',
       kind: 'additional',
@@ -1389,7 +1498,7 @@ describe('server terminal runtime', () => {
     // microtask without firing any timer.
     await Promise.resolve()
 
-    const sessionsAfterExpiry = await host.listSessions('client_a', USER_1, '/repo')
+    const sessionsAfterExpiry = await host.listSessions('client_a', USER_1, { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID })
     expect(sessionsAfterExpiry).toEqual([
       expect.objectContaining({
         ptySessionId,
@@ -1629,7 +1738,7 @@ describe('server terminal runtime', () => {
       host.registerSocket('client_idle', USER_1, socket)
       const ptySessionId = await createTerminalSession(host, 'client_idle')
 
-      expect(await host.listSessions('client_idle', USER_1, '/repo')).toEqual([
+      expect(await host.listSessions('client_idle', USER_1, { repoRoot: '/repo', repoInstanceId: REPO_INSTANCE_ID })).toEqual([
         expect.objectContaining({
           ptySessionId,
           controller: { clientId: 'client_idle', status: 'connected' },
@@ -1638,7 +1747,7 @@ describe('server terminal runtime', () => {
 
       vi.advanceTimersByTime(HEARTBEAT_SILENCE_MS)
       expect(handle.isClientOnline('client_idle')).toBe(false)
-      expect(await host.listSessions('client_idle', USER_1, '/repo')).toEqual([
+      expect(await host.listSessions('client_idle', USER_1, { repoRoot: '/repo', repoInstanceId: REPO_INSTANCE_ID })).toEqual([
         expect.objectContaining({
           ptySessionId,
           controller: null,
@@ -1648,7 +1757,7 @@ describe('server terminal runtime', () => {
       const reconnectedSocket = { send: vi.fn(), close: vi.fn() }
       host.registerSocket('client_idle', USER_1, reconnectedSocket)
       expect(handle.isClientOnline('client_idle')).toBe(true)
-      expect(await host.listSessions('client_idle', USER_1, '/repo')).toEqual([
+      expect(await host.listSessions('client_idle', USER_1, { repoRoot: '/repo', repoInstanceId: REPO_INSTANCE_ID })).toEqual([
         expect.objectContaining({
           ptySessionId,
           controller: { clientId: 'client_idle', status: 'connected' },
@@ -1684,7 +1793,9 @@ describe('server terminal runtime', () => {
         host.handleRealtimeMessage('client_recovered', USER_1, reconnectedSocket, JSON.stringify({ type: 'heartbeat' }))
       }
       await vi.runOnlyPendingTimersAsync()
-      await expect(host.listSessions('client_recovered', USER_1, '/repo')).resolves.toHaveLength(1)
+      await expect(
+        host.listSessions('client_recovered', USER_1, { repoRoot: '/repo', repoInstanceId: REPO_INSTANCE_ID }),
+      ).resolves.toHaveLength(1)
     } finally {
       vi.useRealTimers()
       shutdownFn?.()
@@ -1711,7 +1822,9 @@ describe('server terminal runtime', () => {
       await vi.runOnlyPendingTimersAsync()
 
       expect(host.getDiagnostics().liveSessionCount).toBe(0)
-      await expect(host.listSessions('client_half_open', USER_1, '/repo')).resolves.toEqual([])
+      await expect(
+        host.listSessions('client_half_open', USER_1, { repoRoot: '/repo', repoInstanceId: REPO_INSTANCE_ID }),
+      ).resolves.toEqual([])
     } finally {
       vi.useRealTimers()
       shutdownFn?.()
@@ -1739,7 +1852,9 @@ describe('server terminal runtime', () => {
       await vi.runOnlyPendingTimersAsync()
 
       expect(host.getDiagnostics().liveSessionCount).toBe(0)
-      await expect(host.listSessions('client_late_drain', USER_1, '/repo')).resolves.toEqual([])
+      await expect(
+        host.listSessions('client_late_drain', USER_1, { repoRoot: '/repo', repoInstanceId: REPO_INSTANCE_ID }),
+      ).resolves.toEqual([])
     } finally {
       vi.useRealTimers()
       shutdownFn?.()

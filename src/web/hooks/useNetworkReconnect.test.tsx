@@ -110,7 +110,7 @@ function seedRepo(id: string, lifecycle: RemoteRepoConnectionLifecycle | null) {
       [id]: {
         id,
         name: id,
-        instanceToken: 1,
+        instanceId: 'repo-instance-test',
         data: { branches: [], currentBranch: '', status: [], statusLoaded: false, worktreesByPath: {} },
         dataLoads: {
           fetch: { phase: 'idle', loadedAt: null, stale: false, error: null },

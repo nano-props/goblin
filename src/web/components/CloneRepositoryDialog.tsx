@@ -12,6 +12,7 @@ import { useT } from '#/web/stores/i18n.ts'
 import { joinPath, tildify, untildify } from '#/web/lib/paths.ts'
 import { cn } from '#/web/lib/cn.ts'
 import type { CloneRepoResult } from '#/shared/api-types.ts'
+import { createOpaqueId } from '#/shared/opaque-id.ts'
 export interface CloneRepositoryRequest {
   operationId: string
   url: string
@@ -247,11 +248,5 @@ function defaultCloneParentPath(): string {
 }
 
 function createOperationId(): string {
-  const uuid = globalThis.crypto?.randomUUID?.()
-  if (uuid) return uuid
-  const bytes = new Uint32Array(2)
-  globalThis.crypto?.getRandomValues?.(bytes)
-  const a = bytes[0] || Math.floor(Math.random() * 0xffffffff)
-  const b = bytes[1] || Math.floor(Math.random() * 0xffffffff)
-  return `${Date.now().toString(36)}-${a.toString(36)}-${b.toString(36)}`
+  return createOpaqueId('clone-operation')
 }

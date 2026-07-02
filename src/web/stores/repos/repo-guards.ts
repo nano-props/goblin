@@ -6,7 +6,7 @@ import {
   type RemoteRepoTarget,
 } from '#/shared/remote-repo.ts'
 import { deriveConnectivityLog } from '#/web/logger.ts'
-import type { RepoState, ReposSet } from '#/web/stores/repos/types.ts'
+import type { RepoState, ReposSet, ReposStore } from '#/web/stores/repos/types.ts'
 
 /**
  * Live SSH liveness state for remote repos. Derived — never stored —
@@ -77,14 +77,40 @@ export function isRepoUnavailable(repo: RepoState): boolean {
 
 type RepoMutator = (repo: Draft<RepoState>) => void
 
-/** Apply `mutator` to the repo at `id` only if its instanceToken still
+export interface RepoInstanceHandle {
+  id: string
+  repoInstanceId: string
+}
+
+export function repoInstanceHandle(
+  repo: Pick<RepoState, 'id' | 'instanceId'> | null | undefined,
+): RepoInstanceHandle | null {
+  return repo ? { id: repo.id, repoInstanceId: repo.instanceId } : null
+}
+
+export function hasFreshRepoInstance(
+  state: Pick<ReposStore, 'repos'>,
+  handle: RepoInstanceHandle | null | undefined,
+): boolean {
+  if (!handle) return false
+  return state.repos[handle.id]?.instanceId === handle.repoInstanceId
+}
+
+export function currentRepoInstanceId(
+  state: Pick<ReposStore, 'repos'>,
+  repoRoot: string,
+): string | null {
+  return state.repos[repoRoot]?.instanceId ?? null
+}
+
+/** Apply `mutator` to the repo at `id` only if its instanceId still
  *  matches the captured one. The check runs inside the functional
  *  setter so it reads the freshest store state, not the caller's
  *  pre-await snapshot. */
-export function updateIfFresh(set: ReposSet, id: string, token: number, mutator: RepoMutator): void {
+export function updateIfFresh(set: ReposSet, id: string, repoInstanceId: string, mutator: RepoMutator): void {
   set((s) => {
     const repo = s.repos[id]
-    if (!repo || repo.instanceToken !== token) return s
+    if (!repo || repo.instanceId !== repoInstanceId) return s
     const nextRepo = produce(repo, mutator)
     return nextRepo === repo ? s : { ...s, repos: { ...s.repos, [id]: nextRepo } }
   })

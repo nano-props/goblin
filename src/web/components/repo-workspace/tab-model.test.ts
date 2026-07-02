@@ -398,6 +398,40 @@ describe('repo workspace pane tab model', () => {
     expect(nextRepoWorkspaceTabAfterClose(model.tabs, 'missing:missing')).toBeNull()
   })
 
+  test('prefers the opener tab over the adjacent tab when resolving the next tab after close', () => {
+    const model = createRepoWorkspaceTabModel({
+      repoId: REPO_ID,
+      branchName: 'feature/model',
+      worktreePath: WORKTREE_PATH,
+      preferredTab: 'status',
+      tabEntries: [staticEntry('status'), terminalEntry('session-1'), staticEntry('changes')],
+      runtimeTerminalViews: [terminalView('session-1', 1, true)],
+      terminalSyncReady: true,
+      selectedTerminalSessionId: 'session-1',
+    })
+
+    expect(
+      nextRepoWorkspaceTabAfterClose(model.tabs, 'terminal:session-1', 'workspace-pane:changes')?.identity,
+    ).toBe('workspace-pane:changes')
+  })
+
+  test('falls back to the adjacent tab when the opener tab no longer exists', () => {
+    const model = createRepoWorkspaceTabModel({
+      repoId: REPO_ID,
+      branchName: 'feature/model',
+      worktreePath: WORKTREE_PATH,
+      preferredTab: 'status',
+      tabEntries: [staticEntry('status'), terminalEntry('session-1'), staticEntry('changes')],
+      runtimeTerminalViews: [terminalView('session-1', 1, true)],
+      terminalSyncReady: true,
+      selectedTerminalSessionId: 'session-1',
+    })
+
+    expect(
+      nextRepoWorkspaceTabAfterClose(model.tabs, 'terminal:session-1', 'terminal:missing-opener')?.identity,
+    ).toBe('workspace-pane:changes')
+  })
+
   test('skips pending terminal tabs when resolving the next tab after close', () => {
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,

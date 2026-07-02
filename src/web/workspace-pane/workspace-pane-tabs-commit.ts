@@ -11,6 +11,7 @@ import { runWorkspacePaneTabsOperation } from '#/web/workspace-pane/workspace-pa
 
 export interface CommitWorkspacePaneTabsInput {
   repoRoot: string
+  repoInstanceId: string
   branchName: string
   worktreePath: string | null
   tabs: WorkspacePaneTabEntry[]
@@ -18,6 +19,7 @@ export interface CommitWorkspacePaneTabsInput {
 
 export interface UpdateWorkspacePaneTabsInput {
   repoRoot: string
+  repoInstanceId: string
   branchName: string
   worktreePath: string | null
   operation: TerminalUpdateWorkspaceTabsOperation
@@ -95,10 +97,11 @@ async function commitWorkspacePaneTabsNow(
   input: CommitWorkspacePaneTabsInput,
 ): Promise<WorkspacePaneTabsMutationResult> {
   try {
-    await cancelWorkspacePaneTabs(input.repoRoot)
+    await cancelWorkspacePaneTabs(input.repoRoot, input.repoInstanceId)
     const serverTabs = await replaceWorkspacePaneTabsOnServer(input)
     await writeCanonicalWorkspacePaneTabsForTarget({
       repoRoot: input.repoRoot,
+      repoInstanceId: input.repoInstanceId,
       branchName: input.branchName,
       worktreePath: input.worktreePath,
       tabs: serverTabs,
@@ -119,10 +122,11 @@ async function updateWorkspacePaneTabsNow(
   input: UpdateWorkspacePaneTabsInput,
 ): Promise<WorkspacePaneTabsMutationResult> {
   try {
-    await cancelWorkspacePaneTabs(input.repoRoot)
+    await cancelWorkspacePaneTabs(input.repoRoot, input.repoInstanceId)
     const serverTabs = await updateWorkspacePaneTabsOnServer(input)
     await writeCanonicalWorkspacePaneTabsForTarget({
       repoRoot: input.repoRoot,
+      repoInstanceId: input.repoInstanceId,
       branchName: input.branchName,
       worktreePath: input.worktreePath,
       tabs: serverTabs,
@@ -145,7 +149,7 @@ export async function writeCanonicalWorkspacePaneTabsForTarget(
 ): Promise<void> {
   // A list query may have started while the server write was in flight.
   // Cancel again so stale list results cannot overwrite the canonical tabs.
-  await cancelWorkspacePaneTabs(input.repoRoot, queryClient)
+  await cancelWorkspacePaneTabs(input.repoRoot, input.repoInstanceId, queryClient)
   setWorkspacePaneTabsForTargetQueryData(input, queryClient)
 }
 
@@ -158,6 +162,7 @@ export async function replaceWorkspacePaneTabsOnServer(
 ): Promise<WorkspacePaneTabEntry[]> {
   return await terminalBridge.replaceWorkspaceTabs({
     repoRoot: input.repoRoot,
+    repoInstanceId: input.repoInstanceId,
     branchName: input.branchName,
     worktreePath: input.worktreePath,
     tabs: input.tabs,
@@ -169,6 +174,7 @@ export async function updateWorkspacePaneTabsOnServer(
 ): Promise<WorkspacePaneTabEntry[]> {
   return await terminalBridge.updateWorkspaceTabs({
     repoRoot: input.repoRoot,
+    repoInstanceId: input.repoInstanceId,
     branchName: input.branchName,
     worktreePath: input.worktreePath,
     operation: input.operation,

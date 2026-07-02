@@ -37,6 +37,7 @@ const DEFAULT_TERMINAL_ERROR_MESSAGE_KEY = 'error.unknown'
 
 interface TerminalSessionViewProps {
   repoRoot: string
+  repoInstanceId: string
   branch: string
   worktreePath: string
   syncReady?: boolean
@@ -45,6 +46,7 @@ interface TerminalSessionViewProps {
 
 export function TerminalSessionView({
   repoRoot,
+  repoInstanceId,
   branch,
   worktreePath,
   syncReady = true,
@@ -524,7 +526,7 @@ export function TerminalSessionView({
         <EmptyTerminalCta
           onCreate={async () => {
             try {
-              await (createTerminalForSlot ?? createTerminal)({ repoRoot, branch, worktreePath })
+              await (createTerminalForSlot ?? createTerminal)({ repoRoot, repoInstanceId, branch, worktreePath })
             } catch (err) {
               const messageKey = showTerminalCreateErrorToast(err, t)
               terminalLog.warn('empty-state terminal create failed', { err, messageKey })

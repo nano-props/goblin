@@ -16,23 +16,23 @@ import {
 } from '#/shared/pull-request-state.ts'
 import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 
-function repoFresh(get: ReposGet, id: string, token: number): boolean {
+function repoFresh(get: ReposGet, id: string, repoInstanceId: string): boolean {
   const repo = get().repos[id]
-  return !!repo && repo.instanceToken === token
+  return !!repo && repo.instanceId === repoInstanceId
 }
 
-function pullRequestRefreshFailed(get: ReposGet, id: string, token: number): boolean {
+function pullRequestRefreshFailed(get: ReposGet, id: string, repoInstanceId: string): boolean {
   const repo = get().repos[id]
-  return !!repo && repo.instanceToken === token && repo.dataLoads.pullRequests.error !== null
+  return !!repo && repo.instanceId === repoInstanceId && repo.dataLoads.pullRequests.error !== null
 }
 
-function visibleDetailPullRequestPending(get: ReposGet, id: string, token: number): boolean {
+function visibleDetailPullRequestPending(get: ReposGet, id: string, repoInstanceId: string): boolean {
   const repo = get().repos[id]
   if (!repo) return false
   const target = workspacePaneTabsTargetForSelectedBranch(repo)
   const openStaticTabs = workspacePaneStaticTabsFromEntries(readWorkspacePaneTabsForSelectedBranch(repo))
   if (
-    repo.instanceToken !== token ||
+    repo.instanceId !== repoInstanceId ||
     preferredWorkspacePaneTabForTarget(repo.ui, target) !== 'status' ||
     !openStaticTabs.includes('status') ||
     !repo.ui.selectedBranch
@@ -42,25 +42,26 @@ function visibleDetailPullRequestPending(get: ReposGet, id: string, token: numbe
   return pullRequestMergeStatusPending(branch?.pullRequest)
 }
 
-async function refreshVisibleDetailPullRequest(get: ReposGet, id: string, token: number): Promise<void> {
+async function refreshVisibleDetailPullRequest(get: ReposGet, id: string, repoInstanceId: string): Promise<void> {
   const repo = get().repos[id]
   if (!repo) return
   const target = workspacePaneTabsTargetForSelectedBranch(repo)
   const openStaticTabs = workspacePaneStaticTabsFromEntries(readWorkspacePaneTabsForSelectedBranch(repo))
   if (
-    repo.instanceToken !== token ||
+    repo.instanceId !== repoInstanceId ||
     preferredWorkspacePaneTabForTarget(repo.ui, target) !== 'status' ||
     !openStaticTabs.includes('status') ||
     !repo.ui.selectedBranch
   )
     return
-  await get().refreshPullRequests(id, [repo.ui.selectedBranch], { token, mode: 'full' })
+  await get().refreshPullRequests(id, [repo.ui.selectedBranch], { repoInstanceId, mode: 'full' })
 }
 
 function readWorkspacePaneTabsForSelectedBranch(repo: NonNullable<ReturnType<ReposGet>['repos'][string]>) {
   const target = workspacePaneTabsTargetForSelectedBranch(repo)
   return readWorkspacePaneTabsForTarget({
     repoRoot: repo.id,
+    repoInstanceId: repo.instanceId,
     branchName: target?.branchName ?? null,
     worktreePath: target?.worktreePath ?? null,
   })
@@ -76,26 +77,26 @@ async function delay(ms: number): Promise<void> {
 
 async function retryVisibleDetailPullRequestUntilSettled(
   get: ReposGet,
-  options: { id: string; token: number; isSnapshotCurrent: () => boolean },
+  options: { id: string; repoInstanceId: string; isSnapshotCurrent: () => boolean },
 ): Promise<void> {
   for (let attempt = 0; attempt < PULL_REQUEST_UNKNOWN_RETRY_LIMIT; attempt += 1) {
-    if (!options.isSnapshotCurrent() || !repoFresh(get, options.id, options.token)) return
-    if (!visibleDetailPullRequestPending(get, options.id, options.token)) return
+    if (!options.isSnapshotCurrent() || !repoFresh(get, options.id, options.repoInstanceId)) return
+    if (!visibleDetailPullRequestPending(get, options.id, options.repoInstanceId)) return
     await delay(PULL_REQUEST_UNKNOWN_RETRY_DELAY_MS)
-    if (!options.isSnapshotCurrent() || !repoFresh(get, options.id, options.token)) return
-    if (!visibleDetailPullRequestPending(get, options.id, options.token)) return
-    await refreshVisibleDetailPullRequest(get, options.id, options.token)
-    if (pullRequestRefreshFailed(get, options.id, options.token)) return
+    if (!options.isSnapshotCurrent() || !repoFresh(get, options.id, options.repoInstanceId)) return
+    if (!visibleDetailPullRequestPending(get, options.id, options.repoInstanceId)) return
+    await refreshVisibleDetailPullRequest(get, options.id, options.repoInstanceId)
+    if (pullRequestRefreshFailed(get, options.id, options.repoInstanceId)) return
   }
 }
 
 async function refreshPullRequestSummaryAfterSnapshot(
   get: ReposGet,
-  options: { id: string; token: number; branchNames: string[]; isSnapshotCurrent: () => boolean },
+  options: { id: string; repoInstanceId: string; branchNames: string[]; isSnapshotCurrent: () => boolean },
 ): Promise<void> {
-  if (!options.isSnapshotCurrent() || !repoFresh(get, options.id, options.token)) return
+  if (!options.isSnapshotCurrent() || !repoFresh(get, options.id, options.repoInstanceId)) return
   await get().refreshPullRequests(options.id, options.branchNames, {
-    token: options.token,
+    repoInstanceId: options.repoInstanceId,
     mode: 'summary',
     clearMissing: true,
   })
@@ -106,7 +107,7 @@ export async function runSnapshotSuccessWorkflow(
   get: ReposGet,
   options: {
     id: string
-    token: number
+    repoInstanceId: string
     branchNames: string[]
     worktreePaths: string[]
     isSnapshotCurrent: () => boolean
@@ -114,19 +115,19 @@ export async function runSnapshotSuccessWorkflow(
   },
 ): Promise<void> {
   if (!options.isSnapshotCurrent()) return
-  persistRepoSnapshotCacheEntry(set, get().repos[options.id], options.token)
-  void terminalBridge.pruneTerminals(options.id).catch((err) => {
+  persistRepoSnapshotCacheEntry(set, get().repos[options.id], options.repoInstanceId)
+  void terminalBridge.pruneTerminals(options.id, options.repoInstanceId).catch((err) => {
     terminalLog.warn('failed to prune repo sessions', { err })
   })
   void (async () => {
     try {
       if (options.isSnapshotCurrent()) await refreshPullRequestSummaryAfterSnapshot(get, options)
-      if (pullRequestRefreshFailed(get, options.id, options.token)) return
+      if (pullRequestRefreshFailed(get, options.id, options.repoInstanceId)) return
       if (options.isSnapshotCurrent()) await runSnapshotVisibleDetailBackfill(get, options)
     } catch (err) {
       refreshPullRequestsLog.warn('failed', { err })
       const message = err instanceof Error ? err.message : String(err)
-      updateIfFresh(set, options.id, options.token, (r) => {
+      updateIfFresh(set, options.id, options.repoInstanceId, (r) => {
         r.events = appendRepoEvent(r.events, errorEvent(message))
       })
     }
@@ -135,18 +136,18 @@ export async function runSnapshotSuccessWorkflow(
 
 async function runSnapshotVisibleDetailBackfill(
   get: ReposGet,
-  options: { id: string; token: number; isSnapshotCurrent: () => boolean; skipLogBackfill?: boolean },
+  options: { id: string; repoInstanceId: string; isSnapshotCurrent: () => boolean; skipLogBackfill?: boolean },
 ): Promise<void> {
   void options.skipLogBackfill
-  if (!options.isSnapshotCurrent() || !repoFresh(get, options.id, options.token)) return
-  await refreshVisibleDetailPullRequest(get, options.id, options.token)
-  if (pullRequestRefreshFailed(get, options.id, options.token)) return
+  if (!options.isSnapshotCurrent() || !repoFresh(get, options.id, options.repoInstanceId)) return
+  await refreshVisibleDetailPullRequest(get, options.id, options.repoInstanceId)
+  if (pullRequestRefreshFailed(get, options.id, options.repoInstanceId)) return
   await retryVisibleDetailPullRequestUntilSettled(get, options)
 }
 
-export async function runCoreDataRefreshWorkflow(get: ReposGet, options: { id: string; token: number }): Promise<void> {
-  await get().refreshSnapshotAndStatus(options.id, { skipLogBackfill: true, token: options.token })
+export async function runCoreDataRefreshWorkflow(get: ReposGet, options: { id: string; repoInstanceId: string }): Promise<void> {
+  await get().refreshSnapshotAndStatus(options.id, { skipLogBackfill: true, repoInstanceId: options.repoInstanceId })
   const after = get().repos[options.id]
-  if (!after || after.instanceToken !== options.token) return
+  if (!after || after.instanceId !== options.repoInstanceId) return
   if (isRepoUnavailable(after)) return
 }

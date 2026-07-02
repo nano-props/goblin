@@ -1,4 +1,5 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react'
+import type { QueryCacheNotifyEvent } from '@tanstack/react-query'
 import { persistWorkspaceSessionState } from '#/web/settings-actions.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { restorableWorkspaceStateFromStore } from '#/web/stores/repos/selector-state.ts'
@@ -25,6 +26,32 @@ export function useSessionPersistence() {
   const filetreeInteractionByScope = useFiletreeInteractionStore((s) => s.interactionByScope)
   const lastSavedRef = useRef<string | null>(null)
   const lastImmediateKeyRef = useRef<string | null>(null)
+  const queuedSaveRef = useRef<{ session: ReturnType<typeof workspaceSessionStateFromRestorableWorkspaceState>; serialized: string } | null>(null)
+  const saveDrainRef = useRef<Promise<void> | null>(null)
+
+  const enqueueSave = (
+    session: ReturnType<typeof workspaceSessionStateFromRestorableWorkspaceState>,
+    serialized: string,
+  ) => {
+    queuedSaveRef.current = { session, serialized }
+    if (saveDrainRef.current) return
+    saveDrainRef.current = (async () => {
+      while (queuedSaveRef.current) {
+        const next = queuedSaveRef.current
+        queuedSaveRef.current = null
+        lastSavedRef.current = next.serialized
+        try {
+          await persistWorkspaceSessionState(next.session)
+        } catch (err) {
+          if (lastSavedRef.current === next.serialized) lastSavedRef.current = null
+          sessionLog.warn('save failed', { err })
+        }
+      }
+    })().finally(() => {
+      saveDrainRef.current = null
+      if (queuedSaveRef.current) enqueueSave(queuedSaveRef.current.session, queuedSaveRef.current.serialized)
+    })
+  }
 
   useEffect(() => {
     // Client -> persistence only. Boot restore runs elsewhere first. sessionReady
@@ -43,25 +70,21 @@ export function useSessionPersistence() {
       filetreeInteractionByScope,
     })
     const serialized = JSON.stringify(session)
+    // Restorable session writes should be immediate only for coarse
+    // workspace-structure changes. High-frequency runtime churn such as
+    // terminal selection and workspace-tab mutation is still restorable, but
+    // it should batch through the debounce path instead of competing with
+    // server-owned runtime traffic one write at a time.
     const immediateKey = JSON.stringify({
       openRepoEntries: session.openRepoEntries,
       activeRepoId: session.activeRepoId,
       zenMode: session.zenMode,
       workspacePaneSize: session.workspacePaneSize,
-      selectedTerminalSessionIdByTerminalWorktree: session.selectedTerminalSessionIdByTerminalWorktree,
-      preferredWorkspacePaneTabByTargetByRepo: session.preferredWorkspacePaneTabByTargetByRepo,
-      workspacePaneTabsByTargetByRepo: session.workspacePaneTabsByTargetByRepo,
     })
     const immediate = lastImmediateKeyRef.current !== immediateKey
     lastImmediateKeyRef.current = immediateKey
     if (lastSavedRef.current === serialized) return
-    const save = () => {
-      lastSavedRef.current = serialized
-      void persistWorkspaceSessionState(session).catch((err) => {
-        lastSavedRef.current = null
-        sessionLog.warn('save failed', { err })
-      })
-    }
+    const save = () => enqueueSave(session, serialized)
     if (immediate) {
       save()
       return
@@ -88,7 +111,7 @@ function useWorkspacePaneTabsCacheVersion(): number {
 
 function subscribeWorkspacePaneTabsCache(onStoreChange: () => void): () => void {
   return primaryWindowQueryClient.getQueryCache().subscribe((event) => {
-    if (!event?.query || !isWorkspacePaneTabsQueryKey(event.query.queryKey)) return
+    if (!isWorkspacePaneTabsDataWrite(event)) return
     workspacePaneTabsCacheVersion += 1
     onStoreChange()
   })
@@ -96,4 +119,10 @@ function subscribeWorkspacePaneTabsCache(onStoreChange: () => void): () => void 
 
 function workspacePaneTabsCacheSnapshot(): number {
   return workspacePaneTabsCacheVersion
+}
+
+function isWorkspacePaneTabsDataWrite(event: QueryCacheNotifyEvent | undefined): boolean {
+  if (!event?.query || !isWorkspacePaneTabsQueryKey(event.query.queryKey)) return false
+  if (event.type !== 'updated') return false
+  return event.action.type === 'success' || event.action.type === 'setState'
 }

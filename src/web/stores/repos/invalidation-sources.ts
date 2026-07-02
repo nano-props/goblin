@@ -1,14 +1,12 @@
+import { createOpaqueId } from '#/shared/opaque-id.ts'
+
 const RECENT_SOURCE_TOKEN_TTL_MS = 10_000
 
 const activeSourceTokens = new Set<string>()
 const recentSourceTokens = new Map<string, number>()
 
 function createRepoInvalidationSourceToken(prefix: 'manual' | 'branch'): string {
-  const random =
-    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-      ? crypto.randomUUID().replace(/-/g, '')
-      : `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`
-  return `repo_${prefix}_${random}`
+  return createOpaqueId(`repo-${prefix}`)
 }
 
 export function beginRepoInvalidationSource(token: string): void {

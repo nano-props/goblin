@@ -1,6 +1,12 @@
 import { openExternalUrl } from '#/web/app-shell-client.ts'
 import { postServerJson } from '#/web/lib/server-fetch.ts'
-import type { CloneRepoResult, PullRequestEntry, RepoSnapshot, RepoLogResponse } from '#/shared/api-types.ts'
+import type {
+  CloneRepoResult,
+  PullRequestEntry,
+  RepoRuntimeOpenResult,
+  RepoSnapshot,
+  RepoLogResponse,
+} from '#/shared/api-types.ts'
 import type { EditorApp, TerminalApp } from '#/shared/api-types.ts'
 import type { ExecResult, LogEntry, PullRequestFetchMode, RepoUrlTarget, WorktreeStatus } from '#/shared/git-types.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
@@ -206,4 +212,26 @@ export async function openRepoInFinder(path: string): Promise<ExecResult> {
 
 export async function setBackgroundSyncRepos(repoIds: string[]): Promise<void> {
   await postServerJson('/api/repo/background-sync-repos', { repoIds })
+}
+
+export async function openRepoRuntimeInstance(repoRoot: string): Promise<string> {
+  const result = await postServerJson<{ repoRoot: string }, { repoInstanceId: string }>('/api/repo/runtime-open', {
+    repoRoot,
+  })
+  return result.repoInstanceId
+}
+
+export async function openRepoRuntimeForInput(repoInput: string): Promise<RepoRuntimeOpenResult> {
+  return await postServerJson<{ repoInput: string }, RepoRuntimeOpenResult>('/api/repo/runtime-open', { repoInput })
+}
+
+export async function closeRepoRuntimeInstance(repoRoot: string, repoInstanceId: string): Promise<boolean> {
+  const result = await postServerJson<
+    { repoRoot: string; repoInstanceId: string },
+    { ok: boolean; closed: boolean }
+  >('/api/repo/runtime-close', {
+    repoRoot,
+    repoInstanceId,
+  })
+  return result.closed
 }

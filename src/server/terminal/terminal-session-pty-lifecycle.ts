@@ -50,10 +50,13 @@ export interface TerminalPtySessionState<TUser extends string | number = string 
 export interface TerminalPtyBindingEvents<TSession extends TerminalPtySessionState> {
   isSessionLive(session: TSession): boolean
   emitLifecycle(session: TSession): void
-  emitOutput(session: TSession, event: TerminalOutputEvent): void
-  emitBell(session: TSession, event: Omit<TerminalBellRealtimeEvent, 'terminalSessionId' | 'repoRoot' | 'worktreePath'>): void
-  emitTitle(session: TSession, event: TerminalTitleEvent): void
-  emitExit(session: TSession, event: TerminalExitEvent): void
+  emitOutput(session: TSession, event: Omit<TerminalOutputEvent, 'terminalSessionId'>): void
+  emitBell(
+    session: TSession,
+    event: Omit<TerminalBellRealtimeEvent, 'terminalSessionId' | 'repoRoot' | 'worktreePath'>,
+  ): void
+  emitTitle(session: TSession, event: Omit<TerminalTitleEvent, 'terminalSessionId' | 'repoRoot' | 'worktreePath'>): void
+  emitExit(session: TSession, event: Omit<TerminalExitEvent, 'terminalSessionId'>): void
   closeSession(ptySessionId: string): void
 }
 

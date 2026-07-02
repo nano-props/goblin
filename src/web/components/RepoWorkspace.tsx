@@ -27,7 +27,7 @@ function repoWorkspaceRepoEqual(a: RepoWorkspaceRepo | undefined, b: RepoWorkspa
     (!!a &&
       !!b &&
       a.id === b.id &&
-      a.instanceToken === b.instanceToken &&
+      a.instanceId === b.instanceId &&
       a.data.branches === b.data.branches &&
       a.data.currentBranch === b.data.currentBranch &&
       a.data.status === b.data.status &&
@@ -66,7 +66,7 @@ export function RepoWorkspace({
       return repo
         ? {
             id: repo.id,
-            instanceToken: repo.instanceToken,
+            instanceId: repo.instanceId,
             data: {
               branches: repo.data.branches,
               currentBranch: repo.data.currentBranch,

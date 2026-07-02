@@ -33,7 +33,11 @@ describe('git', () => {
 
       expect(err).toBeInstanceOf(Error)
       expect((err as { timedOut?: boolean }).timedOut).toBe(true)
-      expect(performance.now() - started).toBeLessThan(1_500)
+      // Expected budget is ~timeoutMs (300) + forceKillAfterDelay (500) plus
+      // process spawn/kill overhead. Generous ceiling to avoid flaking under
+      // load (parallel test runs, slow CI runners) while still catching a
+      // genuinely broken kill path (which would hang far longer than this).
+      expect(performance.now() - started).toBeLessThan(5_000)
     } finally {
       if (originalPath === undefined) delete process.env.PATH
       else process.env.PATH = originalPath

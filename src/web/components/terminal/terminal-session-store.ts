@@ -119,10 +119,10 @@ export function useTerminalSessionSummaries(terminalWorktreeKey: string | null):
 }
 
 export function useTerminalRepoSyncReady(repoRoot: string | null): boolean {
-  const instanceToken = useReposStore((s) => (repoRoot ? s.repos[repoRoot]?.instanceToken : undefined))
+  const instanceId = useReposStore((s) => (repoRoot ? s.repos[repoRoot]?.instanceId : undefined))
   return useRepoSyncStore((s) => {
-    if (!repoRoot || typeof instanceToken !== 'number') return false
-    return s.ready.get(repoRoot) === instanceToken
+    if (!repoRoot || typeof instanceId !== 'string') return false
+    return s.ready.get(repoRoot) === instanceId
   })
 }
 

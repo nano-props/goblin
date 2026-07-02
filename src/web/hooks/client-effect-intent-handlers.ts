@@ -174,7 +174,7 @@ export async function handleWorkspaceClientIntent(
       await runRepoRefreshIntent(useReposStore.getState, {
         kind: 'manual-refresh-requested',
         id: plan.repoId,
-        token: plan.token,
+        repoInstanceId: plan.repoInstanceId,
       })
       return true
     case 'show-workspace-pane-tab':

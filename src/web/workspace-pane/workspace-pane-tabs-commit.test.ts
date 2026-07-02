@@ -16,6 +16,7 @@ import type { WorkspacePaneTabsEntry } from '#/shared/terminal-types.ts'
 import { clearWorkspacePaneTabsOperationQueuesForTests } from '#/web/workspace-pane/workspace-pane-tabs-operation-queue.ts'
 
 const REPO_ROOT = '/tmp/workspace-pane-tabs-commit-repo'
+const REPO_INSTANCE_ID = 'repo-instance-test'
 const BRANCH_NAME = 'feature/worktree'
 const WORKTREE_PATH = '/tmp/workspace-pane-tabs-commit-worktree'
 
@@ -42,6 +43,7 @@ describe('commitWorkspacePaneTabs', () => {
 
     setWorkspacePaneTabsForTargetQueryData({
       repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
       branchName: BRANCH_NAME,
       worktreePath: WORKTREE_PATH,
       tabs: [workspacePaneStaticTabEntry('history')],
@@ -49,6 +51,7 @@ describe('commitWorkspacePaneTabs', () => {
 
     const commit = commitWorkspacePaneTabs({
       repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
       branchName: BRANCH_NAME,
       worktreePath: WORKTREE_PATH,
       tabs: [workspacePaneTerminalTabEntry('session-1'), workspacePaneStaticTabEntry('status')],
@@ -72,6 +75,7 @@ describe('commitWorkspacePaneTabs', () => {
     })
     setWorkspacePaneTabsForTargetQueryData({
       repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
       branchName: BRANCH_NAME,
       worktreePath: WORKTREE_PATH,
       tabs: [workspacePaneStaticTabEntry('status')],
@@ -80,6 +84,7 @@ describe('commitWorkspacePaneTabs', () => {
     await expect(
       commitWorkspacePaneTabs({
         repoRoot: REPO_ROOT,
+        repoInstanceId: REPO_INSTANCE_ID,
         branchName: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
         tabs: [workspacePaneStaticTabEntry('history')],
@@ -99,11 +104,14 @@ describe('commitWorkspacePaneTabs', () => {
       replaceWorkspaceTabs: async (input) => [...input.tabs],
     })
 
-    const fetch = primaryWindowQueryClient.fetchQuery(workspacePaneTabsQueryOptions(REPO_ROOT)).catch(() => null)
+    const fetch = primaryWindowQueryClient
+      .fetchQuery(workspacePaneTabsQueryOptions(REPO_ROOT, REPO_INSTANCE_ID))
+      .catch(() => null)
 
     await expect(
       commitWorkspacePaneTabs({
         repoRoot: REPO_ROOT,
+        repoInstanceId: REPO_INSTANCE_ID,
         branchName: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
         tabs: [workspacePaneTerminalTabEntry('session-1'), workspacePaneStaticTabEntry('status')],
@@ -149,12 +157,15 @@ describe('commitWorkspacePaneTabs', () => {
 
     const commit = commitWorkspacePaneTabs({
       repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
       branchName: BRANCH_NAME,
       worktreePath: WORKTREE_PATH,
       tabs: [workspacePaneTerminalTabEntry('session-1'), workspacePaneStaticTabEntry('status')],
     })
     await replaceStarted
-    const fetch = primaryWindowQueryClient.fetchQuery(workspacePaneTabsQueryOptions(REPO_ROOT)).catch(() => null)
+    const fetch = primaryWindowQueryClient
+      .fetchQuery(workspacePaneTabsQueryOptions(REPO_ROOT, REPO_INSTANCE_ID))
+      .catch(() => null)
 
     resolveServerTabs([workspacePaneTerminalTabEntry('session-1'), workspacePaneStaticTabEntry('status')])
     await expect(commit).resolves.toMatchObject({ ok: true })
@@ -185,6 +196,7 @@ describe('updateWorkspacePaneTabs', () => {
     })
     setWorkspacePaneTabsForTargetQueryData({
       repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
       branchName: BRANCH_NAME,
       worktreePath: WORKTREE_PATH,
       tabs: [workspacePaneStaticTabEntry('status')],
@@ -193,6 +205,7 @@ describe('updateWorkspacePaneTabs', () => {
     await expect(
       updateWorkspacePaneTabs({
         repoRoot: REPO_ROOT,
+        repoInstanceId: REPO_INSTANCE_ID,
         branchName: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
         operation: { type: 'open-static', tabType: 'history' },
@@ -218,6 +231,7 @@ describe('updateWorkspacePaneTabs', () => {
     })
     setWorkspacePaneTabsForTargetQueryData({
       repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
       branchName: BRANCH_NAME,
       worktreePath: WORKTREE_PATH,
       tabs: [workspacePaneStaticTabEntry('status')],
@@ -226,6 +240,7 @@ describe('updateWorkspacePaneTabs', () => {
     await expect(
       updateWorkspacePaneTabs({
         repoRoot: REPO_ROOT,
+        repoInstanceId: REPO_INSTANCE_ID,
         branchName: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
         operation: {
@@ -250,6 +265,7 @@ describe('updateWorkspacePaneTabs', () => {
     })
     setWorkspacePaneTabsForTargetQueryData({
       repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
       branchName: BRANCH_NAME,
       worktreePath: WORKTREE_PATH,
       tabs: [workspacePaneStaticTabEntry('status')],
@@ -258,6 +274,7 @@ describe('updateWorkspacePaneTabs', () => {
     await expect(
       updateWorkspacePaneTabs({
         repoRoot: REPO_ROOT,
+        repoInstanceId: REPO_INSTANCE_ID,
         branchName: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
         operation: { type: 'open-static', tabType: 'history' },
@@ -271,6 +288,7 @@ describe('updateWorkspacePaneTabs', () => {
 function readWorkspacePaneTabs(): WorkspacePaneTabEntry[] {
   return readWorkspacePaneTabsForTarget({
     repoRoot: REPO_ROOT,
+    repoInstanceId: REPO_INSTANCE_ID,
     branchName: BRANCH_NAME,
     worktreePath: WORKTREE_PATH,
   })

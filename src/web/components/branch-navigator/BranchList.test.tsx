@@ -36,7 +36,7 @@ afterEach(() => {
 
 describe('BranchList', () => {
   test('renders one row per branch and forwards click/double-click', () => {
-    const repo = emptyRepo('/tmp/repo', 'repo')
+    const repo = emptyRepo('/tmp/repo', 'repo', 'repo-instance-test')
     const branches = [createRepoBranch('main'), createRepoBranch('feature/a'), createRepoBranch('fix/b')]
     const onSelect = vi.fn()
     const onOpenStatus = vi.fn()
@@ -63,7 +63,7 @@ describe('BranchList', () => {
   })
 
   test('renders the emptyState slot when branches is empty', () => {
-    const repo = emptyRepo('/tmp/repo', 'repo')
+    const repo = emptyRepo('/tmp/repo', 'repo', 'repo-instance-test')
     const onSelect = vi.fn()
 
     const { container } = renderInJsdom(
@@ -102,7 +102,7 @@ describe('BranchList', () => {
   })
 
   test('highlights the row whose name matches highlightedBranch', () => {
-    const repo = emptyRepo('/tmp/repo', 'repo')
+    const repo = emptyRepo('/tmp/repo', 'repo', 'repo-instance-test')
     const branches = [createRepoBranch('main'), createRepoBranch('feature/a'), createRepoBranch('fix/b')]
 
     const { container } = renderInJsdom(

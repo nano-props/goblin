@@ -113,6 +113,7 @@ describe('shared terminal validators', () => {
         action: 'replace-tabs',
         input: {
           repoRoot: '/repo',
+          repoInstanceId: 'repo-instance-test',
           branchName: 'main',
           worktreePath: '/repo',
           tabs: [{ type: 'terminal', terminalSessionId: '' }],
@@ -129,6 +130,7 @@ describe('shared terminal validators', () => {
         action: 'update-tabs',
         input: {
           repoRoot: '/repo',
+          repoInstanceId: 'repo-instance-test',
           branchName: 'main',
           worktreePath: '/repo',
           operation: { type: 'open-static', tabType: 'history' },
@@ -143,12 +145,38 @@ describe('shared terminal validators', () => {
         action: 'update-tabs',
         input: {
           repoRoot: '/repo',
+          repoInstanceId: 'repo-instance-test',
           branchName: 'main',
           worktreePath: '/repo',
           operation: { type: 'reorder', tabIdentities: ['workspace-pane:status', 'bad\0identity'] },
         },
       }),
     ).toBeNull()
+  })
+
+  test('rejects prune requests without a repo instance id', () => {
+    expect(
+      normalizeTerminalClientMessage({
+        type: 'request',
+        requestId: 'request_125',
+        action: 'prune',
+        input: {
+          repoRoot: '/repo',
+        },
+      }),
+    ).toBeNull()
+
+    expect(
+      normalizeTerminalClientMessage({
+        type: 'request',
+        requestId: 'request_126',
+        action: 'prune',
+        input: {
+          repoRoot: '/repo',
+          repoInstanceId: 'repo-instance-test',
+        },
+      }),
+    ).toMatchObject({ type: 'request', action: 'prune' })
   })
 
   test('rejects NUL bytes in startup shell commands', () => {
@@ -213,11 +241,23 @@ describe('shared terminal validators', () => {
     expect(
       normalizeTerminalSocketServerMessage({
         type: 'output',
-        event: { ptySessionId: 'pty_1234567890abcdef', data: 'hi', seq: 1, processName: 'zsh' },
+        event: {
+          ptySessionId: 'pty_1234567890abcdef',
+          terminalSessionId: 'session-1',
+          data: 'hi',
+          seq: 1,
+          processName: 'zsh',
+        },
       }),
     ).toEqual({
       type: 'output',
-      event: { ptySessionId: 'pty_1234567890abcdef', data: 'hi', seq: 1, processName: 'zsh' },
+      event: {
+        ptySessionId: 'pty_1234567890abcdef',
+        terminalSessionId: 'session-1',
+        data: 'hi',
+        seq: 1,
+        processName: 'zsh',
+      },
     })
 
     expect(normalizeTerminalSocketServerMessage({ type: 'pong', requestId: 'health_1' })).toEqual({

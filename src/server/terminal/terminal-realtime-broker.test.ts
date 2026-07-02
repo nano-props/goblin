@@ -12,10 +12,12 @@ const USER_B = 'user_b'
 const TEST_NOW = new Date('2026-06-24T00:00:00Z')
 const HEARTBEAT_SILENCE_MS = HEARTBEAT_DEADLINE_MS + HEARTBEAT_INTERVAL_MS
 
-function createBroker(options: {
-  onClientPresenceChanged?: (event: TerminalClientPresenceChange) => void
-  onUserSocketsDrained?: (userId: string) => void
-} = {}): TerminalRealtimeBroker {
+function createBroker(
+  options: {
+    onClientPresenceChanged?: (event: TerminalClientPresenceChange) => void
+    onUserSocketsDrained?: (userId: string) => void
+  } = {},
+): TerminalRealtimeBroker {
   return new TerminalRealtimeBroker({
     onClientPresenceChanged: options.onClientPresenceChanged ?? vi.fn(),
     onUserSocketsDrained: options.onUserSocketsDrained ?? vi.fn(),
@@ -61,7 +63,7 @@ describe('terminal realtime broker', () => {
 
     broker.broadcastToUser(USER_A, {
       type: 'output',
-      event: { ptySessionId: 's_1', data: 'hi', seq: 1, processName: 'zsh' },
+      event: { ptySessionId: 's_1', terminalSessionId: 'terminal_1', data: 'hi', seq: 1, processName: 'zsh' },
     })
 
     expect(electronSocket.send).toHaveBeenCalledTimes(1)
@@ -70,7 +72,7 @@ describe('terminal realtime broker', () => {
     expect(String(chromeSocket.send.mock.calls[0]?.[0])).toBe(payload)
     expect(JSON.parse(payload)).toMatchObject({
       type: 'output',
-      event: { ptySessionId: 's_1', data: 'hi', seq: 1, processName: 'zsh' },
+      event: { ptySessionId: 's_1', terminalSessionId: 'terminal_1', data: 'hi', seq: 1, processName: 'zsh' },
     })
   })
 
@@ -83,7 +85,7 @@ describe('terminal realtime broker', () => {
 
     broker.broadcastToUser(USER_A, {
       type: 'output',
-      event: { ptySessionId: 's_1', data: 'a', seq: 1, processName: 'zsh' },
+      event: { ptySessionId: 's_1', terminalSessionId: 'terminal_1', data: 'a', seq: 1, processName: 'zsh' },
     })
 
     expect(userASocket.send).toHaveBeenCalledTimes(1)
@@ -99,7 +101,7 @@ describe('terminal realtime broker', () => {
 
     broker.broadcastToUser(USER_A, {
       type: 'output',
-      event: { ptySessionId: 's_1', data: 'a', seq: 1, processName: 'zsh' },
+      event: { ptySessionId: 's_1', terminalSessionId: 'terminal_1', data: 'a', seq: 1, processName: 'zsh' },
     })
 
     expect(userASocket.send).toHaveBeenCalledTimes(1)
@@ -116,7 +118,7 @@ describe('terminal realtime broker', () => {
 
     broker.broadcastToUser(USER_A, {
       type: 'output',
-      event: { ptySessionId: 's_1', data: 'a', seq: 1, processName: 'zsh' },
+      event: { ptySessionId: 's_1', terminalSessionId: 'terminal_1', data: 'a', seq: 1, processName: 'zsh' },
     })
     expect(socket.send).not.toHaveBeenCalled()
   })

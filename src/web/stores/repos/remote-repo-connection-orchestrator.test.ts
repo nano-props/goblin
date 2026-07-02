@@ -78,7 +78,7 @@ describe('runRemoteRepoConnection', () => {
       const repo: RepoState = {
         id: REMOTE_ID,
         name: 'example:repo',
-        instanceToken: 1,
+        instanceId: 'repo-instance-test',
         data: { branches: [], currentBranch: '', status: [], statusLoaded: false, worktreesByPath: {} },
         dataLoads: {
           fetch: { phase: 'idle', loadedAt: null, stale: false, error: null },
@@ -138,7 +138,7 @@ describe('runRemoteRepoConnection', () => {
       const repo: RepoState = {
         id: REMOTE_ID,
         name: 'example:repo',
-        instanceToken: 1,
+        instanceId: 'repo-instance-test',
         data: { branches: [], currentBranch: '', status: [], statusLoaded: false, worktreesByPath: {} },
         dataLoads: emptyDataLoads(),
         operations: emptyOperations(),
@@ -184,7 +184,7 @@ describe('runRemoteRepoConnection', () => {
       const repo: RepoState = {
         id: REMOTE_ID,
         name: 'example:repo',
-        instanceToken: 1,
+        instanceId: 'repo-instance-test',
         data: { branches: [], currentBranch: '', status: [], statusLoaded: false, worktreesByPath: {} },
         dataLoads: emptyDataLoads(),
         operations: emptyOperations(),
@@ -230,7 +230,7 @@ describe('runRemoteRepoConnection', () => {
       const repo: RepoState = {
         id: REMOTE_ID,
         name: 'example:repo',
-        instanceToken: 1,
+        instanceId: 'repo-instance-test',
         data: { branches: [], currentBranch: '', status: [], statusLoaded: false, worktreesByPath: {} },
         dataLoads: emptyDataLoads(),
         operations: emptyOperations(),
@@ -272,7 +272,7 @@ describe('runRemoteRepoConnection', () => {
     const target = remoteTargetFixture()
     installGoblin()
     useReposStore.setState((s) => {
-      const repo = emptyRepo(REMOTE_ID, 'example:/')
+      const repo = emptyRepo(REMOTE_ID, 'example:/', 'repo-instance-test')
       repo.remote.lifecycle = { kind: 'failed', reason: 'unreachable', target }
       repo.availability = { phase: 'unavailable', reason: 'unreachable', checkedAt: 0 }
       return { ...s, repos: { ...s.repos, [REMOTE_ID]: repo }, order: [REMOTE_ID] }
@@ -309,7 +309,7 @@ describe('runRemoteRepoConnection', () => {
       const repo: RepoState = {
         id: REMOTE_ID,
         name: 'example:repo',
-        instanceToken: 1,
+        instanceId: 'repo-instance-test',
         data: { branches: [], currentBranch: '', status: [], statusLoaded: false, worktreesByPath: {} },
         dataLoads: emptyDataLoads(),
         operations: emptyOperations(),
@@ -375,7 +375,7 @@ describe('runRemoteRepoConnection', () => {
         const repo: RepoState = {
           id: REMOTE_ID,
           name: 'example:repo',
-          instanceToken: 1,
+          instanceId: 'repo-instance-test',
           data: { branches: [], currentBranch: '', status: [], statusLoaded: false, worktreesByPath: {} },
           dataLoads: emptyDataLoads(),
           operations: emptyOperations(),

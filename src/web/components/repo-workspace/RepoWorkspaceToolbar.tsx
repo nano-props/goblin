@@ -29,6 +29,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
 import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
+import { captureWorkspacePaneActiveTabIdentity } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import {
   terminalWorkspacePaneTabProvider,
   workspacePaneStaticTabProvider,
@@ -79,16 +80,21 @@ export function RepoWorkspaceToolbar({
   )
   const showBranchLevelTabs = !!detail.branch
 
-  const { createTerminal, selectTerminal, scrollToBottom } = useTerminalSessionContext()
+  const { createTerminal, createOwnedTerminal, selectTerminal, scrollToBottom } = useTerminalSessionContext()
 
   const workspacePaneTabFocusRegistry = useFocusRegistry<string, HTMLButtonElement>()
 
   const terminalBase = useMemo<TerminalSessionBase | null>(
     () =>
       detail.branch?.worktree?.path
-        ? { repoRoot: repo.id, branch: detail.branch.name, worktreePath: detail.branch.worktree.path }
+        ? {
+            repoRoot: repo.id,
+            repoInstanceId: repo.instanceId,
+            branch: detail.branch.name,
+            worktreePath: detail.branch.worktree.path,
+          }
         : null,
-    [repo.id, detail.branch],
+    [repo.id, repo.instanceId, detail.branch],
   )
 
   // Shared "enter the terminal view" effect for any terminal-targeting action:
@@ -105,13 +111,16 @@ export function RepoWorkspaceToolbar({
 
   const handleNewTerminal = useCallback(() => {
     if (!terminalBase) return
-    enterTerminalTab()
+    const openerIdentity = captureWorkspacePaneActiveTabIdentity(repo.id)
     void runCreateTerminalTabCommand({
       base: terminalBase,
       createTerminal,
+      createOwnedTerminal,
+      openerIdentity,
+      enterTerminalTab,
       t,
     })
-  }, [createTerminal, terminalBase, enterTerminalTab, t])
+  }, [createOwnedTerminal, createTerminal, terminalBase, repo.id, enterTerminalTab, t])
 
   const showWorkspacePaneTabItem = useCallback(
     (item: WorkspacePaneTabItem) => {
@@ -148,6 +157,7 @@ export function RepoWorkspaceToolbar({
   })
   const { reorderTabs: reorderWorkspacePaneTabs } = useWorkspacePaneTabsReorderMutation({
     repoRoot: repo.id,
+    repoInstanceId: repo.instanceId,
     branchName,
     worktreePath: terminalBase?.worktreePath ?? null,
     canonicalTabs: workspacePaneTabModel.tabEntries,
@@ -296,9 +306,10 @@ export function RepoWorkspaceToolbar({
               panelActive
               focusRegistry={workspacePaneTabFocusRegistry}
               emptyFocusKey={EMPTY_WORKSPACE_PANE_TAB_FOCUS_KEY}
-              // While a real terminal create is in flight, the tab model
-              // contributes a pending terminal tab. Additional creates stay
-              // disabled through the New Terminal affordance.
+              // While a terminal create is in flight, the tab model contributes
+              // a pending terminal tab. This is presentation only: create
+              // intent still goes to the server, which is the lifecycle
+              // authority and either accepts, serializes, or rejects it.
               newTerminalBusy={isInitialSyncInFlight || workspacePaneTabModel.terminalCreatePending}
               onNew={handleNewTerminal}
               onSelect={handleSelectWorkspacePaneTabItem}

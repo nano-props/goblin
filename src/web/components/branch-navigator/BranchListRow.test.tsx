@@ -45,28 +45,28 @@ beforeEach(() => {
 
 describe('BranchListRow', () => {
   test('forwards `branchActionBusy=true` when an in-flight branch action targets this branch', () => {
-    const repo = emptyRepo('/tmp/repo', 'repo')
+    const repo = emptyRepo('/tmp/repo', 'repo', 'repo-instance-test')
     repo.operations.branchAction = { ...repo.operations.branchAction, phase: 'running', target: 'feature/a' }
     renderInJsdom(<BranchListRow {...baseProps(repo, 'feature/a')} />)
     expect(branchRowPropsSpy).toHaveBeenCalledWith(expect.objectContaining({ branchActionBusy: true }))
   })
 
   test('forwards `branchActionBusy=false` when an in-flight branch action targets a different branch', () => {
-    const repo = emptyRepo('/tmp/repo', 'repo')
+    const repo = emptyRepo('/tmp/repo', 'repo', 'repo-instance-test')
     repo.operations.branchAction = { ...repo.operations.branchAction, phase: 'running', target: 'feature/other' }
     renderInJsdom(<BranchListRow {...baseProps(repo, 'feature/a')} />)
     expect(branchRowPropsSpy).toHaveBeenCalledWith(expect.objectContaining({ branchActionBusy: false }))
   })
 
   test('forwards `branchActionBusy=false` when the operations state is idle', () => {
-    const repo = emptyRepo('/tmp/repo', 'repo')
+    const repo = emptyRepo('/tmp/repo', 'repo', 'repo-instance-test')
     renderInJsdom(<BranchListRow {...baseProps(repo, 'feature/a')} />)
     expect(branchRowPropsSpy).toHaveBeenCalledWith(expect.objectContaining({ branchActionBusy: false }))
   })
 
   test('forwards terminal output activity from the worktree terminal snapshot', () => {
     terminalStoreMocks.outputActive = true
-    const repo = emptyRepo('/tmp/repo', 'repo')
+    const repo = emptyRepo('/tmp/repo', 'repo', 'repo-instance-test')
     renderInJsdom(<BranchListRow {...baseProps(repo, 'feature/a')} />)
     expect(branchRowPropsSpy).toHaveBeenCalledWith(expect.objectContaining({ terminalOutputActive: true }))
   })

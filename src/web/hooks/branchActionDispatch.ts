@@ -56,7 +56,7 @@ export function dispatchDeleteBranch({
 }): Promise<ExecResult | null> {
   return dispatchRepoBranchAction(
     repo.id,
-    repo.instanceToken,
+    repo.instanceId,
     { kind: 'deleteBranch', branch: branchName, force, alsoDeleteUpstream },
     useReposStore.getState().runBranchAction,
     {
@@ -109,7 +109,7 @@ export async function dispatchRemoveWorktree({
   }
   return await dispatchRepoBranchAction(
     repo.id,
-    repo.instanceToken,
+    repo.instanceId,
     {
       kind: 'removeWorktree',
       branch: target.branch,
@@ -154,7 +154,7 @@ function recordRemoveWorktreeResult(
   alsoDeleteBranch: boolean,
   result: ExecResult,
 ): void {
-  useReposStore.getState().setLastResult(repo.id, result, repo.instanceToken, {
+  useReposStore.getState().setLastResult(repo.id, result, repo.instanceId, {
     action: {
       kind: 'removeWorktree',
       branch: target.branch,
@@ -174,7 +174,7 @@ export function dispatchPush({
 }: BranchActionDispatchContext & { branchName: string }): Promise<ExecResult | null> {
   return dispatchRepoBranchAction(
     repo.id,
-    repo.instanceToken,
+    repo.instanceId,
     { kind: 'push', branch: branchName },
     useReposStore.getState().runBranchAction,
   )

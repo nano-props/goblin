@@ -12,47 +12,52 @@ import { defaultWorkspacePaneTabs, normalizeWorkspacePaneTabs } from '#/web/work
 
 export type WorkspacePaneTabsQueryData = WorkspacePaneTabsEntry[]
 
-export function workspacePaneTabsQueryKey(repoRoot: string) {
-  return ['workspace-pane-tabs', repoRoot] as const
+export function workspacePaneTabsQueryKey(repoRoot: string, repoInstanceId: string) {
+  return ['workspace-pane-tabs', repoRoot, repoInstanceId] as const
 }
 
 export function isWorkspacePaneTabsQueryKey(queryKey: readonly unknown[]): boolean {
-  return queryKey[0] === 'workspace-pane-tabs' && typeof queryKey[1] === 'string'
+  return queryKey[0] === 'workspace-pane-tabs' && typeof queryKey[1] === 'string' && typeof queryKey[2] === 'string'
 }
 
-export function workspacePaneTabsQueryOptions(repoRoot: string) {
+export function workspacePaneTabsQueryOptions(repoRoot: string, repoInstanceId: string) {
   return queryOptions({
-    queryKey: workspacePaneTabsQueryKey(repoRoot),
-    queryFn: async () => normalizeWorkspacePaneTabsQueryData(await terminalBridge.listWorkspaceTabs({ repoRoot })),
+    queryKey: workspacePaneTabsQueryKey(repoRoot, repoInstanceId),
+    queryFn: async () =>
+      normalizeWorkspacePaneTabsQueryData(await terminalBridge.listWorkspaceTabs({ repoRoot, repoInstanceId })),
     staleTime: Number.POSITIVE_INFINITY,
     gcTime: Number.POSITIVE_INFINITY,
   })
 }
 
-export function useWorkspacePaneTabsQuery(repoRoot: string) {
-  return useQuery(workspacePaneTabsQueryOptions(repoRoot))
+export function useWorkspacePaneTabsQuery(repoRoot: string, repoInstanceId: string) {
+  return useQuery(workspacePaneTabsQueryOptions(repoRoot, repoInstanceId))
 }
 
 export function readWorkspacePaneTabsForTarget(
   target: {
     repoRoot: string
+    repoInstanceId: string
     branchName: string | null | undefined
     worktreePath: string | null
   },
   queryClient: QueryClient = primaryWindowQueryClient,
 ): WorkspacePaneTabEntry[] {
-  const data = queryClient.getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(target.repoRoot)) ?? []
+  const data =
+    queryClient.getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(target.repoRoot, target.repoInstanceId)) ??
+    []
   return workspacePaneTabsForTargetFromQueryData(data, target)
 }
 
 export async function fetchWorkspacePaneTabsForTarget(input: {
   repoRoot: string
+  repoInstanceId: string
   branchName: string
   worktreePath: string | null
   queryClient?: QueryClient
 }): Promise<WorkspacePaneTabEntry[]> {
   const queryClient = input.queryClient ?? primaryWindowQueryClient
-  const data = await queryClient.fetchQuery(workspacePaneTabsQueryOptions(input.repoRoot))
+  const data = await queryClient.fetchQuery(workspacePaneTabsQueryOptions(input.repoRoot, input.repoInstanceId))
   return workspacePaneTabsForTargetFromQueryData(data, input)
 }
 
@@ -76,37 +81,43 @@ export function workspacePaneTabsForTargetFromQueryData(
 export function setWorkspacePaneTabsForTargetQueryData(
   input: {
     repoRoot: string
+    repoInstanceId: string
     branchName: string
     worktreePath: string | null
     tabs: readonly WorkspacePaneTabEntry[]
   },
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
-  queryClient.setQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(input.repoRoot), (current) => {
-    return normalizeWorkspacePaneTabsQueryData([
-      ...(current ?? []).filter((entry) => !workspacePaneTabsEntryMatchesTarget(entry, input)),
-      {
-        repoRoot: input.repoRoot,
-        branchName: input.branchName,
-        worktreePath: input.worktreePath,
-        tabs: [...input.tabs],
-      },
-    ])
-  })
+  queryClient.setQueryData<WorkspacePaneTabsQueryData>(
+    workspacePaneTabsQueryKey(input.repoRoot, input.repoInstanceId),
+    (current) => {
+      return normalizeWorkspacePaneTabsQueryData([
+        ...(current ?? []).filter((entry) => !workspacePaneTabsEntryMatchesTarget(entry, input)),
+        {
+          repoRoot: input.repoRoot,
+          branchName: input.branchName,
+          worktreePath: input.worktreePath,
+          tabs: [...input.tabs],
+        },
+      ])
+    },
+  )
 }
 
 export async function cancelWorkspacePaneTabs(
   repoRoot: string,
+  repoInstanceId: string,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): Promise<void> {
-  await queryClient.cancelQueries({ queryKey: workspacePaneTabsQueryKey(repoRoot), exact: true })
+  await queryClient.cancelQueries({ queryKey: workspacePaneTabsQueryKey(repoRoot, repoInstanceId), exact: true })
 }
 
 export function invalidateWorkspacePaneTabs(
   repoRoot: string,
+  repoInstanceId: string,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
-  void queryClient.invalidateQueries({ queryKey: workspacePaneTabsQueryKey(repoRoot), exact: true })
+  void queryClient.invalidateQueries({ queryKey: workspacePaneTabsQueryKey(repoRoot, repoInstanceId), exact: true })
 }
 
 export function workspacePaneTabsByTargetFromQueryData(

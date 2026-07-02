@@ -15,7 +15,7 @@ import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-p
 
 interface RepoRefreshIntentBase {
   id: string
-  token: number
+  repoInstanceId: string
 }
 
 type CoreRepoRefreshReason = 'initial-load' | 'branch-action'
@@ -30,7 +30,7 @@ type RepoInvalidationRefreshDisposition = 'refresh' | 'suppress'
 
 export interface RepoStatusRefreshSnapshot {
   id: string
-  token: number
+  repoInstanceId: string
   preferredWorkspacePaneTab: WorkspacePaneTabType
   statusViewOpen: boolean
   unavailable: boolean
@@ -41,11 +41,12 @@ export function repoStatusRefreshSnapshot(repo: RepoState): RepoStatusRefreshSna
   const selectedTarget = workspacePaneTabsTargetForRepoBranch(repo, repo.ui.selectedBranch)
   return {
     id: repo.id,
-    token: repo.instanceToken,
+    repoInstanceId: repo.instanceId,
     preferredWorkspacePaneTab: preferredWorkspacePaneTabForTarget(repo.ui, selectedTarget),
     statusViewOpen: workspacePaneStaticTabsFromEntries(
       readWorkspacePaneTabsForTarget({
         repoRoot: repo.id,
+        repoInstanceId: repo.instanceId,
         branchName: selectedTarget?.branchName ?? null,
         worktreePath: selectedTarget?.worktreePath ?? null,
       }),
@@ -63,19 +64,19 @@ async function runVisiblePullRequestRefresh(
   get: ReposGet,
   id: string,
   branch: string | null | undefined,
-  token: number,
+  repoInstanceId: string,
 ): Promise<void> {
   if (!branch) return
-  await get().refreshPullRequests(id, [branch], { token, mode: 'full' })
+  await get().refreshPullRequests(id, [branch], { repoInstanceId, mode: 'full' })
 }
 
-async function runVisibleStatusRefresh(get: ReposGet, id: string, token: number): Promise<void> {
+async function runVisibleStatusRefresh(get: ReposGet, id: string, repoInstanceId: string): Promise<void> {
   const state = get()
   if (state.activeId !== id) return
   const repo = state.repos[id]
-  if (!repo || repo.instanceToken !== token) return
+  if (!repo || repo.instanceId !== repoInstanceId) return
   if (!isRepoStatusRefreshable(repoStatusRefreshSnapshot(repo))) return
-  await state.refreshStatus(id, { token })
+  await state.refreshStatus(id, { repoInstanceId })
 }
 
 export function requestVisibleRepoStatusRefresh(get: ReposGet, id: string): void {
@@ -84,7 +85,7 @@ export function requestVisibleRepoStatusRefresh(get: ReposGet, id: string): void
   void runRepoRefreshIntent(get, {
     kind: 'visible-status-like-view-opened',
     id,
-    token: repo.instanceToken,
+    repoInstanceId: repo.instanceId,
   })
 }
 
@@ -98,14 +99,14 @@ export function repoInvalidationRefreshDisposition(
 export async function handleRepoInvalidationRefresh(
   get: ReposGet,
   event: Pick<RepoQueryInvalidationEvent, 'repoId' | 'query' | 'sourceToken'>,
-  token: number,
+  repoInstanceId: string,
 ): Promise<void> {
   const repoId = event.repoId
   const repo = get().repos[repoId]
-  if (!repo || repo.instanceToken !== token || isRepoUnavailable(repo)) return
+  if (!repo || repo.instanceId !== repoInstanceId || isRepoUnavailable(repo)) return
   const disposition = repoInvalidationRefreshDisposition(event)
   if (disposition !== 'refresh') return
-  await get().refreshCoreData(repoId, { token })
+  await get().refreshCoreData(repoId, { repoInstanceId })
 }
 
 export function resetRepoRefreshCoordinatorState(): void {
@@ -115,16 +116,16 @@ export function resetRepoRefreshCoordinatorState(): void {
 export async function runRepoRefreshIntent(get: ReposGet, intent: RepoRefreshIntent): Promise<void> {
   switch (intent.kind) {
     case 'manual-refresh-requested':
-      await get().syncAndRefresh(intent.id, { token: intent.token })
+      await get().syncAndRefresh(intent.id, { repoInstanceId: intent.repoInstanceId })
       return
     case 'core-data-changed':
-      await get().refreshCoreData(intent.id, { token: intent.token })
+      await get().refreshCoreData(intent.id, { repoInstanceId: intent.repoInstanceId })
       return
     case 'visible-pull-request-changed':
-      await runVisiblePullRequestRefresh(get, intent.id, intent.branch, intent.token)
+      await runVisiblePullRequestRefresh(get, intent.id, intent.branch, intent.repoInstanceId)
       return
     case 'visible-status-like-view-opened':
-      await runVisibleStatusRefresh(get, intent.id, intent.token)
+      await runVisibleStatusRefresh(get, intent.id, intent.repoInstanceId)
       return
   }
   const exhaustive: never = intent

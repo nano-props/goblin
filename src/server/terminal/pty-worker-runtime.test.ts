@@ -93,7 +93,7 @@ describe('PtyWorkerRuntime', () => {
       type: 'pty-spawn-result',
       requestId: 'req_1',
       ok: true,
-      ptySessionId: expect.stringMatching(/^pty_/),
+      ptySessionId: expect.stringMatching(/^pty-/),
       // The initial processName is a placeholder; the real name is
       // sampled on the first onData chunk so the macOS spawn-helper
       // comm never leaks. See "samples the real process name on the

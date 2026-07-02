@@ -171,25 +171,25 @@ function applyPullRequestEntries(
   }
 }
 
-export function shouldAttemptFetch(repo: RepoState | null | undefined, token: number): boolean {
-  return !!repo && repo.instanceToken === token && repo.remote.hasRemotes === true && !isRepoUnavailable(repo)
+export function shouldAttemptFetch(repo: RepoState | null | undefined, repoInstanceId: string): boolean {
+  return !!repo && repo.instanceId === repoInstanceId && repo.remote.hasRemotes === true && !isRepoUnavailable(repo)
 }
 
-export function repoIfFresh(get: ReposGet, id: string, token: number): RepoState | null {
+export function repoIfFresh(get: ReposGet, id: string, repoInstanceId: string): RepoState | null {
   const repo = get().repos[id]
-  return repo && repo.instanceToken === token ? repo : null
+  return repo && repo.instanceId === repoInstanceId ? repo : null
 }
 
-export function resolveActionToken(
+export function resolveActionRepoInstanceId(
   get: ReposGet,
   id: string,
-  token?: number,
-): { repo: RepoState; token: number } | null {
+  requestedRepoInstanceId?: string,
+): { repo: RepoState; repoInstanceId: string } | null {
   const repo = get().repos[id]
   if (!repo) return null
-  const nextToken = token ?? repo.instanceToken
-  if (repo.instanceToken !== nextToken) return null
-  return { repo, token: nextToken }
+  const repoInstanceId = requestedRepoInstanceId ?? repo.instanceId
+  if (repo.instanceId !== repoInstanceId) return null
+  return { repo, repoInstanceId }
 }
 
 export function applyFetchDataLoadResult(r: RepoState, result: ExecResult): void {

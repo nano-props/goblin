@@ -3,6 +3,7 @@ import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs
 
 export interface WorkspacePaneTabsOperationTarget {
   repoRoot: string
+  repoInstanceId: string
   branchName: string
   worktreePath: string | null
 }
@@ -29,7 +30,7 @@ export async function runWorkspacePaneTabsOperation<T>(
 }
 
 export function workspacePaneTabsOperationQueueKey(target: WorkspacePaneTabsOperationTarget): string {
-  return workspacePaneTabsTargetIdentityKey(target)
+  return `${workspacePaneTabsTargetIdentityKey(target)}::${target.repoInstanceId}`
 }
 
 export function clearWorkspacePaneTabsOperationQueuesForTests(): void {

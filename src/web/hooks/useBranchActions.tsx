@@ -102,7 +102,7 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
     options?: { deferResultMessages?: string[]; handleResult?: (result: ExecResult) => boolean },
   ): void {
     if (guardBusy()) return
-    void dispatchRepoBranchAction(repo.id, repo.instanceToken, action, runBranchAction, {
+    void dispatchRepoBranchAction(repo.id, repo.instanceId, action, runBranchAction, {
       deferResultMessages: options?.deferResultMessages,
       handleResult: options?.handleResult,
     })
@@ -115,7 +115,7 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
   ): Promise<ExecResult | null> {
     if (guardBusy()) return Promise.resolve(null)
     const pending = runPendingLocalAction(op, async () => {
-      const result = await dispatchRepoUiAction(repo.id, repo.instanceToken, op, fn, setLastResult, {
+      const result = await dispatchRepoUiAction(repo.id, repo.instanceId, op, fn, setLastResult, {
         silentSuccessOps: SILENT_SUCCESS_OPS,
         handleResult: options?.handleResult,
       })

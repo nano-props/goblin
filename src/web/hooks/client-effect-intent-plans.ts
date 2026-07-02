@@ -55,7 +55,7 @@ export type WorkspaceIntentPlan =
   | { kind: 'close-repo'; repoId: string }
   | { kind: 'close-window' }
   | { kind: 'cycle-repo'; direction: 1 | -1 }
-  | { kind: 'refresh-repo'; repoId: string; token: number }
+  | { kind: 'refresh-repo'; repoId: string; repoInstanceId: string }
   | { kind: 'show-workspace-pane-tab'; repoId: string; tab: WorkspacePaneTabType }
   | { kind: 'terminal-primary-action'; repoId: string }
   | { kind: 'toggle-zen-mode' }
@@ -71,7 +71,7 @@ interface WorkspaceIntentPlanContext {
   workspaceShortcutSuppressed: boolean
   terminalFocused: boolean
   currentRepoId: string | null
-  currentRepo: Pick<RepoState, 'id' | 'instanceToken'> | null
+  currentRepo: Pick<RepoState, 'id' | 'instanceId'> | null
 }
 
 export function createTerminalBellIntentPlan(
@@ -122,7 +122,8 @@ export function createWorkspaceIntentPlan(
 ): WorkspaceIntentPlan | null {
   if (!isClientWorkspaceIntent(event)) return null
   if (event.type === 'workspace-pane-close-tab-or-window-requested') {
-    if (context.overlayBlocked || context.workspaceShortcutSuppressed) return { kind: 'close-window' }
+    if (!context.currentRepoId) return { kind: 'close-window' }
+    if (context.overlayBlocked || context.workspaceShortcutSuppressed) return { kind: 'noop' }
     return { kind: 'close-workspace-pane-tab-or-window', repoId: context.currentRepoId }
   }
   if (context.overlayBlocked) return { kind: 'noop' }
@@ -139,7 +140,7 @@ export function createWorkspaceIntentPlan(
     case 'open-remote-repo-requested':
       return { kind: 'open-remote-repo' }
     case 'terminal-new-tab-requested':
-      if (context.workspaceShortcutSuppressed || !context.currentRepoId) return { kind: 'noop' }
+      if (!context.currentRepoId) return { kind: 'noop' }
       return { kind: 'new-terminal-tab', repoId: context.currentRepoId }
     case 'close-repo-requested':
       if (context.workspaceShortcutSuppressed) return { kind: 'noop' }
@@ -149,7 +150,7 @@ export function createWorkspaceIntentPlan(
     case 'repo-refresh-requested':
       if (context.workspaceShortcutSuppressed || context.terminalFocused || !context.currentRepo)
         return { kind: 'noop' }
-      return { kind: 'refresh-repo', repoId: context.currentRepo.id, token: context.currentRepo.instanceToken }
+      return { kind: 'refresh-repo', repoId: context.currentRepo.id, repoInstanceId: context.currentRepo.instanceId }
     case 'show-workspace-pane-tab-requested':
       if (context.workspaceShortcutSuppressed || !context.currentRepoId) return { kind: 'noop' }
       return { kind: 'show-workspace-pane-tab', repoId: context.currentRepoId, tab: event.tab }

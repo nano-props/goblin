@@ -22,6 +22,7 @@ import type { TerminalUpdateWorkspaceTabsInput, WorkspacePaneTabsEntry } from '#
 import { clearWorkspacePaneTabsOperationQueuesForTests } from '#/web/workspace-pane/workspace-pane-tabs-operation-queue.ts'
 
 const REPO_ROOT = '/tmp/workspace-pane-tabs-reorder-mutation-repo'
+const REPO_INSTANCE_ID = 'repo-instance-test'
 const BRANCH_NAME = 'feature/worktree'
 const WORKTREE_PATH = '/tmp/workspace-pane-tabs-reorder-mutation-worktree'
 
@@ -114,7 +115,7 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
       currentControls().reorderTabs(reorderedTabs)
     })
     await updateStarted
-    const fetch = queryClient.fetchQuery(workspacePaneTabsQueryOptions(REPO_ROOT)).catch(() => null)
+    const fetch = queryClient.fetchQuery(workspacePaneTabsQueryOptions(REPO_ROOT, REPO_INSTANCE_ID)).catch(() => null)
 
     resolveServerTabs(canonicalServerTabs)
     await vi.waitFor(() => {
@@ -249,6 +250,7 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     setWorkspacePaneTabsForTargetQueryData(
       {
         repoRoot: REPO_ROOT,
+        repoInstanceId: REPO_INSTANCE_ID,
         branchName: otherBranchName,
         worktreePath: null,
         tabs: [staticEntry('status')],
@@ -266,6 +268,7 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     setWorkspacePaneTabsForTargetQueryData(
       {
         repoRoot: REPO_ROOT,
+        repoInstanceId: REPO_INSTANCE_ID,
         branchName: otherBranchName,
         worktreePath: null,
         tabs: [staticEntry('history')],
@@ -282,7 +285,12 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
       expect(readWorkspacePaneTabs()).toEqual(sourceTabs)
       expect(
         readWorkspacePaneTabsForTarget(
-          { repoRoot: REPO_ROOT, branchName: otherBranchName, worktreePath: null },
+          {
+            repoRoot: REPO_ROOT,
+            repoInstanceId: REPO_INSTANCE_ID,
+            branchName: otherBranchName,
+            worktreePath: null,
+          },
           queryClient,
         ),
       ).toEqual([staticEntry('history')])
@@ -309,6 +317,7 @@ function renderMutationHook(input: Partial<WorkspacePaneTabsReorderMutationInput
       <HookHost
         input={{
           repoRoot: REPO_ROOT,
+          repoInstanceId: REPO_INSTANCE_ID,
           branchName: BRANCH_NAME,
           worktreePath: WORKTREE_PATH,
           canonicalTabs: [],
@@ -333,6 +342,7 @@ function readWorkspacePaneTabs(): WorkspacePaneTabEntry[] {
   return readWorkspacePaneTabsForTarget(
     {
       repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
       branchName: BRANCH_NAME,
       worktreePath: WORKTREE_PATH,
     },
@@ -344,6 +354,7 @@ function seedWorkspacePaneTabs(tabs: WorkspacePaneTabEntry[]): void {
   setWorkspacePaneTabsForTargetQueryData(
     {
       repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
       branchName: BRANCH_NAME,
       worktreePath: WORKTREE_PATH,
       tabs,

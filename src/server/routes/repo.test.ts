@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { createRepoRoutes } from '#/server/routes/repo.ts'
+import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 
 const mocks = vi.hoisted(() => ({
   probeRepo: vi.fn(),
@@ -73,14 +74,43 @@ vi.mock('#/server/modules/repo-write-paths.ts', () => ({
 vi.mock('#/server/modules/settings-source.ts', () => ({
   getServerFetchIntervalSec: mocks.getServerFetchIntervalSec,
 }))
+vi.mock('#/server/common/identity.ts', () => ({
+  userIdFromContext: () => 'user-test',
+}))
 
 beforeEach(() => {
   vi.clearAllMocks()
 })
 
+const terminalHostStub: ServerTerminalHost = {
+  isValidClientId: ((value: unknown): value is string => typeof value === 'string') as never,
+  isClientOnline: vi.fn(() => true),
+  getDiagnostics: vi.fn(() => ({}) as never),
+  registerSocket: vi.fn(),
+  unregisterSocket: vi.fn(),
+  attach: vi.fn(async () => ({ ok: true }) as never),
+  restart: vi.fn(async () => ({ ok: true }) as never),
+  write: vi.fn(async () => ({ ok: true }) as never),
+  resize: vi.fn(async () => ({ ok: true }) as never),
+  takeover: vi.fn(async () => ({ ok: true }) as never),
+  close: vi.fn(async () => ({ ok: true }) as never),
+  listSessions: vi.fn(async () => []),
+  listWorkspaceTabs: vi.fn(async () => []),
+  create: vi.fn(async () => ({ ok: true }) as never),
+  replaceTabs: vi.fn(async () => []),
+  updateTabs: vi.fn(async () => []),
+  prune: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
+  handleRealtimeMessage: vi.fn(),
+  shutdown: vi.fn(),
+}
+
+function createTestRepoRoutes() {
+  return createRepoRoutes()
+}
+
 describe('repo routes — POST body validation (read endpoints)', () => {
   test('returns 400 when the body is missing required fields', async () => {
-    const app = createRepoRoutes()
+    const app = createTestRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/probe', {
         method: 'POST',
@@ -99,7 +129,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     // `parseHttpBody` treats an empty body as `undefined` and lets the
     // schema decide — a required-field schema must still 400 even
     // without a JSON envelope.
-    const app = createRepoRoutes()
+    const app = createTestRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/probe', {
         method: 'POST',
@@ -114,7 +144,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
   })
 
   test('returns 400 for invalid picklist values in the body (e.g. pull-requests mode)', async () => {
-    const app = createRepoRoutes()
+    const app = createTestRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/pull-requests', {
         method: 'POST',
@@ -130,7 +160,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
 
   test('passes a valid body through to the module layer', async () => {
     mocks.probeRepo.mockResolvedValue({ ok: true, root: '/tmp/repo', name: 'repo' })
-    const app = createRepoRoutes()
+    const app = createTestRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/probe', {
         method: 'POST',
@@ -141,6 +171,45 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ ok: true, root: '/tmp/repo', name: 'repo' })
     expect(mocks.probeRepo).toHaveBeenCalledWith('/tmp/repo')
+  })
+
+  test('runtime-open with repoInput canonicalizes and binds the runtime id to the probed root', async () => {
+    mocks.probeRepo.mockResolvedValue({ ok: true, root: '/tmp/repo', name: 'repo' })
+    const app = createTestRepoRoutes()
+
+    const response = await app.request(
+      new Request('http://localhost/runtime-open', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ repoInput: '/tmp/repo/subdir' }),
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    const json = (await response.json()) as {
+      ok: true
+      repo: { id: string; name: string }
+      repoInstanceId: string
+    }
+    expect(json).toMatchObject({ ok: true, repo: { id: '/tmp/repo', name: 'repo' } })
+    expect(json.repoInstanceId).toMatch(/^repo-instance-/)
+    expect(mocks.probeRepo).toHaveBeenCalledWith('/tmp/repo/subdir')
+  })
+
+  test('runtime-open with repoInput fails without minting a runtime id when probe fails', async () => {
+    mocks.probeRepo.mockResolvedValue({ ok: false, message: 'missing' })
+    const app = createTestRepoRoutes()
+
+    const response = await app.request(
+      new Request('http://localhost/runtime-open', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ repoInput: '/missing' }),
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ ok: false, input: '/missing', reason: 'missing' })
   })
 
   test('passes worktree bootstrap preview requests through to the module layer', async () => {
@@ -156,7 +225,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
         excludeCount: 0,
       },
     })
-    const app = createRepoRoutes()
+    const app = createTestRepoRoutes()
 
     const response = await app.request(
       new Request('http://localhost/worktree-bootstrap-preview', {
@@ -173,7 +242,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
 
   test('passes an array of branches through the body to the module layer', async () => {
     mocks.getRepoPullRequests.mockResolvedValue([])
-    const app = createRepoRoutes()
+    const app = createTestRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/pull-requests', {
         method: 'POST',
@@ -190,7 +259,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
 
   test('passes patch body through to getRepoPatch', async () => {
     mocks.getRepoPatch.mockResolvedValue({ ok: true, message: 'diff --git a b' })
-    const app = createRepoRoutes()
+    const app = createTestRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/patch', {
         method: 'POST',
@@ -208,7 +277,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
 
   test('returns an error envelope when repo log reading fails', async () => {
     mocks.getRepoLog.mockRejectedValueOnce(new Error('fatal: bad revision'))
-    const app = createRepoRoutes()
+    const app = createTestRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/log', {
         method: 'POST',
@@ -234,7 +303,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       ],
       truncated: false,
     })
-    const app = createRepoRoutes()
+    const app = createTestRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/tree', {
         method: 'POST',
@@ -255,7 +324,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
 
   test('does not pass the HTTP request signal into /tree reads', async () => {
     mocks.getRepositoryTree.mockResolvedValueOnce({ nodes: [], truncated: false })
-    const app = createRepoRoutes()
+    const app = createTestRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/tree', {
         method: 'POST',
@@ -271,7 +340,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
   })
 
   test('returns 400 when /tree prefix is invalid', async () => {
-    const app = createRepoRoutes()
+    const app = createTestRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/tree', {
         method: 'POST',
@@ -285,7 +354,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
 
   test('returns the soft-fail empty envelope when /tree read fails', async () => {
     mocks.getRepositoryTree.mockRejectedValueOnce(new Error('boom'))
-    const app = createRepoRoutes()
+    const app = createTestRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/tree', {
         method: 'POST',
@@ -299,7 +368,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
 
   test('passes /file-viewer requests through to the read layer', async () => {
     mocks.getRepositoryFileViewer.mockResolvedValueOnce({ viewer: 'bat', shell: 'posix' })
-    const app = createRepoRoutes()
+    const app = createTestRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/file-viewer', {
         method: 'POST',
@@ -318,7 +387,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
 
   test('returns the cat fallback when /file-viewer read fails', async () => {
     mocks.getRepositoryFileViewer.mockRejectedValueOnce(new Error('boom'))
-    const app = createRepoRoutes()
+    const app = createTestRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/file-viewer', {
         method: 'POST',
@@ -332,7 +401,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
 
   test('passes /trash-file requests through to the filetree write layer', async () => {
     mocks.trashRepositoryFile.mockResolvedValueOnce({ ok: true, message: 'ok' })
-    const app = createRepoRoutes()
+    const app = createTestRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/trash-file', {
         method: 'POST',
@@ -356,7 +425,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
   })
 
   test('returns 400 when /trash-file path escapes the worktree', async () => {
-    const app = createRepoRoutes()
+    const app = createTestRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/trash-file', {
         method: 'POST',
@@ -371,7 +440,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
   test('returns 400 when count is below the minimum (1)', async () => {
     // Body schema is `v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(200))`
     // — POST body has no string coercion, so a wrong type also 400s.
-    const app = createRepoRoutes()
+    const app = createTestRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/log', {
         method: 'POST',
@@ -385,7 +454,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
   })
 
   test('returns 400 when count is a non-integer number', async () => {
-    const app = createRepoRoutes()
+    const app = createTestRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/log', {
         method: 'POST',
@@ -401,7 +470,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
   test('returns 400 when count is not a number', async () => {
     // Query-string mode coerced strings to numbers; POST body doesn't,
     // so this is a new boundary the migration introduces.
-    const app = createRepoRoutes()
+    const app = createTestRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/log', {
         method: 'POST',
@@ -422,7 +491,7 @@ describe('repo routes — composite read', () => {
       status: [],
       pullRequests: [],
     })
-    const app = createRepoRoutes()
+    const app = createTestRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/composite', {
         method: 'POST',
@@ -440,7 +509,7 @@ describe('repo routes — composite read', () => {
 
   test('forwards include, branches, and mode to the read function', async () => {
     mocks.readRepoBulk.mockResolvedValue({ snapshot: null, status: [], pullRequests: null })
-    const app = createRepoRoutes()
+    const app = createTestRepoRoutes()
     await app.request(
       new Request('http://localhost/composite', {
         method: 'POST',
@@ -463,7 +532,7 @@ describe('repo routes — composite read', () => {
 
   test('forwards timeoutMs to the read function when provided', async () => {
     mocks.readRepoBulk.mockResolvedValue({ snapshot: null, status: [], pullRequests: null })
-    const app = createRepoRoutes()
+    const app = createTestRepoRoutes()
     await app.request(
       new Request('http://localhost/composite', {
         method: 'POST',
@@ -479,7 +548,7 @@ describe('repo routes — composite read', () => {
   })
 
   test('returns 400 when timeoutMs is not a number', async () => {
-    const app = createRepoRoutes()
+    const app = createTestRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/composite', {
         method: 'POST',
@@ -493,7 +562,7 @@ describe('repo routes — composite read', () => {
   })
 
   test('returns 400 when timeoutMs is negative', async () => {
-    const app = createRepoRoutes()
+    const app = createTestRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/composite', {
         method: 'POST',
@@ -505,7 +574,7 @@ describe('repo routes — composite read', () => {
   })
 
   test('returns 400 when include has an unknown value', async () => {
-    const app = createRepoRoutes()
+    const app = createTestRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/composite', {
         method: 'POST',
@@ -524,7 +593,7 @@ describe('repo routes — composite read', () => {
     // endpoint returns the empty default rather than a 5xx, so
     // the client can keep rendering whatever it already has.
     mocks.readRepoBulk.mockRejectedValue(new Error('backend exploded'))
-    const app = createRepoRoutes()
+    const app = createTestRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/composite', {
         method: 'POST',
@@ -539,7 +608,7 @@ describe('repo routes — composite read', () => {
 
 describe('repo routes — POST body validation (action endpoints)', () => {
   test('returns 400 for invalid picklist values in fetch body', async () => {
-    const app = createRepoRoutes()
+    const app = createTestRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/fetch', {
         method: 'POST',
@@ -554,7 +623,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
   })
 
   test('returns 400 when the POST body is empty', async () => {
-    const app = createRepoRoutes()
+    const app = createTestRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/fetch', {
         method: 'POST',
@@ -566,7 +635,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
   })
 
   test('returns 400 when the POST body is malformed JSON', async () => {
-    const app = createRepoRoutes()
+    const app = createTestRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/fetch', {
         method: 'POST',
@@ -579,7 +648,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
 
   test('clone route forwards operationId/url/parentPath/directoryName', async () => {
     mocks.cloneRepo.mockResolvedValue({ ok: true, message: 'ok', path: '/tmp/repo' })
-    const app = createRepoRoutes()
+    const app = createTestRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/clone', {
         method: 'POST',
@@ -598,7 +667,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
 
   test('open-url route forwards repo URL targets', async () => {
     mocks.openRepoUrl.mockResolvedValue({ ok: true, message: 'https://github.com/acme/repo/commit/abcdef1' })
-    const app = createRepoRoutes()
+    const app = createTestRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/open-url', {
         method: 'POST',
@@ -615,7 +684,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
     mocks.openRepoTerminal.mockResolvedValue({ ok: true, message: '' })
     mocks.openRepoEditor.mockResolvedValue({ ok: true, message: '' })
     mocks.openRepoInFinder.mockResolvedValue({ ok: true, message: '' })
-    const app = createRepoRoutes()
+    const app = createTestRepoRoutes()
 
     await app.request(
       new Request('http://localhost/open-terminal', {
@@ -645,7 +714,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
   })
 
   test('returns 400 for invalid external app choices', async () => {
-    const app = createRepoRoutes()
+    const app = createTestRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/open-editor', {
         method: 'POST',

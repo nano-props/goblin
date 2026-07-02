@@ -140,6 +140,44 @@ describe('WorkspacePaneTabStrip', () => {
     expect(closeButton?.className).not.toContain('group-hover:opacity-100')
   })
 
+  test('keeps the collapsed new-terminal action available while terminal creation is busy', async () => {
+    const onNew = vi.fn()
+    render(
+      <TestWorkspacePaneTabStrip
+        terminalWorktreeKey="/repo\0/repo/worktree"
+        workspacePaneId="workspace"
+        responsiveCompact
+        newTerminalBusy
+        sessions={[session({ terminalSessionId: 't1', selected: true, title: 'term-1' })]}
+        onNew={onNew}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    )
+
+    const trigger = document.body.querySelector('button[aria-label="workspace-pane-tabs.tabs"]')
+    if (!(trigger instanceof HTMLButtonElement)) throw new Error('missing terminal popover trigger')
+
+    await act(async () => {
+      trigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+      trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
+      await Promise.resolve()
+    })
+
+    const newTerminalAction = [...document.body.querySelectorAll('button')].find(
+      (button) => button.textContent === 'terminal.new',
+    )
+    expect(newTerminalAction).not.toBeNull()
+
+    act(() => {
+      newTerminalAction?.click()
+    })
+
+    expect(onNew).toHaveBeenCalledTimes(1)
+  })
+
   test('collapsed terminal tab only navigates out on arrow keys', () => {
     const onNavigateOut = vi.fn()
     render(
@@ -909,11 +947,12 @@ describe('WorkspacePaneTabStrip', () => {
     expect(tabs).toHaveLength(2)
     expect(tabs.map((tab) => tab.getAttribute('aria-label'))).toEqual(['term-1', 'terminal.opening'])
     expect(pendingView?.textContent).not.toContain('terminal.opening')
-    const disabledNewButton = document.body.querySelector<HTMLButtonElement>('[data-workspace-pane-new-button]')
-    expect(disabledNewButton).not.toBeNull()
-    expect(disabledNewButton?.getAttribute('aria-label')).toBe('terminal.new')
-    expect(disabledNewButton?.disabled).toBe(true)
-    expect(disabledNewButton?.querySelector('.animate-spin')).toBeNull()
+    const busyNewButton = document.body.querySelector<HTMLButtonElement>('[data-workspace-pane-new-button]')
+    expect(busyNewButton).not.toBeNull()
+    expect(busyNewButton?.getAttribute('aria-label')).toBe('terminal.new')
+    expect(busyNewButton?.getAttribute('aria-busy')).toBe('true')
+    expect(busyNewButton?.disabled).toBe(false)
+    expect(busyNewButton?.querySelector('.animate-spin')).toBeNull()
   })
 
   test('keeps placeholder terminal titles out of materialized tab text', () => {

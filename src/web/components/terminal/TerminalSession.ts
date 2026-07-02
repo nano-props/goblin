@@ -64,7 +64,7 @@ export class TerminalSession {
   // that need it; this also keeps the gate from outliving the
   // session when the projection disposes us.
   private authorityGate: TerminalAuthorityGate | null = null
-  private startToken = 0
+  private startEpoch = 0
   private geometryAbortController: AbortController | null = null
   private resizeFlushScheduled = false
   private outputFlushFrame: number | null = null
@@ -543,18 +543,18 @@ export class TerminalSession {
 
   private start(): void {
     if (this.disposed || this.view.currentTerminal() || !this.view.isConnected()) return
-    const token = (this.startToken += 1)
+    const epoch = (this.startEpoch += 1)
     if (this.runtime.phase() !== 'restarting' && this.runtime.startAttaching()) this.notify('metadata')
-    void this.startAsync(token)
+    void this.startAsync(epoch)
   }
 
-  private async startAsync(token: number): Promise<void> {
+  private async startAsync(epoch: number): Promise<void> {
     let preloadReplayGeneration: number | null = null
     try {
-      const opened = await this.openPhase(token)
+      const opened = await this.openPhase(epoch)
       const { term } = opened
       preloadReplayGeneration = opened.preloadReplayGeneration
-      const result = await this.ipcPhase(token, term)
+      const result = await this.ipcPhase(epoch, term)
       if (result.phase === 'error') {
         // The attach failed. Drop the replay window the preload
         // started so the boundary and captured events don't leak
@@ -570,8 +570,8 @@ export class TerminalSession {
         if (changed) this.notify('metadata')
         return
       }
-      const metadataChanged = await this.replayPhase(token, term, result)
-      this.finalizePhase(token, term, metadataChanged)
+      const metadataChanged = await this.replayPhase(epoch, term, result)
+      this.finalizePhase(epoch, term, metadataChanged)
     } catch (err) {
       if (err instanceof StartCancelledError) {
         // A newer start has superseded this one. Drop the replay
@@ -582,22 +582,22 @@ export class TerminalSession {
         return
       }
       this.closeRestartBaseSession()
-      if (!this.currentToken(token)) return
+      if (!this.isCurrentStartEpoch(epoch)) return
       this.destroyActiveView()
       if (this.runtime.failRuntime(err instanceof Error ? err.message : String(err))) this.notify('metadata')
     }
   }
 
-  private async openPhase(token: number): Promise<{ term: XTermTerminal; preloadReplayGeneration: number | null }> {
+  private async openPhase(epoch: number): Promise<{ term: XTermTerminal; preloadReplayGeneration: number | null }> {
     let preloadReplayGeneration: number | null = null
-    if (this.disposed || this.startToken !== token || this.view.currentTerminal()) throw new StartCancelledError()
+    if (this.disposed || this.startEpoch !== epoch || this.view.currentTerminal()) throw new StartCancelledError()
     try {
       await preloadTerminalFont()
       // The preload await can yield long enough for the session to be disposed
       // (React unmount, user navigation). Without this guard the orchestrator
       // would proceed to waitForMeasurableHost with a detached host, leaking a
       // ResizeObserver and hanging the promise indefinitely.
-      if (this.disposed || this.startToken !== token) throw new StartCancelledError()
+      if (this.disposed || this.startEpoch !== epoch) throw new StartCancelledError()
       // The orchestrator owns the geometry wait. The view never falls back to
       // a default — if the host never becomes measurable, this attach fails
       // and the user can retry by re-selecting the terminal. See
@@ -615,9 +615,9 @@ export class TerminalSession {
           terminalLog.warn('terminal host did not become measurable; failing attach', { err })
           // The wait may have been aborted by a newer start() or by dispose().
           // In that case a fresh attach is already in flight and we must not
-          // tear its transient state down. Tear down only if our start token
+          // tear its transient state down. Tear down only if our starting epoch
           // is still current.
-          if (this.currentToken(token)) {
+          if (this.isCurrentStartEpoch(epoch)) {
             this.destroyActiveView()
             if (this.runtime.failAttachAttempt('error.terminal-host-not-measurable')) this.notify('metadata')
           }
@@ -631,9 +631,9 @@ export class TerminalSession {
         (input) => this.writeInput(input),
       )
       await waitForTerminalLayout()
-      this.guardStart(token, term)
+      this.assertCurrentStart(epoch, term)
       this.view.fitNow()
-      preloadReplayGeneration = await this.preloadHydratedSnapshot(token, term)
+      preloadReplayGeneration = await this.preloadHydratedSnapshot(epoch, term)
       // The post-fitNow rAF barrier is intentionally concurrent with the
       // subsequent ipcPhase.attach: view.fitNow() is synchronous, so
       // term.cols/term.rows are correct the moment we return from openPhase,
@@ -643,7 +643,7 @@ export class TerminalSession {
       // paint to have completed. A future local first-frame optimization
       // MUST restore the blocking wait before trusting local geometry.
       void waitForTerminalLayout()
-      this.guardStart(token, term)
+      this.assertCurrentStart(epoch, term)
       return { term, preloadReplayGeneration }
     } catch (err) {
       if (err instanceof StartCancelledError && preloadReplayGeneration !== null) {
@@ -653,7 +653,7 @@ export class TerminalSession {
     }
   }
 
-  private async ipcPhase(token: number, term: XTermTerminal): Promise<TerminalAttachResultWithController> {
+  private async ipcPhase(epoch: number, term: XTermTerminal): Promise<TerminalAttachResultWithController> {
     const restart = this.runtime.consumeRestartFlag()
     const ptySessionId = restart ? this.runtime.restartingPtySessionId() : this.runtime.currentPtySessionId()
     if (!ptySessionId) {
@@ -664,7 +664,7 @@ export class TerminalSession {
     const result = restart
       ? await terminalBridge.restart(this.terminalRestartInput(ptySessionId, term))
       : await terminalBridge.attach(this.terminalAttachInput(ptySessionId, term))
-    if (this.disposed || this.startToken !== token || this.view.currentTerminal() !== term) {
+    if (this.disposed || this.startEpoch !== epoch || this.view.currentTerminal() !== term) {
       if (this.disposed) {
         if (result.ok) void this.requestDurableClose(result.ptySessionId).catch(() => {})
         else this.closeRestartBaseSession()
@@ -706,7 +706,7 @@ export class TerminalSession {
   }
 
   private async replayPhase(
-    token: number,
+    epoch: number,
     term: XTermTerminal,
     result: TerminalAttachResultWithController,
   ): Promise<boolean> {
@@ -726,18 +726,18 @@ export class TerminalSession {
         this.queueResize(term.cols, term.rows)
       }
     }
-    await this.replayActiveView(token, term, result.snapshot, result.snapshotSeq)
-    this.guardStart(token, term)
+    await this.replayActiveView(epoch, term, result.snapshot, result.snapshotSeq)
+    this.assertCurrentStart(epoch, term)
     return changed
   }
 
-  private finalizePhase(token: number, term: XTermTerminal, metadataChanged: boolean): void {
-    this.guardStart(token, term)
+  private finalizePhase(epoch: number, term: XTermTerminal, metadataChanged: boolean): void {
+    this.assertCurrentStart(epoch, term)
     if (metadataChanged) this.notify('metadata')
   }
 
-  private guardStart(token: number, term: XTermTerminal): void {
-    if (this.disposed || this.startToken !== token || this.view.currentTerminal() !== term) {
+  private assertCurrentStart(epoch: number, term: XTermTerminal): void {
+    if (this.disposed || this.startEpoch !== epoch || this.view.currentTerminal() !== term) {
       throw new StartCancelledError()
     }
   }
@@ -763,13 +763,13 @@ export class TerminalSession {
     return projectTerminalAttachResultForClient(result, clientId)
   }
 
-  private async replayActiveView(token: number, term: XTermTerminal, replay: string, replaySeq: number): Promise<void> {
+  private async replayActiveView(epoch: number, term: XTermTerminal, replay: string, replaySeq: number): Promise<void> {
     const replayGeneration = this.runtime.beginReplay(replaySeq)
     try {
       term.reset()
       if (replay) await termWrite(term, replay)
     } finally {
-      if (this.currentStart(token, term)) {
+      if (this.isCurrentStart(epoch, term)) {
         for (const event of this.runtime.finishReplay(replayGeneration)) this.queueOutput(event.data)
       } else {
         this.runtime.drainReplay(replayGeneration)
@@ -777,13 +777,13 @@ export class TerminalSession {
     }
   }
 
-  private async preloadHydratedSnapshot(token: number, term: XTermTerminal): Promise<number | null> {
+  private async preloadHydratedSnapshot(epoch: number, term: XTermTerminal): Promise<number | null> {
     const hydratedSnapshot = this.hydratedSnapshot
     // An empty snapshot is the "no preload" sentinel — the hydration
     // input always carries the field, but producers use '' when they
     // have no buffer to seed. Resetting/writing on empty would clobber
     // the term for nothing.
-    if (hydratedSnapshot.snapshot.length === 0 || !this.currentStart(token, term)) return null
+    if (hydratedSnapshot.snapshot.length === 0 || !this.isCurrentStart(epoch, term)) return null
     // Open the replay window — see state.beginReplay for the preload+post-attach contract.
     const replayGeneration = this.runtime.beginReplay(hydratedSnapshot.snapshotSeq)
     try {
@@ -799,7 +799,7 @@ export class TerminalSession {
         this.runtime.drainReplay(replayGeneration)
         return null
       }
-      const stillCurrent = this.currentStart(token, term)
+      const stillCurrent = this.isCurrentStart(epoch, term)
       // Identity check: a concurrent hydrate() between termWrite start
       // and resolve may have already replaced this.hydratedSnapshot
       // with a fresher value. Clearing in that case would discard it;
@@ -966,18 +966,18 @@ export class TerminalSession {
     this.pendingWriteBuffer = ''
     this.inputFlushScheduled = false
     this.clearExternalCommandGate()
-    this.startToken += 1
+    this.startEpoch += 1
     const transientChanged = options?.preserveTransientState ? false : this.runtime.resetTransientState()
     this.view.destroyTerminal()
     return transientChanged
   }
 
-  private currentStart(token: number, term: XTermTerminal): boolean {
-    return !this.disposed && this.startToken === token && this.view.currentTerminal() === term
+  private isCurrentStart(epoch: number, term: XTermTerminal): boolean {
+    return !this.disposed && this.startEpoch === epoch && this.view.currentTerminal() === term
   }
 
-  private currentToken(token: number): boolean {
-    return !this.disposed && this.startToken === token
+  private isCurrentStartEpoch(epoch: number): boolean {
+    return !this.disposed && this.startEpoch === epoch
   }
 
   private updateProgress(state: number, value: number): void {

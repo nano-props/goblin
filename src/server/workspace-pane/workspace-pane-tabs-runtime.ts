@@ -134,6 +134,13 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
     }
   }
 
+  closeSessionsForScope(userId: TUser, scope: string): void {
+    const prefix = workspacePaneTabsRuntimeScopePrefixKey(userId, scope)
+    for (const key of Array.from(this.tabsByTarget.keys())) {
+      if (key.startsWith(prefix)) this.tabsByTarget.delete(key)
+    }
+  }
+
   private targetKey(input: WorkspacePaneTabsTargetInput<TUser>): string {
     return workspacePaneTabsRuntimeKey({
       userId: input.userId,

@@ -32,6 +32,12 @@ import {
 import { getServerFetchIntervalSec } from '#/server/modules/settings-source.ts'
 import { publishRepoQueryInvalidation } from '#/server/modules/invalidation-broker.ts'
 import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'
+import { userIdFromContext } from '#/server/common/identity.ts'
+import {
+  closeRepoRuntimeInstance,
+  getOrOpenRepoRuntimeInstance,
+  openRepoRuntimeInstance,
+} from '#/server/modules/repo-runtime-instances.ts'
 import { REPO_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 import type { RepoLogResponse } from '#/shared/api-types.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
@@ -266,6 +272,34 @@ export function createRepoRoutes() {
         'background-sync-repos',
       ),
     )
+  })
+  app.post('/runtime-open', async (c) => {
+    const userId = userIdFromContext(c)
+    if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
+    const input = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.runtimeOpen, c)
+    if ('repoInput' in input) {
+      const probe = await jsonOr(() => probeRepo(input.repoInput), READ_REPO_ERROR, 'runtime-open')
+      if (!probe.ok || !probe.root) {
+        return c.json({
+          ok: false as const,
+          input: input.repoInput,
+          reason: probe.message ?? 'error.not-git-repo',
+        })
+      }
+      const repo = { id: probe.root, name: probe.name ?? probe.root.split('/').filter(Boolean).at(-1) ?? probe.root }
+      return c.json({
+        ok: true as const,
+        repo,
+        repoInstanceId: getOrOpenRepoRuntimeInstance(userId, repo.id),
+      })
+    }
+    return c.json({ ok: true as const, repoInstanceId: openRepoRuntimeInstance(userId, input.repoRoot) })
+  })
+  app.post('/runtime-close', async (c) => {
+    const userId = userIdFromContext(c)
+    if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
+    const { repoRoot, repoInstanceId } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.runtimeClose, c)
+    return c.json({ ok: true as const, closed: closeRepoRuntimeInstance(userId, repoRoot, repoInstanceId) })
   })
   app.post('/abort', async (c) => {
     const { cwd } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.abort, c)

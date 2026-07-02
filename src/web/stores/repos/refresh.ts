@@ -15,7 +15,7 @@ import {
   applyPullRequestRefreshSuccessState,
   applyPullRequestRefreshUnavailableState,
   applySnapshotToRepoProjection,
-  resolveActionToken,
+  resolveActionRepoInstanceId,
   startPullRequestRefreshDataLoads,
 } from '#/web/stores/repos/refresh-state.ts'
 import { createRefreshSyncHelpers } from '#/web/stores/repos/refresh-sync.ts'
@@ -73,13 +73,13 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
 
   async function runSnapshotSuccessFlow(
     id: string,
-    token: number,
+    repoInstanceId: string,
     snap: RepoSnapshot,
     isSnapshotCurrent: () => boolean,
     options?: { skipLogBackfill?: boolean },
   ): Promise<void> {
     const validBranches = new Set(snap.branches.map((b) => b.name))
-    updateIfFresh(set, id, token, (r) => {
+    updateIfFresh(set, id, repoInstanceId, (r) => {
       applySnapshotToRepoProjection(r, snap, validBranches)
     })
     pruneRepoBranchPullRequestOperations(id, validBranches)
@@ -89,7 +89,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       .filter((p): p is string => typeof p === 'string' && p.length > 0)
     await runSnapshotSuccessWorkflow(set, get, {
       id,
-      token,
+      repoInstanceId,
       branchNames,
       worktreePaths,
       isSnapshotCurrent,
@@ -99,69 +99,69 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
 
   function applyPullRequestRefreshUnavailable(
     id: string,
-    token: number,
+    repoInstanceId: string,
     branchNames: string[],
     mode: PullRequestFetchMode,
   ): void {
-    updateIfFresh(set, id, token, (r) => {
+    updateIfFresh(set, id, repoInstanceId, (r) => {
       applyPullRequestRefreshUnavailableState(r, branchNames, mode)
     })
   }
 
   function applyPullRequestRefreshSuccess(
     id: string,
-    token: number,
+    repoInstanceId: string,
     branchNames: string[],
     entries: Array<{ branch: string; pullRequest: PullRequestInfo }>,
     requested: Set<string>,
     clearMissing: boolean,
     mode: PullRequestFetchMode,
   ): void {
-    updateIfFresh(set, id, token, (r) => {
+    updateIfFresh(set, id, repoInstanceId, (r) => {
       applyPullRequestRefreshSuccessState(r, branchNames, entries, requested, clearMissing, mode)
     })
   }
 
   function applyPullRequestRefreshStale(
     id: string,
-    token: number,
+    repoInstanceId: string,
     branchNames: string[],
     mode: PullRequestFetchMode,
     operationId: number,
   ): void {
-    updateIfFresh(set, id, token, (r) => {
+    updateIfFresh(set, id, repoInstanceId, (r) => {
       applyPullRequestRefreshStaleState(r, branchNames, mode, operationId)
     })
   }
 
   function applyPullRequestRefreshError(
     id: string,
-    token: number,
+    repoInstanceId: string,
     branchNames: string[],
     mode: PullRequestFetchMode,
     err: unknown,
   ): void {
     const message = err instanceof Error ? err.message : String(err)
     refreshPullRequestsLog.warn('failed', { err })
-    updateIfFresh(set, id, token, (r) => {
+    updateIfFresh(set, id, repoInstanceId, (r) => {
       applyPullRequestRefreshErrorState(r, branchNames, mode, message)
       r.events = appendRepoEvent(r.events, errorEvent(message))
     })
   }
 
   return {
-    async refreshSnapshot(id: string, options?: { skipLogBackfill?: boolean; token?: number }) {
-      const resolved = resolveActionToken(get, id, options?.token)
+    async refreshSnapshot(id: string, options?: { skipLogBackfill?: boolean; repoInstanceId?: string }) {
+      const resolved = resolveActionRepoInstanceId(get, id, options?.repoInstanceId)
       if (!resolved) return
-      const { token } = resolved
-      updateIfFresh(set, id, token, (r) => {
+      const { repoInstanceId } = resolved
+      updateIfFresh(set, id, repoInstanceId, (r) => {
         startDataLoad(r.dataLoads.snapshot, { hasData: r.data.branches.length > 0 })
       })
       await runLatestOperation({
         set,
         get,
         id,
-        token,
+        repoInstanceId,
         lane: 'read',
         operationKey: 'snapshot',
         priority: 50,
@@ -170,16 +170,16 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
         errorFromResult: (snap) => (snap ? null : 'error.failed-read-repo'),
         onResult: async (snap, ctx) => {
           if (!snap) {
-            updateIfFresh(set, id, token, (r) => {
+            updateIfFresh(set, id, repoInstanceId, (r) => {
               finishDataLoadError(r.dataLoads.snapshot, 'error.failed-read-repo')
               r.events = appendRepoEvent(r.events, errorEvent('error.failed-read-repo'))
             })
             return
           }
-          await runSnapshotSuccessFlow(id, token, snap, ctx.isCurrent, { skipLogBackfill: options?.skipLogBackfill })
+          await runSnapshotSuccessFlow(id, repoInstanceId, snap, ctx.isCurrent, { skipLogBackfill: options?.skipLogBackfill })
         },
         onError: (message) => {
-          updateIfFresh(set, id, token, (r) => {
+          updateIfFresh(set, id, repoInstanceId, (r) => {
             if (isRepoUnavailableReason(message)) markRepoUnavailable(r, message)
             finishDataLoadError(r.dataLoads.snapshot, message)
             r.events = appendRepoEvent(r.events, errorEvent(message))
@@ -192,25 +192,25 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       id: string,
       branchesArg?: string[],
       options?: {
-        token?: number
+        repoInstanceId?: string
         mode?: PullRequestFetchMode
         clearMissing?: boolean
       },
     ) {
-      const resolved = resolveActionToken(get, id, options?.token)
+      const resolved = resolveActionRepoInstanceId(get, id, options?.repoInstanceId)
       if (!resolved) return
-      const { repo: repoBefore, token } = resolved
+      const { repo: repoBefore, repoInstanceId } = resolved
       const request = resolvePullRequestRefreshRequest(repoBefore, branchesArg, options)
       if (!request) return
       const { branchNames, requested, mode, clearMissing } = request
-      updateIfFresh(set, id, token, (r) => {
+      updateIfFresh(set, id, repoInstanceId, (r) => {
         startPullRequestRefreshDataLoads(r, branchNames, requested, mode)
       })
       await runLatestOperation({
         set,
         get,
         id,
-        token,
+        repoInstanceId,
         lane: 'read',
         operationKey: 'pullRequests',
         priority: 10,
@@ -221,30 +221,30 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
         task: (signal) => getRepoPullRequests(id, branchNames, { mode }, signal),
         onResult: (entries, ctx) => {
           if (entries === null) {
-            applyPullRequestRefreshUnavailable(id, token, branchNames, mode)
+            applyPullRequestRefreshUnavailable(id, repoInstanceId, branchNames, mode)
             return
           }
-          applyPullRequestRefreshSuccess(id, token, branchNames, entries, requested, clearMissing, mode)
-          if (ctx.isCurrent()) persistRepoSnapshotCacheEntry(set, get().repos[id], token)
+          applyPullRequestRefreshSuccess(id, repoInstanceId, branchNames, entries, requested, clearMissing, mode)
+          if (ctx.isCurrent()) persistRepoSnapshotCacheEntry(set, get().repos[id], repoInstanceId)
         },
         onStale: (ctx) => {
-          applyPullRequestRefreshStale(id, token, branchNames, mode, ctx.operationId)
+          applyPullRequestRefreshStale(id, repoInstanceId, branchNames, mode, ctx.operationId)
         },
         onError: (message) => {
-          applyPullRequestRefreshError(id, token, branchNames, mode, message)
+          applyPullRequestRefreshError(id, repoInstanceId, branchNames, mode, message)
         },
       })
     },
 
-    async refreshStatus(id: string, options?: { token?: number }) {
-      const resolved = resolveActionToken(get, id, options?.token)
+    async refreshStatus(id: string, options?: { repoInstanceId?: string }) {
+      const resolved = resolveActionRepoInstanceId(get, id, options?.repoInstanceId)
       if (!resolved) return
-      const { token } = resolved
+      const { repoInstanceId } = resolved
       await runLatestDataLoadOperation({
         set,
         get,
         id,
-        token,
+        repoInstanceId,
         lane: 'read',
         operationKey: 'status',
         priority: 40,
@@ -259,7 +259,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
         },
         onSuccess: (_status, ctx) => {
           const repoAfterStatus = get().repos[id]
-          if (ctx.isCurrent()) persistRepoSnapshotCacheEntry(set, repoAfterStatus, token)
+          if (ctx.isCurrent()) persistRepoSnapshotCacheEntry(set, repoAfterStatus, repoInstanceId)
         },
         onError: (message, r) => {
           if (isRepoUnavailableReason(message)) markRepoUnavailable(r, message)
@@ -270,11 +270,11 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       })
     },
 
-    async refreshCoreData(id: string, options?: { token?: number }) {
-      const resolved = resolveActionToken(get, id, options?.token)
+    async refreshCoreData(id: string, options?: { repoInstanceId?: string }) {
+      const resolved = resolveActionRepoInstanceId(get, id, options?.repoInstanceId)
       if (!resolved) return
-      const { token } = resolved
-      await runCoreDataRefreshWorkflow(get, { id, token })
+      const { repoInstanceId } = resolved
+      await runCoreDataRefreshWorkflow(get, { id, repoInstanceId })
     },
 
     /**
@@ -284,11 +284,11 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
      * requests are still fetched separately (different lane, different
      * retry semantics, different priority).
      */
-    async refreshSnapshotAndStatus(id: string, options?: { skipLogBackfill?: boolean; token?: number }) {
-      const resolved = resolveActionToken(get, id, options?.token)
+    async refreshSnapshotAndStatus(id: string, options?: { skipLogBackfill?: boolean; repoInstanceId?: string }) {
+      const resolved = resolveActionRepoInstanceId(get, id, options?.repoInstanceId)
       if (!resolved) return
-      const { token } = resolved
-      updateIfFresh(set, id, token, (r) => {
+      const { repoInstanceId } = resolved
+      updateIfFresh(set, id, repoInstanceId, (r) => {
         startDataLoad(r.dataLoads.snapshot, { hasData: r.data.branches.length > 0 })
         startDataLoad(r.dataLoads.status, { hasData: r.data.statusLoaded || r.data.status.length > 0 })
       })
@@ -296,7 +296,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
         set,
         get,
         id,
-        token,
+        repoInstanceId,
         lane: 'read',
         operationKey: 'snapshot+status',
         priority: 50,
@@ -312,7 +312,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
         },
         onResult: async (result, ctx) => {
           // Apply status first (leaf, no follow-up).
-          updateIfFresh(set, id, token, (r) => {
+          updateIfFresh(set, id, repoInstanceId, (r) => {
             r.data.status = result.status
             r.data.statusLoaded = true
             r.data.worktreesByPath = applyStatusToWorktreeStates(r.data.worktreesByPath, result.status)
@@ -325,21 +325,21 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
             finishDataLoadSuccess(r.dataLoads.status)
           })
           if (result.status.length > 0 && ctx.isCurrent()) {
-            persistRepoSnapshotCacheEntry(set, get().repos[id], token)
+            persistRepoSnapshotCacheEntry(set, get().repos[id], repoInstanceId)
           }
           if (result.snapshot === null) {
-            updateIfFresh(set, id, token, (r) => {
+            updateIfFresh(set, id, repoInstanceId, (r) => {
               finishDataLoadError(r.dataLoads.snapshot, 'error.failed-read-repo')
               r.events = appendRepoEvent(r.events, errorEvent('error.failed-read-repo'))
             })
             return
           }
-          await runSnapshotSuccessFlow(id, token, result.snapshot, ctx.isCurrent, {
+          await runSnapshotSuccessFlow(id, repoInstanceId, result.snapshot, ctx.isCurrent, {
             skipLogBackfill: options?.skipLogBackfill,
           })
         },
         onError: (message) => {
-          updateIfFresh(set, id, token, (r) => {
+          updateIfFresh(set, id, repoInstanceId, (r) => {
             if (isRepoUnavailableReason(message)) markRepoUnavailable(r, message)
             finishDataLoadError(r.dataLoads.snapshot, message)
             finishDataLoadError(r.dataLoads.status, message)
@@ -354,22 +354,22 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
      *  2) Always refresh the local snapshot + status afterwards.
      *  Bookkeeping (setLastResult, clearFetchFailed) is handled inline
      *  so there is one source of truth for post-sync cleanup. */
-    async syncAndRefresh(id: string, options?: { token?: number }) {
-      const resolved = resolveActionToken(get, id, options?.token)
+    async syncAndRefresh(id: string, options?: { repoInstanceId?: string }) {
+      const resolved = resolveActionRepoInstanceId(get, id, options?.repoInstanceId)
       if (!resolved) return
-      const { token } = resolved
+      const { repoInstanceId } = resolved
       await runExclusiveOperation({
         set,
         get,
         id,
-        token,
+        repoInstanceId,
         lane: 'read',
         priority: 100,
         targets: [{ key: 'manualRefresh', reason: 'manual-refresh' }],
         task: async () =>
           await runWithRepoInvalidationSource(
             'manual',
-            async (sourceToken) => await runManualSyncPipeline(id, token, sourceToken),
+            async (sourceToken) => await runManualSyncPipeline(id, repoInstanceId, sourceToken),
           ),
       })
     },

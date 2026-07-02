@@ -68,14 +68,14 @@ describe('persistRepoSnapshotCacheEntry', () => {
   test('does not write a stale cache entry after the repo instance changes', () => {
     const staleRepo = seedRepoState({
       id: '/repo',
-      instanceToken: 1,
+      instanceId: 'repo-instance-test',
       branches: [createRepoBranch('main')],
       currentBranch: 'main',
       selectedBranch: 'main',
     })
-    seedRepoState({ id: '/repo', instanceToken: 2 })
+    seedRepoState({ id: '/repo', instanceId: 'repo-instance-test-2' })
 
-    persistRepoSnapshotCacheEntry(useReposStore.setState, staleRepo, 1)
+    persistRepoSnapshotCacheEntry(useReposStore.setState, staleRepo, 'repo-instance-test')
 
     expect(useReposStore.getState().repoSnapshotCache['/repo']).toBeUndefined()
   })
@@ -83,7 +83,7 @@ describe('persistRepoSnapshotCacheEntry', () => {
   test('persists branch references without dynamic worktree or pull request state', () => {
     const repo = seedRepoState({
       id: '/repo',
-      instanceToken: 1,
+      instanceId: 'repo-instance-test',
       branchSnapshots: [
         createBranchSnapshot('feature/a', {
           worktree: {
@@ -108,7 +108,7 @@ describe('persistRepoSnapshotCacheEntry', () => {
       selectedBranch: 'feature/a',
     })
 
-    persistRepoSnapshotCacheEntry(useReposStore.setState, repo, 1)
+    persistRepoSnapshotCacheEntry(useReposStore.setState, repo, 'repo-instance-test')
 
     const cached = useReposStore.getState().repoSnapshotCache['/repo']
     expect(cached?.data.branches[0]?.worktree).toEqual({ path: '/tmp/worktree-a' })
@@ -133,7 +133,7 @@ describe('restoreRepoProjectionFromCacheEntry', () => {
       }),
     ]
 
-    const repo = restoreRepoProjectionFromCacheEntry(emptyRepo('/repo', 'repo'), cached)
+    const repo = restoreRepoProjectionFromCacheEntry(emptyRepo('/repo', 'repo', 'repo-instance-test'), cached)
 
     expect(repo.data.branches[0]?.worktree).toEqual({ path: '/tmp/worktree-a' })
     expect(repo.data.branches[0]?.pullRequest).toBeUndefined()

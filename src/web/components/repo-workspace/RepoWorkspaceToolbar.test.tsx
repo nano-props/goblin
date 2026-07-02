@@ -285,22 +285,6 @@ describe('RepoWorkspaceToolbar', () => {
     expect(document.body.textContent).not.toContain('settings.editor.windsurf')
   })
 
-  test('renders the remote/PR item in the open-externally dropdown', async () => {
-    const { container: c } = renderToolbar({
-      terminalCount: 0,
-      navigation: navigationWith({}),
-      remote: { hasBrowserRemote: true, browserRemoteProvider: 'github' },
-    })
-
-    const trigger = c.querySelector<HTMLButtonElement>('[data-testid="workspace-open-externally-menu-trigger"]')
-    expect(trigger).not.toBeNull()
-
-    await act(async () => {
-      trigger?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
-      trigger?.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
-      await Promise.resolve()
-    })
-
   test('hides the open-externally menu when no local external apps are available', async () => {
     useHostInfoStore.setState({
       snapshot: { homeDir: '/Users/tester', platform: 'win32', hostname: 'test-host', pid: 1 },
@@ -792,11 +776,12 @@ describe('RepoWorkspaceToolbar', () => {
     expect(pendingView?.textContent).not.toContain('terminal.opening')
     expect(tabs.map((tab) => tab.getAttribute('aria-label'))).toEqual(['tab.status', 'terminal.opening'])
     expect(c.querySelector('[role="tab"][aria-label="terminal.opening"]')?.getAttribute('aria-busy')).toBeNull()
-    const disabledNewButton = c.querySelector<HTMLButtonElement>('[data-workspace-pane-new-button]')
-    expect(disabledNewButton).not.toBeNull()
-    expect(disabledNewButton?.getAttribute('aria-label')).toBe('terminal.new')
-    expect(disabledNewButton?.disabled).toBe(true)
-    expect(disabledNewButton?.querySelector('.animate-spin')).toBeNull()
+    const busyNewButton = c.querySelector<HTMLButtonElement>('[data-workspace-pane-new-button]')
+    expect(busyNewButton).not.toBeNull()
+    expect(busyNewButton?.getAttribute('aria-label')).toBe('terminal.new')
+    expect(busyNewButton?.getAttribute('aria-busy')).toBe('true')
+    expect(busyNewButton?.disabled).toBe(false)
+    expect(busyNewButton?.querySelector('.animate-spin')).toBeNull()
   })
 
   test('clicking the new-terminal button navigates and creates a terminal', async () => {
@@ -1032,7 +1017,7 @@ describe('RepoWorkspaceToolbar', () => {
     expect(showRepoWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'changes')
   })
 
-  test('T6.1: disables the new-terminal button while the initial session sync is in flight', async () => {
+  test('T6.1: marks the new-terminal button busy while the initial session sync is in flight', async () => {
     const { container: c } = renderToolbar({
       terminalCount: 0,
       navigation: navigationWith({}),
@@ -1043,20 +1028,20 @@ describe('RepoWorkspaceToolbar', () => {
     const busyNewButton = c.querySelector<HTMLButtonElement>('[data-workspace-pane-new-button]')
     expect(busyNewButton).not.toBeNull()
     expect(busyNewButton?.getAttribute('aria-label')).toBe('terminal.new')
-    expect(busyNewButton?.getAttribute('aria-busy')).toBeNull()
-    expect(busyNewButton?.disabled).toBe(true)
+    expect(busyNewButton?.getAttribute('aria-busy')).toBe('true')
+    expect(busyNewButton?.disabled).toBe(false)
     expect(busyNewButton?.querySelector('.animate-spin')).toBeNull()
 
     // Once the provider calls markReady() (which the real Provider
     // does at the end of syncServerSessions' finally block), the
     // busy state clears and the real button appears.
-    useRepoSyncStore.getState().markReady(REPO_ID, 0)
+    useRepoSyncStore.getState().markReady(REPO_ID, 'repo-instance-test')
     await flush()
     expect(c.querySelector('button[aria-label="terminal.new"]')).not.toBeNull()
   })
 
-  test('disables the new-terminal button during terminal creation', () => {
-    const { container: c } = renderToolbar({
+  test('keeps the new-terminal button actionable during terminal creation', async () => {
+    const { container: c, mocks } = renderToolbar({
       terminalCount: 0,
       navigation: navigationWith({}),
       pendingCreate: true,
@@ -1066,11 +1051,18 @@ describe('RepoWorkspaceToolbar', () => {
     const busyNewButton = c.querySelector<HTMLButtonElement>('[data-workspace-pane-new-button]')
     expect(busyNewButton).not.toBeNull()
     expect(busyNewButton?.getAttribute('aria-label')).toBe('terminal.new')
-    expect(busyNewButton?.disabled).toBe(true)
+    expect(busyNewButton?.getAttribute('aria-busy')).toBe('true')
+    expect(busyNewButton?.disabled).toBe(false)
     expect(busyNewButton?.querySelector('.animate-spin')).toBeNull()
+
+    act(() => {
+      busyNewButton?.click()
+    })
+    await flush()
+    expect(mocks.createTerminal).toHaveBeenCalledTimes(1)
   })
 
-  test('disables the new-terminal button during terminal creation when a terminal is already open', () => {
+  test('keeps the new-terminal button actionable during terminal creation when a terminal is already open', async () => {
     const { container: c, mocks } = renderToolbar({
       terminalCount: 1,
       navigation: navigationWith({}),
@@ -1081,12 +1073,15 @@ describe('RepoWorkspaceToolbar', () => {
     const busyNewButton = c.querySelector<HTMLButtonElement>('[data-workspace-pane-new-button]')
     expect(busyNewButton).not.toBeNull()
     expect(busyNewButton?.getAttribute('aria-label')).toBe('terminal.new')
-    expect(busyNewButton?.getAttribute('aria-busy')).toBeNull()
-    expect(busyNewButton?.disabled).toBe(true)
+    expect(busyNewButton?.getAttribute('aria-busy')).toBe('true')
+    expect(busyNewButton?.disabled).toBe(false)
     expect(busyNewButton?.querySelector('.animate-spin')).toBeNull()
 
-    busyNewButton?.click()
-    expect(mocks.createTerminal).not.toHaveBeenCalled()
+    act(() => {
+      busyNewButton?.click()
+    })
+    await flush()
+    expect(mocks.createTerminal).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -1100,7 +1095,6 @@ function menuBranchActions(): BranchActions {
       canCopyPatch: false,
       canPull: false,
       canPush: false,
-      canOpenRemote: false,
       canOpenTerminal: true,
       canOpenEditor: true,
       canOpenFinder: true,
@@ -1112,7 +1106,6 @@ function menuBranchActions(): BranchActions {
       openTerminal: vi.fn(async () => ({ ok: true, message: '' })),
       openEditor: vi.fn(async () => ({ ok: true, message: '' })),
       openFinder: vi.fn(async () => ({ ok: true, message: '' })),
-      openRemote: vi.fn(async () => ({ ok: true, message: '' })),
       requestDeleteBranch: vi.fn(),
       requestRemoveWorktree: vi.fn(),
     },
@@ -1159,7 +1152,7 @@ function renderToolbar(options: {
   // Mark the repo as already-synced so the toolbar renders the normal
   // "+ New" button. Loading-state tests pass `loading: true` to skip this.
   if (!options.loading) {
-    useRepoSyncStore.getState().markReady(REPO_ID, 0)
+    useRepoSyncStore.getState().markReady(REPO_ID, 'repo-instance-test')
   }
   const branchName = options.worktree === false ? 'feature/no-worktree' : 'feature/worktree'
   const branch = createRepoBranch(branchName, options.worktree === false ? {} : { worktree: { path: WORKTREE_PATH } })
@@ -1276,8 +1269,10 @@ function renderToolbar(options: {
         ]
       : undefined)
   if (workspacePaneTabs) {
+    const repoInstanceId = useReposStore.getState().repos[REPO_ID]!.instanceId
     const workspacePaneTabsQueryInput = {
       repoRoot: REPO_ID,
+      repoInstanceId,
       branchName,
       worktreePath: options.worktree === false ? null : WORKTREE_PATH,
       tabs: workspacePaneTabs,
@@ -1363,7 +1358,7 @@ function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
 function tabsFor(branchName: string): WorkspacePaneTabEntry[] {
   const repo = useReposStore.getState().repos[REPO_ID]
   const target = repo ? workspacePaneTabsTargetForRepoBranch(repo, branchName) : null
-  return target ? readWorkspacePaneTabsForTarget(target) : []
+  return target ? readWorkspacePaneTabsForTarget({ ...target, repoInstanceId: repo.instanceId }) : []
 }
 
 function staticEntry(type: WorkspacePaneStaticTabType): WorkspacePaneTabEntry {

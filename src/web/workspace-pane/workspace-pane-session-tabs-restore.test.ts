@@ -9,6 +9,7 @@ import {
   resetReposStore,
   seedRepoState,
 } from '#/web/test-utils/bridge.ts'
+import { useReposStore } from '#/web/stores/repos/store.ts'
 import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
@@ -77,6 +78,7 @@ describe('restoreServerWorkspacePaneTabsFromSession', () => {
 
     expect(replaceWorkspaceTabs).toHaveBeenCalledWith({
       repoRoot: REPO_ID,
+      repoInstanceId: useReposStore.getState().repos[REPO_ID]!.instanceId,
       branchName: 'feature/no-worktree',
       worktreePath: null,
       tabs: [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-stale')],
@@ -99,6 +101,7 @@ describe('restoreServerWorkspacePaneTabsFromSession', () => {
 
     expect(replaceWorkspaceTabs).toHaveBeenCalledWith({
       repoRoot: REPO_ID,
+      repoInstanceId: useReposStore.getState().repos[REPO_ID]!.instanceId,
       branchName: 'feature/worktree',
       worktreePath: null,
       tabs: [workspacePaneStaticTabEntry('history')],
@@ -169,7 +172,12 @@ function seedRepo(): void {
 }
 
 function readTabsFor(branchName: string, worktreePath: string | null) {
-  return readWorkspacePaneTabsForTarget({ repoRoot: REPO_ID, branchName, worktreePath })
+  return readWorkspacePaneTabsForTarget({
+    repoRoot: REPO_ID,
+    repoInstanceId: useReposStore.getState().repos[REPO_ID]!.instanceId,
+    branchName,
+    worktreePath,
+  })
 }
 
 function worktreeTargetKey(): string {

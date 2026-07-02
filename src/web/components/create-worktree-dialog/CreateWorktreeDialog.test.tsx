@@ -186,7 +186,7 @@ describe('CreateWorktreeDialog', () => {
 })
 
 function createRepo(): RepoState {
-  const repo = emptyRepo('/tmp/goblin-repo', 'goblin-repo')
+  const repo = emptyRepo('/tmp/goblin-repo', 'goblin-repo', 'repo-instance-test')
   repo.data.currentBranch = 'main'
   repo.data.branches = [
     {

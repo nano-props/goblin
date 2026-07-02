@@ -10,7 +10,7 @@ export function repoIndexFromRepos(repos: ReposStore['repos']): TerminalRepoInde
       if (worktreePath) branchByWorktreePath[worktreePath] = branch.name
     }
     index[repoRoot] = {
-      instanceToken: repo.instanceToken,
+      instanceId: repo.instanceId,
       branchByWorktreePath,
     }
   }
@@ -26,7 +26,7 @@ export function repoIndexEqual(a: TerminalRepoIndex, b: TerminalRepoIndex): bool
     const current = a[repoRoot]
     const next = b[repoRoot]
     if (!current || !next) return false
-    if (current.instanceToken !== next.instanceToken) return false
+    if (current.instanceId !== next.instanceId) return false
     const currentPaths = Object.keys(current.branchByWorktreePath)
     const nextPaths = Object.keys(next.branchByWorktreePath)
     if (currentPaths.length !== nextPaths.length) return false

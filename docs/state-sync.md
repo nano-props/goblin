@@ -50,6 +50,11 @@ Notes:
 - Runtime-coherent repo actions should prefer orchestration entrypoints plus focused helper modules for projection/state transitions and sync pipelines.
 - Settings truth lives on the server; clients read it through query snapshots or specialized runtime projections.
 - Runtime-coherent state may use invalidation plus refetch or realtime streaming.
+- For runtime correctness boundaries, prefer server-owned fast fail over client guards. A mutation that no longer matches the live runtime instance should be rejected by the server, not locally guessed away by the client.
+- Do not mirror authoritative runtime membership from the client back into the server with whole-snapshot sync. Use server-owned open/close transitions and let the server mint runtime identities.
+- Cache identity must match runtime identity. If reopen can mint a new instance for the same stable path, cache keys and mutation preconditions need an instance dimension too.
+- Do not layer a client freshness check on top of a server-owned runtime id when the server can already validate the mutation from that id alone. That is not extra safety; it is a second authority and a new failure mode.
+- After a successful server mutation, prefer invalidation from server push over client-issued "confirming" fetches. If the server already owns the durable state transition, the client should re-project from the broadcast instead of trying to restage the transition locally.
 
 ## Restorable state
 
@@ -82,6 +87,9 @@ Notes:
 - Use streaming only for continuous flows such as terminal output.
 - Treat session restore as boot-only.
 - Suppress self-echo when a client mutation causes its own invalidation event.
+- Do not keep a mutation alive with client-side compensation after its runtime precondition has gone stale. Fail fast and let the next read/refetch re-project truth.
+- If the client cannot prove a runtime precondition from server-issued data, it should not invent one locally. Ask the server, or fail.
+- "Fail" here means reject the mutation cleanly. It does not mean silently downgrading into a local-only approximation that keeps the UI moving while runtime truth has already diverged.
 
 ## Rules of thumb
 

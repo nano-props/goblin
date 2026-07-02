@@ -84,7 +84,7 @@ describe('branch action dispatch', () => {
         alsoDeleteUpstream: false,
       },
       {
-        token: repo.instanceToken,
+        repoInstanceId: repo.instanceId,
         deferResultMessages: [],
       },
     )

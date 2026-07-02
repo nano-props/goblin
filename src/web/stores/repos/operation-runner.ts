@@ -18,7 +18,7 @@ export type { RepoOperationTarget }
 
 interface RepoOperationContext {
   id: string
-  token: number
+  repoInstanceId: string
   operationId: number
   isCurrent: () => boolean
   setPhase: (phase: 'queued' | 'running') => void
@@ -28,7 +28,7 @@ interface RepoOperationBaseOptions<T> {
   set: ReposSet
   get: ReposGet
   id: string
-  token?: number
+  repoInstanceId?: string
   lane: RepoOperationLane
   priority: number
   targets: [RepoOperationTarget, ...RepoOperationTarget[]]
@@ -55,9 +55,9 @@ type InternalRepoOperationOptions<T> =
   | (RunLatestOperationOptions<T> & { policy: 'latest-wins' })
   | (RunExclusiveOperationOptions<T> & { policy: 'exclusive' })
 
-function operationCurrent(get: ReposGet, id: string, token: number, operationId: number, target: RepoOperationTarget) {
+function operationCurrent(get: ReposGet, id: string, repoInstanceId: string, operationId: number, target: RepoOperationTarget) {
   const repo = get().repos[id]
-  return !!repo && repo.instanceToken === token && repoOperationCurrent(id, target.key, operationId)
+  return !!repo && repo.instanceId === repoInstanceId && repoOperationCurrent(id, target.key, operationId)
 }
 
 function anyTargetBusy(id: string, targets: RepoOperationTarget[]) {
@@ -66,25 +66,25 @@ function anyTargetBusy(id: string, targets: RepoOperationTarget[]) {
 
 function markOperationState<T>(
   options: InternalRepoOperationOptions<T>,
-  token: number,
+  repoInstanceId: string,
   operationId: number,
   phase: 'queued' | 'running',
   wasQueued = false,
 ) {
   markRepoOperationTargets(options.id, operationId, options.targets, phase, wasQueued)
-  updateIfFresh(options.set, options.id, token, (repo) => {
+  updateIfFresh(options.set, options.id, repoInstanceId, (repo) => {
     markRepoOperationViews(repo.operations, operationId, options.targets, phase, wasQueued)
   })
 }
 
 function settleOperationState<T>(
   options: InternalRepoOperationOptions<T>,
-  token: number,
+  repoInstanceId: string,
   operationId: number,
   error: string | null,
 ) {
   settleRepoOperationTargets(options.id, operationId, options.targets, error)
-  updateIfFresh(options.set, options.id, token, (repo) => {
+  updateIfFresh(options.set, options.id, repoInstanceId, (repo) => {
     settleRepoOperationViews(repo.operations, operationId, options.targets, error)
   })
 }
@@ -92,8 +92,8 @@ function settleOperationState<T>(
 async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Promise<T | null> {
   const repoBefore = options.get().repos[options.id]
   if (!repoBefore) return null
-  const token = options.token ?? repoBefore.instanceToken
-  if (repoBefore.instanceToken !== token) return null
+  const repoInstanceId = options.repoInstanceId ?? repoBefore.instanceId
+  if (repoBefore.instanceId !== repoInstanceId) return null
   const primary = options.targets[0]
   if (options.policy !== 'latest-wins') {
     const busy = anyTargetBusy(options.id, options.targets)
@@ -103,11 +103,11 @@ async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Pr
   const operationId = nextRepoOperationId(options.id)
   const ctx: RepoOperationContext = {
     id: options.id,
-    token,
+    repoInstanceId,
     operationId,
-    isCurrent: () => operationCurrent(options.get, options.id, token, operationId, primary),
+    isCurrent: () => operationCurrent(options.get, options.id, repoInstanceId, operationId, primary),
     setPhase: (phase) => {
-      if (ctx.isCurrent()) markOperationState(options, token, operationId, phase)
+      if (ctx.isCurrent()) markOperationState(options, repoInstanceId, operationId, phase)
     },
   }
 
@@ -125,8 +125,8 @@ async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Pr
         options.policy === 'latest-wins' ? `${options.lane}:${options.operationKey ?? primary.key}` : undefined,
       queuedTimeoutMs: options.queuedTimeoutMs,
       queuedTimeoutMessage: options.queuedTimeoutMessage,
-      onQueued: () => markOperationState(options, token, operationId, 'queued'),
-      onStart: (wasQueued) => markOperationState(options, token, operationId, 'running', wasQueued),
+      onQueued: () => markOperationState(options, repoInstanceId, operationId, 'queued'),
+      onStart: (wasQueued) => markOperationState(options, repoInstanceId, operationId, 'running', wasQueued),
     })
     if (!ctx.isCurrent()) {
       outcome = { kind: 'stale' }
@@ -139,7 +139,7 @@ async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Pr
 
   // Phase 2: 统一 settle（只发生一次，在副作用之前）
   const settleError = outcome.kind === 'success' ? outcome.error : outcome.kind === 'error' ? outcome.error : null
-  settleOperationState(options, token, operationId, settleError)
+  settleOperationState(options, repoInstanceId, operationId, settleError)
 
   // Phase 3: 副作用回调（onResult/onError/onStale）
   if (outcome.kind === 'stale') {

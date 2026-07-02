@@ -20,7 +20,7 @@ export type BranchListRepo = BranchActionRepo & {
 
 const branchListRepoEqualFields: Array<keyof BranchListRepo> = [
   'id',
-  'instanceToken',
+  'instanceId',
   'data',
   'ui',
   'operations',
@@ -68,7 +68,7 @@ export function useBranchListRepo(repoId: string): BranchListRepo | undefined {
       return repo
         ? {
             id: repo.id,
-            instanceToken: repo.instanceToken,
+            instanceId: repo.instanceId,
             data: {
               branches: repo.data.branches,
               currentBranch: repo.data.currentBranch,

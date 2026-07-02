@@ -60,8 +60,11 @@ function workspacePaneTabsByTargetByRepoFromQueryCache(
 ): Record<string, Record<string, WorkspacePaneTabEntry[]>> {
   const byRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>> = {}
   for (const id of order) {
-    if (!repos[id]) continue
-    const data = primaryWindowQueryClient.getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(id))
+    const repo = repos[id]
+    if (!repo) continue
+    const data = primaryWindowQueryClient.getQueryData<WorkspacePaneTabsQueryData>(
+      workspacePaneTabsQueryKey(id, repo.instanceId),
+    )
     if (!data) continue
     const byTarget = workspacePaneTabsByTargetFromQueryData(data)
     if (Object.keys(byTarget).length > 0) byRepo[id] = byTarget

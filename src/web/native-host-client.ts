@@ -1,10 +1,9 @@
 import type { NativeHostIpcPath, IpcRequest } from '#/shared/api-types.ts'
+import { createOpaqueId } from '#/shared/opaque-id.ts'
 import { getClientBridge } from '#/web/client-bridge.ts'
 
-let nextNativeRequestId = 1
-
 function createNativeRequestId(): string {
-  return `ipc_${Date.now().toString(36)}_${nextNativeRequestId++}`
+  return createOpaqueId('ipc')
 }
 
 function abortNativeRequest(requestId: string): void {

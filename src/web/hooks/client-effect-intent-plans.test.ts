@@ -53,14 +53,14 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: true,
         terminalFocused: false,
         currentRepoId: '/tmp/repo',
-        currentRepo: { id: '/tmp/repo', instanceToken: 7 },
+        currentRepo: { id: '/tmp/repo', instanceId: 'repo-instance-test-7' },
       },
     )
 
     expect(plan).toEqual({ kind: 'noop' })
   })
 
-  test('routes workspace tab close shortcut to close-window while workspace shortcuts are blocked', () => {
+  test('suppresses workspace tab close shortcut while workspace shortcuts are blocked', () => {
     const plan = createWorkspaceIntentPlan(
       { type: 'workspace-pane-close-tab-or-window-requested' },
       {
@@ -68,14 +68,14 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: true,
         terminalFocused: false,
         currentRepoId: '/tmp/repo',
-        currentRepo: { id: '/tmp/repo', instanceToken: 7 },
+        currentRepo: { id: '/tmp/repo', instanceId: 'repo-instance-test-7' },
       },
     )
 
-    expect(plan).toEqual({ kind: 'close-window' })
+    expect(plan).toEqual({ kind: 'noop' })
   })
 
-  test('routes workspace tab close shortcut to close-window while overlays block workspace actions', () => {
+  test('suppresses workspace tab close shortcut while overlays block workspace actions', () => {
     const plan = createWorkspaceIntentPlan(
       { type: 'workspace-pane-close-tab-or-window-requested' },
       {
@@ -83,14 +83,44 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: true,
         terminalFocused: false,
         currentRepoId: '/tmp/repo',
-        currentRepo: { id: '/tmp/repo', instanceToken: 7 },
+        currentRepo: { id: '/tmp/repo', instanceId: 'repo-instance-test-7' },
+      },
+    )
+
+    expect(plan).toEqual({ kind: 'noop' })
+  })
+
+  test('routes workspace tab close shortcut to close-window when no repo is active', () => {
+    const plan = createWorkspaceIntentPlan(
+      { type: 'workspace-pane-close-tab-or-window-requested' },
+      {
+        overlayBlocked: false,
+        workspaceShortcutSuppressed: false,
+        terminalFocused: false,
+        currentRepoId: null,
+        currentRepo: null,
       },
     )
 
     expect(plan).toEqual({ kind: 'close-window' })
   })
 
-  test('creates a refresh plan from the current visible repo token', () => {
+  test('keeps native new-terminal intent active while workspace shortcuts are suppressed', () => {
+    const plan = createWorkspaceIntentPlan(
+      { type: 'terminal-new-tab-requested' },
+      {
+        overlayBlocked: false,
+        workspaceShortcutSuppressed: true,
+        terminalFocused: false,
+        currentRepoId: '/tmp/repo',
+        currentRepo: { id: '/tmp/repo', instanceId: 'repo-instance-test-7' },
+      },
+    )
+
+    expect(plan).toEqual({ kind: 'new-terminal-tab', repoId: '/tmp/repo' })
+  })
+
+  test('creates a refresh plan from the current visible repo instance id', () => {
     const plan = createWorkspaceIntentPlan(
       { type: 'repo-refresh-requested' },
       {
@@ -98,11 +128,11 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: false,
         terminalFocused: false,
         currentRepoId: '/tmp/repo',
-        currentRepo: { id: '/tmp/repo', instanceToken: 7 },
+        currentRepo: { id: '/tmp/repo', instanceId: 'repo-instance-test-7' },
       },
     )
 
-    expect(plan).toEqual({ kind: 'refresh-repo', repoId: '/tmp/repo', token: 7 })
+    expect(plan).toEqual({ kind: 'refresh-repo', repoId: '/tmp/repo', repoInstanceId: 'repo-instance-test-7' })
   })
 
   test('creates a zen mode toggle plan for the current workspace', () => {
@@ -113,7 +143,7 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: false,
         terminalFocused: false,
         currentRepoId: '/tmp/repo',
-        currentRepo: { id: '/tmp/repo', instanceToken: 7 },
+        currentRepo: { id: '/tmp/repo', instanceId: 'repo-instance-test-7' },
       },
     )
 
@@ -128,7 +158,7 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: true,
         terminalFocused: false,
         currentRepoId: '/tmp/repo',
-        currentRepo: { id: '/tmp/repo', instanceToken: 7 },
+        currentRepo: { id: '/tmp/repo', instanceId: 'repo-instance-test-7' },
       },
     )
 
@@ -143,7 +173,7 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: false,
         terminalFocused: true,
         currentRepoId: '/tmp/repo',
-        currentRepo: { id: '/tmp/repo', instanceToken: 7 },
+        currentRepo: { id: '/tmp/repo', instanceId: 'repo-instance-test-7' },
       },
     )
 
@@ -158,7 +188,7 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: false,
         terminalFocused: false,
         currentRepoId: '/tmp/repo',
-        currentRepo: { id: '/tmp/repo', instanceToken: 7 },
+        currentRepo: { id: '/tmp/repo', instanceId: 'repo-instance-test-7' },
       },
     )
 
@@ -188,7 +218,7 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: true,
         terminalFocused: false,
         currentRepoId: '/tmp/repo',
-        currentRepo: { id: '/tmp/repo', instanceToken: 7 },
+        currentRepo: { id: '/tmp/repo', instanceId: 'repo-instance-test-7' },
       },
     )
 

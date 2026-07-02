@@ -217,6 +217,11 @@ export interface ProbeResult {
   message?: string
 }
 
+export type RepoRuntimeOpenResult =
+  | { ok: true; repo: { id: string; name: string }; repoInstanceId: string }
+  | { ok: false; input: string; reason: string }
+export type RepoRuntimeOpenResponse = { ok: true; repoInstanceId: string } | RepoRuntimeOpenResult
+
 export interface CloneRepoResult extends ExecResult {
   path?: string
 }
@@ -261,6 +266,7 @@ export type IpcEvent =
 export interface AppIpcHandlers {
   repo: {
     probe: (input: { cwd: string }) => Promise<ProbeResult>
+    runtimeOpen: (input: { repoRoot: string } | { repoInput: string }) => Promise<RepoRuntimeOpenResponse>
     clone: (input: {
       operationId: string
       url: string

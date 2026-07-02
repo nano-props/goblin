@@ -26,7 +26,7 @@ export interface BranchCopyPatchAction {
 
 export interface BranchActionRepo {
   id: RepoState['id']
-  instanceToken: RepoState['instanceToken']
+  instanceId: RepoState['instanceId']
   data: Pick<RepoState['data'], 'currentBranch' | 'status' | 'worktreesByPath'>
   operations: Pick<RepoState['operations'], 'branchAction'>
   remote: Pick<
