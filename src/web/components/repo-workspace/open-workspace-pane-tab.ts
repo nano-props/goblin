@@ -10,6 +10,7 @@ export async function openWorkspacePaneTab(input: {
   branchName?: string
   worktreePath: string | null | undefined
   type: WorkspacePaneStaticTabType
+  insertAfterTabType?: WorkspacePaneStaticTabType
   navigation: Pick<PrimaryWindowNavigationActions, 'showRepoBranchWorkspacePaneTab' | 'showRepoWorkspacePaneTab'>
 }): Promise<boolean> {
   const provider = workspacePaneStaticTabProvider(input.type)
@@ -22,7 +23,11 @@ export async function openWorkspacePaneTab(input: {
       repoRoot: input.repoId,
       branchName,
       worktreePath: input.worktreePath ?? null,
-      operation: { type: 'open-static', tabType: input.type },
+      operation: {
+        type: 'open-static',
+        tabType: input.type,
+        insertAfterTabType: input.insertAfterTabType,
+      },
     })
     if (!committed.ok) return false
   }

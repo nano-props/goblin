@@ -279,7 +279,10 @@ export const ko: Record<DictKey, string> = {
   'branch-status.pr.merge-conflicting': '병합 충돌',
   'branch-status.pr.merge-unknown': '병합 상태 동기화 중',
   'branch-status.pr.copy-link': 'PR 링크 복사',
+  'branch-status.pr.open-externally': '브라우저에서 풀 리퀘스트 열기',
   'branch-status.pr.created-by': '{author} 님이 {time}에 생성',
+  'branch-status.commit.open-externally': '브라우저에서 커밋 열기',
+  'branch-status.upstream.open-externally': '브라우저에서 업스트림 열기',
 
   // ---- Log list ----------------------------------------------------------
   'log.empty': '표시할 커밋이 없습니다.',
@@ -366,8 +369,6 @@ export const ko: Record<DictKey, string> = {
   'action.pull': '풀',
   'action.push': '푸시',
   'action.fetch': '페치',
-  'workspace.open-externally.remote': '원격',
-  'workspace.open-externally.pr': 'PR #{n}',
   'action.delete-branch': '삭제',
   'action.remove-worktree': '삭제',
   'action.pull-loading': '풀 중…',
@@ -387,8 +388,6 @@ export const ko: Record<DictKey, string> = {
   'action.push-title': '{branch} 푸시',
   'action.fetch-title': '원격과 상태를 동기화',
   'action.fetch-local-title': '로컬 브랜치와 상태를 동기화',
-  'workspace.open-externally.remote-title': '브라우저에서 리포지토리 열기',
-  'workspace.open-externally.pr-title': '브라우저에서 풀 리퀘스트 열기',
   'action.result-ok': '성공',
   'action.result-error': '오류',
   'worktree-bootstrap.summary.copy-one': '{count}개 경로를 복사했습니다: {paths}{moreSuffix}',

@@ -14,6 +14,7 @@ export interface BranchSnapshotInfo {
   ahead: number
   behind: number
   lastCommitHash: string
+  lastCommitShortHash: string
   lastCommitMessage: string
   lastCommitDate: string
   lastCommitAuthor: string
@@ -117,9 +118,7 @@ export interface GitRemoteInfo {
 }
 
 export type RepoUrlTarget =
-  | { type: 'root' }
-  | { type: 'branch'; branch: string }
-  | { type: 'commit'; hash: string }
+  { type: 'root' } | { type: 'branch'; branch: string; remote?: string } | { type: 'commit'; hash: string }
 
 export type BrowserRemoteProvider = 'github' | 'gitlab' | 'external'
 

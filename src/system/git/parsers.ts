@@ -14,7 +14,7 @@ export const FIELD_SEP = '\x1f'
 
 /**
  * Parse `git for-each-ref --format=<fields joined by FIELD_SEP> refs/heads/`.
- * Fields, in order: refname:short, objectname:short, subject,
+ * Fields, in order: refname:short, objectname, objectname:short, subject,
  * authordate:iso-strict, authorname, upstream:short, upstream:track.
  */
 export function parseBranches(
@@ -47,11 +47,12 @@ export function parseBranches(
     const parts = line.split(FIELD_SEP)
     const name = parts[0] ?? ''
     const hash = parts[1] ?? ''
-    const subject = parts[2] ?? ''
-    const date = parts[3] ?? ''
-    const author = parts[4] ?? ''
-    const upstream = parts[5] ?? ''
-    const track = parts[6] ?? ''
+    const shortHash = parts[2] ?? ''
+    const subject = parts[3] ?? ''
+    const date = parts[4] ?? ''
+    const author = parts[5] ?? ''
+    const upstream = parts[6] ?? ''
+    const track = parts[7] ?? ''
 
     let ahead = 0
     let behind = 0
@@ -66,6 +67,7 @@ export function parseBranches(
       ahead,
       behind,
       lastCommitHash: hash,
+      lastCommitShortHash: shortHash,
       lastCommitMessage: subject,
       lastCommitDate: date,
       lastCommitAuthor: author,

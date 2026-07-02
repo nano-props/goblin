@@ -7,7 +7,6 @@ import {
 } from '#/web/stores/repos/repo-operation-scheduler.ts'
 import { replaceRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { getBranchActionCapabilities } from '#/web/hooks/useBranchActions.tsx'
-import { branchBrowserRemoteProvider } from '#/web/hooks/useRemoteOpenAction.ts'
 import {
   createBranchSnapshot,
   createRepoBranch,
@@ -19,6 +18,20 @@ import type { RepoBranchAction } from '#/web/stores/repos/branch-action-types.ts
 import type { BranchViewMode } from '#/web/stores/repos/types.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 const REPO_ID = '/tmp/gbl-branch-actions-test-repo'
+
+function branchBrowserRemoteProvider(
+  repo: NonNullable<ReturnType<typeof useReposStore.getState>['repos'][string]>,
+  branch: ReturnType<typeof createRepoBranch>,
+) {
+  const providers = repo.remote.remoteProviders
+  if (branch.tracking && providers) {
+    const remoteName = Object.keys(providers)
+      .filter((remote) => branch.tracking === remote || branch.tracking.startsWith(`${remote}/`))
+      .sort((a, b) => b.length - a.length)[0]
+    if (remoteName) return providers[remoteName]
+  }
+  return repo.remote.browserRemoteProvider
+}
 
 async function flushAsyncWork() {
   await new Promise((resolve) => setTimeout(resolve, 0))
@@ -128,7 +141,6 @@ describe('branch action capabilities', () => {
 
     expect(getBranchActionCapabilities(repo, branch)).toMatchObject({
       canPush: true,
-      canOpenRemote: true,
       canOpenTerminal: true,
       canOpenEditor: true,
     })
@@ -145,7 +157,6 @@ describe('branch action capabilities', () => {
 
     expect(getBranchActionCapabilities(repo, branch)).toMatchObject({
       canPush: false,
-      canOpenRemote: false,
       canOpenTerminal: true,
       canOpenEditor: true,
     })
@@ -191,27 +202,6 @@ describe('branch action capabilities', () => {
     expect(getBranchActionCapabilities(repo, branch)).toMatchObject({
       canRemoveWorktree: true,
       isRegularBranch: false,
-    })
-  })
-
-  test('allows browser actions for non-GitHub web remotes', () => {
-    const branch = createRepoBranch('feature/gitlab')
-    seedRepoState({
-      id: REPO_ID,
-      branches: [branch],
-      remote: {
-        remotes: ['origin'],
-        hasRemotes: true,
-        hasBrowserRemote: true,
-        browserRemoteProvider: 'gitlab',
-        remoteProviders: { origin: 'gitlab' },
-        hasGitHubRemote: false,
-      },
-    })
-
-    expect(getBranchActionCapabilities(useReposStore.getState().repos[REPO_ID]!, branch)).toMatchObject({
-      canPush: true,
-      canOpenRemote: true,
     })
   })
 

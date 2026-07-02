@@ -85,6 +85,46 @@ describe('getBrowserRepoUrl', () => {
       'https://gitlab.com/acme/project/-/tree/feature/test',
     )
   })
+
+  test('honors an explicit remote hint for branch targets', async () => {
+    // Upstream chip use case: caller knows the remote (e.g. `origin`) and
+    // the branch (e.g. `main`) from the tracking ref `origin/main`. The
+    // helper should resolve that exact remote instead of consulting the
+    // local branch's tracking config.
+    gitMock.mockImplementation(async (_cwd: string, args: string[]) => {
+      if (args[0] === 'remote' && args[1] === '-v') {
+        return (
+          'origin\tgit@github.com:acme/project.git (fetch)\n' +
+          'origin\tgit@github.com:acme/project.git (push)\n' +
+          'upstream\tgit@gitlab.com:acme/mirror.git (fetch)\n' +
+          'upstream\tgit@gitlab.com:acme/mirror.git (push)'
+        )
+      }
+      throw new Error(`Unexpected git call: ${args.join(' ')}`)
+    })
+
+    // `upstream` would be the preferred remote if we asked it to guess,
+    // but the explicit hint forces `origin` (GitHub) instead.
+    await expect(getBrowserRepoUrl('/tmp/repo', { type: 'branch', branch: 'main', remote: 'origin' })).resolves.toBe(
+      'https://github.com/acme/project/tree/main',
+    )
+    await expect(getBrowserRepoUrl('/tmp/repo', { type: 'branch', branch: 'main', remote: 'upstream' })).resolves.toBe(
+      'https://gitlab.com/acme/mirror/-/tree/main',
+    )
+  })
+
+  test('returns null when the explicit remote does not exist', async () => {
+    gitMock.mockImplementation(async (_cwd: string, args: string[]) => {
+      if (args[0] === 'remote' && args[1] === '-v') {
+        return 'origin\tgit@github.com:acme/project.git (fetch)\norigin\tgit@github.com:acme/project.git (push)'
+      }
+      throw new Error(`Unexpected git call: ${args.join(' ')}`)
+    })
+
+    await expect(
+      getBrowserRepoUrl('/tmp/repo', { type: 'branch', branch: 'main', remote: 'nonexistent' }),
+    ).resolves.toBeNull()
+  })
 })
 
 describe('commitUrlForBrowserRemote', () => {
@@ -98,8 +138,12 @@ describe('commitUrlForBrowserRemote', () => {
   })
 
   test('returns null for unsupported providers and invalid hashes', () => {
-    expect(commitUrlForBrowserRemote(browserRemote('https://example.com/acme/project', 'external'), 'abcdef1')).toBeNull()
-    expect(commitUrlForBrowserRemote(browserRemote('https://github.com/acme/project', 'github'), 'not-a-hash')).toBeNull()
+    expect(
+      commitUrlForBrowserRemote(browserRemote('https://example.com/acme/project', 'external'), 'abcdef1'),
+    ).toBeNull()
+    expect(
+      commitUrlForBrowserRemote(browserRemote('https://github.com/acme/project', 'github'), 'not-a-hash'),
+    ).toBeNull()
   })
 })
 

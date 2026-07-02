@@ -120,6 +120,7 @@ export async function getBranches(
   try {
     const format = [
       '%(refname:short)',
+      '%(objectname)',
       '%(objectname:short)',
       '%(subject)',
       '%(authordate:iso-strict)',

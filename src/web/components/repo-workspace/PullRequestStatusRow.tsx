@@ -1,4 +1,6 @@
+import { useMemo } from 'react'
 import { Check, Circle, GitPullRequest, X } from 'lucide-react'
+import { throttle } from 'es-toolkit'
 import { useI18nStore, useT } from '#/web/stores/i18n.ts'
 import { CopyButton } from '#/web/components/CopyButton.tsx'
 import { Tip } from '#/web/components/Tip.tsx'
@@ -10,8 +12,10 @@ import {
 import { formatRelativeTimeOrNull } from '#/web/lib/dates.ts'
 import { cn } from '#/web/lib/cn.ts'
 import { prChipTone, visiblePrHealthSignals, type PrHealthSignal } from '#/web/components/repo-workspace/pr-status.ts'
+import { openBranchExternalTarget } from '#/web/hooks/openBranchExternalTarget.ts'
 import {
   STATUS_INLINE_GROUP_CLASS,
+  ClickableStatusChip,
   StatusChip,
   StatusRow,
   type Tone,
@@ -115,7 +119,9 @@ function PullRequestValue({
   url,
   copyLabel,
   copiedLabel,
+  openExternallyLabel,
   tooltipSide,
+  onOpenExternally,
 }: {
   summary: string
   summaryTone: Tone
@@ -124,7 +130,9 @@ function PullRequestValue({
   url: string
   copyLabel: string
   copiedLabel: string
+  openExternallyLabel: string
   tooltipSide: TooltipSide
+  onOpenExternally: () => void
 }) {
   const tooltipAlign = tooltipSide === 'bottom' ? 'center' : 'end'
   // Radix Tooltip exposes the available-width var; the fallback keeps the
@@ -150,9 +158,15 @@ function PullRequestValue({
         collisionPadding={16}
       >
         <div className="flex min-w-0 max-w-full items-center gap-1.5">
-          <StatusChip tone={summaryTone} className="min-w-0 shrink">
+          <ClickableStatusChip
+            tone={summaryTone}
+            className="min-w-0 shrink"
+            data-pull-request-link=""
+            title={openExternallyLabel}
+            onClick={onOpenExternally}
+          >
             <span className="truncate">{summary}</span>
-          </StatusChip>
+          </ClickableStatusChip>
           {signals.map((signal) => (
             <PrSignalChip key={`${signal.tone}:${signal.label}`} signal={signal} />
           ))}
@@ -164,14 +178,35 @@ function PullRequestValue({
 }
 
 export function PullRequestStatusRow({
+  repoId,
+  branchName,
   pullRequest,
   tooltipSide = 'right',
 }: {
+  repoId: string
+  branchName: string
   pullRequest: PullRequestInfo | undefined
   tooltipSide?: TooltipSide
 }) {
   const t = useT()
   const lang = useI18nStore((s) => s.lang)
+  // Leading-edge throttle absorbs accidental double-clicks (mouse bounce,
+  // jitter while the OS shell steals focus). Mirrors the
+  // `runUiAction('remote', ...)` re-entrance gate the toolbar's "Open
+  // Externally" entry already uses. `{ edges: ['leading'] }` keeps the
+  // window trailing-edge silent — a delayed re-fire after the OS hands
+  // the URL off would just open a duplicate tab.
+  const handleOpenExternally = useMemo(
+    () =>
+      throttle(
+        () => {
+          void openBranchExternalTarget(repoId, { name: branchName, pullRequest }).catch(() => {})
+        },
+        500,
+        { edges: ['leading'] },
+      ),
+    [repoId, branchName, pullRequest],
+  )
   if (!pullRequest) return null
 
   const signals = prHealthSignals(pullRequest, t)
@@ -193,7 +228,9 @@ export function PullRequestStatusRow({
           url={pullRequest.url}
           copyLabel={t('branch-status.pr.copy-link')}
           copiedLabel={t('branch-status.copied')}
+          openExternallyLabel={t('branch-status.pr.open-externally')}
           tooltipSide={tooltipSide}
+          onOpenExternally={handleOpenExternally}
         />
       }
       valueLayout="fill"

@@ -113,6 +113,18 @@ export function workspacePaneTabEntryIdentity(entry: WorkspacePaneTabEntry): str
   return entry.type === 'terminal' ? `terminal:${entry.terminalSessionId}` : entry.tabId
 }
 
+export function workspacePaneTabsInsertAfterStaticTab<TEntry extends WorkspacePaneTabEntry>(
+  current: readonly TEntry[],
+  entry: TEntry,
+  afterTabType?: WorkspacePaneStaticTabType | null,
+): TEntry[] {
+  if (!afterTabType) return [...current, entry]
+  const afterIdentity = workspacePaneStaticTabId(afterTabType)
+  const insertAfterIndex = current.findIndex((candidate) => workspacePaneTabEntryIdentity(candidate) === afterIdentity)
+  if (insertAfterIndex === -1) return [...current, entry]
+  return [...current.slice(0, insertAfterIndex + 1), entry, ...current.slice(insertAfterIndex + 1)]
+}
+
 export function workspacePaneStaticTabId(type: WorkspacePaneStaticTabType): WorkspacePaneStaticTabId {
   return WORKSPACE_PANE_STATIC_TAB_IDS[type]
 }

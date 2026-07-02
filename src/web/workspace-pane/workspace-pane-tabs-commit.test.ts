@@ -205,6 +205,43 @@ describe('updateWorkspacePaneTabs', () => {
     ])
   })
 
+  test('passes through open-static insertion hints', async () => {
+    installWorkspacePaneTabsTestBridge({
+      updateWorkspaceTabs: async (input) => {
+        expect(input.operation).toEqual({
+          type: 'open-static',
+          tabType: 'history',
+          insertAfterTabType: 'status',
+        })
+        return [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')]
+      },
+    })
+    setWorkspacePaneTabsForTargetQueryData({
+      repoRoot: REPO_ROOT,
+      branchName: BRANCH_NAME,
+      worktreePath: WORKTREE_PATH,
+      tabs: [workspacePaneStaticTabEntry('status')],
+    })
+
+    await expect(
+      updateWorkspacePaneTabs({
+        repoRoot: REPO_ROOT,
+        branchName: BRANCH_NAME,
+        worktreePath: WORKTREE_PATH,
+        operation: {
+          type: 'open-static',
+          tabType: 'history',
+          insertAfterTabType: 'status',
+        },
+      }),
+    ).resolves.toMatchObject({ ok: true })
+
+    expect(readWorkspacePaneTabs()).toEqual([
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneStaticTabEntry('history'),
+    ])
+  })
+
   test('returns a failure result and leaves cached tabs untouched when the server operation fails', async () => {
     installWorkspacePaneTabsTestBridge({
       updateWorkspaceTabs: async () => {

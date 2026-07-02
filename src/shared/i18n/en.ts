@@ -288,7 +288,10 @@ export const en = {
   'branch-status.pr.merge-conflicting': 'merge conflicts',
   'branch-status.pr.merge-unknown': 'merge status syncing',
   'branch-status.pr.copy-link': 'Copy PR link',
+  'branch-status.pr.open-externally': 'Open pull request in browser',
   'branch-status.pr.created-by': '{author} created {time}',
+  'branch-status.commit.open-externally': 'Open commit in browser',
+  'branch-status.upstream.open-externally': 'Open upstream in browser',
 
   // ---- Log list -----------------------------------------------------------
   'log.empty': 'No commits to show.',
@@ -378,8 +381,6 @@ export const en = {
   'action.pull': 'Pull',
   'action.push': 'Push',
   'action.fetch': 'Fetch',
-  'workspace.open-externally.remote': 'Remote',
-  'workspace.open-externally.pr': 'PR #{n}',
   'action.delete-branch': 'Delete',
   'action.remove-worktree': 'Delete',
   'action.pull-loading': 'Pulling…',
@@ -399,8 +400,6 @@ export const en = {
   'action.push-title': 'Push {branch}',
   'action.fetch-title': 'Sync remote and sync status',
   'action.fetch-local-title': 'Sync local branches and status',
-  'workspace.open-externally.remote-title': 'Open repo in browser',
-  'workspace.open-externally.pr-title': 'Open pull request in browser',
   'action.result-ok': 'OK',
   'action.result-error': 'Error',
   'worktree-bootstrap.summary.copy-one': 'Copied {count} path: {paths}{moreSuffix}',

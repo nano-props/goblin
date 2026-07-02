@@ -203,6 +203,7 @@ describe('useRepoStatusRefresh', () => {
         tracking: '',
         trackingGone: false,
         lastCommitHash: '',
+        lastCommitShortHash: '',
         lastCommitMessage: '',
         lastCommitAuthor: '',
         lastCommitDate: '',

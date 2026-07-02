@@ -330,7 +330,9 @@ class TerminalSessionService {
   ): WorkspacePaneTabEntry[] {
     switch (operation.type) {
       case 'open-static':
-        return this.options.workspaceTabs.openStaticTab(target, operation.tabType)
+        return this.options.workspaceTabs.openStaticTab(target, operation.tabType, {
+          insertAfterTabType: operation.insertAfterTabType,
+        })
       case 'close-static':
         return this.options.workspaceTabs.closeStaticTab(target, operation.tabType)
       case 'reorder':
@@ -668,8 +670,22 @@ function workspaceTabsWithoutStaleTerminalEntries(
 
 function isValidWorkspacePaneTabsOperation(value: unknown): value is TerminalUpdateWorkspaceTabsOperation {
   if (!value || typeof value !== 'object') return false
-  const operation = value as { type?: unknown; tabType?: unknown; tabIdentities?: unknown }
-  if (operation.type === 'open-static' || operation.type === 'close-static') {
+  const operation = value as {
+    type?: unknown
+    tabType?: unknown
+    tabIdentities?: unknown
+    insertAfterTabType?: unknown
+  }
+  if (operation.type === 'open-static') {
+    return (
+      typeof operation.tabType === 'string' &&
+      isWorkspacePaneStaticTabType(operation.tabType) &&
+      (operation.insertAfterTabType === undefined ||
+        operation.insertAfterTabType === null ||
+        (typeof operation.insertAfterTabType === 'string' && isWorkspacePaneStaticTabType(operation.insertAfterTabType)))
+    )
+  }
+  if (operation.type === 'close-static') {
     return typeof operation.tabType === 'string' && isWorkspacePaneStaticTabType(operation.tabType)
   }
   if (operation.type === 'reorder') {

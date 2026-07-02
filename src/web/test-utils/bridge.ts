@@ -109,6 +109,7 @@ export function createBranchSnapshot(name: string, options: Partial<BranchSnapsh
     ahead: 0,
     behind: 0,
     lastCommitHash: '',
+    lastCommitShortHash: '',
     lastCommitMessage: '',
     lastCommitDate: '',
     lastCommitAuthor: '',
@@ -234,7 +235,9 @@ function defaultWorkspacePaneTabsOperationResult(input: TerminalUpdateWorkspaceT
   const currentTabs = readWorkspacePaneTabsForTarget(input)
   switch (input.operation.type) {
     case 'open-static':
-      return workspacePaneTabsWithStaticTab(currentTabs, input.operation.tabType)
+      return workspacePaneTabsWithStaticTab(currentTabs, input.operation.tabType, {
+        insertAfterTabType: input.operation.insertAfterTabType,
+      })
     case 'close-static':
       return workspacePaneTabsWithoutStaticTab(currentTabs, input.operation.tabType)
     case 'reorder':

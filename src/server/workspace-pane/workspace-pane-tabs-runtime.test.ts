@@ -52,6 +52,25 @@ describe('workspace pane tabs runtime', () => {
     expect(runtime.closeStaticTab(target(), 'status')).toEqual([workspacePaneStaticTabEntry('history')])
   })
 
+  test('inserts a new static tab immediately after the requested tab identity', () => {
+    const runtime = createWorkspacePaneTabsRuntime<string>()
+    runtime.replaceTabs({
+      ...target(),
+      tabs: [
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneTerminalTabEntry('session-1'),
+        workspacePaneStaticTabEntry('history'),
+      ],
+    })
+
+    expect(runtime.openStaticTab(target(), 'changes', { insertAfterTabType: 'status' })).toEqual([
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneStaticTabEntry('changes'),
+      workspacePaneTerminalTabEntry('session-1'),
+      workspacePaneStaticTabEntry('history'),
+    ])
+  })
+
   test('reorders only current tab identities and preserves current tabs absent from the drag snapshot', () => {
     const runtime = createWorkspacePaneTabsRuntime<string>()
     runtime.replaceTabs({

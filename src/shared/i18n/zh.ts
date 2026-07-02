@@ -271,7 +271,10 @@ export const zh: Record<DictKey, string> = {
   'branch-status.pr.merge-conflicting': '合并冲突',
   'branch-status.pr.merge-unknown': '合并状态同步中',
   'branch-status.pr.copy-link': '复制 PR 链接',
+  'branch-status.pr.open-externally': '在浏览器中打开拉取请求',
   'branch-status.pr.created-by': '{author} 于 {time}创建',
+  'branch-status.commit.open-externally': '在浏览器中打开提交',
+  'branch-status.upstream.open-externally': '在浏览器中打开上游',
 
   // ---- Log list ----------------------------------------------------------
   'log.empty': '暂无提交可显示。',
@@ -357,8 +360,6 @@ export const zh: Record<DictKey, string> = {
   'action.pull': '拉取',
   'action.push': '推送',
   'action.fetch': '同步',
-  'workspace.open-externally.remote': '远端',
-  'workspace.open-externally.pr': 'PR #{n}',
   'action.delete-branch': '删除',
   'action.remove-worktree': '删除',
   'action.pull-loading': '正在拉取…',
@@ -378,8 +379,6 @@ export const zh: Record<DictKey, string> = {
   'action.push-title': '推送 {branch}',
   'action.fetch-title': '同步远端和状态',
   'action.fetch-local-title': '同步本地分支和状态',
-  'workspace.open-externally.remote-title': '在浏览器中打开仓库',
-  'workspace.open-externally.pr-title': '在浏览器中打开拉取请求',
   'action.result-ok': '成功',
   'action.result-error': '错误',
   'worktree-bootstrap.summary.copy-one': '已复制 {count} 个路径：{paths}{moreSuffix}',

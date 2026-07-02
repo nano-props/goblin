@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import {
   ArrowDown,
   ArrowUp,
@@ -10,17 +11,20 @@ import {
   RadioTower,
   RefreshCw,
 } from 'lucide-react'
+import { throttle } from 'es-toolkit'
 import { useI18nStore, useT } from '#/web/stores/i18n.ts'
 import { EmptyState } from '#/web/components/Layout.tsx'
 import { PullRequestStatusRow } from '#/web/components/repo-workspace/PullRequestStatusRow.tsx'
 import { IconCopyButton } from '#/web/components/IconCopyButton.tsx'
+import { CopyButton } from '#/web/components/CopyButton.tsx'
 import type { BranchCopyPatchAction } from '#/web/hooks/branch-action-state.ts'
 import { useActionFeedback } from '#/web/hooks/useActionFeedback.ts'
 import { useBranchActionSurface } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
 import {
+  ClickableStatusChip,
   CopyableValue,
-  MonoValue,
   StatusChip,
+  StatusLink,
   StatusRow,
   StatusRows,
   type Tone,
@@ -31,7 +35,11 @@ import { formatWorktreePath } from '#/web/lib/paths.ts'
 import { remoteRepoTarget } from '#/web/stores/repos/repo-guards.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { PROTECTED_BRANCHES, branchPullRequestBelongsToBranch } from '#/shared/git-types.ts'
+import { openUpstreamBranchExternalTarget } from '#/web/hooks/openBranchExternalTarget.ts'
 import type { SelectedRepoWorkspace } from '#/web/components/repo-workspace/model.ts'
+import { CommitHashLink } from '#/web/components/repo-workspace/repo-link-actions.tsx'
+import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
+import { openWorkspacePaneTab } from '#/web/components/repo-workspace/open-workspace-pane-tab.ts'
 interface Props {
   detail: SelectedRepoWorkspace
 }
@@ -106,15 +114,47 @@ function StatusCopyPatchButton({ action }: { action: BranchCopyPatchAction }) {
   )
 }
 
+// Clickable upstream ref (e.g. `origin/main`). Routes through
+// `openUpstreamBranchExternalTarget` so the helper resolves the named
+// remote instead of guessing from the local branch's tracking config.
+function UpstreamLink({
+  repoId,
+  tracking,
+  title,
+  tone,
+}: {
+  repoId: string
+  tracking: string
+  title: string
+  tone?: Tone
+}) {
+  const handleClick = useMemo(
+    () =>
+      throttle(
+        () => {
+          void openUpstreamBranchExternalTarget(repoId, tracking).catch(() => {})
+        },
+        500,
+        { edges: ['leading'] },
+      ),
+    [repoId, tracking],
+  )
+  return (
+    <StatusLink mono title={title} data-upstream-link="" tone={tone} truncate onClick={handleClick}>
+      {tracking}
+    </StatusLink>
+  )
+}
+
 export function BranchStatus({ detail }: Props) {
   const { copyPatchAction } = useBranchActionSurface()
   const t = useT()
   const lang = useI18nStore((s) => s.lang)
   const compact = useIsCompactUi()
+  const navigation = usePrimaryWindowNavigation()
   const { branch, statusCount } = detail
-  if (!branch) return <EmptyState title={t('branches.empty')} />
-
-  const protectedBranch = PROTECTED_BRANCHES.has(branch.name)
+  const branchName = branch?.name
+  const worktreePathRaw = branch?.worktree?.path
   // Phase 4: pull the target off the lifecycle union. The
   // selector is keyed on the lifecycle itself, so a re-probe
   // (e.g. network reconnect) re-renders this row.
@@ -122,6 +162,46 @@ export function BranchStatus({ detail }: Props) {
     const repo = s.repos[detail.repoId]
     return repo ? remoteRepoTarget(repo.id, repo.remote.lifecycle) : null
   })
+  const openFilesTab = useMemo(
+    () =>
+      throttle(
+        () => {
+          if (!branchName || !worktreePathRaw) return
+          void openWorkspacePaneTab({
+            repoId: detail.repoId,
+            branchName,
+            worktreePath: worktreePathRaw,
+            type: 'files',
+            insertAfterTabType: 'status',
+            navigation,
+          })
+        },
+        500,
+        { edges: ['leading'] },
+      ),
+    [branchName, worktreePathRaw, detail.repoId, navigation],
+  )
+  const openChangesTab = useMemo(
+    () =>
+      throttle(
+        () => {
+          if (!branchName || !worktreePathRaw) return
+          void openWorkspacePaneTab({
+            repoId: detail.repoId,
+            branchName,
+            worktreePath: worktreePathRaw,
+            type: 'changes',
+            insertAfterTabType: 'status',
+            navigation,
+          })
+        },
+        500,
+        { edges: ['leading'] },
+      ),
+    [branchName, worktreePathRaw, detail.repoId, navigation],
+  )
+  if (!branch) return <EmptyState title={t('branches.empty')} />
+  const protectedBranch = PROTECTED_BRANCHES.has(branch.name)
   const worktreePath = branch.worktree?.path ? formatWorktreePath(branch.worktree?.path, worktreeTarget) : ''
   const worktreeChangeCount = detail.worktreeState?.changeCount ?? statusCount
   const pullRequest =
@@ -152,12 +232,22 @@ export function BranchStatus({ detail }: Props) {
   // row only needs to surface lock state on its own.
   const worktreeTone: Tone = worktreeLocked ? 'attention' : branch.worktree?.path ? 'brand' : 'neutral'
   const worktreeValue = branch.worktree?.path ? (
-    <CopyableValue
-      value={worktreePath}
-      copyValue={branch.worktree?.path}
-      copyLabel={t('branch-status.copy-worktree-path')}
-      copiedLabel={t('branch-status.copied')}
-    />
+    <div className="inline-flex max-w-full min-w-0 items-center gap-1.5 align-middle">
+      <StatusLink
+        mono
+        truncate
+        title={t('workspace-pane-tabs.files-tooltip', { branch: branch.name })}
+        onClick={openFilesTab}
+      >
+        {worktreePath}
+      </StatusLink>
+      <CopyButton
+        value={branch.worktree.path}
+        copyLabel={t('branch-status.copy-worktree-path')}
+        copiedLabel={t('branch-status.copied')}
+        className="shrink-0"
+      />
+    </div>
   ) : (
     <StatusChip>{t('branch-status.worktree.none')}</StatusChip>
   )
@@ -165,9 +255,12 @@ export function BranchStatus({ detail }: Props) {
     <StatusChip tone="attention">{t('branch-status.worktree.locked')}</StatusChip>
   ) : undefined
   const upstreamValue = branch.tracking ? (
-    <MonoValue title={branch.tracking} tone={branch.trackingGone ? 'attention' : undefined} truncate>
-      {branch.tracking}
-    </MonoValue>
+    <UpstreamLink
+      repoId={detail.repoId}
+      tracking={branch.tracking}
+      title={t('branch-status.upstream.open-externally')}
+      tone={branch.trackingGone ? 'attention' : undefined}
+    />
   ) : (
     <StatusChip tone="attention">{t('branches.no-upstream')}</StatusChip>
   )
@@ -212,7 +305,13 @@ export function BranchStatus({ detail }: Props) {
           icon={<Diff size={14} />}
           label={t('branch-status.signal.changes')}
           value={
-            <StatusChip tone="attention">{t('branch-status.changes-count', { n: worktreeChangeCount })}</StatusChip>
+            <ClickableStatusChip
+              tone="attention"
+              title={t('workspace-pane-tabs.changes-tooltip', { count: worktreeChangeCount })}
+              onClick={openChangesTab}
+            >
+              {t('branch-status.changes-count', { n: worktreeChangeCount })}
+            </ClickableStatusChip>
           }
           after={copyPatchAction.visible ? <StatusCopyPatchButton action={copyPatchAction} /> : undefined}
           valueLayout="inline"
@@ -249,12 +348,15 @@ export function BranchStatus({ detail }: Props) {
         value={
           <div className="flex min-w-0 flex-nowrap items-center gap-2 overflow-hidden text-sm text-foreground">
             {branch.lastCommitHash ? (
-              <span
-                className="shrink-0 font-mono text-sm font-medium tabular-nums leading-none text-brand-text/85"
-                title={branch.lastCommitHash}
-              >
-                {branch.lastCommitHash}
-              </span>
+              <CommitHashLink
+                repoId={detail.repoId}
+                hash={branch.lastCommitHash}
+                shortHash={branch.lastCommitShortHash}
+                title={t('branch-status.commit.open-externally')}
+                data-commit-link=""
+                tone="brand"
+                className="shrink-0 text-sm font-medium tabular-nums leading-none text-brand-text/85"
+              />
             ) : null}
             <span
               className="min-w-0 truncate leading-tight text-foreground/95"
@@ -288,7 +390,12 @@ export function BranchStatus({ detail }: Props) {
           tone={mergeTone}
         />
       )}
-      <PullRequestStatusRow pullRequest={pullRequest} tooltipSide={compact ? 'top' : 'bottom'} />
+      <PullRequestStatusRow
+        repoId={detail.repoId}
+        branchName={branch.name}
+        pullRequest={pullRequest}
+        tooltipSide={compact ? 'top' : 'bottom'}
+      />
     </StatusRows>
   )
 }

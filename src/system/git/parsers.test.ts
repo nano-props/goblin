@@ -26,7 +26,16 @@ describe('parseBranches', () => {
   })
 
   test('parses a single branch with no upstream', () => {
-    const line = ['main', 'abc1234', 'initial commit', '2026-05-20T10:00:00+08:00', 'Alice', '', ''].join(SEP)
+    const line = [
+      'main',
+      'abc1234000000000000000000000000000000000',
+      'abc1234',
+      'initial commit',
+      '2026-05-20T10:00:00+08:00',
+      'Alice',
+      '',
+      '',
+    ].join(SEP)
     const result = parseBranches(line, 'main')
     expect(result).toHaveLength(1)
     expect(result[0]).toMatchObject({
@@ -34,7 +43,8 @@ describe('parseBranches', () => {
       isCurrent: true,
       ahead: 0,
       behind: 0,
-      lastCommitHash: 'abc1234',
+      lastCommitHash: 'abc1234000000000000000000000000000000000',
+      lastCommitShortHash: 'abc1234',
       lastCommitMessage: 'initial commit',
       lastCommitDate: '2026-05-20T10:00:00+08:00',
       lastCommitAuthor: 'Alice',
@@ -46,6 +56,7 @@ describe('parseBranches', () => {
   test('parses ahead/behind from track string', () => {
     const line = [
       'feature',
+      'def567800000000000000000000000000000000',
       'def5678',
       'wip',
       '2026-05-20T10:00:00+08:00',
@@ -61,7 +72,16 @@ describe('parseBranches', () => {
   })
 
   test('flags trackingGone when upstream marked [gone]', () => {
-    const line = ['stale', 'aaa1111', 'old', '2026-05-20T10:00:00+08:00', 'Carol', 'origin/stale', '[gone]'].join(SEP)
+    const line = [
+      'stale',
+      'aaa111100000000000000000000000000000000',
+      'aaa1111',
+      'old',
+      '2026-05-20T10:00:00+08:00',
+      'Carol',
+      'origin/stale',
+      '[gone]',
+    ].join(SEP)
     const [b] = parseBranches(line, 'main')
     expect(b?.tracking).toBe('origin/stale')
     expect(b?.trackingGone).toBe(true)
@@ -70,7 +90,10 @@ describe('parseBranches', () => {
   })
 
   test('marks isCurrent only for the matching branch', () => {
-    const out = [['main', 'a', 's', 'd', 'a1', '', ''].join(SEP), ['dev', 'b', 's', 'd', 'a1', '', ''].join(SEP)].join(
+    const out = [
+      ['main', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'a', 's', 'd', 'a1', '', ''].join(SEP),
+      ['dev', 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 'b', 's', 'd', 'a1', '', ''].join(SEP),
+    ].join(
       '\n',
     )
     const result = parseBranches(out, 'dev')
@@ -79,7 +102,7 @@ describe('parseBranches', () => {
   })
 
   test('attaches worktree info when branch matches', () => {
-    const line = ['feat', 'h', 's', 'd', 'a', '', ''].join(SEP)
+    const line = ['feat', 'hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh', 'h', 's', 'd', 'a', '', ''].join(SEP)
     const result = parseBranches(line, 'main', [
       { path: '/wt/feat', branch: 'feat', isBare: false, isPrimary: false, isDirty: true, changeCount: 3 },
     ])
@@ -90,7 +113,7 @@ describe('parseBranches', () => {
   })
 
   test('attaches primary worktree marker when branch matches the main worktree', () => {
-    const line = ['main', 'h', 's', 'd', 'a', '', ''].join(SEP)
+    const line = ['main', 'hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh', 'h', 's', 'd', 'a', '', ''].join(SEP)
     const [branch] = parseBranches(line, 'feature', [{ path: '/repo', branch: 'main', isBare: false, isPrimary: true }])
     expect(branch?.worktree?.path).toBe('/repo')
     expect(branch?.worktree?.isPrimary).toBe(true)
@@ -99,7 +122,7 @@ describe('parseBranches', () => {
 
   test('preserves SEP-free subjects with spaces and unicode', () => {
     const subject = 'feat: 添加 i18n 🎉'
-    const line = ['main', 'a', subject, 'd', 'Z', '', ''].join(SEP)
+    const line = ['main', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'a', subject, 'd', 'Z', '', ''].join(SEP)
     const [b] = parseBranches(line, 'main')
     expect(b?.lastCommitMessage).toBe(subject)
   })

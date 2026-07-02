@@ -286,7 +286,10 @@ export const ja: Record<DictKey, string> = {
   'branch-status.pr.merge-conflicting': 'マージ競合',
   'branch-status.pr.merge-unknown': 'マージ状態を同期中',
   'branch-status.pr.copy-link': 'PR リンクをコピー',
+  'branch-status.pr.open-externally': 'プルリクエストをブラウザで開く',
   'branch-status.pr.created-by': '{author} が {time} に作成',
+  'branch-status.commit.open-externally': 'コミットをブラウザで開く',
+  'branch-status.upstream.open-externally': 'アップストリームをブラウザで開く',
 
   // ---- Log list ----------------------------------------------------------
   'log.empty': '表示できるコミットがありません。',
@@ -374,8 +377,6 @@ export const ja: Record<DictKey, string> = {
   'action.pull': 'プル',
   'action.push': 'プッシュ',
   'action.fetch': 'フェッチ',
-  'workspace.open-externally.remote': 'リモート',
-  'workspace.open-externally.pr': 'PR #{n}',
   'action.delete-branch': '削除',
   'action.remove-worktree': '削除',
   'action.pull-loading': 'プル中…',
@@ -395,8 +396,6 @@ export const ja: Record<DictKey, string> = {
   'action.push-title': '{branch} をプッシュ',
   'action.fetch-title': 'リモートとステータスを同期',
   'action.fetch-local-title': 'ローカルブランチとステータスを同期',
-  'workspace.open-externally.remote-title': 'リポジトリをブラウザで開く',
-  'workspace.open-externally.pr-title': 'プルリクエストをブラウザで開く',
   'action.result-ok': 'OK',
   'action.result-error': 'エラー',
   'worktree-bootstrap.summary.copy-one': '{count} 件をコピーしました: {paths}{moreSuffix}',

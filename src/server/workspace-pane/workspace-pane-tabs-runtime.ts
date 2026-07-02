@@ -3,6 +3,7 @@ import {
   type WorkspacePaneTabEntry,
   workspacePaneStaticTabEntry,
   workspacePaneTabEntryIdentity,
+  workspacePaneTabsInsertAfterStaticTab,
   workspacePaneTabRequiresWorktree,
   workspacePaneTerminalTabEntry,
 } from '#/shared/workspace-pane.ts'
@@ -79,10 +80,16 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
   openStaticTab(
     input: WorkspacePaneTabsTargetInput<TUser>,
     tabType: WorkspacePaneStaticTabType,
+    options?: { insertAfterTabType?: WorkspacePaneStaticTabType | null },
   ): WorkspacePaneTabEntry[] {
     const current = this.tabs(input)
+    // Reopening an existing static tab should preserve the current user-managed
+    // order and simply focus that tab on the client side.
     if (current.some((entry) => entry.type === tabType)) return current
-    return this.replaceTabs({ ...input, tabs: [...current, workspacePaneStaticTabEntry(tabType)] })
+    return this.replaceTabs({
+      ...input,
+      tabs: workspacePaneTabsInsertAfterStaticTab(current, workspacePaneStaticTabEntry(tabType), options?.insertAfterTabType),
+    })
   }
 
   closeStaticTab(

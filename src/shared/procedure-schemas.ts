@@ -27,7 +27,14 @@ const EditorAppSchema = v.picklist(['vscode', 'cursor', 'windsurf'])
 const WorktreeBootstrapConfigHashSchema = v.pipe(v.string(), v.regex(WORKTREE_BOOTSTRAP_CONFIG_HASH_RE))
 const RepoUrlTargetSchema = v.variant('type', [
   v.object({ type: v.literal('root') }),
-  v.object({ type: v.literal('branch'), branch: v.string() }),
+  // `remote` is an optional hint for which remote to resolve the URL against
+  // (e.g. clicking an `origin/main` upstream chip should open `origin`, not
+  // whatever `pickBrowserRemote` would have guessed from the local branch).
+  v.object({
+    type: v.literal('branch'),
+    branch: v.string(),
+    remote: v.optional(v.string()),
+  }),
   v.object({ type: v.literal('commit'), hash: v.pipe(v.string(), v.regex(GIT_HASH_RE)) }),
 ])
 const WorktreeBootstrapDecisionSchema = v.variant('kind', [
