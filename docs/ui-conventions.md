@@ -60,3 +60,17 @@ Use this doc for UI language and presentation rules.
   Do **not** add a third `cond && '…'` clause to an existing
   `cn(...)` — that patches the same class name twice and buries the
   visibility policy. Add the new condition to the boolean instead.
+- Transient status chips (e.g. terminal "Opening…", "Syncing worktree…",
+  "Pushing…") must NOT mimic button affordance — no `border`,
+  `background`, `box-shadow`, or hover styles. Users will try to click
+  them, get no response, and read the surface as broken. Style them as
+  passive text (low-weight `muted-foreground`, 11–12 px, `font-weight: 500`)
+  with a small animated dot at `currentColor` for the "in progress"
+  signal. The chip's host element should set `pointer-events: none`
+  and the dot itself must be a real `<span>` child (not a
+  pseudo-element) so the host's `pointer-events: none` cascades and the
+  dot doesn't swallow clicks meant for the surface underneath. Mount
+  the chip in a single stable node across the entire transition window
+  — rendering one `<div role="status" aria-live="polite">` per state
+  flip causes screen readers to re-announce the same label every time
+  React unmounts and remounts the node.
