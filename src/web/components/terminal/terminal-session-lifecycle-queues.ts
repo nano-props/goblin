@@ -23,9 +23,6 @@ export interface PendingTerminalCreate<TBase, TOptions> {
 
 export interface PendingTerminalClose {
   ptySessionId: string
-  repoRoot: string
-  branchName: string
-  worktreePath: string
   terminalWorktreeKey: string
   promise: Promise<void>
   resolve: () => void

@@ -469,6 +469,7 @@ export const zh: Record<DictKey, string> = {
   'error.trash-unavailable': '系统废纸篓不可用',
   'error.failed-trash-file': '无法将文件移到废纸篓',
   'error.invalid-arguments': '参数无效',
+  'error.repo-instance-stale': '仓库实例已失效',
   'error.not-controller': '此终端正由另一个会话控制',
   'error.network-op-in-progress': '另一个 git 网络操作正在进行中。',
   'error.branch-action-wait-timeout': '等待仓库刷新完成超时。',

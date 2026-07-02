@@ -9,6 +9,7 @@ import type {
   TerminalBellRealtimeEvent,
   TerminalCreateInput,
   TerminalExitEvent,
+  TerminalListSessionsInput,
   TerminalListWorkspaceTabsInput,
   TerminalMutationResult,
   TerminalNotifyBellInput,
@@ -27,7 +28,7 @@ import type {
   TerminalWriteInput,
 } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import type { TerminalIdentityViewModel, TerminalLifecycleViewModel } from '#/web/components/terminal/types.ts'
+import type { TerminalIdentityRealtimeEvent, TerminalLifecycleRealtimeEvent } from '#/web/components/terminal/types.ts'
 
 export interface ClientTerminalBridge {
   attach: (input: TerminalAttachInput) => Promise<TerminalAttachResult>
@@ -39,8 +40,8 @@ export interface ClientTerminalBridge {
   create: (input: TerminalCreateInput) => Promise<TerminalCreateResult>
   replaceWorkspaceTabs: (input: TerminalReplaceWorkspaceTabsInput) => Promise<WorkspacePaneTabEntry[]>
   updateWorkspaceTabs: (input: TerminalUpdateWorkspaceTabsInput) => Promise<WorkspacePaneTabEntry[]>
-  pruneTerminals: (repoRoot: string) => Promise<{ pruned: number; remaining: number }>
-  listSessions: (input: { repoRoot: string }) => Promise<TerminalSessionSummary[]>
+  pruneTerminals: (repoRoot: string, repoInstanceId: string) => Promise<{ pruned: number; remaining: number }>
+  listSessions: (input: TerminalListSessionsInput) => Promise<TerminalSessionSummary[]>
   listWorkspaceTabs: (input: TerminalListWorkspaceTabsInput) => Promise<WorkspacePaneTabsEntry[]>
   /**
    * Open the underlying WebSocket (if not already open) and resolve
@@ -69,8 +70,8 @@ export interface ClientTerminalBridge {
   onBell: (cb: (event: TerminalBellRealtimeEvent) => void) => () => void
   onTitle: (cb: (event: TerminalTitleEvent) => void) => () => void
   onExit: (cb: (event: TerminalExitEvent) => void) => () => void
-  onIdentity: (cb: (event: TerminalIdentityViewModel) => void) => () => void
-  onLifecycle: (cb: (event: TerminalLifecycleViewModel) => void) => () => void
+  onIdentity: (cb: (event: TerminalIdentityRealtimeEvent) => void) => () => void
+  onLifecycle: (cb: (event: TerminalLifecycleRealtimeEvent) => void) => () => void
   onSessionsChanged: (cb: (repoRoot: string) => void) => () => void
   onWorkspaceTabsChanged: (cb: (repoRoot: string) => void) => () => void
   /**
@@ -83,12 +84,7 @@ export interface ClientTerminalBridge {
    * bug, where a lost close request left the server PTY alive.
    */
   onSessionClosed: (
-    cb: (event: {
-      ptySessionId: string
-      terminalSessionId: string
-      repoRoot: string
-      worktreePath: string
-    }) => void,
+    cb: (event: { ptySessionId: string; terminalSessionId: string; repoRoot: string; worktreePath: string }) => void,
   ) => () => void
 }
 

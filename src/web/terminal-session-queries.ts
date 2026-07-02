@@ -11,6 +11,6 @@ import { terminalBridge } from '#/web/terminal.ts'
 // already drives the refetch lifecycle on its own. Keeping the
 // loader as a plain async function means there is no second
 // client-side state surface to keep in sync with the projection.
-export async function loadTerminalSessions(repoRoot: string): Promise<TerminalSessionSummary[]> {
-  return await terminalBridge.listSessions({ repoRoot })
+export async function loadTerminalSessions(repoRoot: string, repoInstanceId: string): Promise<TerminalSessionSummary[]> {
+  return await terminalBridge.listSessions({ repoRoot, repoInstanceId })
 }

@@ -29,7 +29,7 @@ import {
 } from '#/server/workspace-pane/workspace-pane-tabs-user-queue-key.ts'
 import { isValidTerminalClientId, isValidTerminalSize } from '#/shared/terminal-validators.ts'
 import { createTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
-import { terminalSessionScope } from '#/server/terminal/terminal-session-scope.ts'
+import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import {
   buildGoblinTerminalCommandEnvironment,
   type GoblinTerminalCommandRuntime,
@@ -39,6 +39,7 @@ import type { WorkspacePaneTabsRuntime } from '#/server/workspace-pane/workspace
 
 interface EnsureTerminalSessionInput {
   repoRoot: string
+  repoInstanceId: string
   branch: string
   worktreePath: string
   terminalSessionId?: string
@@ -72,6 +73,8 @@ type EnsureTerminalSessionResult =
 interface TerminalServiceEnsureSessionInput {
   userId: string
   scope: string
+  repoRoot: string
+  repoInstanceId: string
   terminalSessionId: string
   worktreePath: string
   cwd: string
@@ -140,7 +143,7 @@ class TerminalSessionService {
       return { ok: false, message: 'error.invalid-arguments' }
     if (!isValidTerminalSize(cols, rows)) return { ok: false, message: 'error.invalid-arguments' }
 
-    const sessionScope = terminalSessionScope(input.repoRoot)
+    const sessionScope = terminalSessionRuntimeScope(input.repoRoot, input.repoInstanceId)
     const scopedWorktreePath = terminalWorktreePath(input.repoRoot, input.worktreePath)
     const existingSessions = await this.options.manager.listSessionsForUser(userId, sessionScope)
     const existingSession = existingSessions.find(
@@ -180,30 +183,31 @@ class TerminalSessionService {
         terminalSessionId: allocation.terminalSessionId,
       }).finally(() => this.releaseSessionIdReservation(allocation))
       if (!createResult.ok) return { ok: false, message: createResult.message }
-      const sessions = await this.listSessions(userId, input.repoRoot)
+      const sessions = await this.listSessions(userId, input.repoRoot, input.repoInstanceId)
       const createdSession = sessions.find((session) => session.terminalSessionId === createResult.terminalSessionId)
+      const sessionScope = terminalSessionRuntimeScope(input.repoRoot, input.repoInstanceId)
       const tabs = createdSession
         ? await this.runWorkspaceTabsOperation(
             userId,
-            createdSession.repoRoot,
+            sessionScope,
             input.branch,
             createdSession.worktreePath,
             async () => {
               const liveTerminalSessionIds = await this.liveTerminalSessionIdsForWorktree(
                 userId,
-                createdSession.repoRoot,
+                sessionScope,
                 createdSession.worktreePath,
               )
               return this.options.workspaceTabs.replaceTabs({
                 userId,
-                scope: createdSession.repoRoot,
+                scope: sessionScope,
                 branchName: input.branch,
                 worktreePath: createdSession.worktreePath,
                 tabs: workspaceTabsWithoutStaleTerminalEntries(
                   this.options.workspaceTabs.ensureTerminalTab(
                     {
                       userId,
-                      scope: createdSession.repoRoot,
+                      scope: sessionScope,
                       branchName: input.branch,
                       worktreePath: createdSession.worktreePath,
                     },
@@ -239,6 +243,7 @@ class TerminalSessionService {
     userId: string,
     input: {
       repoRoot: string
+      repoInstanceId: string
       branchName: string
       worktreePath: string | null
       tabs: readonly WorkspacePaneTabEntry[]
@@ -247,7 +252,7 @@ class TerminalSessionService {
     if (!isValidRepoLocator(input.repoRoot)) return []
     if (!isValidBranch(input.branchName)) return []
     if (input.worktreePath !== null && !isValidCwd(input.worktreePath)) return []
-    const scope = terminalSessionScope(input.repoRoot)
+    const scope = terminalSessionRuntimeScope(input.repoRoot, input.repoInstanceId)
     const worktreePath = input.worktreePath === null ? null : terminalWorktreePath(input.repoRoot, input.worktreePath)
     return await this.runWorkspaceTabsOperation(userId, scope, input.branchName, worktreePath, async () => {
       const liveTerminalSessionIds =
@@ -267,7 +272,7 @@ class TerminalSessionService {
     if (!isValidBranch(input.branchName)) return []
     if (input.worktreePath !== null && !isValidCwd(input.worktreePath)) return []
     if (!isValidWorkspacePaneTabsOperation(input.operation)) return []
-    const scope = terminalSessionScope(input.repoRoot)
+    const scope = terminalSessionRuntimeScope(input.repoRoot, input.repoInstanceId)
     const worktreePath = input.worktreePath === null ? null : terminalWorktreePath(input.repoRoot, input.worktreePath)
     return await this.runWorkspaceTabsOperation(userId, scope, input.branchName, worktreePath, async () => {
       const liveTerminalSessionIds =
@@ -282,24 +287,25 @@ class TerminalSessionService {
   }
 
   async reconcileTerminalTabsForSession(userId: string, session: TerminalSessionSummary): Promise<void> {
-    await this.runWorkspaceTabsWorktreeOperation(userId, session.repoRoot, session.worktreePath, async () => {
+    const scope = terminalSessionRuntimeScope(session.repoRoot, session.repoInstanceId)
+    await this.runWorkspaceTabsWorktreeOperation(userId, scope, session.worktreePath, async () => {
       const liveTerminalSessionIds = await this.liveTerminalSessionIdsForWorktree(
         userId,
-        session.repoRoot,
+        scope,
         session.worktreePath,
       )
       this.pruneWorkspaceTabsForWorktree({
         userId,
-        scope: session.repoRoot,
+        scope,
         worktreePath: session.worktreePath,
         liveTerminalSessionIds,
       })
     })
   }
 
-  async listWorkspaceTabs(userId: string, repoRoot: string): Promise<WorkspacePaneTabsEntry[]> {
+  async listWorkspaceTabs(userId: string, repoRoot: string, repoInstanceId: string): Promise<WorkspacePaneTabsEntry[]> {
     if (!isValidRepoLocator(repoRoot)) return []
-    const scope = terminalSessionScope(repoRoot)
+    const scope = terminalSessionRuntimeScope(repoRoot, repoInstanceId)
     const worktreePaths = new Set(
       this.options.workspaceTabs
         .tabsForScope({ userId, scope })
@@ -421,7 +427,7 @@ class TerminalSessionService {
     input: TerminalCreateInput,
     task: () => Promise<T>,
   ): Promise<T> {
-    const scope = terminalSessionScope(input.repoRoot)
+    const scope = terminalSessionRuntimeScope(input.repoRoot, input.repoInstanceId)
     const queueKey = terminalSessionUserWorktreeKey({
       userId,
       scope,
@@ -451,16 +457,21 @@ class TerminalSessionService {
     })
   }
 
-  async listSessions(userId: string, repoRoot: string): Promise<TerminalSessionSummary[]> {
+  async listSessions(userId: string, repoRoot: string, repoInstanceId: string): Promise<TerminalSessionSummary[]> {
     if (!isValidRepoLocator(repoRoot)) return []
-    return await this.options.manager.listSessionsForUser(userId, terminalSessionScope(repoRoot))
+    return await this.options.manager.listSessionsForUser(userId, terminalSessionRuntimeScope(repoRoot, repoInstanceId))
   }
 
-  async prune(clientId: string, userId: string, repoRoot: string): Promise<{ pruned: number; remaining: number }> {
+  async prune(
+    clientId: string,
+    userId: string,
+    repoRoot: string,
+    repoInstanceId: string,
+  ): Promise<{ pruned: number; remaining: number }> {
     if (!this.options.isValidClientId(clientId)) return { pruned: 0, remaining: 0 }
     if (!isValidRepoLocator(repoRoot)) return { pruned: 0, remaining: 0 }
 
-    const sessionScope = terminalSessionScope(repoRoot)
+    const sessionScope = terminalSessionRuntimeScope(repoRoot, repoInstanceId)
     const allSessions = await this.options.manager.listSessionsForUser(userId, sessionScope)
     if (isRemoteRepoId(repoRoot)) return { pruned: 0, remaining: allSessions.length }
 
@@ -494,7 +505,7 @@ class TerminalSessionService {
     userId: string,
     input: TerminalCreateInput,
   ): Promise<TerminalSessionIdAllocation> {
-    const scope = terminalSessionScope(input.repoRoot)
+    const scope = terminalSessionRuntimeScope(input.repoRoot, input.repoInstanceId)
     const worktreePath = terminalWorktreePath(input.repoRoot, input.worktreePath)
     const sessions = await this.options.manager.listSessionsForUser(userId, scope)
     const existingSession = sessions.find((session) => session.worktreePath === worktreePath)
@@ -560,7 +571,9 @@ class TerminalSessionService {
     )
     const result = await this.options.manager.ensureSession({
       userId,
-      scope: input.repoRoot,
+      scope: terminalSessionRuntimeScope(input.repoRoot, input.repoInstanceId),
+      repoRoot: input.repoRoot,
+      repoInstanceId: input.repoInstanceId,
       terminalSessionId: context.terminalSessionId,
       worktreePath: context.scopedWorktreePath,
       cwd: process.cwd(),
@@ -601,7 +614,9 @@ class TerminalSessionService {
       : undefined
     const result = await this.options.manager.ensureSession({
       userId,
-      scope: repoRoot,
+      scope: terminalSessionRuntimeScope(input.repoRoot, input.repoInstanceId),
+      repoRoot,
+      repoInstanceId: input.repoInstanceId,
       terminalSessionId: context.terminalSessionId,
       worktreePath: worktreePath,
       cwd: worktreePath,

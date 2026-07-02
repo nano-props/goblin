@@ -44,10 +44,10 @@ export function createTerminalRealtimeHandlers(host: ServerTerminalHost): {
       return host.close(clientId, userId, input)
     },
     'list-sessions'(clientId, userId, input) {
-      return host.listSessions(clientId, userId, input.repoRoot)
+      return host.listSessions(clientId, userId, input)
     },
     'list-workspace-tabs'(clientId, userId, input) {
-      return host.listWorkspaceTabs(clientId, userId, input.repoRoot)
+      return host.listWorkspaceTabs(clientId, userId, input)
     },
     create(clientId, userId, input) {
       return host.create(clientId, userId, { ...input, clientId })
@@ -59,7 +59,7 @@ export function createTerminalRealtimeHandlers(host: ServerTerminalHost): {
       return host.updateTabs(clientId, userId, input)
     },
     prune(clientId, userId, input) {
-      return host.prune(clientId, userId, input.repoRoot)
+      return host.prune(clientId, userId, input)
     },
   }
 }

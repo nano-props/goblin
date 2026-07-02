@@ -15,6 +15,7 @@ import type {
   WorkspacePaneTabsEntry,
 } from '#/shared/terminal-types.ts'
 import { WORKSPACE_PANE_STATIC_TAB_IDS, WORKSPACE_PANE_STATIC_TAB_TYPES } from '#/shared/workspace-pane.ts'
+import { OPAQUE_ID_RE } from '#/shared/opaque-id.ts'
 
 const MIN_TERMINAL_COLS = 1
 const MAX_TERMINAL_COLS = 500
@@ -78,12 +79,18 @@ const TerminalResizeInputSchema = TerminalAttachInputSchema
 const TerminalSessionInputSchema = v.object({
   ptySessionId: TerminalPtySessionIdSchema,
 })
+const RepoInstanceIdSchema = v.pipe(v.string(), v.regex(OPAQUE_ID_RE))
 const TerminalListSessionsInputSchema = v.object({
   repoRoot: v.string(),
+  repoInstanceId: RepoInstanceIdSchema,
 })
-const TerminalListWorkspaceTabsInputSchema = TerminalListSessionsInputSchema
+const TerminalListWorkspaceTabsInputSchema = v.object({
+  repoRoot: v.string(),
+  repoInstanceId: RepoInstanceIdSchema,
+})
 const TerminalCreateInputSchema = v.object({
   repoRoot: v.string(),
+  repoInstanceId: RepoInstanceIdSchema,
   branch: v.string(),
   worktreePath: v.string(),
   kind: v.picklist(['primary', 'additional']),
@@ -94,6 +101,7 @@ const TerminalCreateInputSchema = v.object({
 })
 const TerminalPruneInputSchema = v.object({
   repoRoot: v.string(),
+  repoInstanceId: RepoInstanceIdSchema,
 })
 const WorkspacePaneStaticTabEntrySchema = v.variant('type', [
   v.object({ type: v.literal('status'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.status) }),
@@ -108,6 +116,7 @@ const WorkspacePaneTerminalTabEntrySchema = v.object({
 })
 const TerminalReplaceWorkspaceTabsInputSchema = v.object({
   repoRoot: v.string(),
+  repoInstanceId: RepoInstanceIdSchema,
   branchName: v.string(),
   worktreePath: v.nullable(v.string()),
   tabs: v.array(v.union([WorkspacePaneStaticTabEntrySchema, WorkspacePaneTerminalTabEntrySchema])),
@@ -120,6 +129,7 @@ const WorkspacePaneTabIdentitySchema = v.pipe(
 const WorkspacePaneOptionalStaticTabTypeSchema = v.optional(v.nullable(WorkspacePaneStaticTabTypeSchema))
 const TerminalUpdateWorkspaceTabsInputSchema = v.object({
   repoRoot: v.string(),
+  repoInstanceId: RepoInstanceIdSchema,
   branchName: v.string(),
   worktreePath: v.nullable(v.string()),
   operation: v.variant('type', [
@@ -142,6 +152,7 @@ const WorkspacePaneTabsEntrySchema = v.object({
 const TerminalSessionSummarySchema = v.object({
   ptySessionId: v.string(),
   terminalSessionId: v.string(),
+  repoInstanceId: RepoInstanceIdSchema,
   repoRoot: v.string(),
   worktreePath: v.string(),
   cwd: v.string(),
@@ -181,6 +192,7 @@ const TerminalCreateResultSchema = v.variant('ok', [
 ])
 const TerminalOutputEventSchema = v.object({
   ptySessionId: v.string(),
+  terminalSessionId: v.string(),
   data: v.string(),
   seq: v.number(),
   processName: v.string(),
@@ -195,10 +207,14 @@ const TerminalBellRealtimeEventSchema = v.object({
 })
 const TerminalTitleEventSchema = v.object({
   ptySessionId: v.string(),
+  terminalSessionId: v.string(),
+  repoRoot: v.string(),
+  worktreePath: v.string(),
   canonicalTitle: v.nullable(v.string()),
 })
 const TerminalExitEventSchema = v.object({
   ptySessionId: v.string(),
+  terminalSessionId: v.string(),
 })
 const TerminalSessionClosedEventSchema = v.object({
   type: v.literal('session-closed'),
@@ -213,12 +229,14 @@ export function isValidTerminalPtySessionId(value: unknown): value is string {
 }
 const TerminalIdentityEventSchema = v.object({
   ptySessionId: v.string(),
+  terminalSessionId: v.string(),
   controller: v.nullable(TerminalControllerSchema),
   canonicalCols: v.number(),
   canonicalRows: v.number(),
 })
 const TerminalLifecycleEventSchema = v.object({
   ptySessionId: v.string(),
+  terminalSessionId: v.string(),
   phase: v.picklist(TERMINAL_SESSION_PHASE_VALUES),
   message: v.nullable(v.string()),
   takeoverPending: v.boolean(),

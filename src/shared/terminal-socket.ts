@@ -7,6 +7,7 @@ import type {
   TerminalIdentityEvent,
   TerminalLifecycleEvent,
   TerminalListSessionsInput,
+  TerminalPruneInput,
   TerminalListWorkspaceTabsInput,
   TerminalMutationResult,
   TerminalOutputEvent,
@@ -66,7 +67,7 @@ export interface TerminalSocketRequestInputs {
   create: TerminalCreateInput
   'replace-tabs': TerminalReplaceWorkspaceTabsInput
   'update-tabs': TerminalUpdateWorkspaceTabsInput
-  prune: { repoRoot: string }
+  prune: TerminalPruneInput
 }
 
 export interface TerminalSocketResponseOutputs {

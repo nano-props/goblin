@@ -7,12 +7,13 @@ import {
 import type { TerminalRepoIndex } from '#/web/components/terminal/types.ts'
 
 const REPO_ROOT = '/repo'
+const REPO_INSTANCE_ID = 'repo-instance-test'
 const WORKTREE_PATH = '/repo'
 
 function makeRepoIndex(): TerminalRepoIndex {
   return {
     [REPO_ROOT]: {
-      instanceToken: 1,
+      instanceId: 'repo-instance-test',
       branchByWorktreePath: { [WORKTREE_PATH]: 'main' },
     },
   }
@@ -28,6 +29,7 @@ describe('terminal session projection helpers', () => {
       serverSession: {
         ptySessionId: 'pty_session_123_aaaaaaaaa',
         terminalSessionId: 'session-2',
+        repoInstanceId: REPO_INSTANCE_ID,
         repoRoot: REPO_ROOT,
         worktreePath: WORKTREE_PATH,
         cwd: WORKTREE_PATH,
@@ -78,6 +80,7 @@ describe('terminal session projection helpers', () => {
       serverSession: {
         ptySessionId: 'pty_session_123_aaaaaaaaa',
         terminalSessionId: 'session-1',
+        repoInstanceId: REPO_INSTANCE_ID,
         repoRoot: REPO_ROOT,
         worktreePath: WORKTREE_PATH,
         cwd: WORKTREE_PATH,
@@ -122,7 +125,7 @@ describe('terminal session projection helpers', () => {
 
   test('materializes create projection from first-frame payload when sessions list lags', () => {
     const projected = projectCreateResultForClient(
-      { repoRoot: REPO_ROOT, branch: 'main', worktreePath: WORKTREE_PATH },
+      { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID, branch: 'main', worktreePath: WORKTREE_PATH },
       {
         ok: true,
         action: 'created',
@@ -146,6 +149,7 @@ describe('terminal session projection helpers', () => {
       {
         ptySessionId: 'pty_session_123_aaaaaaaaa',
         terminalSessionId: 'session-1',
+        repoInstanceId: REPO_INSTANCE_ID,
         repoRoot: REPO_ROOT,
         worktreePath: WORKTREE_PATH,
         cwd: WORKTREE_PATH,
@@ -169,6 +173,7 @@ describe('terminal session projection helpers', () => {
     const existingSession = {
       ptySessionId: 'pty_session_123_aaaaaaaaa',
       terminalSessionId: 'session-1',
+      repoInstanceId: REPO_INSTANCE_ID,
       repoRoot: '/server/repo',
       worktreePath: '/server/repo/worktree',
       cwd: '/server/repo/worktree/subdir',
@@ -182,7 +187,7 @@ describe('terminal session projection helpers', () => {
     }
 
     const projected = projectCreateResultForClient(
-      { repoRoot: REPO_ROOT, branch: 'main', worktreePath: WORKTREE_PATH },
+      { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID, branch: 'main', worktreePath: WORKTREE_PATH },
       {
         ok: true,
         action: 'created',
@@ -221,6 +226,7 @@ describe('terminal session projection helpers', () => {
     const staleSession = {
       ptySessionId: 'pty_session_old_aaaaaaaaa',
       terminalSessionId: 'session-1',
+      repoInstanceId: REPO_INSTANCE_ID,
       repoRoot: REPO_ROOT,
       worktreePath: WORKTREE_PATH,
       cwd: WORKTREE_PATH,
@@ -234,7 +240,7 @@ describe('terminal session projection helpers', () => {
     }
 
     const projected = projectCreateResultForClient(
-      { repoRoot: REPO_ROOT, branch: 'main', worktreePath: WORKTREE_PATH },
+      { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID, branch: 'main', worktreePath: WORKTREE_PATH },
       {
         ok: true,
         action: 'restored',

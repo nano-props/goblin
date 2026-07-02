@@ -4,6 +4,9 @@ import type {
   TerminalAttachResult,
   TerminalCreateResult,
   TerminalCreateInput,
+  TerminalListSessionsInput,
+  TerminalPruneInput,
+  TerminalListWorkspaceTabsInput,
   TerminalMutationResult,
   TerminalReplaceWorkspaceTabsInput,
   TerminalRestartInput,
@@ -20,12 +23,18 @@ import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { isValidTerminalPtySessionId, isValidTerminalSize } from '#/shared/terminal-validators.ts'
 import type { TerminalRealtimeBroker } from '#/server/terminal/terminal-realtime-broker.ts'
 import { isValidTerminalWriteData, type TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
+import { isCurrentRepoRuntimeInstance } from '#/server/modules/repo-runtime-instances.ts'
 
 interface TerminalSessionServiceLike {
   create(clientId: string, userId: string, input: TerminalCreateInput): Promise<TerminalCreateResult>
-  prune(clientId: string, userId: string, repoRoot: string): Promise<{ pruned: number; remaining: number }>
-  listSessions(userId: string, repoRoot: string): Promise<TerminalSessionSummary[]>
-  listWorkspaceTabs(userId: string, repoRoot: string): Promise<WorkspacePaneTabsEntry[]>
+  prune(
+    clientId: string,
+    userId: string,
+    repoRoot: string,
+    repoInstanceId: string,
+  ): Promise<{ pruned: number; remaining: number }>
+  listSessions(userId: string, repoRoot: string, repoInstanceId: string): Promise<TerminalSessionSummary[]>
+  listWorkspaceTabs(userId: string, repoRoot: string, repoInstanceId: string): Promise<WorkspacePaneTabsEntry[]>
   replaceTabs(userId: string, input: TerminalReplaceWorkspaceTabsInput): Promise<WorkspacePaneTabEntry[]>
   updateTabs(userId: string, input: TerminalUpdateWorkspaceTabsInput): Promise<WorkspacePaneTabEntry[]>
 }
@@ -67,14 +76,17 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       ) {
         return { ok: false, message: 'error.invalid-arguments' }
       }
-      const repoRoot = manager.getSessionScope(userId, ptySessionId)
+      const session = manager.getSessionSummaryForUser(userId, ptySessionId)
       const terminalClientId = input.clientId ?? clientId
       const result = await manager.restartSession(userId, ptySessionId, input.cols, input.rows, terminalClientId)
-      if (repoRoot) broadcastRepoSessionsChanged(userId, repoRoot)
+      if (session) broadcastRepoSessionsChanged(userId, session.repoRoot)
       return result
     },
 
     async create(clientId: string, userId: string, input: TerminalCreateInput): Promise<TerminalCreateResult> {
+      if (!isCurrentRepoInstance(userId, input.repoRoot, input.repoInstanceId)) {
+        return { ok: false, message: 'error.repo-instance-stale' }
+      }
       const result = await sessionService.create(clientId, userId, input)
       if (result.ok) broadcastRepoWorkspaceTabsChanged(userId, input.repoRoot)
       return result
@@ -88,6 +100,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       if (!isValidTerminalClientId(clientId)) return []
       if (!isValidRepoLocator(input?.repoRoot)) return []
       if (input?.worktreePath !== null && !isValidCwd(input?.worktreePath)) return []
+      assertCurrentRepoInstance(userId, input.repoRoot, input.repoInstanceId)
       const tabs = await sessionService.replaceTabs(userId, input)
       broadcastRepoWorkspaceTabsChanged(userId, input.repoRoot)
       return tabs
@@ -101,13 +114,17 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       if (!isValidTerminalClientId(clientId)) return []
       if (!isValidRepoLocator(input?.repoRoot)) return []
       if (input?.worktreePath !== null && !isValidCwd(input?.worktreePath)) return []
+      assertCurrentRepoInstance(userId, input.repoRoot, input.repoInstanceId)
       const tabs = await sessionService.updateTabs(userId, input)
       broadcastRepoWorkspaceTabsChanged(userId, input.repoRoot)
       return tabs
     },
 
-    async prune(clientId: string, userId: string, repoRoot: string): Promise<{ pruned: number; remaining: number }> {
-      return await sessionService.prune(clientId, userId, repoRoot)
+    async prune(clientId: string, userId: string, input: TerminalPruneInput): Promise<{ pruned: number; remaining: number }> {
+      if (!isValidTerminalClientId(clientId)) return { pruned: 0, remaining: 0 }
+      if (!isValidRepoLocator(input.repoRoot)) return { pruned: 0, remaining: 0 }
+      assertCurrentRepoInstance(userId, input.repoRoot, input.repoInstanceId)
+      return await sessionService.prune(clientId, userId, input.repoRoot, input.repoInstanceId)
     },
 
     write(clientId: string, userId: string, input: TerminalWriteInput): TerminalMutationResult {
@@ -135,16 +152,13 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       // `closeSessionForUser` returns, so a post-close lookup would
       // always miss. The lookup is also gated on validity so a
       // malformed input never throws inside the action.
-      const repoRoot = isValidTerminalPtySessionId(input?.ptySessionId)
-        ? manager.getSessionScope(userId, input.ptySessionId)
-        : undefined
       const session = isValidTerminalPtySessionId(input?.ptySessionId)
         ? manager.getSessionSummaryForUser(userId, input.ptySessionId)
         : null
       const closed = isValidTerminalPtySessionId(input?.ptySessionId)
         ? manager.closeSessionForUser(userId, input.ptySessionId)
         : false
-      if (closed && repoRoot && session) {
+      if (closed && session) {
         // General repo/session-list invalidation is emitted by the
         // manager close lifecycle. This action owns only the targeted
         // sibling-window event; other users must not hear about this
@@ -153,7 +167,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
           type: 'session-closed',
           ptySessionId: input.ptySessionId,
           terminalSessionId: session.terminalSessionId,
-          repoRoot,
+          repoRoot: session.repoRoot,
           worktreePath: session.worktreePath,
         })
       }
@@ -169,16 +183,22 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       return manager.takeoverSession(userId, input.ptySessionId, input.cols, input.rows, terminalClientId)
     },
 
-    async listSessions(clientId: string, userId: string, repoRoot: string): Promise<TerminalSessionSummary[]> {
+    async listSessions(clientId: string, userId: string, input: TerminalListSessionsInput): Promise<TerminalSessionSummary[]> {
       if (!isValidTerminalClientId(clientId)) return []
-      if (!isValidRepoLocator(repoRoot)) return []
-      return await sessionService.listSessions(userId, repoRoot)
+      if (!isValidRepoLocator(input.repoRoot)) return []
+      assertCurrentRepoInstance(userId, input.repoRoot, input.repoInstanceId)
+      return await sessionService.listSessions(userId, input.repoRoot, input.repoInstanceId)
     },
 
-    async listWorkspaceTabs(clientId: string, userId: string, repoRoot: string): Promise<WorkspacePaneTabsEntry[]> {
+    async listWorkspaceTabs(
+      clientId: string,
+      userId: string,
+      input: TerminalListWorkspaceTabsInput,
+    ): Promise<WorkspacePaneTabsEntry[]> {
       if (!isValidTerminalClientId(clientId)) return []
-      if (!isValidRepoLocator(repoRoot)) return []
-      return await sessionService.listWorkspaceTabs(userId, repoRoot)
+      if (!isValidRepoLocator(input.repoRoot)) return []
+      assertCurrentRepoInstance(userId, input.repoRoot, input.repoInstanceId)
+      return await sessionService.listWorkspaceTabs(userId, input.repoRoot, input.repoInstanceId)
     },
 
   }
@@ -189,5 +209,15 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
 
   function broadcastRepoWorkspaceTabsChanged(userId: string, repoRoot: string): void {
     broker.broadcastToUser(userId, { type: 'workspace-tabs-changed', repoRoot })
+  }
+
+  function assertCurrentRepoInstance(userId: string, repoRoot: string, repoInstanceId: string): void {
+    if (!isCurrentRepoInstance(userId, repoRoot, repoInstanceId)) {
+      throw new Error('error.repo-instance-stale')
+    }
+  }
+
+  function isCurrentRepoInstance(userId: string, repoRoot: string, repoInstanceId: string): boolean {
+    return isCurrentRepoRuntimeInstance(userId, repoRoot, repoInstanceId)
   }
 }

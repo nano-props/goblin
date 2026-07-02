@@ -9,6 +9,7 @@ import {
 } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
 import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
 import type { TerminalAttachResult, TerminalSessionSummary } from '#/shared/terminal-types.ts'
+import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 
 vi.mock('#/system/git/worktrees.ts', () => ({
   getWorktrees: vi.fn(async () => []),
@@ -20,6 +21,8 @@ vi.mock('#/shared/worktree-guards.ts', () => ({
 
 const USER_ID = 'user_terminal_service'
 const REPO_ROOT = '/repo'
+const REPO_INSTANCE_ID = 'repo-instance-test'
+const RUNTIME_SCOPE = terminalSessionRuntimeScope(REPO_ROOT, REPO_INSTANCE_ID)
 const WORKTREE_PATH = '/repo/worktree'
 const BRANCH_NAME = 'feature/worktree'
 
@@ -28,7 +31,7 @@ describe('terminal session service workspace tabs', () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     workspaceTabs.replaceTabs({
       userId: USER_ID,
-      scope: path.resolve(REPO_ROOT),
+      scope: RUNTIME_SCOPE,
       branchName: BRANCH_NAME,
       worktreePath: path.resolve(WORKTREE_PATH),
       tabs: [workspacePaneTerminalTabEntry('session-stale'), workspacePaneStaticTabEntry('status')],
@@ -57,6 +60,7 @@ describe('terminal session service workspace tabs', () => {
 
     const result = await service.create('client_terminal_service', USER_ID, {
       repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
       branch: BRANCH_NAME,
       worktreePath: WORKTREE_PATH,
       kind: 'additional',
@@ -82,6 +86,7 @@ describe('terminal session service workspace tabs', () => {
     await expect(
       service.replaceTabs(USER_ID, {
         repoRoot: REPO_ROOT,
+        repoInstanceId: REPO_INSTANCE_ID,
         branchName: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
         tabs: [
@@ -95,7 +100,7 @@ describe('terminal session service workspace tabs', () => {
     expect(
       workspaceTabs.tabs({
         userId: USER_ID,
-        scope: path.resolve(REPO_ROOT),
+        scope: RUNTIME_SCOPE,
         branchName: BRANCH_NAME,
         worktreePath: path.resolve(WORKTREE_PATH),
       }),
@@ -104,6 +109,7 @@ describe('terminal session service workspace tabs', () => {
     await expect(
       service.replaceTabs(USER_ID, {
         repoRoot: REPO_ROOT,
+        repoInstanceId: REPO_INSTANCE_ID,
         branchName: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
         tabs: [workspacePaneStaticTabEntry('status')],
@@ -115,7 +121,7 @@ describe('terminal session service workspace tabs', () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     workspaceTabs.replaceTabs({
       userId: USER_ID,
-      scope: path.resolve(REPO_ROOT),
+      scope: RUNTIME_SCOPE,
       branchName: BRANCH_NAME,
       worktreePath: path.resolve(WORKTREE_PATH),
       tabs: [
@@ -129,7 +135,7 @@ describe('terminal session service workspace tabs', () => {
       workspaceTabs,
     })
 
-    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT)).resolves.toEqual([
+    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT, REPO_INSTANCE_ID)).resolves.toEqual([
       {
         repoRoot: REPO_ROOT,
         branchName: BRANCH_NAME,
@@ -140,13 +146,13 @@ describe('terminal session service workspace tabs', () => {
 
     workspaceTabs.replaceTabs({
       userId: USER_ID,
-      scope: path.resolve(REPO_ROOT),
+      scope: RUNTIME_SCOPE,
       branchName: 'feature/static-only',
       worktreePath: path.resolve(WORKTREE_PATH),
       tabs: [workspacePaneStaticTabEntry('history')],
     })
 
-    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT)).resolves.toEqual([
+    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT, REPO_INSTANCE_ID)).resolves.toEqual([
       {
         repoRoot: REPO_ROOT,
         branchName: 'feature/static-only',
@@ -160,7 +166,7 @@ describe('terminal session service workspace tabs', () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     workspaceTabs.replaceTabs({
       userId: USER_ID,
-      scope: path.resolve(REPO_ROOT),
+      scope: RUNTIME_SCOPE,
       branchName: BRANCH_NAME,
       worktreePath: path.resolve(WORKTREE_PATH),
       tabs: [
@@ -178,11 +184,12 @@ describe('terminal session service workspace tabs', () => {
       workspaceTabs,
     })
 
-    const list = service.listWorkspaceTabs(USER_ID, REPO_ROOT)
+    const list = service.listWorkspaceTabs(USER_ID, REPO_ROOT, REPO_INSTANCE_ID)
     await vi.waitFor(() => expect(listSessionResolves).toHaveLength(1))
 
     const reorder = service.updateTabs(USER_ID, {
       repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
       branchName: BRANCH_NAME,
       worktreePath: WORKTREE_PATH,
       operation: { type: 'reorder', tabIdentities: ['workspace-pane:history', 'workspace-pane:status'] },
@@ -216,7 +223,7 @@ describe('terminal session service workspace tabs', () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     workspaceTabs.replaceTabs({
       userId: USER_ID,
-      scope: path.resolve(REPO_ROOT),
+      scope: RUNTIME_SCOPE,
       branchName: BRANCH_NAME,
       worktreePath: path.resolve(WORKTREE_PATH),
       tabs: [
@@ -235,7 +242,7 @@ describe('terminal session service workspace tabs', () => {
     expect(
       workspaceTabs.tabs({
         userId: USER_ID,
-        scope: path.resolve(REPO_ROOT),
+        scope: RUNTIME_SCOPE,
         branchName: BRANCH_NAME,
         worktreePath: path.resolve(WORKTREE_PATH),
       }),
@@ -246,7 +253,7 @@ describe('terminal session service workspace tabs', () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     workspaceTabs.replaceTabs({
       userId: USER_ID,
-      scope: path.resolve(REPO_ROOT),
+      scope: RUNTIME_SCOPE,
       branchName: BRANCH_NAME,
       worktreePath: path.resolve(WORKTREE_PATH),
       tabs: [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-live')],
@@ -260,7 +267,7 @@ describe('terminal session service workspace tabs', () => {
     expect(
       workspaceTabs.tabs({
         userId: USER_ID,
-        scope: path.resolve(REPO_ROOT),
+        scope: RUNTIME_SCOPE,
         branchName: BRANCH_NAME,
         worktreePath: path.resolve(WORKTREE_PATH),
       }),
@@ -271,7 +278,7 @@ describe('terminal session service workspace tabs', () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     workspaceTabs.replaceTabs({
       userId: USER_ID,
-      scope: path.resolve(REPO_ROOT),
+      scope: RUNTIME_SCOPE,
       branchName: BRANCH_NAME,
       worktreePath: path.resolve(WORKTREE_PATH),
       tabs: [
@@ -294,6 +301,7 @@ describe('terminal session service workspace tabs', () => {
 
     const reorder = service.updateTabs(USER_ID, {
       repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
       branchName: BRANCH_NAME,
       worktreePath: WORKTREE_PATH,
       operation: { type: 'reorder', tabIdentities: ['workspace-pane:history', 'workspace-pane:status'] },
@@ -312,7 +320,7 @@ describe('terminal session service workspace tabs', () => {
     expect(
       workspaceTabs.tabs({
         userId: USER_ID,
-        scope: path.resolve(REPO_ROOT),
+        scope: RUNTIME_SCOPE,
         branchName: BRANCH_NAME,
         worktreePath: path.resolve(WORKTREE_PATH),
       }),
@@ -329,6 +337,7 @@ describe('terminal session service workspace tabs', () => {
     await expect(
       service.replaceTabs(USER_ID, {
         repoRoot: REPO_ROOT,
+        repoInstanceId: REPO_INSTANCE_ID,
         branchName: 'feature/no-worktree',
         worktreePath: null,
         tabs: [
@@ -342,7 +351,7 @@ describe('terminal session service workspace tabs', () => {
     expect(
       workspaceTabs.tabs({
         userId: USER_ID,
-        scope: path.resolve(REPO_ROOT),
+        scope: RUNTIME_SCOPE,
         branchName: 'feature/no-worktree',
         worktreePath: null,
       }),
@@ -353,7 +362,7 @@ describe('terminal session service workspace tabs', () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     workspaceTabs.replaceTabs({
       userId: USER_ID,
-      scope: path.resolve(REPO_ROOT),
+      scope: RUNTIME_SCOPE,
       branchName: BRANCH_NAME,
       worktreePath: path.resolve(WORKTREE_PATH),
       tabs: [
@@ -370,6 +379,7 @@ describe('terminal session service workspace tabs', () => {
     await expect(
       service.updateTabs(USER_ID, {
         repoRoot: REPO_ROOT,
+        repoInstanceId: REPO_INSTANCE_ID,
         branchName: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
         operation: { type: 'close-static', tabType: 'history' },
@@ -379,6 +389,7 @@ describe('terminal session service workspace tabs', () => {
     await expect(
       service.updateTabs(USER_ID, {
         repoRoot: REPO_ROOT,
+        repoInstanceId: REPO_INSTANCE_ID,
         branchName: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
         operation: {
@@ -393,7 +404,7 @@ describe('terminal session service workspace tabs', () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     workspaceTabs.replaceTabs({
       userId: USER_ID,
-      scope: path.resolve(REPO_ROOT),
+      scope: RUNTIME_SCOPE,
       branchName: 'feature/old',
       worktreePath: path.resolve(WORKTREE_PATH),
       tabs: [workspacePaneTerminalTabEntry('session-live'), workspacePaneStaticTabEntry('status')],
@@ -406,6 +417,7 @@ describe('terminal session service workspace tabs', () => {
     await expect(
       service.updateTabs(USER_ID, {
         repoRoot: REPO_ROOT,
+        repoInstanceId: REPO_INSTANCE_ID,
         branchName: 'feature/new',
         worktreePath: WORKTREE_PATH,
         operation: { type: 'open-static', tabType: 'history' },
@@ -416,7 +428,7 @@ describe('terminal session service workspace tabs', () => {
       workspacePaneStaticTabEntry('history'),
     ])
 
-    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT)).resolves.toEqual([
+    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT, REPO_INSTANCE_ID)).resolves.toEqual([
       {
         repoRoot: REPO_ROOT,
         branchName: 'feature/new',
@@ -466,6 +478,7 @@ function terminalSession(terminalSessionId: string): TerminalSessionSummary {
   return {
     ptySessionId: `pty_${terminalSessionId}`,
     terminalSessionId,
+    repoInstanceId: REPO_INSTANCE_ID,
     repoRoot: path.resolve(REPO_ROOT),
     worktreePath: path.resolve(WORKTREE_PATH),
     cwd: path.resolve(WORKTREE_PATH),

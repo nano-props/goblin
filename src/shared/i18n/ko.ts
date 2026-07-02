@@ -482,6 +482,7 @@ export const ko: Record<DictKey, string> = {
   'error.trash-unavailable': '시스템 휴지통을 사용할 수 없습니다',
   'error.failed-trash-file': '파일을 휴지통으로 이동할 수 없습니다',
   'error.invalid-arguments': '인수가 올바르지 않습니다',
+  'error.repo-instance-stale': '리포지토리 인스턴스가 만료되었습니다',
   'error.not-controller': '이 터미널은 다른 세션이 제어하고 있습니다',
   'error.network-op-in-progress': '다른 git 네트워크 작업이 이미 실행 중입니다.',
   'error.branch-action-wait-timeout': '저장소 새로고침 완료 대기 시간이 초과되었습니다.',

@@ -3,7 +3,10 @@ import type {
   TerminalAttachResult,
   TerminalCreateResult,
   TerminalCreateInput,
+  TerminalListSessionsInput,
+  TerminalPruneInput,
   TerminalMutationResult,
+  TerminalListWorkspaceTabsInput,
   TerminalReplaceWorkspaceTabsInput,
   TerminalResizeInput,
   TerminalRestartInput,
@@ -100,12 +103,12 @@ export interface ServerTerminalHost {
   resize(clientId: string, userId: string, input: TerminalResizeInput): MaybePromise<TerminalMutationResult>
   takeover(clientId: string, userId: string, input: TerminalTakeoverInput): MaybePromise<TerminalTakeoverResult>
   close(clientId: string, userId: string, input: TerminalSessionInput): MaybePromise<TerminalMutationResult>
-  listSessions(clientId: string, userId: string, repoRoot: string): MaybePromise<TerminalSessionSummary[]>
-  listWorkspaceTabs(clientId: string, userId: string, repoRoot: string): MaybePromise<WorkspacePaneTabsEntry[]>
+  listSessions(clientId: string, userId: string, input: TerminalListSessionsInput): MaybePromise<TerminalSessionSummary[]>
+  listWorkspaceTabs(clientId: string, userId: string, input: TerminalListWorkspaceTabsInput): MaybePromise<WorkspacePaneTabsEntry[]>
   create(clientId: string, userId: string, input: TerminalCreateInput): MaybePromise<TerminalCreateResult>
   replaceTabs(clientId: string, userId: string, input: TerminalReplaceWorkspaceTabsInput): MaybePromise<WorkspacePaneTabEntry[]>
   updateTabs(clientId: string, userId: string, input: TerminalUpdateWorkspaceTabsInput): MaybePromise<WorkspacePaneTabEntry[]>
-  prune(clientId: string, userId: string, repoRoot: string): MaybePromise<{ pruned: number; remaining: number }>
+  prune(clientId: string, userId: string, input: TerminalPruneInput): MaybePromise<{ pruned: number; remaining: number }>
   /** Handle an incoming realtime message from a client socket. */
   handleRealtimeMessage(clientId: string, userId: string, socket: ServerTerminalSocket, message: string): void
   shutdown(): void

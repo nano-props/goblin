@@ -109,6 +109,7 @@ function createSessionSummaryFromCreate(
   return {
     ptySessionId: result.ptySessionId,
     terminalSessionId: result.terminalSessionId,
+    repoInstanceId: serverSession?.repoInstanceId ?? requireBaseRepoInstanceId(base),
     repoRoot: serverSession?.repoRoot ?? base.repoRoot,
     worktreePath: serverSession?.worktreePath ?? base.worktreePath,
     cwd: serverSession?.cwd ?? serverSession?.worktreePath ?? base.worktreePath,
@@ -120,4 +121,9 @@ function createSessionSummaryFromCreate(
     cols: result.canonicalCols,
     rows: result.canonicalRows,
   }
+}
+
+function requireBaseRepoInstanceId(base: TerminalSessionBase): string {
+  if (typeof base.repoInstanceId === 'string' && base.repoInstanceId.length > 0) return base.repoInstanceId
+  throw new Error('error.repo-instance-stale')
 }

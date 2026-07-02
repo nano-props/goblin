@@ -52,6 +52,7 @@ import type { WorkspacePaneTabEntry, WorkspacePaneTabType } from '#/shared/works
 import type { BranchSnapshotInfo, PullRequestInfo, WorktreeStatus } from '#/web/types.ts'
 import { vi } from 'vitest'
 import { installWebSocketMock } from '#/web/test-utils/websocket-mock.ts'
+import { createOpaqueId } from '#/shared/opaque-id.ts'
 
 export type IpcTestHandler = (input: any) => unknown
 
@@ -292,10 +293,12 @@ export function resetReposStore(): void {
     zenMode: DEFAULT_ZEN_MODE,
     workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
     selectedTerminalSessionIdByTerminalWorktree: {},
+    tabOpenerIdentityByScope: {},
   })
 }
 
 export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>): void {
+  const repoRuntimeState = new Map<string, { currentInstanceId: string | null }>()
   const hostOpenExternalUrl = handlers['app.openExternalUrl']
   const hostOpenDirectoryDialog = handlers['repo.openDialog']
   const hostConsumeExternalOpenPaths = handlers['repo.consumeExternalOpenPaths']
@@ -580,6 +583,47 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         }
         return handler(payload)
       }
+      const openRepoRuntime = async (payload: unknown) => {
+        const repoRoot = typeof payload === 'object' && payload && 'repoRoot' in payload ? payload.repoRoot : null
+        const repoInput = typeof payload === 'object' && payload && 'repoInput' in payload ? payload.repoInput : null
+        if (typeof repoInput === 'string' && repoInput.length > 0) {
+          const probe = (await call('repo.probe', { cwd: repoInput })) as {
+            ok: boolean
+            root?: string
+            name?: string
+            message?: string
+          }
+          if (!probe.ok || !probe.root) {
+            return { ok: false as const, input: repoInput, reason: probe.message ?? 'error.not-git-repo' }
+          }
+          const state = repoRuntimeState.get(probe.root) ?? { currentInstanceId: null }
+          if (!state.currentInstanceId) state.currentInstanceId = createOpaqueId('repo-instance')
+          repoRuntimeState.set(probe.root, state)
+          return {
+            ok: true as const,
+            repo: { id: probe.root, name: probe.name ?? probe.root.split('/').at(-1) ?? probe.root },
+            repoInstanceId: state.currentInstanceId,
+          }
+        }
+        if (typeof repoRoot !== 'string' || repoRoot.length === 0) throw new Error('runtime-open requires repoRoot')
+        const state = repoRuntimeState.get(repoRoot) ?? { currentInstanceId: null }
+        const repoInstanceId = createOpaqueId('repo-instance')
+        state.currentInstanceId = repoInstanceId
+        repoRuntimeState.set(repoRoot, state)
+        return { ok: true as const, repoInstanceId }
+      }
+      const closeRepoRuntime = (payload: unknown) => {
+        const repoRoot = typeof payload === 'object' && payload && 'repoRoot' in payload ? payload.repoRoot : null
+        const repoInstanceId =
+          typeof payload === 'object' && payload && 'repoInstanceId' in payload ? payload.repoInstanceId : null
+        if (typeof repoRoot !== 'string' || typeof repoInstanceId !== 'string') {
+          throw new Error('runtime-close requires repoRoot and repoInstanceId')
+        }
+        const state = repoRuntimeState.get(repoRoot)
+        const closed = !!state && state.currentInstanceId === repoInstanceId
+        if (closed && state) state.currentInstanceId = null
+        return { ok: true as const, closed }
+      }
       const result = (() => {
         if (url.pathname === '/api/settings') return call('settings.get', undefined)
         if (url.pathname === '/api/i18n') return call('i18n.get', undefined)
@@ -618,6 +662,12 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         if (url.pathname === '/api/repo/open-terminal') return call('repo.openTerminal', body)
         if (url.pathname === '/api/repo/open-editor') return call('repo.openEditor', body)
         if (url.pathname === '/api/repo/background-sync-repos') return call('repo.backgroundSyncRepos', body)
+        if (url.pathname === '/api/repo/runtime-open') {
+          return handlers['repo.runtimeOpen'] ? call('repo.runtimeOpen', body) : openRepoRuntime(body)
+        }
+        if (url.pathname === '/api/repo/runtime-close') {
+          return handlers['repo.runtimeClose'] ? call('repo.runtimeClose', body) : closeRepoRuntime(body)
+        }
         if (url.pathname === '/api/repo/abort') return call('repo.abort', body)
         throw new Error(`Unhandled fetch URL: ${url.pathname}`)
       })()
@@ -668,13 +718,13 @@ export function seedRepoState(options: {
   preferredWorkspacePaneTab?: WorkspacePaneTabType
   preferredWorkspacePaneTabByTarget?: Record<string, WorkspacePaneTabType>
   workspacePaneTabsByBranch?: Record<string, WorkspacePaneTabEntry[]>
-  instanceToken?: number
+  instanceId?: string
   status?: WorktreeStatus[]
   statusLoaded?: boolean
   worktreesByPath?: RepoState['data']['worktreesByPath']
   remote?: Partial<RepoState['remote']>
 }): RepoState {
-  const base = emptyRepo(options.id, options.name ?? 'repo')
+  const base = emptyRepo(options.id, options.name ?? 'repo', options.instanceId ?? createOpaqueId('repo-instance'))
   const branchesWithSnapshotWorktreeMetadata = options.branchSnapshots ?? options.branches ?? base.data.branches
   const branches = options.branches ?? stripBranchWorktreeMetadata(branchesWithSnapshotWorktreeMetadata)
   const status = options.status ?? base.data.status
@@ -692,7 +742,7 @@ export function seedRepoState(options: {
       : base.ui.preferredWorkspacePaneTabByTarget)
   const repo: RepoState = {
     ...base,
-    instanceToken: options.instanceToken ?? base.instanceToken,
+    instanceId: base.instanceId,
     data: {
       ...base.data,
       branches,
@@ -728,6 +778,7 @@ export function seedRepoState(options: {
     if (!branch) continue
     setWorkspacePaneTabsForTargetQueryData({
       repoRoot: options.id,
+      repoInstanceId: repo.instanceId,
       branchName,
       worktreePath: branch.worktree?.path ?? null,
       tabs,
