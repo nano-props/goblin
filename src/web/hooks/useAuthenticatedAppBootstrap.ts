@@ -12,7 +12,10 @@ import { useI18nStore } from '#/web/stores/i18n.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useSessionRestoreStore } from '#/web/stores/session-restore.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
-import { restoreServerWorkspacePaneTabsFromSession } from '#/web/workspace-pane/workspace-pane-session-tabs-restore.ts'
+import {
+  restoreServerWorkspacePaneTabsFromSession,
+  type RestoreWorkspacePaneTabsFromSessionResult,
+} from '#/web/workspace-pane/workspace-pane-session-tabs-restore.ts'
 
 export function useAuthenticatedAppBootstrap() {
   const hydratedRef = useRef(false)
@@ -66,14 +69,39 @@ async function restoreBootSession(settingsSnapshot: Promise<SettingsSnapshot>): 
         preferredWorkspacePaneTabByTargetByRepo: restoredWorkspaceState.preferredWorkspacePaneTabByTargetByRepo,
       },
     })
-    const workspaceTabsRestored = await restoreServerWorkspacePaneTabsFromSession(
+    const workspaceTabsRestoreResult = await restoreServerWorkspacePaneTabsFromSession(
       restoredWorkspaceState.workspacePaneTabsByTargetByRepo,
     )
-    if (!workspaceTabsRestored) bootstrapLog.warn('workspace pane tabs restore incomplete')
-    if (workspaceTabsRestored) useReposStore.setState({ sessionPersistenceReady: true })
+    finishWorkspacePaneTabsBootRestore(workspaceTabsRestoreResult)
   } catch (err) {
     bootstrapLog.warn('session restore failed', { err })
     useReposStore.setState({ sessionReady: true, sessionPersistenceReady: true })
+  }
+}
+
+function finishWorkspacePaneTabsBootRestore(result: RestoreWorkspacePaneTabsFromSessionResult): void {
+  switch (result.status) {
+    case 'restored':
+      useReposStore.setState({ sessionPersistenceReady: true })
+      return
+    case 'stale-pruned':
+      // Stale session entries can happen after moving between machines,
+      // deleting a worktree, or renaming a branch. Let normal session
+      // persistence prune those unreachable tabs on the next save.
+      bootstrapLog.info('workspace pane tabs restore pruned stale entries', workspacePaneTabsRestoreSummary(result))
+      useReposStore.setState({ sessionPersistenceReady: true })
+      return
+    case 'failed':
+      bootstrapLog.warn('workspace pane tabs restore incomplete', workspacePaneTabsRestoreSummary(result))
+      return
+  }
+}
+
+function workspacePaneTabsRestoreSummary(result: RestoreWorkspacePaneTabsFromSessionResult) {
+  return {
+    unresolvedRepos: result.unresolvedRepos,
+    unresolvedTargets: result.unresolvedTargets,
+    failedCommitCount: result.failedCommits.length,
   }
 }
 

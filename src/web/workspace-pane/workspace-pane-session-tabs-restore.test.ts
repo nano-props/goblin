@@ -45,7 +45,7 @@ describe('restoreServerWorkspacePaneTabsFromSession', () => {
           ],
         },
       }),
-    ).resolves.toBe(true)
+    ).resolves.toMatchObject({ status: 'restored' })
 
     expect(readTabsFor('feature/worktree', WORKTREE_PATH)).toEqual([
       workspacePaneStaticTabEntry('status'),
@@ -74,7 +74,7 @@ describe('restoreServerWorkspacePaneTabsFromSession', () => {
           ],
         },
       }),
-    ).resolves.toBe(true)
+    ).resolves.toMatchObject({ status: 'restored' })
 
     expect(replaceWorkspaceTabs).toHaveBeenCalledWith({
       repoRoot: REPO_ID,
@@ -97,7 +97,7 @@ describe('restoreServerWorkspacePaneTabsFromSession', () => {
           [branchTargetKey('feature/worktree')]: [workspacePaneStaticTabEntry('history')],
         },
       }),
-    ).resolves.toBe(true)
+    ).resolves.toMatchObject({ status: 'restored' })
 
     expect(replaceWorkspaceTabs).toHaveBeenCalledWith({
       repoRoot: REPO_ID,
@@ -124,7 +124,7 @@ describe('restoreServerWorkspacePaneTabsFromSession', () => {
           [worktreeTargetKey()]: [workspacePaneStaticTabEntry('history')],
         },
       }),
-    ).resolves.toBe(false)
+    ).resolves.toMatchObject({ status: 'failed', failedCommits: [expect.objectContaining({ ok: false })] })
 
     expect(readTabsFor('feature/worktree', WORKTREE_PATH)).toEqual([workspacePaneStaticTabEntry('status')])
   })
@@ -140,7 +140,7 @@ describe('restoreServerWorkspacePaneTabsFromSession', () => {
           [worktreeTargetKey()]: [workspacePaneStaticTabEntry('history')],
         },
       }),
-    ).resolves.toBe(false)
+    ).resolves.toMatchObject({ status: 'stale-pruned', unresolvedRepos: [REPO_ID] })
   })
 
   test('reports incomplete restore when a persisted target no longer resolves', async () => {
@@ -154,7 +154,10 @@ describe('restoreServerWorkspacePaneTabsFromSession', () => {
           [branchTargetKey('feature/missing')]: [workspacePaneStaticTabEntry('history')],
         },
       }),
-    ).resolves.toBe(false)
+    ).resolves.toMatchObject({
+      status: 'stale-pruned',
+      unresolvedTargets: [{ repoRoot: REPO_ID, targetKey: branchTargetKey('feature/missing') }],
+    })
 
     expect(replaceWorkspaceTabs).not.toHaveBeenCalled()
   })

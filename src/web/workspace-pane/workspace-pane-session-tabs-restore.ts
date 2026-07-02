@@ -3,29 +3,52 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { workspacePaneTabsTargetForRepoTargetKey } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { commitWorkspacePaneTabs, type WorkspacePaneTabsMutationResult } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 
+interface WorkspacePaneTabsRestoreDetails {
+  unresolvedRepos: string[]
+  unresolvedTargets: Array<{ repoRoot: string; targetKey: string }>
+  failedCommits: WorkspacePaneTabsMutationResult[]
+}
+
+export type RestoreWorkspacePaneTabsFromSessionResult =
+  | ({ status: 'restored' } & WorkspacePaneTabsRestoreDetails)
+  | ({ status: 'stale-pruned' } & WorkspacePaneTabsRestoreDetails)
+  | ({ status: 'failed' } & WorkspacePaneTabsRestoreDetails)
+
 export async function restoreServerWorkspacePaneTabsFromSession(
   workspacePaneTabsByTargetByRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>>,
-): Promise<boolean> {
+): Promise<RestoreWorkspacePaneTabsFromSessionResult> {
   const commits: Promise<WorkspacePaneTabsMutationResult>[] = []
   const repos = useReposStore.getState().repos
-  let allTargetsResolved = true
+  const unresolvedRepos: string[] = []
+  const unresolvedTargets: Array<{ repoRoot: string; targetKey: string }> = []
   for (const [repoRoot, tabsByTarget] of Object.entries(workspacePaneTabsByTargetByRepo)) {
     const repo = repos[repoRoot]
     if (!repo) {
-      allTargetsResolved = false
+      unresolvedRepos.push(repoRoot)
       continue
     }
     for (const [targetKey, tabs] of Object.entries(tabsByTarget)) {
       const target = workspacePaneTabsTargetForRepoTargetKey(repo, targetKey)
       if (!target) {
-        allTargetsResolved = false
+        unresolvedTargets.push({ repoRoot, targetKey })
         continue
       }
       commits.push(restoreWorkspacePaneTabs({ ...target, repoInstanceId: repo.instanceId, tabs }))
     }
   }
   const results = await Promise.all(commits)
-  return allTargetsResolved && results.every((result) => result.ok)
+  const failedCommits = results.filter((result) => !result.ok)
+  const details = {
+    unresolvedRepos,
+    unresolvedTargets,
+    failedCommits,
+  }
+  if (failedCommits.length > 0) return { status: 'failed', ...details }
+  if (unresolvedRepos.length > 0 || unresolvedTargets.length > 0) return { status: 'stale-pruned', ...details }
+  return {
+    status: 'restored',
+    ...details,
+  }
 }
 
 async function restoreWorkspacePaneTabs(input: {
