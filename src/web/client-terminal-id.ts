@@ -1,9 +1,10 @@
 import { normalizeClientServerClientId, readInjectedWebBootstrap } from '#/web/client-bootstrap-bridge.ts'
+import { createOpaqueId } from '#/shared/opaque-id.ts'
 
 const WEB_TERMINAL_CLIENT_ID_STORAGE_KEY = 'goblin:terminal-client-id'
 
 export function readOrCreateWebTerminalClientId(): string {
-  const fallback = `client_${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`
+  const fallback = createOpaqueId('client')
   try {
     const bootstrapClientId = normalizeClientServerClientId(readInjectedWebBootstrap()?.initialServer?.clientId)
     if (bootstrapClientId) return bootstrapClientId
@@ -14,10 +15,7 @@ export function readOrCreateWebTerminalClientId(): string {
     const storage = window.sessionStorage
     const existing = storage?.getItem(WEB_TERMINAL_CLIENT_ID_STORAGE_KEY)?.trim()
     if (existing) return existing
-    const created =
-      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-        ? `client_${crypto.randomUUID().replace(/-/g, '')}`
-        : fallback
+    const created = createOpaqueId('client')
     storage?.setItem(WEB_TERMINAL_CLIENT_ID_STORAGE_KEY, created)
     return created
   } catch {

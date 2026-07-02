@@ -1,4 +1,3 @@
-import crypto from 'node:crypto'
 import { spawnTerminalPtyRuntime, type TerminalPtyRuntime } from '#/server/terminal/terminal-pty-runtime.ts'
 import {
   createPtyHandle,
@@ -6,6 +5,7 @@ import {
   type PtySpawnResult,
   type PtySupervisor,
 } from '#/server/terminal/pty-supervisor.ts'
+import { createOpaqueId } from '#/shared/opaque-id.ts'
 
 interface PtyEntry {
   runtime: TerminalPtyRuntime
@@ -96,5 +96,5 @@ export function createInProcessPtySupervisor(): PtySupervisor {
 }
 
 function createPtySessionId(): string {
-  return `pty_${crypto.randomUUID()}`
+  return createOpaqueId('pty')
 }

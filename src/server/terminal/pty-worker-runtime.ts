@@ -15,6 +15,7 @@ import type {
   PtyWorkerRequest,
   PtyWorkerSpawnFailureCode,
 } from '#/server/terminal/pty-worker-protocol.ts'
+import { createOpaqueId } from '#/shared/opaque-id.ts'
 
 /** The return shape from a PtySupervisor-style spawn call. The worker
  *  runtime's spawnPty fn returns this same shape so the failure path
@@ -130,7 +131,7 @@ export class PtyWorkerRuntime {
 }
 
 function createPtySessionId(): string {
-  return `pty_${crypto.randomUUID()}`
+  return createOpaqueId('pty')
 }
 
 function defaultSpawnPty(input: PtySpawnInput): PtySpawnOutcome {

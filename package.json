@@ -86,6 +86,7 @@
     "immer": "11.1.9",
     "lru-cache": "11.5.1",
     "lucide-react": "1.22.0",
+    "nanoid": "5.1.16",
     "node-pty": "1.1.0",
     "p-limit": "7.3.0",
     "p-queue": "9.3.0",
