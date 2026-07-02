@@ -70,7 +70,6 @@ const terminalHostStub = {
   replaceTabs: vi.fn(() => []),
   updateTabs: vi.fn(() => []),
   prune: vi.fn(),
-  getSessionSnapshot: vi.fn(),
   handleRealtimeMessage: vi.fn(),
   shutdown: vi.fn(),
 } satisfies ServerTerminalHost

@@ -152,10 +152,10 @@ The client was doing an overly strict validation step:
 That extra requirement was removed. The client now trusts the
 authoritative `create` payload for first paint. `create.sessions`
 remains useful for tab-strip and count updates, but a lagging list
-no longer triggers the false-failure toast. If the server claims
-`action: 'created'` yet the session service `sessions[]` does not echo that
-session, the create is rejected as a half-applied protocol mismatch
-rather than silently fabricating a synthetic entry.
+no longer triggers the false-failure toast. If the response has the
+required first-frame fields but `sessions[]` does not echo the target
+yet, the client materializes a minimal local projection from the create
+payload and lets the next server sync reconcile the directory data.
 
 ### Type-level atomicity
 
@@ -175,6 +175,26 @@ runtime crash.
    the full first-frame payload at the type level. The client's runtime
    "missing ptySessionId" check stays as a belt-and-suspenders guard
    against `unknown`/JSON-blob shapes arriving from the bridge layer.
+
+### `ptySessionId` is an addressable runtime id, not a live-handle proof
+
+The `ptySessionId` wire field is historical terminology. In the
+server-first model it is the runtime session lookup id used by attach,
+write, resize, restart, close, and realtime messages. It must not be read
+as "there is definitely a live PTY handle right now".
+
+That distinction matters most on restart failure:
+
+- the server keeps the terminal session addressable;
+- the session moves to `phase: 'error'`;
+- the `ptySessionId` remains the id to retry with;
+- writes and resizes are still rejected because the server checks phase,
+  controller authority, and PTY binding state before touching a PTY.
+
+The durable identity for a terminal tab is still `terminalSessionId`.
+The lower-level live resource is the supervisor PTY handle. Keeping these
+three concepts separate prevents restart failures from accidentally
+turning into session deletion.
 
 ---
 
@@ -203,22 +223,10 @@ Two problems:
 
 ### Design
 
-Mirror the existing pending-create queue (enqueue / flush /
-destroy) for closes.
-
-**New projection state**:
-
-```ts
-private readonly pendingCloseByPtySessionId = new Map<
-  string,
-  {
-    terminalWorktreeKey: string
-    promise: Promise<void>
-    resolve: () => void
-    reject: (error: unknown) => void
-  }
->()
-```
+Terminal close now shares the same lifecycle-queue boundary as
+pending create. `TerminalSessionLifecycleQueues` owns dedupe and
+promise settlement; `TerminalSessionProjection` decides when to drain
+pending closes before create.
 
 **New projection methods**:
 
@@ -283,7 +291,13 @@ A per-session broadcast is the targeted counterpart.
 Add to `TerminalRealtimeMessage`:
 
 ```ts
-| { type: 'session-closed'; ptySessionId: string; repoRoot: string }
+| {
+    type: 'session-closed'
+    ptySessionId: string
+    terminalSessionId: string
+    repoRoot: string
+    worktreePath: string
+  }
 ```
 
 ### Server emit
@@ -294,11 +308,14 @@ After a user-initiated close succeeds:
 broker.broadcastToUser(userId, {
   type: 'session-closed',
   ptySessionId,
+  terminalSessionId,
   repoRoot,
+  worktreePath,
 })
 ```
 
-The `repoRoot` is derived from the session's scope. The message is
+The `repoRoot`, `worktreePath`, and `terminalSessionId` are captured
+before the close removes the session from the manager. The message is
 sent only to sockets for the same `userId`; other users never see
 the closed session id. Internal/non-user closes (PTY exit, shutdown)
 do **not** emit `session-closed`; those paths rely on the broader
@@ -316,7 +333,7 @@ The provider mirrors the `onExit` pattern. On `session-closed`:
 
 ```ts
 terminalBridge.onSessionClosed((event) => {
-  projection.handleSessionClosed(event.ptySessionId)
+  projection.handleSessionClosed(event)
 })
 ```
 
@@ -501,12 +518,16 @@ order would have been:
   on both `created` and `reused` paths; projection tests cover the
   `create.ptySessionId` + `snapshot` + `snapshotSeq` rule.
 - **R1**: projection durable-close tests cover awaiting an in-flight
-  close before creating, failures not blocking the next create,
-  deduplicating concurrent enqueues, destroying pending entries, and
-  dropping the local session on `session-closed`.
-- **R2**: runtime-action tests cover emitting both broadcasts on
-  successful user close, non-user closes not leaking phantom events,
-  and failed closes not synthesizing fake broadcasts.
+  close before creating, in-flight close failures allowing the queued
+  create to proceed afterward, deduplicating concurrent enqueues,
+  destroying pending entries, and dropping the local session on
+  `session-closed`.
+- **R2**: runtime-action tests cover the targeted `session-closed`
+  action broadcast on successful user close, non-user closes not
+  leaking phantom events, and failed closes not synthesizing fake
+  broadcasts. Runtime integration tests cover the broader
+  `sessions-changed` / workspace invalidation paths for close-like
+  lifecycle changes.
 - **R3**: session tests cover rendering the CTA when the session has no
   sessions, click triggering create, and failure toasting.
 

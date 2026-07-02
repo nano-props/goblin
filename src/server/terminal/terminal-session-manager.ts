@@ -2,12 +2,12 @@ import crypto from 'node:crypto'
 import path from 'node:path'
 import {
   type TerminalAttachResult,
+  type TerminalBellRealtimeEvent,
   type TerminalController,
   type TerminalExitEvent,
   type TerminalIdentityEvent,
   type TerminalLifecycleEvent,
   type TerminalOutputEvent,
-  type TerminalSessionSnapshot,
   type TerminalSessionSummary,
   type TerminalTakeoverResult,
 } from '#/shared/terminal-types.ts'
@@ -27,7 +27,6 @@ import {
 import {
   createEmptyTerminalRenderState,
   replaySnapshot,
-  takeSnapshot,
 } from '#/server/terminal/terminal-render-state.ts'
 import { markTerminalSessionClosed, markTerminalSessionError } from '#/server/terminal/terminal-session-lifecycle.ts'
 import { TerminalPtyBinding, type TerminalPtySessionState } from '#/server/terminal/terminal-session-pty-lifecycle.ts'
@@ -83,6 +82,7 @@ interface TerminalSessionView<TUser extends string | number> extends TerminalPty
 
 export interface TerminalEventSink<TUser extends string | number> {
   onOutput(userId: TUser, event: TerminalOutputEvent): void
+  onBell?(userId: TUser, event: TerminalBellRealtimeEvent): void
   onTitle?(userId: TUser, event: { ptySessionId: string; canonicalTitle: string | null }): void
   onExit(userId: TUser, event: TerminalExitEvent): void
   onSessionClosed?(userId: TUser, session: TerminalSessionSummary): void
@@ -312,14 +312,6 @@ export class TerminalSessionManager<TUser extends string | number> {
 
   closeAll(): void {
     for (const ptySessionId of Array.from(this.sessionsByPtySessionId.keys())) this.closeSession(ptySessionId)
-  }
-
-  async getSessionSnapshot(userId: TUser, ptySessionId: string): Promise<TerminalSessionSnapshot | null> {
-    const session = this.getSession(userId, ptySessionId)
-    if (!session) return null
-    const snap = await takeSnapshot(session.render)
-    if (!snap) return null
-    return { ptySessionId, snapshot: snap.snapshot, snapshotSeq: snap.snapshotSeq }
   }
 
   async listSessionsForUser(userId: TUser, scope: string): Promise<TerminalSessionSummary[]> {
@@ -560,6 +552,13 @@ export class TerminalSessionManager<TUser extends string | number> {
       isSessionLive: (session) => this.isLiveSession(session),
       emitLifecycle: (session) => this.emitLifecycle(session),
       emitOutput: (session, event) => this.sink.onOutput(session.userId, event),
+      emitBell: (session, event) =>
+        this.sink.onBell?.(session.userId, {
+          ...event,
+          terminalSessionId: session.terminalSessionId,
+          repoRoot: session.scope,
+          worktreePath: session.worktreePath,
+        }),
       emitTitle: (session, event) => this.sink.onTitle?.(session.userId, event),
       emitExit: (session, event) => this.sink.onExit(session.userId, event),
       closeSession: (ptySessionId) => this.closeSession(ptySessionId),

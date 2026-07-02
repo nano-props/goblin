@@ -7,6 +7,7 @@ import {
   isValidTerminalSize,
   isValidTerminalPtySessionId,
   normalizeTerminalClientMessage,
+  normalizeTerminalCreateResult,
   normalizeTerminalSize,
   normalizeTerminalSocketServerMessage,
   terminalUtf8ByteLength,
@@ -167,6 +168,47 @@ describe('shared terminal validators', () => {
     ).toBeNull()
   })
 
+  test('normalizes terminal create results with required first-frame payloads', () => {
+    expect(
+      normalizeTerminalCreateResult({
+        ok: true,
+        action: 'created',
+        terminalSessionId: 'session-1',
+        tabs: [],
+        sessions: [],
+        ptySessionId: 'pty_session_1_aaaaaaaaa',
+        processName: 'zsh',
+        canonicalTitle: null,
+        phase: 'open',
+        message: null,
+        snapshot: 'first frame',
+        snapshotSeq: 1,
+        controller: { clientId: 'client_a', status: 'connected' },
+        canonicalCols: 120,
+        canonicalRows: 40,
+      }),
+    ).toMatchObject({
+      ok: true,
+      terminalSessionId: 'session-1',
+      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      snapshotSeq: 1,
+    })
+
+    expect(
+      normalizeTerminalCreateResult({
+        ok: true,
+        action: 'created',
+        terminalSessionId: 'session-1',
+        tabs: [],
+        sessions: [],
+      }),
+    ).toBeNull()
+    expect(normalizeTerminalCreateResult({ ok: false, message: 'error.spawn-failed' })).toEqual({
+      ok: false,
+      message: 'error.spawn-failed',
+    })
+  })
+
   test('normalizes valid terminal socket server messages', () => {
     expect(
       normalizeTerminalSocketServerMessage({
@@ -198,12 +240,14 @@ describe('shared terminal validators', () => {
       normalizeTerminalSocketServerMessage({
         type: 'session-closed',
         ptySessionId: 'pty_session_1_aaaaaaaaa',
+        terminalSessionId: 'session-1',
         repoRoot: '/repo',
         worktreePath: '/repo/worktree',
       }),
     ).toEqual({
       type: 'session-closed',
       ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalSessionId: 'session-1',
       repoRoot: '/repo',
       worktreePath: '/repo/worktree',
     })

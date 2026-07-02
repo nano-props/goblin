@@ -38,7 +38,6 @@ function makeSession(
     takeover: vi.fn(),
     handleIdentity: vi.fn(),
     handleLifecycle: vi.fn(),
-    serialize: vi.fn(() => ''),
     handleOutput: vi.fn(),
     handleServerTitle: vi.fn(),
     handleExit: vi.fn(() => false),

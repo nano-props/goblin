@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import {
+  projectCreateResultForClient,
   projectServerTerminalSession,
   projectTerminalAttachResultForClient,
 } from '#/web/components/terminal/terminal-session-projection.ts'
@@ -68,7 +69,7 @@ describe('terminal session projection helpers', () => {
     })
   })
 
-  test('falls back to reattach snapshot cache only for matching session ids', () => {
+  test('uses an empty snapshot when the server snapshot is missing', () => {
     const projected = projectServerTerminalSession({
       repoIndex: makeRepoIndex(),
       repoRoot: REPO_ROOT,
@@ -88,11 +89,10 @@ describe('terminal session projection helpers', () => {
         cols: 80,
         rows: 24,
       },
-      reattachSnapshot: { ptySessionId: 'pty_session_123_aaaaaaaaa', snapshot: 'cached-snap', snapshotSeq: 3 },
     })
 
-    expect(projected?.hydrateInput.snapshot).toBe('cached-snap')
-    expect(projected?.hydrateInput.snapshotSeq).toBe(3)
+    expect(projected?.hydrateInput.snapshot).toBe('')
+    expect(projected?.hydrateInput.snapshotSeq).toBe(0)
     expect(projected?.hydrateInput.role).toBe('viewer')
     expect(projected?.hydrateInput.controllerStatus).toBe('connected')
     expect(projected?.controlsTerminal).toBe(false)
@@ -118,5 +118,151 @@ describe('terminal session projection helpers', () => {
 
     expect(projected.role).toBe('viewer')
     expect(projected.controllerStatus).toBe('connected')
+  })
+
+  test('materializes create projection from first-frame payload when sessions list lags', () => {
+    const projected = projectCreateResultForClient(
+      { repoRoot: REPO_ROOT, branch: 'main', worktreePath: WORKTREE_PATH },
+      {
+        ok: true,
+        action: 'created',
+        terminalSessionId: 'session-1',
+        tabs: [],
+        sessions: [],
+        ptySessionId: 'pty_session_123_aaaaaaaaa',
+        processName: 'zsh',
+        canonicalTitle: null,
+        phase: 'open',
+        message: null,
+        snapshot: 'first-frame',
+        snapshotSeq: 3,
+        controller: { clientId: 'client_a', status: 'connected' },
+        canonicalCols: 120,
+        canonicalRows: 40,
+      },
+    )
+
+    expect(projected.serverSessions).toEqual([
+      {
+        ptySessionId: 'pty_session_123_aaaaaaaaa',
+        terminalSessionId: 'session-1',
+        repoRoot: REPO_ROOT,
+        worktreePath: WORKTREE_PATH,
+        cwd: WORKTREE_PATH,
+        controller: { clientId: 'client_a', status: 'connected' },
+        processName: 'zsh',
+        canonicalTitle: null,
+        phase: 'open',
+        message: null,
+        cols: 120,
+        rows: 40,
+      },
+    ])
+    expect(projected.snapshotByPtySessionId.get('pty_session_123_aaaaaaaaa')).toEqual({
+      ptySessionId: 'pty_session_123_aaaaaaaaa',
+      snapshot: 'first-frame',
+      snapshotSeq: 3,
+    })
+  })
+
+  test('uses authoritative create first-frame metadata when sessions projection already includes the target', () => {
+    const existingSession = {
+      ptySessionId: 'pty_session_123_aaaaaaaaa',
+      terminalSessionId: 'session-1',
+      repoRoot: '/server/repo',
+      worktreePath: '/server/repo/worktree',
+      cwd: '/server/repo/worktree/subdir',
+      controller: { clientId: 'client_a', status: 'connected' as const },
+      processName: 'old-shell',
+      canonicalTitle: 'old title',
+      phase: 'opening' as const,
+      message: 'old message',
+      cols: 80,
+      rows: 24,
+    }
+
+    const projected = projectCreateResultForClient(
+      { repoRoot: REPO_ROOT, branch: 'main', worktreePath: WORKTREE_PATH },
+      {
+        ok: true,
+        action: 'created',
+        terminalSessionId: 'session-1',
+        tabs: [],
+        sessions: [existingSession],
+        ptySessionId: 'pty_session_123_aaaaaaaaa',
+        processName: 'new-shell',
+        canonicalTitle: 'new title',
+        phase: 'open',
+        message: null,
+        snapshot: '',
+        snapshotSeq: 0,
+        controller: { clientId: 'client_a', status: 'connected' },
+        canonicalCols: 120,
+        canonicalRows: 40,
+      },
+    )
+
+    expect(projected.serverSessions).toEqual([
+      {
+        ...existingSession,
+        ptySessionId: 'pty_session_123_aaaaaaaaa',
+        terminalSessionId: 'session-1',
+        processName: 'new-shell',
+        canonicalTitle: 'new title',
+        phase: 'open',
+        message: null,
+        cols: 120,
+        rows: 40,
+      },
+    ])
+  })
+
+  test('replaces stale create projection entry for the same terminal session id', () => {
+    const staleSession = {
+      ptySessionId: 'pty_session_old_aaaaaaaaa',
+      terminalSessionId: 'session-1',
+      repoRoot: REPO_ROOT,
+      worktreePath: WORKTREE_PATH,
+      cwd: WORKTREE_PATH,
+      controller: { clientId: 'client_old', status: 'connected' as const },
+      processName: 'old-shell',
+      canonicalTitle: null,
+      phase: 'open' as const,
+      message: null,
+      cols: 80,
+      rows: 24,
+    }
+
+    const projected = projectCreateResultForClient(
+      { repoRoot: REPO_ROOT, branch: 'main', worktreePath: WORKTREE_PATH },
+      {
+        ok: true,
+        action: 'restored',
+        terminalSessionId: 'session-1',
+        tabs: [],
+        sessions: [staleSession],
+        ptySessionId: 'pty_session_new_aaaaaaaaa',
+        processName: 'zsh',
+        canonicalTitle: 'new-shell',
+        phase: 'open',
+        message: null,
+        snapshot: 'restored-frame',
+        snapshotSeq: 4,
+        controller: { clientId: 'client_a', status: 'connected' },
+        canonicalCols: 120,
+        canonicalRows: 40,
+      },
+    )
+
+    expect(projected.serverSessions).toEqual([
+      expect.objectContaining({
+        ptySessionId: 'pty_session_new_aaaaaaaaa',
+        terminalSessionId: 'session-1',
+        processName: 'zsh',
+        canonicalTitle: 'new-shell',
+        cols: 120,
+        rows: 40,
+      }),
+    ])
   })
 })

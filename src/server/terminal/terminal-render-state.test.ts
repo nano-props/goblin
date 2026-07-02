@@ -7,6 +7,7 @@ import {
   disposeRender,
   resetRender,
   resizeRender,
+  scanTerminalOutputForBell,
   takeSnapshot,
   type TerminalRenderState,
 } from '#/server/terminal/terminal-render-state.ts'
@@ -125,6 +126,54 @@ describe('terminal-render-state', () => {
     })
   })
 
+  describe('scanTerminalOutputForBell', () => {
+    const cleanBellScanState = { inOsc: false, pendingEsc: false }
+
+    test('detects a plain BEL control character', () => {
+      expect(scanTerminalOutputForBell('done\x07', cleanBellScanState).hasBell).toBe(true)
+    })
+
+    test('does not treat BEL-terminated OSC title as a terminal bell', () => {
+      expect(scanTerminalOutputForBell('\x1b]0;~/repo\x07', cleanBellScanState).hasBell).toBe(false)
+    })
+
+    test('detects a plain BEL after an OSC title sequence', () => {
+      expect(scanTerminalOutputForBell('\x1b]0;~/repo\x07done\x07', cleanBellScanState).hasBell).toBe(true)
+    })
+
+    test('does not treat ST-terminated OSC content as a terminal bell', () => {
+      expect(scanTerminalOutputForBell('\x1b]0;~/repo\x1b\\', cleanBellScanState).hasBell).toBe(false)
+    })
+
+    test('carries OSC state across chunks so split title terminators are not terminal bells', () => {
+      const first = scanTerminalOutputForBell('\x1b]0;~/repo', cleanBellScanState)
+      expect(first).toEqual({ hasBell: false, state: { inOsc: true, pendingEsc: false } })
+      const second = scanTerminalOutputForBell('\x07', first.state)
+      expect(second).toEqual({ hasBell: false, state: cleanBellScanState })
+    })
+
+    test('continues scanning after a bell so later split OSC state is preserved', () => {
+      const first = scanTerminalOutputForBell('\x07\x1b]0;~/repo', cleanBellScanState)
+      expect(first).toEqual({ hasBell: true, state: { inOsc: true, pendingEsc: false } })
+      const second = scanTerminalOutputForBell('\x07', first.state)
+      expect(second).toEqual({ hasBell: false, state: cleanBellScanState })
+    })
+
+    test('carries a split ESC before OSC start across chunks', () => {
+      const first = scanTerminalOutputForBell('\x1b', cleanBellScanState)
+      expect(first).toEqual({ hasBell: false, state: { inOsc: false, pendingEsc: true } })
+      const second = scanTerminalOutputForBell(']0;~/repo\x07', first.state)
+      expect(second).toEqual({ hasBell: false, state: cleanBellScanState })
+    })
+
+    test('carries a split ESC before ST across chunks', () => {
+      const first = scanTerminalOutputForBell('\x1b]0;~/repo\x1b', cleanBellScanState)
+      expect(first).toEqual({ hasBell: false, state: { inOsc: true, pendingEsc: true } })
+      const second = scanTerminalOutputForBell('\\done\x07', first.state)
+      expect(second).toEqual({ hasBell: true, state: cleanBellScanState })
+    })
+  })
+
   describe('title extraction', () => {
     test('captures the last OSC 0 title from a chunk', () => {
       const state = createRawOnlyState()
@@ -154,17 +203,40 @@ describe('terminal-render-state', () => {
       expect(state.title).toBeNull()
     })
 
-    // Pin the deliberately-dropped behavior: OSC 0/2 sequences split
-    // across two PTY writes are not reassembled. The shell typically
-    // emits the full sequence in one write, but a misbehaving or
-    // boundary-pushing program could split it. If we later want to
-    // reassemble, this test is the contract to update.
-    test('does not reassemble an OSC 0 sequence split across two appendOutput calls', () => {
+    test('reassembles an OSC 0 sequence split across two appendOutput calls', () => {
       const state = createRawOnlyState()
       appendOutput(state, '\x1b]0;~/Developer/goblin — ')
       expect(state.title).toBeNull()
       appendOutput(state, 'npm run dev\x07')
+      expect(state.title).toBe('~/Developer/goblin — npm run dev')
+    })
+
+    test('reassembles a split ESC before an OSC 0 sequence', () => {
+      const state = createRawOnlyState()
+      appendOutput(state, '\x1b')
       expect(state.title).toBeNull()
+      appendOutput(state, ']0;split-start\x07')
+      expect(state.title).toBe('split-start')
+    })
+
+    test('captures an ST-terminated OSC 0 sequence', () => {
+      const state = createRawOnlyState()
+      appendOutput(state, '\x1b]0;st title\x1b\\')
+      expect(state.title).toBe('st title')
+    })
+
+    test('reassembles a split ST terminator', () => {
+      const state = createRawOnlyState()
+      appendOutput(state, '\x1b]0;split-st\x1b')
+      expect(state.title).toBeNull()
+      appendOutput(state, '\\')
+      expect(state.title).toBe('split-st')
+    })
+
+    test('ignores unsupported OSC commands without losing a later title', () => {
+      const state = createRawOnlyState()
+      appendOutput(state, '\x1b]9;ignored\x07\x1b]2;window title\x07')
+      expect(state.title).toBe('window title')
     })
   })
 

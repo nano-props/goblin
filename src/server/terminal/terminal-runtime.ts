@@ -67,6 +67,9 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       onOutput(userId, event) {
         broker.broadcastToUser(userId, { type: 'output', event })
       },
+      onBell(userId, event) {
+        broker.broadcastToUser(userId, { type: 'bell', event })
+      },
       onTitle(userId, event) {
         broker.broadcastToUser(userId, { type: 'title', event })
       },
@@ -188,9 +191,6 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     },
     async prune(clientId, userId, repoRoot) {
       return await actions.prune(clientId, userId, repoRoot)
-    },
-    async getSessionSnapshot(clientId, userId, input) {
-      return await actions.getSessionSnapshot(clientId, userId, input)
     },
     handleRealtimeMessage(clientId, userId, socket, payload) {
       // Log invalid identifier/parse drops so a stuck takeover

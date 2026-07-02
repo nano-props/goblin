@@ -207,7 +207,6 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
 
     expect(supervisor.killed).toEqual(['pty_initial_123456', 'pty_restart_one_123'])
     supervisor.emitData('pty_restart_one_123', 'stale output')
-    await expect(manager.getSessionSnapshot(USER_ID, created.ptySessionId)).resolves.toBeNull()
 
     supervisor.emitExit('pty_restart_one_123')
     await expect(manager.listSessionsForUser(USER_ID, SCOPE)).resolves.toEqual([

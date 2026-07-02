@@ -6,8 +6,6 @@ import type { ProgressAddon as XTermProgressAddon } from '@xterm/addon-progress'
 import { ProgressAddon } from '@xterm/addon-progress'
 import type { SearchAddon as XTermSearchAddon, ISearchOptions, ISearchResultChangeEvent } from '@xterm/addon-search'
 import { SearchAddon } from '@xterm/addon-search'
-import type { SerializeAddon as XTermSerializeAddon } from '@xterm/addon-serialize'
-import { SerializeAddon } from '@xterm/addon-serialize'
 import { Unicode11Addon } from '@xterm/addon-unicode11'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import type { ILinkHandler, ITheme } from '@xterm/xterm'
@@ -33,22 +31,12 @@ import {
 import { terminalLog } from '#/web/logger.ts'
 const RESIZE_DEBOUNCE_MS = 80
 const FONT_REMEASURE_DEBOUNCE_MS = 80
-const PARKED_FRAME_WIDTH_VAR = '--goblin-terminal-parked-width'
-const PARKED_FRAME_HEIGHT_VAR = '--goblin-terminal-parked-height'
-
-interface FrameGeometry {
-  width: number
-  height: number
-}
-
 export class TerminalSessionView {
   private readonly frame: HTMLDivElement
   private readonly xtermHost: HTMLDivElement
-  private readonly parkingElement: HTMLDivElement
   private term: XTermTerminal | null = null
   private fitAddon: XTermFitAddon | null = null
   private searchAddon: XTermSearchAddon | null = null
-  private serializeAddon: XTermSerializeAddon | null = null
   private imageAddon: XTermImageAddon | null = null
   private progressAddon: XTermProgressAddon | null = null
   private resizeObserver: ResizeObserver | null = null
@@ -64,7 +52,6 @@ export class TerminalSessionView {
 
   constructor(handlers: {
     onInput: (input: TerminalInput) => void
-    onBell: () => void
     onResize: (size: { cols: number; rows: number }) => void
     onSearchResult: (event: ISearchResultChangeEvent) => void
     onProgress: (state: number, value: number) => void
@@ -75,14 +62,11 @@ export class TerminalSessionView {
     this.xtermHost = document.createElement('div')
     this.xtermHost.className = 'goblin-managed-terminal-host'
     this.frame.appendChild(this.xtermHost)
-    this.parkingElement = document.createElement('div')
-    this.parkingElement.className = 'goblin-terminal-parking__item'
     this.handlers = handlers
   }
 
   private readonly handlers: {
     onInput: (input: TerminalInput) => void
-    onBell: () => void
     onResize: (size: { cols: number; rows: number }) => void
     onSearchResult: (event: ISearchResultChangeEvent) => void
     onProgress: (state: number, value: number) => void
@@ -92,7 +76,6 @@ export class TerminalSessionView {
   attach(host: HTMLElement): void {
     this.host = host
     host.replaceChildren(this.frame)
-    this.releaseParkedFrameGeometry()
     if (this.term) {
       this.installResizeObserver()
       this.fitSoon()
@@ -103,20 +86,17 @@ export class TerminalSessionView {
     return this.frame.isConnected
   }
 
-  detach(host: HTMLElement, parkingRoot: HTMLElement): void {
-    if (this.host !== host) return
-    this.fitNow()
-    this.preserveParkedFrameGeometry()
+  detach(host: HTMLElement): boolean {
+    if (this.host !== host) return false
     this.host = null
     this.blurIfFocused()
     this.disconnectResizeObserver()
     this.cancelFitFlush()
-    if (!this.parkingElement.parentElement) parkingRoot.appendChild(this.parkingElement)
-    this.parkingElement.replaceChildren(this.frame)
+    this.frame.remove()
+    return true
   }
 
   disposeFrame(): void {
-    this.parkingElement.remove()
     this.frame.remove()
   }
 
@@ -171,7 +151,6 @@ export class TerminalSessionView {
     if (!hasCoreUserInputAttribution) this.installFallbackUserInputAttribution(term)
     this.disposables.push(term.onData((data) => this.handlers.onInput(this.inputFromXtermData(data, 'data'))))
     this.disposables.push(term.onBinary((data) => this.handlers.onInput(this.inputFromXtermData(data, 'binary'))))
-    this.disposables.push(term.onBell(() => this.handlers.onBell()))
     this.disposables.push(term.onResize((size) => this.handlers.onResize(size)))
     term.open(this.xtermHost)
     this.installResizeObserver()
@@ -191,10 +170,6 @@ export class TerminalSessionView {
     if (!this.term) return
     if (this.term.cols === cols && this.term.rows === rows) return
     this.term.resize(cols, rows)
-  }
-
-  serialize(): string {
-    return this.serializeAddon?.serialize({ excludeAltBuffer: true }) ?? ''
   }
 
   clearSearch(): void {
@@ -253,7 +228,6 @@ export class TerminalSessionView {
     this.pendingFallbackUserInput = []
     this.fitAddon = null
     this.searchAddon = null
-    this.serializeAddon = null
     this.imageAddon = null
     this.progressAddon = null
     this.term?.dispose()
@@ -361,7 +335,6 @@ export class TerminalSessionView {
     this.installUnicode11Addon(term)
     this.installWebLinksAddon(term)
     this.installSearchAddon(term)
-    this.installSerializeAddon(term)
     this.installImageAddon(term)
     this.installProgressAddon(term)
   }
@@ -401,16 +374,6 @@ export class TerminalSessionView {
       this.searchAddon = searchAddon
     } catch (err) {
       terminalLog.warn('failed to load search addon', { err })
-    }
-  }
-
-  private installSerializeAddon(term: XTermTerminal): void {
-    try {
-      const serializeAddon = new SerializeAddon()
-      term.loadAddon(serializeAddon)
-      this.serializeAddon = serializeAddon
-    } catch (err) {
-      terminalLog.warn('failed to load serialize addon', { err })
     }
   }
 
@@ -492,29 +455,6 @@ export class TerminalSessionView {
     this.fitFlushTimer = null
   }
 
-  private preserveParkedFrameGeometry(): void {
-    const geometry = this.captureFrameGeometry()
-    if (!geometry) {
-      this.releaseParkedFrameGeometry()
-      return
-    }
-    this.parkingElement.style.setProperty(PARKED_FRAME_WIDTH_VAR, `${geometry.width}px`)
-    this.parkingElement.style.setProperty(PARKED_FRAME_HEIGHT_VAR, `${geometry.height}px`)
-  }
-
-  private captureFrameGeometry(): FrameGeometry | null {
-    // Park the full frame box, not only the inner xterm host: the frame's
-    // padding is part of the layout contract that keeps xterm's fitted cols
-    // aligned with the DOM while live output continues in the parking root.
-    const rect = this.frame.getBoundingClientRect()
-    if (rect.width <= 0 || rect.height <= 0) return null
-    return { width: rect.width, height: rect.height }
-  }
-
-  private releaseParkedFrameGeometry(): void {
-    this.parkingElement.style.removeProperty(PARKED_FRAME_WIDTH_VAR)
-    this.parkingElement.style.removeProperty(PARKED_FRAME_HEIGHT_VAR)
-  }
 }
 
 interface XtermCoreUserInputService {

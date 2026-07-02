@@ -91,6 +91,13 @@ export function TerminalSessionView({
 
   const descriptor = useTerminalWorktreeSelectedDescriptor(terminalWorktreeKey)
   const terminalSessionId = descriptor?.terminalSessionId ?? null
+  // The descriptor is server projection metadata. Keep the latest value
+  // available for attach, but do not let metadata-only changes such as tab
+  // reorder/index updates drive the xterm mount lifecycle.
+  const descriptorRef = useRef(descriptor)
+  useLayoutEffect(() => {
+    descriptorRef.current = descriptor
+  }, [descriptor])
   // `terminalSessionId` can change when the user switches worktrees mid-flight. The
   // paste/drop handlers capture it at invocation time; a ref tracks
   // the latest value so the post-resolve `.then` can detect a switch
@@ -107,10 +114,11 @@ export function TerminalSessionView({
 
   useLayoutEffect(() => {
     const host = hostRef.current
-    if (!host || !descriptor) return
-    attach(descriptor, host)
-    return () => detach(descriptor.terminalSessionId, host)
-  }, [attach, descriptor, detach])
+    const selectedDescriptor = descriptorRef.current
+    if (!host || !selectedDescriptor || selectedDescriptor.terminalSessionId !== terminalSessionId) return
+    attach(selectedDescriptor, host)
+    return () => detach(selectedDescriptor.terminalSessionId, host)
+  }, [attach, detach, terminalSessionId])
 
   useEffect(() => {
     if (!terminalSessionId || typeof document === 'undefined' || !document.hasFocus()) return

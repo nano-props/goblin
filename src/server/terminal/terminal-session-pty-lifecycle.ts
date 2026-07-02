@@ -1,5 +1,6 @@
 import {
   type TerminalExitEvent,
+  type TerminalBellRealtimeEvent,
   type TerminalOutputEvent,
   type TerminalSessionPhase,
   type TerminalTitleEvent,
@@ -11,6 +12,8 @@ import {
   disposeRender,
   resetRender,
   resizeRender,
+  scanTerminalOutputForBell,
+  type TerminalOutputBellScanState,
   type TerminalRenderState,
 } from '#/server/terminal/terminal-render-state.ts'
 import {
@@ -48,6 +51,7 @@ export interface TerminalPtyBindingEvents<TSession extends TerminalPtySessionSta
   isSessionLive(session: TSession): boolean
   emitLifecycle(session: TSession): void
   emitOutput(session: TSession, event: TerminalOutputEvent): void
+  emitBell(session: TSession, event: Omit<TerminalBellRealtimeEvent, 'terminalSessionId' | 'repoRoot' | 'worktreePath'>): void
   emitTitle(session: TSession, event: TerminalTitleEvent): void
   emitExit(session: TSession, event: TerminalExitEvent): void
   closeSession(ptySessionId: string): void
@@ -60,6 +64,7 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
   private readonly disposables: Array<{ dispose(): void }> = []
   private inputQueue: string[] = []
   private inputFlushScheduled = false
+  private bellScanState: TerminalOutputBellScanState = { inOsc: false, pendingEsc: false }
   private spawnGeneration = 0
   private pendingSpawn: Promise<TerminalPtySpawnResult> | null = null
 
@@ -193,6 +198,8 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
 
         const processNameAfterData = this.supervisor.processName(handle)
         lastProcessName = processNameAfterData
+        const bellScan = scanTerminalOutputForBell(data, this.bellScanState)
+        this.bellScanState = bellScan.state
 
         // Stale title detection: when a child process exits without
         // setting a new title-OSC, the tab would keep showing the
@@ -218,6 +225,13 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
           lastBroadcastTitle = session.render.title
           this.events.emitTitle(session, {
             ptySessionId: session.id,
+            canonicalTitle: session.render.title,
+          })
+        }
+        if (bellScan.hasBell) {
+          this.events.emitBell(session, {
+            ptySessionId: session.id,
+            processName: processNameAfterData,
             canonicalTitle: session.render.title,
           })
         }
@@ -280,6 +294,7 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
     }
     this.handle = null
     this.inputQueue = []
+    this.bellScanState = { inOsc: false, pendingEsc: false }
     this.inputFlushScheduled = false
   }
 

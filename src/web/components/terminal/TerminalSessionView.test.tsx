@@ -126,7 +126,6 @@ async function renderTerminalSession() {
     writeInput,
     takeover: vi.fn(),
     focusTerminal: vi.fn(),
-    serialize: vi.fn(() => ''),
   }
   const readContext: TerminalSessionReadContextValue = {
     terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
@@ -209,6 +208,119 @@ async function dispatchPasteWithText(sessionRoot: HTMLElement, text: string, fil
 }
 
 describe('TerminalSessionView', () => {
+  test('keeps the active terminal attached when selected descriptor metadata changes', async () => {
+    const descriptor = {
+      terminalSessionId: 'session-1',
+      terminalWorktreeKey: '/repo\0/worktree',
+      index: 1,
+      repoRoot: '/repo',
+      branch: 'feature',
+      worktreePath: '/worktree',
+    }
+    let terminalWorktreeSnapshot = completeWorktreeSnapshot({
+      terminalWorktreeKey: '/repo\0/worktree',
+      selectedDescriptor: descriptor,
+      sessions: [
+        {
+          terminalSessionId: 'session-1',
+          terminalWorktreeKey: '/repo\0/worktree',
+          index: 1,
+          title: 'zsh',
+          phase: 'open' as const,
+          selected: true,
+          hasBell: false,
+        },
+      ],
+      count: 1,
+      pendingCreate: false,
+    })
+    const snapshot = {
+      phase: 'open' as const,
+      message: null,
+      processName: 'zsh',
+      attachment: {
+        role: 'controller' as const,
+        controllerStatus: 'connected' as const,
+        active: true,
+        canTakeover: false,
+        canonicalCols: 120,
+        canonicalRows: 40,
+      },
+    }
+    const attach = vi.fn()
+    const detach = vi.fn()
+    const worktreeListeners = new Set<() => void>()
+    const context: TerminalSessionContextValue = {
+      createTerminal: async () => 'session-1',
+      registerHost: vi.fn(),
+      unregisterHost: vi.fn(),
+      selectTerminal: vi.fn(),
+      scrollToBottom: vi.fn(),
+      scrollLines: vi.fn(),
+      clearBell: vi.fn(() => false),
+      closeTerminalByDescriptor: vi.fn(async () => true),
+      attach,
+      detach,
+      restart: vi.fn(),
+      isTerminalFocusTarget: vi.fn(() => false),
+      findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+      findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+      clearSearch: vi.fn(),
+      writeInput: vi.fn(),
+      takeover: vi.fn(),
+      focusTerminal: vi.fn(),
+    }
+    const readContext: TerminalSessionReadContextValue = {
+      terminalWorktreeSnapshot: () => terminalWorktreeSnapshot,
+      subscribeTerminalWorktree: (_terminalWorktreeKey, listener) => {
+        worktreeListeners.add(listener)
+        return () => worktreeListeners.delete(listener)
+      },
+      repoBellCount: () => 0,
+      subscribeRepoBellCount: () => () => {},
+      snapshot: () => snapshot,
+      subscribeSnapshot: () => () => {},
+    }
+
+    const { unmount } = renderInJsdom(
+      <TerminalSessionContext value={context}>
+        <TerminalSessionReadContext value={readContext}>
+          <TerminalSessionView repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+        </TerminalSessionReadContext>
+      </TerminalSessionContext>,
+    )
+
+    try {
+      expect(attach).toHaveBeenCalledTimes(1)
+
+      terminalWorktreeSnapshot = completeWorktreeSnapshot({
+        terminalWorktreeKey: '/repo\0/worktree',
+        selectedDescriptor: { ...descriptor, index: 2 },
+        sessions: [
+          {
+            terminalSessionId: 'session-1',
+            terminalWorktreeKey: '/repo\0/worktree',
+            index: 2,
+            title: 'zsh',
+            phase: 'open' as const,
+            selected: true,
+            hasBell: false,
+          },
+        ],
+        count: 1,
+        pendingCreate: false,
+      })
+      await act(async () => {
+        for (const listener of worktreeListeners) listener()
+      })
+
+      expect(attach).toHaveBeenCalledTimes(1)
+      expect(detach).not.toHaveBeenCalled()
+    } finally {
+      unmount()
+    }
+  })
+
   test('renders mirror attach banner and triggers takeover', async () => {
     const takeover = vi.fn().mockResolvedValue(true)
     const summaries = [
@@ -271,7 +383,6 @@ describe('TerminalSessionView', () => {
       writeInput: vi.fn(),
       takeover,
       focusTerminal: vi.fn(),
-      serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
@@ -338,7 +449,6 @@ describe('TerminalSessionView', () => {
       writeInput: vi.fn(),
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
-      serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(emptyWorktreeSnapshot),
@@ -414,7 +524,6 @@ describe('TerminalSessionView', () => {
       writeInput: vi.fn(),
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
-      serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
@@ -506,7 +615,6 @@ describe('TerminalSessionView', () => {
       writeInput: vi.fn(),
       takeover: vi.fn(),
       focusTerminal,
-      serialize: vi.fn(() => ''),
     }
     let activeSnapshot: TerminalSnapshot = openingSnapshot
     const readContext: TerminalSessionReadContextValue = {
@@ -611,7 +719,6 @@ describe('TerminalSessionView', () => {
       writeInput: vi.fn(),
       takeover: vi.fn(),
       focusTerminal,
-      serialize: vi.fn(() => ''),
     }
     let activeSnapshot: TerminalSnapshot = openingSnapshot
     const readContext: TerminalSessionReadContextValue = {
@@ -722,7 +829,6 @@ describe('TerminalSessionView', () => {
       writeInput: vi.fn(),
       takeover,
       focusTerminal: vi.fn(),
-      serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
@@ -835,7 +941,6 @@ describe('TerminalSessionView', () => {
       writeInput,
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
-      serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
@@ -951,7 +1056,6 @@ describe('TerminalSessionView', () => {
       writeInput,
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
-      serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
@@ -1084,7 +1188,6 @@ describe('TerminalSessionView', () => {
       writeInput,
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
-      serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
@@ -1191,7 +1294,6 @@ describe('TerminalSessionView', () => {
       writeInput,
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
-      serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
@@ -1310,7 +1412,6 @@ describe('TerminalSessionView', () => {
       writeInput,
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
-      serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
@@ -1585,7 +1686,6 @@ describe('TerminalSessionView', () => {
       writeInput,
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
-      serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
@@ -1744,7 +1844,6 @@ describe('TerminalSessionView', () => {
       writeInput,
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
-      serialize: vi.fn(() => ''),
     }
     let activeWorktreeSnapshot = worktreeSnapshotA
     const readContext: TerminalSessionReadContextValue = {
@@ -1859,7 +1958,6 @@ describe('TerminalSessionView', () => {
       writeInput: vi.fn(),
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
-      serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(emptyWorktreeSnapshot),
@@ -1942,7 +2040,6 @@ describe('TerminalSessionView', () => {
       writeInput: vi.fn(),
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
-      serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(emptyWorktreeSnapshot),

@@ -42,7 +42,6 @@ import { terminalLog } from '#/web/logger.ts'
 import { t } from 'i18next'
 import { toast } from 'sonner'
 import type {
-  TerminalBellEvent,
   TerminalDescriptor,
   TerminalIdentityViewModel,
   TerminalLifecycleViewModel,
@@ -56,7 +55,6 @@ export type TerminalNotifyReason = 'metadata'
 export class TerminalSession {
   descriptor: TerminalDescriptor
   private readonly notify: (reason: TerminalNotifyReason) => void
-  private readonly onBell: ((descriptor: TerminalDescriptor, event: TerminalBellEvent) => void) | null
   private readonly requestDurableClose: (ptySessionId: string) => Promise<void>
   private readonly runtime = new TerminalSessionRuntime()
   private readonly view: TerminalSessionView
@@ -87,23 +85,20 @@ export class TerminalSession {
   constructor(
     descriptor: TerminalDescriptor,
     notify: (reason: TerminalNotifyReason) => void,
-    onBell: ((descriptor: TerminalDescriptor, event: TerminalBellEvent) => void) | null = null,
     // Durable close hook. The projection passes this in so dispose() can
     // hand the close to a queue (drained on the next create for the
     // same worktree) instead of firing `terminalBridge.close` as a
     // fire-and-forget. The old `void … .catch(() => {})` path could
     // drop the request if the WebSocket was already closing, leaving
     // the server PTY alive and the next create reattaching to the
-    // orphan. See `TerminalSessionProjection.pendingCloseByPtySessionId`.
+    // orphan. See `TerminalSessionLifecycleQueues`.
     requestDurableClose: (ptySessionId: string) => Promise<void> = () => Promise.resolve(),
   ) {
     this.descriptor = descriptor
     this.notify = notify
-    this.onBell = onBell
     this.requestDurableClose = requestDurableClose
     this.view = new TerminalSessionView({
       onInput: (data) => this.writeInput(data),
-      onBell: () => this.handleBell(),
       onResize: ({ cols, rows }) => this.queueResize(cols, rows),
       onSearchResult: (event) => this.updateSearchResult(event),
       onProgress: (state, value) => this.updateProgress(state, value),
@@ -137,9 +132,9 @@ export class TerminalSession {
     return this.runtime.phase() === 'open' && this.runtime.clientRole() === 'unowned'
   }
 
-  detach(host: HTMLElement, parkingRoot: HTMLElement): void {
+  detach(host: HTMLElement): void {
     this.clearTerminalFocusIfOwned()
-    this.view.detach(host, parkingRoot)
+    if (this.view.detach(host) && this.destroyActiveView()) this.notify('metadata')
   }
 
   restart(): void {
@@ -193,6 +188,10 @@ export class TerminalSession {
 
   isTerminalFocusTarget(target: EventTarget | null): boolean {
     return this.view.isTerminalFocusTarget(target)
+  }
+
+  isVisible(): boolean {
+    return this.view.isVisible()
   }
 
   writeInput(input: TerminalInput): void {
@@ -329,10 +328,6 @@ export class TerminalSession {
 
   scrollLines(amount: number): void {
     this.view.scrollLines(amount)
-  }
-
-  serialize(): string {
-    return this.view.serialize()
   }
 
   currentPtySessionId(): string | null {
@@ -586,7 +581,7 @@ export class TerminalSession {
         if (preloadReplayGeneration !== null) this.runtime.drainReplay(preloadReplayGeneration)
         return
       }
-      this.closeReplacingPtySession()
+      this.closeRestartBaseSession()
       if (!this.currentToken(token)) return
       this.destroyActiveView()
       if (this.runtime.failRuntime(err instanceof Error ? err.message : String(err))) this.notify('metadata')
@@ -645,8 +640,8 @@ export class TerminalSession {
       // and the attach IPC reads them synchronously when ipcPhase runs.
       // The rAF settles the *layout paint* for measurement accuracy in
       // later operations, but the attach roundtrip doesn't need that
-      // paint to have completed. A future refactor that turns attach into
-      // a local cache lookup MUST restore the blocking wait.
+      // paint to have completed. A future local first-frame optimization
+      // MUST restore the blocking wait before trusting local geometry.
       void waitForTerminalLayout()
       this.guardStart(token, term)
       return { term, preloadReplayGeneration }
@@ -670,18 +665,44 @@ export class TerminalSession {
       ? await terminalBridge.restart(this.terminalRestartInput(ptySessionId, term))
       : await terminalBridge.attach(this.terminalAttachInput(ptySessionId, term))
     if (this.disposed || this.startToken !== token || this.view.currentTerminal() !== term) {
-      if (result.ok) void terminalBridge.close({ ptySessionId: result.ptySessionId }).catch(() => {})
-      else this.closeReplacingPtySession()
+      if (this.disposed) {
+        if (result.ok) void this.requestDurableClose(result.ptySessionId).catch(() => {})
+        else this.closeRestartBaseSession()
+      } else {
+        this.absorbDetachedIpcResult(result, { cols: term.cols, rows: term.rows }, { restart })
+      }
       throw new StartCancelledError()
     }
     this.runtime.settleStartAttempt()
     if (!result.ok) {
-      this.closeReplacingPtySession()
       this.destroyActiveView()
-      if (this.runtime.failAttachAttempt(result.message)) this.notify('metadata')
+      const changed = restart
+        ? this.runtime.failRestartAttempt(result.message)
+        : this.runtime.failAttachAttempt(result.message)
+      if (changed) this.notify('metadata')
       throw new StartCancelledError()
     }
     return this.withLocalController(result)
+  }
+
+  private absorbDetachedIpcResult(
+    result: TerminalAttachResult,
+    fallbackSize: { cols: number; rows: number },
+    options: { restart: boolean },
+  ): void {
+    this.runtime.settleStartAttempt()
+    if (!result.ok) {
+      const changed = options.restart
+        ? this.runtime.failRestartAttempt(result.message)
+        : this.runtime.failAttachAttempt(result.message)
+      if (changed) this.notify('metadata')
+      return
+    }
+    const projected = this.withLocalController(result)
+    const changed = this.runtime.applyAttachResult(projected, fallbackSize)
+    this.syncExternalCommandGate(projected.ptySessionId, terminalSnapshotHasOutput(projected.snapshot, projected.snapshotSeq))
+    this.authority().setRole(projected.role)
+    if (changed) this.notify('metadata')
   }
 
   private async replayPhase(
@@ -932,7 +953,7 @@ export class TerminalSession {
     this.queuedExternalCommandInput = ''
   }
 
-  private destroyActiveView(options?: { preserveTransientState?: boolean }): void {
+  private destroyActiveView(options?: { preserveTransientState?: boolean }): boolean {
     this.geometryAbortController?.abort()
     this.geometryAbortController = null
     this.cancelResizeFlush()
@@ -946,8 +967,9 @@ export class TerminalSession {
     this.inputFlushScheduled = false
     this.clearExternalCommandGate()
     this.startToken += 1
-    if (!options?.preserveTransientState) this.runtime.resetTransientState()
+    const transientChanged = options?.preserveTransientState ? false : this.runtime.resetTransientState()
     this.view.destroyTerminal()
+    return transientChanged
   }
 
   private currentStart(token: number, term: XTermTerminal): boolean {
@@ -960,14 +982,6 @@ export class TerminalSession {
 
   private updateProgress(state: number, value: number): void {
     if (this.runtime.setProgress(state, value)) this.notify('metadata')
-  }
-
-  private handleBell(): void {
-    this.onBell?.(this.descriptor, {
-      processName: this.runtime.processName(),
-      canonicalTitle: this.runtime.canonicalTitle(),
-      visible: this.view.isVisible(),
-    })
   }
 
   private find(term: string, direction: 'next' | 'previous', incremental: boolean): TerminalSearchResult {
@@ -1001,9 +1015,9 @@ export class TerminalSession {
     if (this.isTerminalFocusTarget(document.activeElement)) setTerminalFocused(false)
   }
 
-  private closeReplacingPtySession(): void {
-    const ptySessionId = this.runtime.closeReplacingPtySessionId()
-    if (ptySessionId) void terminalBridge.close({ ptySessionId }).catch(() => {})
+  private closeRestartBaseSession(): void {
+    const ptySessionId = this.runtime.takeRestartBasePtySessionIdForClose()
+    if (ptySessionId) void this.requestDurableClose(ptySessionId).catch(() => {})
   }
 }
 

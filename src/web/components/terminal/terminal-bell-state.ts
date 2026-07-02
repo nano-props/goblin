@@ -1,6 +1,6 @@
 import { lastPathSegment } from '#/web/lib/paths.ts'
 import { terminalBridge } from '#/web/terminal.ts'
-import type { TerminalBellEvent, TerminalDescriptor } from '#/web/components/terminal/types.ts'
+import type { TerminalBellPolicyEvent, TerminalDescriptor } from '#/web/components/terminal/types.ts'
 import { getRuntimeFetchSettings } from '#/web/runtime-settings-fetch.ts'
 const BELL_NOTIFICATION_THROTTLE_MS = 5000
 
@@ -9,13 +9,15 @@ export interface TerminalBellState {
   clear: (terminalSessionId: string) => boolean
   remove: (terminalSessionId: string) => void
   reset: () => void
-  handleBell: (descriptor: TerminalDescriptor, event: TerminalBellEvent) => void
+  handleBell: (descriptor: TerminalDescriptor, event: TerminalBellPolicyEvent) => void
 }
 
 export function createTerminalBellState(
   notify: (terminalSessionId?: string) => void,
   onBadgeChange: (count: number) => void,
 ): TerminalBellState {
+  // Client-local UI state only. Server bell events are not replayed or
+  // persisted, and this unread set is rebuilt from live realtime events.
   const unreadSessionIds = new Set<string>()
   const lastSystemNotificationAtByTerminalSessionId = new Map<string, number>()
 

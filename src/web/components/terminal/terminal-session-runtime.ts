@@ -14,7 +14,11 @@ import type {
 export class TerminalSessionRuntime {
   private readonly state = new TerminalSessionState()
   private ptySessionId: string | null = null
-  private replacingPtySessionId: string | null = null
+  // Restart is issued against the last server runtime session id. During
+  // the restart attempt the client has no open attachment, but the server
+  // session remains addressable; if restart fails, this id is restored and
+  // the session enters `error` instead of being closed.
+  private restartBasePtySessionId: string | null = null
   private restartOnStart = false
 
   snapshot() {
@@ -38,7 +42,7 @@ export class TerminalSessionRuntime {
   }
 
   restartingPtySessionId(): string | null {
-    return this.replacingPtySessionId ?? this.ptySessionId
+    return this.restartBasePtySessionId ?? this.ptySessionId
   }
 
   currentCanonicalSize(): { cols: number; rows: number } {
@@ -75,7 +79,7 @@ export class TerminalSessionRuntime {
   prepareRestart(): { changed: boolean } {
     const oldPtySessionId = this.ptySessionId
     this.ptySessionId = null
-    if (oldPtySessionId) this.replacingPtySessionId = oldPtySessionId
+    if (oldPtySessionId) this.restartBasePtySessionId = oldPtySessionId
     this.restartOnStart = true
     return { changed: this.state.setRestarting() }
   }
@@ -91,7 +95,7 @@ export class TerminalSessionRuntime {
     },
     fallbackSize: { cols: number; rows: number },
   ): boolean {
-    this.replacingPtySessionId = null
+    this.restartBasePtySessionId = null
     this.ptySessionId = result.ptySessionId
     return this.state.applyOpenResult({
       phase: result.phase,
@@ -117,7 +121,7 @@ export class TerminalSessionRuntime {
     canonicalRows: number
   }): boolean {
     const sessionChanged = this.ptySessionId !== input.ptySessionId
-    this.replacingPtySessionId = null
+    this.restartBasePtySessionId = null
     this.restartOnStart = false
     this.ptySessionId = input.ptySessionId
     const metadataChanged = this.state.applyOpenResult({
@@ -135,6 +139,15 @@ export class TerminalSessionRuntime {
   }
 
   failAttachAttempt(message: string): boolean {
+    return this.state.setError(message)
+  }
+
+  failRestartAttempt(message: string): boolean {
+    if (this.restartBasePtySessionId) {
+      this.ptySessionId = this.restartBasePtySessionId
+      this.restartBasePtySessionId = null
+    }
+    this.restartOnStart = false
     return this.state.setError(message)
   }
 
@@ -251,20 +264,20 @@ export class TerminalSessionRuntime {
   }
 
   ptySessionIdsForClose(): string[] {
-    return Array.from(new Set([this.ptySessionId, this.replacingPtySessionId].filter((id): id is string => !!id)))
+    return Array.from(new Set([this.ptySessionId, this.restartBasePtySessionId].filter((id): id is string => !!id)))
   }
 
   disposePtySessionIds(): string[] {
     const ptySessionIds = this.ptySessionIdsForClose()
     this.ptySessionId = null
-    this.replacingPtySessionId = null
+    this.restartBasePtySessionId = null
     this.restartOnStart = false
     return ptySessionIds
   }
 
-  closeReplacingPtySessionId(): string | null {
-    const ptySessionId = this.replacingPtySessionId
-    this.replacingPtySessionId = null
+  takeRestartBasePtySessionIdForClose(): string | null {
+    const ptySessionId = this.restartBasePtySessionId
+    this.restartBasePtySessionId = null
     return ptySessionId
   }
 }

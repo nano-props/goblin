@@ -258,12 +258,9 @@ describe('server terminal runtime', () => {
       rows: 24,
       clientId: 'client_a',
     })
-    const snapshot = await host.getSessionSnapshot('client_1', USER_1, { ptySessionId })
-
     expect(attach.ok).toBe(true)
     if (!attach.ok) return
     expect(attach.snapshot).toBe('👾:~/repo\r\n$ ')
-    expect(snapshot?.snapshot).toBe('👾:~/repo\r\n$ ')
     host.unregisterSocket('client_a', USER_1, socket)
     shutdown()
   })
@@ -385,7 +382,7 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
-  test('broadcasts output and exit events to registered web terminal sockets', async () => {
+  test('broadcasts output, bell, and exit events to registered web terminal sockets', async () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
@@ -406,6 +403,21 @@ describe('server terminal runtime', () => {
     expect(outputMessage).toMatchObject({
       type: 'output',
       event: { data: 'hello', seq: 1 },
+    })
+
+    socket.send.mockClear()
+    mockPtys[0]?.emitData('\x1b]0;build running\x07done\x07')
+    const bellMessage = sentSocketMessages(socket).find((message) => message.type === 'bell')
+    expect(bellMessage).toMatchObject({
+      type: 'bell',
+      event: {
+        ptySessionId,
+        terminalSessionId: expect.any(String),
+        repoRoot: '/repo',
+        worktreePath: '/repo-linked',
+        processName: 'zsh',
+        canonicalTitle: 'build running',
+      },
     })
 
     mockPtys[0]?.emitExit()
@@ -1113,9 +1125,6 @@ describe('server terminal runtime', () => {
     if (!userASession) throw new Error('expected user A session')
 
     expect(await host.listSessions('client_shared', USER_2, '/repo')).toEqual([])
-    await expect(
-      host.getSessionSnapshot('client_shared', USER_2, { ptySessionId: userASession.ptySessionId }),
-    ).resolves.toBeNull()
     await expect(host.close('client_shared', USER_2, { ptySessionId: userASession.ptySessionId })).resolves.toBe(false)
     expect(
       userBSocket.send.mock.calls.some(([payload]) => {

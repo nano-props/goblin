@@ -28,6 +28,12 @@ export interface TerminalSessionBase {
 }
 
 export interface TerminalAttachInput {
+  /**
+   * Server runtime lookup id for terminal operations. The name is historical:
+   * callers must not infer that a live PTY handle exists from this field
+   * alone. `phase` plus server-side PTY binding/authority checks decide
+   * whether the session is currently interactive.
+   */
   ptySessionId: string
   cols: number
   rows: number
@@ -51,6 +57,11 @@ export interface TerminalCreateInput {
 }
 
 export interface TerminalRestartInput {
+  /**
+   * Runtime lookup id for the session being restarted. Restart failure keeps
+   * this id addressable in `phase: 'error'` so the client can retry without
+   * changing the durable `terminalSessionId`.
+   */
   ptySessionId: string
   cols: number
   rows: number
@@ -224,11 +235,7 @@ export interface TerminalSessionSummary {
   rows: number
 }
 
-export interface TerminalSessionSnapshotInput {
-  ptySessionId: string
-}
-
-export interface TerminalSessionSnapshot {
+export interface TerminalHydrationSnapshot {
   ptySessionId: string
   snapshot: string
   snapshotSeq: number
@@ -241,6 +248,17 @@ export interface TerminalOutputEvent {
   data: string
   seq: number
   processName: string
+}
+
+// Bell is an ephemeral realtime hint for currently connected clients. It is
+// intentionally not part of terminal summaries or any persisted unread model.
+export interface TerminalBellRealtimeEvent {
+  ptySessionId: string
+  terminalSessionId: string
+  repoRoot: string
+  worktreePath: string
+  processName: string
+  canonicalTitle: string | null
 }
 
 export interface TerminalTitleEvent {

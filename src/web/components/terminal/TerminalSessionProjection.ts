@@ -7,20 +7,22 @@ import { formatTerminalWorktreeKey, parseTerminalWorktreeKey } from '#/shared/te
 import { terminalBridge } from '#/web/terminal.ts'
 import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
 import type {
-  TerminalSessionSnapshot,
+  TerminalBellRealtimeEvent,
+  TerminalHydrationSnapshot,
   TerminalSessionSummary as ServerTerminalSessionSummary,
 } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { branchForTerminalWorktree } from '#/web/components/terminal/terminal-repo-index.ts'
 import {
+  projectCreateResultForClient,
   projectServerTerminalSession,
-  type ReattachSnapshotCacheEntry,
 } from '#/web/components/terminal/terminal-session-projection.ts'
 import { userTerminalInput, type TerminalUserInputSource } from '#/web/components/terminal/terminal-input.ts'
 import {
   captureTerminalHostGeometry,
   resolveTerminalStartupGeometryHint,
 } from '#/web/components/terminal/terminal-session-geometry.ts'
+import { TerminalSessionLifecycleQueues } from '#/web/components/terminal/terminal-session-lifecycle-queues.ts'
 import { DEFAULT_TERMINAL_COLS, DEFAULT_TERMINAL_ROWS } from '#/web/components/terminal/terminal-geometry.ts'
 import {
   countOrphanedTerminalSessionIds,
@@ -51,6 +53,8 @@ const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = {
   processName: 'terminal',
   canonicalTitle: null,
 }
+const EMPTY_SERVER_SNAPSHOTS = new Map<string, TerminalHydrationSnapshot>()
+const MAX_PENDING_SERVER_BELLS = 99
 /**
  * Client-level authority for terminal session state.
  *
@@ -64,8 +68,8 @@ const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = {
  * `terminal-roadmap.md` P1.7.
  *
  * **Why singleton**: the terminal feature owns cross-cutting state
- * (parking root, per-worktree session lists, bell controller, startup geometry
- * cache, snapshot caches, pending create/close queues) that has no
+ * (per-worktree session lists, bell controller, startup geometry hints,
+ * selector snapshot caches, pending create/close queues) that has no
  * natural React tree boundary. The previous Provider-owned lifetime
  * required a `pendingProjectionDestroyRef + setTimeout(0)` debounce to
  * survive StrictMode; the singleton removes that dance entirely.
@@ -74,27 +78,19 @@ export class TerminalSessionProjection {
   private readonly onSelectedWorktreeChange: (terminalWorktreeKey: string, terminalSessionId: string | null) => void
   private readonly onWorkspaceTabsChanged: (base: TerminalSessionBase, tabs: readonly WorkspacePaneTabEntry[]) => void
   private repoIndex: TerminalRepoIndex = {}
-  private parkingRoot: HTMLDivElement | null = null
   private readonly sessions = new Map<string, TerminalSession>()
   private readonly terminalSessionIdByPtySessionId = new Map<string, string>()
   private readonly ptySessionIdByTerminalSessionId = new Map<string, string>()
+  // Client preference only: server owns session existence/control, while
+  // each client chooses which terminal to present for a worktree.
   private readonly selectedTerminalSessionIdByTerminalWorktree = new Map<string, string>()
   private readonly preferredSelectedTerminalSessionIdByTerminalWorktree = new Map<string, string>()
   private readonly hostByWorktree = new Map<string, HTMLElement>()
   private readonly startupGeometryHintByWorktree = new Map<string, { cols: number; rows: number }>()
-  private readonly pendingCreateByWorktree = new Map<
-    string,
-    {
-      base: TerminalSessionBase
-      options: TerminalCreateOptions
-      promise: Promise<string>
-      resolve: (terminalSessionId: string) => void
-      reject: (error: unknown) => void
-      flushing: boolean
-      creating: boolean
-    }
-  >()
-  // Durable close queue. `TerminalSession.dispose` used to fire
+  // Owns pending create and durable close promises. The projection decides
+  // when to drain them; the helper owns dedupe and settle mechanics.
+  private readonly lifecycleQueues = new TerminalSessionLifecycleQueues<TerminalSessionBase, TerminalCreateOptions>()
+  // Durable close queue rationale. `TerminalSession.dispose` used to fire
   // `terminalBridge.close({ ptySessionId })` as a `void ... .catch(() => {})`
   // — if the WebSocket was already closing (or `closeSocketIfIdle` raced
   // the request), the request was rejected before the server saw it and
@@ -108,41 +104,14 @@ export class TerminalSessionProjection {
   // Failures are logged (the old path swallowed them silently) so any
   // future regression is visible in `terminalLog` rather than invisible
   // shell ghosts in the buffer.
-  private readonly pendingCloseByPtySessionId = new Map<
-    string,
-    {
-      repoRoot: string
-      branchName: string
-      worktreePath: string
-      terminalWorktreeKey: string
-      promise: Promise<void>
-      resolve: () => void
-      reject: (error: unknown) => void
-    }
-  >()
   // User-initiated close hides the session from worktree snapshots
   // synchronously while server cleanup runs. This is terminal-runtime
   // visibility, not workspace pane selection state.
   private readonly hiddenClosingTerminalSessionIds = new Set<string>()
   private readonly closeCompletionByTerminalSessionId = new Map<string, Promise<boolean>>()
+  // Selector publication caches only. They memoize lightweight UI snapshots
+  // for React subscribers and do not contain terminal render buffers.
   private readonly snapshotCache = new Map<string, TerminalSnapshot>()
-  // Safety-net hard cap. The expected cleanup is the server-exit
-  // event (handleExit), with removeSession / destroy as secondary
-  // sites; a small ceiling trims the oldest entries if bookkeeping
-  // ever drifts (e.g. a wedged server that never emits exit). Set
-  // well above the realistic number of simultaneously-detached
-  // sessions, so in normal use no entry is evicted by the trim path.
-  //
-  // T2.1: lowered from 32 to 8. The 32 was sized for multi-tenant
-  // assumptions; for a single user, typical detached-session count
-  // is 1-3 with occasional 5. 8 gives generous headroom. Per-snapshot
-  // size is bounded by the server's 16 MiB ring buffer (terminal-render-state.ts),
-  // so worst-case reattach memory is 8 × 16 MiB = 128 MiB — almost
-  // never realised because most snapshots are KB-scale. Eviction is
-  // the source-of-truth fallback: a user who lost the snapshot sees
-  // the server's ring buffer on next attach.
-  private static readonly REATTACH_SNAPSHOT_CACHE_HARD_CAP = 8
-  private readonly reattachSnapshotCache = new Map<string, ReattachSnapshotCacheEntry>()
   private readonly worktreeSnapshotCache = new Map<string, TerminalWorktreeSnapshot>()
   private readonly worktreeListeners = new Map<string, Set<() => void>>()
   private readonly repoBellCountListeners = new Map<string, Set<() => void>>()
@@ -153,6 +122,7 @@ export class TerminalSessionProjection {
   private readonly lastPublishedRepoBellCountByRepo = new Map<string, number>()
   private readonly snapshotListeners = new Map<string, Set<() => void>>()
   private readonly terminalSessionIdsByTerminalWorktree = new Map<string, string[]>()
+  private readonly pendingServerBellByTerminalSessionId = new Map<string, TerminalBellRealtimeEvent>()
   private readonly bellState = createTerminalBellState(
     (terminalSessionId) => {
       if (terminalSessionId) {
@@ -183,10 +153,6 @@ export class TerminalSessionProjection {
     this.syncDescriptorsFromRepoIndex()
   }
 
-  setParkingRoot(root: HTMLDivElement | null): void {
-    this.parkingRoot = root
-  }
-
   /**
    * Test-only / explicit-teardown path.
    *
@@ -208,11 +174,7 @@ export class TerminalSessionProjection {
    */
   destroy(): void {
     setTerminalFocused(false)
-    for (const pending of this.pendingCreateByWorktree.values()) {
-      pending.reject(new Error('terminal session projection destroyed'))
-    }
-    for (const pending of this.pendingCloseByPtySessionId.values())
-      pending.reject(new Error('terminal session projection destroyed'))
+    this.lifecycleQueues.rejectAll(new Error('terminal session projection destroyed'))
     for (const session of this.sessions.values()) session.dispose({ closeSession: false })
     this.sessions.clear()
     this.terminalSessionIdByPtySessionId.clear()
@@ -221,18 +183,16 @@ export class TerminalSessionProjection {
     this.preferredSelectedTerminalSessionIdByTerminalWorktree.clear()
     this.hostByWorktree.clear()
     this.startupGeometryHintByWorktree.clear()
-    this.pendingCreateByWorktree.clear()
-    this.pendingCloseByPtySessionId.clear()
     this.hiddenClosingTerminalSessionIds.clear()
     this.closeCompletionByTerminalSessionId.clear()
     this.snapshotCache.clear()
-    this.reattachSnapshotCache.clear()
     this.worktreeSnapshotCache.clear()
     this.worktreeListeners.clear()
     this.repoBellCountListeners.clear()
     this.lastPublishedRepoBellCountByRepo.clear()
     this.snapshotListeners.clear()
     this.terminalSessionIdsByTerminalWorktree.clear()
+    this.pendingServerBellByTerminalSessionId.clear()
     this.bellState.reset()
     this.outputActivityState.reset()
     if (projectionInstance === this) projectionInstance = null
@@ -246,6 +206,36 @@ export class TerminalSessionProjection {
         this.outputActivityState.markOutput(directKey, directSession.descriptor.terminalWorktreeKey)
       directSession.handleOutput(event)
     }
+  }
+
+  handleServerBell(event: TerminalBellRealtimeEvent): void {
+    const session =
+      this.sessions.get(event.terminalSessionId) ??
+      this.sessions.get(this.terminalSessionIdByPtySessionId.get(event.ptySessionId) ?? '')
+    if (!session) {
+      this.trimPendingServerBellsForInsert(event.terminalSessionId)
+      this.pendingServerBellByTerminalSessionId.set(event.terminalSessionId, event)
+      return
+    }
+    this.applyServerBell(session, event)
+  }
+
+  private trimPendingServerBellsForInsert(terminalSessionId: string): void {
+    if (this.pendingServerBellByTerminalSessionId.has(terminalSessionId)) return
+    while (this.pendingServerBellByTerminalSessionId.size >= MAX_PENDING_SERVER_BELLS) {
+      const oldestTerminalSessionId = this.pendingServerBellByTerminalSessionId.keys().next().value
+      if (!oldestTerminalSessionId) return
+      this.pendingServerBellByTerminalSessionId.delete(oldestTerminalSessionId)
+    }
+  }
+
+  private applyServerBell(session: TerminalSession, event: TerminalBellRealtimeEvent): void {
+    this.pendingServerBellByTerminalSessionId.delete(event.terminalSessionId)
+    this.bellState.handleBell(session.descriptor, {
+      processName: event.processName,
+      canonicalTitle: event.canonicalTitle,
+      visible: session.isVisible(),
+    })
   }
 
   handleServerTitle(event: { ptySessionId: string; canonicalTitle: string | null }): void {
@@ -262,21 +252,18 @@ export class TerminalSessionProjection {
     if (directKey && directSession?.handleExit(event)) {
       // Local runtime accepted the exit. Gating the discard on the
       // runtime's accept (rather than evicting eagerly on the
-      // ptySessionId match) avoids discarding a still-valid cache entry
-      // during a race where the local session has moved to a new
-      // ptySessionId (e.g. after a server-side restart) but the index
-      // still maps the old ptySessionId to the same terminalSessionId.
-      // `discardLocalSessionAndDismissDetailIfLast → removeSession`
-      // is what actually evicts the reattach cache entry for `directKey`.
+      // ptySessionId match) avoids discarding a live local session
+      // during a race where the session has moved to a new ptySessionId
+      // (e.g. after a server-side restart) but the index still maps the
+      // old ptySessionId to the same terminalSessionId.
       this.discardLocalSessionAndDismissDetailIfLast(directKey, directSession.descriptor)
       return
     }
     if (directKey && directSession && !directSession.currentPtySessionId()) {
       // The runtime is empty (exit was observed earlier, or the
       // session was never attached) but the ptySessionId index still
-      // points at it. The cache entry is keyed by the local terminalSessionId, not
-      // the old ptySessionId, so leaving it in place is the right call —
-      // the next reattach may still hydrate from it.
+      // points at it. Drop the local projection; future render recovery
+      // comes from the server snapshot, not a client-side render cache.
       this.discardLocalSessionAndDismissDetailIfLast(directKey, directSession.descriptor)
     }
   }
@@ -291,12 +278,15 @@ export class TerminalSessionProjection {
   // `closeTerminal`) because the server has already killed the PTY
   // — calling `close` again would no-op the `closeSessionForUser` check
   // on the server and add a useless WS roundtrip.
-  handleSessionClosed(ptySessionId: string): void {
-    const directKey = this.terminalSessionIdByPtySessionId.get(ptySessionId)
-    if (!directKey) return
-    const session = this.sessions.get(directKey)
+  handleSessionClosed(event: { ptySessionId: string; terminalSessionId: string }): void {
+    this.pendingServerBellByTerminalSessionId.delete(event.terminalSessionId)
+    const terminalSessionId = this.sessions.has(event.terminalSessionId)
+      ? event.terminalSessionId
+      : (this.terminalSessionIdByPtySessionId.get(event.ptySessionId) ?? null)
+    if (!terminalSessionId) return
+    const session = this.sessions.get(terminalSessionId)
     if (!session) return
-    this.discardLocalSessionAndDismissDetailIfLast(directKey, session.descriptor)
+    this.discardLocalSessionAndDismissDetailIfLast(terminalSessionId, session.descriptor)
   }
 
   handleIdentity(event: TerminalIdentityViewModel): void {
@@ -319,7 +309,7 @@ export class TerminalSessionProjection {
     repoRoot: string,
     serverSessions: ServerTerminalSessionSummary[],
     clientId: string,
-    snapshotsByPtySessionId: ReadonlyMap<string, TerminalSessionSnapshot>,
+    snapshotsByPtySessionId: ReadonlyMap<string, TerminalHydrationSnapshot> = EMPTY_SERVER_SNAPSHOTS,
   ): void {
     if (!this.repoIndex[repoRoot]) return
 
@@ -343,7 +333,7 @@ export class TerminalSessionProjection {
     repoRoot: string,
     serverSessions: ServerTerminalSessionSummary[],
     clientId: string,
-    snapshotsByPtySessionId: ReadonlyMap<string, TerminalSessionSnapshot>,
+    snapshotsByPtySessionId: ReadonlyMap<string, TerminalHydrationSnapshot>,
   ): {
     controllerTerminalSessionIdByWorktree: Map<string, string>
     touchedWorktrees: Set<string>
@@ -364,14 +354,16 @@ export class TerminalSessionProjection {
         clientId,
         index,
         serverSnapshot: snapshotsByPtySessionId.get(serverSession.ptySessionId) ?? null,
-        reattachSnapshot: this.reattachSnapshotCache.get(serverSession.terminalSessionId) ?? null,
       })
       if (!projected) continue
       touchedWorktrees.add(projected.terminalWorktreeKey)
       nextIndexByWorktree.set(projected.terminalWorktreeKey, index)
       const descriptor = projected.descriptor
-      this.ensureSession(descriptor).hydrate(projected.hydrateInput)
+      const session = this.ensureSession(descriptor)
+      session.hydrate(projected.hydrateInput)
       this.syncPtySessionIdIndex(descriptor.terminalSessionId, projected.hydrateInput.ptySessionId)
+      const pendingBell = this.pendingServerBellByTerminalSessionId.get(descriptor.terminalSessionId)
+      if (pendingBell) this.applyServerBell(session, pendingBell)
       if (projected.controlsTerminal)
         controllerTerminalSessionIdByWorktree.set(projected.terminalWorktreeKey, descriptor.terminalSessionId)
       pushUniqueMapList(
@@ -495,27 +487,14 @@ export class TerminalSessionProjection {
     if (!snapshotPtySessionId || typeof result.snapshot !== 'string' || typeof result.snapshotSeq !== 'number') {
       throw new Error('error.terminal-create-failed')
     }
-    // First-frame contract: when the server reports `action: 'created'`,
-    // the session service must echo that session in `sessions[]`. The first-frame
-    // payload is the source of truth — fabricates below this point would
-    // hide a real protocol mismatch (e.g., a half-applied create that
-    // committed the session row but skipped the session service append). Reject
-    // and let the operator restart the create.
-    const createdSession = result.sessions.find(
-      (session) =>
-        session.terminalSessionId === result.terminalSessionId && session.ptySessionId === snapshotPtySessionId,
-    )
-    if (!createdSession) {
-      throw new Error('error.terminal-create-failed')
-    }
-    const serverSessions = result.sessions
+    const projectedCreate = projectCreateResultForClient(base, result)
     this.onWorkspaceTabsChanged(base, result.tabs)
     this.setPreferredSelectedTerminalSessionId(terminalWorktreeKey, result.terminalSessionId)
     this.reconcileServerSessions(
       base.repoRoot,
-      serverSessions,
+      projectedCreate.serverSessions,
       clientId,
-      new Map<string, TerminalSessionSnapshot>([[snapshotPtySessionId, result as TerminalSessionSnapshot]]),
+      projectedCreate.snapshotByPtySessionId,
     )
     return result.terminalSessionId
   }
@@ -537,35 +516,21 @@ export class TerminalSessionProjection {
     terminalWorktreeKey: string,
     options: TerminalCreateOptions,
   ): Promise<string> {
-    const existing = this.pendingCreateByWorktree.get(terminalWorktreeKey)
-    if (existing) {
-      if (existing.options.startupShellCommand === options.startupShellCommand) return existing.promise
-      return existing.promise
-        .catch(() => undefined)
-        .then(() => this.enqueuePendingCreate(base, terminalWorktreeKey, options))
-    }
-    let resolve!: (terminalSessionId: string) => void
-    let reject!: (error: unknown) => void
-    const promise = new Promise<string>((innerResolve, innerReject) => {
-      resolve = innerResolve
-      reject = innerReject
-    })
-    this.pendingCreateByWorktree.set(terminalWorktreeKey, {
+    const promise = this.lifecycleQueues.enqueueCreate({
+      terminalWorktreeKey,
       base,
       options,
-      promise,
-      resolve,
-      reject,
-      flushing: false,
-      creating: false,
+      isSameRequest: (existing, next) => existing.startupShellCommand === next.startupShellCommand,
+      flush: (key) => {
+        void this.flushPendingCreate(key)
+      },
     })
     this.notifyWorktree(terminalWorktreeKey)
-    void this.flushPendingCreate(terminalWorktreeKey)
     return promise
   }
 
   private async flushPendingCreate(terminalWorktreeKey: string): Promise<void> {
-    const pending = this.pendingCreateByWorktree.get(terminalWorktreeKey)
+    const pending = this.lifecycleQueues.getCreate(terminalWorktreeKey)
     if (!pending || pending.flushing) return
     // Synchronous claim: enqueuePendingCreate, registerHost, and a
     // StrictMode double-invoke can all arrive here while a prior flush
@@ -577,11 +542,11 @@ export class TerminalSessionProjection {
       // `enqueuePendingCreate` puts the entry into the map first and
       // emits the synchronous `pendingCreate: true` snapshot.
       await this.flushPendingClosesForWorktree(terminalWorktreeKey)
-      if (this.pendingCreateByWorktree.get(terminalWorktreeKey) !== pending) {
+      if (this.lifecycleQueues.getCreate(terminalWorktreeKey) !== pending) {
         throw new Error('terminal create request canceled')
       }
       const geometry = this.startupGeometryHint(terminalWorktreeKey)
-      if (this.pendingCreateByWorktree.get(terminalWorktreeKey) !== pending) {
+      if (this.lifecycleQueues.getCreate(terminalWorktreeKey) !== pending) {
         throw new Error('terminal create request canceled')
       }
       pending.creating = true
@@ -590,8 +555,7 @@ export class TerminalSessionProjection {
       pending.reject(error)
     } finally {
       pending.creating = false
-      if (this.pendingCreateByWorktree.get(terminalWorktreeKey) === pending) {
-        this.pendingCreateByWorktree.delete(terminalWorktreeKey)
+      if (this.lifecycleQueues.deleteCreate(terminalWorktreeKey, pending)) {
         this.notifyWorktree(terminalWorktreeKey)
       }
     }
@@ -614,27 +578,7 @@ export class TerminalSessionProjection {
     worktreePath: string
     terminalWorktreeKey: string
   }): Promise<void> {
-    const existing = this.pendingCloseByPtySessionId.get(input.ptySessionId)
-    if (existing) return existing.promise
-
-    let resolve!: () => void
-    let reject!: (error: unknown) => void
-    const promise = new Promise<void>((innerResolve, innerReject) => {
-      resolve = innerResolve
-      reject = innerReject
-    })
-    this.pendingCloseByPtySessionId.set(input.ptySessionId, {
-      repoRoot: input.repoRoot,
-      branchName: input.branchName,
-      worktreePath: input.worktreePath,
-      terminalWorktreeKey: input.terminalWorktreeKey,
-      promise,
-      resolve,
-      reject,
-    })
-
-    void this.performDurableClose(input)
-    return promise
+    return this.lifecycleQueues.enqueueClose(input, async (closeInput) => await this.performDurableClose(closeInput))
   }
 
   // Awaited at the top of `createTerminal` for the same worktree.
@@ -645,12 +589,10 @@ export class TerminalSessionProjection {
   // `performDurableClose` and the user can `pruneTerminals` from the
   // UI to recover if the orphan ever resurfaces.
   private async flushPendingClosesForWorktree(terminalWorktreeKey: string): Promise<void> {
-    if (this.pendingCloseByPtySessionId.size === 0) return
-    const pendingForWorktree = Array.from(this.pendingCloseByPtySessionId.entries()).filter(
-      ([, entry]) => entry.terminalWorktreeKey === terminalWorktreeKey,
-    )
+    if (!this.lifecycleQueues.hasCloses()) return
+    const pendingForWorktree = this.lifecycleQueues.closesForWorktree(terminalWorktreeKey)
     if (pendingForWorktree.length === 0) return
-    await Promise.allSettled(pendingForWorktree.map(([, entry]) => entry.promise))
+    await Promise.allSettled(pendingForWorktree.map((entry) => entry.promise))
   }
 
   private async performDurableClose(input: {
@@ -685,29 +627,23 @@ export class TerminalSessionProjection {
           }
         },
       )
-      const entry = this.pendingCloseByPtySessionId.get(ptySessionId)
-      this.pendingCloseByPtySessionId.delete(ptySessionId)
-      entry?.resolve()
     } catch (err) {
-      const entry = this.pendingCloseByPtySessionId.get(ptySessionId)
-      this.pendingCloseByPtySessionId.delete(ptySessionId)
       // The old fire-and-forget path swallowed this rejection. Loud
       // logging is intentional: the failure mode (orphan PTY surviving
       // a tab close) is otherwise invisible to operators and surfaces
       // only as a confused user re-opening a tab and seeing the prior
       // shell's `Restored session: …` line print twice.
       terminalSessionProviderLog.warn('durable close failed for terminal session', { ptySessionId, err })
-      entry?.reject(err)
+      throw err
     }
   }
 
   private async settlePendingCreateForWorktree(terminalWorktreeKey: string): Promise<void> {
-    const pending = this.pendingCreateByWorktree.get(terminalWorktreeKey)
+    const pending = this.lifecycleQueues.getCreate(terminalWorktreeKey)
     if (!pending) return
     if (!pending.creating) {
       const error = new Error('terminal create request canceled')
-      if (this.pendingCreateByWorktree.get(terminalWorktreeKey) === pending) {
-        this.pendingCreateByWorktree.delete(terminalWorktreeKey)
+      if (this.lifecycleQueues.deleteCreate(terminalWorktreeKey, pending)) {
         pending.reject(error)
         this.notifyWorktree(terminalWorktreeKey)
       }
@@ -722,9 +658,7 @@ export class TerminalSessionProjection {
   }
 
   private async waitForPendingClosesForWorktree(terminalWorktreeKey: string): Promise<boolean> {
-    const pendingForWorktree = Array.from(this.pendingCloseByPtySessionId.values()).filter(
-      (entry) => entry.terminalWorktreeKey === terminalWorktreeKey,
-    )
+    const pendingForWorktree = this.lifecycleQueues.closesForWorktree(terminalWorktreeKey)
     if (pendingForWorktree.length === 0) return true
     const results = await Promise.allSettled(pendingForWorktree.map((entry) => entry.promise))
     return results.every((result) => result.status === 'fulfilled')
@@ -759,7 +693,7 @@ export class TerminalSessionProjection {
     const snapshot = buildTerminalWorktreeSnapshot({
       terminalWorktreeKey,
       selectedDescriptor: this.selectedDescriptor(terminalWorktreeKey),
-      pendingCreate: this.pendingCreateByWorktree.has(terminalWorktreeKey),
+      pendingCreate: this.lifecycleQueues.hasCreate(terminalWorktreeKey),
       sessions: this.visibleSessionsForWorktree(terminalWorktreeKey),
       selectedTerminalSessionId: this.selectedTerminalSessionIdByTerminalWorktree.get(terminalWorktreeKey) ?? null,
       getCachedSnapshot: (terminalSessionId) => this.snapshotCache.get(terminalSessionId) ?? null,
@@ -859,14 +793,7 @@ export class TerminalSessionProjection {
 
   detach = (terminalSessionId: string, host: HTMLElement): void => {
     const session = this.sessions.get(terminalSessionId)
-    if (session && this.parkingRoot) {
-      const serialized = session.serialize()
-      const ptySessionId = session.currentPtySessionId()
-      if (serialized && ptySessionId) {
-        this.setReattachSnapshot(terminalSessionId, { ptySessionId, snapshot: serialized, snapshotSeq: 0 })
-      }
-      session.detach(host, this.parkingRoot)
-    }
+    session?.detach(host)
   }
 
   restart = (terminalSessionId: string): void => {
@@ -925,10 +852,6 @@ export class TerminalSessionProjection {
     const session = this.sessions.get(terminalSessionId)
     if (!session) return Promise.resolve(false)
     return session.takeover()
-  }
-
-  serialize = (terminalSessionId: string): string => {
-    return this.sessions.get(terminalSessionId)?.serialize() ?? ''
   }
 
   private notifyWorktree(terminalWorktreeKey: string): void {
@@ -1030,22 +953,6 @@ export class TerminalSessionProjection {
     if (terminalWorktreeKey) this.notifyWorktree(terminalWorktreeKey)
   }
 
-  // Cache write for the reattach path. The expected cleanup is the
-  // server-exit event (handleExit), with removeSession / destroy as
-  // secondary sites. A small hard cap trims the oldest entries if
-  // bookkeeping ever drifts (e.g., a wedged server that never emits
-  // exit); the limit is set well above the realistic number of
-  // simultaneously-detached sessions.
-  private setReattachSnapshot(terminalSessionId: string, entry: ReattachSnapshotCacheEntry): void {
-    if (this.reattachSnapshotCache.has(terminalSessionId)) this.reattachSnapshotCache.delete(terminalSessionId)
-    this.reattachSnapshotCache.set(terminalSessionId, entry)
-    while (this.reattachSnapshotCache.size > TerminalSessionProjection.REATTACH_SNAPSHOT_CACHE_HARD_CAP) {
-      const oldestSessionId = this.reattachSnapshotCache.keys().next().value
-      if (oldestSessionId === undefined) break
-      this.reattachSnapshotCache.delete(oldestSessionId)
-    }
-  }
-
   private removeSession(terminalSessionId: string, options: { dispose: boolean; closeSession?: boolean }): boolean {
     const session = this.sessions.get(terminalSessionId)
     if (!session) return false
@@ -1056,10 +963,10 @@ export class TerminalSessionProjection {
     const wasSelected = this.selectedTerminalSessionIdByTerminalWorktree.get(terminalWorktreeKey) === terminalSessionId
     this.hiddenClosingTerminalSessionIds.delete(terminalSessionId)
     this.closeCompletionByTerminalSessionId.delete(terminalSessionId)
+    this.pendingServerBellByTerminalSessionId.delete(terminalSessionId)
     this.syncPtySessionIdIndex(terminalSessionId, null)
     this.sessions.delete(terminalSessionId)
     this.snapshotCache.delete(terminalSessionId)
-    this.reattachSnapshotCache.delete(terminalSessionId)
     this.removeTerminalSessionIdFromWorktreeList(terminalWorktreeKey, terminalSessionId)
     this.outputActivityState.remove(terminalSessionId)
     this.notifySnapshot(terminalSessionId)
@@ -1178,7 +1085,6 @@ export class TerminalSessionProjection {
     session = new TerminalSession(
       descriptor,
       () => this.notifySession(descriptor.terminalSessionId),
-      this.bellState.handleBell,
       (ptySessionId) =>
         this.enqueueDurableClose({
           ptySessionId,

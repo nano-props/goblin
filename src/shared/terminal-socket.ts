@@ -1,6 +1,7 @@
 import type {
   TerminalAttachInput,
   TerminalAttachResult,
+  TerminalBellRealtimeEvent,
   TerminalCreateResult,
   TerminalCreateInput,
   TerminalIdentityEvent,
@@ -13,8 +14,6 @@ import type {
   TerminalResizeInput,
   TerminalRestartInput,
   TerminalSessionInput,
-  TerminalSessionSnapshot,
-  TerminalSessionSnapshotInput,
   TerminalSessionSummary,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
@@ -28,6 +27,7 @@ import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 
 export type TerminalRealtimeMessage =
   | { type: 'output'; event: TerminalOutputEvent }
+  | { type: 'bell'; event: TerminalBellRealtimeEvent }
   | { type: 'title'; event: TerminalTitleEvent }
   | { type: 'exit'; event: TerminalExitEvent }
   // Identity and lifecycle are split at the wire. The client's
@@ -49,6 +49,7 @@ export type TerminalRealtimeMessage =
   | {
       type: 'session-closed'
       ptySessionId: string
+      terminalSessionId: string
       repoRoot: string
       worktreePath: string
     }
@@ -66,7 +67,6 @@ export interface TerminalSocketRequestInputs {
   'replace-tabs': TerminalReplaceWorkspaceTabsInput
   'update-tabs': TerminalUpdateWorkspaceTabsInput
   prune: { repoRoot: string }
-  'session-snapshot': TerminalSessionSnapshotInput
 }
 
 export interface TerminalSocketResponseOutputs {
@@ -82,7 +82,6 @@ export interface TerminalSocketResponseOutputs {
   'replace-tabs': WorkspacePaneTabEntry[]
   'update-tabs': WorkspacePaneTabEntry[]
   prune: { pruned: number; remaining: number }
-  'session-snapshot': TerminalSessionSnapshot | null
 }
 
 export type TerminalSocketRequestAction = keyof TerminalSocketRequestInputs

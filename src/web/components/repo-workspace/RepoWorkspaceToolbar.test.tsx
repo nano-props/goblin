@@ -1284,7 +1284,6 @@ function renderToolbar(options: {
     writeInput: vi.fn(),
     takeover: vi.fn(),
     focusTerminal: vi.fn(),
-    serialize: vi.fn(() => ''),
   }
   setTerminalSessionCommandBridge({
     terminalWorktreeSnapshot: readContext.terminalWorktreeSnapshot,

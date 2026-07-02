@@ -213,10 +213,7 @@ describe('terminal web host bridge', () => {
         ok: true,
         action: 'create',
         payload: {
-          ok: true,
-          action: 'created',
-          terminalSessionId: 'session-1',
-          sessions: [],
+          ...terminalCreatePayload('session-1'),
         },
       }),
     )
@@ -260,40 +257,6 @@ describe('terminal web host bridge', () => {
     )
 
     await expect(listPromise).rejects.toThrow('invalid terminal sessions response')
-    expect(fetchMock).not.toHaveBeenCalled()
-    dispose()
-  })
-
-  test('loads terminal snapshots through websocket request-response and validates payloads', async () => {
-    const fetchMock = mockFetch()
-    const { terminalBridge } = await import('#/web/terminal.ts')
-    const dispose = terminalBridge.onOutput(() => {})
-    const socket = wsMock.instances[0]
-
-    const snapshotPromise = terminalBridge.getSessionSnapshot({ ptySessionId: 'pty_1234567890123456' })
-    socket?.emitOpen()
-    await Promise.resolve()
-    const request = socket?.sent
-      .map((payload) => JSON.parse(payload))
-      .find((message) => message.action === 'session-snapshot')
-    expect(request).toMatchObject({
-      type: 'request',
-      action: 'session-snapshot',
-      input: {
-        ptySessionId: 'pty_1234567890123456',
-      },
-    })
-    socket?.emitMessage(
-      JSON.stringify({
-        type: 'response',
-        requestId: request?.requestId,
-        ok: true,
-        action: 'session-snapshot',
-        payload: { ptySessionId: 'pty_1', snapshotSeq: 'bad' },
-      }),
-    )
-
-    await expect(snapshotPromise).rejects.toThrow('invalid terminal session snapshot response')
     expect(fetchMock).not.toHaveBeenCalled()
     dispose()
   })
@@ -391,20 +354,6 @@ describe('terminal web host bridge', () => {
     socket?.close()
 
     await expect(listPromise).rejects.toThrow('Terminal socket closed before open')
-    expect(fetchMock).not.toHaveBeenCalled()
-    dispose()
-  })
-
-  test('does not fall back to http when snapshot websocket cannot open', async () => {
-    const fetchMock = mockFetch()
-    const { terminalBridge } = await import('#/web/terminal.ts')
-    const dispose = terminalBridge.onOutput(() => {})
-    const socket = wsMock.instances[0]
-    const snapshotPromise = terminalBridge.getSessionSnapshot({ ptySessionId: 'pty_1234567890123456' })
-
-    socket?.close()
-
-    await expect(snapshotPromise).rejects.toThrow('Terminal socket closed before open')
     expect(fetchMock).not.toHaveBeenCalled()
     dispose()
   })
@@ -574,7 +523,7 @@ describe('terminal web host bridge', () => {
     }
   })
 
-  test('does not fall back to http when create/list/snapshot/prune websocket payloads resolve successfully', async () => {
+  test('does not fall back to http when create/list/prune websocket payloads resolve successfully', async () => {
     const fetchMock = mockFetch()
     const { terminalBridge } = await import('#/web/terminal.ts')
     const dispose = terminalBridge.onOutput(() => {})
@@ -596,7 +545,7 @@ describe('terminal web host bridge', () => {
         requestId: createRequest?.requestId,
         ok: true,
         action: 'create',
-        payload: { ok: true, action: 'created', terminalSessionId: 'session-1', sessions: [] },
+        payload: terminalCreatePayload('session-1'),
       }),
     )
     await expect(createPromise).resolves.toMatchObject({ ok: true, terminalSessionId: 'session-1' })
@@ -604,9 +553,39 @@ describe('terminal web host bridge', () => {
     dispose()
   })
 
-  test('forwards terminal output, title, and exit events from the web socket', async () => {
+  test('rejects invalid create websocket payloads at the bridge boundary', async () => {
+    const { terminalBridge } = await import('#/web/terminal.ts')
+    const dispose = terminalBridge.onOutput(() => {})
+    const socket = wsMock.instances[0]
+    const createPromise = terminalBridge.create({
+      repoRoot: '/tmp/repo',
+      branch: 'feature',
+      worktreePath: '/tmp/repo',
+      kind: 'primary',
+    })
+    socket?.emitOpen()
+    await Promise.resolve()
+    const createRequest = socket?.sent
+      .map((payload) => JSON.parse(payload))
+      .find((message) => message.action === 'create')
+    socket?.emitMessage(
+      JSON.stringify({
+        type: 'response',
+        requestId: createRequest?.requestId,
+        ok: true,
+        action: 'create',
+        payload: { ok: true, action: 'created', terminalSessionId: 'session-1', tabs: [], sessions: [] },
+      }),
+    )
+
+    await expect(createPromise).rejects.toThrow('invalid terminal create response')
+    dispose()
+  })
+
+  test('forwards terminal output, bell, title, and exit events from the web socket', async () => {
     const { terminalBridge } = await import('#/web/terminal.ts')
     const onOutput = vi.fn()
+    const onBell = vi.fn()
     const onTitle = vi.fn()
     const onExit = vi.fn()
     const onIdentity = vi.fn()
@@ -615,6 +594,7 @@ describe('terminal web host bridge', () => {
     const onWorkspaceTabsChanged = vi.fn()
 
     const disposeOutput = terminalBridge.onOutput(onOutput)
+    const disposeBell = terminalBridge.onBell(onBell)
     const disposeTitle = terminalBridge.onTitle(onTitle)
     const disposeExit = terminalBridge.onExit(onExit)
     const disposeIdentity = terminalBridge.onIdentity(onIdentity)
@@ -634,6 +614,19 @@ describe('terminal web host bridge', () => {
       JSON.stringify({
         type: 'output',
         event: { ptySessionId: 'pty_1', data: 'hello', seq: 1, processName: 'zsh' },
+      }),
+    )
+    socket.emitMessage(
+      JSON.stringify({
+        type: 'bell',
+        event: {
+          ptySessionId: 'pty_1',
+          terminalSessionId: 'terminal_1',
+          repoRoot: '/tmp/repo',
+          worktreePath: '/tmp/repo-worktree',
+          processName: 'zsh',
+          canonicalTitle: null,
+        },
       }),
     )
     socket.emitMessage(
@@ -668,6 +661,14 @@ describe('terminal web host bridge', () => {
     )
 
     expect(onOutput).toHaveBeenCalledWith({ ptySessionId: 'pty_1', data: 'hello', seq: 1, processName: 'zsh' })
+    expect(onBell).toHaveBeenCalledWith({
+      ptySessionId: 'pty_1',
+      terminalSessionId: 'terminal_1',
+      repoRoot: '/tmp/repo',
+      worktreePath: '/tmp/repo-worktree',
+      processName: 'zsh',
+      canonicalTitle: null,
+    })
     expect(onTitle).toHaveBeenCalledWith({ ptySessionId: 'pty_1', canonicalTitle: '~/Developer/goblin — npm run dev' })
     expect(onExit).toHaveBeenCalledWith({ ptySessionId: 'pty_1' })
     expect(onIdentity).toHaveBeenCalledWith({
@@ -687,6 +688,7 @@ describe('terminal web host bridge', () => {
     expect(onWorkspaceTabsChanged).toHaveBeenCalledWith('/tmp/repo')
 
     disposeOutput()
+    disposeBell()
     disposeTitle()
     disposeExit()
     disposeIdentity()
@@ -837,7 +839,7 @@ describe('terminal web host bridge', () => {
         requestId: request?.requestId,
         ok: true,
         action: 'create',
-        payload: { ok: true, action: 'created', terminalSessionId: 'session-1', sessions: [] },
+        payload: terminalCreatePayload('session-1'),
       }),
     )
 
@@ -917,3 +919,23 @@ describe('terminal web host bridge', () => {
     resetClientLocalEventsForTests()
   })
 })
+
+function terminalCreatePayload(terminalSessionId: string) {
+  return {
+    ok: true,
+    action: 'created',
+    terminalSessionId,
+    tabs: [],
+    sessions: [],
+    ptySessionId: 'pty_session_1_aaaaaaaaa',
+    processName: 'zsh',
+    canonicalTitle: null,
+    phase: 'open',
+    message: null,
+    snapshot: '',
+    snapshotSeq: 0,
+    controller: { clientId: 'client_a', status: 'connected' },
+    canonicalCols: 120,
+    canonicalRows: 40,
+  }
+}
