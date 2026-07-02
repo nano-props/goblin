@@ -163,6 +163,7 @@ function branch(): RepoBranchState {
     ahead: 0,
     behind: 0,
     lastCommitHash: '',
+    lastCommitShortHash: '',
     lastCommitMessage: '',
     lastCommitDate: '',
     lastCommitAuthor: '',

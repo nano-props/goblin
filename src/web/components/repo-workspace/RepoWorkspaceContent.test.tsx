@@ -367,7 +367,8 @@ describe('RepoWorkspaceContent', () => {
       branches: [
         createRepoBranch('feature/no-worktree', {
           tracking: 'origin/feature/no-worktree',
-          lastCommitHash: 'abc1234',
+          lastCommitHash: 'abc1234000000000000000000000000000000000',
+          lastCommitShortHash: 'abc1234',
           lastCommitMessage: 'Update placeholder branch',
           lastCommitAuthor: 'Example Author',
           lastCommitDate: '2026-01-01T00:00:00.000Z',
@@ -398,7 +399,8 @@ describe('RepoWorkspaceContent', () => {
       branches: [
         createRepoBranch('feature/no-worktree', {
           tracking: 'origin/feature/no-worktree',
-          lastCommitHash: 'abc1234',
+          lastCommitHash: 'abc1234000000000000000000000000000000000',
+          lastCommitShortHash: 'abc1234',
           lastCommitMessage: 'Update placeholder branch',
           lastCommitAuthor: 'Example Author',
           lastCommitDate: '2026-01-01T00:00:00.000Z',

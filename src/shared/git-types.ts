@@ -14,6 +14,7 @@ export interface BranchSnapshotInfo {
   ahead: number
   behind: number
   lastCommitHash: string
+  lastCommitShortHash: string
   lastCommitMessage: string
   lastCommitDate: string
   lastCommitAuthor: string

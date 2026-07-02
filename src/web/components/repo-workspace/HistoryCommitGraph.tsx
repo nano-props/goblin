@@ -1,11 +1,10 @@
-import { openRepoUrl } from '#/web/repo-client.ts'
 import type { LogEntry } from '#/web/types.ts'
 import { cn } from '#/web/lib/cn.ts'
 import { Skeleton } from '#/web/components/ui/skeleton.tsx'
 import { STATUS_TONE_CHIP_CLASS } from '#/web/components/ui/status-tones.ts'
 import { historyRefDisplays, parseHistoryRefs } from '#/web/components/repo-workspace/history-refs.ts'
 import type { HistoryRefDisplay } from '#/web/components/repo-workspace/history-refs.ts'
-import { StatusLink } from '#/web/components/repo-workspace/status-ui.tsx'
+import { CommitHashLink } from '#/web/components/repo-workspace/repo-link-actions.tsx'
 
 interface HistoryCommitNode {
   key: string
@@ -99,19 +98,15 @@ function HistoryCommitContent({ repoId, commit }: { repoId: string; commit: Hist
 
 function HistoryCommitHash({ repoId, commit }: { repoId: string; commit: HistoryCommitNode }) {
   return (
-    <StatusLink
-      mono
+    <CommitHashLink
+      repoId={repoId}
+      hash={commit.fullHash}
+      shortHash={commit.hash}
       tone="warning"
       className="shrink-0 text-sm font-medium leading-5"
       data-history-log-hash=""
       title={commit.fullHash ? `Open commit ${commit.fullHash}` : undefined}
-      onClick={() => {
-        if (!commit.fullHash) return
-        void openRepoUrl(repoId, { type: 'commit', hash: commit.fullHash }).catch(() => {})
-      }}
-    >
-      {commit.hash}
-    </StatusLink>
+    />
   )
 }
 

@@ -8,7 +8,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '#/web/components/ui/pop
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import type { BranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
-import { useRemoteOpenAction, type RemoteOpenActionItem } from '#/web/hooks/useRemoteOpenAction.ts'
 import { useExternalAppSettings } from '#/web/runtime-settings-external-apps.ts'
 import { remoteRepoTarget } from '#/web/stores/repos/repo-guards.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
@@ -38,7 +37,6 @@ export function WorkspaceOpenExternallyMenu({ repo, branch, branchActions }: Pro
   const hostPlatform = useHostInfoStore((state) => state.snapshot?.platform ?? 'web')
   const isRemoteRepo = remoteRepoTarget(repo.id, repo.remote.lifecycle) !== null
   const finderAvailable = capabilities.canOpenFinder && hostPlatform === 'darwin'
-  const remoteOpenAction = useRemoteOpenAction(repo, branch, branchActions)
   const { data: settingsSnapshot } = useSettingsSnapshotQuery()
   const repoSettings = settingsSnapshot?.repoSettings
   const serverRecentItemId = useMemo(
@@ -72,7 +70,7 @@ export function WorkspaceOpenExternallyMenu({ repo, branch, branchActions }: Pro
     [recentItemId, localItems],
   )
 
-  if (localItems.length === 0 && !remoteOpenAction.visible) return null
+  if (localItems.length === 0) return null
 
   const busy = pending !== null || blocked
   const menuLabel = t('workspace.open-externally.open')
@@ -106,12 +104,6 @@ export function WorkspaceOpenExternallyMenu({ repo, branch, branchActions }: Pro
     })
   }
 
-  function runRemoteItem() {
-    if (busy || remoteOpenAction.disabled || remoteOpenAction.busy || !remoteOpenAction.visible) return
-    setOpen(false)
-    remoteOpenAction.onSelect()
-  }
-
   const primaryAction = primaryItem
     ? {
         title: t(primaryItem.labelKey),
@@ -121,14 +113,9 @@ export function WorkspaceOpenExternallyMenu({ repo, branch, branchActions }: Pro
         icon: <primaryItem.Icon />,
         onSelect: () => runLocalItem(primaryItem),
       }
-    : {
-        title: remoteOpenAction.title,
-        ariaLabel: remoteOpenAction.ariaLabel,
-        busy: remoteOpenAction.busy,
-        disabled: busy || remoteOpenAction.busy || remoteOpenAction.disabled,
-        icon: remoteOpenAction.icon,
-        onSelect: runRemoteItem,
-      }
+    : null
+
+  if (!primaryAction) return null
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -179,16 +166,6 @@ export function WorkspaceOpenExternallyMenu({ repo, branch, branchActions }: Pro
                   />
                 </div>
               ))}
-            </div>
-          )}
-          {remoteOpenAction.visible && localItems.length > 0 && (
-            <div aria-hidden="true" className="border-t border-separator" />
-          )}
-          {remoteOpenAction.visible && (
-            <div className="space-y-0.5 p-1" key={remoteOpenAction.id}>
-              <div role="listitem">
-                <WorkspaceOpenExternallyRemoteItem action={remoteOpenAction} pending={pending} onSelect={runRemoteItem} />
-              </div>
             </div>
           )}
         </div>
@@ -256,35 +233,6 @@ function WorkspaceOpenExternallyItem({
         {pending === item.id ? <Loader2 size={16} className="animate-spin" /> : <Icon className="size-4" />}
       </span>
       <span className="min-w-0 flex-1 truncate">{t(item.labelKey)}</span>
-    </button>
-  )
-}
-
-function WorkspaceOpenExternallyRemoteItem({
-  action,
-  pending,
-  onSelect,
-}: {
-  action: RemoteOpenActionItem
-  pending: string | null
-  onSelect: () => void
-}) {
-  return (
-    <button
-      type="button"
-      title={action.title}
-      aria-label={action.ariaLabel}
-      disabled={action.disabled}
-      onClick={onSelect}
-      className={cn(
-        'flex h-8 w-full cursor-pointer items-center gap-2 rounded-sm py-1 pl-2 pr-2 text-left text-sm outline-none transition-colors duration-100 hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50',
-        focusRing,
-      )}
-    >
-      <span className="flex size-4 shrink-0 items-center justify-center text-muted-foreground [&_svg]:size-4 [&_svg]:shrink-0">
-        {action.busy ? <Loader2 size={16} className="animate-spin" /> : action.icon}
-      </span>
-      <span className="min-w-0 flex-1 truncate">{action.label}</span>
     </button>
   )
 }

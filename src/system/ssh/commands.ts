@@ -234,6 +234,7 @@ function scriptForCommand(command: RemoteCommandKind): string {
       const repo = shellQuote(command.path)
       const branchFormat = [
         '%(refname:short)',
+        '%(objectname)',
         '%(objectname:short)',
         '%(subject)',
         '%(authordate:iso-strict)',

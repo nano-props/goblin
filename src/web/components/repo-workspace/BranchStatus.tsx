@@ -34,8 +34,8 @@ import { remoteRepoTarget } from '#/web/stores/repos/repo-guards.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { PROTECTED_BRANCHES, branchPullRequestBelongsToBranch } from '#/shared/git-types.ts'
 import { openUpstreamBranchExternalTarget } from '#/web/hooks/openBranchExternalTarget.ts'
-import { openRepoUrl } from '#/web/repo-client.ts'
 import type { SelectedRepoWorkspace } from '#/web/components/repo-workspace/model.ts'
+import { CommitHashLink } from '#/web/components/repo-workspace/repo-link-actions.tsx'
 interface Props {
   detail: SelectedRepoWorkspace
 }
@@ -107,36 +107,6 @@ function StatusCopyPatchButton({ action }: { action: BranchCopyPatchAction }) {
       disabled={action.disabled || busy}
       onClick={handleClick}
     />
-  )
-}
-
-// Clickable commit-hash link. The throttle mirrors the same anti-double-
-// click treatment used by the upstream and PR badge handlers so a single
-// user intent produces a single browser tab. Visual styling matches the
-// pre-existing hash chip (mono, brand-tinted, non-shrinking).
-function CommitHashLink({ repoId, hash, title }: { repoId: string; hash: string; title: string }) {
-  const handleClick = useMemo(
-    () =>
-      throttle(
-        () => {
-          void openRepoUrl(repoId, { type: 'commit', hash }).catch(() => {})
-        },
-        500,
-        { edges: ['leading'] },
-      ),
-    [repoId, hash],
-  )
-  return (
-    <StatusLink
-      mono
-      tone="brand"
-      title={title}
-      data-commit-link=""
-      onClick={handleClick}
-      className="shrink-0 text-sm font-medium tabular-nums leading-none text-brand-text/85"
-    >
-      {hash}
-    </StatusLink>
   )
 }
 
@@ -320,7 +290,11 @@ export function BranchStatus({ detail }: Props) {
               <CommitHashLink
                 repoId={detail.repoId}
                 hash={branch.lastCommitHash}
+                shortHash={branch.lastCommitShortHash}
                 title={t('branch-status.commit.open-externally')}
+                data-commit-link=""
+                tone="brand"
+                className="shrink-0 text-sm font-medium tabular-nums leading-none text-brand-text/85"
               />
             ) : null}
             <span

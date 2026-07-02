@@ -18,6 +18,7 @@ const BranchSchema = v.object({
   ahead: FiniteNumber,
   behind: FiniteNumber,
   lastCommitHash: v.string(),
+  lastCommitShortHash: v.optional(v.string(), ''),
   lastCommitMessage: v.string(),
   lastCommitDate: v.string(),
   lastCommitAuthor: v.string(),

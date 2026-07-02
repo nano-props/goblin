@@ -301,14 +301,7 @@ describe('RepoWorkspaceToolbar', () => {
       await Promise.resolve()
     })
 
-    const menuItems = Array.from(document.body.querySelectorAll<HTMLButtonElement>('[role="listitem"] button')).map(
-      (button) => button.textContent,
-    )
-    expect(menuItems).toContain('workspace.open-externally.remote')
-    expect(document.body.textContent).toContain('workspace.open-externally.remote')
-  })
-
-  test('renders the open-externally menu for remote only when no local external apps are available', async () => {
+  test('hides the open-externally menu when no local external apps are available', async () => {
     useHostInfoStore.setState({
       snapshot: { homeDir: '/Users/tester', platform: 'win32', hostname: 'test-host', pid: 1 },
     })
@@ -324,29 +317,10 @@ describe('RepoWorkspaceToolbar', () => {
       remote: { hasBrowserRemote: true, browserRemoteProvider: 'github' },
     })
 
-    // The split-button primary now falls back to the remote action when no
-    // local app is reachable, so the left button is enabled and labelled as
-    // the remote item rather than disabled.
     const primary = c.querySelector<HTMLButtonElement>('[data-testid="workspace-open-externally-menu-primary"]')
-    expect(primary).not.toBeNull()
-    expect(primary?.disabled).toBe(false)
-    expect(primary?.getAttribute('aria-label')).toBe('workspace.open-externally.remote')
-    expect(primary?.getAttribute('aria-busy')).toBeNull()
-    // The right-hand chevron trigger stays the same so the user can still
-    // open the dropdown.
     const trigger = c.querySelector<HTMLButtonElement>('[data-testid="workspace-open-externally-menu-trigger"]')
-    expect(trigger).not.toBeNull()
-
-    await act(async () => {
-      trigger?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
-      trigger?.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
-      await Promise.resolve()
-    })
-
-    const menuItems = Array.from(document.body.querySelectorAll<HTMLButtonElement>('[role="listitem"] button')).map(
-      (button) => button.textContent,
-    )
-    expect(menuItems).toEqual(['workspace.open-externally.remote'])
+    expect(primary).toBeNull()
+    expect(trigger).toBeNull()
   })
 
   test('uses the first visible external app as the split-button primary action without recent state', () => {

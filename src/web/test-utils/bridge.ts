@@ -109,6 +109,7 @@ export function createBranchSnapshot(name: string, options: Partial<BranchSnapsh
     ahead: 0,
     behind: 0,
     lastCommitHash: '',
+    lastCommitShortHash: '',
     lastCommitMessage: '',
     lastCommitDate: '',
     lastCommitAuthor: '',
