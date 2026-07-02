@@ -268,6 +268,131 @@ describe('RepoWorkspaceContent', () => {
     expect(container.querySelector('button[aria-label="status.copy-patch-title"]')).toBeNull()
   })
 
+  test('opens files and changes tabs from the status rows', async () => {
+    const worktreePath = '/tmp/status-links-worktree'
+    const showRepoBranchWorkspacePaneTab = vi.fn()
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branchSnapshots: [
+        createBranchSnapshot('feature/status-links', {
+          worktree: { path: worktreePath, summary: { dirty: true, changeCount: 18 } },
+        }),
+      ],
+      selectedBranch: 'feature/status-links',
+      preferredWorkspacePaneTab: 'status',
+      workspacePaneTabsByBranch: {
+        'feature/status-links': [staticEntry('status'), staticEntry('changes'), staticEntry('files')],
+      },
+      statusLoaded: true,
+      status: [
+        {
+          path: worktreePath,
+          branch: 'feature/status-links',
+          isMain: false,
+          entries: Array.from({ length: 18 }, (_, index) => ({ x: 'M', y: ' ', path: `src/file-${index}.ts` })),
+        },
+      ],
+    })
+    const detail = getSelectedRepoWorkspacePresentation(repo)
+
+    const { container } = renderInJsdom(
+      <PrimaryWindowNavigationProvider value={navigationWith({ showRepoBranchWorkspacePaneTab })}>
+        <TerminalSessionReadContext value={emptyTerminalReadContext}>
+          <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
+            <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+          </BranchActionSurfaceContext>
+        </TerminalSessionReadContext>
+      </PrimaryWindowNavigationProvider>,
+    )
+
+    const pathButton = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
+      (button) => button.textContent === worktreePath,
+    )
+    const changesButton = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find((button) =>
+      (button.textContent ?? '').includes('branch-status.changes-count'),
+    )
+
+    expect(pathButton).not.toBeNull()
+    expect(changesButton).not.toBeNull()
+
+    await act(async () => {
+      pathButton?.click()
+      await Promise.resolve()
+    })
+    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/status-links', 'files')
+
+    showRepoBranchWorkspacePaneTab.mockClear()
+
+    await act(async () => {
+      changesButton?.click()
+      await Promise.resolve()
+    })
+    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/status-links', 'changes')
+  })
+
+  test('opens upstream refs and commit hashes from the status rows', async () => {
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branchSnapshots: [
+        createBranchSnapshot('feature/open-links', {
+          tracking: 'origin/team/main',
+          lastCommitHash: 'ecff955e65e045ee673dc730c06a9a7350d8a558',
+          lastCommitShortHash: 'ecff955',
+          lastCommitMessage: 'Unify repo status link actions',
+        }),
+      ],
+      selectedBranch: 'feature/open-links',
+      preferredWorkspacePaneTab: 'status',
+      workspacePaneTabsByBranch: {
+        'feature/open-links': [staticEntry('status')],
+      },
+      remote: {
+        remotes: ['origin', 'origin/team'],
+        hasRemotes: true,
+        hasBrowserRemote: true,
+        browserRemoteProvider: 'github',
+        remoteProviders: { origin: 'github', 'origin/team': 'gitlab' },
+        hasGitHubRemote: true,
+      },
+    })
+    const detail = getSelectedRepoWorkspacePresentation(repo)
+
+    const { container } = renderInJsdom(
+      <TerminalSessionReadContext value={emptyTerminalReadContext}>
+        <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
+          <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+        </BranchActionSurfaceContext>
+      </TerminalSessionReadContext>,
+    )
+
+    const upstreamButton = container.querySelector<HTMLButtonElement>('[data-upstream-link=""]')
+    const commitButton = container.querySelector<HTMLButtonElement>('[data-commit-link=""]')
+
+    expect(upstreamButton).not.toBeNull()
+    expect(commitButton).not.toBeNull()
+
+    await act(async () => {
+      upstreamButton?.click()
+      await Promise.resolve()
+    })
+    expect(repoClientMocks.openRepoUrl).toHaveBeenCalledWith(REPO_ID, {
+      type: 'branch',
+      branch: 'main',
+      remote: 'origin/team',
+    })
+
+    repoClientMocks.openRepoUrl.mockClear()
+
+    await act(async () => {
+      commitButton?.click()
+      await Promise.resolve()
+    })
+    expect(repoClientMocks.openRepoUrl).toHaveBeenCalledWith(REPO_ID, {
+      type: 'commit',
+      hash: 'ecff955e65e045ee673dc730c06a9a7350d8a558',
+    })
+  })
+
   test('hides the copy patch button on the changes row when copyPatchAction.visible is false', () => {
     const worktreePath = '/tmp/visibility-worktree'
     const repo = seedRepoState({

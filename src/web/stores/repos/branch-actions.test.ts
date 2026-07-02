@@ -141,7 +141,6 @@ describe('branch action capabilities', () => {
 
     expect(getBranchActionCapabilities(repo, branch)).toMatchObject({
       canPush: true,
-      canOpenRemote: true,
       canOpenTerminal: true,
       canOpenEditor: true,
     })
@@ -158,7 +157,6 @@ describe('branch action capabilities', () => {
 
     expect(getBranchActionCapabilities(repo, branch)).toMatchObject({
       canPush: false,
-      canOpenRemote: false,
       canOpenTerminal: true,
       canOpenEditor: true,
     })
@@ -204,27 +202,6 @@ describe('branch action capabilities', () => {
     expect(getBranchActionCapabilities(repo, branch)).toMatchObject({
       canRemoveWorktree: true,
       isRegularBranch: false,
-    })
-  })
-
-  test('allows browser actions for non-GitHub web remotes', () => {
-    const branch = createRepoBranch('feature/gitlab')
-    seedRepoState({
-      id: REPO_ID,
-      branches: [branch],
-      remote: {
-        remotes: ['origin'],
-        hasRemotes: true,
-        hasBrowserRemote: true,
-        browserRemoteProvider: 'gitlab',
-        remoteProviders: { origin: 'gitlab' },
-        hasGitHubRemote: false,
-      },
-    })
-
-    expect(getBranchActionCapabilities(useReposStore.getState().repos[REPO_ID]!, branch)).toMatchObject({
-      canPush: true,
-      canOpenRemote: true,
     })
   })
 

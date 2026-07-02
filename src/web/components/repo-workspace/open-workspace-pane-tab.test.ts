@@ -9,7 +9,7 @@ import {
 } from '#/web/test-utils/bridge.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
-import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
+import { type WorkspacePaneStaticTabType, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import {
   preferredWorkspacePaneTabForTarget,
   workspacePaneTabsTargetForRepoBranch,
@@ -73,6 +73,34 @@ describe('openWorkspacePaneTab', () => {
     expect(openTabsFor('feature/worktree')).toEqual(['status', 'changes'])
     expect(preferredWorkspacePaneTab()).toBe('changes')
     expect(refreshStatus).toHaveBeenCalledWith(REPO_ID, { token })
+  })
+
+  test('can insert a newly opened static tab immediately after a specific tab', async () => {
+    seedWorktreeRepo('history')
+    installWorkspacePaneTabsTestBridge({
+      updateWorkspaceTabs: async (input) => {
+        expect(input.operation).toEqual({
+          type: 'open-static',
+          tabType: 'changes',
+          insertAfterTabType: 'status',
+        })
+        return [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('changes')]
+      },
+    })
+
+    await expect(
+      openWorkspacePaneTab({
+        repoId: REPO_ID,
+        branchName: 'feature/worktree',
+        worktreePath: WORKTREE_PATH,
+        type: 'changes',
+        insertAfterTabType: 'status',
+        navigation: navigationWithStoreActions(),
+      }),
+    ).resolves.toBe(true)
+
+    expect(openTabsFor('feature/worktree')).toEqual(['status', 'changes'])
+    expect(preferredWorkspacePaneTab()).toBe('changes')
   })
 
   test('does not select changes when the selected branch has no worktree', async () => {

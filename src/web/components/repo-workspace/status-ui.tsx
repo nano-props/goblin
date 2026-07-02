@@ -138,16 +138,6 @@ export function MonoValue({
   )
 }
 
-type ClickableMonoValueProps = Omit<StatusActionProps, 'variant' | 'mono'> & {
-  tone?: Tone
-}
-
-export function ClickableMonoValue({
-  ...props
-}: ClickableMonoValueProps) {
-  return <StatusAction mono {...props} />
-}
-
 type StatusLinkProps = Omit<StatusActionProps, 'variant'>
 
 export function StatusLink(props: StatusLinkProps) {

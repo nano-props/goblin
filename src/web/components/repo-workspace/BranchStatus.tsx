@@ -201,6 +201,7 @@ export function BranchStatus({ detail }: Props) {
             branchName: branch.name,
             worktreePath: branch.worktree.path,
             type: 'files',
+            insertAfterTabType: 'status',
             navigation,
           })
         },
@@ -219,6 +220,7 @@ export function BranchStatus({ detail }: Props) {
             branchName: branch.name,
             worktreePath: branch.worktree.path,
             type: 'changes',
+            insertAfterTabType: 'status',
             navigation,
           })
         },

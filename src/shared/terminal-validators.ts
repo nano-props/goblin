@@ -117,12 +117,17 @@ const WorkspacePaneTabIdentitySchema = v.pipe(
   v.minLength(1),
   v.check((value) => !value.includes('\0'), 'Invalid workspace pane tab identity'),
 )
+const WorkspacePaneOptionalStaticTabTypeSchema = v.optional(v.nullable(WorkspacePaneStaticTabTypeSchema))
 const TerminalUpdateWorkspaceTabsInputSchema = v.object({
   repoRoot: v.string(),
   branchName: v.string(),
   worktreePath: v.nullable(v.string()),
   operation: v.variant('type', [
-    v.object({ type: v.literal('open-static'), tabType: WorkspacePaneStaticTabTypeSchema }),
+    v.object({
+      type: v.literal('open-static'),
+      tabType: WorkspacePaneStaticTabTypeSchema,
+      insertAfterTabType: WorkspacePaneOptionalStaticTabTypeSchema,
+    }),
     v.object({ type: v.literal('close-static'), tabType: WorkspacePaneStaticTabTypeSchema }),
     v.object({ type: v.literal('reorder'), tabIdentities: v.array(WorkspacePaneTabIdentitySchema) }),
   ]),

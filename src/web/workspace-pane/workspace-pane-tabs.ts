@@ -3,6 +3,7 @@ import {
   workspacePaneTabEntryFromUnknown,
   workspacePaneStaticTabEntry,
   workspacePaneTabEntryIdentity,
+  workspacePaneTabsInsertAfterStaticTab,
   workspacePaneTabRequiresWorktree,
 } from '#/shared/workspace-pane.ts'
 
@@ -21,9 +22,14 @@ export function workspacePaneStaticTabsFromEntries(
 export function workspacePaneTabsWithStaticTab(
   current: readonly WorkspacePaneTabEntry[],
   tab: WorkspacePaneStaticTabType,
+  options?: { insertAfterTabType?: WorkspacePaneStaticTabType | null },
 ): WorkspacePaneTabEntry[] {
+  // Reopening an already-open static tab should only focus it; we intentionally
+  // do not reorder existing tabs from here.
   if (current.some((entry) => entry.type === tab)) return normalizeWorkspacePaneTabs(current)
-  return normalizeWorkspacePaneTabs([...current, workspacePaneStaticTabEntry(tab)])
+  return normalizeWorkspacePaneTabs(
+    workspacePaneTabsInsertAfterStaticTab(current, workspacePaneStaticTabEntry(tab), options?.insertAfterTabType),
+  )
 }
 
 export function workspacePaneTabsWithoutStaticTab(

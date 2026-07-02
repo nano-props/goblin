@@ -208,7 +208,7 @@ export interface TerminalReplaceWorkspaceTabsInput extends WorkspacePaneTabsTarg
 }
 
 export type TerminalUpdateWorkspaceTabsOperation =
-  | { type: 'open-static'; tabType: WorkspacePaneStaticTabType }
+  | { type: 'open-static'; tabType: WorkspacePaneStaticTabType; insertAfterTabType?: WorkspacePaneStaticTabType | null }
   | { type: 'close-static'; tabType: WorkspacePaneStaticTabType }
   | { type: 'reorder'; tabIdentities: string[] }
 
