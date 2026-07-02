@@ -12,7 +12,7 @@ import type { AuthorizationDenialReason } from '#/web/components/terminal/author
  */
 export const WRITE_BLOCKED_KEY_BY_REASON: Record<AuthorizationDenialReason, string | null> = {
   'session-closed': null,
-  'no-bridge': 'terminal.write-blocked-bridge-unavailable',
+  'no-client': 'terminal.write-blocked-client-unavailable',
   'session-unknown': 'terminal.write-blocked-session-gone',
   'client-offline': 'terminal.write-blocked-reconnecting',
   'takeover-rejected': 'terminal.write-blocked-rejected',

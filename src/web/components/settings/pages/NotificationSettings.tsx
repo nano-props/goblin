@@ -5,7 +5,7 @@ import { Switch } from '#/web/components/ui/switch.tsx'
 import { SettingsGroup, SettingsList, SettingsRow } from '#/web/components/settings/SettingsPrimitives.tsx'
 import { useFetchSettingsController, useFetchSettings } from '#/web/runtime-settings-fetch.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import { terminalBridge } from '#/web/terminal.ts'
+import { terminalClient } from '#/web/terminal.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import { settingsLog } from '#/web/logger.ts'
 export function NotificationSettings() {
@@ -22,7 +22,7 @@ export function NotificationSettings() {
   const testTerminalNotification = () => {
     if (testingTerminalNotification) return
     setTestingTerminalNotification(true)
-    void terminalBridge
+    void terminalClient
       .sendTestNotification({
         title: t('settings.terminal-notifications-test-title'),
         body: t('settings.terminal-notifications-test-body'),

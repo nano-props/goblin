@@ -56,7 +56,7 @@ import { createOpaqueId } from '#/shared/opaque-id.ts'
 
 export type IpcTestHandler = (input: any) => unknown
 
-interface TerminalBridgeTestOutputs {
+interface TerminalClientTestOutputs {
   'terminal.attach': TerminalAttachResult
   'terminal.restart': TerminalAttachResult
   'terminal.write': TerminalMutationResult
@@ -72,7 +72,7 @@ interface TerminalBridgeTestOutputs {
   'terminal.notifyBell': TerminalMutationResult
 }
 
-function terminalHandlerNameForSocketAction(action: string): keyof TerminalBridgeTestOutputs | null {
+function terminalHandlerNameForSocketAction(action: string): keyof TerminalClientTestOutputs | null {
   switch (action) {
     case 'attach':
       return 'terminal.attach'
@@ -368,48 +368,48 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       },
     },
   })
-  function callTerminalHandler(name: 'terminal.attach', payload: unknown): TerminalBridgeTestOutputs['terminal.attach']
+  function callTerminalHandler(name: 'terminal.attach', payload: unknown): TerminalClientTestOutputs['terminal.attach']
   function callTerminalHandler(
     name: 'terminal.restart',
     payload: unknown,
-  ): TerminalBridgeTestOutputs['terminal.restart']
-  function callTerminalHandler(name: 'terminal.write', payload: unknown): TerminalBridgeTestOutputs['terminal.write']
-  function callTerminalHandler(name: 'terminal.resize', payload: unknown): TerminalBridgeTestOutputs['terminal.resize']
+  ): TerminalClientTestOutputs['terminal.restart']
+  function callTerminalHandler(name: 'terminal.write', payload: unknown): TerminalClientTestOutputs['terminal.write']
+  function callTerminalHandler(name: 'terminal.resize', payload: unknown): TerminalClientTestOutputs['terminal.resize']
   function callTerminalHandler(
     name: 'terminal.takeover',
     payload: unknown,
-  ): TerminalBridgeTestOutputs['terminal.takeover']
-  function callTerminalHandler(name: 'terminal.close', payload: unknown): TerminalBridgeTestOutputs['terminal.close']
-  function callTerminalHandler(name: 'terminal.create', payload: unknown): TerminalBridgeTestOutputs['terminal.create']
+  ): TerminalClientTestOutputs['terminal.takeover']
+  function callTerminalHandler(name: 'terminal.close', payload: unknown): TerminalClientTestOutputs['terminal.close']
+  function callTerminalHandler(name: 'terminal.create', payload: unknown): TerminalClientTestOutputs['terminal.create']
   function callTerminalHandler(
     name: 'terminal.replaceWorkspaceTabs',
     payload: unknown,
-  ): TerminalBridgeTestOutputs['terminal.replaceWorkspaceTabs']
+  ): TerminalClientTestOutputs['terminal.replaceWorkspaceTabs']
   function callTerminalHandler(
     name: 'terminal.updateWorkspaceTabs',
     payload: unknown,
-  ): TerminalBridgeTestOutputs['terminal.updateWorkspaceTabs']
+  ): TerminalClientTestOutputs['terminal.updateWorkspaceTabs']
   function callTerminalHandler(
     name: 'terminal.listWorkspaceTabs',
     payload: unknown,
-  ): TerminalBridgeTestOutputs['terminal.listWorkspaceTabs']
-  function callTerminalHandler(name: 'terminal.prune', payload: unknown): TerminalBridgeTestOutputs['terminal.prune']
+  ): TerminalClientTestOutputs['terminal.listWorkspaceTabs']
+  function callTerminalHandler(name: 'terminal.prune', payload: unknown): TerminalClientTestOutputs['terminal.prune']
   function callTerminalHandler(
     name: 'terminal.listSessions',
     payload: unknown,
-  ): TerminalBridgeTestOutputs['terminal.listSessions']
+  ): TerminalClientTestOutputs['terminal.listSessions']
   function callTerminalHandler(
     name: 'terminal.notifyBell',
     payload: unknown,
-  ): TerminalBridgeTestOutputs['terminal.notifyBell']
+  ): TerminalClientTestOutputs['terminal.notifyBell']
   function callTerminalHandler(
-    name: keyof TerminalBridgeTestOutputs,
+    name: keyof TerminalClientTestOutputs,
     payload: unknown,
-  ): TerminalBridgeTestOutputs[keyof TerminalBridgeTestOutputs]
+  ): TerminalClientTestOutputs[keyof TerminalClientTestOutputs]
   function callTerminalHandler(
-    name: keyof TerminalBridgeTestOutputs,
+    name: keyof TerminalClientTestOutputs,
     payload: unknown,
-  ): TerminalBridgeTestOutputs[keyof TerminalBridgeTestOutputs] {
+  ): TerminalClientTestOutputs[keyof TerminalClientTestOutputs] {
     const handler = handlers[name]
     if (!handler) {
       switch (name) {
@@ -467,7 +467,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         }
       }
     }
-    return handler(payload) as TerminalBridgeTestOutputs[keyof TerminalBridgeTestOutputs]
+    return handler(payload) as TerminalClientTestOutputs[keyof TerminalClientTestOutputs]
   }
   // Use the shared `installWebSocketMock` for the WebSocket surface and
   // wrap each new socket's `send` so JSON `request` frames are routed to

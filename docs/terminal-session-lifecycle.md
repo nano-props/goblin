@@ -78,7 +78,7 @@ The combined symptom list across the root causes:
   treat it as the authoritative handshake. The client reconstructed
   the first frame from multiple asynchronous sources.
 - **R1 — Close was fire-and-forget and silent on failure.**
-  `TerminalSession.dispose()` called `terminalBridge.close(...)`
+  `TerminalSession.dispose()` called `terminalClient.close(...)`
   with a swallowed rejection. A WebSocket mid-request teardown or a
   race with idle socket shutdown could drop the close before the
   server saw it. The PTY stayed alive.
@@ -174,7 +174,7 @@ runtime crash.
    instead of a partial attach result, so every `create` success carries
    the full first-frame payload at the type level. The client's runtime
    "missing ptySessionId" check stays as a belt-and-suspenders guard
-   against `unknown`/JSON-blob shapes arriving from the bridge layer.
+   against `unknown`/JSON-blob shapes arriving from the client layer.
 
 ### `ptySessionId` is an addressable runtime id, not a live-handle proof
 
@@ -207,7 +207,7 @@ like this:
 
 ```ts
 for (const ptySessionId of ptySessionIds) {
-  void terminalBridge.close({ ptySessionId }).catch(() => {})
+  void terminalClient.close({ ptySessionId }).catch(() => {})
 }
 ```
 
@@ -232,7 +232,7 @@ pending closes before create.
 
 - **Enqueue durable close** — called from `TerminalSession` via
   an injected callback. Records a pending entry, kicks off
-  `terminalBridge.close` in the background, resolves on server ack,
+  `terminalClient.close` in the background, resolves on server ack,
   rejects on socket error. The entry is removed from the map on
   either outcome. Concurrent calls for the same `ptySessionId` dedupe
   to the same promise.
@@ -323,7 +323,7 @@ session-sync primitives.
 
 ### Client dispatcher
 
-The terminal bridge exposes `onSessionClosed(cb)` and dispatches the
+The terminal client exposes `onSessionClosed(cb)` and dispatches the
 `session-closed` variant in the same switch that handles `output`,
 `title`, `exit`, `identity`, `lifecycle`, and `sessions-changed`.
 
@@ -332,7 +332,7 @@ The terminal bridge exposes `onSessionClosed(cb)` and dispatches the
 The provider mirrors the `onExit` pattern. On `session-closed`:
 
 ```ts
-terminalBridge.onSessionClosed((event) => {
+terminalClient.onSessionClosed((event) => {
   projection.handleSessionClosed(event)
 })
 ```
@@ -400,7 +400,7 @@ post-takeover frame.
 
 Before this change, `terminal.takeover` returned only
 `{ ok, ptySessionId, controller }`. The client treated the
-realtime `identity` event as the authority and used the bridge
+realtime `identity` event as the authority and used the client
 response only to "trigger the server-side handoff".
 
 The cost was a stale window between the response settling and the
@@ -442,7 +442,7 @@ response.
    `runtime.applyTakeover(result)`, which feeds the response into
    the identity + lifecycle apply path in one shot. Takeover
    failures are logged instead of swallowed.
-6. The bridge conversion and the runtime's identity handler are
+6. The client conversion and the runtime's identity handler are
    aligned to route role/status/geometry through the identity
    channel and phase/message through the lifecycle channel.
 

@@ -1,12 +1,12 @@
 import type { ClientNativeCapability } from '#/shared/bootstrap.ts'
 import type { IpcEvent, IpcRequest } from '#/shared/api-types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
-import type { ClientHostBridge, ClientBridge, ClientTerminalBridge } from '#/web/client-bridge-types.ts'
+import type { ClientHostBridge, ClientBridge, ClientTerminal } from '#/web/client-bridge-types.ts'
 import { readNativeBridge } from '#/web/native-bridge.ts'
 import { createHttpClipboardBackend } from '#/web/clipboard/http-backend.ts'
 import { normalizeClientServerClientId, readWebBootstrap } from '#/web/client-bootstrap-bridge.ts'
 import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
-import { createServerTerminalBridge, type ClientServerTerminalConfig } from '#/web/client-terminal-bridge.ts'
+import { createServerTerminalClient, type ClientServerTerminalConfig } from '#/web/client-terminal.ts'
 import { createTerminalNotificationProvider } from '#/web/terminal-notification-provider.ts'
 
 /**
@@ -40,7 +40,7 @@ function capabilitiesFromBridge(bridge: NonNullable<Window['goblinNative']>): Re
 
 /**
  * Read the server-terminal config from the bootstrap. Shared by the
- * terminal bridge and the HTTP clipboard backend — both go through
+ * terminal client and the HTTP clipboard backend — both go through
  * the same `window.location.origin` + cookie auth flow, so there is
  * no longer an Electron-specific fork here.
  */
@@ -78,21 +78,21 @@ function readServerTerminalConfig(): ClientServerTerminalConfig | null {
   return null
 }
 
-// The terminal bridge is *expensive*: it opens a WebSocket, holds
+// The terminal client is *expensive*: it opens a WebSocket, holds
 // subscriber sets, and shares state across the whole client.
-// `terminalBridge` from `#/web/terminal.ts` re-reads `getClientBridge()`
+// `terminalClient` from `#/web/terminal.ts` re-reads `getClientBridge()`
 // on every method call, so we must keep a stable singleton here.
-// The bridge's notification provider and badge callback re-read
+// The client's notification provider and badge callback re-read
 // `goblinNative` on each invocation — that's the lazy hook that lets
 // bell-state tests swap the preload between cases without rebuilding
 // the WebSocket layer.
-let memoizedTerminalBridge: ClientTerminalBridge | null = null
-function getOrCreateTerminalBridge(): ClientTerminalBridge {
-  if (memoizedTerminalBridge) return memoizedTerminalBridge
-  memoizedTerminalBridge = createServerTerminalBridge({
+let memoizedTerminalClient: ClientTerminal | null = null
+function getOrCreateTerminalClient(): ClientTerminal {
+  if (memoizedTerminalClient) return memoizedTerminalClient
+  memoizedTerminalClient = createServerTerminalClient({
     getServerConfig() {
       const server = readServerTerminalConfig()
-      if (!server) throw new Error('Client terminal bridge is unavailable')
+      if (!server) throw new Error('Client terminal client is unavailable')
       return server
     },
     notificationProvider: createTerminalNotificationProvider(),
@@ -100,7 +100,7 @@ function getOrCreateTerminalBridge(): ClientTerminalBridge {
       readNativeBridge()?.terminal?.setBadge?.(count)
     },
   })
-  return memoizedTerminalBridge
+  return memoizedTerminalClient
 }
 
 /**
@@ -135,7 +135,7 @@ function createClientBridge(): ClientBridge {
     })
   })()
 
-  const terminalBridge = getOrCreateTerminalBridge()
+  const terminalClient = getOrCreateTerminalClient()
 
   return {
     kind() {
@@ -203,7 +203,7 @@ function createClientBridge(): ClientBridge {
       return readNativeBridge()?.host ?? null
     },
     terminal() {
-      return terminalBridge
+      return terminalClient
     },
   }
 }
@@ -214,7 +214,7 @@ function createClientBridge(): ClientBridge {
 // the preload) and the standalone web runtime (where it isn't).
 //
 // We rebuild the outer bridge on every call rather than memoizing:
-// the inner terminal bridge is memoized separately (it owns the
+// the inner terminal client is memoized separately (it owns the
 // WebSocket and must be a singleton), but everything else — IPC,
 // shell, capabilities, clipboard backend, bootstrap — is just a
 // closure over the live `goblinNative`. Rebuilding is cheap

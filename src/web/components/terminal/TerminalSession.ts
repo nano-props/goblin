@@ -8,7 +8,7 @@ import type {
   TerminalOutputEvent,
   TerminalRestartInput,
 } from '#/shared/terminal-types.ts'
-import { terminalBridge } from '#/web/terminal.ts'
+import { terminalClient } from '#/web/terminal.ts'
 import { setTerminalFocused } from '#/web/terminal-focus.ts'
 import { openExternalUrl } from '#/web/app-shell-client.ts'
 import {
@@ -60,7 +60,7 @@ export class TerminalSession {
   private readonly view: TerminalSessionView
   // Authority gate owns the "am I the controller?" cache and the
   // auto-promote-on-write path. The gate is constructed lazily so
-  // the runtime/bridge dependency wiring stays inside the methods
+  // the runtime/client dependency wiring stays inside the methods
   // that need it; this also keeps the gate from outliving the
   // session when the projection disposes us.
   private authorityGate: TerminalAuthorityGate | null = null
@@ -87,7 +87,7 @@ export class TerminalSession {
     notify: (reason: TerminalNotifyReason) => void,
     // Durable close hook. The projection passes this in so dispose() can
     // hand the close to a queue (drained on the next create for the
-    // same worktree) instead of firing `terminalBridge.close` as a
+    // same worktree) instead of firing `terminalClient.close` as a
     // fire-and-forget. The old `void … .catch(() => {})` path could
     // drop the request if the WebSocket was already closing, leaving
     // the server PTY alive and the next create reattaching to the
@@ -164,7 +164,7 @@ export class TerminalSession {
     const closePromises: Promise<void>[] = []
     if (options.closeSession !== false) {
       // Hand the close to the projection's durable queue instead of
-      // firing `terminalBridge.close` directly. The queue resolves
+      // firing `terminalClient.close` directly. The queue resolves
       // only after the server close settles, so async close callers
       // can use this method as a resource-release barrier.
       for (const ptySessionId of ptySessionIds) {
@@ -244,7 +244,7 @@ export class TerminalSession {
           this.reportGateDenial('write', result.reason, ptySessionId)
           return
         }
-        return terminalBridge.write({ ptySessionId, data })
+        return terminalClient.write({ ptySessionId, data })
       })
       .catch((err) => {
         terminalLog.warn('write failed for session', { ptySessionId, err })
@@ -262,7 +262,7 @@ export class TerminalSession {
     if (canonicalSize.cols === cols && canonicalSize.rows === rows) return
     // Mirror `flushInput`: resize is also a controller-only action,
     // so it goes through the gate. Without this a viewer would
-    // call `terminalBridge.resize` directly, the server would reject
+    // call `terminalClient.resize` directly, the server would reject
     // with `not-controller`, and the user would see a stale
     // geometry with no feedback. The gate's auto-promote path also
     // gives the resize a chance to succeed via takeover.
@@ -279,7 +279,7 @@ export class TerminalSession {
           this.reportGateDenial('resize', result.reason, ptySessionId)
           return
         }
-        return terminalBridge.resize({ ptySessionId, cols, rows }).then((ok) => {
+        return terminalClient.resize({ ptySessionId, cols, rows }).then((ok) => {
           if (ok && this.runtime.currentPtySessionId() === ptySessionId) this.runtime.acknowledgeResize(cols, rows)
         })
       })
@@ -338,13 +338,13 @@ export class TerminalSession {
    * Lazy accessor for the per-session AuthorityGate. The gate is
    * the single source of truth for write-side promotion: xterm
    * onData, paste, drop file, and the 接管 button all funnel
-   * through it. Constructed on first access so the bridge/runtime
+   * through it. Constructed on first access so the client/runtime
    * dependencies stay inside the gate's closure.
    */
   authority(): TerminalAuthorityGate {
     if (!this.authorityGate) {
       this.authorityGate = createXtermAuthorityGate({
-        bridge: terminalBridge,
+        bridge: terminalClient,
         getPtySessionId: () => this.runtime.currentPtySessionId(),
         resolveSize: async () => {
           // Prefer the live xterm size — the takeover round-trip
@@ -662,8 +662,8 @@ export class TerminalSession {
       throw new StartCancelledError()
     }
     const result = restart
-      ? await terminalBridge.restart(this.terminalRestartInput(ptySessionId, term))
-      : await terminalBridge.attach(this.terminalAttachInput(ptySessionId, term))
+      ? await terminalClient.restart(this.terminalRestartInput(ptySessionId, term))
+      : await terminalClient.attach(this.terminalAttachInput(ptySessionId, term))
     if (this.disposed || this.startEpoch !== epoch || this.view.currentTerminal() !== term) {
       if (this.disposed) {
         if (result.ok) void this.requestDurableClose(result.ptySessionId).catch(() => {})

@@ -360,7 +360,7 @@ export const en = {
   'terminal.write-blocked-reconnecting': 'Reconnecting — try again in a moment.',
   'terminal.write-blocked-session-gone': 'Terminal is no longer available.',
   'terminal.write-blocked-rejected': 'Terminal rejected the request.',
-  'terminal.write-blocked-bridge-unavailable': 'Terminal bridge unavailable.',
+  'terminal.write-blocked-client-unavailable': 'Terminal client unavailable.',
   'terminal.index-title': 'Terminal {index}',
   'terminal.bell-unread': 'Unread terminal bell',
   'terminal.bell-unread-count': '{count} unread bell',

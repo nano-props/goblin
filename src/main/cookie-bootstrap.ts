@@ -23,7 +23,7 @@
 //
 //  2. **A race at first paint.** The preload's IPC was async
 //     (Promise.all of four `ipcRenderer.invoke` calls), but the
-//     client's auth probe and terminal bridge read
+//     client's auth probe and terminal client read
 //     `__GOBLIN_BOOTSTRAP__` synchronously on first render. The
 //     only fix was `sendSync`, which blocks the client's JS
 //     thread for ~1-4ms per call — small, but it's still a

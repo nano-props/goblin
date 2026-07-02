@@ -1,5 +1,5 @@
 import { lastPathSegment } from '#/web/lib/paths.ts'
-import { terminalBridge } from '#/web/terminal.ts'
+import { terminalClient } from '#/web/terminal.ts'
 import type { TerminalBellPolicyEvent, TerminalDescriptor } from '#/web/components/terminal/types.ts'
 import { getRuntimeFetchSettings } from '#/web/runtime-settings-fetch.ts'
 const BELL_NOTIFICATION_THROTTLE_MS = 5000
@@ -67,7 +67,7 @@ export function createTerminalBellState(
       const canonicalTitle = typeof event.canonicalTitle === 'string' ? event.canonicalTitle.trim() : ''
       if (canonicalTitle) bodyParts.push(canonicalTitle)
       else if (event.processName) bodyParts.push(event.processName)
-      void terminalBridge
+      void terminalClient
         .notifyBell({
           title: repoName,
           body: bodyParts.join('\n'),

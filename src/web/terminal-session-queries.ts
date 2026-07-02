@@ -1,5 +1,5 @@
 import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
-import { terminalBridge } from '#/web/terminal.ts'
+import { terminalClient } from '#/web/terminal.ts'
 
 // Plain async loader for a repo's terminal session list. The
 // TerminalSessionProjection is the single source of truth for session
@@ -12,5 +12,5 @@ import { terminalBridge } from '#/web/terminal.ts'
 // loader as a plain async function means there is no second
 // client-side state surface to keep in sync with the projection.
 export async function loadTerminalSessions(repoRoot: string, repoInstanceId: string): Promise<TerminalSessionSummary[]> {
-  return await terminalBridge.listSessions({ repoRoot, repoInstanceId })
+  return await terminalClient.listSessions({ repoRoot, repoInstanceId })
 }

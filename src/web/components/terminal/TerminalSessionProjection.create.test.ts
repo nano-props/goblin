@@ -21,7 +21,7 @@ const mocks = vi.hoisted(() => ({
 const REPO_INSTANCE_ID = 'repo-instance-test'
 
 vi.mock('#/web/terminal.ts', () => ({
-  terminalBridge: {
+  terminalClient: {
     create: mocks.createMock,
     close: mocks.closeMock,
     listWorkspaceTabs: mocks.listWorkspaceTabsMock,

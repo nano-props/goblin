@@ -10,7 +10,7 @@ import { TerminalSession } from '#/web/components/terminal/TerminalSession.ts'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import type { TerminalDescriptor, TerminalRepoIndex } from '#/web/components/terminal/types.ts'
 import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
-import { terminalBridge } from '#/web/terminal.ts'
+import { terminalClient } from '#/web/terminal.ts'
 import { resetReposStore } from '#/web/test-utils/bridge.ts'
 
 const REPO_ROOT = '/repo'
@@ -504,7 +504,7 @@ describe('TerminalSessionProjection', () => {
 
       const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
       const session = (projection as any).sessions.get(terminalSessionId) as TerminalSession
-      const closeSpy = vi.spyOn(terminalBridge, 'close').mockResolvedValue(true)
+      const closeSpy = vi.spyOn(terminalClient, 'close').mockResolvedValue(true)
       ;(session as any).descriptor = { ...session.descriptor, repoInstanceId: undefined }
 
       try {

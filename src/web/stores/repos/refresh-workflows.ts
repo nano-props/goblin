@@ -2,7 +2,7 @@ import { appendRepoEvent, errorEvent } from '#/web/stores/repos/repo-state-facto
 import { isRepoUnavailable, updateIfFresh } from '#/web/stores/repos/repo-guards.ts'
 import { persistRepoSnapshotCacheEntry } from '#/web/stores/repos/persistence.ts'
 import { refreshPullRequestsLog, terminalLog } from '#/web/logger.ts'
-import { terminalBridge } from '#/web/terminal.ts'
+import { terminalClient } from '#/web/terminal.ts'
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import {
   preferredWorkspacePaneTabForTarget,
@@ -116,7 +116,7 @@ export async function runSnapshotSuccessWorkflow(
 ): Promise<void> {
   if (!options.isSnapshotCurrent()) return
   persistRepoSnapshotCacheEntry(set, get().repos[options.id], options.repoInstanceId)
-  void terminalBridge.pruneTerminals(options.id, options.repoInstanceId).catch((err) => {
+  void terminalClient.pruneTerminals(options.id, options.repoInstanceId).catch((err) => {
     terminalLog.warn('failed to prune repo sessions', { err })
   })
   void (async () => {
