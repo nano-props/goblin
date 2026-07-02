@@ -16,10 +16,12 @@ import { useI18nStore, useT } from '#/web/stores/i18n.ts'
 import { EmptyState } from '#/web/components/Layout.tsx'
 import { PullRequestStatusRow } from '#/web/components/repo-workspace/PullRequestStatusRow.tsx'
 import { IconCopyButton } from '#/web/components/IconCopyButton.tsx'
+import { CopyButton } from '#/web/components/CopyButton.tsx'
 import type { BranchCopyPatchAction } from '#/web/hooks/branch-action-state.ts'
 import { useActionFeedback } from '#/web/hooks/useActionFeedback.ts'
 import { useBranchActionSurface } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
 import {
+  ClickableStatusChip,
   CopyableValue,
   StatusChip,
   StatusLink,
@@ -36,6 +38,8 @@ import { PROTECTED_BRANCHES, branchPullRequestBelongsToBranch } from '#/shared/g
 import { openUpstreamBranchExternalTarget } from '#/web/hooks/openBranchExternalTarget.ts'
 import type { SelectedRepoWorkspace } from '#/web/components/repo-workspace/model.ts'
 import { CommitHashLink } from '#/web/components/repo-workspace/repo-link-actions.tsx'
+import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
+import { openWorkspacePaneTab } from '#/web/components/repo-workspace/open-workspace-pane-tab.ts'
 interface Props {
   detail: SelectedRepoWorkspace
 }
@@ -147,6 +151,7 @@ export function BranchStatus({ detail }: Props) {
   const t = useT()
   const lang = useI18nStore((s) => s.lang)
   const compact = useIsCompactUi()
+  const navigation = usePrimaryWindowNavigation()
   const { branch, statusCount } = detail
   // Phase 4: pull the target off the lifecycle union. The
   // selector is keyed on the lifecycle itself, so a re-probe
@@ -186,13 +191,59 @@ export function BranchStatus({ detail }: Props) {
   // The "dirty worktree" signal moved to its own row below; the worktree
   // row only needs to surface lock state on its own.
   const worktreeTone: Tone = worktreeLocked ? 'attention' : branch.worktree?.path ? 'brand' : 'neutral'
+  const openFilesTab = useMemo(
+    () =>
+      throttle(
+        () => {
+          if (!branch.worktree?.path) return
+          void openWorkspacePaneTab({
+            repoId: detail.repoId,
+            branchName: branch.name,
+            worktreePath: branch.worktree.path,
+            type: 'files',
+            navigation,
+          })
+        },
+        500,
+        { edges: ['leading'] },
+      ),
+    [branch.name, branch.worktree?.path, detail.repoId, navigation],
+  )
+  const openChangesTab = useMemo(
+    () =>
+      throttle(
+        () => {
+          if (!branch.worktree?.path) return
+          void openWorkspacePaneTab({
+            repoId: detail.repoId,
+            branchName: branch.name,
+            worktreePath: branch.worktree.path,
+            type: 'changes',
+            navigation,
+          })
+        },
+        500,
+        { edges: ['leading'] },
+      ),
+    [branch.name, branch.worktree?.path, detail.repoId, navigation],
+  )
   const worktreeValue = branch.worktree?.path ? (
-    <CopyableValue
-      value={worktreePath}
-      copyValue={branch.worktree?.path}
-      copyLabel={t('branch-status.copy-worktree-path')}
-      copiedLabel={t('branch-status.copied')}
-    />
+    <div className="inline-flex max-w-full min-w-0 items-center gap-1.5 align-middle">
+      <StatusLink
+        mono
+        truncate
+        title={t('workspace-pane-tabs.files-tooltip', { branch: branch.name })}
+        onClick={openFilesTab}
+      >
+        {worktreePath}
+      </StatusLink>
+      <CopyButton
+        value={branch.worktree.path}
+        copyLabel={t('branch-status.copy-worktree-path')}
+        copiedLabel={t('branch-status.copied')}
+        className="shrink-0"
+      />
+    </div>
   ) : (
     <StatusChip>{t('branch-status.worktree.none')}</StatusChip>
   )
@@ -250,7 +301,13 @@ export function BranchStatus({ detail }: Props) {
           icon={<Diff size={14} />}
           label={t('branch-status.signal.changes')}
           value={
-            <StatusChip tone="attention">{t('branch-status.changes-count', { n: worktreeChangeCount })}</StatusChip>
+            <ClickableStatusChip
+              tone="attention"
+              title={t('workspace-pane-tabs.changes-tooltip', { count: worktreeChangeCount })}
+              onClick={openChangesTab}
+            >
+              {t('branch-status.changes-count', { n: worktreeChangeCount })}
+            </ClickableStatusChip>
           }
           after={copyPatchAction.visible ? <StatusCopyPatchButton action={copyPatchAction} /> : undefined}
           valueLayout="inline"
