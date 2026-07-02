@@ -89,13 +89,13 @@ export function restoreRepoProjectionFromCacheEntry(
   return restoreProjectionFromSnapshot(repo, snapshot)
 }
 
-export function persistRepoSnapshotCacheEntry(set: ReposSet, repo: RepoState | undefined, token: number): void {
+export function persistRepoSnapshotCacheEntry(set: ReposSet, repo: RepoState | undefined, repoInstanceId: string): void {
   if (!repo) return
-  if (repo.instanceToken !== token) return
+  if (repo.instanceId !== repoInstanceId) return
   const entry = repoSnapshotCacheEntryFromRepo(repo)
   if (!entry) return
   set((s) => {
-    if (s.repos[repo.id]?.instanceToken !== token) return s
+    if (s.repos[repo.id]?.instanceId !== repoInstanceId) return s
     const repoSnapshotCache = trimRepoCache({ ...s.repoSnapshotCache, [repo.id]: entry })
     return { repoSnapshotCache }
   })

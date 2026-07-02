@@ -12,7 +12,7 @@ const storeState = {
     '/tmp/repo': {
       id: '/tmp/repo',
       availability: { phase: 'available' },
-      instanceToken: 7,
+      instanceId: 'repo-instance-test-7',
       dataLoads: {
         snapshot: { phase: 'idle', loadedAt: 0, stale: false, error: null },
         status: { phase: 'idle', loadedAt: 0, stale: false, error: null },
@@ -50,7 +50,7 @@ describe('useRepoStoreInvalidationRefresh', () => {
     storeState.repos['/tmp/repo'] = {
       id: '/tmp/repo',
       availability: { phase: 'available' },
-      instanceToken: 7,
+      instanceId: 'repo-instance-test-7',
       dataLoads: {
         snapshot: { phase: 'idle', loadedAt: Date.now(), stale: false, error: null },
         status: { phase: 'idle', loadedAt: Date.now(), stale: false, error: null },
@@ -72,7 +72,7 @@ describe('useRepoStoreInvalidationRefresh', () => {
         listener({ type: 'repo-query-invalidated', repoId: '/tmp/repo', query: 'repo-snapshot' })
     })
 
-    expect(storeState.refreshCoreData).toHaveBeenCalledWith('/tmp/repo', { token: 7 })
+    expect(storeState.refreshCoreData).toHaveBeenCalledWith('/tmp/repo', { repoInstanceId: 'repo-instance-test-7' })
   })
 
   test('skips duplicate invalidation refreshes from an active local source token', async () => {
@@ -127,6 +127,6 @@ describe('useRepoStoreInvalidationRefresh', () => {
         })
     })
 
-    expect(storeState.refreshCoreData).toHaveBeenCalledWith('/tmp/repo', { token: 7 })
+    expect(storeState.refreshCoreData).toHaveBeenCalledWith('/tmp/repo', { repoInstanceId: 'repo-instance-test-7' })
   })
 })

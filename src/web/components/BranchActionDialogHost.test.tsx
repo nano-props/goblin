@@ -115,7 +115,7 @@ function setupRepo() {
 function buildRepo(repo: ReturnType<typeof seedRepoState>): BranchActionRepo {
   return {
     id: repo.id,
-    instanceToken: repo.instanceToken,
+    instanceId: repo.instanceId,
     data: {
       currentBranch: repo.data.currentBranch,
       status: repo.data.status,

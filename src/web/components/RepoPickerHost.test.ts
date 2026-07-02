@@ -144,7 +144,7 @@ describe('repoPickerReposEqual', () => {
   })
 
   test('does not treat warm cache snapshot time as a sync time', () => {
-    const repo = emptyRepo('/tmp/repo', 'repo')
+    const repo = emptyRepo('/tmp/repo', 'repo', 'repo-instance-test')
     repo.projection = { source: 'cache', savedAt: 2_000 }
     repo.dataLoads.snapshot.loadedAt = 2_000
 
@@ -152,7 +152,7 @@ describe('repoPickerReposEqual', () => {
   })
 
   test('uses fresh snapshot and fetch data-load times as sync candidates', () => {
-    const repo = emptyRepo('/tmp/repo', 'repo')
+    const repo = emptyRepo('/tmp/repo', 'repo', 'repo-instance-test')
     repo.projection = { source: 'fresh', savedAt: null }
     repo.dataLoads.snapshot.loadedAt = 2_000
     repo.dataLoads.fetch.loadedAt = 3_000

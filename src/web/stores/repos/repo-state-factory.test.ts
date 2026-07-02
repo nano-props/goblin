@@ -19,31 +19,31 @@ function remoteTargetFixture() {
 
 describe('deriveConnectivity', () => {
   test('local repos always read as connected', () => {
-    const repo = emptyRepo('/tmp/local-repo', 'local')
+    const repo = emptyRepo('/tmp/local-repo', 'local', 'repo-instance-test')
     expect(deriveConnectivity(repo)).toBe('connected')
   })
 
   test('a remote repo with lifecycle=connecting reads as connecting', () => {
-    const repo = emptyRepo(REMOTE_ID, 'remote')
+    const repo = emptyRepo(REMOTE_ID, 'remote', 'repo-instance-test')
     repo.remote.lifecycle = { kind: 'connecting' }
     expect(deriveConnectivity(repo)).toBe('connecting')
   })
 
   test('a remote repo with lifecycle=ready reads as connected', () => {
-    const repo = emptyRepo(REMOTE_ID, 'remote')
+    const repo = emptyRepo(REMOTE_ID, 'remote', 'repo-instance-test')
     const target = remoteTargetFixture()
     repo.remote.lifecycle = { kind: 'ready', target }
     expect(deriveConnectivity(repo)).toBe('connected')
   })
 
   test('a remote repo with lifecycle=failed reads as unreachable', () => {
-    const repo = emptyRepo(REMOTE_ID, 'remote')
+    const repo = emptyRepo(REMOTE_ID, 'remote', 'repo-instance-test')
     repo.remote.lifecycle = { kind: 'failed', reason: 'unreachable' }
     expect(deriveConnectivity(repo)).toBe('unreachable')
   })
 
   test('a remote repo with lifecycle=failed but a retained target still reads as unreachable', () => {
-    const repo = emptyRepo(REMOTE_ID, 'remote')
+    const repo = emptyRepo(REMOTE_ID, 'remote', 'repo-instance-test')
     const target = remoteTargetFixture()
     repo.remote.lifecycle = { kind: 'failed', reason: 'timeout', target }
     expect(deriveConnectivity(repo)).toBe('unreachable')
@@ -57,7 +57,7 @@ describe('deriveConnectivity', () => {
     // restores, or any non-migrated write path that lands a
     // remote repo with no lifecycle are the only callers that
     // should hit this branch.
-    const repo = emptyRepo(REMOTE_ID, 'remote')
+    const repo = emptyRepo(REMOTE_ID, 'remote', 'repo-instance-test')
     expect(deriveConnectivity(repo)).toBe('connecting')
   })
 })

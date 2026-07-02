@@ -290,7 +290,7 @@ describe('client bootstrap', () => {
       initialServer: {
         url: 'http://127.0.0.1:32100/',
         accessToken: 'test-secret',
-        clientId: expect.stringMatching(/^client_/),
+        clientId: expect.stringMatching(/^client-/),
       },
     })
   })

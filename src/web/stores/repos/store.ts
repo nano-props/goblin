@@ -8,9 +8,9 @@
 // scroll/selection state when the user flips between them.
 //
 // Race-condition defenses
-//   - `instanceToken`: every time a repo is created/reset we mint a new
-//     token. Async writers capture the token at call time and bail when
-//     they observe a different token in `set()` — this guards against
+//   - `instanceId`: every time a repo is created/reset we mint a new
+//     id. Async writers capture the id at call time and bail when
+//     they observe a different id in `set()` — this guards against
 //     a stale snapshot from before close-and-reopen overwriting fresh
 //     data in the wrong repo.
 import { create } from 'zustand'
@@ -20,6 +20,7 @@ import { createCommitActions } from '#/web/stores/repos/commit.ts'
 import { createRepoSessionActions } from '#/web/stores/repos/repo-session.ts'
 import { createRefreshActions } from '#/web/stores/repos/refresh.ts'
 import { createSelectionActions } from '#/web/stores/repos/selection.ts'
+import { createTabOpenerActions } from '#/web/stores/repos/tab-opener.ts'
 import { reposLog } from '#/web/logger.ts'
 import { normalizeRepoSnapshotCache } from '#/web/stores/repos/persistence.ts'
 import { DEFAULT_ZEN_MODE, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
@@ -108,9 +109,11 @@ export const useReposStore = create<ReposStore>()(
       // Local client-only state.
       sessionReady: false,
       sessionPersistenceReady: false,
+      tabOpenerIdentityByScope: {},
 
       ...createRepoSessionActions(set, get),
       ...createSelectionActions(set, get),
+      ...createTabOpenerActions(set),
       ...createRefreshActions(set, get),
       ...createBranchActions(set, get),
       ...createCommitActions(set, get),

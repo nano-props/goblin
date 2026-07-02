@@ -41,7 +41,7 @@ function repoActivityControlRepoEqual(a: RepoState | undefined, b: RepoState | u
     (!!a &&
       !!b &&
       a.id === b.id &&
-      a.instanceToken === b.instanceToken &&
+      a.instanceId === b.instanceId &&
       a.dataLoads === b.dataLoads &&
       a.operations.fetch === b.operations.fetch &&
       a.operations.manualRefresh === b.operations.manualRefresh &&
@@ -125,14 +125,14 @@ function RepoRefreshButton({ repo, manualSyncBusy }: { repo: RepoState; manualSy
   const label = t('action.refresh')
 
   function handleSync() {
-    const token = repo.instanceToken
+    const repoInstanceId = repo.instanceId
     // Fire-and-forget so AsyncButton's internal pending state does not fight
     // the external manualSyncBusy prop. The visual loading state is owned by
     // the operation, not the click promise.
     void runRepoRefreshIntent(useReposStore.getState, {
       kind: 'manual-refresh-requested',
       id: repo.id,
-      token,
+      repoInstanceId,
     })
   }
 

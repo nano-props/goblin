@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { normalizeRemoteTarget, remoteRepoSessionEntry } from '#/shared/remote-repo.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { BranchSnapshotInfo } from '#/web/types.ts'
+import { tabOpenerScopeKey } from '#/web/stores/repos/tab-opener.ts'
+import { createRepoBranch, seedRepoState } from '#/web/test-utils/bridge.ts'
 import {
   branchSnapshot,
   flushIpc,
@@ -111,11 +113,11 @@ describe('repo lifecycle', () => {
 
     const first = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
     if (first.ok) useReposStore.getState().setActive(first.id)
-    const firstToken = useReposStore.getState().repos[REPO_A]?.instanceToken
+    const firstToken = useReposStore.getState().repos[REPO_A]?.instanceId
     useReposStore.getState().closeRepo(REPO_A)
     const second = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
     if (second.ok) useReposStore.getState().setActive(second.id)
-    const secondToken = useReposStore.getState().repos[REPO_A]?.instanceToken
+    const secondToken = useReposStore.getState().repos[REPO_A]?.instanceId
 
     snapshotResolvers[1]?.({ branches: [branchSnapshot('fresh')], current: 'fresh' })
     await flushIpc()
@@ -237,5 +239,29 @@ describe('repo lifecycle', () => {
       target: newTarget,
     })
     expect(calls.composite).toEqual([newTarget!.id])
+  })
+
+  test('closeRepo clears recorded tab openers scoped to that repo, but leaves other repos untouched', () => {
+    // seedRepoState replaces the whole `repos` map, so seed both repos
+    // before merging them back together into one multi-repo store state.
+    const repoA = seedRepoState({ id: REPO_A, branches: [createRepoBranch('feature/a')], selectedBranch: 'feature/a' })
+    const repoB = seedRepoState({ id: REPO_B, branches: [createRepoBranch('feature/b')], selectedBranch: 'feature/b' })
+    useReposStore.setState({
+      repos: { [REPO_A]: repoA, [REPO_B]: repoB },
+      order: [REPO_A, REPO_B],
+      activeId: REPO_A,
+    })
+    useReposStore
+      .getState()
+      .setTabOpener(tabOpenerScopeKey(REPO_A, 'feature/a'), 'workspace-pane:changes', 'workspace-pane:status')
+    useReposStore
+      .getState()
+      .setTabOpener(tabOpenerScopeKey(REPO_B, 'feature/b'), 'workspace-pane:changes', 'workspace-pane:status')
+
+    useReposStore.getState().closeRepo(REPO_A)
+
+    const openers = useReposStore.getState().tabOpenerIdentityByScope
+    expect(openers[tabOpenerScopeKey(REPO_A, 'feature/a')]).toBeUndefined()
+    expect(openers[tabOpenerScopeKey(REPO_B, 'feature/b')]?.['workspace-pane:changes']).toBe('workspace-pane:status')
   })
 })

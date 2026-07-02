@@ -64,7 +64,9 @@ function seedRepo(options: {
 function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
   const repo = useReposStore.getState().repos[REPO_ID]
   const target = repo ? workspacePaneTabsTargetForRepoBranch(repo, branchName) : null
-  return workspacePaneStaticTabsFromEntries(target ? readWorkspacePaneTabsForTarget(target) : [])
+  return workspacePaneStaticTabsFromEntries(
+    target ? readWorkspacePaneTabsForTarget({ ...target, repoInstanceId: repo.instanceId }) : [],
+  )
 }
 
 function preferredTabFor(branchName?: string | null): WorkspacePaneTabType | null {
@@ -151,9 +153,9 @@ describe('setBranchViewMode', () => {
     expect(useReposStore.getState().repoSnapshotCache[REPO_ID]?.ui.selectedBranch).toBeNull()
   })
 
-  test('passes the current repo token to follow-up refreshes', () => {
+  test('passes the current repo instance id to follow-up refreshes', () => {
     seedRepo({ selectedBranch: 'feature/plain', preferredWorkspacePaneTab: 'status' })
-    const token = useReposStore.getState().repos[REPO_ID]!.instanceToken
+    const repoInstanceId = useReposStore.getState().repos[REPO_ID]!.instanceId
     const pullRequestCalls: Parameters<ReturnType<typeof useReposStore.getState>['refreshPullRequests']>[] = []
     const restore = stubRefreshActions({
       refreshPullRequests: async (...args) => {
@@ -164,7 +166,7 @@ describe('setBranchViewMode', () => {
     try {
       useReposStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
 
-      expect(pullRequestCalls[0]).toEqual([REPO_ID, ['main'], { token, mode: 'full' }])
+      expect(pullRequestCalls[0]).toEqual([REPO_ID, ['main'], { repoInstanceId, mode: 'full' }])
     } finally {
       restore()
     }
@@ -220,9 +222,9 @@ describe('selectBranch', () => {
     expect(useReposStore.getState().repoSnapshotCache[REPO_ID]?.ui.selectedBranch).toBe('main')
   })
 
-  test('passes the current repo token to selected branch refreshes', () => {
+  test('passes the current repo instance id to selected branch refreshes', () => {
     seedRepo({ selectedBranch: 'feature/plain', preferredWorkspacePaneTab: 'status' })
-    const token = useReposStore.getState().repos[REPO_ID]!.instanceToken
+    const repoInstanceId = useReposStore.getState().repos[REPO_ID]!.instanceId
     const pullRequestCalls: Parameters<ReturnType<typeof useReposStore.getState>['refreshPullRequests']>[] = []
     const restore = stubRefreshActions({
       refreshPullRequests: async (...args) => {
@@ -233,7 +235,7 @@ describe('selectBranch', () => {
     try {
       useReposStore.getState().selectBranch(REPO_ID, 'main')
 
-      expect(pullRequestCalls[0]).toEqual([REPO_ID, ['main'], { token, mode: 'full' }])
+      expect(pullRequestCalls[0]).toEqual([REPO_ID, ['main'], { repoInstanceId, mode: 'full' }])
     } finally {
       restore()
     }
@@ -385,9 +387,9 @@ describe('setWorkspacePaneTab', () => {
     expect(preferredTabFor('main')).toBe('changes')
   })
 
-  test('passes the current repo token to workspace pane tab refreshes', () => {
+  test('passes the current repo instance id to workspace pane tab refreshes', () => {
     seedRepo({ selectedBranch: 'main', preferredWorkspacePaneTab: 'terminal' })
-    const token = useReposStore.getState().repos[REPO_ID]!.instanceToken
+    const repoInstanceId = useReposStore.getState().repos[REPO_ID]!.instanceId
     const pullRequestCalls: Parameters<ReturnType<typeof useReposStore.getState>['refreshPullRequests']>[] = []
     const restore = stubRefreshActions({
       refreshPullRequests: async (...args) => {
@@ -398,7 +400,7 @@ describe('setWorkspacePaneTab', () => {
     try {
       useReposStore.getState().setWorkspacePaneTab(REPO_ID, 'status')
 
-      expect(pullRequestCalls[0]).toEqual([REPO_ID, ['main'], { token, mode: 'full' }])
+      expect(pullRequestCalls[0]).toEqual([REPO_ID, ['main'], { repoInstanceId, mode: 'full' }])
     } finally {
       restore()
     }

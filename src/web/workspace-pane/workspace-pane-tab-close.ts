@@ -88,6 +88,7 @@ function closeStaticTabWithCommit(worktreePath: string | null) {
     if (!repo) return false
     const result = await updateWorkspacePaneTabs({
       repoRoot: repoId,
+      repoInstanceId: repo.instanceId,
       branchName,
       worktreePath,
       operation: { type: 'close-static', tabType: type },

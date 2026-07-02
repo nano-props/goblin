@@ -33,7 +33,7 @@ function selectBranchForTest(branch: string): void {
 describe('refreshPullRequests', () => {
   test('snapshot records local-only remote capability and clears stale pull requests', async () => {
     const stale = pullRequest(1)
-    const token = seedRepo([branch('feature/a', stale)])
+    const repoInstanceId = seedRepo([branch('feature/a', stale)])
     useReposStore.setState((s) => ({
       repos: {
         ...s.repos,
@@ -55,7 +55,7 @@ describe('refreshPullRequests', () => {
       },
     })
 
-    await useReposStore.getState().refreshSnapshot(REPO_ID, { token })
+    await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.remote).toMatchObject({
@@ -71,7 +71,7 @@ describe('refreshPullRequests', () => {
   })
 
   test('skips pull request refresh for local-only repositories', async () => {
-    const token = seedRepo([branch('feature/a')])
+    const repoInstanceId = seedRepo([branch('feature/a')])
     let callCount = 0
     useReposStore.setState((s) => ({
       repos: {
@@ -88,14 +88,14 @@ describe('refreshPullRequests', () => {
       return []
     }
 
-    await useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a'], { token })
+    await useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a'], { repoInstanceId })
 
     expect(callCount).toBe(0)
     expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.pullRequests.phase).toBe('idle')
   })
 
   test('skips pull request refresh for browser-only remotes', async () => {
-    const token = seedRepo([branch('feature/gitlab')])
+    const repoInstanceId = seedRepo([branch('feature/gitlab')])
     let callCount = 0
     useReposStore.setState((s) => ({
       repos: {
@@ -111,17 +111,17 @@ describe('refreshPullRequests', () => {
       return []
     }
 
-    await useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/gitlab'], { token })
+    await useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/gitlab'], { repoInstanceId })
 
     expect(callCount).toBe(0)
     expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.pullRequests.phase).toBe('idle')
   })
 
   test('snapshot refresh writes a durable repo cache entry without selecting a branch implicitly', async () => {
-    const token = seedRepo([])
+    const repoInstanceId = seedRepo([])
     ipcHandlers['repo.snapshot'] = async () => ({ branches: [branch('feature/a')], current: 'feature/a' })
 
-    await useReposStore.getState().refreshSnapshot(REPO_ID, { token })
+    await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
 
     const cached = useReposStore.getState().repoSnapshotCache[REPO_ID]
     expect(cached?.name).toBe('repo')
@@ -133,14 +133,14 @@ describe('refreshPullRequests', () => {
   test('attaches returned pull requests and clears stale entries for requested branches', async () => {
     const stale = pullRequest(1)
     const fresh = pullRequest(2)
-    const token = seedRepo([branch('feature/a'), branch('feature/b', stale)])
+    const repoInstanceId = seedRepo([branch('feature/a'), branch('feature/b', stale)])
     let mode: string | undefined
     ipcHandlers['repo.pullRequests'] = async ({ mode: receivedMode }: { mode?: string }) => {
       mode = receivedMode
       return [{ branch: 'feature/a', pullRequest: fresh }]
     }
 
-    await useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a', 'feature/b'], { token })
+    await useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a', 'feature/b'], { repoInstanceId })
 
     const branches = useReposStore.getState().repos[REPO_ID]?.data.branches
     expect(branches?.find((b) => b.name === 'feature/a')?.pullRequest).toEqual(fresh)
@@ -151,10 +151,10 @@ describe('refreshPullRequests', () => {
 
   test('does not attach reverse pull requests to the default branch', async () => {
     const reverse = pullRequest(1, { baseRefName: 'feature/a', headRefName: 'master' })
-    const token = seedRepo([branch('master', reverse, { isDefault: true })])
+    const repoInstanceId = seedRepo([branch('master', reverse, { isDefault: true })])
     ipcHandlers['repo.pullRequests'] = async () => [{ branch: 'master', pullRequest: reverse }]
 
-    await useReposStore.getState().refreshPullRequests(REPO_ID, ['master'], { token })
+    await useReposStore.getState().refreshPullRequests(REPO_ID, ['master'], { repoInstanceId })
 
     expect(useReposStore.getState().repos[REPO_ID]?.data.branches[0]?.pullRequest).toBeUndefined()
   })
@@ -162,22 +162,22 @@ describe('refreshPullRequests', () => {
   test('clears returned pull requests that do not belong even when missing entries are preserved', async () => {
     const existing = pullRequest(1, { headRefName: 'master', baseRefName: 'master' })
     const reverse = pullRequest(2, { headRefName: 'master', baseRefName: 'feature/a' })
-    const token = seedRepo([branch('master', existing, { isDefault: true })])
+    const repoInstanceId = seedRepo([branch('master', existing, { isDefault: true })])
     ipcHandlers['repo.pullRequests'] = async () => [{ branch: 'master', pullRequest: reverse }]
 
     await useReposStore
       .getState()
-      .refreshPullRequests(REPO_ID, ['master'], { token, mode: 'full', clearMissing: false })
+      .refreshPullRequests(REPO_ID, ['master'], { repoInstanceId, mode: 'full', clearMissing: false })
 
     expect(useReposStore.getState().repos[REPO_ID]?.data.branches[0]?.pullRequest).toBeUndefined()
   })
 
   test('keeps existing pull requests when summary lookup omits a requested branch', async () => {
     const existing = pullRequest(1)
-    const token = seedRepo([branch('feature/a', existing)])
+    const repoInstanceId = seedRepo([branch('feature/a', existing)])
     ipcHandlers['repo.pullRequests'] = async () => []
 
-    await useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a'], { token, mode: 'summary' })
+    await useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a'], { repoInstanceId, mode: 'summary' })
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.data.branches[0]?.pullRequest).toEqual(existing)
@@ -186,12 +186,12 @@ describe('refreshPullRequests', () => {
 
   test('summary lookup can explicitly clear missing requested pull requests', async () => {
     const existing = pullRequest(1)
-    const token = seedRepo([branch('feature/a', existing)])
+    const repoInstanceId = seedRepo([branch('feature/a', existing)])
     ipcHandlers['repo.pullRequests'] = async () => []
 
     await useReposStore
       .getState()
-      .refreshPullRequests(REPO_ID, ['feature/a'], { token, mode: 'summary', clearMissing: true })
+      .refreshPullRequests(REPO_ID, ['feature/a'], { repoInstanceId, mode: 'summary', clearMissing: true })
 
     expect(useReposStore.getState().repos[REPO_ID]?.data.branches[0]?.pullRequest).toBeUndefined()
     expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.pullRequests.phase).toBe('idle')
@@ -200,10 +200,10 @@ describe('refreshPullRequests', () => {
   test('summary lookup preserves existing full pull request health fields', async () => {
     const existing = pullRequestWithHealth(1)
     const summary = pullRequest(1)
-    const token = seedRepo([branch('feature/a', existing)])
+    const repoInstanceId = seedRepo([branch('feature/a', existing)])
     ipcHandlers['repo.pullRequests'] = async () => [{ branch: 'feature/a', pullRequest: summary }]
 
-    await useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a'], { token, mode: 'summary' })
+    await useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a'], { repoInstanceId, mode: 'summary' })
 
     expect(useReposStore.getState().repos[REPO_ID]?.data.branches[0]?.pullRequest).toEqual({
       ...summary,
@@ -215,41 +215,41 @@ describe('refreshPullRequests', () => {
 
   test('full backfill can avoid clearing omitted branches', async () => {
     const existing = pullRequest(1)
-    const token = seedRepo([branch('feature/a'), branch('feature/b', existing)])
+    const repoInstanceId = seedRepo([branch('feature/a'), branch('feature/b', existing)])
     ipcHandlers['repo.pullRequests'] = async () => []
 
     await useReposStore
       .getState()
-      .refreshPullRequests(REPO_ID, ['feature/a', 'feature/b'], { token, mode: 'full', clearMissing: false })
+      .refreshPullRequests(REPO_ID, ['feature/a', 'feature/b'], { repoInstanceId, mode: 'full', clearMissing: false })
 
     expect(useReposStore.getState().repos[REPO_ID]?.data.branches[1]?.pullRequest).toEqual(existing)
   })
 
   test('does not let stale responses write into a reopened repo instance', async () => {
     let resolve!: (value: { branch: string; pullRequest: PullRequestInfo }[]) => void
-    const token = seedRepo([branch('feature/a')], 1)
+    const repoInstanceId = seedRepo([branch('feature/a')], 'repo-instance-test')
     ipcHandlers['repo.pullRequests'] = () =>
       new Promise<{ branch: string; pullRequest: PullRequestInfo }[]>((r) => {
         resolve = r
       })
 
-    const work = useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a'], { token })
-    seedRepo([branch('feature/a')], 2)
+    const work = useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a'], { repoInstanceId })
+    seedRepo([branch('feature/a')], 'repo-instance-test-2')
     resolve([{ branch: 'feature/a', pullRequest: pullRequest(3) }])
     await work
 
     const repo = useReposStore.getState().repos[REPO_ID]
-    expect(repo?.instanceToken).toBe(2)
+    expect(repo?.instanceId).toBe('repo-instance-test-2')
     expect(repo?.data.branches[0]?.pullRequest).toBeUndefined()
     expect(repo?.dataLoads.pullRequests.phase).toBe('idle')
   })
 
   test('preserves existing pull requests when lookup is unavailable', async () => {
     const existing = pullRequest(1)
-    const token = seedRepo([branch('feature/a', existing)])
+    const repoInstanceId = seedRepo([branch('feature/a', existing)])
     ipcHandlers['repo.pullRequests'] = async () => null
 
-    await useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a'], { token })
+    await useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a'], { repoInstanceId })
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.data.branches[0]?.pullRequest).toEqual(existing)
@@ -260,7 +260,7 @@ describe('refreshPullRequests', () => {
 
   test('preserves existing pull request metadata while snapshot refresh rechecks', async () => {
     const existing = pullRequest(1)
-    const token = seedRepo([branch('feature/a', existing)])
+    const repoInstanceId = seedRepo([branch('feature/a', existing)])
     let resolvePullRequests!: (value: null) => void
     ipcHandlers['repo.snapshot'] = async () => ({ branches: [branch('feature/a')], current: 'feature/a' })
     ipcHandlers['repo.pullRequests'] = () =>
@@ -268,7 +268,7 @@ describe('refreshPullRequests', () => {
         resolvePullRequests = resolve
       })
 
-    await useReposStore.getState().refreshSnapshot(REPO_ID, { token })
+    await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.data.branches[0]?.pullRequest).toEqual(existing)
@@ -281,14 +281,14 @@ describe('refreshPullRequests', () => {
   test('clears preserved pull requests when snapshot recheck omits them', async () => {
     const staleSelected = pullRequest(1, { headRefName: 'feature/a', baseRefName: 'main' })
     const staleOther = pullRequest(2, { headRefName: 'feature/b', baseRefName: 'main' })
-    const token = seedRepo([branch('feature/a', staleSelected), branch('feature/b', staleOther)])
+    const repoInstanceId = seedRepo([branch('feature/a', staleSelected), branch('feature/b', staleOther)])
     ipcHandlers['repo.snapshot'] = async () => ({
       branches: [branch('feature/a'), branch('feature/b')],
       current: 'feature/a',
     })
     ipcHandlers['repo.pullRequests'] = async () => []
 
-    await useReposStore.getState().refreshSnapshot(REPO_ID, { token })
+    await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     const branches = useReposStore.getState().repos[REPO_ID]?.data.branches
@@ -297,12 +297,12 @@ describe('refreshPullRequests', () => {
   })
 
   test('records pull request refresh failures as repo events', async () => {
-    const token = seedRepo([branch('feature/a', pullRequest(1))])
+    const repoInstanceId = seedRepo([branch('feature/a', pullRequest(1))])
     ipcHandlers['repo.pullRequests'] = async () => {
       throw new Error('github unavailable')
     }
 
-    await useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a'], { token })
+    await useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a'], { repoInstanceId })
 
     expect(useReposStore.getState().repos[REPO_ID]?.events).toEqual([
       expect.objectContaining({ kind: 'error', message: 'github unavailable' }),
@@ -322,7 +322,7 @@ describe('refreshPullRequests', () => {
   })
 
   test('snapshot refresh performs summary lookup then selected full lookup for visible detail', async () => {
-    const token = seedRepo([branch('feature/a')])
+    const repoInstanceId = seedRepo([branch('feature/a')])
     selectBranchForTest('feature/a')
     const calls: Array<{ branches?: string[]; mode?: string; loadingAtStart?: boolean }> = []
     ipcHandlers['repo.snapshot'] = async () => ({
@@ -338,7 +338,7 @@ describe('refreshPullRequests', () => {
       return []
     }
 
-    await useReposStore.getState().refreshSnapshot(REPO_ID, { token })
+    await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(calls).toEqual([
@@ -349,7 +349,7 @@ describe('refreshPullRequests', () => {
 
   test('snapshot refresh retries visible full lookup when merge status is still pending', async () => {
     vi.useFakeTimers()
-    const token = seedRepo([branch('feature/a')])
+    const repoInstanceId = seedRepo([branch('feature/a')])
     selectBranchForTest('feature/a')
     const calls: Array<{ branches?: string[]; mode?: string }> = []
     let fullCalls = 0
@@ -369,7 +369,7 @@ describe('refreshPullRequests', () => {
       ]
     }
 
-    await useReposStore.getState().refreshSnapshot(REPO_ID, { token })
+    await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
     await vi.advanceTimersByTimeAsync(PULL_REQUEST_UNKNOWN_RETRY_DELAY_MS + 1)
 
     expect(calls).toEqual([
@@ -381,7 +381,7 @@ describe('refreshPullRequests', () => {
   })
 
   test('snapshot refresh skips selected full lookup when status detail is not visible', async () => {
-    const token = seedRepo([branch('feature/a', undefined, { worktree: { path: '/tmp/feature-a-worktree' } })])
+    const repoInstanceId = seedRepo([branch('feature/a', undefined, { worktree: { path: '/tmp/feature-a-worktree' } })])
     useReposStore.setState((s) => ({
       repos: {
         ...s.repos,
@@ -407,14 +407,14 @@ describe('refreshPullRequests', () => {
       return []
     }
 
-    await useReposStore.getState().refreshSnapshot(REPO_ID, { token })
+    await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(calls).toEqual([{ branches: ['feature/a', 'feature/b'], mode: 'summary' }])
   })
 
   test('snapshot refresh stops pull request backfill after the first refresh error', async () => {
-    const token = seedRepo([branch('feature/a')])
+    const repoInstanceId = seedRepo([branch('feature/a')])
     const calls: Array<{ branches?: string[]; mode?: string }> = []
     ipcHandlers['repo.snapshot'] = async () => ({
       branches: [branch('feature/a'), branch('feature/b')],
@@ -425,7 +425,7 @@ describe('refreshPullRequests', () => {
       throw new Error('GitHub CLI is not signed in to github.com')
     }
 
-    await useReposStore.getState().refreshSnapshot(REPO_ID, { token })
+    await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(calls).toEqual([{ branches: ['feature/a', 'feature/b'], mode: 'summary' }])
@@ -435,14 +435,14 @@ describe('refreshPullRequests', () => {
   })
 
   test('snapshot refresh unavailable pull request lookups do not enqueue repo error events', async () => {
-    const token = seedRepo([branch('feature/a')])
+    const repoInstanceId = seedRepo([branch('feature/a')])
     ipcHandlers['repo.snapshot'] = async () => ({
       branches: [branch('feature/a'), branch('feature/b')],
       current: 'feature/a',
     })
     ipcHandlers['repo.pullRequests'] = async () => null
 
-    await useReposStore.getState().refreshSnapshot(REPO_ID, { token })
+    await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(useReposStore.getState().repos[REPO_ID]?.events).toEqual([])
@@ -450,7 +450,7 @@ describe('refreshPullRequests', () => {
   })
 
   test('ignores stale pull request lookups for the same repo instance', async () => {
-    const token = seedRepo([branch('feature/a')])
+    const repoInstanceId = seedRepo([branch('feature/a')])
     let resolveFirst!: (value: { branch: string; pullRequest: PullRequestInfo }[]) => void
     let resolveSecond!: (value: { branch: string; pullRequest: PullRequestInfo }[]) => void
     let callCount = 0
@@ -462,8 +462,8 @@ describe('refreshPullRequests', () => {
       })
     }
 
-    const first = useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a'], { token })
-    const second = useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a'], { token })
+    const first = useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a'], { repoInstanceId })
+    const second = useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a'], { repoInstanceId })
 
     const fresh = pullRequest(2)
     resolveSecond([{ branch: 'feature/a', pullRequest: fresh }])
@@ -480,7 +480,7 @@ describe('refreshPullRequests', () => {
   })
 
   test('settles branch data loads that are only owned by a stale lookup', async () => {
-    const token = seedRepo([branch('feature/a'), branch('feature/b')])
+    const repoInstanceId = seedRepo([branch('feature/a'), branch('feature/b')])
     let resolveFirst!: (value: { branch: string; pullRequest: PullRequestInfo }[]) => void
     let resolveSecond!: (value: { branch: string; pullRequest: PullRequestInfo }[]) => void
     let callCount = 0
@@ -492,8 +492,8 @@ describe('refreshPullRequests', () => {
       })
     }
 
-    const first = useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a', 'feature/b'], { token })
-    const second = useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a'], { token })
+    const first = useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a', 'feature/b'], { repoInstanceId })
+    const second = useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a'], { repoInstanceId })
 
     resolveSecond([])
     await second
@@ -507,14 +507,14 @@ describe('refreshPullRequests', () => {
   })
 
   test('does not recreate branch data loads for branches removed before lookup completion', async () => {
-    const token = seedRepo([branch('feature/a'), branch('feature/b')])
+    const repoInstanceId = seedRepo([branch('feature/a'), branch('feature/b')])
     let resolve!: (value: { branch: string; pullRequest: PullRequestInfo }[]) => void
     ipcHandlers['repo.pullRequests'] = () =>
       new Promise<{ branch: string; pullRequest: PullRequestInfo }[]>((r) => {
         resolve = r
       })
 
-    const work = useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/b'], { token })
+    const work = useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/b'], { repoInstanceId })
     useReposStore.setState((s) => ({
       repos: {
         ...s.repos,
@@ -534,7 +534,7 @@ describe('refreshPullRequests', () => {
   })
 
   test('does not persist cache from a stale pull request lookup while a newer lookup is running', async () => {
-    const token = seedRepo([branch('feature/a')])
+    const repoInstanceId = seedRepo([branch('feature/a')])
     let callCount = 0
     let resolveFirst!: (value: { branch: string; pullRequest: PullRequestInfo }[]) => void
     let resolveSecond!: (value: { branch: string; pullRequest: PullRequestInfo }[]) => void
@@ -546,8 +546,8 @@ describe('refreshPullRequests', () => {
       })
     }
 
-    const first = useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a'], { token })
-    const second = useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a'], { token })
+    const first = useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a'], { repoInstanceId })
+    const second = useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a'], { repoInstanceId })
 
     resolveFirst([])
     await first

@@ -4,18 +4,26 @@ import type { ReposGet } from '#/web/stores/repos/types.ts'
 import type { ReposSet } from '#/web/stores/repos/types.ts'
 import { createBranchSnapshot, installGoblinTestBridge } from '#/web/test-utils/bridge.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
+import { setWorkspacePaneTabsForTargetQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 
 describe('repo refresh workflows', () => {
   test('snapshot success backfills summary then visible selected repo workspace', async () => {
     const calls: string[] = []
     installGoblinTestBridge({})
+    setWorkspacePaneTabsForTargetQueryData({
+      repoRoot: '/repo',
+      repoInstanceId: 'repo-instance-test-2',
+      branchName: 'feature/a',
+      worktreePath: null,
+      tabs: [workspacePaneStaticTabEntry('status')],
+    })
     const get: ReposGet = () =>
       ({
         repos: {
           '/repo': {
             id: '/repo',
             name: 'repo',
-            instanceToken: 2,
+            instanceId: 'repo-instance-test-2',
             data: {
               branches: [createBranchSnapshot('feature/a')],
               currentBranch: 'feature/a',
@@ -35,10 +43,10 @@ describe('repo refresh workflows', () => {
         refreshPullRequests: (
           id: string,
           branches?: string[],
-          options?: { token?: number; mode?: string; clearMissing?: boolean },
+          options?: { repoInstanceId?: string; mode?: string; clearMissing?: boolean },
         ) => {
           calls.push(
-            `prs:${id}:${branches?.join(',') ?? ''}:${options?.mode ?? ''}:${String(options?.clearMissing ?? false)}:${options?.token ?? ''}`,
+            `prs:${id}:${branches?.join(',') ?? ''}:${options?.mode ?? ''}:${String(options?.clearMissing ?? false)}:${options?.repoInstanceId ?? ''}`,
           )
           return Promise.resolve()
         },
@@ -47,14 +55,14 @@ describe('repo refresh workflows', () => {
 
     runSnapshotSuccessWorkflow(set, get, {
       id: '/repo',
-      token: 2,
+      repoInstanceId: 'repo-instance-test-2',
       branchNames: ['feature/a', 'feature/b'],
       worktreePaths: [],
       isSnapshotCurrent: () => true,
     })
     await new Promise((resolve) => setTimeout(resolve, 0))
 
-    expect(calls).toEqual(['prs:/repo:feature/a,feature/b:summary:true:2', 'prs:/repo:feature/a:full:false:2'])
+    expect(calls).toEqual(['prs:/repo:feature/a,feature/b:summary:true:repo-instance-test-2', 'prs:/repo:feature/a:full:false:repo-instance-test-2'])
   })
 
   test('snapshot success does not block pull request backfill on terminal prune completion', async () => {
@@ -67,6 +75,13 @@ describe('repo refresh workflows', () => {
         return { pruned: 0, remaining: 0 }
       },
     })
+    setWorkspacePaneTabsForTargetQueryData({
+      repoRoot: '/repo',
+      repoInstanceId: 'repo-instance-test-2',
+      branchName: 'feature/a',
+      worktreePath: null,
+      tabs: [workspacePaneStaticTabEntry('status')],
+    })
     const calls: string[] = []
     const get: ReposGet = () =>
       ({
@@ -74,7 +89,7 @@ describe('repo refresh workflows', () => {
           '/repo': {
             id: '/repo',
             name: 'repo',
-            instanceToken: 2,
+            instanceId: 'repo-instance-test-2',
             data: {
               branches: [createBranchSnapshot('feature/a')],
               currentBranch: 'feature/a',
@@ -94,7 +109,7 @@ describe('repo refresh workflows', () => {
         refreshPullRequests: (
           id: string,
           branches?: string[],
-          options?: { token?: number; mode?: string; clearMissing?: boolean },
+          options?: { repoInstanceId?: string; mode?: string; clearMissing?: boolean },
         ) => {
           calls.push(`prs:${id}:${branches?.join(',') ?? ''}:${options?.mode ?? ''}`)
           return Promise.resolve()
@@ -104,7 +119,7 @@ describe('repo refresh workflows', () => {
 
     runSnapshotSuccessWorkflow(set, get, {
       id: '/repo',
-      token: 2,
+      repoInstanceId: 'repo-instance-test-2',
       branchNames: ['feature/a', 'feature/b'],
       worktreePaths: [],
       isSnapshotCurrent: () => true,

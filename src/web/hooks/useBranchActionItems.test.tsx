@@ -134,7 +134,7 @@ function allVisibleCapabilities(): BranchActionCapabilities {
 function repo(): BranchActionRepo {
   return {
     id: '/tmp/gbl-action-items',
-    instanceToken: 1,
+    instanceId: 'repo-instance-test',
     data: {
       currentBranch: 'main',
       status: [],

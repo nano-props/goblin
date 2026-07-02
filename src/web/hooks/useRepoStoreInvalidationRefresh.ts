@@ -10,8 +10,8 @@ export function useRepoStoreInvalidationRefresh() {
       const state = useReposStore.getState()
       const repo = state.repos[event.repoId]
       if (!repo || isRepoUnavailable(repo)) return
-      const token = repo.instanceToken
-      void handleRepoInvalidationRefresh(useReposStore.getState, event, token)
+      const repoInstanceId = repo.instanceId
+      void handleRepoInvalidationRefresh(useReposStore.getState, event, repoInstanceId)
     })
   }, [])
 }

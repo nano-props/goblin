@@ -15,6 +15,11 @@ import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
 async function makeTempWorktree(files: Record<string, string>): Promise<string> {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'repo-tree-source-'))
   await execa('git', ['-C', root, 'init', '-q'])
+  // Isolate from the host machine's global gitignore (`core.excludesFile`).
+  // Without this, a developer's personal excludes (e.g. a global rule for
+  // `.env`) silently changes which fixture files these tests see as
+  // ignored, making assertions about *this repo's* `.gitignore` flaky.
+  await execa('git', ['-C', root, 'config', 'core.excludesFile', '/dev/null'])
   for (const [relpath, contents] of Object.entries(files)) {
     const full = path.join(root, relpath)
     await fs.mkdir(path.dirname(full), { recursive: true })

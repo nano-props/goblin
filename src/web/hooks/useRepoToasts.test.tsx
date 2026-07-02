@@ -55,7 +55,7 @@ beforeEach(() => {
 
 describe('useRepoToasts', () => {
   test('shows worktree bootstrap details on create-worktree success toasts', async () => {
-    const token = seedRepoState({ id: REPO_ID }).instanceToken
+    const repoInstanceId = seedRepoState({ id: REPO_ID }).instanceId
     useReposStore.getState().setLastResult(
       REPO_ID,
       {
@@ -69,7 +69,7 @@ describe('useRepoToasts', () => {
           setup: { command: 'bun install' },
         },
       },
-      token,
+      repoInstanceId,
       { action: { kind: 'createWorktree', branch: 'feature/a', worktreePath: '/tmp/worktrees/feature-a' } },
     )
 

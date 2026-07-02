@@ -4,7 +4,6 @@ import { emptyRepoDataLoadBundle } from '#/web/stores/repos/repo-data-load-state
 import type { ExecResult } from '#/web/types.ts'
 import type { RepoEvent, RepoResultEventOptions, RepoState, ReposStore } from '#/web/stores/repos/types.ts'
 
-let nextInstanceToken = 1
 let nextEventId = 1
 
 const MAX_REPO_EVENTS = 50
@@ -12,11 +11,11 @@ const MAX_REPO_EVENTS = 50
 type RepoMutator = (repo: Draft<RepoState>) => void
 type ReposPatch = Pick<ReposStore, 'repos'>
 
-export function emptyRepo(id: string, name: string): RepoState {
+export function emptyRepo(id: string, name: string, instanceId: string): RepoState {
   return {
     id,
     name,
-    instanceToken: nextInstanceToken++,
+    instanceId,
     data: {
       branches: [],
       currentBranch: '',

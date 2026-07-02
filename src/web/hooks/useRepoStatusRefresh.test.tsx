@@ -36,14 +36,15 @@ function createRepo(
     statusPhase?: 'idle' | 'loading' | 'refreshing'
   } = {},
 ) {
-  const repo = emptyRepo(id, 'repo')
+  const repo = emptyRepo(id, 'repo', 'repo-instance-test')
   const worktreePath = `${id}/main`
-  repo.instanceToken = id === '/repo-a' ? 1 : 2
+  repo.instanceId = id === '/repo-a' ? 'repo-instance-test-a' : 'repo-instance-test-b'
   repo.data.branches = [createRepoBranch('main', { worktree: { path: worktreePath } })]
   repo.data.currentBranch = 'main'
   repo.ui.selectedBranch = 'main'
   setWorkspacePaneTabsForTargetQueryData({
     repoRoot: id,
+    repoInstanceId: repo.instanceId,
     branchName: 'main',
     worktreePath,
     tabs: [workspacePaneStaticTabEntry('status')],
@@ -63,7 +64,7 @@ describe('isRepoStatusRefreshable', () => {
     expect(
       isRepoStatusRefreshable({
         id: '/r',
-        token: 1,
+        repoInstanceId: 'repo-instance-test',
         preferredWorkspacePaneTab: 'status',
         statusViewOpen: true,
         unavailable: false,
@@ -76,7 +77,7 @@ describe('isRepoStatusRefreshable', () => {
     expect(
       isRepoStatusRefreshable({
         id: '/r',
-        token: 1,
+        repoInstanceId: 'repo-instance-test',
         preferredWorkspacePaneTab: 'status',
         statusViewOpen: true,
         unavailable: true,
@@ -89,7 +90,7 @@ describe('isRepoStatusRefreshable', () => {
     expect(
       isRepoStatusRefreshable({
         id: '/r',
-        token: 1,
+        repoInstanceId: 'repo-instance-test',
         preferredWorkspacePaneTab: 'status',
         statusViewOpen: true,
         unavailable: false,
@@ -99,7 +100,7 @@ describe('isRepoStatusRefreshable', () => {
     expect(
       isRepoStatusRefreshable({
         id: '/r',
-        token: 1,
+        repoInstanceId: 'repo-instance-test',
         preferredWorkspacePaneTab: 'status',
         statusViewOpen: true,
         unavailable: false,
@@ -149,7 +150,7 @@ describe('useRepoStatusRefresh', () => {
       useReposStore.setState({ activeId: '/repo-b' })
     })
 
-    expect(refreshStatus).toHaveBeenCalledWith('/repo-b', { token: 2 })
+    expect(refreshStatus).toHaveBeenCalledWith('/repo-b', { repoInstanceId: 'repo-instance-test-b' })
   })
 
   test('refreshes status when opening the status tab', async () => {
@@ -168,7 +169,7 @@ describe('useRepoStatusRefresh', () => {
       useReposStore.getState().setWorkspacePaneTab('/repo-a', 'status')
     })
 
-    expect(refreshStatus).toHaveBeenCalledWith('/repo-a', { token: 1 })
+    expect(refreshStatus).toHaveBeenCalledWith('/repo-a', { repoInstanceId: 'repo-instance-test-a' })
   })
 
   test('refreshes status when opening the changes tab', async () => {
@@ -187,7 +188,7 @@ describe('useRepoStatusRefresh', () => {
       useReposStore.getState().setWorkspacePaneTab('/repo-a', 'changes')
     })
 
-    expect(refreshStatus).toHaveBeenCalledWith('/repo-a', { token: 1 })
+    expect(refreshStatus).toHaveBeenCalledWith('/repo-a', { repoInstanceId: 'repo-instance-test-a' })
   })
 
   test('refreshes status when reopening the status tab after bouncing through terminal', async () => {
@@ -229,7 +230,7 @@ describe('useRepoStatusRefresh', () => {
     await act(async () => {
       useReposStore.getState().setWorkspacePaneTab('/repo-a', 'status')
     })
-    expect(refreshStatus).toHaveBeenCalledWith('/repo-a', { token: 1 })
+    expect(refreshStatus).toHaveBeenCalledWith('/repo-a', { repoInstanceId: 'repo-instance-test-a' })
   })
 
   test('skips refresh when the repo is unavailable', async () => {

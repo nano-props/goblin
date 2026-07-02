@@ -52,7 +52,7 @@ function createRepo(input: {
   return {
     id: input.id,
     name: 'repo',
-    instanceToken: 1,
+    instanceId: 'repo-instance-test',
     data: {
       branches: [],
       currentBranch: '',

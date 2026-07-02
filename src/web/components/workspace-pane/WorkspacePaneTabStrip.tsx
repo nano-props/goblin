@@ -531,7 +531,7 @@ export function WorkspacePaneTabStrip({
           compactItem={selectedItem}
           workspacePaneId={workspacePaneId}
           context={tabBodyContext}
-          canCreateNew={canCreateNew && !newTerminalBusy}
+          canCreateNew={canCreateNew}
           onNew={onNew}
         />
       }
@@ -788,8 +788,8 @@ function WorkspacePaneNewButton({
       size="icon"
       className={cn('h-7 w-7 shrink-0', compact && 'w-7')}
       id={id}
-      onClick={busy ? undefined : onClick}
-      disabled={busy}
+      onClick={onClick}
+      aria-busy={busy ? 'true' : undefined}
       aria-label={label}
       title={label}
       data-workspace-pane-new-button=""

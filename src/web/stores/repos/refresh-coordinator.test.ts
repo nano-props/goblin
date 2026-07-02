@@ -15,24 +15,24 @@ function callsGet() {
       repos: {
         '/repo': {
           id: '/repo',
-          instanceToken: 9,
+          instanceId: 'repo-instance-test-9',
           availability: { phase: 'available' },
         },
       },
-      syncAndRefresh: (id: string, options?: { token?: number }) => {
-        calls.push(`manual:${id}:${options?.token ?? ''}`)
+      syncAndRefresh: (id: string, options?: { repoInstanceId?: string }) => {
+        calls.push(`manual:${id}:${options?.repoInstanceId ?? ''}`)
         return Promise.resolve()
       },
-      refreshCoreData: (id: string, options?: { token?: number }) => {
-        calls.push(`core:${id}:${options?.token ?? ''}`)
+      refreshCoreData: (id: string, options?: { repoInstanceId?: string }) => {
+        calls.push(`core:${id}:${options?.repoInstanceId ?? ''}`)
         return Promise.resolve()
       },
       refreshPullRequests: (
         id: string,
         branches?: string[],
-        options?: { token?: number; mode?: string; clearMissing?: boolean },
+        options?: { repoInstanceId?: string; mode?: string; clearMissing?: boolean },
       ) => {
-        calls.push(`prs:${id}:${branches?.join(',') ?? ''}:${options?.mode ?? ''}:${options?.token ?? ''}`)
+        calls.push(`prs:${id}:${branches?.join(',') ?? ''}:${options?.mode ?? ''}:${options?.repoInstanceId ?? ''}`)
         return Promise.resolve()
       },
     }) as unknown as ReturnType<ReposGet>
@@ -52,25 +52,25 @@ describe('repo refresh coordinator', () => {
   test('routes initial load through a coordinated snapshot and status refresh', async () => {
     const { calls, get } = callsGet()
 
-    await runRepoRefreshIntent(get, { kind: 'core-data-changed', reason: 'initial-load', id: '/repo', token: 7 })
+    await runRepoRefreshIntent(get, { kind: 'core-data-changed', reason: 'initial-load', id: '/repo', repoInstanceId: 'repo-instance-test-7' })
 
-    expect(calls).toEqual(['core:/repo:7'])
+    expect(calls).toEqual(['core:/repo:repo-instance-test-7'])
   })
 
   test('routes manual refresh requests through syncAndRefresh', async () => {
     const { calls, get } = callsGet()
 
-    await runRepoRefreshIntent(get, { kind: 'manual-refresh-requested', id: '/repo', token: 5 })
+    await runRepoRefreshIntent(get, { kind: 'manual-refresh-requested', id: '/repo', repoInstanceId: 'repo-instance-test-5' })
 
-    expect(calls).toEqual(['manual:/repo:5'])
+    expect(calls).toEqual(['manual:/repo:repo-instance-test-5'])
   })
 
   test('routes repo invalidation refreshes directly through the core refresh path', async () => {
     const { calls, get } = callsGet()
 
-    await handleRepoInvalidationRefresh(get, { repoId: '/repo', query: 'repo-snapshot' }, 9)
+    await handleRepoInvalidationRefresh(get, { repoId: '/repo', query: 'repo-snapshot' }, 'repo-instance-test-9')
 
-    expect(calls).toEqual(['core:/repo:9'])
+    expect(calls).toEqual(['core:/repo:repo-instance-test-9'])
   })
 
   test('runs visible pull request refreshes only when a branch is visible', async () => {
@@ -79,17 +79,17 @@ describe('repo refresh coordinator', () => {
     await runRepoRefreshIntent(get, {
       kind: 'visible-pull-request-changed',
       id: '/repo',
-      token: 3,
+      repoInstanceId: 'repo-instance-test-3',
       branch: 'feature/a',
     })
     await runRepoRefreshIntent(get, {
       kind: 'visible-pull-request-changed',
       id: '/repo',
-      token: 3,
+      repoInstanceId: 'repo-instance-test-3',
       branch: null,
     })
 
-    expect(calls).toEqual(['prs:/repo:feature/a:full:3'])
+    expect(calls).toEqual(['prs:/repo:feature/a:full:repo-instance-test-3'])
   })
 
   test('suppresses repo invalidations from an active local source token', () => {
@@ -124,7 +124,7 @@ describe('repo refresh coordinator', () => {
       }) as unknown as ReturnType<ReposGet>
 
     await expect(
-      runRepoRefreshIntent(get, { kind: 'core-data-changed', reason: 'branch-action', id: '/repo', token: 13 }),
+      runRepoRefreshIntent(get, { kind: 'core-data-changed', reason: 'branch-action', id: '/repo', repoInstanceId: 'repo-instance-test-13' }),
     ).rejects.toThrow('boom')
 
     expect(repoInvalidationRefreshDisposition({})).toBe('refresh')

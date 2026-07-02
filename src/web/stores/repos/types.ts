@@ -118,7 +118,7 @@ export interface RepoState {
   id: string
   name: string
   /** Bumped on every fresh open so async writers can detect close-and-reopen. */
-  instanceToken: number
+  instanceId: string
   /** Client-local projection of runtime-coherent repo truth. */
   data: RepoDataState
   dataLoads: RepoDataLoadBundle
@@ -174,6 +174,25 @@ interface LocalWorkspaceState {
   /** Persistence gate — true only after all boot-restored state that can
    *  affect WorkspaceSessionState has converged back into the client store. */
   sessionPersistenceReady: boolean
+  /** Chrome-tab-style "opener" tracking, covering every workspace pane tab
+   *  (static and terminal): maps a tab's identity (see
+   *  `workspacePaneTabEntryIdentity`) to the identity of the tab that was
+   *  active when it was opened. Closing a tab prefers reactivating its
+   *  opener before falling back to the adjacent-tab heuristic. Scoped by
+   *  `tabOpenerScopeKey(repoId, branchName)` because static tab identities
+   *  (e.g. `workspace-pane:changes`) are shared constants across every
+   *  repo/branch, unlike terminal identities. Session-local only — openers
+   *  don't need to survive reload/restart. */
+  tabOpenerIdentityByScope: Record<string, Record<string, string>>
+}
+
+interface LocalWorkspaceActions {
+  /** Records that `childIdentity` was opened from the currently active
+   *  `openerIdentity` tab, within the given opener scope
+   *  (`tabOpenerScopeKey(repoId, branchName)`). */
+  setTabOpener: (scopeKey: string, childIdentity: string, openerIdentity: string) => void
+  /** Clears a tab's recorded opener within a scope, e.g. once the tab has closed. */
+  clearTabOpener: (scopeKey: string, childIdentity: string) => void
 }
 
 interface RestorableWorkspaceActions {
@@ -210,21 +229,21 @@ interface RuntimeCoherentRepoProjectionActions {
   setBranchViewMode: (id: string, viewMode: BranchViewMode) => void
   selectBranch: (id: string, branch: string) => void
   clearSelectedBranch: (id: string) => void
-  refreshSnapshot: (id: string, options?: { skipLogBackfill?: boolean; token?: number }) => Promise<void>
-  refreshSnapshotAndStatus: (id: string, options?: { skipLogBackfill?: boolean; token?: number }) => Promise<void>
+  refreshSnapshot: (id: string, options?: { skipLogBackfill?: boolean; repoInstanceId?: string }) => Promise<void>
+  refreshSnapshotAndStatus: (id: string, options?: { skipLogBackfill?: boolean; repoInstanceId?: string }) => Promise<void>
   refreshPullRequests: (
     id: string,
     branches?: string[],
     options?: {
-      token?: number
+      repoInstanceId?: string
       mode?: PullRequestFetchMode
       clearMissing?: boolean
     },
   ) => Promise<void>
-  refreshStatus: (id: string, options?: { token?: number }) => Promise<void>
-  refreshCoreData: (id: string, options?: { token?: number }) => Promise<void>
-  syncAndRefresh: (id: string, options?: { token?: number }) => Promise<void>
-  setLastResult: (id: string, result: ExecResult, token: number, options?: RepoResultEventOptions) => void
+  refreshStatus: (id: string, options?: { repoInstanceId?: string }) => Promise<void>
+  refreshCoreData: (id: string, options?: { repoInstanceId?: string }) => Promise<void>
+  syncAndRefresh: (id: string, options?: { repoInstanceId?: string }) => Promise<void>
+  setLastResult: (id: string, result: ExecResult, repoInstanceId: string, options?: RepoResultEventOptions) => void
   clearEvents: (id: string, eventIds: number[]) => void
   hydrateRepoSession: (
     openRepoEntries: RepoSessionEntry[],
@@ -234,7 +253,7 @@ interface RuntimeCoherentRepoProjectionActions {
   /** Clear the fetchFailed flag — called by manual fetch success and
    *  by an explicit refresh, so a stale badge doesn't follow the user
    *  around forever. */
-  clearFetchFailed: (id: string, token: number) => void
+  clearFetchFailed: (id: string, repoInstanceId: string) => void
 }
 
 interface RepoMutationActions {
@@ -256,6 +275,7 @@ export interface ReposStore
     RestorableWorkspaceState,
     LocalWorkspaceState,
     RestorableWorkspaceActions,
+    LocalWorkspaceActions,
     RuntimeCoherentRepoProjectionActions,
     RepoMutationActions {}
 

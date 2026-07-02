@@ -91,18 +91,18 @@ export async function runRemoteRepoConnection(
   set: ReposSet,
   get: ReposGet,
   repoId: string,
-  options: { token?: number; signal?: AbortSignal } = {},
+  options: { repoInstanceId?: string; signal?: AbortSignal } = {},
 ): Promise<RemoteRepoConnectionOutcome | null> {
   if (!isRemoteRepoId(repoId)) return null
-  const token = options.token ?? get().repos[repoId]?.instanceToken
-  if (!token) return null
+  const repoInstanceId = options.repoInstanceId ?? get().repos[repoId]?.instanceId
+  if (!repoInstanceId) return null
 
   // Mark the repo as `connecting` BEFORE entering the lane so
   // observers see the projection change immediately.
   set((s) => {
     const repo = s.repos[repoId]
     if (!repo) return s
-    if (repo.instanceToken !== token) return s
+    if (repo.instanceId !== repoInstanceId) return s
     if (repo.remote.lifecycle?.kind === 'connecting') return s
     const next = { ...repo, remote: { ...repo.remote } }
     markRemoteLifecycleConnecting(next)
@@ -113,7 +113,7 @@ export async function runRemoteRepoConnection(
     set,
     get,
     id: repoId,
-    token,
+    repoInstanceId,
     lane: 'lifecycle',
     priority: 50,
     targets: [{ key: 'lifecycle', reason: 'manual-refresh' as const }],
@@ -127,10 +127,10 @@ export async function runRemoteRepoConnection(
       if (outcome.kind === 'ready' && outcome.target) {
         const refreshHolder: { value: InitialRepoRefresh | null } = { value: null }
         set((s) => {
-          const result = addResolvedRepo(s, { id: outcome.repoId, name: outcome.name, target: outcome.target! })
+          const result = addResolvedRepo(s, { id: outcome.repoId, name: outcome.name, target: outcome.target! }, repoInstanceId)
           if (!result.changed) return s
           const repo = result.repos[outcome.repoId]
-          if (repo) refreshHolder.value = { id: repo.id, token: repo.instanceToken }
+          if (repo) refreshHolder.value = { id: repo.id, repoInstanceId: repo.instanceId }
           return { ...s, repos: result.repos, order: result.order }
         })
         const pending = refreshHolder.value
@@ -139,12 +139,12 @@ export async function runRemoteRepoConnection(
             kind: 'core-data-changed',
             reason: 'initial-load',
             id: pending.id,
-            token: pending.token,
+            repoInstanceId: pending.repoInstanceId,
           })
         }
       } else {
         set((s) => {
-          return addUnavailableRepo(s, outcome.repoId, outcome.reason ?? 'unknown', outcome.target)
+          return addUnavailableRepo(s, outcome.repoId, outcome.reason ?? 'unknown', repoInstanceId, outcome.target)
         })
       }
     },
@@ -155,7 +155,7 @@ export async function runRemoteRepoConnection(
       // resolved a target (the task threw before completion), so
       // we degrade gracefully with no last-known target.
       set((s) => {
-        return addUnavailableRepo(s, repoId, message || 'unknown', undefined)
+        return addUnavailableRepo(s, repoId, message || 'unknown', repoInstanceId, undefined)
       })
     },
     onStale: () => {

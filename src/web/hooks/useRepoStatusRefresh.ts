@@ -19,7 +19,7 @@ function activeRepoStatusSnapshotEqual(
     (!!a &&
       !!b &&
       a.id === b.id &&
-      a.token === b.token &&
+      a.repoInstanceId === b.repoInstanceId &&
       a.preferredWorkspacePaneTab === b.preferredWorkspacePaneTab &&
       a.statusViewOpen === b.statusViewOpen &&
       a.unavailable === b.unavailable &&
@@ -62,7 +62,7 @@ export function useRepoStatusRefresh() {
     void runRepoRefreshIntent(useReposStore.getState, {
       kind: 'visible-status-like-view-opened',
       id: activeRepoId.id,
-      token: activeRepoId.token,
+      repoInstanceId: activeRepoId.repoInstanceId,
     })
   }, [activeRepoId])
 }

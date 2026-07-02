@@ -19,6 +19,7 @@ import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
+import { captureWorkspacePaneActiveTabIdentity } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import type { WorkspacePanePanelLabel } from '#/web/components/workspace-pane/tab-providers.ts'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { useFiletreeActionDialogsStore } from '#/web/stores/repos/filetree-action-dialogs.ts'
@@ -38,7 +39,7 @@ const DEFAULT_BRANCH_HISTORY_ERROR_KEY = 'error.failed-read-repo'
 
 export interface WorkspacePanePanelRenderInput {
   type: WorkspacePaneTabType
-  repo: Pick<RepoWorkspaceRepo, 'id' | 'data' | 'ui'> & {
+  repo: Pick<RepoWorkspaceRepo, 'id' | 'instanceId' | 'data' | 'ui'> & {
     data: RepoWorkspaceRepo['data'] & Pick<RepoWorkspaceRepo['data'], 'statusLoaded'>
   }
   detail: SelectedRepoWorkspacePresentation
@@ -128,6 +129,7 @@ function TerminalWorkspacePanePanel({
       workspacePaneId={workspacePaneId}
       panelLabel={panelLabel}
       repoId={repo.id}
+      repoInstanceId={repo.instanceId}
       terminalSyncReady={terminalSyncReady}
       branch={branch}
     />
@@ -146,23 +148,30 @@ function FilesWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel }: 
   }
   return (
     <BranchTabPanel id={`${workspacePaneId}-files-panel`} {...panelLabel}>
-      <FiletreeTab repoId={repo.id} branchName={branch.name} worktreePath={worktreePath} />
+      <FiletreeTab
+        repoId={repo.id}
+        repoInstanceId={repo.instanceId}
+        branchName={branch.name}
+        worktreePath={worktreePath}
+      />
     </BranchTabPanel>
   )
 }
 
 function FiletreeTab({
   repoId,
+  repoInstanceId,
   branchName,
   worktreePath,
 }: {
   repoId: string
+  repoInstanceId: string
   branchName: string
   worktreePath: string
 }) {
   const t = useT()
   const navigation = usePrimaryWindowNavigation()
-  const { createTerminal } = useTerminalSessionContext()
+  const { createTerminal, createOwnedTerminal } = useTerminalSessionContext()
   const openTrashFileConfirm = useFiletreeActionDialogsStore((s) => s.openTrashFileConfirm)
   const interactionScopeKey = useMemo(() => filetreeInteractionScopeKey(repoId, worktreePath), [repoId, worktreePath])
   const selectedKeyList = useFiletreeInteractionStore(
@@ -219,23 +228,25 @@ function FiletreeTab({
   const openFileInTerminal = useCallback(
     async (node: RepoTreeNode) => {
       if (node.kind !== 'file') return
-      navigation.showRepoWorkspacePaneTab(repoId, 'terminal')
+      const openerIdentity = captureWorkspacePaneActiveTabIdentity(repoId)
       const viewerResult = await getRepositoryFileViewer(repoId, worktreePath).catch(() => ({
         viewer: 'cat' as const,
         shell: 'posix' as const,
       }))
-      const terminalResult = await runCreateTerminalTabCommand({
-        base: { repoRoot: repoId, branch: branchName, worktreePath },
+      await runCreateTerminalTabCommand({
+        base: { repoRoot: repoId, repoInstanceId, branch: branchName, worktreePath },
         createTerminal,
+        createOwnedTerminal,
+        openerIdentity,
+        enterTerminalTab: () => navigation.showRepoWorkspacePaneTab(repoId, 'terminal'),
         options: {
           startupShellCommand: fileReadCommand(viewerResult, absoluteFilePathForTerminal(worktreePath, node.path)),
         },
         t,
         logMessage: 'filetree open file terminal create failed',
       })
-      if (!terminalResult.ok) return
     },
-    [branchName, createTerminal, navigation, repoId, t, worktreePath],
+    [branchName, createOwnedTerminal, createTerminal, navigation, repoId, repoInstanceId, t, worktreePath],
   )
 
   const requestTrashFile = useCallback(
@@ -353,33 +364,42 @@ function BranchTerminalTab({
   workspacePaneId,
   panelLabel,
   repoId,
+  repoInstanceId,
   terminalSyncReady,
   branch,
 }: {
   workspacePaneId: string
   panelLabel: WorkspacePanePanelLabel
   repoId: string
+  repoInstanceId: string
   terminalSyncReady: boolean
   branch: RepoWorkspaceBranch
 }) {
-  const { createTerminal } = useTerminalSessionContext()
+  const { createTerminal, createOwnedTerminal } = useTerminalSessionContext()
   const t = useT()
   const createTerminalForSlot = useCallback(
     async (base: TerminalSessionBase) => {
       await runCreateTerminalTabCommand({
         base,
         createTerminal,
+        createOwnedTerminal,
+        openerIdentity: null,
+        // No switch needed: this is the empty-state CTA rendered *inside*
+        // the terminal tab itself (no worktree terminal exists yet), not a
+        // "switch away from another tab" gesture.
+        enterTerminalTab: () => {},
         t,
         logMessage: 'workspace pane terminal create failed',
       })
     },
-    [createTerminal, t],
+    [createOwnedTerminal, createTerminal, t],
   )
   if (!branch.worktree?.path) return null
   return (
     <BranchTabPanel id={`${workspacePaneId}-terminal-panel`} {...panelLabel}>
       <TerminalSessionView
         repoRoot={repoId}
+        repoInstanceId={repoInstanceId}
         branch={branch.name}
         worktreePath={branch.worktree?.path}
         syncReady={terminalSyncReady}

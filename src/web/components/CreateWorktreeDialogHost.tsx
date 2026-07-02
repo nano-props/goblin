@@ -64,10 +64,10 @@ function CreateWorktreeDialogSession({ open, onOpenChange, repoId: sessionRepoId
   }
 
   const repoId = liveRepo?.id ?? null
-  const repoToken = liveRepo?.instanceToken ?? null
+  const repoInstanceId = liveRepo?.instanceId ?? null
 
   useEffect(() => {
-    if (!open || !repoId || repoToken === null) {
+    if (!open || !repoId || repoInstanceId === null) {
       resetBootstrapPreflightState()
       return
     }
@@ -98,23 +98,23 @@ function CreateWorktreeDialogSession({ open, onOpenChange, repoId: sessionRepoId
       ignore = true
       controller.abort()
     }
-  }, [open, repoId, repoToken])
+  }, [open, repoId, repoInstanceId])
 
   if (!displayRepo) return null
 
   function submitCreateWorktree(
     repoId: string,
-    token: number,
+    repoInstanceId: string,
     request: CreateWorktreeRequest,
     worktreeBootstrap: WorktreeBootstrapDecision,
   ): boolean {
     const currentRepo = useReposStore.getState().repos[repoId]
-    if (!currentRepo || currentRepo.instanceToken !== token) return false
+    if (!currentRepo || currentRepo.instanceId !== repoInstanceId) return false
     if (currentRepo.operations.branchAction.phase !== 'idle') return false
     submitBranchAction(
       repoId,
       { kind: 'createWorktree', input: request.input, worktreeBootstrap },
-      { token, refreshOnError: false },
+      { repoInstanceId, refreshOnError: false },
     )
     return true
   }
@@ -125,10 +125,10 @@ function CreateWorktreeDialogSession({ open, onOpenChange, repoId: sessionRepoId
       return false
     }
     const repoId = liveRepo.id
-    const token = liveRepo.instanceToken
+    const repoInstanceId = liveRepo.instanceId
 
     const worktreeBootstrap = resolveWorktreeBootstrapDecision(repoId)
-    return submitCreateWorktree(repoId, token, request, worktreeBootstrap)
+    return submitCreateWorktree(repoId, repoInstanceId, request, worktreeBootstrap)
   }
 
   function resolveWorktreeBootstrapDecision(repoId: string): WorktreeBootstrapDecision {
