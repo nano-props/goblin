@@ -153,6 +153,8 @@ export function BranchStatus({ detail }: Props) {
   const compact = useIsCompactUi()
   const navigation = usePrimaryWindowNavigation()
   const { branch, statusCount } = detail
+  const branchName = branch?.name
+  const worktreePathRaw = branch?.worktree?.path
   // Phase 4: pull the target off the lifecycle union. The
   // selector is keyed on the lifecycle itself, so a re-probe
   // (e.g. network reconnect) re-renders this row.
@@ -160,6 +162,44 @@ export function BranchStatus({ detail }: Props) {
     const repo = s.repos[detail.repoId]
     return repo ? remoteRepoTarget(repo.id, repo.remote.lifecycle) : null
   })
+  const openFilesTab = useMemo(
+    () =>
+      throttle(
+        () => {
+          if (!branchName || !worktreePathRaw) return
+          void openWorkspacePaneTab({
+            repoId: detail.repoId,
+            branchName,
+            worktreePath: worktreePathRaw,
+            type: 'files',
+            insertAfterTabType: 'status',
+            navigation,
+          })
+        },
+        500,
+        { edges: ['leading'] },
+      ),
+    [branchName, worktreePathRaw, detail.repoId, navigation],
+  )
+  const openChangesTab = useMemo(
+    () =>
+      throttle(
+        () => {
+          if (!branchName || !worktreePathRaw) return
+          void openWorkspacePaneTab({
+            repoId: detail.repoId,
+            branchName,
+            worktreePath: worktreePathRaw,
+            type: 'changes',
+            insertAfterTabType: 'status',
+            navigation,
+          })
+        },
+        500,
+        { edges: ['leading'] },
+      ),
+    [branchName, worktreePathRaw, detail.repoId, navigation],
+  )
   if (!branch) return <EmptyState title={t('branches.empty')} />
   const protectedBranch = PROTECTED_BRANCHES.has(branch.name)
   const worktreePath = branch.worktree?.path ? formatWorktreePath(branch.worktree?.path, worktreeTarget) : ''
@@ -191,44 +231,6 @@ export function BranchStatus({ detail }: Props) {
   // The "dirty worktree" signal moved to its own row below; the worktree
   // row only needs to surface lock state on its own.
   const worktreeTone: Tone = worktreeLocked ? 'attention' : branch.worktree?.path ? 'brand' : 'neutral'
-  const openFilesTab = useMemo(
-    () =>
-      throttle(
-        () => {
-          if (!branch.worktree?.path) return
-          void openWorkspacePaneTab({
-            repoId: detail.repoId,
-            branchName: branch.name,
-            worktreePath: branch.worktree.path,
-            type: 'files',
-            insertAfterTabType: 'status',
-            navigation,
-          })
-        },
-        500,
-        { edges: ['leading'] },
-      ),
-    [branch.name, branch.worktree?.path, detail.repoId, navigation],
-  )
-  const openChangesTab = useMemo(
-    () =>
-      throttle(
-        () => {
-          if (!branch.worktree?.path) return
-          void openWorkspacePaneTab({
-            repoId: detail.repoId,
-            branchName: branch.name,
-            worktreePath: branch.worktree.path,
-            type: 'changes',
-            insertAfterTabType: 'status',
-            navigation,
-          })
-        },
-        500,
-        { edges: ['leading'] },
-      ),
-    [branch.name, branch.worktree?.path, detail.repoId, navigation],
-  )
   const worktreeValue = branch.worktree?.path ? (
     <div className="inline-flex max-w-full min-w-0 items-center gap-1.5 align-middle">
       <StatusLink
