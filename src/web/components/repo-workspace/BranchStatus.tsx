@@ -17,6 +17,8 @@ import { EmptyState } from '#/web/components/Layout.tsx'
 import { PullRequestStatusRow } from '#/web/components/repo-workspace/PullRequestStatusRow.tsx'
 import { IconCopyButton } from '#/web/components/IconCopyButton.tsx'
 import { CopyButton } from '#/web/components/CopyButton.tsx'
+import { BranchActionsPopover } from '#/web/components/BranchActionsMenu.tsx'
+import type { BranchActionItem } from '#/web/hooks/useBranchActionItems.ts'
 import type { BranchCopyPatchAction } from '#/web/hooks/branch-action-state.ts'
 import { useActionFeedback } from '#/web/hooks/useActionFeedback.ts'
 import { useBranchActionSurface } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
@@ -147,7 +149,7 @@ function UpstreamLink({
 }
 
 export function BranchStatus({ detail }: Props) {
-  const { copyPatchAction } = useBranchActionSurface()
+  const { mainItems, destructiveItems, copyPatchAction } = useBranchActionSurface()
   const t = useT()
   const lang = useI18nStore((s) => s.lang)
   const compact = useIsCompactUi()
@@ -191,6 +193,26 @@ export function BranchStatus({ detail }: Props) {
             branchName,
             worktreePath: worktreePathRaw,
             type: 'changes',
+            insertAfterTabType: 'status',
+            navigation,
+          })
+        },
+        500,
+        { edges: ['leading'] },
+      ),
+    [branchName, worktreePathRaw, detail.repoId, navigation],
+  )
+  // History doesn't require a worktree, unlike files/changes above.
+  const openHistoryTab = useMemo(
+    () =>
+      throttle(
+        () => {
+          if (!branchName) return
+          void openWorkspacePaneTab({
+            repoId: detail.repoId,
+            branchName,
+            worktreePath: worktreePathRaw,
+            type: 'history',
             insertAfterTabType: 'status',
             navigation,
           })
@@ -276,6 +298,31 @@ export function BranchStatus({ detail }: Props) {
       {protectedBranch && <StatusChip>{t('branch-status.protected')}</StatusChip>}
     </>
   ) : undefined
+  // Surface the same pull/push/delete actions the sidebar branch row
+  // exposes via its "..." menu, so users don't have to leave the status
+  // tab for common operations. Anchored on the branch row (rather than
+  // its own row) to keep the rest of the tab purely informational.
+  //
+  // `mainItems` comes from the shared action surface and its tab-nav
+  // entries (changes/files/history) open tabs without an insertion
+  // hint, since most callers of that surface (sidebar menu, shortcuts)
+  // aren't anchored to any particular tab. From inside the status tab
+  // itself we *are* anchored — swap those entries for the local
+  // handlers above so opening a tab from this menu follows the same
+  // "insert right after status" placement as the inline links in this
+  // panel (worktree path, changes count).
+  const statusTabAnchoredOpeners: Partial<Record<BranchActionItem['id'], () => void>> = {
+    files: openFilesTab,
+    changes: openChangesTab,
+    history: openHistoryTab,
+  }
+  const branchActionMenuItems = mainItems.map((item) => {
+    const onSelect = statusTabAnchoredOpeners[item.id]
+    return onSelect ? { ...item, onSelect } : item
+  })
+  const branchActionsMenu = (
+    <BranchActionsPopover mainItems={branchActionMenuItems} destructiveItems={destructiveItems} />
+  )
   return (
     <StatusRows>
       <StatusRow
@@ -288,7 +335,12 @@ export function BranchStatus({ detail }: Props) {
             copiedLabel={t('branch-status.copied')}
           />
         }
-        after={roleChips}
+        after={
+          <>
+            {roleChips}
+            {branchActionsMenu}
+          </>
+        }
         valueLayout="inline"
         tone={branch.isDefault ? 'brand' : 'neutral'}
       />
