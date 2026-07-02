@@ -65,7 +65,7 @@ Create may send a lightweight startup geometry hint before a real view exists. A
 
 ### Attributed input
 
-- PTY writes must carry client-side provenance before they cross the terminal bridge.
+- PTY writes must carry client-side provenance before they cross the terminal client.
 - User intent, terminal-emulator replies, and replay side effects are different classes of input.
 - Replay side effects are local rendering artifacts and must never be forwarded as user stdin.
 
@@ -101,7 +101,7 @@ The terminal feature spans `shared`, `server`, and `web`, but it still behaves a
 
 - Maintains the client-local projection of live sessions, selection, bells, and attach/replay orchestration state.
 - Coordinates create, attach, detach, select, restart, takeover, and local session lifecycle.
-- Treats the bridge as the transport to server truth, not as the source of truth itself.
+- Treats the terminal client as the transport to server truth, not as the source of truth itself.
 - Owns input provenance before writes are sent to the server.
 
 ### Client view layer

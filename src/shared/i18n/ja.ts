@@ -355,7 +355,7 @@ export const ja: Record<DictKey, string> = {
   'terminal.write-blocked-reconnecting': '再接続中です。しばらく経ってからお試しください。',
   'terminal.write-blocked-session-gone': 'ターミナルはもう利用できません。',
   'terminal.write-blocked-rejected': 'ターミナルがリクエストを拒否しました。',
-  'terminal.write-blocked-bridge-unavailable': 'ターミナルブリッジが利用できません。',
+  'terminal.write-blocked-client-unavailable': 'ターミナルクライアントが利用できません。',
   'terminal.index-title': 'ターミナル {index}',
   'terminal.bell-unread': '未読のターミナルベル',
   'terminal.bell-unread-count': '未読ベル {count} 件',

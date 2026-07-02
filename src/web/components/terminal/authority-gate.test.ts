@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { TerminalTakeoverInput, TerminalTakeoverResult } from '#/shared/terminal-types.ts'
 import { createXtermAuthorityGate } from '#/web/components/terminal/authority-gate.ts'
 import { terminalLog } from '#/web/logger.ts'
-import type { ClientTerminalBridge } from '#/web/client-bridge-types.ts'
+import type { ClientTerminal } from '#/web/client-bridge-types.ts'
 
 // Focused unit tests for the AuthorityGate. The gate is the single
 // source of truth for write-side authorization, so its decision
@@ -13,12 +13,12 @@ import type { ClientTerminalBridge } from '#/web/client-bridge-types.ts'
 
 function makeBridge(
   takeoverImpl?: (input: TerminalTakeoverInput) => Promise<TerminalTakeoverResult>,
-): ClientTerminalBridge {
+): ClientTerminal {
   return {
     takeover: takeoverImpl
-      ? vi.fn<ClientTerminalBridge['takeover']>(takeoverImpl)
-      : vi.fn<ClientTerminalBridge['takeover']>(),
-  } as unknown as ClientTerminalBridge
+      ? vi.fn<ClientTerminal['takeover']>(takeoverImpl)
+      : vi.fn<ClientTerminal['takeover']>(),
+  } as unknown as ClientTerminal
 }
 
 function successResult(ptySessionId: string, clientId = 'client_local'): TerminalTakeoverResult {
@@ -35,7 +35,7 @@ function successResult(ptySessionId: string, clientId = 'client_local'): Termina
 }
 
 interface GateHarness {
-  bridge: ClientTerminalBridge
+  bridge: ClientTerminal
   gate: ReturnType<typeof createXtermAuthorityGate>
   promoted: ReturnType<typeof vi.fn>
   isSessionAlive: ReturnType<typeof vi.fn>
@@ -193,7 +193,7 @@ describe('AuthorityGate.takeover (explicit button path)', () => {
     expect(bridge2.takeover).not.toHaveBeenCalled()
   })
 
-  test('returns no-bridge when the bridge call throws synchronously', async () => {
+  test('returns no-client when the bridge call throws synchronously', async () => {
     const bridge = makeBridge()
     ;(bridge.takeover as ReturnType<typeof vi.fn>).mockImplementation(() => {
       throw new Error('ipc blew up')
@@ -207,7 +207,7 @@ describe('AuthorityGate.takeover (explicit button path)', () => {
     })
     gate.setRole('viewer')
     const result = await gate.takeover()
-    expect(result).toEqual({ kind: 'denied', reason: 'no-bridge' })
+    expect(result).toEqual({ kind: 'denied', reason: 'no-client' })
     expect(gate.currentRole()).toBe('viewer')
   })
 
@@ -409,7 +409,7 @@ describe('AuthorityGate single-emit deny log', () => {
     warnSpy.mockRestore()
   })
 
-  test('bridge throw logs with stage=bridge and reason=no-bridge', async () => {
+  test('client throw logs with stage=client and reason=no-client', async () => {
     const warnSpy = vi.spyOn(terminalLog, 'warn').mockImplementation(() => {})
     const bridge = makeBridge()
     ;(bridge.takeover as ReturnType<typeof vi.fn>).mockImplementation(() => {
@@ -426,7 +426,7 @@ describe('AuthorityGate single-emit deny log', () => {
     await gate.takeover()
     expect(warnSpy).toHaveBeenCalledWith(
       'authority gate: takeover denied',
-      expect.objectContaining({ reason: 'no-bridge', stage: 'bridge' }),
+      expect.objectContaining({ reason: 'no-client', stage: 'client' }),
     )
     warnSpy.mockRestore()
   })

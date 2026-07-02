@@ -1,20 +1,20 @@
 import { getClientBridge } from '#/web/client-bridge.ts'
-import type { ClientTerminalBridge } from '#/web/client-bridge-types.ts'
+import type { ClientTerminal } from '#/web/client-bridge-types.ts'
 
-function getTerminalBridge(): ClientTerminalBridge {
+function getTerminalClient(): ClientTerminal {
   return getClientBridge().terminal()
 }
 
-function bindTerminalMethod<TKey extends keyof ClientTerminalBridge>(key: TKey): ClientTerminalBridge[TKey] {
-  return ((...args: Parameters<ClientTerminalBridge[TKey]>) => {
-    const method = getTerminalBridge()[key] as (
-      ...innerArgs: Parameters<ClientTerminalBridge[TKey]>
-    ) => ReturnType<ClientTerminalBridge[TKey]>
+function bindTerminalMethod<TKey extends keyof ClientTerminal>(key: TKey): ClientTerminal[TKey] {
+  return ((...args: Parameters<ClientTerminal[TKey]>) => {
+    const method = getTerminalClient()[key] as (
+      ...innerArgs: Parameters<ClientTerminal[TKey]>
+    ) => ReturnType<ClientTerminal[TKey]>
     return method(...args)
-  }) as unknown as ClientTerminalBridge[TKey]
+  }) as unknown as ClientTerminal[TKey]
 }
 
-export const terminalBridge: ClientTerminalBridge = {
+export const terminalClient: ClientTerminal = {
   attach: bindTerminalMethod('attach'),
   restart: bindTerminalMethod('restart'),
   write: bindTerminalMethod('write'),

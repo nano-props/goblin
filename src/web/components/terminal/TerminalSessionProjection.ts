@@ -4,7 +4,7 @@ import { TerminalSession } from '#/web/components/terminal/TerminalSession.ts'
 import { createTerminalBellState } from '#/web/components/terminal/terminal-bell-state.ts'
 import { createTerminalOutputActivityState } from '#/web/components/terminal/terminal-output-activity-state.ts'
 import { formatTerminalWorktreeKey, parseTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
-import { terminalBridge } from '#/web/terminal.ts'
+import { terminalClient } from '#/web/terminal.ts'
 import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
 import type {
   TerminalBellRealtimeEvent,
@@ -68,7 +68,7 @@ interface PendingTerminalCreateRequest {
  * process, created on first access via `getTerminalSessionProjection(...)`,
  * lives until the process tears down. The class is intentionally
  * Provider-independent: `TerminalSessionProvider` is just a wiring
- * adapter that forwards bridge events into the singleton and exposes
+ * adapter that forwards client events into the singleton and exposes
  * its API via React context. A dev-mode React StrictMode re-mount of
  * the Provider must NOT recreate the projection — see
  * `terminal-roadmap.md` P1.7.
@@ -97,7 +97,7 @@ export class TerminalSessionProjection {
   // when to drain them; the helper owns dedupe and settle mechanics.
   private readonly lifecycleQueues = new TerminalSessionLifecycleQueues<TerminalSessionBase, PendingTerminalCreateRequest>()
   // Durable close queue rationale. `TerminalSession.dispose` used to fire
-  // `terminalBridge.close({ ptySessionId })` as a `void ... .catch(() => {})`
+  // `terminalClient.close({ ptySessionId })` as a `void ... .catch(() => {})`
   // — if the WebSocket was already closing (or `closeSocketIfIdle` raced
   // the request), the request was rejected before the server saw it and
   // the PTY stayed alive. The next `createTerminal` then reattached to
@@ -139,7 +139,7 @@ export class TerminalSessionProjection {
       this.notifyAllWorktrees()
       this.notifyAllRepoBellCounts()
     },
-    (count) => terminalBridge.setBadge(count),
+    (count) => terminalClient.setBadge(count),
   )
   private readonly outputActivityState = createTerminalOutputActivityState((terminalWorktreeKey) =>
     this.notifyWorktree(terminalWorktreeKey),
@@ -510,7 +510,7 @@ export class TerminalSessionProjection {
       : this.visibleSessionsForWorktree(terminalWorktreeKey).length === 0
         ? 'primary'
         : 'additional'
-    const result = await terminalBridge.create({
+    const result = await terminalClient.create({
       repoRoot: base.repoRoot,
       repoInstanceId: requireRepoInstanceId(base),
       branch: base.branch,
@@ -645,7 +645,7 @@ export class TerminalSessionProjection {
   }): Promise<void> {
     const { ptySessionId } = input
     try {
-      await terminalBridge.close({ ptySessionId })
+      await terminalClient.close({ ptySessionId })
     } catch (err) {
       // The old fire-and-forget path swallowed this rejection. Loud
       // logging is intentional: the failure mode (orphan PTY surviving
@@ -659,7 +659,7 @@ export class TerminalSessionProjection {
 
   private async disposeStaleCreateResult(terminalSessionId: string, ptySessionId: string): Promise<void> {
     try {
-      await terminalBridge.close({ ptySessionId })
+      await terminalClient.close({ ptySessionId })
     } catch (err) {
       terminalSessionProviderLog.warn('failed to dispose stale terminal create result', {
         terminalSessionId,

@@ -14,7 +14,7 @@ import type {
   TerminalTestNotificationInput,
   TerminalTitleEvent,
 } from '#/shared/terminal-types.ts'
-import type { ClientTerminalBridge } from '#/web/client-bridge-types.ts'
+import type { ClientTerminal } from '#/web/client-bridge-types.ts'
 import type { TerminalIdentityRealtimeEvent, TerminalLifecycleRealtimeEvent } from '#/web/components/terminal/types.ts'
 import {
   createTerminalSocketConnection,
@@ -24,11 +24,11 @@ import type { TerminalNotificationProvider } from '#/web/terminal-notification-p
 
 export type ClientServerTerminalConfig = TerminalSocketServerConfig
 
-export function createServerTerminalBridge(options: {
+export function createServerTerminalClient(options: {
   getServerConfig: () => ClientServerTerminalConfig
   notificationProvider: TerminalNotificationProvider
   setBadge?: (count: number) => void
-}): ClientTerminalBridge {
+}): ClientTerminal {
   const outputSubscribers = new Set<(event: TerminalOutputEvent) => void>()
   const bellSubscribers = new Set<(event: TerminalBellRealtimeEvent) => void>()
   const titleSubscribers = new Set<(event: TerminalTitleEvent) => void>()

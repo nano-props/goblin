@@ -30,7 +30,7 @@ import type {
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { TerminalIdentityRealtimeEvent, TerminalLifecycleRealtimeEvent } from '#/web/components/terminal/types.ts'
 
-export interface ClientTerminalBridge {
+export interface ClientTerminal {
   attach: (input: TerminalAttachInput) => Promise<TerminalAttachResult>
   restart: (input: TerminalRestartInput) => Promise<TerminalAttachResult>
   write: (input: TerminalWriteInput) => Promise<TerminalMutationResult>
@@ -51,7 +51,7 @@ export interface ClientTerminalBridge {
    * resolves immediately) and best-effort (failures are swallowed;
    * the next real `listSessions`/`attach` will retry and surface a
    * real error if the server is unreachable). No parameters: the
-   * bridge maintains a single shared socket, not per-repo sockets.
+   * client maintains a single shared socket, not per-repo sockets.
    */
   prewarm: () => Promise<void>
   /**
@@ -124,5 +124,5 @@ export interface ClientBridge {
    */
   rotateAccessToken?(): Promise<{ accessToken: string }>
   host(): ClientHostBridge | null
-  terminal(): ClientTerminalBridge
+  terminal(): ClientTerminal
 }

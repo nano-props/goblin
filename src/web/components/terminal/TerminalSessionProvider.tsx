@@ -4,7 +4,7 @@ import { useStoreWithEqualityFn } from 'zustand/traditional'
 import '#/web/components/terminal/terminal-session.css'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
-import { terminalBridge } from '#/web/terminal.ts'
+import { terminalClient } from '#/web/terminal.ts'
 import { terminalSessionProviderLog } from '#/web/logger.ts'
 import {
   TerminalSessionContext,
@@ -55,15 +55,15 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   }, [])
 
   // T1.2: pay the WebSocket handshake cost when the user enters a repo,
-  // before they click a terminal view. The bridge maintains a single
+  // before they click a terminal view. The client maintains a single
   // shared socket, so watching currentRepoId (not terminalWorktreeKey)
   // is the right granularity: one handshake per repo visit, not one per
   // worktree tab. The prewarm is fire-and-forget — failures are
-  // swallowed inside the bridge; the next real IPC will surface a real
+  // swallowed inside the client; the next real IPC will surface a real
   // error if the server is unreachable.
   useEffect(() => {
     if (!currentRepoId) return
-    void terminalBridge.prewarm()
+    void terminalClient.prewarm()
   }, [currentRepoId])
 
   // The projection is a client-level singleton (terminal-roadmap.md P1.7).
@@ -125,14 +125,14 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   useEffect(() => {
     const onVisibilityChange = () => {
       if (document.visibilityState !== 'visible') return
-      terminalBridge.kickReconnect()
+      terminalClient.kickReconnect()
     }
     const onPageShow = (event: PageTransitionEvent) => {
       // `event.persisted === true` means the page came from the
       // bfcache (Safari/Firefox mobile). A non-persisted pageshow
-      // is a regular full load and the bridge is already healthy.
+      // is a regular full load and the client is already healthy.
       if (!event.persisted) return
-      terminalBridge.kickReconnect()
+      terminalClient.kickReconnect()
     }
     document.addEventListener('visibilitychange', onVisibilityChange)
     window.addEventListener('pageshow', onPageShow)
@@ -143,27 +143,27 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   }, [])
 
   // Projection event wiring (singleton lifecycle, see terminal-roadmap.md P1.7).
-  // The projection is client-level; we only subscribe / unsubscribe bridge
+  // The projection is client-level; we only subscribe / unsubscribe client
   // events on mount/unmount. We do NOT destroy the projection — the singleton
   // outlives the Provider. StrictMode re-mounts simply re-register the same
   // listeners against the same instance.
   useEffect(() => {
-    const offOutput = terminalBridge.onOutput((event) => {
+    const offOutput = terminalClient.onOutput((event) => {
       projection.handleOutput(event)
     })
-    const offBell = terminalBridge.onBell((event) => {
+    const offBell = terminalClient.onBell((event) => {
       projection.handleServerBell(event)
     })
-    const offTitle = terminalBridge.onTitle((event) => {
+    const offTitle = terminalClient.onTitle((event) => {
       projection.handleServerTitle(event)
     })
-    const offExit = terminalBridge.onExit((event) => {
+    const offExit = terminalClient.onExit((event) => {
       projection.handleExit(event)
     })
-    const offIdentity = terminalBridge.onIdentity((event) => {
+    const offIdentity = terminalClient.onIdentity((event) => {
       projection.handleIdentity(event)
     })
-    const offLifecycle = terminalBridge.onLifecycle((event) => {
+    const offLifecycle = terminalClient.onLifecycle((event) => {
       projection.handleLifecycle(event)
     })
     // Per-session close broadcast. When the server confirms a close,
@@ -172,7 +172,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     // window) doesn't reattach to the orphan. The originating window
     // already disposed the local entry, so the handler is a no-op
     // there — the broadcast is multi-window safe by construction.
-    const offSessionClosed = terminalBridge.onSessionClosed((event) => {
+    const offSessionClosed = terminalClient.onSessionClosed((event) => {
       projection.handleSessionClosed(event)
       const repoInstanceId = repoIndexRef.current[event.repoRoot]?.instanceId
       if (typeof repoInstanceId === 'string') invalidateWorkspacePaneTabs(event.repoRoot, repoInstanceId)
@@ -225,8 +225,8 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
         for (const nextRepoRoot of repoRoots) void syncServerSessions(nextRepoRoot)
       }, 0)
     }
-    const offSessionsChanged = terminalBridge.onSessionsChanged(scheduleServerSync)
-    const offWorkspaceTabsChanged = terminalBridge.onWorkspaceTabsChanged((repoRoot) => {
+    const offSessionsChanged = terminalClient.onSessionsChanged(scheduleServerSync)
+    const offWorkspaceTabsChanged = terminalClient.onWorkspaceTabsChanged((repoRoot) => {
       const repoInstanceId = repoIndexRef.current[repoRoot]?.instanceId
       if (typeof repoInstanceId === 'string') invalidateWorkspacePaneTabs(repoRoot, repoInstanceId)
       scheduleServerSync(repoRoot)

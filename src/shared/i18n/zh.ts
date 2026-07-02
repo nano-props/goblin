@@ -339,7 +339,7 @@ export const zh: Record<DictKey, string> = {
   'terminal.write-blocked-reconnecting': '正在重新连接,请稍后再试。',
   'terminal.write-blocked-session-gone': '终端已关闭,无法写入。',
   'terminal.write-blocked-rejected': '终端拒绝了该请求。',
-  'terminal.write-blocked-bridge-unavailable': '终端桥不可用。',
+  'terminal.write-blocked-client-unavailable': '终端客户端不可用。',
   'terminal.index-title': '终端 {index}',
   'terminal.bell-unread': '终端有未读提醒',
   'terminal.bell-unread-count': '{count} 个未读终端提醒',

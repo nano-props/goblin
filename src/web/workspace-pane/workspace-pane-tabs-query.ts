@@ -6,7 +6,7 @@ import {
   workspacePaneTabsEntryMatchesTarget,
   workspacePaneTabsTargetIdentityKey,
 } from '#/shared/workspace-pane-tabs-target.ts'
-import { terminalBridge } from '#/web/terminal.ts'
+import { terminalClient } from '#/web/terminal.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { defaultWorkspacePaneTabs, normalizeWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 
@@ -24,7 +24,7 @@ export function workspacePaneTabsQueryOptions(repoRoot: string, repoInstanceId: 
   return queryOptions({
     queryKey: workspacePaneTabsQueryKey(repoRoot, repoInstanceId),
     queryFn: async () =>
-      normalizeWorkspacePaneTabsQueryData(await terminalBridge.listWorkspaceTabs({ repoRoot, repoInstanceId })),
+      normalizeWorkspacePaneTabsQueryData(await terminalClient.listWorkspaceTabs({ repoRoot, repoInstanceId })),
     staleTime: Number.POSITIVE_INFINITY,
     gcTime: Number.POSITIVE_INFINITY,
   })

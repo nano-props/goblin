@@ -15,7 +15,7 @@ describe('WRITE_BLOCKED_KEY_BY_REASON', () => {
   test('every denial reason has a mapped i18n key or an intentional null', () => {
     const expectedShape: Record<AuthorizationDenialReason, string | null> = {
       'session-closed': null,
-      'no-bridge': 'terminal.write-blocked-bridge-unavailable',
+      'no-client': 'terminal.write-blocked-client-unavailable',
       'session-unknown': 'terminal.write-blocked-session-gone',
       'client-offline': 'terminal.write-blocked-reconnecting',
       'takeover-rejected': 'terminal.write-blocked-rejected',

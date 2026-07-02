@@ -27,7 +27,7 @@ afterEach(() => {
 })
 
 describe('restoreServerWorkspacePaneTabsFromSession', () => {
-  test('commits restored worktree tabs through the terminal bridge and applies canonical server tabs', async () => {
+  test('commits restored worktree tabs through the terminal client and applies canonical server tabs', async () => {
     seedRepo()
     installWorkspacePaneTabsTestBridge({
       replaceWorkspaceTabs: async () => [

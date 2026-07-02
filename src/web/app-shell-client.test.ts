@@ -40,7 +40,7 @@ function testBridge(overrides: Partial<ClientBridge> = {}): ClientBridge {
     saveClipboardFiles: () => Promise.resolve([]),
     host: () => null,
     terminal: (() => {
-      throw new Error('unused terminal bridge')
+      throw new Error('unused terminal client')
     }) as never,
     ...overrides,
   }

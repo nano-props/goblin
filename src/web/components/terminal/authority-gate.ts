@@ -1,6 +1,6 @@
 import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
 import { terminalLog } from '#/web/logger.ts'
-import type { ClientTerminalBridge } from '#/web/client-bridge-types.ts'
+import type { ClientTerminal } from '#/web/client-bridge-types.ts'
 import type { TerminalTakeoverResult } from '#/shared/terminal-types.ts'
 
 /**
@@ -24,7 +24,7 @@ import type { TerminalTakeoverResult } from '#/shared/terminal-types.ts'
  * realtime identity event pushes role changes into `setRole`, and
  * read paths (`isController`, `canWrite`) just return the cached
  * value. The only async path is `authorize` / `takeover`, both of
- * which hit the bridge.
+ * which hit the client.
  */
 /**
  * Reasons a write or takeover was denied. Surfaced to the UI so the
@@ -34,7 +34,7 @@ import type { TerminalTakeoverResult } from '#/shared/terminal-types.ts'
  * - `session-closed` — gate-internal: the runtime no longer has a
  *   ptySessionId, or the session was disposed mid-call. The takeover
  *   round-trip never started.
- * - `no-bridge` — gate-internal: the client bridge is unavailable
+ * - `no-client` — gate-internal: the client bridge is unavailable
  *   (typically only in tests / startup). The takeover round-trip
  *   never started.
  * - `session-unknown` — the server reported the ptySessionId is not
@@ -49,7 +49,7 @@ import type { TerminalTakeoverResult } from '#/shared/terminal-types.ts'
  */
 export type AuthorizationDenialReason =
   | 'session-closed'
-  | 'no-bridge'
+  | 'no-client'
   | 'session-unknown'
   | 'client-offline'
   | 'takeover-rejected'
@@ -105,13 +105,13 @@ export interface TerminalAuthorityGate {
 }
 
 interface XtermAuthorityGateOptions {
-  bridge: ClientTerminalBridge
+  bridge: ClientTerminal
   resolveSize: () => Promise<{ cols: number; rows: number }>
   /**
    * Non-throwing predicate: returns true while the session is
    * still the one this gate belongs to and the parent hasn't been
    * disposed. Used to short-circuit `doTakeover` if the session
-   * vanished between the caller queuing a keystroke and the bridge
+   * vanished between the caller queuing a keystroke and the client
    * round-trip resolving. The previous name `assertSessionAlive`
    * was misleading — this never throws, it just returns false.
    */
@@ -166,7 +166,7 @@ export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): Termi
    * the matching `AuthorizationResult`. The `stage` tag is the only
    * diagnostic the helper adds — it tells the operator which step
    * in the takeover pipeline produced the denial (preflight /
-   * resolveSize / bridge / server) without forcing the call site
+   * resolveSize / client / server) without forcing the call site
    * to invent a new log message per branch.
    */
   function deny(
@@ -203,7 +203,7 @@ export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): Termi
         clientId: readClientId(),
       })
     } catch (err) {
-      return deny('no-bridge', 'bridge', { ptySessionId, err })
+      return deny('no-client', 'client', { ptySessionId, err })
     }
     if (!result.ok) {
       return deny(classifyTakeoverRejection(result.message), 'server', {
@@ -211,7 +211,7 @@ export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): Termi
         message: result.message,
       })
     }
-    // Post-await dispose guard: the bridge's takeover round-trip
+    // Post-await dispose guard: the client's takeover round-trip
     // can resolve after the session was disposed (e.g. the user
     // navigated away mid-takeover). Without this re-check the
     // `onPromoted` callback would mutate a destroyed runtime and

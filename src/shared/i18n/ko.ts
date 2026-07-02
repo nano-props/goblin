@@ -348,7 +348,7 @@ export const ko: Record<DictKey, string> = {
   'terminal.write-blocked-reconnecting': '재연결 중입니다. 잠시 후 다시 시도하세요.',
   'terminal.write-blocked-session-gone': '더 이상 사용할 수 없는 터미널입니다.',
   'terminal.write-blocked-rejected': '터미널이 요청을 거부했습니다.',
-  'terminal.write-blocked-bridge-unavailable': '터미널 브리지를 사용할 수 없습니다.',
+  'terminal.write-blocked-client-unavailable': '터미널 클라이언트를 사용할 수 없습니다.',
   'terminal.index-title': '터미널 {index}',
   'terminal.bell-unread': '읽지 않은 터미널 벨',
   'terminal.bell-unread-count': '읽지 않은 벨 {count}개',

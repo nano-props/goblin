@@ -1,7 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { TerminalUpdateWorkspaceTabsOperation } from '#/shared/terminal-types.ts'
-import { terminalBridge } from '#/web/terminal.ts'
+import { terminalClient } from '#/web/terminal.ts'
 import { gblLog } from '#/web/logger.ts'
 import {
   cancelWorkspacePaneTabs,
@@ -160,7 +160,7 @@ export async function writeCanonicalWorkspacePaneTabsForTarget(
 export async function replaceWorkspacePaneTabsOnServer(
   input: CommitWorkspacePaneTabsInput,
 ): Promise<WorkspacePaneTabEntry[]> {
-  return await terminalBridge.replaceWorkspaceTabs({
+  return await terminalClient.replaceWorkspaceTabs({
     repoRoot: input.repoRoot,
     repoInstanceId: input.repoInstanceId,
     branchName: input.branchName,
@@ -172,7 +172,7 @@ export async function replaceWorkspacePaneTabsOnServer(
 export async function updateWorkspacePaneTabsOnServer(
   input: UpdateWorkspacePaneTabsInput,
 ): Promise<WorkspacePaneTabEntry[]> {
-  return await terminalBridge.updateWorkspaceTabs({
+  return await terminalClient.updateWorkspaceTabs({
     repoRoot: input.repoRoot,
     repoInstanceId: input.repoInstanceId,
     branchName: input.branchName,
