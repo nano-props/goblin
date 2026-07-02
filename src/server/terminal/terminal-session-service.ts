@@ -55,7 +55,7 @@ interface EnsureTerminalSessionInput {
 type EnsureTerminalSessionResult =
   | {
       ok: true
-      ptySessionId: string
+      terminalRuntimeSessionId: string
       terminalSessionId: string
       action: TerminalCreateAction
       processName: string
@@ -90,7 +90,7 @@ interface TerminalServiceEnsureSessionInput {
 interface TerminalSessionServiceManager {
   ensureSession(input: TerminalServiceEnsureSessionInput): Promise<TerminalAttachResult>
   listSessionsForUser(userId: string, repoRoot: string): Promise<TerminalSessionSummary[]>
-  closeSession(ptySessionId: string): void
+  closeSession(terminalRuntimeSessionId: string): void
 }
 
 interface TerminalSessionServiceOptions {
@@ -224,7 +224,7 @@ class TerminalSessionService {
         action: createResult.action,
         terminalSessionId: createResult.terminalSessionId,
         tabs,
-        ptySessionId: createResult.ptySessionId,
+        terminalRuntimeSessionId: createResult.terminalRuntimeSessionId,
         processName: createResult.processName,
         canonicalTitle: createResult.canonicalTitle,
         phase: createResult.phase,
@@ -481,7 +481,7 @@ class TerminalSessionService {
     for (const session of allSessions) {
       if (path.resolve(session.repoRoot) !== path.resolve(repoRoot)) continue
       if (liveWorktreePaths.has(path.resolve(session.worktreePath))) continue
-      this.options.manager.closeSession(session.ptySessionId)
+      this.options.manager.closeSession(session.terminalRuntimeSessionId)
       pruned += 1
     }
     const remaining = await this.options.manager
@@ -639,7 +639,7 @@ function toEnsureResult(
 ): EnsureTerminalSessionResult {
   return {
     ok: true,
-    ptySessionId: snapshotResult.ptySessionId,
+    terminalRuntimeSessionId: snapshotResult.terminalRuntimeSessionId,
     terminalSessionId,
     action,
     processName: snapshotResult.processName,

@@ -46,7 +46,7 @@ snapshots. It should not try to predict browser font metrics or local xterm
 layout details before a real view exists.
 
 Server-owned runtime ids should also drive terminal writes. If a mutation
-targets a live session by `ptySessionId`, close/restart/takeover should be
+targets a live session by `terminalRuntimeSessionId`, close/restart/takeover should be
 decided by the server from that runtime object. The client may still send
 additional explicit preconditions when they are semantically required, but it
 should not invent extra freshness gates that can reject a valid server-owned

@@ -31,7 +31,7 @@ import {
   countOrphanedTerminalSessionIds,
   resolveAdjacentTerminalSelectionAfterRemoval,
 } from '#/web/components/terminal/terminal-session-eviction.ts'
-import { syncTerminalPtySessionIdIndex } from '#/web/components/terminal/terminal-session-index.ts'
+import { syncTerminalRuntimeSessionIdIndex } from '#/web/components/terminal/terminal-session-index.ts'
 import { resolveSelectedTerminalSessionId } from '#/web/components/terminal/terminal-session-selection.ts'
 import { buildTerminalWorktreeSnapshot } from '#/web/components/terminal/terminal-session-worktree-snapshot.ts'
 import { runWorkspacePaneTabsOperation } from '#/web/workspace-pane/workspace-pane-tabs-operation-queue.ts'
@@ -85,8 +85,8 @@ export class TerminalSessionProjection {
   private readonly onWorkspaceTabsChanged: (base: TerminalSessionBase, tabs: readonly WorkspacePaneTabEntry[]) => void
   private repoIndex: TerminalRepoIndex = {}
   private readonly sessions = new Map<string, TerminalSession>()
-  private readonly terminalSessionIdByPtySessionId = new Map<string, string>()
-  private readonly ptySessionIdByTerminalSessionId = new Map<string, string>()
+  private readonly terminalSessionIdByTerminalRuntimeSessionId = new Map<string, string>()
+  private readonly terminalRuntimeSessionIdByTerminalSessionId = new Map<string, string>()
   // Client preference only: server owns session existence/control, while
   // each client chooses which terminal to present for a worktree.
   private readonly selectedTerminalSessionIdByTerminalWorktree = new Map<string, string>()
@@ -97,7 +97,7 @@ export class TerminalSessionProjection {
   // when to drain them; the helper owns dedupe and settle mechanics.
   private readonly lifecycleQueues = new TerminalSessionLifecycleQueues<TerminalSessionBase, PendingTerminalCreateRequest>()
   // Durable close queue rationale. `TerminalSession.dispose` used to fire
-  // `terminalClient.close({ ptySessionId })` as a `void ... .catch(() => {})`
+  // `terminalClient.close({ terminalRuntimeSessionId })` as a `void ... .catch(() => {})`
   // — if the WebSocket was already closing (or `closeSocketIfIdle` raced
   // the request), the request was rejected before the server saw it and
   // the PTY stayed alive. The next `createTerminal` then reattached to
@@ -183,8 +183,8 @@ export class TerminalSessionProjection {
     this.lifecycleQueues.rejectAll(new Error('terminal session projection destroyed'))
     for (const session of this.sessions.values()) session.dispose({ closeSession: false })
     this.sessions.clear()
-    this.terminalSessionIdByPtySessionId.clear()
-    this.ptySessionIdByTerminalSessionId.clear()
+    this.terminalSessionIdByTerminalRuntimeSessionId.clear()
+    this.terminalRuntimeSessionIdByTerminalSessionId.clear()
     this.selectedTerminalSessionIdByTerminalWorktree.clear()
     this.preferredSelectedTerminalSessionIdByTerminalWorktree.clear()
     this.hostByWorktree.clear()
@@ -207,11 +207,11 @@ export class TerminalSessionProjection {
   // Single routing entry point for every realtime event keyed by a
   // session. `terminalSessionId` (the durable tab identity) is tried
   // first to locate the session because it needs no client-local state
-  // to resolve. `ptySessionId` (the server runtime lookup id) is a
+  // to resolve. `terminalRuntimeSessionId` (the server runtime lookup id) is a
   // secondary fallback through a client-local index that is only
   // populated once a session has been attached/reconciled locally — a
   // background tab that has never been selected may not have an index
-  // entry yet. A realtime event that only carries `ptySessionId` cannot
+  // entry yet. A realtime event that only carries `terminalRuntimeSessionId` cannot
   // be routed reliably for such a tab; that gap is exactly what caused
   // a background tab's title updates to be silently dropped, so every
   // realtime event type must carry `terminalSessionId` (see the
@@ -220,21 +220,21 @@ export class TerminalSessionProjection {
   // through this helper rather than reimplementing the fallback.
   private resolveSessionForRealtimeEvent(event: {
     terminalSessionId: string
-    ptySessionId: string
+    terminalRuntimeSessionId: string
   }): TerminalSession | null {
     return (
       this.sessions.get(event.terminalSessionId) ??
-      this.sessions.get(this.terminalSessionIdByPtySessionId.get(event.ptySessionId) ?? '') ??
+      this.sessions.get(this.terminalSessionIdByTerminalRuntimeSessionId.get(event.terminalRuntimeSessionId) ?? '') ??
       null
     )
   }
 
   private resolveCurrentPtySessionForRealtimeEvent(event: {
     terminalSessionId: string
-    ptySessionId: string
+    terminalRuntimeSessionId: string
   }): TerminalSession | null {
     const session = this.resolveSessionForRealtimeEvent(event)
-    return session?.currentPtySessionId() === event.ptySessionId ? session : null
+    return session?.currentTerminalRuntimeSessionId() === event.terminalRuntimeSessionId ? session : null
   }
 
   handleOutput(event: TerminalOutputEvent): void {
@@ -285,13 +285,13 @@ export class TerminalSessionProjection {
       // Local runtime accepted the exit. Gating the discard on the
       // runtime's accept (rather than evicting eagerly on a session
       // match) avoids discarding a live local session during a race
-      // where the session has moved to a new ptySessionId (e.g. after
+      // where the session has moved to a new terminalRuntimeSessionId (e.g. after
       // a server-side restart) but a stale index entry still maps the
-      // old ptySessionId to the same terminalSessionId.
+      // old terminalRuntimeSessionId to the same terminalSessionId.
       this.discardLocalSessionAndDismissDetailIfLast(terminalSessionId, session.descriptor)
       return
     }
-    if (!session.currentPtySessionId()) {
+    if (!session.currentTerminalRuntimeSessionId()) {
       // The runtime is empty (exit was observed earlier, or the
       // session was never attached) but the session is still resolvable.
       // Drop the local projection; future render recovery comes from
@@ -310,7 +310,7 @@ export class TerminalSessionProjection {
   // `closeTerminal`) because the server has already killed the PTY
   // — calling `close` again would no-op the `closeSessionForUser` check
   // on the server and add a useless WS roundtrip.
-  handleSessionClosed(event: { ptySessionId: string; terminalSessionId: string }): void {
+  handleSessionClosed(event: { terminalRuntimeSessionId: string; terminalSessionId: string }): void {
     this.pendingServerBellByTerminalSessionId.delete(event.terminalSessionId)
     const session = this.resolveSessionForRealtimeEvent(event)
     if (!session) return
@@ -329,12 +329,12 @@ export class TerminalSessionProjection {
     repoRoot: string,
     serverSessions: ServerTerminalSessionSummary[],
     clientId: string,
-    snapshotsByPtySessionId: ReadonlyMap<string, TerminalHydrationSnapshot> = EMPTY_SERVER_SNAPSHOTS,
+    snapshotsByTerminalRuntimeSessionId: ReadonlyMap<string, TerminalHydrationSnapshot> = EMPTY_SERVER_SNAPSHOTS,
   ): void {
     if (!this.repoIndex[repoRoot]) return
 
     const { controllerTerminalSessionIdByWorktree, touchedWorktrees, tabsChangedWorktrees } =
-      this.materializeServerSessions(repoRoot, serverSessions, clientId, snapshotsByPtySessionId)
+      this.materializeServerSessions(repoRoot, serverSessions, clientId, snapshotsByTerminalRuntimeSessionId)
 
     const serverTerminalSessionIds = new Set(serverSessions.map((session) => session.terminalSessionId))
     this.evictOrphanedLocalSessions(repoRoot, serverTerminalSessionIds)
@@ -348,12 +348,12 @@ export class TerminalSessionProjection {
   // Phase 1: for each server session, ensure a local TerminalSession
   // exists, hydrate it with the latest server-side metadata, and track
   // which worktrees saw any change. Side effects: ensureSession,
-  // session.hydrate, terminalSessionIdsByTerminalWorktree, syncPtySessionIdIndex.
+  // session.hydrate, terminalSessionIdsByTerminalWorktree, syncTerminalRuntimeSessionIdIndex.
   private materializeServerSessions(
     repoRoot: string,
     serverSessions: ServerTerminalSessionSummary[],
     clientId: string,
-    snapshotsByPtySessionId: ReadonlyMap<string, TerminalHydrationSnapshot>,
+    snapshotsByTerminalRuntimeSessionId: ReadonlyMap<string, TerminalHydrationSnapshot>,
   ): {
     controllerTerminalSessionIdByWorktree: Map<string, string>
     touchedWorktrees: Set<string>
@@ -373,7 +373,7 @@ export class TerminalSessionProjection {
         serverSession,
         clientId,
         index,
-        serverSnapshot: snapshotsByPtySessionId.get(serverSession.ptySessionId) ?? null,
+        serverSnapshot: snapshotsByTerminalRuntimeSessionId.get(serverSession.terminalRuntimeSessionId) ?? null,
       })
       if (!projected) continue
       touchedWorktrees.add(projected.terminalWorktreeKey)
@@ -381,7 +381,7 @@ export class TerminalSessionProjection {
       const descriptor = projected.descriptor
       const session = this.ensureSession(descriptor)
       session.hydrate(projected.hydrateInput)
-      this.syncPtySessionIdIndex(descriptor.terminalSessionId, projected.hydrateInput.ptySessionId)
+      this.syncTerminalRuntimeSessionIdIndex(descriptor.terminalSessionId, projected.hydrateInput.terminalRuntimeSessionId)
       const pendingBell = this.pendingServerBellByTerminalSessionId.get(descriptor.terminalSessionId)
       if (pendingBell) this.applyServerBell(session, pendingBell)
       if (projected.controlsTerminal)
@@ -401,7 +401,7 @@ export class TerminalSessionProjection {
 
   // Phase 2: drop local sessions that have a serverId but no longer
   // appear on the server. Only sessions that have ever been attached
-  // (i.e. have a ptySessionId in our index) are eligible for eviction;
+  // (i.e. have a terminalRuntimeSessionId in our index) are eligible for eviction;
   // never-attached local shells (purely UI placeholders) are left
   // alone. Returns the count for the debug log.
   private evictOrphanedLocalSessions(repoRoot: string, serverTerminalSessionIds: Set<string>): number {
@@ -410,8 +410,8 @@ export class TerminalSessionProjection {
       localTerminalSessionIds: Array.from(this.sessions.keys()),
       getRepoRootForTerminalSessionId: (terminalSessionId) =>
         this.sessions.get(terminalSessionId)?.descriptor.repoRoot ?? null,
-      hasPtySessionIdForTerminalSessionId: (terminalSessionId) =>
-        this.ptySessionIdByTerminalSessionId.has(terminalSessionId),
+      hasTerminalRuntimeSessionIdForTerminalSessionId: (terminalSessionId) =>
+        this.terminalRuntimeSessionIdByTerminalSessionId.has(terminalSessionId),
       serverTerminalSessionIds,
     })
     for (const terminalSessionId of orphanedTerminalSessionIds) {
@@ -526,12 +526,12 @@ export class TerminalSessionProjection {
     if (!result.ok) {
       throw new Error(result.message)
     }
-    const snapshotPtySessionId = result.ptySessionId
-    if (!snapshotPtySessionId || typeof result.snapshot !== 'string' || typeof result.snapshotSeq !== 'number') {
+    const snapshotTerminalRuntimeSessionId = result.terminalRuntimeSessionId
+    if (!snapshotTerminalRuntimeSessionId || typeof result.snapshot !== 'string' || typeof result.snapshotSeq !== 'number') {
       throw new Error('error.terminal-create-failed')
     }
     if (request.owner && !request.owner.isFresh()) {
-      await this.disposeStaleCreateResult(result.terminalSessionId, result.ptySessionId)
+      await this.disposeStaleCreateResult(result.terminalSessionId, result.terminalRuntimeSessionId)
       throw new Error('terminal create request canceled')
     }
     const projectedCreate = projectCreateResultForClient(base, result)
@@ -541,7 +541,7 @@ export class TerminalSessionProjection {
       base.repoRoot,
       projectedCreate.serverSessions,
       clientId,
-      projectedCreate.snapshotByPtySessionId,
+      projectedCreate.snapshotByTerminalRuntimeSessionId,
     )
     return result.terminalSessionId
   }
@@ -615,12 +615,12 @@ export class TerminalSessionProjection {
   // promise the caller can ignore; the close fires in the background
   // and the entry is removed when it settles (resolve or reject).
   //
-  // Returning a stable promise (deduped per ptySessionId) is intentional:
+  // Returning a stable promise (deduped per terminalRuntimeSessionId) is intentional:
   // a `restart` and a `dispose` can both call this for the same
-  // ptySessionId in quick succession. The first call owns the request;
+  // terminalRuntimeSessionId in quick succession. The first call owns the request;
   // the second is a no-op and just observes the same outcome.
   enqueueDurableClose(input: {
-    ptySessionId: string
+    terminalRuntimeSessionId: string
     terminalWorktreeKey: string
   }): Promise<void> {
     return this.lifecycleQueues.enqueueClose(input, async (closeInput) => await this.performDurableClose(closeInput))
@@ -641,29 +641,29 @@ export class TerminalSessionProjection {
   }
 
   private async performDurableClose(input: {
-    ptySessionId: string
+    terminalRuntimeSessionId: string
   }): Promise<void> {
-    const { ptySessionId } = input
+    const { terminalRuntimeSessionId } = input
     try {
-      await terminalClient.close({ ptySessionId })
+      await terminalClient.close({ terminalRuntimeSessionId })
     } catch (err) {
       // The old fire-and-forget path swallowed this rejection. Loud
       // logging is intentional: the failure mode (orphan PTY surviving
       // a tab close) is otherwise invisible to operators and surfaces
       // only as a confused user re-opening a tab and seeing the prior
       // shell's `Restored session: …` line print twice.
-      terminalSessionProviderLog.warn('durable close failed for terminal session', { ptySessionId, err })
+      terminalSessionProviderLog.warn('durable close failed for terminal session', { terminalRuntimeSessionId, err })
       throw err
     }
   }
 
-  private async disposeStaleCreateResult(terminalSessionId: string, ptySessionId: string): Promise<void> {
+  private async disposeStaleCreateResult(terminalSessionId: string, terminalRuntimeSessionId: string): Promise<void> {
     try {
-      await terminalClient.close({ ptySessionId })
+      await terminalClient.close({ terminalRuntimeSessionId })
     } catch (err) {
       terminalSessionProviderLog.warn('failed to dispose stale terminal create result', {
         terminalSessionId,
-        ptySessionId,
+        terminalRuntimeSessionId,
         err,
       })
     }
@@ -962,18 +962,18 @@ export class TerminalSessionProjection {
     }
   }
 
-  private syncPtySessionIdIndex(terminalSessionId: string, ptySessionId: string | null): void {
-    syncTerminalPtySessionIdIndex({
+  private syncTerminalRuntimeSessionIdIndex(terminalSessionId: string, terminalRuntimeSessionId: string | null): void {
+    syncTerminalRuntimeSessionIdIndex({
       terminalSessionId,
-      ptySessionId,
-      ptySessionIdByTerminalSessionId: this.ptySessionIdByTerminalSessionId,
-      terminalSessionIdByPtySessionId: this.terminalSessionIdByPtySessionId,
+      terminalRuntimeSessionId,
+      terminalRuntimeSessionIdByTerminalSessionId: this.terminalRuntimeSessionIdByTerminalSessionId,
+      terminalSessionIdByTerminalRuntimeSessionId: this.terminalSessionIdByTerminalRuntimeSessionId,
     })
   }
 
   private notifySession(terminalSessionId: string): void {
     const session = this.sessions.get(terminalSessionId)
-    this.syncPtySessionIdIndex(terminalSessionId, session?.currentPtySessionId() ?? null)
+    this.syncTerminalRuntimeSessionIdIndex(terminalSessionId, session?.currentTerminalRuntimeSessionId() ?? null)
     if (session) {
       this.snapshotCache.set(terminalSessionId, session.snapshot())
     } else {
@@ -995,7 +995,7 @@ export class TerminalSessionProjection {
     this.hiddenClosingTerminalSessionIds.delete(terminalSessionId)
     this.closeCompletionByTerminalSessionId.delete(terminalSessionId)
     this.pendingServerBellByTerminalSessionId.delete(terminalSessionId)
-    this.syncPtySessionIdIndex(terminalSessionId, null)
+    this.syncTerminalRuntimeSessionIdIndex(terminalSessionId, null)
     this.sessions.delete(terminalSessionId)
     this.snapshotCache.delete(terminalSessionId)
     this.removeTerminalSessionIdFromWorktreeList(terminalWorktreeKey, terminalSessionId)
@@ -1105,9 +1105,9 @@ export class TerminalSessionProjection {
     this.appendTerminalSessionIdToWorktreeList(descriptor.terminalWorktreeKey, descriptor.terminalSessionId)
     if (current) {
       current.updateDescriptor(descriptor)
-      this.syncPtySessionIdIndex(
+      this.syncTerminalRuntimeSessionIdIndex(
         descriptor.terminalSessionId,
-        current.currentPtySessionId() ?? this.ptySessionIdByTerminalSessionId.get(descriptor.terminalSessionId) ?? null,
+        current.currentTerminalRuntimeSessionId() ?? this.terminalRuntimeSessionIdByTerminalSessionId.get(descriptor.terminalSessionId) ?? null,
       )
       this.notifyWorktree(descriptor.terminalWorktreeKey)
       return current
@@ -1116,14 +1116,14 @@ export class TerminalSessionProjection {
     session = new TerminalSession(
       descriptor,
       () => this.notifySession(descriptor.terminalSessionId),
-      (ptySessionId) =>
+      (terminalRuntimeSessionId) =>
         this.enqueueDurableClose({
-          ptySessionId,
+          terminalRuntimeSessionId,
           terminalWorktreeKey: session.descriptor.terminalWorktreeKey,
         }),
     )
     this.sessions.set(descriptor.terminalSessionId, session)
-    this.syncPtySessionIdIndex(descriptor.terminalSessionId, session.currentPtySessionId())
+    this.syncTerminalRuntimeSessionIdIndex(descriptor.terminalSessionId, session.currentTerminalRuntimeSessionId())
     this.snapshotCache.set(descriptor.terminalSessionId, session.snapshot())
     if (!this.selectedTerminalSessionIdByTerminalWorktree.has(descriptor.terminalWorktreeKey)) {
       const preferred = this.preferredSelectedTerminalSessionIdByTerminalWorktree.get(descriptor.terminalWorktreeKey)

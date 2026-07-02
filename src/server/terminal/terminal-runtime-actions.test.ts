@@ -15,27 +15,27 @@ const CLIENT_ID = 'client_terminal_actions'
 const USER_ID = 'user_terminal_actions'
 const REPO_ROOT = '/repo'
 let REPO_INSTANCE_ID = ''
-// 16+ alphanumerics, matches TERMINAL_PTY_SESSION_ID_RE in
+// 16+ alphanumerics, matches TERMINAL_RUNTIME_SESSION_ID_RE in
 // shared/terminal-validators.ts.
-const PTY_SESSION_ID = 'session_aaaaaaaaaaaaaa'
+const RUNTIME_SESSION_ID = 'session_aaaaaaaaaaaaaa'
 
 function makeActions(
   options: {
-    closeSessionForUser: (userId: string, ptySessionId: string) => boolean
-    getSlotScope?: (userId: string, ptySessionId: string) => string | undefined
+    closeSessionForUser: (userId: string, terminalRuntimeSessionId: string) => boolean
+    getSlotScope?: (userId: string, terminalRuntimeSessionId: string) => string | undefined
     isValidTerminalClientId?: (value: unknown) => value is string
     broadcasts?: ReturnType<typeof vi.fn>
   } = { closeSessionForUser: () => false },
 ) {
   const broadcasts = options.broadcasts ?? vi.fn()
   const manager = {
-    getSessionSummaryForUser: vi.fn((userId: string, ptySessionId: string) =>
-      options.getSlotScope?.(userId, ptySessionId)
+    getSessionSummaryForUser: vi.fn((userId: string, terminalRuntimeSessionId: string) =>
+      options.getSlotScope?.(userId, terminalRuntimeSessionId)
         ? ({
-            ptySessionId,
+            terminalRuntimeSessionId,
             terminalSessionId: 'terminal-session-1',
             repoInstanceId: REPO_INSTANCE_ID,
-            repoRoot: options.getSlotScope(userId, ptySessionId),
+            repoRoot: options.getSlotScope(userId, terminalRuntimeSessionId),
             worktreePath: '/repo',
             cwd: '/repo',
             controller: null,
@@ -97,7 +97,7 @@ describe('terminal-runtime-actions close broadcast', () => {
       terminalSessionId: 'session-1',
       tabs: [],
       sessions: [],
-      ptySessionId: PTY_SESSION_ID,
+      terminalRuntimeSessionId: RUNTIME_SESSION_ID,
       processName: 'zsh',
       canonicalTitle: null,
       phase: 'open',
@@ -151,14 +151,14 @@ describe('terminal-runtime-actions close broadcast', () => {
       getSlotScope: () => '/repo',
     })
 
-    const closed = await actions.close(CLIENT_ID, USER_ID, { ptySessionId: PTY_SESSION_ID })
+    const closed = await actions.close(CLIENT_ID, USER_ID, { terminalRuntimeSessionId: RUNTIME_SESSION_ID })
 
     expect(closed).toBe(true)
-    expect(close).toHaveBeenCalledWith(USER_ID, PTY_SESSION_ID)
+    expect(close).toHaveBeenCalledWith(USER_ID, RUNTIME_SESSION_ID)
     expect(broadcasts).toHaveBeenCalledTimes(1)
     expect(broadcasts).toHaveBeenCalledWith(USER_ID, {
       type: 'session-closed',
-      ptySessionId: PTY_SESSION_ID,
+      terminalRuntimeSessionId: RUNTIME_SESSION_ID,
       terminalSessionId: 'terminal-session-1',
       repoRoot: '/repo',
       worktreePath: '/repo',
@@ -173,7 +173,7 @@ describe('terminal-runtime-actions close broadcast', () => {
       getSlotScope: () => '/repo',
     })
 
-    const closed = await actions.close(CLIENT_ID, USER_ID, { ptySessionId: PTY_SESSION_ID })
+    const closed = await actions.close(CLIENT_ID, USER_ID, { terminalRuntimeSessionId: RUNTIME_SESSION_ID })
 
     expect(closed).toBe(false)
     expect(broadcasts).not.toHaveBeenCalled()
@@ -188,21 +188,21 @@ describe('terminal-runtime-actions close broadcast', () => {
       getSlotScope: () => undefined,
     })
 
-    const closed = await actions.close(CLIENT_ID, USER_ID, { ptySessionId: PTY_SESSION_ID })
+    const closed = await actions.close(CLIENT_ID, USER_ID, { terminalRuntimeSessionId: RUNTIME_SESSION_ID })
 
     expect(closed).toBe(true)
     expect(broadcasts).not.toHaveBeenCalled()
   })
 
   test('rejects malformed input without throwing and emits nothing', async () => {
-    // A ptySessionId that fails the TERMINAL_PTY_SESSION_ID_RE regex
+    // A terminalRuntimeSessionId that fails the TERMINAL_RUNTIME_SESSION_ID_RE regex
     // (16+ alphanumerics) is rejected by the validator; the action
     // returns false and the broker is not consulted.
     const { actions, broadcasts } = makeActions({
       closeSessionForUser: () => true,
     })
 
-    const closed = await actions.close(CLIENT_ID, USER_ID, { ptySessionId: '' })
+    const closed = await actions.close(CLIENT_ID, USER_ID, { terminalRuntimeSessionId: '' })
 
     expect(closed).toBe(false)
     expect(broadcasts).not.toHaveBeenCalled()
@@ -212,14 +212,14 @@ describe('terminal-runtime-actions close broadcast', () => {
     // The `isValidTerminalClientId` guard is the first check. A bad
     // clientId must never reach `closeSessionForUser` (which would
     // also reject it) and must not emit a session-closed with a
-    // stale ptySessionId.
+    // stale terminalRuntimeSessionId.
     const close = vi.fn(() => true)
     const { actions, broadcasts } = makeActions({
       closeSessionForUser: close,
       getSlotScope: () => '/repo',
     })
 
-    const closed = await actions.close('not_a_client', USER_ID, { ptySessionId: PTY_SESSION_ID })
+    const closed = await actions.close('not_a_client', USER_ID, { terminalRuntimeSessionId: RUNTIME_SESSION_ID })
 
     expect(closed).toBe(false)
     expect(close).not.toHaveBeenCalled()
@@ -318,31 +318,31 @@ describe('terminal-runtime-actions clientId gate', () => {
   test('write / resize / takeover / restart / attach all fall back to outer clientId when input omits it', async () => {
     const { actions, manager } = makeActions({ closeSessionForUser: () => false })
 
-    actions.write(CLIENT_ID, USER_ID, { ptySessionId: PTY_SESSION_ID, data: 'x' } as never)
-    actions.resize(CLIENT_ID, USER_ID, { ptySessionId: PTY_SESSION_ID, cols: 80, rows: 24 } as never)
+    actions.write(CLIENT_ID, USER_ID, { terminalRuntimeSessionId: RUNTIME_SESSION_ID, data: 'x' } as never)
+    actions.resize(CLIENT_ID, USER_ID, { terminalRuntimeSessionId: RUNTIME_SESSION_ID, cols: 80, rows: 24 } as never)
     actions.takeover(CLIENT_ID, USER_ID, {
-      ptySessionId: PTY_SESSION_ID,
+      terminalRuntimeSessionId: RUNTIME_SESSION_ID,
       cols: 80,
       rows: 24,
     } as never)
     await actions.restart(CLIENT_ID, USER_ID, {
-      ptySessionId: PTY_SESSION_ID,
+      terminalRuntimeSessionId: RUNTIME_SESSION_ID,
       cols: 80,
       rows: 24,
     } as never)
     await actions.attach(CLIENT_ID, USER_ID, {
-      ptySessionId: PTY_SESSION_ID,
+      terminalRuntimeSessionId: RUNTIME_SESSION_ID,
       cols: 80,
       rows: 24,
     } as never)
 
     // Each call crossed the gate and reached the manager, passing
     // the outer CLIENT_ID as the session-level clientId.
-    expect(manager.writeSession).toHaveBeenCalledWith(USER_ID, PTY_SESSION_ID, 'x', CLIENT_ID)
-    expect(manager.resizeSession).toHaveBeenCalledWith(USER_ID, PTY_SESSION_ID, 80, 24, CLIENT_ID)
-    expect(manager.takeoverSession).toHaveBeenCalledWith(USER_ID, PTY_SESSION_ID, 80, 24, CLIENT_ID)
-    expect(manager.restartSession).toHaveBeenCalledWith(USER_ID, PTY_SESSION_ID, 80, 24, CLIENT_ID)
-    expect(manager.attachSession).toHaveBeenCalledWith(USER_ID, PTY_SESSION_ID, 80, 24, CLIENT_ID)
+    expect(manager.writeSession).toHaveBeenCalledWith(USER_ID, RUNTIME_SESSION_ID, 'x', CLIENT_ID)
+    expect(manager.resizeSession).toHaveBeenCalledWith(USER_ID, RUNTIME_SESSION_ID, 80, 24, CLIENT_ID)
+    expect(manager.takeoverSession).toHaveBeenCalledWith(USER_ID, RUNTIME_SESSION_ID, 80, 24, CLIENT_ID)
+    expect(manager.restartSession).toHaveBeenCalledWith(USER_ID, RUNTIME_SESSION_ID, 80, 24, CLIENT_ID)
+    expect(manager.attachSession).toHaveBeenCalledWith(USER_ID, RUNTIME_SESSION_ID, 80, 24, CLIENT_ID)
   })
 
   test('restart rejects invalid arguments before looking up the session scope', async () => {
@@ -357,7 +357,7 @@ describe('terminal-runtime-actions clientId gate', () => {
     })
     await expect(
       actions.restart('not_a_client', USER_ID, {
-        ptySessionId: PTY_SESSION_ID,
+        terminalRuntimeSessionId: RUNTIME_SESSION_ID,
         cols: 80,
         rows: 24,
       } as never),
@@ -367,7 +367,7 @@ describe('terminal-runtime-actions clientId gate', () => {
     })
     await expect(
       actions.restart(CLIENT_ID, USER_ID, {
-        ptySessionId: PTY_SESSION_ID,
+        terminalRuntimeSessionId: RUNTIME_SESSION_ID,
         cols: 0,
         rows: 24,
       } as never),

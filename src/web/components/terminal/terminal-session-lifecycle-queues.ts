@@ -8,7 +8,7 @@
  * must therefore resolve to the same terminalSessionId; distinct requests must
  * get their own later create attempt.
  *
- * Close requests are deduped by ptySessionId and are awaited by later creates
+ * Close requests are deduped by terminalRuntimeSessionId and are awaited by later creates
  * for the same worktree so a fresh create cannot race an orphan close.
  */
 export interface PendingTerminalCreate<TBase, TOptions> {
@@ -22,7 +22,7 @@ export interface PendingTerminalCreate<TBase, TOptions> {
 }
 
 export interface PendingTerminalClose {
-  ptySessionId: string
+  terminalRuntimeSessionId: string
   terminalWorktreeKey: string
   promise: Promise<void>
   resolve: () => void
@@ -31,7 +31,7 @@ export interface PendingTerminalClose {
 
 export class TerminalSessionLifecycleQueues<TBase, TOptions> {
   private readonly pendingCreateByWorktree = new Map<string, PendingTerminalCreate<TBase, TOptions>>()
-  private readonly pendingCloseByPtySessionId = new Map<string, PendingTerminalClose>()
+  private readonly pendingCloseByTerminalRuntimeSessionId = new Map<string, PendingTerminalClose>()
 
   enqueueCreate(input: {
     terminalWorktreeKey: string
@@ -83,7 +83,7 @@ export class TerminalSessionLifecycleQueues<TBase, TOptions> {
     input: Omit<PendingTerminalClose, 'promise' | 'resolve' | 'reject'>,
     perform: (input: Omit<PendingTerminalClose, 'promise' | 'resolve' | 'reject'>) => Promise<void>,
   ): Promise<void> {
-    const existing = this.pendingCloseByPtySessionId.get(input.ptySessionId)
+    const existing = this.pendingCloseByTerminalRuntimeSessionId.get(input.terminalRuntimeSessionId)
     if (existing) return existing.promise
 
     let resolve!: () => void
@@ -93,34 +93,34 @@ export class TerminalSessionLifecycleQueues<TBase, TOptions> {
       reject = innerReject
     })
     const entry: PendingTerminalClose = { ...input, promise, resolve, reject }
-    this.pendingCloseByPtySessionId.set(input.ptySessionId, entry)
+    this.pendingCloseByTerminalRuntimeSessionId.set(input.terminalRuntimeSessionId, entry)
     void perform(input).then(
-      () => this.settleClose(input.ptySessionId, entry, null),
-      (error) => this.settleClose(input.ptySessionId, entry, error),
+      () => this.settleClose(input.terminalRuntimeSessionId, entry, null),
+      (error) => this.settleClose(input.terminalRuntimeSessionId, entry, error),
     )
     return promise
   }
 
   hasCloses(): boolean {
-    return this.pendingCloseByPtySessionId.size > 0
+    return this.pendingCloseByTerminalRuntimeSessionId.size > 0
   }
 
   closesForWorktree(terminalWorktreeKey: string): PendingTerminalClose[] {
-    return Array.from(this.pendingCloseByPtySessionId.values()).filter(
+    return Array.from(this.pendingCloseByTerminalRuntimeSessionId.values()).filter(
       (entry) => entry.terminalWorktreeKey === terminalWorktreeKey,
     )
   }
 
   rejectAll(error: unknown): void {
     for (const pending of this.pendingCreateByWorktree.values()) pending.reject(error)
-    for (const pending of this.pendingCloseByPtySessionId.values()) pending.reject(error)
+    for (const pending of this.pendingCloseByTerminalRuntimeSessionId.values()) pending.reject(error)
     this.pendingCreateByWorktree.clear()
-    this.pendingCloseByPtySessionId.clear()
+    this.pendingCloseByTerminalRuntimeSessionId.clear()
   }
 
-  private settleClose(ptySessionId: string, entry: PendingTerminalClose, error: unknown): void {
-    if (this.pendingCloseByPtySessionId.get(ptySessionId) !== entry) return
-    this.pendingCloseByPtySessionId.delete(ptySessionId)
+  private settleClose(terminalRuntimeSessionId: string, entry: PendingTerminalClose, error: unknown): void {
+    if (this.pendingCloseByTerminalRuntimeSessionId.get(terminalRuntimeSessionId) !== entry) return
+    this.pendingCloseByTerminalRuntimeSessionId.delete(terminalRuntimeSessionId)
     if (error === null) entry.resolve()
     else entry.reject(error)
   }

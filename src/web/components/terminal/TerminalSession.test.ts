@@ -641,7 +641,7 @@ describe('TerminalSession', () => {
     expect(host.querySelector('.goblin-managed-terminal-frame')).not.toBeNull()
     expect(host.querySelector('.goblin-managed-terminal-host .xterm')).not.toBeNull()
     expect(terminalCalls.attach).toHaveBeenCalledWith({
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       cols: 100,
       rows: 30,
     })
@@ -864,7 +864,7 @@ describe('TerminalSession', () => {
       // Rapid option-arrow keys are batched into a single write via queueMicrotask.
       expect(terminalCalls.write).toHaveBeenCalledTimes(1)
       expect(terminalCalls.write).toHaveBeenCalledWith({
-        ptySessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         data: '\x1bb\x1bf\x1b[A\x1b[B',
       })
 
@@ -911,7 +911,7 @@ describe('TerminalSession', () => {
 
       // Rapid Safari shift keys are batched into a single write via queueMicrotask.
       expect(terminalCalls.write).toHaveBeenCalledTimes(1)
-      expect(terminalCalls.write).toHaveBeenCalledWith({ ptySessionId: 'pty_session_1_aaaaaaaaa', data: '?!' })
+      expect(terminalCalls.write).toHaveBeenCalledWith({ terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa', data: '?!' })
     } finally {
       Object.defineProperty(window.navigator, 'userAgent', { configurable: true, value: savedUserAgent })
     }
@@ -955,7 +955,7 @@ describe('TerminalSession', () => {
       await flushTerminalStart()
 
       expect(terminalCalls.write).toHaveBeenCalledTimes(1)
-      expect(terminalCalls.write).toHaveBeenCalledWith({ ptySessionId: 'pty_session_1_aaaaaaaaa', data: '：' })
+      expect(terminalCalls.write).toHaveBeenCalledWith({ terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa', data: '：' })
     } finally {
       Object.defineProperty(window.navigator, 'userAgent', { configurable: true, value: savedUserAgent })
     }
@@ -1082,7 +1082,7 @@ describe('TerminalSession', () => {
     await flushTerminalStart()
 
     expect(terminalCalls.restart).toHaveBeenCalledWith({
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       cols: 100,
       rows: 30,
     })
@@ -1102,7 +1102,7 @@ describe('TerminalSession', () => {
     session.restart()
     await flushTerminalStart()
 
-    expect(session.currentPtySessionId()).toBe('pty_session_1_aaaaaaaaa')
+    expect(session.currentTerminalRuntimeSessionId()).toBe('pty_session_1_aaaaaaaaa')
     expect(session.snapshot()).toEqual({
       phase: 'error',
       message: 'error.spawn-failed',
@@ -1144,7 +1144,7 @@ describe('TerminalSession', () => {
     xtermMocks.terminals[0]!.emitData('input')
     await flushTerminalStart()
 
-    expect(terminalCalls.write).toHaveBeenCalledWith({ ptySessionId: 'pty_session_1_aaaaaaaaa', data: 'input' })
+    expect(terminalCalls.write).toHaveBeenCalledWith({ terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa', data: 'input' })
     expect(session.snapshot().phase).toBe('open')
   })
 
@@ -1166,7 +1166,7 @@ describe('TerminalSession', () => {
     await flushTerminalStart()
 
     expect(terminalCalls.write).toHaveBeenCalledTimes(1)
-    expect(terminalCalls.write).toHaveBeenCalledWith({ ptySessionId: 'pty_session_1_aaaaaaaaa', data: 'clear' })
+    expect(terminalCalls.write).toHaveBeenCalledWith({ terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa', data: 'clear' })
   })
 
   test('drops buffered input after dispose', async () => {
@@ -1204,12 +1204,12 @@ describe('TerminalSession', () => {
 
     expect(terminalCalls.resize).toHaveBeenCalledTimes(2)
     expect(terminalCalls.resize).toHaveBeenNthCalledWith(1, {
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       cols: 101,
       rows: 31,
     })
     expect(terminalCalls.resize).toHaveBeenNthCalledWith(2, {
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       cols: 101,
       rows: 31,
     })
@@ -1293,7 +1293,7 @@ describe('TerminalSession', () => {
     hydrateManagedSession(session)
 
     session.hydrate({
-      ptySessionId: 'session-remote',
+      terminalRuntimeSessionId: 'session-remote',
       phase: 'open',
       message: null,
       processName: 'node',
@@ -1321,7 +1321,7 @@ describe('TerminalSession', () => {
     hydrateManagedSession(session)
 
     session.hydrate({
-      ptySessionId: 'session-remote',
+      terminalRuntimeSessionId: 'session-remote',
       phase: 'open',
       message: null,
       processName: 'node',
@@ -1360,10 +1360,10 @@ describe('TerminalSession', () => {
     term.reset.mockClear()
     term.write.mockClear()
 
-    // hydrate() with a different ptySessionId triggers
+    // hydrate() with a different terminalRuntimeSessionId triggers
     // applyHydratedSnapshotToActiveView on the existing term (line 204).
     session.hydrate({
-      ptySessionId: 'pty_session_2_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_2_aaaaaaaaa',
       phase: 'open',
       message: null,
       processName: 'node',
@@ -1398,7 +1398,7 @@ describe('TerminalSession', () => {
     term.write.mockClear()
 
     session.hydrate({
-      ptySessionId: 'session-remote',
+      terminalRuntimeSessionId: 'session-remote',
       phase: 'open',
       message: null,
       processName: 'node',
@@ -1415,7 +1415,7 @@ describe('TerminalSession', () => {
     // applyHydratedSnapshotToActiveView passes a callback as the second arg
     // so it can clear the field after the write resolves.
     expect(term.write).toHaveBeenCalledWith('remote-screen', expect.any(Function))
-    expect(session.currentPtySessionId()).toBe('session-remote')
+    expect(session.currentTerminalRuntimeSessionId()).toBe('session-remote')
   })
 
   test('does not rewrite an existing terminal view when hydrate refreshes the same session snapshot', async () => {
@@ -1432,7 +1432,7 @@ describe('TerminalSession', () => {
     term.write.mockClear()
 
     session.hydrate({
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       phase: 'open',
       message: null,
       processName: 'node',
@@ -1447,7 +1447,7 @@ describe('TerminalSession', () => {
 
     expect(term.reset).not.toHaveBeenCalled()
     expect(term.write).not.toHaveBeenCalled()
-    expect(session.currentPtySessionId()).toBe('pty_session_1_aaaaaaaaa')
+    expect(session.currentTerminalRuntimeSessionId()).toBe('pty_session_1_aaaaaaaaa')
   })
 
   test('stale active hydrate replay callback does not close a newer replay boundary', async () => {
@@ -1466,7 +1466,7 @@ describe('TerminalSession', () => {
     xtermMocks.deferWriteCallbacks(true)
 
     session.hydrate({
-      ptySessionId: 'pty_session_2_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_2_aaaaaaaaa',
       phase: 'open',
       message: null,
       processName: 'node',
@@ -1478,7 +1478,7 @@ describe('TerminalSession', () => {
       snapshotSeq: 10,
     })
     session.hydrate({
-      ptySessionId: 'pty_session_3_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_3_aaaaaaaaa',
       phase: 'open',
       message: null,
       processName: 'node',
@@ -1515,7 +1515,7 @@ describe('TerminalSession', () => {
     xtermMocks.terminals[0]!.emitData('hello')
     await flushUntil(() => terminalCalls.write.mock.calls.length > 0)
 
-    expect(terminalCalls.write).toHaveBeenCalledWith({ ptySessionId: 'pty_session_1_aaaaaaaaa', data: 'hello' })
+    expect(terminalCalls.write).toHaveBeenCalledWith({ terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa', data: 'hello' })
     expect(notify).not.toHaveBeenCalled()
   })
 
@@ -1529,7 +1529,7 @@ describe('TerminalSession', () => {
     expect(terminalCalls.write).not.toHaveBeenCalled()
 
     session.handleOutput({
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalSessionId: 'pty_session_1_aaaaaaaaa',
       data: 'prompt',
       seq: 1,
@@ -1539,7 +1539,7 @@ describe('TerminalSession', () => {
 
     expect(terminalCalls.write).toHaveBeenCalledTimes(1)
     expect(terminalCalls.write).toHaveBeenCalledWith({
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       data: "bat '/worktree/file.ts'\r",
     })
   })
@@ -1553,7 +1553,7 @@ describe('TerminalSession', () => {
 
     expect(terminalCalls.write).toHaveBeenCalledTimes(1)
     expect(terminalCalls.write).toHaveBeenCalledWith({
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       data: "bat '/worktree/file.ts'\r",
     })
   })
@@ -1566,7 +1566,7 @@ describe('TerminalSession', () => {
     await flushUntil(() => terminalCalls.write.mock.calls.length > 0)
 
     expect(terminalCalls.write).toHaveBeenCalledTimes(1)
-    expect(terminalCalls.write).toHaveBeenCalledWith({ ptySessionId: 'pty_session_1_aaaaaaaaa', data: 'l' })
+    expect(terminalCalls.write).toHaveBeenCalledWith({ terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa', data: 'l' })
   })
 
   test('tracks server title changes separately from process name', async () => {
@@ -1661,7 +1661,7 @@ describe('TerminalSession', () => {
     await flushUntil(() => terminalCalls.takeover.mock.calls.length > 0)
 
     expect(terminalCalls.takeover).toHaveBeenCalledWith({
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       cols: 101,
       rows: 31,
       clientId: 'client_local',
@@ -1681,7 +1681,7 @@ describe('TerminalSession', () => {
     // benign re-apply — the runtime treats it as idempotent because
     // every field already matches.
     session.handleIdentity({
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       role: 'controller',
       controllerStatus: 'connected',
       canonicalCols: 101,
@@ -1729,13 +1729,13 @@ describe('TerminalSession', () => {
     await flushTerminalStart()
 
     expect(terminalCalls.takeover).toHaveBeenCalledWith({
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       cols: 120,
       rows: 40,
       clientId: 'client_local',
     })
     expect(terminalCalls.attach).toHaveBeenCalledWith({
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       cols: 100,
       rows: 30,
     })
@@ -1771,7 +1771,7 @@ describe('TerminalSession', () => {
     await flushTerminalStart()
 
     expect(terminalCalls.attach).toHaveBeenCalledWith({
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       cols: 100,
       rows: 30,
     })
@@ -1808,7 +1808,7 @@ describe('TerminalSession', () => {
     await flushUntil(() => session.snapshot().phase === 'open')
 
     session.hydrate({
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       phase: 'open',
       message: null,
       processName: 'zsh',
@@ -1823,7 +1823,7 @@ describe('TerminalSession', () => {
     await flushTerminalStart()
 
     expect(terminalCalls.attach).toHaveBeenNthCalledWith(1, {
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       cols: 100,
       rows: 30,
     })
@@ -1857,7 +1857,7 @@ describe('TerminalSession', () => {
     await expect(session.takeover()).resolves.toBe(true)
 
     expect(terminalCalls.takeover).toHaveBeenCalledWith({
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       cols: 120,
       rows: 40,
       clientId: 'client_local',
@@ -1955,7 +1955,7 @@ describe('TerminalSession', () => {
     await flushUntil(() => terminalCalls.takeover.mock.calls.length > 0)
 
     session.handleIdentity({
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       role: 'unowned',
       controllerStatus: 'none',
       canonicalCols: 120,
@@ -1999,7 +1999,7 @@ describe('TerminalSession', () => {
     })
 
     session.handleIdentity({
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       role: 'unowned',
       controllerStatus: 'none',
       canonicalCols: 120,
@@ -2008,7 +2008,7 @@ describe('TerminalSession', () => {
     await flushTerminalStart()
 
     expect(terminalCalls.attach).toHaveBeenNthCalledWith(2, {
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       cols: 100,
       rows: 30,
     })
@@ -2048,7 +2048,7 @@ describe('TerminalSession', () => {
     await flushUntil(() => session.snapshot().phase === 'open')
 
     session.handleIdentity({
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       role: 'controller',
       controllerStatus: 'connected',
       canonicalCols: 101,
@@ -2104,7 +2104,7 @@ describe('TerminalSession', () => {
     await flushTerminalStart()
 
     expect(terminalCalls.write).toHaveBeenCalledWith({
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       data: 'input during replay',
     })
   })
@@ -2127,7 +2127,7 @@ describe('TerminalSession', () => {
     await flushUntil(() => session.snapshot().phase === 'open')
     await flushTerminalStart()
 
-    expect(terminalCalls.write).toHaveBeenCalledWith({ ptySessionId: 'pty_session_1_aaaaaaaaa', data: '\x1b[M ##' })
+    expect(terminalCalls.write).toHaveBeenCalledWith({ terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa', data: '\x1b[M ##' })
   })
 
   test('resets the terminal before replaying the snapshot', async () => {
@@ -2157,21 +2157,21 @@ describe('TerminalSession', () => {
     notify.mockClear()
 
     session.handleOutput({
-      ptySessionId: 'other-session',
+      terminalRuntimeSessionId: 'other-session',
       terminalSessionId: 'other-session',
       data: 'ignored',
       seq: 1,
       processName: 'zsh',
     })
     session.handleOutput({
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalSessionId: 'pty_session_1_aaaaaaaaa',
       data: 'first',
       seq: 1,
       processName: 'zsh',
     })
     session.handleOutput({
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalSessionId: 'pty_session_1_aaaaaaaaa',
       data: 'second',
       seq: 2,
@@ -2197,15 +2197,15 @@ describe('TerminalSession', () => {
     await flushUntil(() => session.snapshot().phase === 'open')
 
     session.handleOutput({
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalSessionId: 'pty_session_1_aaaaaaaaa',
       data: 'before exit',
       seq: 1,
       processName: 'zsh',
     })
-    expect(session.handleExit({ ptySessionId: 'other-session', terminalSessionId: 'other-session' })).toBe(false)
+    expect(session.handleExit({ terminalRuntimeSessionId: 'other-session', terminalSessionId: 'other-session' })).toBe(false)
     expect(
-      session.handleExit({ ptySessionId: 'pty_session_1_aaaaaaaaa', terminalSessionId: 'pty_session_1_aaaaaaaaa' }),
+      session.handleExit({ terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa', terminalSessionId: 'pty_session_1_aaaaaaaaa' }),
     ).toBe(true)
     session.dispose()
 
@@ -2224,7 +2224,7 @@ describe('TerminalSession', () => {
     document.body.appendChild(host)
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session, {
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       processName: 'zsh',
       canonicalTitle: '~/Developer/goblin — npm run dev',
       role: 'viewer',
@@ -2250,8 +2250,8 @@ describe('TerminalSession', () => {
     // this test we wire it straight to `terminalCalls.close` so the same
     // assertions the old test made still hold.
     const pendingCloses: Array<Promise<unknown>> = []
-    const session = new TerminalSession(descriptor, vi.fn(), async (ptySessionId) => {
-      const promise = terminalCalls.close({ ptySessionId })
+    const session = new TerminalSession(descriptor, vi.fn(), async (terminalRuntimeSessionId) => {
+      const promise = terminalCalls.close({ terminalRuntimeSessionId })
       pendingCloses.push(promise)
       await promise
     })
@@ -2268,7 +2268,7 @@ describe('TerminalSession', () => {
     await Promise.allSettled(pendingCloses)
 
     expect(terminalCalls.restart).not.toHaveBeenCalled()
-    expect(terminalCalls.close).toHaveBeenCalledWith({ ptySessionId: 'pty_session_1_aaaaaaaaa' })
+    expect(terminalCalls.close).toHaveBeenCalledWith({ terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa' })
   })
 
   test('closes stale restart result when disposed while restart is in flight', async () => {
@@ -2310,7 +2310,7 @@ describe('TerminalSession', () => {
     await flushTerminalStart()
 
     expect(terminalCalls.close).not.toHaveBeenCalled()
-    expect(session.currentPtySessionId()).toBe('pty_session_2_aaaaaaaaa')
+    expect(session.currentTerminalRuntimeSessionId()).toBe('pty_session_2_aaaaaaaaa')
     expect(host.querySelector('.goblin-managed-terminal-frame')).toBeNull()
 
     session.attach(host)
@@ -2319,7 +2319,7 @@ describe('TerminalSession', () => {
 
     expect(terminalCalls.restart).toHaveBeenCalledTimes(1)
     expect(terminalCalls.attach).toHaveBeenLastCalledWith({
-      ptySessionId: 'pty_session_2_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_2_aaaaaaaaa',
       cols: 100,
       rows: 30,
     })
@@ -2543,7 +2543,7 @@ describe('TerminalSession', () => {
       // lifecycle event through `handleLifecycle` and the new
       // phase replaces the takeover response's phase.
       session.handleLifecycle({
-        ptySessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         phase: 'restarting',
         message: null,
         takeoverPending: false,
@@ -2581,7 +2581,7 @@ describe('TerminalSession', () => {
       // previous `!canResize()` gate misread this as a downgrade
       // because canResize() requires `phase === 'open'`.
       session.handleIdentity({
-        ptySessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         role: 'controller',
         controllerStatus: 'connected',
         canonicalCols: 100,
@@ -2600,7 +2600,7 @@ describe('TerminalSession', () => {
       // safe: the xterm is still preserved because `handleLifecycle`
       // never tears it down.
       session.handleLifecycle({
-        ptySessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         phase: 'opening',
         message: null,
         takeoverPending: false,
@@ -2632,7 +2632,7 @@ describe('TerminalSession', () => {
       // would also have flipped — the test exercises the role
       // signal independently of phase.
       session.handleIdentity({
-        ptySessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         role: 'viewer',
         controllerStatus: 'connected',
         canonicalCols: 100,
@@ -2646,11 +2646,11 @@ describe('TerminalSession', () => {
 })
 
 function createFirstFrame(
-  ptySessionId: string,
+  terminalRuntimeSessionId: string,
   overrides: Partial<Omit<Extract<TerminalAttachResult, { ok: true }>, 'ok'>> = {},
 ): Extract<TerminalAttachResult, { ok: true }> {
   return {
-    ptySessionId,
+    terminalRuntimeSessionId,
     snapshot: '',
     snapshotSeq: 0,
     processName: 'zsh',
@@ -2666,11 +2666,11 @@ function createFirstFrame(
 }
 
 function attachResult(
-  ptySessionId: string,
+  terminalRuntimeSessionId: string,
   overrides: Partial<Omit<Extract<TerminalAttachResult, { ok: true }>, 'ok'>> = {},
 ): TerminalAttachResult {
   const result: Extract<TerminalAttachResult, { ok: true }> = {
-    ptySessionId,
+    terminalRuntimeSessionId,
     snapshot: '',
     snapshotSeq: 0,
     processName: 'zsh',
@@ -2687,12 +2687,12 @@ function attachResult(
 }
 
 function takeoverResult(
-  ptySessionId: string,
+  terminalRuntimeSessionId: string,
   overrides: Partial<Extract<TerminalTakeoverResult, { ok: true }>> = {},
 ): TerminalTakeoverResult {
   return {
     ok: true,
-    ptySessionId,
+    terminalRuntimeSessionId,
     role: 'controller',
     controllerStatus: 'connected',
     controller: { clientId: 'client_local', status: 'connected' },
@@ -2706,7 +2706,7 @@ function takeoverResult(
 function hydrateManagedSession(
   session: TerminalSession,
   overrides: Partial<{
-    ptySessionId: string
+    terminalRuntimeSessionId: string
     phase: 'opening' | 'restarting' | 'open' | 'error' | 'closed'
     message: string | null
     processName: string
@@ -2720,7 +2720,7 @@ function hydrateManagedSession(
   }> = {},
 ): void {
   session.hydrate({
-    ptySessionId: 'pty_session_1_aaaaaaaaa',
+    terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
     phase: 'open',
     message: null,
     processName: 'zsh',

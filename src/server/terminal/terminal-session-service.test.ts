@@ -44,7 +44,7 @@ describe('terminal session service workspace tabs', () => {
         createdTerminalSessionId = input.terminalSessionId
         return {
           ok: true as const,
-          ptySessionId: 'pty_session_created',
+          terminalRuntimeSessionId: 'pty_session_created',
           snapshot: '',
           snapshotSeq: 0,
           processName: 'zsh',
@@ -476,7 +476,7 @@ interface EnsureSessionInput {
 
 function terminalSession(terminalSessionId: string): TerminalSessionSummary {
   return {
-    ptySessionId: `pty_${terminalSessionId}`,
+    terminalRuntimeSessionId: `pty_${terminalSessionId}`,
     terminalSessionId,
     repoInstanceId: REPO_INSTANCE_ID,
     repoRoot: path.resolve(REPO_ROOT),

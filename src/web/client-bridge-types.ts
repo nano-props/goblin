@@ -84,7 +84,7 @@ export interface ClientTerminal {
    * bug, where a lost close request left the server PTY alive.
    */
   onSessionClosed: (
-    cb: (event: { ptySessionId: string; terminalSessionId: string; repoRoot: string; worktreePath: string }) => void,
+    cb: (event: { terminalRuntimeSessionId: string; terminalSessionId: string; repoRoot: string; worktreePath: string }) => void,
   ) => () => void
 }
 

@@ -63,7 +63,7 @@ describe('terminal realtime broker', () => {
 
     broker.broadcastToUser(USER_A, {
       type: 'output',
-      event: { ptySessionId: 's_1', terminalSessionId: 'terminal_1', data: 'hi', seq: 1, processName: 'zsh' },
+      event: { terminalRuntimeSessionId: 's_1', terminalSessionId: 'terminal_1', data: 'hi', seq: 1, processName: 'zsh' },
     })
 
     expect(electronSocket.send).toHaveBeenCalledTimes(1)
@@ -72,7 +72,7 @@ describe('terminal realtime broker', () => {
     expect(String(chromeSocket.send.mock.calls[0]?.[0])).toBe(payload)
     expect(JSON.parse(payload)).toMatchObject({
       type: 'output',
-      event: { ptySessionId: 's_1', terminalSessionId: 'terminal_1', data: 'hi', seq: 1, processName: 'zsh' },
+      event: { terminalRuntimeSessionId: 's_1', terminalSessionId: 'terminal_1', data: 'hi', seq: 1, processName: 'zsh' },
     })
   })
 
@@ -85,7 +85,7 @@ describe('terminal realtime broker', () => {
 
     broker.broadcastToUser(USER_A, {
       type: 'output',
-      event: { ptySessionId: 's_1', terminalSessionId: 'terminal_1', data: 'a', seq: 1, processName: 'zsh' },
+      event: { terminalRuntimeSessionId: 's_1', terminalSessionId: 'terminal_1', data: 'a', seq: 1, processName: 'zsh' },
     })
 
     expect(userASocket.send).toHaveBeenCalledTimes(1)
@@ -101,7 +101,7 @@ describe('terminal realtime broker', () => {
 
     broker.broadcastToUser(USER_A, {
       type: 'output',
-      event: { ptySessionId: 's_1', terminalSessionId: 'terminal_1', data: 'a', seq: 1, processName: 'zsh' },
+      event: { terminalRuntimeSessionId: 's_1', terminalSessionId: 'terminal_1', data: 'a', seq: 1, processName: 'zsh' },
     })
 
     expect(userASocket.send).toHaveBeenCalledTimes(1)
@@ -118,7 +118,7 @@ describe('terminal realtime broker', () => {
 
     broker.broadcastToUser(USER_A, {
       type: 'output',
-      event: { ptySessionId: 's_1', terminalSessionId: 'terminal_1', data: 'a', seq: 1, processName: 'zsh' },
+      event: { terminalRuntimeSessionId: 's_1', terminalSessionId: 'terminal_1', data: 'a', seq: 1, processName: 'zsh' },
     })
     expect(socket.send).not.toHaveBeenCalled()
   })

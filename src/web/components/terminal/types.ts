@@ -51,7 +51,7 @@ export interface TerminalClientSnapshot extends TerminalControllerViewModel {
  * client's `applyIdentity` boundary.
  */
 export interface TerminalIdentityViewModel extends TerminalControllerViewModel {
-  ptySessionId: string
+  terminalRuntimeSessionId: string
   canonicalCols: number
   canonicalRows: number
 }
@@ -74,7 +74,7 @@ export interface TerminalIdentityRealtimeEvent extends TerminalIdentityViewModel
  * transitional phase update alone.
  */
 export interface TerminalLifecycleViewModel {
-  ptySessionId: string
+  terminalRuntimeSessionId: string
   phase: TerminalSessionPhase
   message: string | null
   takeoverPending: boolean

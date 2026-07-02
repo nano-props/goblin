@@ -5,7 +5,7 @@ import {
   isValidTerminalTestNotificationInput,
   isTerminalWsMessageWithinLimit,
   isValidTerminalSize,
-  isValidTerminalPtySessionId,
+  isValidTerminalRuntimeSessionId,
   normalizeTerminalClientMessage,
   normalizeTerminalCreateResult,
   normalizeTerminalSize,
@@ -25,9 +25,9 @@ describe('shared terminal validators', () => {
   })
 
   test('validates attachment ids and bell payloads', () => {
-    expect(isValidTerminalPtySessionId('pty_1234567890abcdef')).toBe(true)
-    expect(isValidTerminalPtySessionId('short')).toBe(false)
-    expect(isValidTerminalPtySessionId('bad id')).toBe(false)
+    expect(isValidTerminalRuntimeSessionId('pty_1234567890abcdef')).toBe(true)
+    expect(isValidTerminalRuntimeSessionId('short')).toBe(false)
+    expect(isValidTerminalRuntimeSessionId('bad id')).toBe(false)
 
     expect(isValidTerminalClientId(undefined)).toBe(true)
     expect(isValidTerminalClientId('client_a')).toBe(true)
@@ -67,13 +67,13 @@ describe('shared terminal validators', () => {
         type: 'request',
         requestId: 'req_1',
         action: 'attach',
-        input: { ptySessionId: 'pty_1234567890abcdef', cols: 80, rows: 24, clientId: 'client_a' },
+        input: { terminalRuntimeSessionId: 'pty_1234567890abcdef', cols: 80, rows: 24, clientId: 'client_a' },
       }),
     ).toEqual({
       type: 'request',
       requestId: 'req_1',
       action: 'attach',
-      input: { ptySessionId: 'pty_1234567890abcdef', cols: 80, rows: 24, clientId: 'client_a' },
+      input: { terminalRuntimeSessionId: 'pty_1234567890abcdef', cols: 80, rows: 24, clientId: 'client_a' },
     })
 
     expect(normalizeTerminalClientMessage({ type: 'ping', requestId: 'health_1' })).toEqual({
@@ -86,7 +86,7 @@ describe('shared terminal validators', () => {
         type: 'request',
         requestId: 'bad id',
         action: 'attach',
-        input: { ptySessionId: 'pty_1234567890abcdef', cols: 80, rows: 24 },
+        input: { terminalRuntimeSessionId: 'pty_1234567890abcdef', cols: 80, rows: 24 },
       }),
     ).toBeNull()
   })
@@ -98,7 +98,7 @@ describe('shared terminal validators', () => {
         requestId: 'request_123',
         action: 'write',
         input: {
-          ptySessionId: 'pty_session_123456',
+          terminalRuntimeSessionId: 'pty_session_123456',
           data: 'echo\0bad',
         },
       }),
@@ -204,7 +204,7 @@ describe('shared terminal validators', () => {
         terminalSessionId: 'session-1',
         tabs: [],
         sessions: [],
-        ptySessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         processName: 'zsh',
         canonicalTitle: null,
         phase: 'open',
@@ -218,7 +218,7 @@ describe('shared terminal validators', () => {
     ).toMatchObject({
       ok: true,
       terminalSessionId: 'session-1',
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       snapshotSeq: 1,
     })
 
@@ -242,7 +242,7 @@ describe('shared terminal validators', () => {
       normalizeTerminalSocketServerMessage({
         type: 'output',
         event: {
-          ptySessionId: 'pty_1234567890abcdef',
+          terminalRuntimeSessionId: 'pty_1234567890abcdef',
           terminalSessionId: 'session-1',
           data: 'hi',
           seq: 1,
@@ -252,7 +252,7 @@ describe('shared terminal validators', () => {
     ).toEqual({
       type: 'output',
       event: {
-        ptySessionId: 'pty_1234567890abcdef',
+        terminalRuntimeSessionId: 'pty_1234567890abcdef',
         terminalSessionId: 'session-1',
         data: 'hi',
         seq: 1,
@@ -279,14 +279,14 @@ describe('shared terminal validators', () => {
     expect(
       normalizeTerminalSocketServerMessage({
         type: 'session-closed',
-        ptySessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         terminalSessionId: 'session-1',
         repoRoot: '/repo',
         worktreePath: '/repo/worktree',
       }),
     ).toEqual({
       type: 'session-closed',
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalSessionId: 'session-1',
       repoRoot: '/repo',
       worktreePath: '/repo/worktree',

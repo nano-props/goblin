@@ -32,12 +32,12 @@ import type { TerminalTakeoverResult } from '#/shared/terminal-types.ts'
  * diagnosable from production).
  *
  * - `session-closed` — gate-internal: the runtime no longer has a
- *   ptySessionId, or the session was disposed mid-call. The takeover
+ *   terminalRuntimeSessionId, or the session was disposed mid-call. The takeover
  *   round-trip never started.
  * - `no-client` — gate-internal: the client bridge is unavailable
  *   (typically only in tests / startup). The takeover round-trip
  *   never started.
- * - `session-unknown` — the server reported the ptySessionId is not
+ * - `session-unknown` — the server reported the terminalRuntimeSessionId is not
  *   known to this user. The client session index is stale; the user
  *   needs to re-list before retrying.
  * - `client-offline` — the server's broker has no live socket
@@ -115,8 +115,8 @@ interface XtermAuthorityGateOptions {
    * round-trip resolving. The previous name `assertSessionAlive`
    * was misleading — this never throws, it just returns false.
    */
-  isSessionAlive: (ptySessionId: string) => boolean
-  getPtySessionId: () => string | null
+  isSessionAlive: (terminalRuntimeSessionId: string) => boolean
+  getTerminalRuntimeSessionId: () => string | null
   /** Called after a successful auto-promote so the caller can apply
    *  the post-takeover frame (similar to `applyTakeover` on the
    *  runtime) without coupling the gate to the runtime type. */
@@ -172,12 +172,12 @@ export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): Termi
   function deny(
     reason: AuthorizationDenialReason,
     stage: string,
-    extra: { ptySessionId?: string; message?: string; err?: unknown } = {},
+    extra: { terminalRuntimeSessionId?: string; message?: string; err?: unknown } = {},
   ): { kind: 'denied'; reason: AuthorizationDenialReason; message?: string } {
     terminalLog.warn('authority gate: takeover denied', {
       reason,
       stage,
-      ...(extra.ptySessionId !== undefined ? { ptySessionId: extra.ptySessionId } : {}),
+      ...(extra.terminalRuntimeSessionId !== undefined ? { terminalRuntimeSessionId: extra.terminalRuntimeSessionId } : {}),
       ...(extra.message !== undefined ? { message: extra.message } : {}),
       ...(extra.err !== undefined ? { err: extra.err } : {}),
     })
@@ -185,29 +185,29 @@ export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): Termi
   }
 
   async function doTakeover(): Promise<AuthorizationResult> {
-    const ptySessionId = opts.getPtySessionId()
-    if (!ptySessionId) return deny('session-closed', 'preflight')
-    if (!opts.isSessionAlive(ptySessionId)) return deny('session-closed', 'isSessionAlive', { ptySessionId })
+    const terminalRuntimeSessionId = opts.getTerminalRuntimeSessionId()
+    if (!terminalRuntimeSessionId) return deny('session-closed', 'preflight')
+    if (!opts.isSessionAlive(terminalRuntimeSessionId)) return deny('session-closed', 'isSessionAlive', { terminalRuntimeSessionId })
     let size: { cols: number; rows: number }
     try {
       size = await opts.resolveSize()
     } catch (err) {
-      return deny('takeover-rejected', 'resolveSize', { ptySessionId, err })
+      return deny('takeover-rejected', 'resolveSize', { terminalRuntimeSessionId, err })
     }
     let result: TerminalTakeoverResult
     try {
       result = await opts.bridge.takeover({
-        ptySessionId,
+        terminalRuntimeSessionId,
         cols: size.cols,
         rows: size.rows,
         clientId: readClientId(),
       })
     } catch (err) {
-      return deny('no-client', 'client', { ptySessionId, err })
+      return deny('no-client', 'client', { terminalRuntimeSessionId, err })
     }
     if (!result.ok) {
       return deny(classifyTakeoverRejection(result.message), 'server', {
-        ptySessionId,
+        terminalRuntimeSessionId,
         message: result.message,
       })
     }
@@ -216,9 +216,9 @@ export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): Termi
     // navigated away mid-takeover). Without this re-check the
     // `onPromoted` callback would mutate a destroyed runtime and
     // flip the gate's role to `controller`, leaving stale state
-    // for the next sibling attach on the same `ptySessionId`.
-    if (!opts.isSessionAlive(ptySessionId)) {
-      return deny('session-closed', 'post-await isSessionAlive', { ptySessionId })
+    // for the next sibling attach on the same `terminalRuntimeSessionId`.
+    if (!opts.isSessionAlive(terminalRuntimeSessionId)) {
+      return deny('session-closed', 'post-await isSessionAlive', { terminalRuntimeSessionId })
     }
     // ORDERING CONTRACT: `onPromoted` MUST run before `role` is
     // flipped to 'controller'. Callers of `takeover()` /

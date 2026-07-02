@@ -11,7 +11,7 @@ describe('terminal session eviction helpers', () => {
       localTerminalSessionIds: ['session-a', 'session-b', 'session-c'],
       getRepoRootForTerminalSessionId: (terminalSessionId) =>
         terminalSessionId === 'session-c' ? '/other' : '/repo',
-      hasPtySessionIdForTerminalSessionId: (terminalSessionId) => terminalSessionId !== 'session-b',
+      hasTerminalRuntimeSessionIdForTerminalSessionId: (terminalSessionId) => terminalSessionId !== 'session-b',
       serverTerminalSessionIds: new Set(['session-a']),
     })
     expect(orphaned).toEqual([])
@@ -21,7 +21,7 @@ describe('terminal session eviction helpers', () => {
       localTerminalSessionIds: ['session-a', 'session-b', 'session-c'],
       getRepoRootForTerminalSessionId: (terminalSessionId) =>
         terminalSessionId === 'session-c' ? '/other' : '/repo',
-      hasPtySessionIdForTerminalSessionId: (terminalSessionId) => terminalSessionId === 'session-b',
+      hasTerminalRuntimeSessionIdForTerminalSessionId: (terminalSessionId) => terminalSessionId === 'session-b',
       serverTerminalSessionIds: new Set(['session-a']),
     })
     expect(orphaned2).toEqual(['session-b'])

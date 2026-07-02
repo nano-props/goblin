@@ -293,7 +293,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       })
       .catch((err) => {
         terminalRuntimeLogger.warn(
-          { userId, ptySessionId: session.ptySessionId, repoRoot: session.repoRoot, err },
+          { userId, terminalRuntimeSessionId: session.terminalRuntimeSessionId, repoRoot: session.repoRoot, err },
           'failed to reconcile workspace tabs after terminal session close',
         )
       })

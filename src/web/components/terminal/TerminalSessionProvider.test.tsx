@@ -112,13 +112,13 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
     private readonly handleLifecycleSpy = vi.fn()
     private readonly hydrateSpy = vi.fn()
     private readonly detachSpy = vi.fn()
-    private ptySessionId: string | null = null
+    private terminalRuntimeSessionId: string | null = null
     private snapshotValue: TerminalSnapshot
 
     constructor(descriptor: TerminalDescriptor, _notify: () => void) {
       this.descriptor = descriptor
       this.notify = _notify
-      this.ptySessionId = null
+      this.terminalRuntimeSessionId = null
       this.snapshotValue = {
         phase: 'opening',
         message: null,
@@ -179,12 +179,12 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
 
     takeover() {}
 
-    currentPtySessionId(): string | null {
-      return this.ptySessionId
+    currentTerminalRuntimeSessionId(): string | null {
+      return this.terminalRuntimeSessionId
     }
 
     hydrate(input: {
-      ptySessionId: string
+      terminalRuntimeSessionId: string
       phase: 'opening' | 'open' | 'error'
       message: string | null
       processName: string
@@ -197,7 +197,7 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
       snapshotSeq?: number
     }) {
       this.hydrateSpy(input)
-      this.ptySessionId = input.ptySessionId
+      this.terminalRuntimeSessionId = input.terminalRuntimeSessionId
       this.snapshotValue = {
         phase: input.phase,
         message: input.message,
@@ -234,7 +234,7 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
     }
 
     handleIdentity(event: {
-      ptySessionId: string
+      terminalRuntimeSessionId: string
       role: 'controller' | 'viewer' | 'unowned'
       controllerStatus: 'connected' | 'none'
       canonicalCols: number
@@ -244,7 +244,7 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
     }
 
     handleLifecycle(event: {
-      ptySessionId: string
+      terminalRuntimeSessionId: string
       phase: 'opening' | 'restarting' | 'open' | 'error' | 'closed'
       message: string | null
       takeoverPending: boolean
@@ -274,7 +274,7 @@ let lifecycleHandler: ((event: TerminalLifecycleRealtimeEvent) => void) | null =
 let sessionsChangedHandler: ((repoRoot: string) => void) | null = null
 let workspaceTabsChangedHandler: ((repoRoot: string) => void) | null = null
 let sessionClosedHandler:
-  | ((event: { ptySessionId: string; terminalSessionId: string; repoRoot: string; worktreePath: string }) => void)
+  | ((event: { terminalRuntimeSessionId: string; terminalSessionId: string; repoRoot: string; worktreePath: string }) => void)
   | null = null
 type TestTerminalSessionSummary = Omit<TerminalSessionSummary, 'repoInstanceId' | 'repoRoot' | 'worktreePath'> &
   Partial<Pick<TerminalSessionSummary, 'repoInstanceId' | 'repoRoot' | 'worktreePath'>>
@@ -332,7 +332,7 @@ async function waitForScheduledServerSync(): Promise<void> {
 function attachResult(): TerminalAttachResult {
   return {
     ok: true,
-    ptySessionId: 'unused',
+    terminalRuntimeSessionId: 'unused',
     snapshot: '',
     snapshotSeq: 0,
     processName: 'zsh',
@@ -394,7 +394,7 @@ beforeEach(() => {
         terminalSessionId,
         tabs: workspaceTabsWithTerminal(terminalSessionId),
         sessions: completeServerSessions(serverSessions),
-        ptySessionId: reused?.ptySessionId ?? 'session-1',
+        terminalRuntimeSessionId: reused?.terminalRuntimeSessionId ?? 'session-1',
         snapshot: '',
         snapshotSeq: 0,
         processName: reused?.processName ?? 'zsh',
@@ -415,7 +415,7 @@ beforeEach(() => {
           controller: session.controller?.clientId === input.clientId ? null : session.controller,
         })),
       {
-        ptySessionId: terminalSessionId,
+        terminalRuntimeSessionId: terminalSessionId,
         terminalSessionId,
         repoInstanceId: input.repoInstanceId,
         repoRoot: input.repoRoot,
@@ -431,7 +431,7 @@ beforeEach(() => {
       },
     ]
     // First-frame hydration contract: `create` returns
-    // `ptySessionId` + `snapshot` + `snapshotSeq` directly so the
+    // `terminalRuntimeSessionId` + `snapshot` + `snapshotSeq` directly so the
     // client can paint without a follow-up snapshot fetch.
     return {
       ok: true,
@@ -439,7 +439,7 @@ beforeEach(() => {
       terminalSessionId,
       tabs: workspaceTabsWithTerminal(terminalSessionId),
       sessions: completeServerSessions(serverSessions),
-      ptySessionId: terminalSessionId,
+      terminalRuntimeSessionId: terminalSessionId,
       snapshot: '',
       snapshotSeq: 0,
       processName: 'zsh',
@@ -476,7 +476,7 @@ beforeEach(() => {
       terminal: {
         attach: vi.fn(async () => ({
           ok: true,
-          ptySessionId: 'unused',
+          terminalRuntimeSessionId: 'unused',
           snapshot: '',
           snapshotSeq: 0,
           processName: 'zsh',
@@ -489,7 +489,7 @@ beforeEach(() => {
         })),
         restart: vi.fn(async () => ({
           ok: true,
-          ptySessionId: 'unused',
+          terminalRuntimeSessionId: 'unused',
           snapshot: '',
           snapshotSeq: 0,
           processName: 'zsh',
@@ -504,7 +504,7 @@ beforeEach(() => {
         resize: vi.fn(async () => true),
         takeover: vi.fn(async () => ({
           ok: true as const,
-          ptySessionId: 'session-1',
+          terminalRuntimeSessionId: 'session-1',
           role: 'controller' as const,
           controllerStatus: 'connected' as const,
           controller: { clientId: 'client_local', status: 'connected' as const },
@@ -601,7 +601,7 @@ beforeEach(() => {
       resize: vi.fn(async () => true),
       takeover: vi.fn(async () => ({
         ok: true as const,
-        ptySessionId: 'session-1',
+        terminalRuntimeSessionId: 'session-1',
         role: 'controller' as const,
         controllerStatus: 'connected' as const,
         controller: { clientId: 'client_local', status: 'connected' as const },
@@ -660,7 +660,7 @@ beforeEach(() => {
       onSessionClosed: vi.fn(
         (
           cb: (event: {
-            ptySessionId: string
+            terminalRuntimeSessionId: string
             terminalSessionId: string
             repoRoot: string
             worktreePath: string
@@ -725,7 +725,7 @@ describe('TerminalSessionProvider', () => {
       ])
 
       await act(async () => {
-        exitHandler?.({ ptySessionId: 'session-2', terminalSessionId: 'session-2' })
+        exitHandler?.({ terminalRuntimeSessionId: 'session-2', terminalSessionId: 'session-2' })
       })
 
       expect(closeMock).not.toHaveBeenCalled()
@@ -740,7 +740,7 @@ describe('TerminalSessionProvider', () => {
       // at read time (covered by `workspace-pane-tabs.ts` and
       // `workspace-pane-tab.test.ts`).
       await act(async () => {
-        exitHandler?.({ ptySessionId: 'session-1', terminalSessionId: 'session-1' })
+        exitHandler?.({ terminalRuntimeSessionId: 'session-1', terminalSessionId: 'session-1' })
       })
 
       expect(closeMock).not.toHaveBeenCalled()
@@ -776,7 +776,7 @@ describe('TerminalSessionProvider', () => {
 
       await act(async () => {
         bellHandler?.({
-          ptySessionId: 'session-1',
+          terminalRuntimeSessionId: 'session-1',
           terminalSessionId: 'session-1',
           repoRoot: REPO_ID,
           worktreePath: WORKTREE_PATH,
@@ -846,7 +846,7 @@ describe('TerminalSessionProvider', () => {
 
       await act(async () => {
         bellHandler?.({
-          ptySessionId: 'session-1',
+          terminalRuntimeSessionId: 'session-1',
           terminalSessionId: 'session-1',
           repoRoot: REPO_ID,
           worktreePath: WORKTREE_PATH,
@@ -894,7 +894,7 @@ describe('TerminalSessionProvider', () => {
     try {
       await act(async () => {
         bellHandler?.({
-          ptySessionId: 'session-1',
+          terminalRuntimeSessionId: 'session-1',
           terminalSessionId: 'session-1',
           repoRoot: REPO_ID,
           worktreePath: WORKTREE_PATH,
@@ -943,21 +943,21 @@ describe('TerminalSessionProvider', () => {
 
       await act(async () => {
         outputHandler?.({
-          ptySessionId: 'session-1',
+          terminalRuntimeSessionId: 'session-1',
           terminalSessionId: 'session-1',
           data: 'hello',
           seq: 1,
           processName: 'zsh',
         })
         titleHandler?.({
-          ptySessionId: 'session-1',
+          terminalRuntimeSessionId: 'session-1',
           terminalSessionId: 'session-1',
           repoRoot: REPO_ID,
           worktreePath: WORKTREE_PATH,
           canonicalTitle: '~/Developer/goblin — npm run dev',
         })
         identityHandler?.({
-          ptySessionId: 'session-2',
+          terminalRuntimeSessionId: 'session-2',
           terminalSessionId: 'session-2',
           role: 'controller',
           controllerStatus: 'connected',
@@ -965,7 +965,7 @@ describe('TerminalSessionProvider', () => {
           canonicalRows: 30,
         })
         lifecycleHandler?.({
-          ptySessionId: 'session-2',
+          terminalRuntimeSessionId: 'session-2',
           terminalSessionId: 'session-2',
           phase: 'open',
           message: null,
@@ -975,7 +975,7 @@ describe('TerminalSessionProvider', () => {
 
       expect(first.handleOutput).toHaveBeenCalledTimes(1)
       expect(first.handleOutput).toHaveBeenCalledWith({
-        ptySessionId: 'session-1',
+        terminalRuntimeSessionId: 'session-1',
         terminalSessionId: 'session-1',
         data: 'hello',
         seq: 1,
@@ -985,7 +985,7 @@ describe('TerminalSessionProvider', () => {
       expect(first.handleServerTitle).toHaveBeenCalledWith('~/Developer/goblin — npm run dev')
       expect(second.handleIdentity).toHaveBeenCalledTimes(1)
       expect(second.handleIdentity).toHaveBeenCalledWith({
-        ptySessionId: 'session-2',
+        terminalRuntimeSessionId: 'session-2',
         terminalSessionId: 'session-2',
         role: 'controller',
         controllerStatus: 'connected',
@@ -993,7 +993,7 @@ describe('TerminalSessionProvider', () => {
         canonicalRows: 30,
       })
       expect(second.handleLifecycle).toHaveBeenCalledWith({
-        ptySessionId: 'session-2',
+        terminalRuntimeSessionId: 'session-2',
         terminalSessionId: 'session-2',
         phase: 'open',
         message: null,
@@ -1052,7 +1052,7 @@ describe('TerminalSessionProvider', () => {
 
       await act(async () => {
         bellHandler?.({
-          ptySessionId: 'session-1',
+          terminalRuntimeSessionId: 'session-1',
           terminalSessionId: 'session-1',
           repoRoot: REPO_ID,
           worktreePath: WORKTREE_PATH,
@@ -1083,7 +1083,7 @@ describe('TerminalSessionProvider', () => {
     })
     listSessionsMock.mockResolvedValue([
       {
-        ptySessionId: 'server_session_1',
+        terminalRuntimeSessionId: 'server_session_1',
         terminalSessionId: 'session-1',
         cwd: WORKTREE_PATH,
         controller: { clientId: 'client_remote', status: 'connected' },
@@ -1107,7 +1107,7 @@ describe('TerminalSessionProvider', () => {
       const hydrated = mockSessions.find((session) => session.descriptor.terminalSessionId === 'session-1')
       expect(hydrated?.hydrate).toHaveBeenCalledWith(
         expect.objectContaining({
-          ptySessionId: 'server_session_1',
+          terminalRuntimeSessionId: 'server_session_1',
           processName: 'zsh',
           role: 'viewer',
           controllerStatus: 'connected',
@@ -1158,7 +1158,7 @@ describe('TerminalSessionProvider', () => {
     try {
       await act(async () => {
         sessionClosedHandler?.({
-          ptySessionId: 'server_session_1',
+          terminalRuntimeSessionId: 'server_session_1',
           terminalSessionId: 'session-1',
           repoRoot: REPO_ID,
           worktreePath: WORKTREE_PATH,
@@ -1238,7 +1238,7 @@ describe('TerminalSessionProvider', () => {
     })
     serverSessions = [
       {
-        ptySessionId: 'server_session_1',
+        terminalRuntimeSessionId: 'server_session_1',
         terminalSessionId: 'session-1',
         cwd: WORKTREE_PATH,
         controller: { clientId: 'client_local', status: 'connected' },
@@ -1295,7 +1295,7 @@ describe('TerminalSessionProvider', () => {
     })
     serverSessions = [
       {
-        ptySessionId: 'server_session_1',
+        terminalRuntimeSessionId: 'server_session_1',
         terminalSessionId: 'session-1',
         cwd: WORKTREE_PATH,
         controller: null,
@@ -1307,7 +1307,7 @@ describe('TerminalSessionProvider', () => {
         rows: 24,
       },
       {
-        ptySessionId: 'server_session_2',
+        terminalRuntimeSessionId: 'server_session_2',
         terminalSessionId: 'session-2',
         cwd: WORKTREE_PATH,
         controller: { clientId: 'client_local', status: 'connected' },
@@ -1506,7 +1506,7 @@ describe('TerminalSessionProvider', () => {
     })
     listSessionsMock.mockResolvedValue([
       {
-        ptySessionId: 'server_session_2',
+        terminalRuntimeSessionId: 'server_session_2',
         terminalSessionId: 'session-2',
         cwd: WORKTREE_PATH,
         controller: { clientId: 'client_remote', status: 'connected' },
@@ -1545,7 +1545,7 @@ describe('TerminalSessionProvider', () => {
     })
     listSessionsMock.mockResolvedValue([
       {
-        ptySessionId: 'server_session_3',
+        terminalRuntimeSessionId: 'server_session_3',
         terminalSessionId: 'session-1',
         cwd: WORKTREE_PATH,
         controller: { clientId: 'client_remote', status: 'connected' },
@@ -1572,7 +1572,7 @@ describe('TerminalSessionProvider', () => {
 
       listSessionsMock.mockResolvedValue([
         {
-          ptySessionId: 'server_session_3',
+          terminalRuntimeSessionId: 'server_session_3',
           terminalSessionId: 'session-1',
           cwd: WORKTREE_PATH,
           controller: { clientId: 'client_remote', status: 'connected' },
@@ -1606,7 +1606,7 @@ describe('TerminalSessionProvider', () => {
     })
     listSessionsMock.mockResolvedValue([
       {
-        ptySessionId: 'server_session_old',
+        terminalRuntimeSessionId: 'server_session_old',
         terminalSessionId: 'session-1',
         cwd: WORKTREE_PATH,
         controller: { clientId: 'client_remote', status: 'connected' },
@@ -1633,7 +1633,7 @@ describe('TerminalSessionProvider', () => {
 
       listSessionsMock.mockResolvedValue([
         {
-          ptySessionId: 'server_session_new',
+          terminalRuntimeSessionId: 'server_session_new',
           terminalSessionId: 'session-1',
           cwd: WORKTREE_PATH,
           controller: { clientId: 'client_remote', status: 'connected' },
@@ -1683,7 +1683,7 @@ describe('TerminalSessionProvider', () => {
       expect(getProbe()).toMatchObject({ count: 2, terminalIds: ['session-1', 'session-2'] })
 
       await act(async () => {
-        exitHandler?.({ ptySessionId: 'session-2', terminalSessionId: 'session-2' })
+        exitHandler?.({ terminalRuntimeSessionId: 'session-2', terminalSessionId: 'session-2' })
       })
       expect(getProbe()).toMatchObject({ count: 1, terminalIds: ['session-1'] })
     } finally {
@@ -1704,7 +1704,7 @@ describe('TerminalSessionProvider', () => {
       terminalSessionId: 'session-1',
       tabs: [],
       sessions: [],
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       snapshot: '',
       snapshotSeq: 0,
       processName: 'zsh',
@@ -1781,7 +1781,7 @@ describe('TerminalSessionProvider', () => {
           terminalSessionId: 'k',
           tabs: [],
           sessions: [],
-          ptySessionId: 'session-1',
+          terminalRuntimeSessionId: 'session-1',
           snapshot: '',
           snapshotSeq: 0,
           processName: 'zsh',
@@ -1876,7 +1876,7 @@ describe('TerminalSessionProvider', () => {
           terminalSessionId: 'k',
           tabs: [],
           sessions: [],
-          ptySessionId: 'session-1',
+          terminalRuntimeSessionId: 'session-1',
           snapshot: '',
           snapshotSeq: 0,
           processName: 'zsh',

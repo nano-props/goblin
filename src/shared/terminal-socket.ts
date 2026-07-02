@@ -49,7 +49,7 @@ export type TerminalRealtimeMessage =
   // lookup.
   | {
       type: 'session-closed'
-      ptySessionId: string
+      terminalRuntimeSessionId: string
       terminalSessionId: string
       repoRoot: string
       worktreePath: string

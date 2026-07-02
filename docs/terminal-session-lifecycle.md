@@ -101,7 +101,7 @@ The combined symptom list across the root causes:
 1. `create` returns the created session's first-frame hydration
    data directly. The success payload carries the same class of
    information the client already relied on for `attach` / `restart`:
-   - `ptySessionId`
+   - `terminalRuntimeSessionId`
    - `processName`
    - `canonicalTitle`
    - `phase`
@@ -126,7 +126,7 @@ The combined symptom list across the root causes:
 
 ### `create.sessions` is projection data, not the success oracle
 
-- `create.ptySessionId` + `snapshot` + `snapshotSeq` are the
+- `create.terminalRuntimeSessionId` + `snapshot` + `snapshotSeq` are the
   **authoritative first-frame handshake**.
 - `create.sessions` is **projection / directory data**.
 
@@ -145,7 +145,7 @@ toast.
 
 The client was doing an overly strict validation step:
 
-- required `ptySessionId`, `snapshot`, `snapshotSeq` from `create`, **and**
+- required `terminalRuntimeSessionId`, `snapshot`, `snapshotSeq` from `create`, **and**
 - required the returned `sessions` list to already include the
   created session.
 
@@ -165,7 +165,7 @@ runtime crash.
 
 1. A `TerminalFirstFrame` interface is the single source of truth for
    the first-frame handshake. It lifts every field that R0 made
-   required (`ptySessionId`, `processName`, `canonicalTitle`, `phase`,
+   required (`terminalRuntimeSessionId`, `processName`, `canonicalTitle`, `phase`,
    `message`, `snapshot`, `snapshotSeq`, `controller`, `canonicalCols`,
    `canonicalRows`).
 2. `TerminalAttachResult` no longer accepts optional `canonicalCols` /
@@ -173,21 +173,21 @@ runtime crash.
 3. `TerminalCreateResult` intersects with `TerminalFirstFrame`
    instead of a partial attach result, so every `create` success carries
    the full first-frame payload at the type level. The client's runtime
-   "missing ptySessionId" check stays as a belt-and-suspenders guard
+   "missing terminalRuntimeSessionId" check stays as a belt-and-suspenders guard
    against `unknown`/JSON-blob shapes arriving from the client layer.
 
-### `ptySessionId` is an addressable runtime id, not a live-handle proof
+### `terminalRuntimeSessionId` is an addressable runtime id, not a live-handle proof
 
-The `ptySessionId` wire field is historical terminology. In the
-server-first model it is the runtime session lookup id used by attach,
-write, resize, restart, close, and realtime messages. It must not be read
-as "there is definitely a live PTY handle right now".
+In the server-first model `terminalRuntimeSessionId` is the runtime session
+lookup id used by attach, write, resize, restart, close, and realtime
+messages. It must not be read as "there is definitely a live PTY handle
+right now".
 
 That distinction matters most on restart failure:
 
 - the server keeps the terminal session addressable;
 - the session moves to `phase: 'error'`;
-- the `ptySessionId` remains the id to retry with;
+- the `terminalRuntimeSessionId` remains the id to retry with;
 - writes and resizes are still rejected because the server checks phase,
   controller authority, and PTY binding state before touching a PTY.
 
@@ -206,8 +206,8 @@ turning into session deletion.
 like this:
 
 ```ts
-for (const ptySessionId of ptySessionIds) {
-  void terminalClient.close({ ptySessionId }).catch(() => {})
+for (const terminalRuntimeSessionId of terminalRuntimeSessionIds) {
+  void terminalClient.close({ terminalRuntimeSessionId }).catch(() => {})
 }
 ```
 
@@ -234,7 +234,7 @@ pending closes before create.
   an injected callback. Records a pending entry, kicks off
   `terminalClient.close` in the background, resolves on server ack,
   rejects on socket error. The entry is removed from the map on
-  either outcome. Concurrent calls for the same `ptySessionId` dedupe
+  either outcome. Concurrent calls for the same `terminalRuntimeSessionId` dedupe
   to the same promise.
 - **Flush pending closes for the worktree** — awaited inside the
   create flush for the same worktree so a subsequent create cannot
@@ -293,7 +293,7 @@ Add to `TerminalRealtimeMessage`:
 ```ts
 | {
     type: 'session-closed'
-    ptySessionId: string
+    terminalRuntimeSessionId: string
     terminalSessionId: string
     repoRoot: string
     worktreePath: string
@@ -307,7 +307,7 @@ After a user-initiated close succeeds:
 ```ts
 broker.broadcastToUser(userId, {
   type: 'session-closed',
-  ptySessionId,
+  terminalRuntimeSessionId,
   terminalSessionId,
   repoRoot,
   worktreePath,
@@ -399,7 +399,7 @@ post-takeover frame.
 ### The two-step handshake that was
 
 Before this change, `terminal.takeover` returned only
-`{ ok, ptySessionId, controller }`. The client treated the
+`{ ok, terminalRuntimeSessionId, controller }`. The client treated the
 realtime `identity` event as the authority and used the client
 response only to "trigger the server-side handoff".
 
@@ -452,7 +452,7 @@ The realtime `identity` event keeps its authority role on the
 non-takeover paths (controller crash, controller reconnect,
 sibling auto-claim). For those, identity-event-as-authority
 is the only choice — there is no response to be authoritative.
-A subsequent realtime event for the _same_ ptySessionId after a
+A subsequent realtime event for the _same_ terminalRuntimeSessionId after a
 successful takeover is treated as a benign re-apply with
 identical values (no-op).
 
@@ -516,7 +516,7 @@ order would have been:
 
 - **R0**: provider tests supply the new first-frame hydration fields
   on both `created` and `reused` paths; projection tests cover the
-  `create.ptySessionId` + `snapshot` + `snapshotSeq` rule.
+  `create.terminalRuntimeSessionId` + `snapshot` + `snapshotSeq` rule.
 - **R1**: projection durable-close tests cover awaiting an in-flight
   close before creating, in-flight close failures allowing the queued
   create to proceed afterward, deduplicating concurrent enqueues,
@@ -559,7 +559,7 @@ These rules are derived from the symptom family and should outlive
 any individual implementation:
 
 1. **Do not use `create.sessions` as the success criterion for first
-   paint.** `create.ptySessionId` + `snapshot` + `snapshotSeq` are the
+   paint.** `create.terminalRuntimeSessionId` + `snapshot` + `snapshotSeq` are the
    authoritative created-session handshake. `create.sessions` is
    projection data.
 2. **Keep `create`, `attach`, and `restart` aligned in first-frame
