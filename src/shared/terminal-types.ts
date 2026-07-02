@@ -35,12 +35,13 @@ export interface RepoInstanceRuntimeInput {
 
 export interface TerminalAttachInput {
   /**
-   * Server runtime lookup id for terminal operations. The name is historical:
-   * callers must not infer that a live PTY handle exists from this field
-   * alone. `phase` plus server-side PTY binding/authority checks decide
-   * whether the session is currently interactive.
+   * Server terminal-runtime identity used to address attach/write/resize/
+   * restart/close/takeover and terminal realtime events. Callers must not
+   * infer that a live PTY handle exists from this field alone. `phase`
+   * plus server-side PTY binding/authority checks decide whether the
+   * session is currently interactive.
    */
-  ptySessionId: string
+  terminalRuntimeSessionId: string
   cols: number
   rows: number
   clientId?: string
@@ -69,7 +70,7 @@ export interface TerminalRestartInput {
    * this id addressable in `phase: 'error'` so the client can retry without
    * changing the durable `terminalSessionId`.
    */
-  ptySessionId: string
+  terminalRuntimeSessionId: string
   cols: number
   rows: number
   clientId?: string
@@ -97,7 +98,7 @@ export interface TerminalRestartInput {
 export type TerminalTakeoverResult =
   | {
       ok: true
-      ptySessionId: string
+      terminalRuntimeSessionId: string
       role: 'controller' | 'viewer' | 'unowned'
       controllerStatus: 'connected' | 'none'
       controller: TerminalController | null
@@ -126,7 +127,7 @@ export type TerminalTakeoverResult =
 export type TerminalAttachResult =
   | {
       ok: true
-      ptySessionId: string
+      terminalRuntimeSessionId: string
       processName: string
       canonicalTitle: string | null
       phase: TerminalSessionPhase
@@ -148,7 +149,7 @@ export type TerminalCreateAction = 'created' | 'restored' | 'reused'
  * source of truth for the first-frame contract.
  */
 export interface TerminalFirstFrame {
-  ptySessionId: string
+  terminalRuntimeSessionId: string
   processName: string
   canonicalTitle: string | null
   phase: TerminalSessionPhase
@@ -171,13 +172,13 @@ export type TerminalCreateResult =
   | { ok: false; message: string }
 
 export interface TerminalWriteInput {
-  ptySessionId: string
+  terminalRuntimeSessionId: string
   data: string
   clientId?: string
 }
 
 export interface TerminalResizeInput {
-  ptySessionId: string
+  terminalRuntimeSessionId: string
   cols: number
   rows: number
   clientId?: string
@@ -186,7 +187,7 @@ export interface TerminalResizeInput {
 export type TerminalTakeoverInput = TerminalResizeInput
 
 export interface TerminalSessionInput {
-  ptySessionId: string
+  terminalRuntimeSessionId: string
 }
 
 export interface TerminalNotifyBellInput {
@@ -235,7 +236,7 @@ export interface WorkspacePaneTabsEntry extends WorkspacePaneTabsTarget {
 }
 
 export interface TerminalSessionSummary {
-  ptySessionId: string
+  terminalRuntimeSessionId: string
   terminalSessionId: string
   repoInstanceId: string
   repoRoot: string
@@ -251,28 +252,28 @@ export interface TerminalSessionSummary {
 }
 
 export interface TerminalHydrationSnapshot {
-  ptySessionId: string
+  terminalRuntimeSessionId: string
   snapshot: string
   snapshotSeq: number
 }
 
 export type TerminalMutationResult = boolean
 
-// All realtime events below are addressed by both `ptySessionId` and
+// All realtime events below are addressed by both `terminalRuntimeSessionId` and
 // `terminalSessionId`. See the "Identity model" naming-boundary note in
-// `docs/terminal.md`: `ptySessionId` is only a server runtime lookup id
+// `docs/terminal.md`: `terminalRuntimeSessionId` is only a server runtime lookup id
 // (it may be replaced when the runtime binding is replaced, and it is
 // *not* the durable terminal-tab identity), while `terminalSessionId` is
 // the durable client-facing tab identity. Clients must route realtime
-// events by `terminalSessionId` first and fall back to a `ptySessionId`
+// events by `terminalSessionId` first and fall back to a `terminalRuntimeSessionId`
 // index only as a secondary lookup — that index is a client-local cache
 // populated from attach/reconcile and is not guaranteed to be populated
 // yet for a session the client has not attached to locally (e.g. a
 // background tab). Do not add a realtime event that carries
-// `ptySessionId` alone; see the dropped-title-update regression this
+// `terminalRuntimeSessionId` alone; see the dropped-title-update regression this
 // pattern caused.
 export interface TerminalOutputEvent {
-  ptySessionId: string
+  terminalRuntimeSessionId: string
   terminalSessionId: string
   data: string
   seq: number
@@ -282,7 +283,7 @@ export interface TerminalOutputEvent {
 // Bell is an ephemeral realtime hint for currently connected clients. It is
 // intentionally not part of terminal summaries or any persisted unread model.
 export interface TerminalBellRealtimeEvent {
-  ptySessionId: string
+  terminalRuntimeSessionId: string
   terminalSessionId: string
   repoRoot: string
   worktreePath: string
@@ -291,7 +292,7 @@ export interface TerminalBellRealtimeEvent {
 }
 
 export interface TerminalTitleEvent {
-  ptySessionId: string
+  terminalRuntimeSessionId: string
   terminalSessionId: string
   repoRoot: string
   worktreePath: string
@@ -299,7 +300,7 @@ export interface TerminalTitleEvent {
 }
 
 export interface TerminalExitEvent {
-  ptySessionId: string
+  terminalRuntimeSessionId: string
   terminalSessionId: string
 }
 
@@ -317,7 +318,7 @@ export interface TerminalExitEvent {
  * without re-checking the shape.
  */
 export interface TerminalIdentityEvent {
-  ptySessionId: string
+  terminalRuntimeSessionId: string
   terminalSessionId: string
   controller: TerminalController | null
   canonicalCols: number
@@ -333,7 +334,7 @@ export interface TerminalIdentityEvent {
  * controller→viewer teardown decision.
  */
 export interface TerminalLifecycleEvent {
-  ptySessionId: string
+  terminalRuntimeSessionId: string
   terminalSessionId: string
   phase: TerminalSessionPhase
   message: string | null

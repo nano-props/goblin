@@ -23,7 +23,7 @@ const MIN_TERMINAL_ROWS = 1
 const MAX_TERMINAL_ROWS = 300
 export const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
 export const TERMINAL_WS_MESSAGE_LIMIT_BYTES = MAX_TERMINAL_WRITE_CHARS
-const TERMINAL_PTY_SESSION_ID_RE = /^[A-Za-z0-9_-]{16,64}$/
+const TERMINAL_RUNTIME_SESSION_ID_RE = /^[A-Za-z0-9_-]{16,64}$/
 const TERMINAL_CLIENT_ID_RE = /^[A-Za-z0-9_-]{1,128}$/
 const TERMINAL_REQUEST_ID_RE = /^[A-Za-z0-9_-]{1,128}$/
 const TERMINAL_SOCKET_ACTIONS = [
@@ -48,7 +48,7 @@ const TERMINAL_SESSION_PHASE_VALUES = [
   'error',
   'closed',
 ] satisfies TerminalSessionPhase[]
-const TerminalPtySessionIdSchema = v.pipe(v.string(), v.regex(TERMINAL_PTY_SESSION_ID_RE))
+const TerminalRuntimeSessionIdSchema = v.pipe(v.string(), v.regex(TERMINAL_RUNTIME_SESSION_ID_RE))
 const TerminalClientIdSchema = v.pipe(v.string(), v.regex(TERMINAL_CLIENT_ID_RE))
 const TerminalRequestIdSchema = v.pipe(v.string(), v.regex(TERMINAL_REQUEST_ID_RE))
 const TerminalColsSchema = v.pipe(v.number(), v.integer(), v.minValue(MIN_TERMINAL_COLS), v.maxValue(MAX_TERMINAL_COLS))
@@ -64,20 +64,20 @@ const TerminalControllerSchema = v.object({
   status: v.picklist(TERMINAL_CONNECTED_CONTROLLER_STATUS_VALUES),
 })
 const TerminalAttachInputSchema = v.object({
-  ptySessionId: TerminalPtySessionIdSchema,
+  terminalRuntimeSessionId: TerminalRuntimeSessionIdSchema,
   cols: TerminalColsSchema,
   rows: TerminalRowsSchema,
   clientId: TerminalOptionalClientIdSchema,
 })
 const TerminalRestartInputSchema = TerminalAttachInputSchema
 const TerminalWriteInputSchema = v.object({
-  ptySessionId: TerminalPtySessionIdSchema,
+  terminalRuntimeSessionId: TerminalRuntimeSessionIdSchema,
   data: TerminalWriteDataSchema,
   clientId: TerminalOptionalClientIdSchema,
 })
 const TerminalResizeInputSchema = TerminalAttachInputSchema
 const TerminalSessionInputSchema = v.object({
-  ptySessionId: TerminalPtySessionIdSchema,
+  terminalRuntimeSessionId: TerminalRuntimeSessionIdSchema,
 })
 const RepoInstanceIdSchema = v.pipe(v.string(), v.regex(OPAQUE_ID_RE))
 const TerminalListSessionsInputSchema = v.object({
@@ -150,7 +150,7 @@ const WorkspacePaneTabsEntrySchema = v.object({
   tabs: v.array(WorkspacePaneTabEntrySchema),
 })
 const TerminalSessionSummarySchema = v.object({
-  ptySessionId: v.string(),
+  terminalRuntimeSessionId: v.string(),
   terminalSessionId: v.string(),
   repoInstanceId: RepoInstanceIdSchema,
   repoRoot: v.string(),
@@ -165,7 +165,7 @@ const TerminalSessionSummarySchema = v.object({
   rows: v.number(),
 })
 const TerminalFirstFrameSchemaEntries = {
-  ptySessionId: TerminalPtySessionIdSchema,
+  terminalRuntimeSessionId: TerminalRuntimeSessionIdSchema,
   processName: v.string(),
   canonicalTitle: v.nullable(v.string()),
   phase: v.picklist(TERMINAL_SESSION_PHASE_VALUES),
@@ -191,14 +191,14 @@ const TerminalCreateResultSchema = v.variant('ok', [
   }),
 ])
 const TerminalOutputEventSchema = v.object({
-  ptySessionId: v.string(),
+  terminalRuntimeSessionId: v.string(),
   terminalSessionId: v.string(),
   data: v.string(),
   seq: v.number(),
   processName: v.string(),
 })
 const TerminalBellRealtimeEventSchema = v.object({
-  ptySessionId: v.string(),
+  terminalRuntimeSessionId: v.string(),
   terminalSessionId: v.string(),
   repoRoot: v.string(),
   worktreePath: v.string(),
@@ -206,36 +206,36 @@ const TerminalBellRealtimeEventSchema = v.object({
   canonicalTitle: v.nullable(v.string()),
 })
 const TerminalTitleEventSchema = v.object({
-  ptySessionId: v.string(),
+  terminalRuntimeSessionId: v.string(),
   terminalSessionId: v.string(),
   repoRoot: v.string(),
   worktreePath: v.string(),
   canonicalTitle: v.nullable(v.string()),
 })
 const TerminalExitEventSchema = v.object({
-  ptySessionId: v.string(),
+  terminalRuntimeSessionId: v.string(),
   terminalSessionId: v.string(),
 })
 const TerminalSessionClosedEventSchema = v.object({
   type: v.literal('session-closed'),
-  ptySessionId: v.string(),
+  terminalRuntimeSessionId: v.string(),
   terminalSessionId: v.string(),
   repoRoot: v.string(),
   worktreePath: v.string(),
 })
 
-export function isValidTerminalPtySessionId(value: unknown): value is string {
-  return typeof value === 'string' && TERMINAL_PTY_SESSION_ID_RE.test(value)
+export function isValidTerminalRuntimeSessionId(value: unknown): value is string {
+  return typeof value === 'string' && TERMINAL_RUNTIME_SESSION_ID_RE.test(value)
 }
 const TerminalIdentityEventSchema = v.object({
-  ptySessionId: v.string(),
+  terminalRuntimeSessionId: v.string(),
   terminalSessionId: v.string(),
   controller: v.nullable(TerminalControllerSchema),
   canonicalCols: v.number(),
   canonicalRows: v.number(),
 })
 const TerminalLifecycleEventSchema = v.object({
-  ptySessionId: v.string(),
+  terminalRuntimeSessionId: v.string(),
   terminalSessionId: v.string(),
   phase: v.picklist(TERMINAL_SESSION_PHASE_VALUES),
   message: v.nullable(v.string()),

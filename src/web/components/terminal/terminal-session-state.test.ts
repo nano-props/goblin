@@ -11,7 +11,7 @@ describe('TerminalSessionState', () => {
       processName: 'terminal',
       canonicalTitle: null,
     })
-    // No attachment is published until a ptySessionId is set AND
+    // No attachment is published until a terminalRuntimeSessionId is set AND
     // the phase is 'open'. The contract is the same as before the
     // identity/lifecycle split: the public snapshot surfaces the
     // attachment only on the open state.
@@ -68,7 +68,7 @@ describe('TerminalSessionState', () => {
 
     // Identity-only update: phase is unchanged.
     const identityOnly: TerminalIdentityViewModel = {
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       role: 'viewer',
       controllerStatus: 'connected',
       canonicalCols: 100,
@@ -80,7 +80,7 @@ describe('TerminalSessionState', () => {
 
     // Lifecycle-only update: role is unchanged.
     const lifecycleOnly: TerminalLifecycleViewModel = {
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       phase: 'opening',
       message: 'restarting',
       takeoverPending: true,
@@ -111,7 +111,7 @@ describe('TerminalSessionState', () => {
 
     // Move to a transitional phase but keep the controller role.
     state.applyLifecycle({
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       phase: 'opening',
       message: null,
       takeoverPending: false,
@@ -133,7 +133,7 @@ describe('TerminalSessionState', () => {
     // Viewer cannot send input regardless of phase.
     expect(state.canSendInput()).toBe(false)
     state.applyLifecycle({
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       phase: 'open',
       message: null,
       takeoverPending: false,
@@ -142,7 +142,7 @@ describe('TerminalSessionState', () => {
 
     // Controller can send input only when phase is 'open'.
     state.applyIdentity({
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       role: 'controller',
       controllerStatus: 'connected',
       canonicalCols: 100,
@@ -151,7 +151,7 @@ describe('TerminalSessionState', () => {
     expect(state.canSendInput()).toBe(true)
 
     state.applyLifecycle({
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       phase: 'restarting',
       message: null,
       takeoverPending: false,
@@ -165,14 +165,14 @@ describe('TerminalSessionState', () => {
     // as long as the final values are the same. This pins the
     // contract that the two sub-states do not interact.
     const identity: TerminalIdentityViewModel = {
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       role: 'controller',
       controllerStatus: 'connected',
       canonicalCols: 100,
       canonicalRows: 30,
     }
     const lifecycle: TerminalLifecycleViewModel = {
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       phase: 'open',
       message: null,
       takeoverPending: false,
@@ -225,7 +225,7 @@ describe('TerminalSessionState', () => {
     })
     state.beginReplay(1)
     state.captureReplayOutput({
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalSessionId: 'pty_session_1_aaaaaaaaa',
       data: 'live',
       seq: 2,

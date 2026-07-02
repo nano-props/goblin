@@ -43,7 +43,7 @@ vi.mock('#/web/components/terminal/terminal-geometry.ts', () => ({
 vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
   class MockTerminalSession {
     descriptor: any
-    private ptySessionId: string | null = null
+    private terminalRuntimeSessionId: string | null = null
     private snapshotState: any = { phase: 'opening', message: null, processName: 'terminal', canonicalTitle: null }
 
     constructor(descriptor: any) {
@@ -84,14 +84,14 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
       return false
     }
     handleIdentity(): void {}
-    currentPtySessionId(): string | null {
-      return this.ptySessionId
+    currentTerminalRuntimeSessionId(): string | null {
+      return this.terminalRuntimeSessionId
     }
     snapshot() {
       return this.snapshotState
     }
     hydrate(input: any): void {
-      this.ptySessionId = input.ptySessionId
+      this.terminalRuntimeSessionId = input.terminalRuntimeSessionId
       this.snapshotState = {
         phase: 'open',
         message: null,
@@ -164,7 +164,7 @@ function makeCreateResult(overrides: Partial<Record<string, unknown>> = {}) {
     action: 'created' as const,
     terminalSessionId: 'session-1',
     tabs: [],
-    ptySessionId: 'pty_session_1_aaaaaaaaa',
+    terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
     processName: 'zsh',
     canonicalTitle: null,
     phase: 'open' as const,
@@ -176,7 +176,7 @@ function makeCreateResult(overrides: Partial<Record<string, unknown>> = {}) {
     canonicalRows: 31,
     sessions: [
       {
-        ptySessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         terminalSessionId: 'session-1',
         repoRoot: REPO_ROOT,
         worktreePath: WORKTREE_PATH,
@@ -210,7 +210,7 @@ function emitBellForKey(projection: TerminalSessionProjection, terminalSessionId
 
 function durableCloseInput() {
   return {
-    ptySessionId: 'session-stale',
+    terminalRuntimeSessionId: 'session-stale',
     terminalWorktreeKey: WORKTREE_KEY,
   }
 }
@@ -326,10 +326,10 @@ describe('TerminalSessionProjection create flow', () => {
     const first = Promise.withResolvers<ReturnType<typeof makeCreateResult>>()
     const secondResult = makeCreateResult({
       terminalSessionId: 'session-2',
-      ptySessionId: 'pty_session_2_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_2_aaaaaaaaa',
       sessions: [
         {
-          ptySessionId: 'pty_session_1_aaaaaaaaa',
+          terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
           terminalSessionId: 'session-1',
           repoRoot: REPO_ROOT,
           worktreePath: WORKTREE_PATH,
@@ -343,7 +343,7 @@ describe('TerminalSessionProjection create flow', () => {
           rows: 31,
         },
         {
-          ptySessionId: 'pty_session_2_aaaaaaaaa',
+          terminalRuntimeSessionId: 'pty_session_2_aaaaaaaaa',
           terminalSessionId: 'session-2',
           repoRoot: REPO_ROOT,
           worktreePath: WORKTREE_PATH,
@@ -445,7 +445,7 @@ describe('TerminalSessionProjection create flow', () => {
 
     await expect(pending).rejects.toThrow('terminal create request canceled')
 
-    expect(mocks.closeMock).toHaveBeenCalledWith({ ptySessionId: 'pty_session_1_aaaaaaaaa' })
+    expect(mocks.closeMock).toHaveBeenCalledWith({ terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa' })
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
     expect(projection.snapshot('session-1').phase).toBe('opening')
   })
@@ -454,10 +454,10 @@ describe('TerminalSessionProjection create flow', () => {
     const first = Promise.withResolvers<ReturnType<typeof makeCreateResult>>()
     const secondResult = makeCreateResult({
       terminalSessionId: 'session-2',
-      ptySessionId: 'pty_session_2_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_2_aaaaaaaaa',
       sessions: [
         {
-          ptySessionId: 'pty_session_1_aaaaaaaaa',
+          terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
           terminalSessionId: 'session-1',
           repoRoot: REPO_ROOT,
           worktreePath: WORKTREE_PATH,
@@ -471,7 +471,7 @@ describe('TerminalSessionProjection create flow', () => {
           rows: 31,
         },
         {
-          ptySessionId: 'pty_session_2_aaaaaaaaa',
+          terminalRuntimeSessionId: 'pty_session_2_aaaaaaaaa',
           terminalSessionId: 'session-2',
           repoRoot: REPO_ROOT,
           worktreePath: WORKTREE_PATH,
@@ -707,7 +707,7 @@ describe('TerminalSessionProjection create flow', () => {
 
   test('durable close: deduplicates concurrent enqueues for the same session', async () => {
     // The session service may surface a session-closed event AND a parallel
-    // dispose() call for the same ptySessionId. The first call owns the
+    // dispose() call for the same terminalRuntimeSessionId. The first call owns the
     // request; the second observes the same outcome.
     let resolveClose!: (value: boolean) => void
     mocks.closeMock.mockReturnValueOnce(
@@ -725,7 +725,7 @@ describe('TerminalSessionProjection create flow', () => {
 
     // Only one close call was dispatched.
     expect(mocks.closeMock).toHaveBeenCalledTimes(1)
-    expect(mocks.closeMock).toHaveBeenCalledWith({ ptySessionId: 'session-stale' })
+    expect(mocks.closeMock).toHaveBeenCalledWith({ terminalRuntimeSessionId: 'session-stale' })
 
     resolveClose(true)
     await expect(first).resolves.toBeUndefined()
@@ -753,7 +753,7 @@ describe('TerminalSessionProjection create flow', () => {
     await expect(closePromise).rejects.toThrow('terminal session projection destroyed')
     expect((projection as any).lifecycleQueues.hasCloses()).toBe(false)
     resolveClose(true)
-    await vi.waitFor(() => expect(mocks.closeMock).toHaveBeenCalledWith({ ptySessionId: 'session-stale' }))
+    await vi.waitFor(() => expect(mocks.closeMock).toHaveBeenCalledWith({ terminalRuntimeSessionId: 'session-stale' }))
   })
 
   test('durable close: handleSessionClosed drops the matching local session', async () => {
@@ -768,7 +768,7 @@ describe('TerminalSessionProjection create flow', () => {
 
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
 
-    projection.handleSessionClosed({ ptySessionId: 'pty_session_1_aaaaaaaaa', terminalSessionId: 'session-1' })
+    projection.handleSessionClosed({ terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa', terminalSessionId: 'session-1' })
 
     // The local session is gone; the worktree snapshot is empty.
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(0)
@@ -782,7 +782,7 @@ describe('TerminalSessionProjection create flow', () => {
 
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
 
-    projection.handleSessionClosed({ ptySessionId: 'pty_session_missing_aaaaaaaaa', terminalSessionId: 'session-1' })
+    projection.handleSessionClosed({ terminalRuntimeSessionId: 'pty_session_missing_aaaaaaaaa', terminalSessionId: 'session-1' })
 
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(0)
   })
@@ -790,7 +790,7 @@ describe('TerminalSessionProjection create flow', () => {
   test('caps pending server bells for unknown sessions', () => {
     for (let index = 0; index < 100; index += 1) {
       projection.handleServerBell({
-        ptySessionId: `pty_session_${index}_aaaaaaaaa`,
+        terminalRuntimeSessionId: `pty_session_${index}_aaaaaaaaa`,
         terminalSessionId: `session-${index}`,
         repoRoot: REPO_ROOT,
         worktreePath: WORKTREE_PATH,
@@ -807,7 +807,7 @@ describe('TerminalSessionProjection create flow', () => {
 
   test('clears pending server bell when an unknown session is closed', () => {
     projection.handleServerBell({
-      ptySessionId: 'pty_session_unknown_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_unknown_aaaaaaaaa',
       terminalSessionId: 'session-unknown',
       repoRoot: REPO_ROOT,
       worktreePath: WORKTREE_PATH,
@@ -819,7 +819,7 @@ describe('TerminalSessionProjection create flow', () => {
     expect(pendingBells.has('session-unknown')).toBe(true)
 
     projection.handleSessionClosed({
-      ptySessionId: 'pty_session_unknown_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_unknown_aaaaaaaaa',
       terminalSessionId: 'session-unknown',
     })
 
@@ -897,7 +897,7 @@ describe('TerminalSessionProjection create flow', () => {
     try {
       expect(projection.repoBellCount(REPO_ROOT)).toBe(1)
 
-      projection.handleSessionClosed({ ptySessionId: 'pty_session_1_aaaaaaaaa', terminalSessionId })
+      projection.handleSessionClosed({ terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa', terminalSessionId })
 
       expect(projection.repoBellCount(REPO_ROOT)).toBe(0)
       expect(listener).toHaveBeenCalledTimes(1)

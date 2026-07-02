@@ -30,7 +30,7 @@ export interface ProjectedServerTerminalSession {
 
 export interface ProjectedCreateTerminalSessions {
   serverSessions: ServerTerminalSessionSummary[]
-  snapshotByPtySessionId: Map<string, TerminalHydrationSnapshot>
+  snapshotByTerminalRuntimeSessionId: Map<string, TerminalHydrationSnapshot>
 }
 
 export function projectTerminalAttachResultForClient(
@@ -57,8 +57,8 @@ export function projectCreateResultForClient(
   if (!sawTarget) serverSessions.push(targetSession)
   return {
     serverSessions,
-    snapshotByPtySessionId: new Map<string, TerminalHydrationSnapshot>([
-      [result.ptySessionId, { ptySessionId: result.ptySessionId, snapshot: result.snapshot, snapshotSeq: result.snapshotSeq }],
+    snapshotByTerminalRuntimeSessionId: new Map<string, TerminalHydrationSnapshot>([
+      [result.terminalRuntimeSessionId, { terminalRuntimeSessionId: result.terminalRuntimeSessionId, snapshot: result.snapshot, snapshotSeq: result.snapshotSeq }],
     ]),
   }
 }
@@ -85,7 +85,7 @@ export function projectServerTerminalSession(input: {
     descriptor,
     terminalWorktreeKey: terminalWorktree,
     hydrateInput: {
-      ptySessionId: input.serverSession.ptySessionId,
+      terminalRuntimeSessionId: input.serverSession.terminalRuntimeSessionId,
       processName: input.serverSession.processName,
       canonicalTitle: input.serverSession.canonicalTitle,
       phase: input.serverSession.phase,
@@ -107,7 +107,7 @@ function createSessionSummaryFromCreate(
   serverSession?: ServerTerminalSessionSummary,
 ): ServerTerminalSessionSummary {
   return {
-    ptySessionId: result.ptySessionId,
+    terminalRuntimeSessionId: result.terminalRuntimeSessionId,
     terminalSessionId: result.terminalSessionId,
     repoInstanceId: serverSession?.repoInstanceId ?? requireBaseRepoInstanceId(base),
     repoRoot: serverSession?.repoRoot ?? base.repoRoot,

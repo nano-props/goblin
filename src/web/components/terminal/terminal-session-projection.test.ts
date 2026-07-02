@@ -27,7 +27,7 @@ describe('terminal session projection helpers', () => {
       clientId: 'client_a',
       index: 2,
       serverSession: {
-        ptySessionId: 'pty_session_123_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalSessionId: 'session-2',
         repoInstanceId: REPO_INSTANCE_ID,
         repoRoot: REPO_ROOT,
@@ -41,7 +41,7 @@ describe('terminal session projection helpers', () => {
         cols: 120,
         rows: 40,
       },
-      serverSnapshot: { ptySessionId: 'pty_session_123_aaaaaaaaa', snapshot: 'server-snap', snapshotSeq: 9 },
+      serverSnapshot: { terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa', snapshot: 'server-snap', snapshotSeq: 9 },
     })
 
     expect(projected).toEqual({
@@ -55,7 +55,7 @@ describe('terminal session projection helpers', () => {
       },
       terminalWorktreeKey: `${REPO_ROOT}\0${WORKTREE_PATH}`,
       hydrateInput: {
-        ptySessionId: 'pty_session_123_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         processName: 'zsh',
         canonicalTitle: 'shell',
         phase: 'open',
@@ -78,7 +78,7 @@ describe('terminal session projection helpers', () => {
       clientId: 'client_b',
       index: 1,
       serverSession: {
-        ptySessionId: 'pty_session_123_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalSessionId: 'session-1',
         repoInstanceId: REPO_INSTANCE_ID,
         repoRoot: REPO_ROOT,
@@ -105,7 +105,7 @@ describe('terminal session projection helpers', () => {
     const projected = projectTerminalAttachResultForClient(
       {
         ok: true,
-        ptySessionId: 'pty_session_123_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         snapshot: '',
         snapshotSeq: 0,
         processName: 'zsh',
@@ -132,7 +132,7 @@ describe('terminal session projection helpers', () => {
         terminalSessionId: 'session-1',
         tabs: [],
         sessions: [],
-        ptySessionId: 'pty_session_123_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         processName: 'zsh',
         canonicalTitle: null,
         phase: 'open',
@@ -147,7 +147,7 @@ describe('terminal session projection helpers', () => {
 
     expect(projected.serverSessions).toEqual([
       {
-        ptySessionId: 'pty_session_123_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalSessionId: 'session-1',
         repoInstanceId: REPO_INSTANCE_ID,
         repoRoot: REPO_ROOT,
@@ -162,8 +162,8 @@ describe('terminal session projection helpers', () => {
         rows: 40,
       },
     ])
-    expect(projected.snapshotByPtySessionId.get('pty_session_123_aaaaaaaaa')).toEqual({
-      ptySessionId: 'pty_session_123_aaaaaaaaa',
+    expect(projected.snapshotByTerminalRuntimeSessionId.get('pty_session_123_aaaaaaaaa')).toEqual({
+      terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
       snapshot: 'first-frame',
       snapshotSeq: 3,
     })
@@ -171,7 +171,7 @@ describe('terminal session projection helpers', () => {
 
   test('uses authoritative create first-frame metadata when sessions projection already includes the target', () => {
     const existingSession = {
-      ptySessionId: 'pty_session_123_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
       terminalSessionId: 'session-1',
       repoInstanceId: REPO_INSTANCE_ID,
       repoRoot: '/server/repo',
@@ -194,7 +194,7 @@ describe('terminal session projection helpers', () => {
         terminalSessionId: 'session-1',
         tabs: [],
         sessions: [existingSession],
-        ptySessionId: 'pty_session_123_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         processName: 'new-shell',
         canonicalTitle: 'new title',
         phase: 'open',
@@ -210,7 +210,7 @@ describe('terminal session projection helpers', () => {
     expect(projected.serverSessions).toEqual([
       {
         ...existingSession,
-        ptySessionId: 'pty_session_123_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalSessionId: 'session-1',
         processName: 'new-shell',
         canonicalTitle: 'new title',
@@ -224,7 +224,7 @@ describe('terminal session projection helpers', () => {
 
   test('replaces stale create projection entry for the same terminal session id', () => {
     const staleSession = {
-      ptySessionId: 'pty_session_old_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_old_aaaaaaaaa',
       terminalSessionId: 'session-1',
       repoInstanceId: REPO_INSTANCE_ID,
       repoRoot: REPO_ROOT,
@@ -247,7 +247,7 @@ describe('terminal session projection helpers', () => {
         terminalSessionId: 'session-1',
         tabs: [],
         sessions: [staleSession],
-        ptySessionId: 'pty_session_new_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_new_aaaaaaaaa',
         processName: 'zsh',
         canonicalTitle: 'new-shell',
         phase: 'open',
@@ -262,7 +262,7 @@ describe('terminal session projection helpers', () => {
 
     expect(projected.serverSessions).toEqual([
       expect.objectContaining({
-        ptySessionId: 'pty_session_new_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_new_aaaaaaaaa',
         terminalSessionId: 'session-1',
         processName: 'zsh',
         canonicalTitle: 'new-shell',

@@ -1,21 +1,21 @@
-export function syncTerminalPtySessionIdIndex(input: {
+export function syncTerminalRuntimeSessionIdIndex(input: {
   terminalSessionId: string
-  ptySessionId: string | null
-  ptySessionIdByTerminalSessionId: Map<string, string>
-  terminalSessionIdByPtySessionId: Map<string, string>
+  terminalRuntimeSessionId: string | null
+  terminalRuntimeSessionIdByTerminalSessionId: Map<string, string>
+  terminalSessionIdByTerminalRuntimeSessionId: Map<string, string>
 }): void {
-  const previousPtySessionId = input.ptySessionIdByTerminalSessionId.get(input.terminalSessionId)
+  const previousTerminalRuntimeSessionId = input.terminalRuntimeSessionIdByTerminalSessionId.get(input.terminalSessionId)
   if (
-    previousPtySessionId &&
-    previousPtySessionId !== input.ptySessionId &&
-    input.terminalSessionIdByPtySessionId.get(previousPtySessionId) === input.terminalSessionId
+    previousTerminalRuntimeSessionId &&
+    previousTerminalRuntimeSessionId !== input.terminalRuntimeSessionId &&
+    input.terminalSessionIdByTerminalRuntimeSessionId.get(previousTerminalRuntimeSessionId) === input.terminalSessionId
   ) {
-    input.terminalSessionIdByPtySessionId.delete(previousPtySessionId)
+    input.terminalSessionIdByTerminalRuntimeSessionId.delete(previousTerminalRuntimeSessionId)
   }
-  if (!input.ptySessionId) {
-    input.ptySessionIdByTerminalSessionId.delete(input.terminalSessionId)
+  if (!input.terminalRuntimeSessionId) {
+    input.terminalRuntimeSessionIdByTerminalSessionId.delete(input.terminalSessionId)
     return
   }
-  input.ptySessionIdByTerminalSessionId.set(input.terminalSessionId, input.ptySessionId)
-  input.terminalSessionIdByPtySessionId.set(input.ptySessionId, input.terminalSessionId)
+  input.terminalRuntimeSessionIdByTerminalSessionId.set(input.terminalSessionId, input.terminalRuntimeSessionId)
+  input.terminalSessionIdByTerminalRuntimeSessionId.set(input.terminalRuntimeSessionId, input.terminalSessionId)
 }

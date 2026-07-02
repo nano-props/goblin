@@ -174,7 +174,7 @@ export function installWorkspacePaneTabsTestBridge(
       resize: async () => true,
       takeover: async () => ({
         ok: true as const,
-        ptySessionId: 'pty_test_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_test_aaaaaaaaa',
         role: 'controller' as const,
         controllerStatus: 'connected' as const,
         controller: { clientId: 'attachment_local', status: 'connected' as const },
@@ -189,7 +189,7 @@ export function installWorkspacePaneTabsTestBridge(
         terminalSessionId: 'terminal-session-test-1',
         tabs: [],
         sessions: [],
-        ptySessionId: 'pty_test_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_test_aaaaaaaaa',
         snapshot: '',
         snapshotSeq: 0,
         processName: 'zsh',
@@ -350,7 +350,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           takeover: () =>
             Promise.resolve({
               ok: true as const,
-              ptySessionId: 'pty_test_aaaaaaaaa',
+              terminalRuntimeSessionId: 'pty_test_aaaaaaaaa',
               controller: { clientId: 'attachment_local', status: 'connected' as const },
             }),
           close: () => Promise.resolve(true),
@@ -424,7 +424,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         case 'terminal.takeover':
           return {
             ok: true as const,
-            ptySessionId: 'pty_test_aaaaaaaaa',
+            terminalRuntimeSessionId: 'pty_test_aaaaaaaaa',
             role: 'controller' as const,
             controllerStatus: 'connected' as const,
             controller: { clientId: 'attachment_local', status: 'connected' as const },
@@ -446,14 +446,14 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           return []
         case 'terminal.create': {
           const terminalKind = (payload as { kind?: string } | undefined)?.kind
-          const ptySessionId = terminalKind === 'primary' ? 'pty_test_1_aaaaaaaaa' : 'pty_test_2_aaaaaaaaa'
+          const terminalRuntimeSessionId = terminalKind === 'primary' ? 'pty_test_1_aaaaaaaaa' : 'pty_test_2_aaaaaaaaa'
           return {
             ok: true,
             action: terminalKind === 'primary' ? 'reused' : 'created',
             terminalSessionId: terminalKind === 'primary' ? 'terminal-session-test-1' : 'terminal-session-test-2',
             tabs: [],
             sessions: [],
-            ptySessionId,
+            terminalRuntimeSessionId,
             snapshot: '',
             snapshotSeq: 0,
             processName: 'zsh',

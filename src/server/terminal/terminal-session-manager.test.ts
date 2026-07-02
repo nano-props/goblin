@@ -17,8 +17,8 @@ const TERMINAL_SESSION_ID = 'session-1'
 function createDeferredPtySupervisor(): PtySupervisor & {
   spawns: Array<(result: PtySpawnResult) => void>
   killed: string[]
-  emitData(ptySessionId: string, data: string): void
-  emitExit(ptySessionId: string): void
+  emitData(terminalRuntimeSessionId: string, data: string): void
+  emitExit(terminalRuntimeSessionId: string): void
 } {
   const spawns: Array<(result: PtySpawnResult) => void> = []
   const killed: string[] = []
@@ -185,7 +185,7 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     })
     const [openingSession] = await manager.listSessionsForUser(USER_ID, SCOPE)
     expect(openingSession).toBeDefined()
-    expect(manager.closeSessionForUser(USER_ID, openingSession!.ptySessionId)).toBe(true)
+    expect(manager.closeSessionForUser(USER_ID, openingSession!.terminalRuntimeSessionId)).toBe(true)
 
     supervisor.spawns.shift()?.(ptySpawnSuccess('pty_late_spawn_123456'))
 
@@ -199,8 +199,8 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     const manager = createManager(supervisor)
     const created = await createSession(manager, supervisor)
 
-    const firstRestart = manager.restartSession(USER_ID, created.ptySessionId, 100, 30, CLIENT_ID)
-    const secondRestart = manager.restartSession(USER_ID, created.ptySessionId, 120, 40, CLIENT_ID)
+    const firstRestart = manager.restartSession(USER_ID, created.terminalRuntimeSessionId, 100, 30, CLIENT_ID)
+    const secondRestart = manager.restartSession(USER_ID, created.terminalRuntimeSessionId, 120, 40, CLIENT_ID)
 
     supervisor.spawns.shift()?.(ptySpawnSuccess('pty_restart_one_123'))
     supervisor.spawns.shift()?.(ptySpawnSuccess('pty_restart_two_123'))
@@ -208,7 +208,7 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     await expect(firstRestart).resolves.toEqual({ ok: false, message: 'error.unavailable' })
     await expect(secondRestart).resolves.toMatchObject({
       ok: true,
-      ptySessionId: created.ptySessionId,
+      terminalRuntimeSessionId: created.terminalRuntimeSessionId,
       canonicalCols: 120,
       canonicalRows: 40,
     })
@@ -218,10 +218,10 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
 
     supervisor.emitExit('pty_restart_one_123')
     await expect(manager.listSessionsForUser(USER_ID, SCOPE)).resolves.toEqual([
-      expect.objectContaining({ ptySessionId: created.ptySessionId }),
+      expect.objectContaining({ terminalRuntimeSessionId: created.terminalRuntimeSessionId }),
     ])
 
-    expect(manager.closeSessionForUser(USER_ID, created.ptySessionId)).toBe(true)
+    expect(manager.closeSessionForUser(USER_ID, created.terminalRuntimeSessionId)).toBe(true)
     expect(supervisor.killed).toEqual(['pty_initial_123456', 'pty_restart_one_123', 'pty_restart_two_123'])
   })
 
@@ -230,8 +230,8 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     const manager = createManager(supervisor)
     const created = await createSession(manager, supervisor)
 
-    const firstRestart = manager.restartSession(USER_ID, created.ptySessionId, 100, 30, CLIENT_ID)
-    const secondRestart = manager.restartSession(USER_ID, created.ptySessionId, 120, 40, CLIENT_ID)
+    const firstRestart = manager.restartSession(USER_ID, created.terminalRuntimeSessionId, 100, 30, CLIENT_ID)
+    const secondRestart = manager.restartSession(USER_ID, created.terminalRuntimeSessionId, 120, 40, CLIENT_ID)
 
     supervisor.spawns.shift()?.({ ok: false, message: 'old restart failed' })
     supervisor.spawns.shift()?.(ptySpawnSuccess('pty_restart_two_456'))
@@ -239,14 +239,14 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     await expect(firstRestart).resolves.toEqual({ ok: false, message: 'error.unavailable' })
     await expect(secondRestart).resolves.toMatchObject({
       ok: true,
-      ptySessionId: created.ptySessionId,
+      terminalRuntimeSessionId: created.terminalRuntimeSessionId,
       canonicalCols: 120,
       canonicalRows: 40,
     })
 
     await expect(manager.listSessionsForUser(USER_ID, SCOPE)).resolves.toEqual([
       expect.objectContaining({
-        ptySessionId: created.ptySessionId,
+        terminalRuntimeSessionId: created.terminalRuntimeSessionId,
         phase: 'restarting',
         message: null,
       }),
@@ -258,9 +258,9 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     const manager = createManager(supervisor)
     const created = await createSession(manager, supervisor)
 
-    const firstRestart = manager.restartSession(USER_ID, created.ptySessionId, 100, 30, CLIENT_ID)
-    const attach = manager.attachSession(USER_ID, created.ptySessionId, 100, 30, CLIENT_ID)
-    const secondRestart = manager.restartSession(USER_ID, created.ptySessionId, 120, 40, CLIENT_ID)
+    const firstRestart = manager.restartSession(USER_ID, created.terminalRuntimeSessionId, 100, 30, CLIENT_ID)
+    const attach = manager.attachSession(USER_ID, created.terminalRuntimeSessionId, 100, 30, CLIENT_ID)
+    const secondRestart = manager.restartSession(USER_ID, created.terminalRuntimeSessionId, 120, 40, CLIENT_ID)
 
     supervisor.spawns.shift()?.({ ok: false, message: 'old restart failed' })
     supervisor.spawns.shift()?.(ptySpawnSuccess('pty_restart_two_789'))
@@ -268,13 +268,13 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     await expect(firstRestart).resolves.toEqual({ ok: false, message: 'error.unavailable' })
     await expect(secondRestart).resolves.toMatchObject({
       ok: true,
-      ptySessionId: created.ptySessionId,
+      terminalRuntimeSessionId: created.terminalRuntimeSessionId,
       canonicalCols: 120,
       canonicalRows: 40,
     })
     await expect(attach).resolves.toMatchObject({
       ok: true,
-      ptySessionId: created.ptySessionId,
+      terminalRuntimeSessionId: created.terminalRuntimeSessionId,
       canonicalCols: 120,
       canonicalRows: 40,
     })

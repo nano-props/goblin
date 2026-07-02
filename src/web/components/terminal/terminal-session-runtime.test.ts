@@ -8,7 +8,7 @@ describe('TerminalSessionRuntime', () => {
     runtime.applyAttachResult(
       {
         ok: true,
-        ptySessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         snapshot: '',
         snapshotSeq: 0,
         processName: 'zsh',
@@ -24,16 +24,16 @@ describe('TerminalSessionRuntime', () => {
       { cols: 100, rows: 30 },
     )
 
-    expect(runtime.currentPtySessionId()).toBe('pty_session_1_aaaaaaaaa')
+    expect(runtime.currentTerminalRuntimeSessionId()).toBe('pty_session_1_aaaaaaaaa')
     expect(runtime.snapshot().attachment).toMatchObject({ active: true, canTakeover: false })
 
     runtime.prepareRestart()
 
-    expect(runtime.currentPtySessionId()).toBeNull()
+    expect(runtime.currentTerminalRuntimeSessionId()).toBeNull()
     expect(runtime.phase()).toBe('restarting')
     expect(runtime.snapshot().attachment).toBeUndefined()
     expect(runtime.consumeRestartFlag()).toBe(true)
-    expect(runtime.takeRestartBasePtySessionIdForClose()).toBe('pty_session_1_aaaaaaaaa')
+    expect(runtime.takePendingRestartTerminalRuntimeSessionIdForClose()).toBe('pty_session_1_aaaaaaaaa')
   })
 
   test('routes output, identity, replay, and takeover through runtime state', () => {
@@ -41,7 +41,7 @@ describe('TerminalSessionRuntime', () => {
     runtime.applyAttachResult(
       {
         ok: true,
-        ptySessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         snapshot: '',
         snapshotSeq: 0,
         processName: 'zsh',
@@ -62,7 +62,7 @@ describe('TerminalSessionRuntime', () => {
     runtime.beginReplay(2)
     expect(
       runtime.handleOutput({
-        ptySessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         terminalSessionId: 'pty_session_1_aaaaaaaaa',
         data: 'old',
         seq: 1,
@@ -74,7 +74,7 @@ describe('TerminalSessionRuntime', () => {
     })
     expect(
       runtime.handleOutput({
-        ptySessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         terminalSessionId: 'pty_session_1_aaaaaaaaa',
         data: 'new',
         seq: 3,
@@ -87,7 +87,7 @@ describe('TerminalSessionRuntime', () => {
     expect(runtime.processName()).toBe('bash')
     expect(runtime.finishReplay()).toEqual([
       {
-        ptySessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         terminalSessionId: 'pty_session_1_aaaaaaaaa',
         data: 'new',
         seq: 3,
@@ -105,7 +105,7 @@ describe('TerminalSessionRuntime', () => {
     runtime.applyAttachResult(
       {
         ok: true,
-        ptySessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         snapshot: '',
         snapshotSeq: 0,
         processName: 'zsh',
@@ -123,7 +123,7 @@ describe('TerminalSessionRuntime', () => {
 
     runtime.beginReplay(2)
     runtime.handleOutput({
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalSessionId: 'pty_session_1_aaaaaaaaa',
       data: 'new',
       seq: 3,
@@ -147,7 +147,7 @@ describe('TerminalSessionRuntime', () => {
     runtime.applyAttachResult(
       {
         ok: true,
-        ptySessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         snapshot: '',
         snapshotSeq: 0,
         processName: 'zsh',
@@ -167,14 +167,14 @@ describe('TerminalSessionRuntime', () => {
     // The boundary is the server snapshot's seq.
     runtime.beginReplay(2)
     runtime.handleOutput({
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalSessionId: 'pty_session_1_aaaaaaaaa',
       data: 'preload-old',
       seq: 3,
       processName: 'bash',
     })
     runtime.handleOutput({
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalSessionId: 'pty_session_1_aaaaaaaaa',
       data: 'preload-new',
       seq: 6,
@@ -185,7 +185,7 @@ describe('TerminalSessionRuntime', () => {
     // boundary; the buffer is preserved across the call.
     runtime.beginReplay(5)
     runtime.handleOutput({
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalSessionId: 'pty_session_1_aaaaaaaaa',
       data: 'post-attach',
       seq: 7,
@@ -205,7 +205,7 @@ describe('TerminalSessionRuntime', () => {
     runtime.applyAttachResult(
       {
         ok: true,
-        ptySessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         snapshot: '',
         snapshotSeq: 0,
         processName: 'zsh',
@@ -233,7 +233,7 @@ describe('TerminalSessionRuntime', () => {
 
     expect(
       runtime.hydrateRepoSession({
-        ptySessionId: 'session-remote',
+        terminalRuntimeSessionId: 'session-remote',
         phase: 'open',
         message: null,
         processName: 'node',
@@ -244,7 +244,7 @@ describe('TerminalSessionRuntime', () => {
       }),
     ).toBe(true)
 
-    expect(runtime.currentPtySessionId()).toBe('session-remote')
+    expect(runtime.currentTerminalRuntimeSessionId()).toBe('session-remote')
     expect(runtime.phase()).toBe('open')
     expect(runtime.snapshot().attachment).toMatchObject({
       role: 'viewer',
@@ -256,7 +256,7 @@ describe('TerminalSessionRuntime', () => {
     })
     expect(
       runtime.handleOutput({
-        ptySessionId: 'session-remote',
+        terminalRuntimeSessionId: 'session-remote',
         terminalSessionId: 'session-remote',
         data: 'tick',
         seq: 1,
@@ -271,7 +271,7 @@ describe('TerminalSessionRuntime', () => {
   test('resetTransientState clears transient terminal state without dropping runtime metadata', () => {
     const runtime = new TerminalSessionRuntime()
     runtime.hydrateRepoSession({
-      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       phase: 'open',
       message: null,
       processName: 'zsh',

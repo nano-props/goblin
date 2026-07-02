@@ -21,10 +21,10 @@ function makeBridge(
   } as unknown as ClientTerminal
 }
 
-function successResult(ptySessionId: string, clientId = 'client_local'): TerminalTakeoverResult {
+function successResult(terminalRuntimeSessionId: string, clientId = 'client_local'): TerminalTakeoverResult {
   return {
     ok: true,
-    ptySessionId,
+    terminalRuntimeSessionId,
     role: 'controller',
     controllerStatus: 'connected',
     controller: { clientId, status: 'connected' },
@@ -44,19 +44,19 @@ interface GateHarness {
 function buildGate(
   overrides: {
     takeoverImpl?: (input: TerminalTakeoverInput) => Promise<TerminalTakeoverResult>
-    isSessionAlive?: (ptySessionId: string) => boolean
-    getPtySessionId?: () => string | null
+    isSessionAlive?: (terminalRuntimeSessionId: string) => boolean
+    getTerminalRuntimeSessionId?: () => string | null
   } = {},
 ): GateHarness {
   const bridge = makeBridge(overrides.takeoverImpl)
   const promoted = vi.fn()
   const isSessionAlive = vi.fn(overrides.isSessionAlive ?? (() => true))
-  const getPtySessionId = overrides.getPtySessionId ?? (() => 'pty_session_1_aaaaaaaaa')
+  const getTerminalRuntimeSessionId = overrides.getTerminalRuntimeSessionId ?? (() => 'pty_session_1_aaaaaaaaa')
   const gate = createXtermAuthorityGate({
     bridge,
     resolveSize: async () => ({ cols: 80, rows: 24 }),
     isSessionAlive,
-    getPtySessionId,
+    getTerminalRuntimeSessionId,
     onPromoted: promoted,
   })
   return { bridge, gate, promoted, isSessionAlive }
@@ -157,7 +157,7 @@ describe('AuthorityGate.takeover (explicit button path)', () => {
   })
 
   test('returns session-closed when the session id is null', async () => {
-    const { gate, bridge } = buildGate({ getPtySessionId: () => null })
+    const { gate, bridge } = buildGate({ getTerminalRuntimeSessionId: () => null })
     gate.setRole('viewer')
     const result = await gate.takeover()
     expect(result).toEqual({ kind: 'denied', reason: 'session-closed' })
@@ -184,7 +184,7 @@ describe('AuthorityGate.takeover (explicit button path)', () => {
         throw new Error('measurement failed')
       },
       isSessionAlive: () => true,
-      getPtySessionId: () => 'pty_session_1_aaaaaaaaa',
+      getTerminalRuntimeSessionId: () => 'pty_session_1_aaaaaaaaa',
       onPromoted: vi.fn(),
     })
     gate2.setRole('viewer')
@@ -202,7 +202,7 @@ describe('AuthorityGate.takeover (explicit button path)', () => {
       bridge,
       resolveSize: async () => ({ cols: 80, rows: 24 }),
       isSessionAlive: () => true,
-      getPtySessionId: () => 'pty_session_1_aaaaaaaaa',
+      getTerminalRuntimeSessionId: () => 'pty_session_1_aaaaaaaaa',
       onPromoted: vi.fn(),
     })
     gate.setRole('viewer')
@@ -253,16 +253,16 @@ describe('AuthorityGate.takeover (explicit button path)', () => {
   })
 })
 
-describe('AuthorityGate synchronous getPtySessionId + isSessionAlive contract', () => {
-  // The gate's `doTakeover` captures `getPtySessionId()` then immediately
-  // calls `isSessionAlive(ptySessionId)` before any await. This is a
+describe('AuthorityGate synchronous getTerminalRuntimeSessionId + isSessionAlive contract', () => {
+  // The gate's `doTakeover` captures `getTerminalRuntimeSessionId()` then immediately
+  // calls `isSessionAlive(terminalRuntimeSessionId)` before any await. This is a
   // load-bearing ordering: the two synchronous calls must see the
   // same closure state, otherwise a rehydrate that lands between
   // them would let a takeover round-trip fire against a stale
-  // ptySessionId. The two tests below exercise that ordering.
-  test('short-circuits when ptySessionId is captured but no longer alive by isSessionAlive (rehydrate race)', async () => {
-    // Simulate a rehydrate that swaps the live ptySessionId the instant
-    // getPtySessionId returns. The next closure call (`isSessionAlive`)
+  // terminalRuntimeSessionId. The two tests below exercise that ordering.
+  test('short-circuits when terminalRuntimeSessionId is captured but no longer alive by isSessionAlive (rehydrate race)', async () => {
+    // Simulate a rehydrate that swaps the live terminalRuntimeSessionId the instant
+    // getTerminalRuntimeSessionId returns. The next closure call (`isSessionAlive`)
     // sees the post-rehydrate value and returns false.
     let liveId: string = 'pty_session_1_aaaaaaaaa'
     const bridge = makeBridge(async () => successResult('pty_session_1_aaaaaaaaa'))
@@ -270,7 +270,7 @@ describe('AuthorityGate synchronous getPtySessionId + isSessionAlive contract', 
       bridge,
       resolveSize: async () => ({ cols: 80, rows: 24 }),
       isSessionAlive: (id) => liveId === id,
-      getPtySessionId: () => {
+      getTerminalRuntimeSessionId: () => {
         const captured = liveId
         liveId = 'pty_session_2_aaaaaaaaa'
         return captured
@@ -283,13 +283,13 @@ describe('AuthorityGate synchronous getPtySessionId + isSessionAlive contract', 
     expect(bridge.takeover).not.toHaveBeenCalled()
   })
 
-  test('does not short-circuit when both getPtySessionId and isSessionAlive observe the same ptySessionId', async () => {
+  test('does not short-circuit when both getTerminalRuntimeSessionId and isSessionAlive observe the same terminalRuntimeSessionId', async () => {
     const bridge = makeBridge(async () => successResult('pty_session_1_aaaaaaaaa'))
     const gate = createXtermAuthorityGate({
       bridge,
       resolveSize: async () => ({ cols: 80, rows: 24 }),
       isSessionAlive: () => true,
-      getPtySessionId: () => 'pty_session_1_aaaaaaaaa',
+      getTerminalRuntimeSessionId: () => 'pty_session_1_aaaaaaaaa',
       onPromoted: vi.fn(),
     })
     gate.setRole('viewer')
@@ -316,7 +316,7 @@ describe('AuthorityGate ordering contract', () => {
         return { cols: 80, rows: 24 }
       },
       isSessionAlive: () => true,
-      getPtySessionId: () => 'pty_session_1_aaaaaaaaa',
+      getTerminalRuntimeSessionId: () => 'pty_session_1_aaaaaaaaa',
       onPromoted,
     })
     gate.setRole('viewer')
@@ -340,13 +340,13 @@ describe('AuthorityGate ordering contract', () => {
       bridge,
       resolveSize: async () => ({ cols: 132, rows: 50 }),
       isSessionAlive: () => true,
-      getPtySessionId: () => 'session-xyz',
+      getTerminalRuntimeSessionId: () => 'session-xyz',
       onPromoted: vi.fn(),
     })
     gate.setRole('viewer')
     await gate.takeover()
     expect(bridge.takeover).toHaveBeenCalledWith({
-      ptySessionId: 'session-xyz',
+      terminalRuntimeSessionId: 'session-xyz',
       cols: 132,
       rows: 50,
       clientId: 'client_local',
@@ -361,9 +361,9 @@ describe('AuthorityGate single-emit deny log', () => {
   // gate is the single source of truth for takeover-failure logs.
   // These tests pin that contract: one warn per deny, tagged with
   // the pipeline stage that produced it.
-  test('preflight deny (null ptySessionId) logs with stage=preflight', async () => {
+  test('preflight deny (null terminalRuntimeSessionId) logs with stage=preflight', async () => {
     const warnSpy = vi.spyOn(terminalLog, 'warn').mockImplementation(() => {})
-    const { gate } = buildGate({ getPtySessionId: () => null })
+    const { gate } = buildGate({ getTerminalRuntimeSessionId: () => null })
     gate.setRole('viewer')
     await gate.takeover()
     expect(warnSpy).toHaveBeenCalledWith(
@@ -383,7 +383,7 @@ describe('AuthorityGate single-emit deny log', () => {
       expect.objectContaining({
         reason: 'session-closed',
         stage: 'isSessionAlive',
-        ptySessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       }),
     )
     warnSpy.mockRestore()
@@ -397,7 +397,7 @@ describe('AuthorityGate single-emit deny log', () => {
         throw new Error('measurement failed')
       },
       isSessionAlive: () => true,
-      getPtySessionId: () => 'pty_session_1_aaaaaaaaa',
+      getTerminalRuntimeSessionId: () => 'pty_session_1_aaaaaaaaa',
       onPromoted: vi.fn(),
     })
     gate.setRole('viewer')
@@ -419,7 +419,7 @@ describe('AuthorityGate single-emit deny log', () => {
       bridge,
       resolveSize: async () => ({ cols: 80, rows: 24 }),
       isSessionAlive: () => true,
-      getPtySessionId: () => 'pty_session_1_aaaaaaaaa',
+      getTerminalRuntimeSessionId: () => 'pty_session_1_aaaaaaaaa',
       onPromoted: vi.fn(),
     })
     gate.setRole('viewer')
@@ -444,7 +444,7 @@ describe('AuthorityGate single-emit deny log', () => {
         reason: 'client-offline',
         stage: 'server',
         message: 'error.unavailable',
-        ptySessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       }),
     )
     warnSpy.mockRestore()

@@ -38,7 +38,7 @@ export function createServerTerminalClient(options: {
   const sessionsChangedSubscribers = new Set<(repoRoot: string) => void>()
   const workspaceTabsChangedSubscribers = new Set<(repoRoot: string) => void>()
   const sessionClosedSubscribers = new Set<
-    (event: { ptySessionId: string; terminalSessionId: string; repoRoot: string; worktreePath: string }) => void
+    (event: { terminalRuntimeSessionId: string; terminalSessionId: string; repoRoot: string; worktreePath: string }) => void
   >()
 
   const connection = createTerminalSocketConnection({
@@ -228,7 +228,7 @@ export function createServerTerminalClient(options: {
       case 'session-closed':
         for (const subscriber of sessionClosedSubscribers)
           subscriber({
-            ptySessionId: message.ptySessionId,
+            terminalRuntimeSessionId: message.terminalRuntimeSessionId,
             terminalSessionId: message.terminalSessionId,
             repoRoot: message.repoRoot,
             worktreePath: message.worktreePath,
@@ -236,7 +236,7 @@ export function createServerTerminalClient(options: {
         return
       case 'identity': {
         const identityEvent = {
-          ptySessionId: message.event.ptySessionId,
+          terminalRuntimeSessionId: message.event.terminalRuntimeSessionId,
           terminalSessionId: message.event.terminalSessionId,
           ...resolveTerminalController(message.event.controller, currentClientId),
           canonicalCols: message.event.canonicalCols,

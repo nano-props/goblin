@@ -13,16 +13,16 @@ import type {
 } from '#/web/components/terminal/types.ts'
 export class TerminalSessionRuntime {
   private readonly state = new TerminalSessionState()
-  private ptySessionId: string | null = null
+  private terminalRuntimeSessionId: string | null = null
   // Restart is issued against the last server runtime session id. During
   // the restart attempt the client has no open attachment, but the server
   // session remains addressable; if restart fails, this id is restored and
   // the session enters `error` instead of being closed.
-  private restartBasePtySessionId: string | null = null
+  private pendingRestartTerminalRuntimeSessionId: string | null = null
   private restartOnStart = false
 
   snapshot() {
-    return this.state.snapshot(this.ptySessionId)
+    return this.state.snapshot(this.terminalRuntimeSessionId)
   }
 
   phase(): 'opening' | 'restarting' | 'open' | 'error' | 'closed' {
@@ -37,12 +37,12 @@ export class TerminalSessionRuntime {
     return this.state.getCanonicalTitle()
   }
 
-  currentPtySessionId(): string | null {
-    return this.ptySessionId
+  currentTerminalRuntimeSessionId(): string | null {
+    return this.terminalRuntimeSessionId
   }
 
-  restartingPtySessionId(): string | null {
-    return this.restartBasePtySessionId ?? this.ptySessionId
+  restartingTerminalRuntimeSessionId(): string | null {
+    return this.pendingRestartTerminalRuntimeSessionId ?? this.terminalRuntimeSessionId
   }
 
   currentCanonicalSize(): { cols: number; rows: number } {
@@ -77,9 +77,9 @@ export class TerminalSessionRuntime {
   }
 
   prepareRestart(): { changed: boolean } {
-    const oldPtySessionId = this.ptySessionId
-    this.ptySessionId = null
-    if (oldPtySessionId) this.restartBasePtySessionId = oldPtySessionId
+    const oldTerminalRuntimeSessionId = this.terminalRuntimeSessionId
+    this.terminalRuntimeSessionId = null
+    if (oldTerminalRuntimeSessionId) this.pendingRestartTerminalRuntimeSessionId = oldTerminalRuntimeSessionId
     this.restartOnStart = true
     return { changed: this.state.setRestarting() }
   }
@@ -95,8 +95,8 @@ export class TerminalSessionRuntime {
     },
     fallbackSize: { cols: number; rows: number },
   ): boolean {
-    this.restartBasePtySessionId = null
-    this.ptySessionId = result.ptySessionId
+    this.pendingRestartTerminalRuntimeSessionId = null
+    this.terminalRuntimeSessionId = result.terminalRuntimeSessionId
     return this.state.applyOpenResult({
       phase: result.phase,
       message: result.message,
@@ -110,7 +110,7 @@ export class TerminalSessionRuntime {
   }
 
   hydrateRepoSession(input: {
-    ptySessionId: string
+    terminalRuntimeSessionId: string
     phase: TerminalSessionPhase
     message: string | null
     processName: string
@@ -120,10 +120,10 @@ export class TerminalSessionRuntime {
     canonicalCols: number
     canonicalRows: number
   }): boolean {
-    const sessionChanged = this.ptySessionId !== input.ptySessionId
-    this.restartBasePtySessionId = null
+    const sessionChanged = this.terminalRuntimeSessionId !== input.terminalRuntimeSessionId
+    this.pendingRestartTerminalRuntimeSessionId = null
     this.restartOnStart = false
-    this.ptySessionId = input.ptySessionId
+    this.terminalRuntimeSessionId = input.terminalRuntimeSessionId
     const metadataChanged = this.state.applyOpenResult({
       phase: input.phase,
       message: input.message,
@@ -143,9 +143,9 @@ export class TerminalSessionRuntime {
   }
 
   failRestartAttempt(message: string): boolean {
-    if (this.restartBasePtySessionId) {
-      this.ptySessionId = this.restartBasePtySessionId
-      this.restartBasePtySessionId = null
+    if (this.pendingRestartTerminalRuntimeSessionId) {
+      this.terminalRuntimeSessionId = this.pendingRestartTerminalRuntimeSessionId
+      this.pendingRestartTerminalRuntimeSessionId = null
     }
     this.restartOnStart = false
     return this.state.setError(message)
@@ -184,19 +184,19 @@ export class TerminalSessionRuntime {
   }
 
   handleOutput(event: TerminalOutputEvent): { changed: boolean; output: string | null } {
-    if (event.ptySessionId !== this.ptySessionId) return { changed: false, output: null }
+    if (event.terminalRuntimeSessionId !== this.terminalRuntimeSessionId) return { changed: false, output: null }
     const changed = this.state.setProcessName(event.processName)
     if (this.state.captureReplayOutput(event)) return { changed, output: null }
     return { changed, output: event.data }
   }
 
   handleIdentity(event: TerminalIdentityViewModel): boolean {
-    if (event.ptySessionId !== this.ptySessionId) return false
+    if (event.terminalRuntimeSessionId !== this.terminalRuntimeSessionId) return false
     return this.state.applyIdentity(event)
   }
 
   handleLifecycle(event: TerminalLifecycleViewModel): boolean {
-    if (event.ptySessionId !== this.ptySessionId) return false
+    if (event.terminalRuntimeSessionId !== this.terminalRuntimeSessionId) return false
     return this.state.applyLifecycle(event)
   }
 
@@ -209,20 +209,20 @@ export class TerminalSessionRuntime {
    * no-op.
    *
    * Returns `false` if the result is for a different session (the
-   * caller must already have a current ptySessionId for the takeover
+   * caller must already have a current terminalRuntimeSessionId for the takeover
    * to be valid; this is a defensive guard).
    */
   applyTakeover(result: Extract<TerminalTakeoverResult, { ok: true }>): boolean {
-    if (result.ptySessionId !== this.ptySessionId) return false
+    if (result.terminalRuntimeSessionId !== this.terminalRuntimeSessionId) return false
     const idChanged = this.state.applyIdentity({
-      ptySessionId: result.ptySessionId,
+      terminalRuntimeSessionId: result.terminalRuntimeSessionId,
       role: result.role,
       controllerStatus: result.controllerStatus,
       canonicalCols: result.canonicalCols,
       canonicalRows: result.canonicalRows,
     })
     const lcChanged = this.state.applyLifecycle({
-      ptySessionId: result.ptySessionId,
+      terminalRuntimeSessionId: result.terminalRuntimeSessionId,
       phase: result.phase,
       message: null,
       takeoverPending: false,
@@ -234,9 +234,9 @@ export class TerminalSessionRuntime {
     return this.state.setCanonicalTitle(canonicalTitle)
   }
 
-  handleExit(event: { ptySessionId: string }): boolean {
-    if (event.ptySessionId !== this.ptySessionId) return false
-    this.ptySessionId = null
+  handleExit(event: { terminalRuntimeSessionId: string }): boolean {
+    if (event.terminalRuntimeSessionId !== this.terminalRuntimeSessionId) return false
+    this.terminalRuntimeSessionId = null
     return true
   }
 
@@ -263,21 +263,21 @@ export class TerminalSessionRuntime {
     this.state.setCanonicalSize(cols, rows)
   }
 
-  ptySessionIdsForClose(): string[] {
-    return Array.from(new Set([this.ptySessionId, this.restartBasePtySessionId].filter((id): id is string => !!id)))
+  terminalRuntimeSessionIdsForClose(): string[] {
+    return Array.from(new Set([this.terminalRuntimeSessionId, this.pendingRestartTerminalRuntimeSessionId].filter((id): id is string => !!id)))
   }
 
-  disposePtySessionIds(): string[] {
-    const ptySessionIds = this.ptySessionIdsForClose()
-    this.ptySessionId = null
-    this.restartBasePtySessionId = null
+  disposeTerminalRuntimeSessionIds(): string[] {
+    const terminalRuntimeSessionIds = this.terminalRuntimeSessionIdsForClose()
+    this.terminalRuntimeSessionId = null
+    this.pendingRestartTerminalRuntimeSessionId = null
     this.restartOnStart = false
-    return ptySessionIds
+    return terminalRuntimeSessionIds
   }
 
-  takeRestartBasePtySessionIdForClose(): string | null {
-    const ptySessionId = this.restartBasePtySessionId
-    this.restartBasePtySessionId = null
-    return ptySessionId
+  takePendingRestartTerminalRuntimeSessionIdForClose(): string | null {
+    const terminalRuntimeSessionId = this.pendingRestartTerminalRuntimeSessionId
+    this.pendingRestartTerminalRuntimeSessionId = null
+    return terminalRuntimeSessionId
   }
 }

@@ -77,7 +77,7 @@ export class TerminalSessionState {
   // never make this return false for a session whose role is still
   // `'controller'`. Named after the role enum value (not the
   // older "user" terminology) to match the userId/clientId/
-  // ptySessionId identity split: the role is `controller`, not
+  // terminalRuntimeSessionId identity split: the role is `controller`, not
   // `user`.
   isController(): boolean {
     return this.runtimeState.clientController.role === 'controller'
@@ -101,7 +101,7 @@ export class TerminalSessionState {
     return this.runtimeState.canonicalSize
   }
 
-  snapshot(ptySessionId: string | null): TerminalSnapshot {
+  snapshot(terminalRuntimeSessionId: string | null): TerminalSnapshot {
     const snapshot: TerminalSnapshot = {
       phase: this.runtimeState.phase,
       message: this.runtimeState.message,
@@ -109,10 +109,10 @@ export class TerminalSessionState {
       canonicalTitle: this.runtimeState.canonicalTitle,
     }
     // The `attachment` session is only populated when the session is
-    // open AND we have a ptySessionId, matching the previous
+    // open AND we have a terminalRuntimeSessionId, matching the previous
     // behaviour. The fields are identity-only — phase is at the
     // top level of the snapshot already.
-    if (this.runtimeState.phase === 'open' && ptySessionId) {
+    if (this.runtimeState.phase === 'open' && terminalRuntimeSessionId) {
       snapshot.attachment = createTerminalClientSnapshot({
         ...this.runtimeState.clientController,
         canonicalCols: this.runtimeState.canonicalSize.cols,
@@ -170,7 +170,7 @@ export class TerminalSessionState {
     let changed = false
     changed =
       this.applyIdentity({
-        ptySessionId: '', // The runtime stamps the actual ptySessionId itself; the first-frame path carries it via `currentPtySessionId` set by the caller.
+        terminalRuntimeSessionId: '', // The runtime stamps the actual terminalRuntimeSessionId itself; the first-frame path carries it via `currentTerminalRuntimeSessionId` set by the caller.
         role: input.role,
         controllerStatus: input.controllerStatus,
         canonicalCols: input.canonicalCols,
@@ -178,7 +178,7 @@ export class TerminalSessionState {
       }) || changed
     changed =
       this.applyLifecycle({
-        ptySessionId: '',
+        terminalRuntimeSessionId: '',
         phase: input.phase ?? 'open',
         message: input.message ?? null,
         takeoverPending: false,

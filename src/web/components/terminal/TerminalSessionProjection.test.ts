@@ -39,7 +39,7 @@ function makeRepoIndex(): TerminalRepoIndex {
 }
 
 function makeServerSession(
-  ptySessionId: string,
+  terminalRuntimeSessionId: string,
   terminalSessionId: string,
   overrides: Partial<{
     controller: { clientId: string; status: 'connected' }
@@ -52,7 +52,7 @@ function makeServerSession(
   }> = {},
 ): TerminalSessionSummary {
   return {
-    ptySessionId,
+    terminalRuntimeSessionId,
     terminalSessionId,
     repoInstanceId: 'repo-instance-test',
     repoRoot: REPO_ROOT,
@@ -97,7 +97,7 @@ describe('TerminalSessionProjection', () => {
   })
 
   describe('event dispatch', () => {
-    test('dispatches output to the correct session by ptySessionId index', () => {
+    test('dispatches output to the correct session by terminalRuntimeSessionId index', () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(
         REPO_ROOT,
@@ -112,7 +112,7 @@ describe('TerminalSessionProjection', () => {
       const handleOutputSpy = vi.spyOn(session, 'handleOutput')
 
       projection.handleOutput({
-        ptySessionId: 'pty_session_a_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
         terminalSessionId: 'unrouted-terminal-session',
         data: 'hello',
         seq: 1,
@@ -121,7 +121,7 @@ describe('TerminalSessionProjection', () => {
       expect(handleOutputSpy).toHaveBeenCalledTimes(1)
 
       projection.handleOutput({
-        ptySessionId: 'pty_session_b_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_b_aaaaaaaaa',
         terminalSessionId: 'unrouted-terminal-session',
         data: 'hello',
         seq: 1,
@@ -132,12 +132,12 @@ describe('TerminalSessionProjection', () => {
 
     test('recovers output that arrived before the pty index through the next server snapshot', () => {
       projection.setRepoIndex(makeRepoIndex())
-      const ptySessionId = 'pty_session_late_aaaaaaaaa'
+      const terminalRuntimeSessionId = 'pty_session_late_aaaaaaaaa'
       const hydrateSpy = vi.spyOn(TerminalSession.prototype, 'hydrate')
 
       try {
         projection.handleOutput({
-          ptySessionId,
+          terminalRuntimeSessionId,
           terminalSessionId: 'session-1',
           data: 'before-index',
           seq: 1,
@@ -148,16 +148,16 @@ describe('TerminalSessionProjection', () => {
         projection.reconcileServerSessions(
           REPO_ROOT,
           [
-            makeServerSession(ptySessionId, 'session-1', {
+            makeServerSession(terminalRuntimeSessionId, 'session-1', {
               controller: { clientId: 'client_local', status: 'connected' },
             }),
           ],
           'client_local',
-          new Map([[ptySessionId, { ptySessionId, snapshot: 'before-index', snapshotSeq: 1 }]]),
+          new Map([[terminalRuntimeSessionId, { terminalRuntimeSessionId, snapshot: 'before-index', snapshotSeq: 1 }]]),
         )
 
         expect(hydrateSpy).toHaveBeenCalledWith(
-          expect.objectContaining({ ptySessionId, snapshot: 'before-index', snapshotSeq: 1 }),
+          expect.objectContaining({ terminalRuntimeSessionId, snapshot: 'before-index', snapshotSeq: 1 }),
         )
         expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]?.terminalSessionId).toBe('session-1')
       } finally {
@@ -181,7 +181,7 @@ describe('TerminalSessionProjection', () => {
       const handleOutputSpy = vi.spyOn(session, 'handleOutput')
 
       projection.handleOutput({
-        ptySessionId: 'pty_session_a_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
         terminalSessionId: 'unrouted-terminal-session',
         data: '',
         seq: 1,
@@ -189,7 +189,7 @@ describe('TerminalSessionProjection', () => {
       })
       vi.advanceTimersByTime(5000)
       projection.handleOutput({
-        ptySessionId: 'pty_session_a_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
         terminalSessionId: 'unrouted-terminal-session',
         data: '',
         seq: 2,
@@ -214,7 +214,7 @@ describe('TerminalSessionProjection', () => {
       const handleOutputSpy = vi.spyOn(session, 'handleOutput')
 
       projection.handleOutput({
-        ptySessionId: 'pty_session_old_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_old_aaaaaaaaa',
         terminalSessionId: 'session-1',
         data: 'stale output',
         seq: 1,
@@ -225,7 +225,7 @@ describe('TerminalSessionProjection', () => {
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).outputActiveCount).toBe(0)
     })
 
-    test('dispatches title changes by ptySessionId index', () => {
+    test('dispatches title changes by terminalRuntimeSessionId index', () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(
         REPO_ROOT,
@@ -239,7 +239,7 @@ describe('TerminalSessionProjection', () => {
       const handleServerTitleSpy = vi.spyOn(session, 'handleServerTitle')
 
       projection.handleServerTitle({
-        ptySessionId: 'pty_session_a_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
         terminalSessionId: 'unrouted-terminal-session',
         repoRoot: REPO_ROOT,
         worktreePath: WORKTREE_PATH,
@@ -249,7 +249,7 @@ describe('TerminalSessionProjection', () => {
 
       handleServerTitleSpy.mockClear()
       projection.handleServerTitle({
-        ptySessionId: 'pty_session_b_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_b_aaaaaaaaa',
         terminalSessionId: 'unrouted-terminal-session',
         repoRoot: REPO_ROOT,
         worktreePath: WORKTREE_PATH,
@@ -259,11 +259,11 @@ describe('TerminalSessionProjection', () => {
     })
 
     // Regression: a background tab may see a `title` event before its
-    // ptySessionId->terminalSessionId index entry exists locally (e.g. it
+    // terminalRuntimeSessionId->terminalSessionId index entry exists locally (e.g. it
     // has never been attached/reconciled). `terminalSessionId` must be
     // used as the primary routing key, same as bell events, so title
     // updates for such tabs are not silently dropped.
-    test('dispatches title changes by terminalSessionId even without a ptySessionId index entry', () => {
+    test('dispatches title changes by terminalSessionId even without a terminalRuntimeSessionId index entry', () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(
         REPO_ROOT,
@@ -275,10 +275,10 @@ describe('TerminalSessionProjection', () => {
       const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
       const session = (projection as any).sessions.get(terminalSessionId)
       const handleServerTitleSpy = vi.spyOn(session, 'handleServerTitle')
-      ;(projection as any).terminalSessionIdByPtySessionId.delete('pty_session_a_aaaaaaaaa')
+      ;(projection as any).terminalSessionIdByTerminalRuntimeSessionId.delete('pty_session_a_aaaaaaaaa')
 
       projection.handleServerTitle({
-        ptySessionId: 'pty_session_a_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
         terminalSessionId: 'session-1',
         repoRoot: REPO_ROOT,
         worktreePath: WORKTREE_PATH,
@@ -287,7 +287,7 @@ describe('TerminalSessionProjection', () => {
       expect(handleServerTitleSpy).toHaveBeenCalledWith('new title')
     })
 
-    test('ignores stale title changes for an old ptySessionId on the same terminalSessionId', () => {
+    test('ignores stale title changes for an old terminalRuntimeSessionId on the same terminalSessionId', () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(
         REPO_ROOT,
@@ -301,7 +301,7 @@ describe('TerminalSessionProjection', () => {
       const handleServerTitleSpy = vi.spyOn(session, 'handleServerTitle')
 
       projection.handleServerTitle({
-        ptySessionId: 'pty_session_old_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_old_aaaaaaaaa',
         terminalSessionId: 'session-1',
         repoRoot: REPO_ROOT,
         worktreePath: WORKTREE_PATH,
@@ -310,7 +310,7 @@ describe('TerminalSessionProjection', () => {
       expect(handleServerTitleSpy).not.toHaveBeenCalled()
     })
 
-    test('dispatches exit by ptySessionId index', () => {
+    test('dispatches exit by terminalRuntimeSessionId index', () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(
         REPO_ROOT,
@@ -323,21 +323,21 @@ describe('TerminalSessionProjection', () => {
       const session = (projection as any).sessions.get(terminalSessionId)
       const handleExitSpy = vi.spyOn(session, 'handleExit').mockReturnValue(true)
 
-      projection.handleExit({ ptySessionId: 'pty_session_a_aaaaaaaaa', terminalSessionId: 'unrouted-terminal-session' })
+      projection.handleExit({ terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa', terminalSessionId: 'unrouted-terminal-session' })
       expect(handleExitSpy).toHaveBeenCalledTimes(1)
 
       handleExitSpy.mockClear()
-      projection.handleExit({ ptySessionId: 'pty_session_b_aaaaaaaaa', terminalSessionId: 'unrouted-terminal-session' })
+      projection.handleExit({ terminalRuntimeSessionId: 'pty_session_b_aaaaaaaaa', terminalSessionId: 'unrouted-terminal-session' })
       expect(handleExitSpy).not.toHaveBeenCalled()
     })
 
     // Regression coverage for every realtime event type: a background tab
     // that has never been attached/reconciled locally may not yet have a
-    // ptySessionId->terminalSessionId index entry. `terminalSessionId`
+    // terminalRuntimeSessionId->terminalSessionId index entry. `terminalSessionId`
     // must be tried first for every dispatcher (mirroring the title-event
     // fix) so no realtime event type can silently drop updates for such a
     // tab. See `resolveSessionForRealtimeEvent`.
-    test('routes output, exit, identity, and lifecycle by terminalSessionId even without a ptySessionId index entry', () => {
+    test('routes output, exit, identity, and lifecycle by terminalSessionId even without a terminalRuntimeSessionId index entry', () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(
         REPO_ROOT,
@@ -352,10 +352,10 @@ describe('TerminalSessionProjection', () => {
       const handleIdentitySpy = vi.spyOn(session, 'handleIdentity')
       const handleLifecycleSpy = vi.spyOn(session, 'handleLifecycle')
       const handleExitSpy = vi.spyOn(session, 'handleExit').mockReturnValue(true)
-      ;(projection as any).terminalSessionIdByPtySessionId.delete('pty_session_a_aaaaaaaaa')
+      ;(projection as any).terminalSessionIdByTerminalRuntimeSessionId.delete('pty_session_a_aaaaaaaaa')
 
       projection.handleOutput({
-        ptySessionId: 'pty_session_a_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
         terminalSessionId: 'session-1',
         data: 'hello',
         seq: 1,
@@ -364,7 +364,7 @@ describe('TerminalSessionProjection', () => {
       expect(handleOutputSpy).toHaveBeenCalledTimes(1)
 
       projection.handleIdentity({
-        ptySessionId: 'pty_session_a_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
         terminalSessionId: 'session-1',
         role: 'controller',
         controllerStatus: 'connected',
@@ -374,7 +374,7 @@ describe('TerminalSessionProjection', () => {
       expect(handleIdentitySpy).toHaveBeenCalledTimes(1)
 
       projection.handleLifecycle({
-        ptySessionId: 'pty_session_a_aaaaaaaaa',
+        terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
         terminalSessionId: 'session-1',
         phase: 'open',
         message: null,
@@ -382,7 +382,7 @@ describe('TerminalSessionProjection', () => {
       })
       expect(handleLifecycleSpy).toHaveBeenCalledTimes(1)
 
-      projection.handleExit({ ptySessionId: 'pty_session_a_aaaaaaaaa', terminalSessionId: 'session-1' })
+      projection.handleExit({ terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa', terminalSessionId: 'session-1' })
       expect(handleExitSpy).toHaveBeenCalledTimes(1)
     })
   })
@@ -509,7 +509,7 @@ describe('TerminalSessionProjection', () => {
 
       try {
         await expect((session as any).requestDurableClose('pty_session_1_aaaaaaaaa')).resolves.toBeUndefined()
-        expect(closeSpy).toHaveBeenCalledWith({ ptySessionId: 'pty_session_1_aaaaaaaaa' })
+        expect(closeSpy).toHaveBeenCalledWith({ terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa' })
       } finally {
         closeSpy.mockRestore()
       }
@@ -814,7 +814,7 @@ describe('TerminalSessionProjection', () => {
       ;(projection as any).sessions.set(descriptor.terminalSessionId, {
         descriptor,
         snapshot: () => ({ phase: 'open', message: null, processName: 'zsh', canonicalTitle: null }),
-        currentPtySessionId: () => 'pty_session_1_aaaaaaaaa',
+        currentTerminalRuntimeSessionId: () => 'pty_session_1_aaaaaaaaa',
         dispose: () => {},
       })
       // Synthesize a remount: re-fetch the singleton via the

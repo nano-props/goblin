@@ -57,7 +57,7 @@ export interface TerminalPtyBindingEvents<TSession extends TerminalPtySessionSta
   ): void
   emitTitle(session: TSession, event: Omit<TerminalTitleEvent, 'terminalSessionId' | 'repoRoot' | 'worktreePath'>): void
   emitExit(session: TSession, event: Omit<TerminalExitEvent, 'terminalSessionId'>): void
-  closeSession(ptySessionId: string): void
+  closeSession(terminalRuntimeSessionId: string): void
 }
 
 export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
@@ -141,7 +141,7 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
       session.rows = rows
       return true
     } catch (err) {
-      ptyLifecycleLogger.warn({ ptySessionId: session.id, err }, 'failed to resize PTY')
+      ptyLifecycleLogger.warn({ terminalRuntimeSessionId: session.id, err }, 'failed to resize PTY')
       return false
     }
   }
@@ -218,7 +218,7 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
           if (lastBroadcastTitle !== null) {
             lastBroadcastTitle = null
             this.events.emitTitle(session, {
-              ptySessionId: session.id,
+              terminalRuntimeSessionId: session.id,
               canonicalTitle: null,
             })
           }
@@ -227,19 +227,19 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
         if (session.render.title !== lastBroadcastTitle) {
           lastBroadcastTitle = session.render.title
           this.events.emitTitle(session, {
-            ptySessionId: session.id,
+            terminalRuntimeSessionId: session.id,
             canonicalTitle: session.render.title,
           })
         }
         if (bellScan.hasBell) {
           this.events.emitBell(session, {
-            ptySessionId: session.id,
+            terminalRuntimeSessionId: session.id,
             processName: processNameAfterData,
             canonicalTitle: session.render.title,
           })
         }
         this.events.emitOutput(session, {
-          ptySessionId: session.id,
+          terminalRuntimeSessionId: session.id,
           data,
           seq,
           processName: processNameAfterData,
@@ -250,7 +250,7 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
       this.supervisor.onExit(handle, () => {
         if (!this.isCurrentBinding(session, generation, handle)) return
         this.handle = null
-        this.events.emitExit(session, { ptySessionId: session.id })
+        this.events.emitExit(session, { terminalRuntimeSessionId: session.id })
         this.events.closeSession(session.id)
       }),
     )
@@ -277,11 +277,11 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
     return this.spawnResult(generation, { ok: false, message: 'error.unavailable' })
   }
 
-  private killStalePtyHandle(ptySessionId: string, handle: PtyHandle): void {
+  private killStalePtyHandle(terminalRuntimeSessionId: string, handle: PtyHandle): void {
     try {
       this.supervisor.kill(handle)
     } catch (err) {
-      ptyLifecycleLogger.warn({ ptySessionId, err }, 'failed to kill stale PTY')
+      ptyLifecycleLogger.warn({ terminalRuntimeSessionId, err }, 'failed to kill stale PTY')
     }
   }
 
@@ -292,7 +292,7 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
       try {
         this.supervisor.kill(this.handle)
       } catch (err) {
-        ptyLifecycleLogger.warn({ ptySessionId: session.id, err }, 'failed to kill PTY')
+        ptyLifecycleLogger.warn({ terminalRuntimeSessionId: session.id, err }, 'failed to kill PTY')
       }
     }
     this.handle = null
@@ -301,12 +301,12 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
     this.inputFlushScheduled = false
   }
 
-  private disposeListeners(ptySessionId: string): void {
+  private disposeListeners(terminalRuntimeSessionId: string): void {
     for (const disposable of this.disposables.splice(0)) {
       try {
         disposable.dispose()
       } catch (err) {
-        ptyLifecycleLogger.warn({ ptySessionId, err }, 'failed to dispose PTY listener')
+        ptyLifecycleLogger.warn({ terminalRuntimeSessionId, err }, 'failed to dispose PTY listener')
       }
     }
   }
@@ -326,7 +326,7 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
     try {
       this.supervisor.write(this.handle, batch)
     } catch (err) {
-      ptyLifecycleLogger.warn({ ptySessionId: session.id, err, bytes: batch.length }, 'failed to write PTY')
+      ptyLifecycleLogger.warn({ terminalRuntimeSessionId: session.id, err, bytes: batch.length }, 'failed to write PTY')
     }
   }
 }

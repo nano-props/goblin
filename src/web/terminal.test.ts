@@ -30,7 +30,7 @@ describe('terminal web host client', () => {
     const socket = wsMock.instances[0]
     expect(socket?.url).toMatch(/^ws:\/\/127\.0\.0\.1:32100\/ws\/terminal\?t=secret&clientId=client_sharedterminal$/)
     const attachPromise = terminalClient.attach({
-      ptySessionId: 'pty_1234567890123456',
+      terminalRuntimeSessionId: 'pty_1234567890123456',
       cols: 100,
       rows: 30,
     })
@@ -41,7 +41,7 @@ describe('terminal web host client', () => {
       type: 'request',
       action: 'attach',
       input: {
-        ptySessionId: 'pty_1234567890123456',
+        terminalRuntimeSessionId: 'pty_1234567890123456',
         cols: 100,
         rows: 30,
       },
@@ -54,7 +54,7 @@ describe('terminal web host client', () => {
         action: 'attach',
         payload: {
           ok: true,
-          ptySessionId: 'pty_1234567890123456',
+          terminalRuntimeSessionId: 'pty_1234567890123456',
           snapshot: '',
           snapshotSeq: 0,
           processName: 'zsh',
@@ -79,7 +79,7 @@ describe('terminal web host client', () => {
     const dispose = terminalClient.onOutput(() => {})
     const socket = wsMock.instances[0]
     const attachPromise = terminalClient.attach({
-      ptySessionId: 'pty_1234567890123456',
+      terminalRuntimeSessionId: 'pty_1234567890123456',
       cols: 100,
       rows: 30,
     })
@@ -94,7 +94,7 @@ describe('terminal web host client', () => {
         action: 'attach',
         payload: {
           ok: true,
-          ptySessionId: 'pty_1234567890123456',
+          terminalRuntimeSessionId: 'pty_1234567890123456',
           snapshot: '',
           snapshotSeq: 0,
           processName: 'zsh',
@@ -128,7 +128,7 @@ describe('terminal web host client', () => {
       JSON.stringify({
         type: 'identity',
         event: {
-          ptySessionId: 'pty_1',
+          terminalRuntimeSessionId: 'pty_1',
           terminalSessionId: 'terminal_1',
           controller: { clientId: 'client_sharedterminal', status: 'connected' },
           canonicalCols: 100,
@@ -139,7 +139,7 @@ describe('terminal web host client', () => {
 
     expect(socket.url).toContain('clientId=client_sharedterminal')
     expect(onIdentity).toHaveBeenCalledWith({
-      ptySessionId: 'pty_1',
+      terminalRuntimeSessionId: 'pty_1',
       terminalSessionId: 'terminal_1',
       role: 'controller',
       controllerStatus: 'connected',
@@ -155,7 +155,7 @@ describe('terminal web host client', () => {
     const dispose = terminalClient.onOutput(() => {})
     const socket = wsMock.instances[0]
     const attachPromise = terminalClient.attach({
-      ptySessionId: 'pty_1234567890123456',
+      terminalRuntimeSessionId: 'pty_1234567890123456',
       cols: 100,
       rows: 30,
     })
@@ -173,7 +173,7 @@ describe('terminal web host client', () => {
     const dispose = terminalClient.onOutput(() => {})
     const socket = wsMock.instances[0]
     const writePromise = terminalClient.write({
-      ptySessionId: 'pty_1234567890123456',
+      terminalRuntimeSessionId: 'pty_1234567890123456',
       data: 'pwd',
     })
 
@@ -258,7 +258,7 @@ describe('terminal web host client', () => {
         requestId: request?.requestId,
         ok: true,
         action: 'list-sessions',
-        payload: [{ ptySessionId: 'pty_1', terminalSessionId: 123 }],
+        payload: [{ terminalRuntimeSessionId: 'pty_1', terminalSessionId: 123 }],
       }),
     )
 
@@ -634,7 +634,7 @@ describe('terminal web host client', () => {
       JSON.stringify({
         type: 'title',
         event: {
-          ptySessionId: 'pty_1',
+          terminalRuntimeSessionId: 'pty_1',
           terminalSessionId: 'terminal_1',
           repoRoot: '/tmp/repo',
           worktreePath: '/tmp/repo-worktree',
@@ -645,14 +645,14 @@ describe('terminal web host client', () => {
     socket.emitMessage(
       JSON.stringify({
         type: 'output',
-        event: { ptySessionId: 'pty_1', terminalSessionId: 'terminal_1', data: 'hello', seq: 1, processName: 'zsh' },
+        event: { terminalRuntimeSessionId: 'pty_1', terminalSessionId: 'terminal_1', data: 'hello', seq: 1, processName: 'zsh' },
       }),
     )
     socket.emitMessage(
       JSON.stringify({
         type: 'bell',
         event: {
-          ptySessionId: 'pty_1',
+          terminalRuntimeSessionId: 'pty_1',
           terminalSessionId: 'terminal_1',
           repoRoot: '/tmp/repo',
           worktreePath: '/tmp/repo-worktree',
@@ -664,14 +664,14 @@ describe('terminal web host client', () => {
     socket.emitMessage(
       JSON.stringify({
         type: 'exit',
-        event: { ptySessionId: 'pty_1', terminalSessionId: 'terminal_1' },
+        event: { terminalRuntimeSessionId: 'pty_1', terminalSessionId: 'terminal_1' },
       }),
     )
     socket.emitMessage(
       JSON.stringify({
         type: 'identity',
         event: {
-          ptySessionId: 'pty_1',
+          terminalRuntimeSessionId: 'pty_1',
           terminalSessionId: 'terminal_1',
           controller: null,
           canonicalCols: 100,
@@ -683,7 +683,7 @@ describe('terminal web host client', () => {
       JSON.stringify({
         type: 'lifecycle',
         event: {
-          ptySessionId: 'pty_1',
+          terminalRuntimeSessionId: 'pty_1',
           terminalSessionId: 'terminal_1',
           phase: 'open',
           message: null,
@@ -705,14 +705,14 @@ describe('terminal web host client', () => {
     )
 
     expect(onOutput).toHaveBeenCalledWith({
-      ptySessionId: 'pty_1',
+      terminalRuntimeSessionId: 'pty_1',
       terminalSessionId: 'terminal_1',
       data: 'hello',
       seq: 1,
       processName: 'zsh',
     })
     expect(onBell).toHaveBeenCalledWith({
-      ptySessionId: 'pty_1',
+      terminalRuntimeSessionId: 'pty_1',
       terminalSessionId: 'terminal_1',
       repoRoot: '/tmp/repo',
       worktreePath: '/tmp/repo-worktree',
@@ -720,15 +720,15 @@ describe('terminal web host client', () => {
       canonicalTitle: null,
     })
     expect(onTitle).toHaveBeenCalledWith({
-      ptySessionId: 'pty_1',
+      terminalRuntimeSessionId: 'pty_1',
       terminalSessionId: 'terminal_1',
       repoRoot: '/tmp/repo',
       worktreePath: '/tmp/repo-worktree',
       canonicalTitle: '~/Developer/goblin — npm run dev',
     })
-    expect(onExit).toHaveBeenCalledWith({ ptySessionId: 'pty_1', terminalSessionId: 'terminal_1' })
+    expect(onExit).toHaveBeenCalledWith({ terminalRuntimeSessionId: 'pty_1', terminalSessionId: 'terminal_1' })
     expect(onIdentity).toHaveBeenCalledWith({
-      ptySessionId: 'pty_1',
+      terminalRuntimeSessionId: 'pty_1',
       terminalSessionId: 'terminal_1',
       role: 'unowned',
       controllerStatus: 'none',
@@ -736,7 +736,7 @@ describe('terminal web host client', () => {
       canonicalRows: 30,
     })
     expect(onLifecycle).toHaveBeenCalledWith({
-      ptySessionId: 'pty_1',
+      terminalRuntimeSessionId: 'pty_1',
       terminalSessionId: 'terminal_1',
       phase: 'open',
       message: null,
@@ -862,7 +862,7 @@ describe('terminal web host client', () => {
     socket.emitMessage(
       JSON.stringify({
         type: 'output',
-        event: { ptySessionId: 'pty_1', terminalSessionId: 'terminal_1', data: 'hello', seq: 1, processName: 'zsh' },
+        event: { terminalRuntimeSessionId: 'pty_1', terminalSessionId: 'terminal_1', data: 'hello', seq: 1, processName: 'zsh' },
       }),
     )
 
@@ -924,7 +924,7 @@ describe('terminal web host client', () => {
       JSON.stringify({
         type: 'output',
         event: {
-          ptySessionId: 'term_old',
+          terminalRuntimeSessionId: 'term_old',
           terminalSessionId: 'terminal_old',
           data: 'stale',
           seq: 1,
@@ -936,7 +936,7 @@ describe('terminal web host client', () => {
       JSON.stringify({
         type: 'output',
         event: {
-          ptySessionId: 'term_new',
+          terminalRuntimeSessionId: 'term_new',
           terminalSessionId: 'terminal_new',
           data: 'fresh',
           seq: 2,
@@ -947,7 +947,7 @@ describe('terminal web host client', () => {
 
     expect(onOutput).toHaveBeenCalledTimes(1)
     expect(onOutput).toHaveBeenCalledWith({
-      ptySessionId: 'term_new',
+      terminalRuntimeSessionId: 'term_new',
       terminalSessionId: 'terminal_new',
       data: 'fresh',
       seq: 2,
@@ -1004,7 +1004,7 @@ function terminalCreatePayload(terminalSessionId: string) {
     terminalSessionId,
     tabs: [],
     sessions: [],
-    ptySessionId: 'pty_session_1_aaaaaaaaa',
+    terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
     processName: 'zsh',
     canonicalTitle: null,
     phase: 'open',

@@ -55,7 +55,7 @@ export type TerminalNotifyReason = 'metadata'
 export class TerminalSession {
   descriptor: TerminalDescriptor
   private readonly notify: (reason: TerminalNotifyReason) => void
-  private readonly requestDurableClose: (ptySessionId: string) => Promise<void>
+  private readonly requestDurableClose: (terminalRuntimeSessionId: string) => Promise<void>
   private readonly runtime = new TerminalSessionRuntime()
   private readonly view: TerminalSessionView
   // Authority gate owns the "am I the controller?" cache and the
@@ -73,7 +73,7 @@ export class TerminalSession {
   private pendingOutput: string[] = []
   private pendingWriteBuffer = ''
   private inputFlushScheduled = false
-  private externalCommandGatePtySessionId: string | null = null
+  private externalCommandGateTerminalRuntimeSessionId: string | null = null
   private hasObservedOutputForExternalCommandGate = false
   private queuedExternalCommandInput = ''
   // An empty snapshot string is the "no preload" sentinel — the hydration
@@ -92,7 +92,7 @@ export class TerminalSession {
     // drop the request if the WebSocket was already closing, leaving
     // the server PTY alive and the next create reattaching to the
     // orphan. See `TerminalSessionLifecycleQueues`.
-    requestDurableClose: (ptySessionId: string) => Promise<void> = () => Promise.resolve(),
+    requestDurableClose: (terminalRuntimeSessionId: string) => Promise<void> = () => Promise.resolve(),
   ) {
     this.descriptor = descriptor
     this.notify = notify
@@ -160,15 +160,15 @@ export class TerminalSession {
     this.geometryAbortController = null
     this.clearTerminalFocusIfOwned()
     this.view.blurIfFocused()
-    const ptySessionIds = this.runtime.disposePtySessionIds()
+    const terminalRuntimeSessionIds = this.runtime.disposeTerminalRuntimeSessionIds()
     const closePromises: Promise<void>[] = []
     if (options.closeSession !== false) {
       // Hand the close to the projection's durable queue instead of
       // firing `terminalClient.close` directly. The queue resolves
       // only after the server close settles, so async close callers
       // can use this method as a resource-release barrier.
-      for (const ptySessionId of ptySessionIds) {
-        closePromises.push(this.requestDurableClose(ptySessionId))
+      for (const terminalRuntimeSessionId of terminalRuntimeSessionIds) {
+        closePromises.push(this.requestDurableClose(terminalRuntimeSessionId))
       }
     }
     this.destroyActiveView()
@@ -178,8 +178,8 @@ export class TerminalSession {
 
   async closeServerResourcesAndWait(): Promise<void> {
     if (this.disposed) return
-    const ptySessionIds = this.runtime.ptySessionIdsForClose()
-    await Promise.all(ptySessionIds.map((ptySessionId) => this.requestDurableClose(ptySessionId)))
+    const terminalRuntimeSessionIds = this.runtime.terminalRuntimeSessionIdsForClose()
+    await Promise.all(terminalRuntimeSessionIds.map((terminalRuntimeSessionId) => this.requestDurableClose(terminalRuntimeSessionId)))
   }
 
   snapshot() {
@@ -195,10 +195,10 @@ export class TerminalSession {
   }
 
   writeInput(input: TerminalInput): void {
-    const ptySessionId = this.runtime.currentPtySessionId()
-    if (!ptySessionId || !this.runtime.canSendInput()) return
+    const terminalRuntimeSessionId = this.runtime.currentTerminalRuntimeSessionId()
+    if (!terminalRuntimeSessionId || !this.runtime.canSendInput()) return
     if (this.runtime.isReplaying() && isTerminalEmulatorInput(input)) return
-    if (this.shouldQueueExternalCommandInput(input, ptySessionId)) {
+    if (this.shouldQueueExternalCommandInput(input, terminalRuntimeSessionId)) {
       this.queueExternalCommandInput(input.data)
       return
     }
@@ -217,8 +217,8 @@ export class TerminalSession {
 
   private flushInput(): void {
     if (this.disposed) return
-    const ptySessionId = this.runtime.currentPtySessionId()
-    if (!ptySessionId || !this.runtime.canSendInput()) return
+    const terminalRuntimeSessionId = this.runtime.currentTerminalRuntimeSessionId()
+    if (!terminalRuntimeSessionId || !this.runtime.canSendInput()) return
     const data = this.pendingWriteBuffer
     this.pendingWriteBuffer = ''
     if (!data) return
@@ -236,25 +236,25 @@ export class TerminalSession {
       .then((result) => {
         // Post-dispose guard: the gate's takeover round-trip can
         // resolve after `dispose()` ran, in which case the session no
-        // longer owns this ptySessionId. Drop the write — the
+        // longer owns this terminalRuntimeSessionId. Drop the write — the
         // projection's durable-close queue has already taken
         // responsibility for the actual close.
-        if (this.disposed || this.runtime.currentPtySessionId() !== ptySessionId) return
+        if (this.disposed || this.runtime.currentTerminalRuntimeSessionId() !== terminalRuntimeSessionId) return
         if (result.kind === 'denied') {
-          this.reportGateDenial('write', result.reason, ptySessionId)
+          this.reportGateDenial('write', result.reason, terminalRuntimeSessionId)
           return
         }
-        return terminalClient.write({ ptySessionId, data })
+        return terminalClient.write({ terminalRuntimeSessionId, data })
       })
       .catch((err) => {
-        terminalLog.warn('write failed for session', { ptySessionId, err })
+        terminalLog.warn('write failed for session', { terminalRuntimeSessionId, err })
       })
   }
 
   private flushResize(): void {
-    const ptySessionId = this.runtime.currentPtySessionId()
+    const terminalRuntimeSessionId = this.runtime.currentTerminalRuntimeSessionId()
     const resize = this.pendingResize
-    if (!ptySessionId || !resize) return
+    if (!terminalRuntimeSessionId || !resize) return
     if (!this.runtime.canSendInput()) return
     this.pendingResize = null
     const { cols, rows } = resize
@@ -271,23 +271,23 @@ export class TerminalSession {
       .then((result) => {
         // Post-dispose guard: see `flushInput` for the same
         // race. Without this, a resize queued before `dispose()`
-        // could land on a torn-down session's ptySessionId and the
+        // could land on a torn-down session's terminalRuntimeSessionId and the
         // server would echo the resize back to whichever sibling
         // tab is now the controller.
-        if (this.disposed || this.runtime.currentPtySessionId() !== ptySessionId) return
+        if (this.disposed || this.runtime.currentTerminalRuntimeSessionId() !== terminalRuntimeSessionId) return
         if (result.kind === 'denied') {
-          this.reportGateDenial('resize', result.reason, ptySessionId)
+          this.reportGateDenial('resize', result.reason, terminalRuntimeSessionId)
           return
         }
-        return terminalClient.resize({ ptySessionId, cols, rows }).then((ok) => {
-          if (ok && this.runtime.currentPtySessionId() === ptySessionId) this.runtime.acknowledgeResize(cols, rows)
+        return terminalClient.resize({ terminalRuntimeSessionId, cols, rows }).then((ok) => {
+          if (ok && this.runtime.currentTerminalRuntimeSessionId() === terminalRuntimeSessionId) this.runtime.acknowledgeResize(cols, rows)
         })
       })
       .catch((err) => {
         // Resize rejection leaves the view stuck at the old geometry —
         // surface the failure so ops can correlate with server-side
         // validation rejections (size out of range, lost controller, etc.).
-        terminalLog.warn('resize failed for session', { ptySessionId, cols, rows, err })
+        terminalLog.warn('resize failed for session', { terminalRuntimeSessionId, cols, rows, err })
       })
   }
 
@@ -301,9 +301,9 @@ export class TerminalSession {
   private reportGateDenial(
     action: 'write' | 'resize' | 'takeover',
     reason: AuthorizationDenialReason,
-    ptySessionId: string,
+    terminalRuntimeSessionId: string,
   ): void {
-    terminalLog.warn(`${action} denied by authority gate`, { ptySessionId, reason })
+    terminalLog.warn(`${action} denied by authority gate`, { terminalRuntimeSessionId, reason })
     const key = WRITE_BLOCKED_KEY_BY_REASON[reason]
     if (!key) return
     toast.warning(t(key))
@@ -330,8 +330,8 @@ export class TerminalSession {
     this.view.scrollLines(amount)
   }
 
-  currentPtySessionId(): string | null {
-    return this.runtime.currentPtySessionId()
+  currentTerminalRuntimeSessionId(): string | null {
+    return this.runtime.currentTerminalRuntimeSessionId()
   }
 
   /**
@@ -345,7 +345,7 @@ export class TerminalSession {
     if (!this.authorityGate) {
       this.authorityGate = createXtermAuthorityGate({
         bridge: terminalClient,
-        getPtySessionId: () => this.runtime.currentPtySessionId(),
+        getTerminalRuntimeSessionId: () => this.runtime.currentTerminalRuntimeSessionId(),
         resolveSize: async () => {
           // Prefer the live xterm size — the takeover round-trip
           // resizes the PTY to match the new controller's geometry.
@@ -356,7 +356,7 @@ export class TerminalSession {
           // xterm's own cols/rows above become authoritative.
           return this.runtime.currentCanonicalSize()
         },
-        isSessionAlive: (ptySessionId) => !this.disposed && this.runtime.currentPtySessionId() === ptySessionId,
+        isSessionAlive: (terminalRuntimeSessionId) => !this.disposed && this.runtime.currentTerminalRuntimeSessionId() === terminalRuntimeSessionId,
         onPromoted: (result) => {
           // Mirror the runtime's `applyTakeover` so the new
           // controller's view (cols/rows/phase) is applied
@@ -370,10 +370,10 @@ export class TerminalSession {
   }
 
   hydrate(input: TerminalSessionHydrationInput): void {
-    const previousPtySessionId = this.runtime.currentPtySessionId()
+    const previousTerminalRuntimeSessionId = this.runtime.currentTerminalRuntimeSessionId()
     this.hydratedSnapshot = { snapshot: input.snapshot, snapshotSeq: input.snapshotSeq }
     const changed = this.runtime.hydrateRepoSession({
-      ptySessionId: input.ptySessionId,
+      terminalRuntimeSessionId: input.terminalRuntimeSessionId,
       phase: input.phase,
       message: input.message,
       processName: input.processName,
@@ -383,13 +383,13 @@ export class TerminalSession {
       canonicalCols: input.canonicalCols,
       canonicalRows: input.canonicalRows,
     })
-    this.syncExternalCommandGate(input.ptySessionId, terminalSnapshotHasOutput(input.snapshot, input.snapshotSeq))
+    this.syncExternalCommandGate(input.terminalRuntimeSessionId, terminalSnapshotHasOutput(input.snapshot, input.snapshotSeq))
     // Keep the write-side authority cache aligned with hydration.
     if (changed) this.authority().setRole(input.role)
     if (changed && input.phase === 'open' && input.role === 'unowned' && this.view.isConnected()) {
       this.start()
     }
-    if (previousPtySessionId && previousPtySessionId !== input.ptySessionId) this.applyHydratedSnapshotToActiveView()
+    if (previousTerminalRuntimeSessionId && previousTerminalRuntimeSessionId !== input.terminalRuntimeSessionId) this.applyHydratedSnapshotToActiveView()
     if (changed) this.notify('metadata')
   }
 
@@ -398,7 +398,7 @@ export class TerminalSession {
     if (result.changed) this.notify('metadata')
     if (result.output && this.runtime.isController()) {
       this.queueOutput(result.output)
-      this.markExternalCommandGateOutputObserved(event.ptySessionId)
+      this.markExternalCommandGateOutputObserved(event.terminalRuntimeSessionId)
     }
   }
 
@@ -492,8 +492,8 @@ export class TerminalSession {
   }
 
   async takeover(): Promise<boolean> {
-    const ptySessionId = this.runtime.currentPtySessionId()
-    if (!ptySessionId) return false
+    const terminalRuntimeSessionId = this.runtime.currentTerminalRuntimeSessionId()
+    if (!terminalRuntimeSessionId) return false
     // Capture the role BEFORE the gate calls applyTakeover — the
     // post-takeover check below needs to fire `ensureControllerViewStarted`
     // when the caller was a viewer and is now a controller. Reading
@@ -525,7 +525,7 @@ export class TerminalSession {
       // observable. Without this, the 接管 button click appears
       // to do nothing on a session-unknown or client-offline
       // condition.
-      if (ptySessionId) this.reportGateDenial('takeover', result.reason, ptySessionId)
+      if (terminalRuntimeSessionId) this.reportGateDenial('takeover', result.reason, terminalRuntimeSessionId)
     }
     return ok
   }
@@ -563,7 +563,7 @@ export class TerminalSession {
         const changed = this.runtime.applyAttachResult(result, { cols: term.cols, rows: term.rows })
         // Sync the gate so writes/resizes that race the next identity
         // event use the correct role. The first-frame payload is
-        // authoritative for the new ptySessionId, so a successful
+        // authoritative for the new terminalRuntimeSessionId, so a successful
         // attach always lands here before any keystroke.
         this.authority().setRole(result.role)
         this.destroyActiveView()
@@ -655,18 +655,18 @@ export class TerminalSession {
 
   private async ipcPhase(epoch: number, term: XTermTerminal): Promise<TerminalAttachResultWithController> {
     const restart = this.runtime.consumeRestartFlag()
-    const ptySessionId = restart ? this.runtime.restartingPtySessionId() : this.runtime.currentPtySessionId()
-    if (!ptySessionId) {
+    const terminalRuntimeSessionId = restart ? this.runtime.restartingTerminalRuntimeSessionId() : this.runtime.currentTerminalRuntimeSessionId()
+    if (!terminalRuntimeSessionId) {
       this.destroyActiveView()
       if (this.runtime.failAttachAttempt('error.invalid-arguments')) this.notify('metadata')
       throw new StartCancelledError()
     }
     const result = restart
-      ? await terminalClient.restart(this.terminalRestartInput(ptySessionId, term))
-      : await terminalClient.attach(this.terminalAttachInput(ptySessionId, term))
+      ? await terminalClient.restart(this.terminalRestartInput(terminalRuntimeSessionId, term))
+      : await terminalClient.attach(this.terminalAttachInput(terminalRuntimeSessionId, term))
     if (this.disposed || this.startEpoch !== epoch || this.view.currentTerminal() !== term) {
       if (this.disposed) {
-        if (result.ok) void this.requestDurableClose(result.ptySessionId).catch(() => {})
+        if (result.ok) void this.requestDurableClose(result.terminalRuntimeSessionId).catch(() => {})
         else this.closeRestartBaseSession()
       } else {
         this.absorbDetachedIpcResult(result, { cols: term.cols, rows: term.rows }, { restart })
@@ -700,7 +700,7 @@ export class TerminalSession {
     }
     const projected = this.withLocalController(result)
     const changed = this.runtime.applyAttachResult(projected, fallbackSize)
-    this.syncExternalCommandGate(projected.ptySessionId, terminalSnapshotHasOutput(projected.snapshot, projected.snapshotSeq))
+    this.syncExternalCommandGate(projected.terminalRuntimeSessionId, terminalSnapshotHasOutput(projected.snapshot, projected.snapshotSeq))
     this.authority().setRole(projected.role)
     if (changed) this.notify('metadata')
   }
@@ -711,7 +711,7 @@ export class TerminalSession {
     result: TerminalAttachResultWithController,
   ): Promise<boolean> {
     const changed = this.runtime.applyAttachResult(result, { cols: term.cols, rows: term.rows })
-    this.syncExternalCommandGate(result.ptySessionId, terminalSnapshotHasOutput(result.snapshot, result.snapshotSeq))
+    this.syncExternalCommandGate(result.terminalRuntimeSessionId, terminalSnapshotHasOutput(result.snapshot, result.snapshotSeq))
     // Sync the gate. Without this, a controller→unowned→recreate
     // cycle leaves the gate at 'viewer' even though the runtime
     // already reflects 'controller', and the next write would
@@ -742,17 +742,17 @@ export class TerminalSession {
     }
   }
 
-  private terminalAttachInput(ptySessionId: string, term: XTermTerminal): TerminalAttachInput {
+  private terminalAttachInput(terminalRuntimeSessionId: string, term: XTermTerminal): TerminalAttachInput {
     return {
-      ptySessionId,
+      terminalRuntimeSessionId,
       cols: term.cols,
       rows: term.rows,
     }
   }
 
-  private terminalRestartInput(ptySessionId: string, term: XTermTerminal): TerminalRestartInput {
+  private terminalRestartInput(terminalRuntimeSessionId: string, term: XTermTerminal): TerminalRestartInput {
     return {
-      ptySessionId,
+      terminalRuntimeSessionId,
       cols: term.cols,
       rows: term.rows,
     }
@@ -791,7 +791,7 @@ export class TerminalSession {
       if (hydratedSnapshot.snapshot) await termWrite(term, hydratedSnapshot.snapshot)
       // Post-await dispose guard: `termWrite` may have resolved
       // after `dispose()` ran (the session is no longer the current
-      // controller of this ptySessionId, the term is destroyed, and any
+      // controller of this terminalRuntimeSessionId, the term is destroyed, and any
       // `term.write` callback would land on a freed term and throw
       // an unhandled-rejection). Drop the replay window before
       // letting the callback path touch anything.
@@ -869,7 +869,7 @@ export class TerminalSession {
   }
 
   private queueResize(cols: number, rows: number): void {
-    if (!this.runtime.currentPtySessionId() || !this.runtime.canSendInput()) return
+    if (!this.runtime.currentTerminalRuntimeSessionId() || !this.runtime.canSendInput()) return
     const canonicalSize = this.runtime.currentCanonicalSize()
     if (canonicalSize.cols === cols && canonicalSize.rows === rows && !this.pendingResize) return
     this.pendingResize = { cols, rows }
@@ -911,10 +911,10 @@ export class TerminalSession {
     this.view.currentTerminal()?.write(output)
   }
 
-  private shouldQueueExternalCommandInput(input: TerminalInput, ptySessionId: string): boolean {
+  private shouldQueueExternalCommandInput(input: TerminalInput, terminalRuntimeSessionId: string): boolean {
     return (
       isExternalCommandInput(input) &&
-      this.externalCommandGatePtySessionId === ptySessionId &&
+      this.externalCommandGateTerminalRuntimeSessionId === terminalRuntimeSessionId &&
       !this.hasObservedOutputForExternalCommandGate
     )
   }
@@ -924,16 +924,16 @@ export class TerminalSession {
     this.queuedExternalCommandInput += data
   }
 
-  private syncExternalCommandGate(ptySessionId: string, hasObservedOutput: boolean): void {
-    if (this.externalCommandGatePtySessionId !== ptySessionId) {
+  private syncExternalCommandGate(terminalRuntimeSessionId: string, hasObservedOutput: boolean): void {
+    if (this.externalCommandGateTerminalRuntimeSessionId !== terminalRuntimeSessionId) {
       this.clearExternalCommandGate()
-      this.externalCommandGatePtySessionId = ptySessionId
+      this.externalCommandGateTerminalRuntimeSessionId = terminalRuntimeSessionId
     }
-    if (hasObservedOutput) this.markExternalCommandGateOutputObserved(ptySessionId)
+    if (hasObservedOutput) this.markExternalCommandGateOutputObserved(terminalRuntimeSessionId)
   }
 
-  private markExternalCommandGateOutputObserved(ptySessionId: string): void {
-    if (this.externalCommandGatePtySessionId !== ptySessionId) return
+  private markExternalCommandGateOutputObserved(terminalRuntimeSessionId: string): void {
+    if (this.externalCommandGateTerminalRuntimeSessionId !== terminalRuntimeSessionId) return
     if (this.hasObservedOutputForExternalCommandGate) return
     this.hasObservedOutputForExternalCommandGate = true
     this.flushQueuedExternalCommandInput()
@@ -948,7 +948,7 @@ export class TerminalSession {
   }
 
   private clearExternalCommandGate(): void {
-    this.externalCommandGatePtySessionId = null
+    this.externalCommandGateTerminalRuntimeSessionId = null
     this.hasObservedOutputForExternalCommandGate = false
     this.queuedExternalCommandInput = ''
   }
@@ -1016,8 +1016,8 @@ export class TerminalSession {
   }
 
   private closeRestartBaseSession(): void {
-    const ptySessionId = this.runtime.takeRestartBasePtySessionIdForClose()
-    if (ptySessionId) void this.requestDurableClose(ptySessionId).catch(() => {})
+    const terminalRuntimeSessionId = this.runtime.takePendingRestartTerminalRuntimeSessionIdForClose()
+    if (terminalRuntimeSessionId) void this.requestDurableClose(terminalRuntimeSessionId).catch(() => {})
   }
 }
 

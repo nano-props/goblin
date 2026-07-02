@@ -123,7 +123,7 @@ work is related but separate.
 ## P1.8: Make create deliver an atomic first frame (completed)
 
 **Status: completed.** `create` now returns the full first-frame
-payload (`ptySessionId`, `snapshot`, `snapshotSeq`, process metadata,
+payload (`terminalRuntimeSessionId`, `snapshot`, `snapshotSeq`, process metadata,
 geometry, and controller info) directly. `TerminalCreateResult`
 intersects with `TerminalFirstFrame` at the type level, and the client
 hydrates from the response without a follow-up snapshot fetch.
