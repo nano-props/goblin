@@ -19,6 +19,7 @@ import { NativeHostProjectionSchema } from '#/shared/native-host-projection.ts'
 import { RepoTreePrefixSchema } from '#/shared/repo-tree-schema.ts'
 import { GIT_HASH_RE } from '#/shared/git-types.ts'
 import { WORKTREE_BOOTSTRAP_CONFIG_HASH_RE } from '#/shared/repo-settings.ts'
+import { OPAQUE_ID_RE } from '#/shared/opaque-id.ts'
 
 const SourceToken = v.optional(v.string())
 const StringArray = v.array(v.string())
@@ -55,6 +56,11 @@ const RepoSessionEntrySchema = v.variant('kind', [
   v.object({ kind: v.literal('local'), id: v.string() }),
   v.object({ kind: v.literal('remote'), id: v.string(), ref: RemoteRepoRefSchema }),
 ])
+const RepoRuntimeOpenSchema = v.union([v.object({ repoRoot: v.string() }), v.object({ repoInput: v.string() })])
+const RepoRuntimeCloseSchema = v.object({
+  repoRoot: v.string(),
+  repoInstanceId: v.pipe(v.string(), v.regex(OPAQUE_ID_RE)),
+})
 
 export const REPO_PROCEDURE_SCHEMAS = {
   // Action endpoints — POST with a JSON body.
@@ -111,6 +117,8 @@ export const REPO_PROCEDURE_SCHEMAS = {
   openEditor: v.object({ path: v.string(), app: EditorAppSchema }),
   openInFinder: v.object({ path: v.string() }),
   backgroundSyncRepos: v.object({ repoIds: StringArray }),
+  runtimeOpen: RepoRuntimeOpenSchema,
+  runtimeClose: RepoRuntimeCloseSchema,
   abort: CwdInput,
   probe: CwdInput,
   snapshot: CwdInput,
