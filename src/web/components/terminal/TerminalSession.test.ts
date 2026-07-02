@@ -1089,6 +1089,30 @@ describe('TerminalSession', () => {
     expect(terminalCalls.attach).toHaveBeenCalledTimes(1)
   })
 
+  test('keeps the server session addressable when restart fails', async () => {
+    terminalCalls.restart.mockResolvedValueOnce({ ok: false, message: 'error.spawn-failed' })
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const durableClose = vi.fn(async () => {})
+    const session = new TerminalSession(descriptor, vi.fn(), durableClose)
+    hydrateManagedSession(session)
+    session.attach(host)
+    await flushTerminalStart()
+
+    session.restart()
+    await flushTerminalStart()
+
+    expect(session.currentPtySessionId()).toBe('pty_session_1_aaaaaaaaa')
+    expect(session.snapshot()).toEqual({
+      phase: 'error',
+      message: 'error.spawn-failed',
+      processName: 'zsh',
+      canonicalTitle: null,
+    })
+    expect(durableClose).not.toHaveBeenCalled()
+    expect(terminalCalls.close).not.toHaveBeenCalled()
+  })
+
   test('enters error state when terminal attach fails', async () => {
     terminalCalls.attach.mockResolvedValueOnce({ ok: false, message: 'error.spawn-failed' })
     const host = document.createElement('div')

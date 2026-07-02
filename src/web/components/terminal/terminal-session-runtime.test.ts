@@ -33,7 +33,7 @@ describe('TerminalSessionRuntime', () => {
     expect(runtime.phase()).toBe('restarting')
     expect(runtime.snapshot().attachment).toBeUndefined()
     expect(runtime.consumeRestartFlag()).toBe(true)
-    expect(runtime.closeReplacingPtySessionId()).toBe('pty_session_1_aaaaaaaaa')
+    expect(runtime.takeRestartBasePtySessionIdForClose()).toBe('pty_session_1_aaaaaaaaa')
   })
 
   test('routes output, identity, replay, and takeover through runtime state', () => {

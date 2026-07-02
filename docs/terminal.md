@@ -14,7 +14,9 @@ Use this doc for the terminal system design.
 
 The terminal feature is built around four different concepts:
 
-- **Session**: the long-lived shell process and its server-owned lifecycle.
+- **Session**: the long-lived server business object for a terminal and
+  its lifecycle. It may temporarily have no live PTY handle, for example
+  while opening, restarting, or after a restart failure.
 - **Attachment**: one client attachment to a session.
 - **Controller**: the attachment that currently has write and resize authority.
 - **View**: one local xterm instance that renders a session in a particular UI surface.
@@ -143,18 +145,37 @@ Repo routes and server-side repo write paths should not know about Workspace Pan
 
 ## Identity model
 
-The terminal system relies on five identity/grouping scopes:
+The terminal system relies on these identity/grouping scopes:
 
 - **userId**: the server-side terminal user derived from the authenticated access token. Session visibility, lifecycle cleanup, and realtime fanout are partitioned by this id.
 - **clientId**: the logical client for one browser tab or Electron client. It validates and routes requests and is also the code-level controller identity (`TerminalController.clientId`).
 - **terminalSessionId**: the server-allocated persistent identity for one terminal business session. Terminal workspace-pane tabs use this value directly as their durable terminal tab identity.
 - **terminalWorktreeKey**: the repo/worktree grouping key produced by `formatTerminalWorktreeKey(repoRoot, worktreePath)`. It is used for per-worktree selection, tab-strip grouping, bell/activity summaries, and materialization callbacks. It is not a terminal identity.
-- **ptySessionId**: the server-owned runtime identifier for the current live PTY associated with a terminal session. Restart/reconnect can change PTY runtime state without changing `terminalSessionId`.
+- **ptySessionId**: the server-owned runtime lookup id used by attach,
+  write, resize, restart, close, and realtime messages. Despite the
+  historical name, it is not a guarantee that a live OS PTY handle exists
+  at that instant; `phase` and server PTY binding state determine whether
+  the session is interactive. A restart failure keeps the same
+  `ptySessionId` addressable in `phase: 'error'` so the session can be
+  retried without changing `terminalSessionId`.
 - **terminal attachment**: the conceptual relationship between a `clientId` and a terminal session. There is intentionally no separate `attachmentId` field, and none is planned. One client should have at most one Terminal View for a given `terminalSessionId`; cross-client viewing/control is modeled with `clientId`, controller/viewer state, and explicit takeover.
 
 This means terminal identity is not encoded from repo/worktree strings. Repo and worktree location travel as explicit fields on session summaries and as `terminalWorktreeKey` only where a grouped lookup is needed.
 
 This identity model is the basis for reconnect, mirror mode, controller handoff, and multi-window coherence.
+
+Keep the naming boundary explicit:
+
+- `terminalSessionId` is the durable product/session identity used by tabs.
+- `ptySessionId` is the server runtime lookup identity for terminal
+  operations and events.
+- A PTY handle is the lower-level supervisor resource. It may be absent
+  while the runtime session still exists, notably during `opening`,
+  `restarting`, or `error`.
+
+Do not infer liveness from `ptySessionId` alone. Use the session phase and
+server authority checks (`hasPty`, controller role, and operation-specific
+guards) to decide whether writes/resizes are allowed.
 
 ## Control and takeover
 

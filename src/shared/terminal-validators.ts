@@ -7,6 +7,7 @@ import type {
 } from '#/shared/terminal-socket.ts'
 import type {
   TerminalControllerStatus,
+  TerminalCreateResult,
   TerminalNotifyBellInput,
   TerminalSessionPhase,
   TerminalSessionSummary,
@@ -147,6 +148,32 @@ const TerminalSessionSummarySchema = v.object({
   cols: v.number(),
   rows: v.number(),
 })
+const TerminalFirstFrameSchemaEntries = {
+  ptySessionId: TerminalPtySessionIdSchema,
+  processName: v.string(),
+  canonicalTitle: v.nullable(v.string()),
+  phase: v.picklist(TERMINAL_SESSION_PHASE_VALUES),
+  message: v.nullable(v.string()),
+  snapshot: v.string(),
+  snapshotSeq: v.number(),
+  controller: v.nullable(TerminalControllerSchema),
+  canonicalCols: TerminalColsSchema,
+  canonicalRows: TerminalRowsSchema,
+}
+const TerminalCreateResultSchema = v.variant('ok', [
+  v.object({
+    ok: v.literal(true),
+    action: v.picklist(['created', 'restored', 'reused']),
+    terminalSessionId: v.string(),
+    tabs: v.array(WorkspacePaneTabEntrySchema),
+    sessions: v.array(TerminalSessionSummarySchema),
+    ...TerminalFirstFrameSchemaEntries,
+  }),
+  v.object({
+    ok: v.literal(false),
+    message: v.string(),
+  }),
+])
 const TerminalOutputEventSchema = v.object({
   ptySessionId: v.string(),
   data: v.string(),
@@ -393,6 +420,11 @@ export function isValidTerminalTestNotificationInput(value: unknown): value is T
 
 export function normalizeTerminalSessionSummaryList(value: unknown): TerminalSessionSummary[] | null {
   const parsed = v.safeParse(v.array(TerminalSessionSummarySchema), value)
+  return parsed.success ? parsed.output : null
+}
+
+export function normalizeTerminalCreateResult(value: unknown): TerminalCreateResult | null {
+  const parsed = v.safeParse(TerminalCreateResultSchema, value)
   return parsed.success ? parsed.output : null
 }
 

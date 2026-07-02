@@ -52,7 +52,7 @@ export function projectCreateResultForClient(
   const serverSessions = result.sessions.map((session) => {
     if (session.terminalSessionId !== result.terminalSessionId) return session
     sawTarget = true
-    return targetSession
+    return createSessionSummaryFromCreate(base, result, session)
   })
   if (!sawTarget) serverSessions.push(targetSession)
   return {
@@ -104,13 +104,14 @@ export function projectServerTerminalSession(input: {
 function createSessionSummaryFromCreate(
   base: TerminalSessionBase,
   result: Extract<TerminalCreateResult, { ok: true }>,
+  serverSession?: ServerTerminalSessionSummary,
 ): ServerTerminalSessionSummary {
   return {
     ptySessionId: result.ptySessionId,
     terminalSessionId: result.terminalSessionId,
-    repoRoot: base.repoRoot,
-    worktreePath: base.worktreePath,
-    cwd: base.worktreePath,
+    repoRoot: serverSession?.repoRoot ?? base.repoRoot,
+    worktreePath: serverSession?.worktreePath ?? base.worktreePath,
+    cwd: serverSession?.cwd ?? serverSession?.worktreePath ?? base.worktreePath,
     controller: result.controller,
     processName: result.processName,
     canonicalTitle: result.canonicalTitle,

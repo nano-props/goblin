@@ -213,10 +213,7 @@ describe('terminal web host bridge', () => {
         ok: true,
         action: 'create',
         payload: {
-          ok: true,
-          action: 'created',
-          terminalSessionId: 'session-1',
-          sessions: [],
+          ...terminalCreatePayload('session-1'),
         },
       }),
     )
@@ -526,7 +523,7 @@ describe('terminal web host bridge', () => {
     }
   })
 
-  test('does not fall back to http when create/list/snapshot/prune websocket payloads resolve successfully', async () => {
+  test('does not fall back to http when create/list/prune websocket payloads resolve successfully', async () => {
     const fetchMock = mockFetch()
     const { terminalBridge } = await import('#/web/terminal.ts')
     const dispose = terminalBridge.onOutput(() => {})
@@ -548,11 +545,40 @@ describe('terminal web host bridge', () => {
         requestId: createRequest?.requestId,
         ok: true,
         action: 'create',
-        payload: { ok: true, action: 'created', terminalSessionId: 'session-1', sessions: [] },
+        payload: terminalCreatePayload('session-1'),
       }),
     )
     await expect(createPromise).resolves.toMatchObject({ ok: true, terminalSessionId: 'session-1' })
     expect(fetchMock).not.toHaveBeenCalled()
+    dispose()
+  })
+
+  test('rejects invalid create websocket payloads at the bridge boundary', async () => {
+    const { terminalBridge } = await import('#/web/terminal.ts')
+    const dispose = terminalBridge.onOutput(() => {})
+    const socket = wsMock.instances[0]
+    const createPromise = terminalBridge.create({
+      repoRoot: '/tmp/repo',
+      branch: 'feature',
+      worktreePath: '/tmp/repo',
+      kind: 'primary',
+    })
+    socket?.emitOpen()
+    await Promise.resolve()
+    const createRequest = socket?.sent
+      .map((payload) => JSON.parse(payload))
+      .find((message) => message.action === 'create')
+    socket?.emitMessage(
+      JSON.stringify({
+        type: 'response',
+        requestId: createRequest?.requestId,
+        ok: true,
+        action: 'create',
+        payload: { ok: true, action: 'created', terminalSessionId: 'session-1', tabs: [], sessions: [] },
+      }),
+    )
+
+    await expect(createPromise).rejects.toThrow('invalid terminal create response')
     dispose()
   })
 
@@ -813,7 +839,7 @@ describe('terminal web host bridge', () => {
         requestId: request?.requestId,
         ok: true,
         action: 'create',
-        payload: { ok: true, action: 'created', terminalSessionId: 'session-1', sessions: [] },
+        payload: terminalCreatePayload('session-1'),
       }),
     )
 
@@ -893,3 +919,23 @@ describe('terminal web host bridge', () => {
     resetClientLocalEventsForTests()
   })
 })
+
+function terminalCreatePayload(terminalSessionId: string) {
+  return {
+    ok: true,
+    action: 'created',
+    terminalSessionId,
+    tabs: [],
+    sessions: [],
+    ptySessionId: 'pty_session_1_aaaaaaaaa',
+    processName: 'zsh',
+    canonicalTitle: null,
+    phase: 'open',
+    message: null,
+    snapshot: '',
+    snapshotSeq: 0,
+    controller: { clientId: 'client_a', status: 'connected' },
+    canonicalCols: 120,
+    canonicalRows: 40,
+  }
+}

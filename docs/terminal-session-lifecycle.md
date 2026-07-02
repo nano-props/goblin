@@ -176,6 +176,26 @@ runtime crash.
    "missing ptySessionId" check stays as a belt-and-suspenders guard
    against `unknown`/JSON-blob shapes arriving from the bridge layer.
 
+### `ptySessionId` is an addressable runtime id, not a live-handle proof
+
+The `ptySessionId` wire field is historical terminology. In the
+server-first model it is the runtime session lookup id used by attach,
+write, resize, restart, close, and realtime messages. It must not be read
+as "there is definitely a live PTY handle right now".
+
+That distinction matters most on restart failure:
+
+- the server keeps the terminal session addressable;
+- the session moves to `phase: 'error'`;
+- the `ptySessionId` remains the id to retry with;
+- writes and resizes are still rejected because the server checks phase,
+  controller authority, and PTY binding state before touching a PTY.
+
+The durable identity for a terminal tab is still `terminalSessionId`.
+The lower-level live resource is the supervisor PTY handle. Keeping these
+three concepts separate prevents restart failures from accidentally
+turning into session deletion.
+
 ---
 
 ## R1: Durable close

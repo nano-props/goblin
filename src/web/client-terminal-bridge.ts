@@ -1,4 +1,8 @@
-import { normalizeTerminalSessionSummaryList, normalizeWorkspacePaneTabsEntryList } from '#/shared/terminal-validators.ts'
+import {
+  normalizeTerminalCreateResult,
+  normalizeTerminalSessionSummaryList,
+  normalizeWorkspacePaneTabsEntryList,
+} from '#/shared/terminal-validators.ts'
 import { resolveTerminalController } from '#/shared/terminal-controller.ts'
 import type { TerminalRealtimeMessage } from '#/shared/terminal-socket.ts'
 import type {
@@ -63,7 +67,11 @@ export function createServerTerminalBridge(options: {
       return connection.request('close', input)
     },
     create(input) {
-      return connection.request('create', input satisfies TerminalCreateInput)
+      return connection.request('create', input satisfies TerminalCreateInput).then((value) => {
+        const result = normalizeTerminalCreateResult(value)
+        if (!result) throw new Error('Terminal socket response failed: invalid terminal create response')
+        return result
+      })
     },
     replaceWorkspaceTabs(input) {
       return connection.request('replace-tabs', input)

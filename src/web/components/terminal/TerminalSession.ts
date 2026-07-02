@@ -581,7 +581,7 @@ export class TerminalSession {
         if (preloadReplayGeneration !== null) this.runtime.drainReplay(preloadReplayGeneration)
         return
       }
-      this.closeReplacingPtySession()
+      this.closeRestartBaseSession()
       if (!this.currentToken(token)) return
       this.destroyActiveView()
       if (this.runtime.failRuntime(err instanceof Error ? err.message : String(err))) this.notify('metadata')
@@ -667,27 +667,35 @@ export class TerminalSession {
     if (this.disposed || this.startToken !== token || this.view.currentTerminal() !== term) {
       if (this.disposed) {
         if (result.ok) void this.requestDurableClose(result.ptySessionId).catch(() => {})
-        else this.closeReplacingPtySession()
+        else this.closeRestartBaseSession()
       } else {
-        this.absorbDetachedIpcResult(result, { cols: term.cols, rows: term.rows })
+        this.absorbDetachedIpcResult(result, { cols: term.cols, rows: term.rows }, { restart })
       }
       throw new StartCancelledError()
     }
     this.runtime.settleStartAttempt()
     if (!result.ok) {
-      this.closeReplacingPtySession()
       this.destroyActiveView()
-      if (this.runtime.failAttachAttempt(result.message)) this.notify('metadata')
+      const changed = restart
+        ? this.runtime.failRestartAttempt(result.message)
+        : this.runtime.failAttachAttempt(result.message)
+      if (changed) this.notify('metadata')
       throw new StartCancelledError()
     }
     return this.withLocalController(result)
   }
 
-  private absorbDetachedIpcResult(result: TerminalAttachResult, fallbackSize: { cols: number; rows: number }): void {
+  private absorbDetachedIpcResult(
+    result: TerminalAttachResult,
+    fallbackSize: { cols: number; rows: number },
+    options: { restart: boolean },
+  ): void {
     this.runtime.settleStartAttempt()
     if (!result.ok) {
-      this.closeReplacingPtySession()
-      if (this.runtime.failAttachAttempt(result.message)) this.notify('metadata')
+      const changed = options.restart
+        ? this.runtime.failRestartAttempt(result.message)
+        : this.runtime.failAttachAttempt(result.message)
+      if (changed) this.notify('metadata')
       return
     }
     const projected = this.withLocalController(result)
@@ -1007,9 +1015,9 @@ export class TerminalSession {
     if (this.isTerminalFocusTarget(document.activeElement)) setTerminalFocused(false)
   }
 
-  private closeReplacingPtySession(): void {
-    const ptySessionId = this.runtime.closeReplacingPtySessionId()
-    if (ptySessionId) void terminalBridge.close({ ptySessionId }).catch(() => {})
+  private closeRestartBaseSession(): void {
+    const ptySessionId = this.runtime.takeRestartBasePtySessionIdForClose()
+    if (ptySessionId) void this.requestDurableClose(ptySessionId).catch(() => {})
   }
 }
 

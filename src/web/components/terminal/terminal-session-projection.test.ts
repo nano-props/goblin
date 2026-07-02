@@ -169,9 +169,9 @@ describe('terminal session projection helpers', () => {
     const existingSession = {
       ptySessionId: 'pty_session_123_aaaaaaaaa',
       terminalSessionId: 'session-1',
-      repoRoot: REPO_ROOT,
-      worktreePath: WORKTREE_PATH,
-      cwd: WORKTREE_PATH,
+      repoRoot: '/server/repo',
+      worktreePath: '/server/repo/worktree',
+      cwd: '/server/repo/worktree/subdir',
       controller: { clientId: 'client_a', status: 'connected' as const },
       processName: 'old-shell',
       canonicalTitle: 'old title',
@@ -205,6 +205,8 @@ describe('terminal session projection helpers', () => {
     expect(projected.serverSessions).toEqual([
       {
         ...existingSession,
+        ptySessionId: 'pty_session_123_aaaaaaaaa',
+        terminalSessionId: 'session-1',
         processName: 'new-shell',
         canonicalTitle: 'new title',
         phase: 'open',
