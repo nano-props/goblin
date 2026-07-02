@@ -128,6 +128,7 @@ describe('terminal web host bridge', () => {
         type: 'identity',
         event: {
           ptySessionId: 'pty_1',
+          terminalSessionId: 'terminal_1',
           controller: { clientId: 'client_sharedterminal', status: 'connected' },
           canonicalCols: 100,
           canonicalRows: 30,
@@ -138,6 +139,7 @@ describe('terminal web host bridge', () => {
     expect(socket.url).toContain('clientId=client_sharedterminal')
     expect(onIdentity).toHaveBeenCalledWith({
       ptySessionId: 'pty_1',
+      terminalSessionId: 'terminal_1',
       role: 'controller',
       controllerStatus: 'connected',
       canonicalCols: 100,
@@ -607,13 +609,19 @@ describe('terminal web host bridge', () => {
     socket.emitMessage(
       JSON.stringify({
         type: 'title',
-        event: { ptySessionId: 'pty_1', canonicalTitle: '~/Developer/goblin — npm run dev' },
+        event: {
+          ptySessionId: 'pty_1',
+          terminalSessionId: 'terminal_1',
+          repoRoot: '/tmp/repo',
+          worktreePath: '/tmp/repo-worktree',
+          canonicalTitle: '~/Developer/goblin — npm run dev',
+        },
       }),
     )
     socket.emitMessage(
       JSON.stringify({
         type: 'output',
-        event: { ptySessionId: 'pty_1', data: 'hello', seq: 1, processName: 'zsh' },
+        event: { ptySessionId: 'pty_1', terminalSessionId: 'terminal_1', data: 'hello', seq: 1, processName: 'zsh' },
       }),
     )
     socket.emitMessage(
@@ -632,19 +640,31 @@ describe('terminal web host bridge', () => {
     socket.emitMessage(
       JSON.stringify({
         type: 'exit',
-        event: { ptySessionId: 'pty_1' },
+        event: { ptySessionId: 'pty_1', terminalSessionId: 'terminal_1' },
       }),
     )
     socket.emitMessage(
       JSON.stringify({
         type: 'identity',
-        event: { ptySessionId: 'pty_1', controller: null, canonicalCols: 100, canonicalRows: 30 },
+        event: {
+          ptySessionId: 'pty_1',
+          terminalSessionId: 'terminal_1',
+          controller: null,
+          canonicalCols: 100,
+          canonicalRows: 30,
+        },
       }),
     )
     socket.emitMessage(
       JSON.stringify({
         type: 'lifecycle',
-        event: { ptySessionId: 'pty_1', phase: 'open', message: null, takeoverPending: false },
+        event: {
+          ptySessionId: 'pty_1',
+          terminalSessionId: 'terminal_1',
+          phase: 'open',
+          message: null,
+          takeoverPending: false,
+        },
       }),
     )
     socket.emitMessage(
@@ -660,7 +680,13 @@ describe('terminal web host bridge', () => {
       }),
     )
 
-    expect(onOutput).toHaveBeenCalledWith({ ptySessionId: 'pty_1', data: 'hello', seq: 1, processName: 'zsh' })
+    expect(onOutput).toHaveBeenCalledWith({
+      ptySessionId: 'pty_1',
+      terminalSessionId: 'terminal_1',
+      data: 'hello',
+      seq: 1,
+      processName: 'zsh',
+    })
     expect(onBell).toHaveBeenCalledWith({
       ptySessionId: 'pty_1',
       terminalSessionId: 'terminal_1',
@@ -669,10 +695,17 @@ describe('terminal web host bridge', () => {
       processName: 'zsh',
       canonicalTitle: null,
     })
-    expect(onTitle).toHaveBeenCalledWith({ ptySessionId: 'pty_1', canonicalTitle: '~/Developer/goblin — npm run dev' })
-    expect(onExit).toHaveBeenCalledWith({ ptySessionId: 'pty_1' })
+    expect(onTitle).toHaveBeenCalledWith({
+      ptySessionId: 'pty_1',
+      terminalSessionId: 'terminal_1',
+      repoRoot: '/tmp/repo',
+      worktreePath: '/tmp/repo-worktree',
+      canonicalTitle: '~/Developer/goblin — npm run dev',
+    })
+    expect(onExit).toHaveBeenCalledWith({ ptySessionId: 'pty_1', terminalSessionId: 'terminal_1' })
     expect(onIdentity).toHaveBeenCalledWith({
       ptySessionId: 'pty_1',
+      terminalSessionId: 'terminal_1',
       role: 'unowned',
       controllerStatus: 'none',
       canonicalCols: 100,
@@ -680,6 +713,7 @@ describe('terminal web host bridge', () => {
     })
     expect(onLifecycle).toHaveBeenCalledWith({
       ptySessionId: 'pty_1',
+      terminalSessionId: 'terminal_1',
       phase: 'open',
       message: null,
       takeoverPending: false,
@@ -804,7 +838,7 @@ describe('terminal web host bridge', () => {
     socket.emitMessage(
       JSON.stringify({
         type: 'output',
-        event: { ptySessionId: 'pty_1', data: 'hello', seq: 1, processName: 'zsh' },
+        event: { ptySessionId: 'pty_1', terminalSessionId: 'terminal_1', data: 'hello', seq: 1, processName: 'zsh' },
       }),
     )
 
@@ -864,18 +898,36 @@ describe('terminal web host bridge', () => {
     firstSocket.emitMessage(
       JSON.stringify({
         type: 'output',
-        event: { ptySessionId: 'term_old', data: 'stale', seq: 1, processName: 'zsh' },
+        event: {
+          ptySessionId: 'term_old',
+          terminalSessionId: 'terminal_old',
+          data: 'stale',
+          seq: 1,
+          processName: 'zsh',
+        },
       }),
     )
     secondSocket.emitMessage(
       JSON.stringify({
         type: 'output',
-        event: { ptySessionId: 'term_new', data: 'fresh', seq: 2, processName: 'zsh' },
+        event: {
+          ptySessionId: 'term_new',
+          terminalSessionId: 'terminal_new',
+          data: 'fresh',
+          seq: 2,
+          processName: 'zsh',
+        },
       }),
     )
 
     expect(onOutput).toHaveBeenCalledTimes(1)
-    expect(onOutput).toHaveBeenCalledWith({ ptySessionId: 'term_new', data: 'fresh', seq: 2, processName: 'zsh' })
+    expect(onOutput).toHaveBeenCalledWith({
+      ptySessionId: 'term_new',
+      terminalSessionId: 'terminal_new',
+      data: 'fresh',
+      seq: 2,
+      processName: 'zsh',
+    })
     dispose()
     vi.useRealTimers()
   })

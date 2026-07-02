@@ -181,6 +181,7 @@ const TerminalCreateResultSchema = v.variant('ok', [
 ])
 const TerminalOutputEventSchema = v.object({
   ptySessionId: v.string(),
+  terminalSessionId: v.string(),
   data: v.string(),
   seq: v.number(),
   processName: v.string(),
@@ -195,10 +196,14 @@ const TerminalBellRealtimeEventSchema = v.object({
 })
 const TerminalTitleEventSchema = v.object({
   ptySessionId: v.string(),
+  terminalSessionId: v.string(),
+  repoRoot: v.string(),
+  worktreePath: v.string(),
   canonicalTitle: v.nullable(v.string()),
 })
 const TerminalExitEventSchema = v.object({
   ptySessionId: v.string(),
+  terminalSessionId: v.string(),
 })
 const TerminalSessionClosedEventSchema = v.object({
   type: v.literal('session-closed'),
@@ -213,12 +218,14 @@ export function isValidTerminalPtySessionId(value: unknown): value is string {
 }
 const TerminalIdentityEventSchema = v.object({
   ptySessionId: v.string(),
+  terminalSessionId: v.string(),
   controller: v.nullable(TerminalControllerSchema),
   canonicalCols: v.number(),
   canonicalRows: v.number(),
 })
 const TerminalLifecycleEventSchema = v.object({
   ptySessionId: v.string(),
+  terminalSessionId: v.string(),
   phase: v.picklist(TERMINAL_SESSION_PHASE_VALUES),
   message: v.nullable(v.string()),
   takeoverPending: v.boolean(),

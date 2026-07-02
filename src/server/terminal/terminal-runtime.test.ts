@@ -129,7 +129,9 @@ async function flushPromiseQueue(): Promise<void> {
   for (let i = 0; i < 5; i++) await Promise.resolve()
 }
 
-function sentSocketMessages(socket: { send: ReturnType<typeof vi.fn> }): Array<{ type?: string; [key: string]: unknown }> {
+function sentSocketMessages(socket: {
+  send: ReturnType<typeof vi.fn>
+}): Array<{ type?: string; [key: string]: unknown }> {
   return socket.send.mock.calls.map(([payload]) => JSON.parse(String(payload)))
 }
 
@@ -402,7 +404,7 @@ describe('server terminal runtime', () => {
       .find((message) => message.type === 'output')
     expect(outputMessage).toMatchObject({
       type: 'output',
-      event: { data: 'hello', seq: 1 },
+      event: { ptySessionId, terminalSessionId: expect.any(String), data: 'hello', seq: 1 },
     })
 
     socket.send.mockClear()
@@ -424,7 +426,10 @@ describe('server terminal runtime', () => {
     const exitMessage = socket.send.mock.calls
       .map(([payload]) => JSON.parse(String(payload)))
       .find((message) => message.type === 'exit')
-    expect(exitMessage).toMatchObject({ type: 'exit' })
+    expect(exitMessage).toMatchObject({
+      type: 'exit',
+      event: { ptySessionId, terminalSessionId: expect.any(String) },
+    })
     expect(host.getDiagnostics().pty.state).toBe('idle')
 
     host.unregisterSocket('client_a', USER_1, socket)
@@ -844,7 +849,7 @@ describe('server terminal runtime', () => {
     })
     expect(messages[outputIndex]).toMatchObject({
       type: 'output',
-      event: { ptySessionId, data: 'during-attach', seq: 1 },
+      event: { ptySessionId, terminalSessionId: expect.any(String), data: 'during-attach', seq: 1 },
     })
 
     host.unregisterSocket('client_a', USER_1, socket)
@@ -961,10 +966,15 @@ describe('server terminal runtime', () => {
     })
 
     const output = messages[outputIndex]
-    const ptySessionId = (response.payload as { ptySessionId: string }).ptySessionId
+    const createdPayload = response.payload as { ptySessionId: string; terminalSessionId: string }
     expect(output).toMatchObject({
       type: 'output',
-      event: { ptySessionId, data: 'during-create', seq: 1 },
+      event: {
+        ptySessionId: createdPayload.ptySessionId,
+        terminalSessionId: createdPayload.terminalSessionId,
+        data: 'during-create',
+        seq: 1,
+      },
     })
 
     host.unregisterSocket('client_a', USER_1, socket)
@@ -1150,10 +1160,16 @@ describe('server terminal runtime', () => {
     expect(userBSession.terminalSessionId).not.toBe(userASession.terminalSessionId)
     expect(userBSession.ptySessionId).not.toBe(userASession.ptySessionId)
     expect(await host.listSessions('client_shared', USER_1, '/repo')).toEqual([
-      expect.objectContaining({ ptySessionId: userASession.ptySessionId, terminalSessionId: userASession.terminalSessionId }),
+      expect.objectContaining({
+        ptySessionId: userASession.ptySessionId,
+        terminalSessionId: userASession.terminalSessionId,
+      }),
     ])
     expect(await host.listSessions('client_shared', USER_2, '/repo')).toEqual([
-      expect.objectContaining({ ptySessionId: userBSession.ptySessionId, terminalSessionId: userBSession.terminalSessionId }),
+      expect.objectContaining({
+        ptySessionId: userBSession.ptySessionId,
+        terminalSessionId: userBSession.terminalSessionId,
+      }),
     ])
 
     host.unregisterSocket('client_shared_attachment_a', USER_1, userASocket)

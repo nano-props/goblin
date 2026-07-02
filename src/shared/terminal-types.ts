@@ -243,8 +243,22 @@ export interface TerminalHydrationSnapshot {
 
 export type TerminalMutationResult = boolean
 
+// All realtime events below are addressed by both `ptySessionId` and
+// `terminalSessionId`. See the "Identity model" naming-boundary note in
+// `docs/terminal.md`: `ptySessionId` is only a server runtime lookup id
+// (it may be replaced when the runtime binding is replaced, and it is
+// *not* the durable terminal-tab identity), while `terminalSessionId` is
+// the durable client-facing tab identity. Clients must route realtime
+// events by `terminalSessionId` first and fall back to a `ptySessionId`
+// index only as a secondary lookup — that index is a client-local cache
+// populated from attach/reconcile and is not guaranteed to be populated
+// yet for a session the client has not attached to locally (e.g. a
+// background tab). Do not add a realtime event that carries
+// `ptySessionId` alone; see the dropped-title-update regression this
+// pattern caused.
 export interface TerminalOutputEvent {
   ptySessionId: string
+  terminalSessionId: string
   data: string
   seq: number
   processName: string
@@ -263,11 +277,15 @@ export interface TerminalBellRealtimeEvent {
 
 export interface TerminalTitleEvent {
   ptySessionId: string
+  terminalSessionId: string
+  repoRoot: string
+  worktreePath: string
   canonicalTitle: string | null
 }
 
 export interface TerminalExitEvent {
   ptySessionId: string
+  terminalSessionId: string
 }
 
 /**
@@ -285,6 +303,7 @@ export interface TerminalExitEvent {
  */
 export interface TerminalIdentityEvent {
   ptySessionId: string
+  terminalSessionId: string
   controller: TerminalController | null
   canonicalCols: number
   canonicalRows: number
@@ -300,6 +319,7 @@ export interface TerminalIdentityEvent {
  */
 export interface TerminalLifecycleEvent {
   ptySessionId: string
+  terminalSessionId: string
   phase: TerminalSessionPhase
   message: string | null
   takeoverPending: boolean

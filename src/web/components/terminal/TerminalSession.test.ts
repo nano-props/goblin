@@ -1528,7 +1528,13 @@ describe('TerminalSession', () => {
 
     expect(terminalCalls.write).not.toHaveBeenCalled()
 
-    session.handleOutput({ ptySessionId: 'pty_session_1_aaaaaaaaa', data: 'prompt', seq: 1, processName: 'zsh' })
+    session.handleOutput({
+      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalSessionId: 'pty_session_1_aaaaaaaaa',
+      data: 'prompt',
+      seq: 1,
+      processName: 'zsh',
+    })
     await flushUntil(() => terminalCalls.write.mock.calls.length > 0)
 
     expect(terminalCalls.write).toHaveBeenCalledTimes(1)
@@ -2150,9 +2156,27 @@ describe('TerminalSession', () => {
     await flushUntil(() => session.snapshot().phase === 'open')
     notify.mockClear()
 
-    session.handleOutput({ ptySessionId: 'other-session', data: 'ignored', seq: 1, processName: 'zsh' })
-    session.handleOutput({ ptySessionId: 'pty_session_1_aaaaaaaaa', data: 'first', seq: 1, processName: 'zsh' })
-    session.handleOutput({ ptySessionId: 'pty_session_1_aaaaaaaaa', data: 'second', seq: 2, processName: 'zsh' })
+    session.handleOutput({
+      ptySessionId: 'other-session',
+      terminalSessionId: 'other-session',
+      data: 'ignored',
+      seq: 1,
+      processName: 'zsh',
+    })
+    session.handleOutput({
+      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalSessionId: 'pty_session_1_aaaaaaaaa',
+      data: 'first',
+      seq: 1,
+      processName: 'zsh',
+    })
+    session.handleOutput({
+      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalSessionId: 'pty_session_1_aaaaaaaaa',
+      data: 'second',
+      seq: 2,
+      processName: 'zsh',
+    })
 
     // Controller mode: metadata doesn't change (processName was already set during attach)
     expect(notify).toHaveBeenCalledTimes(0)
@@ -2172,9 +2196,17 @@ describe('TerminalSession', () => {
     await flushTerminalStart()
     await flushUntil(() => session.snapshot().phase === 'open')
 
-    session.handleOutput({ ptySessionId: 'pty_session_1_aaaaaaaaa', data: 'before exit', seq: 1, processName: 'zsh' })
-    expect(session.handleExit({ ptySessionId: 'other-session' })).toBe(false)
-    expect(session.handleExit({ ptySessionId: 'pty_session_1_aaaaaaaaa' })).toBe(true)
+    session.handleOutput({
+      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalSessionId: 'pty_session_1_aaaaaaaaa',
+      data: 'before exit',
+      seq: 1,
+      processName: 'zsh',
+    })
+    expect(session.handleExit({ ptySessionId: 'other-session', terminalSessionId: 'other-session' })).toBe(false)
+    expect(
+      session.handleExit({ ptySessionId: 'pty_session_1_aaaaaaaaa', terminalSessionId: 'pty_session_1_aaaaaaaaa' }),
+    ).toBe(true)
     session.dispose()
 
     expect(xtermMocks.terminals[0]!.write).toHaveBeenCalledWith('before exit')

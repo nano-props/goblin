@@ -224,7 +224,13 @@ describe('TerminalSessionState', () => {
       canonicalRows: 40,
     })
     state.beginReplay(1)
-    state.captureReplayOutput({ ptySessionId: 'pty_session_1_aaaaaaaaa', data: 'live', seq: 2, processName: 'zsh' })
+    state.captureReplayOutput({
+      ptySessionId: 'pty_session_1_aaaaaaaaa',
+      terminalSessionId: 'pty_session_1_aaaaaaaaa',
+      data: 'live',
+      seq: 2,
+      processName: 'zsh',
+    })
     state.setSearchResult({ resultIndex: 0, resultCount: 1, found: true })
     state.setProgress(1, 10)
 

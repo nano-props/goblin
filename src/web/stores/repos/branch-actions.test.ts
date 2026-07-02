@@ -24,9 +24,10 @@ function branchBrowserRemoteProvider(
   branch: ReturnType<typeof createRepoBranch>,
 ) {
   const providers = repo.remote.remoteProviders
-  if (branch.tracking && providers) {
+  const tracking = branch.tracking
+  if (tracking && providers) {
     const remoteName = Object.keys(providers)
-      .filter((remote) => branch.tracking === remote || branch.tracking.startsWith(`${remote}/`))
+      .filter((remote) => tracking === remote || tracking.startsWith(`${remote}/`))
       .sort((a, b) => b.length - a.length)[0]
     if (remoteName) return providers[remoteName]
   }

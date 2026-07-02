@@ -285,22 +285,6 @@ describe('RepoWorkspaceToolbar', () => {
     expect(document.body.textContent).not.toContain('settings.editor.windsurf')
   })
 
-  test('renders the remote/PR item in the open-externally dropdown', async () => {
-    const { container: c } = renderToolbar({
-      terminalCount: 0,
-      navigation: navigationWith({}),
-      remote: { hasBrowserRemote: true, browserRemoteProvider: 'github' },
-    })
-
-    const trigger = c.querySelector<HTMLButtonElement>('[data-testid="workspace-open-externally-menu-trigger"]')
-    expect(trigger).not.toBeNull()
-
-    await act(async () => {
-      trigger?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
-      trigger?.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
-      await Promise.resolve()
-    })
-
   test('hides the open-externally menu when no local external apps are available', async () => {
     useHostInfoStore.setState({
       snapshot: { homeDir: '/Users/tester', platform: 'win32', hostname: 'test-host', pid: 1 },
@@ -1100,7 +1084,6 @@ function menuBranchActions(): BranchActions {
       canCopyPatch: false,
       canPull: false,
       canPush: false,
-      canOpenRemote: false,
       canOpenTerminal: true,
       canOpenEditor: true,
       canOpenFinder: true,
@@ -1112,7 +1095,6 @@ function menuBranchActions(): BranchActions {
       openTerminal: vi.fn(async () => ({ ok: true, message: '' })),
       openEditor: vi.fn(async () => ({ ok: true, message: '' })),
       openFinder: vi.fn(async () => ({ ok: true, message: '' })),
-      openRemote: vi.fn(async () => ({ ok: true, message: '' })),
       requestDeleteBranch: vi.fn(),
       requestRemoveWorktree: vi.fn(),
     },

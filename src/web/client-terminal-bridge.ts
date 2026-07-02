@@ -15,7 +15,7 @@ import type {
   TerminalTitleEvent,
 } from '#/shared/terminal-types.ts'
 import type { ClientTerminalBridge } from '#/web/client-bridge-types.ts'
-import type { TerminalIdentityViewModel, TerminalLifecycleViewModel } from '#/web/components/terminal/types.ts'
+import type { TerminalIdentityRealtimeEvent, TerminalLifecycleRealtimeEvent } from '#/web/components/terminal/types.ts'
 import {
   createTerminalSocketConnection,
   type TerminalSocketServerConfig,
@@ -33,8 +33,8 @@ export function createServerTerminalBridge(options: {
   const bellSubscribers = new Set<(event: TerminalBellRealtimeEvent) => void>()
   const titleSubscribers = new Set<(event: TerminalTitleEvent) => void>()
   const exitSubscribers = new Set<(event: TerminalExitEvent) => void>()
-  const identitySubscribers = new Set<(event: TerminalIdentityViewModel) => void>()
-  const lifecycleSubscribers = new Set<(event: TerminalLifecycleViewModel) => void>()
+  const identitySubscribers = new Set<(event: TerminalIdentityRealtimeEvent) => void>()
+  const lifecycleSubscribers = new Set<(event: TerminalLifecycleRealtimeEvent) => void>()
   const sessionsChangedSubscribers = new Set<(repoRoot: string) => void>()
   const workspaceTabsChangedSubscribers = new Set<(repoRoot: string) => void>()
   const sessionClosedSubscribers = new Set<
@@ -231,6 +231,7 @@ export function createServerTerminalBridge(options: {
       case 'identity': {
         const identityEvent = {
           ptySessionId: message.event.ptySessionId,
+          terminalSessionId: message.event.terminalSessionId,
           ...resolveTerminalController(message.event.controller, currentClientId),
           canonicalCols: message.event.canonicalCols,
           canonicalRows: message.event.canonicalRows,

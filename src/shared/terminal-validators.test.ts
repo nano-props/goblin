@@ -213,11 +213,23 @@ describe('shared terminal validators', () => {
     expect(
       normalizeTerminalSocketServerMessage({
         type: 'output',
-        event: { ptySessionId: 'pty_1234567890abcdef', data: 'hi', seq: 1, processName: 'zsh' },
+        event: {
+          ptySessionId: 'pty_1234567890abcdef',
+          terminalSessionId: 'session-1',
+          data: 'hi',
+          seq: 1,
+          processName: 'zsh',
+        },
       }),
     ).toEqual({
       type: 'output',
-      event: { ptySessionId: 'pty_1234567890abcdef', data: 'hi', seq: 1, processName: 'zsh' },
+      event: {
+        ptySessionId: 'pty_1234567890abcdef',
+        terminalSessionId: 'session-1',
+        data: 'hi',
+        seq: 1,
+        processName: 'zsh',
+      },
     })
 
     expect(normalizeTerminalSocketServerMessage({ type: 'pong', requestId: 'health_1' })).toEqual({

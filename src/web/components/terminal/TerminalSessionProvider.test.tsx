@@ -27,8 +27,8 @@ import {
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import type {
   TerminalDescriptor,
-  TerminalIdentityViewModel,
-  TerminalLifecycleViewModel,
+  TerminalIdentityRealtimeEvent,
+  TerminalLifecycleRealtimeEvent,
   TerminalSearchResult,
   TerminalSessionContextValue,
   TerminalSnapshot,
@@ -102,10 +102,7 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
     private ptySessionId: string | null = null
     private snapshotValue: TerminalSnapshot
 
-    constructor(
-      descriptor: TerminalDescriptor,
-      _notify: () => void,
-    ) {
+    constructor(descriptor: TerminalDescriptor, _notify: () => void) {
       this.descriptor = descriptor
       this.notify = _notify
       this.ptySessionId = null
@@ -259,8 +256,8 @@ let exitHandler: ((event: TerminalExitEvent) => void) | null = null
 let outputHandler: ((event: TerminalOutputEvent) => void) | null = null
 let bellHandler: ((event: TerminalBellRealtimeEvent) => void) | null = null
 let titleHandler: ((event: TerminalTitleEvent) => void) | null = null
-let identityHandler: ((event: TerminalIdentityViewModel) => void) | null = null
-let lifecycleHandler: ((event: TerminalLifecycleViewModel) => void) | null = null
+let identityHandler: ((event: TerminalIdentityRealtimeEvent) => void) | null = null
+let lifecycleHandler: ((event: TerminalLifecycleRealtimeEvent) => void) | null = null
 let sessionsChangedHandler: ((repoRoot: string) => void) | null = null
 let workspaceTabsChangedHandler: ((repoRoot: string) => void) | null = null
 let sessionClosedHandler:
@@ -518,11 +515,11 @@ beforeEach(() => {
           exitHandler = cb
           return () => {}
         }),
-        onIdentity: vi.fn((cb: (event: TerminalIdentityViewModel) => void) => {
+        onIdentity: vi.fn((cb: (event: TerminalIdentityRealtimeEvent) => void) => {
           identityHandler = cb
           return () => {}
         }),
-        onLifecycle: vi.fn((cb: (event: TerminalLifecycleViewModel) => void) => {
+        onLifecycle: vi.fn((cb: (event: TerminalLifecycleRealtimeEvent) => void) => {
           lifecycleHandler = cb
           return () => {}
         }),
@@ -620,11 +617,11 @@ beforeEach(() => {
         exitHandler = cb
         return () => {}
       }),
-      onIdentity: vi.fn((cb: (event: TerminalIdentityViewModel) => void) => {
+      onIdentity: vi.fn((cb: (event: TerminalIdentityRealtimeEvent) => void) => {
         identityHandler = cb
         return () => {}
       }),
-      onLifecycle: vi.fn((cb: (event: TerminalLifecycleViewModel) => void) => {
+      onLifecycle: vi.fn((cb: (event: TerminalLifecycleRealtimeEvent) => void) => {
         lifecycleHandler = cb
         return () => {}
       }),
@@ -641,7 +638,14 @@ beforeEach(() => {
         }
       }),
       onSessionClosed: vi.fn(
-        (cb: (event: { ptySessionId: string; terminalSessionId: string; repoRoot: string; worktreePath: string }) => void) => {
+        (
+          cb: (event: {
+            ptySessionId: string
+            terminalSessionId: string
+            repoRoot: string
+            worktreePath: string
+          }) => void,
+        ) => {
           sessionClosedHandler = cb
           return () => {
             if (sessionClosedHandler === cb) sessionClosedHandler = null
@@ -701,7 +705,7 @@ describe('TerminalSessionProvider', () => {
       ])
 
       await act(async () => {
-        exitHandler?.({ ptySessionId: 'session-2' })
+        exitHandler?.({ ptySessionId: 'session-2', terminalSessionId: 'session-2' })
       })
 
       expect(closeMock).not.toHaveBeenCalled()
@@ -716,7 +720,7 @@ describe('TerminalSessionProvider', () => {
       // at read time (covered by `workspace-pane-tabs.ts` and
       // `workspace-pane-tab.test.ts`).
       await act(async () => {
-        exitHandler?.({ ptySessionId: 'session-1' })
+        exitHandler?.({ ptySessionId: 'session-1', terminalSessionId: 'session-1' })
       })
 
       expect(closeMock).not.toHaveBeenCalled()
@@ -877,7 +881,11 @@ describe('TerminalSessionProvider', () => {
           processName: 'zsh',
           canonicalTitle: 'build running',
         })
-        await getContext().createTerminal({ repoRoot: REPO_ID, branch: 'feature/worktree', worktreePath: WORKTREE_PATH })
+        await getContext().createTerminal({
+          repoRoot: REPO_ID,
+          branch: 'feature/worktree',
+          worktreePath: WORKTREE_PATH,
+        })
       })
 
       expect(getProbe().summaries.map((session) => [session.terminalSessionId, session.hasBell])).toEqual([
@@ -918,10 +926,23 @@ describe('TerminalSessionProvider', () => {
       if (!first || !second) throw new Error('missing terminal mock sessions')
 
       await act(async () => {
-        outputHandler?.({ ptySessionId: 'session-1', data: 'hello', seq: 1, processName: 'zsh' })
-        titleHandler?.({ ptySessionId: 'session-1', canonicalTitle: '~/Developer/goblin — npm run dev' })
+        outputHandler?.({
+          ptySessionId: 'session-1',
+          terminalSessionId: 'session-1',
+          data: 'hello',
+          seq: 1,
+          processName: 'zsh',
+        })
+        titleHandler?.({
+          ptySessionId: 'session-1',
+          terminalSessionId: 'session-1',
+          repoRoot: REPO_ID,
+          worktreePath: WORKTREE_PATH,
+          canonicalTitle: '~/Developer/goblin — npm run dev',
+        })
         identityHandler?.({
           ptySessionId: 'session-2',
+          terminalSessionId: 'session-2',
           role: 'controller',
           controllerStatus: 'connected',
           canonicalCols: 100,
@@ -929,6 +950,7 @@ describe('TerminalSessionProvider', () => {
         })
         lifecycleHandler?.({
           ptySessionId: 'session-2',
+          terminalSessionId: 'session-2',
           phase: 'open',
           message: null,
           takeoverPending: false,
@@ -938,6 +960,7 @@ describe('TerminalSessionProvider', () => {
       expect(first.handleOutput).toHaveBeenCalledTimes(1)
       expect(first.handleOutput).toHaveBeenCalledWith({
         ptySessionId: 'session-1',
+        terminalSessionId: 'session-1',
         data: 'hello',
         seq: 1,
         processName: 'zsh',
@@ -947,6 +970,7 @@ describe('TerminalSessionProvider', () => {
       expect(second.handleIdentity).toHaveBeenCalledTimes(1)
       expect(second.handleIdentity).toHaveBeenCalledWith({
         ptySessionId: 'session-2',
+        terminalSessionId: 'session-2',
         role: 'controller',
         controllerStatus: 'connected',
         canonicalCols: 100,
@@ -954,6 +978,7 @@ describe('TerminalSessionProvider', () => {
       })
       expect(second.handleLifecycle).toHaveBeenCalledWith({
         ptySessionId: 'session-2',
+        terminalSessionId: 'session-2',
         phase: 'open',
         message: null,
         takeoverPending: false,
@@ -1626,7 +1651,7 @@ describe('TerminalSessionProvider', () => {
       expect(getProbe()).toMatchObject({ count: 2, terminalIds: ['session-1', 'session-2'] })
 
       await act(async () => {
-        exitHandler?.({ ptySessionId: 'session-2' })
+        exitHandler?.({ ptySessionId: 'session-2', terminalSessionId: 'session-2' })
       })
       expect(getProbe()).toMatchObject({ count: 1, terminalIds: ['session-1'] })
     } finally {

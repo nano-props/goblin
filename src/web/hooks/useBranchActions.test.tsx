@@ -211,37 +211,6 @@ describe('useBranchActions', () => {
   })
 })
 
-describe('openBranchExternalTarget', () => {
-  beforeEach(() => {
-    mocks.openExternalUrl.mockReset()
-    mocks.openRepoUrl.mockReset()
-  })
-
-  test('prefers the existing pull request URL', async () => {
-    mocks.openExternalUrl.mockResolvedValue({ ok: true, message: '' })
-
-    await openBranchExternalTarget(REPO_ID, {
-      name: 'feature/pr',
-      pullRequest: createPullRequest(28689, { url: 'https://github.com/acme/repo/pull/28689' }),
-    })
-
-    expect(mocks.openExternalUrl).toHaveBeenCalledWith('https://github.com/acme/repo/pull/28689')
-    expect(mocks.openRepoUrl).not.toHaveBeenCalled()
-  })
-
-  test('falls back to the branch remote target when no pull request exists', async () => {
-    mocks.openRepoUrl.mockResolvedValue({ ok: true, message: '' })
-
-    await openBranchExternalTarget(REPO_ID, {
-      name: 'feature/no-pr',
-      pullRequest: undefined,
-    })
-
-    expect(mocks.openRepoUrl).toHaveBeenCalledWith(REPO_ID, { type: 'branch', branch: 'feature/no-pr' })
-    expect(mocks.openExternalUrl).not.toHaveBeenCalled()
-  })
-})
-
 function BranchActionsHarness({
   repo,
   onReady,

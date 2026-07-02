@@ -10,6 +10,7 @@ import {
   type TerminalOutputEvent,
   type TerminalSessionSummary,
   type TerminalTakeoverResult,
+  type TerminalTitleEvent,
 } from '#/shared/terminal-types.ts'
 import { isValidTerminalPtySessionId, normalizeTerminalSize } from '#/shared/terminal-validators.ts'
 import type { WorkspacePaneTabsRuntime } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
@@ -24,10 +25,7 @@ import {
   terminalIdentityChanged,
   type TerminalClientControllerState,
 } from '#/server/terminal/terminal-controller.ts'
-import {
-  createEmptyTerminalRenderState,
-  replaySnapshot,
-} from '#/server/terminal/terminal-render-state.ts'
+import { createEmptyTerminalRenderState, replaySnapshot } from '#/server/terminal/terminal-render-state.ts'
 import { markTerminalSessionClosed, markTerminalSessionError } from '#/server/terminal/terminal-session-lifecycle.ts'
 import { TerminalPtyBinding, type TerminalPtySessionState } from '#/server/terminal/terminal-session-pty-lifecycle.ts'
 import type { PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
@@ -83,7 +81,7 @@ interface TerminalSessionView<TUser extends string | number> extends TerminalPty
 export interface TerminalEventSink<TUser extends string | number> {
   onOutput(userId: TUser, event: TerminalOutputEvent): void
   onBell?(userId: TUser, event: TerminalBellRealtimeEvent): void
-  onTitle?(userId: TUser, event: { ptySessionId: string; canonicalTitle: string | null }): void
+  onTitle?(userId: TUser, event: TerminalTitleEvent): void
   onExit(userId: TUser, event: TerminalExitEvent): void
   onSessionClosed?(userId: TUser, session: TerminalSessionSummary): void
   // Identity and lifecycle are emitted on separate channels so the
@@ -496,9 +494,32 @@ export class TerminalSessionManager<TUser extends string | number> {
     )
   }
 
+  // Realtime events are addressed by `ptySessionId` (the runtime lookup
+  // id) *and* `terminalSessionId` (the durable tab identity) — see the
+  // naming-boundary note on the realtime event types in
+  // `#/shared/terminal-types.ts`. Every emit path funnels through one of
+  // these two helpers so a future event type cannot be added without the
+  // `terminalSessionId` a client needs to route it reliably.
+  private terminalSessionIdentity(session: TerminalSessionView<TUser>): { terminalSessionId: string } {
+    return { terminalSessionId: session.terminalSessionId }
+  }
+
+  private terminalSessionScope(session: TerminalSessionView<TUser>): {
+    terminalSessionId: string
+    repoRoot: string
+    worktreePath: string
+  } {
+    return {
+      terminalSessionId: session.terminalSessionId,
+      repoRoot: session.scope,
+      worktreePath: session.worktreePath,
+    }
+  }
+
   private emitIdentity(session: TerminalSessionView<TUser>): void {
     this.sink.onIdentity?.(session.userId, {
       ptySessionId: session.id,
+      ...this.terminalSessionIdentity(session),
       controller: this.effectiveController(session),
       canonicalCols: session.cols,
       canonicalRows: session.rows,
@@ -514,6 +535,7 @@ export class TerminalSessionManager<TUser extends string | number> {
   private emitLifecycle(session: TerminalSessionView<TUser>): void {
     this.sink.onLifecycle?.(session.userId, {
       ptySessionId: session.id,
+      ...this.terminalSessionIdentity(session),
       phase: session.phase,
       message: session.message,
       takeoverPending: session.takeoverPending,
@@ -551,16 +573,14 @@ export class TerminalSessionManager<TUser extends string | number> {
     return new TerminalPtyBinding<TerminalSessionView<TUser>>(this.ptySupervisor, {
       isSessionLive: (session) => this.isLiveSession(session),
       emitLifecycle: (session) => this.emitLifecycle(session),
-      emitOutput: (session, event) => this.sink.onOutput(session.userId, event),
+      emitOutput: (session, event) =>
+        this.sink.onOutput(session.userId, { ...event, ...this.terminalSessionIdentity(session) }),
       emitBell: (session, event) =>
-        this.sink.onBell?.(session.userId, {
-          ...event,
-          terminalSessionId: session.terminalSessionId,
-          repoRoot: session.scope,
-          worktreePath: session.worktreePath,
-        }),
-      emitTitle: (session, event) => this.sink.onTitle?.(session.userId, event),
-      emitExit: (session, event) => this.sink.onExit(session.userId, event),
+        this.sink.onBell?.(session.userId, { ...event, ...this.terminalSessionScope(session) }),
+      emitTitle: (session, event) =>
+        this.sink.onTitle?.(session.userId, { ...event, ...this.terminalSessionScope(session) }),
+      emitExit: (session, event) =>
+        this.sink.onExit(session.userId, { ...event, ...this.terminalSessionIdentity(session) }),
       closeSession: (ptySessionId) => this.closeSession(ptySessionId),
     })
   }

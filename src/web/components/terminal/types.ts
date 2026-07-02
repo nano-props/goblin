@@ -56,6 +56,17 @@ export interface TerminalIdentityViewModel extends TerminalControllerViewModel {
   canonicalRows: number
 }
 
+// Wire-level identity event: the routing-only `terminalSessionId` layered
+// on top of the session-scoped `TerminalIdentityViewModel`. Kept separate
+// from the base view model because `TerminalSessionRuntime`/
+// `TerminalSessionState` are already scoped to one session and have no
+// notion of `terminalSessionId` — only `TerminalSessionProjection`
+// (which fans realtime events out across sessions) needs it to route
+// reliably. See the naming-boundary note in `#/shared/terminal-types.ts`.
+export interface TerminalIdentityRealtimeEvent extends TerminalIdentityViewModel {
+  terminalSessionId: string
+}
+
 /**
  * Lifecycle view-model: the transient phase + message +
  * takeover-pending flag. No role — role lives on the identity
@@ -67,6 +78,13 @@ export interface TerminalLifecycleViewModel {
   phase: TerminalSessionPhase
   message: string | null
   takeoverPending: boolean
+}
+
+// Wire-level lifecycle event — see `TerminalIdentityRealtimeEvent` above
+// for why `terminalSessionId` is layered on separately from the
+// session-scoped view model instead of added to it directly.
+export interface TerminalLifecycleRealtimeEvent extends TerminalLifecycleViewModel {
+  terminalSessionId: string
 }
 
 export interface TerminalSessionHydrationInput extends TerminalIdentityViewModel {

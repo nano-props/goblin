@@ -8,8 +8,11 @@ import { terminalBridge } from '#/web/terminal.ts'
 import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
 import type {
   TerminalBellRealtimeEvent,
+  TerminalExitEvent,
   TerminalHydrationSnapshot,
+  TerminalOutputEvent,
   TerminalSessionSummary as ServerTerminalSessionSummary,
+  TerminalTitleEvent,
 } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { branchForTerminalWorktree } from '#/web/components/terminal/terminal-repo-index.ts'
@@ -39,8 +42,8 @@ import {
 import type {
   TerminalDescriptor,
   TerminalCreateOptions,
-  TerminalIdentityViewModel,
-  TerminalLifecycleViewModel,
+  TerminalIdentityRealtimeEvent,
+  TerminalLifecycleRealtimeEvent,
   TerminalRepoIndex,
   TerminalWorktreeSnapshot,
   TerminalSnapshot,
@@ -198,20 +201,49 @@ export class TerminalSessionProjection {
     if (projectionInstance === this) projectionInstance = null
   }
 
-  handleOutput(event: { ptySessionId: string; data: string; seq: number; processName: string }): void {
-    const directKey = this.terminalSessionIdByPtySessionId.get(event.ptySessionId)
-    const directSession = directKey ? this.sessions.get(directKey) : null
-    if (directKey && directSession) {
-      if (event.data.length > 0)
-        this.outputActivityState.markOutput(directKey, directSession.descriptor.terminalWorktreeKey)
-      directSession.handleOutput(event)
-    }
+  // Single routing entry point for every realtime event keyed by a
+  // session. `terminalSessionId` (the durable tab identity) is tried
+  // first to locate the session because it needs no client-local state
+  // to resolve. `ptySessionId` (the server runtime lookup id) is a
+  // secondary fallback through a client-local index that is only
+  // populated once a session has been attached/reconciled locally — a
+  // background tab that has never been selected may not have an index
+  // entry yet. A realtime event that only carries `ptySessionId` cannot
+  // be routed reliably for such a tab; that gap is exactly what caused
+  // a background tab's title updates to be silently dropped, so every
+  // realtime event type must carry `terminalSessionId` (see the
+  // naming-boundary note on the event types in
+  // `#/shared/terminal-types.ts`) and every dispatcher must resolve
+  // through this helper rather than reimplementing the fallback.
+  private resolveSessionForRealtimeEvent(event: {
+    terminalSessionId: string
+    ptySessionId: string
+  }): TerminalSession | null {
+    return (
+      this.sessions.get(event.terminalSessionId) ??
+      this.sessions.get(this.terminalSessionIdByPtySessionId.get(event.ptySessionId) ?? '') ??
+      null
+    )
+  }
+
+  private resolveCurrentPtySessionForRealtimeEvent(event: {
+    terminalSessionId: string
+    ptySessionId: string
+  }): TerminalSession | null {
+    const session = this.resolveSessionForRealtimeEvent(event)
+    return session?.currentPtySessionId() === event.ptySessionId ? session : null
+  }
+
+  handleOutput(event: TerminalOutputEvent): void {
+    const session = this.resolveCurrentPtySessionForRealtimeEvent(event)
+    if (!session) return
+    session.handleOutput(event)
+    if (event.data.length > 0)
+      this.outputActivityState.markOutput(session.descriptor.terminalSessionId, session.descriptor.terminalWorktreeKey)
   }
 
   handleServerBell(event: TerminalBellRealtimeEvent): void {
-    const session =
-      this.sessions.get(event.terminalSessionId) ??
-      this.sessions.get(this.terminalSessionIdByPtySessionId.get(event.ptySessionId) ?? '')
+    const session = this.resolveSessionForRealtimeEvent(event)
     if (!session) {
       this.trimPendingServerBellsForInsert(event.terminalSessionId)
       this.pendingServerBellByTerminalSessionId.set(event.terminalSessionId, event)
@@ -238,33 +270,30 @@ export class TerminalSessionProjection {
     })
   }
 
-  handleServerTitle(event: { ptySessionId: string; canonicalTitle: string | null }): void {
-    const directKey = this.terminalSessionIdByPtySessionId.get(event.ptySessionId)
-    const directSession = directKey ? this.sessions.get(directKey) : null
-    if (directSession) {
-      directSession.handleServerTitle(event.canonicalTitle)
-    }
+  handleServerTitle(event: TerminalTitleEvent): void {
+    this.resolveCurrentPtySessionForRealtimeEvent(event)?.handleServerTitle(event.canonicalTitle)
   }
 
-  handleExit(event: { ptySessionId: string }): void {
-    const directKey = this.terminalSessionIdByPtySessionId.get(event.ptySessionId)
-    const directSession = directKey ? this.sessions.get(directKey) : null
-    if (directKey && directSession?.handleExit(event)) {
+  handleExit(event: TerminalExitEvent): void {
+    const session = this.resolveSessionForRealtimeEvent(event)
+    if (!session) return
+    const terminalSessionId = session.descriptor.terminalSessionId
+    if (session.handleExit(event)) {
       // Local runtime accepted the exit. Gating the discard on the
-      // runtime's accept (rather than evicting eagerly on the
-      // ptySessionId match) avoids discarding a live local session
-      // during a race where the session has moved to a new ptySessionId
-      // (e.g. after a server-side restart) but the index still maps the
+      // runtime's accept (rather than evicting eagerly on a session
+      // match) avoids discarding a live local session during a race
+      // where the session has moved to a new ptySessionId (e.g. after
+      // a server-side restart) but a stale index entry still maps the
       // old ptySessionId to the same terminalSessionId.
-      this.discardLocalSessionAndDismissDetailIfLast(directKey, directSession.descriptor)
+      this.discardLocalSessionAndDismissDetailIfLast(terminalSessionId, session.descriptor)
       return
     }
-    if (directKey && directSession && !directSession.currentPtySessionId()) {
+    if (!session.currentPtySessionId()) {
       // The runtime is empty (exit was observed earlier, or the
-      // session was never attached) but the ptySessionId index still
-      // points at it. Drop the local projection; future render recovery
-      // comes from the server snapshot, not a client-side render cache.
-      this.discardLocalSessionAndDismissDetailIfLast(directKey, directSession.descriptor)
+      // session was never attached) but the session is still resolvable.
+      // Drop the local projection; future render recovery comes from
+      // the server snapshot, not a client-side render cache.
+      this.discardLocalSessionAndDismissDetailIfLast(terminalSessionId, session.descriptor)
     }
   }
 
@@ -280,29 +309,17 @@ export class TerminalSessionProjection {
   // on the server and add a useless WS roundtrip.
   handleSessionClosed(event: { ptySessionId: string; terminalSessionId: string }): void {
     this.pendingServerBellByTerminalSessionId.delete(event.terminalSessionId)
-    const terminalSessionId = this.sessions.has(event.terminalSessionId)
-      ? event.terminalSessionId
-      : (this.terminalSessionIdByPtySessionId.get(event.ptySessionId) ?? null)
-    if (!terminalSessionId) return
-    const session = this.sessions.get(terminalSessionId)
+    const session = this.resolveSessionForRealtimeEvent(event)
     if (!session) return
-    this.discardLocalSessionAndDismissDetailIfLast(terminalSessionId, session.descriptor)
+    this.discardLocalSessionAndDismissDetailIfLast(session.descriptor.terminalSessionId, session.descriptor)
   }
 
-  handleIdentity(event: TerminalIdentityViewModel): void {
-    const directKey = this.terminalSessionIdByPtySessionId.get(event.ptySessionId)
-    const directSession = directKey ? this.sessions.get(directKey) : null
-    if (directSession) {
-      directSession.handleIdentity(event)
-    }
+  handleIdentity(event: TerminalIdentityRealtimeEvent): void {
+    this.resolveSessionForRealtimeEvent(event)?.handleIdentity(event)
   }
 
-  handleLifecycle(event: TerminalLifecycleViewModel): void {
-    const directKey = this.terminalSessionIdByPtySessionId.get(event.ptySessionId)
-    const directSession = directKey ? this.sessions.get(directKey) : null
-    if (directSession) {
-      directSession.handleLifecycle(event)
-    }
+  handleLifecycle(event: TerminalLifecycleRealtimeEvent): void {
+    this.resolveSessionForRealtimeEvent(event)?.handleLifecycle(event)
   }
 
   reconcileServerSessions(
