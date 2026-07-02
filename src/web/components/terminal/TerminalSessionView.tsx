@@ -250,6 +250,22 @@ export function TerminalSessionView({
   const showErrorChip = sessionPhase === 'error-controller'
   const terminalErrorMessageKey = snapshot.message ?? DEFAULT_TERMINAL_ERROR_MESSAGE_KEY
   const readonlyBadge = attachment?.role === 'viewer' ? t('terminal.mirror-controlled') : t('terminal.unowned')
+  // Status-chip visibility is derived here (not in a JSX branch chain)
+  // so the chip's mount identity stays stable across the `!hasSessions`
+  // ↔ `hasSessions` flip during a normal terminal open. Stable mount
+  // prevents mount-orchestrated aria-live re-announcement; text-change
+  // re-announcement is still possible when the label transitions within
+  // the same node (e.g. `Loading…` → `Opening…` when `syncReady` flips),
+  // which is the standard polite-live-region contract.
+  const showEmptyCta =
+    sessionPhase === 'opening' && !hasSessions && syncReady && !pendingCreate
+  const showStatusOverlay = isAttaching && !showEmptyCta
+  const statusOverlayLabel =
+    sessionPhase === 'restarting'
+      ? t('terminal.restarting')
+      : sessionPhase === 'opening' && !hasSessions && !syncReady
+        ? t('terminal.loading')
+        : t('terminal.opening')
   const progressVariant =
     progress?.state === 2 ? 'error' : progress?.state === 4 ? 'warning' : progress?.state === 3 ? 'indeterminate' : ''
   const readyFocusedKeyRef = useRef<string | null>(null)
@@ -485,15 +501,9 @@ export function TerminalSessionView({
           takeoverPending={snapshot.takeoverPending}
         />
       )}
-      {sessionPhase === 'opening' && !hasSessions && !syncReady ? (
-        <div className="goblin-terminal-session__status-overlay">
-          <span>{t('terminal.loading')}</span>
-        </div>
-      ) : sessionPhase === 'opening' && !hasSessions && pendingCreate ? (
-        <div className="goblin-terminal-session__status-overlay">
-          <span>{t('terminal.opening')}</span>
-        </div>
-      ) : sessionPhase === 'opening' && !hasSessions ? (
+      {/* Stable mount — see the constants block above for the aria-live rationale. */}
+      {showStatusOverlay && <StatusOverlay label={statusOverlayLabel} />}
+      {showEmptyCta && (
         // Empty state: the worktree has no terminals yet. The bare
         // host <div> renders a featureless black box otherwise, which
         // is what the user reported as "blank screen" on the first
@@ -515,11 +525,7 @@ export function TerminalSessionView({
           emptyLabel={t('terminal.empty')}
           newTerminalLabel={t('terminal.new')}
         />
-      ) : sessionPhase === 'opening' || sessionPhase === 'restarting' ? (
-        <div className="goblin-terminal-session__status-overlay">
-          <span>{t('terminal.opening')}</span>
-        </div>
-      ) : null}
+      )}
       {/* Error-state rendering is mode-driven: only the controller sees
           the error chip with a working restart button; a viewer in
           error state must takeover first (the viewer overlay covers
@@ -590,6 +596,32 @@ function EmptyTerminalCta({ onCreate, emptyLabel, newTerminalLabel }: EmptyTermi
       <Button type="button" size="sm" variant="secondary" onClick={handleClick} disabled={creating}>
         {creating ? `${newTerminalLabel}…` : newTerminalLabel}
       </Button>
+    </div>
+  )
+}
+
+interface StatusOverlayProps {
+  label: string
+}
+
+// Hoisted so clsx + tailwind-merge don't re-allocate per render.
+const STATUS_DOT_CLASS = cn('goblin-terminal-session__status-dot', 'animate-pulse')
+
+// Transient status chip rendered while a terminal is opening or
+// restarting. See the `showStatusOverlay` derivation above for the
+// aria-live contract (stable mount prevents mount-orchestrated
+// re-announcement; label transitions within the same node still
+// re-announce per the polite-live-region default).
+function StatusOverlay({ label }: StatusOverlayProps) {
+  return (
+    <div
+      className="goblin-terminal-session__status-overlay"
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <span className={STATUS_DOT_CLASS} />
+      <span>{label}</span>
     </div>
   )
 }

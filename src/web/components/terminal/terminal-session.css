@@ -158,8 +158,34 @@
   position: absolute;
   right: var(--goblin-terminal-overlay-offset);
   bottom: var(--goblin-terminal-overlay-offset);
-  display: flex;
+  z-index: 1;
+  display: inline-flex;
   align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  color: color-mix(in srgb, var(--color-muted-foreground) 80%, transparent);
+  font-size: 11px;
+  font-weight: 500;
+  pointer-events: none;
+}
+
+/* Status dot. Real `<span>` (not `::before`) so the host's
+   `pointer-events: none` inherits — pseudo-elements default to
+   pointer-events: auto and would otherwise swallow xterm.js clicks
+   in this 6×6 px region. */
+.goblin-terminal-session__status-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 9999px;
+  background: currentColor;
+}
+
+/* Error chip is intentionally still button-styled — it contains a real
+   restart Button, so the surrounding surface needs to read as a card,
+   not a passive badge. */
+.goblin-terminal-session__status-overlay--error {
+  display: flex;
   gap: 8px;
   border: 1px solid var(--color-border);
   border-radius: var(--goblin-terminal-control-radius);
@@ -168,6 +194,7 @@
   color: var(--color-muted-foreground);
   font-size: 12px;
   box-shadow: var(--shadow-sm);
+  pointer-events: auto;
 }
 
 .goblin-terminal-session__drop-overlay {
