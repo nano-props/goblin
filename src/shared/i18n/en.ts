@@ -288,7 +288,10 @@ export const en = {
   'branch-status.pr.merge-conflicting': 'merge conflicts',
   'branch-status.pr.merge-unknown': 'merge status syncing',
   'branch-status.pr.copy-link': 'Copy PR link',
+  'branch-status.pr.open-externally': 'Open pull request in browser',
   'branch-status.pr.created-by': '{author} created {time}',
+  'branch-status.commit.open-externally': 'Open commit in browser',
+  'branch-status.upstream.open-externally': 'Open upstream in browser',
 
   // ---- Log list -----------------------------------------------------------
   'log.empty': 'No commits to show.',

@@ -271,7 +271,10 @@ export const zh: Record<DictKey, string> = {
   'branch-status.pr.merge-conflicting': '合并冲突',
   'branch-status.pr.merge-unknown': '合并状态同步中',
   'branch-status.pr.copy-link': '复制 PR 链接',
+  'branch-status.pr.open-externally': '在浏览器中打开拉取请求',
   'branch-status.pr.created-by': '{author} 于 {time}创建',
+  'branch-status.commit.open-externally': '在浏览器中打开提交',
+  'branch-status.upstream.open-externally': '在浏览器中打开上游',
 
   // ---- Log list ----------------------------------------------------------
   'log.empty': '暂无提交可显示。',

@@ -279,7 +279,10 @@ export const ko: Record<DictKey, string> = {
   'branch-status.pr.merge-conflicting': '병합 충돌',
   'branch-status.pr.merge-unknown': '병합 상태 동기화 중',
   'branch-status.pr.copy-link': 'PR 링크 복사',
+  'branch-status.pr.open-externally': '브라우저에서 풀 리퀘스트 열기',
   'branch-status.pr.created-by': '{author} 님이 {time}에 생성',
+  'branch-status.commit.open-externally': '브라우저에서 커밋 열기',
+  'branch-status.upstream.open-externally': '브라우저에서 업스트림 열기',
 
   // ---- Log list ----------------------------------------------------------
   'log.empty': '표시할 커밋이 없습니다.',

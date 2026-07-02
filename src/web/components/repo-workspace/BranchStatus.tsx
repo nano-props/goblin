@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import {
   ArrowDown,
   ArrowUp,
@@ -10,6 +11,7 @@ import {
   RadioTower,
   RefreshCw,
 } from 'lucide-react'
+import { throttle } from 'es-toolkit'
 import { useI18nStore, useT } from '#/web/stores/i18n.ts'
 import { EmptyState } from '#/web/components/Layout.tsx'
 import { PullRequestStatusRow } from '#/web/components/repo-workspace/PullRequestStatusRow.tsx'
@@ -19,8 +21,8 @@ import { useActionFeedback } from '#/web/hooks/useActionFeedback.ts'
 import { useBranchActionSurface } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
 import {
   CopyableValue,
-  MonoValue,
   StatusChip,
+  StatusLink,
   StatusRow,
   StatusRows,
   type Tone,
@@ -31,6 +33,8 @@ import { formatWorktreePath } from '#/web/lib/paths.ts'
 import { remoteRepoTarget } from '#/web/stores/repos/repo-guards.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { PROTECTED_BRANCHES, branchPullRequestBelongsToBranch } from '#/shared/git-types.ts'
+import { openUpstreamBranchExternalTarget } from '#/web/hooks/openBranchExternalTarget.ts'
+import { openRepoUrl } from '#/web/repo-client.ts'
 import type { SelectedRepoWorkspace } from '#/web/components/repo-workspace/model.ts'
 interface Props {
   detail: SelectedRepoWorkspace
@@ -106,15 +110,74 @@ function StatusCopyPatchButton({ action }: { action: BranchCopyPatchAction }) {
   )
 }
 
+// Clickable commit-hash link. The throttle mirrors the same anti-double-
+// click treatment used by the upstream and PR badge handlers so a single
+// user intent produces a single browser tab. Visual styling matches the
+// pre-existing hash chip (mono, brand-tinted, non-shrinking).
+function CommitHashLink({ repoId, hash, title }: { repoId: string; hash: string; title: string }) {
+  const handleClick = useMemo(
+    () =>
+      throttle(
+        () => {
+          void openRepoUrl(repoId, { type: 'commit', hash }).catch(() => {})
+        },
+        500,
+        { edges: ['leading'] },
+      ),
+    [repoId, hash],
+  )
+  return (
+    <StatusLink
+      mono
+      tone="brand"
+      title={title}
+      data-commit-link=""
+      onClick={handleClick}
+      className="shrink-0 text-sm font-medium tabular-nums leading-none text-brand-text/85"
+    >
+      {hash}
+    </StatusLink>
+  )
+}
+
+// Clickable upstream ref (e.g. `origin/main`). Routes through
+// `openUpstreamBranchExternalTarget` so the helper resolves the named
+// remote instead of guessing from the local branch's tracking config.
+function UpstreamLink({
+  repoId,
+  tracking,
+  title,
+  tone,
+}: {
+  repoId: string
+  tracking: string
+  title: string
+  tone?: Tone
+}) {
+  const handleClick = useMemo(
+    () =>
+      throttle(
+        () => {
+          void openUpstreamBranchExternalTarget(repoId, tracking).catch(() => {})
+        },
+        500,
+        { edges: ['leading'] },
+      ),
+    [repoId, tracking],
+  )
+  return (
+    <StatusLink mono title={title} data-upstream-link="" tone={tone} truncate onClick={handleClick}>
+      {tracking}
+    </StatusLink>
+  )
+}
+
 export function BranchStatus({ detail }: Props) {
   const { copyPatchAction } = useBranchActionSurface()
   const t = useT()
   const lang = useI18nStore((s) => s.lang)
   const compact = useIsCompactUi()
   const { branch, statusCount } = detail
-  if (!branch) return <EmptyState title={t('branches.empty')} />
-
-  const protectedBranch = PROTECTED_BRANCHES.has(branch.name)
   // Phase 4: pull the target off the lifecycle union. The
   // selector is keyed on the lifecycle itself, so a re-probe
   // (e.g. network reconnect) re-renders this row.
@@ -122,6 +185,8 @@ export function BranchStatus({ detail }: Props) {
     const repo = s.repos[detail.repoId]
     return repo ? remoteRepoTarget(repo.id, repo.remote.lifecycle) : null
   })
+  if (!branch) return <EmptyState title={t('branches.empty')} />
+  const protectedBranch = PROTECTED_BRANCHES.has(branch.name)
   const worktreePath = branch.worktree?.path ? formatWorktreePath(branch.worktree?.path, worktreeTarget) : ''
   const worktreeChangeCount = detail.worktreeState?.changeCount ?? statusCount
   const pullRequest =
@@ -165,9 +230,12 @@ export function BranchStatus({ detail }: Props) {
     <StatusChip tone="attention">{t('branch-status.worktree.locked')}</StatusChip>
   ) : undefined
   const upstreamValue = branch.tracking ? (
-    <MonoValue title={branch.tracking} tone={branch.trackingGone ? 'attention' : undefined} truncate>
-      {branch.tracking}
-    </MonoValue>
+    <UpstreamLink
+      repoId={detail.repoId}
+      tracking={branch.tracking}
+      title={t('branch-status.upstream.open-externally')}
+      tone={branch.trackingGone ? 'attention' : undefined}
+    />
   ) : (
     <StatusChip tone="attention">{t('branches.no-upstream')}</StatusChip>
   )
@@ -249,12 +317,11 @@ export function BranchStatus({ detail }: Props) {
         value={
           <div className="flex min-w-0 flex-nowrap items-center gap-2 overflow-hidden text-sm text-foreground">
             {branch.lastCommitHash ? (
-              <span
-                className="shrink-0 font-mono text-sm font-medium tabular-nums leading-none text-brand-text/85"
-                title={branch.lastCommitHash}
-              >
-                {branch.lastCommitHash}
-              </span>
+              <CommitHashLink
+                repoId={detail.repoId}
+                hash={branch.lastCommitHash}
+                title={t('branch-status.commit.open-externally')}
+              />
             ) : null}
             <span
               className="min-w-0 truncate leading-tight text-foreground/95"
@@ -288,7 +355,12 @@ export function BranchStatus({ detail }: Props) {
           tone={mergeTone}
         />
       )}
-      <PullRequestStatusRow pullRequest={pullRequest} tooltipSide={compact ? 'top' : 'bottom'} />
+      <PullRequestStatusRow
+        repoId={detail.repoId}
+        branchName={branch.name}
+        pullRequest={pullRequest}
+        tooltipSide={compact ? 'top' : 'bottom'}
+      />
     </StatusRows>
   )
 }

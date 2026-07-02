@@ -34,9 +34,34 @@ export async function getBrowserRepoUrl(
 ): Promise<string | null> {
   if (target.type === 'branch' && !isSafeBranchName(target.branch)) return null
   if (target.type === 'commit' && !GIT_HASH_RE.test(target.hash)) return null
+  // When the caller pins a specific remote (e.g. clicking an upstream chip
+  // like `origin/main`), resolve that exact remote instead of guessing from
+  // the local branch's tracking config.
+  if (target.type === 'branch' && target.remote) {
+    const remote = await resolveExplicitRemote(cwd, target.remote, options?.signal)
+    return repoUrlForBrowserRemote(remote, target)
+  }
   const branch = target.type === 'branch' ? target.branch : undefined
   const remote = await getBrowserRemote(cwd, { branch, signal: options?.signal })
   return repoUrlForBrowserRemote(remote, target)
+}
+
+// Resolves a single named remote (e.g. "origin") into a `BrowserRemote` so
+// callers that already know which remote they want can bypass the
+// preferred-remote guessing in `getBrowserRemote`.
+async function resolveExplicitRemote(
+  cwd: string,
+  remoteName: string,
+  signal?: AbortSignal,
+): Promise<BrowserRemote | null> {
+  try {
+    const remotes = await getRemotes(cwd, signal)
+    const target = remotes.find((remote) => remote.name === remoteName)
+    if (!target) return null
+    return browserRemote(target)
+  } catch {
+    return null
+  }
 }
 
 async function hasRemote(cwd: string, remote: string, signal?: AbortSignal): Promise<boolean> {

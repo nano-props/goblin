@@ -286,7 +286,10 @@ export const ja: Record<DictKey, string> = {
   'branch-status.pr.merge-conflicting': 'マージ競合',
   'branch-status.pr.merge-unknown': 'マージ状態を同期中',
   'branch-status.pr.copy-link': 'PR リンクをコピー',
+  'branch-status.pr.open-externally': 'プルリクエストをブラウザで開く',
   'branch-status.pr.created-by': '{author} が {time} に作成',
+  'branch-status.commit.open-externally': 'コミットをブラウザで開く',
+  'branch-status.upstream.open-externally': 'アップストリームをブラウザで開く',
 
   // ---- Log list ----------------------------------------------------------
   'log.empty': '表示できるコミットがありません。',

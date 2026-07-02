@@ -13,6 +13,8 @@ const INLINE_TRUNCATE_CLASS = 'block min-w-0 flex-1 truncate'
 export const STATUS_INLINE_GROUP_CLASS = 'inline-flex max-w-full min-w-0 items-center gap-1.5 align-middle'
 export const STATUS_CHIP_CLASS =
   'inline-flex h-5 shrink-0 cursor-default items-center gap-1 rounded-sm border px-1.5 text-[11px] font-normal leading-none'
+const STATUS_LINK_BASE_CLASS =
+  'rounded-sm cursor-pointer outline-none hover:underline underline-offset-2 focus-visible:ring-2 focus-visible:ring-ring/60'
 const ROW_VALUE_CLASS: Record<StatusRowValueLayout, string> = {
   inline: 'min-w-0 max-w-full text-sm text-foreground',
   fill: 'min-w-0 flex-1 text-sm text-foreground',
@@ -28,6 +30,50 @@ export function StatusChip({ children, className, tone = 'neutral', ref, ...prop
       {children}
     </span>
   )
+}
+
+type StatusActionProps = Omit<ComponentProps<'button'>, 'type'> & {
+  tone?: Tone
+  mono?: boolean
+  truncate?: boolean
+  variant?: 'text' | 'chip'
+}
+
+export function StatusAction({
+  children,
+  className,
+  tone = 'neutral',
+  mono = false,
+  truncate = false,
+  variant = 'text',
+  ref,
+  ...props
+}: StatusActionProps) {
+  return (
+    <button
+      ref={ref}
+      type="button"
+      {...props}
+      className={cn(
+        STATUS_LINK_BASE_CLASS,
+        mono && MONO_VALUE_CLASS,
+        truncate && INLINE_TRUNCATE_CLASS,
+        tone && STATUS_TONE_TEXT_CLASS[tone],
+        variant === 'chip' && STATUS_CHIP_CLASS,
+        variant === 'chip' && STATUS_TONE_CHIP_CLASS[tone],
+        variant === 'chip' && 'cursor-pointer',
+        className,
+      )}
+    >
+      {children}
+    </button>
+  )
+}
+
+type ClickableStatusChipProps = Omit<StatusActionProps, 'variant' | 'mono' | 'truncate'>
+
+export function ClickableStatusChip(props: ClickableStatusChipProps) {
+  return <StatusAction variant="chip" {...props} />
 }
 
 export function StatusRows({ children }: { children: ReactNode }) {
@@ -89,6 +135,22 @@ export function MonoValue({
       {children}
     </span>
   )
+}
+
+type ClickableMonoValueProps = Omit<StatusActionProps, 'variant' | 'mono'> & {
+  tone?: Tone
+}
+
+export function ClickableMonoValue({
+  ...props
+}: ClickableMonoValueProps) {
+  return <StatusAction mono {...props} />
+}
+
+type StatusLinkProps = Omit<StatusActionProps, 'variant'>
+
+export function StatusLink(props: StatusLinkProps) {
+  return <StatusAction {...props} />
 }
 
 export function CopyableValue({

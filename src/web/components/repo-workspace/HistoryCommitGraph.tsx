@@ -5,6 +5,7 @@ import { Skeleton } from '#/web/components/ui/skeleton.tsx'
 import { STATUS_TONE_CHIP_CLASS } from '#/web/components/ui/status-tones.ts'
 import { historyRefDisplays, parseHistoryRefs } from '#/web/components/repo-workspace/history-refs.ts'
 import type { HistoryRefDisplay } from '#/web/components/repo-workspace/history-refs.ts'
+import { StatusLink } from '#/web/components/repo-workspace/status-ui.tsx'
 
 interface HistoryCommitNode {
   key: string
@@ -98,9 +99,10 @@ function HistoryCommitContent({ repoId, commit }: { repoId: string; commit: Hist
 
 function HistoryCommitHash({ repoId, commit }: { repoId: string; commit: HistoryCommitNode }) {
   return (
-    <button
-      type="button"
-      className="shrink-0 cursor-pointer rounded-sm font-mono text-sm font-medium leading-5 text-warning outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/60"
+    <StatusLink
+      mono
+      tone="warning"
+      className="shrink-0 text-sm font-medium leading-5"
       data-history-log-hash=""
       title={commit.fullHash ? `Open commit ${commit.fullHash}` : undefined}
       onClick={() => {
@@ -109,7 +111,7 @@ function HistoryCommitHash({ repoId, commit }: { repoId: string; commit: History
       }}
     >
       {commit.hash}
-    </button>
+    </StatusLink>
   )
 }
 
