@@ -235,7 +235,7 @@ export interface TerminalSessionSummary {
   rows: number
 }
 
-export interface TerminalSessionSnapshot {
+export interface TerminalHydrationSnapshot {
   ptySessionId: string
   snapshot: string
   snapshotSeq: number

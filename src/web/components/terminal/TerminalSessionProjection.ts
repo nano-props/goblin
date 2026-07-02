@@ -8,7 +8,7 @@ import { terminalBridge } from '#/web/terminal.ts'
 import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
 import type {
   TerminalBellRealtimeEvent,
-  TerminalSessionSnapshot,
+  TerminalHydrationSnapshot,
   TerminalSessionSummary as ServerTerminalSessionSummary,
 } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
@@ -53,7 +53,7 @@ const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = {
   processName: 'terminal',
   canonicalTitle: null,
 }
-const EMPTY_SERVER_SNAPSHOTS = new Map<string, TerminalSessionSnapshot>()
+const EMPTY_SERVER_SNAPSHOTS = new Map<string, TerminalHydrationSnapshot>()
 const MAX_PENDING_SERVER_BELLS = 99
 /**
  * Client-level authority for terminal session state.
@@ -309,7 +309,7 @@ export class TerminalSessionProjection {
     repoRoot: string,
     serverSessions: ServerTerminalSessionSummary[],
     clientId: string,
-    snapshotsByPtySessionId: ReadonlyMap<string, TerminalSessionSnapshot> = EMPTY_SERVER_SNAPSHOTS,
+    snapshotsByPtySessionId: ReadonlyMap<string, TerminalHydrationSnapshot> = EMPTY_SERVER_SNAPSHOTS,
   ): void {
     if (!this.repoIndex[repoRoot]) return
 
@@ -333,7 +333,7 @@ export class TerminalSessionProjection {
     repoRoot: string,
     serverSessions: ServerTerminalSessionSummary[],
     clientId: string,
-    snapshotsByPtySessionId: ReadonlyMap<string, TerminalSessionSnapshot>,
+    snapshotsByPtySessionId: ReadonlyMap<string, TerminalHydrationSnapshot>,
   ): {
     controllerTerminalSessionIdByWorktree: Map<string, string>
     touchedWorktrees: Set<string>

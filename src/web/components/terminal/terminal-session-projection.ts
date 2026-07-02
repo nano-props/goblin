@@ -2,8 +2,8 @@ import { resolveTerminalController } from '#/shared/terminal-controller.ts'
 import type {
   TerminalAttachResult,
   TerminalCreateResult,
+  TerminalHydrationSnapshot,
   TerminalSessionBase,
-  TerminalSessionSnapshot,
   TerminalSessionSummary as ServerTerminalSessionSummary,
 } from '#/shared/terminal-types.ts'
 import { terminalDescriptor } from '#/web/components/terminal/terminal-descriptor.ts'
@@ -30,7 +30,7 @@ export interface ProjectedServerTerminalSession {
 
 export interface ProjectedCreateTerminalSessions {
   serverSessions: ServerTerminalSessionSummary[]
-  snapshotByPtySessionId: Map<string, TerminalSessionSnapshot>
+  snapshotByPtySessionId: Map<string, TerminalHydrationSnapshot>
 }
 
 export function projectTerminalAttachResultForClient(
@@ -57,7 +57,7 @@ export function projectCreateResultForClient(
   if (!sawTarget) serverSessions.push(targetSession)
   return {
     serverSessions,
-    snapshotByPtySessionId: new Map<string, TerminalSessionSnapshot>([
+    snapshotByPtySessionId: new Map<string, TerminalHydrationSnapshot>([
       [result.ptySessionId, { ptySessionId: result.ptySessionId, snapshot: result.snapshot, snapshotSeq: result.snapshotSeq }],
     ]),
   }
@@ -69,7 +69,7 @@ export function projectServerTerminalSession(input: {
   serverSession: ServerTerminalSessionSummary
   clientId: string
   index: number
-  serverSnapshot?: TerminalSessionSnapshot | null
+  serverSnapshot?: TerminalHydrationSnapshot | null
 }): ProjectedServerTerminalSession | null {
   if (input.serverSession.repoRoot !== input.repoRoot) return null
   const branch = branchForTerminalWorktree(input.repoIndex, input.serverSession.repoRoot, input.serverSession.worktreePath)

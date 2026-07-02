@@ -589,20 +589,37 @@ describe('TerminalSessionProjection create flow', () => {
     document.body.appendChild(host)
     projection.registerHost(WORKTREE_KEY, host)
 
-    mocks.closeMock.mockRejectedValueOnce(new Error('Terminal socket closed'))
+    const callOrder: string[] = []
+    const close = Promise.withResolvers<boolean>()
+    mocks.closeMock.mockImplementationOnce(async () => {
+      callOrder.push('close')
+      return await close.promise
+    })
+    mocks.createMock.mockImplementationOnce(async () => {
+      callOrder.push('create')
+      return makeCreateResult()
+    })
 
     const closePromise = projection.enqueueDurableClose({
       ...durableCloseInput(),
     })
 
-    await expect(closePromise).rejects.toThrow('Terminal socket closed')
-    expect((projection as any).lifecycleQueues.hasCloses()).toBe(false)
+    const createPromise = projection.createTerminal({
+      repoRoot: REPO_ROOT,
+      branch: BRANCH,
+      worktreePath: WORKTREE_PATH,
+    })
 
-    // The next create proceeds normally.
-    await expect(
-      projection.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH }),
-    ).resolves.toBe('session-1')
+    await Promise.resolve()
+    expect(mocks.createMock).not.toHaveBeenCalled()
+
+    close.reject(new Error('Terminal socket closed'))
+
+    await expect(closePromise).rejects.toThrow('Terminal socket closed')
+    await expect(createPromise).resolves.toBe('session-1')
     expect(mocks.createMock).toHaveBeenCalledTimes(1)
+    expect(callOrder).toEqual(['close', 'create'])
+    expect((projection as any).lifecycleQueues.hasCloses()).toBe(false)
   })
 
   test('durable close: deduplicates concurrent enqueues for the same session', async () => {

@@ -518,12 +518,16 @@ order would have been:
   on both `created` and `reused` paths; projection tests cover the
   `create.ptySessionId` + `snapshot` + `snapshotSeq` rule.
 - **R1**: projection durable-close tests cover awaiting an in-flight
-  close before creating, failures not blocking the next create,
-  deduplicating concurrent enqueues, destroying pending entries, and
-  dropping the local session on `session-closed`.
-- **R2**: runtime-action tests cover emitting both broadcasts on
-  successful user close, non-user closes not leaking phantom events,
-  and failed closes not synthesizing fake broadcasts.
+  close before creating, in-flight close failures allowing the queued
+  create to proceed afterward, deduplicating concurrent enqueues,
+  destroying pending entries, and dropping the local session on
+  `session-closed`.
+- **R2**: runtime-action tests cover the targeted `session-closed`
+  action broadcast on successful user close, non-user closes not
+  leaking phantom events, and failed closes not synthesizing fake
+  broadcasts. Runtime integration tests cover the broader
+  `sessions-changed` / workspace invalidation paths for close-like
+  lifecycle changes.
 - **R3**: session tests cover rendering the CTA when the session has no
   sessions, click triggering create, and failure toasting.
 
