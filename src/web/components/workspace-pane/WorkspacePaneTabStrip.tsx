@@ -96,45 +96,49 @@ function shouldShowWorkspacePaneTabSeparator({
   return !!rightId && leftId !== activeId && rightId !== activeId && leftId !== hoveredId && rightId !== hoveredId
 }
 
-function useScrollNewWorkspacePaneTabIntoView({
-  items,
-  viewportRef,
-}: {
-  items: readonly WorkspacePaneTabItem[]
-  viewportRef: RefObject<HTMLDivElement | null>
-}) {
-  const latestItemsRef = useRef(items)
-  const prevTabCountRef = useRef(items.length)
-  latestItemsRef.current = items
+function usePrefersReducedMotion() {
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(() =>
+    typeof window === 'undefined' ? false : window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true,
+  )
 
   useLayoutEffect(() => {
-    const tabCount = latestItemsRef.current.length
-    const prevTabCount = prevTabCountRef.current
-    if (tabCount <= prevTabCount) {
-      prevTabCountRef.current = tabCount
-      return
-    }
-    prevTabCountRef.current = tabCount
-    const newItem = latestItemsRef.current[tabCount - 1]
-    if (newItem && isPendingWorkspacePaneTabItem(newItem)) return
-    const viewport = viewportRef.current
-    if (!viewport) return
-    if (viewport.scrollWidth <= viewport.clientWidth) return
-    viewport.style.scrollBehavior = 'smooth'
-    viewport.scrollLeft = viewport.scrollWidth
-    // Reset scroll-behavior on the next frame so subsequent user-driven scrolls
-    // (e.g. dragging the scrollbar) are not animated, while the in-flight scroll
-    // initiated above still benefits from the smooth behavior.
-    const frame = requestAnimationFrame(() => {
-      viewport.style.scrollBehavior = ''
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
+    const query = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const update = () => setPrefersReducedMotion(query.matches)
+    update()
+    query.addEventListener('change', update)
+    return () => query.removeEventListener('change', update)
+  }, [])
+
+  return prefersReducedMotion
+}
+
+function useScrollActiveWorkspacePaneTabIntoView({
+  activeTabIdentity,
+  items,
+  enabled,
+  getTabElement,
+}: {
+  activeTabIdentity: string | null
+  items: readonly WorkspacePaneTabItem[]
+  enabled: boolean
+  getTabElement: (identity: string) => HTMLButtonElement | null
+}) {
+  const prefersReducedMotion = usePrefersReducedMotion()
+  const activeRenderableTabIdentity = activeTabIdentity
+    ? (items.find((item) => item.identity === activeTabIdentity && !isPendingWorkspacePaneTabItem(item))?.identity ?? null)
+    : null
+
+  useLayoutEffect(() => {
+    if (!enabled || !activeRenderableTabIdentity) return
+    const tab = getTabElement(activeRenderableTabIdentity)
+    if (!tab || typeof tab.scrollIntoView !== 'function') return
+    tab.scrollIntoView({
+      inline: 'nearest',
+      block: 'nearest',
+      behavior: prefersReducedMotion ? 'auto' : 'smooth',
     })
-    return () => {
-      cancelAnimationFrame(frame)
-      if (viewport.style.scrollBehavior === 'smooth') {
-        viewport.style.scrollBehavior = ''
-      }
-    }
-  }, [items.length, viewportRef])
+  }, [activeRenderableTabIdentity, enabled, getTabElement, prefersReducedMotion])
 }
 
 function useDeferredWorkspacePaneTabFocus({
@@ -154,7 +158,7 @@ function useDeferredWorkspacePaneTabFocus({
       pendingFocusIdentityRef.current = null
       return
     }
-    focusRegistry.focus(pendingFocusIdentity)
+    focusRegistry.focus(pendingFocusIdentity, { preventScroll: true })
     pendingFocusIdentityRef.current = null
   }, [focusRegistry, focusRequestVersion, items])
 
@@ -384,7 +388,12 @@ export function WorkspacePaneTabStrip({
     onReorder,
   })
 
-  useScrollNewWorkspacePaneTabIntoView({ items, viewportRef })
+  useScrollActiveWorkspacePaneTabIntoView({
+    activeTabIdentity,
+    items,
+    enabled: !collapseToSelectedTab,
+    getTabElement: focusRegistry.getRef,
+  })
 
   const handleSelect = useCallback(
     (identity: string) => {

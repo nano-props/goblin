@@ -410,7 +410,7 @@ describe('WorkspacePaneTabStrip', () => {
     expect(tab2.tabIndex).toBe(-1)
   })
 
-  test('scrolls the tab strip to the far right when a new terminal session is added', () => {
+  test('scrolls the active tab into view when selection changes', () => {
     render(
       <TestWorkspacePaneTabStrip
         terminalWorktreeKey="/repo\0/repo/worktree"
@@ -427,20 +427,17 @@ describe('WorkspacePaneTabStrip', () => {
       />,
     )
 
-    const viewport = document.body.querySelector('[data-radix-scroll-area-viewport]')
-    if (!(viewport instanceof HTMLDivElement)) throw new Error('missing scroll viewport')
-
-    Object.defineProperty(viewport, 'scrollWidth', { value: 1000, writable: true, configurable: true })
-    Object.defineProperty(viewport, 'scrollLeft', { value: 0, writable: true, configurable: true })
+    const scrollIntoView = scrollIntoViewMock()
+    scrollIntoView.mockClear()
 
     rerender(
       <TestWorkspacePaneTabStrip
         terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
-          session({ terminalSessionId: 't1', title: 'term-1' }),
+          session({ terminalSessionId: 't1', title: 'term-1', selected: false }),
           session({ terminalSessionId: 't2', title: 'term-2', selected: false }),
-          session({ terminalSessionId: 't3', title: 'term-3', selected: false }),
+          session({ terminalSessionId: 't3', title: 'term-3', selected: true }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -450,129 +447,18 @@ describe('WorkspacePaneTabStrip', () => {
       />,
     )
 
-    expect(viewport.scrollLeft).toBe(1000)
-  })
-
-  test('does not scroll on initial mount', () => {
-    render(
-      <TestWorkspacePaneTabStrip
-        terminalWorktreeKey="/repo\0/repo/worktree"
-        workspacePaneId="workspace"
-        sessions={[
-          session({ terminalSessionId: 't1', title: 'term-1' }),
-          session({ terminalSessionId: 't2', title: 'term-2', selected: false }),
-          session({ terminalSessionId: 't3', title: 'term-3', selected: false }),
-        ]}
-        onNew={() => {}}
-        onSelect={() => {}}
-        onScrollToBottom={() => {}}
-        onClose={() => {}}
-        onReorder={() => {}}
-      />,
-    )
-
-    const viewport = document.body.querySelector('[data-radix-scroll-area-viewport]')
-    if (!(viewport instanceof HTMLDivElement)) throw new Error('missing scroll viewport')
-
-    Object.defineProperty(viewport, 'scrollWidth', { value: 1000, writable: true, configurable: true })
-    Object.defineProperty(viewport, 'scrollLeft', { value: 0, writable: true, configurable: true })
-
-    // Trigger a re-render with the same sessions to confirm the effect does not scroll.
-    rerender(
-      <TestWorkspacePaneTabStrip
-        terminalWorktreeKey="/repo\0/repo/worktree"
-        workspacePaneId="workspace"
-        sessions={[
-          session({ terminalSessionId: 't1', title: 'term-1' }),
-          session({ terminalSessionId: 't2', title: 'term-2', selected: false }),
-          session({ terminalSessionId: 't3', title: 'term-3', selected: false }),
-        ]}
-        onNew={() => {}}
-        onSelect={() => {}}
-        onScrollToBottom={() => {}}
-        onClose={() => {}}
-        onReorder={() => {}}
-      />,
-    )
-
-    expect(viewport.scrollLeft).toBe(0)
-  })
-
-  test('does not scroll when the tab strip does not overflow horizontally', () => {
-    render(
-      <TestWorkspacePaneTabStrip
-        terminalWorktreeKey="/repo\0/repo/worktree"
-        workspacePaneId="workspace"
-        sessions={[
-          session({ terminalSessionId: 't1', title: 'term-1' }),
-          session({ terminalSessionId: 't2', title: 'term-2', selected: false }),
-        ]}
-        onNew={() => {}}
-        onSelect={() => {}}
-        onScrollToBottom={() => {}}
-        onClose={() => {}}
-        onReorder={() => {}}
-      />,
-    )
-
-    const viewport = document.body.querySelector('[data-radix-scroll-area-viewport]')
-    if (!(viewport instanceof HTMLDivElement)) throw new Error('missing scroll viewport')
-
-    // Content fits within the viewport (no horizontal overflow).
-    Object.defineProperty(viewport, 'scrollWidth', { value: 400, writable: true, configurable: true })
-    Object.defineProperty(viewport, 'clientWidth', { value: 600, writable: true, configurable: true })
-    Object.defineProperty(viewport, 'scrollLeft', { value: 0, writable: true, configurable: true })
-
-    rerender(
-      <TestWorkspacePaneTabStrip
-        terminalWorktreeKey="/repo\0/repo/worktree"
-        workspacePaneId="workspace"
-        sessions={[
-          session({ terminalSessionId: 't1', title: 'term-1' }),
-          session({ terminalSessionId: 't2', title: 'term-2', selected: false }),
-          session({ terminalSessionId: 't3', title: 'term-3', selected: false }),
-        ]}
-        onNew={() => {}}
-        onSelect={() => {}}
-        onScrollToBottom={() => {}}
-        onClose={() => {}}
-        onReorder={() => {}}
-      />,
-    )
-
-    expect(viewport.scrollLeft).toBe(0)
-  })
-
-  test('resets the inline scroll-behavior after a new session scroll settles', async () => {
-    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb: FrameRequestCallback) => {
-      cb(0)
-      return 0
+    const activeTab = document.getElementById('workspace-workspace-pane-tab-2')
+    expect(scrollIntoView).toHaveBeenCalledTimes(1)
+    expect(scrollIntoView.mock.contexts.at(-1)).toBe(activeTab)
+    expect(scrollIntoView).toHaveBeenLastCalledWith({
+      inline: 'nearest',
+      block: 'nearest',
+      behavior: 'smooth',
     })
+  })
 
+  test('scrolls the active tab into view on initial mount', () => {
     render(
-      <TestWorkspacePaneTabStrip
-        terminalWorktreeKey="/repo\0/repo/worktree"
-        workspacePaneId="workspace"
-        sessions={[
-          session({ terminalSessionId: 't1', title: 'term-1' }),
-          session({ terminalSessionId: 't2', title: 'term-2', selected: false }),
-        ]}
-        onNew={() => {}}
-        onSelect={() => {}}
-        onScrollToBottom={() => {}}
-        onClose={() => {}}
-        onReorder={() => {}}
-      />,
-    )
-
-    const viewport = document.body.querySelector('[data-radix-scroll-area-viewport]')
-    if (!(viewport instanceof HTMLDivElement)) throw new Error('missing scroll viewport')
-
-    Object.defineProperty(viewport, 'scrollWidth', { value: 1000, writable: true, configurable: true })
-    Object.defineProperty(viewport, 'clientWidth', { value: 600, writable: true, configurable: true })
-    Object.defineProperty(viewport, 'scrollLeft', { value: 0, writable: true, configurable: true })
-
-    rerender(
       <TestWorkspacePaneTabStrip
         terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
@@ -589,137 +475,116 @@ describe('WorkspacePaneTabStrip', () => {
       />,
     )
 
-    // After the rAF callback runs, the inline scroll-behavior should be cleared so that
-    // subsequent user-driven scrolls (e.g. dragging the scrollbar) are not animated.
-    expect(viewport.style.scrollBehavior).toBe('')
-    expect(viewport.scrollLeft).toBe(1000)
+    const scrollIntoView = scrollIntoViewMock()
+    const activeTab = document.getElementById('workspace-workspace-pane-tab')
+    expect(scrollIntoView).toHaveBeenCalledTimes(1)
+    expect(scrollIntoView.mock.contexts.at(-1)).toBe(activeTab)
   })
 
-  test('keeps the auto-scroll cleanup frame alive across same-length rerenders', () => {
-    const scheduledFrame: { id: number; callback: FrameRequestCallback; canceled: boolean } = {
-      id: 0,
-      callback: () => {},
-      canceled: false,
+  test('does not scroll when compact mode renders without a scroll viewport', () => {
+    render(
+      <TestWorkspacePaneTabStrip
+        terminalWorktreeKey="/repo\0/repo/worktree"
+        workspacePaneId="workspace"
+        responsiveCompact
+        sessions={[
+          session({ terminalSessionId: 't1', title: 'term-1' }),
+          session({ terminalSessionId: 't2', title: 'term-2', selected: false }),
+        ]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    )
+
+    expect(scrollIntoViewMock()).not.toHaveBeenCalled()
+  })
+
+  test('scrolls the right neighbour into view after closing the active tab', () => {
+    function CloseActiveHarness() {
+      const [sessions, setSessions] = useState([
+        session({ terminalSessionId: 't1', title: 'term-1', selected: false }),
+        session({ terminalSessionId: 't2', title: 'term-2', selected: true }),
+        session({ terminalSessionId: 't3', title: 'term-3', selected: false }),
+      ])
+
+      return (
+        <TestWorkspacePaneTabStrip
+          terminalWorktreeKey="/repo\0/repo/worktree"
+          workspacePaneId="workspace"
+          sessions={sessions}
+          onNew={() => {}}
+          onSelect={() => {}}
+          onScrollToBottom={() => {}}
+          onClose={(closed) => {
+            setSessions((current) =>
+              current
+                .filter((candidate) => candidate.terminalSessionId !== closed.terminalSessionId)
+                .map((candidate) => ({
+                  ...candidate,
+                  selected: candidate.terminalSessionId === 't3',
+                })),
+            )
+          }}
+          onReorder={() => {}}
+        />
+      )
     }
-    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback: FrameRequestCallback) => {
-      scheduledFrame.id = 1
-      scheduledFrame.callback = callback
-      scheduledFrame.canceled = false
-      return 1
-    })
-    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((id: number) => {
-      if (scheduledFrame.id === id) scheduledFrame.canceled = true
-    })
 
-    render(
-      <TestWorkspacePaneTabStrip
-        terminalWorktreeKey="/repo\0/repo/worktree"
-        workspacePaneId="workspace"
-        sessions={[
-          session({ terminalSessionId: 't1', title: 'term-1' }),
-          session({ terminalSessionId: 't2', title: 'term-2', selected: false }),
-        ]}
-        onNew={() => {}}
-        onSelect={() => {}}
-        onScrollToBottom={() => {}}
-        onClose={() => {}}
-        onReorder={() => {}}
-      />,
-    )
+    render(<CloseActiveHarness />)
+    const scrollIntoView = scrollIntoViewMock()
+    scrollIntoView.mockClear()
+    const closeButton = document.body.querySelector<HTMLButtonElement>('button[aria-label="close term-2"]')
+    expect(closeButton).not.toBeNull()
 
-    const viewport = document.body.querySelector('[data-radix-scroll-area-viewport]')
-    if (!(viewport instanceof HTMLDivElement)) throw new Error('missing scroll viewport')
-
-    Object.defineProperty(viewport, 'scrollWidth', { value: 1000, writable: true, configurable: true })
-    Object.defineProperty(viewport, 'clientWidth', { value: 600, writable: true, configurable: true })
-    Object.defineProperty(viewport, 'scrollLeft', { value: 0, writable: true, configurable: true })
-
-    rerender(
-      <TestWorkspacePaneTabStrip
-        terminalWorktreeKey="/repo\0/repo/worktree"
-        workspacePaneId="workspace"
-        sessions={[
-          session({ terminalSessionId: 't1', title: 'term-1' }),
-          session({ terminalSessionId: 't2', title: 'term-2', selected: false }),
-          session({ terminalSessionId: 't3', title: 'term-3', selected: false }),
-        ]}
-        onNew={() => {}}
-        onSelect={() => {}}
-        onScrollToBottom={() => {}}
-        onClose={() => {}}
-        onReorder={() => {}}
-      />,
-    )
-
-    expect(viewport.style.scrollBehavior).toBe('smooth')
-    expect(scheduledFrame.canceled).toBe(false)
-
-    rerender(
-      <TestWorkspacePaneTabStrip
-        terminalWorktreeKey="/repo\0/repo/worktree"
-        workspacePaneId="workspace"
-        sessions={[
-          session({ terminalSessionId: 't1', title: 'term-1' }),
-          session({ terminalSessionId: 't2', title: 'term-2', selected: false }),
-          session({ terminalSessionId: 't3', title: 'term-3 updated', selected: false }),
-        ]}
-        onNew={() => {}}
-        onSelect={() => {}}
-        onScrollToBottom={() => {}}
-        onClose={() => {}}
-        onReorder={() => {}}
-      />,
-    )
-
-    expect(scheduledFrame.canceled).toBe(false)
     act(() => {
-      scheduledFrame.callback(0)
+      closeButton?.click()
     })
-    expect(viewport.style.scrollBehavior).toBe('')
-    expect(viewport.scrollLeft).toBe(1000)
+
+    const activeTab = document.getElementById('workspace-workspace-pane-tab-1')
+    expect(scrollIntoView).toHaveBeenCalledTimes(1)
+    expect(scrollIntoView.mock.contexts.at(-1)).toBe(activeTab)
   })
 
-  test('does not scroll when a terminal session is removed', () => {
-    render(
-      <TestWorkspacePaneTabStrip
-        terminalWorktreeKey="/repo\0/repo/worktree"
-        workspacePaneId="workspace"
-        sessions={[
-          session({ terminalSessionId: 't1', title: 'term-1' }),
-          session({ terminalSessionId: 't2', title: 'term-2', selected: false }),
-          session({ terminalSessionId: 't3', title: 'term-3', selected: false }),
-        ]}
-        onNew={() => {}}
-        onSelect={() => {}}
-        onScrollToBottom={() => {}}
-        onClose={() => {}}
-        onReorder={() => {}}
-      />,
-    )
+  test('does not scroll when a non-active terminal session is removed', () => {
+    function CloseInactiveHarness() {
+      const [sessions, setSessions] = useState([
+        session({ terminalSessionId: 't1', title: 'term-1', selected: true }),
+        session({ terminalSessionId: 't2', title: 'term-2', selected: false }),
+        session({ terminalSessionId: 't3', title: 'term-3', selected: false }),
+      ])
 
-    const viewport = document.body.querySelector('[data-radix-scroll-area-viewport]')
-    if (!(viewport instanceof HTMLDivElement)) throw new Error('missing scroll viewport')
+      return (
+        <TestWorkspacePaneTabStrip
+          terminalWorktreeKey="/repo\0/repo/worktree"
+          workspacePaneId="workspace"
+          sessions={sessions}
+          onNew={() => {}}
+          onSelect={() => {}}
+          onScrollToBottom={() => {}}
+          onClose={(closed) => {
+            setSessions((current) =>
+              current.filter((candidate) => candidate.terminalSessionId !== closed.terminalSessionId),
+            )
+          }}
+          onReorder={() => {}}
+        />
+      )
+    }
 
-    Object.defineProperty(viewport, 'scrollWidth', { value: 1000, writable: true, configurable: true })
-    Object.defineProperty(viewport, 'scrollLeft', { value: 500, writable: true, configurable: true })
+    render(<CloseInactiveHarness />)
+    const scrollIntoView = scrollIntoViewMock()
+    scrollIntoView.mockClear()
+    const closeButton = document.body.querySelector<HTMLButtonElement>('button[aria-label="close term-2"]')
+    expect(closeButton).not.toBeNull()
 
-    rerender(
-      <TestWorkspacePaneTabStrip
-        terminalWorktreeKey="/repo\0/repo/worktree"
-        workspacePaneId="workspace"
-        sessions={[
-          session({ terminalSessionId: 't1', title: 'term-1' }),
-          session({ terminalSessionId: 't2', title: 'term-2', selected: false }),
-        ]}
-        onNew={() => {}}
-        onSelect={() => {}}
-        onScrollToBottom={() => {}}
-        onClose={() => {}}
-        onReorder={() => {}}
-      />,
-    )
+    act(() => {
+      closeButton?.click()
+    })
 
-    expect(viewport.scrollLeft).toBe(500)
+    expect(scrollIntoView).not.toHaveBeenCalled()
   })
 
   test('restores the full tab strip after leaving compact mode', () => {
@@ -1052,6 +917,10 @@ function rerender(element: ReactNode): RenderResult {
   if (!lastRender) return render(element)
   lastRender.rerender(element)
   return lastRender
+}
+
+function scrollIntoViewMock() {
+  return vi.mocked(HTMLElement.prototype.scrollIntoView)
 }
 
 function session(overrides: Partial<TerminalSessionSummary> = {}): TerminalSessionSummary {
