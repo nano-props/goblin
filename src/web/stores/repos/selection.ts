@@ -17,7 +17,7 @@ import {
 import {
   readRepoBranchReadModel,
   repoBranchesFromReadModel,
-  repoWithBranchReadModel,
+  readRepoWithBranchReadModel,
 } from '#/web/repo-branch-read-model.ts'
 
 type RestorableWorkspaceSelectionActions = Pick<
@@ -187,11 +187,7 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
       set((s) => {
         const repo = s.repos[id]
         if (!repo) return s
-        const branchReadModel = readRepoBranchReadModel(repo)
-        const target = workspacePaneTabsTargetForRepoBranch(
-          repoWithBranchReadModel(repo, branchReadModel),
-          repo.ui.selectedBranch,
-        )
+        const target = workspacePaneTabsTargetForRepoBranch(readRepoWithBranchReadModel(repo), repo.ui.selectedBranch)
         const current = preferredWorkspacePaneTabForTarget(repo.ui, target)
         if (!target || current === tab) return s
         changed = true
@@ -202,12 +198,8 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
       })
       if (!changed || repoInstanceId === undefined) return
       const repo = get().repos[id]
-      const branchReadModel = repo ? readRepoBranchReadModel(repo) : null
       const target = repo
-        ? workspacePaneTabsTargetForRepoBranch(
-            repoWithBranchReadModel(repo, branchReadModel),
-            repo.ui.selectedBranch,
-          )
+        ? workspacePaneTabsTargetForRepoBranch(readRepoWithBranchReadModel(repo), repo.ui.selectedBranch)
         : null
       afterSelectionChange(
         id,

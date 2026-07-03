@@ -13,7 +13,7 @@ import {
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { invalidateRepoDataQueries } from '#/web/repo-data-query.ts'
-import { readRepoBranchReadModel, repoWithBranchReadModel } from '#/web/repo-branch-read-model.ts'
+import { readRepoWithBranchReadModel } from '#/web/repo-branch-read-model.ts'
 
 interface RepoRefreshIntentBase {
   id: string
@@ -40,7 +40,7 @@ export interface RepoStatusRefreshSnapshot {
 }
 
 export function repoStatusRefreshSnapshot(repo: RepoState): RepoStatusRefreshSnapshot {
-  const projectedRepo = repoWithBranchReadModel(repo, readRepoBranchReadModel(repo))
+  const projectedRepo = readRepoWithBranchReadModel(repo)
   const selectedTarget = workspacePaneTabsTargetForRepoBranch(projectedRepo, projectedRepo.ui.selectedBranch)
   return {
     id: projectedRepo.id,

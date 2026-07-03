@@ -26,7 +26,7 @@ import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { OpenRepoResult } from '#/web/stores/repos/types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
-import { readRepoBranchReadModel, repoWithBranchReadModel } from '#/web/repo-branch-read-model.ts'
+import { readRepoWithBranchReadModel } from '#/web/repo-branch-read-model.ts'
 
 interface TerminalBellIntentDeps {
   navigation: PrimaryWindowNavigationActions
@@ -62,10 +62,7 @@ export function handleTerminalBellClickIntent(
   deps: TerminalBellIntentDeps,
 ): void {
   const repo = useReposStore.getState().repos[event.repoRoot]
-  const plan = createTerminalBellIntentPlan(
-    repo ? repoWithBranchReadModel(repo, readRepoBranchReadModel(repo)) : repo,
-    event,
-  )
+  const plan = createTerminalBellIntentPlan(repo ? readRepoWithBranchReadModel(repo) : repo, event)
   if (plan.kind === 'noop') return
   deps.closeAllOverlays()
   switch (plan.kind) {

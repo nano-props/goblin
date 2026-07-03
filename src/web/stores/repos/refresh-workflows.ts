@@ -15,7 +15,7 @@ import {
   pullRequestMergeStatusPending,
 } from '#/shared/pull-request-state.ts'
 import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
-import { readRepoBranchReadModel, repoWithBranchReadModel } from '#/web/repo-branch-read-model.ts'
+import { readRepoWithBranchReadModel } from '#/web/repo-branch-read-model.ts'
 
 function repoFresh(get: ReposGet, id: string, repoInstanceId: string): boolean {
   const repo = get().repos[id]
@@ -30,7 +30,7 @@ function pullRequestRefreshFailed(get: ReposGet, id: string, repoInstanceId: str
 function visibleDetailPullRequestPending(get: ReposGet, id: string, repoInstanceId: string): boolean {
   const repo = get().repos[id]
   if (!repo) return false
-  const projectedRepo = repoWithBranchReadModel(repo, readRepoBranchReadModel(repo))
+  const projectedRepo = readRepoWithBranchReadModel(repo)
   const target = workspacePaneTabsTargetForSelectedBranch(projectedRepo)
   const openStaticTabs = workspacePaneStaticTabsFromEntries(readWorkspacePaneTabsForSelectedBranch(projectedRepo))
   if (
@@ -49,7 +49,7 @@ function visibleDetailPullRequestPending(get: ReposGet, id: string, repoInstance
 async function refreshVisibleDetailPullRequest(get: ReposGet, id: string, repoInstanceId: string): Promise<void> {
   const repo = get().repos[id]
   if (!repo) return
-  const projectedRepo = repoWithBranchReadModel(repo, readRepoBranchReadModel(repo))
+  const projectedRepo = readRepoWithBranchReadModel(repo)
   const target = workspacePaneTabsTargetForSelectedBranch(projectedRepo)
   const openStaticTabs = workspacePaneStaticTabsFromEntries(readWorkspacePaneTabsForSelectedBranch(projectedRepo))
   if (

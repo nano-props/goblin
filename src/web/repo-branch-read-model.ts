@@ -68,6 +68,13 @@ export function repoWithBranchReadModel<Repo extends { data: RepoState['data'] }
   return readModel ? { ...repo, data: { ...repo.data, ...readModel } } : repo
 }
 
+export function readRepoWithBranchReadModel<Repo extends Pick<RepoState, 'id' | 'instanceId'> & { data: RepoState['data'] }>(
+  repo: Repo,
+  queryClient?: QueryClient,
+): Repo {
+  return repoWithBranchReadModel(repo, readRepoBranchReadModel(repo, queryClient))
+}
+
 export function repoBranchesFromReadModel(
   repo: Pick<RepoState, 'data'>,
   readModel: Pick<RepoBranchReadModelData, 'branches'> | null,

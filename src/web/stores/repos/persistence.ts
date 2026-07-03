@@ -5,7 +5,7 @@ import { selectedBranchForBranchSet } from '#/web/stores/repos/branch-view-mode.
 import type { RepoSnapshotCacheEntry, RepoState } from '#/web/stores/repos/types.ts'
 import { finishDataLoadSuccess } from '#/web/stores/repos/repo-data-load-state.ts'
 import { stripBranchWorktreeMetadata } from '#/web/stores/repos/worktree-state.ts'
-import { readRepoBranchReadModel, repoWithBranchReadModel } from '#/web/repo-branch-read-model.ts'
+import { readRepoWithBranchReadModel } from '#/web/repo-branch-read-model.ts'
 const MAX_CACHE_AGE_MS = 14 * 24 * 60 * 60 * 1000
 const MAX_REPOS = 50
 const FiniteNumber = v.pipe(v.number(), v.finite())
@@ -93,7 +93,7 @@ export function restoreRepoProjectionFromCacheEntry(
 export function persistRepoSnapshotCacheEntry(set: ReposSet, repo: RepoState | undefined, repoInstanceId: string): void {
   if (!repo) return
   if (repo.instanceId !== repoInstanceId) return
-  const projectedRepo = repoWithBranchReadModel(repo, readRepoBranchReadModel(repo))
+  const projectedRepo = readRepoWithBranchReadModel(repo)
   const entry = repoSnapshotCacheEntryFromRepo(projectedRepo)
   if (!entry) return
   set((s) => {
