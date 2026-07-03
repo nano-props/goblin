@@ -3,8 +3,10 @@ import type { RepoSessionHydrationOptions, ReposGet, ReposSet, ReposStore } from
 import {
   insertPlaceholderRepo,
   addResolvedRepo,
+  closeRepoRuntimeInstanceWithCache,
   createRuntimeRepoSessionActions,
   openLocalRepoRuntimeForInput,
+  openRepoRuntimeInstanceWithCache,
   refreshInitialRepoState,
   type RuntimeOpenResolvedRepo,
 } from '#/web/stores/repos/repo-session-write-paths.ts'
@@ -12,7 +14,6 @@ import { runRemoteRepoConnection } from '#/web/stores/repos/remote-repo-connecti
 import { activeRepoIdAfterWorkspaceHydration } from '#/web/open-workspace-state.ts'
 import { isRemoteRepoId, localRepoSessionEntry, type RepoSessionEntry } from '#/shared/remote-repo.ts'
 import { restoreSessionWorkspacePaneStateInRepos } from '#/web/stores/repos/workspace-pane-session-restore.ts'
-import { closeRepoRuntimeInstance, openRepoRuntimeInstance } from '#/web/repo-client.ts'
 
 interface InitialRepoRefresh {
   id: string
@@ -58,7 +59,7 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
         if (signal?.aborted) throw new Error('aborted')
         const existing = runtimeInstanceIdPromiseByRepoId.get(repoId)
         if (existing) return existing
-        const created = openRepoRuntimeInstance(repoId)
+        const created = openRepoRuntimeInstanceWithCache(repoId)
         runtimeInstanceIdPromiseByRepoId.set(repoId, created)
         return created
       }
@@ -91,7 +92,7 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
             return
           }
           if (signal?.aborted) {
-            void closeRepoRuntimeInstance(runtimeRepoRoot, instanceId).catch(() => {
+            void closeRepoRuntimeInstanceWithCache(runtimeRepoRoot, instanceId).catch(() => {
               /* abort rollback is best-effort; next open re-establishes authority */
             })
             return

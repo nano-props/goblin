@@ -1,6 +1,7 @@
 import type { RepoSessionEntry, RemoteRepoTarget } from '#/shared/remote-repo.ts'
 import { resolveServerRemoteRepoConnection, type RemoteRepoConnectionDeps } from '#/server/modules/remote.ts'
 import { createBranchSnapshot, installGoblinTestBridge, resetReposStore } from '#/web/test-utils/bridge.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 export const REPO_A = '/tmp/gbl-lifecycle-a'
 export const REPO_B = '/tmp/gbl-lifecycle-b'
 export const branchSnapshot = createBranchSnapshot
@@ -99,4 +100,5 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
 
 export function resetLifecycleTest(): void {
   resetReposStore()
+  primaryWindowQueryClient.clear()
 }

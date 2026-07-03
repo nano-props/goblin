@@ -624,6 +624,11 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         if (closed && state) state.currentInstanceId = null
         return { ok: true as const, closed }
       }
+      const listRepoRuntime = () => ({
+        instances: Array.from(repoRuntimeState.entries()).flatMap(([repoRoot, state]) =>
+          state.currentInstanceId ? [{ repoRoot, repoInstanceId: state.currentInstanceId }] : [],
+        ),
+      })
       const result = (() => {
         if (url.pathname === '/api/settings') return call('settings.get', undefined)
         if (url.pathname === '/api/i18n') return call('i18n.get', undefined)
@@ -664,6 +669,9 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         if (url.pathname === '/api/repo/background-sync-repos') return call('repo.backgroundSyncRepos', body)
         if (url.pathname === '/api/repo/runtime-open') {
           return handlers['repo.runtimeOpen'] ? call('repo.runtimeOpen', body) : openRepoRuntime(body)
+        }
+        if (url.pathname === '/api/repo/runtime-list') {
+          return handlers['repo.runtimeList'] ? call('repo.runtimeList', body) : listRepoRuntime()
         }
         if (url.pathname === '/api/repo/runtime-close') {
           return handlers['repo.runtimeClose'] ? call('repo.runtimeClose', body) : closeRepoRuntime(body)

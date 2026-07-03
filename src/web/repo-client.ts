@@ -3,6 +3,7 @@ import { postServerJson } from '#/web/lib/server-fetch.ts'
 import type {
   CloneRepoResult,
   PullRequestEntry,
+  RepoRuntimeInstancesSnapshot,
   RepoRuntimeOpenResult,
   RepoSnapshot,
   RepoLogResponse,
@@ -225,13 +226,17 @@ export async function openRepoRuntimeForInput(repoInput: string): Promise<RepoRu
   return await postServerJson<{ repoInput: string }, RepoRuntimeOpenResult>('/api/repo/runtime-open', { repoInput })
 }
 
+export async function listRepoRuntimeInstances(): Promise<RepoRuntimeInstancesSnapshot> {
+  return await postServerJson<Record<string, never>, RepoRuntimeInstancesSnapshot>('/api/repo/runtime-list', {})
+}
+
 export async function closeRepoRuntimeInstance(repoRoot: string, repoInstanceId: string): Promise<boolean> {
-  const result = await postServerJson<
-    { repoRoot: string; repoInstanceId: string },
-    { ok: boolean; closed: boolean }
-  >('/api/repo/runtime-close', {
-    repoRoot,
-    repoInstanceId,
-  })
+  const result = await postServerJson<{ repoRoot: string; repoInstanceId: string }, { ok: boolean; closed: boolean }>(
+    '/api/repo/runtime-close',
+    {
+      repoRoot,
+      repoInstanceId,
+    },
+  )
   return result.closed
 }

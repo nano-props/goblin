@@ -36,6 +36,7 @@ import { userIdFromContext } from '#/server/common/identity.ts'
 import {
   closeRepoRuntimeInstance,
   getOrOpenRepoRuntimeInstance,
+  listRepoRuntimeInstances,
   openRepoRuntimeInstance,
 } from '#/server/modules/repo-runtime-instances.ts'
 import { REPO_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
@@ -294,6 +295,12 @@ export function createRepoRoutes() {
       })
     }
     return c.json({ ok: true as const, repoInstanceId: openRepoRuntimeInstance(userId, input.repoRoot) })
+  })
+  app.post('/runtime-list', async (c) => {
+    const userId = userIdFromContext(c)
+    if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
+    await parseHttpBody(REPO_PROCEDURE_SCHEMAS.runtimeList, c)
+    return c.json({ instances: listRepoRuntimeInstances(userId) })
   })
   app.post('/runtime-close', async (c) => {
     const userId = userIdFromContext(c)

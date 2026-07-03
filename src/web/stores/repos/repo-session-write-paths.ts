@@ -12,6 +12,11 @@ import {
 } from '#/web/repo-client.ts'
 import { resolveRemoteRepositoryTarget } from '#/web/remote-client.ts'
 import { recordRecentRepo } from '#/web/settings-actions.ts'
+import {
+  invalidateRepoRuntimeInstances,
+  removeRepoRuntimeInstanceFromCache,
+  updateRepoRuntimeInstanceCache,
+} from '#/web/repo-runtime-query.ts'
 import { runRemoteRepoConnection } from '#/web/stores/repos/remote-repo-connection-orchestrator.ts'
 import {
   markRemoteLifecycleConnecting,
@@ -113,12 +118,25 @@ export async function openLocalRepoRuntimeForInput(input: string | RepoSessionEn
       repoInstanceId: null,
     }
   }
+  updateRepoRuntimeInstanceCache({ repoRoot: opened.repo.id, repoInstanceId: opened.repoInstanceId })
   return {
     input: entry.id,
     reason: null,
     repo: opened.repo,
     repoInstanceId: opened.repoInstanceId,
   }
+}
+
+export async function openRepoRuntimeInstanceWithCache(repoRoot: string): Promise<string> {
+  const repoInstanceId = await openRepoRuntimeInstance(repoRoot)
+  updateRepoRuntimeInstanceCache({ repoRoot, repoInstanceId })
+  return repoInstanceId
+}
+
+export async function closeRepoRuntimeInstanceWithCache(repoRoot: string, repoInstanceId: string): Promise<void> {
+  const closed = await closeRepoRuntimeInstance(repoRoot, repoInstanceId)
+  if (closed) removeRepoRuntimeInstanceFromCache({ repoRoot, repoInstanceId })
+  else invalidateRepoRuntimeInstances()
 }
 
 function orderedInsert(order: string[], id: string, rankById?: ReadonlyMap<string, number>): string[] {
@@ -377,7 +395,7 @@ export function createRuntimeRepoSessionActions(
         // store entry; the orchestrator will fill in target +
         // trigger refresh on settle.
         if (!get().repos[entry.id]) {
-          const instanceId = await openRepoRuntimeInstance(entry.id)
+          const instanceId = await openRepoRuntimeInstanceWithCache(entry.id)
           set((s) => {
             const result = insertPlaceholderRepo(
               { repos: s.repos, repoSnapshotCache: s.repoSnapshotCache, order: s.order },
@@ -401,7 +419,8 @@ export function createRuntimeRepoSessionActions(
       // Local probe stays on the legacy path — there's no remote
       // lifecycle to converge and no orchestrator concern.
       const resolved = await openLocalRepoRuntimeForInput(entry)
-      if (!resolved.repo || !resolved.repoInstanceId) return { ok: false, message: resolved.reason ?? 'error.not-git-repo' }
+      if (!resolved.repo || !resolved.repoInstanceId)
+        return { ok: false, message: resolved.reason ?? 'error.not-git-repo' }
       const repo = resolved.repo
       const { id } = repo
       const instanceId = resolved.repoInstanceId
@@ -460,8 +479,8 @@ export function createRuntimeRepoSessionActions(
         }
       })
       if (typeof repoInstanceId === 'string') {
-        void closeRepoRuntimeInstance(id, repoInstanceId).catch(() => {
-          /* close is best-effort; stale repoInstanceId paths already fail server-side */
+        void closeRepoRuntimeInstanceWithCache(id, repoInstanceId).catch(() => {
+          invalidateRepoRuntimeInstances()
         })
       }
     },

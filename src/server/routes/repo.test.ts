@@ -212,6 +212,31 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     await expect(response.json()).resolves.toEqual({ ok: false, input: '/missing', reason: 'missing' })
   })
 
+  test('runtime-list returns the server-owned open runtime instances for the user', async () => {
+    const app = createTestRepoRoutes()
+
+    const openResponse = await app.request(
+      new Request('http://localhost/runtime-open', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ repoRoot: '/tmp/runtime-list-repo' }),
+      }),
+    )
+    const opened = (await openResponse.json()) as { ok: true; repoInstanceId: string }
+
+    const response = await app.request(
+      new Request('http://localhost/runtime-list', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    const json = (await response.json()) as { instances: Array<{ repoRoot: string; repoInstanceId: string }> }
+    expect(json.instances).toContainEqual({ repoRoot: '/tmp/runtime-list-repo', repoInstanceId: opened.repoInstanceId })
+  })
+
   test('passes worktree bootstrap preview requests through to the module layer', async () => {
     mocks.getRepoWorktreeBootstrapPreview.mockResolvedValueOnce({
       ok: true,

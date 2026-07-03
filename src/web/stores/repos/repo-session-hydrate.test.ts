@@ -3,7 +3,10 @@ import { localRepoSessionEntry, normalizeRemoteTarget, remoteRepoSessionEntry } 
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { deriveConnectivity } from '#/web/stores/repos/repo-guards.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { repoRuntimeInstancesQueryKey } from '#/web/repo-runtime-query.ts'
 import type { BranchSnapshotInfo } from '#/web/types.ts'
+import type { RepoRuntimeInstancesSnapshot } from '#/shared/api-types.ts'
 import {
   branchSnapshot,
   flushIpc,
@@ -44,6 +47,8 @@ describe('repo session hydration', () => {
     const repo = useReposStore.getState().repos[REPO_A]
     expect(repo).toBeDefined()
     expect(repo?.instanceId).toMatch(/^repo-instance-/)
+    const cached = primaryWindowQueryClient.getQueryData<RepoRuntimeInstancesSnapshot>(repoRuntimeInstancesQueryKey())
+    expect(cached?.instances).toEqual([{ repoRoot: REPO_A, repoInstanceId: repo!.instanceId }])
     await vi.waitFor(() => {
       expect(calls.composite).toEqual([REPO_A])
     })

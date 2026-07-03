@@ -4,6 +4,9 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { BranchSnapshotInfo } from '#/web/types.ts'
 import { tabOpenerScopeKey } from '#/web/stores/repos/tab-opener.ts'
 import { createRepoBranch, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { repoRuntimeInstancesQueryKey } from '#/web/repo-runtime-query.ts'
+import type { RepoRuntimeInstancesSnapshot } from '#/shared/api-types.ts'
 import {
   branchSnapshot,
   flushIpc,
@@ -29,6 +32,18 @@ describe('repo lifecycle', () => {
     await vi.waitFor(() => {
       expect(calls.composite).toEqual([REPO_A])
     })
+  })
+
+  test('ensureWorkspaceOpen writes server runtime membership into the query cache', async () => {
+    installGoblin()
+
+    const result = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
+
+    expect(result).toEqual({ ok: true, id: REPO_A })
+    const cached = primaryWindowQueryClient.getQueryData<RepoRuntimeInstancesSnapshot>(repoRuntimeInstancesQueryKey())
+    expect(cached?.instances).toEqual([
+      { repoRoot: REPO_A, repoInstanceId: useReposStore.getState().repos[REPO_A]!.instanceId },
+    ])
   })
 
   test('ensureWorkspaceOpen adds a repo to the open set without changing the active selection', async () => {
@@ -131,6 +146,20 @@ describe('repo lifecycle', () => {
     await flushIpc()
 
     expect(useReposStore.getState().repos[REPO_A]?.data.currentBranch).toBe('fresh')
+  })
+
+  test('closeRepo removes the closed server runtime membership from the query cache', async () => {
+    installGoblin()
+
+    const result = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
+    expect(result).toEqual({ ok: true, id: REPO_A })
+    const repoInstanceId = useReposStore.getState().repos[REPO_A]!.instanceId
+
+    useReposStore.getState().closeRepo(REPO_A)
+    await vi.waitFor(() => {
+      const cached = primaryWindowQueryClient.getQueryData<RepoRuntimeInstancesSnapshot>(repoRuntimeInstancesQueryKey())
+      expect(cached?.instances).not.toContainEqual({ repoRoot: REPO_A, repoInstanceId })
+    })
   })
 
   test('ensureWorkspaceOpen preserves remote target metadata for recent repos and later actions', async () => {
