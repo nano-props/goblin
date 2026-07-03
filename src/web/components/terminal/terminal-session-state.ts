@@ -44,8 +44,10 @@ export class TerminalSessionState {
     replayPendingOutput: [],
     replayGeneration: 0,
   }
-  /** Client-only terminal UI state such as search/progress. This is safe
-   *  to discard when the active terminal view is torn down. */
+  /** Client-only terminal UI state such as search/progress. Progress comes
+   *  from the browser xterm ProgressAddon parsing OSC 9;4 in raw output; the
+   *  server scanner intentionally does not emit progress metadata events. This
+   *  state is safe to discard when the active terminal view is torn down. */
   private transientViewState: {
     searchResult: TerminalSearchResult | null
     progressState: TerminalProgressState | null

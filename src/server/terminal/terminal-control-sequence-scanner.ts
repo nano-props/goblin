@@ -16,6 +16,9 @@ export interface TerminalControlSequenceScannerState {
   titleTooLong: boolean
 }
 
+// Only emit metadata that needs server-canonical ordering. OSC 9;4
+// progress sequences are intentionally left as raw output for the browser
+// xterm ProgressAddon, where progress is transient client UI state.
 export type TerminalControlSequenceEvent = { type: 'bell' } | { type: 'title'; title: string | null }
 
 export interface TerminalControlSequenceScanResult {
