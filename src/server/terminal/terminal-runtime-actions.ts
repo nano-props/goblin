@@ -1,4 +1,4 @@
-import { isValidCwd, isValidRepoLocator } from '#/shared/input-validation.ts'
+import { isValidBranch, isValidCwd, isValidRepoLocator } from '#/shared/input-validation.ts'
 import type {
   TerminalAttachInput,
   TerminalAttachResult,
@@ -84,6 +84,14 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
     },
 
     async create(clientId: string, userId: string, input: TerminalCreateInput): Promise<TerminalCreateResult> {
+      if (
+        !isValidTerminalClientId(clientId) ||
+        !isValidRepoLocator(input?.repoRoot) ||
+        !isValidBranch(input?.branch) ||
+        !isValidCwd(input?.worktreePath)
+      ) {
+        return { ok: false, message: 'error.invalid-arguments' }
+      }
       if (!isCurrentRepoInstance(userId, input.repoRoot, input.repoInstanceId)) {
         return { ok: false, message: 'error.repo-instance-stale' }
       }

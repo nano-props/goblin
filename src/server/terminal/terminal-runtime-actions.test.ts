@@ -141,6 +141,24 @@ describe('terminal-runtime-actions close broadcast', () => {
     expect(broadcasts).not.toHaveBeenCalled()
   })
 
+  test('rejects invalid create input before checking repo instance freshness', async () => {
+    clearRepoRuntimeInstancesForUser(USER_ID)
+    const { actions, broadcasts, sessionService } = makeActions()
+
+    await expect(
+      actions.create(CLIENT_ID, USER_ID, {
+        repoRoot: '',
+        repoInstanceId: 'repo-instance-stale',
+        branch: 'feature/worktree',
+        worktreePath: '/repo',
+        kind: 'additional',
+      }),
+    ).resolves.toEqual({ ok: false, message: 'error.invalid-arguments' })
+
+    expect(sessionService.create).not.toHaveBeenCalled()
+    expect(broadcasts).not.toHaveBeenCalled()
+  })
+
   test('emits targeted close broadcast on a successful close', async () => {
     // Repo/session-list invalidation is owned by the manager close
     // lifecycle. The action owns only the targeted sibling-window

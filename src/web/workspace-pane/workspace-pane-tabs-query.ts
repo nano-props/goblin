@@ -10,11 +10,14 @@ import {
 import { terminalClient } from '#/web/terminal.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { defaultWorkspacePaneTabs, normalizeWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs.ts'
+import { gblLog } from '#/web/logger.ts'
 
 export type WorkspacePaneTabsQueryData = WorkspacePaneTabsEntry[]
 
 let workspacePaneTabsPersistenceVersion = 0
 const workspacePaneTabsPersistenceListeners = new Set<() => void>()
+const workspacePaneTabsProjectionGeneration = new Map<string, number>()
+const workspacePaneTabsRefreshSequence = new Map<string, number>()
 
 export function workspacePaneTabsQueryKey(repoRoot: string, repoInstanceId: string) {
   return ['workspace-pane-tabs', repoRoot, repoInstanceId] as const
@@ -129,7 +132,9 @@ export function refreshWorkspacePaneTabs(
   repoInstanceId: string,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
-  void refreshWorkspacePaneTabsQueryData(repoRoot, repoInstanceId, queryClient)
+  void refreshWorkspacePaneTabsQueryData(repoRoot, repoInstanceId, queryClient).catch((err) => {
+    gblLog.warn('workspace pane tabs refresh failed', { repoRoot, repoInstanceId, err })
+  })
 }
 
 export async function refreshWorkspacePaneTabsQueryData(
@@ -137,8 +142,12 @@ export async function refreshWorkspacePaneTabsQueryData(
   repoInstanceId: string,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): Promise<void> {
+  const key = workspacePaneTabsProjectionKey(repoRoot, repoInstanceId)
+  const requestId = nextWorkspacePaneTabsRefreshSequence(key)
+  const startedGeneration = workspacePaneTabsProjectionGeneration.get(key) ?? 0
   await queryClient.cancelQueries({ queryKey: workspacePaneTabsQueryKey(repoRoot, repoInstanceId), exact: true })
   const entries = await fetchWorkspacePaneTabsQueryData(repoRoot, repoInstanceId)
+  if (!isCurrentWorkspacePaneTabsRefresh(key, requestId, startedGeneration)) return
   replaceWorkspacePaneTabsQueryData(repoRoot, repoInstanceId, entries, queryClient)
 }
 
@@ -170,6 +179,23 @@ function notifyWorkspacePaneTabsPersistenceChanged(): void {
   for (const listener of workspacePaneTabsPersistenceListeners) listener()
 }
 
+function workspacePaneTabsProjectionKey(repoRoot: string, repoInstanceId: string): string {
+  return `${repoRoot}\0${repoInstanceId}`
+}
+
+function nextWorkspacePaneTabsRefreshSequence(key: string): number {
+  const next = (workspacePaneTabsRefreshSequence.get(key) ?? 0) + 1
+  workspacePaneTabsRefreshSequence.set(key, next)
+  return next
+}
+
+function isCurrentWorkspacePaneTabsRefresh(key: string, requestId: number, startedGeneration: number): boolean {
+  return (
+    workspacePaneTabsRefreshSequence.get(key) === requestId &&
+    (workspacePaneTabsProjectionGeneration.get(key) ?? 0) === startedGeneration
+  )
+}
+
 async function fetchWorkspacePaneTabsQueryData(
   repoRoot: string,
   repoInstanceId: string,
@@ -183,10 +209,12 @@ function updateWorkspacePaneTabsQueryData(
   queryClient: QueryClient,
   update: (current: WorkspacePaneTabsQueryData | undefined) => readonly WorkspacePaneTabsEntry[],
 ): void {
+  const key = workspacePaneTabsProjectionKey(repoRoot, repoInstanceId)
   queryClient.setQueryData<WorkspacePaneTabsQueryData>(
     workspacePaneTabsQueryKey(repoRoot, repoInstanceId),
     (current) => normalizeWorkspacePaneTabsQueryData(update(current)),
   )
+  workspacePaneTabsProjectionGeneration.set(key, (workspacePaneTabsProjectionGeneration.get(key) ?? 0) + 1)
   notifyWorkspacePaneTabsPersistenceChanged()
 }
 

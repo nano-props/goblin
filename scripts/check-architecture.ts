@@ -155,15 +155,32 @@ export function extractImports(source: string, filePath: string): ImportReferenc
   return values
 }
 
-function importMatchesRule(importPath: string, rule: Rule): boolean {
-  return rule.disallow.some((pattern) =>
-    typeof pattern === 'string' ? importPath === pattern || importPath.startsWith(pattern) : pattern.test(importPath),
-  )
+function canonicalImportPath(importPath: string, relativeFilePath: string): string {
+  if (importPath.startsWith('#/')) return `/src/${importPath.slice(2)}`
+  if (importPath.startsWith('.')) {
+    return path.posix.normalize(path.posix.join(path.posix.dirname(relativeFilePath), importPath))
+  }
+  return importPath
+}
+
+function importMatchesRule(importPath: string, relativeFilePath: string, rule: Rule): boolean {
+  const candidates = new Set([importPath, canonicalImportPath(importPath, relativeFilePath)])
+  return rule.disallow.some((pattern) => {
+    if (typeof pattern !== 'string') return [...candidates].some((candidate) => pattern.test(candidate))
+    const canonicalPattern = canonicalImportPath(pattern, relativeFilePath)
+    return [...candidates].some(
+      (candidate) =>
+        candidate === pattern ||
+        candidate.startsWith(pattern) ||
+        candidate === canonicalPattern ||
+        candidate.startsWith(canonicalPattern),
+    )
+  })
 }
 
 export function violatesRule(relativeFilePath: string, importRef: ImportReference, rule: Rule): boolean {
   if (!relativeFilePath.startsWith(rule.fromPrefix)) return false
-  if (!importMatchesRule(importRef.importPath, rule)) return false
+  if (!importMatchesRule(importRef.importPath, relativeFilePath, rule)) return false
   const allowedImports = rule.allowedImportsByFile?.[relativeFilePath]
   if (!allowedImports) return true
   if (importRef.importedNames === null) return true

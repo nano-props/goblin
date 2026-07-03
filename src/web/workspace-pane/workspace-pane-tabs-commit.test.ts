@@ -6,6 +6,7 @@ import { commitWorkspacePaneTabs, updateWorkspacePaneTabs } from '#/web/workspac
 import { installWorkspacePaneTabsTestBridge, resetReposStore } from '#/web/test-utils/bridge.ts'
 import {
   readWorkspacePaneTabsForTarget,
+  refreshWorkspacePaneTabsQueryData,
   setWorkspacePaneTabsForTargetQueryData,
   workspacePaneTabsQueryOptions,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
@@ -178,6 +179,45 @@ describe('commitWorkspacePaneTabs', () => {
       },
     ])
     await fetch
+
+    expect(readWorkspacePaneTabs()).toEqual([
+      workspacePaneTerminalTabEntry('session-1'),
+      workspacePaneStaticTabEntry('status'),
+    ])
+  })
+
+  test('ignores a stale manual refresh that resolves after committed tabs are written', async () => {
+    let resolveListTabs!: (tabs: WorkspacePaneTabsEntry[]) => void
+    const listTabs = new Promise<WorkspacePaneTabsEntry[]>((resolve) => {
+      resolveListTabs = resolve
+    })
+    installWorkspacePaneTabsTestBridge({
+      listWorkspaceTabs: async () => await listTabs,
+      replaceWorkspaceTabs: async (input) => [...input.tabs],
+    })
+
+    const refresh = refreshWorkspacePaneTabsQueryData(REPO_ROOT, REPO_INSTANCE_ID)
+    await Promise.resolve()
+
+    await expect(
+      commitWorkspacePaneTabs({
+        repoRoot: REPO_ROOT,
+        repoInstanceId: REPO_INSTANCE_ID,
+        branchName: BRANCH_NAME,
+        worktreePath: WORKTREE_PATH,
+        tabs: [workspacePaneTerminalTabEntry('session-1'), workspacePaneStaticTabEntry('status')],
+      }),
+    ).resolves.toMatchObject({ ok: true })
+
+    resolveListTabs([
+      {
+        repoRoot: REPO_ROOT,
+        branchName: BRANCH_NAME,
+        worktreePath: WORKTREE_PATH,
+        tabs: [workspacePaneStaticTabEntry('history')],
+      },
+    ])
+    await refresh
 
     expect(readWorkspacePaneTabs()).toEqual([
       workspacePaneTerminalTabEntry('session-1'),

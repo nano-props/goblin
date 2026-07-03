@@ -40,4 +40,19 @@ describe('architecture boundary rules', () => {
       ),
     ])
   })
+
+  test('rejects relative imports that resolve to settings-client', () => {
+    expect(
+      checkArchitectureSources([
+        {
+          relativeFilePath: '/src/web/components/settings/GeneralSettings.tsx',
+          source: "import { setThemePref } from '../../settings-client.ts'\n",
+        },
+      ]),
+    ).toEqual([
+      expect.stringContaining(
+        '/src/web/components/settings/GeneralSettings.tsx: disallowed import "../../settings-client.ts"',
+      ),
+    ])
+  })
 })
