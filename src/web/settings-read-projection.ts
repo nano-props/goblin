@@ -1,5 +1,6 @@
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { settingsSnapshotQueryKey, useSettingsSnapshotQuery } from '#/web/settings-queries.ts'
+import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
+import { useSettingsSnapshotQuery } from '#/web/settings-queries.ts'
 import type {
   ExternalAppsSnapshot,
   RuntimeRecentReposState,

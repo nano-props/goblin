@@ -5,7 +5,7 @@ import { createTerminalBellState } from '#/web/components/terminal/terminal-bell
 import type { TerminalDescriptor } from '#/web/components/terminal/types.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { settingsSnapshotQueryKey } from '#/web/settings-queries.ts'
+import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 
 const descriptor: TerminalDescriptor = {
   terminalSessionId: 'session-1',

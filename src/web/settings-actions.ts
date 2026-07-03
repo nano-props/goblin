@@ -1,5 +1,5 @@
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
-import type { GlobalShortcutState, WorkspaceSessionState } from '#/shared/api-types.ts'
+import type { GlobalShortcutState, I18nSnapshot, ThemeState, WorkspaceSessionState } from '#/shared/api-types.ts'
 import { settingsLog } from '#/web/logger.ts'
 import {
   addRecentRepo,
@@ -9,12 +9,17 @@ import {
   saveSession,
   setGlobalShortcut as setSettingsGlobalShortcut,
   setGlobalShortcutDisabled as setSettingsGlobalShortcutDisabled,
+  setI18nPref as setSettingsI18nPref,
   setLanEnabled as setSettingsLanEnabled,
   setRecentWorkspaceExternalApp,
   setSettingsFetchInterval,
   setShortcutsDisabled as setSettingsShortcutsDisabled,
   setTerminalNotificationsEnabled as setSettingsTerminalNotificationsEnabled,
+  setThemeColorTheme as setSettingsThemeColorTheme,
+  setThemePref as setSettingsThemePref,
 } from '#/web/settings-client.ts'
+import type { ColorTheme } from '#/shared/color-theme.ts'
+import type { LangPref, ThemePref } from '#/shared/settings.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import {
   externalAppsQueryKey,
@@ -81,6 +86,32 @@ export async function setGlobalShortcut(accelerator: string): Promise<GlobalShor
     globalShortcutRegistered: state.registered,
   }))
   return state
+}
+
+export async function setThemePreference(pref: ThemePref): Promise<ThemeState> {
+  const state = await setSettingsThemePref(pref)
+  updateRuntimeSettingsSnapshotCache(primaryWindowQueryClient, (current) => ({
+    ...current,
+    theme: state.pref,
+    colorTheme: state.colorTheme,
+  }))
+  return state
+}
+
+export async function setThemeColorThemePreference(colorTheme: ColorTheme): Promise<ThemeState> {
+  const state = await setSettingsThemeColorTheme(colorTheme)
+  updateRuntimeSettingsSnapshotCache(primaryWindowQueryClient, (current) => ({
+    ...current,
+    theme: state.pref,
+    colorTheme: state.colorTheme,
+  }))
+  return state
+}
+
+export async function setI18nPreference(pref: LangPref): Promise<I18nSnapshot> {
+  const snapshot = await setSettingsI18nPref(pref)
+  updateRuntimeSettingsSnapshotCache(primaryWindowQueryClient, (current) => ({ ...current, lang: snapshot.pref }))
+  return snapshot
 }
 
 export async function refreshExternalAppsDetection(): Promise<void> {
