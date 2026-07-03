@@ -10,7 +10,7 @@ import {
 import type { PullRequestEntry, RepoSnapshot } from '#/shared/api-types.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT, type PullRequestFetchMode, type WorktreeStatus } from '#/shared/git-types.ts'
 
-export interface RepoBulkReadCacheEntry {
+interface RepoBulkReadCacheEntry {
   snapshot: RepoSnapshot | null
   status: WorktreeStatus[]
   pullRequests: PullRequestEntry[] | null
@@ -67,14 +67,14 @@ export function repoSnapshotQueryOptions(repoRoot: string, repoInstanceId: strin
   })
 }
 
-export function repoStatusQueryOptions(repoRoot: string, repoInstanceId: string) {
+function repoStatusQueryOptions(repoRoot: string, repoInstanceId: string) {
   return queryOptions({
     queryKey: repoStatusQueryKey(repoRoot, repoInstanceId),
     queryFn: ({ signal }) => getRepoStatus(repoRoot, signal),
   })
 }
 
-export function repoPullRequestsQueryOptions(
+function repoPullRequestsQueryOptions(
   repoRoot: string,
   repoInstanceId: string,
   branches?: readonly string[],
@@ -86,7 +86,7 @@ export function repoPullRequestsQueryOptions(
   })
 }
 
-export function repoLogQueryOptions(
+function repoLogQueryOptions(
   repoRoot: string,
   repoInstanceId: string,
   branch: string,
@@ -101,7 +101,7 @@ export function repoLogQueryOptions(
   })
 }
 
-export function repoRemoteBranchesQueryOptions(
+function repoRemoteBranchesQueryOptions(
   repoRoot: string,
   repoInstanceId: string,
   options: { enabled?: boolean } = {},
