@@ -164,7 +164,7 @@ vi.mock('#/system/terminals.ts', () => ({
 }))
 
 vi.mock('#/system/editors.ts', () => ({
-  getEditorAppAvailability: vi.fn(() => ({ vscode: false, cursor: false, windsurf: false })),
+  getEditorAppAvailability: vi.fn(() => ({ vscode: false })),
   openInPreferredEditor: vi.fn(),
   openRemoteInPreferredEditor: vi.fn(),
 }))

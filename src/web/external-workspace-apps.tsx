@@ -1,12 +1,11 @@
 import type { ComponentType } from 'react'
 import type { EditorAppAvailability, EditorApp, TerminalApp, TerminalAppAvailability } from '#/shared/api-types.ts'
+import type { WorkspaceExternalAppId } from '#/shared/repo-settings.ts'
 import {
   AppleTerminalIcon,
-  CursorIcon,
   FinderIcon,
   GhosttyIcon,
   VSCodeIcon,
-  WindsurfIcon,
 } from '#/web/components/ExternalAppIcon/index.tsx'
 
 export type WorkspaceExternalTerminalApp = Extract<TerminalApp, 'ghostty' | 'terminal'>
@@ -62,22 +61,6 @@ export const WORKSPACE_EXTERNAL_EDITOR_APPS = [
     Icon: VSCodeIcon,
     supportsRemote: true,
   },
-  {
-    kind: 'editor',
-    app: 'cursor',
-    id: 'editor:cursor',
-    labelKey: 'settings.editor.cursor',
-    Icon: CursorIcon,
-    supportsRemote: true,
-  },
-  {
-    kind: 'editor',
-    app: 'windsurf',
-    id: 'editor:windsurf',
-    labelKey: 'settings.editor.windsurf',
-    Icon: WindsurfIcon,
-    supportsRemote: true,
-  },
 ] as const satisfies readonly WorkspaceExternalEditorAppItem[]
 
 export const WORKSPACE_EXTERNAL_FINDER_APPS = [
@@ -95,6 +78,27 @@ export const WORKSPACE_EXTERNAL_APPS = [
   ...WORKSPACE_EXTERNAL_EDITOR_APPS,
   ...WORKSPACE_EXTERNAL_FINDER_APPS,
 ] as const satisfies readonly WorkspaceExternalAppItem[]
+
+// Compile-time guard: every item id in WORKSPACE_EXTERNAL_APPS must
+// be a member of the shared `WorkspaceExternalAppId` union, otherwise
+// the server-side normalizer would reject the value as unknown. This
+// is a two-way check — both `_RegisteredIds extends
+// WorkspaceExternalAppId` (catches an id in the web array that isn't
+// in the shared set) and `WorkspaceExternalAppId extends
+// _RegisteredIds` (catches a shared set entry that has no matching
+// web item, which would be a dead id the user can never pick).
+//
+// Adding a new editor (e.g. WebStorm as `'editor:webstorm'`) requires
+// updating BOTH sides — the guard will fail to typecheck if either
+// side is missed. See the full checklist in `src/system/editors.ts`.
+type _RegisteredIds = (typeof WORKSPACE_EXTERNAL_APPS)[number]['id']
+type _AssertAllRegisteredIdsAreKnown = _RegisteredIds extends WorkspaceExternalAppId
+  ? WorkspaceExternalAppId extends _RegisteredIds
+    ? true
+    : false
+  : false
+const _allRegisteredIdsKnown: _AssertAllRegisteredIdsAreKnown = true
+void _allRegisteredIdsKnown
 
 export function workspaceExternalAppAvailable(
   item: WorkspaceExternalAppItem,

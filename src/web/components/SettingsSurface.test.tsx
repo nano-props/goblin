@@ -59,7 +59,7 @@ function defaultIpcResult(path: string, input?: unknown) {
       },
       editor: {
         available: false,
-        appAvailability: { vscode: false, cursor: false, windsurf: false },
+        appAvailability: { vscode: false },
         detectedAt: 0,
       },
     }

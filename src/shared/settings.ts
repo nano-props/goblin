@@ -5,7 +5,7 @@ export type ResolvedTheme = 'light' | 'dark'
 export type LangPref = 'auto' | 'en' | 'zh' | 'ko' | 'ja'
 export type Lang = 'en' | 'zh' | 'ko' | 'ja'
 export type TerminalApp = 'ghostty' | 'terminal' | 'windowsTerminal'
-export type EditorApp = 'vscode' | 'cursor' | 'windsurf'
+export type EditorApp = 'vscode'
 export type TerminalAppAvailability = Record<TerminalApp, boolean>
 export type EditorAppAvailability = Record<EditorApp, boolean>
 

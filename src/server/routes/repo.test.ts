@@ -697,7 +697,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
       new Request('http://localhost/open-editor', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ path: '/tmp/repo', app: 'windsurf' }),
+        body: JSON.stringify({ path: '/tmp/repo', app: 'vscode' }),
       }),
     )
     await app.request(
@@ -709,7 +709,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
     )
 
     expect(mocks.openRepoTerminal).toHaveBeenCalledWith('/tmp/repo', 'ghostty')
-    expect(mocks.openRepoEditor).toHaveBeenCalledWith('/tmp/repo', 'windsurf')
+    expect(mocks.openRepoEditor).toHaveBeenCalledWith('/tmp/repo', 'vscode')
     expect(mocks.openRepoInFinder).toHaveBeenCalledWith('/tmp/repo')
   })
 
