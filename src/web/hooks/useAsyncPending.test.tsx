@@ -1,11 +1,31 @@
 // @vitest-environment jsdom
 
 import { act } from '@testing-library/react'
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
 import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 
 describe('useAsyncPending', () => {
+  test('runs when resetKey is omitted', () => {
+    const onRun = vi.fn()
+    const apiRef: { current: ReturnType<typeof useAsyncPending<string>> | null } = { current: null }
+
+    renderInJsdom(
+      <UseAsyncPendingHarness
+        onReady={(nextApi) => {
+          apiRef.current = nextApi
+        }}
+      />,
+    )
+
+    act(() => {
+      apiRef.current?.run('sync', onRun)
+    })
+
+    expect(onRun).toHaveBeenCalledTimes(1)
+    expect(apiRef.current?.hasPending()).toBe(false)
+  })
+
   test('resetKey clears pending without letting older promises clear newer pending', async () => {
     const first = deferred<void>()
     const second = deferred<void>()
@@ -26,7 +46,7 @@ describe('useAsyncPending', () => {
 
     expect(apiRef.current?.pending).toBe('first')
 
-    await act(async () => {
+    act(() => {
       view.rerender(
         <UseAsyncPendingHarness
           resetKey="b"
@@ -38,6 +58,7 @@ describe('useAsyncPending', () => {
     })
 
     expect(apiRef.current?.pending).toBeNull()
+    expect(apiRef.current?.hasPending()).toBe(false)
 
     await act(async () => {
       apiRef.current?.run('second', () => second.promise)
@@ -65,7 +86,7 @@ function UseAsyncPendingHarness({
   resetKey,
   onReady,
 }: {
-  resetKey: string
+  resetKey?: string
   onReady: (api: ReturnType<typeof useAsyncPending<string>>) => void
 }) {
   const api = useAsyncPending<string>({ resetKey })

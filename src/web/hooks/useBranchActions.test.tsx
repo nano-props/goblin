@@ -250,7 +250,7 @@ describe('useBranchActions', () => {
     expect(surfaceRef.current?.busyAction).toBe('terminal')
     expect(surfaceRef.current?.blocked).toBe(true)
 
-    await act(async () => {
+    act(() => {
       view.rerender(
         <BranchActionsSurfaceHarness
           repo={repo}
