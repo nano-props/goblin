@@ -17,6 +17,9 @@ export type RestoreWorkspacePaneTabsFromSessionResult =
 export async function restoreServerWorkspacePaneTabsFromSession(
   workspacePaneTabsByTargetByRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>>,
 ): Promise<RestoreWorkspacePaneTabsFromSessionResult> {
+  // Boot-only import from persisted session state into the server runtime.
+  // After this completes, runtime tab changes flow server -> query cache ->
+  // eventual session persistence; the saved session is not a live owner.
   const commits: Promise<WorkspacePaneTabsMutationResult>[] = []
   const repos = useReposStore.getState().repos
   const unresolvedRepos: string[] = []

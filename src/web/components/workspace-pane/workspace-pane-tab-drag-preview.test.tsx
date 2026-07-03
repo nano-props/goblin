@@ -1,10 +1,15 @@
 // @vitest-environment jsdom
 
 import { act } from '@testing-library/react'
+import { QueryClient } from '@tanstack/react-query'
 import { afterEach, describe, expect, test } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+import {
+  readWorkspacePaneTabsForTarget,
+  setWorkspacePaneTabsForTargetQueryData,
+} from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import {
   type WorkspacePaneTabDragPreviewInput,
   type WorkspacePaneTabDragPreviewState,
@@ -12,6 +17,7 @@ import {
 } from '#/web/components/workspace-pane/workspace-pane-tab-drag-preview.ts'
 
 const REPO_ROOT = '/tmp/workspace-pane-tab-drag-preview-repo'
+const REPO_INSTANCE_ID = 'repo-instance-test'
 const BRANCH_NAME = 'feature/worktree'
 const WORKTREE_PATH = '/tmp/workspace-pane-tab-drag-preview-worktree'
 
@@ -34,6 +40,31 @@ describe('useWorkspacePaneTabDragPreview', () => {
     })
 
     expect(currentControls().visualTabs).toEqual(reorderedTabs)
+  })
+
+  test('does not mutate workspace pane tabs query cache', () => {
+    const queryClient = new QueryClient()
+    const sourceTabs = [terminalEntry('session-1'), staticEntry('status')]
+    const reorderedTabs = [staticEntry('status'), terminalEntry('session-1')]
+    setWorkspacePaneTabsForTargetQueryData(
+      {
+        repoRoot: REPO_ROOT,
+        repoInstanceId: REPO_INSTANCE_ID,
+        branchName: BRANCH_NAME,
+        worktreePath: WORKTREE_PATH,
+        tabs: sourceTabs,
+      },
+      queryClient,
+    )
+    renderPreviewHook({ canonicalTabs: sourceTabs })
+
+    act(() => {
+      expect(currentControls().stageDragPreview(reorderedTabs)).toBe(true)
+    })
+
+    expect(currentControls().visualTabs).toEqual(reorderedTabs)
+    expect(readWorkspacePaneTabsFromQueryCache(queryClient)).toEqual(sourceTabs)
+    queryClient.clear()
   })
 
   test('clears the visual preview when canonical tabs catch up', () => {
@@ -137,6 +168,18 @@ function HookHost({ input }: { input: WorkspacePaneTabDragPreviewInput }) {
 function currentControls(): WorkspacePaneTabDragPreviewState {
   if (!controls) throw new Error('missing workspace pane tab drag preview controls')
   return controls
+}
+
+function readWorkspacePaneTabsFromQueryCache(queryClient: QueryClient): WorkspacePaneTabEntry[] {
+  return readWorkspacePaneTabsForTarget(
+    {
+      repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
+      branchName: BRANCH_NAME,
+      worktreePath: WORKTREE_PATH,
+    },
+    queryClient,
+  )
 }
 
 function terminalEntry(sessionId: string): WorkspacePaneTabEntry {

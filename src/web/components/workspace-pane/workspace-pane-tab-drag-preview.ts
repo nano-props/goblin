@@ -27,6 +27,9 @@ export interface WorkspacePaneTabDragPreviewState {
 export function useWorkspacePaneTabDragPreview(
   input: WorkspacePaneTabDragPreviewInput,
 ): WorkspacePaneTabDragPreviewState {
+  // Visual-only drag state. Runtime tab truth lives on the server and
+  // React Query only caches that server projection; this hook must not
+  // write either one.
   const targetKey = useMemo(
     () =>
       input.branchName

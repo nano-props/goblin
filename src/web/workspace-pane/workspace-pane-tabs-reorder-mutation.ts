@@ -72,6 +72,9 @@ export function useWorkspacePaneTabsReorderMutation(
             workspacePaneTabsQueryKey(target.repoRoot, target.repoInstanceId),
           )
           ?.find((entry) => workspacePaneTabsEntryMatchesTarget(entry, target))
+        // Optimistic cache only: server runtime remains canonical. Success
+        // below replaces this projection with server-returned tabs; failure
+        // restores the prior target and invalidates the list query.
         setWorkspacePaneTabsForTargetQueryData(
           {
             repoRoot: target.repoRoot,

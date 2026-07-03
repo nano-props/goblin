@@ -147,6 +147,9 @@ export async function writeCanonicalWorkspacePaneTabsForTarget(
   input: CommitWorkspacePaneTabsInput,
   queryClient?: QueryClient,
 ): Promise<void> {
+  // Server-returned tabs are the canonical runtime projection. Session
+  // persistence may observe this query cache later, but it is not a
+  // runtime source for tabs after boot restore.
   // A list query may have started while the server write was in flight.
   // Cancel again so stale list results cannot overwrite the canonical tabs.
   await cancelWorkspacePaneTabs(input.repoRoot, input.repoInstanceId, queryClient)

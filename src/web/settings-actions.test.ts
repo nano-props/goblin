@@ -185,4 +185,36 @@ describe('settings actions', () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: lanInfoQueryKey() })
     invalidateSpy.mockRestore()
   })
+
+  test('leaves runtime settings cache unchanged when the server write fails', async () => {
+    primaryWindowQueryClient.setQueryData(
+      settingsSnapshotQueryKey(),
+      defaultSettingsSnapshot({ terminalNotificationsEnabled: false }),
+    )
+    appDataClientMocks.setTerminalNotificationsEnabled.mockRejectedValue(new Error('settings unavailable'))
+    const { setTerminalNotificationsEnabled } = await import('#/web/settings-actions.ts')
+
+    await expect(setTerminalNotificationsEnabled(true)).rejects.toThrow('settings unavailable')
+
+    expect(primaryWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
+      terminalNotificationsEnabled: false,
+    })
+  })
+
+  test('uses the server shortcut registration result as the cache value', async () => {
+    primaryWindowQueryClient.setQueryData(
+      settingsSnapshotQueryKey(),
+      defaultSettingsSnapshot({ globalShortcut: 'Alt+Space', globalShortcutRegistered: true }),
+    )
+    appDataClientMocks.setGlobalShortcut.mockResolvedValue({ accelerator: 'Ctrl+Space', registered: false })
+    const { setGlobalShortcut } = await import('#/web/settings-actions.ts')
+
+    const state = await setGlobalShortcut('Ctrl+Space')
+
+    expect(state).toEqual({ accelerator: 'Ctrl+Space', registered: false })
+    expect(primaryWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
+      globalShortcut: 'Ctrl+Space',
+      globalShortcutRegistered: false,
+    })
+  })
 })

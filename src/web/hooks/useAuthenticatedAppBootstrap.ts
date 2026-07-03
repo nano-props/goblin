@@ -93,6 +93,11 @@ function finishWorkspacePaneTabsBootRestore(result: RestoreWorkspacePaneTabsFrom
       return
     case 'failed':
       bootstrapLog.warn('workspace pane tabs restore incomplete', workspacePaneTabsRestoreSummary(result))
+      // A failed tabs import should not leave session persistence blocked
+      // forever. Runtime tab truth stays on the server; the next session
+      // save will persist the reachable runtime/query projection rather
+      // than repeatedly treating the failed boot snapshot as live state.
+      useReposStore.setState({ sessionPersistenceReady: true })
       return
   }
 }

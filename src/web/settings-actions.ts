@@ -24,6 +24,8 @@ import {
   updateRuntimeSettingsSnapshotCache,
 } from '#/web/settings-query-cache.ts'
 
+// Settings actions commit to the embedded server first. React Query is the
+// window-local projection of that server result, never an independent source.
 export async function recordRecentRepo(repo: RepoSessionEntry): Promise<void> {
   const result = await addRecentRepo(repo)
   updateRuntimeRecentReposStateCache(primaryWindowQueryClient, { recentRepos: result.recentRepos })
