@@ -24,11 +24,12 @@ import { finishDataLoadError, finishDataLoadSuccess, startDataLoad } from '#/web
 import { getRepoPullRequests, getRepoSnapshot, getRepoStatus, readRepoBulk } from '#/web/repo-client.ts'
 import {
   setRepoBulkReadQueryData,
+  getRepoStatusQueryData,
   setRepoPullRequestsQueryData,
   setRepoSnapshotQueryData,
   setRepoStatusQueryData,
 } from '#/web/repo-data-query.ts'
-import { readRepoWithBranchReadModel } from '#/web/repo-branch-read-model.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import type { RepoSnapshot } from '#/shared/api-types.ts'
 import type { RepoPullRequestReason } from '#/web/stores/repos/operations.ts'
 import type { RepoState, ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
@@ -57,7 +58,8 @@ function resolvePullRequestRefreshRequest(
   }
   const mode = options?.mode ?? 'full'
   const clearMissing = options?.clearMissing ?? mode === 'full'
-  const branchNames = branchesArg ?? readRepoWithBranchReadModel(repo).data.branches.map((branch) => branch.name)
+  const branchProjection = branchesArg ? null : readRepoBranchQueryProjection(repo)
+  const branchNames = branchesArg ?? branchProjection?.branches.map((branch) => branch.name) ?? []
   if (branchNames.length === 0) return null
   if (repo.remote.hasGitHubRemote !== true) return null
   return { branchNames, requested: new Set(branchNames), mode, clearMissing }
@@ -161,7 +163,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       if (!resolved) return
       const { repoInstanceId } = resolved
       updateIfFresh(set, id, repoInstanceId, (r) => {
-        startDataLoad(r.dataLoads.snapshot, { hasData: readRepoWithBranchReadModel(r).data.branches.length > 0 })
+        startDataLoad(r.dataLoads.snapshot, { hasData: (readRepoBranchQueryProjection(r)?.branches.length ?? 0) > 0 })
       })
       await runLatestOperation({
         set,
@@ -183,7 +185,9 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
             })
             return
           }
-          await runSnapshotSuccessFlow(id, repoInstanceId, snap, ctx.isCurrent, { skipLogBackfill: options?.skipLogBackfill })
+          await runSnapshotSuccessFlow(id, repoInstanceId, snap, ctx.isCurrent, {
+            skipLogBackfill: options?.skipLogBackfill,
+          })
         },
         onError: (message) => {
           updateIfFresh(set, id, repoInstanceId, (r) => {
@@ -258,7 +262,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
         priority: 40,
         target: { key: 'status', reason: 'status' },
         selectDataLoad: (r) => r.dataLoads.status,
-        start: (r) => ({ hasData: r.data.statusLoaded || r.data.status.length > 0 }),
+        start: (r) => ({ hasData: (getRepoStatusQueryData(r.id, r.instanceId)?.length ?? 0) > 0 }),
         task: (signal) => getRepoStatus(id, signal),
         applyResult: (r, status) => {
           r.data.status = status
@@ -298,8 +302,8 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       if (!resolved) return
       const { repoInstanceId } = resolved
       updateIfFresh(set, id, repoInstanceId, (r) => {
-        startDataLoad(r.dataLoads.snapshot, { hasData: readRepoWithBranchReadModel(r).data.branches.length > 0 })
-        startDataLoad(r.dataLoads.status, { hasData: r.data.statusLoaded || r.data.status.length > 0 })
+        startDataLoad(r.dataLoads.snapshot, { hasData: (readRepoBranchQueryProjection(r)?.branches.length ?? 0) > 0 })
+        startDataLoad(r.dataLoads.status, { hasData: (getRepoStatusQueryData(r.id, r.instanceId)?.length ?? 0) > 0 })
       })
       await runLatestOperation({
         set,

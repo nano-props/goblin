@@ -16,7 +16,7 @@ import {
   workspacePaneTabsQueryKey,
   type WorkspacePaneTabsQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { readRepoWithBranchReadModel } from '#/web/repo-branch-read-model.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
 export function workspaceSessionStateFromRestorableWorkspaceState(input: {
   repos: ReposStore['repos']
@@ -61,8 +61,19 @@ function reposWithQueryBranchReadModels(repos: ReposStore['repos'], order: reado
   for (const id of order) {
     const repo = repos[id]
     if (!repo) continue
-    const projectedRepo = readRepoWithBranchReadModel(repo)
-    if (projectedRepo === repo) continue
+    const branchModel = readRepoBranchQueryProjection(repo)
+    const projectedRepo = branchModel
+      ? { ...repo, data: { ...repo.data, ...branchModel } }
+      : {
+          ...repo,
+          data: {
+            ...repo.data,
+            branches: [],
+            currentBranch: '',
+            currentHEAD: undefined,
+            worktreesByPath: {},
+          },
+        }
     if (projectedRepos === repos) projectedRepos = { ...repos }
     projectedRepos[id] = projectedRepo
   }

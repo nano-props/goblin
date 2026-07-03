@@ -29,6 +29,7 @@ import {
   readWorkspacePaneTabsForTarget,
   setWorkspacePaneTabsForTargetQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { setRepoSnapshotQueryData, setRepoStatusQueryData } from '#/web/repo-data-query.ts'
 import {
   workspacePaneTabsWithStaticTab,
   workspacePaneTabsWithoutStaticTab,
@@ -783,6 +784,11 @@ export function seedRepoState(options: {
     zenMode: DEFAULT_ZEN_MODE,
     workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
   })
+  setRepoSnapshotQueryData(options.id, repo.instanceId, {
+    branches: branchesWithSnapshotWorktreeMetadata,
+    current: options.currentBranch ?? base.data.currentBranch,
+  })
+  setRepoStatusQueryData(options.id, repo.instanceId, status)
   for (const [branchName, tabs] of Object.entries(options.workspacePaneTabsByBranch ?? {})) {
     const branch = branches.find((candidate) => candidate.name === branchName)
     if (!branch) continue

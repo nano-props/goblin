@@ -18,43 +18,27 @@ export interface RepoBranchReadModelData {
 
 export function repoBranchReadModelFromSnapshot(
   snapshot: RepoSnapshot,
-  current: Pick<RepoState['data'], 'status' | 'worktreesByPath'>,
+  current: Partial<Pick<RepoState['data'], 'status' | 'worktreesByPath'>> = {},
 ): RepoBranchReadModelData {
   const branches = stripBranchWorktreeMetadata(snapshot.branches)
   return {
     branches,
     currentBranch: snapshot.current,
     currentHEAD: snapshot.currentHEAD,
-    worktreesByPath: worktreeStatesFromBranches(snapshot.branches, current.worktreesByPath, current.status),
+    worktreesByPath: worktreeStatesFromBranches(snapshot.branches, current.worktreesByPath ?? {}, current.status ?? []),
   }
 }
 
 export function useRepoBranchReadModel(
   repoRoot: string,
   repoInstanceId: string,
-  current: Pick<RepoState['data'], 'status' | 'worktreesByPath'>,
   enabled: boolean,
 ): RepoBranchReadModelData | null {
   const snapshotReadModel = useRepoSnapshotReadModel(repoRoot, repoInstanceId, enabled)
   const statusReadModel = useRepoStatusReadModel(repoRoot, repoInstanceId, enabled)
   if (!snapshotReadModel.data) return null
   return repoBranchReadModelFromSnapshot(snapshotReadModel.data, {
-    ...current,
-    status: statusReadModel.data ?? current.status,
-  })
-}
-
-function readRepoBranchReadModel(
-  repo: Pick<RepoState, 'id' | 'instanceId'> & {
-    data: Pick<RepoState['data'], 'status' | 'worktreesByPath'>
-  },
-  queryClient?: QueryClient,
-): RepoBranchReadModelData | null {
-  const snapshot = getRepoSnapshotQueryData(repo.id, repo.instanceId, queryClient)
-  if (!snapshot) return null
-  return repoBranchReadModelFromSnapshot(snapshot, {
-    ...repo.data,
-    status: getRepoStatusQueryData(repo.id, repo.instanceId, queryClient) ?? repo.data.status,
+    status: statusReadModel.data ?? [],
   })
 }
 
@@ -65,8 +49,13 @@ export function repoWithBranchReadModel<Repo extends { data: RepoState['data'] }
   return readModel ? { ...repo, data: { ...repo.data, ...readModel } } : repo
 }
 
-export function readRepoWithBranchReadModel<
-  Repo extends Pick<RepoState, 'id' | 'instanceId'> & { data: RepoState['data'] },
->(repo: Repo, queryClient?: QueryClient): Repo {
-  return repoWithBranchReadModel(repo, readRepoBranchReadModel(repo, queryClient))
+export function readRepoBranchQueryProjection(
+  repo: Pick<RepoState, 'id' | 'instanceId'>,
+  queryClient?: QueryClient,
+): RepoBranchReadModelData | null {
+  const snapshot = getRepoSnapshotQueryData(repo.id, repo.instanceId, queryClient)
+  if (!snapshot) return null
+  return repoBranchReadModelFromSnapshot(snapshot, {
+    status: getRepoStatusQueryData(repo.id, repo.instanceId, queryClient) ?? [],
+  })
 }

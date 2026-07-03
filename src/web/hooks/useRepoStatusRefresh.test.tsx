@@ -10,6 +10,7 @@ import { preferredWorkspacePaneTabByTargetRecordWith } from '#/web/stores/repos/
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 
 const originalRefreshStatus = useReposStore.getState().refreshStatus
 
@@ -42,6 +43,10 @@ function createRepo(
   repo.data.branches = [createRepoBranch('main', { worktree: { path: worktreePath } })]
   repo.data.currentBranch = 'main'
   repo.ui.selectedBranch = 'main'
+  setRepoSnapshotQueryData(id, repo.instanceId, {
+    current: 'main',
+    branches: [createRepoBranch('main', { worktree: { path: worktreePath } })],
+  })
   setWorkspacePaneTabsForTargetQueryData({
     repoRoot: id,
     repoInstanceId: repo.instanceId,

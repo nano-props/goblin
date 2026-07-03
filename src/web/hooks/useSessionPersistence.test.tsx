@@ -241,6 +241,10 @@ describe('useSessionPersistence', () => {
         },
       },
     })
+    setRepoSnapshotQueryData(repo.id, currentInstanceId, {
+      current: 'feature/worktree',
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
+    })
 
     renderInJsdom(<Harness />)
 

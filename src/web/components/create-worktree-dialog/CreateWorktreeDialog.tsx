@@ -75,15 +75,7 @@ export function CreateWorktreeDialog({ open, repo, worktreeBootstrap, onClose, o
   })
   const remoteBranches = remoteBranchesQuery.data ?? []
   const remoteBranchesLoading = remoteBranchesQuery.isLoading
-  const branchReadModel = useRepoBranchReadModel(
-    repo.id,
-    repo.instanceId,
-    {
-      status: repo.data.status,
-      worktreesByPath: repo.data.worktreesByPath,
-    },
-    open,
-  )
+  const branchReadModel = useRepoBranchReadModel(repo.id, repo.instanceId, open)
   const presentationRepo: RepoState = repoWithBranchReadModel(repo, branchReadModel)
 
   // Reset on the rising edge of `open` only. A guard ref prevents snapshot

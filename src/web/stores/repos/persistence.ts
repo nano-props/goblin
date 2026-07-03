@@ -5,7 +5,7 @@ import { selectedBranchForBranchSet } from '#/web/stores/repos/branch-view-mode.
 import type { RepoSnapshotCacheEntry, RepoState } from '#/web/stores/repos/types.ts'
 import { finishDataLoadSuccess } from '#/web/stores/repos/repo-data-load-state.ts'
 import { stripBranchWorktreeMetadata } from '#/web/stores/repos/worktree-state.ts'
-import { readRepoWithBranchReadModel } from '#/web/repo-branch-read-model.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 const MAX_CACHE_AGE_MS = 14 * 24 * 60 * 60 * 1000
 const MAX_REPOS = 50
 const FiniteNumber = v.pipe(v.number(), v.finite())
@@ -90,11 +90,15 @@ export function restoreRepoProjectionFromCacheEntry(
   return restoreProjectionFromSnapshot(repo, snapshot)
 }
 
-export function persistRepoSnapshotCacheEntry(set: ReposSet, repo: RepoState | undefined, repoInstanceId: string): void {
+export function persistRepoSnapshotCacheEntry(
+  set: ReposSet,
+  repo: RepoState | undefined,
+  repoInstanceId: string,
+): void {
   if (!repo) return
   if (repo.instanceId !== repoInstanceId) return
-  const projectedRepo = readRepoWithBranchReadModel(repo)
-  const entry = repoSnapshotCacheEntryFromRepo(projectedRepo)
+  const branchModel = readRepoBranchQueryProjection(repo)
+  const entry = branchModel ? repoSnapshotCacheEntryFromRepo(repo, branchModel) : null
   if (!entry) return
   set((s) => {
     if (s.repos[repo.id]?.instanceId !== repoInstanceId) return s
@@ -113,14 +117,17 @@ export function normalizeRepoSnapshotCache(value: unknown): Record<string, RepoS
   return trimRepoCache(Object.fromEntries(entries))
 }
 
-function repoSnapshotCacheEntryFromRepo(repo: RepoState): RepoSnapshotCacheEntry | null {
-  if (repo.data.branches.length === 0) return null
+function repoSnapshotCacheEntryFromRepo(
+  repo: RepoState,
+  branchModel: NonNullable<ReturnType<typeof readRepoBranchQueryProjection>>,
+): RepoSnapshotCacheEntry | null {
+  if (branchModel.branches.length === 0) return null
   return {
     savedAt: Date.now(),
     name: repo.name,
     data: {
-      branches: cachedBranches(repo.data.branches),
-      currentBranch: repo.data.currentBranch,
+      branches: cachedBranches(branchModel.branches),
+      currentBranch: branchModel.currentBranch,
     },
     ui: {
       selectedBranch: repo.ui.selectedBranch,

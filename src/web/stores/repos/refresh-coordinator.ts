@@ -13,7 +13,7 @@ import {
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { invalidateRepoDataQueries } from '#/web/repo-data-query.ts'
-import { readRepoWithBranchReadModel } from '#/web/repo-branch-read-model.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
 interface RepoRefreshIntentBase {
   id: string
@@ -40,16 +40,21 @@ export interface RepoStatusRefreshSnapshot {
 }
 
 export function repoStatusRefreshSnapshot(repo: RepoState): RepoStatusRefreshSnapshot {
-  const projectedRepo = readRepoWithBranchReadModel(repo)
-  const selectedTarget = workspacePaneTabsTargetForRepoBranch(projectedRepo, projectedRepo.ui.selectedBranch)
+  const branchModel = readRepoBranchQueryProjection(repo)
+  const selectedTarget = branchModel
+    ? workspacePaneTabsTargetForRepoBranch(
+        { id: repo.id, data: { branches: branchModel.branches } },
+        repo.ui.selectedBranch,
+      )
+    : null
   return {
-    id: projectedRepo.id,
-    repoInstanceId: projectedRepo.instanceId,
-    preferredWorkspacePaneTab: preferredWorkspacePaneTabForTarget(projectedRepo.ui, selectedTarget),
+    id: repo.id,
+    repoInstanceId: repo.instanceId,
+    preferredWorkspacePaneTab: preferredWorkspacePaneTabForTarget(repo.ui, selectedTarget),
     statusViewOpen: workspacePaneStaticTabsFromEntries(
       readWorkspacePaneTabsForTarget({
-        repoRoot: projectedRepo.id,
-        repoInstanceId: projectedRepo.instanceId,
+        repoRoot: repo.id,
+        repoInstanceId: repo.instanceId,
         branchName: selectedTarget?.branchName ?? null,
         worktreePath: selectedTarget?.worktreePath ?? null,
       }),

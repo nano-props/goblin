@@ -175,6 +175,14 @@ describe('branch action dispatch', () => {
         },
       },
     })
+    setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
+      current: 'feature/worktree',
+      branches: [
+        createBranchSnapshot('feature/worktree', {
+          worktree: { path: WORKTREE_PATH, summary: { dirty: true, changeCount: 1 } },
+        }),
+      ],
+    })
     const runBranchAction = vi.fn(async () => ({ ok: true, message: 'ok' }))
     const closeTerminalsForWorktree = vi.fn(async () => true)
     useReposStore.setState({ runBranchAction })

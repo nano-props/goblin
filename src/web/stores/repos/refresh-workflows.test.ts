@@ -16,6 +16,10 @@ describe('repo refresh workflows', () => {
   test('snapshot success backfills summary then visible selected repo workspace', async () => {
     const calls: string[] = []
     installGoblinTestBridge({})
+    setRepoSnapshotQueryData('/repo', 'repo-instance-test-2', {
+      current: 'feature/a',
+      branches: [createBranchSnapshot('feature/a'), createBranchSnapshot('feature/b')],
+    })
     setWorkspacePaneTabsForTargetQueryData({
       repoRoot: '/repo',
       repoInstanceId: 'repo-instance-test-2',
@@ -68,7 +72,10 @@ describe('repo refresh workflows', () => {
     })
     await new Promise((resolve) => setTimeout(resolve, 0))
 
-    expect(calls).toEqual(['prs:/repo:feature/a,feature/b:summary:true:repo-instance-test-2', 'prs:/repo:feature/a:full:false:repo-instance-test-2'])
+    expect(calls).toEqual([
+      'prs:/repo:feature/a,feature/b:summary:true:repo-instance-test-2',
+      'prs:/repo:feature/a:full:false:repo-instance-test-2',
+    ])
   })
 
   test('snapshot success does not block pull request backfill on terminal prune completion', async () => {
@@ -89,6 +96,10 @@ describe('repo refresh workflows', () => {
       tabs: [workspacePaneStaticTabEntry('status')],
     })
     const calls: string[] = []
+    setRepoSnapshotQueryData('/repo', 'repo-instance-test-2', {
+      current: 'feature/a',
+      branches: [createBranchSnapshot('feature/a'), createBranchSnapshot('feature/b')],
+    })
     const get: ReposGet = () =>
       ({
         repos: {

@@ -16,7 +16,7 @@ import {
   pullRequestMergeStatusPending,
 } from '#/shared/pull-request-state.ts'
 import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
-import { readRepoWithBranchReadModel } from '#/web/repo-branch-read-model.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
 function repoFresh(get: ReposGet, id: string, repoInstanceId: string): boolean {
   const repo = get().repos[id]
@@ -31,20 +31,18 @@ function pullRequestRefreshFailed(get: ReposGet, id: string, repoInstanceId: str
 function visibleDetailPullRequestPending(get: ReposGet, id: string, repoInstanceId: string): boolean {
   const repo = get().repos[id]
   if (!repo) return false
-  const projectedRepo = readRepoWithBranchReadModel(repo)
-  const target = workspacePaneTabsTargetForSelectedBranch(projectedRepo)
-  const openStaticTabs = workspacePaneStaticTabsFromEntries(readWorkspacePaneTabsForSelectedBranch(projectedRepo))
+  const branchModel = readRepoBranchQueryProjection(repo)
+  if (!branchModel) return false
+  const target = workspacePaneTabsTargetForSelectedBranch(repo, branchModel)
+  const openStaticTabs = workspacePaneStaticTabsFromEntries(readWorkspacePaneTabsForSelectedBranch(repo, branchModel))
   if (
-    projectedRepo.instanceId !== repoInstanceId ||
-    preferredWorkspacePaneTabForTarget(projectedRepo.ui, target) !== 'status' ||
+    repo.instanceId !== repoInstanceId ||
+    preferredWorkspacePaneTabForTarget(repo.ui, target) !== 'status' ||
     !openStaticTabs.includes('status') ||
-    !projectedRepo.ui.selectedBranch
+    !repo.ui.selectedBranch
   )
     return false
-  const branch = projectedRepo.data.branches.find((entry) => entry.name === projectedRepo.ui.selectedBranch)
-  const pullRequest =
-    readVisibleFullPullRequest(projectedRepo.id, projectedRepo.instanceId, projectedRepo.ui.selectedBranch) ??
-    branch?.pullRequest
+  const pullRequest = readVisibleFullPullRequest(repo.id, repo.instanceId, repo.ui.selectedBranch)
   return pullRequestMergeStatusPending(pullRequest)
 }
 
@@ -57,21 +55,25 @@ function readVisibleFullPullRequest(repoRoot: string, repoInstanceId: string, br
 async function refreshVisibleDetailPullRequest(get: ReposGet, id: string, repoInstanceId: string): Promise<void> {
   const repo = get().repos[id]
   if (!repo) return
-  const projectedRepo = readRepoWithBranchReadModel(repo)
-  const target = workspacePaneTabsTargetForSelectedBranch(projectedRepo)
-  const openStaticTabs = workspacePaneStaticTabsFromEntries(readWorkspacePaneTabsForSelectedBranch(projectedRepo))
+  const branchModel = readRepoBranchQueryProjection(repo)
+  if (!branchModel) return
+  const target = workspacePaneTabsTargetForSelectedBranch(repo, branchModel)
+  const openStaticTabs = workspacePaneStaticTabsFromEntries(readWorkspacePaneTabsForSelectedBranch(repo, branchModel))
   if (
-    projectedRepo.instanceId !== repoInstanceId ||
-    preferredWorkspacePaneTabForTarget(projectedRepo.ui, target) !== 'status' ||
+    repo.instanceId !== repoInstanceId ||
+    preferredWorkspacePaneTabForTarget(repo.ui, target) !== 'status' ||
     !openStaticTabs.includes('status') ||
-    !projectedRepo.ui.selectedBranch
+    !repo.ui.selectedBranch
   )
     return
-  await get().refreshPullRequests(id, [projectedRepo.ui.selectedBranch], { repoInstanceId, mode: 'full' })
+  await get().refreshPullRequests(id, [repo.ui.selectedBranch], { repoInstanceId, mode: 'full' })
 }
 
-function readWorkspacePaneTabsForSelectedBranch(repo: NonNullable<ReturnType<ReposGet>['repos'][string]>) {
-  const target = workspacePaneTabsTargetForSelectedBranch(repo)
+function readWorkspacePaneTabsForSelectedBranch(
+  repo: NonNullable<ReturnType<ReposGet>['repos'][string]>,
+  branchModel: ReturnType<typeof readRepoBranchQueryProjection>,
+) {
+  const target = workspacePaneTabsTargetForSelectedBranch(repo, branchModel)
   return readWorkspacePaneTabsForTarget({
     repoRoot: repo.id,
     repoInstanceId: repo.instanceId,
@@ -80,8 +82,16 @@ function readWorkspacePaneTabsForSelectedBranch(repo: NonNullable<ReturnType<Rep
   })
 }
 
-function workspacePaneTabsTargetForSelectedBranch(repo: NonNullable<ReturnType<ReposGet>['repos'][string]>) {
-  return workspacePaneTabsTargetForRepoBranch(repo, repo.ui.selectedBranch)
+function workspacePaneTabsTargetForSelectedBranch(
+  repo: NonNullable<ReturnType<ReposGet>['repos'][string]>,
+  branchModel: ReturnType<typeof readRepoBranchQueryProjection>,
+) {
+  return branchModel
+    ? workspacePaneTabsTargetForRepoBranch(
+        { id: repo.id, data: { branches: branchModel.branches } },
+        repo.ui.selectedBranch,
+      )
+    : null
 }
 
 async function delay(ms: number): Promise<void> {
@@ -158,7 +168,10 @@ async function runSnapshotVisibleDetailBackfill(
   await retryVisibleDetailPullRequestUntilSettled(get, options)
 }
 
-export async function runCoreDataRefreshWorkflow(get: ReposGet, options: { id: string; repoInstanceId: string }): Promise<void> {
+export async function runCoreDataRefreshWorkflow(
+  get: ReposGet,
+  options: { id: string; repoInstanceId: string },
+): Promise<void> {
   await get().refreshSnapshotAndStatus(options.id, { skipLogBackfill: true, repoInstanceId: options.repoInstanceId })
   const after = get().repos[options.id]
   if (!after || after.instanceId !== options.repoInstanceId) return

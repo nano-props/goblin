@@ -98,15 +98,7 @@ export function useBranchListRepo(repoId: string): BranchListRepo | undefined {
     branchListRepoEqual,
   )
   const statusReadModel = useRepoStatusReadModel(repo?.id ?? '', repo?.instanceId ?? '', !!repo)
-  const branchReadModel = useRepoBranchReadModel(
-    repo?.id ?? '',
-    repo?.instanceId ?? '',
-    {
-      status: repo?.data.status ?? [],
-      worktreesByPath: repo?.data.worktreesByPath ?? {},
-    },
-    !!repo,
-  )
+  const branchReadModel = useRepoBranchReadModel(repo?.id ?? '', repo?.instanceId ?? '', !!repo)
   if (!repo || (!branchReadModel && !statusReadModel.data)) return repo
   return {
     ...repo,

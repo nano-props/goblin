@@ -29,7 +29,7 @@ import {
   clearWorkspacePaneTabOpener,
   workspacePaneTabOpener,
 } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
-import { readRepoWithBranchReadModel } from '#/web/repo-branch-read-model.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
 interface ShowWorkspacePaneTabCommandOptions {
   repoId: string | null
@@ -72,10 +72,7 @@ type CloseWorkspacePaneTabOrWindowCommandOptions = CloseWorkspacePaneTabCommandO
   closeWindow?: () => void
 }
 
-type CloseWorkspaceSurfaceIntent =
-  | { kind: 'close-tab' }
-  | { kind: 'close-window' }
-  | { kind: 'noop' }
+type CloseWorkspaceSurfaceIntent = { kind: 'close-tab' } | { kind: 'close-window' } | { kind: 'noop' }
 
 interface SelectWorkspacePaneTabByIndexCommandOptions {
   repoId: string | null
@@ -97,7 +94,11 @@ export async function runShowWorkspacePaneTabCommand({
   return await showWorkspacePaneTabCommand({ repoId, tab, navigation })
 }
 
-async function showWorkspacePaneTabCommand({ repoId, tab, navigation }: ShowWorkspacePaneTabCommandOptions): Promise<boolean> {
+async function showWorkspacePaneTabCommand({
+  repoId,
+  tab,
+  navigation,
+}: ShowWorkspacePaneTabCommandOptions): Promise<boolean> {
   if (!repoId) return false
   const provider = workspacePaneTabProvider(tab)
   if (isWorkspacePaneStaticTabProvider(provider)) {
@@ -231,10 +232,7 @@ async function closeWorkspacePaneTabCommand(options: CloseWorkspacePaneTabComman
   observeWorkspacePaneTabClose(close.completion, target.repoId, target.branchName, closingIdentity)
   if (tab.kind === 'static' && !(await close.completion)) return false
 
-  if (
-    nextTab &&
-    (tab.kind !== 'static' || shouldSelectNextTabAfterStaticClose(target, tab.type, initialActiveId))
-  ) {
+  if (nextTab && (tab.kind !== 'static' || shouldSelectNextTabAfterStaticClose(target, tab.type, initialActiveId))) {
     showWorkspacePaneCommandTab(target, nextTab, navigation)
   }
   return true
@@ -252,7 +250,8 @@ function closeConfirmedTerminalWorkspacePaneTab(options: ConfirmCloseTerminalWor
     wasActive && target && tab
       ? workspacePaneTabOpener(target.repoId, confirmedTerminal.base.branch, tab.identity)
       : null
-  const nextTab = wasActive && target && tab ? nextRepoWorkspaceTabAfterClose(target.tabs, tab.identity, openerIdentity) : null
+  const nextTab =
+    wasActive && target && tab ? nextRepoWorkspaceTabAfterClose(target.tabs, tab.identity, openerIdentity) : null
   const closeTerminalByDescriptor = readTerminalSessionCommandBridge()?.closeTerminalByDescriptor
   if (!closeTerminalByDescriptor) return false
   observeWorkspacePaneTabClose(
@@ -361,8 +360,8 @@ function enterTerminalWorkspacePaneTab(
 function selectedRepoWorkspaceTarget(repoId: string): { branchName: string; worktreePath: string | null } | null {
   const repo = useReposStore.getState().repos[repoId]
   if (!repo?.ui.selectedBranch) return null
-  const projectedRepo = readRepoWithBranchReadModel(repo)
-  const branch = projectedRepo.data.branches.find((candidate) => candidate.name === repo.ui.selectedBranch)
+  const branchModel = readRepoBranchQueryProjection(repo)
+  const branch = branchModel?.branches.find((candidate) => candidate.name === repo.ui.selectedBranch)
   if (!branch) return null
   return { branchName: branch.name, worktreePath: branch.worktree?.path ?? null }
 }

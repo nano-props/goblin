@@ -1,11 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { createRepoBranch } from '#/web/test-utils/bridge.ts'
-import {
-  readRepoWithBranchReadModel,
-  repoWithBranchReadModel,
-  type RepoBranchReadModelData,
-} from '#/web/repo-branch-read-model.ts'
+import { repoWithBranchReadModel, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 
 describe('repo branch read model helpers', () => {
   test('projects branch snapshot data over store repo data as one atomic view', () => {
@@ -36,12 +32,5 @@ describe('repo branch read model helpers', () => {
     expect(projected.data.currentHEAD).toBe('1111111000000000000000000000000000000000')
     expect(projected.data.branches.map((branch) => branch.name)).toEqual(['feature/query'])
     expect(projected.data.worktreesByPath['/tmp/query-worktree']?.branch).toBe('feature/query')
-  })
-
-  test('falls back to store branches only when no branch read model is available', () => {
-    const repo = emptyRepo('/tmp/read-model-fallback-repo', 'read-model-fallback-repo', 'repo-instance-fallback')
-    repo.data.branches = [createRepoBranch('main')]
-
-    expect(readRepoWithBranchReadModel(repo).data.branches.map((branch) => branch.name)).toEqual(['main'])
   })
 })

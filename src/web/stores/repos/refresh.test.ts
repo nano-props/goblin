@@ -14,6 +14,7 @@ import {
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import {
   repoBulkReadQueryKey,
+  repoDataQueryKey,
   repoSnapshotQueryKey,
   repoStatusQueryKey,
   setRepoSnapshotQueryData,
@@ -242,7 +243,9 @@ describe('remote fetch timestamps', () => {
         resolvePull = resolve
       })
 
-    const work = useReposStore.getState().runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' }, { repoInstanceId })
+    const work = useReposStore
+      .getState()
+      .runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' }, { repoInstanceId })
 
     const runningRepo = useReposStore.getState().repos[REPO_ID]
     expect(runningRepo?.operations.branchAction.phase).toBe('running')
@@ -493,7 +496,9 @@ describe('core refresh request ordering', () => {
 
     await useReposStore.getState().refreshCoreData(REPO_ID, { repoInstanceId })
 
-    expect(primaryWindowQueryClient.getQueryData(repoBulkReadQueryKey(REPO_ID, repoInstanceId, ['snapshot', 'status']))).toEqual({
+    expect(
+      primaryWindowQueryClient.getQueryData(repoBulkReadQueryKey(REPO_ID, repoInstanceId, ['snapshot', 'status'])),
+    ).toEqual({
       snapshot,
       status,
       pullRequests: null,
@@ -504,6 +509,7 @@ describe('core refresh request ordering', () => {
 
   test('refreshCoreData drops stale results when the repo is reopened during a composite read', async () => {
     const repoInstanceId = seedRepo([branch('main')], 'repo-instance-test')
+    primaryWindowQueryClient.removeQueries({ queryKey: repoDataQueryKey(REPO_ID, repoInstanceId) })
     ipcHandlers['repo.composite'] = async () => {
       // Reopen the repo while the composite is in flight. With the new
       // atomic flow the snapshot result is stale and should be dropped
@@ -517,7 +523,9 @@ describe('core refresh request ordering', () => {
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.instanceId).toBe('repo-instance-test-2')
     expect(repo?.data.branches.map((b) => b.name)).toEqual(['reopened'])
-    expect(primaryWindowQueryClient.getQueryData(repoBulkReadQueryKey(REPO_ID, repoInstanceId, ['snapshot', 'status']))).toBeUndefined()
+    expect(
+      primaryWindowQueryClient.getQueryData(repoBulkReadQueryKey(REPO_ID, repoInstanceId, ['snapshot', 'status'])),
+    ).toBeUndefined()
     expect(primaryWindowQueryClient.getQueryData(repoSnapshotQueryKey(REPO_ID, repoInstanceId))).toBeUndefined()
     expect(primaryWindowQueryClient.getQueryData(repoStatusQueryKey(REPO_ID, repoInstanceId))).toBeUndefined()
   })
@@ -912,9 +920,11 @@ describe('core refresh request ordering', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.ui.selectedBranch).toBe('feature/a')
-    expect(repo ? preferredWorkspacePaneTabForTarget(repo.ui, workspacePaneTabsTargetForRepoBranch(repo, 'feature/a')) : null).toBe(
-      'terminal',
-    )
+    expect(
+      repo
+        ? preferredWorkspacePaneTabForTarget(repo.ui, workspacePaneTabsTargetForRepoBranch(repo, 'feature/a'))
+        : null,
+    ).toBe('terminal')
   })
 
   test('snapshot refresh follows the selected worktree when checkout moves it to another branch', async () => {
@@ -940,7 +950,9 @@ describe('core refresh request ordering', () => {
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.ui.selectedBranch).toBe('feature/new')
     expect(
-      repo ? preferredWorkspacePaneTabForTarget(repo.ui, workspacePaneTabsTargetForRepoBranch(repo, 'feature/new')) : null,
+      repo
+        ? preferredWorkspacePaneTabForTarget(repo.ui, workspacePaneTabsTargetForRepoBranch(repo, 'feature/new'))
+        : null,
     ).toBe('terminal')
   })
 

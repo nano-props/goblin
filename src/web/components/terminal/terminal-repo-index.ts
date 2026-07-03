@@ -10,7 +10,6 @@ import type { RepoSnapshot } from '#/shared/api-types.ts'
 export interface TerminalRepoIndexEntry {
   id: string
   instanceId: string
-  data: ReposStore['repos'][string]['data']
 }
 
 export function useTerminalRepoIndex(): TerminalRepoIndex {
@@ -18,7 +17,7 @@ export function useTerminalRepoIndex(): TerminalRepoIndex {
   const snapshotQueries = useQueries({
     queries: entries.map((entry) => ({
       ...repoSnapshotQueryOptions(entry.id, entry.instanceId),
-      enabled: false,
+      enabled: true,
       subscribed: true,
     })),
   })
@@ -35,8 +34,8 @@ export function repoIndexFromEntries(
   const index: TerminalRepoIndex = {}
   entries.forEach((repo, indexInEntries) => {
     const snapshot = snapshots[indexInEntries] ?? null
-    const branchReadModel = snapshot ? repoBranchReadModelFromSnapshot(snapshot, repo.data) : null
-    const branches = branchReadModel?.branches ?? repo.data.branches
+    const branchReadModel = snapshot ? repoBranchReadModelFromSnapshot(snapshot) : null
+    const branches = branchReadModel?.branches ?? []
     const branchByWorktreePath: Record<string, string> = {}
     for (const branch of branches) {
       const worktreePath = branch.worktree?.path
@@ -82,7 +81,6 @@ function terminalRepoIndexEntriesFromRepos(repos: ReposStore['repos']): Terminal
   return Object.values(repos).map((repo) => ({
     id: repo.id,
     instanceId: repo.instanceId,
-    data: repo.data,
   }))
 }
 
@@ -95,7 +93,6 @@ function entriesEqual(a: readonly TerminalRepoIndexEntry[], b: readonly Terminal
     if (!current || !next) return false
     if (current.id !== next.id) return false
     if (current.instanceId !== next.instanceId) return false
-    if (current.data !== next.data) return false
   }
   return true
 }

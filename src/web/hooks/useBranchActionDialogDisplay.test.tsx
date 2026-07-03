@@ -87,6 +87,8 @@ function setupRepo(): void {
 }
 
 function dropBranch(repoId: string, branchName: string): void {
+  const repo = useReposStore.getState().repos[repoId]
+  const nextBranches = repo?.data.branches.filter((b: { name: string }) => b.name !== branchName) ?? []
   act(() => {
     useReposStore.setState((state) => ({
       repos: {
@@ -100,6 +102,12 @@ function dropBranch(repoId: string, branchName: string): void {
         },
       },
     }))
+    if (repo) {
+      setRepoSnapshotQueryData(repoId, repo.instanceId, {
+        current: repo.data.currentBranch,
+        branches: nextBranches,
+      })
+    }
   })
 }
 

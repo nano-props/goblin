@@ -5,7 +5,7 @@ import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { readRepoWithBranchReadModel } from '#/web/repo-branch-read-model.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
 /** Resolves the tab model for whichever branch is currently selected on
  *  `repoId`. Shared by command entry points that need to read/act on "the
@@ -21,8 +21,8 @@ export function workspacePaneTabTargetForBranch(repoId: string, branchName: stri
   const state = useReposStore.getState()
   const repo = state.repos[repoId]
   if (!repo) return null
-  const projectedRepo = readRepoWithBranchReadModel(repo)
-  const branch = projectedRepo.data.branches.find((candidate) => candidate.name === branchName)
+  const branchModel = readRepoBranchQueryProjection(repo)
+  const branch = branchModel?.branches.find((candidate) => candidate.name === branchName)
   if (!branch) return null
   const worktreePath = branch.worktree?.path
   const terminalSyncReady = useRepoSyncStore.getState().ready.get(repoId) === repo.instanceId

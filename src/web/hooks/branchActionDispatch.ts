@@ -31,8 +31,7 @@ import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import type { ExecResult } from '#/web/types.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { closeWorkspacePaneTabsForWorktree } from '#/web/workspace-pane/workspace-pane-tab-close.ts'
-import { repoBranchReadModelFromSnapshot } from '#/web/repo-branch-read-model.ts'
-import { getRepoSnapshotQueryData, getRepoStatusQueryData } from '#/web/repo-data-query.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
 interface BranchActionDispatchContext {
   repo: BranchActionRepo
@@ -57,6 +56,7 @@ export function dispatchDeleteBranch({
   alsoDeleteUpstream: boolean
 }): Promise<ExecResult | null> {
   const actionRepo = repoForBranchActionDispatch(repo)
+  if (!actionRepo) return Promise.resolve(recordRepoDataUnavailable(repo))
   return dispatchRepoBranchAction(
     actionRepo.id,
     actionRepo.instanceId,
@@ -96,6 +96,7 @@ export async function dispatchRemoveWorktree({
   alsoDeleteUpstream: boolean
 }): Promise<ExecResult | null> {
   const actionRepo = repoForBranchActionDispatch(repo)
+  if (!actionRepo) return recordRepoDataUnavailable(repo)
   const preflightFailure = removeWorktreePreflightFailure(actionRepo, target)
   if (preflightFailure) {
     recordRemoveWorktreeResult(actionRepo, target, alsoDeleteBranch, preflightFailure)
@@ -177,6 +178,7 @@ export function dispatchPush({
   branchName,
 }: BranchActionDispatchContext & { branchName: string }): Promise<ExecResult | null> {
   const actionRepo = repoForBranchActionDispatch(repo)
+  if (!actionRepo) return Promise.resolve(recordRepoDataUnavailable(repo))
   return dispatchRepoBranchAction(
     actionRepo.id,
     actionRepo.instanceId,
@@ -185,13 +187,9 @@ export function dispatchPush({
   )
 }
 
-function repoForBranchActionDispatch(repo: BranchActionRepo): BranchActionRepo {
-  const snapshot = getRepoSnapshotQueryData(repo.id, repo.instanceId)
-  if (!snapshot) return repo
-  const readModel = repoBranchReadModelFromSnapshot(snapshot, {
-    status: getRepoStatusQueryData(repo.id, repo.instanceId) ?? repo.data.status,
-    worktreesByPath: repo.data.worktreesByPath,
-  })
+function repoForBranchActionDispatch(repo: BranchActionRepo): BranchActionRepo | null {
+  const readModel = readRepoBranchQueryProjection(repo)
+  if (!readModel) return null
   return {
     ...repo,
     data: {
@@ -200,4 +198,10 @@ function repoForBranchActionDispatch(repo: BranchActionRepo): BranchActionRepo {
       worktreesByPath: readModel.worktreesByPath,
     },
   }
+}
+
+function recordRepoDataUnavailable(repo: BranchActionRepo): ExecResult {
+  const result = { ok: false as const, message: 'error.failed-read-repo' }
+  useReposStore.getState().setLastResult(repo.id, result, repo.instanceId)
+  return result
 }

@@ -9,6 +9,7 @@ import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bo
 import { TerminalSessionProvider } from '#/web/components/terminal/TerminalSessionProvider.tsx'
 import { setTerminalSessionProjectionForTests } from '#/web/components/terminal/TerminalSessionProjection.ts'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
+import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import {
   useTerminalWorktreeCount,
   useTerminalSessionSummaries,
@@ -52,6 +53,7 @@ import {
   setWorkspacePaneTabsForTargetQueryData,
   workspacePaneTabsQueryKey,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 
 const mockSessions = vi.hoisted(
   () =>
@@ -275,15 +277,18 @@ let lifecycleHandler: ((event: TerminalLifecycleRealtimeEvent) => void) | null =
 let sessionsChangedHandler: ((repoRoot: string) => void) | null = null
 let workspaceTabsChangedHandler: ((repoRoot: string) => void) | null = null
 let sessionClosedHandler:
-  | ((event: { terminalRuntimeSessionId: string; terminalSessionId: string; repoRoot: string; worktreePath: string }) => void)
+  | ((event: {
+      terminalRuntimeSessionId: string
+      terminalSessionId: string
+      repoRoot: string
+      worktreePath: string
+    }) => void)
   | null = null
 type TestTerminalSessionSummary = Omit<TerminalSessionSummary, 'repoInstanceId' | 'repoRoot' | 'worktreePath'> &
   Partial<Pick<TerminalSessionSummary, 'repoInstanceId' | 'repoRoot' | 'worktreePath'>>
 const listSessionsMock = vi.fn<
   (...args: Array<{ repoRoot: string; repoInstanceId?: string }>) => Promise<TestTerminalSessionSummary[]>
->(
-  async () => [],
-)
+>(async () => [])
 const listWorkspaceTabsMock = vi.fn<(...args: Array<{ repoRoot: string }>) => Promise<WorkspacePaneTabsEntry[]>>(
   async () => [],
 )
@@ -1048,10 +1053,21 @@ describe('TerminalSessionProvider', () => {
               : state.repos[REPO_ID],
           },
         }))
+        setRepoSnapshotQueryData(REPO_ID, useReposStore.getState().repos[REPO_ID]!.instanceId, {
+          current: 'feature/renamed',
+          branches: [createRepoBranch('feature/renamed', { worktree: { path: WORKTREE_PATH } })],
+        })
         await Promise.resolve()
       })
 
+      await vi.waitFor(() => {
+        expect(
+          readTerminalSessionCommandBridge()?.terminalWorktreeSnapshot(terminalWorktreeKey).selectedDescriptor?.branch,
+        ).toBe('feature/renamed')
+      })
+
       await act(async () => {
+        notifyBell.mockClear()
         bellHandler?.({
           terminalRuntimeSessionId: 'session-1',
           terminalSessionId: 'session-1',
@@ -1742,9 +1758,7 @@ describe('TerminalSessionProvider', () => {
     const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
 
     try {
-      await expect(
-        getContext().createTerminal(repoTerminalBase()),
-      ).resolves.toBe('session-1')
+      await expect(getContext().createTerminal(repoTerminalBase())).resolves.toBe('session-1')
       expect(getProbe()).toMatchObject({ count: 1, terminalIds: ['session-1'] })
     } finally {
       await unmount()

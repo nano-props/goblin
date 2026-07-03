@@ -66,6 +66,7 @@ export function repoSnapshotQueryOptions(repoRoot: string, repoInstanceId: strin
   return queryOptions({
     queryKey: repoSnapshotQueryKey(repoRoot, repoInstanceId),
     queryFn: ({ signal }) => getRepoSnapshot(repoRoot, signal),
+    staleTime: Number.POSITIVE_INFINITY,
   })
 }
 
@@ -73,6 +74,7 @@ function repoStatusQueryOptions(repoRoot: string, repoInstanceId: string) {
   return queryOptions({
     queryKey: repoStatusQueryKey(repoRoot, repoInstanceId),
     queryFn: ({ signal }) => getRepoStatus(repoRoot, signal),
+    staleTime: Number.POSITIVE_INFINITY,
   })
 }
 
@@ -85,6 +87,7 @@ function repoPullRequestsQueryOptions(
   return queryOptions({
     queryKey: repoPullRequestsQueryKey(repoRoot, repoInstanceId, branches, mode),
     queryFn: ({ signal }) => getRepoPullRequests(repoRoot, branches ? [...branches] : undefined, { mode }, signal),
+    staleTime: Number.POSITIVE_INFINITY,
   })
 }
 
@@ -103,11 +106,7 @@ function repoLogQueryOptions(
   })
 }
 
-function repoRemoteBranchesQueryOptions(
-  repoRoot: string,
-  repoInstanceId: string,
-  options: { enabled?: boolean } = {},
-) {
+function repoRemoteBranchesQueryOptions(repoRoot: string, repoInstanceId: string, options: { enabled?: boolean } = {}) {
   return queryOptions({
     queryKey: repoRemoteBranchesQueryKey(repoRoot, repoInstanceId),
     queryFn: ({ signal }) => getRepoRemoteBranches(repoRoot, signal),
@@ -118,7 +117,7 @@ function repoRemoteBranchesQueryOptions(
 export function useRepoSnapshotReadModel(repoRoot: string, repoInstanceId: string, enabled: boolean) {
   return useQuery({
     ...repoSnapshotQueryOptions(repoRoot, repoInstanceId),
-    enabled: false,
+    enabled,
     subscribed: enabled,
   })
 }
@@ -126,7 +125,7 @@ export function useRepoSnapshotReadModel(repoRoot: string, repoInstanceId: strin
 export function useRepoStatusReadModel(repoRoot: string, repoInstanceId: string, enabled: boolean) {
   return useQuery({
     ...repoStatusQueryOptions(repoRoot, repoInstanceId),
-    enabled: false,
+    enabled,
     subscribed: enabled,
   })
 }
@@ -140,7 +139,7 @@ export function useRepoPullRequestsReadModel(
 ) {
   return useQuery({
     ...repoPullRequestsQueryOptions(repoRoot, repoInstanceId, branches, mode),
-    enabled: false,
+    enabled,
     subscribed: enabled,
   })
 }

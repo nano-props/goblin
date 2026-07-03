@@ -124,15 +124,7 @@ function RepoWorkspaceLoaded({
   toolbarTrafficLightOffset: boolean
 }) {
   const statusReadModel = useRepoStatusReadModel(repo.id, repo.instanceId, true)
-  const branchReadModel = useRepoBranchReadModel(
-    repo.id,
-    repo.instanceId,
-    {
-      status: repo.data.status,
-      worktreesByPath: repo.data.worktreesByPath,
-    },
-    true,
-  )
+  const branchReadModel = useRepoBranchReadModel(repo.id, repo.instanceId, true)
   const selectedBranchName = repo.ui.selectedBranch
   const pullRequestsReadModel = useRepoPullRequestsReadModel(
     repo.id,
@@ -161,7 +153,8 @@ function RepoWorkspaceLoaded({
       }),
     }
   }
-  const presentationRepo: RepoWorkspaceRepo = presentationData === repo.data ? repo : { ...repo, data: presentationData }
+  const presentationRepo: RepoWorkspaceRepo =
+    presentationData === repo.data ? repo : { ...repo, data: presentationData }
   const detail = getSelectedRepoWorkspacePresentation(presentationRepo)
 
   return (
