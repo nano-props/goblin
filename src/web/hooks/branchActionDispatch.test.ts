@@ -4,20 +4,24 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { dispatchRemoveWorktree } from '#/web/hooks/branchActionDispatch.ts'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
-import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { createBranchSnapshot, createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 
 const REPO_ID = '/tmp/gbl-branch-action-dispatch-repo'
 const WORKTREE_PATH = '/tmp/gbl-branch-action-dispatch-worktree'
 const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
 
 beforeEach(() => {
+  primaryWindowQueryClient.clear()
   resetReposStore()
 })
 
 afterEach(() => {
   setTerminalSessionCommandBridge(null)
+  primaryWindowQueryClient.clear()
   resetReposStore()
 })
 
@@ -188,6 +192,57 @@ describe('branch action dispatch', () => {
           isDirty: true,
         },
       },
+    })
+    const runBranchAction = vi.fn(async () => ({ ok: true, message: 'ok' }))
+    const closeTerminalsForWorktree = vi.fn(async () => true)
+    useReposStore.setState({ runBranchAction })
+    setTerminalSessionCommandBridge({
+      terminalWorktreeSnapshot: () => worktreeSnapshotWithTerminal(),
+      createTerminal: vi.fn(async () => 'session-2'),
+      selectTerminal: vi.fn(),
+      closeTerminalByDescriptor: vi.fn(async () => true),
+      closeTerminalsForWorktree,
+    })
+
+    await expect(
+      dispatchRemoveWorktree({
+        repo,
+        target: { branch: 'feature/worktree', path: WORKTREE_PATH },
+        alsoDeleteBranch: false,
+        forceDeleteBranch: false,
+        alsoDeleteUpstream: false,
+      }),
+    ).resolves.toEqual({ ok: false, message: 'error.cannot-remove-dirty-worktree' })
+
+    expect(closeTerminalsForWorktree).not.toHaveBeenCalled()
+    expect(runBranchAction).not.toHaveBeenCalled()
+  })
+
+  test('remove worktree preflight reads worktree metadata from the React Query snapshot cache', async () => {
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree')],
+      selectedBranch: 'feature/worktree',
+      preferredWorkspacePaneTab: 'terminal',
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [
+          workspacePaneStaticTabEntry('status'),
+          { type: 'terminal', terminalSessionId: 'session-1' },
+        ],
+      },
+      worktreesByPath: {},
+    })
+    setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
+      current: 'main',
+      branches: [
+        createBranchSnapshot('main', {
+          isCurrent: true,
+          worktree: { path: REPO_ID, isPrimary: true, summary: { dirty: false, changeCount: 0 } },
+        }),
+        createBranchSnapshot('feature/worktree', {
+          worktree: { path: WORKTREE_PATH, summary: { dirty: true, changeCount: 2 } },
+        }),
+      ],
     })
     const runBranchAction = vi.fn(async () => ({ ok: true, message: 'ok' }))
     const closeTerminalsForWorktree = vi.fn(async () => true)

@@ -31,6 +31,7 @@ import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import type { ExecResult } from '#/web/types.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { closeWorkspacePaneTabsForWorktree } from '#/web/workspace-pane/workspace-pane-tab-close.ts'
+import { readRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
 
 interface BranchActionDispatchContext {
   repo: BranchActionRepo
@@ -54,9 +55,10 @@ export function dispatchDeleteBranch({
   force: boolean
   alsoDeleteUpstream: boolean
 }): Promise<ExecResult | null> {
+  const actionRepo = repoForBranchActionDispatch(repo)
   return dispatchRepoBranchAction(
-    repo.id,
-    repo.instanceId,
+    actionRepo.id,
+    actionRepo.instanceId,
     { kind: 'deleteBranch', branch: branchName, force, alsoDeleteUpstream },
     useReposStore.getState().runBranchAction,
     {
@@ -64,7 +66,7 @@ export function dispatchDeleteBranch({
       handleResult: (result) => {
         if (deleteBranchNeedsForceConfirm(result, force)) {
           useBranchActionDialogsStore.getState().openForceDeleteConfirm({
-            repoId: repo.id,
+            repoId: actionRepo.id,
             branchName,
             payload: branchName,
           })
@@ -92,24 +94,25 @@ export async function dispatchRemoveWorktree({
   forceDeleteBranch: boolean
   alsoDeleteUpstream: boolean
 }): Promise<ExecResult | null> {
-  const preflightFailure = removeWorktreePreflightFailure(repo, target)
+  const actionRepo = repoForBranchActionDispatch(repo)
+  const preflightFailure = removeWorktreePreflightFailure(actionRepo, target)
   if (preflightFailure) {
-    recordRemoveWorktreeResult(repo, target, alsoDeleteBranch, preflightFailure)
+    recordRemoveWorktreeResult(actionRepo, target, alsoDeleteBranch, preflightFailure)
     return preflightFailure
   }
   const tabsClosed = await closeWorkspacePaneTabsForWorktree({
-    repoId: repo.id,
+    repoId: actionRepo.id,
     branchName: target.branch,
     worktreePath: target.path,
   })
   if (!tabsClosed) {
     const result = { ok: false as const, message: 'error.workspace-tab-close-failed' }
-    recordRemoveWorktreeResult(repo, target, alsoDeleteBranch, result)
+    recordRemoveWorktreeResult(actionRepo, target, alsoDeleteBranch, result)
     return result
   }
   return await dispatchRepoBranchAction(
-    repo.id,
-    repo.instanceId,
+    actionRepo.id,
+    actionRepo.instanceId,
     {
       kind: 'removeWorktree',
       branch: target.branch,
@@ -124,7 +127,7 @@ export async function dispatchRemoveWorktree({
       handleResult: (result) => {
         if (removeWorktreeNeedsForceConfirm(result, alsoDeleteBranch, forceDeleteBranch)) {
           useBranchActionDialogsStore.getState().openForceRemoveWorktreeConfirm({
-            repoId: repo.id,
+            repoId: actionRepo.id,
             branchName: target.branch,
             payload: target,
           })
@@ -172,10 +175,25 @@ export function dispatchPush({
   repo,
   branchName,
 }: BranchActionDispatchContext & { branchName: string }): Promise<ExecResult | null> {
+  const actionRepo = repoForBranchActionDispatch(repo)
   return dispatchRepoBranchAction(
-    repo.id,
-    repo.instanceId,
+    actionRepo.id,
+    actionRepo.instanceId,
     { kind: 'push', branch: branchName },
     useReposStore.getState().runBranchAction,
   )
+}
+
+function repoForBranchActionDispatch(repo: BranchActionRepo): BranchActionRepo {
+  const readModel = readRepoBranchReadModel(repo)
+  return readModel
+    ? {
+        ...repo,
+        data: {
+          ...repo.data,
+          currentBranch: readModel.currentBranch,
+          worktreesByPath: readModel.worktreesByPath,
+        },
+      }
+    : repo
 }
