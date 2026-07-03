@@ -2,7 +2,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { tabOpenerScopeKey } from '#/web/stores/repos/tab-opener.ts'
 import { activeWorkspacePaneTabTarget } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { hasFreshRepoInstance, type RepoInstanceHandle } from '#/web/stores/repos/repo-guards.ts'
-import { readRepoBranchReadModel, repoBranchesFromReadModel } from '#/web/repo-branch-read-model.ts'
+import { readRepoBranches } from '#/web/repo-branch-read-model.ts'
 
 // Chrome-tab-style "opener" tracking, covering every workspace pane tab
 // (static and terminal), factored out of both the tab-creation paths
@@ -41,8 +41,7 @@ export function recordWorkspacePaneTabOpener(
   const repo = state.repos[repoId]
   if (!repo) return
   if (repoInstance && !hasFreshRepoInstance(state, repoInstance)) return
-  const branchReadModel = readRepoBranchReadModel(repo)
-  const branches = repoBranchesFromReadModel(repo, branchReadModel)
+  const branches = readRepoBranches(repo)
   if (!branches.some((branch) => branch.name === branchName)) return
   state.setTabOpener(tabOpenerScopeKey(repoId, branchName), childIdentity, openerIdentity)
 }

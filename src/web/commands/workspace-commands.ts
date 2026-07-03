@@ -29,7 +29,7 @@ import {
   clearWorkspacePaneTabOpener,
   workspacePaneTabOpener,
 } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
-import { readRepoBranchReadModel, repoBranchesFromReadModel } from '#/web/repo-branch-read-model.ts'
+import { readRepoBranches } from '#/web/repo-branch-read-model.ts'
 
 interface ShowWorkspacePaneTabCommandOptions {
   repoId: string | null
@@ -361,8 +361,7 @@ function enterTerminalWorkspacePaneTab(
 function selectedRepoWorkspaceTarget(repoId: string): { branchName: string; worktreePath: string | null } | null {
   const repo = useReposStore.getState().repos[repoId]
   if (!repo?.ui.selectedBranch) return null
-  const branchReadModel = readRepoBranchReadModel(repo)
-  const branches = repoBranchesFromReadModel(repo, branchReadModel)
+  const branches = readRepoBranches(repo)
   const branch = branches.find((candidate) => candidate.name === repo.ui.selectedBranch)
   if (!branch) return null
   return { branchName: branch.name, worktreePath: branch.worktree?.path ?? null }

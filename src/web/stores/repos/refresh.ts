@@ -28,7 +28,7 @@ import {
   setRepoSnapshotQueryData,
   setRepoStatusQueryData,
 } from '#/web/repo-data-query.ts'
-import { readRepoBranchReadModel, repoBranchesFromReadModel } from '#/web/repo-branch-read-model.ts'
+import { readRepoBranches } from '#/web/repo-branch-read-model.ts'
 import type { RepoSnapshot } from '#/shared/api-types.ts'
 import type { RepoPullRequestReason } from '#/web/stores/repos/operations.ts'
 import type { RepoState, ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
@@ -58,8 +58,7 @@ function resolvePullRequestRefreshRequest(
   }
   const mode = options?.mode ?? 'full'
   const clearMissing = options?.clearMissing ?? mode === 'full'
-  const branchReadModel = branchesArg ? null : readRepoBranchReadModel(repo)
-  const branchNames = branchesArg ?? repoBranchesFromReadModel(repo, branchReadModel).map((branch) => branch.name)
+  const branchNames = branchesArg ?? readRepoBranches(repo).map((branch) => branch.name)
   if (branchNames.length === 0) return null
   if (repo.remote.hasGitHubRemote !== true) return null
   return { branchNames, requested: new Set(branchNames), mode, clearMissing }
