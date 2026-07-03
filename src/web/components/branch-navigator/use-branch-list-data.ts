@@ -7,6 +7,7 @@ import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import type { RepoDataState, RepoState, RepoUiState } from '#/web/stores/repos/types.ts'
+import { useRepoStatusReadModel } from '#/web/repo-data-query.ts'
 
 // Composed projection: BranchActionRepo (status, worktrees, currentBranch,
 // branch action, remote) + branches + the j/k selection + the worktree
@@ -61,7 +62,7 @@ function branchListRepoEqual(a: BranchListRepo | undefined, b: BranchListRepo | 
 }
 
 export function useBranchListRepo(repoId: string): BranchListRepo | undefined {
-  return useStoreWithEqualityFn(
+  const repo = useStoreWithEqualityFn(
     useReposStore,
     (s) => {
       const repo: RepoState | undefined = s.repos[repoId]
@@ -95,4 +96,13 @@ export function useBranchListRepo(repoId: string): BranchListRepo | undefined {
     },
     branchListRepoEqual,
   )
+  const statusReadModel = useRepoStatusReadModel(repo?.id ?? '', repo?.instanceId ?? '', !!repo)
+  if (!repo || !statusReadModel.data) return repo
+  return {
+    ...repo,
+    data: {
+      ...repo.data,
+      status: statusReadModel.data,
+    },
+  }
 }
