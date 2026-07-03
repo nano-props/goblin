@@ -49,18 +49,6 @@ export function readWorkspacePaneTabsForTarget(
   return workspacePaneTabsForTargetFromQueryData(data, target)
 }
 
-export async function fetchWorkspacePaneTabsForTarget(input: {
-  repoRoot: string
-  repoInstanceId: string
-  branchName: string
-  worktreePath: string | null
-  queryClient?: QueryClient
-}): Promise<WorkspacePaneTabEntry[]> {
-  const queryClient = input.queryClient ?? primaryWindowQueryClient
-  const data = await queryClient.fetchQuery(workspacePaneTabsQueryOptions(input.repoRoot, input.repoInstanceId))
-  return workspacePaneTabsForTargetFromQueryData(data, input)
-}
-
 export function workspacePaneTabsForTargetFromQueryData(
   data: readonly WorkspacePaneTabsEntry[],
   target: {

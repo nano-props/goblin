@@ -1,21 +1,9 @@
-import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query'
-import { listRepoRuntimeInstances } from '#/web/repo-client.ts'
+import type { QueryClient } from '@tanstack/react-query'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import type { RepoRuntimeInstanceEntry, RepoRuntimeInstancesSnapshot } from '#/shared/api-types.ts'
 
 export function repoRuntimeInstancesQueryKey() {
   return ['repo-runtime', 'instances'] as const
-}
-
-export function repoRuntimeInstancesQueryOptions() {
-  return queryOptions({
-    queryKey: repoRuntimeInstancesQueryKey(),
-    queryFn: () => listRepoRuntimeInstances(),
-  })
-}
-
-export function useRepoRuntimeInstancesQuery() {
-  return useQuery(repoRuntimeInstancesQueryOptions())
 }
 
 export function updateRepoRuntimeInstanceCache(
