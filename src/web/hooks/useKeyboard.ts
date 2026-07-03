@@ -33,6 +33,7 @@ import {
 import { getClientBridge } from '#/web/client-bridge.ts'
 import { translate } from '#/web/stores/i18n.ts'
 import { toast } from 'sonner'
+import { readRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
 
 type MoveDirection = 1 | -1
 const INTERACTIVE_SHORTCUT_TARGET_SELECTOR =
@@ -94,8 +95,9 @@ function moveBranchSelection(
   direction: MoveDirection,
   navigation: PrimaryWindowNavigationActions,
 ): boolean {
+  const branchReadModel = readRepoBranchReadModel(input.repo)
   const branches = visibleBranches({
-    branches: input.repo.data.branches,
+    branches: branchReadModel?.branches ?? input.repo.data.branches,
     viewMode: input.repo.ui.branchViewMode,
   })
   if (branches.length === 0) return false

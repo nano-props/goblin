@@ -18,6 +18,8 @@ import type { PrimaryWindowNavigationActions } from '#/web/primary-window-naviga
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
 import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 
 const testWindow = window as unknown as { goblinNative?: Window['goblinNative'] }
 const REPO_ID = '/tmp/keyboard-repo'
@@ -34,6 +36,7 @@ interface HookHostOptions {
 }
 
 beforeEach(() => {
+  primaryWindowQueryClient.clear()
   resetReposStore()
 })
 
@@ -117,6 +120,30 @@ describe('useKeyboard', () => {
     })
 
     expect(showRepoWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'history')
+  })
+
+  test('branch navigation shortcuts use the React Query snapshot read model for branch order', async () => {
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branches: [],
+      selectedBranch: 'main',
+    })
+    setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
+      current: 'main',
+      branches: [createRepoBranch('main'), createRepoBranch('feature/query')],
+    })
+    const selectRepoBranch = vi.fn()
+    await renderHookHost({
+      currentRepoId: REPO_ID,
+      navigation: navigationWith({ selectRepoBranch }),
+    })
+
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'j', code: 'KeyJ', bubbles: true }))
+      await Promise.resolve()
+    })
+
+    expect(selectRepoBranch).toHaveBeenCalledWith(REPO_ID, 'feature/query')
   })
 
   test('primary modifier plus number selects workspace pane tabs even while terminal is focused', async () => {
