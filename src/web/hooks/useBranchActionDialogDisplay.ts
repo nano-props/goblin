@@ -73,15 +73,16 @@ import {
   useBranchActionDialogsStore,
 } from '#/web/stores/repos/branch-action-dialogs.ts'
 import type { RepoBranchState, RepoState } from '#/web/stores/repos/types.ts'
+import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import { useLastNonNull } from '#/web/hooks/useLastNonNull.ts'
-import {
-  repoWithBranchReadModel,
-  useRepoBranchReadModel,
-  type RepoBranchReadModelData,
-} from '#/web/repo-branch-read-model.ts'
+import { useRepoBranchReadModel, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
+
+type BranchActionDialogRepo = Omit<BranchActionRepo, 'data'> & {
+  data: RepoBranchReadModelData
+}
 
 interface BranchActionDialogContext {
-  repo: RepoState
+  repo: BranchActionDialogRepo
   branch: RepoBranchState
 }
 
@@ -120,7 +121,12 @@ export function useBranchActionDialogDisplay<P>(
 ): BranchActionDialogDisplay<P> {
   const entry = useLastNonNull(slot)
   const slotRepo = slot ? repos[slot.repoId] : null
-  const branchReadModel = useRepoBranchReadModel(slot?.repoId ?? '', slotRepo?.instanceId ?? '', !!slotRepo)
+  const branchReadModel = useRepoBranchReadModel(
+    slot?.repoId ?? '',
+    slotRepo?.instanceId ?? '',
+    slotRepo ? { worktreesByPath: slotRepo.data.worktreesByPath } : null,
+    !!slotRepo,
+  )
   const liveContext = slot ? resolveContext(repos, slot, branchReadModel) : null
   // Retain the last non-null `liveContext` for the close-animation
   // window. After the user clicks Confirm/Cancel, `slot` is null and
@@ -150,8 +156,23 @@ function resolveContext<P>(
   branchReadModel: RepoBranchReadModelData | null,
 ): BranchActionDialogContext | null {
   const repoFromStore = repos[entry.repoId]
-  const repo = repoFromStore && branchReadModel ? repoWithBranchReadModel(repoFromStore, branchReadModel) : null
-  if (!repo) return null
+  if (!repoFromStore || !branchReadModel) return null
+  const repo: BranchActionDialogRepo = {
+    id: repoFromStore.id,
+    instanceId: repoFromStore.instanceId,
+    data: branchReadModel,
+    operations: {
+      branchAction: repoFromStore.operations.branchAction,
+    },
+    remote: {
+      lifecycle: repoFromStore.remote.lifecycle,
+      hasRemotes: repoFromStore.remote.hasRemotes,
+      hasBrowserRemote: repoFromStore.remote.hasBrowserRemote,
+      hasGitHubRemote: repoFromStore.remote.hasGitHubRemote,
+      browserRemoteProvider: repoFromStore.remote.browserRemoteProvider,
+      remoteProviders: repoFromStore.remote.remoteProviders,
+    },
+  }
   const branch = repo.data.branches.find((b) => b.name === entry.branchName)
   if (!branch) return null
   return { repo, branch }

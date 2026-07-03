@@ -3,6 +3,7 @@ import { dataLoadBusy, dataLoadInitialLoading } from '#/web/stores/repos/repo-da
 import { deriveConnectivity } from '#/web/stores/repos/repo-guards.ts'
 import { getBranchWorktreeState, selectedBranchStatus } from '#/web/stores/repos/worktree-state.ts'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
+import type { RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 
 export interface RepoWorkspacePresentation {
   exists: boolean
@@ -30,8 +31,7 @@ export type SelectedRepoWorkspace = ReturnType<typeof getSelectedRepoWorkspace>
 export type SelectedRepoWorkspacePresentation = ReturnType<typeof getSelectedRepoWorkspacePresentation>
 
 export interface RepoWorkspaceRepo extends BranchActionRepo {
-  data: BranchActionRepo['data'] & {
-    branches: RepoState['data']['branches']
+  data: RepoBranchReadModelData & {
     statusReady: boolean
   }
   ui: Pick<RepoState['ui'], 'selectedBranch' | 'preferredWorkspacePaneTabByTarget'>

@@ -9,7 +9,7 @@ import { defaultWorktreePath, formatWorktreePath, tildify, untildify } from '#/w
 import { validateBranchName } from '#/shared/refnames.ts'
 import { isResolvableRemotePathInput, type RemoteRepoTarget } from '#/shared/remote-repo.ts'
 import { deriveLocalBranchFromRemoteRef, type CreateWorktreeInput } from '#/shared/worktree-create.ts'
-import type { RepoState } from '#/web/stores/repos/types.ts'
+import type { RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 
 export type CreateWorktreeDialogMode = CreateWorktreeInput['mode']['kind']
 
@@ -48,9 +48,14 @@ interface CreateWorktreeDerived {
 
 export type Translate = (key: string, params?: Record<string, string | number>) => string
 
+interface CreateWorktreeFormRepo {
+  id: string
+  data: Pick<RepoBranchReadModelData, 'branches' | 'currentBranch'>
+}
+
 export function deriveCreateWorktreeForm(
   state: CreateWorktreeFormState,
-  repo: RepoState,
+  repo: CreateWorktreeFormRepo,
   remoteTarget: RemoteRepoTarget | null,
   t: Translate,
 ): CreateWorktreeDerived {

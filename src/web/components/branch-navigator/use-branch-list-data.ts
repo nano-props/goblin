@@ -6,18 +6,20 @@
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
-import type { RepoDataState, RepoState, RepoUiState } from '#/web/stores/repos/types.ts'
-import { useRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
+import type { RepoState, RepoUiState } from '#/web/stores/repos/types.ts'
+import { useRepoBranchReadModel, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 
 // Composed projection: branch/status/worktree data comes from the repo
 // data query; the store contributes only identity, UI, operation, and
 // remote shell fields for the list.
 export type BranchListRepo = BranchActionRepo & {
-  data: BranchActionRepo['data'] & Pick<RepoDataState, 'branches'>
+  data: Pick<RepoBranchReadModelData, 'branches' | 'currentBranch' | 'status' | 'worktreesByPath'>
   ui: Pick<RepoUiState, 'selectedBranch' | 'branchViewMode'>
 }
 
-type BranchListRepoShell = Omit<BranchListRepo, 'data'>
+type BranchListRepoShell = Omit<BranchListRepo, 'data'> & {
+  currentWorktreesByPath: RepoState['data']['worktreesByPath']
+}
 
 const branchListRepoShellEqualFields: Array<keyof BranchListRepoShell> = [
   'id',
@@ -25,6 +27,7 @@ const branchListRepoShellEqualFields: Array<keyof BranchListRepoShell> = [
   'ui',
   'operations',
   'remote',
+  'currentWorktreesByPath',
 ]
 
 function branchListRepoShellEqual(a: BranchListRepoShell | undefined, b: BranchListRepoShell | undefined): boolean {
@@ -71,6 +74,7 @@ export function useBranchListRepo(repoId: string): BranchListRepo | undefined {
             operations: {
               branchAction: repo.operations.branchAction,
             },
+            currentWorktreesByPath: repo.data.worktreesByPath,
             remote: {
               lifecycle: repo.remote.lifecycle,
               hasRemotes: repo.remote.hasRemotes,
@@ -84,10 +88,16 @@ export function useBranchListRepo(repoId: string): BranchListRepo | undefined {
     },
     branchListRepoShellEqual,
   )
-  const branchReadModel = useRepoBranchReadModel(repoShell?.id ?? '', repoShell?.instanceId ?? '', !!repoShell)
+  const branchReadModel = useRepoBranchReadModel(
+    repoShell?.id ?? '',
+    repoShell?.instanceId ?? '',
+    repoShell ? { worktreesByPath: repoShell.currentWorktreesByPath } : null,
+    !!repoShell,
+  )
   if (!repoShell || !branchReadModel) return undefined
+  const { currentWorktreesByPath: _currentWorktreesByPath, ...shell } = repoShell
   return {
-    ...repoShell,
+    ...shell,
     data: branchReadModel,
   }
 }

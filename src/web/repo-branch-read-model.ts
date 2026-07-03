@@ -29,37 +29,34 @@ export function repoBranchSnapshotDataFromSnapshot(snapshot: RepoSnapshot): Repo
 
 export function repoBranchReadModelFromSnapshot(
   snapshot: RepoSnapshot,
-  current: Pick<RepoState['data'], 'status'> & Partial<Pick<RepoState['data'], 'worktreesByPath'>>,
+  current: Pick<RepoState['data'], 'status' | 'worktreesByPath'>,
 ): RepoBranchReadModelData {
   return {
     ...repoBranchSnapshotDataFromSnapshot(snapshot),
     status: current.status,
-    worktreesByPath: worktreeStatesFromBranches(snapshot.branches, current.worktreesByPath ?? {}, current.status),
+    worktreesByPath: worktreeStatesFromBranches(snapshot.branches, current.worktreesByPath, current.status),
   }
 }
 
 export function useRepoBranchReadModel(
   repoRoot: string,
   repoInstanceId: string,
+  current: Pick<RepoState['data'], 'worktreesByPath'> | null,
   enabled: boolean,
 ): RepoBranchReadModelData | null {
   const snapshotReadModel = useRepoSnapshotReadModel(repoRoot, repoInstanceId, enabled)
   const statusReadModel = useRepoStatusReadModel(repoRoot, repoInstanceId, enabled)
+  if (!enabled) return null
   if (!snapshotReadModel.data || !statusReadModel.data) return null
+  if (!current) throw new Error('repo branch read model requires current worktree projection')
   return repoBranchReadModelFromSnapshot(snapshotReadModel.data, {
+    worktreesByPath: current.worktreesByPath,
     status: statusReadModel.data,
   })
 }
 
-export function repoWithBranchReadModel<Repo extends { data: RepoState['data'] }>(
-  repo: Repo,
-  readModel: RepoBranchReadModelData,
-): Repo {
-  return { ...repo, data: { ...repo.data, ...readModel } }
-}
-
 export function readRepoBranchQueryProjection(
-  repo: Pick<RepoState, 'id' | 'instanceId'>,
+  repo: Pick<RepoState, 'id' | 'instanceId'> & { data: Pick<RepoState['data'], 'worktreesByPath'> },
   queryClient?: QueryClient,
 ): RepoBranchReadModelData | null {
   const snapshot = getRepoSnapshotQueryData(repo.id, repo.instanceId, queryClient)
@@ -68,5 +65,6 @@ export function readRepoBranchQueryProjection(
   if (!status) return null
   return repoBranchReadModelFromSnapshot(snapshot, {
     status,
+    worktreesByPath: repo.data.worktreesByPath,
   })
 }

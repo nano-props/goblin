@@ -1,6 +1,7 @@
 import type { RepoBranchActionKind } from '#/web/stores/repos/branch-action-types.ts'
 import { branchActionKindFromReason, isBranchActionReason } from '#/web/stores/repos/operations.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
+import type { RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 export type BranchActionItemId =
   | 'status'
   | 'history'
@@ -27,7 +28,7 @@ export interface BranchCopyPatchAction {
 export interface BranchActionRepo {
   id: RepoState['id']
   instanceId: RepoState['instanceId']
-  data: Pick<RepoState['data'], 'currentBranch' | 'status' | 'worktreesByPath'>
+  data: Pick<RepoBranchReadModelData, 'currentBranch' | 'status' | 'worktreesByPath'>
   operations: Pick<RepoState['operations'], 'branchAction'>
   remote: Pick<
     RepoState['remote'],

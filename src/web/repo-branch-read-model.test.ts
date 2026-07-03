@@ -1,19 +1,43 @@
 import { describe, expect, test } from 'vitest'
-import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
-import { createRepoBranch } from '#/web/test-utils/bridge.ts'
-import { repoWithBranchReadModel, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
+import { repoBranchReadModelFromSnapshot } from '#/web/repo-branch-read-model.ts'
+import type { RepoSnapshot } from '#/shared/api-types.ts'
 
 describe('repo branch read model helpers', () => {
-  test('projects branch read model data over store repo data as one atomic view', () => {
-    const repo = emptyRepo('/tmp/read-model-repo', 'read-model-repo', 'repo-instance-read-model')
-    repo.data.currentBranch = 'main'
-    repo.data.branches = [createRepoBranch('main')]
-    repo.data.worktreesByPath = {}
-    const readModel: RepoBranchReadModelData = {
-      currentBranch: 'feature/query',
+  test('builds the branch read model from snapshot plus explicit current projections', () => {
+    const snapshot: RepoSnapshot = {
+      current: 'feature/query',
       currentHEAD: '1111111000000000000000000000000000000000',
-      branches: [createRepoBranch('feature/query', { worktree: { path: '/tmp/query-worktree' } })],
-      status: [],
+      branches: [
+        {
+          name: 'feature/query',
+          isCurrent: true,
+          ahead: 0,
+          behind: 0,
+          lastCommitHash: '1111111000000000000000000000000000000000',
+          lastCommitShortHash: '1111111',
+          lastCommitMessage: 'Test commit',
+          lastCommitDate: '2026-01-01T00:00:00.000Z',
+          lastCommitAuthor: 'Test Author',
+          worktree: {
+            path: '/tmp/query-worktree',
+            isPrimary: false,
+            isLocked: true,
+            summary: {
+              dirty: false,
+              changeCount: 0,
+            },
+          },
+          pullRequest: {
+            number: 123,
+            title: 'Draft',
+            url: 'https://example.invalid/pr/123',
+            state: 'open',
+          },
+        },
+      ],
+    }
+
+    const readModel = repoBranchReadModelFromSnapshot(snapshot, {
       worktreesByPath: {
         '/tmp/query-worktree': {
           path: '/tmp/query-worktree',
@@ -24,14 +48,33 @@ describe('repo branch read model helpers', () => {
           isLocked: false,
         },
       },
-    }
+      status: [
+        {
+          path: '/tmp/query-worktree',
+          branch: 'feature/query',
+          isMain: false,
+          entries: [{ path: 'changed.txt', x: 'M', y: 'M' }],
+        },
+      ],
+    })
 
-    const projected = repoWithBranchReadModel(repo, readModel)
-
-    expect(projected).not.toBe(repo)
-    expect(projected.data.currentBranch).toBe('feature/query')
-    expect(projected.data.currentHEAD).toBe('1111111000000000000000000000000000000000')
-    expect(projected.data.branches.map((branch) => branch.name)).toEqual(['feature/query'])
-    expect(projected.data.worktreesByPath['/tmp/query-worktree']?.branch).toBe('feature/query')
+    expect(readModel.currentBranch).toBe('feature/query')
+    expect(readModel.currentHEAD).toBe('1111111000000000000000000000000000000000')
+    expect(readModel.status[0]?.entries).toHaveLength(1)
+    expect(readModel.branches).toEqual([
+      expect.objectContaining({
+        name: 'feature/query',
+        worktree: { path: '/tmp/query-worktree' },
+      }),
+    ])
+    expect(readModel.branches[0]).not.toHaveProperty('pullRequest')
+    expect(readModel.worktreesByPath['/tmp/query-worktree']).toEqual({
+      path: '/tmp/query-worktree',
+      branch: 'feature/query',
+      isMain: false,
+      isDirty: true,
+      changeCount: 1,
+      isLocked: true,
+    })
   })
 })

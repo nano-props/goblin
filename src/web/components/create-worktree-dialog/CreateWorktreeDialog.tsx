@@ -27,7 +27,7 @@ import { remoteRepoTarget } from '#/web/stores/repos/repo-guards.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { useRepoRemoteBranchesQuery } from '#/web/repo-data-query.ts'
-import { repoWithBranchReadModel, useRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
+import { useRepoBranchReadModel, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 import { cn } from '#/web/lib/cn.ts'
 import {
   deriveCreateWorktreeForm,
@@ -50,6 +50,12 @@ interface Props {
   onCreate: (request: CreateWorktreeRequest) => boolean | void | Promise<boolean | void>
 }
 
+type CreateWorktreeDialogRepo = Omit<RepoState, 'data'> & { data: RepoBranchReadModelData }
+
+type ContentProps = Omit<Props, 'repo'> & {
+  repo: CreateWorktreeDialogRepo
+}
+
 interface WorktreeBootstrapPromptState {
   loading: boolean
   preview: WorktreeBootstrapPreview | null
@@ -59,12 +65,17 @@ interface WorktreeBootstrapPromptState {
 }
 
 export function CreateWorktreeDialog({ open, repo, worktreeBootstrap, onClose, onCreate }: Props) {
-  const branchReadModel = useRepoBranchReadModel(repo.id, repo.instanceId, open)
+  const branchReadModel = useRepoBranchReadModel(
+    repo.id,
+    repo.instanceId,
+    { worktreesByPath: repo.data.worktreesByPath },
+    open,
+  )
   if (!branchReadModel) return null
   return (
     <CreateWorktreeDialogContent
       open={open}
-      repo={repoWithBranchReadModel(repo, branchReadModel)}
+      repo={{ ...repo, data: branchReadModel }}
       worktreeBootstrap={worktreeBootstrap}
       onClose={onClose}
       onCreate={onCreate}
@@ -72,7 +83,7 @@ export function CreateWorktreeDialog({ open, repo, worktreeBootstrap, onClose, o
   )
 }
 
-function CreateWorktreeDialogContent({ open, repo, worktreeBootstrap, onClose, onCreate }: Props) {
+function CreateWorktreeDialogContent({ open, repo, worktreeBootstrap, onClose, onCreate }: ContentProps) {
   const t = useT()
   const compact = useIsCompactUi()
 
