@@ -6,15 +6,9 @@ import {
   getRepoRemoteBranches,
   getRepoSnapshot,
   getRepoStatus,
-  readRepoBulk,
 } from '#/web/repo-client.ts'
 import type { PullRequestEntry, RepoSnapshot } from '#/shared/api-types.ts'
-import {
-  DEFAULT_REPOSITORY_LOG_COUNT,
-  type LogEntry,
-  type PullRequestFetchMode,
-  type WorktreeStatus,
-} from '#/shared/git-types.ts'
+import { DEFAULT_REPOSITORY_LOG_COUNT, type PullRequestFetchMode, type WorktreeStatus } from '#/shared/git-types.ts'
 
 export interface RepoBulkReadCacheEntry {
   snapshot: RepoSnapshot | null
@@ -58,11 +52,11 @@ export function repoDataQueryKey(repoRoot: string, repoInstanceId: string) {
   return ['repo-data', repoRoot, repoInstanceId] as const
 }
 
-export function repoLogQueryKey(repoRoot: string, repoInstanceId: string, branch: string, count: number, skip: number) {
+function repoLogQueryKey(repoRoot: string, repoInstanceId: string, branch: string, count: number, skip: number) {
   return ['repo-data', repoRoot, repoInstanceId, 'log', branch, count, skip] as const
 }
 
-export function repoRemoteBranchesQueryKey(repoRoot: string, repoInstanceId: string) {
+function repoRemoteBranchesQueryKey(repoRoot: string, repoInstanceId: string) {
   return ['repo-data', repoRoot, repoInstanceId, 'remote-branches'] as const
 }
 
@@ -89,17 +83,6 @@ export function repoPullRequestsQueryOptions(
   return queryOptions({
     queryKey: repoPullRequestsQueryKey(repoRoot, repoInstanceId, branches, mode),
     queryFn: ({ signal }) => getRepoPullRequests(repoRoot, branches ? [...branches] : undefined, { mode }, signal),
-  })
-}
-
-export function repoBulkReadQueryOptions(
-  repoRoot: string,
-  repoInstanceId: string,
-  include?: ReadonlyArray<'snapshot' | 'status' | 'pullRequests'>,
-) {
-  return queryOptions({
-    queryKey: repoBulkReadQueryKey(repoRoot, repoInstanceId, include),
-    queryFn: ({ signal }) => readRepoBulk(repoRoot, { include, signal }),
   })
 }
 
@@ -130,10 +113,6 @@ export function repoRemoteBranchesQueryOptions(
   })
 }
 
-export function useRepoSnapshotQuery(repoRoot: string, repoInstanceId: string) {
-  return useQuery(repoSnapshotQueryOptions(repoRoot, repoInstanceId))
-}
-
 export function useRepoSnapshotReadModel(repoRoot: string, repoInstanceId: string, enabled: boolean) {
   return useQuery({
     ...repoSnapshotQueryOptions(repoRoot, repoInstanceId),
@@ -142,25 +121,12 @@ export function useRepoSnapshotReadModel(repoRoot: string, repoInstanceId: strin
   })
 }
 
-export function useRepoStatusQuery(repoRoot: string, repoInstanceId: string) {
-  return useQuery(repoStatusQueryOptions(repoRoot, repoInstanceId))
-}
-
 export function useRepoStatusReadModel(repoRoot: string, repoInstanceId: string, enabled: boolean) {
   return useQuery({
     ...repoStatusQueryOptions(repoRoot, repoInstanceId),
     enabled: false,
     subscribed: enabled,
   })
-}
-
-export function useRepoPullRequestsQuery(
-  repoRoot: string,
-  repoInstanceId: string,
-  branches?: readonly string[],
-  mode?: PullRequestFetchMode,
-) {
-  return useQuery(repoPullRequestsQueryOptions(repoRoot, repoInstanceId, branches, mode))
 }
 
 export function useRepoPullRequestsReadModel(
@@ -194,28 +160,6 @@ export function useRepoRemoteBranchesQuery(
   return useQuery(repoRemoteBranchesQueryOptions(repoRoot, repoInstanceId, options))
 }
 
-export function setRepoLogQueryData(
-  repoRoot: string,
-  repoInstanceId: string,
-  branch: string,
-  entries: LogEntry[],
-  options: { count?: number; skip?: number; queryClient?: QueryClient } = {},
-): void {
-  const count = options.count ?? DEFAULT_REPOSITORY_LOG_COUNT
-  const skip = options.skip ?? 0
-  const queryClient = options.queryClient ?? primaryWindowQueryClient
-  queryClient.setQueryData(repoLogQueryKey(repoRoot, repoInstanceId, branch, count, skip), entries)
-}
-
-export function setRepoRemoteBranchesQueryData(
-  repoRoot: string,
-  repoInstanceId: string,
-  branches: string[],
-  queryClient: QueryClient = primaryWindowQueryClient,
-): void {
-  queryClient.setQueryData(repoRemoteBranchesQueryKey(repoRoot, repoInstanceId), branches)
-}
-
 export function setRepoSnapshotQueryData(
   repoRoot: string,
   repoInstanceId: string,
@@ -239,6 +183,18 @@ export function getRepoStatusQueryData(
   queryClient: QueryClient = primaryWindowQueryClient,
 ): WorktreeStatus[] | undefined {
   return queryClient.getQueryData<WorktreeStatus[]>(repoStatusQueryKey(repoRoot, repoInstanceId))
+}
+
+export function getRepoPullRequestsQueryData(
+  repoRoot: string,
+  repoInstanceId: string,
+  branches: readonly string[] | undefined,
+  mode: PullRequestFetchMode | undefined,
+  queryClient: QueryClient = primaryWindowQueryClient,
+): PullRequestEntry[] | null | undefined {
+  return queryClient.getQueryData<PullRequestEntry[] | null>(
+    repoPullRequestsQueryKey(repoRoot, repoInstanceId, branches, mode),
+  )
 }
 
 export function setRepoStatusQueryData(

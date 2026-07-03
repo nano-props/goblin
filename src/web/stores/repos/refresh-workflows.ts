@@ -9,6 +9,7 @@ import {
   workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { getRepoPullRequestsQueryData } from '#/web/repo-data-query.ts'
 import {
   PULL_REQUEST_UNKNOWN_RETRY_DELAY_MS,
   PULL_REQUEST_UNKNOWN_RETRY_LIMIT,
@@ -41,7 +42,16 @@ function visibleDetailPullRequestPending(get: ReposGet, id: string, repoInstance
   )
     return false
   const branch = projectedRepo.data.branches.find((entry) => entry.name === projectedRepo.ui.selectedBranch)
-  return pullRequestMergeStatusPending(branch?.pullRequest)
+  const pullRequest =
+    readVisibleFullPullRequest(projectedRepo.id, projectedRepo.instanceId, projectedRepo.ui.selectedBranch) ??
+    branch?.pullRequest
+  return pullRequestMergeStatusPending(pullRequest)
+}
+
+function readVisibleFullPullRequest(repoRoot: string, repoInstanceId: string, branchName: string) {
+  return getRepoPullRequestsQueryData(repoRoot, repoInstanceId, [branchName], 'full')?.find(
+    (entry) => entry.branch === branchName,
+  )?.pullRequest
 }
 
 async function refreshVisibleDetailPullRequest(get: ReposGet, id: string, repoInstanceId: string): Promise<void> {
