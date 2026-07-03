@@ -48,26 +48,26 @@ export async function setFetchInterval(sec: number): Promise<number> {
 }
 
 export async function setTerminalNotificationsEnabled(enabled: boolean): Promise<void> {
-  await setSettingsTerminalNotificationsEnabled(enabled)
+  const terminalNotificationsEnabled = await setSettingsTerminalNotificationsEnabled(enabled)
   updateRuntimeSettingsSnapshotCache(primaryWindowQueryClient, (current) => ({
     ...current,
-    terminalNotificationsEnabled: enabled,
+    terminalNotificationsEnabled,
   }))
 }
 
 export async function setShortcutsDisabled(disabled: boolean): Promise<void> {
-  await setSettingsShortcutsDisabled(disabled)
+  const shortcutsDisabled = await setSettingsShortcutsDisabled(disabled)
   updateRuntimeSettingsSnapshotCache(primaryWindowQueryClient, (current) => ({
     ...current,
-    shortcutsDisabled: disabled,
+    shortcutsDisabled,
   }))
 }
 
 export async function setGlobalShortcutDisabled(disabled: boolean): Promise<void> {
-  await setSettingsGlobalShortcutDisabled(disabled)
+  const globalShortcutDisabled = await setSettingsGlobalShortcutDisabled(disabled)
   updateRuntimeSettingsSnapshotCache(primaryWindowQueryClient, (current) => ({
     ...current,
-    globalShortcutDisabled: disabled,
+    globalShortcutDisabled,
   }))
 }
 
@@ -92,8 +92,8 @@ export async function refreshGitHubCliDetection(hosts?: string[]): Promise<void>
 }
 
 export async function setLanEnabled(enabled: boolean): Promise<void> {
-  await setSettingsLanEnabled(enabled)
-  updateRuntimeSettingsSnapshotCache(primaryWindowQueryClient, (current) => ({ ...current, lanEnabled: enabled }))
+  const lanEnabled = await setSettingsLanEnabled(enabled)
+  updateRuntimeSettingsSnapshotCache(primaryWindowQueryClient, (current) => ({ ...current, lanEnabled }))
   void primaryWindowQueryClient.invalidateQueries({ queryKey: lanInfoQueryKey() })
 }
 

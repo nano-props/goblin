@@ -36,11 +36,11 @@ const appDataClientMocks = vi.hoisted(() => ({
   })),
   saveSession: vi.fn(async (session) => session),
   setGlobalShortcut: vi.fn(async (accelerator) => ({ accelerator, registered: true })),
-  setGlobalShortcutDisabled: vi.fn(async () => {}),
-  setLanEnabled: vi.fn(async () => {}),
+  setGlobalShortcutDisabled: vi.fn(async (disabled) => disabled),
+  setLanEnabled: vi.fn(async (enabled) => enabled),
   setSettingsFetchInterval: vi.fn(async (sec) => sec),
-  setShortcutsDisabled: vi.fn(async () => {}),
-  setTerminalNotificationsEnabled: vi.fn(async () => {}),
+  setShortcutsDisabled: vi.fn(async (disabled) => disabled),
+  setTerminalNotificationsEnabled: vi.fn(async (enabled) => enabled),
 }))
 
 vi.mock('#/web/settings-client.ts', () => ({
@@ -92,15 +92,15 @@ describe('settings actions', () => {
     appDataClientMocks.setGlobalShortcut.mockReset()
     appDataClientMocks.setGlobalShortcut.mockImplementation(async (accelerator) => ({ accelerator, registered: true }))
     appDataClientMocks.setGlobalShortcutDisabled.mockReset()
-    appDataClientMocks.setGlobalShortcutDisabled.mockResolvedValue(undefined)
+    appDataClientMocks.setGlobalShortcutDisabled.mockImplementation(async (disabled) => disabled)
     appDataClientMocks.setLanEnabled.mockReset()
-    appDataClientMocks.setLanEnabled.mockResolvedValue(undefined)
+    appDataClientMocks.setLanEnabled.mockImplementation(async (enabled) => enabled)
     appDataClientMocks.setSettingsFetchInterval.mockReset()
     appDataClientMocks.setSettingsFetchInterval.mockImplementation(async (sec) => sec)
     appDataClientMocks.setShortcutsDisabled.mockReset()
-    appDataClientMocks.setShortcutsDisabled.mockResolvedValue(undefined)
+    appDataClientMocks.setShortcutsDisabled.mockImplementation(async (disabled) => disabled)
     appDataClientMocks.setTerminalNotificationsEnabled.mockReset()
-    appDataClientMocks.setTerminalNotificationsEnabled.mockResolvedValue(undefined)
+    appDataClientMocks.setTerminalNotificationsEnabled.mockImplementation(async (enabled) => enabled)
   })
 
   test('recordRecentRepo syncs recent repos into the settings snapshot cache', async () => {
@@ -184,6 +184,40 @@ describe('settings actions', () => {
     expect(primaryWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({ lanEnabled: true })
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: lanInfoQueryKey() })
     invalidateSpy.mockRestore()
+  })
+
+  test('uses server canonical runtime boolean preferences as cache values', async () => {
+    primaryWindowQueryClient.setQueryData(
+      settingsSnapshotQueryKey(),
+      defaultSettingsSnapshot({
+        terminalNotificationsEnabled: false,
+        shortcutsDisabled: false,
+        globalShortcutDisabled: false,
+        lanEnabled: false,
+      }),
+    )
+    appDataClientMocks.setTerminalNotificationsEnabled.mockResolvedValue(false)
+    appDataClientMocks.setShortcutsDisabled.mockResolvedValue(false)
+    appDataClientMocks.setGlobalShortcutDisabled.mockResolvedValue(false)
+    appDataClientMocks.setLanEnabled.mockResolvedValue(false)
+    const {
+      setTerminalNotificationsEnabled,
+      setShortcutsDisabled,
+      setGlobalShortcutDisabled,
+      setLanEnabled,
+    } = await import('#/web/settings-actions.ts')
+
+    await setTerminalNotificationsEnabled(true)
+    await setShortcutsDisabled(true)
+    await setGlobalShortcutDisabled(true)
+    await setLanEnabled(true)
+
+    expect(primaryWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
+      terminalNotificationsEnabled: false,
+      shortcutsDisabled: false,
+      globalShortcutDisabled: false,
+      lanEnabled: false,
+    })
   })
 
   test('leaves runtime settings cache unchanged when the server write fails', async () => {

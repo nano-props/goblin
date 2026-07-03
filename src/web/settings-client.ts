@@ -116,8 +116,8 @@ export async function getLanInfo(): Promise<LanInfo> {
   return await fetchServerJson('/api/settings/lan')
 }
 
-export async function setLanEnabled(enabled: boolean): Promise<void> {
-  await updateUserSettingsPatch({ lanEnabled: enabled })
+export async function setLanEnabled(enabled: boolean): Promise<boolean> {
+  return (await updateUserSettingsPatch({ lanEnabled: enabled })).prefs.lanEnabled
 }
 
 export async function getExternalAppsSnapshot(): Promise<ExternalAppsSnapshot> {
@@ -205,16 +205,16 @@ export async function setSettingsFetchInterval(sec: number): Promise<number> {
   return result.fetchIntervalSec
 }
 
-export async function setTerminalNotificationsEnabled(enabled: boolean): Promise<void> {
-  await updateUserSettingsPatch({ terminalNotificationsEnabled: enabled })
+export async function setTerminalNotificationsEnabled(enabled: boolean): Promise<boolean> {
+  return (await updateUserSettingsPatch({ terminalNotificationsEnabled: enabled })).prefs.terminalNotificationsEnabled
 }
 
-export async function setShortcutsDisabled(disabled: boolean): Promise<void> {
-  await updateUserSettingsPatch({ shortcutsDisabled: disabled })
+export async function setShortcutsDisabled(disabled: boolean): Promise<boolean> {
+  return (await updateUserSettingsPatch({ shortcutsDisabled: disabled })).prefs.shortcutsDisabled
 }
 
-export async function setGlobalShortcutDisabled(disabled: boolean): Promise<void> {
-  await updateUserSettingsPatch({ globalShortcutDisabled: disabled })
+export async function setGlobalShortcutDisabled(disabled: boolean): Promise<boolean> {
+  return (await updateUserSettingsPatch({ globalShortcutDisabled: disabled })).prefs.globalShortcutDisabled
 }
 
 export async function setGlobalShortcut(accelerator: string): Promise<GlobalShortcutState> {
