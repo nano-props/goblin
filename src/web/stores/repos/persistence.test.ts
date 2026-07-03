@@ -8,6 +8,8 @@ import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { createBranchSnapshot, createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { RepoSnapshotCacheEntry } from '#/web/stores/repos/types.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 function cachedRepo(savedAt: number): RepoSnapshotCacheEntry {
   return {
     savedAt,
@@ -23,7 +25,10 @@ function cachedRepo(savedAt: number): RepoSnapshotCacheEntry {
   }
 }
 
-beforeEach(resetReposStore)
+beforeEach(() => {
+  primaryWindowQueryClient.clear()
+  resetReposStore()
+})
 
 describe('normalizeRepoSnapshotCache', () => {
   test('keeps only the newest 50 valid cache entries', () => {
@@ -113,6 +118,26 @@ describe('persistRepoSnapshotCacheEntry', () => {
     const cached = useReposStore.getState().repoSnapshotCache['/repo']
     expect(cached?.data.branches[0]?.worktree).toEqual({ path: '/tmp/worktree-a' })
     expect(cached?.data.branches[0]?.pullRequest).toBeUndefined()
+  })
+
+  test('persists the React Query branch read model when it is newer than the store projection', () => {
+    const repo = seedRepoState({
+      id: '/repo',
+      instanceId: 'repo-instance-test',
+      branches: [createRepoBranch('main')],
+      currentBranch: 'main',
+      selectedBranch: 'main',
+    })
+    setRepoSnapshotQueryData('/repo', repo.instanceId, {
+      current: 'feature/query',
+      branches: [createBranchSnapshot('feature/query', { isCurrent: true })],
+    })
+
+    persistRepoSnapshotCacheEntry(useReposStore.setState, repo, 'repo-instance-test')
+
+    const cached = useReposStore.getState().repoSnapshotCache['/repo']
+    expect(cached?.data.currentBranch).toBe('feature/query')
+    expect(cached?.data.branches.map((branch) => branch.name)).toEqual(['feature/query'])
   })
 })
 
