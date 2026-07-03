@@ -1,4 +1,5 @@
 import * as pty from 'node-pty'
+import { ensureNodePtyDarwinSpawnHelperExecutable } from '#/server/terminal/node-pty-spawn-helper.ts'
 import { resolveLocalShell, resolveLocalShellWithStartupShellCommand } from '#/server/terminal/terminal-local-shell.ts'
 
 export interface TerminalPtyRuntime {
@@ -31,6 +32,7 @@ export function spawnTerminalPtyRuntime(input: SpawnTerminalPtyRuntimeInput): Sp
       ? resolveLocalShellWithStartupShellCommand(input.startupShellCommand)
       : resolveLocalShell(input)
     const env = { ...process.env, ...input.env, TERM: 'xterm-256color' }
+    ensureNodePtyDarwinSpawnHelperExecutable()
     const term = pty.spawn(shell.command, shell.args, {
       name: 'xterm-256color',
       cols: input.cols,
