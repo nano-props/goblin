@@ -155,8 +155,8 @@ function orderedInsert(order: string[], id: string, rankById?: ReadonlyMap<strin
 /** Build a fresh repo by layering the restorable cache on top of an
  *  empty shell. `nameHints` is consulted in order; the first non-empty
  *  hint wins, then the cached name, then the last path segment of the
- *  id. The caller mutates the result (e.g. sets `remote.target`,
- *  flips availability) before returning it from `upsertRepo.create`. */
+ *  id. The caller mutates lifecycle / availability fields before
+ *  returning it from `upsertRepo.create`. */
 function buildNewRepo(
   s: Pick<ReposStore, 'repoSnapshotCache'>,
   id: string,
@@ -295,8 +295,7 @@ export function addUnavailableRepo(
     create: () => {
       const repo = buildNewRepo(s, id, [target?.displayName], instanceId)
       // New repo: write the failed lifecycle (with last-known target
-      // if the probe got far enough to resolve one). The legacy
-      // `target` field is mirrored for un-migrated call sites.
+      // if the probe got far enough to resolve one).
       markRemoteLifecycleFailed(repo, reason, target)
       return repo
     },
@@ -330,12 +329,12 @@ export function addUnavailableRepo(
  * addUnavailableRepo. No-op if the repo is already in the store (so
  * calling this twice for the same entry is safe).
  *
- * Note: we intentionally do NOT set `remote.target` here. The ref only
- * carries alias/remotePath; host/user/port require `resolveRemoteRepositoryTarget`,
- * which hasn't run yet. Until the probe succeeds and addResolvedRepo
- * fills in the target, the placeholder lives in a "known alias,
- * unknown concrete host" state — `deriveConnectivity(repo) === 'connecting'`
- * is the signal callers should branch on rather than reading target fields.
+ * Note: the ref only carries alias/remotePath; host/user/port require
+ * `resolveRemoteRepositoryTarget`, which hasn't run yet. Until the probe
+ * succeeds and addResolvedRepo fills in the target, the placeholder lives
+ * in a "known alias, unknown concrete host" state —
+ * `deriveConnectivity(repo) === 'connecting'` is the signal callers should
+ * branch on rather than reading target fields.
  */
 export function insertPlaceholderRepo(
   s: Pick<ReposStore, 'repos' | 'repoSnapshotCache' | 'order'>,
@@ -416,7 +415,7 @@ export function createRuntimeRepoSessionActions(
         }
         return { ok: false, message: outcome.reason ?? 'error.failed-read-repo' }
       }
-      // Local probe stays on the legacy path — there's no remote
+      // Local repos use the direct runtime-open path — there's no remote
       // lifecycle to converge and no orchestrator concern.
       const resolved = await openLocalRepoRuntimeForInput(entry)
       if (!resolved.repo || !resolved.repoInstanceId)

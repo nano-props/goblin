@@ -10,10 +10,9 @@ import type { RepoState, ReposSet, ReposStore } from '#/web/stores/repos/types.t
 
 /**
  * Live SSH liveness state for remote repos. Derived — never stored —
- * from `isRemoteRepoId(id)` + `remote.lifecycle.kind`. Per
- * docs/goblin-remote-repo-refactor-plan.md §4: the lifecycle union
- * is the single source of truth; the legacy `availability.phase` /
- * `target presence` inference is gone after Phase 4.
+ * from `isRemoteRepoId(id)` + `remote.lifecycle.kind`. The lifecycle
+ * union is the single source of truth; availability and target presence
+ * are not used to infer connectivity.
  *   - `connecting`:  remote repo whose lifecycle run has not
  *     converged (placeholder / in-flight probe)
  *   - `connected`:   remote repo with a converged `ready` lifecycle;
@@ -31,11 +30,8 @@ export function deriveConnectivity(repo: RepoState): RepoConnectivity {
     if (lifecycle.kind === 'connecting') return 'connecting'
     return 'connected'
   }
-  // A remote repo without a lifecycle is a pre-Phase-1 fixture
-  // (test mocks, persistence restores) and SHOULD be treated
-  // as a programming error in production. Until Phase 4 finishes
-  // migrating every writer to the lifecycle helpers, treat it
-  // as `connecting` so the UI shows a spinner — never as a
+  // A remote repo without a lifecycle is a malformed fixture or restore.
+  // Treat it as `connecting` so the UI shows a spinner — never as a
   // silently-broken `connected` tab.
   if (import.meta.env.DEV) {
     deriveConnectivityLog.warn(`remote repo ${repo.id} has no lifecycle; treating as connecting`)
@@ -46,9 +42,8 @@ export function deriveConnectivity(repo: RepoState): RepoConnectivity {
 /**
  * The concrete remote target for a remote repo id + lifecycle, or
  * `null` for local repos and remote repos whose lifecycle hasn't
- * reached a terminal state with a retained target. Replaces the
- * legacy `repo.remote.target` field — Phase 4 deletes the field,
- * this helper is the only sanctioned access path.
+ * reached a terminal state with a retained target. This helper is the
+ * only sanctioned access path for a concrete remote target.
  *
  * Takes the id and the lifecycle separately so it works on
  * any subset that carries the lifecycle (e.g. `BranchActionRepo`,

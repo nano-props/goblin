@@ -79,11 +79,9 @@ export interface RepoRemoteState {
   /**
    * Single source-of-truth lifecycle for a remote repo. `null` for local
    * repos. The lifecycle union owns `target` — code MUST read the target
-   * from `lifecycle.target` (ready / failed-with-target). The legacy
-   * `target?: RemoteRepoTarget` field has been removed in Phase 4 of the
-   * remote-repo refactor; new code should call `remoteRepoTarget(repo)`
-   * from `web/stores/repos/repo-guards.ts` instead of reaching into
-   * `repo.remote.target`.
+   * from `lifecycle.target` (ready / failed-with-target). Call
+   * `remoteRepoTarget(repo)` from `web/stores/repos/repo-guards.ts`
+   * instead of inferring target state from other remote fields.
    */
   lifecycle: RemoteRepoConnectionLifecycle | null
   remotes?: string[]

@@ -33,9 +33,8 @@ export { toRemoteRepoFailureReason } from '#/shared/remote-repo.ts'
 
 /**
  * Set the remote lifecycle to `connecting` (entry point of a fresh
- * remote-repo run). The legacy `target` field is gone in Phase 4;
- * the lifecycle union owns the target and the `connecting` variant
- * has no slot for it. Pass-through to availability keeps the
+ * remote-repo run). The lifecycle union owns the target and the
+ * `connecting` variant has no slot for it. Pass-through to availability keeps the
  * refresh-pipeline call sites (refresh.ts) that flip
  * `availability` from `available` working unchanged — the
  * availability mirror is still useful as a hint, not as the
