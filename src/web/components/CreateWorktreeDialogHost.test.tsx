@@ -14,6 +14,7 @@ import { mockFetch } from '#/test-utils/fetch-mock.ts'
 // as Radix dialog state, not as its mount condition.
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { CreateWorktreeDialogHost } from '#/web/components/CreateWorktreeDialogHost.tsx'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
@@ -47,7 +48,15 @@ afterEach(() => {
 })
 
 function renderHost(open: boolean, onOpenChange: (open: boolean) => void) {
-  return renderInJsdom(<CreateWorktreeDialogHost open={open} onOpenChange={onOpenChange} repoId={REPO_ID} />)
+  return renderInJsdom(hostElement(open, onOpenChange, REPO_ID))
+}
+
+function hostElement(open: boolean, onOpenChange: (open: boolean) => void, repoId: string | null) {
+  return (
+    <QueryClientProvider client={primaryWindowQueryClient}>
+      <CreateWorktreeDialogHost open={open} onOpenChange={onOpenChange} repoId={repoId} />
+    </QueryClientProvider>
+  )
 }
 
 describe('CreateWorktreeDialogHost', () => {
@@ -73,7 +82,7 @@ describe('CreateWorktreeDialogHost', () => {
     // true. The host re-renders; only `open` changed, not `repoId`.
     // The guarded effect must NOT call `onOpenChange(false)` — pre-fix
     // it did so in the same render.
-    rerender(<CreateWorktreeDialogHost open={true} onOpenChange={onOpenChange} repoId={REPO_ID} />)
+    rerender(hostElement(true, onOpenChange, REPO_ID))
     expect(onOpenChange).not.toHaveBeenCalledWith(false)
   })
 
@@ -89,7 +98,7 @@ describe('CreateWorktreeDialogHost', () => {
     const onOpenChange = vi.fn()
     const { rerender } = renderHost(true, onOpenChange)
 
-    rerender(<CreateWorktreeDialogHost open={true} onOpenChange={onOpenChange} repoId="/tmp/other-repo" />)
+    rerender(hostElement(true, onOpenChange, '/tmp/other-repo'))
 
     expect(onOpenChange).not.toHaveBeenCalledWith(false)
   })
@@ -482,8 +491,8 @@ describe('CreateWorktreeDialogHost', () => {
 
     const { rerender } = renderHost(true, vi.fn())
     await flushReact()
-    rerender(<CreateWorktreeDialogHost open={false} onOpenChange={vi.fn()} repoId={REPO_ID} />)
-    rerender(<CreateWorktreeDialogHost open={true} onOpenChange={vi.fn()} repoId={REPO_ID} />)
+    rerender(hostElement(false, vi.fn(), REPO_ID))
+    rerender(hostElement(true, vi.fn(), REPO_ID))
     await flushReact()
 
     secondPreview.resolve(previewResponse({ hasOperations: true, configHash }))
