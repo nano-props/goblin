@@ -15,8 +15,8 @@ import {
   workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import {
-  readRepoBranchReadModel,
-  repoBranchesFromReadModel,
+  readRepoBranches,
+  readRepoBranchSelectionModel,
   readRepoWithBranchReadModel,
 } from '#/web/repo-branch-read-model.ts'
 
@@ -161,10 +161,10 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
         if (!repo || repo.ui.branchViewMode === viewMode) return s
         changed = true
         repoInstanceId = repo.instanceId
-        const branchReadModel = readRepoBranchReadModel(repo)
+        const branchModel = readRepoBranchSelectionModel(repo)
         const selectedBranch = selectedBranchForBranchSet({
-          branches: repoBranchesFromReadModel(repo, branchReadModel),
-          currentBranch: branchReadModel?.currentBranch ?? repo.data.currentBranch,
+          branches: branchModel.branches,
+          currentBranch: branchModel.currentBranch,
           selectedBranch: repo.ui.selectedBranch,
           viewMode,
         })
@@ -214,8 +214,7 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
       set((s) => {
         const repo = s.repos[id]
         if (!repo) return s
-        const branchReadModel = readRepoBranchReadModel(repo)
-        const branches = repoBranchesFromReadModel(repo, branchReadModel)
+        const branches = readRepoBranches(repo)
         if (!branches.some((b) => b.name === branch)) return s
         if (repo.ui.selectedBranch === branch) return s
         changed = true
