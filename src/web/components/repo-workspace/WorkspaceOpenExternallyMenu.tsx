@@ -18,7 +18,7 @@ import {
 } from '#/web/external-workspace-apps.tsx'
 import { getRecentWorkspaceExternalAppId } from '#/shared/repo-settings.ts'
 import { useSettingsSnapshotQuery } from '#/web/settings-queries.ts'
-import { setRecentWorkspaceExternalApp } from '#/web/settings-client.ts'
+import { setRecentWorkspaceExternalAppPreference } from '#/web/settings-actions.ts'
 import { cn } from '#/web/lib/cn.ts'
 
 interface Props {
@@ -86,7 +86,7 @@ export function WorkspaceOpenExternallyMenu({ repo, branch, branchActions }: Pro
     void run(item.id, async () => {
       if (shouldWriteRecent) {
         try {
-          await setRecentWorkspaceExternalApp({
+          await setRecentWorkspaceExternalAppPreference({
             repoId: repo.id,
             worktreePath: branch.worktree?.path ?? null,
             itemId: item.id,

@@ -9,6 +9,7 @@ import type {
   I18nSnapshot,
   LangPref,
   LanInfo,
+  RepoSettingsState,
   RuntimeRecentReposState,
   WorkspaceSessionState,
   UserSettings,
@@ -182,10 +183,10 @@ export async function setRecentWorkspaceExternalApp(input: {
   repoId: string
   worktreePath: string | null
   itemId: string
-}): Promise<void> {
-  await postServerJson<
+}): Promise<RepoSettingsState> {
+  return await postServerJson<
     { repoId: string; worktreePath: string | null; itemId: string },
-    { ok: true }
+    { ok: true } & RepoSettingsState
   >('/api/settings/repo-external-app-recent', input)
 }
 

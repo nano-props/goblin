@@ -5,7 +5,7 @@ import { defaultSettingsSnapshot, defaultWorkspaceSessionState } from '#/shared/
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { githubCliQueryKey, lanInfoQueryKey, settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
-import type { GitHubCliState } from '#/shared/api-types.ts'
+import type { GitHubCliState, RepoSettingsState } from '#/shared/api-types.ts'
 
 type AddRecentRepoResult = {
   recentRepos: RepoSessionEntry[]
@@ -38,6 +38,7 @@ const appDataClientMocks = vi.hoisted(() => ({
   setGlobalShortcut: vi.fn(async (accelerator) => ({ accelerator, registered: true })),
   setGlobalShortcutDisabled: vi.fn(async (disabled) => disabled),
   setLanEnabled: vi.fn(async (enabled) => enabled),
+  setRecentWorkspaceExternalApp: vi.fn<() => Promise<RepoSettingsState>>(async () => ({ repoSettings: [] })),
   setSettingsFetchInterval: vi.fn(async (sec) => sec),
   setShortcutsDisabled: vi.fn(async (disabled) => disabled),
   setTerminalNotificationsEnabled: vi.fn(async (enabled) => enabled),
@@ -53,6 +54,7 @@ vi.mock('#/web/settings-client.ts', () => ({
   setGlobalShortcut: appDataClientMocks.setGlobalShortcut,
   setGlobalShortcutDisabled: appDataClientMocks.setGlobalShortcutDisabled,
   setLanEnabled: appDataClientMocks.setLanEnabled,
+  setRecentWorkspaceExternalApp: appDataClientMocks.setRecentWorkspaceExternalApp,
   setSettingsFetchInterval: appDataClientMocks.setSettingsFetchInterval,
   setShortcutsDisabled: appDataClientMocks.setShortcutsDisabled,
   setTerminalNotificationsEnabled: appDataClientMocks.setTerminalNotificationsEnabled,
@@ -95,6 +97,8 @@ describe('settings actions', () => {
     appDataClientMocks.setGlobalShortcutDisabled.mockImplementation(async (disabled) => disabled)
     appDataClientMocks.setLanEnabled.mockReset()
     appDataClientMocks.setLanEnabled.mockImplementation(async (enabled) => enabled)
+    appDataClientMocks.setRecentWorkspaceExternalApp.mockReset()
+    appDataClientMocks.setRecentWorkspaceExternalApp.mockResolvedValue({ repoSettings: [] })
     appDataClientMocks.setSettingsFetchInterval.mockReset()
     appDataClientMocks.setSettingsFetchInterval.mockImplementation(async (sec) => sec)
     appDataClientMocks.setShortcutsDisabled.mockReset()
@@ -249,6 +253,34 @@ describe('settings actions', () => {
     expect(primaryWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
       globalShortcut: 'Ctrl+Space',
       globalShortcutRegistered: false,
+    })
+  })
+
+  test('setRecentWorkspaceExternalAppPreference syncs server repo settings into the settings snapshot cache', async () => {
+    primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot({ repoSettings: [] }))
+    appDataClientMocks.setRecentWorkspaceExternalApp.mockResolvedValue({
+      repoSettings: [
+        {
+          repoId: '/tmp/repo-a',
+          workspaceExternalAppRecent: { byWorktree: { '/tmp/repo-a': 'editor:vscode' } },
+        },
+      ],
+    })
+    const { setRecentWorkspaceExternalAppPreference } = await import('#/web/settings-actions.ts')
+
+    await setRecentWorkspaceExternalAppPreference({
+      repoId: '/tmp/repo-a',
+      worktreePath: '/tmp/repo-a',
+      itemId: 'editor:vscode',
+    })
+
+    expect(primaryWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
+      repoSettings: [
+        {
+          repoId: '/tmp/repo-a',
+          workspaceExternalAppRecent: { byWorktree: { '/tmp/repo-a': 'editor:vscode' } },
+        },
+      ],
     })
   })
 })

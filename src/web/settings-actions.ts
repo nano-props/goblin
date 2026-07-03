@@ -10,6 +10,7 @@ import {
   setGlobalShortcut as setSettingsGlobalShortcut,
   setGlobalShortcutDisabled as setSettingsGlobalShortcutDisabled,
   setLanEnabled as setSettingsLanEnabled,
+  setRecentWorkspaceExternalApp,
   setSettingsFetchInterval,
   setShortcutsDisabled as setSettingsShortcutsDisabled,
   setTerminalNotificationsEnabled as setSettingsTerminalNotificationsEnabled,
@@ -19,6 +20,7 @@ import {
   externalAppsQueryKey,
   lanInfoQueryKey,
   updateGitHubCliCache,
+  updateRepoSettingsStateCache,
   updateRestorableWorkspaceSessionStateCache,
   updateRuntimeRecentReposStateCache,
   updateRuntimeSettingsSnapshotCache,
@@ -89,6 +91,15 @@ export async function refreshExternalAppsDetection(): Promise<void> {
 export async function refreshGitHubCliDetection(hosts?: string[]): Promise<void> {
   const state = await refreshGitHubCliState(hosts)
   updateGitHubCliCache(primaryWindowQueryClient, hosts, state)
+}
+
+export async function setRecentWorkspaceExternalAppPreference(input: {
+  repoId: string
+  worktreePath: string | null
+  itemId: string
+}): Promise<void> {
+  const state = await setRecentWorkspaceExternalApp(input)
+  updateRepoSettingsStateCache(primaryWindowQueryClient, state)
 }
 
 export async function setLanEnabled(enabled: boolean): Promise<void> {
