@@ -113,10 +113,10 @@ describe('useBranchActions', () => {
     renderInJsdom(<BranchActionsHarness repo={repo} onReady={(value) => (actions = value)} />)
 
     await act(async () => {
-      await actions?.openEditor?.('windsurf')
+      await actions?.openEditor?.('vscode')
     })
 
-    expect(mocks.openRemoteRepositoryEditor).toHaveBeenCalledWith(target!.id, '/srv/repo-feature', 'windsurf')
+    expect(mocks.openRemoteRepositoryEditor).toHaveBeenCalledWith(target!.id, '/srv/repo-feature', 'vscode')
     expect(mocks.openRepoEditor).not.toHaveBeenCalled()
   })
 
@@ -153,11 +153,11 @@ describe('useBranchActions', () => {
       await actions?.openTerminal?.('ghostty')
     })
     await act(async () => {
-      await actions?.openEditor?.('windsurf')
+      await actions?.openEditor?.('vscode')
     })
 
     expect(mocks.openRemoteRepositoryTerminal).toHaveBeenCalledWith(target!.id, '/srv/repo-feature', 'ghostty')
-    expect(mocks.openRemoteRepositoryEditor).toHaveBeenCalledWith(target!.id, '/srv/repo-feature', 'windsurf')
+    expect(mocks.openRemoteRepositoryEditor).toHaveBeenCalledWith(target!.id, '/srv/repo-feature', 'vscode')
     expect(mocks.openRepoTerminal).not.toHaveBeenCalled()
     expect(mocks.openRepoEditor).not.toHaveBeenCalled()
   })
@@ -193,10 +193,10 @@ describe('useBranchActions', () => {
     renderInJsdom(<BranchActionsHarness repo={repo} onReady={(value) => (actions = value)} />)
 
     await act(async () => {
-      await actions?.openEditor?.('windsurf')
+      await actions?.openEditor?.('vscode')
     })
 
-    expect(mocks.openRepoEditor).toHaveBeenCalledWith('/tmp/local-feature', 'windsurf')
+    expect(mocks.openRepoEditor).toHaveBeenCalledWith('/tmp/local-feature', 'vscode')
     expect(mocks.openRemoteRepositoryEditor).not.toHaveBeenCalled()
   })
 

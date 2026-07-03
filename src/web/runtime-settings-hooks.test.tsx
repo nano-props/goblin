@@ -93,7 +93,7 @@ describe('runtime settings hooks', () => {
       },
       editor: {
         available: true,
-        appAvailability: { vscode: true, cursor: true, windsurf: false },
+        appAvailability: { vscode: true },
         detectedAt: 1,
       },
     })

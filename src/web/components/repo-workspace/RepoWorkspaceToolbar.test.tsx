@@ -59,7 +59,7 @@ const runtimeExternalAppSettings = vi.hoisted(() => ({
     terminalAvailable: true,
     terminalAppAvailability: { ghostty: true, terminal: true, windowsTerminal: false },
     editorAvailable: true,
-    editorAppAvailability: { vscode: true, cursor: true, windsurf: true },
+    editorAppAvailability: { vscode: true },
   },
 }))
 const appShellMocks = vi.hoisted(() => ({
@@ -113,7 +113,7 @@ function defaultRuntimeExternalAppSettings() {
     terminalAvailable: true,
     terminalAppAvailability: { ghostty: true, terminal: true, windowsTerminal: false },
     editorAvailable: true,
-    editorAppAvailability: { vscode: true, cursor: true, windsurf: true },
+    editorAppAvailability: { vscode: true },
   }
 }
 
@@ -253,7 +253,7 @@ describe('RepoWorkspaceToolbar', () => {
   test('renders the external app launcher at the workspace toolbar right edge', async () => {
     runtimeExternalAppSettings.value = {
       ...defaultRuntimeExternalAppSettings(),
-      editorAppAvailability: { vscode: true, cursor: true, windsurf: false },
+      editorAppAvailability: { vscode: true },
     }
     const { container: c } = renderToolbar({
       terminalCount: 0,
@@ -279,10 +279,8 @@ describe('RepoWorkspaceToolbar', () => {
       'settings.terminal.ghostty',
       'settings.terminal.terminal',
       'settings.editor.vscode',
-      'settings.editor.cursor',
       'worktrees.reveal-title',
     ])
-    expect(document.body.textContent).not.toContain('settings.editor.windsurf')
   })
 
   test('hides the open-externally menu when no local external apps are available', async () => {
@@ -293,7 +291,7 @@ describe('RepoWorkspaceToolbar', () => {
       terminalAvailable: false,
       terminalAppAvailability: { ghostty: false, terminal: false, windowsTerminal: false },
       editorAvailable: false,
-      editorAppAvailability: { vscode: false, cursor: false, windsurf: false },
+      editorAppAvailability: { vscode: false },
     }
     const { container: c } = renderToolbar({
       terminalCount: 0,

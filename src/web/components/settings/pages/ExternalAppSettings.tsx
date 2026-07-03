@@ -1,13 +1,12 @@
 import { type ComponentType } from 'react'
 import { RotateCw, SquareTerminal } from 'lucide-react'
+import type { EditorApp } from '#/shared/api-types.ts'
 import { Badge } from '#/web/components/ui/badge.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
 import {
   AppleTerminalIcon,
-  CursorIcon,
   GhosttyIcon,
   VSCodeIcon,
-  WindsurfIcon,
 } from '#/web/components/ExternalAppIcon/index.tsx'
 import {
   SettingsCard,
@@ -90,26 +89,14 @@ const PLATFORM_TERMINAL_IDS: Record<BootstrapPlatform, ReadonlySet<string>> = {
   web: new Set<string>(),
 }
 
-const EDITOR_APPS: ExternalToolItem[] = [
+const EDITOR_APPS = [
   {
     id: 'vscode',
     Icon: VSCodeIcon,
     titleKey: 'settings.apps.tool.vscode.title',
     commandKey: 'settings.apps.tool.vscode.command',
   },
-  {
-    id: 'cursor',
-    Icon: CursorIcon,
-    titleKey: 'settings.apps.tool.cursor.title',
-    commandKey: 'settings.apps.tool.cursor.command',
-  },
-  {
-    id: 'windsurf',
-    Icon: WindsurfIcon,
-    titleKey: 'settings.apps.tool.windsurf.title',
-    commandKey: 'settings.apps.tool.windsurf.command',
-  },
-]
+] as const satisfies readonly (ExternalToolItem & { id: EditorApp })[]
 
 function DetectionStatusBadge({ available }: { available: boolean }) {
   const t = useT()

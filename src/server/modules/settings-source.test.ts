@@ -172,7 +172,7 @@ test('clears repo-level worktree bootstrap trust without dropping other repo set
   await mod.setServerRepoWorkspaceExternalAppRecent({
     repoId: '/repo-a',
     worktreePath: '/repo-a-worktree',
-    itemId: 'vscode',
+    itemId: 'editor:vscode',
   })
 
   await expect(
@@ -186,7 +186,7 @@ test('clears repo-level worktree bootstrap trust without dropping other repo set
   expect(await mod.getServerRepoSettings()).toEqual([
     {
       repoId: '/repo-a',
-      workspaceExternalAppRecent: { byWorktree: { '/repo-a-worktree': 'vscode' } },
+      workspaceExternalAppRecent: { byWorktree: { '/repo-a-worktree': 'editor:vscode' } },
     },
   ])
 })
@@ -442,7 +442,7 @@ test('overwrites an existing workspace external app recent on the same worktree 
   await mod.setServerRepoWorkspaceExternalAppRecent({
     repoId: '/repo-a',
     worktreePath: '/repo-a/worktree-x',
-    itemId: 'editor:cursor',
+    itemId: 'editor:vscode',
   })
 
   expect(await mod.getServerRepoSettings()).toEqual([
@@ -450,7 +450,7 @@ test('overwrites an existing workspace external app recent on the same worktree 
       repoId: '/repo-a',
       workspaceExternalAppRecent: {
         byWorktree: {
-          '/repo-a/worktree-x': 'editor:cursor',
+          '/repo-a/worktree-x': 'editor:vscode',
         },
       },
     },
@@ -540,8 +540,13 @@ test('normalizer drops malformed workspace external app recent entries on load',
           workspaceExternalAppRecent: {
             byWorktree: {
               '/repo-a/worktree-x': 'editor:vscode',
-              'relative/path': 'editor:cursor',
-              '/repo-a/nul\0key': 'editor:windsurf',
+              // Unknown item id (not in WORKSPACE_EXTERNAL_APP_IDS) —
+              // the normalizer must drop the entry.
+              '/repo-a/worktree-y': 'editor:webstorm',
+              // Path-invalid entries (relative path, NUL byte) must
+              // also be dropped.
+              'relative/path': 'editor:vscode',
+              '/repo-a/nul\0key': 'editor:vscode',
               '': 'finder',
             },
           },
@@ -560,6 +565,39 @@ test('normalizer drops malformed workspace external app recent entries on load',
         byWorktree: {
           '/repo-a/worktree-x': 'editor:vscode',
           '': 'finder',
+        },
+      },
+    },
+  ])
+})
+
+test('setServerRepoWorkspaceExternalAppRecent silently drops unknown item ids without overwriting valid entries', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+
+  const mod = await import('#/server/modules/settings-source.ts')
+  // Seed a known-good entry so we can confirm the unknown-id write
+  // is dropped (not persisted) without losing the existing one.
+  await mod.setServerRepoWorkspaceExternalAppRecent({
+    repoId: '/repo-a',
+    worktreePath: '/repo-a/worktree-x',
+    itemId: 'editor:vscode',
+  })
+
+  await mod.setServerRepoWorkspaceExternalAppRecent({
+    repoId: '/repo-a',
+    worktreePath: '/repo-a/worktree-y',
+    itemId: 'editor:webstorm',
+  })
+
+  const persisted = await mod.getServerRepoSettings()
+  expect(persisted).toEqual([
+    {
+      repoId: '/repo-a',
+      workspaceExternalAppRecent: {
+        byWorktree: {
+          '/repo-a/worktree-x': 'editor:vscode',
         },
       },
     },

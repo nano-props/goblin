@@ -18,6 +18,7 @@ import type {
 import { DEFAULT_ZEN_MODE, normalizeWorkspacePaneSize } from '#/shared/workspace-layout.ts'
 import { repoSessionEntryId, type RepoSessionEntry } from '#/shared/remote-repo.ts'
 import {
+  isKnownWorkspaceExternalAppItemId,
   isWorktreeBootstrapConfigHash,
   type RepoSettingsEntry,
   type WorkspaceExternalAppRecent,
@@ -356,10 +357,6 @@ function normalizeWorktreeBootstrapTrust(value: unknown): WorktreeBootstrapTrust
   }
 }
 
-function isSafeExternalAppRecentItemId(value: unknown): value is string {
-  return typeof value === 'string' && value.length > 0 && value.length <= 64 && !value.includes('\0')
-}
-
 function normalizeWorkspaceExternalAppRecent(value: unknown): WorkspaceExternalAppRecent | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
   const raw = value as Partial<WorkspaceExternalAppRecent>
@@ -370,7 +367,7 @@ function normalizeWorkspaceExternalAppRecent(value: unknown): WorkspaceExternalA
     // Empty string is the reserved key for "no worktree" (bare repo);
     // any other key must be an absolute path with no NULs.
     if (worktreePath !== '' && (!path.isAbsolute(worktreePath) || worktreePath.length > MAX_IPC_PATH_LENGTH)) continue
-    if (!isSafeExternalAppRecentItemId(itemId)) continue
+    if (!isKnownWorkspaceExternalAppItemId(itemId)) continue
     byWorktree[worktreePath] = itemId
   }
   if (Object.keys(byWorktree).length === 0) return undefined
@@ -642,7 +639,7 @@ export async function setServerRepoWorkspaceExternalAppRecent(input: {
   // elsewhere in the codebase, so the rules can't drift.
   const isBareRepoScope = input.worktreePath === null || input.worktreePath === undefined
   const safeWorktreePath = isBareRepoScope ? null : toSafeSessionPath(input.worktreePath)
-  if (!repoId || (!isBareRepoScope && safeWorktreePath === null) || !isSafeExternalAppRecentItemId(input.itemId)) {
+  if (!repoId || (!isBareRepoScope && safeWorktreePath === null) || !isKnownWorkspaceExternalAppItemId(input.itemId)) {
     return cloneRepoSettings(data.repoSettings)
   }
   const worktreeKey = workspaceExternalAppRecentKey(safeWorktreePath)

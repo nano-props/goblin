@@ -24,7 +24,7 @@ const appDataClientMocks = vi.hoisted(() => ({
     },
     editor: {
       available: false,
-      appAvailability: { vscode: false, cursor: false, windsurf: false },
+      appAvailability: { vscode: false },
       detectedAt: 0,
     },
   })),
@@ -76,7 +76,7 @@ describe('settings actions', () => {
       },
       editor: {
         available: false,
-        appAvailability: { vscode: false, cursor: false, windsurf: false },
+        appAvailability: { vscode: false },
         detectedAt: 0,
       },
     })

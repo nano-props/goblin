@@ -24,7 +24,7 @@ import { OPAQUE_ID_RE } from '#/shared/opaque-id.ts'
 const SourceToken = v.optional(v.string())
 const StringArray = v.array(v.string())
 const TerminalAppSchema = v.picklist(['ghostty', 'terminal', 'windowsTerminal'])
-const EditorAppSchema = v.picklist(['vscode', 'cursor', 'windsurf'])
+const EditorAppSchema = v.picklist(['vscode'])
 const WorktreeBootstrapConfigHashSchema = v.pipe(v.string(), v.regex(WORKTREE_BOOTSTRAP_CONFIG_HASH_RE))
 const RepoUrlTargetSchema = v.variant('type', [
   v.object({ type: v.literal('root') }),

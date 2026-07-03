@@ -1,6 +1,6 @@
 // Shared utilities for opening a directory in a macOS .app.
 //
-// VS Code-family editors (VS Code, Cursor, Windsurf) ship a CLI binary
+// VS Code and other VS Code-family editors ship a CLI binary
 // inside their .app bundle at Contents/Resources/app/bin/<name>. Using
 // this CLI is more reliable than `open -a` because the CLI talks to the
 // editor's IPC channel directly, whereas `open -a` just activates the
@@ -48,8 +48,8 @@ export function hasAppCli(appName: string, cliName: string): boolean {
 
 /** Open `dir` using the CLI binary inside a VS Code-family .app bundle.
  *  Returns an error if the CLI binary isn't found — `open -a` is not
- *  used as a fallback because newer editor UIs (e.g. Cursor's Home)
- *  silently ignore the directory argument passed via Launch Services. */
+ *  used as a fallback because newer editor UIs may silently ignore the
+ *  directory argument passed via Launch Services. */
 export function openByAppCli(appName: string, cliName: string, dir: string): Promise<{ ok: boolean; message: string }> {
   if (!isUsableDirectory(dir)) return Promise.resolve({ ok: false, message: 'error.invalid-path' })
 

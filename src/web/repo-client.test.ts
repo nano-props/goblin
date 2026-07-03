@@ -235,7 +235,7 @@ describe('repo-client', () => {
       ok: true,
       message: 'server-terminal',
     })
-    await expect(openRepoEditor('/tmp/repo', 'windsurf')).resolves.toEqual({ ok: true, message: 'server-editor' })
+    await expect(openRepoEditor('/tmp/repo', 'vscode')).resolves.toEqual({ ok: true, message: 'server-editor' })
     await expect(openRepoInFinder('/tmp/repo')).resolves.toEqual({ ok: true, message: 'server-finder' })
     expect(openTerminal).not.toHaveBeenCalled()
     expect(openEditor).not.toHaveBeenCalled()
@@ -254,7 +254,7 @@ describe('repo-client', () => {
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
-        body: JSON.stringify({ path: '/tmp/repo', app: 'windsurf' }),
+        body: JSON.stringify({ path: '/tmp/repo', app: 'vscode' }),
       }),
     )
     expect(fetchMock).toHaveBeenNthCalledWith(
@@ -278,7 +278,7 @@ describe('repo-client', () => {
     )
     const { openRepoEditor, openRepoTerminal } = await import('#/web/repo-client.ts')
     await openRepoTerminal('/tmp/repo', 'ghostty')
-    await openRepoEditor('/tmp/repo', 'windsurf')
+    await openRepoEditor('/tmp/repo', 'vscode')
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
@@ -293,7 +293,7 @@ describe('repo-client', () => {
       'http://127.0.0.1:32100/api/repo/open-editor',
       expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify({ path: '/tmp/repo', app: 'windsurf' }),
+        body: JSON.stringify({ path: '/tmp/repo', app: 'vscode' }),
       }),
     )
   })

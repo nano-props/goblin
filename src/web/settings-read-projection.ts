@@ -70,7 +70,7 @@ export function readRuntimeExternalAppSettings(data: ExternalAppsSnapshot | unde
       windowsTerminal: false,
     },
     editorAvailable: data?.editor.available ?? false,
-    editorAppAvailability: data?.editor.appAvailability ?? { vscode: false, cursor: false, windsurf: false },
+    editorAppAvailability: data?.editor.appAvailability ?? { vscode: false },
   }
 }
 
