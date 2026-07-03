@@ -18,11 +18,9 @@ import type { CreateWorktreeRequest } from '#/web/components/create-worktree-dia
 import { DialogHostMount } from '#/web/components/ui/dialog-host-mount.tsx'
 import { useLastNonNull } from '#/web/hooks/useLastNonNull.ts'
 import { getRepoWorktreeBootstrapPreview } from '#/web/repo-client.ts'
-import { currentSettingsSnapshot } from '#/web/settings-read-projection.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { useSettingsSnapshotReadModel } from '#/web/settings-queries.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { isRepoWorktreeBootstrapConfigTrusted } from '#/shared/repo-settings.ts'
-import type { SettingsSnapshot } from '#/shared/api-types.ts'
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreview } from '#/shared/worktree-bootstrap-summary.ts'
 
 interface Props {
@@ -54,7 +52,7 @@ function CreateWorktreeDialogSession({ open, onOpenChange, repoId: sessionRepoId
   const [bootstrapPreviewError, setBootstrapPreviewError] = useState(false)
   const [bootstrapPreviewLoading, setBootstrapPreviewLoading] = useState(false)
   const [configTrustChoice, setConfigTrustChoice] = useState<boolean | null>(null)
-  const settingsSnapshot = useCurrentSettingsSnapshot()
+  const settingsSnapshot = useSettingsSnapshotReadModel()
 
   function resetBootstrapPreflightState(): void {
     setBootstrapPreview(null)
@@ -181,35 +179,4 @@ function CreateWorktreeDialogSession({ open, onOpenChange, repoId: sessionRepoId
       onCreate={handleCreateWorktree}
     />
   )
-}
-
-function useCurrentSettingsSnapshot(): SettingsSnapshot | undefined {
-  const [snapshot, setSnapshot] = useState(() => currentSettingsSnapshot())
-
-  useEffect(() => {
-    let disposed = false
-    let queued = false
-
-    function syncSnapshot(): void {
-      if (disposed) return
-      setSnapshot(currentSettingsSnapshot())
-    }
-
-    syncSnapshot()
-
-    const unsubscribe = primaryWindowQueryClient.getQueryCache().subscribe(() => {
-      if (queued) return
-      queued = true
-      queueMicrotask(() => {
-        queued = false
-        syncSnapshot()
-      })
-    })
-    return () => {
-      disposed = true
-      unsubscribe()
-    }
-  }, [])
-
-  return snapshot
 }

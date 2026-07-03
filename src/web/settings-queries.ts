@@ -1,10 +1,11 @@
 // architecture-allow settings-client: query options are the read boundary for
 // server-backed settings projections.
-import { useEffect } from 'react'
-import { queryOptions, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
+import { QueryObserver, queryOptions, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ExternalAppsSnapshot, GitHubCliState, LanInfo, SettingsSnapshot } from '#/shared/api-types.ts'
 import { getExternalAppsSnapshot, getGitHubCliState, getLanInfo, getSettingsSnapshot } from '#/web/settings-client.ts'
 import { subscribeSettingsInvalidation } from '#/web/settings-invalidation-ingress.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import {
   externalAppsQueryKey,
   githubCliQueryKey,
@@ -71,6 +72,25 @@ function lanInfoQueryOptions() {
 
 export function useSettingsSnapshotQuery() {
   return useQuery(settingsSnapshotQueryOptions())
+}
+
+export function useSettingsSnapshotReadModel(): SettingsSnapshot | undefined {
+  const [snapshot, setSnapshot] = useState(() =>
+    primaryWindowQueryClient.getQueryData<SettingsSnapshot>(settingsSnapshotQueryKey()),
+  )
+
+  useEffect(() => {
+    const observer = new QueryObserver(primaryWindowQueryClient, {
+      ...settingsSnapshotQueryOptions(),
+      enabled: false,
+    })
+    setSnapshot(observer.getCurrentResult().data)
+    return observer.subscribe((result) => {
+      setSnapshot(result.data)
+    })
+  }, [])
+
+  return snapshot
 }
 
 export function useExternalAppsQuery() {
