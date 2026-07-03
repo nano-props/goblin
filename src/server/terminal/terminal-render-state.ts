@@ -7,15 +7,25 @@ import type {
   ITerminalOptions,
   Terminal as HeadlessTerminalInstance,
 } from '@xterm/headless'
+import {
+  createEmptyTerminalControlSequenceScannerState,
+  scanTerminalControlSequences,
+  type TerminalControlSequenceEvent,
+  type TerminalControlSequenceScannerState,
+} from '#/server/terminal/terminal-control-sequence-scanner.ts'
 
 // Per-session render state. The raw PTY buffer is retained for diagnostics
 // and bounded-tail recovery, but attach/takeover hydration is generated from
 // the server-side headless xterm state. That keeps "current screen" semantics
 // in xterm's parser instead of replaying historical erase/repaint bytes into
 // each newly-attached client.
+//
+// Realtime metadata intentionally uses a separate synchronous control-sequence
+// scanner. Title/bell events must be known while handling the PTY chunk so the
+// server can preserve title -> bell -> output ordering; @xterm/headless remains
+// the async visual screen/snapshot authority.
 
 const MAX_BUFFER_CHARS = 16 * 1024 * 1024
-const MAX_TITLE_CHARS = 4096
 const DEFAULT_COLS = 80
 const DEFAULT_ROWS = 24
 const HEADLESS_SCROLLBACK_ROWS = 10_000
@@ -47,7 +57,7 @@ export interface TerminalRenderState {
   bufferTruncated: boolean
   /** Last OSC 0/2 title set by the shell. */
   title: string | null
-  titleParser: TerminalTitleParserState
+  controlScanner: TerminalControlSequenceScannerState
   screen: TerminalScreenState
 }
 
@@ -60,12 +70,22 @@ export function createEmptyTerminalRenderState(
     buffer: '',
     bufferTruncated: false,
     title: null,
-    titleParser: createEmptyTerminalTitleParserState(),
+    controlScanner: createEmptyTerminalControlSequenceScannerState(),
     screen: createScreenState(cols, rows),
   }
 }
 
-export function appendOutput(state: TerminalRenderState, data: string): number {
+export interface AppendTerminalOutputResult {
+  seq: number
+  controlEvents: TerminalControlSequenceEvent[]
+}
+
+// Single synchronous ingress for PTY chunks. Realtime metadata is scanned here
+// before the chunk is queued into @xterm/headless, but title state is applied
+// by the runtime while replaying the ordered control events. That keeps title
+// ownership aligned with event ordering, while headless remains the async
+// visual screen authority used for snapshots.
+export function appendOutput(state: TerminalRenderState, data: string): AppendTerminalOutputResult {
   state.sequence += 1
   const seq = state.sequence
   state.buffer += data
@@ -73,79 +93,16 @@ export function appendOutput(state: TerminalRenderState, data: string): number {
     state.buffer = safeTail(state.buffer, MAX_BUFFER_CHARS)
     state.bufferTruncated = true
   }
-  const newTitle = scanTerminalOutputForTitle(data, state.titleParser)
-  if (newTitle !== undefined && newTitle !== state.title) state.title = newTitle
+  const control = scanTerminalControlSequences(data, state.controlScanner)
   queueScreenWrite(state.screen, data, seq)
-  return seq
-}
-
-interface TerminalTitleParserState {
-  inOsc: boolean
-  pendingEsc: boolean
-  command: string
-  payload: string
-  collectingTitle: boolean
-  titleTooLong: boolean
-}
-
-function createEmptyTerminalTitleParserState(): TerminalTitleParserState {
   return {
-    inOsc: false,
-    pendingEsc: false,
-    command: '',
-    payload: '',
-    collectingTitle: false,
-    titleTooLong: false,
+    seq,
+    controlEvents: control.events,
   }
 }
 
-export interface TerminalOutputBellScanState {
-  inOsc: boolean
-  pendingEsc: boolean
-}
-
-export function scanTerminalOutputForBell(
-  data: string,
-  initialState: TerminalOutputBellScanState,
-): { hasBell: boolean; state: TerminalOutputBellScanState } {
-  let inOsc = initialState.inOsc
-  let pendingEsc = initialState.pendingEsc
-  let hasBell = false
-  for (let i = 0; i < data.length; i += 1) {
-    const char = data[i]
-    if (pendingEsc) {
-      pendingEsc = false
-      if (inOsc && char === '\\') {
-        inOsc = false
-        continue
-      }
-      if (!inOsc && char === ']') {
-        inOsc = true
-        continue
-      }
-    }
-    if (inOsc) {
-      if (char === '\x07') inOsc = false
-      else if (char === '\x1b' && data[i + 1] === '\\') {
-        inOsc = false
-        i += 1
-      } else if (char === '\x1b' && i === data.length - 1) {
-        pendingEsc = true
-      }
-      continue
-    }
-    if (char === '\x07') {
-      hasBell = true
-      continue
-    }
-    if (char === '\x1b' && data[i + 1] === ']') {
-      inOsc = true
-      i += 1
-    } else if (char === '\x1b' && i === data.length - 1) {
-      pendingEsc = true
-    }
-  }
-  return { hasBell, state: { inOsc, pendingEsc } }
+export function applyTerminalTitle(state: TerminalRenderState, title: string | null): void {
+  state.title = title
 }
 
 export interface RenderSnapshot {
@@ -197,7 +154,7 @@ export function resetRender(
   state.buffer = ''
   state.bufferTruncated = false
   state.title = null
-  state.titleParser = createEmptyTerminalTitleParserState()
+  state.controlScanner = createEmptyTerminalControlSequenceScannerState()
   state.screen = createScreenState(cols, rows)
 }
 
@@ -337,95 +294,4 @@ function stripLeadingIncompleteAnsi(s: string): string {
   if (c2 >= 0x5c && c2 <= 0x7e) return s
   // Unrecognized or incomplete ESC sequence: drop the leading ESC pair
   return s.slice(2)
-}
-
-// OSC 0 and OSC 2 are the title-setting sequences shells use for terminal
-// tabs. This parser is stateful because PTY writes may split ESC ], payload,
-// BEL, or ST across chunks. Unsupported OSC commands are skipped without
-// retaining their payloads.
-function scanTerminalOutputForTitle(
-  data: string,
-  state: TerminalTitleParserState,
-): string | null | undefined {
-  let title: string | null | undefined
-  for (let i = 0; i < data.length; i += 1) {
-    const char = data[i]
-    if (state.pendingEsc) {
-      state.pendingEsc = false
-      if (state.inOsc && char === '\\') {
-        title = finishTitleOsc(state)
-        continue
-      }
-      if (!state.inOsc && char === ']') {
-        startTitleOsc(state)
-        continue
-      }
-      if (state.inOsc) appendTitleOscChar(state, '\x1b')
-    }
-
-    if (state.inOsc) {
-      if (char === '\x07') {
-        title = finishTitleOsc(state)
-        continue
-      }
-      if (char === '\x1b') {
-        if (i === data.length - 1) {
-          state.pendingEsc = true
-        } else if (data[i + 1] === '\\') {
-          title = finishTitleOsc(state)
-          i += 1
-        } else {
-          appendTitleOscChar(state, char)
-        }
-        continue
-      }
-      appendTitleOscChar(state, char)
-      continue
-    }
-
-    if (char === '\x1b') {
-      if (i === data.length - 1) {
-        state.pendingEsc = true
-      } else if (data[i + 1] === ']') {
-        startTitleOsc(state)
-        i += 1
-      }
-    }
-  }
-  return title
-}
-
-function startTitleOsc(state: TerminalTitleParserState): void {
-  state.inOsc = true
-  state.pendingEsc = false
-  state.command = ''
-  state.payload = ''
-  state.collectingTitle = false
-  state.titleTooLong = false
-}
-
-function finishTitleOsc(state: TerminalTitleParserState): string | null | undefined {
-  const shouldApply = state.collectingTitle && !state.titleTooLong
-  const payload = state.payload
-  Object.assign(state, createEmptyTerminalTitleParserState())
-  if (!shouldApply) return undefined
-  return payload === '' ? null : payload
-}
-
-function appendTitleOscChar(state: TerminalTitleParserState, char: string): void {
-  if (!state.collectingTitle) {
-    if (char === ';') {
-      state.collectingTitle = state.command === '0' || state.command === '2'
-      return
-    }
-    if (state.command.length < 8) state.command += char
-    return
-  }
-  if (state.titleTooLong) return
-  if (state.payload.length + char.length > MAX_TITLE_CHARS) {
-    state.payload = ''
-    state.titleTooLong = true
-    return
-  }
-  state.payload += char
 }

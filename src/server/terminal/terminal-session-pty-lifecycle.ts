@@ -9,11 +9,10 @@ import { isShellProcessName } from '#/shared/terminal-process-name.ts'
 import { serverLogger } from '#/server/logger.ts'
 import {
   appendOutput,
+  applyTerminalTitle,
   disposeRender,
   resetRender,
   resizeRender,
-  scanTerminalOutputForBell,
-  type TerminalOutputBellScanState,
   type TerminalRenderState,
 } from '#/server/terminal/terminal-render-state.ts'
 import {
@@ -67,7 +66,6 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
   private readonly disposables: Array<{ dispose(): void }> = []
   private inputQueue: string[] = []
   private inputFlushScheduled = false
-  private bellScanState: TerminalOutputBellScanState = { inOsc: false, pendingEsc: false }
   private spawnGeneration = 0
   private pendingSpawn: Promise<TerminalPtySpawnResult> | null = null
 
@@ -197,24 +195,27 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
         const titleBeforeData = session.render.title
         const processNameBeforeData = lastProcessName
 
-        const seq = appendOutput(session.render, data)
+        const output = appendOutput(session.render, data)
 
         const processNameAfterData = this.supervisor.processName(handle)
         lastProcessName = processNameAfterData
-        const bellScan = scanTerminalOutputForBell(data, this.bellScanState)
-        this.bellScanState = bellScan.state
+        let eventCanonicalTitle = titleBeforeData
+        const hasTitleUpdate = output.controlEvents.some((event) => event.type === 'title')
 
         // Stale title detection: when a child process exits without
         // setting a new title-OSC, the tab would keep showing the
         // child's title. Detect the non-shell -> shell process name
-        // transition with no new title in the chunk and clear it.
+        // transition with no title update in the chunk and clear it before
+        // any bell in the same chunk is emitted.
         if (
           titleBeforeData !== null &&
+          !hasTitleUpdate &&
           session.render.title === titleBeforeData &&
           !isShellProcessName(processNameBeforeData) &&
           isShellProcessName(processNameAfterData)
         ) {
-          session.render.title = null
+          applyTerminalTitle(session.render, null)
+          eventCanonicalTitle = null
           if (lastBroadcastTitle !== null) {
             lastBroadcastTitle = null
             this.events.emitTitle(session, {
@@ -224,24 +225,29 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
           }
         }
 
-        if (session.render.title !== lastBroadcastTitle) {
-          lastBroadcastTitle = session.render.title
-          this.events.emitTitle(session, {
-            terminalRuntimeSessionId: session.id,
-            canonicalTitle: session.render.title,
-          })
-        }
-        if (bellScan.hasBell) {
+        for (const event of output.controlEvents) {
+          if (event.type === 'title') {
+            applyTerminalTitle(session.render, event.title)
+            eventCanonicalTitle = event.title
+            if (eventCanonicalTitle !== lastBroadcastTitle) {
+              lastBroadcastTitle = eventCanonicalTitle
+              this.events.emitTitle(session, {
+                terminalRuntimeSessionId: session.id,
+                canonicalTitle: eventCanonicalTitle,
+              })
+            }
+            continue
+          }
           this.events.emitBell(session, {
             terminalRuntimeSessionId: session.id,
             processName: processNameAfterData,
-            canonicalTitle: session.render.title,
+            canonicalTitle: eventCanonicalTitle,
           })
         }
         this.events.emitOutput(session, {
           terminalRuntimeSessionId: session.id,
           data,
-          seq,
+          seq: output.seq,
           processName: processNameAfterData,
         })
       }),
@@ -297,7 +303,6 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
     }
     this.handle = null
     this.inputQueue = []
-    this.bellScanState = { inOsc: false, pendingEsc: false }
     this.inputFlushScheduled = false
   }
 

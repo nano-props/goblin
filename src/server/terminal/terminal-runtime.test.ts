@@ -59,6 +59,7 @@ const mockPtys: Array<{
   kill: ReturnType<typeof vi.fn>
   emitData: (data: string) => void
   emitExit: () => void
+  setProcessName: (processName: string) => void
 }> = []
 let mockDataToEmitOnRegistration: string | null = null
 
@@ -66,19 +67,26 @@ vi.mock('node-pty', () => ({
   spawn: vi.fn(() => {
     let onData: ((data: string) => void) | null = null
     let onExit: (() => void) | null = null
+    let processName = 'zsh'
     const pty = {
       write: vi.fn(),
       resize: vi.fn(),
       kill: vi.fn(),
       emitData: (data: string) => onData?.(data),
       emitExit: () => onExit?.(),
+      setProcessName: (nextProcessName: string) => {
+        processName = nextProcessName
+      },
       get process() {
-        return 'zsh'
+        return processName
       },
     }
     mockPtys.push(pty)
     return {
       ...pty,
+      get process() {
+        return processName
+      },
       onData: (cb: (data: string) => void) => {
         onData = cb
         if (mockDataToEmitOnRegistration !== null) {
@@ -404,7 +412,7 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
-  test('broadcasts output, bell, and exit events to registered web terminal sockets', async () => {
+  test('broadcasts output, title, bell, and exit events to registered web terminal sockets', async () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
@@ -442,6 +450,64 @@ describe('server terminal runtime', () => {
       },
     })
 
+    socket.send.mockClear()
+    mockPtys[0]?.emitData('\x1b[22;0t\x1b]0;devin: hello\x07\x1b]30;devin: hello\x07')
+    const devinTitleMessage = sentSocketMessages(socket).find((message) => message.type === 'title')
+    expect(devinTitleMessage).toMatchObject({
+      type: 'title',
+      event: {
+        terminalRuntimeSessionId,
+        terminalSessionId: expect.any(String),
+        repoRoot: '/repo',
+        worktreePath: '/repo-linked',
+        canonicalTitle: 'devin: hello',
+      },
+    })
+
+    socket.send.mockClear()
+    mockPtys[0]?.emitData('\x07\x1b]0;after bell\x07')
+    const bellThenTitleMessages = sentSocketMessages(socket)
+    expect(bellThenTitleMessages.map((message) => message.type)).toEqual(['bell', 'title', 'output'])
+    expect(bellThenTitleMessages[0]).toMatchObject({
+      type: 'bell',
+      event: { terminalRuntimeSessionId, canonicalTitle: 'devin: hello' },
+    })
+    expect(bellThenTitleMessages[1]).toMatchObject({
+      type: 'title',
+      event: { terminalRuntimeSessionId, canonicalTitle: 'after bell' },
+    })
+
+    socket.send.mockClear()
+    mockPtys[0]?.emitData('\x1b]0;first\x07\x07\x1b]0;second\x07')
+    const titleBellTitleMessages = sentSocketMessages(socket)
+    expect(titleBellTitleMessages.map((message) => message.type)).toEqual(['title', 'bell', 'title', 'output'])
+    expect(titleBellTitleMessages[0]).toMatchObject({
+      type: 'title',
+      event: { terminalRuntimeSessionId, canonicalTitle: 'first' },
+    })
+    expect(titleBellTitleMessages[1]).toMatchObject({
+      type: 'bell',
+      event: { terminalRuntimeSessionId, canonicalTitle: 'first' },
+    })
+    expect(titleBellTitleMessages[2]).toMatchObject({
+      type: 'title',
+      event: { terminalRuntimeSessionId, canonicalTitle: 'second' },
+    })
+
+    socket.send.mockClear()
+    mockPtys[0]?.emitData('\x9d2;devin running\x9c')
+    const titleMessage = sentSocketMessages(socket).find((message) => message.type === 'title')
+    expect(titleMessage).toMatchObject({
+      type: 'title',
+      event: {
+        terminalRuntimeSessionId,
+        terminalSessionId: expect.any(String),
+        repoRoot: '/repo',
+        worktreePath: '/repo-linked',
+        canonicalTitle: 'devin running',
+      },
+    })
+
     mockPtys[0]?.emitExit()
     const exitMessage = socket.send.mock.calls
       .map(([payload]) => JSON.parse(String(payload)))
@@ -451,6 +517,45 @@ describe('server terminal runtime', () => {
       event: { terminalRuntimeSessionId, terminalSessionId: expect.any(String) },
     })
     expect(host.getDiagnostics().pty.state).toBe('idle')
+
+    host.unregisterSocket('client_a', USER_1, socket)
+    shutdown()
+  })
+
+  test('clears stale title on non-shell to shell transition before emitting same-chunk bell', async () => {
+    const { host, shutdown } = buildRuntime()
+    const socket = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_a', USER_1, socket)
+    const terminalRuntimeSessionId = await createTerminalSession(host, 'client_1')
+
+    const result = await host.attach('client_a', USER_1, {
+      terminalRuntimeSessionId,
+      cols: 80,
+      rows: 24,
+      clientId: 'client_a',
+    })
+    expect(result.ok).toBe(true)
+
+    mockPtys[0]?.setProcessName('vim')
+    mockPtys[0]?.emitData('\x1b]0;vim editing\x07')
+    expect(sentSocketMessages(socket).find((message) => message.type === 'title')).toMatchObject({
+      type: 'title',
+      event: { terminalRuntimeSessionId, canonicalTitle: 'vim editing' },
+    })
+
+    socket.send.mockClear()
+    mockPtys[0]?.setProcessName('zsh')
+    mockPtys[0]?.emitData('\x07$ ')
+    const messages = sentSocketMessages(socket)
+    expect(messages.map((message) => message.type)).toEqual(['title', 'bell', 'output'])
+    expect(messages[0]).toMatchObject({
+      type: 'title',
+      event: { terminalRuntimeSessionId, canonicalTitle: null },
+    })
+    expect(messages[1]).toMatchObject({
+      type: 'bell',
+      event: { terminalRuntimeSessionId, processName: 'zsh', canonicalTitle: null },
+    })
 
     host.unregisterSocket('client_a', USER_1, socket)
     shutdown()
