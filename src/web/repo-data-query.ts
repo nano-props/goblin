@@ -221,6 +221,14 @@ export function getRepoSnapshotQueryData(
   return queryClient.getQueryData<RepoSnapshot | null>(repoSnapshotQueryKey(repoRoot, repoInstanceId))
 }
 
+export function getRepoStatusQueryData(
+  repoRoot: string,
+  repoInstanceId: string,
+  queryClient: QueryClient = primaryWindowQueryClient,
+): WorktreeStatus[] | undefined {
+  return queryClient.getQueryData<WorktreeStatus[]>(repoStatusQueryKey(repoRoot, repoInstanceId))
+}
+
 export function setRepoStatusQueryData(
   repoRoot: string,
   repoInstanceId: string,

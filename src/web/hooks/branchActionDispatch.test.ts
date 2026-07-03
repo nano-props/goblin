@@ -8,7 +8,7 @@ import { createBranchSnapshot, createRepoBranch, resetReposStore, seedRepoState 
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
+import { setRepoSnapshotQueryData, setRepoStatusQueryData } from '#/web/repo-data-query.ts'
 
 const REPO_ID = '/tmp/gbl-branch-action-dispatch-repo'
 const WORKTREE_PATH = '/tmp/gbl-branch-action-dispatch-worktree'
@@ -244,6 +244,65 @@ describe('branch action dispatch', () => {
         }),
       ],
     })
+    const runBranchAction = vi.fn(async () => ({ ok: true, message: 'ok' }))
+    const closeTerminalsForWorktree = vi.fn(async () => true)
+    useReposStore.setState({ runBranchAction })
+    setTerminalSessionCommandBridge({
+      terminalWorktreeSnapshot: () => worktreeSnapshotWithTerminal(),
+      createTerminal: vi.fn(async () => 'session-2'),
+      selectTerminal: vi.fn(),
+      closeTerminalByDescriptor: vi.fn(async () => true),
+      closeTerminalsForWorktree,
+    })
+
+    await expect(
+      dispatchRemoveWorktree({
+        repo,
+        target: { branch: 'feature/worktree', path: WORKTREE_PATH },
+        alsoDeleteBranch: false,
+        forceDeleteBranch: false,
+        alsoDeleteUpstream: false,
+      }),
+    ).resolves.toEqual({ ok: false, message: 'error.cannot-remove-dirty-worktree' })
+
+    expect(closeTerminalsForWorktree).not.toHaveBeenCalled()
+    expect(runBranchAction).not.toHaveBeenCalled()
+  })
+
+  test('remove worktree preflight derives query snapshot worktree state from the query status cache', async () => {
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree')],
+      selectedBranch: 'feature/worktree',
+      preferredWorkspacePaneTab: 'terminal',
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [
+          workspacePaneStaticTabEntry('status'),
+          { type: 'terminal', terminalSessionId: 'session-1' },
+        ],
+      },
+      worktreesByPath: {},
+    })
+    setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
+      current: 'main',
+      branches: [
+        createBranchSnapshot('main', {
+          isCurrent: true,
+          worktree: { path: REPO_ID, isPrimary: true, summary: { dirty: false, changeCount: 0 } },
+        }),
+        createBranchSnapshot('feature/worktree', {
+          worktree: { path: WORKTREE_PATH, summary: { dirty: false, changeCount: 0 } },
+        }),
+      ],
+    })
+    setRepoStatusQueryData(REPO_ID, repo.instanceId, [
+      {
+        path: WORKTREE_PATH,
+        branch: 'feature/worktree',
+        isMain: false,
+        entries: [{ x: 'M', y: ' ', path: 'query-status-dirty.ts' }],
+      },
+    ])
     const runBranchAction = vi.fn(async () => ({ ok: true, message: 'ok' }))
     const closeTerminalsForWorktree = vi.fn(async () => true)
     useReposStore.setState({ runBranchAction })
