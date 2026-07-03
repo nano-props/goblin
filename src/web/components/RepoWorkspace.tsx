@@ -123,16 +123,17 @@ function RepoWorkspaceLoaded({
   shortcutsEnabled: boolean
   toolbarTrafficLightOffset: boolean
 }) {
+  const statusReadModel = useRepoStatusReadModel(repo.id, repo.instanceId, true)
+  const effectiveStatus = statusReadModel.data ?? repo.data.status
   const branchReadModel = useRepoBranchReadModel(
     repo.id,
     repo.instanceId,
     {
-      status: repo.data.status,
+      status: effectiveStatus,
       worktreesByPath: repo.data.worktreesByPath,
     },
     true,
   )
-  const statusReadModel = useRepoStatusReadModel(repo.id, repo.instanceId, true)
   const selectedBranchName = repo.ui.selectedBranch
   const pullRequestsReadModel = useRepoPullRequestsReadModel(
     repo.id,

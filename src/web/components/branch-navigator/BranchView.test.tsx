@@ -11,7 +11,7 @@ import {
 } from '#/web/primary-window-navigation.tsx'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoSnapshotQueryData, setRepoStatusQueryData } from '#/web/repo-data-query.ts'
-import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { createBranchSnapshot, createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { TerminalSessionReadContext } from '#/web/components/terminal/terminal-session-context.ts'
 import type { TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
 
@@ -46,6 +46,7 @@ const terminalReadContext: TerminalSessionReadContextValue = {
 }
 
 beforeEach(() => {
+  primaryWindowQueryClient.clear()
   resetReposStore()
   vi.clearAllMocks()
 })
@@ -78,6 +79,36 @@ describe('BranchView', () => {
     })
     setRepoStatusQueryData(REPO_ID, repo.instanceId, [
       { path: WORKTREE_PATH, branch: 'feature/dirty', isMain: false, entries: [{ x: 'M', y: ' ', path: 'dirty.ts' }] },
+    ])
+
+    renderBranchView()
+
+    expect(screen.getByLabelText('branches.dirty')).toBeTruthy()
+  })
+
+  test('derives query snapshot worktree state from the query status read model', () => {
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branches: [],
+      selectedBranch: 'feature/query-dirty',
+      statusLoaded: true,
+    })
+    setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
+      current: 'feature/query-dirty',
+      branches: [
+        createBranchSnapshot('feature/query-dirty', {
+          isCurrent: true,
+          worktree: { path: WORKTREE_PATH, summary: { dirty: false, changeCount: 0 } },
+        }),
+      ],
+    })
+    setRepoStatusQueryData(REPO_ID, repo.instanceId, [
+      {
+        path: WORKTREE_PATH,
+        branch: 'feature/query-dirty',
+        isMain: false,
+        entries: [{ x: 'M', y: ' ', path: 'query-dirty.ts' }],
+      },
     ])
 
     renderBranchView()

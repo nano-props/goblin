@@ -97,16 +97,17 @@ export function useBranchListRepo(repoId: string): BranchListRepo | undefined {
     },
     branchListRepoEqual,
   )
+  const statusReadModel = useRepoStatusReadModel(repo?.id ?? '', repo?.instanceId ?? '', !!repo)
+  const effectiveStatus = statusReadModel.data ?? repo?.data.status ?? []
   const branchReadModel = useRepoBranchReadModel(
     repo?.id ?? '',
     repo?.instanceId ?? '',
     {
-      status: repo?.data.status ?? [],
+      status: effectiveStatus,
       worktreesByPath: repo?.data.worktreesByPath ?? {},
     },
     !!repo,
   )
-  const statusReadModel = useRepoStatusReadModel(repo?.id ?? '', repo?.instanceId ?? '', !!repo)
   if (!repo || (!branchReadModel && !statusReadModel.data)) return repo
   return {
     ...repo,
