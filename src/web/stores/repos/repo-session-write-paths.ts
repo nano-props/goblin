@@ -17,6 +17,7 @@ import {
   removeRepoRuntimeInstanceFromCache,
   updateRepoRuntimeInstanceCache,
 } from '#/web/repo-runtime-query.ts'
+import { clearWorkspacePaneTabsProjectionState } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { runRemoteRepoConnection } from '#/web/stores/repos/remote-repo-connection-orchestrator.ts'
 import {
   markRemoteLifecycleConnecting,
@@ -141,6 +142,8 @@ export async function closeRepoRuntimeInstanceWithCache(repoRoot: string, repoIn
   } catch (err) {
     invalidateRepoRuntimeInstances()
     throw err
+  } finally {
+    clearWorkspacePaneTabsProjectionState(repoRoot, repoInstanceId)
   }
 }
 

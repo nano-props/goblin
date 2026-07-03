@@ -5,6 +5,7 @@ import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { commitWorkspacePaneTabs, updateWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import { installWorkspacePaneTabsTestBridge, resetReposStore } from '#/web/test-utils/bridge.ts'
 import {
+  clearWorkspacePaneTabsProjectionState,
   readWorkspacePaneTabsForTarget,
   refreshWorkspacePaneTabsQueryData,
   setWorkspacePaneTabsForTargetQueryData,
@@ -223,6 +224,50 @@ describe('commitWorkspacePaneTabs', () => {
       workspacePaneTerminalTabEntry('session-1'),
       workspacePaneStaticTabEntry('status'),
     ])
+  })
+
+  test('keeps stale refresh suppressed after projection bookkeeping is cleared and recreated', async () => {
+    let resolveOldListTabs!: (tabs: WorkspacePaneTabsEntry[]) => void
+    let resolveNewListTabs!: (tabs: WorkspacePaneTabsEntry[]) => void
+    const oldListTabs = new Promise<WorkspacePaneTabsEntry[]>((resolve) => {
+      resolveOldListTabs = resolve
+    })
+    const newListTabs = new Promise<WorkspacePaneTabsEntry[]>((resolve) => {
+      resolveNewListTabs = resolve
+    })
+    const listResponses = [oldListTabs, newListTabs]
+    installWorkspacePaneTabsTestBridge({
+      listWorkspaceTabs: async () => await listResponses.shift()!,
+      replaceWorkspaceTabs: async (input) => [...input.tabs],
+    })
+
+    const oldRefresh = refreshWorkspacePaneTabsQueryData(REPO_ROOT, REPO_INSTANCE_ID)
+    await Promise.resolve()
+    clearWorkspacePaneTabsProjectionState(REPO_ROOT, REPO_INSTANCE_ID)
+    const newRefresh = refreshWorkspacePaneTabsQueryData(REPO_ROOT, REPO_INSTANCE_ID)
+    await Promise.resolve()
+
+    resolveNewListTabs([
+      {
+        repoRoot: REPO_ROOT,
+        branchName: BRANCH_NAME,
+        worktreePath: WORKTREE_PATH,
+        tabs: [workspacePaneStaticTabEntry('status')],
+      },
+    ])
+    await newRefresh
+
+    resolveOldListTabs([
+      {
+        repoRoot: REPO_ROOT,
+        branchName: BRANCH_NAME,
+        worktreePath: WORKTREE_PATH,
+        tabs: [workspacePaneStaticTabEntry('history')],
+      },
+    ])
+    await oldRefresh
+
+    expect(readWorkspacePaneTabs()).toEqual([workspacePaneStaticTabEntry('status')])
   })
 })
 

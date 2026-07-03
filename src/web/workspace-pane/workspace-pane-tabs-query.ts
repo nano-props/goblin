@@ -18,6 +18,7 @@ let workspacePaneTabsPersistenceVersion = 0
 const workspacePaneTabsPersistenceListeners = new Set<() => void>()
 const workspacePaneTabsProjectionGeneration = new Map<string, number>()
 const workspacePaneTabsRefreshSequence = new Map<string, number>()
+let workspacePaneTabsNextRefreshSequence = 0
 
 export function workspacePaneTabsQueryKey(repoRoot: string, repoInstanceId: string) {
   return ['workspace-pane-tabs', repoRoot, repoInstanceId] as const
@@ -151,6 +152,12 @@ export async function refreshWorkspacePaneTabsQueryData(
   replaceWorkspacePaneTabsQueryData(repoRoot, repoInstanceId, entries, queryClient)
 }
 
+export function clearWorkspacePaneTabsProjectionState(repoRoot: string, repoInstanceId: string): void {
+  const key = workspacePaneTabsProjectionKey(repoRoot, repoInstanceId)
+  workspacePaneTabsProjectionGeneration.delete(key)
+  workspacePaneTabsRefreshSequence.delete(key)
+}
+
 export function workspacePaneTabsByTargetFromQueryData(
   data: readonly WorkspacePaneTabsEntry[],
 ): Record<string, WorkspacePaneTabEntry[]> {
@@ -184,7 +191,7 @@ function workspacePaneTabsProjectionKey(repoRoot: string, repoInstanceId: string
 }
 
 function nextWorkspacePaneTabsRefreshSequence(key: string): number {
-  const next = (workspacePaneTabsRefreshSequence.get(key) ?? 0) + 1
+  const next = ++workspacePaneTabsNextRefreshSequence
   workspacePaneTabsRefreshSequence.set(key, next)
   return next
 }
