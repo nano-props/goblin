@@ -12,6 +12,7 @@ import {
   workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { invalidateRepoDataQueries } from '#/web/repo-data-query.ts'
 
 interface RepoRefreshIntentBase {
   id: string
@@ -106,6 +107,7 @@ export async function handleRepoInvalidationRefresh(
   if (!repo || repo.instanceId !== repoInstanceId || isRepoUnavailable(repo)) return
   const disposition = repoInvalidationRefreshDisposition(event)
   if (disposition !== 'refresh') return
+  invalidateRepoDataQueries(repoId, repoInstanceId)
   await get().refreshCoreData(repoId, { repoInstanceId })
 }
 

@@ -54,6 +54,10 @@ export function repoBulkReadQueryKey(
   return ['repo-data', repoRoot, repoInstanceId, 'bulk', ...(include ? [...include].sort() : [])] as const
 }
 
+export function repoDataQueryKey(repoRoot: string, repoInstanceId: string) {
+  return ['repo-data', repoRoot, repoInstanceId] as const
+}
+
 export function repoLogQueryKey(repoRoot: string, branch: string, count: number, skip: number) {
   return ['repo-data', repoRoot, 'log', branch, count, skip] as const
 }
@@ -212,4 +216,12 @@ export function setRepoBulkReadQueryData(
   if (include?.includes('pullRequests')) {
     setRepoPullRequestsQueryData(repoRoot, repoInstanceId, undefined, undefined, result.pullRequests, queryClient)
   }
+}
+
+export function invalidateRepoDataQueries(
+  repoRoot: string,
+  repoInstanceId: string,
+  queryClient: QueryClient = primaryWindowQueryClient,
+): void {
+  void queryClient.invalidateQueries({ queryKey: repoDataQueryKey(repoRoot, repoInstanceId) })
 }

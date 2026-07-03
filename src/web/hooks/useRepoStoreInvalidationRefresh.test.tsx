@@ -5,6 +5,8 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { resetRepoRefreshCoordinatorState } from '#/web/stores/repos/refresh-coordinator.ts'
 import { beginRepoInvalidationSource, settleRepoInvalidationSource } from '#/web/stores/repos/invalidation-sources.ts'
 import { useRepoStoreInvalidationRefresh } from '#/web/hooks/useRepoStoreInvalidationRefresh.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { repoDataQueryKey } from '#/web/repo-data-query.ts'
 
 const listeners = new Set<(event: any) => void>()
 const storeState = {
@@ -45,6 +47,7 @@ describe('useRepoStoreInvalidationRefresh', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
     listeners.clear()
+    primaryWindowQueryClient.clear()
     resetRepoRefreshCoordinatorState()
     storeState.refreshCoreData.mockReset()
     storeState.repos['/tmp/repo'] = {
@@ -60,11 +63,13 @@ describe('useRepoStoreInvalidationRefresh', () => {
 
   afterEach(() => {
     listeners.clear()
+    primaryWindowQueryClient.clear()
     resetRepoRefreshCoordinatorState()
     vi.useRealTimers()
   })
 
   test('refreshes snapshot and status when a repo-snapshot invalidation arrives', async () => {
+    const invalidateSpy = vi.spyOn(primaryWindowQueryClient, 'invalidateQueries')
     renderInJsdom(<Harness />)
 
     await act(async () => {
@@ -73,9 +78,12 @@ describe('useRepoStoreInvalidationRefresh', () => {
     })
 
     expect(storeState.refreshCoreData).toHaveBeenCalledWith('/tmp/repo', { repoInstanceId: 'repo-instance-test-7' })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: repoDataQueryKey('/tmp/repo', 'repo-instance-test-7') })
+    invalidateSpy.mockRestore()
   })
 
   test('skips duplicate invalidation refreshes from an active local source token', async () => {
+    const invalidateSpy = vi.spyOn(primaryWindowQueryClient, 'invalidateQueries')
     beginRepoInvalidationSource('repo_branch_1')
 
     renderInJsdom(<Harness />)
@@ -91,6 +99,8 @@ describe('useRepoStoreInvalidationRefresh', () => {
     })
 
     expect(storeState.refreshCoreData).not.toHaveBeenCalled()
+    expect(invalidateSpy).not.toHaveBeenCalled()
+    invalidateSpy.mockRestore()
   })
 
   test('skips duplicate invalidation refreshes from a recently settled local source token', async () => {
