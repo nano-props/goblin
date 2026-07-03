@@ -16,6 +16,7 @@ import {
   repoBulkReadQueryKey,
   repoSnapshotQueryKey,
   repoStatusQueryKey,
+  setRepoSnapshotQueryData,
 } from '#/web/repo-data-query.ts'
 import type { WorktreeStatus } from '#/web/types.ts'
 beforeEach(resetRefreshTest)
@@ -43,6 +44,27 @@ function createWorktreeAction(): TestCreateWorktreeAction {
 }
 
 describe('remote fetch timestamps', () => {
+  test('snapshot refresh treats query snapshot branches as existing data while loading', async () => {
+    const repoInstanceId = seedRepo([])
+    setRepoSnapshotQueryData(REPO_ID, repoInstanceId, {
+      current: 'feature/query',
+      branches: [branch('feature/query')],
+    })
+    let resolveSnapshot!: (value: { branches: ReturnType<typeof branch>[]; current: string }) => void
+    ipcHandlers['repo.snapshot'] = () =>
+      new Promise((resolve) => {
+        resolveSnapshot = resolve
+      })
+
+    const work = useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
+    await Promise.resolve()
+
+    expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.snapshot.phase).toBe('refreshing')
+
+    resolveSnapshot({ branches: [branch('feature/query')], current: 'feature/query' })
+    await work
+  })
+
   test('manual refresh skips repo.fetch for local-only repositories and refreshes local state', async () => {
     seedRepoState({
       id: REPO_ID,

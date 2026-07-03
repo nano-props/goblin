@@ -162,7 +162,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       if (!resolved) return
       const { repoInstanceId } = resolved
       updateIfFresh(set, id, repoInstanceId, (r) => {
-        startDataLoad(r.dataLoads.snapshot, { hasData: r.data.branches.length > 0 })
+        startDataLoad(r.dataLoads.snapshot, { hasData: readRepoBranches(r).length > 0 })
       })
       await runLatestOperation({
         set,
@@ -299,7 +299,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       if (!resolved) return
       const { repoInstanceId } = resolved
       updateIfFresh(set, id, repoInstanceId, (r) => {
-        startDataLoad(r.dataLoads.snapshot, { hasData: r.data.branches.length > 0 })
+        startDataLoad(r.dataLoads.snapshot, { hasData: readRepoBranches(r).length > 0 })
         startDataLoad(r.dataLoads.status, { hasData: r.data.statusLoaded || r.data.status.length > 0 })
       })
       await runLatestOperation({
