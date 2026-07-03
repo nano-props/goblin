@@ -107,6 +107,7 @@ async function showWorkspacePaneTabCommand({ repoId, tab, navigation }: ShowWork
         branchName: target.branchName,
         worktreePath: target.worktreePath,
         type: provider.type,
+        insertAfterIdentity: null,
         navigation,
       })
     }

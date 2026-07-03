@@ -43,8 +43,8 @@ export async function openWorkspacePaneTab(input: {
     const alreadyOpen = readWorkspacePaneTabsForTarget(target).some((entry) => entry.type === input.type)
     const openerIdentity =
       isVisibleTabStrip && !alreadyOpen ? captureWorkspacePaneActiveTabIdentity(input.repoId) : null
-    // Default anchor is the captured opener; callers may override.
-    const insertAfterIdentity = input.insertAfterIdentity ?? openerIdentity
+    // Default anchor is the captured opener; callers may pass null to force append.
+    const insertAfterIdentity = input.insertAfterIdentity === undefined ? openerIdentity : input.insertAfterIdentity
     const committed = await updateWorkspacePaneTabs({
       ...target,
       repoInstanceId: repo.instanceId,

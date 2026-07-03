@@ -301,9 +301,9 @@ export function BranchStatus({ detail }: Props) {
   // its own row) to keep the rest of the tab purely informational.
   //
   // `mainItems` comes from the shared action surface and its tab-nav
-  // entries (changes/files/history) open tabs without an insertion
-  // hint, since most callers of that surface (sidebar menu, shortcuts)
-  // aren't anchored to any particular tab. From inside the status tab
+  // entries (changes/files/history) explicitly append, since most callers
+  // of that surface (sidebar menu, shortcuts) aren't anchored to any
+  // particular tab. From inside the status tab
   // itself we *are* anchored — swap those entries for the local
   // handlers above so opening a tab from this menu follows the same
   // "insert right after status" placement as the inline links in this

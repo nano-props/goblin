@@ -11,6 +11,7 @@ import { idleOperation } from '#/web/stores/repos/operations.ts'
 const mocks = vi.hoisted(() => ({
   setDetailCollapsed: vi.fn(),
   useBranchActions: vi.fn(),
+  openWorkspacePaneTab: vi.fn(),
 }))
 
 vi.mock('#/web/hooks/useBranchActions.tsx', () => ({
@@ -21,6 +22,10 @@ vi.mock('#/web/primary-window-navigation.tsx', () => ({
   usePrimaryWindowNavigation: () => ({
     showRepoBranchWorkspacePaneTab: vi.fn(),
   }),
+}))
+
+vi.mock('#/web/components/repo-workspace/open-workspace-pane-tab.ts', () => ({
+  openWorkspacePaneTab: mocks.openWorkspacePaneTab,
 }))
 
 vi.mock('#/web/runtime-settings-external-apps.ts', () => ({
@@ -38,6 +43,7 @@ vi.mock('#/web/stores/repos/store.ts', () => ({
 describe('useBranchActionItems', () => {
   beforeEach(() => {
     mocks.setDetailCollapsed.mockClear()
+    mocks.openWorkspacePaneTab.mockClear()
     mocks.useBranchActions.mockReturnValue({
       blocked: false,
       busyAction: null,
@@ -94,6 +100,25 @@ describe('useBranchActionItems', () => {
     // hide together when there is no worktree to walk.
     expect(actionIds).not.toContain('changes')
     expect(actionIds).not.toContain('files')
+  })
+
+  test('opens tab actions as generic append entries', async () => {
+    let actions: ReturnType<typeof useBranchActionItems> | null = null
+
+    await renderHookHost((nextActions) => {
+      actions = nextActions
+    })
+
+    actions!.mainItems.find((item) => item.id === 'history')?.onSelect()
+
+    expect(mocks.openWorkspacePaneTab).toHaveBeenCalledWith(
+      expect.objectContaining({
+        repoId: '/tmp/gbl-action-items',
+        branchName: 'feature/action-order',
+        type: 'history',
+        insertAfterIdentity: null,
+      }),
+    )
   })
 
   function renderHookHost(

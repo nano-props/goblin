@@ -68,6 +68,7 @@ export function useBranchActionItems(
       branchName: branch.name,
       worktreePath: branch.worktree?.path,
       type,
+      insertAfterIdentity: null,
       navigation,
     })
   }

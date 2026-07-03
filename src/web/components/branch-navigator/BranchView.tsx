@@ -49,6 +49,7 @@ export function BranchView({ repoId, onAfterSelect, onAfterOpenStatus }: Props) 
       branchName,
       worktreePath: branch?.worktree?.path ?? null,
       type: 'status',
+      insertAfterIdentity: null,
       navigation,
     })
     onAfterOpenStatus?.(branchName)

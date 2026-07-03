@@ -107,6 +107,40 @@ describe('openWorkspacePaneTab', () => {
     expect(preferredWorkspacePaneTab()).toBe('changes')
   })
 
+  test('can explicitly append a newly opened static tab while still recording the opener', async () => {
+    seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      selectedBranch: 'feature/worktree',
+      preferredWorkspacePaneTab: 'files',
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [
+          workspacePaneStaticTabEntry('status'),
+          workspacePaneStaticTabEntry('files'),
+          workspacePaneStaticTabEntry('history'),
+        ],
+      },
+    })
+
+    await expect(
+      openWorkspacePaneTab({
+        repoId: REPO_ID,
+        branchName: 'feature/worktree',
+        worktreePath: WORKTREE_PATH,
+        type: 'changes',
+        insertAfterIdentity: null,
+        navigation: navigationWithStoreActions(),
+      }),
+    ).resolves.toBe(true)
+
+    expect(openTabsFor('feature/worktree')).toEqual(['status', 'files', 'history', 'changes'])
+    expect(
+      useReposStore.getState().tabOpenerIdentityByScope[tabOpenerScopeKey(REPO_ID, 'feature/worktree')]?.[
+        'workspace-pane:changes'
+      ],
+    ).toBe('workspace-pane:files')
+  })
+
   test('does not select changes when the selected branch has no worktree', async () => {
     seedRepoState({
       id: REPO_ID,

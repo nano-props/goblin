@@ -1167,11 +1167,9 @@ describe('workspace commands', () => {
   })
 
   test('close workspace tab command reactivates the tab that opened a static tab, chrome-style', async () => {
-    // [status, changes, files] with "status" active. Opening "history" from
-    // "status" inserts it immediately after the captured opener ("status"),
-    // not at the end — so the strip becomes [status, history, changes, files].
-    // The close-time reactivation behavior is unchanged: closing history
-    // returns focus to its opener ("status"), not the spatial neighbour.
+    // [status, changes, files] with "status" active. Generic show commands
+    // append to the end but still record the opener, so closing history
+    // returns focus to "status", not the spatial neighbour.
     seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -1187,7 +1185,7 @@ describe('workspace commands', () => {
     const navigation = navigationWith({ showRepoWorkspacePaneTab })
 
     expect(await runShowWorkspacePaneTabCommand({ repoId: REPO_ID, tab: 'history', navigation })).toBe(true)
-    expect(openTabsFor('feature/worktree')).toEqual(['status', 'history', 'changes', 'files'])
+    expect(openTabsFor('feature/worktree')).toEqual(['status', 'changes', 'files', 'history'])
     expect(preferredWorkspacePaneTab()).toBe('history')
 
     expect(await runCloseWorkspacePaneTabCommand({ repoId: REPO_ID, navigation })).toBe(true)
