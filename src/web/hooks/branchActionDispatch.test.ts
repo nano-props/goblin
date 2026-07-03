@@ -53,13 +53,7 @@ describe('branch action dispatch', () => {
           resolveClose = resolve
         }),
     )
-    setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => worktreeSnapshotWithTerminal(),
-      createTerminal: vi.fn(async () => 'session-2'),
-      selectTerminal: vi.fn(),
-      closeTerminalByDescriptor: vi.fn(async () => true),
-      closeTerminalsForWorktree,
-    })
+    installTerminalBridge({ closeTerminalsForWorktree })
 
     const pending = dispatchRemoveWorktree({
       repo,
@@ -109,13 +103,7 @@ describe('branch action dispatch', () => {
     })
     const runBranchAction = vi.fn(async () => ({ ok: true, message: 'ok' }))
     useReposStore.setState({ runBranchAction })
-    setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => worktreeSnapshotWithTerminal(),
-      createTerminal: vi.fn(async () => 'session-2'),
-      selectTerminal: vi.fn(),
-      closeTerminalByDescriptor: vi.fn(async () => true),
-      closeTerminalsForWorktree: vi.fn(async () => false),
-    })
+    installTerminalBridge({ closeTerminalsForWorktree: vi.fn(async () => false) })
 
     await expect(
       dispatchRemoveWorktree({
@@ -151,13 +139,7 @@ describe('branch action dispatch', () => {
     const runBranchAction = vi.fn(async () => ({ ok: true, message: 'ok' }))
     useReposStore.setState({ runBranchAction })
     const closeTerminalsForWorktree = vi.fn(async () => true)
-    setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => emptyWorktreeSnapshot(),
-      createTerminal: vi.fn(async () => 'session-2'),
-      selectTerminal: vi.fn(),
-      closeTerminalByDescriptor: vi.fn(async () => true),
-      closeTerminalsForWorktree,
-    })
+    installTerminalBridge({ terminalWorktreeSnapshot: () => emptyWorktreeSnapshot(), closeTerminalsForWorktree })
 
     await expect(
       dispatchRemoveWorktree({
@@ -196,13 +178,7 @@ describe('branch action dispatch', () => {
     const runBranchAction = vi.fn(async () => ({ ok: true, message: 'ok' }))
     const closeTerminalsForWorktree = vi.fn(async () => true)
     useReposStore.setState({ runBranchAction })
-    setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => worktreeSnapshotWithTerminal(),
-      createTerminal: vi.fn(async () => 'session-2'),
-      selectTerminal: vi.fn(),
-      closeTerminalByDescriptor: vi.fn(async () => true),
-      closeTerminalsForWorktree,
-    })
+    installTerminalBridge({ closeTerminalsForWorktree })
 
     await expect(
       dispatchRemoveWorktree({
@@ -247,13 +223,7 @@ describe('branch action dispatch', () => {
     const runBranchAction = vi.fn(async () => ({ ok: true, message: 'ok' }))
     const closeTerminalsForWorktree = vi.fn(async () => true)
     useReposStore.setState({ runBranchAction })
-    setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => worktreeSnapshotWithTerminal(),
-      createTerminal: vi.fn(async () => 'session-2'),
-      selectTerminal: vi.fn(),
-      closeTerminalByDescriptor: vi.fn(async () => true),
-      closeTerminalsForWorktree,
-    })
+    installTerminalBridge({ closeTerminalsForWorktree })
 
     await expect(
       dispatchRemoveWorktree({
@@ -306,13 +276,7 @@ describe('branch action dispatch', () => {
     const runBranchAction = vi.fn(async () => ({ ok: true, message: 'ok' }))
     const closeTerminalsForWorktree = vi.fn(async () => true)
     useReposStore.setState({ runBranchAction })
-    setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => worktreeSnapshotWithTerminal(),
-      createTerminal: vi.fn(async () => 'session-2'),
-      selectTerminal: vi.fn(),
-      closeTerminalByDescriptor: vi.fn(async () => true),
-      closeTerminalsForWorktree,
-    })
+    installTerminalBridge({ closeTerminalsForWorktree })
 
     await expect(
       dispatchRemoveWorktree({
@@ -328,6 +292,19 @@ describe('branch action dispatch', () => {
     expect(runBranchAction).not.toHaveBeenCalled()
   })
 })
+
+function installTerminalBridge(options: {
+  terminalWorktreeSnapshot?: () => TerminalWorktreeSnapshot
+  closeTerminalsForWorktree: () => Promise<boolean>
+}): void {
+  setTerminalSessionCommandBridge({
+    terminalWorktreeSnapshot: options.terminalWorktreeSnapshot ?? (() => worktreeSnapshotWithTerminal()),
+    createTerminal: vi.fn(async () => 'session-2'),
+    selectTerminal: vi.fn(),
+    closeTerminalByDescriptor: vi.fn(async () => true),
+    closeTerminalsForWorktree: options.closeTerminalsForWorktree,
+  })
+}
 
 function emptyWorktreeSnapshot(): TerminalWorktreeSnapshot {
   return {
