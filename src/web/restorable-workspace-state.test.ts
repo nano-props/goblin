@@ -7,6 +7,7 @@ import {
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
+import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 
 describe('restorable-workspace-state', () => {
   beforeEach(() => {
@@ -52,6 +53,23 @@ describe('restorable-workspace-state', () => {
       },
       filetreeViewStateByWorktreeByRepo: {},
     })
+  })
+
+  test('fails session persistence when an open repo has no branch read model', () => {
+    const repo = emptyRepo('/tmp/repo-without-query-model', 'repo-without-query-model', 'repo-instance-without-query')
+
+    expect(() =>
+      workspaceSessionStateFromRestorableWorkspaceState({
+        repos: { [repo.id]: repo },
+        restorableWorkspaceState: {
+          order: [repo.id],
+          activeId: repo.id,
+          zenMode: false,
+          workspacePaneSize: 55,
+          selectedTerminalSessionIdByTerminalWorktree: {},
+        },
+      }),
+    ).toThrow('workspace session persistence requires branch read model for repo: /tmp/repo-without-query-model')
   })
 
   test('persists changes as a session-restorable preferred tab when its static tab is open', () => {

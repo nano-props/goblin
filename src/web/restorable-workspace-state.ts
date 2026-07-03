@@ -16,7 +16,16 @@ import {
   workspacePaneTabsQueryKey,
   type WorkspacePaneTabsQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { readRepoBranchQueryProjection, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
+
+interface WorkspaceSessionRepoProjection {
+  id: string
+  remote: ReposStore['repos'][string]['remote']
+  ui: Pick<ReposStore['repos'][string]['ui'], 'preferredWorkspacePaneTabByTarget'>
+  data: Pick<RepoBranchReadModelData, 'branches'>
+}
+
+type WorkspaceSessionRepoProjectionMap = Record<string, WorkspaceSessionRepoProjection | undefined>
 
 export function workspaceSessionStateFromRestorableWorkspaceState(input: {
   repos: ReposStore['repos']
@@ -24,9 +33,9 @@ export function workspaceSessionStateFromRestorableWorkspaceState(input: {
   filetreeInteractionByScope?: Readonly<Record<string, FiletreeInteractionSnapshot>>
 }): WorkspaceSessionState {
   const { repos, restorableWorkspaceState } = input
-  const projectedRepos = reposWithQueryBranchReadModels(repos, restorableWorkspaceState.order)
+  const projectedRepos = workspaceSessionRepoProjections(repos, restorableWorkspaceState.order)
   const workspacePaneTabsByTargetByRepo = workspacePaneTabsByTargetByRepoFromQueryCache(
-    projectedRepos,
+    repos,
     restorableWorkspaceState.order,
   )
   return {
@@ -50,38 +59,38 @@ export function workspaceSessionStateFromRestorableWorkspaceState(input: {
     ),
     filetreeViewStateByWorktreeByRepo: persistedFiletreeViewStateByWorktreeByRepoForSession(
       input.filetreeInteractionByScope ?? {},
-      repos,
+      projectedRepos,
       restorableWorkspaceState.order,
     ),
   }
 }
 
-function reposWithQueryBranchReadModels(repos: ReposStore['repos'], order: readonly string[]): ReposStore['repos'] {
-  let projectedRepos = repos
+function workspaceSessionRepoProjections(
+  repos: ReposStore['repos'],
+  order: readonly string[],
+): WorkspaceSessionRepoProjectionMap {
+  const projectedRepos: WorkspaceSessionRepoProjectionMap = {}
   for (const id of order) {
     const repo = repos[id]
     if (!repo) continue
     const branchModel = readRepoBranchQueryProjection(repo)
-    const projectedRepo = branchModel
-      ? { ...repo, data: { ...repo.data, ...branchModel } }
-      : {
-          ...repo,
-          data: {
-            ...repo.data,
-            branches: [],
-            currentBranch: '',
-            currentHEAD: undefined,
-            worktreesByPath: {},
-          },
-        }
-    if (projectedRepos === repos) projectedRepos = { ...repos }
-    projectedRepos[id] = projectedRepo
+    if (!branchModel) throw new Error(`workspace session persistence requires branch read model for repo: ${id}`)
+    projectedRepos[id] = {
+      id: repo.id,
+      remote: repo.remote,
+      ui: {
+        preferredWorkspacePaneTabByTarget: repo.ui.preferredWorkspacePaneTabByTarget,
+      },
+      data: {
+        branches: branchModel.branches,
+      },
+    }
   }
   return projectedRepos
 }
 
 function workspacePaneTabsByTargetByRepoFromQueryCache(
-  repos: ReposStore['repos'],
+  repos: Record<string, Pick<ReposStore['repos'][string], 'instanceId'> | undefined>,
   order: readonly string[],
 ): Record<string, Record<string, WorkspacePaneTabEntry[]>> {
   const byRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>> = {}
