@@ -172,6 +172,7 @@ function makeWorkspacePaneTabStrip(
     return (
       <WorkspacePaneTabStrip
         {...workspacePaneProps}
+        workspacePaneTabTargetKey="/repo\0branch\0main"
         items={items}
         activeTabIdentity={selected ? terminalWorkspacePaneTabProvider.identity(selected.terminalSessionId) : null}
         onSelect={(item) => {

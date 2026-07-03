@@ -21,9 +21,28 @@ const reactActEnvironment = globalThis as typeof globalThis & {
   goblinNative?: unknown
   __GOBLIN_BOOTSTRAP__?: unknown
 }
+const originalGetBoundingClientRect = HTMLElement.prototype.getBoundingClientRect
+let tabStripViewportRect: DOMRect | null = null
+const tabStripTabRects = new Map<string, DOMRect>()
+let tabStripNewButtonRect: DOMRect | null = null
 
 beforeEach(() => {
   vi.useFakeTimers()
+  Object.defineProperty(HTMLElement.prototype, 'getBoundingClientRect', {
+    configurable: true,
+    writable: true,
+    value(this: HTMLElement) {
+      if (this.matches('[data-radix-scroll-area-viewport]') && tabStripViewportRect) return tabStripViewportRect
+      if (this.matches('[data-workspace-pane-new-button]') && tabStripNewButtonRect) return tabStripNewButtonRect
+      if (this.matches('[data-workspace-pane-tab-scroll-target]')) {
+        const tabButton = this.querySelector<HTMLButtonElement>('[role="tab"][id]')
+        const rect = tabButton?.id ? tabStripTabRects.get(tabButton.id) : null
+        if (rect) return rect
+      }
+      const rect = this.id ? tabStripTabRects.get(this.id) : null
+      return rect ?? originalGetBoundingClientRect.call(this)
+    },
+  })
   Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
     configurable: true,
     value: vi.fn(),
@@ -43,7 +62,15 @@ beforeEach(() => {
 afterEach(() => {
   delete reactActEnvironment.goblinNative
   delete reactActEnvironment.__GOBLIN_BOOTSTRAP__
+  Object.defineProperty(HTMLElement.prototype, 'getBoundingClientRect', {
+    configurable: true,
+    writable: true,
+    value: originalGetBoundingClientRect,
+  })
   delete (HTMLElement.prototype as Partial<HTMLElement>).scrollIntoView
+  tabStripViewportRect = null
+  tabStripTabRects.clear()
+  tabStripNewButtonRect = null
   vi.useRealTimers()
   // Reset our module-level render handle so the next test that only
   // calls `rerender(...)` (e.g. "restores the full tab strip after
@@ -418,6 +445,7 @@ describe('WorkspacePaneTabStrip', () => {
         sessions={[
           session({ terminalSessionId: 't1', title: 'term-1' }),
           session({ terminalSessionId: 't2', title: 'term-2', selected: false }),
+          session({ terminalSessionId: 't3', title: 'term-3', selected: false }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -429,6 +457,13 @@ describe('WorkspacePaneTabStrip', () => {
 
     const scrollIntoView = scrollIntoViewMock()
     scrollIntoView.mockClear()
+    setTabStripScrollGeometry({
+      viewport: { left: 0, right: 200 },
+      newButton: { left: 230, right: 258 },
+      tabs: {
+        'workspace-workspace-pane-tab-2': { left: 120, right: 220 },
+      },
+    })
 
     rerender(
       <TestWorkspacePaneTabStrip
@@ -447,17 +482,24 @@ describe('WorkspacePaneTabStrip', () => {
       />,
     )
 
-    const activeTab = document.getElementById('workspace-workspace-pane-tab-2')
+    const newButton = document.body.querySelector('[data-workspace-pane-new-button]')
     expect(scrollIntoView).toHaveBeenCalledTimes(1)
-    expect(scrollIntoView.mock.contexts.at(-1)).toBe(activeTab)
+    expect(scrollIntoView.mock.contexts.at(-1)).toBe(newButton)
     expect(scrollIntoView).toHaveBeenLastCalledWith({
-      inline: 'nearest',
+      inline: 'end',
       block: 'nearest',
       behavior: 'smooth',
     })
   })
 
   test('scrolls the active tab into view on initial mount', () => {
+    setTabStripScrollGeometry({
+      viewport: { left: 0, right: 200 },
+      tabs: {
+        'workspace-workspace-pane-tab': { left: 230, right: 330 },
+      },
+    })
+
     render(
       <TestWorkspacePaneTabStrip
         terminalWorktreeKey="/repo\0/repo/worktree"
@@ -476,9 +518,59 @@ describe('WorkspacePaneTabStrip', () => {
     )
 
     const scrollIntoView = scrollIntoViewMock()
-    const activeTab = document.getElementById('workspace-workspace-pane-tab')
+    const activeTab = workspacePaneTabScrollTarget('workspace-workspace-pane-tab')
     expect(scrollIntoView).toHaveBeenCalledTimes(1)
     expect(scrollIntoView.mock.contexts.at(-1)).toBe(activeTab)
+    expect(scrollIntoView).toHaveBeenLastCalledWith({ inline: 'end', block: 'nearest', behavior: 'smooth' })
+  })
+
+  test('scrolls a left-clipped active tab to the start edge', () => {
+    render(
+      <TestWorkspacePaneTabStrip
+        terminalWorktreeKey="/repo\0/repo/worktree"
+        workspacePaneId="workspace"
+        sessions={[
+          session({ terminalSessionId: 't1', title: 'term-1' }),
+          session({ terminalSessionId: 't2', title: 'term-2', selected: false }),
+        ]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    )
+
+    const scrollIntoView = scrollIntoViewMock()
+    scrollIntoView.mockClear()
+    setTabStripScrollGeometry({
+      viewport: { left: 0, right: 200 },
+      tabs: {
+        'workspace-workspace-pane-tab-1': { left: -80, right: 20 },
+      },
+    })
+
+    rerender(
+      <TestWorkspacePaneTabStrip
+        terminalWorktreeKey="/repo\0/repo/worktree"
+        workspacePaneId="workspace"
+        sessions={[
+          session({ terminalSessionId: 't1', title: 'term-1', selected: false }),
+          session({ terminalSessionId: 't2', title: 'term-2', selected: true }),
+          session({ terminalSessionId: 't3', title: 'term-3', selected: false }),
+        ]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    )
+
+    const activeTab = workspacePaneTabScrollTarget('workspace-workspace-pane-tab-1')
+    expect(scrollIntoView).toHaveBeenCalledTimes(1)
+    expect(scrollIntoView.mock.contexts.at(-1)).toBe(activeTab)
+    expect(scrollIntoView).toHaveBeenLastCalledWith({ inline: 'start', block: 'nearest', behavior: 'smooth' })
   })
 
   test('does not scroll when compact mode renders without a scroll viewport', () => {
@@ -500,6 +592,226 @@ describe('WorkspacePaneTabStrip', () => {
     )
 
     expect(scrollIntoViewMock()).not.toHaveBeenCalled()
+  })
+
+  test('scrolls the new terminal button into view before creating a terminal', () => {
+    const onNew = vi.fn()
+    setTabStripScrollGeometry({
+      viewport: { left: 0, right: 200 },
+      newButton: { left: 230, right: 258 },
+      tabs: {
+        'workspace-workspace-pane-tab': { left: 20, right: 120 },
+      },
+    })
+    render(
+      <TestWorkspacePaneTabStrip
+        terminalWorktreeKey="/repo\0/repo/worktree"
+        workspacePaneId="workspace"
+        sessions={[
+          session({ terminalSessionId: 't1', title: 'term-1' }),
+          session({ terminalSessionId: 't2', title: 'term-2', selected: false }),
+        ]}
+        onNew={onNew}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    )
+    const scrollIntoView = scrollIntoViewMock()
+    scrollIntoView.mockClear()
+    const newButton = document.body.querySelector<HTMLButtonElement>('[data-workspace-pane-new-button]')
+    expect(newButton).not.toBeNull()
+
+    act(() => {
+      newButton?.click()
+    })
+
+    expect(scrollIntoView).toHaveBeenCalledTimes(1)
+    expect(scrollIntoView.mock.contexts.at(-1)).toBe(newButton)
+    expect(scrollIntoView).toHaveBeenLastCalledWith({ inline: 'end', block: 'nearest', behavior: 'smooth' })
+    expect(onNew).toHaveBeenCalledTimes(1)
+  })
+
+  test('does not scroll right when tab data refreshes without changing the active tab', () => {
+    render(
+      <TestWorkspacePaneTabStrip
+        terminalWorktreeKey="/repo\0/repo/worktree"
+        workspacePaneId="workspace"
+        sessions={[
+          session({ terminalSessionId: 't1', title: 'term-1', selected: false }),
+          session({ terminalSessionId: 't2', title: 'term-2', selected: true }),
+        ]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    )
+    const scrollIntoView = scrollIntoViewMock()
+    scrollIntoView.mockClear()
+    setTabStripScrollGeometry({
+      viewport: { left: 0, right: 200 },
+      newButton: { left: 230, right: 258 },
+      tabs: {
+        'workspace-workspace-pane-tab-1': { left: 120, right: 220 },
+      },
+    })
+
+    rerender(
+      <TestWorkspacePaneTabStrip
+        terminalWorktreeKey="/repo\0/repo/worktree"
+        workspacePaneId="workspace"
+        sessions={[
+          session({ terminalSessionId: 't1', title: 'term-1 refreshed', selected: false }),
+          session({ terminalSessionId: 't2', title: 'term-2 refreshed', selected: true }),
+        ]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    )
+
+    expect(scrollIntoView).not.toHaveBeenCalled()
+  })
+
+  test('does not auto-scroll when the workspace tab target changes', () => {
+    render(
+      <TestWorkspacePaneTabStrip
+        terminalWorktreeKey="/repo\0/repo/worktree-a"
+        workspacePaneTabTargetKey="/repo\0branch\0feature-a"
+        workspacePaneId="workspace"
+        sessions={[
+          session({ terminalSessionId: 'a1', title: 'term-a1', selected: false }),
+          session({ terminalSessionId: 'a2', title: 'term-a2', selected: true }),
+        ]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    )
+    const scrollIntoView = scrollIntoViewMock()
+    scrollIntoView.mockClear()
+    setTabStripScrollGeometry({
+      viewport: { left: 0, right: 200 },
+      newButton: { left: 230, right: 258 },
+      tabs: {
+        'workspace-workspace-pane-tab-1': { left: 120, right: 220 },
+      },
+    })
+
+    rerender(
+      <TestWorkspacePaneTabStrip
+        terminalWorktreeKey="/repo\0/repo/worktree-b"
+        workspacePaneTabTargetKey="/repo\0branch\0feature-b"
+        workspacePaneId="workspace"
+        sessions={[
+          session({ terminalSessionId: 'b1', title: 'term-b1', selected: false }),
+          session({ terminalSessionId: 'b2', title: 'term-b2', selected: true }),
+        ]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    )
+
+    expect(scrollIntoView).not.toHaveBeenCalled()
+  })
+
+  test('restores horizontal scroll position for each workspace tab target', () => {
+    render(
+      <TestWorkspacePaneTabStrip
+        terminalWorktreeKey="/repo\0/repo/worktree-a"
+        workspacePaneTabTargetKey="/repo\0branch\0feature-a"
+        workspacePaneId="workspace"
+        sessions={[
+          session({ terminalSessionId: 'a1', title: 'term-a1', selected: false }),
+          session({ terminalSessionId: 'a2', title: 'term-a2', selected: true }),
+          session({ terminalSessionId: 'a3', title: 'term-a3', selected: false }),
+        ]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    )
+
+    const viewport = workspacePaneTabViewport()
+    act(() => {
+      viewport.scrollLeft = 180
+      viewport.dispatchEvent(new Event('scroll', { bubbles: true }))
+    })
+
+    rerender(
+      <TestWorkspacePaneTabStrip
+        terminalWorktreeKey="/repo\0/repo/worktree-b"
+        workspacePaneTabTargetKey="/repo\0branch\0feature-b"
+        workspacePaneId="workspace"
+        sessions={[
+          session({ terminalSessionId: 'b1', title: 'term-b1', selected: true }),
+          session({ terminalSessionId: 'b2', title: 'term-b2', selected: false }),
+        ]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    )
+
+    expect(viewport.scrollLeft).toBe(0)
+
+    act(() => {
+      viewport.scrollLeft = 40
+      viewport.dispatchEvent(new Event('scroll', { bubbles: true }))
+    })
+
+    rerender(
+      <TestWorkspacePaneTabStrip
+        terminalWorktreeKey="/repo\0/repo/worktree-a"
+        workspacePaneTabTargetKey="/repo\0branch\0feature-a"
+        workspacePaneId="workspace"
+        sessions={[
+          session({ terminalSessionId: 'a1', title: 'term-a1', selected: false }),
+          session({ terminalSessionId: 'a2', title: 'term-a2', selected: true }),
+          session({ terminalSessionId: 'a3', title: 'term-a3', selected: false }),
+        ]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    )
+
+    expect(viewport.scrollLeft).toBe(180)
+
+    rerender(
+      <TestWorkspacePaneTabStrip
+        terminalWorktreeKey="/repo\0/repo/worktree-b"
+        workspacePaneTabTargetKey="/repo\0branch\0feature-b"
+        workspacePaneId="workspace"
+        sessions={[
+          session({ terminalSessionId: 'b1', title: 'term-b1', selected: true }),
+          session({ terminalSessionId: 'b2', title: 'term-b2', selected: false }),
+        ]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    )
+
+    expect(viewport.scrollLeft).toBe(40)
   })
 
   test('scrolls the right neighbour into view after closing the active tab', () => {
@@ -536,6 +848,13 @@ describe('WorkspacePaneTabStrip', () => {
     render(<CloseActiveHarness />)
     const scrollIntoView = scrollIntoViewMock()
     scrollIntoView.mockClear()
+    setTabStripScrollGeometry({
+      viewport: { left: 0, right: 200 },
+      newButton: { left: 230, right: 258 },
+      tabs: {
+        'workspace-workspace-pane-tab-1': { left: 120, right: 220 },
+      },
+    })
     const closeButton = document.body.querySelector<HTMLButtonElement>('button[aria-label="close term-2"]')
     expect(closeButton).not.toBeNull()
 
@@ -543,12 +862,13 @@ describe('WorkspacePaneTabStrip', () => {
       closeButton?.click()
     })
 
-    const activeTab = document.getElementById('workspace-workspace-pane-tab-1')
+    const newButton = document.body.querySelector('[data-workspace-pane-new-button]')
     expect(scrollIntoView).toHaveBeenCalledTimes(1)
-    expect(scrollIntoView.mock.contexts.at(-1)).toBe(activeTab)
+    expect(scrollIntoView.mock.contexts.at(-1)).toBe(newButton)
+    expect(scrollIntoView).toHaveBeenLastCalledWith({ inline: 'end', block: 'nearest', behavior: 'smooth' })
   })
 
-  test('does not scroll when a non-active terminal session is removed', () => {
+  test('does not scroll when the active tab stays visible after a non-active terminal session is removed', () => {
     function CloseInactiveHarness() {
       const [sessions, setSessions] = useState([
         session({ terminalSessionId: 't1', title: 'term-1', selected: true }),
@@ -573,6 +893,13 @@ describe('WorkspacePaneTabStrip', () => {
         />
       )
     }
+
+    setTabStripScrollGeometry({
+      viewport: { left: 0, right: 200 },
+      tabs: {
+        'workspace-workspace-pane-tab': { left: 20, right: 120 },
+      },
+    })
 
     render(<CloseInactiveHarness />)
     const scrollIntoView = scrollIntoViewMock()
@@ -836,6 +1163,7 @@ describe('WorkspacePaneTabStrip', () => {
     render(
       <WorkspacePaneTabStrip
         terminalWorktreeKey="/repo\0/repo/worktree"
+        workspacePaneTabTargetKey="/repo\0branch\0main"
         workspacePaneId="workspace"
         panelActive
         items={[item]}
@@ -859,6 +1187,7 @@ describe('WorkspacePaneTabStrip', () => {
 
 function TestWorkspacePaneTabStrip(props: {
   terminalWorktreeKey: string
+  workspacePaneTabTargetKey?: string
   sessions: TerminalSessionSummary[]
   workspacePaneId: string
   pendingTerminal?: boolean
@@ -894,6 +1223,7 @@ function TestWorkspacePaneTabStrip(props: {
   return (
     <WorkspacePaneTabStrip
       {...workspacePaneProps}
+      workspacePaneTabTargetKey={props.workspacePaneTabTargetKey ?? '/repo\0branch\0main'}
       items={items}
       activeTabIdentity={selected ? terminalWorkspacePaneTabProvider.identity(selected.terminalSessionId) : null}
       onSelect={(item) => {
@@ -921,6 +1251,47 @@ function rerender(element: ReactNode): RenderResult {
 
 function scrollIntoViewMock() {
   return vi.mocked(HTMLElement.prototype.scrollIntoView)
+}
+
+function workspacePaneTabScrollTarget(tabId: string): HTMLElement {
+  const tab = document.getElementById(tabId)
+  const target = tab?.closest<HTMLElement>('[data-workspace-pane-tab-scroll-target]')
+  if (!target) throw new Error(`missing scroll target for ${tabId}`)
+  return target
+}
+
+function workspacePaneTabViewport(): HTMLDivElement {
+  const viewport = document.body.querySelector<HTMLDivElement>('[data-radix-scroll-area-viewport]')
+  if (!viewport) throw new Error('missing workspace pane tab viewport')
+  return viewport
+}
+
+function setTabStripScrollGeometry(input: {
+  viewport: { left: number; right: number }
+  newButton?: { left: number; right: number }
+  tabs: Record<string, { left: number; right: number }>
+}) {
+  tabStripViewportRect = rect(input.viewport)
+  tabStripNewButtonRect = input.newButton ? rect(input.newButton) : null
+  tabStripTabRects.clear()
+  for (const [id, tabRect] of Object.entries(input.tabs)) {
+    tabStripTabRects.set(id, rect(tabRect))
+  }
+}
+
+function rect({ left, right }: { left: number; right: number }): DOMRect {
+  const width = right - left
+  return {
+    left,
+    right,
+    width,
+    x: left,
+    top: 0,
+    bottom: 28,
+    height: 28,
+    y: 0,
+    toJSON: () => ({}),
+  } as DOMRect
 }
 
 function session(overrides: Partial<TerminalSessionSummary> = {}): TerminalSessionSummary {

@@ -1,4 +1,4 @@
-import type { ComponentPropsWithoutRef, ReactNode, Ref } from 'react'
+import type { ComponentPropsWithoutRef, ReactNode, Ref, UIEventHandler } from 'react'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import {
   TitleBarDragRegion,
@@ -11,13 +11,20 @@ interface ToolbarTabStripProps {
   compactContent: ReactNode
   scrollContent: ReactNode
   viewportRef?: Ref<HTMLDivElement>
+  viewportOnScroll?: UIEventHandler<HTMLDivElement>
 }
 
 // Shared toolbar tab-strip shell:
 // - compact mode keeps a single flex row in the toolbar height
 // - expanded mode leaves only actual controls as no-drag; gaps inside the
 //   scroll shell and the unused toolbar width stay native window chrome.
-export function ToolbarTabStrip({ compact, compactContent, scrollContent, viewportRef }: ToolbarTabStripProps) {
+export function ToolbarTabStrip({
+  compact,
+  compactContent,
+  scrollContent,
+  viewportRef,
+  viewportOnScroll,
+}: ToolbarTabStripProps) {
   if (compact) {
     return <div className="flex h-full min-w-0 flex-1 items-center">{compactContent}</div>
   }
@@ -31,6 +38,7 @@ export function ToolbarTabStrip({ compact, compactContent, scrollContent, viewpo
           className="h-full min-w-0 max-w-full flex-none w-fit"
           viewportClassName="[&>div]:h-full"
           viewportRef={viewportRef}
+          viewportOnScroll={viewportOnScroll}
         >
           {scrollContent}
         </ScrollArea>

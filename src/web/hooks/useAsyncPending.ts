@@ -14,9 +14,10 @@ function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
  * until settle" semantics. For forms where newer submissions should supersede
  * older results, prefer `useLatestAsyncTask`.
  */
-export function useAsyncPending<T>() {
+export function useAsyncPending<T>({ resetKey }: { resetKey?: string } = {}) {
   const [pending, setPending] = useState<T | null>(null)
-  const pendingRef = useRef<T | null>(null)
+  const pendingRef = useRef<{ id: T; operationId: number } | null>(null)
+  const nextOperationIdRef = useRef(0)
   const mountedRef = useRef(true)
 
   useEffect(
@@ -25,6 +26,13 @@ export function useAsyncPending<T>() {
     },
     [],
   )
+
+  useEffect(() => {
+    if (resetKey === undefined) return
+    nextOperationIdRef.current += 1
+    pendingRef.current = null
+    setPending(null)
+  }, [resetKey])
 
   // Keep sync throws synchronous. Promise rejections are intentionally left to
   // callers so each action boundary can decide whether to show a toast, surface
@@ -35,9 +43,12 @@ export function useAsyncPending<T>() {
     if (pendingRef.current !== null) return
     const result = fn()
     if (!isPromiseLike(result)) return result
-    pendingRef.current = id
+    const operationId = nextOperationIdRef.current + 1
+    nextOperationIdRef.current = operationId
+    pendingRef.current = { id, operationId }
     setPending(id)
     return Promise.resolve(result).finally(() => {
+      if (pendingRef.current?.operationId !== operationId) return
       pendingRef.current = null
       if (mountedRef.current) setPending(null)
     })

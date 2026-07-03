@@ -30,6 +30,7 @@ import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
 import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
 import { captureWorkspacePaneActiveTabIdentity } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
+import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import {
   terminalWorkspacePaneTabProvider,
   workspacePaneStaticTabProvider,
@@ -74,6 +75,13 @@ export function RepoWorkspaceToolbar({
   // of every syncServerSessions.
   const isInitialSyncInFlight = useIsInitialSyncInFlight(repo.id)
   const branchName = detail.branch?.name ?? null
+  const workspacePaneTabTargetKey = branchName
+    ? workspacePaneTabsTargetIdentityKey({
+        repoRoot: repo.id,
+        branchName,
+        worktreePath: detail.branch?.worktree?.path ?? null,
+      })
+    : null
   const preferredWorkspacePaneTab = preferredWorkspacePaneTabForTarget(
     repo.ui,
     branchName ? { repoRoot: repo.id, branchName, worktreePath: detail.branch?.worktree?.path ?? null } : null,
@@ -297,9 +305,10 @@ export function RepoWorkspaceToolbar({
               strip below is empty, so it lives at the toolbar level rather than
               inside WorkspacePaneTabStrip's tab chrome. */}
           {compact && repoWorkspaceBackAction}
-          {showBranchLevelTabs && (
+          {showBranchLevelTabs && workspacePaneTabTargetKey && (
             <WorkspacePaneTabStrip
               terminalWorktreeKey={workspacePaneTabModel.terminalWorktreeKey}
+              workspacePaneTabTargetKey={workspacePaneTabTargetKey}
               items={workspacePaneTabItems}
               workspacePaneId={workspacePaneId}
               activeTabIdentity={activeTabIdentity}
