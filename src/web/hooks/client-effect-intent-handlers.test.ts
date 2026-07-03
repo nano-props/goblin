@@ -2,7 +2,10 @@
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { toast } from 'sonner'
-import { handleWorkspaceClientIntent } from '#/web/hooks/client-effect-intent-handlers.ts'
+import {
+  handleTerminalBellClickIntent,
+  handleWorkspaceClientIntent,
+} from '#/web/hooks/client-effect-intent-handlers.ts'
 
 vi.mock('sonner', () => ({
   toast: {
@@ -14,10 +17,13 @@ import type { PrimaryWindowNavigationActions } from '#/web/primary-window-naviga
 import { preferredWorkspacePaneTabForTarget, workspacePaneTabsTargetForRepoBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 
 const REPO_ID = '/tmp/gbl-client-intent-handlers-repo'
 
 beforeEach(() => {
+  primaryWindowQueryClient.clear()
   resetReposStore()
 })
 
@@ -26,6 +32,33 @@ afterEach(() => {
 })
 
 describe('client effect intent handlers', () => {
+  test('routes terminal bell clicks through the React Query snapshot read model', () => {
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branches: [],
+      selectedBranch: 'feature/query',
+    })
+    setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
+      current: 'feature/query',
+      branches: [createRepoBranch('feature/query', { worktree: { path: '/tmp/bell-worktree' } })],
+    })
+    const d = deps(REPO_ID)
+    d.navigation.showRepoBranchWorkspacePaneTab = vi.fn()
+
+    handleTerminalBellClickIntent(
+      {
+        type: 'terminal-bell-click',
+        repoRoot: REPO_ID,
+        terminalSessionId: 'session-query',
+        terminalWorktreeKey: `${REPO_ID}\0/tmp/bell-worktree`,
+      },
+      d,
+    )
+
+    expect(d.setSelectedTerminal).toHaveBeenCalledWith(`${REPO_ID}\0/tmp/bell-worktree`, 'session-query')
+    expect(d.navigation.showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/query', 'terminal')
+  })
+
   test('returns false when changes cannot be shown for a branch without a worktree', async () => {
     seedRepoState({
       id: REPO_ID,
