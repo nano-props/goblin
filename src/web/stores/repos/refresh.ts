@@ -33,20 +33,17 @@ import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import type { RepoSnapshot } from '#/shared/api-types.ts'
 import type { RepoPullRequestReason } from '#/web/stores/repos/operations.ts'
 import type { RepoState, ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
-import type { PullRequestFetchMode, PullRequestInfo } from '#/web/types.ts'
+import type { PullRequestFetchMode } from '#/web/types.ts'
 
 function resolvePullRequestRefreshRequest(
   repo: Pick<RepoState, 'id' | 'instanceId' | 'availability' | 'data' | 'remote'>,
   branchesArg?: string[],
   options?: {
     mode?: PullRequestFetchMode
-    clearMissing?: boolean
   },
 ): {
   branchNames: string[]
-  requested: Set<string>
   mode: PullRequestFetchMode
-  clearMissing: boolean
 } | null {
   // The caller passes a focused repo shape, so keep the availability
   // check local: local repos carry failure in `availability.phase`;
@@ -57,12 +54,11 @@ function resolvePullRequestRefreshRequest(
     return null
   }
   const mode = options?.mode ?? 'full'
-  const clearMissing = options?.clearMissing ?? mode === 'full'
   const branchProjection = branchesArg ? null : readRepoBranchQueryProjection(repo)
   const branchNames = branchesArg ?? branchProjection?.branches.map((branch) => branch.name) ?? []
   if (branchNames.length === 0) return null
   if (repo.remote.hasGitHubRemote !== true) return null
-  return { branchNames, requested: new Set(branchNames), mode, clearMissing }
+  return { branchNames, mode }
 }
 
 export function createRefreshActions(set: ReposSet, get: ReposGet) {
@@ -120,13 +116,10 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
     id: string,
     repoInstanceId: string,
     branchNames: string[],
-    entries: Array<{ branch: string; pullRequest: PullRequestInfo }>,
-    requested: Set<string>,
-    clearMissing: boolean,
     mode: PullRequestFetchMode,
   ): void {
     updateIfFresh(set, id, repoInstanceId, (r) => {
-      applyPullRequestRefreshSuccessState(r, branchNames, entries, requested, clearMissing, mode)
+      applyPullRequestRefreshSuccessState(r, branchNames, mode)
     })
   }
 
@@ -205,7 +198,6 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       options?: {
         repoInstanceId?: string
         mode?: PullRequestFetchMode
-        clearMissing?: boolean
       },
     ) {
       const resolved = resolveActionRepoInstanceId(get, id, options?.repoInstanceId)
@@ -213,9 +205,9 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       const { repo: repoBefore, repoInstanceId } = resolved
       const request = resolvePullRequestRefreshRequest(repoBefore, branchesArg, options)
       if (!request) return
-      const { branchNames, requested, mode, clearMissing } = request
+      const { branchNames, mode } = request
       updateIfFresh(set, id, repoInstanceId, (r) => {
-        startPullRequestRefreshDataLoads(r, branchNames, requested, mode)
+        startPullRequestRefreshDataLoads(r, branchNames, mode)
       })
       await runLatestOperation({
         set,
@@ -236,8 +228,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
             applyPullRequestRefreshUnavailable(id, repoInstanceId, branchNames, mode)
             return
           }
-          applyPullRequestRefreshSuccess(id, repoInstanceId, branchNames, entries, requested, clearMissing, mode)
-          if (ctx.isCurrent()) persistRepoSnapshotCacheEntry(set, get().repos[id], repoInstanceId)
+          applyPullRequestRefreshSuccess(id, repoInstanceId, branchNames, mode)
         },
         onStale: (ctx) => {
           applyPullRequestRefreshStale(id, repoInstanceId, branchNames, mode, ctx.operationId)

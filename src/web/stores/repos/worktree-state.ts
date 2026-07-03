@@ -43,7 +43,7 @@ export function worktreeStatesFromBranches(
 
 export function stripBranchWorktreeMetadata(branches: BranchSnapshotInfo[]): RepoBranchState[] {
   return branches.map((branch) => {
-    const { worktree, ...rest } = branch
+    const { worktree, pullRequest: _pullRequest, ...rest } = branch
     if (!worktree) return rest
     return { ...rest, worktree: { path: worktree.path } }
   })

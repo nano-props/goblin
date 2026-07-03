@@ -242,7 +242,6 @@ export interface PullRequestEntry {
 
 export interface PullRequestFetchOptions {
   mode?: PullRequestFetchMode
-  clearMissing?: boolean
 }
 
 export type { RemoteRepoTarget } from '#/shared/remote-repo.ts'

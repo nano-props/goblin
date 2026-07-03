@@ -53,11 +53,9 @@ describe('repo refresh workflows', () => {
         refreshPullRequests: (
           id: string,
           branches?: string[],
-          options?: { repoInstanceId?: string; mode?: string; clearMissing?: boolean },
+          options?: { repoInstanceId?: string; mode?: string },
         ) => {
-          calls.push(
-            `prs:${id}:${branches?.join(',') ?? ''}:${options?.mode ?? ''}:${String(options?.clearMissing ?? false)}:${options?.repoInstanceId ?? ''}`,
-          )
+          calls.push(`prs:${id}:${branches?.join(',') ?? ''}:${options?.mode ?? ''}:${options?.repoInstanceId ?? ''}`)
           return Promise.resolve()
         },
       }) as unknown as ReturnType<ReposGet>
@@ -73,8 +71,8 @@ describe('repo refresh workflows', () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(calls).toEqual([
-      'prs:/repo:feature/a,feature/b:summary:true:repo-instance-test-2',
-      'prs:/repo:feature/a:full:false:repo-instance-test-2',
+      'prs:/repo:feature/a,feature/b:summary:repo-instance-test-2',
+      'prs:/repo:feature/a:full:repo-instance-test-2',
     ])
   })
 
@@ -126,7 +124,7 @@ describe('repo refresh workflows', () => {
         refreshPullRequests: (
           id: string,
           branches?: string[],
-          options?: { repoInstanceId?: string; mode?: string; clearMissing?: boolean },
+          options?: { repoInstanceId?: string; mode?: string },
         ) => {
           calls.push(`prs:${id}:${branches?.join(',') ?? ''}:${options?.mode ?? ''}`)
           return Promise.resolve()
@@ -188,7 +186,7 @@ describe('repo refresh workflows', () => {
         refreshPullRequests: (
           id: string,
           branches?: string[],
-          options?: { repoInstanceId?: string; mode?: string; clearMissing?: boolean },
+          options?: { repoInstanceId?: string; mode?: string },
         ) => {
           calls.push(`prs:${id}:${branches?.join(',') ?? ''}:${options?.mode ?? ''}`)
           return Promise.resolve()

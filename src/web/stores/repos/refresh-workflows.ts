@@ -121,7 +121,6 @@ async function refreshPullRequestSummaryAfterSnapshot(
   await get().refreshPullRequests(options.id, options.branchNames, {
     repoInstanceId: options.repoInstanceId,
     mode: 'summary',
-    clearMissing: true,
   })
 }
 

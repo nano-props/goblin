@@ -48,8 +48,7 @@ export interface OpenRepoPostOpenError {
 }
 
 export type OpenRepoResult =
-  | { ok: true; id: string; postOpenEffects?: Promise<OpenRepoPostOpenError[]> }
-  | { ok: false; message: string }
+  { ok: true; id: string; postOpenEffects?: Promise<OpenRepoPostOpenError[]> } | { ok: false; message: string }
 
 export interface RepoDataState {
   branches: RepoBranchState[]
@@ -239,14 +238,16 @@ interface RuntimeCoherentRepoProjectionActions {
   selectBranch: (id: string, branch: string) => void
   clearSelectedBranch: (id: string) => void
   refreshSnapshot: (id: string, options?: { skipLogBackfill?: boolean; repoInstanceId?: string }) => Promise<void>
-  refreshSnapshotAndStatus: (id: string, options?: { skipLogBackfill?: boolean; repoInstanceId?: string }) => Promise<void>
+  refreshSnapshotAndStatus: (
+    id: string,
+    options?: { skipLogBackfill?: boolean; repoInstanceId?: string },
+  ) => Promise<void>
   refreshPullRequests: (
     id: string,
     branches?: string[],
     options?: {
       repoInstanceId?: string
       mode?: PullRequestFetchMode
-      clearMissing?: boolean
     },
   ) => Promise<void>
   refreshStatus: (id: string, options?: { repoInstanceId?: string }) => Promise<void>
