@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { act } from '@testing-library/react'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { useEffect, useRef } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
@@ -1734,11 +1735,7 @@ describe('TerminalSessionProvider', () => {
     // registration path (no RegisterHost, no probes) so the only
     // preloadTerminalFont call comes from the new useEffect in
     // TerminalSessionProvider itself.
-    const result = renderInJsdom(
-      <TerminalSessionProvider>
-        <span>probe</span>
-      </TerminalSessionProvider>,
-    )
+    const result = renderTerminalProvider(<span>probe</span>)
     try {
       expect(geometryMocks.preloadTerminalFont).toHaveBeenCalledTimes(1)
     } finally {
@@ -1814,11 +1811,7 @@ describe('TerminalSessionProvider', () => {
       }),
     })
 
-    const result = renderInJsdom(
-      <TerminalSessionProvider>
-        <span>probe</span>
-      </TerminalSessionProvider>,
-    )
+    const result = renderTerminalProvider(<span>probe</span>)
     try {
       // No active repo yet → effect's guard skips the prewarm.
       expect(prewarm).not.toHaveBeenCalled()
@@ -1909,11 +1902,7 @@ describe('TerminalSessionProvider', () => {
       }),
     })
 
-    const result = renderInJsdom(
-      <TerminalSessionProvider>
-        <span>probe</span>
-      </TerminalSessionProvider>,
-    )
+    const result = renderTerminalProvider(<span>probe</span>)
     try {
       // visibilitychange:visible → kick
       kickReconnect.mockClear()
@@ -2048,11 +2037,11 @@ async function renderProviderWithHost(): Promise<{
   unmount: () => Promise<void>
 }> {
   let context: TerminalSessionContextValue | null = null
-  const result = renderInJsdom(
-    <TerminalSessionProvider>
+  const result = renderTerminalProvider(
+    <>
       <CaptureContext onContext={(value) => (context = value)} />
       <RegisterHost terminalWorktreeKey={formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH)} />
-    </TerminalSessionProvider>,
+    </>,
   )
   await act(async () => {})
 
@@ -2096,12 +2085,12 @@ async function renderProviderWithProbe(terminalWorktreeKey: string): Promise<{
       phase: string
     }>
   } | null = null
-  const result = renderInJsdom(
-    <TerminalSessionProvider>
+  const result = renderTerminalProvider(
+    <>
       <CaptureContext onContext={(value) => (context = value)} />
       <RegisterHost terminalWorktreeKey={terminalWorktreeKey} />
       <CaptureGroupProbe terminalWorktreeKey={terminalWorktreeKey} onProbe={(value) => (probe = value)} />
-    </TerminalSessionProvider>,
+    </>,
   )
   await act(async () => {})
 
@@ -2120,6 +2109,14 @@ async function renderProviderWithProbe(terminalWorktreeKey: string): Promise<{
       })
     },
   }
+}
+
+function renderTerminalProvider(children: React.ReactNode) {
+  return renderInJsdom(
+    <QueryClientProvider client={primaryWindowQueryClient}>
+      <TerminalSessionProvider>{children}</TerminalSessionProvider>
+    </QueryClientProvider>,
+  )
 }
 
 function RegisterHost({ terminalWorktreeKey }: { terminalWorktreeKey: string }) {
