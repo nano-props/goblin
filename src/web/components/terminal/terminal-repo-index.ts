@@ -13,10 +13,6 @@ export interface TerminalRepoIndexEntry {
   data: ReposStore['repos'][string]['data']
 }
 
-export function repoIndexFromRepos(repos: ReposStore['repos']): TerminalRepoIndex {
-  return repoIndexFromEntries(terminalRepoIndexEntriesFromRepos(repos))
-}
-
 export function useTerminalRepoIndex(): TerminalRepoIndex {
   const entries = useStoreWithEqualityFn(useReposStore, (s) => terminalRepoIndexEntriesFromRepos(s.repos), entriesEqual)
   const snapshotQueries = useQueries({
