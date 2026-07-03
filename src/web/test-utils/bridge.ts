@@ -237,7 +237,7 @@ function defaultWorkspacePaneTabsOperationResult(input: TerminalUpdateWorkspaceT
   switch (input.operation.type) {
     case 'open-static':
       return workspacePaneTabsWithStaticTab(currentTabs, input.operation.tabType, {
-        insertAfterTabType: input.operation.insertAfterTabType,
+        insertAfterIdentity: input.operation.insertAfterIdentity,
       })
     case 'close-static':
       return workspacePaneTabsWithoutStaticTab(currentTabs, input.operation.tabType)

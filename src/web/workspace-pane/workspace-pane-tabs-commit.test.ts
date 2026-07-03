@@ -224,7 +224,7 @@ describe('updateWorkspacePaneTabs', () => {
         expect(input.operation).toEqual({
           type: 'open-static',
           tabType: 'history',
-          insertAfterTabType: 'status',
+          insertAfterIdentity: 'workspace-pane:status',
         })
         return [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')]
       },
@@ -246,7 +246,7 @@ describe('updateWorkspacePaneTabs', () => {
         operation: {
           type: 'open-static',
           tabType: 'history',
-          insertAfterTabType: 'status',
+          insertAfterIdentity: 'workspace-pane:status',
         },
       }),
     ).resolves.toMatchObject({ ok: true })

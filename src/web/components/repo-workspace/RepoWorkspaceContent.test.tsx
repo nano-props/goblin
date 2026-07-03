@@ -844,7 +844,10 @@ describe('RepoWorkspaceContent', () => {
     expect(showRepoWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'terminal')
     expect(createTerminal).toHaveBeenCalledWith(
       { repoRoot: REPO_ID, repoInstanceId: repo.instanceId, branch: branchName, worktreePath },
-      { startupShellCommand: "bat --paging=never --style=plain '/tmp/filetree-open-worktree/README.md'\r" },
+      {
+        startupShellCommand: "bat --paging=never --style=plain '/tmp/filetree-open-worktree/README.md'\r",
+        insertAfterIdentity: 'workspace-pane:files',
+      },
     )
     expect(writeInput).not.toHaveBeenCalled()
 

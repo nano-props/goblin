@@ -212,6 +212,7 @@ class TerminalSessionService {
                       worktreePath: createdSession.worktreePath,
                     },
                     createResult.terminalSessionId,
+                    { insertAfterIdentity: input.insertAfterIdentity ?? null },
                   ),
                   liveTerminalSessionIds,
                 ),
@@ -337,7 +338,7 @@ class TerminalSessionService {
     switch (operation.type) {
       case 'open-static':
         return this.options.workspaceTabs.openStaticTab(target, operation.tabType, {
-          insertAfterTabType: operation.insertAfterTabType,
+          insertAfterIdentity: operation.insertAfterIdentity,
         })
       case 'close-static':
         return this.options.workspaceTabs.closeStaticTab(target, operation.tabType)
@@ -689,15 +690,17 @@ function isValidWorkspacePaneTabsOperation(value: unknown): value is TerminalUpd
     type?: unknown
     tabType?: unknown
     tabIdentities?: unknown
-    insertAfterTabType?: unknown
+    insertAfterIdentity?: unknown
   }
   if (operation.type === 'open-static') {
     return (
       typeof operation.tabType === 'string' &&
       isWorkspacePaneStaticTabType(operation.tabType) &&
-      (operation.insertAfterTabType === undefined ||
-        operation.insertAfterTabType === null ||
-        (typeof operation.insertAfterTabType === 'string' && isWorkspacePaneStaticTabType(operation.insertAfterTabType)))
+      (operation.insertAfterIdentity === undefined ||
+        operation.insertAfterIdentity === null ||
+        (typeof operation.insertAfterIdentity === 'string' &&
+          operation.insertAfterIdentity.length > 0 &&
+          !operation.insertAfterIdentity.includes('\0')))
     )
   }
   if (operation.type === 'close-static') {

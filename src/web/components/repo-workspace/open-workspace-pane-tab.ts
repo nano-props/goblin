@@ -16,7 +16,7 @@ export async function openWorkspacePaneTab(input: {
   branchName?: string
   worktreePath: string | null | undefined
   type: WorkspacePaneStaticTabType
-  insertAfterTabType?: WorkspacePaneStaticTabType
+  insertAfterIdentity?: string | null
   navigation: Pick<PrimaryWindowNavigationActions, 'showRepoBranchWorkspacePaneTab' | 'showRepoWorkspacePaneTab'>
 }): Promise<boolean> {
   const provider = workspacePaneStaticTabProvider(input.type)
@@ -43,13 +43,15 @@ export async function openWorkspacePaneTab(input: {
     const alreadyOpen = readWorkspacePaneTabsForTarget(target).some((entry) => entry.type === input.type)
     const openerIdentity =
       isVisibleTabStrip && !alreadyOpen ? captureWorkspacePaneActiveTabIdentity(input.repoId) : null
+    // Default anchor is the captured opener; callers may override.
+    const insertAfterIdentity = input.insertAfterIdentity ?? openerIdentity
     const committed = await updateWorkspacePaneTabs({
       ...target,
       repoInstanceId: repo.instanceId,
       operation: {
         type: 'open-static',
         tabType: input.type,
-        insertAfterTabType: input.insertAfterTabType,
+        insertAfterIdentity,
       },
     })
     if (!committed.ok) return false

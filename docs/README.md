@@ -20,3 +20,4 @@ Use these docs for app-level product and architecture decisions:
 - `terminal-ephemeral-xterm.md`: current inactive-terminal xterm lifetime model
 - `terminal-takeover.md`: terminal takeover — who controls the cursor (single-user, multi-device, intent-recent, user-scoped)
 - `filetree.md`: worktree-scoped file tree view (server-first, read-only v1)
+- `workspace-tab-opener.md`: workspace pane tab opener model — open-after-opener vs. append, close-back-to-opener

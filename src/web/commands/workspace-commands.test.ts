@@ -272,6 +272,8 @@ describe('workspace commands', () => {
     await runTerminalPrimaryActionCommand({ repoId: REPO_ID, navigation })
 
     expect(preferredWorkspacePaneTab()).toBe('terminal')
+    // "Click the Terminal menu" is a generic entry — no insertion anchor is
+    // passed, so the new terminal appends to the end of the strip.
     expect(createTerminal).toHaveBeenCalledWith({
       repoRoot: REPO_ID,
       repoInstanceId: useReposStore.getState().repos[REPO_ID]!.instanceId,
@@ -408,6 +410,8 @@ describe('workspace commands', () => {
 
     expect(preferredWorkspacePaneTab()).toBe('terminal')
     expect(useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[WORKTREE_KEY]).toBe('session-2')
+    // Cmd+T / File → New Terminal Tab is a generic entry — no insertion
+    // anchor is passed, so the new terminal appends to the end of the strip.
     expect(createTerminal).toHaveBeenCalledWith({
       repoRoot: REPO_ID,
       repoInstanceId: useReposStore.getState().repos[REPO_ID]!.instanceId,
@@ -1164,8 +1168,10 @@ describe('workspace commands', () => {
 
   test('close workspace tab command reactivates the tab that opened a static tab, chrome-style', async () => {
     // [status, changes, files] with "status" active. Opening "history" from
-    // "status" appends it at the end, so its spatial neighbor on close would
-    // be "files" — but its opener ("status") should win instead.
+    // "status" inserts it immediately after the captured opener ("status"),
+    // not at the end — so the strip becomes [status, history, changes, files].
+    // The close-time reactivation behavior is unchanged: closing history
+    // returns focus to its opener ("status"), not the spatial neighbour.
     seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -1181,7 +1187,7 @@ describe('workspace commands', () => {
     const navigation = navigationWith({ showRepoWorkspacePaneTab })
 
     expect(await runShowWorkspacePaneTabCommand({ repoId: REPO_ID, tab: 'history', navigation })).toBe(true)
-    expect(openTabsFor('feature/worktree')).toEqual(['status', 'changes', 'files', 'history'])
+    expect(openTabsFor('feature/worktree')).toEqual(['status', 'history', 'changes', 'files'])
     expect(preferredWorkspacePaneTab()).toBe('history')
 
     expect(await runCloseWorkspacePaneTabCommand({ repoId: REPO_ID, navigation })).toBe(true)
