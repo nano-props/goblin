@@ -105,8 +105,7 @@ export function RepoWorkspace({
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-background">
       {detail.branch ? (
-        <BranchShortcutHandler
-          key={`${repo.id}:${detail.branch.name}`}
+        <BranchActionWorkspacePane
           repo={repo}
           detail={detail}
           branch={detail.branch}
@@ -163,7 +162,7 @@ function RepoWorkspacePane({
   )
 }
 
-interface BranchShortcutHandlerProps {
+interface BranchActionWorkspacePaneProps {
   repo: RepoWorkspaceRepo
   detail: SelectedRepoWorkspacePresentation
   branch: NonNullable<SelectedRepoWorkspacePresentation['branch']>
@@ -172,14 +171,14 @@ interface BranchShortcutHandlerProps {
   toolbarTrafficLightOffset?: boolean
 }
 
-function BranchShortcutHandler({
+function BranchActionWorkspacePane({
   repo,
   detail,
   branch,
   workspacePaneId,
   shortcutsEnabled,
   toolbarTrafficLightOffset = false,
-}: BranchShortcutHandlerProps) {
+}: BranchActionWorkspacePaneProps) {
   const branchActions = useBranchActions(repo, branch)
   const actions = useBranchActionItems(repo, branch, branchActions)
   useBranchActionShortcutRegistry(actions, shortcutsEnabled)

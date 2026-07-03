@@ -20,6 +20,7 @@ import {
   isBranchActionBlocked,
   type BranchActionItemId,
 } from '#/web/hooks/branch-action-state.ts'
+import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 
 export type { BranchActionItemId } from '#/web/hooks/branch-action-state.ts'
 
@@ -87,11 +88,16 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
   const runBranchAction = useReposStore((s) => s.runBranchAction)
   const branchActionBusy = isBranchActionBlocked(repo)
   const branchBusyAction = branchActionBusyItemId(repo, branch.name)
+  const localActionScopeKey = workspacePaneTabsTargetIdentityKey({
+    repoRoot: repo.id,
+    branchName: branch.name,
+    worktreePath: branch.worktree?.path ?? null,
+  })
   const {
     pending: pendingLocalAction,
     hasPending: hasPendingLocalAction,
     run: runPendingLocalAction,
-  } = useAsyncPending<BranchUiActionOpId>()
+  } = useAsyncPending<BranchUiActionOpId>({ resetKey: localActionScopeKey })
 
   function guardBusy(): boolean {
     return branchActionBusy || hasPendingLocalAction()

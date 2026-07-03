@@ -8,6 +8,7 @@ import {
   type ComponentPropsWithoutRef,
   type Ref,
   type RefObject,
+  type UIEventHandler,
 } from 'react'
 import { Button } from '#/web/components/ui/button.tsx'
 import { cn } from '#/web/lib/cn.ts'
@@ -55,6 +56,7 @@ type WorkspacePaneT = (key: string, params?: Record<string, string | number>) =>
 
 interface WorkspacePaneTabStripProps {
   terminalWorktreeKey: string | null
+  workspacePaneTabTargetKey: string
   items: WorkspacePaneTabItem[]
   workspacePaneId: string
   responsiveCompact?: boolean
@@ -76,11 +78,50 @@ interface WorkspacePaneTabStripProps {
 export const EMPTY_WORKSPACE_PANE_TAB_FOCUS_KEY = '__workspace-pane-empty__'
 
 const WORKSPACE_PANE_TAB_TOOLTIP_SELECTOR = '[data-workspace-pane-tab-tooltip-id]'
+const WORKSPACE_PANE_TAB_SCROLL_TARGET_SELECTOR = '[data-workspace-pane-tab-scroll-target]'
 // Virtual right-edge for the compact tab's separator computation. The popover
 // trigger that follows the tab is the only real DOM node on that side, but it
 // doesn't report hover state, so we use this sentinel identity instead.
 const WORKSPACE_PANE_COMPACT_TRAILING_ACTION_ID = '__workspace-pane-compact-trailing-action__'
 const WORKSPACE_PANE_NEW_ACTION_ID = '__workspace-pane-new-action__'
+
+function resolveWorkspacePaneTabAutoScroll({
+  activeTabIdentity,
+  previousTargetKey,
+  currentTargetKey,
+  awaitingTargetBaseline,
+  lastScrolledActiveIdentity,
+}: {
+  activeTabIdentity: string | null
+  previousTargetKey: string | null
+  currentTargetKey: string
+  awaitingTargetBaseline: boolean
+  lastScrolledActiveIdentity: string | null
+}): { shouldScroll: boolean; nextScrolledActiveIdentity: string | null; nextAwaitingTargetBaseline: boolean } {
+  const targetChanged = previousTargetKey !== null && previousTargetKey !== currentTargetKey
+  if (!activeTabIdentity) {
+    return {
+      shouldScroll: false,
+      nextScrolledActiveIdentity: null,
+      nextAwaitingTargetBaseline: awaitingTargetBaseline || targetChanged,
+    }
+  }
+  if (targetChanged || awaitingTargetBaseline) {
+    return {
+      shouldScroll: false,
+      nextScrolledActiveIdentity: activeTabIdentity,
+      nextAwaitingTargetBaseline: false,
+    }
+  }
+  if (lastScrolledActiveIdentity === activeTabIdentity) {
+    return {
+      shouldScroll: false,
+      nextScrolledActiveIdentity: lastScrolledActiveIdentity,
+      nextAwaitingTargetBaseline: false,
+    }
+  }
+  return { shouldScroll: true, nextScrolledActiveIdentity: activeTabIdentity, nextAwaitingTargetBaseline: false }
+}
 
 function shouldShowWorkspacePaneTabSeparator({
   leftId,
@@ -113,32 +154,139 @@ function usePrefersReducedMotion() {
   return prefersReducedMotion
 }
 
-function useScrollActiveWorkspacePaneTabIntoView({
+function useWorkspacePaneTabStripAutoScroll({
+  workspacePaneTabTargetKey,
   activeTabIdentity,
   items,
   enabled,
+  viewportRef,
+  newButtonRef,
+  scrollBehavior,
   getTabElement,
 }: {
+  workspacePaneTabTargetKey: string
   activeTabIdentity: string | null
   items: readonly WorkspacePaneTabItem[]
   enabled: boolean
+  viewportRef: RefObject<HTMLDivElement | null>
+  newButtonRef: RefObject<HTMLButtonElement | null>
+  scrollBehavior: ScrollBehavior
   getTabElement: (identity: string) => HTMLButtonElement | null
 }) {
-  const prefersReducedMotion = usePrefersReducedMotion()
   const activeRenderableTabIdentity = activeTabIdentity
     ? (items.find((item) => item.identity === activeTabIdentity && !isPendingWorkspacePaneTabItem(item))?.identity ?? null)
     : null
+  const lastRenderableTabIdentity =
+    items
+      .filter((item) => !isPendingWorkspacePaneTabItem(item))
+      .at(-1)?.identity ?? null
+  const lastScrolledActiveIdentityRef = useRef<string | null>(null)
+  const lastWorkspacePaneTabTargetKeyRef = useRef<string | null>(null)
+  const awaitingTargetBaselineRef = useRef(false)
 
   useLayoutEffect(() => {
-    if (!enabled || !activeRenderableTabIdentity) return
-    const tab = getTabElement(activeRenderableTabIdentity)
-    if (!tab || typeof tab.scrollIntoView !== 'function') return
-    tab.scrollIntoView({
-      inline: 'nearest',
-      block: 'nearest',
-      behavior: prefersReducedMotion ? 'auto' : 'smooth',
+    const previousWorkspacePaneTabTargetKey = lastWorkspacePaneTabTargetKeyRef.current
+    lastWorkspacePaneTabTargetKeyRef.current = workspacePaneTabTargetKey
+    const autoScroll = resolveWorkspacePaneTabAutoScroll({
+      activeTabIdentity: enabled ? activeRenderableTabIdentity : null,
+      previousTargetKey: previousWorkspacePaneTabTargetKey,
+      currentTargetKey: workspacePaneTabTargetKey,
+      awaitingTargetBaseline: awaitingTargetBaselineRef.current,
+      lastScrolledActiveIdentity: lastScrolledActiveIdentityRef.current,
     })
-  }, [activeRenderableTabIdentity, enabled, getTabElement, prefersReducedMotion])
+    awaitingTargetBaselineRef.current = autoScroll.nextAwaitingTargetBaseline
+
+    if (!autoScroll.shouldScroll) {
+      lastScrolledActiveIdentityRef.current = autoScroll.nextScrolledActiveIdentity
+      return
+    }
+    const viewport = viewportRef.current
+    const tab = activeRenderableTabIdentity ? getTabElement(activeRenderableTabIdentity) : null
+    if (!viewport || !tab) return
+    lastScrolledActiveIdentityRef.current = autoScroll.nextScrolledActiveIdentity
+    const tabScrollTarget = workspacePaneTabScrollTarget(tab)
+    const target =
+      activeRenderableTabIdentity === lastRenderableTabIdentity && newButtonRef.current
+        ? newButtonRef.current
+        : tabScrollTarget
+    scrollWorkspacePaneTabTargetIntoView({
+      viewport,
+      target,
+      behavior: scrollBehavior,
+    })
+  }, [
+    activeRenderableTabIdentity,
+    enabled,
+    getTabElement,
+    lastRenderableTabIdentity,
+    newButtonRef,
+    scrollBehavior,
+    workspacePaneTabTargetKey,
+    viewportRef,
+  ])
+}
+
+function useWorkspacePaneTabStripScrollMemory({
+  workspacePaneTabTargetKey,
+  enabled,
+  viewportRef,
+}: {
+  workspacePaneTabTargetKey: string
+  enabled: boolean
+  viewportRef: RefObject<HTMLDivElement | null>
+}): UIEventHandler<HTMLDivElement> {
+  // This is ephemeral UI memory, not persisted workspace state. A single
+  // viewport is reused across branch/worktree tab targets, and browsers can
+  // clamp that viewport's scrollLeft when the rendered tab content changes.
+  // Remembering scrollLeft per tab target lets each target restore its last
+  // horizontal position without making the strip a controlled scroll component.
+  const scrollPositionsRef = useRef(new Map<string, number>())
+  const activeWorkspacePaneTabTargetKeyRef = useRef(workspacePaneTabTargetKey)
+
+  const handleScroll = useCallback<UIEventHandler<HTMLDivElement>>(
+    (event) => {
+      scrollPositionsRef.current.set(workspacePaneTabTargetKey, event.currentTarget.scrollLeft)
+    },
+    [workspacePaneTabTargetKey],
+  )
+
+  useLayoutEffect(() => {
+    if (!enabled) return
+    const viewport = viewportRef.current
+    if (!viewport) return
+    const previousWorkspacePaneTabTargetKey = activeWorkspacePaneTabTargetKeyRef.current
+    if (previousWorkspacePaneTabTargetKey === workspacePaneTabTargetKey) return
+
+    if (!scrollPositionsRef.current.has(previousWorkspacePaneTabTargetKey)) {
+      scrollPositionsRef.current.set(previousWorkspacePaneTabTargetKey, viewport.scrollLeft)
+    }
+    activeWorkspacePaneTabTargetKeyRef.current = workspacePaneTabTargetKey
+    viewport.scrollLeft = scrollPositionsRef.current.get(workspacePaneTabTargetKey) ?? 0
+  }, [enabled, workspacePaneTabTargetKey, viewportRef])
+
+  return handleScroll
+}
+
+function scrollWorkspacePaneTabTargetIntoView({
+  viewport,
+  target,
+  behavior,
+}: {
+  viewport: HTMLDivElement
+  target: HTMLElement
+  behavior: ScrollBehavior
+}) {
+  const viewportRect = viewport.getBoundingClientRect()
+  const targetRect = target.getBoundingClientRect()
+  const inline = targetRect.left < viewportRect.left ? 'start' : targetRect.right > viewportRect.right ? 'end' : null
+
+  if (!inline) return
+
+  target.scrollIntoView({ inline, block: 'nearest', behavior })
+}
+
+function workspacePaneTabScrollTarget(tab: HTMLButtonElement): HTMLElement {
+  return tab.closest<HTMLElement>(WORKSPACE_PANE_TAB_SCROLL_TARGET_SELECTOR) ?? tab
 }
 
 function useDeferredWorkspacePaneTabFocus({
@@ -346,6 +494,7 @@ function WorkspacePaneTabSwitcherPopover({
 
 export function WorkspacePaneTabStrip({
   terminalWorktreeKey,
+  workspacePaneTabTargetKey,
   items,
   workspacePaneId,
   activeTabIdentity,
@@ -380,6 +529,8 @@ export function WorkspacePaneTabStrip({
   const focusRegistry = externalFocusRegistry ?? internalFocusRegistry
   const viewportRef = useRef<HTMLDivElement>(null)
   const newButtonRef = useRef<HTMLButtonElement>(null)
+  const prefersReducedMotion = usePrefersReducedMotion()
+  const scrollBehavior: ScrollBehavior = prefersReducedMotion ? 'auto' : 'smooth'
   const [hoveredTabIdentity, setHoveredTabIdentity] = useState<string | null>(null)
   const requestFocusAfterRender = useDeferredWorkspacePaneTabFocus({ items, focusRegistry })
   const tabDnd = useWorkspacePaneTabDnd({
@@ -387,11 +538,34 @@ export function WorkspacePaneTabStrip({
     newButtonRef,
     onReorder,
   })
+  const scrollNewButtonIntoView = useCallback(() => {
+    const viewport = viewportRef.current
+    const target = newButtonRef.current
+    if (!viewport || !target) return
+    scrollWorkspacePaneTabTargetIntoView({
+      viewport,
+      target,
+      behavior: scrollBehavior,
+    })
+  }, [scrollBehavior])
+  const handleNew = useCallback(() => {
+    scrollNewButtonIntoView()
+    onNew()
+  }, [onNew, scrollNewButtonIntoView])
+  const handleViewportScroll = useWorkspacePaneTabStripScrollMemory({
+    workspacePaneTabTargetKey,
+    enabled: !collapseToSelectedTab,
+    viewportRef,
+  })
 
-  useScrollActiveWorkspacePaneTabIntoView({
+  useWorkspacePaneTabStripAutoScroll({
+    workspacePaneTabTargetKey,
     activeTabIdentity,
     items,
     enabled: !collapseToSelectedTab,
+    viewportRef,
+    newButtonRef,
+    scrollBehavior,
     getTabElement: focusRegistry.getRef,
   })
 
@@ -524,7 +698,7 @@ export function WorkspacePaneTabStrip({
       <WorkspacePaneNewButton
         ref={focusRegistry.setRef(emptyFocusKey)}
         id={`${workspacePaneId}-workspace-pane-tab-empty`}
-        onClick={onNew}
+        onClick={handleNew}
         busy={newTerminalBusy}
         t={t}
       />
@@ -541,7 +715,7 @@ export function WorkspacePaneTabStrip({
           workspacePaneId={workspacePaneId}
           context={tabBodyContext}
           canCreateNew={canCreateNew}
-          onNew={onNew}
+          onNew={handleNew}
         />
       }
       scrollContent={
@@ -549,7 +723,7 @@ export function WorkspacePaneTabStrip({
           items={items}
           context={tabBodyContext}
           canCreateNew={canCreateNew}
-          onNew={onNew}
+          onNew={handleNew}
           newTerminalBusy={newTerminalBusy}
           newButtonRef={newButtonRef}
           workspacePaneId={workspacePaneId}
@@ -557,6 +731,7 @@ export function WorkspacePaneTabStrip({
         />
       }
       viewportRef={viewportRef}
+      viewportOnScroll={handleViewportScroll}
     />
   )
 }
@@ -874,6 +1049,7 @@ function WorkspacePaneTabChrome({
       containerProps={{
         ...containerProps,
         'data-workspace-pane-tab-tooltip-id': item.identity,
+        'data-workspace-pane-tab-scroll-target': '',
         'data-workspace-pane-pending-tab': isPendingWorkspacePaneTabItem(item) ? item.type : undefined,
         onPointerEnter: (event) => {
           containerProps?.onPointerEnter?.(event)

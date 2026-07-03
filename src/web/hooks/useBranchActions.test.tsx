@@ -8,6 +8,7 @@ import { useBranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { openBranchExternalTarget } from '#/web/hooks/openBranchExternalTarget.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 import { createPullRequest, createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import type { ExecResult } from '#/web/types.ts'
 
 const mocks = vi.hoisted(() => ({
   openRepoEditor: vi.fn(),
@@ -217,6 +218,58 @@ describe('useBranchActions', () => {
 
     expect(mocks.openRepoInFinder).toHaveBeenCalledWith('/tmp/local-feature')
   })
+
+  test('clears local pending state when the branch action target changes', async () => {
+    const firstOpen = deferred<ExecResult>()
+    const branchA = createRepoBranch('feature/a', { worktree: { path: '/tmp/local-feature-a' } })
+    const branchB = createRepoBranch('feature/b', { worktree: { path: '/tmp/local-feature-b' } })
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branches: [branchA, branchB],
+    })
+    mocks.openRepoTerminal.mockReturnValue(firstOpen.promise)
+
+    const surfaceRef: { current: ReturnType<typeof useBranchActions> | null } = { current: null }
+    const view = renderInJsdom(
+      <BranchActionsSurfaceHarness
+        repo={repo}
+        branchIndex={0}
+        onReady={(value) => {
+          surfaceRef.current = value
+        }}
+      />,
+    )
+
+    act(() => {
+      void surfaceRef.current?.actions.openTerminal?.('ghostty')
+    })
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    expect(surfaceRef.current?.busyAction).toBe('terminal')
+    expect(surfaceRef.current?.blocked).toBe(true)
+
+    act(() => {
+      view.rerender(
+        <BranchActionsSurfaceHarness
+          repo={repo}
+          branchIndex={1}
+          onReady={(value) => {
+            surfaceRef.current = value
+          }}
+        />,
+      )
+    })
+
+    expect(surfaceRef.current?.busyAction).toBeNull()
+    expect(surfaceRef.current?.blocked).toBe(false)
+
+    await act(async () => {
+      firstOpen.resolve({ ok: true, message: '' })
+      await firstOpen.promise
+    })
+  })
 })
 
 function BranchActionsHarness({
@@ -232,4 +285,31 @@ function BranchActionsHarness({
     onReady(actions)
   }, [actions, onReady])
   return null
+}
+
+function BranchActionsSurfaceHarness({
+  repo,
+  branchIndex,
+  onReady,
+}: {
+  repo: ReturnType<typeof seedRepoState>
+  branchIndex: number
+  onReady: (surface: ReturnType<typeof useBranchActions>) => void
+}) {
+  const branch = repo.data.branches[branchIndex]!
+  const surface = useBranchActions(repo, branch)
+  React.useEffect(() => {
+    onReady(surface)
+  }, [surface, onReady])
+  return null
+}
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve
+    reject = promiseReject
+  })
+  return { promise, resolve, reject }
 }

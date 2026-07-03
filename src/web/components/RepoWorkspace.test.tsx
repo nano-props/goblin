@@ -18,8 +18,9 @@ import {
   type PrimaryWindowNavigationActions,
 } from '#/web/primary-window-navigation.tsx'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
-import { resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 
 const REPO_ID = '/tmp/repo-workspace-container-repo'
 
@@ -104,4 +105,83 @@ describe('RepoWorkspace', () => {
     }).not.toThrow()
     expect(screen.getByText('branches.empty')).toBeTruthy()
   })
+
+  test('keeps the workspace tab strip mounted and restores scroll position by branch', () => {
+    const branchA = createRepoBranch('feature/a', { worktree: { path: '/tmp/repo-workspace-container-repo-a' } })
+    const branchB = createRepoBranch('feature/b', { worktree: { path: '/tmp/repo-workspace-container-repo-b' } })
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branches: [branchA, branchB],
+      selectedBranch: 'feature/a',
+      preferredWorkspacePaneTab: 'status',
+      statusLoaded: true,
+      workspacePaneTabsByBranch: {
+        'feature/a': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
+        'feature/b': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
+      },
+    })
+    const { container } = render(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={navigation}>
+          <TerminalSessionContext value={terminalCommandContext}>
+            <TerminalSessionReadContext value={terminalReadContext}>
+              <RepoWorkspace repoId={REPO_ID} />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+    const viewport = scrollViewport(container)
+    act(() => {
+      viewport.scrollLeft = 120
+      viewport.dispatchEvent(new Event('scroll', { bubbles: true }))
+    })
+
+    act(() => {
+      seedRepoState({
+        id: REPO_ID,
+        instanceId: repo.instanceId,
+        branches: [branchA, branchB],
+        selectedBranch: 'feature/b',
+        preferredWorkspacePaneTab: 'status',
+        statusLoaded: true,
+        workspacePaneTabsByBranch: {
+          'feature/a': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
+          'feature/b': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
+        },
+      })
+    })
+
+    expect(scrollViewport(container)).toBe(viewport)
+    expect(viewport.scrollLeft).toBe(0)
+
+    act(() => {
+      viewport.scrollLeft = 40
+      viewport.dispatchEvent(new Event('scroll', { bubbles: true }))
+    })
+
+    act(() => {
+      seedRepoState({
+        id: REPO_ID,
+        instanceId: repo.instanceId,
+        branches: [branchA, branchB],
+        selectedBranch: 'feature/a',
+        preferredWorkspacePaneTab: 'status',
+        statusLoaded: true,
+        workspacePaneTabsByBranch: {
+          'feature/a': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
+          'feature/b': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
+        },
+      })
+    })
+
+    expect(scrollViewport(container)).toBe(viewport)
+    expect(viewport.scrollLeft).toBe(120)
+  })
 })
+
+function scrollViewport(container: HTMLElement): HTMLDivElement {
+  const viewport = container.querySelector<HTMLDivElement>('[data-radix-scroll-area-viewport]')
+  if (!viewport) throw new Error('missing workspace tab strip scroll viewport')
+  return viewport
+}
