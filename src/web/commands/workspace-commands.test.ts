@@ -41,6 +41,8 @@ import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneStaticTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 
 const toastMocks = vi.hoisted(() => ({
   error: vi.fn(),
@@ -57,6 +59,7 @@ const WORKTREE_PATH = '/tmp/gbl-workspace-command-worktree'
 const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
 
 beforeEach(() => {
+  primaryWindowQueryClient.clear()
   resetReposStore()
   installWorkspacePaneTabsTestBridge()
   resetTerminalActionDialogsStore()
@@ -153,6 +156,35 @@ describe('workspace commands', () => {
     await expect(runShowWorkspacePaneTabCommand({ repoId: REPO_ID, tab: 'changes', navigation })).resolves.toBe(true)
     expect(preferredWorkspacePaneTab()).toBe('changes')
     expect(openTabsFor('feature/worktree')).toEqual(['changes'])
+  })
+
+  test('show workspace pane tab command resolves the selected branch from the React Query snapshot cache', async () => {
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branches: [],
+      selectedBranch: 'feature/query',
+      preferredWorkspacePaneTab: 'status',
+    })
+    setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
+      current: 'feature/query',
+      branches: [createRepoBranch('feature/query', { worktree: { path: WORKTREE_PATH } })],
+    })
+    const showRepoBranchWorkspacePaneTab = vi.fn()
+    const navigation = navigationWith({ showRepoBranchWorkspacePaneTab })
+
+    await expect(runShowWorkspacePaneTabCommand({ repoId: REPO_ID, tab: 'changes', navigation })).resolves.toBe(true)
+
+    expect(
+      workspacePaneStaticTabsFromEntries(
+        readWorkspacePaneTabsForTarget({
+          repoRoot: REPO_ID,
+          repoInstanceId: repo.instanceId,
+          branchName: 'feature/query',
+          worktreePath: WORKTREE_PATH,
+        }),
+      ),
+    ).toEqual(['status', 'changes'])
+    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/query', 'changes')
   })
 
   test.each(['status', 'changes'] as const)(
