@@ -835,6 +835,14 @@ describe('RepoWorkspaceContent', () => {
       row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
       await Promise.resolve()
     })
+    const actionButton = row.querySelector<HTMLButtonElement>('[data-action-popover-trigger]')
+    expect(actionButton?.getAttribute('aria-busy')).toBe('true')
+    expect(actionButton?.querySelector('svg.animate-spin')).toBeTruthy()
+    await act(async () => {
+      row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+      await Promise.resolve()
+    })
+    expect(filetreeClientMocks.getRepositoryFileViewer).toHaveBeenCalledTimes(1)
     useReposStore.getState().setWorkspacePaneTab(REPO_ID, 'status')
     await act(async () => {
       resolveViewer({ viewer: 'bat', shell: 'posix' })

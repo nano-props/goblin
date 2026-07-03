@@ -1,5 +1,5 @@
 import { FolderTree } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Key } from 'react-aria-components'
 import { toast } from 'sonner'
 import { useT } from '#/web/stores/i18n.ts'
@@ -189,6 +189,19 @@ function FiletreeTab({
     () => useFiletreeInteractionStore.getState().interactionByScope[interactionScopeKey]?.topVisibleRowIndex ?? 0,
     [interactionScopeKey],
   )
+  const {
+    pendingKeys: pendingOpeningFileKeys,
+    beginPending: beginOpeningFile,
+    endPending: endOpeningFile,
+  } = usePendingKeySet()
+  const openingFileKeyPrefix = useMemo(() => `${interactionScopeKey}\0`, [interactionScopeKey])
+  const openingFileKeys = useMemo(() => {
+    const keys = new Set<string>()
+    for (const key of pendingOpeningFileKeys) {
+      if (key.startsWith(openingFileKeyPrefix)) keys.add(key.slice(openingFileKeyPrefix.length))
+    }
+    return keys
+  }, [openingFileKeyPrefix, pendingOpeningFileKeys])
   const selectedKeys = useMemo(() => new Set<Key>(selectedKeyList), [selectedKeyList])
   const expandedKeys = useMemo(() => new Set<Key>(expandedKeyList), [expandedKeyList])
   const scrollRestoreReady = useMemo(
@@ -228,26 +241,44 @@ function FiletreeTab({
   const openFileInTerminal = useCallback(
     async (node: RepoTreeNode) => {
       if (node.kind !== 'file') return
-      const openerIdentity = captureWorkspacePaneActiveTabIdentity(repoId)
-      const viewerResult = await getRepositoryFileViewer(repoId, worktreePath).catch(() => ({
-        viewer: 'cat' as const,
-        shell: 'posix' as const,
-      }))
-      await runCreateTerminalTabCommand({
-        base: { repoRoot: repoId, repoInstanceId, branch: branchName, worktreePath },
-        createTerminal,
-        createOwnedTerminal,
-        openerIdentity,
-        enterTerminalTab: () => navigation.showRepoWorkspacePaneTab(repoId, 'terminal'),
-        options: {
-          startupShellCommand: fileReadCommand(viewerResult, absoluteFilePathForTerminal(worktreePath, node.path)),
-          insertAfterIdentity: openerIdentity,
-        },
-        t,
-        logMessage: 'filetree open file terminal create failed',
-      })
+      const openingFileKey = `${openingFileKeyPrefix}${node.id}`
+      if (!beginOpeningFile(openingFileKey)) return
+      try {
+        const openerIdentity = captureWorkspacePaneActiveTabIdentity(repoId)
+        const viewerResult = await getRepositoryFileViewer(repoId, worktreePath).catch(() => ({
+          viewer: 'cat' as const,
+          shell: 'posix' as const,
+        }))
+        await runCreateTerminalTabCommand({
+          base: { repoRoot: repoId, repoInstanceId, branch: branchName, worktreePath },
+          createTerminal,
+          createOwnedTerminal,
+          openerIdentity,
+          enterTerminalTab: () => navigation.showRepoWorkspacePaneTab(repoId, 'terminal'),
+          options: {
+            startupShellCommand: fileReadCommand(viewerResult, absoluteFilePathForTerminal(worktreePath, node.path)),
+            insertAfterIdentity: openerIdentity,
+          },
+          t,
+          logMessage: 'filetree open file terminal create failed',
+        })
+      } finally {
+        endOpeningFile(openingFileKey)
+      }
     },
-    [branchName, createOwnedTerminal, createTerminal, navigation, repoId, repoInstanceId, t, worktreePath],
+    [
+      beginOpeningFile,
+      branchName,
+      createOwnedTerminal,
+      createTerminal,
+      endOpeningFile,
+      openingFileKeyPrefix,
+      navigation,
+      repoId,
+      repoInstanceId,
+      t,
+      worktreePath,
+    ],
   )
 
   const requestTrashFile = useCallback(
@@ -263,6 +294,7 @@ function FiletreeTab({
       tree={result.tree}
       loading={result.loading}
       loadingKeys={result.loadingKeys}
+      openingFileKeys={openingFileKeys}
       error={result.error}
       selectedKeys={selectedKeys}
       expandedKeys={expandedKeys}
@@ -285,6 +317,30 @@ function FiletreeTab({
 
 function stringKeysFromReactAriaKeys(keys: ReadonlySet<Key>): string[] {
   return Array.from(keys).filter((key): key is string => typeof key === 'string')
+}
+
+function usePendingKeySet() {
+  const pendingKeysRef = useRef<ReadonlySet<string>>(new Set())
+  const [pendingKeys, setPendingKeys] = useState<ReadonlySet<string>>(() => new Set())
+
+  const beginPending = useCallback((key: string): boolean => {
+    if (pendingKeysRef.current.has(key)) return false
+    const next = new Set(pendingKeysRef.current)
+    next.add(key)
+    pendingKeysRef.current = next
+    setPendingKeys(next)
+    return true
+  }, [])
+
+  const endPending = useCallback((key: string): void => {
+    if (!pendingKeysRef.current.has(key)) return
+    const next = new Set(pendingKeysRef.current)
+    next.delete(key)
+    pendingKeysRef.current = next
+    setPendingKeys(next)
+  }, [])
+
+  return { pendingKeys, beginPending, endPending }
 }
 
 function BranchTabPanel({ id, labelledById, label, busy = false, children }: TabPanelProps) {

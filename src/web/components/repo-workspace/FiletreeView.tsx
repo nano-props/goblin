@@ -31,6 +31,7 @@ export interface FiletreeViewProps {
   readonly tree: LazyRepoTreeAggregate | null
   readonly loading: boolean
   readonly loadingKeys?: ReadonlySet<string>
+  readonly openingFileKeys?: ReadonlySet<string>
   readonly error: string | null
   readonly onSelect?: (node: RepoTreeNode) => void
   readonly onActivate?: (node: RepoTreeNode) => void
@@ -101,6 +102,7 @@ export function FiletreeView({
   tree,
   loading,
   loadingKeys = new Set(),
+  openingFileKeys = new Set(),
   error,
   onSelect,
   onActivate,
@@ -287,6 +289,7 @@ export function FiletreeView({
                 isSelected={selectedKeys.has(row.id)}
                 isTabbable={virtualRow.index === tabbableIndex}
                 isLoading={loadingKeys.has(row.id)}
+                isOpeningFile={openingFileKeys.has(row.id)}
                 virtualStart={virtualRow.start}
                 onKeyDown={handleRowKeyDown}
                 onRowClick={handleRowPress}
@@ -324,6 +327,7 @@ function FiletreeTreeRow({
   isSelected,
   isTabbable,
   isLoading,
+  isOpeningFile,
   virtualStart,
   onKeyDown,
   onRowClick,
@@ -339,6 +343,7 @@ function FiletreeTreeRow({
   readonly isSelected: boolean
   readonly isTabbable: boolean
   readonly isLoading: boolean
+  readonly isOpeningFile: boolean
   readonly virtualStart: number
   readonly onKeyDown: (node: RepoTreeNode, event: KeyboardEvent<HTMLDivElement>) => void
   readonly onRowClick: (node: RepoTreeNode, isExpanded: boolean) => void
@@ -410,6 +415,7 @@ function FiletreeTreeRow({
         {!isDirectory ? (
           <FiletreeActionMenu
             node={node}
+            busy={isOpeningFile}
             onOpenFile={(target) => {
               onSelect(target)
               onOpenFile(target)
@@ -448,24 +454,28 @@ function handleItemDoubleClick(
 
 function FiletreeActionMenu({
   node,
+  busy,
   onOpenFile,
   onRequestTrashFile,
 }: {
   readonly node: RepoTreeNode
+  readonly busy: boolean
   readonly onOpenFile: (node: RepoTreeNode) => void
   readonly onRequestTrashFile?: (node: RepoTreeNode) => void
 }) {
   const t = useT()
   const [open, setOpen] = useState(false)
   // Compact UI has no hover affordance, so pin the trigger visible.
-  // While the popover is open, keep the trigger visible above it.
-  const alwaysVisible = useIsCompactUi() || open
+  // While the popover is open or the row is busy, keep the trigger visible
+  // so progress stays anchored to the action the user just triggered.
+  const alwaysVisible = useIsCompactUi() || open || busy
 
   return (
     <ActionPopover
       label={t(FILE_TREE_I18N_KEYS.actionMenu)}
       open={open}
       onOpenChange={setOpen}
+      busy={busy}
       triggerClassName={cn(
         'ml-auto size-5 shrink-0 p-0 transition-opacity duration-100',
         alwaysVisible && 'opacity-100',
@@ -479,6 +489,8 @@ function FiletreeActionMenu({
             <div role="listitem">
               <ActionPopoverItem
                 label={t(FILE_TREE_I18N_KEYS.open)}
+                disabled={busy}
+                busy={busy}
                 onSelect={() => {
                   close()
                   onOpenFile(node)

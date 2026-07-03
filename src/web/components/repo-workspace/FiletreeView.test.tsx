@@ -358,6 +358,31 @@ describe('FiletreeView', () => {
     expect(actionButton?.className).not.toContain('group-hover/filetree-row:opacity-100')
   })
 
+  test('keeps the file action menu trigger visible and busy while opening the file', async () => {
+    const user = userEvent.setup()
+    const tree: RepoTreeResult = { nodes: [fileNode('README.md')], truncated: false }
+    renderView({
+      tree,
+      loading: false,
+      openingFileKeys: new Set(['README.md']),
+      error: null,
+    })
+
+    const actionButton = row('README.md').querySelector<HTMLButtonElement>('[data-action-popover-trigger]')
+    expect(actionButton).toBeTruthy()
+    expect(actionButton?.getAttribute('aria-busy')).toBe('true')
+    expect(actionButton?.className).toContain('opacity-100')
+    expect(actionButton?.querySelector('svg.animate-spin')).toBeTruthy()
+
+    await user.click(actionButton!)
+
+    const openItem = Array.from(document.body.querySelectorAll<HTMLButtonElement>('button')).find(
+      (button) => button.textContent === 'app-chrome.open',
+    )
+    expect(openItem?.disabled).toBe(true)
+    expect(openItem?.querySelector('svg.animate-spin')).toBeTruthy()
+  })
+
   test('opens a file on double click', async () => {
     const user = userEvent.setup()
     const onOpenFile = vi.fn()
