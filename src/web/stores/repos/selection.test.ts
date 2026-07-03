@@ -23,6 +23,8 @@ import { DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 const REPO_ID = '/tmp/gbl-selection-test-repo'
 const ipcHandlers: Record<string, (input: any) => unknown> = {}
 
@@ -112,6 +114,7 @@ function stubRefreshActions(
 }
 
 beforeEach(() => {
+  primaryWindowQueryClient.clear()
   for (const key of Object.keys(ipcHandlers)) delete ipcHandlers[key]
   resetReposStore()
   installGoblinTestBridge(ipcHandlers)
@@ -151,6 +154,22 @@ describe('setBranchViewMode', () => {
     expect(repo?.ui.branchViewMode).toBe('worktrees')
     expect(repo?.ui.selectedBranch).toBeNull()
     expect(useReposStore.getState().repoSnapshotCache[REPO_ID]?.ui.selectedBranch).toBeNull()
+  })
+
+  test('uses the React Query snapshot read model when changing branch view mode', () => {
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branches: [],
+      selectedBranch: 'feature/plain',
+    })
+    setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
+      current: 'main',
+      branches: [branch('main', { worktree: { path: '/repo' } }), branch('feature/plain')],
+    })
+
+    useReposStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
+
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBe('main')
   })
 
   test('passes the current repo instance id to follow-up refreshes', () => {
@@ -241,6 +260,22 @@ describe('selectBranch', () => {
     }
   })
 
+  test('uses the React Query snapshot read model to validate selected branches', () => {
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branches: [],
+      selectedBranch: 'main',
+    })
+    setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
+      current: 'main',
+      branches: [branch('main'), branch('feature/query')],
+    })
+
+    useReposStore.getState().selectBranch(REPO_ID, 'feature/query')
+
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBe('feature/query')
+  })
+
   test('ignores a branch that is not in the current snapshot', () => {
     let calls = 0
     ipcHandlers['repo.pullRequests'] = async () => {
@@ -323,6 +358,27 @@ describe('setWorkspacePaneTab', () => {
     const before = useReposStore.getState().repos[REPO_ID]
     useReposStore.getState().setWorkspacePaneTab(REPO_ID, 'status')
     expect(useReposStore.getState().repos[REPO_ID]).toBe(before)
+  })
+
+  test('uses the React Query snapshot read model to resolve workspace pane tab targets', () => {
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branches: [],
+      selectedBranch: 'feature/query',
+      preferredWorkspacePaneTab: 'status',
+    })
+    setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
+      current: 'feature/query',
+      branches: [branch('feature/query', { worktree: { path: '/tmp/query-worktree' } })],
+    })
+
+    useReposStore.getState().setWorkspacePaneTab(REPO_ID, 'changes')
+
+    expect(
+      useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneTabByTarget[
+        worktreeTargetKey('feature/query', '/tmp/query-worktree')
+      ],
+    ).toBe('changes')
   })
 
   test('restores a session-preferred files tab when its static tab is open', () => {

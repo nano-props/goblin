@@ -1,4 +1,4 @@
-import { selectedBranchForViewMode } from '#/web/stores/repos/branch-view-mode.ts'
+import { selectedBranchForBranchSet } from '#/web/stores/repos/branch-view-mode.ts'
 import { replaceRepoState } from '#/web/stores/repos/repo-state-factory.ts'
 import { persistRepoSnapshotCacheEntry } from '#/web/stores/repos/persistence.ts'
 import {
@@ -14,6 +14,7 @@ import {
   preferredWorkspacePaneTabByTargetRecordWith,
   workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { readRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
 
 type RestorableWorkspaceSelectionActions = Pick<
   ReposStore,
@@ -156,7 +157,13 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
         if (!repo || repo.ui.branchViewMode === viewMode) return s
         changed = true
         repoInstanceId = repo.instanceId
-        const selectedBranch = selectedBranchForViewMode(repo, viewMode)
+        const branchReadModel = readRepoBranchReadModel(repo)
+        const selectedBranch = selectedBranchForBranchSet({
+          branches: branchReadModel?.branches ?? repo.data.branches,
+          currentBranch: branchReadModel?.currentBranch ?? repo.data.currentBranch,
+          selectedBranch: repo.ui.selectedBranch,
+          viewMode,
+        })
         const selectionChanged = selectedBranch !== repo.ui.selectedBranch
         selectedForPullRequest = selectionChanged ? selectedBranch : null
         return replaceRepoState(s, repo, (r) => {
@@ -176,7 +183,11 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
       set((s) => {
         const repo = s.repos[id]
         if (!repo) return s
-        const target = workspacePaneTabsTargetForRepoBranch(repo, repo.ui.selectedBranch)
+        const branchReadModel = readRepoBranchReadModel(repo)
+        const target = workspacePaneTabsTargetForRepoBranch(
+          branchReadModel ? { ...repo, data: { ...repo.data, ...branchReadModel } } : repo,
+          repo.ui.selectedBranch,
+        )
         const current = preferredWorkspacePaneTabForTarget(repo.ui, target)
         if (!target || current === tab) return s
         changed = true
@@ -187,7 +198,13 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
       })
       if (!changed || repoInstanceId === undefined) return
       const repo = get().repos[id]
-      const target = repo ? workspacePaneTabsTargetForRepoBranch(repo, repo.ui.selectedBranch) : null
+      const branchReadModel = repo ? readRepoBranchReadModel(repo) : null
+      const target = repo
+        ? workspacePaneTabsTargetForRepoBranch(
+            branchReadModel ? { ...repo, data: { ...repo.data, ...branchReadModel } } : repo,
+            repo.ui.selectedBranch,
+          )
+        : null
       afterSelectionChange(
         id,
         repoInstanceId,
@@ -201,7 +218,9 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
       set((s) => {
         const repo = s.repos[id]
         if (!repo) return s
-        if (!repo.data.branches.some((b) => b.name === branch)) return s
+        const branchReadModel = readRepoBranchReadModel(repo)
+        const branches = branchReadModel?.branches ?? repo.data.branches
+        if (!branches.some((b) => b.name === branch)) return s
         if (repo.ui.selectedBranch === branch) return s
         changed = true
         repoInstanceId = repo.instanceId
