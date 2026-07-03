@@ -27,108 +27,131 @@ function isUsableDirectory(p: string): boolean {
   }
 }
 
-/** Open `dir` as a new window if Ghostty is already running,
- *  setting the initial working directory via Ghostty's scripting
- *  dictionary (see ghostty/macos/Ghostty.sdef). */
-function openInRunningGhostty(dir: string): Promise<boolean> {
-  // The path is passed as argv (item 1 of argv), not interpolated,
-  // so AppleScript string-escaping isn't a concern. The bundle id is
-  // a hardcoded app identifier, not user/settings input. We deliberately
-  // don't call `activate` here — Ghostty's `new window` handler already
-  // runs NSApp.activate internally (TerminalController.swift), and an
-  // extra activate makes macOS pull the user to whichever Space already
-  // has a Ghostty window. See ghostty-org/ghostty#11457.
-  const script = `
-    on run argv
-      set dir to item 1 of argv
-      tell application "System Events"
-        set ghosttyIsRunning to exists (first process whose bundle identifier is "${GHOSTTY_BUNDLE_ID}")
-      end tell
-      if not ghosttyIsRunning then return "not-running"
-      tell application id "${GHOSTTY_BUNDLE_ID}"
-        new window with configuration {initial working directory:dir}
-      end tell
-      return "opened"
-    end run
-  `
-  return execa('/usr/bin/osascript', ['-e', script, dir], {
+// Opens a new window in an already-running Ghostty instance, setting the
+// initial working directory via Ghostty's scripting dictionary (see
+// ghostty/macos/Ghostty.sdef). `dir` is passed as argv, not interpolated,
+// so escaping isn't a concern. No explicit `activate`: Ghostty's `new
+// window` handler already does that internally, and an extra call here
+// would pull focus to the wrong Space (ghostty-org/ghostty#11457).
+const NEW_WINDOW_SCRIPT = `
+  on run argv
+    set dir to item 1 of argv
+    tell application "System Events"
+      set ghosttyIsRunning to exists (first process whose bundle identifier is "${GHOSTTY_BUNDLE_ID}")
+    end tell
+    if not ghosttyIsRunning then return "not-running"
+    tell application id "${GHOSTTY_BUNDLE_ID}"
+      new window with configuration {initial working directory:dir}
+    end tell
+    return "opened"
+  end run
+`
+
+// Same shape as NEW_WINDOW_SCRIPT, but for SSH: types the SSH invocation
+// into the new window's shell and submits it, instead of setting a
+// working directory.
+const REMOTE_NEW_WINDOW_SCRIPT = `
+  on run argv
+    set commandText to item 1 of argv
+    tell application "System Events"
+      set ghosttyIsRunning to exists (first process whose bundle identifier is "${GHOSTTY_BUNDLE_ID}")
+    end tell
+    if not ghosttyIsRunning then return "not-running"
+    tell application id "${GHOSTTY_BUNDLE_ID}"
+      set win to new window with configuration {}
+      set term to terminal 1 of selected tab of win
+      input text commandText to term
+      send key "enter" to term
+    end tell
+    return "opened"
+  end run
+`
+
+/** Run an inline AppleScript via `osascript`, passing `args` as argv
+ *  rather than interpolating them, and return trimmed stdout. */
+function runOsascript(script: string, args: string[]): Promise<string> {
+  return execa('/usr/bin/osascript', ['-e', script, ...args], {
     timeout: APPLE_SCRIPT_TIMEOUT_MS,
     forceKillAfterDelay: 500,
-  }).then(({ stdout }) => stdout.trim() === 'opened')
+  }).then(({ stdout }) => stdout.trim())
 }
 
-// Open the given directory in Ghostty.
-//
-// If Ghostty is already running, we drive its AppleScript dictionary
-// (com.mitchellh.ghostty) to open a new window in the existing
-// instance, passing an inline `surface configuration` record with
-// `initial working directory` set (see Ghostty.sdef). This avoids
-// spawning a second Ghostty.app process every time.
-//
-// If Ghostty isn't running, fall back to `open -na Ghostty.app
-// --args --working-directory=<path>`. The cold-start path can't
-// use AppleScript (no process to talk to) and Ghostty parses
-// --args via ghostty_init(argc, argv) at launch — so -n is needed
-// to ensure the args are read instead of dropped on activation. The
-// working-directory flag is one argv element, not shell text.
-//
-// Spawned children are detached + unref'd so quitting Goblin doesn't
-// bring the terminal down with it.
-export async function openInGhostty(p: string): Promise<{ ok: boolean; message: string }> {
-  if (!isUsableDirectory(p)) return { ok: false, message: 'error.invalid-path' }
-  if (!isGhosttyInstalled()) return { ok: false, message: 'error.ghostty-not-installed' }
+/** Launch Ghostty via Launch Services, forwarding `args` as argv. Ghostty
+ *  only ever reads argv once, at process init (`ghostty_init` in
+ *  `macos/Sources/App/macOS/main.swift`) — a running instance has no
+ *  code path that re-reads it on activation.
+ *
+ *  Deliberately omits `-n` (force new instance): if the warm path above
+ *  failed only because the liveness check itself failed — not because
+ *  Ghostty is actually down — `-n` would spawn a genuinely separate
+ *  second instance/window on top of the existing one. Without `-n`,
+ *  `open` routes to an already-running instance and just activates it
+ *  instead (args get dropped, since nothing re-reads them, but nothing
+ *  duplicates either); when Ghostty truly isn't running, it behaves
+ *  identically to `-n` since there's no instance to route to.
+ *
+ *  Spawned children are detached + unref'd so quitting Goblin doesn't
+ *  bring the terminal down with it. */
+async function launchOrActivateGhostty(args: string[]): Promise<void> {
+  const child = execa('open', ['-a', 'Ghostty.app', '--args', ...args], {
+    detached: true,
+    stdio: 'ignore',
+    cleanup: false,
+    timeout: OPEN_TIMEOUT_MS,
+    forceKillAfterDelay: 500,
+  })
+  child.unref()
+  await child
+}
 
+/** Try the warm (already-running) path via `warmScript` first, falling
+ *  back to `launchOrActivateGhostty` on any failure — including a
+ *  failed/timed-out liveness check, which looks identical to a real
+ *  failure here. Shared by `openInGhostty` and `openRemoteInGhostty`;
+ *  only the script and argv differ between the two. */
+async function openGhosttyWindow(options: {
+  kind: 'local' | 'remote'
+  warmScript: string
+  warmArgs: string[]
+  coldArgs: string[]
+  successMessage: string
+}): Promise<{ ok: boolean; message: string }> {
   try {
-    if (await openInRunningGhostty(p)) return { ok: true, message: p }
+    const stdout = await runOsascript(options.warmScript, options.warmArgs)
+    if (stdout === 'opened') return { ok: true, message: options.successMessage }
   } catch (err) {
-    ghosttyNodeLog.warn({ err }, 'AppleScript open failed, falling back to launch')
+    ghosttyNodeLog.warn({ err, kind: options.kind }, 'AppleScript open failed, falling back to launch')
   }
 
   try {
-    const child = execa('open', ['-na', 'Ghostty.app', '--args', `--working-directory=${p}`], {
-      detached: true,
-      stdio: 'ignore',
-      cleanup: false,
-      timeout: OPEN_TIMEOUT_MS,
-      forceKillAfterDelay: 500,
-    })
-    child.unref()
-    await child
-    return { ok: true, message: p }
+    await launchOrActivateGhostty(options.coldArgs)
+    return { ok: true, message: options.successMessage }
   } catch (err) {
     return { ok: false, message: err instanceof Error ? err.message : String(err) }
   }
 }
 
-function openRemoteInRunningGhostty(commandText: string): Promise<boolean> {
-  const script = `
-    on run argv
-      set commandText to item 1 of argv
-      tell application "System Events"
-        set ghosttyIsRunning to exists (first process whose bundle identifier is "${GHOSTTY_BUNDLE_ID}")
-      end tell
-      if not ghosttyIsRunning then return "not-running"
-      tell application id "${GHOSTTY_BUNDLE_ID}"
-        set win to new window with configuration {}
-        set term to terminal 1 of selected tab of win
-        input text commandText to term
-        send key "enter" to term
-      end tell
-      return "opened"
-    end run
-  `
-  return execa('/usr/bin/osascript', ['-e', script, commandText], {
-    timeout: APPLE_SCRIPT_TIMEOUT_MS,
-    forceKillAfterDelay: 500,
-  }).then(({ stdout }) => stdout.trim() === 'opened')
+/** Open `p` in Ghostty, reusing a running instance when possible and
+ *  cold-starting one otherwise. See `openGhosttyWindow` for how the two
+ *  paths are chosen. */
+export async function openInGhostty(p: string): Promise<{ ok: boolean; message: string }> {
+  if (!isUsableDirectory(p)) return { ok: false, message: 'error.invalid-path' }
+  if (!isGhosttyInstalled()) return { ok: false, message: 'error.ghostty-not-installed' }
+
+  return openGhosttyWindow({
+    kind: 'local',
+    warmScript: NEW_WINDOW_SCRIPT,
+    warmArgs: [p],
+    coldArgs: [`--working-directory=${p}`],
+    successMessage: p,
+  })
 }
 
-/** Open an SSH session in a new Ghostty window.
- *
- *  Mirrors `openInGhostty`: when Ghostty is already running, drive the
- *  scripting dictionary to open a window in the existing instance; on
- *  cold start, `open -na Ghostty.app --args -e ssh ...` so Ghostty
- *  itself spawns the SSH session. */
+/** Open an SSH session in a new Ghostty window. Mirrors `openInGhostty`
+ *  via the same `openGhosttyWindow` orchestration: on the warm path the
+ *  SSH command is typed into a new window's shell; on cold start,
+ *  Ghostty is launched with `-e ssh ...` so it spawns the SSH session
+ *  itself. */
 export async function openRemoteInGhostty(
   alias: string,
   remotePath: string,
@@ -137,24 +160,11 @@ export async function openRemoteInGhostty(
   if (!invocation) return { ok: false, message: 'error.invalid-arguments' }
   if (!isGhosttyInstalled()) return { ok: false, message: 'error.ghostty-not-installed' }
 
-  try {
-    if (await openRemoteInRunningGhostty(invocation.shellCommand)) return { ok: true, message: remotePath }
-  } catch (err) {
-    ghosttyNodeLog.warn({ err }, 'AppleScript remote open failed, falling back to launch')
-  }
-
-  try {
-    const child = execa('open', ['-na', 'Ghostty.app', '--args', '-e', invocation.command, ...invocation.args], {
-      detached: true,
-      stdio: 'ignore',
-      cleanup: false,
-      timeout: OPEN_TIMEOUT_MS,
-      forceKillAfterDelay: 500,
-    })
-    child.unref()
-    await child
-    return { ok: true, message: remotePath }
-  } catch (err) {
-    return { ok: false, message: err instanceof Error ? err.message : String(err) }
-  }
+  return openGhosttyWindow({
+    kind: 'remote',
+    warmScript: REMOTE_NEW_WINDOW_SCRIPT,
+    warmArgs: [invocation.shellCommand],
+    coldArgs: ['-e', invocation.command, ...invocation.args],
+    successMessage: remotePath,
+  })
 }
