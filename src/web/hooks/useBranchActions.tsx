@@ -1,3 +1,4 @@
+import { useMutation } from '@tanstack/react-query'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { remoteRepoTarget } from '#/web/stores/repos/repo-guards.ts'
 import type { RepoBranchState } from '#/web/stores/repos/types.ts'
@@ -86,6 +87,10 @@ export function getBranchActionCapabilities(repo: BranchActionRepo, branch: Repo
 export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState): BranchActions {
   const setLastResult = useReposStore((s) => s.setLastResult)
   const runBranchAction = useReposStore((s) => s.runBranchAction)
+  const copyPatchMutation = useMutation({
+    mutationKey: ['repo-data', repo.id, repo.instanceId, 'patch'],
+    mutationFn: async (worktreePath: string) => await getRepoPatch(repo.id, worktreePath),
+  })
   const branchActionBusy = isBranchActionBlocked(repo)
   const branchBusyAction = branchActionBusyItemId(repo, branch.name)
   const localActionScopeKey = workspacePaneTabsTargetIdentityKey({
@@ -137,7 +142,7 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
     const worktreePath = branch.worktree?.path
     if (!worktreePath) return Promise.resolve(false)
     return runUiAction('copyPatch', async () => {
-      const result = await getRepoPatch(repo.id, worktreePath)
+      const result = await copyPatchMutation.mutateAsync(worktreePath)
       if (!result.ok) return { ok: false, message: result.message }
       if (!result.message) return { ok: false, message: 'status.copy-patch-empty' }
       try {

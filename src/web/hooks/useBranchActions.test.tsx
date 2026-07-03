@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { act } from '@testing-library/react'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import React from 'react'
 import { renderInJsdom } from '#/test-utils/render.tsx'
@@ -8,9 +9,11 @@ import { useBranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { openBranchExternalTarget } from '#/web/hooks/openBranchExternalTarget.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 import { createPullRequest, createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import type { ExecResult } from '#/web/types.ts'
 
 const mocks = vi.hoisted(() => ({
+  getRepoPatch: vi.fn(),
   openRepoEditor: vi.fn(),
   openRepoInFinder: vi.fn(),
   openRepoTerminal: vi.fn(),
@@ -21,7 +24,7 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('#/web/repo-client.ts', () => ({
-  getRepoPatch: vi.fn(),
+  getRepoPatch: mocks.getRepoPatch,
   openRepoEditor: mocks.openRepoEditor,
   openRepoInFinder: mocks.openRepoInFinder,
   openRepoTerminal: mocks.openRepoTerminal,
@@ -42,6 +45,7 @@ const REPO_ID = '/tmp/gbl-use-branch-actions-test-repo'
 describe('useBranchActions', () => {
   beforeEach(() => {
     resetReposStore()
+    mocks.getRepoPatch.mockReset()
     mocks.openRepoEditor.mockReset()
     mocks.openRepoInFinder.mockReset()
     mocks.openRepoTerminal.mockReset()
@@ -83,6 +87,32 @@ describe('useBranchActions', () => {
 
     expect(mocks.openRemoteRepositoryTerminal).toHaveBeenCalledWith(target!.id, '/srv/repo-feature', 'ghostty')
     expect(mocks.openRepoTerminal).not.toHaveBeenCalled()
+  })
+
+  test('copyPatch reads the server patch through a mutation and writes it to the clipboard', async () => {
+    const branch = createRepoBranch('feature/local', { worktree: { path: '/tmp/local-feature' } })
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branches: [branch],
+    })
+    mocks.getRepoPatch.mockResolvedValue({ ok: true, message: 'diff --git a/file.ts b/file.ts' })
+    const writeText = vi.fn(async () => {})
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    })
+
+    let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
+    renderInJsdom(<BranchActionsHarness repo={repo} onReady={(value) => (actions = value)} />)
+
+    let result = false
+    await act(async () => {
+      result = (await actions?.copyPatch()) ?? false
+    })
+
+    expect(result).toBe(true)
+    expect(mocks.getRepoPatch).toHaveBeenCalledWith(REPO_ID, '/tmp/local-feature')
+    expect(writeText).toHaveBeenCalledWith('diff --git a/file.ts b/file.ts')
   })
 
   test('openEditor routes to the remote IPC for remote repos', async () => {
@@ -279,6 +309,20 @@ function BranchActionsHarness({
   repo: ReturnType<typeof seedRepoState>
   onReady: (actions: ReturnType<typeof useBranchActions>['actions']) => void
 }) {
+  return (
+    <QueryClientProvider client={primaryWindowQueryClient}>
+      <BranchActionsHarnessInner repo={repo} onReady={onReady} />
+    </QueryClientProvider>
+  )
+}
+
+function BranchActionsHarnessInner({
+  repo,
+  onReady,
+}: {
+  repo: ReturnType<typeof seedRepoState>
+  onReady: (actions: ReturnType<typeof useBranchActions>['actions']) => void
+}) {
   const branch = repo.data.branches[0]!
   const { actions } = useBranchActions(repo, branch)
   React.useEffect(() => {
@@ -288,6 +332,22 @@ function BranchActionsHarness({
 }
 
 function BranchActionsSurfaceHarness({
+  repo,
+  branchIndex,
+  onReady,
+}: {
+  repo: ReturnType<typeof seedRepoState>
+  branchIndex: number
+  onReady: (surface: ReturnType<typeof useBranchActions>) => void
+}) {
+  return (
+    <QueryClientProvider client={primaryWindowQueryClient}>
+      <BranchActionsSurfaceHarnessInner repo={repo} branchIndex={branchIndex} onReady={onReady} />
+    </QueryClientProvider>
+  )
+}
+
+function BranchActionsSurfaceHarnessInner({
   repo,
   branchIndex,
   onReady,
