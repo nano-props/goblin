@@ -1,10 +1,16 @@
-import { describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { runSnapshotSuccessWorkflow } from '#/web/stores/repos/refresh-workflows.ts'
 import type { ReposGet } from '#/web/stores/repos/types.ts'
 import type { ReposSet } from '#/web/stores/repos/types.ts'
 import { createBranchSnapshot, installGoblinTestBridge } from '#/web/test-utils/bridge.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
+
+beforeEach(() => {
+  primaryWindowQueryClient.clear()
+})
 
 describe('repo refresh workflows', () => {
   test('snapshot success backfills summary then visible selected repo workspace', async () => {
@@ -129,5 +135,65 @@ describe('repo refresh workflows', () => {
     })
 
     resolvePrune()
+  })
+
+  test('visible selected workspace backfill resolves the selected branch from the React Query snapshot cache', async () => {
+    installGoblinTestBridge({})
+    setRepoSnapshotQueryData('/repo', 'repo-instance-test-2', {
+      current: 'feature/query',
+      branches: [createBranchSnapshot('feature/query')],
+    })
+    setWorkspacePaneTabsForTargetQueryData({
+      repoRoot: '/repo',
+      repoInstanceId: 'repo-instance-test-2',
+      branchName: 'feature/query',
+      worktreePath: null,
+      tabs: [workspacePaneStaticTabEntry('status')],
+    })
+    const calls: string[] = []
+    const get: ReposGet = () =>
+      ({
+        repos: {
+          '/repo': {
+            id: '/repo',
+            name: 'repo',
+            instanceId: 'repo-instance-test-2',
+            data: {
+              branches: [],
+              currentBranch: 'main',
+              status: [],
+              statusLoaded: false,
+              worktreesByPath: {},
+            },
+            ui: {
+              selectedBranch: 'feature/query',
+              branchViewMode: 'all',
+              workspacePaneTabsByBranch: {},
+              preferredWorkspacePaneTabByTarget: {},
+            },
+            dataLoads: { pullRequests: { error: null } },
+          },
+        },
+        refreshPullRequests: (
+          id: string,
+          branches?: string[],
+          options?: { repoInstanceId?: string; mode?: string; clearMissing?: boolean },
+        ) => {
+          calls.push(`prs:${id}:${branches?.join(',') ?? ''}:${options?.mode ?? ''}`)
+          return Promise.resolve()
+        },
+      }) as unknown as ReturnType<ReposGet>
+    const set = ((_: unknown) => {}) as ReposSet
+
+    runSnapshotSuccessWorkflow(set, get, {
+      id: '/repo',
+      repoInstanceId: 'repo-instance-test-2',
+      branchNames: ['feature/query'],
+      worktreePaths: [],
+      isSnapshotCurrent: () => true,
+    })
+    await vi.waitFor(() => {
+      expect(calls).toEqual(['prs:/repo:feature/query:summary', 'prs:/repo:feature/query:full'])
+    })
   })
 })

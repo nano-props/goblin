@@ -2,11 +2,17 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   handleRepoInvalidationRefresh,
   repoInvalidationRefreshDisposition,
+  repoStatusRefreshSnapshot,
   resetRepoRefreshCoordinatorState,
   runRepoRefreshIntent,
 } from '#/web/stores/repos/refresh-coordinator.ts'
 import { beginRepoInvalidationSource, settleRepoInvalidationSource } from '#/web/stores/repos/invalidation-sources.ts'
 import type { ReposGet } from '#/web/stores/repos/types.ts'
+import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
+import { setWorkspacePaneTabsForTargetQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 
 function callsGet() {
   const calls: string[] = []
@@ -41,12 +47,41 @@ function callsGet() {
 
 describe('repo refresh coordinator', () => {
   beforeEach(() => {
+    primaryWindowQueryClient.clear()
+    resetReposStore()
     resetRepoRefreshCoordinatorState()
   })
 
   afterEach(() => {
     resetRepoRefreshCoordinatorState()
     vi.useRealTimers()
+  })
+
+  test('builds status refresh snapshots from the React Query branch read model', () => {
+    const repo = seedRepoState({
+      id: '/repo',
+      branches: [],
+      selectedBranch: 'feature/query',
+      preferredWorkspacePaneTab: 'status',
+    })
+    setRepoSnapshotQueryData('/repo', repo.instanceId, {
+      current: 'feature/query',
+      branches: [createRepoBranch('feature/query', { worktree: { path: '/tmp/query-worktree' } })],
+    })
+    setWorkspacePaneTabsForTargetQueryData({
+      repoRoot: '/repo',
+      repoInstanceId: repo.instanceId,
+      branchName: 'feature/query',
+      worktreePath: '/tmp/query-worktree',
+      tabs: [workspacePaneStaticTabEntry('status')],
+    })
+
+    expect(repoStatusRefreshSnapshot(repo)).toMatchObject({
+      id: '/repo',
+      repoInstanceId: repo.instanceId,
+      preferredWorkspacePaneTab: 'status',
+      statusViewOpen: true,
+    })
   })
 
   test('routes initial load through a coordinated snapshot and status refresh', async () => {
