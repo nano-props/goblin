@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import type { ComponentProps } from 'react'
-import { act, screen } from '@testing-library/react'
+import { act, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { RepoWorkspaceContent } from '#/web/components/repo-workspace/RepoWorkspaceContent.tsx'
@@ -943,8 +943,9 @@ describe('RepoWorkspaceContent', () => {
       'feature/history',
       expect.objectContaining({ count: 50 }),
     )
-    const graph = container.querySelector('[data-history-commit-graph=""]')
-    expect(graph).not.toBeNull()
+    await waitFor(() => {
+      expect(container.querySelector('[data-history-commit-graph=""]')).not.toBeNull()
+    })
     const rows = Array.from(container.querySelectorAll('[data-history-commit-row=""]'))
     expect(rows).toHaveLength(2)
     expect(rows[0]?.textContent).toContain('78c150a')
@@ -1007,7 +1008,9 @@ describe('RepoWorkspaceContent', () => {
     )
     await flushAsyncWork()
 
-    expect(container.textContent).toContain('error.failed-read-repo')
+    await waitFor(() => {
+      expect(container.textContent).toContain('error.failed-read-repo')
+    })
     expect(container.textContent).not.toContain('log.empty-for-branch')
   })
 })

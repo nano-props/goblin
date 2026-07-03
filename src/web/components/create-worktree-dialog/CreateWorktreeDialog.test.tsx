@@ -1,13 +1,16 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render as rtlRender, screen, waitFor } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
+import { QueryClientProvider } from '@tanstack/react-query'
+import type { ReactElement } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { CreateWorktreeDialog } from '#/web/components/create-worktree-dialog/CreateWorktreeDialog.tsx'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 import { getRepoRemoteBranches } from '#/web/repo-client.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 
 vi.mock('#/web/repo-client.ts', async () => {
   const actual = await vi.importActual<typeof import('#/web/repo-client.ts')>('#/web/repo-client.ts')
@@ -23,6 +26,7 @@ const testWindow = window as unknown as {
 }
 
 beforeEach(() => {
+  primaryWindowQueryClient.clear()
   testWindow.__GOBLIN_BOOTSTRAP__ = {
     runtime: { kind: 'electron', bridgeVersion: 1, capabilities: [] },
     initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
@@ -43,6 +47,10 @@ afterEach(() => {
   delete testWindow.goblinNative
   delete testWindow.__GOBLIN_BOOTSTRAP__
 })
+
+function render(ui: ReactElement) {
+  return rtlRender(<QueryClientProvider client={primaryWindowQueryClient}>{ui}</QueryClientProvider>)
+}
 
 describe('CreateWorktreeDialog', () => {
   test('focuses the new branch input when opened in newBranch mode', () => {

@@ -26,7 +26,7 @@ import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { remoteRepoTarget } from '#/web/stores/repos/repo-guards.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import { getRepoRemoteBranches } from '#/web/repo-client.ts'
+import { useRepoRemoteBranchesQuery } from '#/web/repo-data-query.ts'
 import { cn } from '#/web/lib/cn.ts'
 import {
   deriveCreateWorktreeForm,
@@ -68,9 +68,10 @@ export function CreateWorktreeDialog({ open, repo, worktreeBootstrap, onClose, o
   const [remoteRef, setRemoteRef] = useState('')
   const [localBranch, setLocalBranch] = useState('')
   const [worktreePath, setWorktreePath] = useState('')
-  const [remoteBranches, setRemoteBranches] = useState<string[]>([])
-  const [remoteBranchesLoading, setRemoteBranchesLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const remoteBranchesQuery = useRepoRemoteBranchesQuery(repo.id, { enabled: open && mode === 'trackRemoteBranch' })
+  const remoteBranches = remoteBranchesQuery.data ?? []
+  const remoteBranchesLoading = remoteBranchesQuery.isLoading
 
   // Reset on the rising edge of `open` only. A guard ref prevents snapshot
   // refreshes (which change repo.data.branches / currentBranch) from wiping
@@ -89,32 +90,8 @@ export function CreateWorktreeDialog({ open, repo, worktreeBootstrap, onClose, o
     setRemoteRef('')
     setLocalBranch('')
     setWorktreePath('')
-    setRemoteBranches([])
-    setRemoteBranchesLoading(false)
     setSubmitting(false)
   }, [open, repo.data.branches, repo.data.currentBranch])
-
-  // Lazy-load remote-tracking branches the first time the user switches
-  // to `trackRemoteBranch`. Re-fetching when `remoteBranches.length > 0`
-  // would only matter if the user did a fetch in another tab — leaving
-  // it to a future iteration keeps the dialog cheap to open.
-  useEffect(() => {
-    if (!open || mode !== 'trackRemoteBranch' || remoteBranches.length > 0) return
-    const ctrl = new AbortController()
-    setRemoteBranchesLoading(true)
-    void getRepoRemoteBranches(repo.id, ctrl.signal)
-      .then((branches) => {
-        if (ctrl.signal.aborted) return
-        setRemoteBranches(branches)
-      })
-      .catch(() => {
-        if (!ctrl.signal.aborted) setRemoteBranches([])
-      })
-      .finally(() => {
-        if (!ctrl.signal.aborted) setRemoteBranchesLoading(false)
-      })
-    return () => ctrl.abort()
-  }, [mode, open, remoteBranches.length, repo.id])
 
   const remoteTarget = remoteRepoTarget(repo.id, repo.remote.lifecycle)
   const derived = deriveCreateWorktreeForm(

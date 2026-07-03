@@ -6,8 +6,7 @@ import { useT } from '#/web/stores/i18n.ts'
 import { EmptyState, ScrollPane } from '#/web/components/Layout.tsx'
 import { StatusListSkeleton } from '#/web/components/Skeleton.tsx'
 import { StatusList } from '#/web/components/StatusList.tsx'
-import { getRepoLog } from '#/web/repo-client.ts'
-import type { LogEntry } from '#/web/types.ts'
+import { useRepoLogQuery } from '#/web/repo-data-query.ts'
 import { BranchStatus } from '#/web/components/repo-workspace/BranchStatus.tsx'
 import { FiletreeNoWorktreeView, FiletreeView } from '#/web/components/repo-workspace/FiletreeView.tsx'
 import { useLazyRepoTree } from '#/web/hooks/useLazyRepoTree.ts'
@@ -370,47 +369,23 @@ function BranchHistoryTab({
   panelLabel: WorkspacePanePanelLabel
 }) {
   const t = useT()
-  const [state, setState] = useState<{
-    phase: 'loading' | 'loaded' | 'error'
-    entries: LogEntry[]
-    error: string | null
-  }>({
-    phase: 'loading',
-    entries: [],
-    error: null,
+  const historyQuery = useRepoLogQuery(repoId, branchName, {
+    count: DEFAULT_REPOSITORY_LOG_COUNT,
   })
-
-  useEffect(() => {
-    const ctrl = new AbortController()
-    setState({ phase: 'loading', entries: [], error: null })
-    void getRepoLog(repoId, branchName, { count: DEFAULT_REPOSITORY_LOG_COUNT, signal: ctrl.signal })
-      .then((entries) => {
-        if (!ctrl.signal.aborted) setState({ phase: 'loaded', entries, error: null })
-      })
-      .catch((err) => {
-        if (ctrl.signal.aborted) return
-        setState({
-          phase: 'error',
-          entries: [],
-          error: err instanceof Error ? err.message : DEFAULT_BRANCH_HISTORY_ERROR_KEY,
-        })
-      })
-    return () => ctrl.abort()
-  }, [branchName, repoId])
-
-  const errorTitleKey = state.error ?? DEFAULT_BRANCH_HISTORY_ERROR_KEY
+  const entries = historyQuery.data ?? []
+  const errorTitleKey = historyQuery.error instanceof Error ? historyQuery.error.message : DEFAULT_BRANCH_HISTORY_ERROR_KEY
 
   return (
-    <BranchTabPanel id={`${workspacePaneId}-history-panel`} {...panelLabel} busy={state.phase === 'loading'}>
-      {state.phase === 'loading' ? (
+    <BranchTabPanel id={`${workspacePaneId}-history-panel`} {...panelLabel} busy={historyQuery.isLoading}>
+      {historyQuery.isLoading ? (
         <HistoryCommitGraphSkeleton rows={8} />
-      ) : state.phase === 'error' ? (
+      ) : historyQuery.isError ? (
         <EmptyState title={t(errorTitleKey)} />
-      ) : state.entries.length === 0 ? (
+      ) : entries.length === 0 ? (
         <EmptyState title={t('log.empty-for-branch', { branch: branchName })} />
       ) : (
         <ScrollPane>
-          <HistoryCommitGraph repoId={repoId} entries={state.entries} />
+          <HistoryCommitGraph repoId={repoId} entries={entries} />
         </ScrollPane>
       )}
     </BranchTabPanel>
