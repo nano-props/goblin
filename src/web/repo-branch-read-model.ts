@@ -1,5 +1,10 @@
 import type { QueryClient } from '@tanstack/react-query'
-import { getRepoSnapshotQueryData, getRepoStatusQueryData, useRepoSnapshotReadModel } from '#/web/repo-data-query.ts'
+import {
+  getRepoSnapshotQueryData,
+  getRepoStatusQueryData,
+  useRepoSnapshotReadModel,
+  useRepoStatusReadModel,
+} from '#/web/repo-data-query.ts'
 import {
   stripBranchWorktreeMetadata,
   worktreeStatesFromBranches,
@@ -34,8 +39,12 @@ export function useRepoBranchReadModel(
   enabled: boolean,
 ): RepoBranchReadModelData | null {
   const snapshotReadModel = useRepoSnapshotReadModel(repoRoot, repoInstanceId, enabled)
+  const statusReadModel = useRepoStatusReadModel(repoRoot, repoInstanceId, enabled)
   if (!snapshotReadModel.data) return null
-  return repoBranchReadModelFromSnapshot(snapshotReadModel.data, current)
+  return repoBranchReadModelFromSnapshot(snapshotReadModel.data, {
+    ...current,
+    status: statusReadModel.data ?? current.status,
+  })
 }
 
 export function readRepoBranchReadModel(
