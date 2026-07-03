@@ -5,6 +5,7 @@ import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import type { LangPref, ThemePref } from '#/shared/settings.ts'
+import type { RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 
 type ClientWorkspaceIntent = Extract<
   ClientEffectIntent,
@@ -75,13 +76,14 @@ interface WorkspaceIntentPlanContext {
 }
 
 export function createTerminalBellIntentPlan(
-  repo: RepoState | undefined,
+  repo: Pick<RepoState, 'id'> | undefined,
+  branchReadModel: RepoBranchReadModelData | null,
   event: Extract<ClientEffectIntent, { type: 'terminal-bell-click' }>,
 ): TerminalBellIntentPlan {
   if (!repo) return { kind: 'noop' }
   const parsedKey = event.terminalWorktreeKey ? parseTerminalWorktreeKey(event.terminalWorktreeKey) : null
   if (parsedKey && parsedKey.repoRoot === repo.id && event.terminalSessionId) {
-    const branch = repo.data.branches.find((candidate) => candidate.worktree?.path === parsedKey.worktreePath)
+    const branch = branchReadModel?.branches.find((candidate) => candidate.worktree?.path === parsedKey.worktreePath)
     if (branch) {
       return {
         kind: 'show-worktree-terminal',

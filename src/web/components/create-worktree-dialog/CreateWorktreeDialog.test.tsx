@@ -246,6 +246,10 @@ function createRepo(): RepoState {
       lastCommitAuthor: 'Test',
     },
   ]
+  setRepoSnapshotQueryData(repo.id, repo.instanceId, {
+    current: repo.data.currentBranch,
+    branches: repo.data.branches,
+  })
   return repo
 }
 
@@ -261,5 +265,9 @@ function createRemoteRepo(): RepoState {
   const repo = createRepo()
   repo.id = target.id
   repo.remote.lifecycle = { kind: 'ready', target }
+  setRepoSnapshotQueryData(repo.id, repo.instanceId, {
+    current: repo.data.currentBranch,
+    branches: repo.data.branches,
+  })
   return repo
 }

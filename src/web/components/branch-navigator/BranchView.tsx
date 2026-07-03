@@ -11,6 +11,7 @@ import { useBranchListRepo } from '#/web/components/branch-navigator/use-branch-
 import { EmptyState } from '#/web/components/Layout.tsx'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { openWorkspacePaneTab } from '#/web/components/repo-workspace/open-workspace-pane-tab.ts'
+import { BranchNavigatorSkeleton } from '#/web/components/Skeleton.tsx'
 
 interface Props {
   repoId: string
@@ -65,9 +66,11 @@ export function BranchView({ repoId, onAfterSelect, onAfterOpenStatus }: Props) 
   // so callers can't pass a stale or wrong value.
   const highlightedBranch = repo?.ui.selectedBranch ?? null
 
+  if (!repo) return <BranchNavigatorSkeleton />
+
   return (
     <BranchList
-      repo={repo ?? null}
+      repo={repo}
       branches={branches}
       highlightedBranch={highlightedBranch}
       onSelectBranch={handleSelectBranch}

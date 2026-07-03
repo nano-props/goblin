@@ -7,38 +7,31 @@ import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import type { RepoDataState, RepoState, RepoUiState } from '#/web/stores/repos/types.ts'
-import { useRepoStatusReadModel } from '#/web/repo-data-query.ts'
 import { useRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
 
-// Composed projection: BranchActionRepo (status, worktrees, currentBranch,
-// branch action, remote) + branches + the j/k selection + the worktree
-// filter mode. Uses Pick<...> from the store state types so adding a new
-// field that's relevant to the list (e.g. ui.someNewFilter) only needs
-// the corresponding Pick extended in one place.
+// Composed projection: branch/status/worktree data comes from the repo
+// data query; the store contributes only identity, UI, operation, and
+// remote shell fields for the list.
 export type BranchListRepo = BranchActionRepo & {
   data: BranchActionRepo['data'] & Pick<RepoDataState, 'branches'>
   ui: Pick<RepoUiState, 'selectedBranch' | 'branchViewMode'>
 }
 
-const branchListRepoEqualFields: Array<keyof BranchListRepo> = [
+type BranchListRepoShell = Omit<BranchListRepo, 'data'>
+
+const branchListRepoShellEqualFields: Array<keyof BranchListRepoShell> = [
   'id',
   'instanceId',
-  'data',
   'ui',
   'operations',
   'remote',
 ]
 
-function branchListRepoEqual(a: BranchListRepo | undefined, b: BranchListRepo | undefined): boolean {
+function branchListRepoShellEqual(a: BranchListRepoShell | undefined, b: BranchListRepoShell | undefined): boolean {
   if (a === b) return true
   if (!a || !b) return false
-  for (const field of branchListRepoEqualFields) {
-    if (field === 'data') {
-      if (a.data.branches !== b.data.branches) return false
-      if (a.data.currentBranch !== b.data.currentBranch) return false
-      if (a.data.status !== b.data.status) return false
-      if (a.data.worktreesByPath !== b.data.worktreesByPath) return false
-    } else if (field === 'ui') {
+  for (const field of branchListRepoShellEqualFields) {
+    if (field === 'ui') {
       if (a.ui.selectedBranch !== b.ui.selectedBranch) return false
       if (a.ui.branchViewMode !== b.ui.branchViewMode) return false
     } else if (field === 'remote') {
@@ -63,7 +56,7 @@ function branchListRepoEqual(a: BranchListRepo | undefined, b: BranchListRepo | 
 }
 
 export function useBranchListRepo(repoId: string): BranchListRepo | undefined {
-  const repo = useStoreWithEqualityFn(
+  const repoShell = useStoreWithEqualityFn(
     useReposStore,
     (s) => {
       const repo: RepoState | undefined = s.repos[repoId]
@@ -71,12 +64,6 @@ export function useBranchListRepo(repoId: string): BranchListRepo | undefined {
         ? {
             id: repo.id,
             instanceId: repo.instanceId,
-            data: {
-              branches: repo.data.branches,
-              currentBranch: repo.data.currentBranch,
-              status: repo.data.status,
-              worktreesByPath: repo.data.worktreesByPath,
-            },
             ui: {
               selectedBranch: repo.ui.selectedBranch,
               branchViewMode: repo.ui.branchViewMode,
@@ -95,17 +82,12 @@ export function useBranchListRepo(repoId: string): BranchListRepo | undefined {
           }
         : undefined
     },
-    branchListRepoEqual,
+    branchListRepoShellEqual,
   )
-  const statusReadModel = useRepoStatusReadModel(repo?.id ?? '', repo?.instanceId ?? '', !!repo)
-  const branchReadModel = useRepoBranchReadModel(repo?.id ?? '', repo?.instanceId ?? '', !!repo)
-  if (!repo || (!branchReadModel && !statusReadModel.data)) return repo
+  const branchReadModel = useRepoBranchReadModel(repoShell?.id ?? '', repoShell?.instanceId ?? '', !!repoShell)
+  if (!repoShell || !branchReadModel) return undefined
   return {
-    ...repo,
-    data: {
-      ...repo.data,
-      ...(branchReadModel ?? {}),
-      ...(statusReadModel.data ? { status: statusReadModel.data } : {}),
-    },
+    ...repoShell,
+    data: branchReadModel,
   }
 }

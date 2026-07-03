@@ -21,6 +21,7 @@ import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
+import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 
 const REPO_ID = '/tmp/gbl-create-host-test'
 let serverSettingsSnapshot: ReturnType<typeof defaultSettingsSnapshot>
@@ -36,10 +37,19 @@ beforeEach(async () => {
   globalThis.localStorage?.clear()
   resetReposStore()
   setServerSettings(defaultSettingsSnapshot())
-  seedRepoState({
+  const repo = seedRepoState({
     id: REPO_ID,
     branches: [createRepoBranch('main', { isCurrent: true, ahead: 0, behind: 0 })],
   })
+  setRepoSnapshotQueryData(
+    repo.id,
+    repo.instanceId,
+    {
+      current: repo.data.currentBranch,
+      branches: repo.data.branches,
+    },
+    testQueryClient,
+  )
   mockCreateWorktreeHostFetch(async () => previewResponse({ hasOperations: false, configHash: null }))
 })
 

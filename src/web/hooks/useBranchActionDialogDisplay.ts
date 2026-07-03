@@ -150,7 +150,7 @@ function resolveContext<P>(
   branchReadModel: RepoBranchReadModelData | null,
 ): BranchActionDialogContext | null {
   const repoFromStore = repos[entry.repoId]
-  const repo = repoFromStore ? repoWithBranchReadModel(repoFromStore, branchReadModel) : null
+  const repo = repoFromStore && branchReadModel ? repoWithBranchReadModel(repoFromStore, branchReadModel) : null
   if (!repo) return null
   const branch = repo.data.branches.find((b) => b.name === entry.branchName)
   if (!branch) return null

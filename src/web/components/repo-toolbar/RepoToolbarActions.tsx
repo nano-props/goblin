@@ -34,18 +34,16 @@ function WorktreeFilterToggle({ repoId }: Props) {
       return {
         id: repo?.id ?? '',
         instanceId: repo?.instanceId ?? '',
-        branchCount: repo?.data.branches.length ?? 0,
         branchViewMode: repo?.ui.branchViewMode ?? 'all',
         exists: !!repo,
       }
     }),
   )
   const branchReadModel = useRepoBranchReadModel(repoView.id, repoView.instanceId, repoView.exists)
-  const branchCount = branchReadModel?.branches.length ?? repoView.branchCount
   return (
     <BranchViewModeControl
       value={repoView.branchViewMode}
-      disabled={branchCount === 0}
+      disabled={!branchReadModel || branchReadModel.branches.length === 0}
       onChange={(viewMode: BranchViewMode) => setBranchViewMode(repoId, viewMode)}
     />
   )

@@ -13,6 +13,7 @@ export interface RepoBranchReadModelData {
   branches: RepoState['data']['branches']
   currentBranch: string
   currentHEAD?: string
+  status: RepoState['data']['status']
   worktreesByPath: RepoState['data']['worktreesByPath']
 }
 
@@ -25,6 +26,7 @@ export function repoBranchReadModelFromSnapshot(
     branches,
     currentBranch: snapshot.current,
     currentHEAD: snapshot.currentHEAD,
+    status: current.status ?? [],
     worktreesByPath: worktreeStatesFromBranches(snapshot.branches, current.worktreesByPath ?? {}, current.status ?? []),
   }
 }
@@ -44,9 +46,9 @@ export function useRepoBranchReadModel(
 
 export function repoWithBranchReadModel<Repo extends { data: RepoState['data'] }>(
   repo: Repo,
-  readModel: RepoBranchReadModelData | null,
+  readModel: RepoBranchReadModelData,
 ): Repo {
-  return readModel ? { ...repo, data: { ...repo.data, ...readModel } } : repo
+  return { ...repo, data: { ...repo.data, ...readModel } }
 }
 
 export function readRepoBranchQueryProjection(

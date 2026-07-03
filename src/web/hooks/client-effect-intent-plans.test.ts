@@ -6,6 +6,7 @@ import {
   createTerminalBellIntentPlan,
   createWorkspaceIntentPlan,
 } from '#/web/hooks/client-effect-intent-plans.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
 describe('client effect intent plans', () => {
   test('creates a worktree terminal bell plan when the worktree group matches a known worktree', () => {
@@ -20,7 +21,7 @@ describe('client effect intent plans', () => {
       ],
     })
 
-    const plan = createTerminalBellIntentPlan(repo, {
+    const plan = createTerminalBellIntentPlan(repo, readRepoBranchQueryProjection(repo), {
       type: 'terminal-bell-click',
       repoRoot: repo.id,
       terminalSessionId: 'session-2',

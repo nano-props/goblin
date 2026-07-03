@@ -4,7 +4,7 @@ import { createRepoBranch } from '#/web/test-utils/bridge.ts'
 import { repoWithBranchReadModel, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 
 describe('repo branch read model helpers', () => {
-  test('projects branch snapshot data over store repo data as one atomic view', () => {
+  test('projects branch read model data over store repo data as one atomic view', () => {
     const repo = emptyRepo('/tmp/read-model-repo', 'read-model-repo', 'repo-instance-read-model')
     repo.data.currentBranch = 'main'
     repo.data.branches = [createRepoBranch('main')]
@@ -13,6 +13,7 @@ describe('repo branch read model helpers', () => {
       currentBranch: 'feature/query',
       currentHEAD: '1111111000000000000000000000000000000000',
       branches: [createRepoBranch('feature/query', { worktree: { path: '/tmp/query-worktree' } })],
+      status: [],
       worktreesByPath: {
         '/tmp/query-worktree': {
           path: '/tmp/query-worktree',

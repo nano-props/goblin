@@ -14,7 +14,8 @@ import { useBranchActionShortcutRegistry } from '#/web/hooks/useBranchActionShor
 import { useBranchActions, type BranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
 import { useRepoPullRequestsReadModel, useRepoStatusReadModel } from '#/web/repo-data-query.ts'
-import { repoWithBranchReadModel, useRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
+import { useRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
+import { RepoWorkspaceSkeleton } from '#/web/components/Skeleton.tsx'
 interface Props {
   repoId: string
   selectedBranchName?: string | null
@@ -23,18 +24,18 @@ interface Props {
 }
 
 // Keep this equality in sync with fields read by RepoWorkspace children.
-function repoWorkspaceRepoEqual(a: RepoWorkspaceRepo | undefined, b: RepoWorkspaceRepo | undefined): boolean {
+type RepoWorkspaceRepoShell = Omit<RepoWorkspaceRepo, 'data'>
+
+function repoWorkspaceRepoShellEqual(
+  a: RepoWorkspaceRepoShell | undefined,
+  b: RepoWorkspaceRepoShell | undefined,
+): boolean {
   return (
     a === b ||
     (!!a &&
       !!b &&
       a.id === b.id &&
       a.instanceId === b.instanceId &&
-      a.data.branches === b.data.branches &&
-      a.data.currentBranch === b.data.currentBranch &&
-      a.data.status === b.data.status &&
-      a.data.statusLoaded === b.data.statusLoaded &&
-      a.data.worktreesByPath === b.data.worktreesByPath &&
       a.ui.selectedBranch === b.ui.selectedBranch &&
       a.ui.preferredWorkspacePaneTabByTarget === b.ui.preferredWorkspacePaneTabByTarget &&
       a.dataLoads.status === b.dataLoads.status &&
@@ -56,7 +57,7 @@ export function RepoWorkspace({
   toolbarTrafficLightOffset = false,
 }: Props) {
   const workspacePaneId = useId()
-  const repo = useStoreWithEqualityFn(
+  const repoShell = useStoreWithEqualityFn(
     useReposStore,
     (s) => {
       const repo = s.repos[repoId]
@@ -69,13 +70,6 @@ export function RepoWorkspace({
         ? {
             id: repo.id,
             instanceId: repo.instanceId,
-            data: {
-              branches: repo.data.branches,
-              currentBranch: repo.data.currentBranch,
-              status: repo.data.status,
-              statusLoaded: repo.data.statusLoaded,
-              worktreesByPath: repo.data.worktreesByPath,
-            },
             ui: {
               selectedBranch,
               preferredWorkspacePaneTabByTarget: repo.ui.preferredWorkspacePaneTabByTarget,
@@ -98,13 +92,13 @@ export function RepoWorkspace({
           }
         : undefined
     },
-    repoWorkspaceRepoEqual,
+    repoWorkspaceRepoShellEqual,
   )
-  if (!repo) return null
+  if (!repoShell) return null
 
   return (
     <RepoWorkspaceLoaded
-      repo={repo}
+      repoShell={repoShell}
       workspacePaneId={workspacePaneId}
       shortcutsEnabled={shortcutsEnabled}
       toolbarTrafficLightOffset={toolbarTrafficLightOffset}
@@ -113,34 +107,34 @@ export function RepoWorkspace({
 }
 
 function RepoWorkspaceLoaded({
-  repo,
+  repoShell,
   workspacePaneId,
   shortcutsEnabled,
   toolbarTrafficLightOffset,
 }: {
-  repo: RepoWorkspaceRepo
+  repoShell: RepoWorkspaceRepoShell
   workspacePaneId: string
   shortcutsEnabled: boolean
   toolbarTrafficLightOffset: boolean
 }) {
-  const statusReadModel = useRepoStatusReadModel(repo.id, repo.instanceId, true)
-  const branchReadModel = useRepoBranchReadModel(repo.id, repo.instanceId, true)
-  const selectedBranchName = repo.ui.selectedBranch
+  const statusReadModel = useRepoStatusReadModel(repoShell.id, repoShell.instanceId, true)
+  const branchReadModel = useRepoBranchReadModel(repoShell.id, repoShell.instanceId, true)
+  const selectedBranchName = repoShell.ui.selectedBranch
   const pullRequestsReadModel = useRepoPullRequestsReadModel(
-    repo.id,
-    repo.instanceId,
+    repoShell.id,
+    repoShell.instanceId,
     selectedBranchName ? [selectedBranchName] : undefined,
     'full',
     !!selectedBranchName,
   )
-  let presentationData: RepoWorkspaceRepo['data'] = repoWithBranchReadModel(repo, branchReadModel).data
-  presentationData = statusReadModel.data
-    ? {
-        ...presentationData,
-        status: statusReadModel.data,
-        statusLoaded: true,
-      }
-    : presentationData
+  if (!branchReadModel) {
+    return <RepoWorkspaceSkeleton toolbarTrafficLightOffset={toolbarTrafficLightOffset} />
+  }
+  let presentationData: RepoWorkspaceRepo['data'] = {
+    ...branchReadModel,
+    status: statusReadModel.data ?? branchReadModel.status,
+    statusLoaded: statusReadModel.isSuccess,
+  }
   if (selectedBranchName && Array.isArray(pullRequestsReadModel.data)) {
     const pullRequest = pullRequestsReadModel.data.find((entry) => entry.branch === selectedBranchName)?.pullRequest
     presentationData = {
@@ -153,8 +147,7 @@ function RepoWorkspaceLoaded({
       }),
     }
   }
-  const presentationRepo: RepoWorkspaceRepo =
-    presentationData === repo.data ? repo : { ...repo, data: presentationData }
+  const presentationRepo: RepoWorkspaceRepo = { ...repoShell, data: presentationData }
   const detail = getSelectedRepoWorkspacePresentation(presentationRepo)
 
   return (
