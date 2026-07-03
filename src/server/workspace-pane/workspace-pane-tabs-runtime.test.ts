@@ -38,6 +38,50 @@ describe('workspace pane tabs runtime', () => {
     ])
   })
 
+  test('ensureTerminalTab with insertAfterIdentity inserts after a static anchor', () => {
+    const runtime = createWorkspacePaneTabsRuntime<string>()
+    runtime.replaceTabs({
+      ...target(),
+      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-1')],
+    })
+
+    expect(runtime.ensureTerminalTab(target(), 'session-2', { insertAfterIdentity: 'workspace-pane:status' })).toEqual([
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneTerminalTabEntry('session-2'),
+      workspacePaneTerminalTabEntry('session-1'),
+    ])
+  })
+
+  test('ensureTerminalTab with insertAfterIdentity inserts after a terminal anchor', () => {
+    const runtime = createWorkspacePaneTabsRuntime<string>()
+    runtime.replaceTabs({
+      ...target(),
+      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-1')],
+    })
+
+    expect(runtime.ensureTerminalTab(target(), 'session-2', { insertAfterIdentity: 'terminal:session-1' })).toEqual([
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneTerminalTabEntry('session-1'),
+      workspacePaneTerminalTabEntry('session-2'),
+    ])
+  })
+
+  test('ensureTerminalTab with insertAfterIdentity falls back to append when anchor is missing', () => {
+    const runtime = createWorkspacePaneTabsRuntime<string>()
+    runtime.replaceTabs({
+      ...target(),
+      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-1')],
+    })
+
+    expect(
+      runtime.ensureTerminalTab(target(), 'session-2', { insertAfterIdentity: 'terminal:missing' }),
+    ).toEqual([
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneTerminalTabEntry('session-1'),
+      workspacePaneTerminalTabEntry('session-2'),
+    ])
+  })
+
   test('opens and closes static tabs in the mixed list', () => {
     const runtime = createWorkspacePaneTabsRuntime<string>()
 
@@ -52,7 +96,7 @@ describe('workspace pane tabs runtime', () => {
     expect(runtime.closeStaticTab(target(), 'status')).toEqual([workspacePaneStaticTabEntry('history')])
   })
 
-  test('inserts a new static tab immediately after the requested tab identity', () => {
+  test('openStaticTab with insertAfterIdentity inserts after a static identity', () => {
     const runtime = createWorkspacePaneTabsRuntime<string>()
     runtime.replaceTabs({
       ...target(),
@@ -63,11 +107,46 @@ describe('workspace pane tabs runtime', () => {
       ],
     })
 
-    expect(runtime.openStaticTab(target(), 'changes', { insertAfterTabType: 'status' })).toEqual([
+    expect(runtime.openStaticTab(target(), 'changes', { insertAfterIdentity: 'workspace-pane:status' })).toEqual([
       workspacePaneStaticTabEntry('status'),
       workspacePaneStaticTabEntry('changes'),
       workspacePaneTerminalTabEntry('session-1'),
       workspacePaneStaticTabEntry('history'),
+    ])
+  })
+
+  test('openStaticTab with insertAfterIdentity inserts after a terminal identity', () => {
+    const runtime = createWorkspacePaneTabsRuntime<string>()
+    runtime.replaceTabs({
+      ...target(),
+      tabs: [
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneTerminalTabEntry('session-1'),
+        workspacePaneStaticTabEntry('history'),
+      ],
+    })
+
+    expect(runtime.openStaticTab(target(), 'changes', { insertAfterIdentity: 'terminal:session-1' })).toEqual([
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneTerminalTabEntry('session-1'),
+      workspacePaneStaticTabEntry('changes'),
+      workspacePaneStaticTabEntry('history'),
+    ])
+  })
+
+  test('openStaticTab with insertAfterIdentity falls back to append when anchor is not in the strip', () => {
+    const runtime = createWorkspacePaneTabsRuntime<string>()
+    runtime.replaceTabs({
+      ...target(),
+      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-1')],
+    })
+
+    expect(
+      runtime.openStaticTab(target(), 'files', { insertAfterIdentity: 'terminal:missing-session' }),
+    ).toEqual([
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneTerminalTabEntry('session-1'),
+      workspacePaneStaticTabEntry('files'),
     ])
   })
 

@@ -27,15 +27,22 @@ export async function runCreateTerminalTabCommand(input: {
     options?: TerminalCreateOptions,
   ) => Promise<string>
   /**
-   * The tab this creation should be attributed to, captured by the caller at
-   * the user-action boundary. This is explicit because some creation paths do
-   * async pre-work before entering the terminal view; their opener is the tab
-   * that initiated the action, not whatever tab happens to be active when the
-   * async work finishes.
+   * The tab this creation should be attributed to (used for close-back focus
+   * via the workspace pane tab opener tracker). Captured by the caller at
+   * the user-action boundary because some creation paths do async pre-work
+   * before entering the terminal view; their opener is the tab that initiated
+   * the action, not whatever tab happens to be active when the async work
+   * finishes.
    */
   openerIdentity: string | null
   /** Switches into the terminal view immediately before creating the terminal. */
   enterTerminalTab: () => void | Promise<void>
+  /**
+   * Insertion anchor for the new terminal tab. Callers decide explicitly:
+   * supply the captured opener's identity when the terminal is opened from
+   * inside a specific tab (per Chrome-style opener rules), or omit for
+   * generic entries (+ button, Cmd+T, Terminal menu) that should append.
+   */
   options?: TerminalCreateOptions
   t?: TerminalCreateTranslator
   logMessage?: string

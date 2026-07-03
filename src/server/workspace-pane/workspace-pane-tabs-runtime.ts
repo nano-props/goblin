@@ -3,7 +3,7 @@ import {
   type WorkspacePaneTabEntry,
   workspacePaneStaticTabEntry,
   workspacePaneTabEntryIdentity,
-  workspacePaneTabsInsertAfterStaticTab,
+  workspacePaneTabsInsertAfterIdentity,
   workspacePaneTabRequiresWorktree,
   workspacePaneTerminalTabEntry,
 } from '#/shared/workspace-pane.ts'
@@ -65,7 +65,11 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
     return [...tabs]
   }
 
-  ensureTerminalTab(input: WorkspacePaneTabsTargetInput<TUser>, terminalSessionId: string): WorkspacePaneTabEntry[] {
+  ensureTerminalTab(
+    input: WorkspacePaneTabsTargetInput<TUser>,
+    terminalSessionId: string,
+    options?: { insertAfterIdentity?: string | null },
+  ): WorkspacePaneTabEntry[] {
     const current = this.tabs(input)
     if (input.worktreePath === null || terminalSessionId.length === 0) return current
     if (current.some((entry) => entry.type === 'terminal' && entry.terminalSessionId === terminalSessionId)) {
@@ -73,14 +77,18 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
     }
     return this.replaceTabs({
       ...input,
-      tabs: [...current, workspacePaneTerminalTabEntry(terminalSessionId)],
+      tabs: workspacePaneTabsInsertAfterIdentity(
+        current,
+        workspacePaneTerminalTabEntry(terminalSessionId),
+        options?.insertAfterIdentity,
+      ),
     })
   }
 
   openStaticTab(
     input: WorkspacePaneTabsTargetInput<TUser>,
     tabType: WorkspacePaneStaticTabType,
-    options?: { insertAfterTabType?: WorkspacePaneStaticTabType | null },
+    options?: { insertAfterIdentity?: string | null },
   ): WorkspacePaneTabEntry[] {
     const current = this.tabs(input)
     // Reopening an existing static tab should preserve the current user-managed
@@ -88,7 +96,11 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
     if (current.some((entry) => entry.type === tabType)) return current
     return this.replaceTabs({
       ...input,
-      tabs: workspacePaneTabsInsertAfterStaticTab(current, workspacePaneStaticTabEntry(tabType), options?.insertAfterTabType),
+      tabs: workspacePaneTabsInsertAfterIdentity(
+        current,
+        workspacePaneStaticTabEntry(tabType),
+        options?.insertAfterIdentity,
+      ),
     })
   }
 

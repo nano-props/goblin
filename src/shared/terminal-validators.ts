@@ -80,6 +80,12 @@ const TerminalSessionInputSchema = v.object({
   terminalRuntimeSessionId: TerminalRuntimeSessionIdSchema,
 })
 const RepoInstanceIdSchema = v.pipe(v.string(), v.regex(OPAQUE_ID_RE))
+const WorkspacePaneTabIdentitySchema = v.pipe(
+  v.string(),
+  v.minLength(1),
+  v.check((value) => !value.includes('\0'), 'Invalid workspace pane tab identity'),
+)
+const WorkspacePaneOptionalTabIdentitySchema = v.optional(v.nullable(WorkspacePaneTabIdentitySchema))
 const TerminalListSessionsInputSchema = v.object({
   repoRoot: v.string(),
   repoInstanceId: RepoInstanceIdSchema,
@@ -98,6 +104,7 @@ const TerminalCreateInputSchema = v.object({
   cols: v.optional(TerminalColsSchema),
   rows: v.optional(TerminalRowsSchema),
   clientId: TerminalOptionalClientIdSchema,
+  insertAfterIdentity: WorkspacePaneOptionalTabIdentitySchema,
 })
 const TerminalPruneInputSchema = v.object({
   repoRoot: v.string(),
@@ -121,12 +128,6 @@ const TerminalReplaceWorkspaceTabsInputSchema = v.object({
   worktreePath: v.nullable(v.string()),
   tabs: v.array(v.union([WorkspacePaneStaticTabEntrySchema, WorkspacePaneTerminalTabEntrySchema])),
 })
-const WorkspacePaneTabIdentitySchema = v.pipe(
-  v.string(),
-  v.minLength(1),
-  v.check((value) => !value.includes('\0'), 'Invalid workspace pane tab identity'),
-)
-const WorkspacePaneOptionalStaticTabTypeSchema = v.optional(v.nullable(WorkspacePaneStaticTabTypeSchema))
 const TerminalUpdateWorkspaceTabsInputSchema = v.object({
   repoRoot: v.string(),
   repoInstanceId: RepoInstanceIdSchema,
@@ -136,7 +137,7 @@ const TerminalUpdateWorkspaceTabsInputSchema = v.object({
     v.object({
       type: v.literal('open-static'),
       tabType: WorkspacePaneStaticTabTypeSchema,
-      insertAfterTabType: WorkspacePaneOptionalStaticTabTypeSchema,
+      insertAfterIdentity: WorkspacePaneOptionalTabIdentitySchema,
     }),
     v.object({ type: v.literal('close-static'), tabType: WorkspacePaneStaticTabTypeSchema }),
     v.object({ type: v.literal('reorder'), tabIdentities: v.array(WorkspacePaneTabIdentitySchema) }),

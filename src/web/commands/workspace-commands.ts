@@ -147,6 +147,9 @@ export async function runTerminalPrimaryActionCommand({
     if (firstSession) bridge.selectTerminal(terminalWorktreeKey, firstSession.terminalSessionId)
     return true
   }
+  // "Click the Terminal menu" is a generic entry — the new terminal should
+  // append to the end of the strip rather than being anchored to whatever
+  // tab happens to be active.
   const result = await runCreateTerminalTabCommand({
     base,
     createTerminal: bridge.createTerminal,

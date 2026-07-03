@@ -154,6 +154,9 @@ export async function handleWorkspaceClientIntent(
       return true
     }
     case 'new-terminal-tab':
+      // Cmd+T / File → New Terminal Tab is a generic entry — the new
+      // terminal should append to the end of the strip rather than being
+      // anchored to the currently-active tab.
       return await runNewTerminalTabCommand({
         repoId: plan.repoId,
         navigation: deps.navigation,

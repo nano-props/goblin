@@ -152,6 +152,7 @@ export function useKeyboard({
         const menuBackedShortcut = hasNativeMenuAccelerators()
         if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyT') {
           e.preventDefault()
+          // Cmd+T is a generic entry → new terminal appends to the end.
           void runNewTerminalTabCommand({ repoId, navigation, t: translate })
           return
         }

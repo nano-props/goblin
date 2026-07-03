@@ -125,6 +125,15 @@ export interface TerminalCreateOptions {
    * If future create options affect the launched session, update the dedupe predicate too.
    */
   startupShellCommand?: string
+  /**
+   * Optional workspace pane tab identity to anchor the new terminal tab after.
+   * When omitted or null, the new tab appends to the end of the strip.
+   * See `docs/workspace-tab-opener.md`.
+   *
+   * Create dedupe intentionally ignores this field — two creates anchored at
+   * different positions are still the same session shape.
+   */
+  insertAfterIdentity?: string | null
 }
 
 export interface TerminalCreateOwner {

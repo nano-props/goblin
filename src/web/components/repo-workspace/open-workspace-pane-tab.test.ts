@@ -86,7 +86,7 @@ describe('openWorkspacePaneTab', () => {
         expect(input.operation).toEqual({
           type: 'open-static',
           tabType: 'changes',
-          insertAfterTabType: 'status',
+          insertAfterIdentity: 'workspace-pane:status',
         })
         return [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('changes')]
       },
@@ -98,7 +98,7 @@ describe('openWorkspacePaneTab', () => {
         branchName: 'feature/worktree',
         worktreePath: WORKTREE_PATH,
         type: 'changes',
-        insertAfterTabType: 'status',
+        insertAfterIdentity: 'workspace-pane:status',
         navigation: navigationWithStoreActions(),
       }),
     ).resolves.toBe(true)
@@ -470,7 +470,10 @@ describe('openWorkspacePaneTab', () => {
       ]),
     ).resolves.toEqual([true, true])
 
-    expect(openTabsFor('feature/worktree')).toEqual(['status', 'changes', 'history'])
+    // Both opens anchor after "status" (the captured opener). The first commit
+    // (changes) lands between status and history's slot; the second commit
+    // (history) inserts immediately after status, pushing changes to position 3.
+    expect(openTabsFor('feature/worktree')).toEqual(['status', 'history', 'changes'])
   })
 })
 

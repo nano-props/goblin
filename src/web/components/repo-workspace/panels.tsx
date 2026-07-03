@@ -241,6 +241,7 @@ function FiletreeTab({
         enterTerminalTab: () => navigation.showRepoWorkspacePaneTab(repoId, 'terminal'),
         options: {
           startupShellCommand: fileReadCommand(viewerResult, absoluteFilePathForTerminal(worktreePath, node.path)),
+          insertAfterIdentity: openerIdentity,
         },
         t,
         logMessage: 'filetree open file terminal create failed',

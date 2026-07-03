@@ -62,6 +62,12 @@ export interface TerminalCreateInput {
   cols?: number
   rows?: number
   clientId?: string
+  /**
+   * Optional workspace pane tab identity to anchor the new terminal tab after.
+   * When omitted or null, the new tab appends to the end of the strip.
+   * See `docs/workspace-tab-opener.md`.
+   */
+  insertAfterIdentity?: string | null
 }
 
 export interface TerminalRestartInput {
@@ -223,7 +229,11 @@ export interface TerminalReplaceWorkspaceTabsInput extends WorkspacePaneTabsTarg
 }
 
 export type TerminalUpdateWorkspaceTabsOperation =
-  | { type: 'open-static'; tabType: WorkspacePaneStaticTabType; insertAfterTabType?: WorkspacePaneStaticTabType | null }
+  | {
+      type: 'open-static'
+      tabType: WorkspacePaneStaticTabType
+      insertAfterIdentity?: string | null
+    }
   | { type: 'close-static'; tabType: WorkspacePaneStaticTabType }
   | { type: 'reorder'; tabIdentities: string[] }
 

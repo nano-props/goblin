@@ -519,6 +519,9 @@ export class TerminalSessionProjection {
       ...(request.createOptions.startupShellCommand
         ? { startupShellCommand: request.createOptions.startupShellCommand }
         : {}),
+      ...(request.createOptions.insertAfterIdentity
+        ? { insertAfterIdentity: request.createOptions.insertAfterIdentity }
+        : {}),
       cols: geometry.cols,
       rows: geometry.rows,
       clientId,

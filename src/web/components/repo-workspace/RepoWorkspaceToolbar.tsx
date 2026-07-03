@@ -111,6 +111,7 @@ export function RepoWorkspaceToolbar({
 
   const handleNewTerminal = useCallback(() => {
     if (!terminalBase) return
+    // "+" is a generic entry → don't anchor; opener only drives close-back.
     const openerIdentity = captureWorkspacePaneActiveTabIdentity(repo.id)
     void runCreateTerminalTabCommand({
       base: terminalBase,
