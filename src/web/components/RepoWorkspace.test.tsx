@@ -20,7 +20,7 @@ import {
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import { createPullRequest, createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { setRepoPullRequestsQueryData, setRepoStatusQueryData } from '#/web/repo-data-query.ts'
+import { setRepoPullRequestsQueryData, setRepoSnapshotQueryData, setRepoStatusQueryData } from '#/web/repo-data-query.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 
 const REPO_ID = '/tmp/repo-workspace-container-repo'
@@ -210,6 +210,38 @@ describe('RepoWorkspace', () => {
     )
 
     expect(container.querySelector('button[aria-label="status.copy-patch-title"]')).not.toBeNull()
+  })
+
+  test('uses the React Query snapshot read model for workspace branch presentation when available', () => {
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branches: [],
+      selectedBranch: 'feature/query',
+      preferredWorkspacePaneTab: 'status',
+      statusLoaded: true,
+      workspacePaneTabsByBranch: {
+        'feature/query': [workspacePaneStaticTabEntry('status')],
+      },
+    })
+    setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
+      current: 'feature/query',
+      branches: [createRepoBranch('feature/query')],
+    })
+
+    const { container } = render(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={navigation}>
+          <TerminalSessionContext value={terminalCommandContext}>
+            <TerminalSessionReadContext value={terminalReadContext}>
+              <RepoWorkspace repoId={REPO_ID} />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+
+    expect(container.textContent).toContain('feature/query')
+    expect(container.textContent).not.toContain('branches.empty')
   })
 
   test('uses the React Query pull request read model for the selected branch when available', () => {

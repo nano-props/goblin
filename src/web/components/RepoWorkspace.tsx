@@ -14,6 +14,7 @@ import { useBranchActionShortcutRegistry } from '#/web/hooks/useBranchActionShor
 import { useBranchActions, type BranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
 import { useRepoPullRequestsReadModel, useRepoStatusReadModel } from '#/web/repo-data-query.ts'
+import { useRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
 interface Props {
   repoId: string
   selectedBranchName?: string | null
@@ -122,6 +123,15 @@ function RepoWorkspaceLoaded({
   shortcutsEnabled: boolean
   toolbarTrafficLightOffset: boolean
 }) {
+  const branchReadModel = useRepoBranchReadModel(
+    repo.id,
+    repo.instanceId,
+    {
+      status: repo.data.status,
+      worktreesByPath: repo.data.worktreesByPath,
+    },
+    true,
+  )
   const statusReadModel = useRepoStatusReadModel(repo.id, repo.instanceId, true)
   const selectedBranchName = repo.ui.selectedBranch
   const pullRequestsReadModel = useRepoPullRequestsReadModel(
@@ -131,13 +141,19 @@ function RepoWorkspaceLoaded({
     'full',
     !!selectedBranchName,
   )
-  let presentationData: RepoWorkspaceRepo['data'] = statusReadModel.data
+  let presentationData: RepoWorkspaceRepo['data'] = branchReadModel
     ? {
         ...repo.data,
+        ...branchReadModel,
+      }
+    : repo.data
+  presentationData = statusReadModel.data
+    ? {
+        ...presentationData,
         status: statusReadModel.data,
         statusLoaded: true,
       }
-    : repo.data
+    : presentationData
   if (selectedBranchName && Array.isArray(pullRequestsReadModel.data)) {
     const pullRequest = pullRequestsReadModel.data.find((entry) => entry.branch === selectedBranchName)?.pullRequest
     presentationData = {
