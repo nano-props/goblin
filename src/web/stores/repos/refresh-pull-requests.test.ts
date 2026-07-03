@@ -3,6 +3,8 @@ import { PULL_REQUEST_UNKNOWN_RETRY_DELAY_MS } from '#/shared/pull-request-state
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { replaceRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { preferredWorkspacePaneTabByTargetRecordWith } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { repoPullRequestsQueryKey } from '#/web/repo-data-query.ts'
 import type { PullRequestInfo } from '#/web/types.ts'
 import {
   branch,
@@ -134,10 +136,11 @@ describe('refreshPullRequests', () => {
     const stale = pullRequest(1)
     const fresh = pullRequest(2)
     const repoInstanceId = seedRepo([branch('feature/a'), branch('feature/b', stale)])
+    const entries = [{ branch: 'feature/a', pullRequest: fresh }]
     let mode: string | undefined
     ipcHandlers['repo.pullRequests'] = async ({ mode: receivedMode }: { mode?: string }) => {
       mode = receivedMode
-      return [{ branch: 'feature/a', pullRequest: fresh }]
+      return entries
     }
 
     await useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a', 'feature/b'], { repoInstanceId })
@@ -147,6 +150,9 @@ describe('refreshPullRequests', () => {
     expect(branches?.find((b) => b.name === 'feature/b')?.pullRequest).toBeUndefined()
     expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.pullRequests.phase).toBe('idle')
     expect(mode).toBe('full')
+    expect(
+      primaryWindowQueryClient.getQueryData(repoPullRequestsQueryKey(REPO_ID, repoInstanceId, ['feature/a', 'feature/b'], 'full')),
+    ).toEqual(entries)
   })
 
   test('does not attach reverse pull requests to the default branch', async () => {

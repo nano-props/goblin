@@ -22,6 +22,12 @@ import { createRefreshSyncHelpers } from '#/web/stores/repos/refresh-sync.ts'
 import { runWithRepoInvalidationSource } from '#/web/stores/repos/invalidation-sources.ts'
 import { finishDataLoadError, finishDataLoadSuccess, startDataLoad } from '#/web/stores/repos/repo-data-load-state.ts'
 import { getRepoPullRequests, getRepoSnapshot, getRepoStatus, readRepoBulk } from '#/web/repo-client.ts'
+import {
+  setRepoBulkReadQueryData,
+  setRepoPullRequestsQueryData,
+  setRepoSnapshotQueryData,
+  setRepoStatusQueryData,
+} from '#/web/repo-data-query.ts'
 import type { RepoSnapshot } from '#/shared/api-types.ts'
 import type { RepoPullRequestReason } from '#/web/stores/repos/operations.ts'
 import type { RepoState, ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
@@ -169,6 +175,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
         task: (signal) => getRepoSnapshot(id, signal),
         errorFromResult: (snap) => (snap ? null : 'error.failed-read-repo'),
         onResult: async (snap, ctx) => {
+          if (ctx.isCurrent()) setRepoSnapshotQueryData(id, repoInstanceId, snap)
           if (!snap) {
             updateIfFresh(set, id, repoInstanceId, (r) => {
               finishDataLoadError(r.dataLoads.snapshot, 'error.failed-read-repo')
@@ -220,6 +227,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
         ],
         task: (signal) => getRepoPullRequests(id, branchNames, { mode }, signal),
         onResult: (entries, ctx) => {
+          if (ctx.isCurrent()) setRepoPullRequestsQueryData(id, repoInstanceId, branchNames, mode, entries)
           if (entries === null) {
             applyPullRequestRefreshUnavailable(id, repoInstanceId, branchNames, mode)
             return
@@ -258,6 +266,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
           r.data.worktreesByPath = applyStatusToWorktreeStates(r.data.worktreesByPath, status)
         },
         onSuccess: (_status, ctx) => {
+          if (ctx.isCurrent()) setRepoStatusQueryData(id, repoInstanceId, _status)
           const repoAfterStatus = get().repos[id]
           if (ctx.isCurrent()) persistRepoSnapshotCacheEntry(set, repoAfterStatus, repoInstanceId)
         },
@@ -311,6 +320,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
           return result.snapshot === null ? 'error.failed-read-repo' : null
         },
         onResult: async (result, ctx) => {
+          if (ctx.isCurrent()) setRepoBulkReadQueryData(id, repoInstanceId, ['snapshot', 'status'], result)
           // Apply status first (leaf, no follow-up).
           updateIfFresh(set, id, repoInstanceId, (r) => {
             r.data.status = result.status

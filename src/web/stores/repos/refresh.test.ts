@@ -11,6 +11,12 @@ import {
   preferredWorkspacePaneTabByTargetRecordWith,
   workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import {
+  repoBulkReadQueryKey,
+  repoSnapshotQueryKey,
+  repoStatusQueryKey,
+} from '#/web/repo-data-query.ts'
 import type { WorktreeStatus } from '#/web/types.ts'
 beforeEach(resetRefreshTest)
 
@@ -455,6 +461,25 @@ describe('core refresh request ordering', () => {
     expect(repo?.data.branches.map((b) => b.name)).toEqual(['main'])
   })
 
+  test('refreshCoreData writes the server composite result into repo data query cache', async () => {
+    const repoInstanceId = seedRepo([branch('old')])
+    const status: WorktreeStatus[] = [
+      { path: REPO_ID, branch: 'main', isMain: true, entries: [{ x: 'M', y: ' ', path: 'src/main.ts' }] },
+    ]
+    const snapshot = { branches: [branch('main')], current: 'main' }
+    ipcHandlers['repo.composite'] = async () => ({ snapshot, status, pullRequests: null })
+
+    await useReposStore.getState().refreshCoreData(REPO_ID, { repoInstanceId })
+
+    expect(primaryWindowQueryClient.getQueryData(repoBulkReadQueryKey(REPO_ID, repoInstanceId, ['snapshot', 'status']))).toEqual({
+      snapshot,
+      status,
+      pullRequests: null,
+    })
+    expect(primaryWindowQueryClient.getQueryData(repoSnapshotQueryKey(REPO_ID, repoInstanceId))).toEqual(snapshot)
+    expect(primaryWindowQueryClient.getQueryData(repoStatusQueryKey(REPO_ID, repoInstanceId))).toEqual(status)
+  })
+
   test('refreshCoreData drops stale results when the repo is reopened during a composite read', async () => {
     const repoInstanceId = seedRepo([branch('main')], 'repo-instance-test')
     ipcHandlers['repo.composite'] = async () => {
@@ -470,6 +495,9 @@ describe('core refresh request ordering', () => {
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.instanceId).toBe('repo-instance-test-2')
     expect(repo?.data.branches.map((b) => b.name)).toEqual(['reopened'])
+    expect(primaryWindowQueryClient.getQueryData(repoBulkReadQueryKey(REPO_ID, repoInstanceId, ['snapshot', 'status']))).toBeUndefined()
+    expect(primaryWindowQueryClient.getQueryData(repoSnapshotQueryKey(REPO_ID, repoInstanceId))).toBeUndefined()
+    expect(primaryWindowQueryClient.getQueryData(repoStatusQueryKey(REPO_ID, repoInstanceId))).toBeUndefined()
   })
 
   test('refreshCoreData marks deleted or non-git paths unavailable and skips follow-up reads', async () => {
@@ -501,6 +529,16 @@ describe('core refresh request ordering', () => {
     expect(repo?.availability).toEqual({ phase: 'available' })
     expect(repo?.data.branches.map((b) => b.name)).toEqual(['main'])
     expect(repo?.dataLoads.snapshot.error).toBeNull()
+  })
+
+  test('refreshSnapshot writes the server snapshot result into repo data query cache', async () => {
+    const repoInstanceId = seedRepo([branch('old')])
+    const snapshot = { branches: [branch('main')], current: 'main' }
+    ipcHandlers['repo.snapshot'] = async () => snapshot
+
+    await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
+
+    expect(primaryWindowQueryClient.getQueryData(repoSnapshotQueryKey(REPO_ID, repoInstanceId))).toEqual(snapshot)
   })
 
   test('refreshCoreData drops status when the repo is reopened before the composite settles', async () => {
@@ -603,6 +641,18 @@ describe('core refresh request ordering', () => {
       isDirty: true,
       changeCount: 3,
     })
+  })
+
+  test('refreshStatus writes the server status result into repo data query cache', async () => {
+    const repoInstanceId = seedRepo([branch('feature/a')])
+    const status: WorktreeStatus[] = [
+      { path: REPO_ID, branch: 'feature/a', isMain: true, entries: [{ x: 'M', y: ' ', path: 'changed.ts' }] },
+    ]
+    ipcHandlers['repo.status'] = async () => status
+
+    await useReposStore.getState().refreshStatus(REPO_ID, { repoInstanceId })
+
+    expect(primaryWindowQueryClient.getQueryData(repoStatusQueryKey(REPO_ID, repoInstanceId))).toEqual(status)
   })
 
   test('snapshot refresh keeps status-derived worktree dirtiness authoritative', async () => {
