@@ -133,7 +133,7 @@ function RepoWorkspaceLoaded({
   let presentationData: RepoWorkspaceRepo['data'] = {
     ...branchReadModel,
     status: statusReadModel.data ?? branchReadModel.status,
-    statusLoaded: statusReadModel.isSuccess,
+    statusReady: statusReadModel.isSuccess,
   }
   if (selectedBranchName && Array.isArray(pullRequestsReadModel.data)) {
     const pullRequest = pullRequestsReadModel.data.find((entry) => entry.branch === selectedBranchName)?.pullRequest

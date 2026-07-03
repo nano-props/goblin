@@ -36,7 +36,7 @@ const DEFAULT_BRANCH_HISTORY_ERROR_KEY = 'error.failed-read-repo'
 export interface WorkspacePanePanelRenderInput {
   type: WorkspacePaneTabType
   repo: Pick<RepoWorkspaceRepo, 'id' | 'instanceId' | 'data' | 'ui'> & {
-    data: RepoWorkspaceRepo['data'] & Pick<RepoWorkspaceRepo['data'], 'statusLoaded'>
+    data: RepoWorkspaceRepo['data']
   }
   detail: SelectedRepoWorkspacePresentation
   workspacePaneId: string
@@ -466,9 +466,9 @@ function BranchChangesTab({
 
   return (
     <BranchTabPanel id={`${workspacePaneId}-changes-panel`} {...panelLabel} busy={statusLoading}>
-      {branch.worktree?.path && statusLoading && !repo.data.statusLoaded ? (
+      {branch.worktree?.path && statusLoading && !repo.data.statusReady ? (
         <StatusListSkeleton rows={8} />
-      ) : branch.worktree?.path && !repo.data.statusLoaded && statusError ? (
+      ) : branch.worktree?.path && !repo.data.statusReady && statusError ? (
         <EmptyState title={t(statusError)} />
       ) : branch.worktree?.path ? (
         <div className="relative flex min-h-0 flex-1 flex-col">

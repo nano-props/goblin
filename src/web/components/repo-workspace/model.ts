@@ -30,7 +30,10 @@ export type SelectedRepoWorkspace = ReturnType<typeof getSelectedRepoWorkspace>
 export type SelectedRepoWorkspacePresentation = ReturnType<typeof getSelectedRepoWorkspacePresentation>
 
 export interface RepoWorkspaceRepo extends BranchActionRepo {
-  data: BranchActionRepo['data'] & Pick<RepoState['data'], 'branches' | 'statusLoaded'>
+  data: BranchActionRepo['data'] & {
+    branches: RepoState['data']['branches']
+    statusReady: boolean
+  }
   ui: Pick<RepoState['ui'], 'selectedBranch' | 'preferredWorkspacePaneTabByTarget'>
   dataLoads: Pick<RepoState['dataLoads'], 'status' | 'pullRequests'>
   remote: BranchActionRepo['remote'] & Pick<RepoState['remote'], 'lifecycle'>
