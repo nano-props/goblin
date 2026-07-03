@@ -12,6 +12,7 @@ interface Rule {
   fromPrefix: string
   disallow: Array<string | RegExp>
   reason: string
+  allowFiles?: string[]
 }
 
 const RULES: Rule[] = [
@@ -40,6 +41,20 @@ const RULES: Rule[] = [
     disallow: ['#/shared/terminal.ts'],
     reason:
       'terminal protocol is split by concern; import terminal-types/socket/validators/ownership/ids directly instead of the aggregate entrypoint',
+  },
+  {
+    fromPrefix: '/src/web/',
+    disallow: ['#/web/settings-client.ts'],
+    allowFiles: [
+      '/src/web/settings-actions.ts',
+      '/src/web/settings-queries.ts',
+      '/src/web/hooks/useAuthenticatedAppBootstrap.ts',
+      '/src/web/stores/session-restore.ts',
+      '/src/web/stores/theme.ts',
+      '/src/web/stores/i18n.ts',
+    ],
+    reason:
+      'settings-client is the transport boundary; settings writes must flow through settings-actions so server results update React Query projections',
   },
 ]
 
@@ -83,6 +98,7 @@ function extractImports(source: string): string[] {
 
 function violatesRule(relativeFilePath: string, importPath: string, rule: Rule): boolean {
   if (!relativeFilePath.startsWith(rule.fromPrefix)) return false
+  if (rule.allowFiles?.includes(relativeFilePath)) return false
   return rule.disallow.some((pattern) =>
     typeof pattern === 'string' ? importPath === pattern || importPath.startsWith(pattern) : pattern.test(importPath),
   )
