@@ -14,7 +14,7 @@ import {
   preferredWorkspacePaneTabByTargetRecordWith,
   workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
-import { readRepoBranches, readRepoWithBranchReadModel } from '#/web/repo-branch-read-model.ts'
+import { readRepoWithBranchReadModel } from '#/web/repo-branch-read-model.ts'
 
 type RestorableWorkspaceSelectionActions = Pick<
   ReposStore,
@@ -212,8 +212,8 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
       set((s) => {
         const repo = s.repos[id]
         if (!repo) return s
-        const branches = readRepoBranches(repo)
-        if (!branches.some((b) => b.name === branch)) return s
+        const branchModel = readRepoWithBranchReadModel(repo)
+        if (!branchModel.data.branches.some((b) => b.name === branch)) return s
         if (repo.ui.selectedBranch === branch) return s
         changed = true
         repoInstanceId = repo.instanceId

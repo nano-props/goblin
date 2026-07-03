@@ -28,7 +28,7 @@ import {
   setRepoSnapshotQueryData,
   setRepoStatusQueryData,
 } from '#/web/repo-data-query.ts'
-import { readRepoBranches } from '#/web/repo-branch-read-model.ts'
+import { readRepoWithBranchReadModel } from '#/web/repo-branch-read-model.ts'
 import type { RepoSnapshot } from '#/shared/api-types.ts'
 import type { RepoPullRequestReason } from '#/web/stores/repos/operations.ts'
 import type { RepoState, ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
@@ -58,7 +58,7 @@ function resolvePullRequestRefreshRequest(
   }
   const mode = options?.mode ?? 'full'
   const clearMissing = options?.clearMissing ?? mode === 'full'
-  const branchNames = branchesArg ?? readRepoBranches(repo).map((branch) => branch.name)
+  const branchNames = branchesArg ?? readRepoWithBranchReadModel(repo).data.branches.map((branch) => branch.name)
   if (branchNames.length === 0) return null
   if (repo.remote.hasGitHubRemote !== true) return null
   return { branchNames, requested: new Set(branchNames), mode, clearMissing }
@@ -162,7 +162,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       if (!resolved) return
       const { repoInstanceId } = resolved
       updateIfFresh(set, id, repoInstanceId, (r) => {
-        startDataLoad(r.dataLoads.snapshot, { hasData: readRepoBranches(r).length > 0 })
+        startDataLoad(r.dataLoads.snapshot, { hasData: readRepoWithBranchReadModel(r).data.branches.length > 0 })
       })
       await runLatestOperation({
         set,
@@ -299,7 +299,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       if (!resolved) return
       const { repoInstanceId } = resolved
       updateIfFresh(set, id, repoInstanceId, (r) => {
-        startDataLoad(r.dataLoads.snapshot, { hasData: readRepoBranches(r).length > 0 })
+        startDataLoad(r.dataLoads.snapshot, { hasData: readRepoWithBranchReadModel(r).data.branches.length > 0 })
         startDataLoad(r.dataLoads.status, { hasData: r.data.statusLoaded || r.data.status.length > 0 })
       })
       await runLatestOperation({

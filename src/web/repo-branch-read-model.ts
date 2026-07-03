@@ -70,19 +70,3 @@ export function readRepoWithBranchReadModel<
 >(repo: Repo, queryClient?: QueryClient): Repo {
   return repoWithBranchReadModel(repo, readRepoBranchReadModel(repo, queryClient))
 }
-
-function repoBranchesFromReadModel(
-  repo: { data: Pick<RepoState['data'], 'branches'> },
-  readModel: Pick<RepoBranchReadModelData, 'branches'> | null,
-): RepoState['data']['branches'] {
-  return readModel?.branches ?? repo.data.branches
-}
-
-export function readRepoBranches(
-  repo: Pick<RepoState, 'id' | 'instanceId'> & {
-    data: Pick<RepoState['data'], 'branches' | 'status' | 'worktreesByPath'>
-  },
-  queryClient?: QueryClient,
-): RepoState['data']['branches'] {
-  return repoBranchesFromReadModel(repo, readRepoBranchReadModel(repo, queryClient))
-}

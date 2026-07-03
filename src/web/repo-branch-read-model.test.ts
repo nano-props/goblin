@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { createRepoBranch } from '#/web/test-utils/bridge.ts'
 import {
-  readRepoBranches,
+  readRepoWithBranchReadModel,
   repoWithBranchReadModel,
   type RepoBranchReadModelData,
 } from '#/web/repo-branch-read-model.ts'
@@ -42,6 +42,6 @@ describe('repo branch read model helpers', () => {
     const repo = emptyRepo('/tmp/read-model-fallback-repo', 'read-model-fallback-repo', 'repo-instance-fallback')
     repo.data.branches = [createRepoBranch('main')]
 
-    expect(readRepoBranches(repo).map((branch) => branch.name)).toEqual(['main'])
+    expect(readRepoWithBranchReadModel(repo).data.branches.map((branch) => branch.name)).toEqual(['main'])
   })
 })
