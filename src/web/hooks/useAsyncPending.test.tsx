@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { act } from '@testing-library/react'
+import { StrictMode } from 'react'
 import { describe, expect, test, vi } from 'vitest'
 import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
@@ -79,6 +80,35 @@ describe('useAsyncPending', () => {
     })
 
     expect(apiRef.current?.pending).toBeNull()
+  })
+
+  test('clears pending after async work settles under StrictMode', async () => {
+    const work = deferred<void>()
+    const apiRef: { current: ReturnType<typeof useAsyncPending<string>> | null } = { current: null }
+
+    renderInJsdom(
+      <StrictMode>
+        <UseAsyncPendingHarness
+          onReady={(nextApi) => {
+            apiRef.current = nextApi
+          }}
+        />
+      </StrictMode>,
+    )
+
+    await act(async () => {
+      apiRef.current?.run('work', () => work.promise)
+    })
+
+    expect(apiRef.current?.pending).toBe('work')
+
+    await act(async () => {
+      work.resolve()
+      await work.promise
+    })
+
+    expect(apiRef.current?.pending).toBeNull()
+    expect(apiRef.current?.hasPending()).toBe(false)
   })
 })
 

@@ -89,21 +89,38 @@ function resolveWorkspacePaneTabAutoScroll({
   activeTabIdentity,
   previousTargetKey,
   currentTargetKey,
+  awaitingTargetBaseline,
   lastScrolledActiveIdentity,
 }: {
   activeTabIdentity: string | null
   previousTargetKey: string | null
   currentTargetKey: string
+  awaitingTargetBaseline: boolean
   lastScrolledActiveIdentity: string | null
-}): { shouldScroll: boolean; nextScrolledActiveIdentity: string | null } {
-  if (!activeTabIdentity) return { shouldScroll: false, nextScrolledActiveIdentity: null }
-  if (previousTargetKey !== null && previousTargetKey !== currentTargetKey) {
-    return { shouldScroll: false, nextScrolledActiveIdentity: activeTabIdentity }
+}): { shouldScroll: boolean; nextScrolledActiveIdentity: string | null; nextAwaitingTargetBaseline: boolean } {
+  const targetChanged = previousTargetKey !== null && previousTargetKey !== currentTargetKey
+  if (!activeTabIdentity) {
+    return {
+      shouldScroll: false,
+      nextScrolledActiveIdentity: null,
+      nextAwaitingTargetBaseline: awaitingTargetBaseline || targetChanged,
+    }
+  }
+  if (targetChanged || awaitingTargetBaseline) {
+    return {
+      shouldScroll: false,
+      nextScrolledActiveIdentity: activeTabIdentity,
+      nextAwaitingTargetBaseline: false,
+    }
   }
   if (lastScrolledActiveIdentity === activeTabIdentity) {
-    return { shouldScroll: false, nextScrolledActiveIdentity: lastScrolledActiveIdentity }
+    return {
+      shouldScroll: false,
+      nextScrolledActiveIdentity: lastScrolledActiveIdentity,
+      nextAwaitingTargetBaseline: false,
+    }
   }
-  return { shouldScroll: true, nextScrolledActiveIdentity: activeTabIdentity }
+  return { shouldScroll: true, nextScrolledActiveIdentity: activeTabIdentity, nextAwaitingTargetBaseline: false }
 }
 
 function shouldShowWorkspacePaneTabSeparator({
@@ -165,6 +182,7 @@ function useWorkspacePaneTabStripAutoScroll({
       .at(-1)?.identity ?? null
   const lastScrolledActiveIdentityRef = useRef<string | null>(null)
   const lastWorkspacePaneTabTargetKeyRef = useRef<string | null>(null)
+  const awaitingTargetBaselineRef = useRef(false)
 
   useLayoutEffect(() => {
     const previousWorkspacePaneTabTargetKey = lastWorkspacePaneTabTargetKeyRef.current
@@ -173,8 +191,10 @@ function useWorkspacePaneTabStripAutoScroll({
       activeTabIdentity: enabled ? activeRenderableTabIdentity : null,
       previousTargetKey: previousWorkspacePaneTabTargetKey,
       currentTargetKey: workspacePaneTabTargetKey,
+      awaitingTargetBaseline: awaitingTargetBaselineRef.current,
       lastScrolledActiveIdentity: lastScrolledActiveIdentityRef.current,
     })
+    awaitingTargetBaselineRef.current = autoScroll.nextAwaitingTargetBaseline
 
     if (!autoScroll.shouldScroll) {
       lastScrolledActiveIdentityRef.current = autoScroll.nextScrolledActiveIdentity

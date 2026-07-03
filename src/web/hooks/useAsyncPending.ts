@@ -22,8 +22,11 @@ export function useAsyncPending<T>({ resetKey }: { resetKey?: string } = {}) {
   const pending = pendingState && pendingState.resetKey === resetKey ? pendingState.id : null
 
   useEffect(
-    () => () => {
-      mountedRef.current = false
+    () => {
+      mountedRef.current = true
+      return () => {
+        mountedRef.current = false
+      }
     },
     [],
   )

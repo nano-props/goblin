@@ -725,6 +725,68 @@ describe('WorkspacePaneTabStrip', () => {
     expect(scrollIntoView).not.toHaveBeenCalled()
   })
 
+  test('does not auto-scroll when target active tab appears after target change', () => {
+    render(
+      <TestWorkspacePaneTabStrip
+        terminalWorktreeKey="/repo\0/repo/worktree-a"
+        workspacePaneTabTargetKey="/repo\0branch\0feature-a"
+        workspacePaneId="workspace"
+        sessions={[session({ terminalSessionId: 'a1', title: 'term-a1', selected: true })]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    )
+    const scrollIntoView = scrollIntoViewMock()
+    scrollIntoView.mockClear()
+
+    rerender(
+      <TestWorkspacePaneTabStrip
+        terminalWorktreeKey="/repo\0/repo/worktree-b"
+        workspacePaneTabTargetKey="/repo\0branch\0feature-b"
+        workspacePaneId="workspace"
+        sessions={[
+          session({ terminalSessionId: 'b1', title: 'term-b1', selected: false }),
+          session({ terminalSessionId: 'b2', title: 'term-b2', selected: false }),
+        ]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    )
+
+    setTabStripScrollGeometry({
+      viewport: { left: 0, right: 200 },
+      newButton: { left: 230, right: 258 },
+      tabs: {
+        'workspace-workspace-pane-tab-1': { left: 120, right: 220 },
+      },
+    })
+
+    rerender(
+      <TestWorkspacePaneTabStrip
+        terminalWorktreeKey="/repo\0/repo/worktree-b"
+        workspacePaneTabTargetKey="/repo\0branch\0feature-b"
+        workspacePaneId="workspace"
+        sessions={[
+          session({ terminalSessionId: 'b1', title: 'term-b1', selected: false }),
+          session({ terminalSessionId: 'b2', title: 'term-b2', selected: true }),
+        ]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    )
+
+    expect(scrollIntoView).not.toHaveBeenCalled()
+  })
+
   test('restores horizontal scroll position for each workspace tab target', () => {
     render(
       <TestWorkspacePaneTabStrip
