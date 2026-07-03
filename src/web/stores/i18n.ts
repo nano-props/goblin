@@ -12,6 +12,8 @@
 // static loading/error state until the first hydrate call replaces
 // it with the user's preferred language. The `hydrated` flag flips
 // to true on the first successful snapshot commit.
+// architecture-allow settings-client: i18n hydration reads the public settings
+// transport; preference writes go through settings-actions.
 
 import i18next from 'i18next'
 import { initReactI18next, useTranslation } from 'react-i18next'

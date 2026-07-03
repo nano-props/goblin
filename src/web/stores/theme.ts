@@ -7,15 +7,14 @@
 // covers both the desktop and plain-browser repoOperationSchedulers. Electron main
 // still projects the server-owned preference into native host state,
 // but it is not the business source of truth.
+// architecture-allow settings-client: theme hydration can read the transport
+// snapshot directly; theme writes go through settings-actions.
 
 import { create, type StoreApi } from 'zustand'
 import { DEFAULT_COLOR_THEME, isColorTheme } from '#/shared/color-theme.ts'
 import type { ResolvedTheme, SettingsSnapshot, ThemePref, ThemeState } from '#/shared/api-types.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
-import {
-  getThemeState,
-  resolveThemeStateFromSettings,
-} from '#/web/settings-client.ts'
+import { getThemeState, resolveThemeStateFromSettings } from '#/web/settings-client.ts'
 import { subscribeSettingsInvalidationRefetch } from '#/web/settings-invalidation-refetch.ts'
 import { setThemeColorThemePreference, setThemePreference } from '#/web/settings-actions.ts'
 

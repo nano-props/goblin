@@ -29,10 +29,7 @@ import {
 } from '#/web/stores/repos/filetree-interaction-state.ts'
 import { getRepositoryFileViewer } from '#/web/filetree-client.ts'
 import { absoluteFilePathForTerminal, fileReadCommand } from '#/web/components/repo-workspace/file-read-command.ts'
-import {
-  HistoryCommitGraph,
-  HistoryCommitGraphSkeleton,
-} from '#/web/components/repo-workspace/HistoryCommitGraph.tsx'
+import { HistoryCommitGraph, HistoryCommitGraphSkeleton } from '#/web/components/repo-workspace/HistoryCommitGraph.tsx'
 
 const DEFAULT_BRANCH_HISTORY_ERROR_KEY = 'error.failed-read-repo'
 
@@ -90,6 +87,7 @@ function HistoryWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel }
   return (
     <BranchHistoryTab
       repoId={repo.id}
+      repoInstanceId={repo.instanceId}
       branchName={branch.name}
       workspacePaneId={workspacePaneId}
       panelLabel={panelLabel}
@@ -359,21 +357,24 @@ function BranchTabPanel({ id, labelledById, label, busy = false, children }: Tab
 
 function BranchHistoryTab({
   repoId,
+  repoInstanceId,
   branchName,
   workspacePaneId,
   panelLabel,
 }: {
   repoId: string
+  repoInstanceId: string
   branchName: string
   workspacePaneId: string
   panelLabel: WorkspacePanePanelLabel
 }) {
   const t = useT()
-  const historyQuery = useRepoLogQuery(repoId, branchName, {
+  const historyQuery = useRepoLogQuery(repoId, repoInstanceId, branchName, {
     count: DEFAULT_REPOSITORY_LOG_COUNT,
   })
   const entries = historyQuery.data ?? []
-  const errorTitleKey = historyQuery.error instanceof Error ? historyQuery.error.message : DEFAULT_BRANCH_HISTORY_ERROR_KEY
+  const errorTitleKey =
+    historyQuery.error instanceof Error ? historyQuery.error.message : DEFAULT_BRANCH_HISTORY_ERROR_KEY
 
   return (
     <BranchTabPanel id={`${workspacePaneId}-history-panel`} {...panelLabel} busy={historyQuery.isLoading}>

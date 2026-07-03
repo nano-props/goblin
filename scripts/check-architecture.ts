@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
+import ts from 'typescript'
 
 const repoRoot = path.resolve(import.meta.dirname, '..')
 const srcRoot = path.join(repoRoot, 'src')
@@ -12,7 +13,7 @@ interface Rule {
   fromPrefix: string
   disallow: Array<string | RegExp>
   reason: string
-  allowFiles?: string[]
+  allowComment?: string
 }
 
 const RULES: Rule[] = [
@@ -45,14 +46,7 @@ const RULES: Rule[] = [
   {
     fromPrefix: '/src/web/',
     disallow: ['#/web/settings-client.ts'],
-    allowFiles: [
-      '/src/web/settings-actions.ts',
-      '/src/web/settings-queries.ts',
-      '/src/web/hooks/useAuthenticatedAppBootstrap.ts',
-      '/src/web/stores/session-restore.ts',
-      '/src/web/stores/theme.ts',
-      '/src/web/stores/i18n.ts',
-    ],
+    allowComment: 'architecture-allow settings-client',
     reason:
       'settings-client is the transport boundary; settings writes must flow through settings-actions so server results update React Query projections',
   },
@@ -80,28 +74,44 @@ function normalizePath(filePath: string): string {
   return filePath.slice(repoRoot.length).replaceAll(path.sep, '/')
 }
 
-function extractImports(source: string): string[] {
+function extractImports(source: string, filePath: string): string[] {
+  const sourceFile = ts.createSourceFile(filePath, source, ts.ScriptTarget.Latest, true)
   const values = new Set<string>()
-  const patterns = [
-    /\bfrom\s+['"]([^'"]+)['"]/g,
-    /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
-    /\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
-  ]
-  for (const pattern of patterns) {
-    for (const match of source.matchAll(pattern)) {
-      const value = match[1]?.trim()
-      if (value) values.add(value)
-    }
+
+  function addStringLiteral(node: ts.Node | undefined): void {
+    if (node && ts.isStringLiteralLike(node)) values.add(node.text)
   }
+
+  function visit(node: ts.Node): void {
+    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
+      addStringLiteral(node.moduleSpecifier)
+    } else if (ts.isCallExpression(node)) {
+      if (node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+        addStringLiteral(node.arguments[0])
+      } else if (ts.isIdentifier(node.expression) && node.expression.text === 'require') {
+        addStringLiteral(node.arguments[0])
+      }
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(sourceFile)
   return [...values]
 }
 
-function violatesRule(relativeFilePath: string, importPath: string, rule: Rule): boolean {
-  if (!relativeFilePath.startsWith(rule.fromPrefix)) return false
-  if (rule.allowFiles?.includes(relativeFilePath)) return false
+function importMatchesRule(importPath: string, rule: Rule): boolean {
   return rule.disallow.some((pattern) =>
     typeof pattern === 'string' ? importPath === pattern || importPath.startsWith(pattern) : pattern.test(importPath),
   )
+}
+
+function hasRuleAllowComment(source: string, rule: Rule): boolean {
+  return !!rule.allowComment && source.includes(rule.allowComment)
+}
+
+function violatesRule(relativeFilePath: string, importPath: string, source: string, rule: Rule): boolean {
+  if (!relativeFilePath.startsWith(rule.fromPrefix)) return false
+  if (!importMatchesRule(importPath, rule)) return false
+  return !hasRuleAllowComment(source, rule)
 }
 
 function main(): void {
@@ -111,10 +121,10 @@ function main(): void {
   for (const filePath of files) {
     const relativeFilePath = normalizePath(filePath)
     const source = readFileSync(filePath, 'utf8')
-    const imports = extractImports(source)
+    const imports = extractImports(source, filePath)
     for (const importPath of imports) {
       for (const rule of RULES) {
-        if (!violatesRule(relativeFilePath, importPath, rule)) continue
+        if (!violatesRule(relativeFilePath, importPath, source, rule)) continue
         violations.push(`${relativeFilePath}: disallowed import "${importPath}" — ${rule.reason}`)
       }
     }

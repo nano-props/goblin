@@ -12,12 +12,11 @@ import { defaultWorkspacePaneTabs, normalizeWorkspacePaneTabs } from '#/web/work
 
 export type WorkspacePaneTabsQueryData = WorkspacePaneTabsEntry[]
 
+let workspacePaneTabsPersistenceVersion = 0
+const workspacePaneTabsPersistenceListeners = new Set<() => void>()
+
 export function workspacePaneTabsQueryKey(repoRoot: string, repoInstanceId: string) {
   return ['workspace-pane-tabs', repoRoot, repoInstanceId] as const
-}
-
-export function isWorkspacePaneTabsQueryKey(queryKey: readonly unknown[]): boolean {
-  return queryKey[0] === 'workspace-pane-tabs' && typeof queryKey[1] === 'string' && typeof queryKey[2] === 'string'
 }
 
 export function workspacePaneTabsQueryOptions(repoRoot: string, repoInstanceId: string) {
@@ -44,8 +43,9 @@ export function readWorkspacePaneTabsForTarget(
   queryClient: QueryClient = primaryWindowQueryClient,
 ): WorkspacePaneTabEntry[] {
   const data =
-    queryClient.getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(target.repoRoot, target.repoInstanceId)) ??
-    []
+    queryClient.getQueryData<WorkspacePaneTabsQueryData>(
+      workspacePaneTabsQueryKey(target.repoRoot, target.repoInstanceId),
+    ) ?? []
   return workspacePaneTabsForTargetFromQueryData(data, target)
 }
 
@@ -102,6 +102,7 @@ export function setWorkspacePaneTabsForTargetQueryData(
       ])
     },
   )
+  notifyWorkspacePaneTabsPersistenceChanged()
 }
 
 export async function cancelWorkspacePaneTabs(
@@ -130,6 +131,22 @@ export function workspacePaneTabsByTargetFromQueryData(
     })
   }
   return byTarget
+}
+
+export function subscribeWorkspacePaneTabsPersistenceChanges(onStoreChange: () => void): () => void {
+  workspacePaneTabsPersistenceListeners.add(onStoreChange)
+  return () => {
+    workspacePaneTabsPersistenceListeners.delete(onStoreChange)
+  }
+}
+
+export function workspacePaneTabsPersistenceSnapshot(): number {
+  return workspacePaneTabsPersistenceVersion
+}
+
+function notifyWorkspacePaneTabsPersistenceChanged(): void {
+  workspacePaneTabsPersistenceVersion += 1
+  for (const listener of workspacePaneTabsPersistenceListeners) listener()
 }
 
 function normalizeWorkspacePaneTabsQueryData(entries: readonly WorkspacePaneTabsEntry[]): WorkspacePaneTabsQueryData {

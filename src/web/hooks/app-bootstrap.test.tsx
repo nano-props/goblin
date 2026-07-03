@@ -214,7 +214,7 @@ describe('app bootstrap hooks', () => {
     })
   })
 
-  test('opens the persistence gate after a failed server workspace tabs commit', async () => {
+  test('keeps the persistence gate closed after a failed server workspace tabs commit', async () => {
     const targetKey = branchTargetKey('/tmp/repo', 'main')
     const session = {
       openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
@@ -255,7 +255,7 @@ describe('app bootstrap hooks', () => {
     renderInJsdom(<Harness />)
     await flushMicrotasks(3)
 
-    expect(useReposStore.getState().sessionPersistenceReady).toBe(true)
+    expect(useReposStore.getState().sessionPersistenceReady).toBe(false)
   })
 
   test('opens the persistence gate even when boot session restore fails', async () => {

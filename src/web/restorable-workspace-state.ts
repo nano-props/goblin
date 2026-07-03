@@ -16,6 +16,7 @@ import {
   workspacePaneTabsQueryKey,
   type WorkspacePaneTabsQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { readRepoWithBranchReadModel } from '#/web/repo-branch-read-model.ts'
 
 export function workspaceSessionStateFromRestorableWorkspaceState(input: {
   repos: ReposStore['repos']
@@ -23,26 +24,27 @@ export function workspaceSessionStateFromRestorableWorkspaceState(input: {
   filetreeInteractionByScope?: Readonly<Record<string, FiletreeInteractionSnapshot>>
 }): WorkspaceSessionState {
   const { repos, restorableWorkspaceState } = input
+  const projectedRepos = reposWithQueryBranchReadModels(repos, restorableWorkspaceState.order)
   const workspacePaneTabsByTargetByRepo = workspacePaneTabsByTargetByRepoFromQueryCache(
-    repos,
+    projectedRepos,
     restorableWorkspaceState.order,
   )
   return {
-    openRepoEntries: persistedOpenWorkspaceEntries(restorableWorkspaceState.order, repos),
+    openRepoEntries: persistedOpenWorkspaceEntries(restorableWorkspaceState.order, projectedRepos),
     activeRepoId: persistedActiveRepoIdForSession(restorableWorkspaceState.activeId),
     zenMode: restorableWorkspaceState.zenMode,
     workspacePaneSize: restorableWorkspaceState.workspacePaneSize,
     selectedTerminalSessionIdByTerminalWorktree: persistedSelectedTerminalSessionIdByTerminalWorktreeForSession(
       restorableWorkspaceState.selectedTerminalSessionIdByTerminalWorktree,
-      repos,
+      projectedRepos,
     ),
     preferredWorkspacePaneTabByTargetByRepo: persistedPreferredWorkspacePaneTabByTargetByRepoForSession(
-      repos,
+      projectedRepos,
       restorableWorkspaceState.order,
       workspacePaneTabsByTargetByRepo,
     ),
     workspacePaneTabsByTargetByRepo: persistedWorkspacePaneTabsByTargetByRepoForSession(
-      repos,
+      projectedRepos,
       restorableWorkspaceState.order,
       workspacePaneTabsByTargetByRepo,
     ),
@@ -52,6 +54,19 @@ export function workspaceSessionStateFromRestorableWorkspaceState(input: {
       restorableWorkspaceState.order,
     ),
   }
+}
+
+function reposWithQueryBranchReadModels(repos: ReposStore['repos'], order: readonly string[]): ReposStore['repos'] {
+  let projectedRepos = repos
+  for (const id of order) {
+    const repo = repos[id]
+    if (!repo) continue
+    const projectedRepo = readRepoWithBranchReadModel(repo)
+    if (projectedRepo === repo) continue
+    if (projectedRepos === repos) projectedRepos = { ...repos }
+    projectedRepos[id] = projectedRepo
+  }
+  return projectedRepos
 }
 
 function workspacePaneTabsByTargetByRepoFromQueryCache(

@@ -70,7 +70,9 @@ export function CreateWorktreeDialog({ open, repo, worktreeBootstrap, onClose, o
   const [localBranch, setLocalBranch] = useState('')
   const [worktreePath, setWorktreePath] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const remoteBranchesQuery = useRepoRemoteBranchesQuery(repo.id, { enabled: open && mode === 'trackRemoteBranch' })
+  const remoteBranchesQuery = useRepoRemoteBranchesQuery(repo.id, repo.instanceId, {
+    enabled: open && mode === 'trackRemoteBranch',
+  })
   const remoteBranches = remoteBranchesQuery.data ?? []
   const remoteBranchesLoading = remoteBranchesQuery.isLoading
   const branchReadModel = useRepoBranchReadModel(

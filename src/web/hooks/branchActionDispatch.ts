@@ -31,7 +31,8 @@ import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import type { ExecResult } from '#/web/types.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { closeWorkspacePaneTabsForWorktree } from '#/web/workspace-pane/workspace-pane-tab-close.ts'
-import { readRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
+import { repoBranchReadModelFromSnapshot } from '#/web/repo-branch-read-model.ts'
+import { getRepoSnapshotQueryData, getRepoStatusQueryData } from '#/web/repo-data-query.ts'
 
 interface BranchActionDispatchContext {
   repo: BranchActionRepo
@@ -185,15 +186,18 @@ export function dispatchPush({
 }
 
 function repoForBranchActionDispatch(repo: BranchActionRepo): BranchActionRepo {
-  const readModel = readRepoBranchReadModel(repo)
-  return readModel
-    ? {
-        ...repo,
-        data: {
-          ...repo.data,
-          currentBranch: readModel.currentBranch,
-          worktreesByPath: readModel.worktreesByPath,
-        },
-      }
-    : repo
+  const snapshot = getRepoSnapshotQueryData(repo.id, repo.instanceId)
+  if (!snapshot) return repo
+  const readModel = repoBranchReadModelFromSnapshot(snapshot, {
+    status: getRepoStatusQueryData(repo.id, repo.instanceId) ?? repo.data.status,
+    worktreesByPath: repo.data.worktreesByPath,
+  })
+  return {
+    ...repo,
+    data: {
+      ...repo.data,
+      currentBranch: readModel.currentBranch,
+      worktreesByPath: readModel.worktreesByPath,
+    },
+  }
 }

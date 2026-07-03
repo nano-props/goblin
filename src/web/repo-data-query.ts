@@ -58,12 +58,12 @@ export function repoDataQueryKey(repoRoot: string, repoInstanceId: string) {
   return ['repo-data', repoRoot, repoInstanceId] as const
 }
 
-export function repoLogQueryKey(repoRoot: string, branch: string, count: number, skip: number) {
-  return ['repo-data', repoRoot, 'log', branch, count, skip] as const
+export function repoLogQueryKey(repoRoot: string, repoInstanceId: string, branch: string, count: number, skip: number) {
+  return ['repo-data', repoRoot, repoInstanceId, 'log', branch, count, skip] as const
 }
 
-export function repoRemoteBranchesQueryKey(repoRoot: string) {
-  return ['repo-data', repoRoot, 'remote-branches'] as const
+export function repoRemoteBranchesQueryKey(repoRoot: string, repoInstanceId: string) {
+  return ['repo-data', repoRoot, repoInstanceId, 'remote-branches'] as const
 }
 
 export function repoSnapshotQueryOptions(repoRoot: string, repoInstanceId: string) {
@@ -105,21 +105,26 @@ export function repoBulkReadQueryOptions(
 
 export function repoLogQueryOptions(
   repoRoot: string,
+  repoInstanceId: string,
   branch: string,
   options: { count?: number; skip?: number; enabled?: boolean } = {},
 ) {
   const count = options.count ?? DEFAULT_REPOSITORY_LOG_COUNT
   const skip = options.skip ?? 0
   return queryOptions({
-    queryKey: repoLogQueryKey(repoRoot, branch, count, skip),
+    queryKey: repoLogQueryKey(repoRoot, repoInstanceId, branch, count, skip),
     queryFn: ({ signal }) => getRepoLog(repoRoot, branch, { count, skip, signal }),
     enabled: options.enabled,
   })
 }
 
-export function repoRemoteBranchesQueryOptions(repoRoot: string, options: { enabled?: boolean } = {}) {
+export function repoRemoteBranchesQueryOptions(
+  repoRoot: string,
+  repoInstanceId: string,
+  options: { enabled?: boolean } = {},
+) {
   return queryOptions({
-    queryKey: repoRemoteBranchesQueryKey(repoRoot),
+    queryKey: repoRemoteBranchesQueryKey(repoRoot, repoInstanceId),
     queryFn: ({ signal }) => getRepoRemoteBranches(repoRoot, signal),
     enabled: options.enabled,
   })
@@ -174,18 +179,24 @@ export function useRepoPullRequestsReadModel(
 
 export function useRepoLogQuery(
   repoRoot: string,
+  repoInstanceId: string,
   branch: string,
   options: { count?: number; skip?: number; enabled?: boolean } = {},
 ) {
-  return useQuery(repoLogQueryOptions(repoRoot, branch, options))
+  return useQuery(repoLogQueryOptions(repoRoot, repoInstanceId, branch, options))
 }
 
-export function useRepoRemoteBranchesQuery(repoRoot: string, options: { enabled?: boolean } = {}) {
-  return useQuery(repoRemoteBranchesQueryOptions(repoRoot, options))
+export function useRepoRemoteBranchesQuery(
+  repoRoot: string,
+  repoInstanceId: string,
+  options: { enabled?: boolean } = {},
+) {
+  return useQuery(repoRemoteBranchesQueryOptions(repoRoot, repoInstanceId, options))
 }
 
 export function setRepoLogQueryData(
   repoRoot: string,
+  repoInstanceId: string,
   branch: string,
   entries: LogEntry[],
   options: { count?: number; skip?: number; queryClient?: QueryClient } = {},
@@ -193,15 +204,16 @@ export function setRepoLogQueryData(
   const count = options.count ?? DEFAULT_REPOSITORY_LOG_COUNT
   const skip = options.skip ?? 0
   const queryClient = options.queryClient ?? primaryWindowQueryClient
-  queryClient.setQueryData(repoLogQueryKey(repoRoot, branch, count, skip), entries)
+  queryClient.setQueryData(repoLogQueryKey(repoRoot, repoInstanceId, branch, count, skip), entries)
 }
 
 export function setRepoRemoteBranchesQueryData(
   repoRoot: string,
+  repoInstanceId: string,
   branches: string[],
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
-  queryClient.setQueryData(repoRemoteBranchesQueryKey(repoRoot), branches)
+  queryClient.setQueryData(repoRemoteBranchesQueryKey(repoRoot, repoInstanceId), branches)
 }
 
 export function setRepoSnapshotQueryData(

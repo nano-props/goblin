@@ -5,10 +5,7 @@ import {
   useRepoSnapshotReadModel,
   useRepoStatusReadModel,
 } from '#/web/repo-data-query.ts'
-import {
-  stripBranchWorktreeMetadata,
-  worktreeStatesFromBranches,
-} from '#/web/stores/repos/worktree-state.ts'
+import { stripBranchWorktreeMetadata, worktreeStatesFromBranches } from '#/web/stores/repos/worktree-state.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import type { RepoSnapshot } from '#/shared/api-types.ts'
 
@@ -47,7 +44,7 @@ export function useRepoBranchReadModel(
   })
 }
 
-export function readRepoBranchReadModel(
+function readRepoBranchReadModel(
   repo: Pick<RepoState, 'id' | 'instanceId'> & {
     data: Pick<RepoState['data'], 'status' | 'worktreesByPath'>
   },
@@ -68,14 +65,13 @@ export function repoWithBranchReadModel<Repo extends { data: RepoState['data'] }
   return readModel ? { ...repo, data: { ...repo.data, ...readModel } } : repo
 }
 
-export function readRepoWithBranchReadModel<Repo extends Pick<RepoState, 'id' | 'instanceId'> & { data: RepoState['data'] }>(
-  repo: Repo,
-  queryClient?: QueryClient,
-): Repo {
+export function readRepoWithBranchReadModel<
+  Repo extends Pick<RepoState, 'id' | 'instanceId'> & { data: RepoState['data'] },
+>(repo: Repo, queryClient?: QueryClient): Repo {
   return repoWithBranchReadModel(repo, readRepoBranchReadModel(repo, queryClient))
 }
 
-export function repoBranchesFromReadModel(
+function repoBranchesFromReadModel(
   repo: { data: Pick<RepoState['data'], 'branches'> },
   readModel: Pick<RepoBranchReadModelData, 'branches'> | null,
 ): RepoState['data']['branches'] {
@@ -89,17 +85,4 @@ export function readRepoBranches(
   queryClient?: QueryClient,
 ): RepoState['data']['branches'] {
   return repoBranchesFromReadModel(repo, readRepoBranchReadModel(repo, queryClient))
-}
-
-export function readRepoBranchSelectionModel(
-  repo: Pick<RepoState, 'id' | 'instanceId'> & {
-    data: Pick<RepoState['data'], 'branches' | 'currentBranch' | 'status' | 'worktreesByPath'>
-  },
-  queryClient?: QueryClient,
-): Pick<RepoBranchReadModelData, 'branches' | 'currentBranch'> {
-  const readModel = readRepoBranchReadModel(repo, queryClient)
-  return {
-    branches: repoBranchesFromReadModel(repo, readModel),
-    currentBranch: readModel?.currentBranch ?? repo.data.currentBranch,
-  }
 }

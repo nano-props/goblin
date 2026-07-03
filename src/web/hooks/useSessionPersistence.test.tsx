@@ -19,6 +19,7 @@ import {
   setWorkspacePaneTabsForTargetQueryData,
   useWorkspacePaneTabsQuery,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 
 const persistWorkspaceSessionStateMock = vi.fn(async (_session: unknown) => {})
 
@@ -123,6 +124,39 @@ describe('useSessionPersistence', () => {
             [targetKey]: 'history',
           },
         },
+        workspacePaneTabsByTargetByRepo: {
+          '/tmp/repo': {
+            [targetKey]: [workspacePaneStaticTabEntry('history')],
+          },
+        },
+      }),
+    )
+  })
+
+  test('validates persisted workspace tab targets against query-backed branches', () => {
+    const targetKey = worktreeTargetKey('/tmp/repo', 'feature/query-worktree', '/tmp/query-worktree')
+    const repo = seedRepoState({
+      id: '/tmp/repo',
+      branches: [createRepoBranch('main')],
+      selectedBranch: 'main',
+      preferredWorkspacePaneTab: 'history',
+    })
+    setRepoSnapshotQueryData(repo.id, repo.instanceId, {
+      branches: [createRepoBranch('feature/query-worktree', { worktree: { path: '/tmp/query-worktree' } })],
+      current: 'feature/query-worktree',
+    })
+    setWorkspacePaneTabsForTargetQueryData({
+      repoRoot: repo.id,
+      repoInstanceId: repo.instanceId,
+      branchName: 'feature/query-worktree',
+      worktreePath: '/tmp/query-worktree',
+      tabs: [workspacePaneStaticTabEntry('history')],
+    })
+
+    renderInJsdom(<Harness />)
+
+    expect(persistWorkspaceSessionStateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
         workspacePaneTabsByTargetByRepo: {
           '/tmp/repo': {
             [targetKey]: [workspacePaneStaticTabEntry('history')],
@@ -275,7 +309,9 @@ describe('useSessionPersistence', () => {
     )
 
     expect(errorSpy).not.toHaveBeenCalledWith(
-      expect.stringContaining('Cannot update a component (`AuthenticatedSideEffects`) while rendering a different component'),
+      expect.stringContaining(
+        'Cannot update a component (`AuthenticatedSideEffects`) while rendering a different component',
+      ),
       expect.anything(),
       expect.anything(),
       expect.anything(),
@@ -287,9 +323,7 @@ describe('useSessionPersistence', () => {
 
   test('coalesces overlapping session saves into the latest state', async () => {
     const persistDeferred = Promise.withResolvers<void>()
-    persistWorkspaceSessionStateMock.mockImplementationOnce(
-      async () => await persistDeferred.promise,
-    )
+    persistWorkspaceSessionStateMock.mockImplementationOnce(async () => await persistDeferred.promise)
     persistWorkspaceSessionStateMock.mockImplementation(async () => {})
 
     const repo = seedRepoState({

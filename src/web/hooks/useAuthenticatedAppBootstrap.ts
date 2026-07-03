@@ -1,3 +1,5 @@
+// architecture-allow settings-client: authenticated bootstrap primes query
+// state from the server transport before feature stores start reading it.
 import { useEffect, useRef } from 'react'
 import type { SettingsSnapshot } from '#/shared/api-types.ts'
 import { normalizeWorkspaceSessionLayoutState } from '#/shared/workspace-layout.ts'
@@ -93,11 +95,10 @@ function finishWorkspacePaneTabsBootRestore(result: RestoreWorkspacePaneTabsFrom
       return
     case 'failed':
       bootstrapLog.warn('workspace pane tabs restore incomplete', workspacePaneTabsRestoreSummary(result))
-      // A failed tabs import should not leave session persistence blocked
-      // forever. Runtime tab truth stays on the server; the next session
-      // save will persist the reachable runtime/query projection rather
-      // than repeatedly treating the failed boot snapshot as live state.
-      useReposStore.setState({ sessionPersistenceReady: true })
+      // Keep session persistence blocked when a server import failed. Saving
+      // the partial runtime/query projection here would permanently erase the
+      // persisted tab targets that failed only because of a transient commit
+      // error during boot.
       return
   }
 }
