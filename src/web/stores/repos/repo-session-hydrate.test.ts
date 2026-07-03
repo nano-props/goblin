@@ -247,7 +247,7 @@ describe('repo session hydration', () => {
   test('hydrateRepoSession flips sessionReady even when openRepoEntries is empty', async () => {
     // Regression: a session with zero open repos used to leave the boot
     // skeleton up forever because sessionReady only flipped on the first
-    // placeholder landing, and Phase 1 with no entries is a no-op.
+    // placeholder landing, and an empty restore has no placeholders.
     installGoblin()
 
     await useReposStore.getState().hydrateRepoSession([], null)
@@ -358,11 +358,10 @@ describe('repo session hydration', () => {
 
     await useReposStore.getState().hydrateRepoSession([remoteRepoSessionEntry(target!)], target!.id)
 
-    // Phase 4: the lifecycle union owns the failure signal.
-    // The `availability` mirror field is kept for the refresh
-    // pipeline guards (refresh.ts / refresh-coordinator.ts)
-    // but is NOT the authoritative source — this assertion
-    // pins the union shape, not the mirror.
+    // The lifecycle union owns the failure signal. The `availability`
+    // mirror field is kept for refresh pipeline guards
+    // (refresh.ts / refresh-coordinator.ts), but is not authoritative;
+    // this assertion pins the union shape, not the mirror.
     expect(useReposStore.getState().repos[target!.id]).toMatchObject({
       id: target!.id,
       remote: {

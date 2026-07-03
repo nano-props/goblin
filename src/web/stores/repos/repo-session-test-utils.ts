@@ -67,10 +67,9 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
     else if (key === 'composite') handlers['repo.composite'] = handler
     else handlers[key] = handler
   }
-  // Phase 3: unified server-side lifecycle boundary. Instead of
-  // hand-rolling the same compose logic the server already owns,
-  // we inject test doubles into the real `resolveServerRemoteRepoConnection`
-  // so the exact same classification / mapping code runs in tests.
+  // Exercise the same server-side lifecycle boundary used in production:
+  // inject test doubles into `resolveServerRemoteRepoConnection` so the
+  // real classification / mapping code runs in tests.
   const deps: RemoteRepoConnectionDeps = {
     resolveTarget: async ({ alias, remotePath }) => {
       const result = handlers['remote.resolveTarget']?.({ alias, remotePath }) as

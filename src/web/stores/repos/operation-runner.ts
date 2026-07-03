@@ -111,7 +111,7 @@ async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Pr
     },
   }
 
-  // Phase 1: 执行核心任务，得到 outcome（不会被后续副作用污染）
+  // Run the core task first so follow-up side effects cannot alter the outcome.
   type Outcome =
     | { kind: 'stale' }
     | { kind: 'error'; error: string; original: unknown }
