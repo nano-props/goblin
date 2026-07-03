@@ -36,17 +36,17 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
       // reopens what WorkspaceSessionState described, but does not subscribe the repos
       // store to future session writes from persistence.
       //
-      // The flow is split into two phases so the repo picker can render
+      // The flow is split into placeholder-ready and settled steps so the repo picker can render
       // server-authoritative placeholders before full refresh finishes:
-      //   Phase 1: establish runtime authority. Local entries go through
+      //   1. Establish runtime authority. Local entries go through
       //     the server's canonical open path (probe input -> canonical
       //     root -> repoInstanceId) before any repo state is written. Remote
       //     entries keep their remote id and are opened directly.
-      //   Phase 2: settle the restored repos. Local entries promote the
+      //   2. Settle the restored repos. Local entries promote the
       //     canonical placeholder to a resolved repo and kick off initial
       //     refresh. Remote entries go through the unified orchestrator.
       //
-      // sessionReady flips after Phase 1 completes. The per-repo body keeps
+      // sessionReady flips after placeholders are ready. The per-repo body keeps
       // showing its own skeleton until each snapshot resolves.
       const rankById = new Map<string, number>()
       openRepoEntries.forEach((entry, index) => {
@@ -202,7 +202,7 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
         ),
       )
       await placeholderReady
-      // Flip sessionReady unconditionally once Phase 1 has finished.
+      // Flip sessionReady unconditionally once placeholders are ready.
       // With open repositories, the boot skeleton (shown only when no activeId) gives
       // way to a real workspace immediately — the per-repo body keeps
       // showing its own skeleton until each snapshot resolves. With no open

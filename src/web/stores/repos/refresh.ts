@@ -47,10 +47,9 @@ function resolvePullRequestRefreshRequest(
   mode: PullRequestFetchMode
   clearMissing: boolean
 } | null {
-  // Phase 4: inlined because the caller is a `Pick<RepoState>`
-  // and `isRepoUnavailable` wants a full repo (it reads `id`).
-  // Local repos carry their failure in `availability.phase`;
-  // remote repos carry theirs in `remote.lifecycle.kind`.
+  // The caller passes a focused repo shape, so keep the availability
+  // check local: local repos carry failure in `availability.phase`;
+  // remote repos carry it in `remote.lifecycle.kind`.
   if (isRemoteRepoId(repo.id)) {
     if (repo.remote.lifecycle?.kind === 'failed') return null
   } else if (repo.availability.phase === 'unavailable') {
