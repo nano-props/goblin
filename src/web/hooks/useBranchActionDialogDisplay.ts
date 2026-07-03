@@ -74,6 +74,7 @@ import {
 } from '#/web/stores/repos/branch-action-dialogs.ts'
 import type { RepoBranchState, RepoState } from '#/web/stores/repos/types.ts'
 import { useLastNonNull } from '#/web/hooks/useLastNonNull.ts'
+import { useRepoBranchReadModel, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 
 interface BranchActionDialogContext {
   repo: RepoState
@@ -114,7 +115,17 @@ export function useBranchActionDialogDisplay<P>(
   repos: Record<string, RepoState>,
 ): BranchActionDialogDisplay<P> {
   const entry = useLastNonNull(slot)
-  const liveContext = slot ? resolveContext(repos, slot) : null
+  const slotRepo = slot ? repos[slot.repoId] : null
+  const branchReadModel = useRepoBranchReadModel(
+    slot?.repoId ?? '',
+    slotRepo?.instanceId ?? '',
+    {
+      status: slotRepo?.data.status ?? [],
+      worktreesByPath: slotRepo?.data.worktreesByPath ?? {},
+    },
+    !!slotRepo,
+  )
+  const liveContext = slot ? resolveContext(repos, slot, branchReadModel) : null
   // Retain the last non-null `liveContext` for the close-animation
   // window. After the user clicks Confirm/Cancel, `slot` is null and
   // `liveContext` is null, but the host still needs a stable context
@@ -140,8 +151,13 @@ export function useBranchActionDialogDisplay<P>(
 function resolveContext<P>(
   repos: Record<string, RepoState>,
   entry: BranchActionDialogEntry<P>,
+  branchReadModel: RepoBranchReadModelData | null,
 ): BranchActionDialogContext | null {
-  const repo = repos[entry.repoId]
+  const repoFromStore = repos[entry.repoId]
+  const repo =
+    repoFromStore && branchReadModel
+      ? { ...repoFromStore, data: { ...repoFromStore.data, ...branchReadModel } }
+      : repoFromStore
   if (!repo) return null
   const branch = repo.data.branches.find((b) => b.name === entry.branchName)
   if (!branch) return null

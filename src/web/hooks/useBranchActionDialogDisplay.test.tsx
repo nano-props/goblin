@@ -11,6 +11,7 @@
 // rendered for the duration of the close animation.
 
 import { act } from '@testing-library/react'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useBranchActionDialogDisplay } from '#/web/hooks/useBranchActionDialogDisplay.ts'
@@ -23,11 +24,14 @@ import {
 } from '#/web/stores/repos/branch-action-dialogs.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 
 const REPO_ID = '/tmp/gbl-dialog-display-test'
 const OTHER_REPO_ID = '/tmp/gbl-dialog-display-test-other'
 
 beforeEach(() => {
+  primaryWindowQueryClient.clear()
   resetReposStore()
   resetBranchActionDialogsStore()
 })
@@ -51,9 +55,17 @@ function mountHarness<P>(initial: BranchActionDialogEntry<P> | null): HarnessHan
     handle.current = useBranchActionDialogDisplay(slot, repos)
     return null
   }
-  const result = renderInJsdom(<Harness slot={initial} />)
+  const result = renderInJsdom(
+    <QueryClientProvider client={primaryWindowQueryClient}>
+      <Harness slot={initial} />
+    </QueryClientProvider>,
+  )
   handle.setSlot = (next) => {
-    result.rerender(<Harness slot={next} />)
+    result.rerender(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <Harness slot={next} />
+      </QueryClientProvider>,
+    )
   }
   return handle
 }
@@ -122,6 +134,31 @@ describe('useBranchActionDialogDisplay', () => {
     // `removeAlsoDeletes` is seeded true on first open for a
     // non-protected branch (matches `openRemoveWorktreeConfirm`).
     expect(handle.current?.displayCheckboxes.removeAlsoDeletes).toBe(true)
+  })
+
+  test('resolves branch context from the React Query snapshot read model when store branches are stale', () => {
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branches: [],
+      selectedBranch: 'feature/query',
+    })
+    setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
+      current: 'feature/query',
+      branches: [createRepoBranch('feature/query', { tracking: 'origin/feature/query', trackingGone: false })],
+    })
+    const entry: BranchActionDialogEntry<string> = {
+      repoId: REPO_ID,
+      branchName: 'feature/query',
+      payload: 'feature/query',
+    }
+    act(() => {
+      useBranchActionDialogsStore.getState().openDeleteConfirm(entry)
+    })
+
+    const handle = mountHarness(entry)
+
+    expect(handle.current?.liveContext?.branch.name).toBe('feature/query')
+    expect(handle.current?.displayContext?.branch.tracking).toBe('origin/feature/query')
   })
 
   test('liveContext and displayContext share identity while the slot is open (single resolveContext call)', () => {

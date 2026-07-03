@@ -10,6 +10,7 @@
 //   - one-dialog-at-a-time invariant across the `openXxx` actions
 
 import { act, cleanup } from '@testing-library/react'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { BranchActionDialogHost } from '#/web/components/BranchActionDialogHost.tsx'
 import {
@@ -23,6 +24,7 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import { idleOperation } from '#/web/stores/repos/operations.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 
 vi.mock('#/web/hooks/branchActionDispatch.ts', () => ({
   dispatchPush: vi.fn(),
@@ -134,6 +136,7 @@ function buildRepo(repo: ReturnType<typeof seedRepoState>): BranchActionRepo {
 }
 
 beforeEach(() => {
+  primaryWindowQueryClient.clear()
   resetReposStore()
   resetBranchActionDialogsStore()
 })
@@ -146,7 +149,13 @@ afterEach(() => {
 })
 
 function render(element: React.ReactNode) {
-  return renderInJsdom(element)
+  const result = renderInJsdom(<QueryClientProvider client={primaryWindowQueryClient}>{element}</QueryClientProvider>)
+  return {
+    ...result,
+    rerender: (next: React.ReactNode) => {
+      result.rerender(<QueryClientProvider client={primaryWindowQueryClient}>{next}</QueryClientProvider>)
+    },
+  }
 }
 
 function findButtonByText(text: string): HTMLButtonElement | null {
