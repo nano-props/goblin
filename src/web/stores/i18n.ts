@@ -19,6 +19,8 @@ import { create, type StoreApi } from 'zustand'
 import type { I18nSnapshot, Lang, LangPref } from '#/shared/api-types.ts'
 import { getI18nSnapshot, setI18nPref } from '#/web/settings-client.ts'
 import { subscribeSettingsInvalidationRefetch } from '#/web/settings-invalidation-refetch.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { updateRuntimeSettingsSnapshotCache } from '#/web/settings-query-cache.ts'
 
 export type { Lang, LangPref }
 type Dict = Record<string, string>
@@ -99,6 +101,7 @@ export const useI18nStore = create<I18nState>((set) => ({
   async setPref(pref) {
     const snapshot = await setI18nPref(pref)
     if (snapshot) {
+      updateRuntimeSettingsSnapshotCache(primaryWindowQueryClient, (current) => ({ ...current, lang: snapshot.pref }))
       await commitSnapshot(set, snapshot)
     }
   },

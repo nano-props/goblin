@@ -317,4 +317,35 @@ describe('theme store OS-appearance sync', () => {
     expect(document.documentElement.getAttribute('data-theme')).toBe('light')
     expect(document.documentElement.getAttribute('data-color-theme')).toBe('github')
   })
+
+  test('setPref syncs the settings snapshot query cache from the server response', async () => {
+    installWindow({ matchMedia: createMediaQuery(false) })
+    const { primaryWindowQueryClient } = await import('#/web/primary-window-queries.ts')
+    const { settingsSnapshotQueryKey } = await import('#/web/settings-query-cache.ts')
+    primaryWindowQueryClient.setQueryData(
+      settingsSnapshotQueryKey(),
+      defaultSettingsSnapshot({ theme: 'auto', colorTheme: 'macos' }),
+    )
+    mockFetch(async () => ({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        prefs: {
+          ...defaultSettingsSnapshot({ theme: 'dark', colorTheme: 'github' }),
+        },
+      }),
+    }))
+
+    const { useThemeStore } = await import('#/web/stores/theme.ts')
+    await useThemeStore.getState().setPref('dark')
+
+    expect(primaryWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
+      theme: 'dark',
+      colorTheme: 'github',
+    })
+    expect(useThemeStore.getState()).toMatchObject({
+      pref: 'dark',
+      colorTheme: 'github',
+    })
+  })
 })

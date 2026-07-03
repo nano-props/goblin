@@ -19,6 +19,8 @@ import {
   setThemePref,
 } from '#/web/settings-client.ts'
 import { subscribeSettingsInvalidationRefetch } from '#/web/settings-invalidation-refetch.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { updateRuntimeSettingsSnapshotCache } from '#/web/settings-query-cache.ts'
 
 interface ThemeStore extends ThemeState {
   setPref: (pref: ThemePref) => Promise<void>
@@ -81,6 +83,14 @@ function resolveOsTheme(): ResolvedTheme | null {
 function commitThemeState(set: ThemeSet, next: ThemeState): void {
   applyHtmlAttrs(next.resolved, next.colorTheme)
   set((s) => (s.pref === next.pref && s.resolved === next.resolved && s.colorTheme === next.colorTheme ? s : next))
+}
+
+function updateThemeSettingsSnapshotCache(next: ThemeState): void {
+  updateRuntimeSettingsSnapshotCache(primaryWindowQueryClient, (current) => ({
+    ...current,
+    theme: next.pref,
+    colorTheme: next.colorTheme,
+  }))
 }
 
 // Only auto mode is OS-driven. Explicit 'light' / 'dark' picks pin
@@ -147,11 +157,15 @@ export const useThemeStore = create<ThemeStore>((set, get) => ({
 
   async setPref(pref) {
     if (pref === get().pref) return
-    commitThemeState(set, await setThemePref(pref))
+    const next = await setThemePref(pref)
+    updateThemeSettingsSnapshotCache(next)
+    commitThemeState(set, next)
   },
 
   async setColorTheme(colorTheme) {
     if (colorTheme === get().colorTheme) return
-    commitThemeState(set, await setThemeColorTheme(colorTheme))
+    const next = await setThemeColorTheme(colorTheme)
+    updateThemeSettingsSnapshotCache(next)
+    commitThemeState(set, next)
   },
 }))
