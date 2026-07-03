@@ -18,6 +18,7 @@ import {
 
 const REPO_ROOT = '/tmp/workspace-pane-tab-drag-preview-repo'
 const REPO_INSTANCE_ID = 'repo-instance-test'
+const NEXT_REPO_INSTANCE_ID = 'repo-instance-next'
 const BRANCH_NAME = 'feature/worktree'
 const WORKTREE_PATH = '/tmp/workspace-pane-tab-drag-preview-worktree'
 
@@ -144,6 +145,30 @@ describe('useWorkspacePaneTabDragPreview', () => {
 
     expect(currentControls().visualTabs).toEqual(sourceTabs)
   })
+
+  test('clears a staged preview when the repo runtime instance changes', () => {
+    const sourceTabs = [terminalEntry('session-1'), staticEntry('status')]
+    const reorderedTabs = [staticEntry('status'), terminalEntry('session-1')]
+    const renderResult = renderPreviewHook({ canonicalTabs: sourceTabs })
+
+    act(() => {
+      expect(currentControls().stageDragPreview(reorderedTabs)).toBe(true)
+    })
+    expect(currentControls().visualTabs).toEqual(reorderedTabs)
+
+    act(() => {
+      renderResult.rerender(
+        <HookHost
+          input={previewInput({
+            repoInstanceId: NEXT_REPO_INSTANCE_ID,
+            canonicalTabs: sourceTabs,
+          })}
+        />,
+      )
+    })
+
+    expect(currentControls().visualTabs).toEqual(sourceTabs)
+  })
 })
 
 function renderPreviewHook(input: Partial<WorkspacePaneTabDragPreviewInput> = {}) {
@@ -153,6 +178,7 @@ function renderPreviewHook(input: Partial<WorkspacePaneTabDragPreviewInput> = {}
 function previewInput(input: Partial<WorkspacePaneTabDragPreviewInput> = {}): WorkspacePaneTabDragPreviewInput {
   return {
     repoRoot: REPO_ROOT,
+    repoInstanceId: REPO_INSTANCE_ID,
     branchName: BRANCH_NAME,
     worktreePath: WORKTREE_PATH,
     canonicalTabs: [],

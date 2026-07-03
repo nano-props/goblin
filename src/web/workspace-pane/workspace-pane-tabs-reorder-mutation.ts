@@ -49,7 +49,7 @@ export function useWorkspacePaneTabsReorderMutation(
             worktreePath: input.worktreePath,
           }
         : null,
-    [input.branchName, input.repoRoot, input.worktreePath],
+    [input.branchName, input.repoInstanceId, input.repoRoot, input.worktreePath],
   )
   const canonicalTabsIdentity = useMemo(
     () => workspacePaneTabEntryListIdentity(input.canonicalTabs),
@@ -136,8 +136,8 @@ function restoreWorkspacePaneTabsTargetQueryData(
   queryClient.setQueryData<WorkspacePaneTabsQueryData>(
     workspacePaneTabsQueryKey(target.repoRoot, target.repoInstanceId),
     (current) => [
-    ...(current ?? []).filter((entry) => !workspacePaneTabsEntryMatchesTarget(entry, target)),
-    ...(previousTargetEntry ? [previousTargetEntry] : []),
+      ...(current ?? []).filter((entry) => !workspacePaneTabsEntryMatchesTarget(entry, target)),
+      ...(previousTargetEntry ? [previousTargetEntry] : []),
     ],
   )
 }
