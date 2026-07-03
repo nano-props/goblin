@@ -108,6 +108,7 @@ interface TerminalSessionServiceOptions {
     | 'tabsForScope'
   >
   broadcastSessionsChanged(userId: string, repoRoot: string): void
+  isCurrentRepoInstance(userId: string, repoRoot: string, repoInstanceId: string): boolean
   gCommand?: GoblinTerminalCommandRuntime
 }
 
@@ -176,6 +177,9 @@ class TerminalSessionService {
     if (!isValidTerminalClientId(terminalClientId)) return { ok: false, message: 'error.invalid-arguments' }
 
     return await this.runCreateInWorktreeQueue(userId, input, async () => {
+      if (!this.isCurrentRepoInstance(userId, input.repoRoot, input.repoInstanceId)) {
+        return { ok: false, message: 'error.repo-instance-stale' }
+      }
       const allocation = await this.allocateSessionIdForCreate(userId, input)
       const createResult = await this.ensureOrRestore(clientId, userId, {
         ...input,
@@ -183,6 +187,10 @@ class TerminalSessionService {
         terminalSessionId: allocation.terminalSessionId,
       }).finally(() => this.releaseSessionIdReservation(allocation))
       if (!createResult.ok) return { ok: false, message: createResult.message }
+      if (!this.isCurrentRepoInstance(userId, input.repoRoot, input.repoInstanceId)) {
+        this.options.manager.closeSession(createResult.terminalRuntimeSessionId)
+        return { ok: false, message: 'error.repo-instance-stale' }
+      }
       const sessions = await this.listSessions(userId, input.repoRoot, input.repoInstanceId)
       const createdSession = sessions.find((session) => session.terminalSessionId === createResult.terminalSessionId)
       const sessionScope = terminalSessionRuntimeScope(input.repoRoot, input.repoInstanceId)
@@ -256,8 +264,10 @@ class TerminalSessionService {
     const scope = terminalSessionRuntimeScope(input.repoRoot, input.repoInstanceId)
     const worktreePath = input.worktreePath === null ? null : terminalWorktreePath(input.repoRoot, input.worktreePath)
     return await this.runWorkspaceTabsOperation(userId, scope, input.branchName, worktreePath, async () => {
+      this.assertCurrentRepoInstance(userId, input.repoRoot, input.repoInstanceId)
       const liveTerminalSessionIds =
         worktreePath === null ? [] : await this.liveTerminalSessionIdsForWorktree(userId, scope, worktreePath)
+      this.assertCurrentRepoInstance(userId, input.repoRoot, input.repoInstanceId)
       return this.options.workspaceTabs.replaceTabs({
         userId,
         scope,
@@ -276,8 +286,10 @@ class TerminalSessionService {
     const scope = terminalSessionRuntimeScope(input.repoRoot, input.repoInstanceId)
     const worktreePath = input.worktreePath === null ? null : terminalWorktreePath(input.repoRoot, input.worktreePath)
     return await this.runWorkspaceTabsOperation(userId, scope, input.branchName, worktreePath, async () => {
+      this.assertCurrentRepoInstance(userId, input.repoRoot, input.repoInstanceId)
       const liveTerminalSessionIds =
         worktreePath === null ? [] : await this.liveTerminalSessionIdsForWorktree(userId, scope, worktreePath)
+      this.assertCurrentRepoInstance(userId, input.repoRoot, input.repoInstanceId)
       const target = { userId, scope, branchName: input.branchName, worktreePath }
       const updatedTabs = this.applyWorkspacePaneTabsOperation(target, input.operation)
       return this.options.workspaceTabs.replaceTabs({
@@ -477,6 +489,7 @@ class TerminalSessionService {
     if (isRemoteRepoId(repoRoot)) return { pruned: 0, remaining: allSessions.length }
 
     const worktrees = await getWorktrees(repoRoot, { includeStatus: false })
+    this.assertCurrentRepoInstance(userId, repoRoot, repoInstanceId)
     const liveWorktreePaths = new Set(worktrees.map((worktree) => path.resolve(worktree.path)))
     let pruned = 0
     for (const session of allSessions) {
@@ -489,6 +502,14 @@ class TerminalSessionService {
       .listSessionsForUser(userId, sessionScope)
       .then((sessions) => sessions.length)
     return { pruned, remaining }
+  }
+
+  private isCurrentRepoInstance(userId: string, repoRoot: string, repoInstanceId: string): boolean {
+    return this.options.isCurrentRepoInstance(userId, repoRoot, repoInstanceId)
+  }
+
+  private assertCurrentRepoInstance(userId: string, repoRoot: string, repoInstanceId: string): void {
+    if (!this.isCurrentRepoInstance(userId, repoRoot, repoInstanceId)) throw new Error('error.repo-instance-stale')
   }
 
   private async liveTerminalSessionIdsForWorktree(

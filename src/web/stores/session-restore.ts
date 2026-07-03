@@ -2,8 +2,8 @@
 // Persisted settings and external-app detection now flow through
 // TanStack Query; this store exists only so bootstrap can consume the
 // one-shot saved session snapshot.
-// architecture-allow settings-client: this store has a legacy hydrate path for
-// one-shot boot session reads; runtime writes still go through settings-actions.
+// This store has a legacy hydrate path for one-shot boot session reads; runtime
+// writes still go through settings-actions.
 
 import { create, type StoreApi } from 'zustand'
 import type { WorkspaceSessionState, SettingsSnapshot } from '#/shared/api-types.ts'

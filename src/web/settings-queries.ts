@@ -1,5 +1,4 @@
-// architecture-allow settings-client: query options are the read boundary for
-// server-backed settings projections.
+// Query options are the read boundary for server-backed settings projections.
 import { useEffect, useState } from 'react'
 import { QueryObserver, queryOptions, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ExternalAppsSnapshot, GitHubCliState, LanInfo, SettingsSnapshot } from '#/shared/api-types.ts'

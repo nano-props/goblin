@@ -1,5 +1,5 @@
-// architecture-allow settings-client: authenticated bootstrap primes query
-// state from the server transport before feature stores start reading it.
+// Authenticated bootstrap primes query state from the server transport before
+// feature stores start reading it.
 import { useEffect, useRef } from 'react'
 import type { SettingsSnapshot } from '#/shared/api-types.ts'
 import { normalizeWorkspaceSessionLayoutState } from '#/shared/workspace-layout.ts'

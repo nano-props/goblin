@@ -134,9 +134,14 @@ export async function openRepoRuntimeInstanceWithCache(repoRoot: string): Promis
 }
 
 export async function closeRepoRuntimeInstanceWithCache(repoRoot: string, repoInstanceId: string): Promise<void> {
-  const closed = await closeRepoRuntimeInstance(repoRoot, repoInstanceId)
-  if (closed) removeRepoRuntimeInstanceFromCache({ repoRoot, repoInstanceId })
-  else invalidateRepoRuntimeInstances()
+  try {
+    const closed = await closeRepoRuntimeInstance(repoRoot, repoInstanceId)
+    if (closed) removeRepoRuntimeInstanceFromCache({ repoRoot, repoInstanceId })
+    else invalidateRepoRuntimeInstances()
+  } catch (err) {
+    invalidateRepoRuntimeInstances()
+    throw err
+  }
 }
 
 function orderedInsert(order: string[], id: string, rankById?: ReadonlyMap<string, number>): string[] {

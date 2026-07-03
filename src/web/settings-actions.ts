@@ -1,5 +1,5 @@
-// architecture-allow settings-client: actions are the write boundary that commits
-// to the server transport and projects server-returned values into React Query.
+// Actions are the write boundary that commits to the server transport and
+// projects server-returned values into React Query.
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { GlobalShortcutState, I18nSnapshot, ThemeState, WorkspaceSessionState } from '#/shared/api-types.ts'
 import { settingsLog } from '#/web/logger.ts'

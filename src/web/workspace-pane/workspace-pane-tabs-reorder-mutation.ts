@@ -1,13 +1,13 @@
 import { useCallback, useMemo } from 'react'
-import { useQueryClient, type QueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabEntryIdentity } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsEntryMatchesTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { WorkspacePaneTabsQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import {
   cancelWorkspacePaneTabs,
-  invalidateWorkspacePaneTabs,
   readWorkspacePaneTabsForTarget,
+  restoreWorkspacePaneTabsTargetQueryData,
   setWorkspacePaneTabsForTargetQueryData,
   workspacePaneTabsQueryKey,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
@@ -74,7 +74,8 @@ export function useWorkspacePaneTabsReorderMutation(
           ?.find((entry) => workspacePaneTabsEntryMatchesTarget(entry, target))
         // Optimistic cache only: server runtime remains canonical. Success
         // below replaces this projection with server-returned tabs; failure
-        // restores the prior target and invalidates the list query.
+        // restores the prior target because the rejected mutation did not
+        // produce a new server projection.
         setWorkspacePaneTabsForTargetQueryData(
           {
             repoRoot: target.repoRoot,
@@ -104,8 +105,16 @@ export function useWorkspacePaneTabsReorderMutation(
             queryClient,
           )
         } catch (err) {
-          restoreWorkspacePaneTabsTargetQueryData(target, previousTargetEntry, queryClient)
-          invalidateWorkspacePaneTabs(target.repoRoot, target.repoInstanceId, queryClient)
+          restoreWorkspacePaneTabsTargetQueryData(
+            {
+              repoRoot: target.repoRoot,
+              repoInstanceId: target.repoInstanceId,
+              branchName: target.branchName,
+              worktreePath: target.worktreePath,
+              previousTargetEntry,
+            },
+            queryClient,
+          )
           reportWorkspacePaneTabsFailure({
             operation: 'reorder',
             repoRoot: target.repoRoot,
@@ -121,23 +130,4 @@ export function useWorkspacePaneTabsReorderMutation(
   )
 
   return { reorderTabs }
-}
-
-function restoreWorkspacePaneTabsTargetQueryData(
-  target: {
-    repoRoot: string
-    repoInstanceId: string
-    branchName: string
-    worktreePath: string | null
-  },
-  previousTargetEntry: WorkspacePaneTabsQueryData[number] | undefined,
-  queryClient: QueryClient,
-): void {
-  queryClient.setQueryData<WorkspacePaneTabsQueryData>(
-    workspacePaneTabsQueryKey(target.repoRoot, target.repoInstanceId),
-    (current) => [
-      ...(current ?? []).filter((entry) => !workspacePaneTabsEntryMatchesTarget(entry, target)),
-      ...(previousTargetEntry ? [previousTargetEntry] : []),
-    ],
-  )
 }

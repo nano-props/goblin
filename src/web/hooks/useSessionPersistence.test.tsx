@@ -16,6 +16,7 @@ import {
 } from '#/web/stores/repos/filetree-interaction-state.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import {
+  replaceWorkspacePaneTabsQueryData,
   setWorkspacePaneTabsForTargetQueryData,
   useWorkspacePaneTabsQuery,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
@@ -131,6 +132,48 @@ describe('useSessionPersistence', () => {
         },
       }),
     )
+  })
+
+  test('persists workspace pane tabs when the server projection is refreshed', async () => {
+    const targetKey = worktreeTargetKey('/tmp/repo', 'feature/worktree', '/tmp/worktree')
+    const repo = seedRepoState({
+      id: '/tmp/repo',
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
+      selectedBranch: 'feature/worktree',
+    })
+    useReposStore.setState({
+      repos: { [repo.id]: repo },
+      order: [repo.id],
+      activeId: repo.id,
+      sessionReady: true,
+      sessionPersistenceReady: true,
+    })
+
+    renderInJsdom(<Harness />)
+    persistWorkspaceSessionStateMock.mockClear()
+
+    act(() => {
+      replaceWorkspacePaneTabsQueryData(repo.id, repo.instanceId, [
+        {
+          repoRoot: repo.id,
+          branchName: 'feature/worktree',
+          worktreePath: '/tmp/worktree',
+          tabs: [workspacePaneStaticTabEntry('history')],
+        },
+      ])
+    })
+
+    await vi.waitFor(() => {
+      expect(persistWorkspaceSessionStateMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          workspacePaneTabsByTargetByRepo: {
+            '/tmp/repo': {
+              [targetKey]: [workspacePaneStaticTabEntry('history')],
+            },
+          },
+        }),
+      )
+    })
   })
 
   test('validates persisted workspace tab targets against query-backed branches', () => {

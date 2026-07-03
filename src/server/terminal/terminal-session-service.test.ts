@@ -76,6 +76,58 @@ describe('terminal session service workspace tabs', () => {
     ])
   })
 
+  test('create closes the runtime session when the repo instance goes stale after ensure', async () => {
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    let current = true
+    let createdTerminalSessionId: string | null = null
+    const closeSession = vi.fn()
+    const service = createService({
+      sessions: () => (createdTerminalSessionId ? [terminalSession(createdTerminalSessionId)] : []),
+      workspaceTabs,
+      closeSession,
+      isCurrentRepoInstance: () => current,
+      ensureSession: vi.fn(async (input) => {
+        createdTerminalSessionId = input.terminalSessionId
+        current = false
+        return {
+          ok: true as const,
+          terminalRuntimeSessionId: 'pty_session_created',
+          snapshot: '',
+          snapshotSeq: 0,
+          processName: 'zsh',
+          canonicalTitle: null,
+          phase: 'open' as const,
+          message: null,
+          controller: null,
+          canonicalCols: input.cols,
+          canonicalRows: input.rows,
+        }
+      }),
+    })
+
+    await expect(
+      service.create('client_terminal_service', USER_ID, {
+        repoRoot: REPO_ROOT,
+        repoInstanceId: REPO_INSTANCE_ID,
+        branch: BRANCH_NAME,
+        worktreePath: WORKTREE_PATH,
+        kind: 'additional',
+        cols: 80,
+        rows: 24,
+      }),
+    ).resolves.toEqual({ ok: false, message: 'error.repo-instance-stale' })
+
+    expect(closeSession).toHaveBeenCalledWith('pty_session_created')
+    expect(
+      workspaceTabs.tabs({
+        userId: USER_ID,
+        scope: RUNTIME_SCOPE,
+        branchName: BRANCH_NAME,
+        worktreePath: path.resolve(WORKTREE_PATH),
+      }),
+    ).toEqual([workspacePaneStaticTabEntry('status')])
+  })
+
   test('replaceTabs drops stale terminal tabs without appending missing live terminals', async () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     const service = createService({
@@ -115,6 +167,45 @@ describe('terminal session service workspace tabs', () => {
         tabs: [workspacePaneStaticTabEntry('status')],
       }),
     ).resolves.toEqual([workspacePaneStaticTabEntry('status')])
+  })
+
+  test('replaceTabs rejects before writing when the repo instance goes stale during live-session lookup', async () => {
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    workspaceTabs.replaceTabs({
+      userId: USER_ID,
+      scope: RUNTIME_SCOPE,
+      branchName: BRANCH_NAME,
+      worktreePath: path.resolve(WORKTREE_PATH),
+      tabs: [workspacePaneStaticTabEntry('status')],
+    })
+    let current = true
+    const service = createService({
+      sessions: async () => {
+        current = false
+        return [terminalSession('session-live')]
+      },
+      workspaceTabs,
+      isCurrentRepoInstance: () => current,
+    })
+
+    await expect(
+      service.replaceTabs(USER_ID, {
+        repoRoot: REPO_ROOT,
+        repoInstanceId: REPO_INSTANCE_ID,
+        branchName: BRANCH_NAME,
+        worktreePath: WORKTREE_PATH,
+        tabs: [workspacePaneStaticTabEntry('history'), workspacePaneTerminalTabEntry('session-live')],
+      }),
+    ).rejects.toThrow('error.repo-instance-stale')
+
+    expect(
+      workspaceTabs.tabs({
+        userId: USER_ID,
+        scope: RUNTIME_SCOPE,
+        branchName: BRANCH_NAME,
+        worktreePath: path.resolve(WORKTREE_PATH),
+      }),
+    ).toEqual([workspacePaneStaticTabEntry('status')])
   })
 
   test('listWorkspaceTabs prunes stale terminal tabs without appending missing live terminals', async () => {
@@ -447,6 +538,8 @@ function createService(options: {
   sessions: TerminalSessionSummary[] | (() => TerminalSessionSummary[] | Promise<TerminalSessionSummary[]>)
   workspaceTabs: WorkspacePaneTabsRuntime<string>
   ensureSession?: (input: EnsureSessionInput) => Promise<TerminalAttachResult>
+  closeSession?: (terminalRuntimeSessionId: string) => void
+  isCurrentRepoInstance?: (userId: string, repoRoot: string, repoInstanceId: string) => boolean
 }) {
   return createTerminalSessionService({
     isValidClientId: (value): value is string => typeof value === 'string',
@@ -461,9 +554,10 @@ function createService(options: {
       listSessionsForUser: vi.fn(async () =>
         await (typeof options.sessions === 'function' ? options.sessions() : options.sessions),
       ),
-      closeSession: vi.fn(),
+      closeSession: options.closeSession ?? vi.fn(),
     },
     workspaceTabs: options.workspaceTabs,
+    isCurrentRepoInstance: options.isCurrentRepoInstance ?? (() => true),
     broadcastSessionsChanged: vi.fn(),
   })
 }

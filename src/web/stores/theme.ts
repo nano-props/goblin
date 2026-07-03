@@ -7,8 +7,8 @@
 // covers both the desktop and plain-browser repoOperationSchedulers. Electron main
 // still projects the server-owned preference into native host state,
 // but it is not the business source of truth.
-// architecture-allow settings-client: theme hydration can read the transport
-// snapshot directly; theme writes go through settings-actions.
+// Theme hydration can read the transport snapshot directly; theme writes go
+// through settings-actions.
 
 import { create, type StoreApi } from 'zustand'
 import { DEFAULT_COLOR_THEME, isColorTheme } from '#/shared/color-theme.ts'

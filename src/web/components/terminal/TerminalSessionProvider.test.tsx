@@ -1157,6 +1157,15 @@ describe('TerminalSessionProvider', () => {
     const { unmount } = await renderProviderWithProbe(terminalWorktreeKey)
 
     try {
+      listWorkspaceTabsMock.mockResolvedValue([
+        {
+          repoRoot: REPO_ID,
+          branchName: 'feature/worktree',
+          worktreePath: WORKTREE_PATH,
+          tabs: [workspacePaneStaticTabEntry('history')],
+        },
+      ])
+
       await act(async () => {
         sessionClosedHandler?.({
           terminalRuntimeSessionId: 'server_session_1',
@@ -1166,13 +1175,15 @@ describe('TerminalSessionProvider', () => {
         })
       })
 
-      expect(primaryWindowQueryClient.getQueryState(workspaceTabsQueryKeyForRepo(REPO_ID))?.isInvalidated).toBe(true)
+      await vi.waitFor(() => {
+        expect(tabsFor(REPO_ID, 'feature/worktree')).toEqual([workspacePaneStaticTabEntry('history')])
+      })
     } finally {
       await unmount()
     }
   })
 
-  test('invalidates workspace tabs query from workspace-tabs-changed broadcasts', async () => {
+  test('refreshes workspace tabs query from workspace-tabs-changed broadcasts', async () => {
     seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -1193,12 +1204,23 @@ describe('TerminalSessionProvider', () => {
     const { unmount } = await renderProviderWithProbe(terminalWorktreeKey)
 
     try {
+      listWorkspaceTabsMock.mockResolvedValue([
+        {
+          repoRoot: REPO_ID,
+          branchName: 'feature/worktree',
+          worktreePath: WORKTREE_PATH,
+          tabs: [workspacePaneStaticTabEntry('history')],
+        },
+      ])
+
       await act(async () => {
         workspaceTabsChangedHandler?.(REPO_ID)
         await waitForScheduledServerSync()
       })
 
-      expect(primaryWindowQueryClient.getQueryState(workspaceTabsQueryKeyForRepo(REPO_ID))?.isInvalidated).toBe(true)
+      await vi.waitFor(() => {
+        expect(tabsFor(REPO_ID, 'feature/worktree')).toEqual([workspacePaneStaticTabEntry('history')])
+      })
     } finally {
       await unmount()
     }

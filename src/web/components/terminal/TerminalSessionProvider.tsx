@@ -13,7 +13,7 @@ import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
 import { preloadTerminalFont } from '#/web/components/terminal/terminal-geometry.ts'
 import { loadTerminalSessions } from '#/web/terminal-session-queries.ts'
 import {
-  invalidateWorkspacePaneTabs,
+  refreshWorkspacePaneTabs,
   setWorkspacePaneTabsForTargetQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import {
@@ -174,7 +174,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     const offSessionClosed = terminalClient.onSessionClosed((event) => {
       projection.handleSessionClosed(event)
       const repoInstanceId = repoIndexRef.current[event.repoRoot]?.instanceId
-      if (typeof repoInstanceId === 'string') invalidateWorkspacePaneTabs(event.repoRoot, repoInstanceId)
+      if (typeof repoInstanceId === 'string') refreshWorkspacePaneTabs(event.repoRoot, repoInstanceId)
     })
 
     setTerminalSessionCommandBridge({
@@ -227,7 +227,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     const offSessionsChanged = terminalClient.onSessionsChanged(scheduleServerSync)
     const offWorkspaceTabsChanged = terminalClient.onWorkspaceTabsChanged((repoRoot) => {
       const repoInstanceId = repoIndexRef.current[repoRoot]?.instanceId
-      if (typeof repoInstanceId === 'string') invalidateWorkspacePaneTabs(repoRoot, repoInstanceId)
+      if (typeof repoInstanceId === 'string') refreshWorkspacePaneTabs(repoRoot, repoInstanceId)
       scheduleServerSync(repoRoot)
     })
 
