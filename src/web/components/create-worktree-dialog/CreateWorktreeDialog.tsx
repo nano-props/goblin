@@ -27,6 +27,7 @@ import { remoteRepoTarget } from '#/web/stores/repos/repo-guards.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { useRepoRemoteBranchesQuery } from '#/web/repo-data-query.ts'
+import { useRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
 import { cn } from '#/web/lib/cn.ts'
 import {
   deriveCreateWorktreeForm,
@@ -72,6 +73,18 @@ export function CreateWorktreeDialog({ open, repo, worktreeBootstrap, onClose, o
   const remoteBranchesQuery = useRepoRemoteBranchesQuery(repo.id, { enabled: open && mode === 'trackRemoteBranch' })
   const remoteBranches = remoteBranchesQuery.data ?? []
   const remoteBranchesLoading = remoteBranchesQuery.isLoading
+  const branchReadModel = useRepoBranchReadModel(
+    repo.id,
+    repo.instanceId,
+    {
+      status: repo.data.status,
+      worktreesByPath: repo.data.worktreesByPath,
+    },
+    open,
+  )
+  const presentationRepo: RepoState = branchReadModel
+    ? { ...repo, data: { ...repo.data, ...branchReadModel } }
+    : repo
 
   // Reset on the rising edge of `open` only. A guard ref prevents snapshot
   // refreshes (which change repo.data.branches / currentBranch) from wiping
@@ -82,7 +95,7 @@ export function CreateWorktreeDialog({ open, repo, worktreeBootstrap, onClose, o
     const wasClosed = !previousOpenRef.current && open
     previousOpenRef.current = open
     if (!wasClosed) return
-    const initialBase = repo.data.currentBranch || repo.data.branches[0]?.name || ''
+    const initialBase = presentationRepo.data.currentBranch || presentationRepo.data.branches[0]?.name || ''
     setMode('newBranch')
     setBase(initialBase)
     setBranch('')
@@ -91,12 +104,12 @@ export function CreateWorktreeDialog({ open, repo, worktreeBootstrap, onClose, o
     setLocalBranch('')
     setWorktreePath('')
     setSubmitting(false)
-  }, [open, repo.data.branches, repo.data.currentBranch])
+  }, [open, presentationRepo.data.branches, presentationRepo.data.currentBranch])
 
   const remoteTarget = remoteRepoTarget(repo.id, repo.remote.lifecycle)
   const derived = deriveCreateWorktreeForm(
     { mode, base, branch, existingBranch, remoteRef, localBranch, worktreePath, remoteBranches },
-    repo,
+    presentationRepo,
     remoteTarget,
     t,
   )
@@ -187,10 +200,10 @@ export function CreateWorktreeDialog({ open, repo, worktreeBootstrap, onClose, o
                       <SelectValue placeholder={t('action.create-worktree-base-placeholder')} />
                     </SelectTrigger>
                     <SelectContent>
-                      {repo.data.branches.map((b) => (
+                      {presentationRepo.data.branches.map((b) => (
                         <SelectItem key={b.name} value={b.name} textValue={b.name}>
                           <span className="truncate">{b.name}</span>
-                          {b.name === repo.data.currentBranch && (
+                          {b.name === presentationRepo.data.currentBranch && (
                             <span className="ml-2 text-xs text-muted-foreground">
                               {t('action.create-worktree-base-current')}
                             </span>
@@ -236,7 +249,7 @@ export function CreateWorktreeDialog({ open, repo, worktreeBootstrap, onClose, o
                     <SelectValue placeholder={t('action.create-worktree-existing-placeholder')} />
                   </SelectTrigger>
                   <SelectContent>
-                    {repo.data.branches.map((b) => (
+                    {presentationRepo.data.branches.map((b) => (
                       <SelectItem key={b.name} value={b.name} textValue={b.name}>
                         <span className="truncate">{b.name}</span>
                       </SelectItem>

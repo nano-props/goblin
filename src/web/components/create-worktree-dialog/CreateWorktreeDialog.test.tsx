@@ -11,6 +11,8 @@ import type { RepoState } from '#/web/stores/repos/types.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 import { getRepoRemoteBranches } from '#/web/repo-client.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
+import { createRepoBranch } from '#/web/test-utils/bridge.ts'
 
 vi.mock('#/web/repo-client.ts', async () => {
   const actual = await vi.importActual<typeof import('#/web/repo-client.ts')>('#/web/repo-client.ts')
@@ -116,6 +118,30 @@ describe('CreateWorktreeDialog', () => {
       },
     })
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  test('uses the React Query snapshot read model for local branch choices', async () => {
+    const user = userEvent.setup()
+    const repo = createRepo()
+    repo.data.currentBranch = ''
+    repo.data.branches = []
+    setRepoSnapshotQueryData(repo.id, repo.instanceId, {
+      current: 'main',
+      branches: [createRepoBranch('main'), createRepoBranch('feature/base')],
+    })
+    const onCreate = vi.fn(async () => {})
+
+    render(<CreateWorktreeDialog open repo={repo} onClose={vi.fn()} onCreate={onCreate} />)
+
+    await user.type(screen.getByRole('textbox', { name: /action.create-worktree-branch-label/i }), 'feature/query')
+    await user.click(screen.getByRole('button', { name: /action.create-worktree-confirm/i }))
+
+    expect(onCreate).toHaveBeenCalledWith({
+      input: {
+        worktreePath: '/tmp/goblin-repo-feature-query',
+        mode: { kind: 'newBranch', newBranch: 'feature/query', baseRef: 'main' },
+      },
+    })
   })
 
   test('switches to existingBranch mode and submits the selected branch', async () => {
