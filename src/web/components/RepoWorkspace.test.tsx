@@ -18,9 +18,9 @@ import {
   type PrimaryWindowNavigationActions,
 } from '#/web/primary-window-navigation.tsx'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
-import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { createPullRequest, createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { setRepoStatusQueryData } from '#/web/repo-data-query.ts'
+import { setRepoPullRequestsQueryData, setRepoStatusQueryData } from '#/web/repo-data-query.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 
 const REPO_ID = '/tmp/repo-workspace-container-repo'
@@ -210,6 +210,38 @@ describe('RepoWorkspace', () => {
     )
 
     expect(container.querySelector('button[aria-label="status.copy-patch-title"]')).not.toBeNull()
+  })
+
+  test('uses the React Query pull request read model for the selected branch when available', () => {
+    const branch = createRepoBranch('feature/pr')
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branches: [branch],
+      selectedBranch: 'feature/pr',
+      preferredWorkspacePaneTab: 'status',
+      statusLoaded: true,
+      workspacePaneTabsByBranch: {
+        'feature/pr': [workspacePaneStaticTabEntry('status')],
+      },
+    })
+    const pullRequest = createPullRequest(42, { headRefName: 'feature/pr' })
+    setRepoPullRequestsQueryData(REPO_ID, repo.instanceId, ['feature/pr'], 'full', [
+      { branch: 'feature/pr', pullRequest },
+    ])
+
+    const { container } = render(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={navigation}>
+          <TerminalSessionContext value={terminalCommandContext}>
+            <TerminalSessionReadContext value={terminalReadContext}>
+              <RepoWorkspace repoId={REPO_ID} />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+
+    expect(container.querySelector('[data-pull-request-link=""]')).not.toBeNull()
   })
 })
 

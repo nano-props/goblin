@@ -13,7 +13,7 @@ import { useBranchActionItems } from '#/web/hooks/useBranchActionItems.ts'
 import { useBranchActionShortcutRegistry } from '#/web/hooks/useBranchActionShortcutRegistry.ts'
 import { useBranchActions, type BranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
-import { useRepoStatusReadModel } from '#/web/repo-data-query.ts'
+import { useRepoPullRequestsReadModel, useRepoStatusReadModel } from '#/web/repo-data-query.ts'
 interface Props {
   repoId: string
   selectedBranchName?: string | null
@@ -123,16 +123,34 @@ function RepoWorkspaceLoaded({
   toolbarTrafficLightOffset: boolean
 }) {
   const statusReadModel = useRepoStatusReadModel(repo.id, repo.instanceId, true)
-  const presentationRepo: RepoWorkspaceRepo = statusReadModel.data
+  const selectedBranchName = repo.ui.selectedBranch
+  const pullRequestsReadModel = useRepoPullRequestsReadModel(
+    repo.id,
+    repo.instanceId,
+    selectedBranchName ? [selectedBranchName] : undefined,
+    'full',
+    !!selectedBranchName,
+  )
+  let presentationData: RepoWorkspaceRepo['data'] = statusReadModel.data
     ? {
-        ...repo,
-        data: {
-          ...repo.data,
-          status: statusReadModel.data,
-          statusLoaded: true,
-        },
+        ...repo.data,
+        status: statusReadModel.data,
+        statusLoaded: true,
       }
-    : repo
+    : repo.data
+  if (selectedBranchName && Array.isArray(pullRequestsReadModel.data)) {
+    const pullRequest = pullRequestsReadModel.data.find((entry) => entry.branch === selectedBranchName)?.pullRequest
+    presentationData = {
+      ...presentationData,
+      branches: presentationData.branches.map((branch) => {
+        if (branch.name !== selectedBranchName) return branch
+        if (pullRequest) return { ...branch, pullRequest }
+        const { pullRequest: _pullRequest, ...branchWithoutPullRequest } = branch
+        return branchWithoutPullRequest
+      }),
+    }
+  }
+  const presentationRepo: RepoWorkspaceRepo = presentationData === repo.data ? repo : { ...repo, data: presentationData }
   const detail = getSelectedRepoWorkspacePresentation(presentationRepo)
 
   return (

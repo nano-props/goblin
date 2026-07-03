@@ -150,6 +150,20 @@ export function useRepoPullRequestsQuery(
   return useQuery(repoPullRequestsQueryOptions(repoRoot, repoInstanceId, branches, mode))
 }
 
+export function useRepoPullRequestsReadModel(
+  repoRoot: string,
+  repoInstanceId: string,
+  branches: readonly string[] | undefined,
+  mode: PullRequestFetchMode | undefined,
+  enabled: boolean,
+) {
+  return useQuery({
+    ...repoPullRequestsQueryOptions(repoRoot, repoInstanceId, branches, mode),
+    enabled: false,
+    subscribed: enabled,
+  })
+}
+
 export function useRepoLogQuery(
   repoRoot: string,
   branch: string,
