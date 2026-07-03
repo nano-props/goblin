@@ -74,7 +74,11 @@ import {
 } from '#/web/stores/repos/branch-action-dialogs.ts'
 import type { RepoBranchState, RepoState } from '#/web/stores/repos/types.ts'
 import { useLastNonNull } from '#/web/hooks/useLastNonNull.ts'
-import { useRepoBranchReadModel, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
+import {
+  repoWithBranchReadModel,
+  useRepoBranchReadModel,
+  type RepoBranchReadModelData,
+} from '#/web/repo-branch-read-model.ts'
 
 interface BranchActionDialogContext {
   repo: RepoState
@@ -154,10 +158,7 @@ function resolveContext<P>(
   branchReadModel: RepoBranchReadModelData | null,
 ): BranchActionDialogContext | null {
   const repoFromStore = repos[entry.repoId]
-  const repo =
-    repoFromStore && branchReadModel
-      ? { ...repoFromStore, data: { ...repoFromStore.data, ...branchReadModel } }
-      : repoFromStore
+  const repo = repoFromStore ? repoWithBranchReadModel(repoFromStore, branchReadModel) : null
   if (!repo) return null
   const branch = repo.data.branches.find((b) => b.name === entry.branchName)
   if (!branch) return null

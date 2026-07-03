@@ -47,3 +47,17 @@ export function readRepoBranchReadModel(
   const snapshot = getRepoSnapshotQueryData(repo.id, repo.instanceId, queryClient)
   return snapshot ? repoBranchReadModelFromSnapshot(snapshot, repo.data) : null
 }
+
+export function repoWithBranchReadModel<Repo extends { data: RepoState['data'] }>(
+  repo: Repo,
+  readModel: RepoBranchReadModelData | null,
+): Repo {
+  return readModel ? { ...repo, data: { ...repo.data, ...readModel } } : repo
+}
+
+export function repoBranchesFromReadModel(
+  repo: Pick<RepoState, 'data'>,
+  readModel: Pick<RepoBranchReadModelData, 'branches'> | null,
+): RepoState['data']['branches'] {
+  return readModel?.branches ?? repo.data.branches
+}

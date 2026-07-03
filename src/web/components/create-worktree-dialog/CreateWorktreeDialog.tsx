@@ -27,7 +27,7 @@ import { remoteRepoTarget } from '#/web/stores/repos/repo-guards.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { useRepoRemoteBranchesQuery } from '#/web/repo-data-query.ts'
-import { useRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
+import { repoWithBranchReadModel, useRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
 import { cn } from '#/web/lib/cn.ts'
 import {
   deriveCreateWorktreeForm,
@@ -82,9 +82,7 @@ export function CreateWorktreeDialog({ open, repo, worktreeBootstrap, onClose, o
     },
     open,
   )
-  const presentationRepo: RepoState = branchReadModel
-    ? { ...repo, data: { ...repo.data, ...branchReadModel } }
-    : repo
+  const presentationRepo: RepoState = repoWithBranchReadModel(repo, branchReadModel)
 
   // Reset on the rising edge of `open` only. A guard ref prevents snapshot
   // refreshes (which change repo.data.branches / currentBranch) from wiping

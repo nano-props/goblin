@@ -14,7 +14,7 @@ import { useBranchActionShortcutRegistry } from '#/web/hooks/useBranchActionShor
 import { useBranchActions, type BranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
 import { useRepoPullRequestsReadModel, useRepoStatusReadModel } from '#/web/repo-data-query.ts'
-import { useRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
+import { repoWithBranchReadModel, useRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
 interface Props {
   repoId: string
   selectedBranchName?: string | null
@@ -141,12 +141,7 @@ function RepoWorkspaceLoaded({
     'full',
     !!selectedBranchName,
   )
-  let presentationData: RepoWorkspaceRepo['data'] = branchReadModel
-    ? {
-        ...repo.data,
-        ...branchReadModel,
-      }
-    : repo.data
+  let presentationData: RepoWorkspaceRepo['data'] = repoWithBranchReadModel(repo, branchReadModel).data
   presentationData = statusReadModel.data
     ? {
         ...presentationData,

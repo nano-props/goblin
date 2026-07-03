@@ -14,7 +14,11 @@ import {
   preferredWorkspacePaneTabByTargetRecordWith,
   workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
-import { readRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
+import {
+  readRepoBranchReadModel,
+  repoBranchesFromReadModel,
+  repoWithBranchReadModel,
+} from '#/web/repo-branch-read-model.ts'
 
 type RestorableWorkspaceSelectionActions = Pick<
   ReposStore,
@@ -159,7 +163,7 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
         repoInstanceId = repo.instanceId
         const branchReadModel = readRepoBranchReadModel(repo)
         const selectedBranch = selectedBranchForBranchSet({
-          branches: branchReadModel?.branches ?? repo.data.branches,
+          branches: repoBranchesFromReadModel(repo, branchReadModel),
           currentBranch: branchReadModel?.currentBranch ?? repo.data.currentBranch,
           selectedBranch: repo.ui.selectedBranch,
           viewMode,
@@ -185,7 +189,7 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
         if (!repo) return s
         const branchReadModel = readRepoBranchReadModel(repo)
         const target = workspacePaneTabsTargetForRepoBranch(
-          branchReadModel ? { ...repo, data: { ...repo.data, ...branchReadModel } } : repo,
+          repoWithBranchReadModel(repo, branchReadModel),
           repo.ui.selectedBranch,
         )
         const current = preferredWorkspacePaneTabForTarget(repo.ui, target)
@@ -201,7 +205,7 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
       const branchReadModel = repo ? readRepoBranchReadModel(repo) : null
       const target = repo
         ? workspacePaneTabsTargetForRepoBranch(
-            branchReadModel ? { ...repo, data: { ...repo.data, ...branchReadModel } } : repo,
+            repoWithBranchReadModel(repo, branchReadModel),
             repo.ui.selectedBranch,
           )
         : null
@@ -219,7 +223,7 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
         const repo = s.repos[id]
         if (!repo) return s
         const branchReadModel = readRepoBranchReadModel(repo)
-        const branches = branchReadModel?.branches ?? repo.data.branches
+        const branches = repoBranchesFromReadModel(repo, branchReadModel)
         if (!branches.some((b) => b.name === branch)) return s
         if (repo.ui.selectedBranch === branch) return s
         changed = true
