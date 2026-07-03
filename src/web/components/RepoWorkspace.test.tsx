@@ -20,6 +20,7 @@ import {
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { setRepoStatusQueryData } from '#/web/repo-data-query.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 
 const REPO_ID = '/tmp/repo-workspace-container-repo'
@@ -177,6 +178,38 @@ describe('RepoWorkspace', () => {
 
     expect(scrollViewport(container)).toBe(viewport)
     expect(viewport.scrollLeft).toBe(120)
+  })
+
+  test('uses the React Query status read model for workspace presentation when available', () => {
+    const worktreePath = '/tmp/repo-workspace-container-repo-a'
+    const branch = createRepoBranch('feature/a', { worktree: { path: worktreePath } })
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branches: [branch],
+      selectedBranch: 'feature/a',
+      preferredWorkspacePaneTab: 'status',
+      statusLoaded: true,
+      workspacePaneTabsByBranch: {
+        'feature/a': [workspacePaneStaticTabEntry('status')],
+      },
+    })
+    setRepoStatusQueryData(REPO_ID, repo.instanceId, [
+      { path: worktreePath, branch: 'feature/a', isMain: false, entries: [{ x: 'M', y: ' ', path: 'changed.ts' }] },
+    ])
+
+    const { container } = render(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={navigation}>
+          <TerminalSessionContext value={terminalCommandContext}>
+            <TerminalSessionReadContext value={terminalReadContext}>
+              <RepoWorkspace repoId={REPO_ID} />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+
+    expect(container.querySelector('button[aria-label="status.copy-patch-title"]')).not.toBeNull()
   })
 })
 

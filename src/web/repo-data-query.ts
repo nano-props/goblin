@@ -133,6 +133,14 @@ export function useRepoStatusQuery(repoRoot: string, repoInstanceId: string) {
   return useQuery(repoStatusQueryOptions(repoRoot, repoInstanceId))
 }
 
+export function useRepoStatusReadModel(repoRoot: string, repoInstanceId: string, enabled: boolean) {
+  return useQuery({
+    ...repoStatusQueryOptions(repoRoot, repoInstanceId),
+    enabled: false,
+    subscribed: enabled,
+  })
+}
+
 export function useRepoPullRequestsQuery(
   repoRoot: string,
   repoInstanceId: string,

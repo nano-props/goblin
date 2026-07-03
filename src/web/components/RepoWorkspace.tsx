@@ -13,6 +13,7 @@ import { useBranchActionItems } from '#/web/hooks/useBranchActionItems.ts'
 import { useBranchActionShortcutRegistry } from '#/web/hooks/useBranchActionShortcutRegistry.ts'
 import { useBranchActions, type BranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
+import { useRepoStatusReadModel } from '#/web/repo-data-query.ts'
 interface Props {
   repoId: string
   selectedBranchName?: string | null
@@ -100,13 +101,45 @@ export function RepoWorkspace({
   )
   if (!repo) return null
 
-  const detail = getSelectedRepoWorkspacePresentation(repo)
+  return (
+    <RepoWorkspaceLoaded
+      repo={repo}
+      workspacePaneId={workspacePaneId}
+      shortcutsEnabled={shortcutsEnabled}
+      toolbarTrafficLightOffset={toolbarTrafficLightOffset}
+    />
+  )
+}
+
+function RepoWorkspaceLoaded({
+  repo,
+  workspacePaneId,
+  shortcutsEnabled,
+  toolbarTrafficLightOffset,
+}: {
+  repo: RepoWorkspaceRepo
+  workspacePaneId: string
+  shortcutsEnabled: boolean
+  toolbarTrafficLightOffset: boolean
+}) {
+  const statusReadModel = useRepoStatusReadModel(repo.id, repo.instanceId, true)
+  const presentationRepo: RepoWorkspaceRepo = statusReadModel.data
+    ? {
+        ...repo,
+        data: {
+          ...repo.data,
+          status: statusReadModel.data,
+          statusLoaded: true,
+        },
+      }
+    : repo
+  const detail = getSelectedRepoWorkspacePresentation(presentationRepo)
 
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-background">
       {detail.branch ? (
         <BranchActionWorkspacePane
-          repo={repo}
+          repo={presentationRepo}
           detail={detail}
           branch={detail.branch}
           workspacePaneId={workspacePaneId}
@@ -115,7 +148,7 @@ export function RepoWorkspace({
         />
       ) : (
         <RepoWorkspacePane
-          repo={repo}
+          repo={presentationRepo}
           detail={detail}
           workspacePaneId={workspacePaneId}
           toolbarTrafficLightOffset={toolbarTrafficLightOffset}
