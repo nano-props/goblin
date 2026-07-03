@@ -175,7 +175,7 @@ describe('app bootstrap hooks', () => {
     expect(mockedGetSettingsSnapshot).toHaveBeenCalledTimes(1)
   })
 
-  test('opens the persistence gate after pruning stale workspace tabs restore entries', async () => {
+  test('reports unresolved workspace tabs restore entries as restore failure', async () => {
     const targetKey = branchTargetKey('/tmp/repo', 'main')
     const session = {
       openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
@@ -193,7 +193,7 @@ describe('app bootstrap hooks', () => {
     }
     mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot({ session }))
     mockedRestoreServerWorkspacePaneTabsFromSession.mockResolvedValue({
-      status: 'stale-pruned',
+      status: 'failed',
       unresolvedRepos: ['/missing/repo'],
       unresolvedTargets: [{ repoRoot: '/tmp/repo', targetKey: '/tmp/repo\0branch\0missing' }],
       failedCommits: [],
@@ -206,7 +206,9 @@ describe('app bootstrap hooks', () => {
     renderInJsdom(<Harness />)
     await flushMicrotasks(3)
 
-    expect(useReposStore.getState().sessionPersistenceReady).toBe(true)
+    expect(useReposStore.getState().sessionReady).toBe(true)
+    expect(useReposStore.getState().sessionPersistenceReady).toBe(false)
+    expect(useReposStore.getState().sessionRestoreError).toBe('workspace pane tabs restore failed')
     expect(mockedRestoreServerWorkspacePaneTabsFromSession).toHaveBeenCalledWith({
       '/tmp/repo': {
         [targetKey]: [],
@@ -214,7 +216,7 @@ describe('app bootstrap hooks', () => {
     })
   })
 
-  test('keeps the persistence gate closed after a failed server workspace tabs commit', async () => {
+  test('reports a failed server workspace tabs commit without keeping persistence blocked', async () => {
     const targetKey = branchTargetKey('/tmp/repo', 'main')
     const session = {
       openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
@@ -255,7 +257,9 @@ describe('app bootstrap hooks', () => {
     renderInJsdom(<Harness />)
     await flushMicrotasks(3)
 
+    expect(useReposStore.getState().sessionReady).toBe(true)
     expect(useReposStore.getState().sessionPersistenceReady).toBe(false)
+    expect(useReposStore.getState().sessionRestoreError).toBe('workspace pane tabs restore failed')
   })
 
   test('opens the persistence gate even when boot session restore fails', async () => {
@@ -265,7 +269,8 @@ describe('app bootstrap hooks', () => {
     await flushMicrotasks(3)
 
     expect(useReposStore.getState().sessionReady).toBe(true)
-    expect(useReposStore.getState().sessionPersistenceReady).toBe(true)
+    expect(useReposStore.getState().sessionPersistenceReady).toBe(false)
+    expect(useReposStore.getState().sessionRestoreError).toBe('settings unavailable')
   })
 })
 

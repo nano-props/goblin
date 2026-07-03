@@ -1,11 +1,14 @@
 // @vitest-environment jsdom
 import { act } from '@testing-library/react'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { CreateWorktreeDialogHost } from '#/web/components/CreateWorktreeDialogHost.tsx'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 
 vi.mock('#/web/components/create-worktree-dialog/CreateWorktreeDialog.tsx', () => ({
   CreateWorktreeDialog: ({ open, repo }: { open: boolean; repo: { id: string } }) => (
@@ -19,6 +22,7 @@ const OTHER_REPO_ID = '/tmp/create-worktree-host-other-active'
 beforeEach(() => {
   primaryWindowQueryClient.clear()
   resetReposStore()
+  primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
   seedRepoState({
     id: REPO_ID,
     branches: [createRepoBranch('main', { isCurrent: true, ahead: 0, behind: 0 })],
@@ -40,13 +44,13 @@ describe('CreateWorktreeDialogHost close state', () => {
   test('keeps the dialog mounted when closing so Radix can run exit motion', () => {
     const onOpenChange = vi.fn()
     const { container, rerender } = renderInJsdom(
-      <CreateWorktreeDialogHost open onOpenChange={onOpenChange} repoId={REPO_ID} />,
+      hostElement(true, onOpenChange, REPO_ID),
     )
 
     expect(dialog(container)?.getAttribute('data-open')).toBe('true')
     expect(dialog(container)?.getAttribute('data-repo-id')).toBe(REPO_ID)
 
-    rerender(<CreateWorktreeDialogHost open={false} onOpenChange={onOpenChange} repoId={REPO_ID} />)
+    rerender(hostElement(false, onOpenChange, REPO_ID))
 
     expect(dialog(container)?.getAttribute('data-open')).toBe('false')
     expect(dialog(container)?.getAttribute('data-repo-id')).toBe(REPO_ID)
@@ -69,7 +73,7 @@ describe('CreateWorktreeDialogHost close state', () => {
       }))
     })
     const onOpenChange = vi.fn()
-    const { container } = renderInJsdom(<CreateWorktreeDialogHost open onOpenChange={onOpenChange} repoId={REPO_ID} />)
+    const { container } = renderInJsdom(hostElement(true, onOpenChange, REPO_ID))
 
     expect(dialog(container)?.getAttribute('data-open')).toBe('true')
     expect(dialog(container)?.getAttribute('data-repo-id')).toBe(REPO_ID)
@@ -78,18 +82,26 @@ describe('CreateWorktreeDialogHost close state', () => {
   test('retains the last repo snapshot if the repo is removed before the close animation finishes', () => {
     const onOpenChange = vi.fn()
     const { container, rerender } = renderInJsdom(
-      <CreateWorktreeDialogHost open onOpenChange={onOpenChange} repoId={REPO_ID} />,
+      hostElement(true, onOpenChange, REPO_ID),
     )
 
     act(() => {
       useReposStore.setState({ repos: {}, order: [], activeId: null })
     })
-    rerender(<CreateWorktreeDialogHost open={false} onOpenChange={onOpenChange} repoId={REPO_ID} />)
+    rerender(hostElement(false, onOpenChange, REPO_ID))
 
     expect(dialog(container)?.getAttribute('data-open')).toBe('false')
     expect(dialog(container)?.getAttribute('data-repo-id')).toBe(REPO_ID)
   })
 })
+
+function hostElement(open: boolean, onOpenChange: (open: boolean) => void, repoId: string) {
+  return (
+    <QueryClientProvider client={primaryWindowQueryClient}>
+      <CreateWorktreeDialogHost open={open} onOpenChange={onOpenChange} repoId={repoId} />
+    </QueryClientProvider>
+  )
+}
 
 function dialog(container: HTMLElement): Element | null {
   return container.querySelector('[data-testid="create-worktree-dialog"]')

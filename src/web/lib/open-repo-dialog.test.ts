@@ -35,6 +35,32 @@ describe('openRepoFromDialog', () => {
     expect(mocks.toastError).not.toHaveBeenCalled()
   })
 
+  test('shows a post-open error toast without blocking activation', async () => {
+    installGoblinTestBridge({
+      'repo.openDialog': () => '/tmp/repo',
+    })
+    const ensureWorkspaceOpen = vi.fn(
+      async (): Promise<OpenRepoResult> => ({
+        ok: true,
+        id: '/tmp/repo',
+        postOpenEffects: Promise.resolve([{ kind: 'recent-repo', message: 'recent write failed' }]),
+      }),
+    )
+    const activateRepo = vi.fn()
+
+    await openRepoFromDialog({
+      ensureWorkspaceOpen,
+      activateRepo,
+      t: (key) => key,
+    })
+
+    expect(activateRepo).toHaveBeenCalledWith('/tmp/repo')
+    await Promise.resolve()
+    expect(mocks.toastError).toHaveBeenCalledWith('repo-picker.recent-save-failed', {
+      description: 'recent write failed',
+    })
+  })
+
   test('shows an error toast when opening fails', async () => {
     installGoblinTestBridge({
       'repo.openDialog': () => '/tmp/repo',

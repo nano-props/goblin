@@ -7,6 +7,7 @@ import { useThemeStore } from '#/web/stores/theme.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 import { clearRecentRepoHistory } from '#/web/settings-actions.ts'
 import { openRepoFromDialog } from '#/web/lib/open-repo-dialog.ts'
+import { reportOpenRepoPostOpenEffects } from '#/web/lib/open-repo-result-feedback.ts'
 import { consumeExternalOpenPaths } from '#/web/app-shell-client.ts'
 import { openRepoPaths } from '#/web/lib/open-repo-paths.ts'
 import { externalOpenLog } from '#/web/logger.ts'
@@ -102,7 +103,10 @@ export async function handleAppLevelClientIntent(
       return true
     case 'ensure-recent-repo-open': {
       const result = await deps.ensureWorkspaceOpen(plan.entry)
-      if (result.ok) deps.navigation.activateRepo(result.id)
+      if (result.ok) {
+        reportOpenRepoPostOpenEffects(result, deps.t)
+        deps.navigation.activateRepo(result.id)
+      }
       return true
     }
     case 'reset-layout':
@@ -233,6 +237,11 @@ export function createExternalOpenIntentDrainer(deps: ExternalOpenIntentDrainerD
               const openErrorMessage = deps.t(message)
               toast.error(deps.t('drop.open-failed'), {
                 description: `${path}\n${openErrorMessage}`,
+              })
+            },
+            onPostOpenError: (path, message) => {
+              toast.error(deps.t('repo-picker.recent-save-failed'), {
+                description: `${path}\n${deps.t(message)}`,
               })
             },
           })

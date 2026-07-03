@@ -1,15 +1,34 @@
-import type { QueryClient } from '@tanstack/react-query'
+import { queryOptions, type QueryClient } from '@tanstack/react-query'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import type { RepoRuntimeInstanceEntry, RepoRuntimeInstancesSnapshot } from '#/shared/api-types.ts'
+import { listRepoRuntimeInstances } from '#/web/repo-client.ts'
 
 export function repoRuntimeInstancesQueryKey() {
   return ['repo-runtime', 'instances'] as const
 }
 
-export function updateRepoRuntimeInstanceCache(
+export function repoRuntimeInstancesQueryOptions() {
+  return queryOptions({
+    queryKey: repoRuntimeInstancesQueryKey(),
+    queryFn: ({ signal }) => listRepoRuntimeInstances(signal),
+    staleTime: Number.POSITIVE_INFINITY,
+    gcTime: Number.POSITIVE_INFINITY,
+  })
+}
+
+export async function refreshRepoRuntimeInstances(
+  queryClient: QueryClient = primaryWindowQueryClient,
+): Promise<RepoRuntimeInstancesSnapshot> {
+  await queryClient.cancelQueries({ queryKey: repoRuntimeInstancesQueryKey(), exact: true })
+  await queryClient.invalidateQueries({ queryKey: repoRuntimeInstancesQueryKey(), exact: true, refetchType: 'none' })
+  return await queryClient.fetchQuery(repoRuntimeInstancesQueryOptions())
+}
+
+export async function updateRepoRuntimeInstanceCache(
   entry: RepoRuntimeInstanceEntry,
   queryClient: QueryClient = primaryWindowQueryClient,
-): void {
+): Promise<void> {
+  await queryClient.cancelQueries({ queryKey: repoRuntimeInstancesQueryKey(), exact: true })
   queryClient.setQueryData<RepoRuntimeInstancesSnapshot>(repoRuntimeInstancesQueryKey(), (current) => {
     const existing = current?.instances ?? []
     const instances = existing.filter((item) => item.repoRoot !== entry.repoRoot)
@@ -18,10 +37,11 @@ export function updateRepoRuntimeInstanceCache(
   })
 }
 
-export function removeRepoRuntimeInstanceFromCache(
+export async function removeRepoRuntimeInstanceFromCache(
   entry: RepoRuntimeInstanceEntry,
   queryClient: QueryClient = primaryWindowQueryClient,
-): void {
+): Promise<void> {
+  await queryClient.cancelQueries({ queryKey: repoRuntimeInstancesQueryKey(), exact: true })
   let foundMatchingEntry = false
   queryClient.setQueryData<RepoRuntimeInstancesSnapshot>(repoRuntimeInstancesQueryKey(), (current) => {
     if (!current) return current
@@ -33,10 +53,12 @@ export function removeRepoRuntimeInstanceFromCache(
     return instances.length === current.instances.length ? current : { instances }
   })
   if (!foundMatchingEntry) {
-    void queryClient.invalidateQueries({ queryKey: repoRuntimeInstancesQueryKey(), exact: true })
+    await refreshRepoRuntimeInstances(queryClient)
   }
 }
 
-export function invalidateRepoRuntimeInstances(queryClient: QueryClient = primaryWindowQueryClient): void {
-  void queryClient.invalidateQueries({ queryKey: repoRuntimeInstancesQueryKey(), exact: true })
+export async function invalidateRepoRuntimeInstances(
+  queryClient: QueryClient = primaryWindowQueryClient,
+): Promise<RepoRuntimeInstancesSnapshot> {
+  return await refreshRepoRuntimeInstances(queryClient)
 }

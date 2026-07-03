@@ -14,6 +14,16 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { resetReposStore } from '#/web/test-utils/bridge.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 
+const mocks = vi.hoisted(() => ({
+  toastError: vi.fn(),
+}))
+
+vi.mock('sonner', () => ({
+  toast: {
+    error: mocks.toastError,
+  },
+}))
+
 const testWindow = window as unknown as { goblinNative?: unknown; __GOBLIN_BOOTSTRAP__?: unknown }
 
 const target = {
@@ -27,6 +37,7 @@ const target = {
 } as const
 
 beforeEach(() => {
+  vi.clearAllMocks()
   resetReposStore()
   setClientBridgeForTests(null)
   vi.stubGlobal(
@@ -410,6 +421,31 @@ describe('OpenRemoteRepositoryDialog', () => {
     })
     expect(activateRepo).toHaveBeenCalledWith(target.id)
     expect(onOpenChange).toHaveBeenCalledWith(false)
+  })
+
+  test('reports post-open effect failures after opening a remote workspace', async () => {
+    const ensureWorkspaceOpen = vi.fn(async () => ({
+      ok: true as const,
+      id: target.id,
+      postOpenEffects: Promise.resolve([{ kind: 'recent-repo' as const, message: 'recent write failed' }]),
+    }))
+    useReposStore.setState({ ensureWorkspaceOpen })
+
+    render(
+      <PrimaryWindowNavigationProvider value={navigationWith({})}>
+        <OpenRemoteRepositoryDialog open onOpenChange={vi.fn()} />
+      </PrimaryWindowNavigationProvider>,
+    )
+    await flush()
+
+    setInputValue('#remote-ssh-host', 'prod')
+    setInputValue('#remote-path', '/srv/repo')
+    click('button[type="submit"]')
+    await flush()
+
+    expect(mocks.toastError).toHaveBeenCalledWith('repo-picker.recent-save-failed', {
+      description: 'prod:repo\nrecent write failed',
+    })
   })
 
   test('clears a previous connection error after editing the target', async () => {

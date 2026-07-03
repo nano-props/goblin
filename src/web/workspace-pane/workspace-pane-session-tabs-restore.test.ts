@@ -129,7 +129,7 @@ describe('restoreServerWorkspacePaneTabsFromSession', () => {
     expect(readTabsFor('feature/worktree', WORKTREE_PATH)).toEqual([workspacePaneStaticTabEntry('status')])
   })
 
-  test('reports incomplete restore when a persisted repo is not loaded', async () => {
+  test('fails restore when a persisted repo is not loaded', async () => {
     installWorkspacePaneTabsTestBridge({
       replaceWorkspaceTabs: async () => [workspacePaneStaticTabEntry('history')],
     })
@@ -140,10 +140,10 @@ describe('restoreServerWorkspacePaneTabsFromSession', () => {
           [worktreeTargetKey()]: [workspacePaneStaticTabEntry('history')],
         },
       }),
-    ).resolves.toMatchObject({ status: 'stale-pruned', unresolvedRepos: [REPO_ID] })
+    ).resolves.toMatchObject({ status: 'failed', unresolvedRepos: [REPO_ID] })
   })
 
-  test('reports incomplete restore when a persisted target no longer resolves', async () => {
+  test('fails restore when a persisted target no longer resolves', async () => {
     seedRepo()
     const replaceWorkspaceTabs = vi.fn(async () => [workspacePaneStaticTabEntry('history')])
     installWorkspacePaneTabsTestBridge({ replaceWorkspaceTabs })
@@ -155,7 +155,7 @@ describe('restoreServerWorkspacePaneTabsFromSession', () => {
         },
       }),
     ).resolves.toMatchObject({
-      status: 'stale-pruned',
+      status: 'failed',
       unresolvedTargets: [{ repoRoot: REPO_ID, targetKey: branchTargetKey('feature/missing') }],
     })
 

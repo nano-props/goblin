@@ -38,4 +38,28 @@ describe('openRepoPaths', () => {
     expect(firstId).toBeNull()
     expect(activateRepo).not.toHaveBeenCalled()
   })
+
+  test('reports post-open errors without treating the path as failed', async () => {
+    const ensureWorkspaceOpen = vi.fn().mockResolvedValue({
+      ok: true,
+      id: '/tmp/repo-a',
+      postOpenEffects: Promise.resolve([{ kind: 'recent-repo', message: 'recent write failed' }]),
+    })
+    const activateRepo = vi.fn()
+    const onOpenFailed = vi.fn()
+    const onPostOpenError = vi.fn()
+
+    const firstId = await openRepoPaths(['/tmp/a'], {
+      ensureWorkspaceOpen,
+      activateRepo,
+      onOpenFailed,
+      onPostOpenError,
+    })
+
+    expect(firstId).toBe('/tmp/repo-a')
+    expect(onOpenFailed).not.toHaveBeenCalled()
+    await Promise.resolve()
+    expect(onPostOpenError).toHaveBeenCalledWith('/tmp/a', 'recent write failed')
+    expect(activateRepo).toHaveBeenCalledWith('/tmp/repo-a')
+  })
 })

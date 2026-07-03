@@ -92,9 +92,7 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
             return
           }
           if (signal?.aborted) {
-            void closeRepoRuntimeInstanceWithCache(runtimeRepoRoot, instanceId).catch(() => {
-              /* abort rollback is best-effort; next open re-establishes authority */
-            })
+            await closeRepoRuntimeInstanceWithCache(runtimeRepoRoot, instanceId)
             return
           }
           set((s) => {

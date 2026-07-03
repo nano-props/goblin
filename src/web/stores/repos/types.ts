@@ -42,7 +42,14 @@ export type RepoEvent =
 /** Discriminated union: a successful open guarantees `id`; a failed
  *  open carries a translation key or raw message. The shape forces
  *  callers to narrow before reading either field. */
-export type OpenRepoResult = { ok: true; id: string } | { ok: false; message: string }
+export interface OpenRepoPostOpenError {
+  kind: 'recent-repo'
+  message: string
+}
+
+export type OpenRepoResult =
+  | { ok: true; id: string; postOpenEffects?: Promise<OpenRepoPostOpenError[]> }
+  | { ok: false; message: string }
 
 export interface RepoDataState {
   branches: RepoBranchState[]
@@ -172,6 +179,10 @@ interface LocalWorkspaceState {
   /** Persistence gate — true only after all boot-restored state that can
    *  affect WorkspaceSessionState has converged back into the client store. */
   sessionPersistenceReady: boolean
+  /** Boot restore failure that blocks session persistence. UI can render, but
+   *  persisted workspace state must not be overwritten until the restore issue
+   *  is resolved by a successful boot. */
+  sessionRestoreError: string | null
   /** Chrome-tab-style "opener" tracking, covering every workspace pane tab
    *  (static and terminal): maps a tab's identity (see
    *  `workspacePaneTabEntryIdentity`) to the identity of the tab that was

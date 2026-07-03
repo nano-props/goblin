@@ -290,6 +290,7 @@ export function resetReposStore(): void {
     activeId: null,
     sessionReady: false,
     sessionPersistenceReady: false,
+    sessionRestoreError: null,
     zenMode: DEFAULT_ZEN_MODE,
     workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
     selectedTerminalSessionIdByTerminalWorktree: {},
@@ -778,6 +779,7 @@ export function seedRepoState(options: {
     activeId: options.id,
     sessionReady: true,
     sessionPersistenceReady: true,
+    sessionRestoreError: null,
     zenMode: DEFAULT_ZEN_MODE,
     workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
   })

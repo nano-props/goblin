@@ -106,6 +106,7 @@ interface TerminalSessionServiceOptions {
     | 'replaceTabs'
     | 'tabs'
     | 'tabsForScope'
+    | 'closeSessionsForScope'
   >
   broadcastSessionsChanged(userId: string, repoRoot: string): void
   isCurrentRepoInstance(userId: string, repoRoot: string, repoInstanceId: string): boolean
@@ -187,14 +188,14 @@ class TerminalSessionService {
         terminalSessionId: allocation.terminalSessionId,
       }).finally(() => this.releaseSessionIdReservation(allocation))
       if (!createResult.ok) return { ok: false, message: createResult.message }
-      if (!this.isCurrentRepoInstance(userId, input.repoRoot, input.repoInstanceId)) {
-        this.options.manager.closeSession(createResult.terminalRuntimeSessionId)
-        return { ok: false, message: 'error.repo-instance-stale' }
-      }
+      const staleAfterEnsure = this.rejectStaleCreateIfNeeded(userId, input, createResult.terminalRuntimeSessionId)
+      if (staleAfterEnsure) return staleAfterEnsure
       const sessions = await this.listSessions(userId, input.repoRoot, input.repoInstanceId)
+      const staleAfterList = this.rejectStaleCreateIfNeeded(userId, input, createResult.terminalRuntimeSessionId)
+      if (staleAfterList) return staleAfterList
       const createdSession = sessions.find((session) => session.terminalSessionId === createResult.terminalSessionId)
       const sessionScope = terminalSessionRuntimeScope(input.repoRoot, input.repoInstanceId)
-      const tabs = createdSession
+      const tabsResult = createdSession
         ? await this.runWorkspaceTabsOperation(
             userId,
             sessionScope,
@@ -206,6 +207,12 @@ class TerminalSessionService {
                 sessionScope,
                 createdSession.worktreePath,
               )
+              const staleAfterLiveLookup = this.rejectStaleCreateIfNeeded(
+                userId,
+                input,
+                createResult.terminalRuntimeSessionId,
+              )
+              if (staleAfterLiveLookup) return staleAfterLiveLookup
               return this.options.workspaceTabs.replaceTabs({
                 userId,
                 scope: sessionScope,
@@ -228,6 +235,10 @@ class TerminalSessionService {
             },
           )
         : []
+      if (isTerminalCreateFailure(tabsResult)) return tabsResult
+      const tabs = tabsResult
+      const staleAfterTabs = this.rejectStaleCreateIfNeeded(userId, input, createResult.terminalRuntimeSessionId)
+      if (staleAfterTabs) return staleAfterTabs
       return {
         ok: true,
         action: createResult.action,
@@ -512,6 +523,17 @@ class TerminalSessionService {
     if (!this.isCurrentRepoInstance(userId, repoRoot, repoInstanceId)) throw new Error('error.repo-instance-stale')
   }
 
+  private rejectStaleCreateIfNeeded(
+    userId: string,
+    input: Pick<TerminalCreateInput, 'repoRoot' | 'repoInstanceId'>,
+    terminalRuntimeSessionId: string,
+  ): Extract<TerminalCreateResult, { ok: false }> | null {
+    if (this.isCurrentRepoInstance(userId, input.repoRoot, input.repoInstanceId)) return null
+    this.options.manager.closeSession(terminalRuntimeSessionId)
+    this.options.workspaceTabs.closeSessionsForScope(userId, terminalSessionRuntimeScope(input.repoRoot, input.repoInstanceId))
+    return { ok: false, message: 'error.repo-instance-stale' }
+  }
+
   private async liveTerminalSessionIdsForWorktree(
     userId: string,
     scope: string,
@@ -652,6 +674,12 @@ class TerminalSessionService {
     this.options.broadcastSessionsChanged(userId, input.repoRoot)
     return toEnsureResult(context.terminalSessionId, context.action, result)
   }
+}
+
+function isTerminalCreateFailure(
+  result: WorkspacePaneTabEntry[] | Extract<TerminalCreateResult, { ok: false }>,
+): result is Extract<TerminalCreateResult, { ok: false }> {
+  return !Array.isArray(result)
 }
 
 function toEnsureResult(

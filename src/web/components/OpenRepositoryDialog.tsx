@@ -12,6 +12,7 @@ import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import { cn } from '#/web/lib/cn.ts'
 import type { OpenRepoResult } from '#/web/stores/repos/types.ts'
+import { reportOpenRepoPostOpenEffects } from '#/web/lib/open-repo-result-feedback.ts'
 interface Props {
   open: boolean
   onClose: () => void
@@ -58,6 +59,7 @@ export function OpenRepositoryDialog({ open, onClose, onOpen }: Props) {
       const result = await runLatest(() => onOpen(resolvedPath))
       if (result.status === 'stale') return
       if (result.value.ok) {
+        reportOpenRepoPostOpenEffects(result.value, t)
         onClose()
         return
       }

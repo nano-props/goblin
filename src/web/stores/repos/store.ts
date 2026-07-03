@@ -109,6 +109,7 @@ export const useReposStore = create<ReposStore>()(
       // Local client-only state.
       sessionReady: false,
       sessionPersistenceReady: false,
+      sessionRestoreError: null,
       tabOpenerIdentityByScope: {},
 
       ...createRepoSessionActions(set, get),

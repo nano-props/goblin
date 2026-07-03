@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act } from '@testing-library/react'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
@@ -60,23 +61,43 @@ afterEach(() => {
 describe('CreateWorktreeDialogHost close retention', () => {
   test('keeps the bootstrap prompt rendered while the dialog is closing', async () => {
     const configHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-    mockFetch(async () => previewResponse({ hasOperations: true, configHash }))
+    mockFetch(async (input: RequestInfo | URL) => {
+      const pathname = new URL(String(input), 'http://localhost').pathname
+      if (pathname === '/api/settings') {
+        return new Response(JSON.stringify(defaultSettingsSnapshot()), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      }
+      if (pathname === '/api/repo/worktree-bootstrap-preview') {
+        return previewResponse({ hasOperations: true, configHash })
+      }
+      throw new Error(`unexpected request ${pathname}`)
+    })
 
     const { rerender } = renderInJsdom(
-      <CreateWorktreeDialogHost open={true} onOpenChange={vi.fn()} repoId={REPO_ID} />,
+      hostElement(true, vi.fn(), REPO_ID),
     )
     await flushReact()
 
     expect(lastDialogProps().open).toBe(true)
     expect(lastDialogProps().worktreeBootstrap?.preview).toMatchObject({ hasOperations: true, configHash })
 
-    rerender(<CreateWorktreeDialogHost open={false} onOpenChange={vi.fn()} repoId={REPO_ID} />)
+    rerender(hostElement(false, vi.fn(), REPO_ID))
     await flushReact()
 
     expect(lastDialogProps().open).toBe(false)
     expect(lastDialogProps().worktreeBootstrap?.preview).toMatchObject({ hasOperations: true, configHash })
   })
 })
+
+function hostElement(open: boolean, onOpenChange: (open: boolean) => void, repoId: string) {
+  return (
+    <QueryClientProvider client={primaryWindowQueryClient}>
+      <CreateWorktreeDialogHost open={open} onOpenChange={onOpenChange} repoId={repoId} />
+    </QueryClientProvider>
+  )
+}
 
 function previewResponse(input: { hasOperations: boolean; configHash: string | null }): Response {
   return new Response(

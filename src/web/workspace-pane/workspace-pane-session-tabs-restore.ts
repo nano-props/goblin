@@ -11,7 +11,6 @@ interface WorkspacePaneTabsRestoreDetails {
 
 export type RestoreWorkspacePaneTabsFromSessionResult =
   | ({ status: 'restored' } & WorkspacePaneTabsRestoreDetails)
-  | ({ status: 'stale-pruned' } & WorkspacePaneTabsRestoreDetails)
   | ({ status: 'failed' } & WorkspacePaneTabsRestoreDetails)
 
 export async function restoreServerWorkspacePaneTabsFromSession(
@@ -46,8 +45,9 @@ export async function restoreServerWorkspacePaneTabsFromSession(
     unresolvedTargets,
     failedCommits,
   }
-  if (failedCommits.length > 0) return { status: 'failed', ...details }
-  if (unresolvedRepos.length > 0 || unresolvedTargets.length > 0) return { status: 'stale-pruned', ...details }
+  if (failedCommits.length > 0 || unresolvedRepos.length > 0 || unresolvedTargets.length > 0) {
+    return { status: 'failed', ...details }
+  }
   return {
     status: 'restored',
     ...details,

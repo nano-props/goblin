@@ -35,8 +35,10 @@ export function repoPullRequestsQueryKey(
     repoRoot,
     repoInstanceId,
     'pull-requests',
-    ...(branches ? [...branches].sort() : []),
-    mode ?? 'full',
+    {
+      branches: branches ? [...branches].sort() : null,
+      mode: mode ?? 'full',
+    },
   ] as const
 }
 
@@ -45,7 +47,7 @@ export function repoBulkReadQueryKey(
   repoInstanceId: string,
   include?: ReadonlyArray<'snapshot' | 'status' | 'pullRequests'>,
 ) {
-  return ['repo-data', repoRoot, repoInstanceId, 'bulk', ...(include ? [...include].sort() : [])] as const
+  return ['repo-data', repoRoot, repoInstanceId, 'bulk', { include: include ? [...include].sort() : null }] as const
 }
 
 export function repoDataQueryKey(repoRoot: string, repoInstanceId: string) {

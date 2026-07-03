@@ -184,6 +184,7 @@ export const zh: Record<DictKey, string> = {
   'drop.title': '松手打开本地仓库',
   'drop.body': '把 Git 仓库文件夹拖到 Goblin 任意位置。',
   'drop.open-failed': '无法打开本地仓库',
+  'repo-picker.recent-save-failed': '仓库已打开，但最近记录未更新',
 
   // ---- Workspace pane tabs ------------------------------------------------
   'tab.branches': '分支',

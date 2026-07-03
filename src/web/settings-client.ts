@@ -1,6 +1,5 @@
 import { canUseGlobalShortcutSettings, canUseNativeIpcBridge } from '#/web/app-shell-client.ts'
 import { invokeNativeIpcPath } from '#/web/native-host-client.ts'
-import { sessionLog } from '#/web/logger.ts'
 import { fetchServerJson, postServerJson } from '#/web/lib/server-fetch.ts'
 import type {
   ExternalAppsSnapshot,
@@ -57,29 +56,12 @@ async function updateUserSettingsPatch(settings: Record<string, unknown>): Promi
   )
   const patch = pickNativeSettingsProjectionPatch(settings as Partial<UserSettings>)
   if (!patch || !canUseNativeIpcBridge()) return result
-  // The embedded server is the authority for settings — the
-  // client just mirrors them to the native menu. A projection
-  // IPC failure here must NOT reject the caller's promise: the
-  // server write already succeeded (otherwise `result` would
-  // have thrown), the user-facing preference is committed, and
-  // the menu will catch up on the next rebuild. Log and move on
-  // so a transient menu IPC failure doesn't surface as a
-  // settings-write failure to the UI.
-  try {
-    await invokeNativeIpcPath<void>('settings.applyNativeHostProjection', {
-      prefs: {
-        patch,
-        settings: nativeSettingsProjectionStateFromSettings(result.prefs),
-      },
-    })
-  } catch (err) {
-    sessionLog.warn(
-      'settings.applyNativeHostProjection failed; server write committed, menu will catch up on next rebuild',
-      {
-        err,
-      },
-    )
-  }
+  await invokeNativeIpcPath<void>('settings.applyNativeHostProjection', {
+    prefs: {
+      patch,
+      settings: nativeSettingsProjectionStateFromSettings(result.prefs),
+    },
+  })
   return result
 }
 
@@ -101,7 +83,8 @@ export async function getI18nSnapshot(options?: { signal?: AbortSignal }): Promi
 
 export async function setI18nPref(pref: LangPref): Promise<I18nSnapshot> {
   const result = await updateUserSettingsPatch({ lang: pref })
-  return result.i18n ?? (await getI18nSnapshot())
+  if (!result.i18n) throw new Error('settings language update did not return i18n snapshot')
+  return result.i18n
 }
 
 export async function getGitHubCliState(hosts?: string[]): Promise<GitHubCliState> {
@@ -135,42 +118,18 @@ export async function addRecentRepo(repo: RepoSessionEntry): Promise<RecentRepos
     { repo },
   )
   if (!canUseNativeIpcBridge()) return result
-  // See `updateUserSettingsPatch` for the rationale: the server
-  // is authoritative, the projection is best-effort. A rejected
-  // IPC here would previously bubble up as "failed to add recent
-  // repo" even though the server write succeeded — the user
-  // would see the toast, refresh, and find the repo in the list.
-  try {
-    await invokeNativeIpcPath<void>('settings.applyNativeHostProjection', {
-      recentRepos: { recentRepos: result.recentRepos },
-    })
-  } catch (err) {
-    sessionLog.warn('recent-repos projection IPC failed; server list committed, menu will catch up on next rebuild', {
-      err,
-    })
-  }
+  await invokeNativeIpcPath<void>('settings.applyNativeHostProjection', {
+    recentRepos: { recentRepos: result.recentRepos },
+  })
   return result
 }
 
 export async function clearRecentRepos(): Promise<void> {
   await postServerJson<{}, { ok: boolean }>('/api/settings/recent-repos/clear', {})
   if (!canUseNativeIpcBridge()) return
-  // Same projection-best-effort contract as the two paths above:
-  // the server has already cleared the list by the time we get
-  // here, so an IPC failure must not reject the caller's promise
-  // — the user already saw the optimistic "cleared" state.
-  try {
-    await invokeNativeIpcPath<void>('settings.applyNativeHostProjection', {
-      recentRepos: { recentRepos: [] },
-    })
-  } catch (err) {
-    sessionLog.warn(
-      'clear-recent-repos projection IPC failed; server list cleared, menu will catch up on next rebuild',
-      {
-        err,
-      },
-    )
-  }
+  await invokeNativeIpcPath<void>('settings.applyNativeHostProjection', {
+    recentRepos: { recentRepos: [] },
+  })
 }
 
 /**

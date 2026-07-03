@@ -3,6 +3,7 @@ import { postServerJson } from '#/web/lib/server-fetch.ts'
 import type {
   CloneRepoResult,
   PullRequestEntry,
+  RepoRuntimeInstancesSnapshot,
   RepoRuntimeOpenResult,
   RepoSnapshot,
   RepoLogResponse,
@@ -234,4 +235,8 @@ export async function closeRepoRuntimeInstance(repoRoot: string, repoInstanceId:
     },
   )
   return result.closed
+}
+
+export async function listRepoRuntimeInstances(signal?: AbortSignal): Promise<RepoRuntimeInstancesSnapshot> {
+  return await postServerJson<{}, RepoRuntimeInstancesSnapshot>('/api/repo/runtime-list', {}, { signal })
 }

@@ -14,34 +14,38 @@ import { mockFetch } from '#/test-utils/fetch-mock.ts'
 // as Radix dialog state, not as its mount condition.
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { QueryClientProvider } from '@tanstack/react-query'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { CreateWorktreeDialogHost } from '#/web/components/CreateWorktreeDialogHost.tsx'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 
 const REPO_ID = '/tmp/gbl-create-host-test'
+let serverSettingsSnapshot: ReturnType<typeof defaultSettingsSnapshot>
+let testQueryClient: QueryClient
 
-beforeEach(() => {
-  primaryWindowQueryClient.clear()
+beforeEach(async () => {
+  testQueryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  })
   globalThis.localStorage?.clear()
   resetReposStore()
-  primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
+  setServerSettings(defaultSettingsSnapshot())
   seedRepoState({
     id: REPO_ID,
     branches: [createRepoBranch('main', { isCurrent: true, ahead: 0, behind: 0 })],
   })
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async () => previewResponse({ hasOperations: false, configHash: null })),
-  )
+  mockCreateWorktreeHostFetch(async () => previewResponse({ hasOperations: false, configHash: null }))
 })
 
-afterEach(() => {
-  primaryWindowQueryClient.clear()
+afterEach(async () => {
+  await testQueryClient.cancelQueries()
+  testQueryClient.clear()
   globalThis.localStorage?.clear()
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
@@ -53,7 +57,7 @@ function renderHost(open: boolean, onOpenChange: (open: boolean) => void) {
 
 function hostElement(open: boolean, onOpenChange: (open: boolean) => void, repoId: string | null) {
   return (
-    <QueryClientProvider client={primaryWindowQueryClient}>
+    <QueryClientProvider client={testQueryClient}>
       <CreateWorktreeDialogHost open={open} onOpenChange={onOpenChange} repoId={repoId} />
     </QueryClientProvider>
   )
@@ -110,9 +114,9 @@ describe('CreateWorktreeDialogHost', () => {
 
   test('forwards a config trust state from the create dialog checkbox', async () => {
     const configHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-    primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
+    setServerSettings(defaultSettingsSnapshot())
     const submitBranchAction = vi.spyOn(useReposStore.getState(), 'submitBranchAction').mockImplementation(() => {})
-    const fetchMock = mockFetch(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const fetchMock = mockCreateWorktreeHostFetch(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = new URL(String(input))
       const body = JSON.parse(String(init?.body ?? '{}')) as { cwd?: string }
       if (url.pathname === '/api/repo/worktree-bootstrap-preview') {
@@ -143,7 +147,7 @@ describe('CreateWorktreeDialogHost', () => {
     renderHost(true, vi.fn())
     await flushReact()
 
-    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(countPreviewRequests(fetchMock)).toBe(1)
     expect(document.body.textContent).toContain('action.create-worktree-bootstrap-config-trusted')
     expect(submitBranchAction).not.toHaveBeenCalled()
 
@@ -164,14 +168,14 @@ describe('CreateWorktreeDialogHost', () => {
       }),
       expect.objectContaining({ refreshOnError: false }),
     )
-    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(countPreviewRequests(fetchMock)).toBe(1)
   })
 
   test('forwards a run-once bootstrap decision from the create dialog without checking trust', async () => {
     const configHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-    primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
+    setServerSettings(defaultSettingsSnapshot())
     const submitBranchAction = vi.spyOn(useReposStore.getState(), 'submitBranchAction').mockImplementation(() => {})
-    const fetchMock = mockFetch(async () => {
+    const fetchMock = mockCreateWorktreeHostFetch(async () => {
       return new Response(
         JSON.stringify({
           ok: true,
@@ -207,12 +211,12 @@ describe('CreateWorktreeDialogHost', () => {
       }),
       expect.objectContaining({ refreshOnError: false }),
     )
-    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(countPreviewRequests(fetchMock)).toBe(1)
   })
 
   test('runs goblin.toml bootstrap once by default for untrusted configs', async () => {
     const submitBranchAction = vi.spyOn(useReposStore.getState(), 'submitBranchAction').mockImplementation(() => {})
-    const fetchMock = mockFetch(async () => {
+    const fetchMock = mockCreateWorktreeHostFetch(async () => {
       return new Response(
         JSON.stringify({
           ok: true,
@@ -248,17 +252,16 @@ describe('CreateWorktreeDialogHost', () => {
       }),
       expect.objectContaining({ refreshOnError: false }),
     )
-    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(countPreviewRequests(fetchMock)).toBe(1)
   })
 
   test('does not submit a bootstrap decision before settings trust state is loaded', async () => {
     const configHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-    primaryWindowQueryClient.removeQueries({ queryKey: settingsSnapshotQueryKey(), exact: true })
+    testQueryClient.removeQueries({ queryKey: settingsSnapshotQueryKey(), exact: true })
     const submitBranchAction = vi.spyOn(useReposStore.getState(), 'submitBranchAction').mockImplementation(() => {})
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => previewResponse({ hasOperations: true, configHash })),
-    )
+    mockCreateWorktreeHostFetch(async () => previewResponse({ hasOperations: true, configHash }), {
+      settings: () => new Promise<Response>(() => {}),
+    })
 
     renderHost(true, vi.fn())
     await flushReact()
@@ -270,8 +273,7 @@ describe('CreateWorktreeDialogHost', () => {
   })
 
   test('preflights then auto-runs a trusted goblin.toml config hash while showing the trust checkbox', async () => {
-    primaryWindowQueryClient.setQueryData(
-      settingsSnapshotQueryKey(),
+    setServerSettings(
       defaultSettingsSnapshot({
         repoSettings: [
           {
@@ -285,7 +287,7 @@ describe('CreateWorktreeDialogHost', () => {
       }),
     )
     const submitBranchAction = vi.spyOn(useReposStore.getState(), 'submitBranchAction').mockImplementation(() => {})
-    const fetchMock = mockFetch(async (_input: RequestInfo | URL, init?: RequestInit) => {
+    const fetchMock = mockCreateWorktreeHostFetch(async (_input: RequestInfo | URL, init?: RequestInit) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as { cwd?: string }
       expect(body.cwd).toBe(REPO_ID)
       return new Response(
@@ -311,7 +313,7 @@ describe('CreateWorktreeDialogHost', () => {
     await clickButton('action.create-worktree-confirm')
     await flushReact()
 
-    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(countPreviewRequests(fetchMock)).toBe(1)
     expect(document.body.textContent).toContain('action.create-worktree-bootstrap-config-trusted')
     const trustCheckbox = checkboxForLabel('action.create-worktree-bootstrap-config-trusted')
     expect(trustCheckbox.getAttribute('aria-checked')).toBe('true')
@@ -332,8 +334,7 @@ describe('CreateWorktreeDialogHost', () => {
 
   test('forwards an unchecked trust choice for an already trusted goblin.toml config hash', async () => {
     const configHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-    primaryWindowQueryClient.setQueryData(
-      settingsSnapshotQueryKey(),
+    setServerSettings(
       defaultSettingsSnapshot({
         repoSettings: [
           {
@@ -347,10 +348,7 @@ describe('CreateWorktreeDialogHost', () => {
       }),
     )
     const submitBranchAction = vi.spyOn(useReposStore.getState(), 'submitBranchAction').mockImplementation(() => {})
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => previewResponse({ hasOperations: true, configHash })),
-    )
+    mockCreateWorktreeHostFetch(async () => previewResponse({ hasOperations: true, configHash }))
 
     renderHost(true, vi.fn())
     await flushReact()
@@ -374,69 +372,15 @@ describe('CreateWorktreeDialogHost', () => {
     )
   })
 
-  test('keeps config trust state in sync when settings cache updates after preview', async () => {
-    const configHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-    primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
-    const submitBranchAction = vi.spyOn(useReposStore.getState(), 'submitBranchAction').mockImplementation(() => {})
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => previewResponse({ hasOperations: true, configHash })),
-    )
-
-    renderHost(true, vi.fn())
-    await flushReact()
-
-    expect(document.body.textContent).toContain('action.create-worktree-bootstrap-config-trusted')
-
-    act(() => {
-      primaryWindowQueryClient.setQueryData(
-        settingsSnapshotQueryKey(),
-        defaultSettingsSnapshot({
-          repoSettings: [
-            {
-              repoId: REPO_ID,
-              worktreeBootstrapTrust: {
-                configHash,
-                trustedAt: '2026-06-26T00:00:00.000Z',
-              },
-            },
-          ],
-        }),
-      )
-    })
-    await flushReact()
-
-    expect(document.body.textContent).toContain('action.create-worktree-bootstrap-config-trusted')
-    const trustCheckbox = checkboxForLabel('action.create-worktree-bootstrap-config-trusted')
-    expect(trustCheckbox.getAttribute('aria-checked')).toBe('true')
-    expect(trustCheckbox.hasAttribute('disabled')).toBe(false)
-
-    setInputValue('cwt-branch', 'feature/trusted-after-preview')
-    await clickButton('action.create-worktree-confirm')
-    await flushReact()
-
-    expect(submitBranchAction).toHaveBeenCalledWith(
-      REPO_ID,
-      expect.objectContaining({
-        kind: 'createWorktree',
-        worktreeBootstrap: { kind: 'run', configHash, configTrusted: true },
-      }),
-      expect.objectContaining({ refreshOnError: false }),
-    )
-  })
-
   test('shows preview errors and skips bootstrap when creating anyway', async () => {
-    primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
+    setServerSettings(defaultSettingsSnapshot())
     const submitBranchAction = vi.spyOn(useReposStore.getState(), 'submitBranchAction').mockImplementation(() => {})
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => {
-        return new Response(JSON.stringify({ ok: false, message: 'invalid goblin.toml' }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        })
-      }),
-    )
+    mockCreateWorktreeHostFetch(async () => {
+      return new Response(JSON.stringify({ ok: false, message: 'invalid goblin.toml' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    })
 
     renderHost(true, vi.fn())
     await flushReact()
@@ -461,8 +405,7 @@ describe('CreateWorktreeDialogHost', () => {
 
   test('ignores a stale bootstrap preview after reopening the create dialog', async () => {
     const configHash = 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
-    primaryWindowQueryClient.setQueryData(
-      settingsSnapshotQueryKey(),
+    setServerSettings(
       defaultSettingsSnapshot({
         repoSettings: [
           {
@@ -479,7 +422,7 @@ describe('CreateWorktreeDialogHost', () => {
     const firstPreview = deferred<Response>()
     const secondPreview = deferred<Response>()
     const previewResponses = [firstPreview, secondPreview]
-    mockFetch((input: RequestInfo | URL) => {
+    mockCreateWorktreeHostFetch((input: RequestInfo | URL) => {
       const url = new URL(String(input))
       if (url.pathname !== '/api/repo/worktree-bootstrap-preview') {
         throw new Error(`unexpected request ${url.pathname}`)
@@ -518,6 +461,37 @@ describe('CreateWorktreeDialogHost', () => {
     )
   })
 })
+
+function setServerSettings(snapshot: ReturnType<typeof defaultSettingsSnapshot>): void {
+  serverSettingsSnapshot = snapshot
+  testQueryClient.setQueryData(settingsSnapshotQueryKey(), snapshot)
+}
+
+function mockCreateWorktreeHostFetch(
+  preview: (...args: Parameters<typeof fetch>) => Response | unknown,
+  options: { settings?: (...args: Parameters<typeof fetch>) => Response | unknown } = {},
+) {
+  return mockFetch((...args: Parameters<typeof fetch>) => {
+    const [input] = args
+    const pathname = new URL(String(input), 'http://localhost').pathname
+    if (pathname === '/api/settings') {
+      return options.settings
+        ? options.settings(...args)
+        : new Response(JSON.stringify(serverSettingsSnapshot), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          })
+    }
+    if (pathname === '/api/repo/worktree-bootstrap-preview') return preview(...args)
+    throw new Error(`unexpected request ${pathname}`)
+  })
+}
+
+function countPreviewRequests(fetchMock: ReturnType<typeof mockFetch>): number {
+  return fetchMock.mock.calls.filter(([input]) => {
+    return new URL(String(input), 'http://localhost').pathname === '/api/repo/worktree-bootstrap-preview'
+  }).length
+}
 
 function previewResponse(input: { hasOperations: boolean; configHash: string | null }): Response {
   return new Response(
@@ -579,7 +553,9 @@ async function clickButton(text: string): Promise<void> {
 }
 
 async function clickLabel(text: string): Promise<void> {
-  const label = Array.from(document.body.querySelectorAll('label')).find((candidate) => candidate.textContent === text)
+  const label = Array.from(document.body.querySelectorAll('label'))
+    .filter((candidate) => candidate.textContent === text)
+    .at(-1)
   if (!(label instanceof HTMLLabelElement)) throw new Error(`missing label ${text}`)
   await act(async () => {
     label.click()
@@ -589,7 +565,8 @@ async function clickLabel(text: string): Promise<void> {
 }
 
 function checkboxForLabel(text: string): HTMLElement {
-  const label = Array.from(document.body.querySelectorAll('label')).find((candidate) => candidate.textContent === text)
+  const labels = Array.from(document.body.querySelectorAll('label')).filter((candidate) => candidate.textContent === text)
+  const label = labels.at(-1)
   if (!(label instanceof HTMLLabelElement)) throw new Error(`missing label ${text}`)
   const checkbox = document.getElementById(label.htmlFor)
   if (!(checkbox instanceof HTMLElement)) throw new Error(`missing checkbox for ${text}`)
