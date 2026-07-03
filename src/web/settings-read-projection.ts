@@ -12,7 +12,7 @@ import {
   runtimeSettingsSnapshotFromSettingsSnapshot,
 } from '#/shared/settings-snapshot.ts'
 
-export function currentSettingsSnapshot(): SettingsSnapshot | undefined {
+function currentSettingsSnapshot(): SettingsSnapshot | undefined {
   return primaryWindowQueryClient.getQueryData<SettingsSnapshot>(settingsSnapshotQueryKey())
 }
 
