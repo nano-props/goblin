@@ -24,13 +24,6 @@ export function markRepoUnavailable(repo: RepoAvailabilityTarget, reason: string
   repo.remote.fetchError = null
 }
 
-// Re-export the shared reason-mapping helper so existing
-// `import { toRemoteRepoFailureReason } from '#/web/.../availability.ts'`
-// call sites keep compiling through the Phase 1→3 transition. The
-// canonical definition lives in `shared/remote-repo.ts` so the
-// server boundary can use the same mapping.
-export { toRemoteRepoFailureReason } from '#/shared/remote-repo.ts'
-
 /**
  * Set the remote lifecycle to `connecting` (entry point of a fresh
  * remote-repo run). The lifecycle union owns the target and the
