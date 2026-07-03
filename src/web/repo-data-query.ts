@@ -129,6 +129,14 @@ export function useRepoSnapshotQuery(repoRoot: string, repoInstanceId: string) {
   return useQuery(repoSnapshotQueryOptions(repoRoot, repoInstanceId))
 }
 
+export function useRepoSnapshotReadModel(repoRoot: string, repoInstanceId: string, enabled: boolean) {
+  return useQuery({
+    ...repoSnapshotQueryOptions(repoRoot, repoInstanceId),
+    enabled: false,
+    subscribed: enabled,
+  })
+}
+
 export function useRepoStatusQuery(repoRoot: string, repoInstanceId: string) {
   return useQuery(repoStatusQueryOptions(repoRoot, repoInstanceId))
 }

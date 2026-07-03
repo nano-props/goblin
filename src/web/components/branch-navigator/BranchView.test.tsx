@@ -10,7 +10,7 @@ import {
   type PrimaryWindowNavigationActions,
 } from '#/web/primary-window-navigation.tsx'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { setRepoStatusQueryData } from '#/web/repo-data-query.ts'
+import { setRepoSnapshotQueryData, setRepoStatusQueryData } from '#/web/repo-data-query.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { TerminalSessionReadContext } from '#/web/components/terminal/terminal-session-context.ts'
 import type { TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
@@ -51,6 +51,23 @@ beforeEach(() => {
 })
 
 describe('BranchView', () => {
+  test('uses the React Query snapshot read model for branch rows when available', () => {
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branches: [],
+      selectedBranch: 'feature/query',
+      statusLoaded: true,
+    })
+    setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
+      current: 'feature/query',
+      branches: [createRepoBranch('feature/query')],
+    })
+
+    renderBranchView()
+
+    expect(screen.getByText('feature/query')).toBeTruthy()
+  })
+
   test('uses the React Query status read model for branch row dirty state when available', () => {
     const branch = createRepoBranch('feature/dirty', { worktree: { path: WORKTREE_PATH } })
     const repo = seedRepoState({
@@ -63,16 +80,20 @@ describe('BranchView', () => {
       { path: WORKTREE_PATH, branch: 'feature/dirty', isMain: false, entries: [{ x: 'M', y: ' ', path: 'dirty.ts' }] },
     ])
 
-    renderInJsdom(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={navigation}>
-          <TerminalSessionReadContext value={terminalReadContext}>
-            <BranchView repoId={REPO_ID} />
-          </TerminalSessionReadContext>
-        </PrimaryWindowNavigationProvider>
-      </QueryClientProvider>,
-    )
+    renderBranchView()
 
     expect(screen.getByLabelText('branches.dirty')).toBeTruthy()
   })
 })
+
+function renderBranchView() {
+  return renderInJsdom(
+    <QueryClientProvider client={primaryWindowQueryClient}>
+      <PrimaryWindowNavigationProvider value={navigation}>
+        <TerminalSessionReadContext value={terminalReadContext}>
+          <BranchView repoId={REPO_ID} />
+        </TerminalSessionReadContext>
+      </PrimaryWindowNavigationProvider>
+    </QueryClientProvider>,
+  )
+}

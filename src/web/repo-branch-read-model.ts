@@ -1,0 +1,38 @@
+import { useRepoSnapshotReadModel } from '#/web/repo-data-query.ts'
+import {
+  stripBranchWorktreeMetadata,
+  worktreeStatesFromBranches,
+} from '#/web/stores/repos/worktree-state.ts'
+import type { RepoState } from '#/web/stores/repos/types.ts'
+import type { RepoSnapshot } from '#/shared/api-types.ts'
+
+export interface RepoBranchReadModelData {
+  branches: RepoState['data']['branches']
+  currentBranch: string
+  currentHEAD?: string
+  worktreesByPath: RepoState['data']['worktreesByPath']
+}
+
+export function repoBranchReadModelFromSnapshot(
+  snapshot: RepoSnapshot,
+  current: Pick<RepoState['data'], 'status' | 'worktreesByPath'>,
+): RepoBranchReadModelData {
+  const branches = stripBranchWorktreeMetadata(snapshot.branches)
+  return {
+    branches,
+    currentBranch: snapshot.current,
+    currentHEAD: snapshot.currentHEAD,
+    worktreesByPath: worktreeStatesFromBranches(snapshot.branches, current.worktreesByPath, current.status),
+  }
+}
+
+export function useRepoBranchReadModel(
+  repoRoot: string,
+  repoInstanceId: string,
+  current: Pick<RepoState['data'], 'status' | 'worktreesByPath'>,
+  enabled: boolean,
+): RepoBranchReadModelData | null {
+  const snapshotReadModel = useRepoSnapshotReadModel(repoRoot, repoInstanceId, enabled)
+  if (!snapshotReadModel.data) return null
+  return repoBranchReadModelFromSnapshot(snapshotReadModel.data, current)
+}

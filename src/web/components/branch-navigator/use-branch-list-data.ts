@@ -8,6 +8,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import type { RepoDataState, RepoState, RepoUiState } from '#/web/stores/repos/types.ts'
 import { useRepoStatusReadModel } from '#/web/repo-data-query.ts'
+import { useRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
 
 // Composed projection: BranchActionRepo (status, worktrees, currentBranch,
 // branch action, remote) + branches + the j/k selection + the worktree
@@ -96,13 +97,23 @@ export function useBranchListRepo(repoId: string): BranchListRepo | undefined {
     },
     branchListRepoEqual,
   )
+  const branchReadModel = useRepoBranchReadModel(
+    repo?.id ?? '',
+    repo?.instanceId ?? '',
+    {
+      status: repo?.data.status ?? [],
+      worktreesByPath: repo?.data.worktreesByPath ?? {},
+    },
+    !!repo,
+  )
   const statusReadModel = useRepoStatusReadModel(repo?.id ?? '', repo?.instanceId ?? '', !!repo)
-  if (!repo || !statusReadModel.data) return repo
+  if (!repo || (!branchReadModel && !statusReadModel.data)) return repo
   return {
     ...repo,
     data: {
       ...repo.data,
-      status: statusReadModel.data,
+      ...(branchReadModel ?? {}),
+      ...(statusReadModel.data ? { status: statusReadModel.data } : {}),
     },
   }
 }
