@@ -40,7 +40,9 @@ function visibleDetailPullRequestPending(get: ReposGet, id: string, repoInstance
     !projectedRepo.ui.selectedBranch
   )
     return false
-  const branch = projectedRepo.data.branches.find((entry) => entry.name === projectedRepo.ui.selectedBranch)
+  const branch =
+    repo.data.branches.find((entry) => entry.name === projectedRepo.ui.selectedBranch) ??
+    projectedRepo.data.branches.find((entry) => entry.name === projectedRepo.ui.selectedBranch)
   return pullRequestMergeStatusPending(branch?.pullRequest)
 }
 
