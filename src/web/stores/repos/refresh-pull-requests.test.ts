@@ -4,7 +4,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { replaceRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { preferredWorkspacePaneTabByTargetRecordWith } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { repoPullRequestsQueryKey } from '#/web/repo-data-query.ts'
+import { repoPullRequestsQueryKey, setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 import type { PullRequestInfo } from '#/web/types.ts'
 import {
   branch,
@@ -153,6 +153,23 @@ describe('refreshPullRequests', () => {
     expect(
       primaryWindowQueryClient.getQueryData(repoPullRequestsQueryKey(REPO_ID, repoInstanceId, ['feature/a', 'feature/b'], 'full')),
     ).toEqual(entries)
+  })
+
+  test('defaults pull request refresh branches from the React Query snapshot cache', async () => {
+    const repoInstanceId = seedRepo([branch('main')])
+    setRepoSnapshotQueryData(REPO_ID, repoInstanceId, {
+      current: 'feature/query-a',
+      branches: [branch('feature/query-a'), branch('feature/query-b')],
+    })
+    const calls: Array<{ branches?: string[]; mode?: string }> = []
+    ipcHandlers['repo.pullRequests'] = async ({ branches, mode }: { branches?: string[]; mode?: string }) => {
+      calls.push({ branches, mode })
+      return []
+    }
+
+    await useReposStore.getState().refreshPullRequests(REPO_ID, undefined, { repoInstanceId })
+
+    expect(calls).toEqual([{ branches: ['feature/query-a', 'feature/query-b'], mode: 'full' }])
   })
 
   test('does not attach reverse pull requests to the default branch', async () => {
