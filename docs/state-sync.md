@@ -45,6 +45,8 @@ Notes:
 - `useReposStore` is not a shared cross-window store.
 - `RuntimeCoherentRepoProjectionState` names the runtime-coherent repo projection slice.
 - `useReposStore.repos` is a client-local projection of runtime-coherent repo truth.
+- React Query is the client read model for repo snapshot/status/pull-request server data. UI and command paths should read through query-backed helpers such as `useRepoBranchReadModel`, `readRepoWithBranchReadModel`, `readRepoBranches`, or `readRepoBranchSelectionModel` instead of treating `useReposStore.repos[*].data.branches` as authoritative runtime truth.
+- Store repo data may still exist as a projection for UI orchestration, action state, warm restore, and in-place server response application. New runtime reads should prefer the query-backed projection unless they are explicitly write-side projection code.
 - `ReposStore` actions are also grouped by local, restorable, runtime-coherent, and mutation responsibilities.
 - Transport payloads may bundle multiple classes together; consumers should split them back into runtime-coherent and restorable views before use.
 - Runtime-coherent repo actions should prefer orchestration entrypoints plus focused helper modules for projection/state transitions and sync pipelines.
@@ -76,6 +78,7 @@ Notes:
 - `repoSnapshotCache` names the warm-start repo cache slice.
 - `RepoSnapshotCacheEntry` is the stored snapshot shape inside that cache.
 - Restorable helpers should focus on boot restore and persistence boundaries, not on live runtime convergence.
+- `repoSnapshotCache` is a startup affordance, not a runtime authority. Persist it from query-projected repo data when available; use it to paint placeholders during boot, then converge through normal server/query refresh.
 - `hydrateSession` belongs to the restorable boot path, while `ensureWorkspaceOpen` and `closeRepo` belong to runtime repo lifecycle.
 - Restorable state is not runtime-coherent shared state.
 - Session writes are client -> persistence only after boot restore; they do not publish runtime invalidation.
