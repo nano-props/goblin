@@ -12,10 +12,16 @@ import { InlineShortcut } from '#/web/components/InlineShortcut.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import { formatAccelerator } from '#/shared/accelerator.ts'
 import { CREATE_WORKTREE_SHORTCUT } from '#/shared/shortcut-definitions.ts'
+import { useRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
+import type { WorktreeStatus } from '#/shared/git-types.ts'
+import type { RepoState } from '#/web/stores/repos/types.ts'
 
 interface Props {
   repoId: string
 }
+
+const EMPTY_STATUS: WorktreeStatus[] = []
+const EMPTY_WORKTREES_BY_PATH: RepoState['data']['worktreesByPath'] = {}
 
 export function RepoSyncAction({ repoId }: Props) {
   return <RepoActivityControl repoId={repoId} />
@@ -27,18 +33,33 @@ export function BranchFilterAction({ repoId }: Props) {
 
 function WorktreeFilterToggle({ repoId }: Props) {
   const setBranchViewMode = useReposStore((s) => s.setBranchViewMode)
-  const { branchCount, branchViewMode } = useReposStore(
+  const repoView = useReposStore(
     useShallow((s) => {
       const repo = s.repos[repoId]
       return {
+        id: repo?.id ?? '',
+        instanceId: repo?.instanceId ?? '',
         branchCount: repo?.data.branches.length ?? 0,
+        status: repo?.data.status ?? EMPTY_STATUS,
+        worktreesByPath: repo?.data.worktreesByPath ?? EMPTY_WORKTREES_BY_PATH,
         branchViewMode: repo?.ui.branchViewMode ?? 'all',
+        exists: !!repo,
       }
     }),
   )
+  const branchReadModel = useRepoBranchReadModel(
+    repoView.id,
+    repoView.instanceId,
+    {
+      status: repoView.status,
+      worktreesByPath: repoView.worktreesByPath,
+    },
+    repoView.exists,
+  )
+  const branchCount = branchReadModel?.branches.length ?? repoView.branchCount
   return (
     <BranchViewModeControl
-      value={branchViewMode}
+      value={repoView.branchViewMode}
       disabled={branchCount === 0}
       onChange={(viewMode: BranchViewMode) => setBranchViewMode(repoId, viewMode)}
     />
