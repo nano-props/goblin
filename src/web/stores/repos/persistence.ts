@@ -5,7 +5,8 @@ import { selectedBranchForBranchSet } from '#/web/stores/repos/branch-view-mode.
 import type { RepoSnapshotCacheEntry, RepoState } from '#/web/stores/repos/types.ts'
 import { finishDataLoadSuccess } from '#/web/stores/repos/repo-data-load-state.ts'
 import { stripBranchWorktreeMetadata } from '#/web/stores/repos/worktree-state.ts'
-import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { getRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
+import { repoBranchSnapshotDataFromSnapshot, type RepoBranchSnapshotData } from '#/web/repo-branch-read-model.ts'
 const MAX_CACHE_AGE_MS = 14 * 24 * 60 * 60 * 1000
 const MAX_REPOS = 50
 const FiniteNumber = v.pipe(v.number(), v.finite())
@@ -97,8 +98,8 @@ export function persistRepoSnapshotCacheEntry(
 ): void {
   if (!repo) return
   if (repo.instanceId !== repoInstanceId) return
-  const branchModel = readRepoBranchQueryProjection(repo)
-  const entry = branchModel ? repoSnapshotCacheEntryFromRepo(repo, branchModel) : null
+  const snapshot = getRepoSnapshotQueryData(repo.id, repo.instanceId)
+  const entry = snapshot ? repoSnapshotCacheEntryFromRepo(repo, repoBranchSnapshotDataFromSnapshot(snapshot)) : null
   if (!entry) return
   set((s) => {
     if (s.repos[repo.id]?.instanceId !== repoInstanceId) return s
@@ -119,7 +120,7 @@ export function normalizeRepoSnapshotCache(value: unknown): Record<string, RepoS
 
 function repoSnapshotCacheEntryFromRepo(
   repo: RepoState,
-  branchModel: NonNullable<ReturnType<typeof readRepoBranchQueryProjection>>,
+  branchModel: RepoBranchSnapshotData,
 ): RepoSnapshotCacheEntry | null {
   if (branchModel.branches.length === 0) return null
   return {

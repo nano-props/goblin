@@ -4,7 +4,7 @@ import type { ReposStore } from '#/web/stores/repos/types.ts'
 import type { TerminalRepoIndex } from '#/web/components/terminal/types.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { repoSnapshotQueryOptions } from '#/web/repo-data-query.ts'
-import { repoBranchReadModelFromSnapshot } from '#/web/repo-branch-read-model.ts'
+import { repoBranchSnapshotDataFromSnapshot } from '#/web/repo-branch-read-model.ts'
 import type { RepoSnapshot } from '#/shared/api-types.ts'
 
 export interface TerminalRepoIndexEntry {
@@ -34,8 +34,8 @@ export function repoIndexFromEntries(
   const index: TerminalRepoIndex = {}
   entries.forEach((repo, indexInEntries) => {
     const snapshot = snapshots[indexInEntries] ?? null
-    const branchReadModel = snapshot ? repoBranchReadModelFromSnapshot(snapshot) : null
-    const branches = branchReadModel?.branches ?? []
+    const branchSnapshot = snapshot ? repoBranchSnapshotDataFromSnapshot(snapshot) : null
+    const branches = branchSnapshot?.branches ?? []
     const branchByWorktreePath: Record<string, string> = {}
     for (const branch of branches) {
       const worktreePath = branch.worktree?.path

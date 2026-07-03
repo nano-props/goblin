@@ -20,7 +20,7 @@ import {
   setWorkspacePaneTabsForTargetQueryData,
   useWorkspacePaneTabsQuery,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
+import { setRepoSnapshotQueryData, setRepoStatusQueryData } from '#/web/repo-data-query.ts'
 
 const persistWorkspaceSessionStateMock = vi.fn(async (_session: unknown) => {})
 
@@ -188,6 +188,7 @@ describe('useSessionPersistence', () => {
       branches: [createRepoBranch('feature/query-worktree', { worktree: { path: '/tmp/query-worktree' } })],
       current: 'feature/query-worktree',
     })
+    setRepoStatusQueryData(repo.id, repo.instanceId, [])
     setWorkspacePaneTabsForTargetQueryData({
       repoRoot: repo.id,
       repoInstanceId: repo.instanceId,
@@ -245,6 +246,7 @@ describe('useSessionPersistence', () => {
       current: 'feature/worktree',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
     })
+    setRepoStatusQueryData(repo.id, currentInstanceId, [])
 
     renderInJsdom(<Harness />)
 

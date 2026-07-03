@@ -6,7 +6,7 @@ import { createBranchSnapshot, installGoblinTestBridge } from '#/web/test-utils/
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
+import { setRepoSnapshotQueryData, setRepoStatusQueryData } from '#/web/repo-data-query.ts'
 
 beforeEach(() => {
   primaryWindowQueryClient.clear()
@@ -16,10 +16,11 @@ describe('repo refresh workflows', () => {
   test('snapshot success backfills summary then visible selected repo workspace', async () => {
     const calls: string[] = []
     installGoblinTestBridge({})
-    setRepoSnapshotQueryData('/repo', 'repo-instance-test-2', {
-      current: 'feature/a',
-      branches: [createBranchSnapshot('feature/a'), createBranchSnapshot('feature/b')],
-    })
+  setRepoSnapshotQueryData('/repo', 'repo-instance-test-2', {
+    current: 'feature/a',
+    branches: [createBranchSnapshot('feature/a'), createBranchSnapshot('feature/b')],
+  })
+  setRepoStatusQueryData('/repo', 'repo-instance-test-2', [])
     setWorkspacePaneTabsForTargetQueryData({
       repoRoot: '/repo',
       repoInstanceId: 'repo-instance-test-2',
@@ -94,10 +95,11 @@ describe('repo refresh workflows', () => {
       tabs: [workspacePaneStaticTabEntry('status')],
     })
     const calls: string[] = []
-    setRepoSnapshotQueryData('/repo', 'repo-instance-test-2', {
-      current: 'feature/a',
-      branches: [createBranchSnapshot('feature/a'), createBranchSnapshot('feature/b')],
-    })
+  setRepoSnapshotQueryData('/repo', 'repo-instance-test-2', {
+    current: 'feature/a',
+    branches: [createBranchSnapshot('feature/a'), createBranchSnapshot('feature/b')],
+  })
+  setRepoStatusQueryData('/repo', 'repo-instance-test-2', [])
     const get: ReposGet = () =>
       ({
         repos: {
@@ -148,10 +150,11 @@ describe('repo refresh workflows', () => {
 
   test('visible selected workspace backfill resolves the selected branch from the React Query snapshot cache', async () => {
     installGoblinTestBridge({})
-    setRepoSnapshotQueryData('/repo', 'repo-instance-test-2', {
-      current: 'feature/query',
-      branches: [createBranchSnapshot('feature/query')],
-    })
+  setRepoSnapshotQueryData('/repo', 'repo-instance-test-2', {
+    current: 'feature/query',
+    branches: [createBranchSnapshot('feature/query')],
+  })
+  setRepoStatusQueryData('/repo', 'repo-instance-test-2', [])
     setWorkspacePaneTabsForTargetQueryData({
       repoRoot: '/repo',
       repoInstanceId: 'repo-instance-test-2',

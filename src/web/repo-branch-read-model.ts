@@ -17,17 +17,24 @@ export interface RepoBranchReadModelData {
   worktreesByPath: RepoState['data']['worktreesByPath']
 }
 
-export function repoBranchReadModelFromSnapshot(
-  snapshot: RepoSnapshot,
-  current: Partial<Pick<RepoState['data'], 'status' | 'worktreesByPath'>> = {},
-): RepoBranchReadModelData {
-  const branches = stripBranchWorktreeMetadata(snapshot.branches)
+export type RepoBranchSnapshotData = Pick<RepoBranchReadModelData, 'branches' | 'currentBranch' | 'currentHEAD'>
+
+export function repoBranchSnapshotDataFromSnapshot(snapshot: RepoSnapshot): RepoBranchSnapshotData {
   return {
-    branches,
+    branches: stripBranchWorktreeMetadata(snapshot.branches),
     currentBranch: snapshot.current,
     currentHEAD: snapshot.currentHEAD,
-    status: current.status ?? [],
-    worktreesByPath: worktreeStatesFromBranches(snapshot.branches, current.worktreesByPath ?? {}, current.status ?? []),
+  }
+}
+
+export function repoBranchReadModelFromSnapshot(
+  snapshot: RepoSnapshot,
+  current: Pick<RepoState['data'], 'status'> & Partial<Pick<RepoState['data'], 'worktreesByPath'>>,
+): RepoBranchReadModelData {
+  return {
+    ...repoBranchSnapshotDataFromSnapshot(snapshot),
+    status: current.status,
+    worktreesByPath: worktreeStatesFromBranches(snapshot.branches, current.worktreesByPath ?? {}, current.status),
   }
 }
 
@@ -38,9 +45,9 @@ export function useRepoBranchReadModel(
 ): RepoBranchReadModelData | null {
   const snapshotReadModel = useRepoSnapshotReadModel(repoRoot, repoInstanceId, enabled)
   const statusReadModel = useRepoStatusReadModel(repoRoot, repoInstanceId, enabled)
-  if (!snapshotReadModel.data) return null
+  if (!snapshotReadModel.data || !statusReadModel.data) return null
   return repoBranchReadModelFromSnapshot(snapshotReadModel.data, {
-    status: statusReadModel.data ?? [],
+    status: statusReadModel.data,
   })
 }
 
@@ -56,8 +63,10 @@ export function readRepoBranchQueryProjection(
   queryClient?: QueryClient,
 ): RepoBranchReadModelData | null {
   const snapshot = getRepoSnapshotQueryData(repo.id, repo.instanceId, queryClient)
+  const status = getRepoStatusQueryData(repo.id, repo.instanceId, queryClient)
   if (!snapshot) return null
+  if (!status) return null
   return repoBranchReadModelFromSnapshot(snapshot, {
-    status: getRepoStatusQueryData(repo.id, repo.instanceId, queryClient) ?? [],
+    status,
   })
 }

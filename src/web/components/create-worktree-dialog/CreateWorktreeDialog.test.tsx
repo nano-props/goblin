@@ -11,7 +11,7 @@ import type { RepoState } from '#/web/stores/repos/types.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 import { getRepoRemoteBranches } from '#/web/repo-client.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
+import { setRepoSnapshotQueryData, setRepoStatusQueryData } from '#/web/repo-data-query.ts'
 import { createRepoBranch } from '#/web/test-utils/bridge.ts'
 
 vi.mock('#/web/repo-client.ts', async () => {
@@ -250,6 +250,7 @@ function createRepo(): RepoState {
     current: repo.data.currentBranch,
     branches: repo.data.branches,
   })
+  setRepoStatusQueryData(repo.id, repo.instanceId, [])
   return repo
 }
 
@@ -269,5 +270,6 @@ function createRemoteRepo(): RepoState {
     current: repo.data.currentBranch,
     branches: repo.data.branches,
   })
+  setRepoStatusQueryData(repo.id, repo.instanceId, [])
   return repo
 }
