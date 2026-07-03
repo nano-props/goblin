@@ -69,7 +69,7 @@ describe('restorable-workspace-state', () => {
           selectedTerminalSessionIdByTerminalWorktree: {},
         },
       }),
-    ).toThrow('workspace session persistence requires branch read model for repo: /tmp/repo-without-query-model')
+    ).toThrow('repo branch read model query data unavailable for repo: /tmp/repo-without-query-model')
   })
 
   test('persists changes as a session-restorable preferred tab when its static tab is open', () => {

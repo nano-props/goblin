@@ -25,6 +25,7 @@ import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-p
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
+import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 const REPO_ID = '/tmp/gbl-selection-test-repo'
 const ipcHandlers: Record<string, (input: any) => unknown> = {}
 
@@ -61,6 +62,16 @@ function seedRepo(options: {
       hasGitHubRemote: true,
     },
   })
+}
+
+function seedRepoShellWithoutBranchReadModel(): void {
+  const repo = emptyRepo(REPO_ID, 'selection-test-repo', 'repo-instance-selection-no-query')
+  repo.ui.selectedBranch = 'main'
+  useReposStore.setState((s) => ({
+    repos: { ...s.repos, [REPO_ID]: repo },
+    order: [...s.order, REPO_ID],
+    activeId: REPO_ID,
+  }))
 }
 
 function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
@@ -123,6 +134,14 @@ beforeEach(() => {
 })
 
 describe('setBranchViewMode', () => {
+  test('fails when the repo branch read model is unavailable', () => {
+    seedRepoShellWithoutBranchReadModel()
+
+    expect(() => useReposStore.getState().setBranchViewMode(REPO_ID, 'worktrees')).toThrow(
+      'repo branch read model query data unavailable for repo',
+    )
+  })
+
   test('changes the selected branch when the previous selection is hidden', () => {
     seedRepo({ selectedBranch: 'feature/plain' })
 
@@ -222,6 +241,14 @@ describe('setBranchViewMode', () => {
 })
 
 describe('selectBranch', () => {
+  test('fails when the repo branch read model is unavailable', () => {
+    seedRepoShellWithoutBranchReadModel()
+
+    expect(() => useReposStore.getState().selectBranch(REPO_ID, 'feature/query')).toThrow(
+      'repo branch read model query data unavailable for repo',
+    )
+  })
+
   test('refreshes pull request details locally', async () => {
     let resolve!: () => void
     const calls: Array<{ branches?: string[]; mode?: string }> = []
@@ -345,6 +372,14 @@ describe('clearSelectedBranch', () => {
 })
 
 describe('setWorkspacePaneTab', () => {
+  test('fails when the repo branch read model is unavailable', () => {
+    seedRepoShellWithoutBranchReadModel()
+
+    expect(() => useReposStore.getState().setWorkspacePaneTab(REPO_ID, 'changes')).toThrow(
+      'repo branch read model query data unavailable for repo',
+    )
+  })
+
   test('persists the selected workspace pane tab immediately', () => {
     seedRepo({ selectedBranch: 'feature/worktree', preferredWorkspacePaneTab: 'status' })
 

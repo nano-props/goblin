@@ -16,7 +16,7 @@ import {
   workspacePaneTabsQueryKey,
   type WorkspacePaneTabsQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { readRepoBranchQueryProjection, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
+import { requireRepoBranchQueryProjection, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 
 interface WorkspaceSessionRepoProjection {
   id: string
@@ -73,8 +73,7 @@ function workspaceSessionRepoProjections(
   for (const id of order) {
     const repo = repos[id]
     if (!repo) continue
-    const branchModel = readRepoBranchQueryProjection(repo)
-    if (!branchModel) throw new Error(`workspace session persistence requires branch read model for repo: ${id}`)
+    const branchModel = requireRepoBranchQueryProjection(repo)
     projectedRepos[id] = {
       id: repo.id,
       remote: repo.remote,

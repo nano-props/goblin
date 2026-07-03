@@ -68,3 +68,12 @@ export function readRepoBranchQueryProjection(
     worktreesByPath: repo.data.worktreesByPath,
   })
 }
+
+export function requireRepoBranchQueryProjection(
+  repo: Pick<RepoState, 'id' | 'instanceId'> & { data: Pick<RepoState['data'], 'worktreesByPath'> },
+  queryClient?: QueryClient,
+): RepoBranchReadModelData {
+  const projection = readRepoBranchQueryProjection(repo, queryClient)
+  if (!projection) throw new Error(`repo branch read model query data unavailable for repo: ${repo.id}`)
+  return projection
+}
