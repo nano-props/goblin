@@ -22,7 +22,7 @@ interface WorkspaceSessionRepoProjection {
   id: string
   remote: ReposStore['repos'][string]['remote']
   ui: Pick<ReposStore['repos'][string]['ui'], 'preferredWorkspacePaneTabByTarget'>
-  data: Pick<RepoBranchReadModelData, 'branches'>
+  branches: RepoBranchReadModelData['branches']
 }
 
 type WorkspaceSessionRepoProjectionMap = Record<string, WorkspaceSessionRepoProjection | undefined>
@@ -80,9 +80,7 @@ function workspaceSessionRepoProjections(
       ui: {
         preferredWorkspacePaneTabByTarget: repo.ui.preferredWorkspacePaneTabByTarget,
       },
-      data: {
-        branches: branchModel.branches,
-      },
+      branches: branchModel.branches,
     }
   }
   return projectedRepos

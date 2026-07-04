@@ -13,21 +13,27 @@ import {
   workspacePaneStaticTabsFromEntries,
 } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 
+interface WorkspaceSessionBranchProjection {
+  name: string
+  worktree?: { path?: string } | undefined
+}
+
+interface WorkspaceSessionRepoProjection {
+  branches: readonly WorkspaceSessionBranchProjection[]
+  ui?: {
+    preferredWorkspacePaneTabByTarget: Record<string, WorkspacePaneTabType>
+  }
+}
+
+type WorkspaceSessionRepoProjectionWithUi = WorkspaceSessionRepoProjection &
+  Required<Pick<WorkspaceSessionRepoProjection, 'ui'>>
+
 export function persistedActiveRepoIdForSession(activeId: string | null): string | null {
   return activeId
 }
 
 export function persistedPreferredWorkspacePaneTabByTargetByRepoForSession(
-  repos: Record<
-    string,
-    | {
-        data?: { branches?: Array<{ name?: string; worktree?: { path?: string } | undefined }> }
-        ui: {
-          preferredWorkspacePaneTabByTarget: Record<string, WorkspacePaneTabType>
-        }
-      }
-    | undefined
-  >,
+  repos: Record<string, WorkspaceSessionRepoProjectionWithUi | undefined>,
   order: string[],
   workspacePaneTabsByTargetByRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>>,
 ): Record<string, Record<string, WorkspacePaneSessionTabType>> {
@@ -51,13 +57,7 @@ export function persistedPreferredWorkspacePaneTabByTargetByRepoForSession(
 }
 
 export function persistedWorkspacePaneTabsByTargetByRepoForSession(
-  repos: Record<
-    string,
-    | {
-        data?: { branches?: Array<{ name?: string; worktree?: { path?: string } | undefined }> }
-      }
-    | undefined
-  >,
+  repos: Record<string, WorkspaceSessionRepoProjection | undefined>,
   order: string[],
   workspacePaneTabsByTargetByRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>>,
 ): Record<string, Record<string, WorkspacePaneTabEntry[]>> {
@@ -79,20 +79,19 @@ export function persistedWorkspacePaneTabsByTargetByRepoForSession(
 function workspacePaneTabsTargetKeyBelongsToRepo(
   targetKey: string,
   repoRoot: string,
-  repo: { data?: { branches?: Array<{ name?: string; worktree?: { path?: string } | undefined }> } },
+  repo: WorkspaceSessionRepoProjection,
 ) {
   const target = parseWorkspacePaneTabsTargetIdentityKey(targetKey)
   if (!target || target.repoRoot !== repoRoot) return null
-  const branches = repo.data?.branches ?? []
   if (target.kind === 'branch') {
-    return branches.some((branch) => branch.name === target.branchName) ? target : null
+    return repo.branches.some((branch) => branch.name === target.branchName) ? target : null
   }
-  return branches.some((branch) => branch.worktree?.path === target.worktreePath) ? target : null
+  return repo.branches.some((branch) => branch.worktree?.path === target.worktreePath) ? target : null
 }
 
 export function persistedSelectedTerminalSessionIdByTerminalWorktreeForSession(
   selectedTerminalSessionIdByTerminalWorktree: Record<string, string>,
-  repos: Record<string, { data?: { branches?: Array<{ worktree?: { path?: string } | undefined }> } } | undefined>,
+  repos: Record<string, WorkspaceSessionRepoProjection | undefined>,
 ): Record<string, string> {
   const persisted: Record<string, string> = {}
   for (const [terminalWorktreeKey, terminalSessionId] of Object.entries(selectedTerminalSessionIdByTerminalWorktree)) {
@@ -101,7 +100,7 @@ export function persistedSelectedTerminalSessionIdByTerminalWorktreeForSession(
     const [repoRoot, worktreePath] = parts
     if (!repoRoot || !worktreePath || !terminalSessionId) continue
     const repo = repos[repoRoot]
-    if (!repo?.data?.branches?.some((branch) => branch.worktree?.path === worktreePath)) continue
+    if (!repo?.branches.some((branch) => branch.worktree?.path === worktreePath)) continue
     persisted[terminalWorktreeKey] = terminalSessionId
   }
   return persisted

@@ -39,9 +39,7 @@ describe('filetree-session-state', () => {
       },
       {
         '/tmp/repo': {
-          data: {
-            branches: [{ worktree: { path: '/tmp/worktree' } }],
-          },
+          branches: [{ worktree: { path: '/tmp/worktree' } }],
         },
       },
       ['/tmp/repo'],
@@ -62,10 +60,10 @@ describe('filetree-session-state', () => {
     restoreFiletreeViewStateFromSession({
       '/tmp/repo': {
         '/tmp/worktree': {
-        selectedKeys: ['src/index.ts'],
-        expandedKeys: ['src', 'src/web'],
-        topVisibleRowIndex: 120,
-      },
+          selectedKeys: ['src/index.ts'],
+          expandedKeys: ['src', 'src/web'],
+          topVisibleRowIndex: 120,
+        },
       },
     })
 
