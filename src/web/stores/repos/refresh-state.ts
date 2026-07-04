@@ -13,7 +13,7 @@ import {
   startPullRequestDataLoad,
 } from '#/web/stores/repos/repo-data-load-state.ts'
 import { canStartRemoteFetch } from '#/web/stores/repos/sync-state.ts'
-import { stripBranchWorktreeMetadata, worktreeStatesFromBranches } from '#/web/stores/repos/worktree-state.ts'
+import { stripBranchWorktreeMetadata } from '#/web/stores/repos/worktree-state.ts'
 import type { RepoSnapshot } from '#/shared/api-types.ts'
 import type { RepoState, ReposGet } from '#/web/stores/repos/types.ts'
 import type { ExecResult, PullRequestFetchMode } from '#/web/types.ts'
@@ -62,7 +62,6 @@ export function applySnapshotToRepoProjection(r: RepoState, snap: RepoSnapshot, 
   r.data.branches = branches
   r.data.currentBranch = snap.current
   r.data.currentHEAD = snap.currentHEAD
-  r.data.worktreesByPath = worktreeStatesFromBranches(snap.branches, r.data.worktreesByPath, r.data.status)
   r.dataLoads.pullRequestsByBranch = Object.fromEntries(
     Object.entries(r.dataLoads.pullRequestsByBranch).filter(([branch]) => validBranches.has(branch)),
   )

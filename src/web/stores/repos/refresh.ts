@@ -6,7 +6,6 @@ import { isRepoUnavailableReason, markRepoUnavailable } from '#/web/stores/repos
 import { runExclusiveOperation, runLatestOperation } from '#/web/stores/repos/operation-runner.ts'
 import { persistRepoSnapshotCacheEntry } from '#/web/stores/repos/persistence.ts'
 import { runLatestDataLoadOperation } from '#/web/stores/repos/data-load-runner.ts'
-import { applyStatusToWorktreeStates } from '#/web/stores/repos/worktree-state.ts'
 import { pruneRepoBranchPullRequestOperations } from '#/web/stores/repos/repo-operation-scheduler.ts'
 import { runCoreDataRefreshWorkflow, runSnapshotSuccessWorkflow } from '#/web/stores/repos/refresh-workflows.ts'
 import {
@@ -255,11 +254,6 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
         selectDataLoad: (r) => r.dataLoads.status,
         start: (r) => ({ hasData: (getRepoStatusQueryData(r.id, r.instanceId)?.length ?? 0) > 0 }),
         task: (signal) => getRepoStatus(id, signal),
-        applyResult: (r, status) => {
-          r.data.status = status
-          r.data.statusLoaded = true
-          r.data.worktreesByPath = applyStatusToWorktreeStates(r.data.worktreesByPath, status)
-        },
         onSuccess: (_status, ctx) => {
           if (ctx.isCurrent()) setRepoStatusQueryData(id, repoInstanceId, _status)
           const repoAfterStatus = get().repos[id]
@@ -318,9 +312,6 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
           if (ctx.isCurrent()) setRepoBulkReadQueryData(id, repoInstanceId, ['snapshot', 'status'], result)
           // Apply status first (leaf, no follow-up).
           updateIfFresh(set, id, repoInstanceId, (r) => {
-            r.data.status = result.status
-            r.data.statusLoaded = true
-            r.data.worktreesByPath = applyStatusToWorktreeStates(r.data.worktreesByPath, result.status)
             // The composite started the status data load above but, unlike
             // snapshot which has a dedicated success flow that calls
             // finishDataLoadSuccess, status has no follow-up path. Without

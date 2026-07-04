@@ -18,7 +18,9 @@ import {
   repoSnapshotQueryKey,
   repoStatusQueryKey,
   setRepoSnapshotQueryData,
+  setRepoStatusQueryData,
 } from '#/web/repo-data-query.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import type { WorktreeStatus } from '#/web/types.ts'
 beforeEach(resetRefreshTest)
 
@@ -606,14 +608,14 @@ describe('core refresh request ordering', () => {
 
     resolveSecond(fresh)
     await second
-    expect(useReposStore.getState().repos[REPO_ID]?.data.status).toEqual(fresh)
+    expect(primaryWindowQueryClient.getQueryData(repoStatusQueryKey(REPO_ID, repoInstanceId))).toEqual(fresh)
 
     resolveFirst([{ path: '/repo', isMain: true, entries: [{ x: 'M', y: ' ', path: 'stale.ts' }] }])
     await first
-    expect(useReposStore.getState().repos[REPO_ID]?.data.status).toEqual(fresh)
+    expect(primaryWindowQueryClient.getQueryData(repoStatusQueryKey(REPO_ID, repoInstanceId))).toEqual(fresh)
   })
 
-  test('refreshStatus updates normalized worktree dirty metadata', async () => {
+  test('refreshStatus updates normalized worktree dirty metadata in the branch read model', async () => {
     const repoInstanceId = seedRepo([
       branch('feature/cleaned', undefined, {
         worktree: {
@@ -658,7 +660,8 @@ describe('core refresh request ordering', () => {
 
     await useReposStore.getState().refreshStatus(REPO_ID, { repoInstanceId })
 
-    const worktreesByPath = useReposStore.getState().repos[REPO_ID]?.data.worktreesByPath
+    const repo = useReposStore.getState().repos[REPO_ID]!
+    const worktreesByPath = readRepoBranchQueryProjection(repo)?.worktreesByPath
     expect(worktreesByPath?.['/tmp/worktree-cleaned']).toMatchObject({
       isDirty: false,
       changeCount: 0,
@@ -700,10 +703,9 @@ describe('core refresh request ordering', () => {
       ],
       'repo-instance-test',
     )
-    updateRepoForTest((repo) => {
-      repo.data.status = [{ path: '/tmp/worktree-a', branch: 'feature/a', isMain: false, entries: [] }]
-      repo.data.statusLoaded = true
-    })
+    setRepoStatusQueryData(REPO_ID, repoInstanceId, [
+      { path: '/tmp/worktree-a', branch: 'feature/a', isMain: false, entries: [] },
+    ])
     ipcHandlers['repo.snapshot'] = async () => ({
       branches: [
         branch('feature/a', undefined, {
@@ -721,13 +723,14 @@ describe('core refresh request ordering', () => {
 
     await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
 
-    expect(useReposStore.getState().repos[REPO_ID]?.data.worktreesByPath['/tmp/worktree-a']).toMatchObject({
+    const repo = useReposStore.getState().repos[REPO_ID]!
+    expect(readRepoBranchQueryProjection(repo)?.worktreesByPath['/tmp/worktree-a']).toMatchObject({
       isDirty: false,
       changeCount: 0,
     })
   })
 
-  test('snapshot refresh stores worktree state outside branch state', async () => {
+  test('snapshot refresh stores worktree state in the branch read model', async () => {
     const repoInstanceId = seedRepo([branch('feature/a')])
     ipcHandlers['repo.snapshot'] = async () => ({
       branches: [
@@ -748,7 +751,7 @@ describe('core refresh request ordering', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.data.branches[0]?.worktree).not.toHaveProperty('summary')
-    expect(repo?.data.worktreesByPath['/tmp/worktree-a']).toMatchObject({
+    expect(repo ? readRepoBranchQueryProjection(repo)?.worktreesByPath['/tmp/worktree-a'] : undefined).toMatchObject({
       isDirty: true,
       changeCount: 3,
     })
@@ -867,7 +870,7 @@ describe('core refresh request ordering', () => {
       resolvers[3]?.(fresh)
       await works[4]
 
-      expect(useReposStore.getState().repos[REPO_ID]?.data.status).toEqual(fresh)
+      expect(primaryWindowQueryClient.getQueryData(repoStatusQueryKey(REPO_ID, repoInstanceId))).toEqual(fresh)
     } finally {
       resolvers[1]?.([])
       resolvers[2]?.([])
@@ -979,7 +982,8 @@ describe('core refresh request ordering', () => {
         repoRoot: REPO_ID,
       }),
     ])
-    const worktreesByPath = useReposStore.getState().repos[REPO_ID]?.data.worktreesByPath
+    const repo = useReposStore.getState().repos[REPO_ID]!
+    const worktreesByPath = readRepoBranchQueryProjection(repo)?.worktreesByPath
     expect(worktreesByPath?.['/tmp/stale-worktree']).toBeUndefined()
     expect(Object.keys(worktreesByPath ?? {}).sort()).toEqual(['/repo', '/tmp/worktree-a'])
   })
