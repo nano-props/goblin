@@ -216,12 +216,6 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
         ),
       )
       await placeholderReady
-      const restoreError =
-        failedOpenEntryIds.size > 0
-          ? new Error('session repo restore failed')
-          : workspacePaneRestoreFailed || unresolvedPreferredRestoreRepoIds(get().repos, workspacePaneRestoreState).length > 0
-            ? new Error('workspace pane preferred tab restore failed')
-            : null
       // Flip sessionReady unconditionally once placeholders are ready.
       // With open repositories, the boot skeleton (shown only when no activeId) gives
       // way to a real workspace immediately — the per-repo body keeps
@@ -242,6 +236,12 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
         return { activeId, sessionReady: true }
       })
       await probeWork
+      const restoreError =
+        failedOpenEntryIds.size > 0
+          ? new Error('session repo restore failed')
+          : workspacePaneRestoreFailed || unresolvedPreferredRestoreRepoIds(get().repos, workspacePaneRestoreState).length > 0
+            ? new Error('workspace pane preferred tab restore failed')
+            : null
       if (restoreError) throw restoreError
     },
   }

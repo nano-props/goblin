@@ -227,8 +227,7 @@ export function setRepoBulkReadQueryData(
 ): void {
   const included = include ?? ['snapshot', 'status', 'pullRequests']
   queryClient.setQueryData(repoBulkReadQueryKey(repoRoot, repoInstanceId, include), result)
-  if (included.includes('snapshot')) {
-    if (!result.snapshot) throw new Error(`repo snapshot read result unavailable for repo: ${repoRoot}`)
+  if (included.includes('snapshot') && result.snapshot) {
     setRepoSnapshotQueryData(repoRoot, repoInstanceId, result.snapshot, queryClient)
   }
   if (included.includes('status')) {
